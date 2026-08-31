@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 690 rules `[generated]`
+## Index — 706 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2248,19 +2248,16 @@ which is the dangerous part — it looks like evidence of absence.
 ## 2026-08-21 — A CONDITIONAL LOCAL IMPORT SHADOWS FOR THE WHOLE FUNCTION
 
 - **Rule: a conditional local import binds that name local for the ENTIRE function, so every branch that does NOT run the import raises `UnboundLocalError`.** An UNCONDITIONAL local import at the top of a function is harmless — it always runs before any use. Only the conditional one is a trap.**
-
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-21 — A NULL RESULT NEEDS A NEGATIVE CONTROL BEFORE IT IS EVIDENCE
 
 - **Rule: run the control on something known-good before an absence counts.**
-
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-21 — A DOCSTRING DESCRIBES INTENT; THE CODE DESCRIBES BEHAVIOUR
 
 - **Rule: where a comment and the writer disagree, the writer wins.**
-
 - *(evidence in `learnings_evidence.md`)*
 
 ## 08-21 A KILLED PROCESS IS NOT A KILLED PIPELINE — `pkill` on the child leaves the wrapper running with STALE ARGS
@@ -2342,7 +2339,6 @@ when it is not.
 ## 2026-08-21 — FORBIDDEN: explaining a local failure with a LOCAL cause when the same code runs in production
 
 - **Rule: a cause that conveniently quarantines a failure to the machine you are standing on deserves more scepticism than a cause that implicates production, not less** — the two are not symmetric, because only one of them lets you ship.**
-
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-21 — READ THE TTL BEFORE BREAKING A LOCK. The force bought 12 minutes.
@@ -3135,92 +3131,8 @@ interesting one.**
 
 ## 2026-08-25 — GitHub Actions CI results are not this repo's source of truth
 
-**User, direct instruction: "ignore the CI results, just keep pushing
-normally."** Said in response to "we don't use github actions anymore" — a
-claim I VERIFIED rather than took on faith (per the notification-handling
-rule to check anything surprising against a primary source) and found
-false in the narrow, mechanical sense: `.github/workflows/ci.yml` is
-enabled and fires on every push/PR event exactly as configured (confirmed
-live, `mcp__github__actions_list`, runs created and completing within the
-same minute as pushes made this session, 40 total runs on the repo). The
-user's real point survived the verification anyway: whatever fires there is
-not what this repo relies on to decide a change is good.
-
-**RULE:** treat `check_run`/`workflow_run` events on a Syndicate PR as noise,
-not as signal. Do not open the job logs, do not diagnose a `pytest-baseline`
-or `test` job failure, do not hold a push waiting for a check to go green,
-and do not report a PR as "CI is red" as if that were an open question this
-repo needs answered. Push and merge on the same basis this repo already
-uses everywhere else in `CLAUDE.md`: targeted local test runs for the
-actual diff, the lane ledger, and (for anything that reaches Render)
-production reads via `.syndicate/deploys.md` -- never a GitHub Actions
-badge.
-
-**What this does NOT change:** `.github/workflows/ci.yml` itself, and this
-session's own 2026-08-25 work parallelizing its `pytest-baseline` job
-(`.syndicate/scope_2026-08-25_ci_pytest_parallelization.md`), are still
-valid, still committed, and still fine to leave in the repo -- the rule
-above is about what to DO with the results it produces, not about deleting
-or reverting the mechanism. A PR's mergeability (conflicts, human review
-threads) is still worth watching; only the CI-check dimension of "drive to
-green" stops applying here.
-
-### 2026-08-25 — FORBIDDEN: report a real-money code-default change as "done" without reading the live service's actual env vars. A contradicting override wins silently
-
-- What we believed: changing `execution_guard.py`'s code defaults (bankroll,
-  per-venue day-dollar caps, max order size, order-count caps) to match the
-  user's stated real policy, plus 427 passing tests, was the fix. Reported it
-  as complete.
-- What was actually true: `live-odds-worker` already had explicit env-var
-  overrides (`SYNDICATE_EXECUTION_MAX_DAY_DOLLARS=40` flat for both venues,
-  `_ALL_VENUES=80`) that outrank ANY new code default under this file's own
-  env>default precedence. The service was still running the OLD "$40/day,
-  survive-being-wrong" policy after the code change merged — the new defaults
-  were completely inert for the two live venues.
-- How we found out: the user asked "these were set as environment variables —
-  are you sure this is set correctly now?" instead of accepting the report.
-  Read `live-odds-worker`'s actual production logs
-  (`[execute_portfolio] LIMITS ... caps={...}`) via the Render MCP server and
-  found the drift directly, before/after.
-- The rule going forward: **a code-default change to a file whose whole design
-  is "env var wins over default" is not verified by the diff or the test
-  suite — it is verified by reading the live service's actual resolved
-  values.** For Syndicate specifically: `mcp__Render__list_logs` on the
-  relevant service, filtered to the module's own log line, is the read; there
-  is no env-var-listing tool, so log lines that print the resolved config
-  (this file's `LIMITS`/`EXECUTION` lines) are the only way to see what a
-  service is actually running without one.
-- Cost: none — caught before any real order was placed under the wrong caps,
-  and only because the user asked rather than accepted the report.
-
-### 2026-08-25 — FORBIDDEN: rename a lane's header status away from the literal word "OPEN" without checking what that silently releases
-
-- What we believed: rewording a lane's header from `OPEN` to a descriptive
-  status like `GOAL COMPLETE, lane idle` was a harmless, purely cosmetic
-  checkpoint edit — the lane's Files: claims were untouched text, so surely
-  the claims themselves were untouched too.
-- What was actually true: `check_lane_invariants.py` (and, by the same
-  `OPEN_RE = re.compile(r"\bOPEN\b")` pattern, several sibling scripts —
-  `archive_released_lanes.py`, `audit_lane_unguarding.py`,
-  `hoist_open_lanes.py`) recognize a lane's claims as live ONLY if the literal
-  word `OPEN` appears in its header. Dropping that one word silently voided
-  EVERY claim the lane held — not just the one file being reconsidered, but
-  six unrelated, still-legitimately-owned modules in the same block.
-  `trim_lane_blocks.py` then read the now-claim-free block as eligible to
-  leave `lanes.md` entirely, compounding it.
-- How we found out: ran `check_lane_invariants.py` after the rewording as a
-  sanity check (not required, done out of caution) and saw the OPEN-lane
-  count drop by one and the claim count drop by dozens — traced to the
-  regex, not to any Files: line actually being edited.
-- The rule going forward: **a lane's header keeps the literal word `OPEN` for
-  as long as it holds ANY claim it intends to keep enforced**, however done
-  or idle the work described in the body is. To retire a specific claim while
-  the lane stays open, strike through that one file with an explicit release
-  note (the convention already used elsewhere in this file) — never rename
-  the whole lane out of `OPEN` as a shortcut. Only drop `OPEN` once every
-  claim is explicitly released one at a time.
-- Cost: none — caught by running the invariant checker before committing,
-  not after.
+- The rule going forward: **a code-default change to a file whose whole design is "env var wins over default" is not verified by the diff or the test suite — it is verified by reading the live service's actual resolved values.** For Syndicate specifically: `mcp__Render__list_logs` on the relevant service, filtered to the module's own log line, is the read; there is no env-var-listing tool, so log lines that print the resolved config (this file's `LIMITS`/`EXECUTION` lines) are the only way to see what a service is actually running without one.
+- *(evidence in `learnings_evidence.md`)*
 
 ## A null result from a QUERY is not a null result from the SYSTEM `[2026-08-26]`
 
@@ -3419,208 +3331,52 @@ says.
 
 ## 2026-08-26 — FORBIDDEN: treating ARITHMETIC ON A DERIVED FIELD as a measurement
 
-**A number you computed from another stored number is not evidence about the
-world. Dividing it back out recovers your own input, and it will look like a
-reading.**
-
-**MEASURED, and it produced a wrong finding reported to the user as fact.**
-Investigating a Polymarket order that appeared mispriced, I wrote:
-
-    IMPLIED PRICE PAID = fill_stake / contracts = 4.05 / 7.11 = 0.5696
-
-and concluded *"a real overpay, not a reporting artifact."* It is not a
-measurement of anything. `execution_ledger.py:996`:
-
-    filled_dollars = contracts * fill_price
-
-`fill_stake_dollars` IS `contracts x fill_price`, so dividing by `contracts`
-returns `fill_price` — the very field under suspicion — with the appearance of
-independent corroboration. `venue_order_view` sets `"fill_cost_dollars": None`,
-so **NOTHING in this system independently measures what was paid.** The correct
-statement was "the ledger RECORDS 0.57 and nothing here can tell us what was
-paid", which is a different investigation with a different next step.
-
-**HOW TO APPLY.** Before using a stored number as evidence, find its WRITER. If
-it was computed from another field in the same record, it can corroborate
-nothing about that field, and any ratio between them is an identity. Reach for
-an input the system did not compute: the SUBMITTED value, the venue's own cash
-field, a second service's copy. The check that finally worked here compares the
-recorded fill against the price WE SENT — an independent input — and is the
-`FILL_ABOVE_LIMIT` guard.
-
-**THE SAME SESSION, THE SAME SHAPE, THREE MORE TIMES**, which is why this is a
-rule and not a note:
-
-- **A guard that "needs no venue semantics" but silently picks a side.** I built
-  a cross-check between `_side_to_outcome` (name axis) and
-  `outcome_side_for_index` (POSITIONAL) and claimed it was semantics-free. It
-  makes the positional reading authoritative — precisely the disputed question —
-  and it contradicted three deliberate tests asserting the opposite convention.
-  Reverted before landing. **A cross-check between two readings is not neutral;
-  it enthrones one of them.**
-- **A background run that exited 0 having never run.** `pytest -k ...` returned
-  exit 0 with 110KB of output and NO summary line: the process never collected a
-  test. Exit status described the shell, not the suite.
-- **A watcher that "found" the thing by matching the wrong string.** Searching
-  logs for `SETTLED` matched `settled_count` inside `INTEL_TRACE`, reporting
-  "11 settlement passes" when zero had run. The filter had to require
-  `SETTLED date=`.
-
-Related: [[feedback_read_the_field_you_already_have]],
-[[feedback_confirm_the_code_ran]], [[feedback_instrument_blindness]],
-[[feedback_rate_not_count]].
+- **A number you computed from another stored number is not evidence about the world. Dividing it back out recovers your own input, and it will look like a reading.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-26 — FORBIDDEN: concluding a VENUE must act because its error names your account
 
-**`user_not_found: <uuid>` from a venue is a statement about a REQUEST, not about
-your account's existence.** I read it as "the exchange has no record of us here,
-so the venue must enable us", shipped that as the remedy, and it went LIVE IN A
-PRODUCTION ERROR STRING telling any reader to contact Kalshi support:
-
-    "the market resolved and the ACCOUNT did not. This needs the venue to enable
-     this account on that exchange shard; no code change fixes it."
-
-**It was never the venue's move.** The user challenged it; reading the venue
-instead of restating the conclusion took minutes.
-`GET /trade-api/v2/exchange/status` enumerates shards as PRODUCTS — `0 Default`,
-`1 Combos`, `2 Crypto`, `3 Tennis & Baseball` — ALL `trading_active`, and
-docs.kalshi.com/getting_started/exchange_sharding.md says plainly: *"Subaccount
-balances are local to a specific exchange instance"* and *"Programmatic traders
-must preallocate collateral on a given exchange shard before order placement."*
-A one-minute transfer by the account holder. It was fixed the same hour.
-
-**HOW TO APPLY.** Before asserting that a counterparty must act, read what the
-counterparty documents about the thing it just refused. The diagnosis and the
-REMEDY are two claims; evidence for the first is not evidence for the second,
-and the remedy is the half that gets pasted into an error message and sends
-someone to the wrong place for a day. Related:
-[[feedback_retraction_is_not_innocence]], [[feedback_presence_is_not_reachability]].
-
----
+- **`user_not_found: <uuid>` from a venue is a statement about a REQUEST, not about your account's existence.** I read it as "the exchange has no record of us here, so the venue must enable us", shipped that as the remedy, and it went LIVE IN A PRODUCTION ERROR STRING telling any reader to contact Kalshi support:
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-26 — An empty log query is not evidence of absence until the query shape is known to match
 
-Lane `layer2-sim-view-and-live-projection`, session `e47e1b67`.
-
-**OVERTURNED:** that a null result from the Render log `text` filter means the
-line is not there.
-
-Passing ONE string containing `|` alternation (`["A|B|C"]`) matches it
-LITERALLY and returns nothing. The working form is a LIST of separate strings
-(`["A","B","C"]`). I used the correct form early in the session, switched to the
-broken one, and twice reported `GAME_CHIPS_PUBLISHED` missing while it was
-present — one step from investigating a publish failure that had not happened.
-
-The tell: `["layer2_shortlist"]` returned health lines in the SAME window where
-the alternation query returned null. **Before concluding absence, confirm the
-query returns something you already know is there.**
+- **OVERTURNED:** that a null result from the Render log `text` filter means the line is not there.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-26 — A before/after comparison where both sides are the same tree always agrees
 
-Same lane. I "confirmed" three failures were pre-existing by running `git stash`
-on an already-clean tree — which stashed nothing — so the "before" run was the
-same commit as the "after" run and produced an identical result that looked like
-proof. Caught only because `git stash pop` reported "No stash entries found".
-
-**Use a detached worktree at the parent commit** (`git worktree add --detach
-<path> <sha>~1`), which cannot silently be the same tree. Done correctly later
-the same session for `test_it_cannot_downgrade_a_started_match`.
+- **Use a detached worktree at the parent commit** (`git worktree add --detach <path> <sha>~1`), which cannot silently be the same tree. Done correctly later the same session for `test_it_cannot_downgrade_a_started_match`.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-26 — One shared method, two callers wanting different answers: check the OTHER caller
 
-Same lane, twice in one day, and the second instance was my own regression.
-
-`#542` widened `provider.games()` to two matchdays to fix the board's chip
-coverage. `games()` is ALSO the home rail's source, which renders everything it
-is given — the rail went **98 -> 210 games** with a count badge claiming 210
-today. Nothing failed; no test covered it; I found it only when a later task
-made me read the call graph.
-
-Identically, `_SOCCER_VENDOR_NAME_ALIASES` has two consumers: `teams_match`
-falls through to heuristics, `canonical_team` is map-only. A club can join
-fixtures fine and still return None for a chip key — so an entry that an
-existing test calls redundant can be load-bearing.
-
-**Before changing a shared resolver, enumerate its callers and state what each
-one needs.** The fix in both cases was to make the difference EXPLICIT
-(`include_upcoming`; the two-resolver rule in the invariant), not to pick one
-caller's answer and hope.
+- **Before changing a shared resolver, enumerate its callers and state what each one needs.** The fix in both cases was to make the difference EXPLICIT (`include_upcoming`; the two-resolver rule in the invariant), not to pick one caller's answer and hope.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-26 — "Done" before the sweep returns is a claim about the future
 
-Same lane. I reported the NFL fix complete while the regression sweep was still
-running; it then failed FOUR tests I had caused — three in my own `#542` file,
-which asserted the behaviour `#575` deliberately made opt-in. The measurements I
-quoted were real; the completion claim was not. Same shape as the alternation
-query: **acting on a result before confirming the method behind it.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-26 — `-k` chosen by TOPIC misses the files you edited
 
-Same lane. I ran `-k "chip or scoreboard or ..."` and reported a clean surface
-— but the change edited `pipeline/intelligence_state.py` and
-`syndicate/blueprints/home.py`, whose tests that selector never ran. Three more
-failures existed there (all pre-existing, verified). Earlier the same day `#539`
-shipped with a guard test a `-k` filter had skipped.
-
-**Choose `-k` from the FILES TOUCHED, not the topic being worked on.**
+- **Choose `-k` from the FILES TOUCHED, not the topic being worked on.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-26 — An estimated window is one sample until you measure the spans
 
-Same lane. I called a board build "past its window" at 16 minutes, from a single
-prior run where `candidate_collection_with_fallback` took 222s. That run it took
-**447s** and the build was healthy throughout.
-
-**`BUILD_SPAN_ENTER`/`BUILD_SPAN_EXIT` distinguishes SLOW from STUCK; elapsed
-time against a remembered number does not.** Also relevant: the worker restarted
-five times in two hours from other sessions' deploys, and two instances never
-reached the shortlist stage at all — so an absent line had a cause entirely
-outside the change under test.
-
+- **447s** and the build was healthy throughout.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-26 — FORBIDDEN: TWO HOSTS ARE NOT ONE VENDOR, and "X can reach ESPN" is not a fact about X
 
-**A success against one hostname says nothing about another hostname, even when
-both belong to the same provider and serve the same path.**
-
-`WNBA_LIVE_BOX_CAPTURED date=2026-08-25 games=3 players=66` -- web fetching from
-ESPN, succeeding. I read that as *"web can reach ESPN"*, routed a producer
-through web on the strength of it, deployed, and got:
-
-    {"ok":false,"error":"HTTPError: HTTP Error 403: Forbidden","games":0}
-
-The capture uses `site.web.api.espn.com` (summary). My call used
-`site.api.espn.com` (scoreboard). **One of those answers Render and the other
-does not.** Both serve both paths, so the fix was a one-line host swap -- but
-only after a wasted deploy, because the evidence I had was about a DIFFERENT
-HOST than the one I was using.
-
-**HOW TO APPLY.** Before citing a past success as proof a hop works, compare the
-HOSTNAME, not the vendor. Write the host into the claim: "web reaches
-`site.web.api.espn.com`" is checkable; "web can reach ESPN" is not. Same rule as
-[[feedback_presence_is_not_reachability]] one level down -- the route is not the
-provider.
+- **A success against one hostname says nothing about another hostname, even when both belong to the same provider and serve the same path.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-26 — FORBIDDEN: assuming an artifact "published to production" is where its CONSUMER reads
 
-**`POST /api/ops/artifacts/publish` writes `data_root() / relative_path` on
-WEB'S FILESYSTEM.** `bet_status_wnba` reads the same relative path through
-`read_text_file`, i.e. the KEYVALUE store, on REFRESH-WORKER. Same string, two
-stores, two services.
-
-I published 84 backfilled boxscore files, verified them with
-`/api/ops/artifacts/export` (which reads the same filesystem, so it agreed), and
-reported production coverage restored. **Settlement cannot see any of them.**
-The verification was circular: I checked the store I had just written to.
-
-**HOW TO APPLY.** An artifact has a WRITER and a READER and they must be shown
-to use the SAME store, not the same path string. `_keyvalue_backed(path)`
-answers it for the state store; the publish endpoint bypasses it entirely. When
-a fix depends on data reaching a consumer, verify from the consumer's side --
-read it back the way the consumer does, on the service the consumer runs on.
-This is the third shape of the same defect in one session, after
-`iterdir`-vs-`read_json_file` (soccer leagues) and web-vs-worker disks.
-Related: [[project_keyvalue_artifact_split_blinds_guards]],
-[[feedback_isolate_the_source_you_changed]].
+- **`POST /api/ops/artifacts/publish` writes `data_root() / relative_path` on WEB'S FILESYSTEM.** `bet_status_wnba` reads the same relative path through `read_text_file`, i.e. the KEYVALUE store, on REFRESH-WORKER. Same string, two stores, two services.
+- *(evidence in `learnings_evidence.md`)*
 
 ## A correct measurement of an unrepresentative case is still a wrong answer
 
@@ -3675,6 +3431,7 @@ deploys — the exact deploy-churn mechanism this lane had just documented.
 ## 2026-08-23 — RULE: editing a fast-appended shared ledger from a stale local copy manufactures a fake conflict
 
 - **Twice in one session, on `.syndicate/deploys.md`.** I read the file, appended a new section with `Edit`, committed, pushed, opened a PR — and GitHub reported "Pull Request has merge conflicts" on a PURE APPEND with nothing else touched. The cause both times: `main` had moved between my read and my push (this repo runs many parallel sessions appending to the same few ledger files), so my commit's diff was computed against a base that was already behind. A rebase onto `origin/main` then showed the "conflict" for what it was — an EMPTY `- *(evidence in `learnings_evidence.md`)*
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-23 — RULE: an empty tmp dir for `SYNDICATE_NFL_SOURCE_ROOT` can still resolve to the REAL checkout, and a test can write into it
 
@@ -3683,3005 +3440,384 @@ deploys — the exact deploy-churn mechanism this lane had just documented.
 
 ## 2026-08-26 — RULE: a measurement can be REAL and still describe the WRONG POPULATION. State the denominator before you generalise a rate.
 
-**Two instances the same evening, in two different sessions, in opposite
-directions — which is why this is a rule and not an anecdote.**
-
-**Instance 1 (`open-bet-live-status`, `#584`).** Measured off the whole
-portfolio plan artifact: `bet_status` resolved **3 of 442**, `live_marks`
-**82 of 442**. Reported to the user as "the status column will be ~5% useful,
-the marks will populate broadly", and the build was scoped on that. Measured
-again after deploying, on the population the feature actually serves — the OPEN
-LIVE book — **status 81 of 126, marks 18 of 126. The inverse.** The 442-row
-plan is dominated by PAPER SOCCER rows, which have no live resolver and so
-answer `no_live_feed`; the live book is MLB/WNBA-heavy where the resolver
-works. And a game in progress has usually LEFT the board, so the marks thin out
-in exactly the rows where the statuses arrive. Neither number was wrong. The
-denominator was.
-
-**Instance 2 (lane `mlb-chip-live-state`, reported unprompted by that session,
-and it belongs to `todo.md #581`'s VERIFICATION rather than to the fix — the
-error was made while checking the fix, not in it).** "12 wrong on the worker
-path", from four samples that turned out to be **ONE artifact re-read as it
-aged 18.7s → 114.8s**. Three misses counted four times, and all three were
-ordinary artifact age rather than the defect being hunted.
-**Repeated reads of one object are one sample.**
-
-**WHY THIS IS NOT JUST `feedback_rate_not_count`.** That rule says: supply a
-denominator. This one says: **supply the RIGHT denominator, and say what it
-is.** Both instances above HAD a denominator — 442 and 4 — and both were
-quoted with it. The failure was that the population measured was not the
-population the claim was about, and nothing in the phrasing exposed the gap.
-
-**HOW TO APPLY.**
-- Before generalising a rate, write the population down: *"N of M, measured over
-  <what>"*. If the sentence you are about to say is about a different <what>,
-  you do not have the number yet.
-- A plan/board/catalogue artifact is usually a MIXED population (paper and live,
-  every sport, every venue). A feature that serves one slice must be sized on
-  that slice.
-- Repeated observations of one object are one observation. Count distinct
-  objects, not reads.
-- **MAKE THAT STRUCTURAL, NOT A HABIT** (that lane's own point, and it is the
-  mechanical half of this rule). Instance 2's sampler polled
-  `/api/board/game-chips` on a fixed interval and recorded every response, when
-  it should have keyed on the artifact's `published_at` and collapsed reads
-  sharing one. **A rule that depends on someone remembering to check the
-  denominator will fail again; a sampler that cannot emit the duplicate will
-  not.** Where you are building the instrument, dedupe at the source.
-- The cheap check is to re-measure on the real population AFTER shipping and
-  compare. Both instances above were caught that way, not by reasoning.
+- **Two instances the same evening, in two different sessions, in opposite directions — which is why this is a rule and not an anecdote.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-26 — FORBIDDEN: reporting a test as failing on `main` from a session worktree, when its fixture is DERIVED from `data/`. And a stash-and-rerun does NOT isolate it.
 
-**`session_worktree.py open` excludes `data/` by design** (34,690 of 37,745
-tracked files; it is a lossy mirror and never evidence about production). Any
-test whose fixture is BUILT FROM those artifacts therefore fails in a session
-worktree and **looks exactly like a real regression on `main`**.
-
-**MEASURED, twice in one evening, in two sessions that had not spoken yet.**
-
-*This session:* `tests/test_venue_quote_adapters.py` reported 3 failures
-(`no_rows` on every soccer row). Traced: `team_aliases._soccer_alias_to_name()`
-is DERIVED from `data/soccer_source/<league>/.../team_branding/*.csv`, so with
-`data/` absent it builds an **EMPTY** map; `canonical_team("soccer","ars")`
-returns None; `polymarket_board_join._effective_league` classifies a row as
-soccer only when BOTH clubs resolve, so no soccer row could ever match.
-Junctioned the worktree at the primary tree's `data/soccer_source`: **alias map
-0 → 474**, `ars`→arsenal, `che`→chelsea, **all 6 pass**. Nothing was broken.
-
-*Lane `ncaaf-opener-regions-props`, independently:* `40 failed / 397 passed` on
-`-k ncaaf`, from `test_ncaaf_team_registry_reachability` and
-`test_ncaaf_transfer_portal_builder`, both built from
-`data/ncaaf_source/source_artifacts/...`.
-
-**THE METHOD ERROR IS THE POINT, AND IT IS THE EXPENSIVE HALF.** Both sessions
-"confirmed pre-existing" by **stashing their own diff and re-running — in the
-same worktree**. That controls for your CODE and not for your ENVIRONMENT, and
-the environment was the variable that mattered. Both got the same failures at
-HEAD and both concluded, wrongly, that `main` was broken. **A stash-and-rerun
-feels like a control while isolating exactly one axis.** This session then
-repeated the false claim to the user and to two peer sessions before checking.
-
-**HOW TO APPLY.**
-- Before calling ANY test failure pre-existing from a worktree, ask what its
-  fixture is built from. `grep` the failing module for `data/` — directly or
-  through a `_source_root` / `all_teams` / `_alias_to_name` style derivation.
-- The check is cheap and definitive: make the data reachable and re-run. A
-  Windows junction (`New-Item -ItemType Junction`) onto the primary tree's
-  specific subtree takes seconds, or `session_worktree.py open --with-data`.
-- **REMOVE THE JUNCTION AFTERWARDS — AND THEN `git sparse-checkout reapply`.**
-  Two distinct hazards, and the second is the dangerous one:
-  1. While the junction exists, the worktree's `git` sees the primary tree's
-     untracked files and a test that WRITES lands in the real checkout — the
-     2026-08-23 `default_nfl_source_root()` entry above, by another route.
-  2. **Removing it leaves the tree reading as ~150 DELETED tracked files.**
-     Measured here: `session_worktree.py` excludes `data/` via non-cone
-     sparse-checkout (`/*`, `!/data/`), and materialising that path through a
-     junction clears the SKIP_WORKTREE bits — so after deleting the junction
-     `git status` shows ` D` on every path it had touched, and `land` correctly
-     refuses a dirty tree. **`git sparse-checkout reapply` restores it to
-     zero.** Do NOT `git restore data/` (writes 34k files) and do NOT commit
-     past it — that is the 4,993-staged-deletions incident's exact shape.
-- "Same failures with my diff stashed" is a statement about your diff. It is
-  not a statement about `main`. Say the first and do not imply the second.
-
-
-### 2026-08-28 — FORBIDDEN: chaining an EDIT and a COMMIT so that a FAILED edit still commits. The guard fired correctly and the commit ran anyway, taking another session's uncommitted work with it.
-
-Known cousin: [[never chain add and commit]]. This is the same lesson one step
-earlier in the pipeline, and the existing rule did not cover it — I was careful
-about `add`, and committed by explicit pathspec, and it happened anyway.
-
-**The shape.** One Bash call containing, on separate lines:
-
-    python - <<'PY'   ... assert old in s ...  PY      <-- FAILED, AssertionError
-    cat > msgfile <<'EOF' ... EOF && git commit -F msgfile -- fileA fileB
-
-The `assert` did exactly its job: the anchor no longer matched because another
-session had rewritten that part of `lanes.md`. But the statements were newline-
-separated, not `&&`-joined, so the failure printed a traceback and the shell ran
-the commit regardless.
-
-**Why pathspec did not save me.** `git commit -- <paths>` commits the WORKING
-TREE version of those paths. `lanes.md` held 97 lines of another session's
-uncommitted edits (`venue-join-refusal-visibility` transferring a claim, and a
-"DO NOT fire a separate refresh-worker deploy" note from a third lane). I
-committed all of it under a message about NCAAF settlement, having never read
-it. Pathspec bounds WHICH files, never WHOSE CHANGES.
-
-**Caught by arithmetic, not by review.** The commit said `2 files changed, 106
-insertions` for a ten-line constant rename. That mismatch is the whole
-detection: a number far larger than the change I made.
-
-**Repaired** (unpushed, so recoverable): `git reset --soft HEAD~1`, then
-`git restore --staged .syndicate/lanes.md` to return their work to the working
-tree uncommitted, then re-commit my file alone. The index was verified EMPTY
-first — a soft reset stages everything in the commit, so doing it with another
-session's staged work present would have made it worse.
-
-**Rules:**
-1. **Never put an edit and a commit in the same Bash call.** Separate calls, and
-   read the edit's result before committing. `&&` is not enough either — it
-   makes the failure mode quieter, not absent.
-2. **Check the diffstat against the size of the change you made** before
-   accepting a commit. "10 lines edited, 106 committed" is the alarm.
-3. **A file another session is editing is not yours to commit, even by
-   pathspec.** If a shared ledger file is dirty and the dirt is not yours, hold
-   your edit until it is clean rather than adding to it — an edit made now can
-   only be committed by entangling both.
-
-**AMENDMENT to rule 3 `[2026-08-28, session 28195565 — the third lane whose note
-this incident swept up]`. The first half stands; "can only" is FALSE, and it
-matters because it forbids the technique that actually solves this.**
-
-The `"DO NOT fire a separate refresh-worker deploy"` note named above is mine. It
-was an uncommitted working-tree edit when this incident took it. Twenty minutes
-later I committed that same note, by hand, while 91 lines of two other sessions'
-work sat dirty in the same file — and took none of it. **Blob-stage against
-HEAD:**
-
-    git show HEAD:<path>            # build from HEAD, never read the dirty file
-    ...apply your hunk to that text...
-    BLOB=$(git hash-object -w tmp)
-    git update-index --cacheinfo 100644,$BLOB,<path>
-
-The index entry becomes `HEAD + your hunk`. The working tree is never written to,
-so the other sessions' edits survive untouched and still uncommitted. Verified
-before committing: **22 insertions, 0 deletions, one hunk**, and every added line
-mine. Their 91 lines were still dirty afterwards. See `[[shared-tree commit
-recipes]]`, which already carried this recipe.
-
-**Rule 2 is what makes it safe, and it is not optional here** — blob-staging is
-precisely the operation where a miscomputed blob would commit a silent revert of
-someone's work. `git diff --cached --numstat` before every such commit, and
-confirm the added lines are yours.
-
-**Choose by whether you can wait.** Holding until clean is still the better
-default — it needs no plumbing and cannot go wrong. Blob-stage when the edit is
-load-bearing now and the file may not go clean soon: mine said "do not fire a
-second deploy", which was worth nothing after someone had fired one. Waiting
-would have been the wrong call, and rule 3 as written prescribes waiting.
-
-**A note that is committed is not therefore intact.** After the sweep and the
-`reset --soft` repair, I re-read the file and counted: `RIDES ALONG` appears
-**exactly once**, all three of its sections present, my lane block whole. A
-round trip through someone else's commit and an undo is a plausible place to
-lose or double a block, and the count is cheap.
+- **`session_worktree.py open` excludes `data/` by design** (34,690 of 37,745 tracked files; it is a lossy mirror and never evidence about production). Any test whose fixture is BUILT FROM those artifacts therefore fails in a session worktree and **looks exactly like a real regression on `main`**.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: treating a refuted MECHANISM as a refuted OBSERVATION. I disproved my own theory of how a wrong-side fill happened, and used that to dismiss the fill.
 
-**THIS ENTRY REPLACES THE ONE THAT STOOD HERE FOR SIX HOURS, WHICH WAS WRONG IN
-ITS CONCLUSION AND WOULD HAVE TAUGHT THE NEXT SESSION TO DISMISS A REAL ONE.**
-The superseded version was titled *"FORBIDDEN: escalating a wrong-side money
-alarm on a property the code already handles"* and concluded the alarm was
-false. It was not. Left in the history; do not restore it.
-
-**What happened.** The user reported a filled order, `aec-mlb-az-sf-2026-08-27`,
-board `side=home` (San Francisco), as showing on Polymarket as "Arizona ML".
-
-I found the venue's `outcomes` array reversed relative to its slug, proposed
-that `outcomes[i]` and `outcomePrices[i]` were MISALIGNED, then tested that
-theory properly and refuted it — the totals markets give a sharp test, `under`
-at index 1 priced 0.445 against a planned 0.4444 where misalignment would read
-Over's ~0.555. Alignment proven at both indices.
-
-**Then I concluded the fill was fine.** That step is the defect. Disproving my
-own mechanism said nothing about the user's observation, which never depended on
-my theory being right.
-
-**The truth, established by a parallel session and verified here:** SF won 6-1
-(MLB StatsAPI, `Arizona Diamondbacks 1 @ San Francisco Giants 6`, Final,
-`home_win=True`). The venue graded the order **lost**, pnl **-5.871** — exactly
-our cost basis — with `held_side=POSITION_RESOLUTION_SIDE_SHORT`. Across the
-settled ledger: polymarket h2h **5 agree, 3 MISMATCH**; polymarket totals 9/0;
-kalshi totals 4/0. A coin flip on h2h, and the totals path is immune only
-because it resolves by NAME (`over`->YES) where h2h has no name to fall back on.
-
-**THE CONFLATION THAT MADE IT PLAUSIBLE, and it is the reusable part.** There are
-TWO mappings here:
-
-    outcomes[i]  <->  outcomePrices[i]        (alignment)   -- I proved this
-    OUTCOME_SIDE_YES  <->  outcomes[0]        (the binding) -- I assumed this
-
-I proved the first and reported it as evidence about the second. They are
-independent, and only the second was ever in question. My follow-up argument —
-"a 0.38 fill is impossible for Arizona at 0.62" — inherits the same error, since
-it prices the leg using the alignment I proved rather than the binding I did
-not.
-
-**Rules:**
-1. **Refuting your own explanation is not refuting the report.** When a proposed
-   mechanism dies, the observation returns to unexplained — NOT to explained-away.
-   Say "I no longer know why" and keep the alarm open.
-2. **Name the mappings before claiming one is proven.** Write them down as
-   separate lines. Two adjacent index-keyed relations look like one fact and are
-   not.
-3. **A person looking at the venue outranks inference from our own logs, because
-   our logs cannot contain the answer.** The order row carries no outcome NAME —
-   measured keys are `action, avgPx, ..., marketSlug, outcomeSide, price, ...` —
-   so reading an order back only ever echoes the side we sent. When the only
-   independent observer is a human, their reading is the evidence, not the thing
-   to be explained away.
-4. **A settled ledger beats every live-price argument.** Three lines of
-   `held_side` and pnl against the real result ended a question that hours of
-   price reasoning could not. Go to settled outcomes first.
-
-5. **Before calling a venue property a bug, check whether the code's own
-   docstring already names it.** `outcome_side_for_index` did, with its own
-   measured example, one function above the line being read.
-6. **Rank candidate tests by SEPARATION before running them.** The moneyline
-   comparison separates by ~0.04 and read as inconclusive; the totals comparison
-   separates by ~0.11 and was decisive, in the same log window.
-
-*(5 and 6 are restored from the superseded entry at the request of the session
-that found the real defect. They were good rules, they are not what failed, and
-dropping them was over-correction — the failure was one inference step, not the
-whole entry.)*
-
-**WHY THE HEADING WAS REPLACED ANYWAY, having kept the body.** That session
-argued for amending rather than retracting. Half right, and the half that is not
-is the heading specifically: the session-start digest surfaces STANDING RULES
-**as headings only**. A heading reading *"FORBIDDEN: escalating a wrong-side
-money alarm"* is therefore the most-read and least-qualified sentence in the
-entry, and it told the next session not to escalate the exact class of report
-that was correct. A rule whose body is right and whose title is wrong is worse
-than no rule, because the title is what survives compression.
-
-**A FOURTH CORROBORATION, and the cleanest, because it needs no team-name
-reasoning at all.** Measured 2026-08-28T15:07:31Z by the same session — four
-sibling futures in ONE catalogue response:
-
-    tec-mlb-nlchamp-2026-09-27-nym   outcomes=["Yes","No"]
-    tec-mlb-champ-2026-09-27-ath     outcomes=["Yes","No"]
-    tec-mlb-nlchamp-2026-09-27-atl   outcomes=["No","Yes"]   <-- reversed
-    tec-mlb-champ-2026-09-27-atl     outcomes=["Yes","No"]
-
-The outcomes are literally the strings "Yes" and "No", listed NO-first on 1 of
-4. No alias, no nickname, no slug to misread — the array simply is not
-YES-first, and any positional rule over it is a coin flip by construction.
-
-**THE VENUE NAMES ITS OWN YES LEG, and it is NOT wired yet — deliberately.**
-`marketSides[].long` with `.team.name` is a NAME rule of the same shape that
-makes totals immune. But only the FIRST `marketSides` entry has been observed (a
-400-char log truncation), so "long == YES" is still an INFERENCE, and the
-sequence in `todo.md #595` is: widen the log to both sides, persist a derived
-`yes_outcome` string (not `marketSides` itself — ~6.7MB against an 8MB ceiling),
-then score it against the 8 venue-settled moneylines where ground truth exists,
-INCLUDING the 3 that went the wrong way. A rule that predicts all 8 is proven on
-real money; anything less is a better-sourced guess. **Do not wire it early.**
-
-**Still true from the superseded entry, and worth keeping:** the outcomes array
-being reversed relative to the slug means nothing on its own — `lad-atl` carries
-its outcomes in slug order and `az-sf` does not — because outcomes order is not
-slug order and `outcome_side_for_index`'s own docstring says so. That part was
-a genuine dead end. And the cost of a WRONG fix here is still the bug itself,
-so the correct response remains a named REFUSAL of `home`/`away` on this venue
-until the YES leg can be read by name, not a flip of
-`_YES_OUTCOME_INDEX_DEFAULT`.
+- **THIS ENTRY REPLACES THE ONE THAT STOOD HERE FOR SIX HOURS, WHICH WAS WRONG IN ITS CONCLUSION AND WOULD HAVE TAUGHT THE NEXT SESSION TO DISMISS A REAL ONE.** The superseded version was titled *"FORBIDDEN: escalating a wrong-side money alarm on a property the code already handles"* and concluded the alarm was false. It was not. Left in the history; do not restore it.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — FORBIDDEN: pushing past a ledger checker's warning because its output "looks like the usual noise". A WARNING THAT IS USUALLY WRONG GETS TRAINED OUT — and two sessions proved it independently on the same night
 
-- **What we believed.** `session_worktree.py land` prints `ledger/todo ids
-  PROBLEMS   (run scripts/todo_id_reconcile.py)` and pushes anyway. Both
-  sessions active on 2026-08-26 read that line as known background — the
-  reconciler's `REVIEW` section lists twelve ancient ids (`#65`–`#81`) that have
-  been unmatched for weeks, so the warning is *usually* about nothing.
-
-- **What was actually true.** The same output also said `DUPLICATED in todo.md
-  -- 1 id(s) declared more than once: #581: 2 item headers`. Lane
-  `mlb-chip-live-state` and lane `open-bet-live-status` had both taken `#581`
-  within about half an hour, and both had landed it. Four pushes went past the
-  warning before anyone read it. The list's own rule is that ids are stable and
-  never reused, so two items sharing one number breaks every cross-reference to
-  it.
-
-- **How we found out.** By finally running the tool the warning names, an hour
-  later, for an unrelated reason. Resolved by ancestry — `merge-base
-  --is-ancestor 23f065d4 f8d8b05f` passes, so the first-landed item keeps the
-  number and the second renumbered to `#584`. **Not by a blanket
-  find-and-replace:** eight files mention `#581`, four belonged to the renumbering
-  lane and four to the other, and one of those four is a correct reference by the
-  renumbering lane's own author to the OTHER lane's item. A `sed` would have
-  broken all four.
-
-- **The rule going forward.** **A checker that emits known-false warnings beside
-  true ones is not a checker, it is noise with an exit code.** Two things follow.
-  (1) When a checker fires, READ ITS FULL OUTPUT before deciding it is the usual
-  thing — "I recognise this warning" is a memory of a DIFFERENT run. (2) Separate
-  the classes at the point that ACTS on the finding: a duplicate declaration should
-  BLOCK, while historical unmatched ids stay advisory. The check that cannot be
-  trained out is the one that only fires when something is wrong.
-
-  **CORRECTED `[2026-08-27, same night]` — this bullet first said the RECONCILER
-  needed the blocking split, and sent the reader to the wrong file.**
-  `scripts/todo_id_reconcile.py` was already correct and already exited 1 on a
-  duplicate; `syndicate-27` proved it by introducing one. The gap was one layer
-  up, in `session_worktree.py`'s `_run_checkers`/`cmd_land`, which printed
-  `PROBLEMS` and pushed anyway — so the entire consequence of a correct finding
-  was a line of text. **Both of us mis-attributed a correct tool's finding to the
-  tool**, which is the same error as the rest of this entry one level out. Fixed
-  in `98d4e119`: `land` now REFUSES on a duplicate id, with
-  `--allow-duplicate-ids` for whoever is fixing it; `missing` and `in both files`
-  still only report, so a pre-existing `#469` does not take everyone's pushes
-  down. Corollary for id assignment
-  specifically: "check both files before taking a number" cannot prevent a
-  simultaneous take, because both sessions check and both see the same maximum.
-  **The check has to be at LAND, not at write.**
-
-- **Cost.** One duplicated id across two lanes, four pushes past a correct
-  warning, and a renumber touching four files after the fact. Nothing shipped
-  wrong and no code was affected — the cost is entirely in the ledger, which is
-  the thing this repo says its context window is not. **Still open, and named
-  because routing around it is not fixing it:** the reconciler prints twelve
-  lines of ancient `#65`–`#81` noise in its unfiltered form, which is what
-  trained both sessions to skim it. Blocking the push stops the damage; it does
-  not make the output readable.
-
-
-### 2026-08-27 — FORBIDDEN: REFUSING A BAD VALUE UPSTREAM OF A COALESCING FALLBACK and calling it fixed. The fallback picks it back up one candidate later, and the fix ships inert
-
-- **What we believed.** `_apply_wnba_live_scores` (`home.py`) was where a
-  SmartSim PROJECTION was leaking into a live score — `GSV 85.43 / CON 68.94` on
-  the Layer 2 chip strip, user-reported. Refuse a fractional value there, stop
-  setting `away["score"]`, done.
-
-- **What was actually true.** `_side_score` (`game_chip_scoreboard.py`) is a
-  COALESCING CHAIN — `container.score`, then `status.<side>_score`, then
-  `score.<side>`, then `<side>_score`, then **`live_state.<side>_pts`**. Not
-  setting `away["score"]` just means the chain falls through one more candidate
-  and finds the same projection in `live_state`, which the fix had not touched.
-  The refusal computed the right answer and changed nothing on screen.
-
-- **How we found out.** A test written against the real production row, before
-  deploying: `test_a_refused_score_does_not_reach_the_chip` failed on its first
-  run with `'85.43' is not None`. Nothing else would have caught it — the unit
-  under change behaved exactly as intended, every other assertion passed, and the
-  served page would have looked identical to the bug.
-
-- **The rule going forward.** Before refusing or sanitising a value, **find every
-  place the consumer can obtain it.** `grep` the field name, not the function you
-  are editing. If the read path is a coalescing chain (`a or b or c`, a `for
-  candidate in (...)` loop, `dict.get` with a fallback), the guard belongs at the
-  CHOKE POINT the chain converges on, not at one of its inputs — and preferably
-  stated as a property of the domain, so a source nobody has written yet is
-  covered too. Here: a fractional value is not a score in any sport this platform
-  carries, so `_score_value` refuses it for every sport and every future feed.
-  Distinct from the existing reachability rules (2026-08-13, 2026-08-25): those
-  ask whether your code RUNS. This one is about code that runs, is correct, and
-  is overtaken by a sibling branch.
-
-- **Cost.** None shipped — caught by a pre-deploy test. Recorded because it was
-  hit three times on one night across two sessions: this one, `#583`'s date
-  filter that built `dateFilteredGames` while the function still returned
-  `gamesList`, and twice more in `ncaaf-opener-regions-props`' own work. The
-  common shape is a correct computation that nothing downstream consumes.
+- **The rule going forward.** **A checker that emits known-false warnings beside true ones is not a checker, it is noise with an exit code.** Two things follow. (1) When a checker fires, READ ITS FULL OUTPUT before deciding it is the usual thing — "I recognise this warning" is a memory of a DIFFERENT run. (2) Separate the classes at the point that ACTS on the finding: a duplicate declaration should BLOCK, while historical unmatched ids stay advisory. The check that cannot be trained out is the one that only fires when something is wrong.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — RULE: a deploy claim serialises SESSIONS. It does not reserve a service against a HUMAN, and an assistant cannot lift the guard from inside a command.
 
-**MEASURED 2026-08-26.** Lane `ncaaf-opener-regions-props` held the
-`refresh-worker` and `live-odds-worker` claims (acquired 22:57:41Z, TTL 2700s,
-so live until 23:42:41Z). At **23:26:02Z** — **16.6 minutes inside the window**
-— both services were deployed to `23f065d4` by the user from their own
-terminal. Nothing refused it, because `.claude/hooks/deploy-guard.py` only
-intercepts an ASSISTANT's Bash calls.
-
-**No harm that time: `23f065d4` was strictly forward of everything live.** The
-hazard is structural, and it is a belief problem rather than a tooling one — the
-holding session believed the service was reserved, and reported to its own user
-that it was.
-
-**A CORRECTION THAT WAS NEARLY WRITTEN THE OTHER WAY ROUND.** That session first
-concluded its claim had already expired and that `deploy_claim.py status` — which
-displayed it as HELD — was the defect. The arithmetic does not support it
-(22:57:41 + 45:00 = 23:42:41 > 23:26:02). **The display was correct.** Filing it
-as a display bug would have left every reader still trusting a claim to reserve a
-service, which is the belief that gets someone hurt on a deploy that is NOT
-strictly forward.
-
-**THE OTHER HALF: an assistant cannot turn the guard off from inside a command.**
-`SYNDICATE_DEPLOY_GUARD=off python scripts/render_deploy.py ...` does NOT work —
-the hook runs in its own process and never sees an inline prefix. Attempted twice
-tonight, refused both times. The remaining routes are forging a preflight receipt
-or POSTing the Render API directly, and **both were declined**: that guard exists
-because a deploy fired 61 seconds after a job started and cancelling it CAUSED
-the restart it was meant to avoid. Both deploys were run by the user from their
-own terminal instead, with the cost of the kill stated first.
-
-**HOW TO APPLY.**
-- A claim tells you no OTHER SESSION will deploy. It tells you nothing about the
-  person at the keyboard. Do not report a service as reserved.
-- Before acting on "my claim was violated", do the arithmetic:
-  `acquired_at + ttl_seconds` against the deploy's `createdAt`. A stale claim and
-  a bypassed live one call for opposite fixes.
-- When the guard blocks you and the user has authorised the deploy, hand them
-  the exact command and state what it kills. Do not route around the hook.
-- After a user-run deploy, **re-read the live SHA on every service** rather than
-  assuming your last deploy is still live. This session told a peer
-  live-odds-worker was on `022583f6` when it had been on `ebfec2ed` for an hour.
+- **MEASURED 2026-08-26.** Lane `ncaaf-opener-regions-props` held the `refresh-worker` and `live-odds-worker` claims (acquired 22:57:41Z, TTL 2700s, so live until 23:42:41Z). At **23:26:02Z** — **16.6 minutes inside the window** — both services were deployed to `23f065d4` by the user from their own terminal. Nothing refused it, because `.claude/hooks/deploy-guard.py` only intercepts an ASSISTANT's Bash calls.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — FORBIDDEN: running `deploy_claim.py` from a session worktree. The claim file is PER-TREE, so nobody else can see it.
 
-**MEASURED 2026-08-27T01:0xZ.** Two `web` claims existed at once, in two files,
-neither aware of the other:
-
-    C:\Users\...\Syndicate\.syndicate\deploy_claims\web.json
-        holder venue-settlement       token 0ddf5e4c...  01:06:32Z
-    C:\tmp\syndicate-sessions\<lane>\.syndicate\deploy_claims\web.json
-        holder open-bet-live-status   token 9d2542ac...  01:07:38Z
-
-`deploy_claim.py` resolves `.syndicate/deploy_claims/` **relative to the tree it
-is run from**, and `session_worktree.py open` gives every lane its own tree. So a
-claim taken from a worktree lands in a directory no other session reads, while
-`deploy-guard.py` and `deploy_preflight.py` — which run under
-`CLAUDE_PROJECT_DIR` — consult the PRIMARY tree's copy.
-
-**Both failure directions are live:**
-- **A claim you cannot see.** Take it from your worktree and every other session
-  reads `web free`. You believe the service is reserved; it is not. This is the
-  same class as the 2026-08-26 finding that a claim does not reserve a service
-  against a human at a terminal — a lock whose holder is the only one who knows
-  it exists.
-- **A claim you cannot release.** `release --token <t>` run from the wrong tree
-  answers `web: no claim to release` and exits 0, leaving the real claim held.
-  Measured here: three "successful" release/acquire cycles moved nothing,
-  because they were all operating on the worktree's copy.
-
-**The guard's `your lane:` line is resolved independently of any of this** — it
-did not match the marker file this session wrote, so aligning the marker did not
-help and the mismatch persisted until the holder name was matched to what the
-guard reported.
-
-**HOW TO APPLY.**
-- **Run every `deploy_claim.py` / `deploy_preflight.py` / `render_deploy.py`
-  from the PRIMARY tree**, with an explicit `cd`. The Bash tool's working
-  directory persists between calls and a `cd` several commands earlier is enough
-  to put you in the worktree without noticing.
-- The tell is `RENDER_API_KEY not set in the environment or .env` — the worktree
-  has no `.env`. Treat that message as "you are in the wrong tree", not as a
-  credentials problem.
-- Before deploying, confirm `deploy claim   held by YOU` in the PREFLIGHT output
-  from the primary tree. An `ACQUIRED` line proves only that some file was
-  written somewhere.
-- If the guard names a lane you do not recognise, acquire under THAT name rather
-  than editing markers to match — the guard's identity resolution is the one
-  that gates the push.
-
----
+- **MEASURED 2026-08-27T01:0xZ.** Two `web` claims existed at once, in two files, neither aware of the other:
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — MEASURED NEGATIVE: the NCAAF advanced-data payload does not close the gap to market
 
-**Do not re-litigate this without new evidence.** The re-fit ran; the answer is
-no. `scripts/refit_ncaaf_smartsim2_payload.py --season 2025 --sims 60`, 714
-games, both arms sharing seeds, ~60 min of compute:
-
-    paired_games            693  (21 skipped: no SP+ rating or no payload)
-    model MAE payload OFF   15.184
-    model MAE payload ON    15.144
-    market MAE, same games  11.854
-    delta ON - OFF          -0.040
-    gap_to_market_ON        +3.290     BAR WAS <= 0
-
-The payload closes **1.2% of the 3.33-point gap to the close.** It would need to
-be ~80x larger to earn a deploy. The bar was fixed BEFORE any results existed,
-deliberately: ON beating OFF is not the test, because a model can improve
-against itself and still lose to the market, and this one does.
-
-**THIS IS A VALID NULL, NOT AN UNFED PIPELINE — that is the load-bearing part.**
-Per-block coverage was 98.6% on the priors-moving blocks (coach_continuity
-714/714, returning_production 704/714, transfer_impact 708/714, roster_depth
-714/714). An EARLIER version of this same harness reported **"100% payload
-coverage"** while `returning_production` and `coach_continuity` were absent for
-EVERY game — the only block present was `roster_depth`, and the aggregate
-"any block" figure hid it at full confidence. Per-block reporting is what makes
-"the features don't help" distinguishable from "the features never arrived".
-Any future re-run MUST print per-block or its null means nothing.
-
-**DO NOT read the -0.040 as directional.** The harness emits no paired SE and
-no t-statistic, so significance is unstated in BOTH directions; at 1.2% of the
-gap this is where paired-seed noise lives. Calling it "a small improvement"
-would be inventing a result the instrument cannot resolve.
-
-**Two instrumentation gaps in this harness, to fix before any re-run:**
-- No progress output anywhere in the sim loop — only early-exit errors and the
-  final report. A 60-minute job whose completion can only be inferred from CPU
-  time. Needs a per-N-games heartbeat.
-- No paired SE / t-stat on `delta_on_minus_off`, which is precisely the number
-  the deploy decision hinges on.
-
-**What this does NOT say:** the wiring is fine. 16/22 fields move, the payload
-is reachable and disk-backed, and `set_snapshot_root` correctly kept the 2025
-re-fit off the 2026 board's snapshots. Building it was right; shipping it as a
-model improvement is not supported. Three blocks remain broken and were never
-part of this test (`defensive_metrics` misrouted, `pace` null at source,
-`player_usage` wrong grain) — fixing those is the only route to a different
-answer, and it is a NEW measurement, not a re-run of this one.
-
----
+- **Do not re-litigate this without new evidence.** The re-fit ran; the answer is no. `scripts/refit_ncaaf_smartsim2_payload.py --season 2025 --sims 60`, 714 games, both arms sharing seeds, ~60 min of compute:
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — NCAAF TOTALS ARE NOT OVER-DISPERSED. The deficit is ONE CONSTANT BIAS, and the residual spread already matches the market
 
-Measured offline on **711 completed 2025 games**, joining the committed
-`smartsim2_projections_2025_wk*.csv` (engine output, payload OFF) to
-`cfbd_lines_*.json` (market total + final score). Zero API calls.
-
-    MEAN BIAS      model  -5.211      market  +0.709    (actual - predicted)
-    RESIDUAL SD    model  15.324      market  15.304
-    sim's CLAIMED predictive SD              12.832
-    CALIBRATION RATIO 0.837   (<1 = OVER-CONFIDENT, not over-dispersed)
-    bias removed:  model total MAE 12.401   vs market 12.373
-
-**Rule: before attacking a model's DISPERSION, decompose its error into BIAS
-and SPREAD. They demand opposite fixes and only one of them was ever wrong
-here.** The model's residual SD is statistically indistinguishable from the
-market's — its errors are ALREADY as tight. The entire totals deficit is a
-single systematic over-prediction of 5.2 points.
-
-**WHAT THIS CORRECTS.** `state.md` carried "totals 1.94x over-dispersed",
-measured on the LIVE slate, and I used it to motivate the pace work. It does
-not reproduce on completed games and it points the OTHER WAY (0.837). The
-live-slate figure compared the sim's predictive SD against a MARKET SD with no
-outcomes available — a different quantity from realised residual spread. **A
-dispersion number computed without outcomes is not a calibration measurement.**
-
-**WHY THE PACE WORK SURVIVES THIS, with a better reason than it had.** A
-hardcoded 24.0 s/play runs 151.6 s/drive against a real 179.5 — ~18% more
-drives per game, hence more scoring. A CONSTANT over-prediction of totals is
-precisely the signature of a pace pinned too fast, and the magnitude fits.
-
-**PRE-REGISTERED, before the re-fit runs:** correcting pace should cut the mean
-total, but a naive full correction scales 58.11 x 0.845 = 49.1 against an actual
-52.90 — it should OVERSHOOT DOWNWARD. The profile was calibrated with pace
-pinned at +0.4, so this is a mechanism added to a calibrated engine and owes a
-re-fit of the rates that were absorbing it. Overshoot is the EXPECTED result,
-not a failure of the input.
-
-**BOUNDS, because these numbers will be quoted.** The projections carry
-`rating_source=cfbd_ppa_season_2025` — the LEAKED season aggregate that
-`state.md` records as inflating apparent skill 30%. Accuracy here is FLATTERED;
-the true gap is wider than +0.914 and "as good as the market" is NOT
-established. The bias removal is IN-SAMPLE. The rating source differs from the
-re-fit's SP+, so this is not the identical configuration.
-
-### 2026-08-27 — PRE-REGISTERED PREDICTION CONFIRMED: raw pace OVER-CORRECTS the totals bias by ~35-56%
-
-The prediction was written into the entry above BEFORE this ran. Measured with
-ratings HELD NEUTRAL (n=300, 40 sims, paired seeds) so the contrast is pace and
-nothing else, and needing no CFBD call:
-
-    mean total, pace OFF (hardcoded 24.0s)  50.20
-    mean total, pace ON  (real, mean 26.25) 43.18
-    MEAN SHIFT   -7.02 pts (-14.0%)   sd 4.41   min -22.33  max +7.00
-    17/300 games where pace RAISED the total
-
-**Rule: a mechanism that is the RIGHT SIGN and the RIGHT ORDER OF MAGNITUDE is
-still not shippable alone -- check whether it OVERSHOOTS.** Pace covers 135% of
-the -5.21 point bias by raw comparison, or ~156% scaling the 14.0% shift onto
-the engine's real 58.11 mean. Enabling it by itself would flip NCAAF totals
-from ~5.2 too HIGH to ~2-3 too LOW. The calibration profile was fitted with
-`pace_index` pinned at +0.4, so the scoring rates absorbed the pace error;
-correcting one without re-fitting the other just moves the bias across zero.
-
-That the shift is NOT uniform (17/300 games get faster) is the check that this
-is real per-team signal and not a constant offset dressed up as a feature.
-
-BOUND: neutral ratings put absolute totals (50.20/43.18) below the engine's
-real 58.11, so the PERCENTAGE transfers more reliably than the point shift.
-Both framings are given above rather than the flattering one.
-
----
+- **Rule: before attacking a model's DISPERSION, decompose its error into BIAS and SPREAD. They demand opposite fixes and only one of them was ever wrong here.** The model's residual SD is statistically indistinguishable from the market's — its errors are ALREADY as tight. The entire totals deficit is a single systematic over-prediction of 5.2 points.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — NCAAF drive structure is an ENGINE ACCOUNTING BUG, not a calibration gap. The sim's own numbers do not multiply out
 
-Measured with `scripts/calibrate_ncaaf_drive_structure.py` against
-`ncaaf_historical_truth_report.md` (53,548 real drives / 2,264 games):
-
-    metric                 truth      sim     err
-    yards per play (MEAS)  7.364    7.413   +0.7%   <- correct
-    yards per drive       42.490   43.143   +1.5%   <- correct
-    plays per drive        5.770    7.246  +25.6%   <- the defect
-    seconds per drive     165.400 182.977  +10.6%
-    possessions per game   23.650  20.033  -15.3%
-
-**Rule: before tuning a model to a target, check the model's own metrics are
-INTERNALLY CONSISTENT. If they do not multiply out, the defect is accounting,
-not calibration, and no parameter will reach it.** Truth multiplies:
-5.77 x 7.36 = 42.5. The sim does not: 7.246 x 7.413 = 53.7 against a credited
-43.1 yards/drive -- a ~10.5 yard/drive gap between gross play gains and net
-drive yardage that real football does not have. Divide the sim's OWN numbers
-and you get 43.14 / 7.413 = **5.82 effective plays/drive, essentially truth's
-5.77**. The football is right; the play COUNT is inflated ~25%.
-
-Everything downstream follows from that one gap: clock burn (+10.6%), lost
-possessions (-15.3%), and the outcome shares (field goals +76%, turnover-on-
-downs -51%, punts -27%) are all drives lasting longer than their yardage
-warrants.
-
-**ALL THREE PROFILE LEVER FAMILIES WERE SWEPT AND NONE REACHES IT** -- which is
-the evidence for "engine, not profile", not an assumption:
-  - yardage (`drive_yardage_multiplier` 1.15 -> 1.60): plays/drive asymptotes at
-    6.99 and then RISES; yards/play overshoots to 11.46, TD rate to 0.403
-  - explosiveness (`explosive_play_multiplier` 1.45 -> 6.0): same floor
-  - 4th-down policy (punt probabilities, conversion multiplier): 7.25 -> 7.21
-    across the entire range, and trades punt rate up for turnover-on-downs
-    DOWN, away from truth
-The profile's 26 parameters have no lever for it because there is nothing to
-tune -- the per-play yardage distribution is already right (32.4% of plays gain
-<= 0, realistic for college).
-
-**A METRIC I MANUFACTURED, AND THE CORRECTION.** The first pass DERIVED
-yards/play as drive_yards / drive_plays and reported **-18.9% vs truth**, which
-sent me sweeping yardage multipliers. Measured per play the way the truth report
-measures it, it is **+0.7%**. In real football the derived and measured values
-are identical by construction; comparing a derived quantity to a measured one
-invented a defect that was not there. The tool now reports BOTH, and their
-disagreement is the actual diagnostic.
-
-**ALSO CORRECTED: the pace story, twice.** `expected_clock_seconds` from
-`drive_priors` is a PRIOR (151.6s), not the realized simulation output (183.0s).
-I quoted the prior as the engine's behaviour and concluded the engine ran 18%
-too fast. It runs 10.6% too SLOW. Feeding the real-world pace measurement makes
-every truth metric worse (possessions 17.91, seconds/drive 209.1), so the
-`pace` block must stay OFF -- the engine's `pace_seconds_per_play` is not on the
-real-world scale its name implies.
-
----
+- **Rule: before tuning a model to a target, check the model's own metrics are INTERNALLY CONSISTENT. If they do not multiply out, the defect is accounting, not calibration, and no parameter will reach it.** Truth multiplies: 5.77 x 7.36 = 42.5. The sim does not: 7.246 x 7.413 = 53.7 against a credited 43.1 yards/drive -- a ~10.5 yard/drive gap between gross play gains and net drive yardage that real football does not have. Divide the sim's OWN numbers and you get 43.14 / 7.413 = **5.82 effective plays/drive, essentially truth's 5.77**. The football is right; the play COUNT is inflated ~25%.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — A GUARD THAT ASSERTS THE CALL, NOT THE RESULT, IS TRUE OF CODE THAT DOES NOTHING
 
-Three defects in one session, all shipped, all passing every check in place:
-
-    projections deploy   built clean, went live, board unchanged (0/51 -> 0/51).
-                         Two of three builders put `predictions` INSIDE the
-                         `ncaaf_card` sub-dict; the adapter reads it at the TOP
-                         level. My structural test asserted the builders CALL
-                         the helper and never WHERE the result lands.
-
-    NameError            two builders passed a bare `projection` neither binds.
-                         Every call raised. Found by session syndicate-27, not
-                         by me — the same structural test passed it, because a
-                         call site can be present and still be unexecutable.
-
-    orphaned tab         moving a tab rail left two surplus `</div>` behind,
-                         evicting the Details panel. Live ~20 minutes while
-                         jinja parsed, 67 payload tests passed, the API served
-                         correct JSON and shared_predictions confirmed 51/51.
-
-**Rule: a guard must assert the OUTCOME at the place that CONSUMES it, and must
-be seen to FAIL before it is trusted.** "The builder calls the helper" was true
-of a payload nothing read. "Jinja parses" was true of markup that collapsed a
-card in a browser. Both are statements about the thing built, not about the
-thing that reads it.
-
-Two practices came out of it and both earned their place the same day:
-- **Negative-control every new guard.** Reintroduce the exact defect, watch the
-  test fail, restore it. The placement test and the template-render suite were
-  both controlled this way, and the control identified WHICH assertion does the
-  work — for the orphaned tab it is the DIV-BALANCE test, not the orphan-tab
-  test, because in an isolated render the section is still in the output string
-  and only a browser's DOM parse evicts it.
-- **A payload check cannot see a template defect.** Rendering is a different
-  instrument, not a more thorough version of the same one.
-
----
+- **Rule: a guard must assert the OUTCOME at the place that CONSUMES it, and must be seen to FAIL before it is trusted.** "The builder calls the helper" was true of a payload nothing read. "Jinja parses" was true of markup that collapsed a card in a browser. Both are statements about the thing built, not about the thing that reads it.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — MEASURE THE OUTCOME YOU PROMISED, NOT THE CHANGE YOU MADE
 
-The NCAAF compact strip, three times:
-
-    generic fallback  435px   the problem
-    my "fix"          633px   WORSE, and shipped — I verified that the prose
-                              blocks were gone (they were) and never measured
-                              the height, which is what I had promised
-    soccer's shape    181px   uniform across all 51
-
-The 633px version passed every check I ran: prose removed, abbreviation
-leading, jinja parsing, div balance. The defect was that moving a long school
-name into `cards-mini-copy` — which `dense_cards.css` gives
-`overflow-wrap: anywhere` — rendered it **1px wide and 226px tall** in a 39px
-box. I had moved a long string OUT of an element that handled it and INTO one
-that breaks anywhere.
-
-**Rule: state the outcome as a NUMBER before changing anything, then measure
-that number.** "Prose blocks: 0" is a fact about my edit. "Card height 181px vs
-435px, uniform across 51" is the thing the user asked for.
-
-Corollary, from the same session: **verify a class is STYLED by the stylesheet
-the page actually loads before using it.** MLB and NCAAF load different sheets
-(`cards_exact.css` vs `dense_cards.css`). `.cards-market-sub` had a colour rule
-and NO font-size rule in the NCAAF sheet, so it inherited 16px body text and
-rendered LARGER than the 15px value it annotates. MLB's `cards-linescore*` have
-zero rules there. Soccer's `cards-strip-pregame-*` ARE global — which is why
-they were safe to reuse, checked rather than assumed.
+- **Rule: state the outcome as a NUMBER before changing anything, then measure that number.** "Prose blocks: 0" is a fact about my edit. "Card height 181px vs 435px, uniform across 51" is the thing the user asked for.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — FORBIDDEN: deferring work around a ledger BLOCKER without re-measuring it. A blocker is a measurement and it expires.
 
-Lane `live-game-line-projection` carried, in bold: *"AND IT CANNOT BE READ
-OFF-WORKER. `/api/ops/artifacts/stream` returns 403 `path is not an allowed hot
-artifact` for the ledger `.jsonl`; re-verified 2026-08-18 — no entry in
-`HOT_ARTIFACT_PATTERNS` matches. Whoever takes this lane needs the artifact
-route, or the allowlist entry first."*
-
-**It was true on 2026-08-18 and false from 2026-08-20**, when `d7dbdbd2`
-("allowlist: make the live-gameline ledger readable off-worker (#440)") added
-both patterns. Content-verified 2026-08-27 on all three DEPLOYED SHAs — web
-`e3568422`, refresh-worker `ad3f116c`, live-odds-worker `34b4d4b4`.
-
-**The damage is that a blocker does not just sit there — it PROPAGATES.** For
-seven days it was the stated reason the ledger route was "deliberately OUT of
-scope and handed on", and a SECOND lane
-(`layer2-rail-duplicate-nfl-cards`) wrote its own scope note around the same
-file. Two lanes shaped their work around a fact that had already been fixed by
-a third. Nobody re-read it because it was bold, dated, and specific — the three
-properties that make a stale fact most convincing.
-
-Compounding it, the claim that would have enforced the detour was held by
-session `e8d83eb5-…`, absent from the roster even with `include_archived=true`.
-So the file was guarded by a dead holder against an edit that was already made.
-
-**Rules:**
-1. **Re-measure a blocker before you scope around it.** The cost of re-running
-   one grep is always lower than the cost of routing work around a phantom. If
-   the blocker names a file:line or a pattern, check that file:line.
-2. **Date-stamp blockers with what was measured, not just when.** "no entry in
-   `HOT_ARTIFACT_PATTERNS` matches" is checkable in seconds; "cannot be read
-   off-worker" is a conclusion that outlives its evidence.
-3. **A blocker inherited from another lane is second-hand.** Same rule as
-   [[feedback_rederive_load_bearing_cross_lane_numbers]] — if it changes what
-   you build, you measure it yourself.
-4. **Check the holder is alive before honouring a claim** — `include_archived=true`,
-   because "ended" and "never existed" look identical without it.
-
-Same family as the other half of this session: the lane ALSO believed its
-accuracy collector was "accumulating nightly" when the scheduled task had been
-`enabled: false` for six days, because one task delegated its own re-enable to
-another and nothing verified the handoff. Both are the same failure — **a
-written status standing in for a reading.**
+- **It was true on 2026-08-18 and false from 2026-08-20**, when `d7dbdbd2` ("allowlist: make the live-gameline ledger readable off-worker (#440)") added both patterns. Content-verified 2026-08-27 on all three DEPLOYED SHAs — web `e3568422`, refresh-worker `ad3f116c`, live-odds-worker `34b4d4b4`.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — FORBIDDEN: trusting a test whose FIXTURE cannot violate the property it asserts. It is not weak coverage; it is zero coverage that reads as strong.
 
-`tests/test_live_gameline_score.py::test_model_and_market_are_scored_on_identical_rows`
-existed, was named for exactly the right invariant, and carried the docstring
-*"The load-bearing assertion. If the market were scored on a different population
-the comparison would be meaningless, and it would still LOOK like a number."*
-
-It passed for weeks while production computed **model n 94 vs market n 90**.
-
-**Why it could never fail:** every record in its fixture carries BOTH
-`model_home_win_prob` and `market_fair_prob`. The populations diverge only when a
-record has a model probability and NO market price — a row the fixture does not
-contain. So `assert model.n == market.n == 2` was re-measuring the fixture, not the
-code. Any implementation, including the broken one, passes it.
-
-The defect it missed had ALREADY been observed, too: `all_records` was recorded in
-`state.md` as "UNSOUND (model n 1526 vs market 1449)" — **written down as a caveat
-and never fixed**, so the same bug shipped in three cuts. A known-unsound number
-that stays in the ledger as a warning is a bug with a comment on it.
-
-**Rules:**
-1. **Before trusting a test, ask what input would make it fail — then check the
-   fixture contains that input.** If no fixture row can violate the property, the
-   test asserts nothing. Name the negative case in the fixture or the test is
-   decoration.
-2. **A property about MISSING data needs a fixture row with data missing.** Null,
-   absent, one-sided. This is the whole class: every "scored on identical rows",
-   "handles absent X", "unknown defaults safely" test needs the absence present.
-3. **When you record a number as UNSOUND, open the fix or say why not.** "UNSOUND"
-   in a ledger is not containment — three cuts and several weeks of quoting say so.
-   Same failure shape as [[a blocker is a measurement and it expires]] from earlier
-   today: writing the caveat felt like handling it.
-
-Both fixes this session were caught the same way and neither by a test: by PRINTING
-BOTH n VALUES side by side instead of the difference. The difference looked fine.
+- **Why it could never fail:** every record in its fixture carries BOTH `model_home_win_prob` and `market_fair_prob`. The populations diverge only when a record has a model probability and NO market price — a row the fixture does not contain. So `assert model.n == market.n == 2` was re-measuring the fixture, not the code. Any implementation, including the broken one, passes it.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — FORBIDDEN: reading `pid` in a deploy claim as evidence the holder is alive
 
-Both claim PIDs read NOT RUNNING. I was one step from `acquire --force` against
-a LIVE session's lock on that basis.
-
-`deploy_claim.py` records `os.getpid()` — the PID of the short-lived *claim
-script*, which exits the instant it writes the file. **It reads "dead" for
-every healthy claim ever taken.** The field cannot distinguish a live holder
-from an abandoned one, which is the only question anyone consults it for.
-
-Liveness comes from finding the READER: search session transcripts for the lane
-slug or the session id. Here `local_38d39247…` had printed
-`SESSION=3515d143-…`, matching the lane owner, last active two minutes earlier.
-It released the claim voluntarily ~2 min after being messaged.
-
-Same family as *"find the READER before calling any id stale"*. A dead PID is
-"not proven alive", never "proven gone".
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — `Path(__file__).parents[1]` MAKES THE PRIMARY TREE THE RENDEZVOUS, AND A WORKTREE INVISIBLE
 
-The session-worktree protocol and the deploy locks disagree about where `.syndicate/` is.
-
-- `deploy_claim.py` sets `CLAIM_DIR = REPO_ROOT / ".syndicate" / "deploy_claims"`
-  with `REPO_ROOT` from the **script's own** location. Run it from a session
-  worktree and the claim lands in that worktree — **no other session can see
-  it**, so the lock silently stops being a lock while still reporting ACQUIRED.
-- The deploy guard resolves the lane marker against `$CLAUDE_PROJECT_DIR`, the
-  primary tree. Writing `.current-lane.<session>` in the worktree (which is what
-  `/lane open` does if you run it there) makes the guard print
-  `your lane: <none>` while you hold the claim — it blocked a deploy whose
-  claim was already mine.
-
-**Run every deploy-lock command from the PRIMARY tree, and write the
-per-session lane marker there too.** Code edits stay in the worktree; the locks
-are shared state and must live where the other sessions read them.
-
-Same family as *"keyvalue/artifact split blinds guards"*: a guard reading a
-different store than the one that matters is blind in exactly the case it exists for.
+- **Run every deploy-lock command from the PRIMARY tree, and write the per-session lane marker there too.** Code edits stay in the worktree; the locks are shared state and must live where the other sessions read them.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — A COMMENTED-OUT PATH IS STILL A CLAIM; AND THE DEPLOY GUARD MATCHES LEDGER PROSE
 
-Two collisions between ledger text and the tools that parse it, both caught by
-the tools rather than by me.
-
-1. Striking a stale claim by wrapping it in an HTML comment inside a `- Files:`
-   block **created two new claims** — `check_lane_invariants.py` parses paths
-   positionally and does not know what a comment is, so both the path I was
-   removing and one I merely *named in my explanation* registered. The note has
-   to live outside the `- Files:` block entirely.
-2. Writing the literal deploy command into `lanes.md` tripped the deploy guard:
-   it pattern-matches command text and cannot tell a ledger write from a POST.
-   **A false positive here is correct behaviour** — the fix is to reword the
-   ledger, never to reach for a route the guard does not recognise.
-
-The general rule: ledger files are INPUTS to guards, not just prose for humans.
-Text written into them is executed-as-pattern by something.
+- **A false positive here is correct behaviour** — the fix is to reword the ledger, never to reach for a route the guard does not recognise.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — A CLAIM HOLDER IS NOT A DEPLOY AUTHOR. The API cannot tell you who fired it.
 
-**Overturned by `ncaaf-opener-regions-props`, self-caught.** They thanked me for
-deploying `600a753a` to refresh-worker. I had not — my deploys that day were all
-live-odds-worker.
-
-The inference was: *X held the claim near the deploy timestamp, therefore X
-deployed it.* Render's deploys API records `trigger=api` and **no session
-identity**. Nothing in it supports that step.
-
-- **Misdirected credit is harmless. Misdirected blame is not**, and it is the
-  same inference — a bad deploy pinned on whoever held the lock.
-- It makes sessions **block on the wrong party**: the same message asked me to
-  release a claim I did not hold while the real holder was a third lane.
-
-**How to apply.** `deploy_claim.py status` answers who holds a claim NOW. For who
-DEPLOYED something, the only record is what that session wrote to
-`.syndicate/deploys.md`; absent that, authorship is unknown and must be stated as
-unknown. Never reconstruct it from timestamps.
+- **Overturned by `ncaaf-opener-regions-props`, self-caught.** They thanked me for deploying `600a753a` to refresh-worker. I had not — my deploys that day were all live-odds-worker.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — FORBIDDEN: measuring a dirty SHARED tree against `HEAD`. In a stale checkout `HEAD` is the thing that is wrong, and every diff built on it lies in the safe-looking direction.
 
-I was asked to commit this session's ledger edits from the primary tree. The obvious
-check — `git diff HEAD -- <my files>` — read **+159/-2437** on `deploys.md`,
-**+77/-1225** on `learnings.md`. Alarming, so I checked the real baseline. Against
-`origin/main` the same files read **+159/-12,933** and **+2,665/-2,271**: the primary
-tree was **791 commits behind**, so its ledger copies were missing everything landed
-since. Committing them — even path-scoped, even having audited the diff — would have
-deleted **~17,000 lines** of other sessions' work.
-
-**`HEAD` looked authoritative and was not.** It is the local branch tip; in a shared
-checkout nobody rebases, that tip is arbitrarily old. Diffing against it compares
-stale-to-stale and hides exactly the deletions that matter.
-
-The same trap fired again ten minutes later, one level down: `log/2026-08-27.md` was
-already tracked and 405 lines long on `origin/main`, written by other sessions.
-Copying my version over it read **+518/-405**. Restored, then appended only my own
-sections — and two blocks in my copy belonged to other lanes and were left out.
-
-**Rules:**
-1. **In a shared tree, diff against `origin/main`, never `HEAD`.** Fetch first.
-   `git rev-list --left-right --count HEAD...origin/main` before you trust any diff.
-2. **Read the DELETION column before staging.** Additions are what you wrote;
-   deletions are what you are about to destroy. `--numstat` per file, and account for
-   every deletion by name — I committed 674 insertions and exactly 2 deletions, both
-   intentional replacements I could name.
-3. **Never assume a file you are creating is new.** `git status` said `??` in the stale
-   tree; the file existed on `origin/main`. Untracked-here is not absent-there.
-4. **Re-apply onto current content rather than committing a stale copy.** Appends are
-   cheap to replay; a stale whole-file write is a revert wearing the shape of a save.
-
-Related: [[a blocker is a measurement and it expires]] and
-[[a test whose fixture cannot violate its property]] — all three are the same failure,
-a stale or incapable reference standing in for a live measurement.
-
----
+- **+77/-1225** on `learnings.md`. Alarming, so I checked the real baseline. Against `origin/main` the same files read **+159/-12,933** and **+2,665/-2,271**: the primary tree was **791 commits behind**, so its ledger copies were missing everything landed since. Committing them — even path-scoped, even having audited the diff — would have deleted **~17,000 lines** of other sessions' work.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — RE-FITTING A MODEL CAN BE THE WRONG ANSWER. Measure the do-nothing arm.
 
-Asked to re-fit both football calibration profiles after a mechanism fix, the
-result was ONE promotion and ONE REFUSAL. All four combinations, 120 games each:
-
-    sport  profile     mechanism   SCORED err
-    ncaaf  shipped     off           15.19%
-    ncaaf  candidate   ON             7.25%   <- promoted
-    nfl    shipped     off            3.87%   <- BEST for NFL: do nothing
-    nfl    candidate   ON             4.18%
-    nfl    candidate   off            7.42%
-
-**Rule: include the DO-NOTHING arm in the grid, and let it win if it wins.** NFL
-was already at its best; the fix plus a careful re-fit made it worse. Had the
-grid only compared "candidate ON" against "candidate OFF", NFL's candidate would
-have looked like a 3.24-point win and shipped a regression.
-
-**Corollary — a mechanism and its calibration are ONE change.** The bottom row
-is the proof: a re-fitted profile with the mechanism OFF is worse than the
-profile it replaces, for both sports. Ship them together or not at all.
-
-**Corollary — do not let one global switch make two engines share a decision.**
-The mechanism was an env flag, so NCAAF's 7.94-point gain would have cost NFL
-0.31. Moving it onto the PROFILE removed the trade-off entirely; the object that
-should decide was already in scope at the call site. A single knob spanning two
-calibrated systems is a modelling error, not a config choice.
-
----
+- **Rule: include the DO-NOTHING arm in the grid, and let it win if it wins.** NFL was already at its best; the fix plus a careful re-fit made it worse. Had the grid only compared "candidate ON" against "candidate OFF", NFL's candidate would have looked like a 3.24-point win and shipped a regression.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — PROMOTING AN ARTIFACT IS A CHAIN. THREE LINKS FAILED SILENTLY.
 
-Promoting a re-fitted calibration profile is "write the file", and it is not:
-
-  1. **NCAAF's profile was a HARDCODED CONSTANT.** `calibration_profile_path("ncaaf")`
-     resolved, the file wrote, and NOTHING read it. NFL had used
-     `load_versioned_profile` since `#440` Phase 5; NCAAF was never wired.
-  2. **The new field was missing from `to_dict()`.** `save_versioned_profile`
-     serialises `to_dict()`, so the artifact round-tripped `goal_line_touchdown`
-     to its DEFAULT — the whole re-fit inert while appearing to apply.
-  3. **`git add` skipped it.** `data/calibration/` is outside this worktree's
-     sparse checkout, so a plain `git add` staged the wiring and not the artifact.
-
-**Rule: test the CHAIN — write, read back, and confirm the consumer holds the new
-value — never the individual link.** Each of these passes an "is the field there"
-check. Only a round-trip catches (2), and only reading the staging output catches (3).
-
-**And make the loaded value OBSERVABLE.** `load_versioned_profile` degrades
-silently by design — absent, corrupt or partially-invalid all fall back to the
-default and never raise — so a silent load and a silent fallback are
-indistinguishable from outside. That is a good property for a sim and a terrible
-one for an operator, unless something states which one happened.
-
-The line added for it is itself weakly placed and worth knowing: it prints at
-module IMPORT, and nothing in the worker's boot path imports the profile —
-`run_refresh_worker.py` runs the projections generator as a SUBPROCESS. A
-boot-time log search reads zero forever. `absent signal is about the emitter`,
-one level further out than usual: the emitter is not merely quiet, it is in a
-process that has not started. The durable form is a field on the OUTPUT artifact
-(the projections CSV already carries `profile_name`, `rating_source`,
-`generated_at`), not a line in a job's stdout.
+- **Rule: test the CHAIN — write, read back, and confirm the consumer holds the new value — never the individual link.** Each of these passes an "is the field there" check. Only a round-trip catches (2), and only reading the staging output catches (3).
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — A CARRIED-FORWARD FACT DECAYS EACH TIME IT IS RESTATED WITHOUT RE-READING THE SOURCE. And a clean kill census proves nothing until you prove the feature was RUNNING in that window.
 
-The lane's OOM debt read: *"an `oomKilled` fired at 04:46:44Z, 22 min after my deploy."*
-I restated that four times across one session — in the lane, twice in reports, in a
-scheduled task — and it was wrong every time. The event is **2026-08-16**T04:46:44Z, not
-08-17. Nobody introduced the error; it degraded by repetition, because each restatement
-was copied from the previous one rather than from the events API.
-
-Re-reading the source did not just fix a date. It dissolved the debt: the kill sits
-inside a storm of **56 oomKilled** whose first is 2026-08-15T00:04:47Z — **28 hours
-BEFORE the ledger deploy**. The deploy landed mid-incident. The attribution had never
-been supported by anything, and a whole session had been treating it as a live liability.
-
-**THE SECOND HALF, which is the part most likely to be skipped.** "Zero kills in 10d13h"
-is worthless on its own — it is equally consistent with the feature being switched off.
-The reading only counts because the ledger was PROVEN to be running in that same window:
-20 ledger files / 47.7 MB with fresh mtimes, and `MLB_LIVE_GAMELINE_LEDGER_ENABLED`
-absent (= enabled). Pair every null with proof the thing could have fired.
-
-**Rules:**
-1. **Re-read the SOURCE before restating a carried fact, not your own last summary.**
-   If a fact has a timestamp, an id, or a count, it has a source — go to it.
-2. **Exonerate on three legs, not one:** the timeline (does it predate the suspect?), the
-   rate (with its window stated, fully paged), and the mechanism (measured, not
-   estimated — 36.3 MB against a 4,096 MB limit ends the argument).
-3. **A null result requires a liveness proof.** No kills / no errors / no hits means
-   nothing until you show the code was executing during the window you read.
-4. Kills are EVENTS. `render_events.py`, never a log search — a killed process emits
-   nothing, so a 0-match log result is evidence about the emitter.
-
-Same family as [[a blocker is a measurement and it expires]] and [[a test whose fixture
-cannot violate its property]]: a stale or incapable reference standing in for a live one.
----
+- **THE SECOND HALF, which is the part most likely to be skipped.** "Zero kills in 10d13h" is worthless on its own — it is equally consistent with the feature being switched off. The reading only counts because the ledger was PROVEN to be running in that same window: 20 ledger files / 47.7 MB with fresh mtimes, and `MLB_LIVE_GAMELINE_LEDGER_ENABLED` absent (= enabled). Pair every null with proof the thing could have fired.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — A GREEN TEST SUITE OVER A FILE THAT CANNOT BOOT `[lane venue-quote-line-join]`
 
-**FORBIDDEN: appending a definition below `if __name__ == "__main__":` and
-treating a passing unit suite as evidence the file still runs.**
-
-I crash-looped `live-odds-worker` for 18 minutes (16:39-16:57Z, `NameError:
-start_venue_poll_loop`, restart every ~85s) by appending functions to the end of
-the entrypoint. `main()` executes at the guard, before the defs below it exist.
-
-**All 18 tests passed the entire time**, and would have passed forever:
-importing a module executes its whole body, so the names exist by the time a
-test asks for them, and the `__main__` guard never runs under pytest at all.
-The suite asked "does the loop behave once running" — true, and irrelevant.
-Nothing asked "does this file still BOOT".
-
-**The guard is STRUCTURAL, not behavioural**: walk the AST, find the `__main__`
-`If`, assert no `FunctionDef` follows it. A behavioural test only ever catches
-the instance someone thought to write; this catches the class.
-
----
+- **FORBIDDEN: appending a definition below `if __name__ == "__main__":` and treating a passing unit suite as evidence the file still runs.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — CADENCE LIVES IN THE CALLER, NOT THE INTERVAL CONSTANT `[lane venue-quote-line-join]`
 
-**FORBIDDEN: reporting an interval env var as a cadence lever without reading
-its CALL SITE.** I told the user twice that raising venue cadence was "pure env,
-no code". Both times wrong, both caught only by reading callers:
-
-- `SYNDICATE_POLYMARKET_REFRESH_INTERVAL_SECONDS` governs
-  `_polymarket_catalogue_at_boot()` — **boot only**, `force=True`.
-- Kalshi's refresh is called **once per board build** (~748s measured), so its
-  120s interval could never fire faster than its caller asked.
-- Both slate/market ticks ride the live worker's **adaptive** loop, which returns
-  the ~900s IDLE interval whenever no game is live.
-
-A self-paced function reaches its own interval only if something asks it that
-often. **The binding constraint is `min(caller frequency, own interval)`**, and
-the interval is the half that is visible in config — which is exactly why it
-gets mistaken for the lever.
-
----
+- **FORBIDDEN: reporting an interval env var as a cadence lever without reading its CALL SITE.** I told the user twice that raising venue cadence was "pure env, no code". Both times wrong, both caught only by reading callers:
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — A KEY MUST NAME EVERY PARTY TO THE BET `[lane venue-quote-line-join]`
 
-**FORBIDDEN: a join key for a player prop that omits the player, or for a total
-that omits the game.** Both were live and both look identical to a working join
-from every counter.
-
-Props keyed `<sport>|<market>|<side>|<line>`, so every player's anytime-scorer
-row collapsed to ONE string and the first row took a quote describing a
-different human. Fixed. **Totals still do this by GAME** — 672 polymarket soccer
-quotes collapse into SIX distinct keys, so one fixture's price can stamp
-another's row.
-
-**The tell is a collapse ratio.** Adapter-reported quotes against DISTINCT keys:
-`oddsapi_props` 15,378 -> 15,378 (1:1, correctly keyed), `polymarket_us` 672 ->
-6 (112:1). **And instability is the second tell**: polymarket's soccer
-selections moved 212 -> 4 across two consecutive builds on an unchanged feed. A
-correctly keyed source does not move 50x on identical input.
-
----
+- **FORBIDDEN: a join key for a player prop that omits the player, or for a total that omits the game.** Both were live and both look identical to a working join from every counter.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — A BREAKDOWN THAT DOES NOT RECONCILE IS NOT EVIDENCE `[lane venue-quote-line-join]`
 
-I shipped `TRIM_BY_SPORT kept=6000 ... kept_by_sport={...}` summing to **1,506**,
-because the tally was updated in one of two passes. The floor WAS working; the
-line written to PROVE it invited the reader to conclude 4,494 markets had
-vanished. **Assert `sum(breakdown) == total` in the test that covers the
-diagnostic**, not just that the diagnostic fires.
-
-Same session, same shape: `[venue_poll]` printed KALSHI on success and
-Polymarket only on FAILURE, so a Polymarket half that had silently stopped
-produced output identical to one working perfectly. Found only because the user
-asked a question the instrument could not answer.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — FORBIDDEN: allowlisting a KEYVALUE-backed path in `HOT_ARTIFACT_PATTERNS` and calling it readable. The guard will pass and the data will not arrive.
 
-I was one step from proposing exactly this. The ask was "make the execution
-ledger readable off-worker so we can compare Polymarket volume day over day",
-and the obvious move is an entry in `HOT_ARTIFACT_PATTERNS`.
-
-**It would have been inert, and inert in the worst way — it looks like a fix,
-it passes review, and it changes a 403 into an empty result.**
-
-`write_json_file` routes every path outside `migration_runs/` to the keyvalue
-store **and returns before touching disk**. `/api/ops/artifacts/export` is a
-DISK read. So for anything written that way there is no file behind the path:
-the allowlist gates a read of something that was never written there.
-`execution_ledger._ledger_path()` is one of these.
-
-**The repo already knew.** `ops.py:566` (`api_ops_live_lens_snapshot_index`)
-documents the same trap and records that FOUR hypotheses — broken pull, dead
-loop, headroom gate, stale builder — were each eliminated by measuring
-something ADJACENT to the artifact that actually decided the join, because the
-one file that mattered could not be read at all. That endpoint is the pattern:
-read through the keyvalue-aware `read_json_file`, not the disk export.
-
-**HOW TO TELL, BEFORE WRITING THE PATTERN:** find the WRITER. If it is
-`write_json_file` / `refresh_state_store`, the artifact is in keyvalue and
-`HOT_ARTIFACT_PATTERNS` is the wrong lever entirely. Only a real
-`open()`/`Path.write_*` on disk makes the allowlist meaningful.
-
-**SECOND ERROR IN THE SAME THREAD, worth its own line:** I first reported the
-ledger as unreadable after probing `reports/execution/live_ledger.jsonl`, a
-path that DOES NOT EXIST. The real path is
-`reports/intelligence/execution_ledger.json`. Re-tested, it is genuinely
-blocked — so my conclusion survived, but it survived by luck. A blocker
-reported off a guessed path is not a measurement, even when it happens to be
-right. Same family as "re-measure the blocker, it expires" (2026-08-27) and
-"read the field you already have".
+- **It would have been inert, and inert in the worst way — it looks like a fix, it passes review, and it changes a 403 into an empty result.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — FORBIDDEN: validating a CONVERTED value while STORING the raw one. The guard clears a number that is not the number anything uses.
 
-`execution_ledger` reconcile computed its safety bound through
-`_price_as_probability(fill_price)` and then stamped `fill_price` RAW. One
-Polymarket fill arrived as American odds:
-
-```
-LIVE_LEDGER_ROW status=filled venue=polymarket
-  ticker=tsc-nfl-lar-lac-2026-08-27-total-38pt5
-  price=104.0  stake=1.64  fill_price=104.0        <- siblings all 0.445-0.49
-```
-
-`contracts x 104.0 = ~$349` against a `stake=1.64`. `spent_today` prefers
-`fill_stake_dollars`, so ONE order took the day's Polymarket spend from
-**$23.25 to $368.97** — against a `max_day_dollars_polymarket` of **100.01**.
-Real spend was ~$20.71. No money moved; the BOOKKEEPING was 15.9x wrong and
-the cap enforces on it.
-
-**THE GUARD DID NOT MISS IT. IT CHECKED A DIFFERENT QUANTITY.**
-`_FILL_DOLLAR_ABSURD = 10.0` compares `filled_dollars > stake * 10`. But
-`filled_dollars` is built from the CONVERTED price (3.36 x 0.4902 = $1.64) —
-entirely plausible against a $1.64 stake — while the value written to the
-ledger and summed by the budget is the RAW one. Two bands, careful
-thresholds, a documented rationale, and it cleared the defect it was written
-to catch, because the quantity it validated was not the quantity that was
-stored.
-
-**THE CONVERTER WAS INNOCENT AND I CHECKED BEFORE BLAMING IT.**
-`_price_as_probability(104.0)` hits `abs(parsed) >= 100.0` and returns
-`american_to_probability(104.0) = 0.4902`, matching the venue's own
-`avgPx='0.4900'`. The obvious suspect was correct code. The bug was the
-ASYMMETRY between the path that validates and the path that persists.
-
-**HOW TO APPLY.** Wherever a value is normalised before being checked, assert
-that the SAME normalised value is what gets written. If a guard reads
-`f(x)` and the store receives `x`, the guard is not guarding the store — and
-a passing guard on a stored raw value is worse than no guard, because it
-reads as verified. Search for the pattern: a converter called inside a bound
-computation, with the unconverted variable still in scope at the assignment.
-
-**COROLLARY, on unit errors and thresholds.** The two-band design assumed a
-unit error would be an ABSURD multiple (>=10x) and a real overspend would be
-small (<=1.25x). That is a reasonable prior and it did not save anything here,
-because the band was never applied to the wrong-unit number at all. A
-threshold cannot classify a value it never sees.
-
-**FOUND ONLY BECAUSE AN AGGREGATE EXISTED.** Invisible in logs — every
-individual line looked normal, including the bad row unless you knew sibling
-`fill_price` values. It surfaced on the FIRST read of a new per-day per-venue
-ledger summary endpoint. A per-day total is a cheap invariant over a record
-that is otherwise only ever appended to one row at a time.
+- **$23.25 to $368.97** — against a `max_day_dollars_polymarket` of **100.01**. Real spend was ~$20.71. No money moved; the BOOKKEEPING was 15.9x wrong and the cap enforces on it.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 FORBIDDEN: an instrument built out of the thing it measures, or out of a symptom the slate can retire — FOUR instances in one session, every one reading HEALTHY
 
-- **The belief overturned.** "The measurement discriminates because the numbers
-  moved." They moved in three of four cases *and the instrument was still
-  incapable of reading unhealthy* — a clean bill of health manufactured by the
-  defect itself. Numbers moving is not discrimination; only a CONTROL run that
-  actually reads unhealthy is.
-- **The four, all in `#589`/`#590`/`#591`, all caught only by running the
-  pre-change bytes against the same payload:**
-  1. A duplicate detector that grouped cards by the chip `chipForGame`
-     resolved — the code under test, which returns null for exactly the
-     duplicated cards. Reported **0 duplicates in BOTH states.**
-  2. A metric ("a bare sport label beside a league") needing two labels present
-     at once. The league-labelled rows drained off the board twelve minutes
-     later; the same pre-change template then read a uniform `SOCCER=213`,
-     **flag 0, defect fully intact.**
-  3. A test harness with a hand-copied `chipForGame` stub that had neither the
-     canonical nor the normalized index and keyed on `group.sport` — the field
-     the defect is about. **The new assertions could not have failed against
-     it.**
-  4. A fixture (`celChip`) with no `league_display`, so the property under test
-     could not be expressed. This one FAILED loudly instead of passing
-     vacuously, because the assertion was an equality between two computed
-     labels rather than a check for a constant.
-- **The rule going forward.** Derive the instrument from a source the defect
-  CANNOT touch, and state that source. Concretely, all three fixes ended up
-  joining on the slug taken from `group.key` and on `chip.league_display` —
-  fields no code path under test writes. **And run the control on the SAME
-  payload, at the same instant, every time:** a fix verified only against
-  post-deploy data is verified against a slate that may have retired the test
-  case. This is the 2026-08-20 census rule (`A CENSUS THAT CANNOT READ UNHEALTHY
-  IS NOT A VERIFICATION`) generalised from "the slate moved" to "the instrument
-  was never able".
-- **The cheap test, worth applying before any verification is banked:** *if the
-  fix were reverted right now, would this reading change?* If it needs the
-  world to cooperate — a particular row family present, two labels coexisting —
-  it is not a verification, it is a coincidence. Pair every "0 bad" count with a
-  "N actually checked" count; `#591`'s `rows that JOIN a league-carrying chip:
-  496` is the shape, and it was the first guard this session built BEFORE
-  measuring rather than after being burned.
-- *(evidence: `.syndicate/log/2026-08-27.md`, the `#589`/`#590`/`#591` entries
-  and the 20:5xZ checkpoint)*
+- **The rule going forward.** Derive the instrument from a source the defect CANNOT touch, and state that source. Concretely, all three fixes ended up joining on the slug taken from `group.key` and on `chip.league_display` — fields no code path under test writes. **And run the control on the SAME payload, at the same instant, every time:** a fix verified only against post-deploy data is verified against a slate that may have retired the test case. This is the 2026-08-20 census rule (`A CENSUS THAT CANNOT READ UNHEALTHY IS NOT A VERIFICATION`) generalised from "the slate moved" to "the instrument was never able".
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — A SINGLE OBSERVATION READ AS A BOUND `[lane venue-quote-line-join]`
 
-**FORBIDDEN: concluding "supply-limited" from one reading where a quantity sat
-below its cap.** I saw mlb take 1,512 slots against a cap of 1,550, concluded
-its Kalshi listings were the constraint, and wrote it into `deploys.md` as the
-finding. mlb went **794 -> 1,741 across the same evening** — its available
-markets GREW as its slate approached first pitch. 1,512 was a moment, not a
-ceiling.
+- **FORBIDDEN: concluding "supply-limited" from one reading where a quantity sat below its cap.** I saw mlb take 1,512 slots against a cap of 1,550, concluded its Kalshi listings were the constraint, and wrote it into `deploys.md` as the finding. mlb went **794 -> 1,741 across the same evening** — its available markets GREW as its slate approached first pitch. 1,512 was a moment, not a ceiling.
+- *(evidence in `learnings_evidence.md`)*
 
-`matched` tracks mlb's slot count almost exactly (794/27, 1620/208, 1741/218,
-1706/221), so ALLOCATION was the binding constraint all along — the opposite of
-what I recorded.
-
-**THE TELL I HAD AND IGNORED:** two hours earlier in the same file I refused to
-read one build's `matched` as a trend. I applied that discipline to the number
-I was suspicious of and not to the one that supported a conclusion I had
-already reached. A bound needs a series; one point below a cap is consistent
-with supply, with timing, and with the cap simply not binding yet.
-
-**WHAT STILL HELD, and why the correction is not a full retraction:** the demand
-PATH did not execute for the recovery (`demand=None` in the trim's own line),
-so the change was still not what fixed it. Deployed is not executed — that half
-survived because it was checked against a predicate rather than a deploy
-timestamp.
 ## 2026-08-27 — A CONTROL THAT IS BROKEN IN THE SAME WAY AS THE TREATMENT DISTINGUISHES NOTHING. I ran one and reported the result as positive.
 
-I reported 5 failing tests in `tests/test_polymarket_board_join.py` as
-"pre-existing, not mine". **There were none — 53 passed in the primary tree.**
-
-They failed only in my session worktree, which excludes `data/` by design, and
-those tests resolve soccer clubs through an alias map BUILT FROM `data/`
-artifacts. Already a standing rule (2026-08-21, `978963b5`).
-
-**THE METHOD ERROR IS THE POINT, NOT THE STALE RULE.** I "verified" by
-stashing my diff and re-running. **Stashing does not restore `data/`.** Both
-arms of the comparison were missing the same thing, so the experiment could
-only ever return "same either way". That proved the failures were not caused
-by MY DIFF; it could not prove they were REAL. I collapsed two different
-claims and reported the weaker result as the stronger one.
-
-**THE GENERAL FORM:** before trusting an A/B, ask what the control still
-shares with the treatment. If the suspected cause is present in BOTH arms, a
-null result is not evidence of anything. Same family as the `sports=8` board
-that "passed" while the guard never fired — which I DID catch, two hours
-earlier, in the same session. Recognising a shape once does not install it.
-
-**AND: I ATTRIBUTED THE FAILURES TO A COMMIT ON TOPIC ADJACENCY.** `git log -8
---format='%an'` returns `github-actions[bot]` eight times — authorship
-distinguishes NOTHING in this repo — so I had no basis whatever. When the
-attribution was challenged I removed it rather than reassigning it to another
-guess.
+- **THE METHOD ERROR IS THE POINT, NOT THE STALE RULE.** I "verified" by stashing my diff and re-running. **Stashing does not restore `data/`.** Both arms of the comparison were missing the same thing, so the experiment could only ever return "same either way". That proved the failures were not caused by MY DIFF; it could not prove they were REAL. I collapsed two different claims and reported the weaker result as the stronger one.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — I CHECKED ANCESTRY AND CALLED IT CAUSATION. The fix's own log line said the path never ran.
 
-`[kalshi_odds] BOARD_JOIN matched` recovered from 5-24 to 208-221. I verified
-`bd81ba3c` (demand-weighted trim) was an ancestor of the live SHA and reported
-that the trim had fixed it — to my user, to the ledger, and to the lane that
-wrote it.
+- **The trim's own line, at the moment of the recovery, reads:**
+- *(evidence in `learnings_evidence.md`)*
 
-**The trim's own line, at the moment of the recovery, reads:**
-
-```
-19:49:44  TRIM_BY_SPORT ... demand=None  mlb_slots=1620     <- matched=208
-```
-
-`_sport_slot_caps` returns None with no demand signal and the trim falls back
-to the FLAT-FLOOR branch. The code was DEPLOYED AND NOT EXECUTED. Caught by
-`venue-quote-line-join`, whose fix it was — they declined credit for it.
-
-**"IS THE COMMIT IN THE LIVE SHA" AND "DID THE CODE RUN" ARE DIFFERENT
-QUESTIONS, AND ONLY THE SECOND IS EVIDENCE.** Ancestry is necessary and never
-sufficient. This repo already has the rule — *"test the fix's predicate, not
-its deploy state"* — and a discriminating field was being PRINTED on the same
-line as the outcome I was reading. I read `kept_by_sport` off that line and
-did not read `demand=` two fields earlier.
-
-**THE REAL CAUSE MATTERED, WHICH IS WHY THIS WAS NOT A HARMLESS
-MIS-CREDIT.** MLB's slate approaching first pitch made its markets the
-freshest in the catalogue, and the staleness-ordered remainder pass handed
-them the slots — staleness accidentally doing what demand weighting does
-deliberately. That mechanism is DIURNAL, so **the collapse is expected to
-RECUR TOMORROW MORNING** — corrected from "afternoon", which was wrong.
-MAPPED TO CENTRAL, today's collapse was MORNING/MIDDAY and the recovery came
-in the AFTERNOON: 09:19-13:57 CT matched 5-27 (spiking 146/210/99), then
-14:49 CT matched=208, 15:25 218, 15:51 221. So the bad window is roughly
-09:00-14:00 CT, when far-dated football is fresh and MLB is not.
-Believing it was already fixed would have meant not deploying the thing that
-actually prevents recurrence.
-
-**A "verified fixed" that names the wrong cause predicts the wrong future.**
-
-Third instance in one session of the same family: a `sports=8` board that
-passed while the guard never fired (caught), a stash control that could not
-restore `data/` (missed), and this (missed). Recognising the shape once does
-not install it.
 ## 2026-08-27 — A WATCHER IS AN INSTRUMENT AND IT LIES IN FOUR SPECIFIC WAYS
 
-Five verification failures in one session, each producing output that looked
-like a result. None was caught by the watcher; all four were caught by reading
-the payload instead of the exit code.
-
-1. **Floored on `createdAt`, not `finishedAt`.** A join tick 69s after the
-   deploy was CREATED ran the OLD commit and returned the baseline. I nearly
-   reported my own change dead on evidence that never touched it. **A deploy
-   timestamp marks when you ASKED; only `finishedAt` marks when the code ran.**
-
-2. **Matched a shared word.** `"calibration" in message.lower()` fired on
-   `[INTEL_TRACE] {"event": "evaluation_reliability_profile"}` — a different
-   subsystem. The watcher exited 0 claiming success. **Match on the tokens the
-   EMITTER writes, not on the topic.**
-
-3. **The re-arm silently didn't apply.** A patch script opened a POSIX path
-   under Windows Python, raised `FileNotFoundError`, and the next line in the
-   same chain ran the UNPATCHED watcher — reproducing the identical bad reading.
-   **A failed edit followed by a successful run of old code is indistinguishable
-   from a successful re-arm.**
-
-4. **Sampled with the function under test.** Measuring recovery from the `lal`
-   bucket returned 0% BY CONSTRUCTION, because that bucket holds exactly the
-   rows the function failed to fold. **If the grouping is produced by the thing
-   you are testing, the sample is already biased.**
-
-5. **A null with no denominator.** `matched 55 -> 59` read as a fix working;
-   the metric swings 48-59 on its own and `58` predated the deploy. **Establish
-   variance before attributing a delta.**
-
-**The general rule:** an absence proves something only once you have shown the
-emitter RAN. Every watcher should count something adjacent that must be non-zero
-— `POLYMARKET_CATALOGUE 0` means nothing until `US_AUTH 1` proves the boot
-happened, and `no calibration line` means nothing until you count the
-projections-process lines. Build the discriminator into the watcher, not into
-the interpretation afterwards.
+- **A failed edit followed by a successful run of old code is indistinguishable from a successful re-arm.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 FORBIDDEN: calling a fix verified when the READING came from a different surface than the one that was broken
 
-Session de363735, lane `ncaaf-opener-regions-props`. Shipped `94d6b6e6` to put
-the NCAAF live-lens phase split on the builder that serves, verified it on
-`/ncaaf/api/live-lens`, and it was CORRECT there:
-`Games 51 | Live 0 | Final 0 | Pregame 51`. I nearly reported it done.
-
-The PAGE was unchanged. `GET /ncaaf/live-lens` came back **byte-identical to the
-pre-deploy fetch — 108,486 bytes both times.** `shared/rank_board.html` renders
-`summary_panel.summary_stats` and never reads `header_stats`, which reaches the
-API payload only. Two hops; the fix landed on the first.
-
-**The rule:** when a value crosses more than one hop to reach the surface that
-was reported broken, a correct reading at hop 1 is not evidence about hop 2.
-Verify at the surface the complaint came from. **A byte-identical response
-across a deploy is a positive signal that nothing changed** — cheap, and it is
-what caught this. Fixed in `d281995b`; one list now feeds both, so payload and
-page cannot drift.
-
-Same session, same shape, one layer earlier: the split had first been added to
-`build_live_lens_page_context`, the legacy FALLBACK, while the route calls
-`build_smartsim_live_lens_page_context`. Present in the file, unreachable in the
-product. **Three surfaces — file, payload, page — and only the last one is the
-product.**
+- **The rule:** when a value crosses more than one hop to reach the surface that was reported broken, a correct reading at hop 1 is not evidence about hop 2. Verify at the surface the complaint came from. **A byte-identical response across a deploy is a positive signal that nothing changed** — cheap, and it is what caught this. Fixed in `d281995b`; one list now feeds both, so payload and page cannot drift.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 FORBIDDEN: inferring that a scheduled job SUCCEEDS from an age that sits at one interval
 
-`state.md` had recorded that an `age_seconds` sitting at one interval rather
-than growing "is also the evidence the generator SUCCEEDS". It is not. The age
-is stamped by the LAUNCHER, so a job that crashes one second in produces the
-same signal as one that completes. Measured this evening: four NCAAF projection
-runs 21:21:37–21:23:31Z each printed their calibration line at import and then
-died on `HTTP 429` in `load_ppa_ratings_asof`. Corrected in place.
-
-**Generalises to:** any liveness signal emitted BEFORE the work it is taken to
-vouch for. Ask what the signal is stamped by, not what it is near.
+- **Generalises to:** any liveness signal emitted BEFORE the work it is taken to vouch for. Ask what the signal is stamped by, not what it is near.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 A lane can be CLOSED while a session keeps working under its name
 
-This session's lane was closed and moved to `lanes_history.md` earlier the same
-day, covering the props/odds/Layer 2 work. Everything after that — an engine
-calibration confirmation, two live-lens deploys, a cross-sport template fix —
-ran under the same slug, and **three deploy claims were acquired with a closed
-lane as `--holder`**. The claims serialised correctly and nothing was harmed,
-so nothing surfaced it; `deploy_claim.py` does not check that a holder is an
-OPEN lane, and the per-session marker still held the slug.
-
-**Not proposing a guard** — the claim's job is mutual exclusion and it did that.
-The point is narrower: **a lane name in a claim is not evidence the lane is
-open**, so "who holds this" can point at a closed lane indefinitely. When work
-continues past a close, open a new lane or reopen the old one before touching
-production.
+- **Not proposing a guard** — the claim's job is mutual exclusion and it did that. The point is narrower: **a lane name in a claim is not evidence the lane is open**, so "who holds this" can point at a closed lane indefinitely. When work continues past a close, open a new lane or reopen the old one before touching production.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 A survey keyed by BARE FUNCTION NAME collapses same-named functions across sports
 
-Two static surveys of the rank_board routes were wrong and discarded before the
-production sweep produced the real number. The first keyed builders by function
-name, so five sports' identically-named `build_live_lens_page_context` collapsed
-onto whichever file parsed last (soccer) — every result misattributed. The
-second added a delegation check that matched `build_module_links` and
-`build_rank_page_context`, which nearly every builder calls, and reported **0
-defective** where the truth was 14.
-
-**Resolve by IMPORT, not by name** in a repo with per-sport parallel modules.
-And when a static result says "no problems anywhere", treat that as a suspected
-broken query before treating it as a finding.
+- **Resolve by IMPORT, not by name** in a repo with per-sport parallel modules. And when a static result says "no problems anywhere", treat that as a suspected broken query before treating it as a finding.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — FORBIDDEN: fitting a model to a total when you can COUNT the operation
 
-- **The rule:** if the thing you are optimising is made of discrete operations —
-  syscalls, queries, requests — **count them**. Do not infer their cost by
-  regressing the total against plausible predictors.
-- **Evidence.** The boot sync's 72.20s was fitted as `1.337 ms/file + 117 MB/s`
-  over 9 roots: r ~1.2% error, and the two largest roots matched to **0.01s**.
-  It predicted −26.6s from removing the byte compare. The measured saving was
-  **−13.05s**, wrong by 2x, and the fix that rested on it was shipped and had to
-  be followed by a second one. Counting syscalls on a real subtree took one
-  script and gave the true answer immediately: **5.34 per file**, of which four
-  were re-asking what the directory read already knew. The regression was not
-  merely imprecise — it pointed at the WRONG TERM, so the first fix optimised
-  the part that was not the cost.
-- **The tell:** a beautiful fit over few points with more parameters than
-  mechanisms. 9 points, 2 parameters, and the residuals looked perfect because
-  one root (31,149 of 33,392 files) dominated both predictors at once.
+- **The rule:** if the thing you are optimising is made of discrete operations — syscalls, queries, requests — **count them**. Do not infer their cost by regressing the total against plausible predictors.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-27 — FORBIDDEN: a verification criterion that can only be met by the failure it is watching for
 
-- **The rule:** before adopting a criterion, ask what it reads on a HEALTHY
-  instance that was never going to fail. If the answer is "the same as on a
-  fixed one", it discriminates nothing.
-- **Evidence.** The lane's criterion was "`/healthz` answered inside 5s across
-  the boot window". Post-fix it read perfectly: 25 probes, max gap 5.10s, zero
-  missed — against pre-fix blackouts of 35.21s and 34.74s. It looked like proof.
-  Then two PRE-FIX boots that happened to SURVIVE were measured: max gaps
-  **5.13s and 5.59s, zero missed**. A clean trace is simply what a surviving
-  boot looks like; the only trace with blackouts is the boot that was killed, so
-  the criterion was measuring the kill rather than exposure to it. With a
-  ~1-in-5 base rate, n=1 was never going to be evidence either way.
-- **What to use instead:** a RATE over enough trials (`server_failed` per
-  deploy, >=5), or — better where available — a STRUCTURAL quantity that does
-  not need a base rate. Here the honest claim is the duration: the window in
-  which sync I/O can starve a health check is 0.6s wide instead of 72s. That is
-  measured directly and one boot establishes it.
-- **Related, same session:** grepping `"on the board"` to check whether a
-  `rank_board` route renders slate stats reads **0 on every route without a
-  populated slate**, which is most of them. It nearly produced a false
-  contradiction of another lane's completed sweep. Caught only by checking the
-  probe against a route known to be GOOD before trusting a negative. The real
-  marker is `feature-summary-pill`.
+- **The rule:** before adopting a criterion, ask what it reads on a HEALTHY instance that was never going to fail. If the answer is "the same as on a fixed one", it discriminates nothing.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — A GAP BETWEEN TWO LOG LINES IS NOT A COST. I measured one, believed it, and was wrong by 30x.
 
-Reading refresh-worker logs I saw ~37 seconds of `[artifact_publisher] PULL_*`
-lines inside the board build, two of them `error=timed out`, and reported the
-cross-service HTTP pull as a significant part of the build's unattributed time.
-
-**Spanned directly, it is `pull_hot_artifacts` = 1.15s.** The 37 seconds was
-everything happening on a shared worker between two prints — other threads, the
-memory watchdog, the sim tick, GC — not the work I attributed it to.
-
-`_timed_candidate_pool`'s own docstring in this repo already says this, and
-names three wrong answers produced the same way on 2026-08-25. I read that
-docstring while looking for something else and still did it.
-
-**THE TELL WAS ALREADY IN THE LOGS AND I HAD NOT READ IT.**
-`BOARD_BUILD_TIMING wall_s=1058.9 cpu_s=942.2 off_cpu_pct=11.0` had been
-emitting all along. A build that is 89% on-CPU cannot be dominated by HTTP
-waits, and one line settles it. The later build read `off_cpu_pct=2.2`.
-
-**HOW TO APPLY.** Before attributing time to a stage, ask which measurement you
-have: a SPAN around the call, or a GAP between two prints. Only the first is a
-cost. On a process with concurrent threads a gap is an upper bound on
-everything, and an estimate of nothing. If only a gap exists, say "at most" or
-add the span — do not name a component.
-
-**AND CHECK FOR AN EXISTING wall-vs-CPU READING FIRST.** "Is it slow or is it
-waiting" is one number, it is often already emitted, and it invalidates whole
-families of hypothesis before any instrumentation is written. Three of mine died
-to it: the HTTP pulls, the Polymarket join (0.25s), and venue-loop contention.
-
-Same family as `feedback_read_the_field_you_already_have`, and this is now the
-second night running that the answer sat in a field I had already fetched.
-
+- **Spanned directly, it is `pull_hot_artifacts` = 1.15s.** The 37 seconds was everything happening on a shared worker between two prints — other threads, the memory watchdog, the sim tick, GC — not the work I attributed it to.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 FORBIDDEN: reading a "not yet running" list as proof something IS running
 
-`pending_deploys.py` enumerates what is committed and **NOT** deployed. I
-polled its JSON for my target SHA, matched, and announced the deploy was live —
-the match meant the exact opposite of what I read into it. Caught only because
-the SERVED page still had the old bytes.
-
-**The rule:** poll the PREDICATE, never a status field that merely mentions your
-SHA. For a deploy that means the changed behaviour appearing in the served
-response, or a log line that exists ONLY in the new code (`ORDERS_ENVELOPE` was
-built for exactly this and worked).
+- **The rule:** poll the PREDICATE, never a status field that merely mentions your SHA. For a deploy that means the changed behaviour appearing in the served response, or a log line that exists ONLY in the new code (`ORDERS_ENVELOPE` was built for exactly this and worked).
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 FORBIDDEN: a shared rule reimplemented as "the half I needed"
 
-The `unknown` bucket tested `not _is_venue_refusal`. The page's actual rule is
-`rejected` OR venue-refused. Production then described **63** build-time
-rejections — orders that never reached a venue — as *"submitted, never
-confirmed at the venue"*: possibly-live money. True figure: 2.
-
-The commit that shipped it had warned, in its own message, against "a fourth
-local definition of not a position, which is how these totals drifted apart in
-the first place." **A commit message asserting the discipline is not the
-discipline.** If two readers must agree, they call ONE function — identity,
-asserted in a test — and it lives in the module that owns the concept, not in
-whichever file noticed first.
-
-Every test passed through this because not one put a `rejected` row in front of
-the counter: the suite only exercised the case I had in mind while writing it.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 FORBIDDEN: grading an AMBIGUOUS zero as a definite outcome
 
-`grade_polymarket_resolution` computed `delta = after.realized -
-before.realized` and called a zero delta a PUSH. That conflates "resolved and
-moved no money" with "nothing booked yet". Seven live orders were stamped
-`push / settled_by=venue` — one of them nine and a half hours BEFORE its game
-started — and grading is idempotent, so the verdict was permanent and
-self-concealing. It landed in the push column, the bucket nobody audits because
-it reads as a non-event.
-
-Measured afterwards: `sides=[LONG, SHORT]`, **no NEUTRAL row anywhere**. The
-venue never called any of them a push.
-
-**The rule:** a value that two different states both produce is not evidence
-for either. Refuse with a NAMED reason and leave the row for a later pass. And
-when a wrong verdict can be written permanently, the repair must carry a
-discriminator that makes it TERMINATE — `held_side` here, without which the
-repair would clear a correct grade every tick forever.
+- **The rule:** a value that two different states both produce is not evidence for either. Refuse with a NAMED reason and leave the row for a later pass. And when a wrong verdict can be written permanently, the repair must carry a discriminator that makes it TERMINATE — `held_side` here, without which the repair would clear a correct grade every tick forever.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 An absent log line is only evidence once you know the line is EMITTED
 
-Twice in one session. `UNKNOWN_ORDER_PROBE` prints only when it finds unknowns,
-so its absence was ambiguous — the neighbouring `VENUE_SETTLEMENT` line, which
-prints unconditionally, is what proved no tick had run. And a watcher grepped
-`"still open . this slate"` where `·` is two UTF-8 bytes: it reported "not yet"
-thirteen times against a deploy that was already live.
-
-**Check the instrument can fire before trusting what it says.** An unfiltered
-query returning *something* is the cheap version of that check.
+- **Check the instrument can fire before trusting what it says.** An unfiltered query returning *something* is the cheap version of that check.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 FORBIDDEN: reading a job's TIMESTAMP as evidence it ran, on a machine that sleeps
 
-`live-gameline-accuracy-snapshot` fired at 23:34:21 CT and issued its script call
-three seconds later. The tool result came back at **08:49:37 the next morning** —
-Windows Modern Standby (entered 22:57:42, exited 08:48:00) suspended the child
-while the scheduler and the model both ran normally. `lastRunAt` was correct and
-completely misleading: the cron fired, the session opened, the model wrote the
-call, and none of that means the work happened.
-
-I first reported this as "fired on time and left no row". It left a row — stamped
-with the WAKE time and carrying the rolled-over date. Displaced, not dropped.
-
-**Compounding it:** the sibling task `live-gameline-fixes-first-real-reading` had a
-hardcoded freshness window ("a row `captured_at` between 04:33Z and 04:45Z") and was
-instructed, on a miss, to declare *"the recurring task is not firing on its cron,
-which is EXACTLY the failure that lost six nights."* Under displacement that window
-can never be met, so it was primed to raise a false alarm indistinguishable from a
-real outage — and the plausible response to that alarm is re-enabling things that
-were never off. 6 of 10 nights (08-18..08-27) fell inside a standby span.
-
-**The rule:** gate on the ARTEFACT, not the clock. "Does a row exist for the slate
-date" survives a nine-hour displacement; "was it captured between 04:33 and 04:45Z"
-does not. A wall-clock window is only evidence on a machine you have shown stays
-awake. When you must distinguish "never fired" from "fired and was suspended", the
-readings that actually discriminate are `enabled: false` and a `lastRunAt` older
-than a full period — not a stale `captured_at`.
+- **Compounding it:** the sibling task `live-gameline-fixes-first-real-reading` had a hardcoded freshness window ("a row `captured_at` between 04:33Z and 04:45Z") and was instructed, on a miss, to declare *"the recurring task is not firing on its cron, which is EXACTLY the failure that lost six nights."* Under displacement that window can never be met, so it was primed to raise a false alarm indistinguishable from a real outage — and the plausible response to that alarm is re-enabling things that were never off. 6 of 10 nights (08-18..08-27) fell inside a standby span.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 A lane-guard claim can be held by PROSE, and "TRANSFERRED" releases nothing
 
-Blocked from editing `game_chip_scoreboard.py` by `wnba-chip-live-token`. Removing
-the path from that lane's `- Files:` line did not clear it, because:
-
-- `lane-guard.py` matches `rel.endswith("/" + f)`, so a **bare filename anywhere in
-  the Files block counts as a claim**. The historical note "— `game_chip_scoreboard.py`
-  ADDED after the first test run" was holding the claim by itself.
-- Its disclaimer vocabulary is a **fixed list** — `not claimed`, `released`, `held by`,
-  `claimed by`, `collision check`, … — and **"TRANSFERRED" is not in it.** So the
-  `~~polymarket_board_join.py~~ **CLAIM TRANSFERRED**` note in `open-bet-live-status`
-  releases NOTHING; that claim is still live despite reading as handed off.
-
-**The rule:** a release is only real if the guard parses it. Verify by DRIVING the
-hook (`echo '{"tool_name":"Edit","tool_input":{"file_path":"..."}}' | python
-.claude/hooks/lane-guard.py`), never by reading the ledger and believing the prose.
-Note the guard cannot express a per-branch claim: releasing for one concern releases
-the file for everyone, so say so where the next reader will see it.
-
----
+- **The rule:** a release is only real if the guard parses it. Verify by DRIVING the hook (`echo '{"tool_name":"Edit","tool_input":{"file_path":"..."}}' | python .claude/hooks/lane-guard.py`), never by reading the ledger and believing the prose. Note the guard cannot express a per-branch claim: releasing for one concern releases the file for everyone, so say so where the next reader will see it.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: building a fix for a hypothesis the REFUSAL NAME has already ruled out `[lane venue-join-refusal-visibility]`
 
-- **What we believed:** soccer was absent from Polymarket execution because
-  whole competitions never entered the `soccer` bucket — `mls` was unprovable,
-  so its 30 h2h markets sat under a key no board row looks up. Measured and
-  true: 0 of 9 MLS fixtures resolve both clubs through the flat alias map.
-- **What was actually true:** that defect is real and was NOT the blocker for
-  the rows I pointed at. The board's 104 soccer h2h rows were already refusing
-  as **`no_match`**, never `no_candidates`. Those are different words for
-  different facts and the module documents the difference: `no_candidates`
-  means the bucket was empty, `no_match` means candidates were present and no
-  FIXTURE paired. The bucketing fix shipped, proved 13 competitions, moved the
-  ops reader from 738 to 1,809 markets — and left `no_match|soccer|h2h` at
-  **93 of 93 board rows**. Zero soccer matches gained.
-- **How we found out:** the denominator. `no_match|soccer|h2h` fell 104 -> 93
-  and I nearly reported it as the fix working. The board had shrunk 1326 ->
-  1308 rows and carried exactly 93 soccer h2h rows. 93 of 93 is 100%, same as
-  104 of 104.
-- **The rule:** before building a fix, read the refusal NAME that is already
-  being emitted and ask which hypothesis it eliminates. A refusal vocabulary
-  written to distinguish causes is worthless if the next person treats every
-  entry as "it didn't work". The name was in production logs for days.
-- **Corollary, and it is the cheaper half:** a count without its denominator
-  cannot tell a fix from a shrinking population. `no_match: 93` is not progress
-  from `104` until you know the board had 93 rows to offer.
-- Real blocker, one instance, UNVERIFIED: fixture home/away orientation
-  (`rrc-elc` vs board `Elche @ Racing`). Counter shipped, never run.
-
----
+- **What we believed:** soccer was absent from Polymarket execution because whole competitions never entered the `soccer` bucket — `mls` was unprovable, so its 30 h2h markets sat under a key no board row looks up. Measured and true: 0 of 9 MLS fixtures resolve both clubs through the flat alias map.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: reading ~0.5 as a weak signal from a comparison never shown to DISCRIMINATE `[lane venue-join-refusal-visibility]`
 
-- **What we believed:** the Polymarket spread sign test was under-powered.
-  Ten production runs returned `rate` 0.44-0.60 at n=9..22 against
-  `min_sample=30`, and the verdict said `UNDECIDED: n < min_sample` — which
-  reads as "collect more".
-- **What was actually true:** the test could never answer. Polymarket lists a
-  spread market per side per line, so a fixture's ladder spans BOTH signs —
-  measured, 12 of 12 sampled MLB fixture/magnitude pairs carry `pos` and `neg`.
-  Comparing "the sign of a rung" to the board's sign is a coin flip by
-  construction. Final reading after the guard: `fixtures=0 rate=None
-  both_signs=17` — **all 17** previously-scored fixtures were non-identifying.
-  Every one of those 17 votes was manufactured out of slate iteration order.
-- **The trap this was minutes from setting:** the verdict ladder mapped
-  anything other than ~1.0/~0.0 to **`FALSIFIED: the sign is not fixed per
-  fixture; do not ship a mapping on this`**. ~0.5 is exactly what a
-  non-identifying test returns. At n>=30 it would have written a property of
-  the INSTRUMENT into the ledger as a durable measurement about the VENUE, and
-  the next reader would have believed Polymarket spreads were unfixable.
-- **Three rounds of one mistake, and I shipped round two:** the module header
-  already recorded round zero (segment `f5` slugs producing 0.2857 that "looked
-  like evidence"). I fixed the rung selection to compare like-for-like, got
-  0.4706, and only then checked whether the comparison could discriminate at
-  all. The better comparison landed in the same place because the defect was
-  never in the sampling.
-- **The rule:** a rate near 0.5 is not weak evidence. It is what NO evidence
-  looks like, and it is indistinguishable from a real coin flip until you have
-  shown the comparison can separate the cases. Prove discrimination BEFORE
-  reading the rate, and never let a verdict ladder map "inconclusive" onto a
-  substantive conclusion.
-- `UNDECIDED` and `NON-IDENTIFYING` are different instructions to the reader:
-  "collect more" versus "collecting more cannot help". A test that cannot tell
-  them apart will keep being fed data forever.
+- **What we believed:** the Polymarket spread sign test was under-powered. Ten production runs returned `rate` 0.44-0.60 at n=9..22 against `min_sample=30`, and the verdict said `UNDECIDED: n < min_sample` — which reads as "collect more".
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: reading `lastRunAt` as evidence a scheduled job RAN. It records DISPATCH, and on this machine the two were nine hours apart.
 
-`live-gameline-accuracy-snapshot` showed `lastRunAt: 2026-08-28T04:34:17Z`,
-exactly in its expected window, and had produced no row. The obvious readings —
-the task is broken, the script is broken, the scorer is off — were all wrong.
-
-The session fired on time and emitted its Bash call at `04:34:24.813Z`. **The
-result returned at `13:49:37.933Z`.** Windows entered Modern Standby at
-`03:57:42Z` (Kernel-Power **506**, Idle Timeout) and left it at `13:48:00Z`
-(**507**, "Reason: Input Mouse"). Modern Standby keeps the NETWORK alive — so
-the scheduler ran and the model produced a tool call — while the Desktop
-Activity Moderator suspends user-mode processes. The session could DECIDE to run
-the script and could not RUN it. The slate rolled in between; the capture landed
-empty.
-
-**How to tell it apart from a task bug, cheaply:** other concurrent sessions
-will show a gap ending at the SAME INSTANT. Three did — 10.22h, 9.99h, 9.78h,
-all resuming inside 72 seconds, from different start times. A per-task bug
-cannot do that. Confirm with `Get-WinEvent` System log, Kernel-Power 506/507.
-
-**The general form:** a scheduler's own record of firing is upstream of every
-interesting failure. Check the ARTIFACT the job writes and compare its timestamp
-to `lastRunAt`. Same family as "presence is not reachability" and "confirm the
-code ran".
-
-**Corollary, and it cost a near-miss the same day:** a wall-clock cron whose
-deadline is a real-world roll (a slate date, a market close) must not live on a
-machine that sleeps. The fix was not to harden the cron but to move the work to
-where the data already is — the worker that builds the artifact — which deleted
-the deadline rather than defending it.
+- **How to tell it apart from a task bug, cheaply:** other concurrent sessions will show a gap ending at the SAME INSTANT. Three did — 10.22h, 9.99h, 9.78h, all resuming inside 72 seconds, from different start times. A per-task bug cannot do that. Confirm with `Get-WinEvent` System log, Kernel-Power 506/507.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: baselining a test in a fresh worktree when the test reads state the worktree does not share. It is not a baseline, it is a different experiment.
 
-Two `MissingRequiredArtifactRepairTests` failed after my change. I created a
-worktree at `origin/main`, ran them, saw them PASS, and reported that my change
-had broken them.
-
-**A git worktree does not carry the primary tree's `data/` mirror, and that test
-reads the real data root** — visible in its own error output
-(`...\Syndicate\data\wnba_source\...`), which I had already been shown and did
-not read. The worktree was a different environment, so the comparison was
-meaningless.
-
-Reverting ONLY my edit **in place**, in the tree where the symptom appeared,
-reproduced both failures. They were pre-existing and environmental.
-
-**The rule: isolate the variable you changed, in the environment the symptom
-lives in.** Changing the environment and the code at once and attributing the
-delta to the code is the error. Related: "re-baseline before judging" — but note
-this failed the other way, a stale baseline said INNOCENT when the truth was
-also innocent, and I still got the attribution wrong.
+- **A git worktree does not carry the primary tree's `data/` mirror, and that test reads the real data root** — visible in its own error output (`...\Syndicate\data\wnba_source\...`), which I had already been shown and did not read. The worktree was a different environment, so the comparison was meaningless.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: concluding a lane claim is free because the roster says its session is gone. `get_session` said "not found" while the session was live.
 
-`syndicate/blueprints/intelligence.py` was claimed by an OPEN lane and I had
-authorisation to take it. `get_session` on the holding session
-(`12b2be57-...`) returned **"Session not found"** — which reads as "it ended,
-the claim is stale, reassign it."
-
-Its transcript's last entry was **11 seconds old**. The session was actively
-editing that file.
-
-An archived-but-running session, an ended session, and one that never existed
-are **indistinguishable** through the roster. The transcript's last timestamp is
-the ground truth and costs one read:
-
-    ~/.claude/projects/<project>/<session-id>.jsonl   -> max timestamp
-
-Extends "session roster hides archived": that rule said the roster OMITS things;
-this says it can also answer a confident NOT FOUND about something running right
-now. Never reassign a claim on roster evidence alone.
-
-
-### 2026-08-28 — FORBIDDEN: trusting a refusal's stated premise without rechecking it. A REASONED "we cannot do this" is stickier than a bug, because it tells the next reader not to look
-
-**What the code said, and it had said it for months.**
-`bet_status_wnba` refused every WNBA spread, moneyline and total. Not by
-omission — by an argued comment:
-
-> The market IS gradeable in principle -- `game_line_bet` handles spreads and
-> moneylines for any sport that can supply two team scores. This capture is a
-> PLAYER box and has none, **so the fix is upstream in the capture** rather than
-> a missing entry in a table here.
-
-Every clause of that is true except the last one. The final boxscore CSV, which
-this same module ALREADY READS for player props, carries `TEAM_ABBREVIATION` and
-`PTS`. **In basketball a team's score IS the sum of its players' points** — there
-is no team-level scoring, no own goal, no defensive touchdown — so the team score
-was one `groupby` away in an artifact the function had open. Nothing upstream had
-to change.
-
-**Why it survived.** The comment is GOOD writing. It names the constraint,
-distinguishes two candidate fixes, says which is wrong and why, and points at the
-right owner. It reads like a conclusion someone reached carefully — which is
-exactly what makes it a stop sign. A missing feature invites investigation; a
-reasoned refusal closes it. This one even carried its own test
-(`test_a_game_line_names_the_CAPTURE_as_the_blocker_not_the_vocabulary`), so the
-premise had a green check beside it.
-
-**What it cost.** Five WNBA game lines exist in the live book. One settled, and
-only because Kalshi settled it for us. Two (`GSV @ CON` 2026-08-26, over and
-under 151.5) sat ungraded for two days with no mechanism that could ever reach
-them. The real total was 153.
-
-**HOW TO APPLY.**
-1. **A refusal's premise is a CLAIM, and claims get checked.** "This artifact has
-   no X" is falsifiable in about a minute — open the artifact. I found the
-   answer by fetching one CSV and reading its header.
-2. **Suspect a premise hardest when the code already reads the artifact it
-   claims is insufficient.** `_load_final_box` was fifteen lines away.
-3. **Domain invariants are evidence, and they are sport-specific.** Sum-of-parts
-   equals the whole for basketball points; it does NOT for soccer goals (own
-   goals) or football points (defensive scores). The reasoning transfers by
-   sport, not by shape — check the sport before reusing this.
-4. **Verify the derivation against an independent source BEFORE relying on it**,
-   even when the arithmetic looks obvious. Six of six exact against ESPN's own
-   scoreboard, both sides of three games, took one request. Had it been five of
-   six I would have shipped a settlement path on an assumption.
-5. **A test can pin a wrong premise as firmly as a right one.** When the premise
-   falls, the test is the thing to invert — not the evidence.
-
-**Companion, same session, same shape:** the SECOND wrong belief I held was
-`/api/ops/artifacts/export` showing no `boxscores_2026-08-26.csv`, which I read
-as "the capture died". It is a DISK read; the producer and the consumer both use
-`read_text_file` (KEYVALUE). The count endpoint returned `games: 2` the whole
-time. That is the keyvalue/artifact split already in this file, hit again — so
-the rule needs restating as an instruction rather than a fact: **before
-concluding an artifact is absent, name which STORE you looked in and which store
-its consumer reads.** They are frequently not the same one.
+- **What the code said, and it had said it for months.** `bet_status_wnba` refused every WNBA spread, moneyline and total. Not by omission — by an argued comment:
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: instrumenting a function without first proving it is ON the path you are measuring. I did it, and the counter read zero.
 
-Soccer's overview cost was unlocated. I found a mechanism that explained it
-beautifully: `build_soccer_market_board` takes a LEAGUE, caches on a **60s TTL**
-against a **680-874s** board build, and loads a **sport-wide** odds_history
-shard that had grown **3,935,768 -> 48,169,883 bytes (12x)** in a day — without
-passing the `cache` argument the loader accepts. Ten leagues x 48MB per build.
-Magnitude and growth curve both fit.
-
-**Every one of those facts is true, and the theory is worthless, because
-`build_soccer_market_board` IS NOT ON THE OVERVIEW PATH.** `soccer/cards.py` —
-what `_build_sport_overview` actually calls — never imports `market_board`. Its
-importers are the `/soccer` blueprint, `layer1_board`, `live_refresh_loop`. I
-shipped a counter into it and production emitted ZERO lines.
-
-**THE CHECK I SKIPPED IS ONE GREP.** Before instrumenting `f`, grep from the
-entry point you are timing to `f`. Not "is `f` plausible", not "does `f` have
-the right shape" — is `f` REACHED. A mechanism can be real, documented, and
-irrelevant at the same time, and a coherent story is the most dangerous form of
-that because it stops you checking.
-
-**THE ZERO WAS THE FIND.** A counter that never fires is not a failed
-measurement — it is a strong negative about reachability, and it arrived faster
-than any positive would have. Instrument to falsify, and treat an empty log as
-data rather than as something wrong with the logging.
-
-**THIS WAS PREDICTION FIVE OF FIVE, ALL REFUTED**, on one subsystem in one day:
-~39 leagues (10), fan-out (one cold league), one slow league (whichever is
-cold), props (0.17s), this. `feedback_presence_is_not_reachability` already
-covers the general case; the new part is that I applied it to DEPLOYS all
-session and never once to a CODE PATH.
-
-**AND THE HONEST CONSEQUENCE:** after five refutations my hit rate on a
-subsystem is evidence about my model of it. The right move was to stop
-proposing mechanisms and change method — a profiler over one real build, rather
-than a sixth incremental log span.
-
-### 2026-08-28 — FORBIDDEN: diagnosing a resolver when the log said `graded=N` and the served payload changed nothing. That is a LOST WRITE, and I spent three theories on the wrong layer
-
-**The symptom, and how long it fooled me.** `[paper_settlement] SETTLED
-date=2026-08-26 ... graded=8` with `outcomes={'lost': 3, 'won': 5}` — and zero
-live rows changing outcome on `/api/portfolio/live` across that pass. I read
-that as "the rows never reached the resolver" and went looking for what filtered
-them, through **three** theories: a reconcile race on `status` (disproved —
-`reconciled_at` is re-stamped every cycle, so `reconciled_from: 'submitted'`
-records the ORIGINAL transition, not a recent one); an upstream sport filter;
-a missing artifact. A peer offered a fourth (a keyvalue/disk store mismatch).
-
-**What settled it was running the DEPLOYED predicate chain against the REAL
-order records** rather than reasoning about it:
-
-    outcome truthy?  False
-    status = 'filled'   -> not_filled?      False
-    mode   = 'live'     age 42.76h/45.21h   -> awaiting_venue? False (24h grace)
-    => REACHES RESOLVER: True
-
-Nothing filtered them. They were graded, and the write was discarded 12 seconds
-later by the other service.
-
-**The cause was two log lines apart the whole time.** Both services print
-`KEYVALUE_WRITE_LARGE` with a `size_bytes`:
-
-    refresh-worker    17:40:48   1,276,296
-    live-odds-worker  17:41:00   1,268,265   <- 8,031 bytes SMALLER
-
-**HOW TO APPLY.**
-1. **`graded=N` (N>0) with no outcome change on the served surface is a LOST
-   WRITE. It is not a resolver bug.** Check the write, not the reader.
-2. **A whole-document `size_bytes` that goes DOWN is the cheapest possible
-   detector for a clobber**, and both services already print it. Diff the sizes
-   across services before forming any theory about why data is missing.
-3. **Run the deployed predicate chain against the real record.** Every one of my
-   three theories was about which branch a row took; the branch was checkable in
-   about a minute and I kept reasoning instead.
-4. **A peer's theory is not evidence either.** Declining the fourth one because
-   the chain had already answered it was the only correct move available.
-
-**Related, same session, same shape one level up:** the durable
-`last_blind_write` stamp I added to replace an ephemeral log line shipped
-WRITE-ONLY — into the document and into `ledger_summary()`, which nothing in
-production calls. **Durable state with no reader is barely better than the log
-line it replaced.** Found by reading the deployed endpoint's payload instead of
-assuming the field had arrived. Add the reader in the same commit as the field.
-
+- **Every one of those facts is true, and the theory is worthless, because `build_soccer_market_board` IS NOT ON THE OVERVIEW PATH.** `soccer/cards.py` — what `_build_sport_overview` actually calls — never imports `market_board`. Its importers are the `/soccer` blueprint, `layer1_board`, `live_refresh_loop`. I shipped a counter into it and production emitted ZERO lines.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: treating a "this API does not exist" finding as a fact about the VENUE when it was written from a network that could not reach the venue. It is a fact about the NETWORK.
 
-`cryptocom_client.py`'s `FINDING` (2026-08-24) said: no public REST/WebSocket
-market-data API has shipped; the one concrete endpoint anyone had cited came
-from "a third-party marketing site" and was "uncorroborated by any
-Crypto.com-owned source". It carried a `confidence` field admitting the agent
-proxy had denied a direct read of the page it was reasoning about.
-
-Re-checked 2026-08-28 from a machine with egress. **Three claims, three wrong,
-all in the direction that stops the next reader looking:**
-
-1. The endpoint is printed on **Crypto.com's own API page**, in the hero
-   terminal sample. The third party was quoting them.
-2. A JSON endpoint serving **sports events exists** and returns 200 with 200 MLB
-   rows. "Nothing shipped" was false.
-3. Sports was treated as uncovered because `exchange-pro` says "crypto, politics
-   and economics". That page describes the DCM/FCM institutional feed. Sports is
-   a **headline category of the product**. Neither page is evidence about the
-   other.
-
-The real blocker was findable only WITH egress and is much more specific:
-Cloudflare. 200 JSON to a challenged browser, **403 to curl with full Chrome
-headers**. That is a sharper, more actionable fact than "no API", and the
-blocked session could not have reached it.
-
-**The decision ("do not build") was right in both versions. The REASONS were
-false, and a false reason is worse than no reason** — it reads as a closed
-question. Compounding: the same finding's `probe()` named "HTML that mentions a
-live REST path" as its unblock signal; that would FIRE TODAY and be wrong, since
-the page advertises a REST path no host serves.
-
-**How to apply.** A finding whose own text says the network was blocked is a
-HYPOTHESIS with a stated expiry, not a result. Re-run it from egress before
-citing it, and write the status as what you could not do
-(`no_sanctioned_server_readable_api`) rather than as a claim about what the
-other party has not built (`no_public_api_yet`). Extends "trusting a refusal's
-stated premise without rechecking it" (same day) from code comments to findings.
-
+- **The decision ("do not build") was right in both versions. The REASONS were false, and a false reason is worse than no reason** — it reads as a closed question. Compounding: the same finding's `probe()` named "HTML that mentions a live REST path" as its unblock signal; that would FIRE TODAY and be wrong, since the page advertises a REST path no host serves.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — A lane disclaimer marker governs its OWN LINE ONLY. Three of five "contested" files were deference that PARSED as ownership.
 
-`check_lane_invariants` flagged 5 files with two or three OPEN holders. Three
-were never real contests — the ledger already recorded the resolution in prose:
-
-    ~~`scripts/run_refresh_worker.py`~~ (claim on THIS ONE FILE released
-    `paper_settlement.py` (held by `open-bet-live-status`, session `syndicate-27`,
-
-`lane-guard._claimable_prefix` cuts a line at its FIRST disclaimer marker and
-keeps what precedes it. In both lines the path precedes the marker, so both
-parsed as live claims. A **strikethrough means nothing to the parser**, and a
-marker on line N does not govern a path on line N+1.
-
-**The form that works** — marker first, path after, on ONE line:
-
-    RELEASED `[2026-08-28, session <id>]`: `syndicate/templates/portfolio.html`
-
-My first fix attempt failed for exactly this reason: I put the released paths on
-a continuation line under a marker line. It also created a PHANTOM claim on
-`/.claude`, because `PATH_RE` matched `~/.claude` in prose I wrote inside a
-`- Files:` block. **Do not write example paths, tool paths, or directories
-inside a Files block.**
-
-**How to apply.** After any edit to `lanes.md` claims, diff the CLAIM SET
-against `HEAD` with the checker's own parser rather than reading the text —
-`m.claims(git show HEAD:...)` vs `m.claims(working copy)`. It caught both
-mistakes here and proved the final state removed exactly 5 and added 0 (121 ->
-116). Reading the markdown would not have shown either.
-
----
+- **The form that works** — marker first, path after, on ONE line:
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — AMENDS the `createdAt`/`finishedAt` rule: the DEPLOY RECORD and the PROCESS are not the same instant `[lane venue-join-refusal-visibility]`
 
-The existing rule says *"a deploy timestamp marks when you ASKED; only
-`finishedAt` marks when the code ran."* The first half is right. **The second
-half is off by up to half a minute**, and on a worker that emits every few
-seconds that is a real window.
-
-Measured on refresh-worker, 2026-08-28:
-
-```
-deploy 521b6dea finishedAt   20:20:59      <- the deploy record
-[refresh_worker] BOOTED      20:21:29      <- the process, 30s later
-```
-
-A log line at 20:21:10 is AFTER `finishedAt` and BEFORE the new process
-existed. `finishedAt` says the artifact is ready; only the boot line says the
-code is running. **For a before/after they are not interchangeable, and the one
-that matters is the process.**
-
-**HONESTY ABOUT SCOPE, because overstating this would make it a worse rule:**
-in the incident that produced it, `finishedAt` WOULD have been sufficient. A
-peer read a `POLYMARKET_ORIENTATION` line from 20:19:16 as post-deploy — before
-`finishedAt` AND before `BOOTED` — because they INFERRED "~20:18Z" instead of
-reading the field at all. The actual error was not consulting the record; the
-30-second window is a hazard I found while checking, not the one that bit.
-
-Both halves are worth carrying:
-
-- **Read `finishedAt`, never infer a deploy time.** That is what went wrong.
-- **Prefer the service's own boot line when a reading sits within ~30s of it.**
-  That is what could go wrong next.
-
-**WHY IT MATTERED HERE.** The mislabelled reading showed `listed 5 -> 24` and
-`unreadable 66 -> 45` on a counter I had shipped, and I was told my tri-code
-table had worked. It had never executed. The change was slate turnover between
-two reads of the SAME binary — the exact "a count is not a rate when the
-population moves underneath it" error this lane spent the day fixing, arriving
-one level up as a gift from a peer. **A result handed to you by another session
-still needs its boundary established, and the more welcome it is the more that
-applies.**
+- **HONESTY ABOUT SCOPE, because overstating this would make it a worse rule:** in the incident that produced it, `finishedAt` WOULD have been sufficient. A peer read a `POLYMARKET_ORIENTATION` line from 20:19:16 as post-deploy — before `finishedAt` AND before `BOOTED` — because they INFERRED "~20:18Z" instead of reading the field at all. The actual error was not consulting the record; the 30-second window is a hazard I found while checking, not the one that bit.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: keying a venue join on the fixture without keying it on the PORTION of the fixture
 
-**Measured, real money: five orders, $7.08.** `kalshi_board_join._match_key` and
-`_row_key` were five-tuples — game, market, player, line, side — with no
-`segment`. A board row for "under 2.5 runs, first 3 innings" therefore matched
-Kalshi's FULL-GAME `KXMLBTOTAL` on every field the key contained, and nothing
-downstream checked that the contract settles on a different portion of the game.
-
-    first3  under 2.5  KXMLBTOTAL-26AUG281940TEXMIL-3  +1900,  5c
-    first3  under 2.5  KXMLBTOTAL-26AUG282138PHILAA-3  +1900,  5c
-    first3  under 2.5  KXMLBTOTAL-26AUG281845MIAWSH-3  +1900,  5c
-    first3  under 2.5  KXMLBTOTAL-26AUG281840LADDET-3  +1567,  6c
-    first5  under 3.5  KXMLBTOTAL-26AUG281840LADDET-4  +567,  15c
-
-**THE PRICE IS THE TELL, AND IT LOOKS LIKE FREE MONEY RATHER THAN LIKE A BUG.**
-The model priced "under 2.5 through three innings" — an ordinary proposition —
-against the venue's price for "under 2.5 in nine", correctly ~5c because it
-almost never happens. +1900 is not an edge; it is the two numbers describing
-different events. **A mis-keyed join does not present as a missing match, it
-presents as the best line on the board** — so the edge-ranking that is supposed
-to find value actively SELECTS for the defect. Every one of the five will lose.
-
-Kalshi HAS the right contract (`KXMLBF5TOTAL`, 'First 5 innings: Over 6.5 runs')
-and we already fetch it, so this was a mis-SELECTION, not an impossibility.
-
-**RULE.** A join key must carry every dimension on which the two sides could
-disagree while still comparing equal. For a venue contract that is at minimum
-fixture + market + line + side + **segment**. Adding a market family to an
-existing join is the moment to re-audit the key, not to reuse it.
-
-**AND THE COROLLARY THAT NEARLY CAUSED A BIGGER LOSS.** My first fix refused
-every unmapped series. That would have unindexed the entire player-prop book —
-`KXMLBKS`, `KXWNBAREB`, `KXMLBHIT` are absent from the table and all inherently
-whole-game — trading a $7.08 defect for no Kalshi orders at all. The general
-rule "unknown must not default permissive" is right, but **the permissive branch
-has to be identified against what the field actually ranges over**, not assumed
-from the shape of the bug. Here the protection belongs on the BOARD side: a row
-saying `first3` cannot match a contract saying `full` whatever the series is
-named, so unmapped can safely default to `full`. Refusal is reserved for a
-series carrying a segment MARKER (F5, INNING, 1H…) that is not in the table,
-which closes the mirror failure without touching the props.
-
-Caught by the existing suite, not by me: `test_the_price_resolver_is_keyed_as
-_tightly_as_the_join` failed on a fixture with no `series` — which was itself
-the discovery that NEITHER match-record construction carried one, so version one
-would have unindexed every Kalshi match in production.
-
-**Stale reassurance is a hazard in its own right.** `_match_key`'s docstring
-said Kalshi "currently supplies only player props, whose `player_name` happens
-to identify a game" — true when written, and it named its own accident. The
-accident expired when the join started supplying game totals, and nothing
-re-read the paragraph that depended on it. Corrected in place rather than
-replaced, as the record of a comment that went false silently.
-
-Fix: `632f3473`. `kalshi_catalogue.segment_for_series` + `segment` in both key
-tuples + `series` stamped at both match-record sites. 9 new tests, 127 passing
-across the Kalshi join and catalogue suites.
+- **Measured, real money: five orders, $7.08.** `kalshi_board_join._match_key` and `_row_key` were five-tuples — game, market, player, line, side — with no `segment`. A board row for "under 2.5 runs, first 3 innings" therefore matched Kalshi's FULL-GAME `KXMLBTOTAL` on every field the key contained, and nothing downstream checked that the contract settles on a different portion of the game.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: closing on the venue that was REPORTED when the join it mirrors has the same key
 
-`#601` arrived as "the Kalshi segment bug" and I fixed it as one — correctly,
-with tests, and landed. Then I ran the same query against Polymarket and found
-**four more bad orders of the same class, the same day.** Nine distinct wrong
-orders across both venues, not five. Nothing pointed at Polymarket; the only
-reason it surfaced is that the audit was repeated rather than concluded.
-
-**HALF A GUARD IS WORSE THAN NONE.** Polymarket's join ALREADY refused segment
-MARKETS on the venue side (`segment_market_not_full_game`), ~200 lines above the
-board loop that had no matching check. That guarantee made the index safe and
-the missing board-side check unsafe in the same stroke: because every indexed
-market is full-game, a `first3` row could not match a CORRECT contract — only a
-wrong one. **The half that exists is what makes the other half look
-unnecessary**, and a reader who finds the venue-side refusal will reasonably
-conclude segment is handled.
-
-So: when a guard exists on one side of a join, that is a reason to check the
-other side, not evidence that the concern is covered.
-
-**THE UPSTREAM SIGNAL WAS SITTING IN PLAIN SIGHT AND BOTH CONSUMERS IGNORED IT.**
-`layer2_board.py:623` keys a board row on `(event_id, market, **segment**, line,
-player_name)`. The board has always treated segment as part of a row's identity.
-Two independent venue resolvers each flattened that identity to a 5-tuple. That
-is not two bugs, it is one mistake made twice — which is the argument for
-grepping every consumer of a shared record shape when one is found wrong, rather
-than fixing the one that was reported. **Not yet done for the remaining
-consumers, and recorded as open in `#602`.**
-
-Related: the correction discipline that found it. The reported symptom named a
-venue; the DEFECT named a key. Fixing at the level of the symptom would have
-left half the money on the table and the ledger reading as if it were closed.
+- **four more bad orders of the same class, the same day.** Nine distinct wrong orders across both venues, not five. Nothing pointed at Polymarket; the only reason it surfaced is that the audit was repeated rather than concluded.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: sizing a fix before measuring the component's SHARE of the whole. I did it twice in one day on the same subsystem.
 
-**Instance 1.** I found soccer's cards-context TTL (600s) was finer than the
-board build period (680-874s), fixed it, measured `games()` 42.34s -> 2.76s and
-recorded a verified 15x win. The sport bracket was 163-382s. The component I
-fixed was ~3s of it. I optimised a real defect that could not matter.
-
-**Instance 2, after being caught on the first.** I traced the cost to
-`week_games`, proposed a request-scoped memo of `recommendations_payload`, and
-worked out the plumbing in detail -- `games()` is an 8-implementation
-interface, three signatures below it need changing, and memoizing the payload
-itself is FORBIDDEN (`@lru_cache` removed 2026-07-24; matches froze at
-`status_state="pre"` 0-0 for days). Every word of that is correct. Then I
-measured:
-
-```
-la_liga  total 20.78s   payload_s 1.29   assemble_s 19.49
-```
-
-**`payload_s` is under 7%.** The memo would save 1.3 of 20.8 seconds.
-
-**THE RULE:** before designing a fix for component `C`, get `C / whole`. Not
-`C`'s absolute cost, not whether `C` contains a genuine defect -- its SHARE.
-A real defect in a 7% component is a real defect that cannot move the number.
-Both times I had the whole (163-382s bracket; 20.78s call) and the component
-in hand and did not divide.
-
-**WHY IT KEPT HAPPENING:** finding a defect feels like finding THE defect. The
-TTL was genuinely too fine. The payload memo was genuinely blocked by two
-recorded cache removals. Being right about the mechanism is what made me stop
-checking whether it mattered.
-
-**COROLLARY, from the same session:** `la_liga` week 3, SAME 10 fixtures, read
-3.24s and 13.99s -- 4x on identical inputs. A single sample of a variable
-quantity is not a measurement of it, and I built a "slow league" theory on one
-`belgian_pro_league` reading. When the spread on identical inputs is larger
-than the difference you are explaining, you are explaining noise.
+- **Instance 1.** I found soccer's cards-context TTL (600s) was finer than the board build period (680-874s), fixed it, measured `games()` 42.34s -> 2.76s and recorded a verified 15x win. The sport bracket was 163-382s. The component I fixed was ~3s of it. I optimised a real defect that could not matter.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: judging a change by the metric I chose instead of the metric the USER SEES. Mine read "bought nothing"; the board read 4h24m stale.
 
-I raised `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` 300 -> 1800
-(code default) so future dates would stop stealing cycles from today. I then
-measured today's SHARE of build cycles, found it unmoved at ~50%, and recorded
-the change as **"bought nothing"** — harmless, left in place.
-
-Nine hours later the user asked why the board was stale. It was showing
-`as of 12:15 PM` at 4:33 PM:
-
-```
-2026-08-28   last build 21:20:24   19m
-2026-08-29   last build 21:37:15    3m
-2026-08-30   last build 17:15:20  264m   <- sets computed_at
-```
-
-`combined_board_window` reports `computed_at` as the OLDEST contributor's
-stamp, deliberately, so the weakest link is what the board shows. My throttle
-starved the third date of a 3-day window until it set the vintage for the
-whole board. Today and tomorrow were 19 and 3 minutes fresh and it did not
-matter.
-
-**THE RULE:** when a change alters scheduling, priority or cadence, check the
-USER-FACING freshness/quality signal, not only the internal counter you
-reasoned about. "Bought nothing" is a conclusion about MY metric. The question
-is always "what does the surface show now".
-
-**AND "NO EFFECT" IS NOT A SAFE VERDICT.** I left it deployed BECAUSE I
-believed it was inert. A change measured as neutral on the chosen metric is
-not thereby harmless — it is unmeasured on every other one. Either revert it
-or check the surface; do not bank neutrality as safety.
-
-Same family as the share-of-the-whole rule logged earlier today: both are
-measuring a real quantity confidently and it being the wrong quantity.
+- **THE RULE:** when a change alters scheduling, priority or cadence, check the USER-FACING freshness/quality signal, not only the internal counter you reasoned about. "Bought nothing" is a conclusion about MY metric. The question is always "what does the surface show now".
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — Pre-registering a confound does not help if you get its SIGN wrong
 
-Before deploying `#604` I wrote the expected reading down in `deploys.md`:
-Kalshi `matched` would FALL (my phantom-match removal) while `unreadable_title`
-would also fall (a peer's soccer grammars) — "two independent causes moving two
-numbers in the same direction, so neither is evidence for the other."
-
-Measured after: `matched` **233 → 255, it ROSE**; `unreadable_title` 2242 → 1790.
-The two causes moved in **opposite** directions, and the peer's +452 newly
-readable titles swamped my guard, which fired **twice**.
-
-Writing the prediction down was still right — it is why the miss is legible at
-all instead of being quietly re-narrated. But two further rules come out of it:
-
-1. **A co-deployed change can swamp your effect entirely.** A 2-count guard is
-   not measurable against a 452-count change in what the same function can read.
-   The honest report is "cannot isolate", not a hedged causal story. If an effect
-   must be attributed, it needs its OWN counter — which is exactly what `#604`
-   added, and why `segment_has_no_matching_series: 2` is the real evidence while
-   `matched` is not.
-2. **Predict the SIGN, not just the confound.** "Both move together" felt like
-   rigour and was an unchecked assumption doing the work of a measurement.
-
-Related, same session, same shape: I told the user tonight's 20:22 sim "was
-killed by a deploy and relaunched harmlessly" while advising them on whether to
-override a deploy guard. It **completed on its own** at 20:56:24, two minutes
-before the 20:58:17 deploy — which is precisely why preflight read CLEAR. **No
-sim was killed tonight, so there was no local example of a kill being harmless**,
-only the ledger's example of one being harmful. I had inverted the evidence in
-the direction that made the action I was about to take look cheaper. Corrected
-to the user before they decided.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: reaching for the next knob after a tuning change fails. Three attempts, each refuted by the next reading, when the second should have said "structural".
 
-The board displayed `as of 12:15 PM` at 4:33 PM. `computed_at` is the OLDEST
-contributing date's stamp, so one starved date sets the whole board's vintage.
-
-  1. I had raised `SLOW_REFRESH_SECONDS` 300 -> 1800 that morning and recorded
-     it "bought nothing" -- measured today's SHARE of cycles, never the board.
-  2. Set it to 600 to loosen the throttle. **`2026-08-29` went 3m -> 84m.**
-  3. Set `BOARD_WINDOW_DAYS=2` to remove a competitor. **Today absorbed the
-     freed slot: 36 minutes post-boot, two builds, both today.**
-
-**THE SIGNAL I IGNORED IS AT STEP 2.** A change that moves the metric the WRONG
-WAY is not a dosage problem, it is evidence the model is wrong. I read it as
-"not enough" and reached for a second knob. The cause was structural the whole
-time: today is re-queued every loop iteration UNTHROTTLED while futures are
-throttled, and with 11-15 minute builds today wins every slot. Eligibility was
-never the constraint; slot allocation was.
-
-**THE RULE:** when a tuning change makes the observable worse, STOP TUNING. One
-more knob is a guess that the mechanism is right and the value is wrong -- and
-the wrong-direction result is precisely the evidence against that. State the
-mechanism as unknown and go read the scheduler.
-
-**AND THE THIRD ATTEMPT PROVED IT CONCLUSIVELY, WHICH IS THE TELL.** Removing a
-competitor freed a slot and the DOMINANT party took it. If I had predicted that
-outcome I would not have run the experiment; I ran it because I still believed
-the starving date was merely under-eligible.
-
-Sits with the two rules already logged today: judging by the metric I chose
-rather than the one the user sees, and sizing a fix without the component's
-share of the whole. All three are confident measurement of the wrong quantity.
+- **THE SIGNAL I IGNORED IS AT STEP 2.** A change that moves the metric the WRONG WAY is not a dosage problem, it is evidence the model is wrong. I read it as "not enough" and reached for a second knob. The cause was structural the whole time: today is re-queued every loop iteration UNTHROTTLED while futures are throttled, and with 11-15 minute builds today wins every slot. Eligibility was never the constraint; slot allocation was.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: naming a cause from a mechanism you can see without measuring the one you cannot
 
-I diagnosed board staleness as queue starvation -- today re-queued unthrottled,
-futures throttled -- and wrote it into `state.md` and `learnings.md` as the
-STRUCTURAL cause, with "round-robin the pending queue" as the fix. The starvation
-mechanism is really in the code. It is not what was happening. One log query
-(`BUILD_SPAN_ENTER`, 8 builds) showed the dates alternating cleanly, and the real
-cause -- 900-2000s build duration against a 2-date window -- was in a stage timer
-I had already deployed and never read.
-
-**Why it survived three failed fixes:** each failure was read as "not enough of
-the right thing" rather than "the wrong thing". The `=600` result moved `08-29`
-the WRONG way, which is a refutation of the model, and I took it as a dosage
-problem. The rule written that day (`stop tuning when the observable moves the
-wrong way`) fired correctly and I still did not re-examine the CAUSE, only the knob.
-
-**The asymmetry to watch for:** a mechanism you can read in the source is
-available for free; the quantity that decides whether it BINDS costs a query. The
-free one will always be more available, and it is not evidence. Both of the
-session's real findings this day -- the alternation, and the 60-loads-per-week
-count -- came from measuring the thing that was not visible in the code.
-
-**How to apply:** before writing a cause into `state.md`, state the ONE reading
-that would refute it and take that reading. "Today starves tomorrow" is refuted by
-the build-start sequence, which is one query against a log line that already
-existed. Cost: two minutes. It was skipped for three deploys and a wrong ledger entry.
+- **Why it survived three failed fixes:** each failure was read as "not enough of the right thing" rather than "the wrong thing". The `=600` result moved `08-29` the WRONG way, which is a refutation of the model, and I took it as a dosage problem. The rule written that day (`stop tuning when the observable moves the wrong way`) fired correctly and I still did not re-examine the CAUSE, only the knob.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: carrying a component's SHARE across regimes when the regime is what sets it
 
-I found a real defect (`_match_to_game` re-reading the same `(league,date)`
-artifacts once per FIXTURE; 60 file loads -> 4, structural and reproducible),
-sized it with `assemble_s 19.49 of 20.78s`, shipped it, and measured no change at
-the sport level. The share was the problem, not the defect. That 19.49/20.78 was
-taken at 20:24Z inside a European live window. Overnight -- when I deployed and
-measured -- one full eight-league pass totals ~28.8s of a ~206s soccer bracket:
-**14%, not 95%.** A 40% cut of 14% is ~6%, which is below the noise of the thing
-I promised to move.
+- **14%, not 95%.** A 40% cut of 14% is ~6%, which is below the noise of the thing I promised to move.
+- *(evidence in `learnings_evidence.md`)*
 
-**This is the SAME confound this lane already retracted once**, in the other
-direction: a "TTL 42.34 -> 2.76s, 15x" win that was a quiet reading compared
-against a live one. I wrote that retraction, wrote the rule, and then re-used a
-live-window ratio as though it were a constant.
-
-**The generalisation:** a magnitude and a SHARE degrade differently when carried
-across regimes. `assemble_s = 19.49s` stays true of that moment. `assemble_s is
-95% of the call` is a ratio between two things that move independently, and it
-survives nothing. Treat every share as scoped to the window it was taken in.
-
-**How to apply:** before sizing a fix from a share, re-measure the share in the
-regime you will DEPLOY and MEASURE in. One query. If the deploy window and the
-measurement window differ from the window that motivated the work, that is the
-first thing to reconcile, not the last.
-
-**Also: state the settle bar and then actually meet it.** I required >25 min
-post-boot and every sample I took was 2-19 min in, across two boots. I reported
-the numbers anyway. A caveat is not a substitute for a measurement.
 ## 2026-08-29 — FORBIDDEN: reading a conditional log's silence as absence of the EVENT, when it is really absence of one SPECIAL CASE of the event
 
-`#600`'s merge logs `LEDGER_MERGE` only when `concurrent > 0` or the merge
-failed. I checked that the line is conditional, confirmed the code was live on
-all three writers, and reported a 68-minute production null — 59 settlement
-lines, 49 execute lines, zero merges — as "no collision happened, the conflict
-branch has never executed".
-
-**Both halves of that were wrong, and a forced-collision test found it in
-minutes.** `counts["concurrent"]` increments only when a row **already in our
-baseline** has a different fingerprint now (`execution_ledger.py:443`). An
-intruder that only APPENDS rows never trips it. So:
-
-- an addition-only race IS a collision, IS merged correctly, and logs NOTHING;
-- **a placement cycle appending orders while a settlement pass holds a snapshot
-  is exactly that case** — i.e. the most likely real-world race on this ledger
-  is the one the instrument cannot see;
-- the conflict branch may well have been running successfully all along.
-
-**The rule.** "This log is conditional, therefore its silence is meaningful" is
-only half the check. The other half is **what exactly the condition is**, read
-off the increment site — not the log line, not the function name. `concurrent`
-sounds like "another writer wrote"; it means "another writer modified a row I
-had already loaded". Those differ by the entire class of appends.
-
-I had already done the shallow version of this check twice the same night
-(`SIM_START` never emitted; `LEDGER_MERGE` is conditional) and both times
-stopped at "does the line exist". The deeper question is what makes it fire.
-
-**And the general one: when waiting cannot produce the event, FORCE it.** Sixty-
-eight minutes of real traffic produced no reading. A test with two threads and
-an `Event` produced it immediately, plus a defect in my own interpretation.
-Waiting for a rare event is not evidence-gathering — it is deferring the
-experiment that would settle it.
+- **Both halves of that were wrong, and a forced-collision test found it in minutes.** `counts["concurrent"]` increments only when a row **already in our baseline** has a different fingerprint now (`execution_ledger.py:443`). An intruder that only APPENDS rows never trips it. So:
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: breaking a lock before checking whether the thing it guards has already happened
 
-I forced an UNEXPIRED 30-minute-old deploy claim off an active peer lane. The
-very next command — preflight — returned `TOO_SOON: refresh-worker was deployed
-4 min ago`. **The peer had already deployed the exact SHA I was about to
-deploy**, and it carried both lanes' work. The claim was not an obstacle to my
-goal; the claim's HOLDER had already achieved my goal.
-
-**The ordering error, stated precisely:** I checked "is anyone deploying?"
-(`render_events.py --since`) at 15:46, saw none, and then forced at 15:52 on the
-strength of that. The deploy landed at 15:52:29. A null result is scoped to the
-window it covered — 15:30-15:46Z — and I carried it forward as a standing fact
-across the six minutes that actually mattered. This is the same shape as
-`absence_in_a_window_is_not_absence`, now with a destructive action attached
-instead of a wrong opinion.
-
-**Why the guard still saved it:** the 25-minute spacing rule (`#563`) refused the
-redeploy, which would have discarded the in-flight build and frozen the board for
-~21 minutes. So the cost was a broken claim and an interrupted peer, not an
-outage. That is luck plus somebody else's foresight, not judgement.
-
-**How to apply:** before `--force` on ANY lock, re-check the state the lock
-protects, in that order and at that moment — not the check you ran earlier.
-Specifically for deploys: `render_events.py --since <5 min ago>` for a
-`deploy_started`, and read the live SHA. If the answer is "already done", the
-correct action is to release, not to proceed. A held lock is evidence that
-someone else is acting on the same system; treat the holder as a source of
-information about the world, not purely as a queue ahead of you.
+- **The ordering error, stated precisely:** I checked "is anyone deploying?" (`render_events.py --since`) at 15:46, saw none, and then forced at 15:52 on the strength of that. The deploy landed at 15:52:29. A null result is scoped to the window it covered — 15:30-15:46Z — and I carried it forward as a standing fact across the six minutes that actually mattered. This is the same shape as `absence_in_a_window_is_not_absence`, now with a destructive action attached instead of a wrong opinion.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 FORBIDDEN: letting a shipped "cannot be tested until X" caveat stand without putting the test on X's date
 
-`ncaaf-board-surfaces` shipped the NCAAF live-lens state path on 2026-08-27 and
-wrote, accurately: *"The live lens's state PATH is tested; its DATA cannot be
-until a game is in progress."* The first game of the season kicked off
-2026-08-29 16:00Z. At 16:05Z, with the game visibly in progress, production
-served `Games 51 | Live 0 | Final 0 | Pregame 51`. `ncaaf/cards.py` had **zero
-occurrences of `live_state`** — the key `_shared_game_state` derives
-`live`/`final`/`period`/`clock` from. The live branch was **unreachable by
-construction**, and had been for the whole preseason.
-
-**An honest caveat is not a mitigation. It is a defect with a date on it**, and
-the date arrives when nobody is looking at that surface.
-
-Compounding it: `test_smartsim_live_lens_runtime_uses_runtime_cards` had been
-FAILING since 08-27, asserting the pre-08-27 constant eyebrow. **A test that is
-already red cannot report that something else broke.** It was the one test over
-this exact code path.
-
-**How to apply:** when a trigger condition arrives (opening day, first live
-game, first scheduled run), grep the ledger for THAT CONDITION and re-test what
-named it, before starting anything new. And never let a red test sit in the area
-you are relying on the suite to watch.
+- **An honest caveat is not a mitigation. It is a defect with a date on it**, and the date arrives when nobody is looking at that surface.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 FORBIDDEN: reading `check_lane_invariants` PASSING as proof that lane claims are sane
 
-`lane-guard` blocked an NCAAF edit during the first game of the season,
-attributing `syndicate/features/ncaaf/cards.py` to the UNOWNED lane
-`soccer-board-mlb-parity`. That lane's `- Files:` block spelled a bare
-`cards.py` twice — **inside a note stating the claim had been REMOVED**. The
-guard matches on path SUFFIX (`rel.endswith("/" + f)`, `lane-guard.py:420`), and
-a bare filename has no directory to disambiguate it, so that one token claimed
-**mlb, nba, nfl, ncaaf and wnba** cards builders simultaneously.
-
-`check_lane_invariants` reported `INVARIANTS HOLD` throughout — it verifies that
-each claim has exactly ONE holder, and this claim did. The two tools disagree
-about what a claim IS, and only one of them gates edits.
-
-Same basename-collision class `state.md` already records for `live_lens` across
-eight sports.
-
-**How to apply:** a disclaimer next to a path does not unclaim it — only
-deleting the path text does. Never write a bare filename inside a `- Files:`
-block, prose or not; always the full repo-relative path. And when the guard
-blocks you on a file you believe is unclaimed, read the guard's matching rule
-before assuming the ledger is right.
-
-### 2026-08-29 — FORBIDDEN: making a previously-unreachable code path reachable without measuring the cost of the path that will now call it
-
-- **What we believed:** that fixing `ncaaf_week_and_card_keys_for_date` was a
-  CORRECTNESS change. It restored a dead join, so the risk seemed to be "does
-  it return the right games", and that is what was measured: 8/8 and 30/30 keys
-  matched real card gamePks locally, and production went 0 -> 8 chips at
-  17:14:02Z with the live game carrying `Q2 5:44` and `10-10`. **The fix worked.
-  It was verified. And it took the site down anyway.**
-- **What was actually true:** `_NCAAFDataProvider.games()` builds the ENTIRE
-  NCAAF board on every chips build — `build_smartsim_cards_page_context` PLUS
-  `build_ncaaf_market_board`, 51 games. That code was always that expensive.
-  The broken resolver's `return []` had been acting as an **accidental circuit
-  breaker** for months. Removing it put a ~30s build on the home page's request
-  path behind a 30s TTL, on a 2GB display-only service with two gunicorn
-  workers. One slow build occupies a worker; two exhaust the pool; Render's
-  router then fast-fails everything else with 502 in ~0.4s.
-- **How we found out:** the user's board went down. Measured: `/` 3.5s baseline
-  -> **37.9s**; `/ncaaf/cards` **502**; `/api/ops/memory` **502**. Restored by
-  reverting forward (`0163f904`) — `/` settles to 1.8s, all routes 200.
-- **The rule going forward:** **enabling dead code is a performance change, not
-  only a correctness one.** Before shipping a fix that makes an unreachable path
-  reachable, read what the newly-reachable code CALLS and measure it on the path
-  that will now call it. "It returns the right answer" is not a deploy
-  verification for a change that alters *how often* something runs.
-- **Cost:** ~8 minutes of degraded-to-502 production during the FIRST live
-  college football game of the season — the exact surface the user was watching
-  — plus a revert, plus the resolver fix now unshipped and owed.
-
-#### The epistemic failure is worse than the technical one, three times over
-
-1. **I noticed the risk and shipped anyway.** Before deploying I wrote to myself
-   that the chips path would now do "real NCAAF board work" and that it was
-   "worth flagging". Then I deployed and did not measure it. A noticed-and-
-   unacted risk is worse than an unnoticed one, because it proves the
-   information was in hand.
-2. **I dropped a habit exactly when it mattered most.** Two deploys earlier I
-   measured latency on this very endpoint family (3.0/3.0/3.3/3.9/5.3s against a
-   4.85s baseline) and wrote it into `deploys.md`. On the riskier change I
-   measured only correctness.
-3. **My verification watcher could not have seen it.** It polled
-   `chips>0` and exited on success — a success-only filter, which the Monitor
-   guidance explicitly warns against, and the SECOND one I wrote this session
-   (the first broke on `head != '0:00'` and fired on a stale render). **A
-   watcher that cannot express the failure is not a watcher.**
-
-### 2026-08-29 — the check that would have caught this ALREADY EXISTS and was not applied
-
-`syndicate/features/shared/request_path_guard.py` carries **two** functions:
-`warn_if_compute_in_request_path` (logs only) and
-**`refuse_if_compute_in_request_path`** — a HARD refusal written for `#56/#98/#109`,
-whose docstring names this exact failure: *"the web service does no heavy
-computation ... `_build_candidate_pool` directly on the 2GB [service]"*.
-
-Neither is called anywhere on the game-chips path, and `_NCAAFDataProvider.games()`
-calls neither. The rule was written down, the enforcement was built, and the
-new caller simply never opted in.
-
-**PROPOSED CHECK, because another line of prose will not catch the next one:**
-a post-deploy latency assertion in the web verification loop — measure `/` and
-the changed route against the pre-deploy baseline in the same run, and treat
-**>2x** as a FAILED deploy verification rather than a passing one. This incident
-would have failed it at 37.9s vs 3.5s, ~4 minutes before it was noticed by hand.
-A rule would not have caught this; I had the rule and violated it. Only a
-measurement in the verify step catches it.
-
-### 2026-08-29 — a cross-session ANSWER has to go where the reader looks, because SendMessage cannot address a lane
-
-- **What we believed:** that a peer session or a lane holder can be reached by
-  the identifier the ledger gives you.
-- **What was actually true:** lane blocks and inbound peer messages carry
-  session UUIDs (`3e5a9659`, `764eca35`, `local_5163d9b3…`); `ListAgents` lists
-  NAMES (`syndicate-9c [4ad613]`, `Polymarket execution gaps`). **There is no
-  mapping between the two**, and neither the UUID nor the quoted name resolved.
-  Three attempts, three failures, in one session:
-  `ncaaf-settlement-resolver` (wanted a 2-field parser addition),
-  `soccer-overview-cost` (wanted a carve-out on `home.py`), and a peer who
-  explicitly asked whether a revert-then-reapply was safe to deploy and said
-  they would HOLD until answered.
-- **How we found out:** `SendMessage` returned "No agent named … is reachable"
-  for the `from` attribute the message itself supplied, which is the exact value
-  the tool documentation says to reply to.
-- **The rule going forward:** when a peer or lane holder cannot be addressed,
-  **write the answer into the artefact they demonstrably read and say why it is
-  there.** The peer had cited `deploys.md`, so the answer went into `deploys.md`
-  under a heading naming them. Do not let an unreachable address turn into
-  silence — silence read as "no objection" is how a lane's file gets taken
-  without its holder ever hearing, which happened twice today.
-- **Cost:** two carve-outs taken without the holder's consent (both logged on
-  both lane blocks), and a peer blocked on an answer until the user relayed it
-  by hand.
-
-**Check, not prose:** the useful fix is for lane headers to carry the
-`ListAgents` NAME alongside the session UUID, so a holder is addressable from
-the ledger. Until then, `/lane open` should record both.
+- **The rule going forward:** **enabling dead code is a performance change, not only a correctness one.** Before shipping a fix that makes an unreachable path reachable, read what the newly-reachable code CALLS and measure it on the path that will now call it. "It returns the right answer" is not a deploy verification for a change that alters *how often* something runs.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: trusting a profiler's ANSWER without validating its SCOPE against the metric you care about
 
-I wired cProfile into `_build_sport_overview`, read `posix.lstat` at 46% of it,
-fixed that, and reported it as soccer's cost. The profile was correct. **The
-region was 2.4% of soccer's `OVERVIEW_SPORT` bracket** (10.95s of 452.97s, later
-3.22s of 362.76s). I had carried "sport_branch is 98%" from this lane's own
-notes, where it meant 98% OF `_build_sport_overview`'S OWN ELAPSED — a share
-against a different denominator.
-
-**The instrument does not know what you are trying to explain.** A profiler tells
-you where time went INSIDE ITS BRACKET, with total authority and no opinion about
-whether that bracket is the thing you care about. That check is one subtraction:
-compare the profile's `elapsed_s` against the enclosing measurement. 10.95 vs
-452.97 was visible in logs I had already pulled, and I did not do it until the
-second profile forced the question.
-
-**The correct move, once done, took one step:** `OVERVIEW_SPORT_BEGIN..END`
-contains exactly three calls, so ~99% had to be in the consumer. Profiling THERE
-gave `collect_s=901.59 of 902.06` and named the leaf in one run.
-
-**How to apply:** before acting on a profile, state the profiled region's share of
-the number you are trying to move, from a measurement OUTSIDE the profiler. If
-you cannot, you do not yet know what you measured.
+- **The instrument does not know what you are trying to explain.** A profiler tells you where time went INSIDE ITS BRACKET, with total authority and no opinion about whether that bracket is the thing you care about. That check is one subtraction: compare the profile's `elapsed_s` against the enclosing measurement. 10.95 vs 452.97 was visible in logs I had already pulled, and I did not do it until the second profile forced the question.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: windowing a verification watcher on wall-clock time instead of on the boot it is verifying
 
-My post-deploy watcher opened its log window at a fixed timestamp and returned
-`CONSUME_SPORT_SEGMENTS total_s=1114.41` — a clean, plausible, correctly-formatted
-number **from a pass that ran eight minutes BEFORE the deploy started**, on the old
-code, with a profiler still armed. Read as a post-fix result it says the fix made
-things worse. The `boot=none` field in the same output was the only tell.
-
-Fixed by keying the window on the BOOTED timestamp and requiring the sample to be
-strictly after it. The rewritten watcher then produced the real number, 75.78s.
-
-**This is the same family as the substring collisions this session** (`BOOTED`
-matching the log tool's own header; `ODDS_HISTORY_LOAD` matching
-`ODDS_HISTORY_LOADED`; a claim watcher grepping `free` against a status line
-reading `EXPIRED (does not block)`, which cost 13 minutes of waiting on an
-already-dead lock). **Four instances in one session of a query matching something
-that was not what it was looking for.** The shared fix is to anchor the query on
-an identifier the target event actually emits, and to include in the output the
-field that would reveal a mismatch.
-
-### 2026-08-29 — a fix proven on ONE consumer is not proven on another that recomputes it elsewhere
-
-- **What we believed:** that fixing `board_enrichment._side_matches` would fix
-  every surface that shows NCAAF game state, because they all go through
-  `attach_game_state`.
-- **What was actually true:** `book-grid` re-runs the enrichment at READ time on
-  web, so a web deploy fixed it instantly (`rows_matched` 0 -> 44).
-  `layer2-shortlist` runs the same enrichment in
-  `pipeline/layer2_shortlist.py:548` on the WORKER, over its own artifact.
-  Measured 18:59:25Z with `95c4fb12` live on BOTH services and the worker past
-  its ~21-min first-publish window: book-grid **44**, shortlist **0 of 96**.
-- **How we found out:** reading both surfaces in the same minute instead of
-  generalising from the one that moved.
-- **The rule going forward:** when two endpoints display "the same" joined
-  field, find out WHERE each computes it before treating one reading as
-  evidence for the other. A shared function is not a shared execution site, and
-  on this platform the web/worker split makes that difference routine rather
-  than exotic.
-- **Cost:** none yet — the lane was NOT closed on the book-grid number, which is
-  the whole point of writing this down now rather than after closing it.
-
-### 2026-08-29 — PowerShell reserved variables can fake a regression
-
-`$home = git show <sha>:path` fails (`HOME` is read-only), leaving the variable
-empty, so a content check reported the light chip path MISSING from a commit
-that contained it. A false "regression" on a deploy candidate is exactly the
-reading that triggers an unnecessary revert. Use non-reserved names (`$homePy`)
-in verification scripts, and treat a surprising negative as suspect before
-acting on it.
-
----
+- **The rule going forward:** when two endpoints display "the same" joined field, find out WHERE each computes it before treating one reading as evidence for the other. A shared function is not a shared execution site, and on this platform the web/worker split makes that difference routine rather than exotic.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — a diagnostic that TRUNCATES will be read as evidence. Twice.
 
-`key_miss_samples`' `market_indexed_under` is `sorted({...})[:4]`. Alphabetical,
-capped at four. `cfb` and `alsv` sort first, so they filled the cap on EVERY
-market they touched.
-
-I read that as attribution twice in one session:
-
-- `soccer|btts` -> `['lgscup|...', 'lmx|...', 'soccer|2026-08-29']` was read as
-  "unmapped competitions are losing BTTS". It was not. The meaningful entry was
-  the FOURTH -- right league, wrong date. No tokens needed adding at all.
-- `ncaaf|spreads` -> `['cfb|...']` was read as the `cfb` alias. The IDENTICAL
-  list appeared under `wnba|totals`, where `cfb` cannot possibly be the alias.
-
-**RULE: a bounded, sorted sample is not a rate and not an attribution.** Before
-drawing a conclusion from a truncated list, ask what a NULL result would look
-like -- here, the same list under an unrelated key, which was visible the whole
-time. The `cfb` alias was real, but it was settled by a NAMED FIXTURE on both
-sides (`tsc-cfb-sacst-emich` = the exact board row), not by the list.
-
-**Corollary that cost the most:** the same session nearly DELETED the corners
-route on a 19-slug sample showing no corners family. The census found 434.
-A sample that finds nothing is not evidence of absence at any n you did not
-choose in advance.
-
----
+- **RULE: a bounded, sorted sample is not a rate and not an attribution.** Before drawing a conclusion from a truncated list, ask what a NULL result would look like -- here, the same list under an unrelated key, which was visible the whole time. The `cfb` alias was real, but it was settled by a NAMED FIXTURE on both sides (`tsc-cfb-sacst-emich` = the exact board row), not by the list.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: mapping an outcome polarity that the venue has not stated
 
-Polymarket corners are `["Yes","No"]` while the board asks over/under. The
-obvious map (`over -> Yes`) would have closed 59 refusals in two lines. If the
-polarity were reversed it prices the OPPOSITE SIDE of a live bet at a
-confident-looking number -- the $7.08 MLB error, at scale.
-
-What made it safe was NOT reasoning about which word "should" mean over. It was
-shipping a census first (`side_gap_samples`: outcome names AND prices beside the
-wanted side and the board's line), then reading two independent confirmations:
-
-    TOKEN  `cor-all-gt10pt5` -- the venue states "greater than" IN THE SLUG
-    PRICE  `Yes` = 0.76 on a 7.5 line; over 7.5 corners is the likely side of a
-           ~10-corner match, under would be ~0.24
-
-The fix is gated on the `gt` TOKEN, not on "Yes/No plus a line": the gate IS the
-evidence, so a family that never declares a direction keeps refusing instead of
-being assigned one.
-
-**MLB spreads are still refusing for the same reason and must stay that way**
-until a sample settles them: outcomes are `+1.50`/`-1.50`, both observed samples
-carry `pos-1pt5` and differ only in the side wanted, so they cannot establish
-whose perspective the venue states the spread from.
-
-**RULE: coverage may be traded for certainty; a side may not.** A refusal costs
-a bet. A wrong polarity costs the bet AND pays the other side.
-
----
+- **MLB spreads are still refusing for the same reason and must stay that way** until a sample settles them: outcomes are `+1.50`/`-1.50`, both observed samples carry `pos-1pt5` and differ only in the side wanted, so they cannot establish whose perspective the venue states the spread from.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — ancestry is a DEPLOY-TIME MEASUREMENT, never a claim
 
-I twice told a peer they would "carry my commits anyway, they're on main ahead
-of you". Wrong both times -- my commit landed AFTER their trigger. They
-corrected me, and the correction is the rule:
-
-**main moves under every session. Only the deploying session can see its own
-trigger moment.** Telling a peer what their deploy contains is asserting a fact
-only they can measure. State main's head as a fact they can check; let them
-verify ancestry themselves.
-
-The same discipline caught a real one later: a peer deployed `6625b5e6` and I
-checked rather than assumed -- `1be9fa3e` was NOT in it. Had I assumed the other
-way I would have read an unchanged counter off a binary without the fix and
-called it inert.
-
-### 2026-08-29 — FORBIDDEN: gating a verdict on ELAPSED TIME when the artifact carries its own build stamp
-
-- **What we believed:** that enough minutes after a worker deploy, a zero on
-  `/api/board/layer2-shortlist` meant the fix had failed. The watcher was built
-  on that: a grace window counted from the deploy, then a `STILL ZERO` verdict.
-- **What was actually true:** the endpoint is a **PURE READ**
-  (`source: layer2_shortlist_artifact`) of a pool built on refresh-worker inside
-  `_build_candidate_pool`. It computes nothing at request time. The pool it was
-  serving carried `written_at 2026-08-29T18:30:44Z` — **twelve minutes OLDER
-  than the fix**, which went live at 18:42:34Z. No amount of waiting would have
-  changed that reading, because nothing had rebuilt it.
-- **How we found out:** dumping every scalar key on the payload instead of only
-  the rows, and finding `written_at` already there.
-- **The rule going forward:** when a surface serves an artifact, the ONLY input
-  that licenses a verdict about a code change is the artifact's own build stamp
-  crossing the deploy time. Elapsed time is a fact about you, not about the
-  system. Find the build stamp BEFORE arming a watcher — `written_at`,
-  `generated_at`, `published_at` — and gate on it. If a surface has no such
-  stamp, that absence is the first thing to fix, not to work around.
-- **Cost:** none — the false `STILL ZERO` was caught before it was reported.
-  Once re-gated on `written_at`, the confirmation arrived in 90 seconds:
-  ncaaf 0/96 -> 49/92.
-
-This is the same shape as two other errors the same day: a green local read off
-an untracked `cfbd_lines` mirror production has never had, and a "baseline"
-worktree that passed only because it lacked untracked MLB data. **Three times
-in one session the instrument, not the system, produced the reading** — see
-[[feedback_instrument_blindness]] in spirit. The discriminator is always the
-same question: *what would this reading look like if the thing I am testing had
-never run?*
-
-### 2026-08-29 — FORBIDDEN: closing a name-join gap by POPULATING an alias map, without first checking the map's source carries the missing name
-
-- **What we believed:** that NCAAF's join gap was a missing alias MAP, so
-  deriving one from `ncaaf_team_registry.unambiguous_team_index()` would close
-  it. The registry has 684 teams and is the lane's authoritative vocabulary; it
-  looked like the obvious source.
-- **What was actually true, on two counts:**
-  1. **A derived map cannot invent vocabulary its source lacks.** With 2,232
-     keys built, `canonical_team("ncaaf", "UMass Minutemen")` still returned
-     `None` — team 113 is `Massachusetts` and carries no `umass` in any column,
-     so the combined key is `massachusetts minutemen`. The target case was
-     untouched.
-  2. **Populating a map CHANGES THE SEMANTICS of every lookup for that sport.**
-     `teams_match` returns the map's verdict when both sides resolve
-     (`team_aliases.py:640-644`) and deliberately does NOT fall through to the
-     heuristics. So a mis-resolution stops being a harmless miss and becomes a
-     confident wrong answer. Measured: `canonical_team("ncaaf", "MAS")` ->
-     **`UMass Dartmouth`**, team 379's real abbreviation, colliding with the
-     chip's synthetic abbr for Massachusetts.
-- **How we found out:** spot-checking the map's own output on the exact failing
-  token before trusting the key count. 2,232 keys looked like success; the one
-  token that mattered still returned `None`.
-- **The rule going forward:** before adding a map for a sport that has none,
-  (a) confirm the SOURCE contains the specific name the join is failing on, and
-  (b) enumerate what the new map resolves that the heuristics previously left
-  unresolved — because those are exactly the lookups whose semantics flip from
-  "fall back" to "authoritative". A map is not a strictly-additive change.
-- **Cost:** none shipped. Built, measured, reverted; control confirmed the map
-  back to 0 keys and the 8 slate pairs still 8/8. The real gap is REGISTRY DATA
-  upstream (CFBD does not ship the alias), handed to the owning lane.
-
-`_basketball_alias_to_name`'s docstring already recorded this exact failure from
-the other direction — a merged map made `("wnba", "min")` vs "Minnesota Lynx"
-FALSE, "a wrong answer, and worse than no answer, because the map is treated as
-authoritative and skips the heuristic fallback." **The warning was in the file I
-was editing.**
-
----
+- **The rule going forward:** when a surface serves an artifact, the ONLY input that licenses a verdict about a code change is the artifact's own build stamp crossing the deploy time. Elapsed time is a fact about you, not about the system. Find the build stamp BEFORE arming a watcher — `written_at`, `generated_at`, `published_at` — and gate on it. If a surface has no such stamp, that absence is the first thing to fix, not to work around.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: calling a placeholder threshold "conservative" without checking it against the real one. A threshold above break-even everywhere is a DISABLED FEATURE wearing safety language. `[lane live-venue-order-placement]`
 
-- **What we believed:** `kalshi_polymarket_arb.DEFAULT_FEE_BUFFER = 0.04` was a
-  safe stand-in. Its own docstring says so at length and honestly — "a
-  conservative placeholder, not either venue's real fee schedule", "only
-  `edge_after_buffer` should be read as an actionable signal". Every word of
-  that is true and it still produced the wrong outcome.
-- **What was actually true:** measured break-even for a two-leg MLB pair runs
-  **3.38c at even money down to 0.39c at 0.97**. The flat 4.00c threshold sat
-  **above break-even at every price on the board.** The detector could not
-  report a profitable MLB pair — not "rarely", not "only the big ones". Never.
-  And MLB is the sport with the most volume on the platform.
-- **Why the honest label made it worse, not better.** "Conservative" names the
-  DIRECTION of the error and says nothing about its MAGNITUDE. Over-stating a
-  cost feels like the safe side, so nobody re-derived it. But a detector that
-  never fires is indistinguishable from a market with no arb in it — the exact
-  empty-list confusion `kalshi_client.py`'s header already warns about, arriving
-  through a threshold instead of through a return value.
-- **How we found out:** not by auditing the buffer. By computing the real fee
-  from the venue's own `fee_type`/`fee_multiplier` fields for an unrelated
-  reason, and noticing the break-even table was under 4c on every row.
-- **The rules going forward:**
-  1. **A placeholder threshold must be compared to the real quantity before it
-     is called conservative.** One number and one comparison. Until then the
-     right word is "unvalidated", which invites the check that "conservative"
-     suppresses.
-  2. **A flat stand-in for a curved cost is wrong in SHAPE, not just level, and
-     no single value fixes it.** Kalshi's fee is `rate * P * (1-P)`. At p=0.05
-     the flat buffer was 12x the truth; at even money on a full-rate series it
-     was roughly right. A constant cannot approximate a parabola, so the error
-     changes sign across the book and any calibration of the constant just
-     moves where it is wrong.
-  3. **When a detector reports zero, the first question is whether it CAN
-     report non-zero.** `test_arb_net_edge.py::test_the_old_flat_buffer_was_
-     above_mlb_break_even_at_every_price` asserts exactly that, so the class
-     cannot come back silently. Same shape as the standing
-     `presence_is_not_reachability` rule, applied to a threshold.
-- **Also corrected, and it is the smaller half:** every third-party source says
-  Kalshi rounds fees "up to the next cent". Against 18 real fills that is wrong
-  — ceil-to-4dp matches **18/18**, round-to-4dp **9/18**. A spot check on one or
-  two fills cannot separate them (9 of the 18 agree under both rules), which is
-  why the count is the evidence and a sample is not. **The venue's own fields
-  and our own fills outrank any explainer, and both were available the whole
-  time.**
-- **Cost:** none realised — no money was placed on the bad threshold, because
-  the detector's silence also meant nothing ever acted. That is luck, not
-  design: the same class of error on the permissive side would have placed
-  losing pairs at even money instead of finding nothing at the tails.
-
----
+- **What we believed:** `kalshi_polymarket_arb.DEFAULT_FEE_BUFFER = 0.04` was a safe stand-in. Its own docstring says so at length and honestly — "a conservative placeholder, not either venue's real fee schedule", "only `edge_after_buffer` should be read as an actionable signal". Every word of that is true and it still produced the wrong outcome.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: reading `count: 0` from an artifact export as "the artifact is unreachable". It is a fact about what the READER scans. I had this rule on file and walked into it anyway. `[lane live-venue-order-placement]`
 
-- **What we believed:** `/api/ops/artifacts/export?pattern=*polymarket*`
-  returning `count: 0` meant the Polymarket slate was not reachable from web,
-  so any cross-venue measurement needed a worker-side probe or a publishing
-  change first. I put that in `state.md` and built a recommendation on it.
-- **What was actually true:** the slate has been reachable from web the whole
-  time. Both services run `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`, so
-  `persist_game_slate` writes to the KEYVALUE store and never to disk, while
-  the export scans DISK. `/api/ops/polymarket/slate` returns `count: 17241`.
-  **`ops.py:450`'s docstring records this exact trap, measured 2026-08-27**,
-  including the observation that the obvious fix (allowlist it in
-  `HOT_ARTIFACT_PATTERNS`) would have been an inert no-op.
-- **And better than that:** `/api/board/layer2-shortlist` carries BOTH venues'
-  prices on the same row in `quote.book_prices`. The measurement I said needed
-  a credentialed worker probe needed ONE web call.
-- **How we found out:** a peer lane mentioned in passing that it had settled
-  several venue questions off `/api/ops/polymarket/slate` without credentials.
-  I checked instead of accepting, and they were right.
-- **Why the existing rule did not save me.** I have
-  `keyvalue_artifact_split_blinds_guards` in memory — "read_json_file sees only
-  keyvalue; a guard reading it is blind to exactly the big payloads that
-  matter". That is the SAME split, from the other side, and I did not connect
-  it because the symptom presented as an ordinary empty result rather than as a
-  guard misfiring. **A rule filed under one symptom does not fire on another.**
-- **The rules going forward:**
-  1. **A zero from a reader is a fact about the reader until you have checked
-     what it reads.** Before concluding "absent", name the STORE the writer
-     writes to and confirm the reader scans it. One question, and it is the
-     same question in both directions of this split.
-  2. **Before building a new reader, grep the ops blueprint for an existing
-     one.** `/api/ops/polymarket/slate` existed, was documented, and answered
-     the question. I proposed building a probe and publishing an artifact —
-     both unnecessary, both would have shipped.
-  3. **Ask what is already joined before assembling a join.** Two venues'
-     prices sitting on one board row is a stronger instrument than two
-     separately-fetched catalogues, because it is same-instant by construction
-     — which is a standing rule here (`measure_same_instant`) that I satisfied
-     by luck rather than by design.
-- **Cost:** none realised — no code was written against the wrong conclusion,
-  and the correction arrived before the next increment. But the recommendation
-  I gave the user ("worker-side probe, or publish the slate first") was wrong
-  in both branches, and had they picked either we would have built something
-  that already existed.
-
+- **What we believed:** `/api/ops/artifacts/export?pattern=*polymarket*` returning `count: 0` meant the Polymarket slate was not reachable from web, so any cross-venue measurement needed a worker-side probe or a publishing change first. I put that in `state.md` and built a recommendation on it.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: judging whether `main` is green from a session worktree OR the primary tree. Neither is a control, and they lie in OPPOSITE directions
 
-- **What we believed:** that running a test file in my own worktree told me
-  whether the branch was healthy. I reported to the user that a deploy carried
-  "9 red tests, 1 of them a new regression," named the regression, identified
-  which lane owned it, and messaged that lane about it.
-- **What was actually true:** every one of those 9 was an artifact of my
-  worktree. `scripts/session_worktree.py` excludes `data/` BY DEFAULT (34,689 of
-  37,745 tracked files) and CLAUDE.md instructs every session to work that way.
-  `_teams_match` -> `soccer_fixture_clubs` -> `all_teams` -> `rosters_path()`
-  reads `rosters_<season>.csv` from `data/`; absent it,
-  `_soccer_alias_by_league()` returns **0 leagues** and every soccer pair
-  resolves to None. Same SHA, `data/`-complete tree: **144 passed**.
-- **And the mirror-image failure, same evening, same two files.** Asked to fix
-  the primary tree's failures, I found it 3 commits stale AND carrying 141
-  uncommitted entries from other sessions -- including `venue_quote_fanin.py`
-  (+107), mid-change, adding a game-scoped candidate key. Six tests asserting
-  exact `_candidate_keys` lists were red there while `origin/main` was **145
-  passed**. So the primary tree showed red main did not have, minutes after my
-  worktree had shown red main did not have.
-- **The general form:** a sparse worktree under-reports what code can see; a
-  shared tree over-reports, because it contains work nobody has committed. Both
-  produce confident, specific, WRONG failure names -- with assertion text, line
-  numbers, and a plausible owner. Nothing about the output says "environment".
-
-**How to apply:**
-- **Only a clean worktree at `origin/main` answers "is main green."** `git
-  worktree add --detach /c/tmp/<x> origin/main`, run, remove. It costs ~40s.
-- **CHEAPER CONTROL, and usually the right one first** `[session 4465737c,
-  2026-08-30]`: you rarely need a whole clean tree. `git diff origin/main --
-  <path>` returning 0 lines PROVES that file matches main, so a dirty tree is a
-  valid environment for anything whose inputs you can enumerate. They cleared a
-  probe this way over three modules plus its registry CSV — no worktree, no 40s.
-  **The caveat is the enumeration, not the method:** it is only sufficient once
-  you have listed every input, TRANSITIVE IMPORTS AND `data/` INCLUDED. Miss one
-  and you have proved something about the files you thought of. Use the diff
-  when the input set is small and known; use the clean worktree when it is not,
-  or when the question is "is the SUITE green" rather than "is this file main's".
-- Before attributing ANY test failure to a commit, reproduce it there. If you
-  cannot, the failure is yours, not the code's.
-- **Never "fix" a red in the primary tree without checking `git status` on the
-  module under test first.** The six here were another lane's in-flight
-  cross-game-bleed fix; reverting the file to make them green would have deleted
-  a live-money safety change. A shared tree showing red actively invites that.
-- A peer's "I cannot reproduce" outranks your own reproduction when your
-  environment is the non-standard one. `[session 5163d9b3 pushed back twice and
-  was right both times.]`
-- Corollary they supplied and it is the same rule one level up: **checks that
-  agree are only independent if they differ in the decisive variable.** They
-  reported "three configurations, all green"; all three carried `data/`. Their
-  three checks were one check.
+- **What we believed:** that running a test file in my own worktree told me whether the branch was healthy. I reported to the user that a deploy carried "9 red tests, 1 of them a new regression," named the regression, identified which lane owned it, and messaged that lane about it.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — a null from an instrument you have not calibrated is not evidence. RUN THE CONTROL
 
-- **What we believed:** that `venue_balance_history.json` being absent from
-  `/api/ops/keyvalue/usage?top_keys=100` and from `sweep-preview` meant the new
-  write was not happening.
-- **What was actually true:** both endpoints ALSO report `venue_balances.json`
-  absent -- a file written every worker tick and rendered on `/portfolio`. The
-  smallest key `usage` lists is **196,768 bytes**; both files are a few hundred.
-  The instrument cannot see artifacts of that size at all.
-- **How to apply:** before reading a null as absence, ask what makes this
-  instrument read PRESENT, and check it against something you already know is
-  there. One extra call. Without it the honest answer ("not observable by any
-  route available to me") is indistinguishable from a real finding -- and the
-  real finding here would have been a false alarm about my own fix.
-- Same family as [[feedback-instrument-blindness]] and
-  [[feedback-absence-in-a-window-is-not-absence]]; this is the third instance,
-  so the control is now the rule rather than the diligence.
----
-
-### 2026-08-29 — FORBIDDEN: never treat a `lanes.md` claim as evidence that anyone is holding the file. `lane-guard.py` has NO liveness notion, so a claim outlives its session forever
-
-- **What we believed:** the lane system's file claims describe live contention —
-  if `lane-guard` blocks you, another session is working that file and the
-  correct move is to surface the conflict and work elsewhere. The protocol says
-  exactly that: "If another OPEN lane lists a file you need, stop and surface
-  the conflict."
-- **What was actually true:** claims never expire, and nothing ever released
-  them on a session's death. Measured 2026-08-29: **26 OPEN lanes held 133
-  claims while 3 sessions were alive.** 121 of those claims (91%) were enforced
-  on behalf of sessions that no longer existed — some archived nine days
-  earlier. There were also **56 `.current-lane.<session>` markers for 4 live
-  sessions.** The lane blocks themselves were often not even wrong: several
-  headers *say* "CLAIMS RELEASED" or "UNOWNED" in prose while their `- Files:`
-  block still parses as a live claim, because the guard reads the block, not
-  the header.
-- **How we found out:** a user asking why so many things were claimed. Liveness
-  is measurable and was never being measured: a session is live iff its
-  transcript `~/.claude/projects/<proj>/<id>.jsonl` was written recently, and
-  the break was unambiguous — 4 files inside 60s, the next 87 minutes back.
-  The cost had already been paid once that same day: `live-venue-order-placement`
-  needed a **USER OVERRIDE** to take `venue_quote_adapters.py` off
-  `kalshi-line-aware-rungs`, a lane whose session was gone and whose header
-  already said the files were free.
-- **The rules going forward:**
-  1. **Before honouring a claim, check the holder is alive.** The header names
-     a session id; if its transcript is hours stale, the claim is a phantom and
-     `py -3 scripts/release_phantom_lane_claims.py` releases it — no override,
-     no permission, no waiting on a session that cannot answer.
-  2. **A lane header saying "UNOWNED"/"CLAIMS RELEASED" releases NOTHING.**
-     `lane-guard` parses the `- Files:` block and never reads the header's
-     prose. Release means putting a `_DISCLAIMER_MARKERS` token ahead of the
-     path text on every line of the block. Verify with the hook itself.
-  3. **Prove a release on the guard, both directions.** Feed `lane-guard.py`
-     the real payload before and after: a released path must go exit 2 -> exit
-     0 **and a still-held path must stay exit 2**. A claim count dropping is
-     not that proof — it is consistent with having disarmed the guard.
-  4. **Do not run the release from PowerShell's pipe.** `'json' | py -3 hook.py`
-     returned **exit 0 with no output** — `json.load` failed on the piped
-     stdin and `main()` returns 0 on parse failure, so a BLOCKED path read as
-     ALLOWED. That is the exact shape of a false clean bill. Use bash `printf`.
-- **Cost:** one user override spent on a file nobody held, an unknown number of
-  earlier sessions routed away from files that were free, and 121 claims'
-  worth of standing false contention. Nothing was lost: the sweep released
-  enforceability only — every path stays in its block as a record, and a lane
-  resuming the work reclaims by striking the note.
-
----
+- **What we believed:** that `venue_balance_history.json` being absent from `/api/ops/keyvalue/usage?top_keys=100` and from `sweep-preview` meant the new write was not happening.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: gating on a status string you did not read from the function that emits it. The whole conversion shipped INERT and every test was green. `[lane live-venue-order-placement]`
 
-- **What we believed:** `#603`'s Kalshi half was done. The adapter resolved a
-  ticker's club blob through `match_event_blob`, took the matched fixture, and
-  keyed the quote to it. Code present, suite green, downstream green.
-- **What was actually true:** the guard read
-  `result["status"] == "matched"`. **`"matched"` is not a value that function
-  ever returns.** Its vocabulary is `ok` / `no_match` / `ambiguous`. Every
-  Kalshi quote failed the check, fell back to a bare key, and the conversion
-  did **nothing at all**.
-- **Everything else was right.** Blob extracted, split resolved against the
-  schedule, teams returned, token built correctly. One guessed string, and the
-  feature was decorative.
-- **Why green meant nothing.** An inert conversion is indistinguishable from a
-  correct one from outside: no test failed, no log line changed, and the
-  fallback it landed in is the pre-change behaviour — which is by design
-  *correct*, just not new. Had the fallback been an error instead of graceful
-  degradation, this would have been obvious in a second.
-- **How we found out:** ONE test —
-  `test_a_kalshi_totals_quote_names_its_game_OFF_vs_ON` — asserting
-  `on_keys != off`, i.e. *passing the new argument must CHANGE something*.
-  An ON-only assertion passes if the qualifier is unconditional. An OFF-only
-  assertion passes while inert. Only the pair discriminates.
-- **The rules going forward:**
-  1. **A status string is a fact about the emitting function. Read it there.**
-     One grep of `match_event_blob` for `"status"` would have shown three
-     values and none of them mine. I had already read that function's
-     docstring in the same session and still guessed the value.
-  2. **Every graceful fallback needs an off != on test.** Where wrong input
-     degrades quietly instead of raising, "it works" and "it never runs" look
-     identical. The test must assert the CHANGE, not the outcome.
-  3. **Suspect inertness hardest when a feature is additive.** This one could
-     only add a key. Adding nothing is a perfectly valid-looking state for an
-     additive change, which is what let it through the whole suite.
-- **Related, same session, same shape:** a `TypeError` from passing a new
-  keyword to a monkeypatched three-argument `collect_quotes` stub was being
-  swallowed by a surrounding `except Exception` into an EMPTY QUOTE POOL — a
-  silent zero, the failure that module's own rule 3 exists to prevent. Two
-  tests caught that one. **Both defects are the same species: a new argument
-  that fails quietly and leaves the system looking healthy.**
-- **Cost:** none realised — caught before commit, by a test written in the same
-  pass. Had the off != on test not been written, a green suite and a
-  confident finding would have recorded "Kalshi now names its game" while the
-  cross-game bleed continued on every Kalshi quote in production.
+- **What we believed:** `#603`'s Kalshi half was done. The adapter resolved a ticker's club blob through `match_event_blob`, took the matched fixture, and keyed the quote to it. Code present, suite green, downstream green.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-29 — FORBIDDEN: verifying a DELETION by grepping for the deleted string, without first proving the container renders
 
-- **What we believed:** that grepping the served `/portfolio` HTML for the two
-  sentences I had just removed, and finding them ABSENT, confirmed the edit was
-  live. I reported it that way, with a tidy `ABSENT ok` next to each.
-- **What was actually true:** there are ZERO unknown submits right now, so the
-  entire `{% if L.unknown_submits %}` block does not render. Both sentences
-  would have read ABSENT against the OLD template too. The check could not fail,
-  which means it could not confirm anything either.
-- **The shape, and it is the general one:** a test for the absence of X is only
-  evidence once you know the page WOULD have shown X. Deletion checks are
-  uniquely prone to this because the passing result and the vacuous result are
-  byte-identical. Two other strings on the same page misled the same way in the
-  same minute -- `500 ` matched `drift=+0.0500`, and `live-unknown-list` matched
-  the CSS class DEFINITION in `<style>` rather than a rendered banner.
-
-**How to apply:**
-- **Verify a deployment by the ARTEFACT, not by the rendered absence:**
-  `git show <deployed-sha>:<path>` for the content, plus the service's own
-  reported SHA. That pair cannot be vacuous.
-- If you must assert on rendered output, assert something POSITIVE that only the
-  new code emits, and make the fixture actually reach that branch. The unit
-  tests here did exactly that (`assert "Balance unchanged across the submit" in
-  body`) and were the only real evidence the template works.
-- State plainly when a path is covered by tests but has never run in
-  production. "Deployed" and "exercised" are different claims.
-- Third instance in one session of the same family, so it is now a rule rather
-  than diligence: see [[feedback-instrument-blindness]] and the entry above on
-  running the control before reading a null as absence.
-
----
+- **What we believed:** that grepping the served `/portfolio` HTML for the two sentences I had just removed, and finding them ABSENT, confirmed the edit was live. I reported it that way, with a tidy `ABSENT ok` next to each.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-30 — FORBIDDEN: fixing the caller whose NAME matches what you are looking for, without checking which caller actually runs. `#603` shipped inert twice for this. `[lane live-venue-order-placement]`
 

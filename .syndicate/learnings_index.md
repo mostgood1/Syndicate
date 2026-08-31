@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 690 rules `[generated]`
+## Index — 706 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 180**
+**FORBIDDEN — 189**
 
 - [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
 - [2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch…](#2026-08-30-forbidden-inferring-who-wrote-a-commit-from-adjacency-in-a-shared-branch-where-every-commit-carries-one-bot-author-lane-exchange-join-refusals)
@@ -80,17 +80,13 @@
 - [08-22 FORBIDDEN: `git add -A` in this repo. THE TEST SUITE MUTATES TRACKED FILES](#08-22-forbidden-git-add--a-in-this-repo-the-test-suite-mutates-tracked-files)
 - [08-22 FORBIDDEN: calling a test failure "pre-existing on main" from a clean WORKTREE. A…](#08-22-forbidden-calling-a-test-failure-pre-existing-on-main-from-a-clean-worktree-a-worktree-shares-site-packages)
 - [08-22 FORBIDDEN: treating a todo id as RESERVED because you checked it was free. Checki…](#08-22-forbidden-treating-a-todo-id-as-reserved-because-you-checked-it-was-free-checking-is-not-reserving)
-- [2026-08-25 — FORBIDDEN: report a real-money code-default change as "done" without readi…](#2026-08-25-forbidden-report-a-real-money-code-default-change-as-done-without-reading-the-live-services-actual-env-vars-a-contradicting-override-wins-silently)
-- [2026-08-25 — FORBIDDEN: rename a lane's header status away from the literal word "OPEN"…](#2026-08-25-forbidden-rename-a-lanes-header-status-away-from-the-literal-word-open-without-checking-what-that-silently-releases)
 - [2026-08-26 — FORBIDDEN: treating ARITHMETIC ON A DERIVED FIELD as a measurement](#2026-08-26-forbidden-treating-arithmetic-on-a-derived-field-as-a-measurement)
 - [2026-08-26 — FORBIDDEN: concluding a VENUE must act because its error names your account](#2026-08-26-forbidden-concluding-a-venue-must-act-because-its-error-names-your-account)
 - [2026-08-26 — FORBIDDEN: TWO HOSTS ARE NOT ONE VENDOR, and "X can reach ESPN" is not a f…](#2026-08-26-forbidden-two-hosts-are-not-one-vendor-and-x-can-reach-espn-is-not-a-fact-about-x)
 - [2026-08-26 — FORBIDDEN: assuming an artifact "published to production" is where its CON…](#2026-08-26-forbidden-assuming-an-artifact-published-to-production-is-where-its-consumer-reads)
 - [2026-08-26 — FORBIDDEN: reporting a test as failing on `main` from a session worktree,…](#2026-08-26-forbidden-reporting-a-test-as-failing-on-main-from-a-session-worktree-when-its-fixture-is-derived-from-data-and-a-stash-and-rerun-does-not-isolate-it)
-- [2026-08-28 — FORBIDDEN: chaining an EDIT and a COMMIT so that a FAILED edit still commi…](#2026-08-28-forbidden-chaining-an-edit-and-a-commit-so-that-a-failed-edit-still-commits-the-guard-fired-correctly-and-the-commit-ran-anyway-taking-another-sessions-uncommitted-work-with-it)
 - [2026-08-28 — FORBIDDEN: treating a refuted MECHANISM as a refuted OBSERVATION. I dispro…](#2026-08-28-forbidden-treating-a-refuted-mechanism-as-a-refuted-observation-i-disproved-my-own-theory-of-how-a-wrong-side-fill-happened-and-used-that-to-dismiss-the-fill)
 - [2026-08-27 — FORBIDDEN: pushing past a ledger checker's warning because its output "loo…](#2026-08-27-forbidden-pushing-past-a-ledger-checkers-warning-because-its-output-looks-like-the-usual-noise-a-warning-that-is-usually-wrong-gets-trained-out-and-two-sessions-proved-it-independently-on-the-same-night)
-- [2026-08-27 — FORBIDDEN: REFUSING A BAD VALUE UPSTREAM OF A COALESCING FALLBACK and call…](#2026-08-27-forbidden-refusing-a-bad-value-upstream-of-a-coalescing-fallback-and-calling-it-fixed-the-fallback-picks-it-back-up-one-candidate-later-and-the-fix-ships-inert)
 - [2026-08-27 — FORBIDDEN: running `deploy_claim.py` from a session worktree. The claim fi…](#2026-08-27-forbidden-running-deploy_claimpy-from-a-session-worktree-the-claim-file-is-per-tree-so-nobody-else-can-see-it)
 - [2026-08-27 — FORBIDDEN: deferring work around a ledger BLOCKER without re-measuring it.…](#2026-08-27-forbidden-deferring-work-around-a-ledger-blocker-without-re-measuring-it-a-blocker-is-a-measurement-and-it-expires)
 - [2026-08-27 — FORBIDDEN: trusting a test whose FIXTURE cannot violate the property it as…](#2026-08-27-forbidden-trusting-a-test-whose-fixture-cannot-violate-the-property-it-asserts-it-is-not-weak-coverage-it-is-zero-coverage-that-reads-as-strong)
@@ -112,9 +108,7 @@
 - [2026-08-28 — FORBIDDEN: reading `lastRunAt` as evidence a scheduled job RAN. It records…](#2026-08-28-forbidden-reading-lastrunat-as-evidence-a-scheduled-job-ran-it-records-dispatch-and-on-this-machine-the-two-were-nine-hours-apart)
 - [2026-08-28 — FORBIDDEN: baselining a test in a fresh worktree when the test reads state…](#2026-08-28-forbidden-baselining-a-test-in-a-fresh-worktree-when-the-test-reads-state-the-worktree-does-not-share-it-is-not-a-baseline-it-is-a-different-experiment)
 - [2026-08-28 — FORBIDDEN: concluding a lane claim is free because the roster says its ses…](#2026-08-28-forbidden-concluding-a-lane-claim-is-free-because-the-roster-says-its-session-is-gone-get_session-said-not-found-while-the-session-was-live)
-- [2026-08-28 — FORBIDDEN: trusting a refusal's stated premise without rechecking it. A RE…](#2026-08-28-forbidden-trusting-a-refusals-stated-premise-without-rechecking-it-a-reasoned-we-cannot-do-this-is-stickier-than-a-bug-because-it-tells-the-next-reader-not-to-look)
 - [2026-08-28 — FORBIDDEN: instrumenting a function without first proving it is ON the pat…](#2026-08-28-forbidden-instrumenting-a-function-without-first-proving-it-is-on-the-path-you-are-measuring-i-did-it-and-the-counter-read-zero)
-- [2026-08-28 — FORBIDDEN: diagnosing a resolver when the log said `graded=N` and the serv…](#2026-08-28-forbidden-diagnosing-a-resolver-when-the-log-said-gradedn-and-the-served-payload-changed-nothing-that-is-a-lost-write-and-i-spent-three-theories-on-the-wrong-layer)
 - [2026-08-28 — FORBIDDEN: treating a "this API does not exist" finding as a fact about th…](#2026-08-28-forbidden-treating-a-this-api-does-not-exist-finding-as-a-fact-about-the-venue-when-it-was-written-from-a-network-that-could-not-reach-the-venue-it-is-a-fact-about-the-network)
 - [2026-08-28 — FORBIDDEN: keying a venue join on the fixture without keying it on the POR…](#2026-08-28-forbidden-keying-a-venue-join-on-the-fixture-without-keying-it-on-the-portion-of-the-fixture)
 - [2026-08-28 — FORBIDDEN: closing on the venue that was REPORTED when the join it mirrors…](#2026-08-28-forbidden-closing-on-the-venue-that-was-reported-when-the-join-it-mirrors-has-the-same-key)
@@ -127,16 +121,12 @@
 - [2026-08-29 — FORBIDDEN: breaking a lock before checking whether the thing it guards has…](#2026-08-29-forbidden-breaking-a-lock-before-checking-whether-the-thing-it-guards-has-already-happened)
 - [2026-08-29 FORBIDDEN: letting a shipped "cannot be tested until X" caveat stand without…](#2026-08-29-forbidden-letting-a-shipped-cannot-be-tested-until-x-caveat-stand-without-putting-the-test-on-xs-date)
 - [2026-08-29 FORBIDDEN: reading `check_lane_invariants` PASSING as proof that lane claims…](#2026-08-29-forbidden-reading-check_lane_invariants-passing-as-proof-that-lane-claims-are-sane)
-- [2026-08-29 — FORBIDDEN: making a previously-unreachable code path reachable without mea…](#2026-08-29-forbidden-making-a-previously-unreachable-code-path-reachable-without-measuring-the-cost-of-the-path-that-will-now-call-it)
 - [2026-08-29 — FORBIDDEN: trusting a profiler's ANSWER without validating its SCOPE again…](#2026-08-29-forbidden-trusting-a-profilers-answer-without-validating-its-scope-against-the-metric-you-care-about)
 - [2026-08-29 — FORBIDDEN: windowing a verification watcher on wall-clock time instead of…](#2026-08-29-forbidden-windowing-a-verification-watcher-on-wall-clock-time-instead-of-on-the-boot-it-is-verifying)
 - [2026-08-29 — FORBIDDEN: mapping an outcome polarity that the venue has not stated](#2026-08-29-forbidden-mapping-an-outcome-polarity-that-the-venue-has-not-stated)
-- [2026-08-29 — FORBIDDEN: gating a verdict on ELAPSED TIME when the artifact carries its…](#2026-08-29-forbidden-gating-a-verdict-on-elapsed-time-when-the-artifact-carries-its-own-build-stamp)
-- [2026-08-29 — FORBIDDEN: closing a name-join gap by POPULATING an alias map, without fir…](#2026-08-29-forbidden-closing-a-name-join-gap-by-populating-an-alias-map-without-first-checking-the-maps-source-carries-the-missing-name)
 - [2026-08-29 — FORBIDDEN: calling a placeholder threshold "conservative" without checking…](#2026-08-29-forbidden-calling-a-placeholder-threshold-conservative-without-checking-it-against-the-real-one-a-threshold-above-break-even-everywhere-is-a-disabled-feature-wearing-safety-language-lane-live-venue-order-placement)
 - [2026-08-29 — FORBIDDEN: reading `count: 0` from an artifact export as "the artifact is…](#2026-08-29-forbidden-reading-count-0-from-an-artifact-export-as-the-artifact-is-unreachable-it-is-a-fact-about-what-the-reader-scans-i-had-this-rule-on-file-and-walked-into-it-anyway-lane-live-venue-order-placement)
 - [2026-08-29 — FORBIDDEN: judging whether `main` is green from a session worktree OR the…](#2026-08-29-forbidden-judging-whether-main-is-green-from-a-session-worktree-or-the-primary-tree-neither-is-a-control-and-they-lie-in-opposite-directions)
-- [2026-08-29 — FORBIDDEN: never treat a `lanes.md` claim as evidence that anyone is holdi…](#2026-08-29-forbidden-never-treat-a-lanesmd-claim-as-evidence-that-anyone-is-holding-the-file-lane-guardpy-has-no-liveness-notion-so-a-claim-outlives-its-session-forever)
 - [2026-08-29 — FORBIDDEN: gating on a status string you did not read from the function th…](#2026-08-29-forbidden-gating-on-a-status-string-you-did-not-read-from-the-function-that-emits-it-the-whole-conversion-shipped-inert-and-every-test-was-green-lane-live-venue-order-placement)
 - [2026-08-29 — FORBIDDEN: verifying a DELETION by grepping for the deleted string, withou…](#2026-08-29-forbidden-verifying-a-deletion-by-grepping-for-the-deleted-string-without-first-proving-the-container-renders)
 - [2026-08-30 — FORBIDDEN: fixing the caller whose NAME matches what you are looking for,…](#2026-08-30-forbidden-fixing-the-caller-whose-name-matches-what-you-are-looking-for-without-checking-which-caller-actually-runs-603-shipped-inert-twice-for-this-lane-live-venue-order-placement)
@@ -149,6 +139,15 @@
 - [2026-08-30 — FORBIDDEN: reading a gate's VERDICT without reading what its KEY covers. A…](#2026-08-30-forbidden-reading-a-gates-verdict-without-reading-what-its-key-covers-a-measurement-about-one-claim-silently-denied-a-different-one)
 - [2026-08-30 — FORBIDDEN: reporting a config key as UNSET without reading its LIVE value.…](#2026-08-30-forbidden-reporting-a-config-key-as-unset-without-reading-its-live-value-the-knob-is-not-reaching-x-does-not-mean-the-knob-is-empty)
 - [2026-08-30 — FORBIDDEN: `[ -d data ]` as a check that a worktree is data-complete. Part…](#2026-08-30-forbidden--d-data-as-a-check-that-a-worktree-is-data-complete-partial-is-worse-than-absent-and-it-passes)
+- [2026-08-30 — FORBIDDEN: reasoning about a limit order's cost as if the LIMIT were the p…](#2026-08-30-forbidden-reasoning-about-a-limit-orders-cost-as-if-the-limit-were-the-price-paid-it-is-a-cap-a-marketable-limit-fills-at-the-book)
+- [2026-08-30 — FORBIDDEN: presenting an agreement as corroboration without asking what IN…](#2026-08-30-forbidden-presenting-an-agreement-as-corroboration-without-asking-what-input-the-two-sides-share-three-blind-cross-checks-in-one-evening-from-one-root)
+- [2026-08-30 — FORBIDDEN: concluding "the venue does not report X" from X being absent in…](#2026-08-30-forbidden-concluding-the-venue-does-not-report-x-from-x-being-absent-in-our-stored-row-read-the-payload-not-the-record-of-it)
+- [2026-08-30 — FORBIDDEN: trusting a guard that has been crying wolf. Count its false fir…](#2026-08-30-forbidden-trusting-a-guard-that-has-been-crying-wolf-count-its-false-firings-before-reading-its-silence-or-its-alarm)
+- [2026-08-30 — FORBIDDEN: writing to a money-path file without first reading what landed…](#2026-08-30-forbidden-writing-to-a-money-path-file-without-first-reading-what-landed-on-it-i-shipped-an-unsafe-rule-that-silently-overrode-a-correct-fix-committed-20-minutes-earlier)
+- [2026-08-30 — FORBIDDEN: carrying a count across a population boundary. "71 board spread…](#2026-08-30-forbidden-carrying-a-count-across-a-population-boundary-71-board-spread-rows-never-reach-order_path-compared-an-odds-board-row-count-against-a-portfolio-position-count-and-i-spent-a-day-tracing-the-gap-between-them)
+- [2026-08-30 — FORBIDDEN: keying a predicate to a field name you have not confirmed the r…](#2026-08-30-forbidden-keying-a-predicate-to-a-field-name-you-have-not-confirmed-the-record-stores-my-log-printed-tickernone-for-every-order-because-ticker-is-not-a-key-on-it)
+- [2026-08-31 — FORBIDDEN: concluding from ONE tick of a counter that increments before it…](#2026-08-31-forbidden-concluding-from-one-tick-of-a-counter-that-increments-before-its-own-drop-gate-three-wrong-readings-in-one-session-each-confident-and-each-plausible)
+- [2026-08-31 — FORBIDDEN: shipping a gate on a one-variable rule when the sample cannot r…](#2026-08-31-forbidden-shipping-a-gate-on-a-one-variable-rule-when-the-sample-cannot-rule-out-a-second-variable-three-hypotheses-died-on-one-dataset-because-each-was-a-projection-of-a-2-d-structure)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -190,6 +189,16 @@
 - [2026-08-25 — FORBIDDEN: never pin a position in an ordered chain with an ABSOLUTE index…](learnings_evidence.md#2026-08-25-forbidden-never-pin-a-position-in-an-ordered-chain-with-an-absolute-index-in-a-comment-or-an-assertion-both-go-stale-silently-and-two-of-them-can-become-mutually-unsatisfiable) `[evidence]`
 - [2026-08-25 — FORBIDDEN: never assert `mock.assert_not_called()` on a shared primitive l…](learnings_evidence.md#2026-08-25-forbidden-never-assert-mockassert_not_called-on-a-shared-primitive-like-subprocesspopen-it-asserts-about-the-whole-process-not-your-code-and-the-answer-is-platform--and-order-dependent) `[evidence]`
 - [2026-08-26 — FORBIDDEN: verifying a consumer against a fixture drawn from ONE producer,…](learnings_evidence.md#2026-08-26-forbidden-verifying-a-consumer-against-a-fixture-drawn-from-one-producer-when-the-artifact-has-more-than-one-producer-two-producers-two-shapes-enumerate-the-shapes-from-production-do-not-assume-there-is-one) `[evidence]`
+- [2026-08-25 — FORBIDDEN: report a real-money code-default change as "done" without readi…](learnings_evidence.md#2026-08-25-forbidden-report-a-real-money-code-default-change-as-done-without-reading-the-live-services-actual-env-vars-a-contradicting-override-wins-silently) `[evidence]`
+- [2026-08-25 — FORBIDDEN: rename a lane's header status away from the literal word "OPEN"…](learnings_evidence.md#2026-08-25-forbidden-rename-a-lanes-header-status-away-from-the-literal-word-open-without-checking-what-that-silently-releases) `[evidence]`
+- [2026-08-28 — FORBIDDEN: chaining an EDIT and a COMMIT so that a FAILED edit still commi…](learnings_evidence.md#2026-08-28-forbidden-chaining-an-edit-and-a-commit-so-that-a-failed-edit-still-commits-the-guard-fired-correctly-and-the-commit-ran-anyway-taking-another-sessions-uncommitted-work-with-it) `[evidence]`
+- [2026-08-27 — FORBIDDEN: REFUSING A BAD VALUE UPSTREAM OF A COALESCING FALLBACK and call…](learnings_evidence.md#2026-08-27-forbidden-refusing-a-bad-value-upstream-of-a-coalescing-fallback-and-calling-it-fixed-the-fallback-picks-it-back-up-one-candidate-later-and-the-fix-ships-inert) `[evidence]`
+- [2026-08-28 — FORBIDDEN: trusting a refusal's stated premise without rechecking it. A RE…](learnings_evidence.md#2026-08-28-forbidden-trusting-a-refusals-stated-premise-without-rechecking-it-a-reasoned-we-cannot-do-this-is-stickier-than-a-bug-because-it-tells-the-next-reader-not-to-look) `[evidence]`
+- [2026-08-28 — FORBIDDEN: diagnosing a resolver when the log said `graded=N` and the serv…](learnings_evidence.md#2026-08-28-forbidden-diagnosing-a-resolver-when-the-log-said-gradedn-and-the-served-payload-changed-nothing-that-is-a-lost-write-and-i-spent-three-theories-on-the-wrong-layer) `[evidence]`
+- [2026-08-29 — FORBIDDEN: making a previously-unreachable code path reachable without mea…](learnings_evidence.md#2026-08-29-forbidden-making-a-previously-unreachable-code-path-reachable-without-measuring-the-cost-of-the-path-that-will-now-call-it) `[evidence]`
+- [2026-08-29 — FORBIDDEN: gating a verdict on ELAPSED TIME when the artifact carries its…](learnings_evidence.md#2026-08-29-forbidden-gating-a-verdict-on-elapsed-time-when-the-artifact-carries-its-own-build-stamp) `[evidence]`
+- [2026-08-29 — FORBIDDEN: closing a name-join gap by POPULATING an alias map, without fir…](learnings_evidence.md#2026-08-29-forbidden-closing-a-name-join-gap-by-populating-an-alias-map-without-first-checking-the-maps-source-carries-the-missing-name) `[evidence]`
+- [2026-08-29 — FORBIDDEN: never treat a `lanes.md` claim as evidence that anyone is holdi…](learnings_evidence.md#2026-08-29-forbidden-never-treat-a-lanesmd-claim-as-evidence-that-anyone-is-holding-the-file-lane-guardpy-has-no-liveness-notion-so-a-claim-outlives-its-session-forever) `[evidence]`
 
 **EXONERATED — 5**
 
@@ -199,7 +208,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 505**
+**Rules and corrections — 512**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -457,7 +466,6 @@
 - [2026-08-27 — RULE: a deploy claim serialises SESSIONS. It does not reserve a service ag…](#2026-08-27-rule-a-deploy-claim-serialises-sessions-it-does-not-reserve-a-service-against-a-human-and-an-assistant-cannot-lift-the-guard-from-inside-a-command)
 - [2026-08-27 — MEASURED NEGATIVE: the NCAAF advanced-data payload does not close the gap…](#2026-08-27-measured-negative-the-ncaaf-advanced-data-payload-does-not-close-the-gap-to-market)
 - [2026-08-27 — NCAAF TOTALS ARE NOT OVER-DISPERSED. The deficit is ONE CONSTANT BIAS, and…](#2026-08-27-ncaaf-totals-are-not-over-dispersed-the-deficit-is-one-constant-bias-and-the-residual-spread-already-matches-the-market)
-- [2026-08-27 — PRE-REGISTERED PREDICTION CONFIRMED: raw pace OVER-CORRECTS the totals bia…](#2026-08-27-pre-registered-prediction-confirmed-raw-pace-over-corrects-the-totals-bias-by-35-56)
 - [2026-08-27 — NCAAF drive structure is an ENGINE ACCOUNTING BUG, not a calibration gap.…](#2026-08-27-ncaaf-drive-structure-is-an-engine-accounting-bug-not-a-calibration-gap-the-sims-own-numbers-do-not-multiply-out)
 - [2026-08-27 — A GUARD THAT ASSERTS THE CALL, NOT THE RESULT, IS TRUE OF CODE THAT DOES N…](#2026-08-27-a-guard-that-asserts-the-call-not-the-result-is-true-of-code-that-does-nothing)
 - [2026-08-27 — MEASURE THE OUTCOME YOU PROMISED, NOT THE CHANGE YOU MADE](#2026-08-27-measure-the-outcome-you-promised-not-the-change-you-made)
@@ -483,10 +491,6 @@
 - [2026-08-28 — A lane disclaimer marker governs its OWN LINE ONLY. Three of five "contest…](#2026-08-28-a-lane-disclaimer-marker-governs-its-own-line-only-three-of-five-contested-files-were-deference-that-parsed-as-ownership)
 - [2026-08-28 — AMENDS the `createdAt`/`finishedAt` rule: the DEPLOY RECORD and the PROCES…](#2026-08-28-amends-the-createdatfinishedat-rule-the-deploy-record-and-the-process-are-not-the-same-instant-lane-venue-join-refusal-visibility)
 - [2026-08-28 — Pre-registering a confound does not help if you get its SIGN wrong](#2026-08-28-pre-registering-a-confound-does-not-help-if-you-get-its-sign-wrong)
-- [2026-08-29 — the check that would have caught this ALREADY EXISTS and was not applied](#2026-08-29-the-check-that-would-have-caught-this-already-exists-and-was-not-applied)
-- [2026-08-29 — a cross-session ANSWER has to go where the reader looks, because SendMessa…](#2026-08-29-a-cross-session-answer-has-to-go-where-the-reader-looks-because-sendmessage-cannot-address-a-lane)
-- [2026-08-29 — a fix proven on ONE consumer is not proven on another that recomputes it e…](#2026-08-29-a-fix-proven-on-one-consumer-is-not-proven-on-another-that-recomputes-it-elsewhere)
-- [2026-08-29 — PowerShell reserved variables can fake a regression](#2026-08-29-powershell-reserved-variables-can-fake-a-regression)
 - [2026-08-29 — a diagnostic that TRUNCATES will be read as evidence. Twice.](#2026-08-29-a-diagnostic-that-truncates-will-be-read-as-evidence-twice)
 - [2026-08-29 — ancestry is a DEPLOY-TIME MEASUREMENT, never a claim](#2026-08-29-ancestry-is-a-deploy-time-measurement-never-a-claim)
 - [2026-08-29 — a null from an instrument you have not calibrated is not evidence. RUN THE…](#2026-08-29-a-null-from-an-instrument-you-have-not-calibrated-is-not-evidence-run-the-control)
@@ -502,6 +506,13 @@
 - [2026-08-30 — RULE: a guard that refuses only what it can PROVE wrong is SILENT on the m…](#2026-08-30-rule-a-guard-that-refuses-only-what-it-can-prove-wrong-is-silent-on-the-majority-case-when-identity-is-usually-unknown-measure-what-share-of-the-population-it-can-even-evaluate-before-shipping-it)
 - [2026-08-30 — RULE: two guards in series, each encoding a DIRECTION assumption, can with…](#2026-08-30-rule-two-guards-in-series-each-encoding-a-direction-assumption-can-withhold-a-true-value-with-no-error-anywhere-each-is-individually-correct-and-neither-can-clear-the-other)
 - [2026-08-30 — METHOD: a DEGENERATE distribution is not a boring result. It is evidence t…](#2026-08-30-method-a-degenerate-distribution-is-not-a-boring-result-it-is-evidence-the-field-is-not-measuring-what-its-name-says)
+- [2026-08-30 — CORRECTION, same day: the tick floor did NOT cause the resting Polymarket…](#2026-08-30-correction-same-day-the-tick-floor-did-not-cause-the-resting-polymarket-orders-i-paired-two-log-lines-30-minutes-apart-and-called-it-a-mechanism)
+- [2026-08-30 — A GATE WRITTEN AGAINST DATA THE SYSTEM DOES NOT RETAIN DOES NOT GATE. IT B…](#2026-08-30-a-gate-written-against-data-the-system-does-not-retain-does-not-gate-it-blocks)
+- [2026-08-30 — A RETRACTION: I DIAGNOSED THE `not_found` LATCH CORRECTLY IN GENERAL AND W…](#2026-08-30-a-retraction-i-diagnosed-the-not_found-latch-correctly-in-general-and-wrongly-in-the-instance)
+- [2026-08-31 — `TaskStop` does not kill the shell child, and a poller that re-`acquire`s…](#2026-08-31-taskstop-does-not-kill-the-shell-child-and-a-poller-that-re-acquires-strands-its-own-deploy-claim)
+- [2026-08-31 — THREE HYPOTHESES DIED ON ONE DATASET, AND ALL THREE WERE ONE-DIMENSIONAL P…](#2026-08-31-three-hypotheses-died-on-one-dataset-and-all-three-were-one-dimensional-projections-of-a-two-variable-rule)
+- [2026-08-31 — A reachability test in TWO STATES says nothing about the EDGE between them](#2026-08-31-a-reachability-test-in-two-states-says-nothing-about-the-edge-between-them)
+- [2026-08-31 — A tidier rendering of a `- Files:` list SILENTLY DECLAIMS](#2026-08-31-a-tidier-rendering-of-a---files-list-silently-declaims)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
@@ -706,5 +717,10 @@
 - [2026-08-22 — RULE: `| tail -N` on a backgrounded command truncates the OUTPUT FILE, not…](learnings_evidence.md#2026-08-22-rule-tail--n-on-a-backgrounded-command-truncates-the-output-file-not-just-the-display) `[evidence]`
 - [2026-08-25 — METHOD: a log line that prints only on the bad path cannot verify the good…](learnings_evidence.md#2026-08-25-method-a-log-line-that-prints-only-on-the-bad-path-cannot-verify-the-good-path-silence-is-not-a-reading) `[evidence]`
 - [2026-08-25 — METHOD: to prove a conditional gate still fires, find it firing for a SIBL…](learnings_evidence.md#2026-08-25-method-to-prove-a-conditional-gate-still-fires-find-it-firing-for-a-sibling-that-meets-the-condition-today-do-not-reason-from-the-code) `[evidence]`
+- [2026-08-27 — PRE-REGISTERED PREDICTION CONFIRMED: raw pace OVER-CORRECTS the totals bia…](learnings_evidence.md#2026-08-27-pre-registered-prediction-confirmed-raw-pace-over-corrects-the-totals-bias-by-35-56) `[evidence]`
+- [2026-08-29 — the check that would have caught this ALREADY EXISTS and was not applied](learnings_evidence.md#2026-08-29-the-check-that-would-have-caught-this-already-exists-and-was-not-applied) `[evidence]`
+- [2026-08-29 — a cross-session ANSWER has to go where the reader looks, because SendMessa…](learnings_evidence.md#2026-08-29-a-cross-session-answer-has-to-go-where-the-reader-looks-because-sendmessage-cannot-address-a-lane) `[evidence]`
+- [2026-08-29 — a fix proven on ONE consumer is not proven on another that recomputes it e…](learnings_evidence.md#2026-08-29-a-fix-proven-on-one-consumer-is-not-proven-on-another-that-recomputes-it-elsewhere) `[evidence]`
+- [2026-08-29 — PowerShell reserved variables can fake a regression](learnings_evidence.md#2026-08-29-powershell-reserved-variables-can-fake-a-regression) `[evidence]`
 
 <!-- LEARNINGS-INDEX:END -->
