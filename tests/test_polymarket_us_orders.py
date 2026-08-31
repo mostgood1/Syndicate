@@ -591,3 +591,40 @@ def test_price_and_side_describe_the_SAME_leg():
     assert body["price"]["value"] == "0.26"                    # the Over price
     # And the size is the stake divided by THAT price, not some other leg's.
     assert abs(float(body["quantity"]) * 0.26 - 10.0) < 0.26   # _Request stake=10.0
+
+
+def test_ORDER_STATE_logs_the_expiry_we_never_set(capsys):
+    """`goodTillTime` decides whether the venue is expiring our orders.
+
+    MEASURED 2026-08-30: Polymarket orders are not resting-and-not-filling, they
+    are CANCELLED and we re-place them within three seconds of noticing. A fixed
+    TTL is already dead (a replacement lived 40+ min while its predecessor died
+    at ~28) and so is market close (one died ~15h before kickoff). We send
+    `tif=GOOD_TILL_CANCEL` and NO expiry, so any expiry is the venue's own — and
+    it returns the field on every read, which `ORDERS_READ` was printing as a
+    key NAME while discarding the value."""
+    from syndicate.features.shared.polymarket_us_orders import _log_order_states
+
+    _log_order_states([{
+        "id": "C1", "marketSlug": "tsc-x", "state": "ORDER_STATE_NEW",
+        "tif": "TIME_IN_FORCE_GOOD_TILL_CANCEL",
+        "goodTillTime": "2026-08-31T01:30:00Z",
+        "createTime": "2026-08-31T01:02:05Z",
+    }], mode="per_order")
+    out = capsys.readouterr().out
+    assert "goodTillTime='2026-08-31T01:30:00Z'" in out
+    # `tif` too: that the venue STORED the good-till-cancel we sent is an
+    # assumption until something reads it back.
+    assert "tif='TIME_IN_FORCE_GOOD_TILL_CANCEL'" in out
+    assert "created='2026-08-31T01:02:05Z'" in out
+
+
+def test_ORDER_STATE_survives_a_row_missing_every_new_field(capsys):
+    """The venue is not obliged to send them. A reader that raises on an absent
+    optional field would take down the reconcile pass it is instrumenting."""
+    from syndicate.features.shared.polymarket_us_orders import _log_order_states
+
+    _log_order_states([{"id": "C2", "marketSlug": "x", "state": "ORDER_STATE_NEW"}],
+                      mode="per_order")
+    out = capsys.readouterr().out
+    assert "goodTillTime=None" in out and "tif=None" in out

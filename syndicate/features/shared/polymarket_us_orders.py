@@ -469,7 +469,29 @@ def _log_order_states(rows: Any, *, mode: str) -> None:
             f" side={row.get('outcomeSide')} action={row.get('action')}"
             f" price={row.get('price')}"
             f" cum={row.get('cumQuantity')!r} leaves={row.get('leavesQuantity')!r}"
-            f" avgPx={row.get('avgPx')!r}",
+            f" avgPx={row.get('avgPx')!r}"
+            # THE EXPIRY WE NEVER SET AND NEVER READ.
+            #
+            # `order_body` sends `tif=TIME_IN_FORCE_GOOD_TILL_CANCEL` and NO
+            # `goodTillTime`, so whatever expiry these orders carry is the
+            # venue's own default -- and the venue RETURNS it on every read.
+            # `ORDERS_READ` prints the KEY NAMES only, so the value has been
+            # fetched on every poll all along and thrown away.
+            #
+            # WHY IT IS THE FIELD THAT MATTERS, measured 2026-08-30: Polymarket
+            # orders are not resting-and-not-filling, they are CANCELLED, and we
+            # re-place them within THREE SECONDS of noticing (submit 01:02:05 ->
+            # CANCELED 01:30:32 -> resubmit 01:30:35). Two explanations are
+            # already dead -- a fixed TTL (a replacement lived 40+ min while its
+            # predecessor died at ~28) and market close (one died ~15h before
+            # kickoff). An expiry the venue chose for us is the next candidate
+            # and cannot be tested without this value.
+            #
+            # `tif` alongside it because we assume the venue STORED the
+            # good-till-cancel we sent. That is an assumption, not a reading,
+            # and this is the line that can check it.
+            f" tif={row.get('tif')!r} goodTillTime={row.get('goodTillTime')!r}"
+            f" created={row.get('createTime')!r} inserted={row.get('insertTime')!r}",
             flush=True,
         )
 
