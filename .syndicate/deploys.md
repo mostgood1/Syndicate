@@ -39267,3 +39267,64 @@ same day.
   the order was never submittable at all. The reverted version's defect was
   running after those refusals and converting each into a silent write.
 
+
+## 2026-08-31 — `#601` the model-edge join: three breaks in series, VERIFIED IN PRODUCTION — lane `layer1-model-edge-join`
+
+**Deployed.** web `4028969e` (by me, `dep-daadhf2jnfac73883p0g`, api, finished
+01:34:28Z). refresh-worker `91e1f69e` and live-odds-worker `91e1f69e` (by the
+USER, manual, finished 01:32:07Z / 01:32:30Z). The two SHAs differ and both
+carry the change: `91e1f69e` was checked BY CONTENT, not by ancestry, because
+the live SHA is not mine — `attach_modelled_fair_edges` present in
+`board_enrichment.py` and `layer2_board.py`, `_model_value_ev` in
+`layer2_board.py`, `_GAME_MARKET_FAMILY` in `wnba_game_projections.py`.
+
+**verify: `modelled_edge_rows_priced` = 953 of 1,022 considered, on the served
+`/api/board/book-grid?sport=soccer&date=2026-08-31`, read 01:41Z. It was 0 on
+every sport before the deploy, and the KEY WAS ABSENT — which is the reading
+that matters, because absent indicts the producer while 0 would indict the
+input.** Served rows carrying `edge_vs_modelled_fair_pct`: 114 of 181
+`player_goal_scorer_anytime`, 197 of 285 `player_shots_on_target`. Edge range
+-36.69 .. +9.11, median -11.63 on shots. Refusals are NAMED and total exactly:
+`modelled_fair_edge_refused` 23, `projection_carries_no_probability` 46.
+
+**The pre-deploy control is what makes that number mean anything.**
+`scripts/measure_model_edge_coverage.py` was run against production BEFORE the
+deploy landed and printed `mfair_priced: ABSENT` on all five sports, with
+`per_sport_ingest` at mlb 6/5252, ncaaf 0/945, nfl 670/2490, soccer 342/16923,
+wnba 6/2339. A post-deploy reading alone could not have distinguished the fix
+working from the slate having changed.
+
+**AND THE HONEST BOUND ON TONIGHT'S READING.** The slate moved while the work
+was in flight: MLB went 1 pregame game -> 0 and WNBA 2 -> 0 between the baseline
+and the deploy. Neither sport can show this fix tonight, and their flat numbers
+must NOT be read as "no effect" — the fix only touches pregame rows. Soccer is
+the only sport with a pregame population right now, and it is also where 2,613
+of the 2,654 affected rows were, so it is the right witness rather than a
+convenient one. **The refresh-worker artifact had still not rebuilt at 01:41Z
+(`written_at` 01:29:16Z, pre-restart), so the SHORTLIST-side numbers —
+`rows_with_model_edge / sides_priced`, `ev_basis`, `model_ev_pct` — are STILL
+OWED and must be read off tomorrow's first build.**
+
+**The deploy killed an in-flight MLB sim.** `deploy_preflight` returned
+`HOLD: 7 job(s) in flight` at 01:27:50Z naming `run_mlb_daily_sim_job.py` and
+the `ui-daily` `daily_update.py` tree; the manual deploy fired at 01:29:34Z,
+~90s later. Recorded as a fact, not a complaint — the sim needs requeuing.
+
+**Claims:** acquired refresh-worker + web at 01:27Z under this lane, released
+BOTH with `--force` at 01:30Z. The force was against MY OWN claim: a watcher
+loop I started re-ran `acquire` each pass, which rotated the token and stranded
+the one I held. That is a defect in the watcher, not in the lock — a poller must
+re-`status`, never re-`acquire`.
+
+**What is fixed** (full audit:
+`.syndicate/findings_2026-08-30_layer1_model_edge_join.md`): the modelled-fair
+edge had never once run on any sport or path (ordering, then the reader, then
+the side key); WNBA spreads compared an away-framed row line to a home-framed
+sim line so `p_home_cover` was unreachable for every non-zero spread; WNBA's
+alternate ladder was documented and filtered out before the loop; four producers
+served a blank edge with the reason key ABSENT; NFL h2h never set
+`edge_vs_market_pct` at all and its regular season opens 2026-09-10; NFL spreads
+refused on a premise `#262` settled; pitcher strikeouts published under
+`batter_strikeouts`. Plus `[user decision]` the one-sided rows are now valued on
+EV against the MODEL's probability rather than the book's own margin, because
+`-hold` is the same number for every such row and buried them.
