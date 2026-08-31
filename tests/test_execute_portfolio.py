@@ -1449,3 +1449,57 @@ def test_a_kalshi_row_with_no_ticker_says_WHICH_book_priced_it(monkeypatch):
     example = detail["examples"].get("totals_alt|no_venue_ticker")
     assert example, detail
     assert "price_source=" in example, example
+
+
+@pytest.fixture(autouse=True)
+def _no_crossing_by_default(monkeypatch):
+    """Pin the BASE price contract: send exactly the venue's quote.
+
+    `SYNDICATE_POLYMARKET_CROSS_TICKS` defaults to 1 in production because the
+    crossing experiment is RUNNING `[2026-08-31, user decision]`. A test suite
+    that inherited that default would assert an experiment's arm as if it were
+    the contract, and every price assertion here would move the day the
+    experiment is switched off.
+
+    So the suite fixes the dial at 0 and the crossing tests set it themselves.
+    Eight tests failed with `0.505 == 0.5` before this existed, which is the
+    experiment working, not a regression.
+    """
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_CROSS_TICKS", "0")
+
+
+def test_cross_ticks_default_is_the_arm_being_tested(monkeypatch):
+    """The crossing experiment's dial.  `[2026-08-31, user decision]`
+
+    We bid EXACTLY the venue's quote and pregame orders rest untouched (3 of 3)
+    while live-or-past orders fill (8 of 8); nine other explanations are dead by
+    measurement. This bids one tick ABOVE the quote to test whether size sits
+    just above. The default IS the arm under test."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_CROSS_TICKS", raising=False)
+    from pipeline.execute_portfolio import _polymarket_cross_ticks
+    assert _polymarket_cross_ticks() == 1, "the production default must be the arm under test"
+
+
+def test_cross_ticks_zero_restores_bidding_exactly_the_quote(monkeypatch):
+    """An experiment must be switchable off without a code change."""
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_CROSS_TICKS", "0")
+    from pipeline.execute_portfolio import _polymarket_cross_ticks
+    assert _polymarket_cross_ticks() == 0
+
+
+def test_cross_ticks_is_BOUNDED_so_a_typo_cannot_become_a_market_order(monkeypatch):
+    """A large cross stops being a spread-crossing test. The slippage guard must
+    not be the only thing between a typo and the book."""
+    from pipeline.execute_portfolio import _polymarket_cross_ticks
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_CROSS_TICKS", "99")
+    assert _polymarket_cross_ticks() == 3
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_CROSS_TICKS", "-5")
+    assert _polymarket_cross_ticks() == 0
+
+
+def test_cross_ticks_UNREADABLE_takes_the_safe_arm_and_says_so(monkeypatch):
+    """Unknown must not land on the permissive branch. Not crossing is the
+    conservative reading, and it is named rather than silent."""
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_CROSS_TICKS", "abc")
+    from pipeline.execute_portfolio import _polymarket_cross_ticks
+    assert _polymarket_cross_ticks() == 0

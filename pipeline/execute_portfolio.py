@@ -825,6 +825,30 @@ def _polymarket_max_price_age_seconds() -> float:
     return parsed if parsed > 0 else _slate_ceiling_default()
 
 
+def _polymarket_cross_ticks() -> int:
+    """Ticks to bid ABOVE the venue quote. `SYNDICATE_POLYMARKET_CROSS_TICKS`.
+
+    Defaults to 1: this is a running experiment (see the block that calls it),
+    and the default is the arm being tested. `0` restores bidding exactly the
+    quote. Bounded at 3 -- a large cross stops being a spread-crossing test and
+    becomes an unpriced market order, and the slippage guard should not be the
+    only thing standing between a typo and the book.
+    """
+    raw = str(os.environ.get("SYNDICATE_POLYMARKET_CROSS_TICKS") or "").strip()
+    if not raw:
+        return 1
+    try:
+        return max(0, min(3, int(float(raw))))
+    except (TypeError, ValueError):
+        # UNREADABLE IS NOT ZERO and is not the default either -- say so, then
+        # take the safe arm, which is not crossing.
+        print(
+            f"[execute_portfolio] POLYMARKET_CROSS_TICKS_UNREADABLE {raw!r} -- not crossing",
+            flush=True,
+        )
+        return 0
+
+
 def _polymarket_resolve_market(request) -> tuple | None:
     """`(slug, price, tick_size, min_qty)` for one Polymarket US position, or
     `None` to refuse cleanly -- which `polymarket_us_submitter` turns into an
@@ -1150,6 +1174,63 @@ def _polymarket_resolve_market(request) -> tuple | None:
                 flush=True,
             )
             price = quoted
+        else:
+            # ------------------------------------------------------------
+            # THE CROSSING EXPERIMENT  [2026-08-31, user decision]
+            # ------------------------------------------------------------
+            #
+            # WHAT IT TESTS. Every Polymarket order observed splits the same
+            # way: PREGAME markets rest untouched (3 of 3 pending, cum=0),
+            # LIVE-or-PAST markets fill (8 of 8 settled). And we bid EXACTLY
+            # the venue's quote, never under it -- measured on both live
+            # orders, `lec-rom` quote 0.48 sent 0.48 and `scp-scf` quote 0.44
+            # sent 0.44, both `snapped=False`.
+            #
+            # Nine explanations are already dead by measurement: the tick
+            # floor, a stale ask, bidding a mid, our own cancel loop, market
+            # close, a venue expiry (`goodTillTime=None`), insufficient
+            # collateral, restart/OOM, and deploy. What survives is that the
+            # quote is DISPLAYED with no size behind it pregame -- and that is
+            # INFERENCE, because nothing we have reads book DEPTH.
+            #
+            # This is the cheapest test of it. Bid one tick ABOVE the quote:
+            #   fills                      -> size sits just above; price was it
+            #   never fills at any price   -> no book yet; the fix is TIMING
+            #
+            # WHY IT IS CHEAP. A marketable limit fills at the BOOK, not at the
+            # limit: `C4N3GPYA4GNQ` was submitted at 0.51 and filled at
+            # avgPx=0.4900. A tick of headroom costs nothing when the book is
+            # better, and at most one tick when it sits exactly at our price.
+            #
+            # AND IT STAYS GUARDED. This runs BEFORE the slippage check below,
+            # so a cross that pushes past tolerance is REFUSED rather than
+            # silently paid -- the reason the snap was moved above that check.
+            #
+            # `SYNDICATE_POLYMARKET_CROSS_TICKS=0` turns it off. It defaults to
+            # 1 because this is a RUNNING experiment, not a shipped policy.
+            cross = _polymarket_cross_ticks()
+            if cross:
+                try:
+                    crossed = round(price + cross * float(tick_value), 9)
+                except (TypeError, ValueError):
+                    crossed = price
+                if crossed < 1.0:
+                    print(
+                        f"[execute_portfolio] POLYMARKET_CROSS slug={slug}"
+                        f" quote={quoted} snapped={price} crossed={crossed}"
+                        f" ticks={cross} tick={tick_value!r}",
+                        flush=True,
+                    )
+                    price = crossed
+                else:
+                    # A cross that leaves (0,1) is not a price. Declining to
+                    # cross is NOT declining the order -- the snapped price
+                    # stands and the order still goes.
+                    print(
+                        f"[execute_portfolio] POLYMARKET_CROSS_SKIPPED slug={slug}"
+                        f" snapped={price} would_be={crossed} -- not a probability",
+                        flush=True,
+                    )
 
     planned_raw = getattr(request, "requested_price", None)
     planned = planned_probability(planned_raw)
