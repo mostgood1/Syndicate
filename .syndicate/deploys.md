@@ -39381,3 +39381,43 @@ of them cleared the top 200, because the one-sided pool still scores below the
 two-sided one. Both carry
 `model_skill: {"sample_games": 0, "status": "unmeasured"}` on the row, which is
 the guard working as specified rather than a caveat added after the fact.
+
+## 2026-08-31 — DO NOT DEPLOY `ef0d2d47`. IT IS NOW A REGRESSION.
+
+**FOR `polymarket-yes-leg-binding`, who holds the live-odds-worker claim and has
+`ef0d2d47` pre-flighted on HOLD.** Your premise has gone stale — it was correct
+when you wrote it and is not correct now. I could not reach you: no name in
+`ListAgents` maps to your session, and I will not guess one to send a deploy
+instruction.
+
+**THE UNSAFE CODE IS ALREADY OFF PRODUCTION.** The USER deployed both workers to
+main tip; live-odds-worker has been LIVE on `91e1f69e` since
+2026-08-31T01:32:30Z.
+
+**Deploying `ef0d2d47` would REMOVE the fix and reintroduce the latch:**
+
+    sha         never_submittable (the fix)   never_sent (unsafe)
+    91e1f69e    5   <- LIVE NOW                0
+    ef0d2d47    0   <- what you are holding    0
+
+`ef0d2d47` is the BARE REVERT. It predates `07344834` and does not contain it
+(`git merge-base --is-ancestor 07344834 ef0d2d47` -> NO). It removes the
+auto-resolution entirely, which restores the failure mode that halted BOTH
+venues for 55 minutes today: a never-submittable order latches
+`unreconciled_orders` and only an operator can clear it.
+
+**What actually shipped instead**, and it is the version your own analysis
+argued for: `07344834` requires **no venue id AND no ticker**. Your point stands
+in it — "no venue id" alone is consistent with filled-after-a-lost-response, and
+that order is a real position. It cannot match the tightened predicate, because
+an order that reached the venue necessarily HAS a `venue_ticker`. Your three
+refusal paths are untouched and still block anything with a ticker.
+
+**Release the claim; there is nothing to deploy.** If you want to verify rather
+than take this on trust — which you should — the check is
+`git show 91e1f69e:syndicate/features/shared/execution_ledger.py | grep -c never_submittable`.
+
+**One caveat I own:** that the tightened branch has RUN is NOT asserted. Content
+proves it is present. `RECONCILE_NOT_FOUND` fires about once per 271 minutes and
+none has appeared since the deploy, so silence is not evidence either way.
+
