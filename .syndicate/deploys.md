@@ -15184,3 +15184,87 @@ edges an order of magnitude larger than the market offers, on rows whose
 shrinkage, and there is no measured skill to shrink by. **Recorded as
 UNSETTLED and NOT ACTED ON.** `layer2_board.py` is held by lane
 `polymarket-yes-leg-binding`; nothing here was edited.
+## 2026-08-31 16:48Z — `cffbbd89` — both workers — the board ranks on EDGE, not EV — lane `layer2-longshot-scoring`
+
+**User decision, 2026-08-31: _"confirmed - rank on edge, flip the default."_**
+This is a SECOND decision, not the 08-30 one `state.md` carries. Do not read
+the two as one — 08-30 set the model/market basis split; 08-31 changed which
+term the model branch ranks on, and flipped the env default so absent means
+`edge`.
+
+**What shipped** (`syndicate/features/shared/layer2_board.py`): `_model_value_term()`
+reads `SYNDICATE_LAYER2_MODEL_VALUE_TERM`; **absent → `edge`**, only the literal
+`ev` restores the old behaviour. When the model branch is taken and
+`model_edge` is present, `value_ev = model_edge` and `ev_basis =
+EV_BASIS_MODEL_EDGE`. Deployed **manually by the user**, `trigger=manual`,
+refresh-worker live 16:48:10Z and live-odds-worker 16:48:45Z.
+
+**Why:** `EV = edge / p`. That divisor is a 1/p amplifier, so the lowest-probability
+row on the board wins the sort by construction. It is not a home-run-prop
+problem — that was my framing for six messages and it was wrong. It follows
+whichever sport is currently one-sided; MLB home runs rotated out and soccer
+shots took the same slots with no code change.
+
+### verify: the value column IS the edge column, on the served board
+
+Board `written_at=2026-08-31T17:00:33Z`, first build under the new SHA, n=929:
+
+```
+value_pct == model_edge_pct   184/184     (control, prior board: model_ev 69/69)
+value_pct == model_ev_pct       0/184
+ev_basis                      model_edge 184,  market_fair 745
+```
+
+Exact per-row identity, not a distributional proxy. The **headline metric I
+started with was confounded** — top-25 composition flipped MLB→soccer across
+builds with no code change at all, so it could not have distinguished this
+deploy from a slate rotation. The peer showed that; the identity above replaced it.
+
+### the read path is a pass-through — PROVEN, not assumed
+
+Web is on `592cf643`, which **does not contain `cffbbd89`** and has zero
+occurrences of `_model_value_term`. It served `ev_basis=model_edge` anyway.
+So the scoring is entirely writer-side and a web deploy is not needed for this
+change. (Useful the next time this family is touched.)
+
+### what moved, and what did not
+
+```
+model rows in top 25         18 -> 11
+uninformative_ev           1416 -> 1348
+top-25 by ev_basis           model_edge 11, market_fair 14
+top-25 with POSITIVE market ev_pct   13/25      (was ~0 -- every one-sided row reads -6.5)
+```
+
+**My shape prediction FAILED.** I predicted "#1 is market-anchored at ev_pct
++3.88". Actual top1 is `(soccer, player_shots, model_edge, ev_pct -6.2167)` —
+still a one-sided row. It earns the slot honestly: its `model_edge` of 11.48 is
+the largest value term on the board. The rule demoted rows that were *amplified*
+into the top; it does not remove a row whose raw edge is genuinely biggest.
+
+The reorder is two-directional, which is worth seeing before anyone assumes it
+only demotes: a row at `m_edge 8.86 / m_ev 31.27` ranked on 31.3 and now ranks
+on 8.86, while top1 at `m_edge 11.48 / m_ev 6.79` was ranked **down** by the old
+rule and up by the new one.
+
+### a number I am NOT claiming
+
+`mb 69 -> 184` looks like growth and is **a slice artifact**. The control was
+truncated at `limit=1000` against an unknown-size board; this reading is the
+whole 929 rows. 69 undercounts an unknown population. Not evidence of anything.
+
+### withdrawn from the plan this deploy came from
+
+Item 1 ("the book prices these at -6.5%") was **wrong and is withdrawn**.
+`ev_pct = -6.5` on a one-sided market is a `book_margin_model` artifact —
+`fair = implied x (1 - hold)` makes it exactly `-hold` for every such row
+regardless of which side you take. It carries no information about the bet.
+
+### still open, and this is what actually unblocks the caps request
+
+`SYNDICATE_LAYER2_COMBINED_ROWS=0` on refresh-worker is **not flipped**. All
+three services carry the merge and three clean shadow cycles are recorded
+(963 / 1159 / 753 rows, one cycle dropping a sport, merge reproduced the board
+exactly each time). Until that flag flips, the 8MB keyvalue ceiling still binds
+the combined key and **`SYNDICATE_LAYER2_ROWS_PER_SPORT` cannot go above 400** —
+which was the original request and is still not done.
