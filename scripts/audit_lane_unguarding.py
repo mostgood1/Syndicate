@@ -34,7 +34,10 @@ import types
 
 REPO = pathlib.Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")
 LANES = ".syndicate/lanes.md"
-ARCHIVES = (".syndicate/lanes_closed.md", ".syndicate/lanes_history.md")
+# `lanes_closed.md` was split by date into `lanes_closed_archive.md` on
+# 2026-08-31. A released claim can now land in either, so both are searched.
+ARCHIVES = (".syndicate/lanes_closed.md", ".syndicate/lanes_closed_archive.md",
+            ".syndicate/lanes_history.md")
 
 HEADER_RE = re.compile(r"^###\s+(\S+)\s", re.M)
 OPEN_RE = re.compile(r"\bOPEN\b")
