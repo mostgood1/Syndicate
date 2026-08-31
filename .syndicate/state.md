@@ -8185,6 +8185,36 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-resting-orders-do-not-encumber-cash] 2026-08-31T15:45Z — CONFIRMED by a before/after pair, after I doubted it
+
+**The claim under test:** "an unfilled order holds no reserved funds", used as
+the argument that placing early costs only CHURN, never capital. It rested on a
+balance that was flat at $87.26 across a cancellation — weaker evidence than it
+sounded, because a cancellation restoring funds looks identical to funds never
+having been taken.
+
+**The doubt:** the user's order screen showed Cash $75.55 against Portfolio
+$89.95 with $10.09 of pending orders sitting in the gap.
+
+**THE MEASUREMENT — the same instant either side of two real submits:**
+
+    15:25:23Z  VENUE_BALANCES polymarket=ok:75.56   BEFORE both explores
+    15:25:43Z  SUBMIT bal-col  $1.10
+    15:25:45Z  SUBMIT ast-ars  $8.99
+    15:42:16Z  VENUE_BALANCES polymarket=ok:75.56   AFTER, unchanged
+
+$10.09 of NEW resting orders moved spendable capital by **$0.00**. The gap on
+the screen is position value and reconciles exactly: 75.55 + 14.40 = 89.95.
+
+**WHY THIS READING IS THE RIGHT ONE.** `venue_balances.py:372` sets
+`spendable = buying_power if buying_power is not None else current`, and
+`buyingPower` is the venue's own "unencumbered capital available for trading".
+Encumbrance is precisely what that field would express, and it did not move.
+
+**SO CHURN REALLY IS THE ONLY COST OF A RESTING ORDER**, and the pregame hold is
+justified by duplicate-exposure risk alone — never by tied-up capital. Anyone
+arguing the hold saves money is arguing something this measurement refutes.
+
 ## [polymarket-price-gate-leaks-by-crossing] 2026-08-31T15:35Z — the ceiling is checked against a price the venue never receives
 
 **VERIFIED BY CODE TRACE, not by inference:**
