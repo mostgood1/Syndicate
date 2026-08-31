@@ -1399,6 +1399,28 @@ def _mlb_betting_day_backfill_completed_dates(last_status: Mapping[str, Any] | N
     return done
 
 
+def _season_betting_day_filename(season: int, date_str: str) -> str:
+    """`season_betting_day_<season>_<MM>_<DD>.json`.
+
+    The rule is not obvious -- the slug is the date with underscores, and the
+    SEASON PREFIX IS STRIPPED from it, so 2026-08-30 becomes
+    `season_betting_day_2026_08_30.json` and not `..._2026_2026_08_30.json`.
+    Duplicated from `syndicate.features.mlb.sources.season_betting_card_day_path`
+    rather than called, because that helper resolves against ITS OWN data root
+    while the caller here must publish the file the subprocess actually wrote,
+    under the `--day-payload-dir` it was handed. Importing it would couple two
+    root resolutions that are allowed to differ.
+
+    `test_season_betting_day_filename_matches_the_canonical_helper` pins the two
+    together so the duplication cannot drift silently.
+    """
+    slug = str(date_str).replace("-", "_")
+    prefix = f"{int(season)}_"
+    if slug.startswith(prefix):
+        slug = slug[len(prefix):]
+    return f"season_betting_day_{int(season)}_{slug}.json"
+
+
 def _mlb_betting_day_backfill_status_path() -> Path:
     return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "mlb_betting_day_backfill_status.json"
 
@@ -1526,6 +1548,43 @@ def _run_mlb_betting_day_backfill_tick() -> dict[str, Any] | None:
             "error": f"{type(exc).__name__}: {exc}",
             "command": [str(part) for part in command],
         }
+    # PUBLISH THE REBUILT PAYLOAD TO WEB.
+    #
+    # Without this the backfill is UNOBSERVABLE. It writes to refresh-worker's
+    # disk; `/mlb/api/market-accuracy` reads WEB's. This worker publishes
+    # explicitly per path (`publish_hot_artifact`, see the shard loop) and there
+    # is no blanket sweep here -- `sweep_changed_hot_artifacts`'s only
+    # production caller is `live_lens_loop`, on another service. So nothing
+    # bridged a backfilled payload across, and a regrade could not be verified
+    # from anywhere. Measured 2026-08-31: two watchers polled market-accuracy
+    # for ~35 minutes for a change that was structurally impossible, and a
+    # 90-minute timeout would have read as "the regrade failed".
+    #
+    # Settlement itself does NOT need this -- it runs on this worker against
+    # this disk. This is for the web-facing accuracy page and for being able to
+    # prove a backfill did something.
+    #
+    # `season_betting_day_*.json` is already in HOT_ARTIFACT_PATTERNS
+    # (`artifact_publisher.py:442`), so nothing needs allowlisting.
+    if status.get("ok"):
+        try:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+            payload_path = day_payload_dir / _season_betting_day_filename(season, target_date)
+            if payload_path.is_file():
+                published = bool(publish_hot_artifact(payload_path, timeout_seconds=120))
+                status["published"] = published
+                status["published_path"] = str(payload_path)
+                status["published_bytes"] = payload_path.stat().st_size
+            else:
+                # NAME THE PATH WE LOOKED FOR. A silent False here is the same
+                # blindness this block exists to remove.
+                status["published"] = False
+                status["publish_skip_reason"] = f"payload not found at {payload_path}"
+        except Exception as exc:
+            status["published"] = False
+            status["publish_error"] = f"{type(exc).__name__}: {exc}"
+
     # MERGE, never overwrite. The completion markers ARE the self-disable, so
     # a write that dropped the other dates' records would make every finished
     # date outstanding again on the next tick.
