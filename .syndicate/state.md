@@ -7982,6 +7982,47 @@ Venue-scoped coverage is much better than board-wide: the Polymarket line
 reports `sim_view_on=14/29` (48%). The unprojected mass is mostly rows the
 venues do not quote anyway.
 
+## [polymarket-fill-time-to-event] 2026-08-30 — the leading hypothesis is TIME TO EVENT, not liquidity at our size
+
+**Raised by `polymarket-yes-leg-binding` off the `ORDER_STATE` instrument, and it
+is better than my own.** n=2 resting vs 8 settled, and the separation is on the
+market's DATE, not its price:
+
+    RESTING (2, both cum=0 NEVER TOUCHED)   2026-08-31 and 2026-09-05
+    SETTLED (8)                             7 past, 1 today
+
+Confirmed against the board: `tsc-sea-lec-rom-2026-08-31-2pt5` is ROM@LEC
+starting 2026-08-31T16:30Z, and `tsc-bun-scp-scf-2026-09-05-2pt5` is SCF@SCP
+starting 2026-09-05T13:30Z — **both PREGAME**, one five days out. Every fill was
+on a live-or-finished market. A Bundesliga total five days away plausibly has no
+resting size because nobody is trading it yet.
+
+**This fits my own counter-example better than size does.** `sea-tor` filled
+11.17 at 0.435 while `lad-det` rested at 10.66 — near-identical size, opposite
+outcome, which "no liquidity at our quantity" cannot explain and time-to-event
+can.
+
+**AND I CAN NO LONGER TEST IT ON THAT PAIR.** Both MLB fixtures have aged off the
+board, the same way KC@CLE did, so their kickoff times are unavailable. That
+check is gone; it needed to be run while they were live.
+
+**MY LIQUIDITY HYPOTHESIS IS NOT DEAD, IT IS CONFOUNDED.** Every untouched order
+in this sample is on an unplayed market, so the sample cannot separate the two.
+n=2 is not a rate and neither of us is claiming it is.
+
+**THE DISCRIMINATING TEST, needing no new code now `ORDER_STATE` is live:**
+bucket `cum==0` resting orders by HOURS TO COMMENCE. If never-touched
+concentrates far from kickoff and fills concentrate near it, the fix is WHEN we
+place, not what we price. **If untouched orders appear at t-30min too, the
+liquidity story survives and time-to-event is dead.** Run it on a full slate, not
+on tonight's two.
+
+**IF IT HOLDS, it reframes the original complaint** ("barely placing orders, and
+the ones placed aren't processed"): we would be placing into books that do not
+exist yet, and the remedy is placement timing rather than pricing, sizing, the
+venue join, or the tick logic — all four of which have now been eliminated by
+measurement.
+
 ## [polymarket-order-fills] 2026-08-30 — four causes REFUTED; fills are mostly fine
 
 **5 of 7 Polymarket orders FILLED today.** The two that did not (`lad-det`,
