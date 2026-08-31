@@ -1388,14 +1388,39 @@ def _mlb_betting_day_backfill_completed_dates(last_status: Mapping[str, Any] | N
     if not isinstance(last_status, Mapping):
         return set()
     done: set[str] = set()
-    legacy_date = str(last_status.get("date") or "").strip()
-    if legacy_date and bool(last_status.get("ok")):
-        done.add(legacy_date)
     per_date = last_status.get("dates")
+    # The legacy shape ONLY when there is no per-date map. The current document
+    # also carries a top-level `date`/`ok` describing the LAST TICK, so reading
+    # it unconditionally would mark that one date done while ignoring the
+    # published-check below -- pinning whichever date happened to run last.
+    if not isinstance(per_date, Mapping):
+        legacy_date = str(last_status.get("date") or "").strip()
+        if legacy_date and bool(last_status.get("ok")):
+            done.add(legacy_date)
     if isinstance(per_date, Mapping):
         for key, value in per_date.items():
-            if isinstance(value, Mapping) and bool(value.get("ok")):
-                done.add(str(key))
+            if not isinstance(value, Mapping) or not value.get("ok"):
+                continue
+            # A DATE THAT BUILT BUT WAS NEVER PUBLISHED IS NOT DONE.
+            #
+            # Self-heals the window rebuilt on 2026-08-31 at 19:03-19:08Z,
+            # before the publish call existed: seven dates sit `ok: True` with
+            # their payloads on this worker's disk and no copy on web, so the
+            # regrade cannot be verified and the accuracy page still serves the
+            # pre-fix numbers. There is no way to clear these markers from
+            # outside -- `keyvalue/expire-run-artifacts` matches the key
+            # (`matched_keys: 1`) but refuses it for having no run stamp
+            # (`skipped_no_run_stamp: 1`, measured), and every other route needs
+            # an env write. So the tick heals itself instead.
+            #
+            # BOUNDED TO EXACTLY ONE RE-RUN PER DATE, deliberately: the test is
+            # whether `published` is ABSENT, not whether it is False. Once a
+            # date re-runs, `published` is set either way and it never qualifies
+            # again -- so a persistently failing publish costs one rebuild per
+            # date, not a 600s subprocess on every tick forever.
+            if "published" not in value:
+                continue
+            done.add(str(key))
     return done
 
 

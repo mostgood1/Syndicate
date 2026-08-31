@@ -969,6 +969,57 @@ class RefreshWorkerTests(unittest.TestCase):
         self.assertFalse(status.get("published"))
         self.assertIn("season_betting_day_2026_08_30.json", status.get("publish_skip_reason", ""))
 
+    def test_betting_day_backfill_reruns_a_date_that_built_but_never_published(self) -> None:
+        """Self-heals the 2026-08-31 19:03-19:08Z window.
+
+        Seven dates sit ok=True with payloads on the worker and no copy on
+        web, and the markers cannot be cleared from outside: the keyvalue
+        expire endpoint MATCHES the key but refuses it for having no run
+        stamp (measured), and every other route needs an env write.
+        """
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+        built_not_published = {"dates": {"2026-08-30": {"ok": True}}}
+        self.assertEqual(module._mlb_betting_day_backfill_completed_dates(built_not_published), set())
+
+    def test_betting_day_backfill_rerun_is_bounded_to_once_per_date(self) -> None:
+        """The test is whether `published` is ABSENT, not whether it is False.
+
+        A persistently failing publish must cost one rebuild per date, not a
+        600s subprocess on every tick forever.
+        """
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+        for published in (True, False):
+            status = {"dates": {"2026-08-30": {"ok": True, "published": published}}}
+            self.assertEqual(
+                module._mlb_betting_day_backfill_completed_dates(status),
+                {"2026-08-30"},
+                f"published={published} must count as done either way",
+            )
+
+    def test_betting_day_backfill_top_level_date_does_not_pin_the_last_tick(self) -> None:
+        """The current document carries a top-level date/ok for the LAST TICK.
+
+        Reading it unconditionally as the legacy marker would mark that one
+        date done while skipping the published-check, pinning whichever date
+        happened to run last.
+        """
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+        current = {"date": "2026-08-30", "ok": True, "dates": {"2026-08-30": {"ok": True}}}
+        self.assertEqual(
+            module._mlb_betting_day_backfill_completed_dates(current),
+            set(),
+            "top-level date must not bypass the published-check",
+        )
+        legacy = {"date": "2026-08-02", "ok": True}
+        self.assertEqual(
+            module._mlb_betting_day_backfill_completed_dates(legacy),
+            {"2026-08-02"},
+            "a genuinely legacy document has no dates map and must still self-disable",
+        )
+
     def test_betting_day_backfill_accepts_a_comma_separated_list(self) -> None:
         """A 7-day backlog used to cost SEVEN deploys.
 
