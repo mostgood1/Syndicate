@@ -7982,6 +7982,50 @@ Venue-scoped coverage is much better than board-wide: the Polymarket line
 reports `sim_view_on=14/29` (48%). The unprojected mass is mostly rows the
 venues do not quote anyway.
 
+## [polymarket-orders-are-cancelled] 2026-08-30 — the venue cancels them, we re-place them, and nobody knows why
+
+**THE ORDERS DO NOT REST AND FAIL TO FILL. THEY ARE CANCELLED.** That reframes
+the original question: it is not a pricing or sizing problem at all.
+
+**WE ARE NOT DOING IT — fifth cause eliminated.** `cancel_stale_resting_orders`
+(15-min age, 1c band, max 3/pass) is a real venue-write loop, but
+`run_live_odds_refresh_worker:1676-1699` feeds it ONLY Kalshi rows and says so:
+*"Kalshi first and its result kept ... Polymarket's pass runs for its ledger
+corrections only."* Polymarket's own `cancel_order` (`3170db13`) exists and is
+NEVER CALLED. So the cancellations are venue-initiated.
+
+**THE SUBMIT -> CANCEL -> RESUBMIT LOOP is real, and it is where the duplicate
+exposure came from:**
+
+    tsc-sea-lec-rom-2026-08-31   submit 01:02:05 -> CANCELED 01:30:32 -> resubmit 01:30:35
+    tsc-mlb-phi-laa-2026-08-30   submit 16:42:25 -> cancelled -> 18:19:10 -> cancelled -> 20:48:00
+
+The resubmit follows the observed cancel by THREE SECONDS — same tick.
+
+**REFUTED: a fixed venue TTL.** `C6R7RS83JKDD` died ~28 min after submit, but its
+replacement `C6RNQZ8B2KDE` has been `ORDER_STATE_NEW` for 40+ minutes
+(01:30:35 -> 02:10:11) with no cancel. **REFUTED: market close** — sea-lec-rom
+was cancelled ~15 HOURS before its 16:30Z kickoff.
+
+**CORRECTION, MINE, CAUGHT BEFORE IT WAS REPORTED AS A FINDING.** I measured a
+near-perfect +62s correlation between deploys and cancellations across six
+deploys and nearly called it cancel-on-disconnect. It was an artifact: I matched
+the raw text `order_state_canceled`, which appears on EVERY pass that re-prints
+an already-cancelled row. Filtering to actual `RECONCILED` state TRANSITIONS
+leaves **three events in 12h** — 18:18:51 (n=4), 19:59:16 (n=1), 01:30:32 (n=1)
+— and only one is deploy-adjacent. **A re-report is not an event.**
+
+**STILL WORTH EXPLAINING: 18:18:51 cancelled FOUR orders at once** (lad-det x2,
+phi-laa, lal-cel-ath). A simultaneous batch looks like a session-level event, but
+no restart appears in the 18:00-18:30Z logs.
+
+**THE DECISIVE FIELD IS `goodTillTime`, AND WE NEITHER SET NOR LOG IT.** We send
+`tif=TIME_IN_FORCE_GOOD_TILL_CANCEL` and no expiry, so the venue applies its own
+default. It RETURNS `goodTillTime` on every order — `ORDERS_READ` prints the KEY
+NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
+to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
+`polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
+
 ## [polymarket-fill-time-to-event] 2026-08-30 — the leading hypothesis is TIME TO EVENT, not liquidity at our size
 
 **Raised by `polymarket-yes-leg-binding` off the `ORDER_STATE` instrument, and it
