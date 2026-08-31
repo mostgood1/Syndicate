@@ -494,17 +494,18 @@ def run_execution(
         # HOLD, DO NOT DROP. `skipped` means "not placed on this pass", and the
         # position stays in the plan, so the next tick inside the window places
         # it normally. Nothing is abandoned.
-        held = _polymarket_hold_hours(request, venue)
+        held = _polymarket_hold_price(request, venue)
         if held is not None:
+            price, hours = held
             skipped += 1
-            refused["too_early_to_place"] = refused.get("too_early_to_place", 0) + 1
+            refused["pregame_price_too_high"] = refused.get("pregame_price_too_high", 0) + 1
             print(
-                f"[execute_portfolio] HELD_TOO_EARLY venue={venue}"
+                f"[execute_portfolio] HELD_PREGAME_NEAR_EVEN venue={venue}"
                 f" ticker={getattr(request, 'venue_ticker', None)!r}"
                 f" market={getattr(request, 'market', None)}"
-                f" hours_to_commence={held:.1f}"
-                f" threshold={_polymarket_min_hours_to_commence()}"
-                " -- pregame orders do not fill at any price; it will be placed nearer kickoff",
+                f" price={price:.3f} ceiling={_polymarket_max_pregame_price()}"
+                f" hours_to_commence={hours:.1f}"
+                " -- pregame, no book on a near-even side; it places once live",
                 flush=True,
             )
             continue
@@ -912,59 +913,74 @@ def _polymarket_max_price_age_seconds() -> float:
     return parsed if parsed > 0 else _slate_ceiling_default()
 
 
-def _polymarket_min_hours_to_commence() -> float:
-    """Hold a Polymarket order further out than this many hours from kickoff.
+def _polymarket_max_pregame_price() -> float:
+    """Hold a PREGAME Polymarket order priced above this. Place it if cheaper.
 
-    `SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE`. **The default of 24 is a
-    JUDGEMENT, not a measurement, and it is deliberately loose.** What is
-    measured is only the two ends: orders on LIVE markets fill (8 of 8), and
-    orders 12 hours and 5 days out do not (3 of 3, at two different prices).
-    Nothing establishes where between "live" and "12 hours" the boundary sits,
-    so this suppresses only the clearly-premature end and leaves the ambiguous
-    middle alone.
+    `SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE`. **0.37 IS A MIDPOINT GUESS, NOT A
+    MEASUREMENT**, and it is labelled so nobody later mistakes it for one. The
+    boundary lies somewhere in a gap that has never been observed:
 
-    `0` disables the hold entirely and restores placing whenever the plan says.
+        pregame FILLED   0.240  0.250  0.335
+        pregame RESTING  0.410  0.435  0.460  0.460  0.490 x3
+
+    n=3 fills. 0.37 splits 0.335 and 0.410 and nothing has been seen between
+    them. Re-derive it as the gap fills in.
+
+    `0` disables the hold entirely.
     """
-    raw = str(os.environ.get("SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE") or "").strip()
+    raw = str(os.environ.get("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE") or "").strip()
     if not raw:
-        return 24.0
+        return 0.37
     try:
         return max(0.0, float(raw))
     except (TypeError, ValueError):
         print(
-            f"[execute_portfolio] MIN_HOURS_TO_COMMENCE_UNREADABLE {raw!r} -- not holding",
+            f"[execute_portfolio] MAX_PREGAME_PRICE_UNREADABLE {raw!r} -- not holding",
             flush=True,
         )
         return 0.0
 
 
-def _polymarket_hold_hours(request, venue: str) -> float | None:
-    """Hours to kickoff if this order should be HELD, else None.
+def _polymarket_hold_price(request, venue: str) -> tuple[float, float] | None:
+    """`(price, hours_to_commence)` if this order should be HELD, else None.
 
-    RETURNS None ON ANYTHING IT CANNOT ESTABLISH. An unreadable or absent
-    `commence_time` must not silently suppress a bet: "we do not know when this
-    starts" and "this starts too far away" are different facts, and only the
-    second is a reason not to place. Unknown places, as it does today.
+    THE RULE, and it is two-dimensional because one dimension never fitted:
+
+        PREGAME  + near-even  -> HOLD   (no book on that side yet)
+        PREGAME  + cheap      -> PLACE  (these demonstrably fill)
+        LIVE/PAST + anything  -> PLACE  (everything fills, including 0.490)
+
+    RETURNS None ON ANYTHING IT CANNOT ESTABLISH. An unknown kickoff or an
+    unreadable price must not suppress a bet: "we cannot tell" and "this will
+    not fill" are different facts and only the second is a reason not to place.
     """
     if "polymarket" not in str(venue or "").lower():
         return None
-    threshold = _polymarket_min_hours_to_commence()
-    if threshold <= 0:
+    ceiling = _polymarket_max_pregame_price()
+    if ceiling <= 0:
         return None
-    raw = getattr(request, "commence_time", None)
-    if not raw:
+
+    raw_when = getattr(request, "commence_time", None)
+    if not raw_when:
         return None
     try:
-        text = str(raw).strip().replace("Z", "+00:00")
+        text = str(raw_when).strip().replace("Z", "+00:00")
         starts = _dt.datetime.fromisoformat(text)
         if starts.tzinfo is None:
             starts = starts.replace(tzinfo=_dt.timezone.utc)
     except (TypeError, ValueError):
         return None
     hours = (starts - _dt.datetime.now(_dt.timezone.utc)).total_seconds() / 3600.0
-    # ALREADY STARTED IS NEVER TOO EARLY. A live market is the one regime that
-    # demonstrably fills, so a negative value must place, not hold.
-    return hours if hours > threshold else None
+    # ALREADY STARTED PLACES, WHATEVER THE PRICE. Live is the regime where
+    # everything fills -- a 0.490 fill on a past market is what refuted the
+    # price-only rule, and holding it would suppress a side that works.
+    if hours <= 0:
+        return None
+
+    price = planned_probability(getattr(request, "requested_price", None))
+    if price is None:
+        return None
+    return (price, hours) if price > ceiling else None
 
 
 def _polymarket_cross_ticks() -> int:
