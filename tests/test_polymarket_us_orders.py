@@ -628,3 +628,49 @@ def test_ORDER_STATE_survives_a_row_missing_every_new_field(capsys):
                       mode="per_order")
     out = capsys.readouterr().out
     assert "goodTillTime=None" in out and "tif=None" in out
+
+
+def test_ORDER_STATE_logs_WHEN_the_state_changed(capsys):
+    """`lastTransactTime` is the field that decides whether the 2026-08-30 batch
+    was ONE sweep or four independent cancellations.
+
+    Every cancellation so far has been dated by the reconcile pass that NOTICED
+    it. That let four orders seen in a single 5.6-minute pass be described as
+    simultaneous when simultaneity was never measured."""
+    from syndicate.features.shared.polymarket_us_orders import _log_order_states
+
+    _log_order_states([{
+        "id": "C1", "marketSlug": "tsc-x", "state": "ORDER_STATE_CANCELED",
+        "lastTransactTime": "2026-08-30T18:15:02.113Z", "intent": "INTENT_OPEN",
+    }], mode="per_order")
+    out = capsys.readouterr().out
+    assert "lastTransact='2026-08-30T18:15:02.113Z'" in out
+    assert "intent='INTENT_OPEN'" in out
+
+
+def test_marketMetadata_is_CLIPPED_and_says_so(capsys):
+    """It is a nested object of unknown shape and this line runs once per order
+    per pass. A truncated value that looks whole is worse than no value: it
+    invites a conclusion drawn from the part that happened to fit."""
+    from syndicate.features.shared.polymarket_us_orders import _log_order_states
+
+    _log_order_states([{
+        "id": "C2", "marketSlug": "tsc-x", "state": "ORDER_STATE_NEW",
+        "marketMetadata": {"filler": "y" * 900},
+    }], mode="per_order")
+    out = capsys.readouterr().out
+    assert "...+" in out and "chars" in out, "a clipped value must be marked as clipped"
+    assert len(out) < 1200, "one order must not emit an unbounded blob"
+
+
+def test_a_small_marketMetadata_is_NOT_clipped(capsys):
+    """The bound must not hide a value that fits -- that is the whole point of
+    logging it."""
+    from syndicate.features.shared.polymarket_us_orders import _log_order_states
+
+    _log_order_states([{
+        "id": "C3", "marketSlug": "tsc-x", "state": "ORDER_STATE_NEW",
+        "marketMetadata": {"marketState": "MARKET_STATE_OPEN"},
+    }], mode="per_order")
+    out = capsys.readouterr().out
+    assert "MARKET_STATE_OPEN" in out and "...+" not in out

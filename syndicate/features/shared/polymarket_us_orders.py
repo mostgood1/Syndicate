@@ -433,6 +433,18 @@ def _positive_float(value: Any, name: str) -> float:
     return parsed
 
 
+def _clipped(value: Any, limit: int = 240) -> str:
+    """A repr bounded for a per-order, per-pass log line.
+
+    MARKED WHEN CLIPPED. A truncated value that looks whole is worse than no
+    value: it invites a conclusion drawn from the part that happened to fit.
+    """
+    text = repr(value)
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit]}...+{len(text) - limit}chars"
+
+
 def _log_order_states(rows: Any, *, mode: str) -> None:
     """One line per order: is it UNTOUCHED, or partly filled and stuck?
 
@@ -491,7 +503,30 @@ def _log_order_states(rows: Any, *, mode: str) -> None:
             # good-till-cancel we sent. That is an assumption, not a reading,
             # and this is the line that can check it.
             f" tif={row.get('tif')!r} goodTillTime={row.get('goodTillTime')!r}"
-            f" created={row.get('createTime')!r} inserted={row.get('insertTime')!r}",
+            f" created={row.get('createTime')!r} inserted={row.get('insertTime')!r}"
+            # WHEN THE STATE ACTUALLY CHANGED, which we have never had.
+            #
+            # Every cancellation so far has been dated by the reconcile pass
+            # that NOTICED it, not by when it happened. On 2026-08-30 that let
+            # four orders look like one simultaneous event when all that was
+            # established is that they were seen together in a single pass
+            # spanning 5.6 minutes (18:13:12 -> 18:18:51).
+            #
+            # `lastTransactTime` decides it outright: ONE shared timestamp is a
+            # sweep, four different ones are independent events that have been
+            # theorised about as a single phenomenon. Nothing else in the 24
+            # fields the venue returns can tell those apart -- there is no
+            # cancellation-reason field at all.
+            f" lastTransact={row.get('lastTransactTime')!r}"
+            f" intent={row.get('intent')!r}"
+            # BOUNDED. `marketMetadata` is a nested object of unknown shape and
+            # this line runs once per order per reconcile pass, so an unbounded
+            # dump would be a log-volume problem of exactly the kind
+            # `KEYVALUE_WRITE_LARGE` exists to warn about. 240 chars is enough
+            # to see whether it carries a market STATE -- the leading remaining
+            # explanation for the cancellations -- and the truncation is marked
+            # so a reader never mistakes a clipped value for the whole one.
+            f" marketMetadata={_clipped(row.get('marketMetadata'))}",
             flush=True,
         )
 
