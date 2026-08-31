@@ -15,6 +15,7 @@ import requests
 
 from syndicate.features.ncaaf.cfbd_backoff import call_with_retry
 from syndicate.features.ncaaf.cfbd_quota_latch import (
+    QuotaExhausted,
     note_quota_exhausted,
     raise_if_latched,
 )
@@ -381,10 +382,19 @@ class CfbdClient:
                 # into an AttributeError. The latch exists to protect this call,
                 # so it must never be the thing that breaks it -- an unreadable
                 # body simply does not latch.
-                note_quota_exhausted(
+                if note_quota_exhausted(
                     getattr(response, "text", "") or "",
                     log=lambda message: print(message, flush=True),
-                )
+                ):
+                    # Same as the generator: abandon the ladder rather than
+                    # retrying a MONTHLY limit four more times. Measured
+                    # 2026-08-31 -- five `LATCH_SET` lines, one per attempt.
+                    # `QuotaExhausted` carries no `.response`, so
+                    # `_classify_requests_error` returns None and
+                    # `call_with_retry` re-raises without sleeping.
+                    raise QuotaExhausted(
+                        f"CFBD monthly quota exhausted; abandoning retries for GET {path}."
+                    )
             response.raise_for_status()
             return response.json()
 

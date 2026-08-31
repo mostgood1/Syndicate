@@ -127,5 +127,63 @@ class ItActuallySuppressesTheRequest(_Isolated):
         opened.assert_called_once()
 
 
+
+class TheTransitionMidRetry(_Isolated):
+    """THE STATE THE FIRST CUT OF THESE TESTS DID NOT COVER, and the reason a
+    real defect shipped.
+
+    The suite above exercises latched -> no request and not-latched -> request.
+    Neither is the state where the backoff and the latch INTERACT: a call that
+    starts unlatched and BECOMES latched on its first 429. A reachability test
+    in two states says nothing about the edge between them.
+
+    MEASURED in production 2026-08-31 05:16:39-05:16:58: five `LATCH_SET` lines
+    at 2s/5s/10s gaps -- exactly `cfbd_backoff.MAX_ATTEMPTS`. The latch was set
+    by the first 429 and the four retries behind it still went out, because
+    `raise_if_latched` runs once BEFORE `call_with_retry` and never again inside
+    it. On the run that DISCOVERS the exhaustion the latch saved zero calls.
+    """
+
+    def _http_429(self, body: str):
+        import urllib.error
+        import io
+
+        return urllib.error.HTTPError(
+            "https://api.collegefootballdata.com/ppa/teams", 429, "Too Many Requests",
+            {}, io.BytesIO(body.encode("utf-8")),
+        )
+
+    def test_a_monthly_quota_429_ABANDONS_the_ladder_after_ONE_call(self):
+        import scripts.generate_smartsim2_ncaaf_projections as gen
+
+        latch.clear_latch()
+        err = self._http_429('{"message":"Monthly call quota exceeded."}')
+        with mock.patch("urllib.request.urlopen", side_effect=err) as opened:
+            with mock.patch.dict("os.environ", {"CFBD_API_KEY": "k"}):
+                with self.assertRaises(latch.QuotaExhausted):
+                    gen._cfbd_get("/ppa/teams", {"year": 2026})
+        self.assertEqual(
+            opened.call_count, 1,
+            "the ladder must stop on the FIRST monthly-quota 429; production spent 5",
+        )
+        self.assertIsNotNone(latch.quota_latched_until(), "and the latch must still be set")
+
+    def test_a_SHORT_WINDOW_429_still_climbs_the_ladder(self):
+        """off != on, in the direction that protects the existing behaviour. A
+        throttle and an exhausted month share a status code; collapsing them
+        would turn 30 seconds of waiting into a multi-day outage."""
+        import scripts.generate_smartsim2_ncaaf_projections as gen
+        from syndicate.features.ncaaf import cfbd_backoff
+
+        latch.clear_latch()
+        err = self._http_429('{"message":"Too many requests"}')
+        with mock.patch("urllib.request.urlopen", side_effect=err) as opened:
+            with mock.patch.dict("os.environ", {"CFBD_API_KEY": "k"}):
+                with mock.patch.object(cfbd_backoff.time, "sleep"):
+                    with self.assertRaises(Exception):
+                        gen._cfbd_get("/ppa/teams", {"year": 2026})
+        self.assertEqual(opened.call_count, cfbd_backoff.MAX_ATTEMPTS)
+        self.assertIsNone(latch.quota_latched_until(), "a throttle must NOT latch")
+
 if __name__ == "__main__":
     unittest.main()

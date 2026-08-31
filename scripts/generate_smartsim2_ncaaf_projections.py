@@ -113,7 +113,28 @@ def _cfbd_get(path: str, params: dict[str, object]) -> object:
                     body = exc.read().decode("utf-8", "replace")
                 except Exception:
                     body = ""
-                note_quota_exhausted(body, log=lambda message: print(message, flush=True))
+                if note_quota_exhausted(body, log=lambda message: print(message, flush=True)):
+                    # ABANDON THE LADDER, do not merely record the latch.
+                    #
+                    # MEASURED in production 2026-08-31 05:16:39-05:16:58: FIVE
+                    # `LATCH_SET` lines at 2s/5s/10s gaps -- exactly
+                    # `MAX_ATTEMPTS`. The latch was set by the first 429 and the
+                    # four retries behind it still went out, because
+                    # `raise_if_latched` is checked once BEFORE
+                    # `call_with_retry` and never again inside it. On the run
+                    # that DISCOVERS the exhaustion the latch was saving zero
+                    # calls.
+                    #
+                    # `QuotaExhausted` is not an `HTTPError`, so
+                    # `_classify_cfbd_error` returns None and `call_with_retry`
+                    # re-raises immediately instead of sleeping and retrying a
+                    # limit it has just been told about. It is also the type
+                    # `load_ppa_ratings` already catches to fall back to cache,
+                    # so the discovering run now gets the stale-cache path too.
+                    raise QuotaExhausted(
+                        "CFBD monthly quota exhausted (first 429 of this run); "
+                        "abandoning the retry ladder."
+                    ) from exc
             raise
 
     return call_with_retry(
