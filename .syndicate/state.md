@@ -9181,3 +9181,67 @@ say a scalar divisor is the WRONG correction. It is still not a licence to ship
 a fitted shrinkage: this lane's standing rule is that any fit clears a HELD-OUT
 validation on different matches than the fit, and the natural split here is by
 DATE, since the archive spans 2026-07-20..2026-08-30.
+
+### SHRINKAGE FITTED AND HELD-OUT VALIDATED `[2026-08-31]` — **a SCALAR DIVISOR WINS, and my pre-registered expectation was WRONG**
+
+Criterion fixed before the held-out numbers were seen, per this lane's standing
+rule. Split by DATE, never by row, so no match straddles it. Three candidates,
+deliberately including the one I had argued against.
+
+**MY RECORDED EXPECTATION: "AFFINE beats SCALAR, because the error has a SLOPE."
+IT DOES NOT. A plain divisor is better held out, in every split and every
+league.**
+
+    HELD-OUT TEST, dates >= 2026-08-22, n=6,405 (train n=3,435, 88 matches)
+      candidate                    MAE      bias    pred mean
+      RAW                       0.6251   +0.1743      0.5726
+      SCALAR   (x / 1.3331)     0.5551   +0.0312      0.4295
+      AFFINE   (0.1021+0.5818x) 0.5748   +0.0370      0.4352
+      constant-mean baseline    0.6278   +0.0000      0.3983
+      realized mean on test                           0.3983
+
+**Both pass the criterion; SCALAR passes by more.** It beats AFFINE on MAE and
+on absolute bias, **in all 9 leagues individually** (mls, la_liga, serie_a, epl,
+championship, ligue_1, eredivisie, primeira_liga, bundesliga) — so this is not a
+pooled win carried by one league, which the date/league confound made a real
+risk.
+
+**STABLE ACROSS SPLIT POINTS AND DIRECTION:**
+
+    split                 train n  test n   c(train)   SCALAR   AFFINE
+    forward cut 08-08        1129    8711     1.2441   0.5691   0.6017
+    forward cut 08-15        1818    8022     1.3135   0.5588   0.5854
+    forward cut 08-22        3435    6405     1.3331   0.5551   0.5748
+    REVERSE cut 08-22        6405    3435     1.4376   0.5535   0.5625
+
+SCALAR wins all four. **But `c` drifts 1.24 -> 1.44 as the training window moves
+later**, so the constant is NOT a fixed property of the engine over this window —
+whether that is the over-prediction worsening or the league mix shifting is not
+established, and it is the reason to re-fit on a schedule rather than hard-code a
+number.
+
+**WHY MY SLOPE READING WAS REAL AND STILL WRONG AS A DECISION.** The
+under-prediction in the bottom two deciles is real (ratios 0.55 and 0.93), but
+those rows predict 0.00-0.22 shots, so their absolute error is tiny. MAE is
+dominated by the large-prediction rows, where the error is a clean level
+over-shoot. **A miscalibration can be genuine and still not be worth correcting
+for** — I inferred "slope, therefore a scalar is the wrong fix" from a ratio
+table and did not check what carried the loss.
+
+**THE SIZE OF THE PRIZE:** RAW barely beats predicting the average (0.6251 vs
+0.6278, **0.4%**). Corrected, it beats it by **11.6%**. The model's ordering was
+always informative; the level was eating almost all of the value.
+
+### NOT SHIPPED, AND WHAT SHIPPING WOULD NEED
+
+Nothing in the engine was changed. `scripts/fit_soccer_shot_shrinkage.py` is
+committed so the fit is reproducible and re-runnable as the archive grows.
+
+Shipping this divisor is a MECHANISM change to a calibrated engine, which this
+repo requires be accompanied by a re-fit of the rates that were absorbing it —
+the shot mean feeds `poisson_at_least`, whose FORM is already exonerated
+(dispersion 1.07, P(>=2) bias -0.0001), so correcting the mean moves every shots
+prop and every derived probability at once. It is also a live money-path change
+on a board that currently ranks one-sided rows on model edge. **That is a
+product decision, and the drifting `c` says it wants a scheduled re-fit rather
+than a constant.**
