@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 707 rules `[generated]`
+## Index — 712 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5328,3 +5328,72 @@ RELATED, same session: the count also cannot tell you WHAT is holding. `jobs=7`
 and `jobs=3` were the same verdict from the guard, but one contained the MLB sim
 and the other was three soccer artifact builds that re-run for free. Grep the
 process list for the expensive job by name rather than reading the number.
+
+
+## 2026-08-31 — FORBIDDEN: verifying a ranking change by TOP-N COMPOSITION. The slate rotates faster than you deploy
+
+**A composition count over a ranked list is not a property of your change. It is
+a property of what happened to be on the board.** Measured on the served Layer 2
+shortlist, with NO code change, inside twenty minutes:
+
+    16:30:50Z   batter_home_runs 23, totals 1, hits_runs_rbis 1
+    16:32:42Z   player_shots 12, shots_on_target 6, h2h 5, totals 1, corners 1
+    16:45:29Z   batter_home_runs 22, totals 2, hits_runs_rbis 1
+
+MLB -> soccer -> MLB. Model-basis rows 18 -> 50 over the same span. The predicted
+verification was "top-25 `hr_1plus` 23 -> 8"; reading that after the deploy would
+have attributed slate rotation to the change **in the direction that looks like
+success** — a harder demotion than predicted reads as the fix working better.
+
+**THE REPLACEMENT IS AN EXACT PER-ROW IDENTITY, NOT A BETTER AGGREGATE.**
+`score.value_pct` is the term the score actually ranks on and it is stamped on
+every row, so "does it rank on edge or on edge/p" has an exact answer:
+
+    before   value_pct == model_ev_pct  50/50     == model_edge_pct  0/50
+    after    value_pct == model_ev_pct   0/52     == model_edge_pct 52/52
+
+**ONE row decides it.** That is the property that matters: rotation cannot starve
+the verification the way it starves a top-N count, there is no threshold to
+argue about afterwards, and it is immune to which sport is on the board, how
+many rows there are, or whether the predicted market exists at all.
+
+**HOW TO APPLY.** Before verifying any ranking or ordering change, ask what the
+metric would read if the INPUT SET rotated and the code did not. If the answer
+moves, the metric is measuring the slate. Prefer an assertion that holds per
+row. And take the control IMMEDIATELY before the treatment — a baseline from
+forty minutes earlier is a different population, which is why the first one
+taken here was withdrawn rather than used.
+
+---
+
+## 2026-08-31 — A basis LABEL does not make two scales commensurable
+
+**FORBIDDEN: putting two differently-united quantities into one sort field and
+treating a stamped `basis` string as having handled it.**
+
+The Layer 2 fix routed model edge into `value_ev` for one-sided rows, keeping
+market EV there for two-sided ones, and stamped `ev_basis` so every row states
+which it ranked on. The stamp is correct and load-bearing — a modelled number
+must not wear a measured one's clothes (`#242`) — and it does not do the job
+people expected of it.
+
+**MEASURED after the deploy:** model edges on the board run **3.4 to 12.0**
+probability points; the best market EV anywhere on the same board is **4.94
+percent**. So the top NINE rows are all model-basis and the best market-anchored
+row reaches **rank 10** — score 1.31 against the leader's 7.23. The stated goal
+was "comparable, not absent". Comparable was not achieved, and could not have
+been: **the bigger unit wins the sort on units alone.**
+
+**What the change DID achieve, so this is not read as a failure:** the pathology
+it targeted is gone — a smaller edge on a longer shot no longer outranks a bigger
+edge on a shorter one, exactly and per row — and market rows went 3 -> 14 of the
+top 25. The head of the board is unchanged in ORDER while the quantity behind it
+became honest: 94.22 was an artefact of dividing by a small probability, 11.48 is
+the model's actual disagreement.
+
+**HOW TO APPLY.** When a sort key can be filled from two sources, state the UNIT
+of each and compare their ranges before shipping, not after. If the ranges do
+not overlap comparably, the sort is decided by the choice of source and no label
+on the row changes that. The question "should these share one sort at all" is a
+product decision — record it as unsettled rather than letting a deploy imply an
+answer.

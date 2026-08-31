@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 707 rules `[generated]`
+## Index — 712 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 189**
+**FORBIDDEN — 190**
 
 - [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
 - [2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch…](#2026-08-30-forbidden-inferring-who-wrote-a-commit-from-adjacency-in-a-shared-branch-where-every-commit-carries-one-bot-author-lane-exchange-join-refusals)
@@ -148,6 +148,7 @@
 - [2026-08-30 — FORBIDDEN: keying a predicate to a field name you have not confirmed the r…](#2026-08-30-forbidden-keying-a-predicate-to-a-field-name-you-have-not-confirmed-the-record-stores-my-log-printed-tickernone-for-every-order-because-ticker-is-not-a-key-on-it)
 - [2026-08-31 — FORBIDDEN: concluding from ONE tick of a counter that increments before it…](#2026-08-31-forbidden-concluding-from-one-tick-of-a-counter-that-increments-before-its-own-drop-gate-three-wrong-readings-in-one-session-each-confident-and-each-plausible)
 - [2026-08-31 — FORBIDDEN: shipping a gate on a one-variable rule when the sample cannot r…](#2026-08-31-forbidden-shipping-a-gate-on-a-one-variable-rule-when-the-sample-cannot-rule-out-a-second-variable-three-hypotheses-died-on-one-dataset-because-each-was-a-projection-of-a-2-d-structure)
+- [2026-08-31 — FORBIDDEN: verifying a ranking change by TOP-N COMPOSITION. The slate rota…](#2026-08-31-forbidden-verifying-a-ranking-change-by-top-n-composition-the-slate-rotates-faster-than-you-deploy)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -208,7 +209,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 513**
+**Rules and corrections — 517**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -514,6 +515,10 @@
 - [2026-08-31 — A reachability test in TWO STATES says nothing about the EDGE between them](#2026-08-31-a-reachability-test-in-two-states-says-nothing-about-the-edge-between-them)
 - [2026-08-31 — A tidier rendering of a `- Files:` list SILENTLY DECLAIMS](#2026-08-31-a-tidier-rendering-of-a---files-list-silently-declaims)
 - [2026-08-31 — `lane-guard` strips the leading dot, so every claim under `.syndicate/` or…](#2026-08-31-lane-guard-strips-the-leading-dot-so-every-claim-under-syndicate-or-claude-is-unenforced)
+- [2026-08-31 — a branch assertion proves the code RAN, not that it did the right thing](#2026-08-31-a-branch-assertion-proves-the-code-ran-not-that-it-did-the-right-thing)
+- [2026-08-31 — a correct fix can make a latent bug REACHABLE, and that is the fix's probl…](#2026-08-31-a-correct-fix-can-make-a-latent-bug-reachable-and-that-is-the-fixs-problem)
+- [2026-08-31 — TWO THINGS ABOUT GATED DEPLOYS THAT COST AN HOUR EACH TO REDISCOVER](#2026-08-31-two-things-about-gated-deploys-that-cost-an-hour-each-to-rediscover)
+- [2026-08-31 — A basis LABEL does not make two scales commensurable](#2026-08-31-a-basis-label-does-not-make-two-scales-commensurable)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`

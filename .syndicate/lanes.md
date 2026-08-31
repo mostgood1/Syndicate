@@ -1104,6 +1104,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `mfair_priced` 0 -> 3159, served top-200 rows with a model edge **1 -> 130**,
   `rows_uninformative_ev` **1269 -> 138**. EV is now priced against the model
   where a modelled fair exists (`ev_basis`), per user decision.
+- **THE MODEL-EDGE WORK IS NOW MEASURED END TO END `[2026-08-31 17:00:33Z]`.**
+  The scorer was released to lane `layer2-board-opportunities` on a scope
+  request; their change is live on `cffbbd89` and verified: the ranking identity
+  inverted exactly (`value_pct==model_ev` 50/50 -> 0/52, `==model_edge` 0/50 ->
+  52/52), scores compressed 5x, top-25 market rows 3 -> 14. **The intended
+  outcome is NOT achieved** — the top nine are still model-basis, best market
+  row at rank 10, because edge is in probability points and market EV is in
+  percent. `deploys.md` 16:48Z carries the working; the units question is
+  UNSETTLED and is not this lane's to settle.
 - **STILL OWED — the only reason this lane is OPEN:** MLB, WNBA and NCAAF are
   **UNREAD, NOT FLAT** (zero PREGAME games at every reading; `mfair_priced: 0`
   there is the sweep declining settled rows, not the sweep missing). WNBA's

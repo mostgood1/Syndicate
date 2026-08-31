@@ -1818,6 +1818,22 @@ unsaved anywhere.
 
 ## [session-harness] SESSION HARNESS — what the hooks actually enforce
 
+- **`lane-guard` STRIPPED THE LEADING DOT until 2026-08-31, so every claim under
+  `.syndicate/` or `.claude/` guarded NOTHING** — `.syndicate/x.md` parsed to
+  `syndicate/x.md` and matching is `rel.endswith("/" + f)`, which can never
+  match. Fixed asymmetrically (right side keeps the original strip set, left
+  side drops the dot). Audited before applying: no shared ledger among the
+  affected claims, so no session newly blocks on ledger writes.
+- **`py -3 scripts/lane_claim_audit.py` is the one tool for "what does the guard
+  actually claim".** It loads the hook by AST (running it blocks on stdin) and
+  applies BOTH checks, because either alone misses half: a token that does not
+  look like a path (prose written inside a `- Files:` block becomes a claim —
+  `1/p`, `15.0` and a bare `/` all did this in one day), and a path absent from
+  `git ls-files` (the dot-strip class, which looks well-formed). **Run it from a
+  worktree pinned to `origin/main`** — the shared primary tree drifts behind and
+  reports live files as phantom. `check_lane_invariants` catches neither: one
+  holder per claim is true of a claim that guards nothing.
+
 - **THE LEDGERS ARE KEYED AND CHECKED** `[verified 2026-08-18]`. One checker per
   ledger, all three ENFORCED in CI and reported at session start as
   `LEDGER INCOHERENT`: `scripts/lane_identity_check.py` (slug, one OPEN block,
@@ -2807,6 +2823,18 @@ what would make the shed unreachable rather than merely rare.
   one-tenth a two-point probability error moves EV about twenty points, and
   these rows carry `model_skill.sample_games: 0`. `layer2_board.py` is released
   to that lane; the flag defaults to the NEW behaviour.
+  **LIVE AND MEASURED `[cffbbd89, board rebuilt 2026-08-31T17:00:33Z]`.** The
+  identity inverted exactly: `score.value_pct == model_ev_pct` 50/50 -> **0/52**,
+  `== model_edge_pct` 0/50 -> **52/52**; scores compressed 5x (36.16 -> 7.23);
+  top-25 market-priced rows 3 -> 14. **BUT THE INTENDED OUTCOME IS NOT
+  ACHIEVED: the top NINE rows are still model-basis and the best
+  market-anchored row reaches only RANK 10** (`ev_pct` 4.91, score 1.31 against
+  the leader's 7.23). Cause, and it is structural rather than a tuning miss:
+  `value_ev` carries edge in PROBABILITY POINTS while market rows carry EV in
+  PERCENT — model edges run 3.4-12.0 against a best market EV of 4.94, so the
+  bigger unit wins the sort on units alone and `ev_basis` cannot fix that.
+  **Whether the two should share one sort at all is UNSETTLED and this deploy
+  did not settle it.** Full working: `deploys.md`, 2026-08-31 16:48Z.
   **COVERAGE IS UNREAD, NOT FLAT.** MLB/WNBA/NCAAF all read zero at the
   post-deploy check because there were **zero PREGAME games** at that moment.
   Read it with `py -3 scripts/measure_model_edge_coverage.py`, which prints the
