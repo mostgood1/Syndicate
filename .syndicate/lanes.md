@@ -3124,6 +3124,42 @@ caaf-no-orders`). NOT
   `rows_at_sim_market_line` for WNBA spreads (structurally 0 today).
 - **NOT DEPLOYED.** `board_enrichment.py` + `layer2_board.py` are refresh-worker
   and web. Needs both locks and the measurement above.
+- **VERIFIED IN PRODUCTION `[2026-08-31 01:43Z]`, and the lane stays OPEN for one
+  more reading.** web `4028969e` (mine), refresh-worker + live-odds-worker
+  `91e1f69e` (USER-deployed) — the latter checked BY CONTENT, not ancestry.
+  Against a SAME-EVENING control at 01:29Z, not the 22:2xZ baseline (the slate
+  had moved too far and using it would have flattered the result):
+
+      soccer   342/16923 ( 2.0%) -> 2082/16940 (12.3%)   mfair ABSENT -> 3159
+      nfl      670/2490  (26.9%) ->  990/2490  (39.8%)
+      ncaaf      0/945   ( 0.0%) ->    0/945   ( 0.0%)   policy, unchanged
+      mlb        6/5252         ->    3/5209             slate over
+      wnba       6/2339         ->    6/2193             slate over
+
+  Served shortlist top-200: rows carrying `model_edge_pct` **1 -> 100**.
+  `rows_uninformative_ev` 274 -> 184.
+- **STILL OWED, and it is why this lane does not close:** MLB, WNBA and NCAAF are
+  at 0 pregame games, so their flat numbers are NOT evidence — `mfair_priced` is
+  0 for them, which is the sweep RUNNING and declining live/settled rows, not the
+  sweep missing. `rows_at_sim_market_line` for WNBA spreads (D2, structurally 0
+  before the fix) has had no pregame slate to fire on at all. Read all four off
+  TOMORROW'S FIRST BUILD with `py -3 scripts/measure_model_edge_coverage.py`.
+- **The `[user decision]` model-EV change works and reached TWO rows of 200.**
+  `ev_basis` = market_fair 198 / model_probability 2, both soccer
+  `player_shots_on_target`. Teo Quintero is the mechanism end to end: `ev_pct`
+  -8.611 (the book's own margin, identical for every such row) -> `model_ev_pct`
+  +16.194, score 4.05, rank ~93. But 3,159 rows were priced against the modelled
+  fair and 2 cleared the top 200 — the one-sided pool still scores below the
+  two-sided one. Recorded because the decision was taken expecting more.
+- **A DEFECT IN MY OWN TOOLING, recorded rather than quietly fixed:** the watcher
+  I wrote re-ran `deploy_claim.py acquire` each pass, which issues a NEW token
+  and stranded the one I held, so `release` refused and I had to `--force` my own
+  live claim. A poller must re-`status`, never re-`acquire`. `--force` is the
+  gesture reserved for a session that is gone and must not become routine.
+- **The deploy killed an in-flight MLB sim.** `deploy_preflight` returned
+  `HOLD: 7 job(s) in flight` at 01:27:50Z naming `run_mlb_daily_sim_job.py` and
+  the `ui-daily` `daily_update.py` tree; the manual deploy fired 01:29:34Z. The
+  sim needs requeuing. Fact, not complaint.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
