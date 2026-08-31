@@ -2625,6 +2625,20 @@ what would make the shed unreachable rather than merely rare.
   its line was skipped outright; (4) `_live_pitcher_prop_row_actionable` drops
   pulled-starter rows. Fixed in `3a476001` behind `include_projection_only`.
   **NOT PROVEN IN PRODUCTION — see the env split below.** `[from-code + measured 08-15 20:12Z]`
+- **~~THE LIVE-LENS SNAPSHOT IS BUILT ON live-odds-worker, NOT refresh-worker~~
+  — SUPERSEDED, IT HAS MOVED TO refresh-worker. `[measured 2026-08-31 02:17Z,
+  refresh-worker logs, lane mlb-live-prop-prob-merge]`** `[live_lens_loop]
+  TICK_COMPLETE results={'mlb': True, 'wnba': True, 'soccer': True, 'nfl': True}`
+  and `[live_props] LIVE_MC_PRICED` both appear on **refresh-worker**;
+  live-odds-worker matched NOTHING for `live_props` or `LIVE_MC_PRICED` over the
+  same window. The 08-15 reading below was true then and is false now.
+  **The point of the original entry survives and is the reason this line is
+  corrected rather than deleted: loop ownership is an env flag that moves with
+  no diff, so a fix shipped to the wrong service is INERT and looks identical to
+  a fix that did not work.** Read the logs for the loop's own line before
+  choosing a deploy target; do not inherit this from any ledger, including this
+  one. `[superseded: MLB_ENABLE_LIVE_LENS_LOOP false on refresh-worker / true on
+  live-odds-worker, measured 08-15 21:5xZ]`
 - **THE LIVE-LENS SNAPSHOT IS BUILT ON live-odds-worker, NOT refresh-worker, AND
   ONLY THE ENV SAYS SO.** `MLB_ENABLE_LIVE_LENS_LOOP` = **false** on
   refresh-worker, **true** on live-odds-worker. A `cards.py` emitter fix shipped
