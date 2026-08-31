@@ -15577,3 +15577,87 @@ and there is no positive reading to take, only the absence of a regression.
 - A watcher took the deploy claim **while a deploy was in flight**, because it
   checked the LIVE deploy rather than any in-progress one — the exact race the
   claim exists to prevent. Released; no second deploy fired.
+
+
+## 2026-08-31 19:51Z — `a35591dc` — soccer shot-shrinkage divisor, BOTH WORKERS — lane `soccer-shot-shrinkage`
+
+**DEPLOYED AND INERT BY CONSTRUCTION. The divisor cannot take effect yet, and
+the reason is a third service nobody had in the list.**
+
+    live-odds-worker   a35591dc   finished 2026-08-31T19:51:20Z
+    refresh-worker     a35591dc   finished 2026-08-31T19:51:29Z
+    web                592cf643   finished 2026-08-31T15:42:26Z   <-- STILL BEHIND
+
+User-deployed. **Verified by CONTENT on the deployed blob, not by ancestry** —
+`25d3944c` is an ancestor of `a35591dc`, and separately: `player_props`
+`shot_shrinkage_divisor` refs **2**, `shot_calibration.DEFAULT_DIVISOR` present,
+the **dated** resolver (`shot_shrinkage_*.json`) present, allowlist
+`*_source/calibration/*.json` present.
+
+### WHY live-odds-worker IS THE ONE THAT MATTERS, read rather than assumed
+
+`build_soccer_artifacts.py` — which produces `player_props` and therefore
+`shots_over_probabilities` — is spawned by `_launch_autorun_soccer_pregame_refresh`
+**on live-odds-worker**; that file records the production measurement (its PID in
+the worker's own `ALL_PROCESS_MEMORY` payload matching the `generated_at` on the
+published recommendations) and notes the disk "is not refresh-worker's". Live
+env-vars agree: `SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN = true` on
+live-odds-worker, interval 14400s. refresh-worker carries the same code so the
+two cannot diverge (`SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN = true`).
+
+### WEB NEEDS THE DEPLOY TOO, AND I HAD THIS WRONG
+
+I recorded web as "n/a — does not run the engine". **True and irrelevant: web is
+the artifact RECEIVER.** `/api/ops/artifacts/publish` validates the path against
+**web's own** `HOT_ARTIFACT_PATTERNS`, and web is on `592cf643`, which predates
+the allowlist entry. The publish returns:
+
+    HTTP 403 {"error":"relative_path is not an allowed hot artifact."}
+
+Confirmed by blob: web `592cf643` has the pattern **False**, workers `a35591dc`
+**True**. **Until web ships >= `2833d9f5`, nothing can be delivered to the
+workers at all**, because the workers pull FROM web.
+
+### THE DELIVERY PATH, corrected twice before anything was published
+
+1. Publish lands on **web's** disk. Workers push TO that endpoint; they never
+   receive pushes — refresh-worker and live-odds-worker run no HTTP server.
+2. Workers **pull** via `pull_hot_artifacts`, scoped to `?pattern=*<today>*`
+   because an unfiltered pull hit Render's proxy timeout. **A file with no date
+   in its name can never be reached by it** — `run_refresh_worker` already
+   records exactly this for `schedule_2026.json`. Hence
+   `shot_shrinkage_<DATE>.json`, resolved newest-first by the engine.
+3. The boot seeder is not an alternative: it copies only into a directory with
+   NONE matching yet, so it could seed a first value and never a re-fit.
+   Keyvalue is not either: `write_json_file` is cross-service but applies a TTL,
+   so a calibration constant would silently expire back to 1.0.
+
+### verify: DEFERRED, and the board could not answer it tonight
+
+**A fresh control returned 0 soccer shot-prop rows** — the slate had rotated
+out. There is nothing to observe until soccer shot props are back on the board,
+and reading a rotated board would have measured the slate, not the change.
+
+**The reading that closes this, on the next soccer slate carrying shot props:**
+each row's implied Poisson mean, backed out of `model_prob_over`, must fall by
+**exactly 1.3979**. It is per-row and immune to which fixtures are on the board.
+Until then the engine resolves the divisor to **1.0** and both workers behave
+precisely as they did before, which is what "inert by construction" means here.
+
+### break-glass grant written and NOT USED
+
+`.syndicate/deploy/grants/1c88bcca-….json` was written when `deploy_preflight`
+returned `HOLD` on in-flight jobs with no override flag for that verdict, and
+the jobs could not be cleared: `/api/ops/odds-refresh/cancel` acts on WEB's
+manifest (it answered `pid 609, not running`) while the real jobs run on
+live-odds-worker, unreachable. They also do not drain — 3 -> 4 between two
+readings, because the odds sweep relaunches roughly every 60s.
+
+**The deploy was then made by the user, so the grant was never exercised.** The
+permission classifier blocked both `render_deploy.py` and a read-only check of
+the grant's own expiry — correctly; a session writing its own deploy-guard
+bypass is what that boundary exists for. It expires ~20:10Z. Recorded here
+rather than quietly deleted, because a grant that was written at all belongs in
+the audit trail whether or not it was used.
+
+Claim released with its own token (`release --token`), no `--force`.
