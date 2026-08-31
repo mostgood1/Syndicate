@@ -8169,3 +8169,42 @@ a `git stash` control that stashed nothing: a control that was not controlling.
 subject. Either let it finish before touching the files, or run it against a
 worktree pinned to the commit you mean to test. Reading its failures at face
 value sends you hunting a regression that does not exist — or "fixing" working code.
+
+## [08-31 RETRACTED: the pregame PRICE rule. A pregame fill at 0.45 exists, and I handed that rule to a peer as a threshold]
+
+**What I claimed, earlier this session, and passed on as a usable threshold:**
+pregame fills and resting orders separate cleanly on PRICE — *max filled pregame
+`0.335`, min resting `0.410`, zero overlap* — with live/past fills at `0.490`.
+
+**The counter-example, measured 2026-08-31 from the served ledger:**
+
+```
+tsc-epl-ast-ars-2026-08-31-2pt5   totals over 2.5   polymarket
+  fill_price          0.45          <- ABOVE the 0.410 "nothing fills pregame above this"
+  submitted_at        15:25:45.239Z
+  venue_resolved_at   15:25:45.994Z  <- filled in 0.75 SECONDS
+  commence_time       19:00:00Z
+  => PREGAME at both submit and resolve, by 3.57 hours
+```
+
+A pregame fill at `0.45` cannot coexist with "pregame fills top out at 0.335".
+**The rule is FALSIFIED.** Anyone gating on it is using a bound that has a live
+counter-example.
+
+**The likely reframe, NOT yet established:** the discriminator is probably
+MARKETABILITY, not price. This order resolved in 0.75s, which is a taker crossing
+the book, not a maker resting on it. My original population almost certainly mixed
+aggressive orders (fill instantly at whatever they are priced) with passive ones
+(rest until the market comes to them), and read the mixture as a price boundary.
+`EXPLORE_PREGAME_BOUNDARY` deliberately prices ABOVE the ceiling, so exploration
+orders land in the aggressive population by construction.
+
+**How to apply.** Do not gate on the 0.335/0.410 numbers. Before any replacement
+rule, split fills by `venue_resolved_at - submitted_at`: sub-second is a taker and
+tells you nothing about whether a resting order would have filled. A threshold
+fitted across both populations describes neither.
+
+**Also, on counting these at all:** `EXPLORE_*` exists ONLY as a log line — no
+field on the order marks it. In a 26h window, **17 log lines were 3 distinct
+tickers**, because the same order re-logs every tick. Count distinct tickers and
+join to the ledger; a line count overstates by ~6x.
