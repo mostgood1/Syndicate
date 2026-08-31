@@ -8803,3 +8803,81 @@ by one order with no venue id. Fixed correctly by `dd33c865` (per-order read;
 three refusing paths keep blocking). My `63661af1` auto-reject was UNSAFE and is
 reverted (`ef0d2d47`) — absent from the OPEN book is not absent from the venue.
 
+﻿
+## [soccer-shots-prop-skill] SOCCER SHOTS PROPS â€” THE POISSON SHAPE IS RIGHT AND THE MEAN IS INFLATED `[measured 2026-08-31, lane layer1-model-edge-join]`
+
+**Asked to measure model skill on the props carrying the board's largest model
+edges. Two things are now measured and they point in opposite directions, which
+is the whole result: the model's DISTRIBUTIONAL FORM is exonerated, and its
+CENTRAL TENDENCY is not.**
+
+The engine is `soccersim/player_props.py`: `poisson_at_least(mean, k)` over
+`_SHOT_LINES = (0.5, 1.5, 2.5, 3.5)`. So a prop probability is exactly
+`P(X >= k)` for `X ~ Poisson(mean)`, and only two things can be wrong â€” the
+Poisson assumption, or the mean fed to it.
+
+### 1. THE POISSON FORM IS EXONERATED, replicated across two leagues
+
+Realized per-match, per-player shot counts from
+`data/soccer_source/<league>/shot_events/shot_events_2025.csv` (`event_id` is
+the match, `player_name` the shooter). **Zeros recovered** from the season
+table's `games` minus the matches in which the player actually shot â€” without
+that, the sample is shooters-only and every rate is biased high.
+
+    league    matches  players   disp(var/mean)   P(>=2) obs   P(>=2) Poisson      bias
+    la_liga       380      294             1.05       0.1926           0.1935   +0.0008
+    epl           379      303             1.07       0.2129           0.2118   -0.0011
+    POOLED          -      597             1.07       0.2029           0.2028   -0.0001
+
+**Poisson assumes dispersion 1.00 and gets 1.07. It predicts P(shots>=2) to
+within 0.01 percentage points pooled, on 597 players across 759 matches.** Both
+leagues agree and the sign of the bias flips between them, which is what noise
+looks like rather than a defect. **Do not "fix" the distribution.**
+
+### 2. THE MEAN RUNS ABOVE THE PLAYER'S OWN REALIZED RATE
+
+Inverting `poisson_at_least` on the served board's own `model_prob_over` gives
+the mean the model actually used, comparable directly against that player's
+season `shots_per90` â€” the model's OWN input file.
+
+    board soccer shots-prop model rows   27
+    matched to a season rate             23  (85%)
+    SHOTS props (n=15): implied mean / player's own shots_per90
+        median 1.19   mean 1.13   min 0.43   max 1.54
+        ABOVE the player's own rate: 11 of 15 (73%)
+
+**The worked case, which is also the board's #1 row.** Ante Budimir, over 1.5
+shots: model `0.9423`, implied mean **4.57**. His actual season rate is **3.0952
+shots/90 over 2995 minutes / 37 games** â€” and 4.57 would sit at roughly the
+99th percentile of the league (max 5.01, p90 2.63, median 0.83). Under the
+model's own Poisson, his realized rate implies **P = 0.7951**. The market's fair
+was **0.8275**. **The market is pricing this within ~3 points of the player's own
+realized rate; the model's entire 11.46-point "edge" is the mean inflation.**
+
+**IT CLUSTERS BY TEAM, which points at the team-total step rather than at
+players.** The five most inflated rows are all Osasuna (1.54, 1.53, 1.45, 1.19,
+1.05). A per-player error would not line up by club; a team shot-total that is
+too high, then distributed by `shot_share`, would.
+
+### WHAT THIS IS NOT
+
+**This is not a skill measurement of the model's per-match predictions**, and it
+must not be quoted as one. Section 1 scores the FORM given a correct mean;
+section 2 compares the model's mean to a season rate on ONE board snapshot,
+n=15, dominated by one club. A model is entitled to deviate from a season rate
+for opponent, home/away and expected minutes â€” **ratio is not error.**
+
+**The real backtest is blocked on the same wall the `soccer-model-dispersion`
+lane already recorded:** the usage-profile inputs are UNDATED SEASON
+AGGREGATES (`players_2025.csv`), so the model cannot be replayed as-of a past
+date. `shot_events` supplies the outcomes; nothing supplies the historical
+INPUTS. Closing that needs dated player inputs, not another scorer.
+
+### CONSEQUENCE FOR THE BOARD
+
+`model_skill` on these rows reads `sample_games: 0, status: unmeasured` and that
+is still literally true. But the board's largest model edges now have a named,
+measured, non-speculative cause â€” **an inflated shot mean, clustered by team** â€”
+which is a better basis for shrinking them than the units argument that was
+tried and withdrawn. **The lever is the team shot total, not the scorer, and not
+the distribution.**
