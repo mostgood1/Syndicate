@@ -16900,3 +16900,297 @@ Full working record. Current STATUS is in `lanes.md`; the narrative is in
   measurement in `.syndicate/deploys.md`.
 - Blocked by: none
 
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-08-31
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### live-venue-order-placement — CLOSED 2026-08-30 — opened 2026-08-29 — session 69f9e24f-00e5-4e2c-8f5a-7c674d80dc2b — **OUTCOME: live execution recovered after ~13h and three money-path defects fixed; the venue basis is WIRED and still owes its first scored comparison.** Duplicate-bet defect fixed (`commence_time` out of the position identity; threshold verified at ONE SECOND; cost measured **$0.78**, second pair EXPIRED UNFILLED) with a dual-key migration guard — which **shipped INERT** and was caught only because `LEGACY_KEY_MATCH` was silent while `placed=0 duplicates=8` looked healthy. `#603` CLOSED: 0 of 96 refs answer >1 fixture against 192 contested keys of opportunity. `age_seconds` proven to be the CAPTURE's age, not per-quote — the 45s ceiling is a capture-vs-build race. NEW `cancel_order` adapter (dry-run default, read-before-write), never fired. **OWED, NOT DONE:** `LEGACY_KEY_MATCH` proof needs a plan REBUILD; the venue basis has NEVER produced a scored comparison and `servable=False` must stay; the capture/build lag series is n=2. Two scheduled tasks cover the last two. Narrative: `log/2026-08-30.md`. Claims: NONE held.
+- Goal: Kalshi and Polymarket can place orders against IN-PLAY game markets,
+  and a cross-venue Kalshi/Polymarket arb can be executed as two legs. ONE
+  testable outcome for the first increment: a production reading of the arb
+  scan that states, with real per-venue fee models, how many EXECUTABLE
+  two-leg opportunities exist on a live slate and their size — a number, not
+  a capability claim.
+- Files: `syndicate/features/shared/kalshi_polymarket_arb.py`,
+  `syndicate/features/shared/polymarket_us_markets.py`,
+  `pipeline/venue_odds_loop.py`,
+  `syndicate/features/shared/venue_fees.py`,
+  `scripts/probe_live_venue_arb.py`,
+  `scripts/verify_603_cross_game.py`,
+  `syndicate/features/shared/venue_quote_adapters.py`,
+  `syndicate/features/shared/venue_quote_fanin.py`,
+  `syndicate/features/shared/venue_basis_edge.py`,
+  `tests/test_venue_basis_edge.py`,
+  `tests/test_venue_basis_wiring.py`,
+  NARROW `[2026-08-30]`: `syndicate/features/shared/layer2_board.py` — ONE key
+  added to the `quote` fan-out (`venue_basis`), nothing else in the file. Taken
+  because the only block naming it, `portfolio-decision-and-execution`, states
+  its own claims RELEASED ("phantom sweep, the owning session is gone... a
+  RECORD, not a claim"), and the narrow holder it cites,
+  `layer2-sim-view-and-live-projection`, has no lane header at all. Required,
+  not cosmetic: that fan-out copies a FIXED FIELD LIST and is where `#382`
+  died, so a display-only annotation not named there reaches no consumer and
+  reads in production as "no live venue edges" instead of "never wired".
+  `tests/test_venue_quote_key_names_game.py`,
+  `tests/test_polymarket_side_vocabulary.py`,
+  `tests/test_kalshi_side_vocabulary.py`
+- **THE TWO TEST FILES were not in the override as given and are taken under
+  it, because the totals key CHANGED SHAPE and they pin the old one** — landing
+  the fix without them means landing a red suite. Both are marked RELEASED at
+  source (`kalshi-line-aware-rungs` line ~1680 lists
+  `test_kalshi_side_vocabulary` under "released:";
+  `venue-candidate-key-token-guard`'s `Files:` line literally begins
+  `released:`) — and both were STILL being enforced, the same phantom-claim
+  shape as (a) above: the path sits inside a `- Files:` block, so the guard
+  reads it as a claim regardless of the word "released" beside it.
+- **A GUARD GAP FOUND BY ACCIDENT, and it let one edit through
+  `[2026-08-29]`.** `.claude/hooks/lane-guard.py` is a `PreToolUse` hook on
+  **Edit** and does NOT intercept file writes made through **Bash**. A python
+  heredoc that rewrites a file is invisible to it. Found because the same edit
+  was refused via `Edit` seconds after an equivalent one had already landed via
+  Bash on `tests/test_kalshi_side_vocabulary.py`. Disclosed rather than left:
+  the claim is now regularised above, and the bypass was not deliberate. **The
+  guard is an Edit-tool guard, not a filesystem guard — do not read a clean run
+  as proof that no claimed file was touched.**
+- **CLAIM PROVENANCE for the last three `[2026-08-29, USER OVERRIDE — "take
+  both files, land on main, don't deploy"]`.** Two different obstacles, and
+  only one was real:
+  (a) `venue_quote_adapters` read as held by `kalshi-line-aware-rungs` — a
+  PHANTOM claim. That lane's session is GONE and its header says "CLAIMS
+  RELEASED. The files below are FREE to take"; the filenames only appeared in a
+  note saying they had been struck, and that note sat INSIDE the `Files:`
+  block, which `lane-guard.py` parses as a claim. Note moved out of the block
+  rather than the claim being overridden — nothing real was released.
+  (b) `venue_quote_fanin` was held by `venue-candidate-key-token-guard`, a LIVE
+  claim on the very function being edited (`_candidate_keys`). That conflict
+  was surfaced to the user BEFORE the override and transferred explicitly; the
+  donor block is annotated and can reclaim by striking the note.
+  `check_lane_invariants.py` and `lane-guard.py` PARSE `Files:` BLOCKS
+  DIFFERENTLY — the checker reported no violation on (a) while the guard
+  refused the edit. Do not read a clean checker as "no holder".
+- NOT TAKEN — CONFLICT SURFACED, read-only to this lane (paths deliberately
+  kept out of the Files block above so the parser does not turn them into
+  claims): the Polymarket order module is claimed by OPEN lane
+  `unknown-submit-retry-provenance` (session 6475567d). The YES-leg binding
+  fix (`#595` step 3) lands there. This lane can PRODUCE the evidence that fix
+  needs (`marketSides` `long_index` persisted onto the stored slate row, in
+  `polymarket_us_markets.py`, which IS free — released by
+  `venue-join-refusal-visibility` 2026-08-29) but must hand the consuming edit
+  to that lane or get a user override. The Kalshi order module is claimed by
+  `kalshi-spread-join-sign` (OPEN, UNOWNED); the execution ledger by
+  `unknown-submit-retry-provenance`.
+- Hypothesis: the blocker on live venue placement is NOT the execution path.
+  `execute_portfolio` has no pregame gate, Kalshi already re-reads the venue's
+  CURRENT ask at submit bounded by slippage, and both venues have filled real
+  orders. The binding constraints are, in order: (1) Polymarket REFUSES every
+  moneyline today (`team_side_needs_verified_yes_leg`, live since
+  2026-08-28T15:06:23Z) and moneyline is exactly the market the arb detector
+  covers, so the arb path is blocked at the venue adapter; (2) the arb
+  detector's `DEFAULT_FEE_BUFFER = 0.04` is a placeholder, not either venue's
+  fee schedule, so no flagged opportunity is known to be executable; (3) the
+  live MODEL trails the market (`live-game-line-projection`, CLOSED 2026-08-29:
+  model-minus-market Brier positive on 8 of 9 scored dates), so a model-driven
+  live edge is a FALSE edge and must stay gated.
+- Falsification test: (1) is wrong if a Polymarket moneyline order reaches the
+  venue today without the `SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE=1` hatch.
+  (2) is wrong if a real fee model leaves the flagged-opportunity set
+  materially unchanged. (3) is wrong if a live-priced row's probability is
+  measurably different from its pregame probability AND scores better than the
+  market on a held-out slate — neither has been shown.
+- Verification: the first increment is a MEASUREMENT, not a deploy — the arb
+  scan run against a production slate, reporting executable opportunities net
+  of real fees, split pregame vs in-play. No order is placed by this session.
+  Arming live placement is the user's action, not mine.
+- **STATUS 2026-08-29 22:3xZ — HALF DISCHARGED.** The FEE half is measured and
+  shipped (`venue_fees.py`, 18/18 real fills; `net_edge_per_contract` replaces
+  the flat buffer; 52 new tests, 361 green in the venue/arb suites). The
+  CROSS-VENUE half is NOT: it needs a Polymarket price beside a Kalshi price at
+  the same instant, and this session could not get one.
+- **NEXT ACTION, and it is a worker-side job:** a probe that calls
+  `polymarket_us_markets.fetch_game_markets()` and Kalshi's in-play book in the
+  SAME pass and reports pairs where `net_edge_per_contract > 0`, split pregame
+  vs in-play. Cannot run locally (`api.polymarket.us` 401s past `limit=1`, no
+  local creds) and cannot be read after the fact (slate not published to web,
+  `export?pattern=*polymarket*` -> `count: 0` since 08-26). Publishing the
+  slate is the cheaper unblock and is likely worth doing first.
+- **SCOPE REPLIES to two peer lanes, 2026-08-29** —
+  `.syndicate/handoff_2026-08-29_scope_replies_live_venue.md`. Both asked
+  whether I hold their files; I hold NONE of the six
+  (`execution_ledger.py`, `polymarket_us_orders.py`, `venue_settlement.py`,
+  `live_projection_join.py`, `layer2_shortlist.py`, `execute_portfolio.py`).
+  **Neither session was reachable via `SendMessage` when I answered**, so the
+  replies are in the ledger instead. They also carry one correction worth
+  reading: "live placement is zero and it is NOT the venues refusing" is true
+  for props/totals and FALSE for moneyline, where
+  `team_side_needs_verified_yes_leg` refuses by name — it has simply never
+  fired because nothing has tried an h2h in the observed window.
+- **HIGHEST-VALUE MEASUREMENT IN THIS LANE:** Polymarket's real fee. It is
+  ~2/3 of modelled pair cost at even money and is currently a bound, not a
+  number. `unknown-submit-retry-provenance` is already reading
+  `commissionNotionalTotalCollected` for its own reasons — that lands it.
+- Blocked by: none for the fee work (done). Two-leg EXECUTION is blocked by
+  `#595` step 3 (the Polymarket YES-leg binding), held by
+  `unknown-submit-retry-provenance` — evidence half delivered, scoring against
+  the 8 settled moneylines still required before its refusal comes off.
+
+### market-gone-rows-drop — **CLOSED 2026-08-30, MEASURED NOT DEPLOYED** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+- Goal met: rows whose market the feed has stopped quoting no longer reach the
+  board. `[user 2026-08-30: "Drop them"]`
+- Files: (none held) — `pipeline/layer2_shortlist.py`,
+  `tests/test_market_gone_drop.py`, released.
+- **RE-BASELINING CHANGED THE ANSWER AND WOULD OTHERWISE HAVE BROKEN THE BOARD.**
+  The framing inherited from `stale-row-cause-blind-spot` was "drop the ~1/3 of
+  the board that is stale". Measured on the 13:56:30Z board (1,565 rows) with
+  the production classifier over the live state files:
+
+      soccer   stale= 289  sidecar=   9min   market_gone 288, orphaned_line 1
+      mlb      stale= 304  sidecar= 152min   as_fresh_as_sweep 304
+      ncaaf    stale= 192  sidecar= 540min   as_fresh_as_sweep 192
+      wnba     stale= 360  sidecar= 168min   as_fresh_as_sweep 359, orphaned 1
+
+      market_gone 288 (18.4%)   as_fresh_as_sweep 855
+
+  **855 of 1,145 "stale" rows are AS FRESH AS THE SWEEP ITSELF.** NCAAF's
+  sidecar is nine HOURS old, so its nine-hour-old rows ARE the freshest prices
+  that exist. An age rule deletes every NCAAF and WNBA row and calls it a
+  cleanup. Only soccer's 288 are genuinely dead, against a NINE-MINUTE sidecar.
+- RESULT on that production payload: **1,565 -> 1,277, soccer 400 -> 112, and
+  mlb 400->400 / ncaaf 365->365 / wnba 400->400 UNCHANGED.** Falsification test
+  ran on the real data: **0 non-`market_gone` rows dropped.**
+- A TEST FOUND A HAZARD AND THE CODE WAS FIXED RATHER THAN THE TEST: a state
+  file with entries but NO PARSEABLE KEYS yields an empty group index, which
+  reads as `market_gone` for every row — a corrupt file would have emptied a
+  sport's board. Now guarded, reported as `MARKET_GONE_DROP_SKIPPED`.
+- THE NAIVE VERSION IS PINNED AS FAILING: sabotaging the predicate to drop on
+  AGE alone fails 4 tests including the slow-sweep protection.
+- Unknown classifications, absent state files, orphaned lines and any exception
+  all KEEP the row. Serving a stale row is a smaller harm than an empty board.
+- Tests: 10 new; 98 green across market_gone / stale_row_cause / served_quote_age
+  / shortlist floors + api.
+- Reversible without a deploy: `SYNDICATE_DROP_MARKET_GONE_ROWS=0`.
+- **NOT DEPLOYED.** Worker change; inert until a refresh-worker deploy. Reading
+  it owes: `MARKET_GONE_DROPPED` in production, and per-sport served row counts
+  showing soccer down with mlb/ncaaf/wnba unchanged.
+- Blocked by: none. Claims released.
+
+### position-key-commence-time-instability — CLOSED 2026-08-30 — the exposure is GONE and the defect is fixed by its owner
+- **RESOLVED. THE HEADER ABOVE USED TO SAY A DUPLICATE BET WAS RESTING RIGHT NOW; IT IS NOT.**
+  Measured 2026-08-30 via per-order reconcile: `tsc-mlb-lad-det-2026-08-30-7pt5`
+  ended `venue_status='order_state_canceled'` with `contracts=0` — it EXPIRED
+  UNFILLED, so the ~$9.12 of duplicated exposure never became a position.
+  Independently recorded on main as `2a1417d0` ("the resting duplicate EXPIRED
+  UNFILLED — closed, and the defect's cost stays $0.78").
+- **The cause is fixed and not by me:** the owner removed `commence_time` from
+  `_POSITION_IDENTITY_FIELDS` in `ec56b7ef`, adding
+  `_LEGACY_POSITION_IDENTITY_FIELDS` / `legacy_position_key()` so pre-fix rows
+  still match. Production confirmed it working: `LEGACY_KEY_MATCH
+  position_key='ae59d573e256c5fe' ... refused as a duplicate rather than
+  re-placed`.
+- **The gap this exposed is also closed:** `3170db13` adds a Polymarket
+  `cancel_order` adapter — "the capability that did not exist when it was
+  needed" — which is what forced a human to cancel on the venue screen.
+- Left OPEN as a live-money alarm long after the money was safe. A finding block
+  that states a present-tense risk must be re-measured before it is trusted; the
+  cost of not doing so is a permanent false alarm in the file every session reads
+  first.
+- **A DUPLICATE LIVE BET IS RESTING AT POLYMARKET RIGHT NOW.** Two orders, one
+  position: `C6H7WE0DPKDJ` ($4.06, 16:42:22Z) and `C6HN0XD92KDE` ($5.44,
+  17:19:26Z) on `tsc-mlb-lad-det-2026-08-30-7pt5`, both `under 7.5` at -104.
+  ~$9.12 of exposure where one bet was intended. Reported by the USER from
+  Polymarket's own Orders screen; our ledger holds both and matches the venue
+  share for share (7.96 + 10.66).
+- **CAUSE, measured field-by-field:** every identity field is byte-identical
+  ACROSS the two rows except one —
+
+      commence_time  2026-08-30T17:41:00Z   ->   2026-08-30T18:11:00Z   (+30 min)
+
+  `commence_time` is in `_POSITION_IDENTITY_FIELDS`
+  (`syndicate/features/shared/portfolio_commit.py:125-135`), so the game start
+  being restated 30 minutes changed `position_key`, which changed
+  `idempotency_key` (derived from it), so `record_order` saw a bet it had never
+  seen and placed it again.
+- **THE GUARD DID NOT FAIL — IT WAS NEVER CONSULTED.** `execution_ledger`'s own
+  words: "the same bet computed twice yields the same key, so the second write
+  is refused" and "`filled`, `submitted` and `failed` all mean the venue may
+  hold this order, and re-sending any of them is how one bet becomes two".
+  Both hold only while every hashed input is stable, and `commence_time` is the
+  one input a sports feed is EXPECTED to change.
+- **THE IDENTITY TUPLE MIXES TWO KINDS OF FIELD:** immutable facts about the
+  bet (`sport`, `event_id`, `market`, `segment`, `side`, `line`, `player_name`,
+  book) and MUTABLE attributes of the fixture (`commence_time`, and arguably
+  `home_team`/`away_team` if a feed renames a club). `event_id` already names
+  the game; `commence_time` adds nothing to identity and imports every feed
+  correction into it.
+- **THE STRONGEST EVIDENCE THAT THIS IS THE DEFECT AND NOT A JUDGEMENT CALL:**
+  `opening_key`, built for the same joining purpose, DELIBERATELY EXCLUDES
+  `commence_time` — and it was IDENTICAL across both orders. Two keys for the
+  same bet disagree about what a bet is, and the stable one is the one NOT used
+  for idempotency.
+- **SYSTEMATIC, not a one-off.** Any delay or restatement unlocks a duplicate on
+  any still-open position: MLB rain delays, postponements, doubleheader
+  restatements. MLB is the highest-volume sport on this platform.
+- **LEDGER SCANNED, AND IT HAS ALREADY COST MONEY.** 398 live orders grouped by
+  `opening_key` (the STABLE identity): **2 keys carry more than one order, and
+  BOTH have differing `position_key` — this defect's exact signature.**
+
+      HOU@NYY h2h away, 2026-08-26 -- BOTH FILLED, BOTH LOST
+        15:04:15  stake 3.41  fill 0.465  pnl -3.41   commence 23:05:00Z
+        01:33:16  stake 1.27  fill 0.040  pnl -0.78   commence 23:08:38Z
+
+  **The delta that unlocked it was 3 MINUTES 38 SECONDS.** Not a rain delay —
+  ordinary feed jitter restating first pitch to the second. **The threshold is
+  effectively ZERO**, so "delays and postponements" understates it: ANY
+  restatement mints a new key.
+- **$0.78 of REAL LOSS on a bet nobody intended.** The duplicate was placed
+  02:33 AFTER first pitch and bought a 4-cent longshot on a game in progress.
+  Small, but it is the confirmed-loss existence proof the LAD@DET pair lacks.
+- **NOT confined to totals:** this pair is `h2h` with an empty `line`, so the
+  defect spans market types.
+- **2 IS A FLOOR, NOT A COUNT.** The scan only sees pairs where BOTH legs
+  survive in the book sharing an `opening_key`. A pair whose other leg was
+  hidden, refused, or predates retention is invisible to it.
+- Falsification test: if two rows with an identical `opening_key` can be shown
+  to need DIFFERENT `position_key`s for some legitimate reason, this is wrong
+  and `commence_time` belongs in the hash.
+- Verification wanted: a second submit on one position must be refused across a
+  `commence_time` change — and check the ledger for OTHER duplicate pairs
+  sharing an `opening_key`, since this one was only found because a human
+  looked at the venue screen.
+- Files: NONE HELD. The defect is in
+  `syndicate/features/shared/portfolio_commit.py` (`position_key`,
+  `_POSITION_IDENTITY_FIELDS`) — named here as a POINTER, not a claim: this
+  is a live-money identity change and belongs to whoever owns the commit
+  path.
+- **IMMEDIATE, and not fixable in code:** one leg should be cancelled at the
+  venue. There is NO Polymarket cancel path — `kalshi_orders` has
+  `cancel_order`, `polymarket_us_orders` does not — so it must be done on
+  Polymarket's own screen.
+- NOTE, deliberately written without the extension so the guard does not read
+  it as a claim: the same-named file under `pipeline/` is a DIFFERENT module
+  and is held by `live-prob-producer-reader-gap`. My first draft named it
+  inside the `Files:` block and the invariant checker correctly reported it
+  CONTESTED — the trap its own `[hint]` line warns about.
+- Blocked by: none.
+
+### polymarket-buy-limit-tick-floor — CLOSED 2026-08-30 — PREMISE REFUTED BY ITS OWN DEPLOY
+- Goal: stop Polymarket buy limits resting below the venue's quote. NOT ACHIEVED — the premise was wrong.
+- Files: NONE HELD — released 2026-08-30.
+- Outcome: the tick floor was never the cause. 12 of 12 quotes on-grid post-deploy, snap never fired. Submit-time quote for lad-det was 0.51 and we sent 0.51; the 0.515 was read 30 min later. Retracted in learnings.md. Code kept as a no-op; the slippage guard now gates the SENT price, which is a real improvement.
+- Also refuted this lane: stale ask (44s at submit), bidding a mid (prices[] sums 1.005-1.030 = an ASK), and "orders rest forever" (5 of 7 filled; the 2 that did not were CANCELLED).
+- Incident handled: live execution halted on BOTH venues 19:47:34Z. Correct fix was another lane's dd33c865. My 63661af1 auto-reject was UNSAFE and is reverted (ef0d2d47).
+- Shipped and useful: ORDER_STATE logging of cumQuantity/leavesQuantity (d8b6c847, landed as bf1dd290) — NOT YET READ.
+- Next: read ORDER_STATE for the cancelled orders; trace why 71 board spread rows reach ORDER_PATH zero times.
+
+### ncaaf-totals-dispersion — BLOCKED — CFBD monthly quota, clears ~2026-09-01
+- Goal: compress NCAAF simulated-total dispersion at its carrier, and MEASURE totals skill vs market.
+- Files: NONE HELD.
+- Status: dial BUILT and VERIFIED (exact no-op at default, c5afcf27). Value NOT FITTED. Gate NOT OPENED. Step-1 provenance DONE — the existing 752-record measurement is unusable (engine `ncaaf_v2`/2026-07-16 vs today's `ncaaf-goal-line-refit-1`/2026-08-27, AND `rating_source=cfbd_ppa_season_2025` leaks).
+- BLOCKED BY: CFBD monthly quota exhausted (measured 22:03:34Z 08-30). Also blocked live NCAAF projections.
+- Unblock: PPA needs NO CFBD call (derivable from `historical_truth/plays_*`, 74.3% coverage, leak-free by construction); only SP+ needs ONE fetch per completed season — cache and COMMIT both so this cannot recur.
+- Do NOT re-sweep the rating weights: `calibration_profile.py:51-64` is a measured dead end.
+- Blocked by: cfbd-monthly-quota
