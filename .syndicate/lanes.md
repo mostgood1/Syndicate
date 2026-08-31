@@ -3162,6 +3162,61 @@ caaf-no-orders`). NOT
   sim needs requeuing. Fact, not complaint.
 - Blocked by: none
 
+### mlb-live-prop-prob-merge — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+- Goal: get MLB's live prop probability onto the board. The producer emits it
+  and a merge throws it away. `rows_live_edged` is 0 and must become non-zero
+  on a live MLB game, measured on the served payload.
+- Files: syndicate/features/mlb/live_lens.py, tests/test_mlb_live_prop_prob_merge.py (new)
+- NOT CLAIMED, DELIBERATELY: `syndicate/features/shared/live_projection_join.py`
+  is held by OPEN lane `live-prob-producer-reader-gap`. This lane IMPORTS its key
+  rule (read-only) and edits nothing in it. That lane's question — LOST IN THE
+  JOIN vs NEVER PRODUCED — is ANSWERED by the series below: produced, then
+  discarded. It is neither of its two options, which is why it stayed open.
+- MEASURED 2026-08-31, refresh-worker logs, one live game (824636), the full
+  `LIVE_MC_PRICED` series rather than one tick:
+
+      00:40Z rows=27   01:07Z rows=14   01:42Z rows=4
+      00:48Z rows=26   01:21Z rows=10   01:58Z rows=2
+      00:58Z rows=18   01:31Z rows=8    02:12Z rows=0   <- end of game
+
+  The producer emits up to **27 rows carrying `liveModelProbOver`**, decaying to
+  0 only as the game ended. The published snapshot over the same window:
+  `live: {rows: 124, with_live_projection: 115, with_live_prob: 0}`.
+  **Produced 27, published 0.**
+- **A ONE-TICK READ SAYS THE OPPOSITE AND I BRIEFLY BELIEVED IT.** The 02:12Z
+  line is `rows=0 outcomes={'priced': 14}`, which reads as "priced but never
+  emitted" and points at the engine. It is an end-of-game artifact: the
+  `priced` counter increments in `_live_mc_prob_over_for` BEFORE
+  `_live_prop_market_resolved` drops the row, so a decided prop is priced and
+  then discarded — correct behaviour, misleading single sample. The instrument
+  is NOT at fault; it prints both numbers. Read the SERIES.
+- Hypothesis: `_merge_cards_context_into_live_row`
+  (`syndicate/features/mlb/live_lens.py:~1012`) does
+  `if card_props: merged["liveProps"] = card_props` — an UNCONDITIONAL
+  overwrite of the MC rows by the cards rows, which carry `liveProjection` and
+  no probability. 124 published rows against 27 MC rows is the shape of cards
+  winning wholesale. NOTE: `:1298` (`_enhance_card_row_with_live_projection`)
+  is the OTHER direction and is not the operative site; the ledger and my own
+  first reading both named it.
+- Falsification test: if the published snapshot's live rows are NOT the cards
+  set — i.e. a row appears carrying `liveModelProbOver` — the overwrite is not
+  the loss point and the hypothesis is dead.
+- Verification: `off != on` unit both directions, then PRODUCTION —
+  `snapshot_live_prob_seen > 0` and `rows_live_edged > 0` on a live MLB game,
+  read off `/api/board/layer2-shortlist` `per_sport_ingest.mlb.enrichment.live_projections`.
+- CONSTRAINTS THAT SURVIVE THIS LANE, both load-bearing:
+  1. `#414`: the edge prices `liveModelProbOver` and NOTHING else. A fallback to
+     `modelProbOver` was shipped and BACKED OUT — bit-identical to the pregame
+     number on 24 of 28 rows, decided props reading 0.659/0.655/0.745. Do not
+     reintroduce it.
+  2. `#124 follow-up (a)`: cards are the reliable primary ROW SOURCE. The fix
+     must not swap that; it must carry the probability ONTO the card rows.
+  3. `live-game-line-projection` (CLOSED) measured the live GAME-LINE model
+     trailing the market on 8 of 9 dates. Prop live skill has NOT been measured
+     either way. Publishing a live prop edge is not the same as it being safe to
+     bet, and this lane does not claim otherwise.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
