@@ -3285,6 +3285,54 @@ caaf-no-orders`). NOT
   reads as success rather than as a crash.
 - Blocked by: none
 
+### ncaaf-cfbd-quota-latch — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+- Goal: stop NCAAF projection regeneration burning a MONTHLY CFBD quota it has
+  already been told is exhausted, and let it succeed from cache while exhausted.
+  Success = `[ppa] source=cache` in the refresh-worker log and the NCAAF season
+  artifact's `age_seconds` RESETTING, on a build taken while the quota is still 429.
+- Files: syndicate/features/ncaaf/cfbd_quota_latch.py (NEW),
+  scripts/generate_smartsim2_ncaaf_projections.py,
+  syndicate/features/ncaaf/cfbd.py,
+  tests/test_cfbd_quota_latch.py (NEW)
+- RECLAIMED from `ncaaf-no-orders`, which marks these paths `released:` with
+  "a lane that resumes this work reclaims them". Its owning session is gone
+  (phantom sweep 2026-08-29). Its hypothesis names this exact chain and its own
+  analysis proposes the PPA cache; this lane executes it.
+- NOT TOUCHED, DELIBERATELY: `scripts/run_refresh_worker.py::_season_projection_should_launch`,
+  which `cfbd_backoff.py`'s docstring names as the home of the relaunch-cadence
+  fix. It is contended — another session has it STAGED in the shared index — and
+  the launches are cheap while the CALLS are what burn quota. Damping the calls
+  also ends the storm indirectly: a run that succeeds from cache refreshes the
+  artifact, `age_seconds` resets, and the staleness trigger stops firing.
+- MEASURED 2026-08-31 on refresh-worker:
+  `SEASON_PROJECTION_LAUNCHING sport=ncaaf reason=artifact_stale
+   age_seconds=366893 interval_seconds=86400` — **the configured interval is
+  once per DAY and it is firing ~24x that**, because a failing run never
+  refreshes the artifact so every tick re-triggers it. 14 generator attempts
+  today, hourly, each dying in `load_ppa_ratings_asof` -> `_cfbd_get`.
+  `age_seconds` 366,893 = 4.25 days stale, matching "has not rebuilt since
+  2026-08-26". A feedback loop with the wrong sign: it hammers hardest exactly
+  when the quota is scarcest, and ten snapshot builders share the key.
+- Hypothesis: `/games` and `/ratings/sp` are already cached; `/ppa/teams` is not,
+  so it is the ONLY hard CFBD dependency left in a regeneration. Cache it with a
+  STALE-FALLBACK and latch the quota, and a regeneration completes with zero
+  CFBD calls while exhausted.
+- Falsification test: if a regeneration still dies with the latch set and the
+  cache warm, PPA is not the only remaining hard dependency and the premise is
+  wrong.
+- Verification: unit `off != on` both directions for the latch (a latched call
+  makes NO request; an expired latch makes one), plus a PRODUCTION reading of
+  `[ppa] source=cache` and a reset `age_seconds`.
+- HONEST LIMIT: the cache CANNOT be filled before the quota rolls (2026-09-01) —
+  it is empty now and filling it needs the call that is failing. This ships
+  ready; its first successful fetch arms it. Week 2 (09-11..09-13) is NOT at
+  risk either way: the roll is ~9 days ahead of it and the generator retries
+  hourly on its own.
+- A STALE PPA IS USED ONLY WHEN THE ALTERNATIVE IS NOTHING, and it must SAY SO:
+  the age is logged and stamped into the output CSV's `rating_source`, so a
+  downstream reader cannot mistake a cached rating for a fresh one.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
