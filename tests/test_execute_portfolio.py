@@ -1503,3 +1503,73 @@ def test_cross_ticks_UNREADABLE_takes_the_safe_arm_and_says_so(monkeypatch):
     monkeypatch.setenv("SYNDICATE_POLYMARKET_CROSS_TICKS", "abc")
     from pipeline.execute_portfolio import _polymarket_cross_ticks
     assert _polymarket_cross_ticks() == 0
+
+
+def _req_at(hours_from_now):
+    """An order request whose fixture starts `hours_from_now` hours out."""
+    import datetime as dt
+    class _R:
+        commence_time = (dt.datetime.now(dt.timezone.utc)
+                         + dt.timedelta(hours=hours_from_now)).isoformat().replace("+00:00", "Z")
+        venue_ticker = "tsc-x"
+        market = "totals"
+    return _R()
+
+
+def test_a_far_out_polymarket_order_is_HELD(monkeypatch):
+    """MEASURED: Polymarket fills happen on LIVE markets (8 of 8) and pregame
+    orders rest (3 of 3) -- at the quote AND one tick above it, same markets,
+    same session. Price is not the constraint, so placing five days early only
+    buys the submit -> cancel -> resubmit churn that produced a duplicate bet."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE", raising=False)
+    from pipeline.execute_portfolio import _polymarket_hold_hours
+    assert _polymarket_hold_hours(_req_at(120), "polymarket") is not None
+
+
+def test_an_ALREADY_LIVE_market_is_never_held(monkeypatch):
+    """A negative time-to-kickoff must place. Live is the ONE regime that
+    demonstrably fills; holding it would suppress the only thing that works."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE", raising=False)
+    from pipeline.execute_portfolio import _polymarket_hold_hours
+    assert _polymarket_hold_hours(_req_at(-1), "polymarket") is None
+
+
+def test_the_ambiguous_middle_is_left_alone(monkeypatch):
+    """Nothing measures where between "live" and "12 hours" the boundary sits,
+    so the default suppresses only the clearly-premature end."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE", raising=False)
+    from pipeline.execute_portfolio import _polymarket_hold_hours
+    assert _polymarket_hold_hours(_req_at(12), "polymarket") is None
+    assert _polymarket_hold_hours(_req_at(2), "polymarket") is None
+
+
+def test_kalshi_is_untouched(monkeypatch):
+    """The finding is Polymarket's. Kalshi fills 15 of 20 and is not in scope."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE", raising=False)
+    from pipeline.execute_portfolio import _polymarket_hold_hours
+    assert _polymarket_hold_hours(_req_at(120), "kalshi") is None
+
+
+def test_an_UNKNOWN_kickoff_places_rather_than_suppresses(monkeypatch):
+    """"We do not know when this starts" and "this starts too far away" are
+    different facts, and only the second is a reason not to bet. Unknown must
+    not land on the suppressing branch."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE", raising=False)
+    from pipeline.execute_portfolio import _polymarket_hold_hours
+
+    class _NoTime:
+        commence_time = None
+        venue_ticker = "tsc-x"
+        market = "totals"
+
+    class _Garbage(_NoTime):
+        commence_time = "not-a-date"
+
+    assert _polymarket_hold_hours(_NoTime(), "polymarket") is None
+    assert _polymarket_hold_hours(_Garbage(), "polymarket") is None
+
+
+def test_the_hold_can_be_switched_off_without_a_code_change(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE", "0")
+    from pipeline.execute_portfolio import _polymarket_hold_hours
+    assert _polymarket_hold_hours(_req_at(120), "polymarket") is None

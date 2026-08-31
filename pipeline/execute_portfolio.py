@@ -15,6 +15,7 @@ problem.
 
 from __future__ import annotations
 
+import datetime as _dt
 import os
 import time
 from collections.abc import Sequence
@@ -422,6 +423,39 @@ def run_execution(
             refused["incomplete_position"] = refused.get("incomplete_position", 0) + 1
             continue
 
+        # TOO EARLY TO PLACE  [2026-08-31, user decision]
+        #
+        # MEASURED, and this is the only cause left standing after ten were
+        # eliminated: Polymarket fills happen on LIVE-or-PAST markets (8 of 8)
+        # and pregame orders rest (3 of 3). PRICE IS NOT THE CONSTRAINT -- we
+        # bid the quote and they rested, then bid a tick ABOVE it and they
+        # rested again, same markets, same session. There is no book to hit.
+        #
+        # WHAT PLACING EARLY ACTUALLY COSTS. Not the stake -- an unfilled order
+        # holds no reserved funds (balance was flat at $87.26 across a
+        # cancellation). It costs CHURN: the order rests, the venue cancels it,
+        # the next tick re-places it, and that submit -> cancel -> resubmit loop
+        # is where the duplicate exposure came from ($9.12 on lad-det, two live
+        # orders for one intended bet).
+        #
+        # HOLD, DO NOT DROP. `skipped` means "not placed on this pass", and the
+        # position stays in the plan, so the next tick inside the window places
+        # it normally. Nothing is abandoned.
+        held = _polymarket_hold_hours(request, venue)
+        if held is not None:
+            skipped += 1
+            refused["too_early_to_place"] = refused.get("too_early_to_place", 0) + 1
+            print(
+                f"[execute_portfolio] HELD_TOO_EARLY venue={venue}"
+                f" ticker={getattr(request, 'venue_ticker', None)!r}"
+                f" market={getattr(request, 'market', None)}"
+                f" hours_to_commence={held:.1f}"
+                f" threshold={_polymarket_min_hours_to_commence()}"
+                " -- pregame orders do not fill at any price; it will be placed nearer kickoff",
+                flush=True,
+            )
+            continue
+
         before = _status_of(request)
         # A REJECTED order never reached the venue, so a fresh attempt is a
         # PLACEMENT, not a duplicate. Measured 2026-08-24T12:58Z: the retry
@@ -823,6 +857,61 @@ def _polymarket_max_price_age_seconds() -> float:
     # A non-positive ceiling is a typo, not an instruction to refuse everything
     # forever -- same reading `execution_guard._float_env` gives a bad cap.
     return parsed if parsed > 0 else _slate_ceiling_default()
+
+
+def _polymarket_min_hours_to_commence() -> float:
+    """Hold a Polymarket order further out than this many hours from kickoff.
+
+    `SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE`. **The default of 24 is a
+    JUDGEMENT, not a measurement, and it is deliberately loose.** What is
+    measured is only the two ends: orders on LIVE markets fill (8 of 8), and
+    orders 12 hours and 5 days out do not (3 of 3, at two different prices).
+    Nothing establishes where between "live" and "12 hours" the boundary sits,
+    so this suppresses only the clearly-premature end and leaves the ambiguous
+    middle alone.
+
+    `0` disables the hold entirely and restores placing whenever the plan says.
+    """
+    raw = str(os.environ.get("SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE") or "").strip()
+    if not raw:
+        return 24.0
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        print(
+            f"[execute_portfolio] MIN_HOURS_TO_COMMENCE_UNREADABLE {raw!r} -- not holding",
+            flush=True,
+        )
+        return 0.0
+
+
+def _polymarket_hold_hours(request, venue: str) -> float | None:
+    """Hours to kickoff if this order should be HELD, else None.
+
+    RETURNS None ON ANYTHING IT CANNOT ESTABLISH. An unreadable or absent
+    `commence_time` must not silently suppress a bet: "we do not know when this
+    starts" and "this starts too far away" are different facts, and only the
+    second is a reason not to place. Unknown places, as it does today.
+    """
+    if "polymarket" not in str(venue or "").lower():
+        return None
+    threshold = _polymarket_min_hours_to_commence()
+    if threshold <= 0:
+        return None
+    raw = getattr(request, "commence_time", None)
+    if not raw:
+        return None
+    try:
+        text = str(raw).strip().replace("Z", "+00:00")
+        starts = _dt.datetime.fromisoformat(text)
+        if starts.tzinfo is None:
+            starts = starts.replace(tzinfo=_dt.timezone.utc)
+    except (TypeError, ValueError):
+        return None
+    hours = (starts - _dt.datetime.now(_dt.timezone.utc)).total_seconds() / 3600.0
+    # ALREADY STARTED IS NEVER TOO EARLY. A live market is the one regime that
+    # demonstrably fills, so a negative value must place, not hold.
+    return hours if hours > threshold else None
 
 
 def _polymarket_cross_ticks() -> int:
