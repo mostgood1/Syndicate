@@ -8185,6 +8185,42 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-explore-arm-too-slow] 2026-08-31T15:11Z — the arm is LIVE and CORRECT, and its sample rate is close to zero
+
+**Deployed `b6c02dff`, live 15:07:47Z. First tick: `EXPLORE_PREGAME_BOUNDARY 0`,
+and that is arithmetic, not a fault.**
+
+    HELD    0.485  0.465  0.461  0.450        band = 0.35 .. 0.45
+    -> only ONE of four is inside the band, and at rate 0.10 one order explores
+       10% of the time.
+
+**AND DETERMINISM MEANS IT NEVER RE-ROLLS.** Assignment is
+`sha1(position_key)`, deliberately, so the same position gets the same verdict
+forever — that is what stops the churn. The consequence is that the arm samples
+**new POSITIONS, not ticks**: repeating a held order every 5 minutes gives no
+extra chances. With a handful of new boundary positions a day at 10%, this
+yields roughly **one exploration order every several days**.
+
+**So the falsifier is alive but nearly static.** Better than the
+self-confirming gate it replaced, and far short of what re-deriving a threshold
+needs.
+
+**TWO TUNABLE FIXES, neither applied:**
+  - **RAISE THE RATE.** 0.10 was picked for a large population; the real
+    boundary population is 1-3 positions per tick. 0.25-0.50 would sample
+    meaningfully at a still-bounded cost, since the cost is churn and not stake.
+  - **WIDEN THE BAND** past 0.45. Weaker: 0.46-0.49 has been observed resting
+    repeatedly, so it buys churn for information already held.
+
+**Prefer the rate.** `SYNDICATE_POLYMARKET_EXPLORE_RATE`, and on Render an env
+change needs a deploy either way.
+
+**ALSO OBSERVED, unrelated and pre-existing:** `POLYMARKET_US_SLATE
+status=skipped reason=sports_routes_404_on_this_host_measured_2026-08-24`. It is
+NOT blocking the order path — `ORDER_PATH` and `EXECUTED` both ran this tick —
+but if the slate ever stops refreshing, price resolution refuses on staleness and
+the symptom looks identical to a dead arm.
+
 ## [polymarket-gate-is-self-confirming] 2026-08-31T13:42Z — THE GATE DESTROYED ITS OWN FALSIFIER
 
 **Asked whether `sf-atl` (pregame, ~0.400, the closest observation to the
