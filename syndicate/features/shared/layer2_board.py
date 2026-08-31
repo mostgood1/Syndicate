@@ -1014,6 +1014,58 @@ _MODEL_EDGE_MAX_POINTS = 15.0
 # carry it, this bound is the guard -- and it is a GUARD, not a calibration.
 
 
+EV_BASIS_MARKET = "market_fair"
+EV_BASIS_MODEL = "model_probability"
+
+
+def _model_value_ev(
+    row: Mapping[str, Any], side: str, price: Any, fair_method: Any
+) -> float | None:
+    """EV against the MODEL's probability, for a row whose EV is a hold restatement.
+
+    `[2026-08-30, user decision]` — and the reason it is confined to these rows.
+
+    `book_margin_model` prices a one-sided market as `fair = implied x (1-hold)`,
+    so `expected_value_pct(price, fair)` is `fair/implied - 1`: the price
+    cancels and the EV is **-hold for every such row regardless of the bet**
+    (`_row_ev_is_hold_restatement` states this and it is exact). That number
+    carries no information about the bet, and because it is roughly -6 points it
+    buries whatever the model says underneath it. MEASURED 2026-08-30 after the
+    `#601` join fixes: 2,611 rows that had just gained a correct model edge
+    scored a maximum of **-4.73** against a live shortlist whose #50 was +0.64.
+    Every one of them was priced, correct, attributable — and unreachable.
+
+    EV against the model's own probability is the honest alternative and a
+    genuinely different question: "if the model is right, what does this bet
+    return". It is NOT a better estimate of the same quantity, which is exactly
+    why it goes in its own field with its own basis (`#242`).
+
+    CONFINED TO HOLD-RESTATEMENT ROWS ON PURPOSE. Where a real two-sided
+    consensus exists, `ev_pct` is a MEASURED market EV and the model's view
+    already enters through `blended_score`'s capped sim term. Substituting there
+    would replace a measured number with a modelled one on rows that do not need
+    it — the failure this repo has paid for most often.
+
+    THE HONEST LIMIT, recorded at the point of use: the models behind most of
+    these rows carry `model_skill: {"sample_games": 0, "status": "unmeasured"}`.
+    Soccer's goal-scorer and shots props are the bulk of the population. This EV
+    is exactly as good as they are, and the row says so — `model_skill` travels
+    on the projection and `ev_basis` travels on the candidate, so nothing
+    downstream can read this as a measured market EV.
+    """
+    if str(fair_method or "").strip() != "book_margin_model":
+        return None
+    model_prob = _model_prob_for_side(row, side)
+    if model_prob is None:
+        return None
+    if not (0.0 < float(model_prob) < 1.0):
+        # A degenerate probability produces an unbounded EV. `#414`'s lesson in
+        # a different shape: an already-decided outcome priced as a live one is
+        # the largest fake number on the board.
+        return None
+    return expected_value_pct(price, model_prob)
+
+
 MODEL_EDGE_BASIS_MARKET = "market_fair"
 MODEL_EDGE_BASIS_MODELLED = "modelled_fair"
 
@@ -1503,6 +1555,32 @@ def build_layer2_rows(
 
             ev = expected_value_pct(price, fair) if fair is not None else None
             model_edge = _model_edge_for(row, side, fair)
+            # THE VALUE TERM THE SCORE ACTUALLY RANKS AND ADMITS ON.
+            #
+            # `ev_pct` below is left EXACTLY as computed -- `portfolio_commit`
+            # back-derives the market fair from it
+            # (`fair = (ev_pct/100 + 1) / (profit + 1)`) and then reaches the
+            # model probability as `fair + model_edge_pct/100`. Substituting a
+            # model-based EV into that field would make the sizer re-add an edge
+            # already baked into its own fair, double-counting it. So the
+            # substitution happens HERE, on the term that feeds the score, and
+            # nowhere else.
+            model_ev = _model_value_ev(row, side, price, fair_method)
+            if model_ev is not None:
+                value_ev = model_ev
+                ev_basis = EV_BASIS_MODEL
+                # `model_edge` is DROPPED from the blend for these rows, not
+                # kept alongside. The two are the same information twice over --
+                # `model_ev` is EV against the model probability and
+                # `model_edge` is that probability minus the same fair -- so
+                # passing both would count the model's disagreement in the value
+                # term twice. It stays on the candidate for display and for the
+                # sizer, which needs it.
+                blend_model_edge = None
+            else:
+                value_ev = ev
+                ev_basis = EV_BASIS_MARKET
+                blend_model_edge = model_edge
             # Computed ONCE, here, and stamped onto the candidate so the card
             # builder reuses it rather than recomputing against the same index.
             # Ranking on a movement number the card does not show (or showing
@@ -1521,8 +1599,8 @@ def build_layer2_rows(
             # Probed ONCE per process, not per row: `_blended_score_accepts`
             # is module-level and this loop runs thousands of times.
             score = blended_score(
-                ev_pct=ev,
-                model_edge=model_edge,
+                ev_pct=value_ev,
+                model_edge=blend_model_edge,
                 **(
                     {"movement_price_delta": movement.get("movement_price_delta")}
                     if _blended_score_accepts("movement_price_delta")
@@ -1539,6 +1617,12 @@ def build_layer2_rows(
                 fair_prob=fair,
             )
             candidate["ev_pct"] = ev
+            # BOTH NUMBERS, ALWAYS, AND WHICH ONE THE SCORE USED. A reader who
+            # sees a row ranked well on a -6% `ev_pct` must be able to find the
+            # term that ranked it, and a consumer must never be able to mistake
+            # a modelled EV for a measured one.
+            candidate["model_ev_pct"] = model_ev
+            candidate["ev_basis"] = ev_basis
             candidate["model_edge_pct"] = model_edge
             # WHICH FAIR THAT EDGE WAS PRICED AGAINST. Stamped beside the number
             # rather than left for a reader to infer, because a modelled fair

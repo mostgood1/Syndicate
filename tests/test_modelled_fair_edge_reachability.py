@@ -285,3 +285,86 @@ class ItReachesLayer2(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# `[2026-08-30, user decision]` -- EV against the MODEL's probability on rows
+# whose market EV is a hold restatement.
+# ---------------------------------------------------------------------------
+
+
+class ModelBasedEv(unittest.TestCase):
+    """The join fix alone left these rows unreachable, and that was measured.
+
+    2,611 rows gained a correct model edge and still topped out at -4.73 against
+    a live shortlist whose #50 was +0.64, because `expected_value_pct(price,
+    book_margin_model_fair)` is `-hold` for every such row regardless of the
+    bet. The value term now comes from the model's own probability instead.
+    """
+
+    def _row(self, price=250, model_prob=0.31, fair=0.25):
+        return {
+            "sides": ["over"],
+            "best": {"over": {"price": price, "books_quoting": 6}},
+            "modelled_fair": {
+                "over": {
+                    "fair_probability": fair,
+                    "fair_method": "book_margin_model",
+                    "assumed_hold_pct": 5.0,
+                    "basis": "fanduel/player_prop",
+                }
+            },
+            "projection": {
+                "model_prob_over": model_prob,
+                "side": "over",
+                "edge_vs_market_pct": None,
+            },
+        }
+
+    def test_a_hold_restatement_row_is_valued_on_the_model(self):
+        from syndicate.features.shared.layer2_board import _model_value_ev
+        from syndicate.features.shared.opportunity_signals import expected_value_pct
+
+        row = self._row()
+        got = _model_value_ev(row, "over", 250, "book_margin_model")
+        self.assertIsNotNone(got)
+        self.assertAlmostEqual(got, expected_value_pct(250, 0.31), places=6)
+        # And it is NOT the hold restatement it replaces.
+        self.assertNotAlmostEqual(got, expected_value_pct(250, 0.25), places=3)
+
+    def test_a_measured_two_sided_fair_is_left_alone(self):
+        """Where a real consensus exists, `ev_pct` is a MEASURED market EV and
+        the model already enters through the capped sim term. Substituting there
+        would replace a measured number with a modelled one."""
+        from syndicate.features.shared.layer2_board import _model_value_ev
+
+        self.assertIsNone(
+            _model_value_ev(self._row(), "over", 250, "two_sided_consensus")
+        )
+        self.assertIsNone(_model_value_ev(self._row(), "over", 250, None))
+
+    def test_no_model_probability_means_no_substitution(self):
+        from syndicate.features.shared.layer2_board import _model_value_ev
+
+        row = self._row()
+        row["projection"]["model_prob_over"] = None
+        self.assertIsNone(_model_value_ev(row, "over", 250, "book_margin_model"))
+
+    def test_a_degenerate_probability_is_refused(self):
+        """P == 1 makes EV unbounded. An already-decided outcome priced as a
+        live one is the largest fake number a board can carry (`#414`)."""
+        from syndicate.features.shared.layer2_board import _model_value_ev
+
+        for prob in (0.0, 1.0):
+            with self.subTest(prob=prob):
+                row = self._row(model_prob=prob)
+                self.assertIsNone(_model_value_ev(row, "over", 250, "book_margin_model"))
+
+    def test_the_wrong_side_gets_the_complement_not_the_over(self):
+        from syndicate.features.shared.layer2_board import _model_value_ev
+        from syndicate.features.shared.opportunity_signals import expected_value_pct
+
+        row = self._row(model_prob=0.31)
+        row["sides"] = ["over", "under"]
+        got = _model_value_ev(row, "under", 250, "book_margin_model")
+        self.assertAlmostEqual(got, expected_value_pct(250, 0.69), places=6)
