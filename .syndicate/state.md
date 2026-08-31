@@ -8920,3 +8920,61 @@ measured, non-speculative cause â€” **an inflated shot mean, clustered by t
 which is a better basis for shrinking them than the units argument that was
 tried and withdrawn. **The lever is the team shot total, not the scorer, and not
 the distribution.**
+
+### CORRECTION `[2026-08-31]` — the team shot total is APPROXIMATELY RIGHT. The defect is the per-player SHARE, and I inferred the wrong term from clustering
+
+**Asked to fix the team shot total, went to measure it first, and the
+measurement refutes my own diagnosis. Recorded before any code was touched.**
+
+**WHAT I CLAIMED**, from the section above: the five most inflated rows were all
+Osasuna, so "a per-player error would not line up by club; a team shot-total
+that is too high, then distributed by `shot_share`, would."
+
+**THE CLUSTERING WAS AN ARTEFACT OF THE BOARD, NOT OF THE MODEL.** The board
+carried ONE Osasuna fixture with seven players listed and every other fixture
+with one or two. Grouping by club therefore reproduces the fixture, not a
+mechanism. The inflation ratios also ranged 1.05-1.54, which a single team-level
+multiplier cannot produce.
+
+**THE DECIDING MEASUREMENT — sum the implied means over one fixture:**
+
+    CA Osasuna vs Getafe, 7 players on the board, summed implied mean   11.4
+      Budimir 4.57 | Oroz 1.54 | R.Garcia 1.50 | Munoz 1.07
+      Moncayola 1.05 | Catena 0.89 | Bretones 0.76
+    Osasuna realized team shots/match (38 matches)                      11.03
+    league realized team shots/match                                    11.72
+
+**Seven players already account for 11.4 against a team that averages 11.0.**
+The full XI would carry it somewhat higher — so the team total is mildly high at
+most, nothing like the 1.95x my earlier back-calculation implied. That
+calculation assumed the model used Budimir's realized share; it does not, which
+is precisely the thing being measured.
+
+**THE ACTUAL DEFECT IS THE TOP SHOOTER'S SHARE.** Budimir takes **4.57 of the
+fixture's 11.4 modelled shots, about 40%**, against a realized share of
+**89/419 = 21.2%** of Osasuna's shots across the season. Roughly double. The
+allocation conserves the team total and mis-distributes within it — which is
+why the mean looked inflated per player while the total looked fine.
+
+**A MECHANISM IS NAMED IN THE CODE AND IS NOT YET CONFIRMED AS THE CAUSE.**
+`build_usage_profiles`' docstring describes starter awareness: shares are
+normalized across the squad weighted by expected minutes, and bench rows are
+discounted to `bench_minutes_share = 0.15` rather than dropped, because season
+per-90 rates "dilute a squad's volume across everyone who saw the field". That
+renormalization necessarily RAISES every starter's share. Whether it raises the
+top shooter's by ~1.9x, and whether that is the whole story, has **not** been
+established — it needs the profile builder run on the real inputs, not inferred
+from the served numbers.
+
+**NOTHING WAS CHANGED.** `model_engine_standard.md` requires a documented
+pipeline trace with file:line at each hop before an engine edit, and this repo's
+own rule is that adding or altering a mechanism in a CALIBRATED engine requires
+re-fitting the rates that were absorbing it — the soccer lane already has a
+standing rule that any single-parameter fit must clear a held-out validation,
+written after the most trustworthy-looking in-sample result failed one. A fix
+aimed at the team total would have moved a term that is not wrong.
+
+**Two model facts do survive intact and neither is affected by this
+correction:** the Poisson form is exonerated (dispersion 1.07, P(shots>=2) bias
+-0.0001 pooled over 597 players and 759 matches), and the served board's model
+means run above the players' own realized rates (median 1.19x, 11 of 15).
