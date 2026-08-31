@@ -1718,6 +1718,84 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
             # id, is not in the OPEN book, and would have been marked rejected
             # -- deleting a real position from the money record. Only an
             # operator resolution may make that call.
+            #
+            # ---------------------------------------------------------------
+            # ONE CASE IS PROVABLE, AND ONLY ONE: NO TICKER.
+            # ---------------------------------------------------------------
+            #
+            # `venue_ticker` is what `place_order` SENDS. An order with none was
+            # never submittable -- `execute_portfolio` rejects it every tick with
+            # an OrderBuildError on the missing ticker and nothing ever reaches
+            # the venue. So it cannot be a live position, cannot be doubled, and
+            # cannot be the lost-submit-response case above, because THAT order
+            # necessarily HAS a ticker: it could not have been built without one.
+            #
+            # That is the whole difference from the version that was reverted.
+            # "No venue id" is consistent with BOTH never-sent AND
+            # filled-after-a-lost-response, so it proves nothing. "No venue id
+            # AND no ticker" is consistent with only the first.
+            #
+            # MEASURED 2026-08-30: `3243b1c994b6a445ae917a45` halted live
+            # execution on BOTH venues for 55 minutes, and production logged it
+            # every tick as `LIVE_ORDER status=rejected venue=kalshi ticker=None
+            # market=spreads_alt`. That line reads `record["venue_ticker"]`, so
+            # the field is confirmed against what the ledger actually stores.
+            #
+            # WHICH FIELD, SPELT OUT, BECAUSE THE REVERTED VERSION GOT IT WRONG:
+            # its log printed `order.get("ticker")` -- a key this record does not
+            # have -- so it reported `ticker=None` for EVERY order whether or not
+            # one existed. A predicate keyed to that would have matched
+            # everything: silently permissive. The stored field is
+            # `venue_ticker` (`record_order`, and `_LEAN_FIELDS`).
+            venue_order_id = str(order.get("venue_order_id") or "").strip()
+            venue_ticker = str(order.get("venue_ticker") or "").strip()
+            never_submittable = (
+                not venue_order_id
+                and not venue_ticker
+                and declared_coverage == "book"
+            )
+            print(
+                "[execution_ledger] RECONCILE_NOT_FOUND"
+                f" key={key!r} venue={venue!r} venue_ticker={venue_ticker or None!r}"
+                f" venue_order_id={venue_order_id or None!r}"
+                f" coverage={declared_coverage} never_submittable={never_submittable}"
+                " -- the venue read succeeded and does not contain this order",
+                flush=True,
+            )
+            if never_submittable:
+                # `rejected` is ALREADY the status meaning "never reached the
+                # venue": `is_non_position` recognises it, the day's budget stops
+                # charging for it, and `record_order` lets the position be
+                # retried. The same resting place
+                # `resolve_unknown_submit(..., not_placed)` gives an operator,
+                # reached automatically ONLY where the evidence is conclusive.
+                order.setdefault("pre_resolution_status", order.get("status"))
+                order.setdefault("pre_resolution_error", order.get("error"))
+                order["status"] = STATUS_REJECTED
+                order["auto_resolution"] = {
+                    "finding": RESOLUTION_NOT_PLACED,
+                    "by": "reconcile_never_submittable",
+                    "coverage": declared_coverage,
+                    "at": _utc_now(),
+                }
+                changed.append(
+                    {
+                        "idempotency_key": key,
+                        "ticker": order.get("venue_ticker"),
+                        "from": order.get("pre_resolution_status"),
+                        "to": STATUS_REJECTED,
+                        "venue_status": "never_submittable",
+                        "contracts": order.get("contracts"),
+                        "fill_price": order.get("fill_price"),
+                        "fees_dollars": order.get("fees_dollars"),
+                    }
+                )
+                print(
+                    f"[execution_ledger] RECONCILE_NEVER_SUBMITTABLE key={key!r}"
+                    " -- no ticker and no venue id: never sendable, so it cannot"
+                    " be a position. Marked rejected to clear the block.",
+                    flush=True,
+                )
             continue
 
         venue_state = seen.get("state")

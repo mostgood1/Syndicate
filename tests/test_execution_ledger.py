@@ -588,11 +588,17 @@ def test_a_failed_order_is_never_retried(monkeypatch):
 # --------------------------------------------------------------------------
 
 
-def _live_order(mod, monkeypatch, *, key: str, status: str, **fields):
-    """A live order in the ledger, forced into a given post-submit state."""
+def _live_order(mod, monkeypatch, *, key: str, status: str,
+                venue_ticker: str | None = "KX-TEST-1", **fields):
+    """A live order in the ledger, forced into a given post-submit state.
+
+    `venue_ticker` is a parameter because it is now load-bearing: an order with
+    NO ticker was never submittable, which is the only case `reconcile_live_orders`
+    may auto-resolve. The default is unchanged, so every existing caller is
+    byte-identical."""
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
-    request = _request(position_key=key, venue="kalshi", venue_ticker="KX-TEST-1")
+    request = _request(position_key=key, venue="kalshi", venue_ticker=venue_ticker)
     record, _ = mod.record_order(request, mode=mod.LIVE)
     mod.complete_order(record["idempotency_key"], status=status, **fields)
     return record["idempotency_key"]
@@ -2524,36 +2530,64 @@ def test_the_LEGACY_KEY_SURVIVES_THE_WHOLE_CHAIN_commit_to_request():
     )
 
 
-def test_an_order_ABSENT_from_the_OPEN_book_with_NO_VENUE_ID_is_NEVER_auto_rejected(monkeypatch):
-    """ABSENT FROM THE OPEN BOOK IS NOT ABSENT FROM THE VENUE.
+def test_an_order_with_NO_TICKER_and_no_venue_id_is_auto_resolved(monkeypatch):
+    """The ONLY provable case. `venue_ticker` is what `place_order` sends, so an
+    order without one was never submittable and cannot be a position.
 
-    I added the opposite of this test on 2026-08-30 and shipped it: `no venue id
-    + book coverage` was auto-resolved to `rejected` as "provably never sent".
-    It is not provable and it was wrong. `fetch_orders` covers the OPEN book, so
-    an order that FILLED after a lost submit response has no venue id, is not in
-    that book, and would have been marked rejected -- deleting a real position
-    from the money record. It also silently overrode all three of the recovery
-    path's deliberate refusals.
-
-    Only an operator may make that call. This test exists so the shortcut cannot
-    come back."""
+    MEASURED 2026-08-30: `3243b1c994b6a445ae917a45` halted live execution on BOTH
+    venues for 55 minutes as exactly this shape."""
     from syndicate.features.shared import execution_ledger as mod
 
-    key = _live_order(mod, monkeypatch, key="never-sent", status=mod.STATUS_SUBMITTED)
-    # A COMPLETE book read that simply does not contain it.
+    key = _live_order(mod, monkeypatch, key="no-ticker", status=mod.STATUS_SUBMITTED,
+                      venue_ticker=None)
     monkeypatch.setattr(mod, "_venue_reader", lambda venue: _reader([]))
 
     assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
-
     result = mod.reconcile_live_orders()
     assert result["not_found"] == 1
 
+    resolved = mod.find_order(key)
+    assert resolved["status"] == mod.STATUS_REJECTED
+    assert resolved["auto_resolution"]["by"] == "reconcile_never_submittable"
+    assert resolved["pre_resolution_status"] == mod.STATUS_SUBMITTED
+    assert mod.unreconciled_orders() == []
+
+
+def test_an_order_WITH_A_TICKER_but_no_venue_id_is_NEVER_auto_rejected(monkeypatch):
+    """THE REGRESSION GUARD. `63661af1` auto-rejected on "no venue id" alone and
+    was reverted: an order that FILLED after a lost submit response has no venue
+    id, is absent from the OPEN book, and would have been marked rejected --
+    deleting a real position. It HAS a ticker, which is what separates it."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="had-ticker", status=mod.STATUS_SUBMITTED,
+                      venue_ticker="KXMLBTOTAL-26AUG30-9")
+    monkeypatch.setattr(mod, "_venue_reader", lambda venue: _reader([]))
+
+    result = mod.reconcile_live_orders()
+    assert result["not_found"] == 1
     after = mod.find_order(key)
-    assert after["status"] == mod.STATUS_SUBMITTED, "the money record must not be rewritten by a guess"
+    assert after["status"] == mod.STATUS_SUBMITTED, "a ticketed order may be a live position"
     assert "auto_resolution" not in after
-    # KEEPS BLOCKING, which is the safe direction: it might be a live position.
     assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
 
+
+def test_a_PER_ORDER_coverage_read_never_auto_resolves(monkeypatch):
+    """On a per-order venue, absence means the READ failed, not that the order is
+    missing. Only a complete book read can support the inference."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="per-order", status=mod.STATUS_SUBMITTED,
+                      venue_ticker=None)
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: (lambda **kw: {"status": "ok", "orders": [], "coverage": "per_order"},
+                       venue_order_view, "per_order"),
+    )
+    mod.reconcile_live_orders()
+    assert mod.find_order(key)["status"] == mod.STATUS_SUBMITTED
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
 
 def test_an_order_WITH_a_venue_id_absent_from_the_book_KEEPS_blocking(monkeypatch):
     """The other half. A venue id means the venue accepted it once, so absence
