@@ -1782,3 +1782,35 @@ def test_an_UNRESOLVABLE_market_places_so_the_refusal_keeps_its_name(monkeypatch
     import pipeline.execute_portfolio as ep
     monkeypatch.setattr(ep, "_polymarket_resolve_market", lambda request: None)
     assert ep._polymarket_hold_price(_req(0.49, 20), "polymarket") is None
+
+
+def test_the_band_INCLUDES_its_own_top_edge(monkeypatch, capsys):
+    """`0.35 + 0.10` is `0.44999999999999996`, so a 0.450 order was excluded from
+    a band whose configured top is 0.45.
+
+    LATENT UNTIL THE SUBMIT-PRICE FIX MADE IT REACHABLE. Planned prices are
+    arbitrary and never land on the edge; SUBMIT prices are snapped to the tick,
+    so they land on round boundaries constantly. Measured 15:53Z: both live
+    experiments read submit_price=0.450 and were held instead of explored, which
+    silently stalled the arm."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", raising=False)
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_EXPLORE_BAND", raising=False)
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_EXPLORE_RATE", "1")
+    import pipeline.execute_portfolio as ep
+    monkeypatch.setattr(ep, "_polymarket_resolve_market",
+                        lambda request: ("slug", 0.450, 0.005, 0.01, 0, (None, None)))
+    held = ep._polymarket_hold_price(_req_keyed("edge-key", 0.45), "polymarket")
+    capsys.readouterr()
+    assert held is None, "0.450 sits ON the band top (0.35+0.10) and must be explorable"
+
+
+def test_just_ABOVE_the_band_top_is_still_held(monkeypatch, capsys):
+    """The rounding must not widen the band -- 0.455 stays outside."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", raising=False)
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_EXPLORE_BAND", raising=False)
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_EXPLORE_RATE", "1")
+    import pipeline.execute_portfolio as ep
+    monkeypatch.setattr(ep, "_polymarket_resolve_market",
+                        lambda request: ("slug", 0.455, 0.005, 0.01, 0, (None, None)))
+    assert ep._polymarket_hold_price(_req_keyed("edge-key", 0.455), "polymarket") is not None
+    capsys.readouterr()

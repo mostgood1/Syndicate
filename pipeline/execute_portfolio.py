@@ -986,7 +986,21 @@ def _polymarket_explores(request, price: float, ceiling: float) -> bool:
     rate = _polymarket_explore_rate()
     if rate <= 0:
         return False
-    if price > ceiling + _polymarket_explore_band():
+    # ROUNDED, because the band's top edge is a price we will actually see.
+    #
+    # MEASURED 2026-08-31T15:53Z, minutes after the gate started reading SUBMIT
+    # prices: `0.35 + 0.10` is `0.44999999999999996`, so `0.45 > band_top` is
+    # True and a 0.450 order fell OUTSIDE a band whose configured top is 0.45.
+    # Both live experiments -- bal-col and ast-ars, each submit_price=0.450 --
+    # were held instead of explored, and the arm stopped being able to fire.
+    #
+    # THIS WAS LATENT UNTIL THE SUBMIT-PRICE FIX MADE IT REACHABLE. Planned
+    # prices are arbitrary (0.441, 0.444) and essentially never land on the
+    # edge; submit prices are SNAPPED TO THE TICK, so they land on round
+    # boundaries constantly -- and 0.45 is exactly where a 0.44 or 0.445 quote
+    # crosses to. The arm's most probable price was the one value it excluded.
+    band_top = round(ceiling + _polymarket_explore_band(), 9)
+    if price > band_top:
         return False
     key = str(getattr(request, "position_key", "") or "").strip()
     if not key:
