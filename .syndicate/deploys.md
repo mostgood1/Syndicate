@@ -39670,3 +39670,43 @@ rather than preventing one. Manual override is `clear_latch()`; the file is
 
 **Claim:** acquired 04:1xZ under this lane, released cleanly with its token
 (`release --service refresh-worker --token <t>`) — no `--force`.
+
+### 2026-08-31 05:16Z — the latch FIRED, and the reading found a defect in it — lane `ncaaf-cfbd-quota-latch`
+
+**The trigger is verified. The suppression is NOT, and one run still spent five
+calls.**
+
+    05:16:39  SEASON_PROJECTION_LAUNCHING sport=ncaaf reason=artifact_stale
+              age_seconds=374120 interval_seconds=86400
+    05:16:39  [cfbd_quota] LATCH_SET until=2026-09-01T00:00:00+00:00
+    05:16:41  [cfbd_quota] LATCH_SET ...
+    05:16:43  [cfbd_quota] LATCH_SET ...
+    05:16:48  [cfbd_quota] LATCH_SET ...
+    05:16:58  [cfbd_quota] LATCH_SET ...
+
+**VERIFIED:** the body discriminator recognises CFBD's wording, and the expiry
+is computed correctly — `2026-09-01T00:00:00+00:00`, the month roll, not a TTL.
+
+**THE DEFECT THE READING FOUND.** Five `LATCH_SET` lines is exactly
+`cfbd_backoff.MAX_ATTEMPTS`, at 2s/5s/10s gaps — the backoff ladder. So the run
+that DISCOVERED the exhaustion still issued **five** CFBD calls, not one:
+`raise_if_latched` is checked once at the top of `_cfbd_get`, BEFORE
+`call_with_retry`, so a latch set by the first 429 does not stop the four
+retries behind it. **On the discovering run the fix saved zero calls.**
+
+**WHY THE UNIT TESTS MISSED IT.** `test_cfbd_quota_latch.py` exercises
+latched -> no request and not-latched -> request. It never exercises the
+TRANSITION — becoming latched mid-retry — which is the only state where the
+backoff and the latch interact. A reachability test in two states does not
+cover the edge between them.
+
+**NOT YET VERIFIED: the suppression itself.** `LATCHED_SKIP` has never appeared,
+because it can only appear on a run that STARTS latched, and the next launch is
+~06:16Z (hourly). `LATCH_SET` proves the trigger; `LATCHED_SKIP` is what proves
+the fix. Do not read the first as the second. No `[ppa]` line and no
+`QuotaExhausted` surfaced — the run died exactly as it did before, which is
+consistent with the latch having been consulted only once.
+
+**Scale of the residual:** five calls once per exhaustion event rather than one.
+The hourly storm — the actual burn, ~24 runs/day — is still addressed, because
+every SUBSEQUENT run starts latched. This is a real defect and a small one.
