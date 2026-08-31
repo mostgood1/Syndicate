@@ -39791,3 +39791,47 @@ consistent with the latch having been consulted only once.
 **Scale of the residual:** five calls once per exhaustion event rather than one.
 The hourly storm — the actual burn, ~24 runs/day — is still addressed, because
 every SUBSEQUENT run starts latched. This is a real defect and a small one.
+
+### 2026-08-31 06:30Z — `LATCHED_SKIP` CONFIRMED, and the ladder fix deployed behind it — lane `ncaaf-cfbd-quota-latch`
+
+**THE SUPPRESSION IS NOW VERIFIED, which `LATCH_SET` never proved.** Two
+consecutive hourly runs on the SAME build (`bf0811bb`), one hour apart:
+
+    05:16:39  LATCH_SET x5 (2s/5s/10s gaps = MAX_ATTEMPTS)   -> 5 CFBD calls
+    06:19:49  SEASON_PROJECTION_LAUNCHING ... age_seconds=377910
+    06:19:49  [cfbd_quota] LATCHED_SKIP GET /ppa/teams clears_in_hours=17.7
+    06:19:49  [ppa] season=2025 source=none reason=quota_exhausted_and_cache_empty
+              new LATCH_SET count: 0                          -> 0 CFBD calls
+
+All three lines of the second run land in the SAME SECOND, in a FRESH PROCESS,
+with zero new `LATCH_SET`. That is the claim `LATCH_SET` alone could not make:
+the latch persists across processes and actually suppresses the request. The
+empty-cache branch refused correctly rather than returning nothing silently, and
+`season=2025` confirms it suppressed the PRIOR-SEASON PPA fallback — the exact
+call in the original traceback.
+
+**Deployed `13afa27f`** (the retry-ladder fix), `dep-daahv64s728c738ei9vg`,
+triggered 06:30:48Z — **17 seconds after preflight went CLEAR** — LIVE
+06:34:11Z. verify: `[live_lens_loop] TICK_COMPLETE results={'mlb': True,
+'wnba': True, 'soccer': True, 'nfl': True}` at 06:35:57Z, **0 tracebacks**.
+
+**NOTHING WAS KILLED AND NO OVERRIDE WAS USED.** Preflight held on 7 jobs
+including `run_mlb_daily_sim_job.py` — a sim already killed once tonight. That
+sim is worth far more than this change, which saves four CFBD calls per
+exhaustion event against a latch already taking every run from 5 calls to 0. The
+window cleared on its own at 06:30:31Z after ~9 minutes.
+
+**STILL UNVERIFIED, and it may stay that way for weeks.** The ladder fix's own
+claim — 1 call on the DISCOVERING run instead of 5 — needs a FRESH exhaustion
+event, and the latch is already set until the 2026-09-01 roll. The next chance
+is the first 429 after the roll, IF September's quota is ever exhausted. That is
+not imminent and should not be written up as pending.
+
+**WHAT IS VERIFIABLE SOON, and is the outcome that actually mattered:** after
+the roll, the first launch should show `[ppa] source=api` and the cache arming,
+then `SEASON_PROJECTION_LAUNCHING`'s `age_seconds` RESETTING from ~378,000 and
+the cadence dropping from ~24/day to the configured 1/day. That is the storm
+ending.
+
+**Claim** acquired 06:2xZ under this lane, released cleanly with its token — no
+`--force`.
