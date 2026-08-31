@@ -15004,9 +15004,8 @@ evidence of cancellation).
 
 ## 2026-08-31 16:48Z — `cffbbd89` — refresh-worker: the board ranks one-sided rows on model EDGE, not model EV — lane `layer2-board-opportunities` (change) / `layer1-model-edge-join` (measurement)
 
-**DEPLOYED AND UNVERIFIED AT THE TIME OF WRITING. The reading that closes it is
-named below and is not a thing to watch — it is a single assertion with a
-control already taken.**
+**DEPLOYED. The verification is DISCHARGED at the end of this entry — the
+mechanism passes exactly and the intended OUTCOME does not.**
 
     16:45:10.196Z  build_started    mostgood@gmail.com  manual
     16:45:10.254Z  deploy_started
@@ -15076,3 +15075,54 @@ home-run-props problem; it is a ONE-SIDED-MARKET problem that follows whichever
 sport is one-sided today.** The original framing would have survived exactly as
 long as MLB was in season and the fix would have looked over-tuned when it kept
 firing on soccer shots in October.
+
+### verify: DISCHARGED 2026-08-31 17:00:33Z — the MECHANISM passes exactly; the INTENDED OUTCOME does not
+
+Board rebuilt under `cffbbd89` at `written_at 17:00:33Z`, 12 min after
+`deploy_ended`. Read twice, independently, same numbers.
+
+**THE IDENTITY INVERTED EXACTLY. This is the change, and it works.**
+
+    control  written_at 16:45:29Z   50 model-basis rows   value_pct==model_ev 50/50   ==model_edge  0/50
+    after    written_at 17:00:33Z   52 model_edge rows    value_pct==model_ev  0/52   ==model_edge 52/52
+    ev_basis ALL   market_fair 150 / model_probability 50   ->   market_fair 148 / model_edge 52
+
+`ev_basis` stamps `model_edge`; `score.value_pct` is the edge in probability
+points, never the EV. No partial state, no mixed rows, 52 of 52.
+
+**The 1/p amplification is gone and the scores compressed 5x:**
+
+    top score   36.1642  (model_ev 94.22)   ->   7.2324  (model_edge 11.48)
+    top-25 one-sided rows      22 of 25     ->   11 of 25
+    top-25 market_fair rows     3 of 25     ->   14 of 25
+
+**BUT THE PREDICTED OUTCOME DID NOT HAPPEN, AND THIS IS THE FINDING.** The
+change's author predicted "#1 a market-anchored row at `ev_pct +3.88`".
+Measured: **the top NINE rows are all `model_edge`, and the best `market_fair`
+row sits at RANK 10** with `ev_pct 4.91` and score **1.31** against the #1's
+7.23. One-sided rows still sweep the head of the board — by roughly 5x less than
+before, but they still sweep it.
+
+**WHY, and it was flagged before the deploy rather than after:** `value_ev` now
+carries model edge in PROBABILITY POINTS while market rows carry EV in PERCENT,
+and the two are not commensurable. Model edges here run 3.4-12.0; the best
+market EV on the whole board is 4.94. So the bigger unit wins the sort on units
+alone. `ev_basis` is doing real work rather than decorating the row, which is
+why it was insisted on — but a basis LABEL does not make two scales comparable.
+
+**What is therefore true and what is not:**
+  - TRUE: the board no longer ranks a smaller edge on a longer shot above a
+    bigger edge on a shorter one. That defect is fixed and measured.
+  - TRUE: market-priced rows went from 3 to 14 of the top 25.
+  - NOT TRUE: "comparable, not absent". The head of the board is still
+    one-sided, and a positive-EV market row still cannot reach #1.
+  - UNCHANGED: `rows_uninformative_ev` 1345 -> 1348. This change was never
+    going to move it and it did not.
+
+**NOT A REGRESSION AND NOT A REASON TO REVERT.** The old state ranked the same
+rows first with a 94.22 number that was an artefact of dividing by a small
+probability; the new state ranks them first with an 11.48 number that is the
+model's actual disagreement. Same order at the head, honest quantity, and the
+tail is materially better. **The remaining question — whether a probability-point
+edge and a percentage EV should share one sort at all — is a product decision
+that this deploy did not settle and should not be read as having settled.**
