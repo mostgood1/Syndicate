@@ -40483,3 +40483,62 @@ WRITER-side measurement from the real code path, not yet a production reading.
    (`pct=93.3` on a healthy board; its advice to lower `ROWS_PER_SPORT` is
    backwards). Defect (2), the skipped shed, is CLOSED by this split — the shed
    could never have helped, and said so itself as `SHORTLIST_SHED_IMPOSSIBLE`.
+
+## 2026-08-31 22:30Z — `7e678674` — THE CARDS FLIP IS VERIFIED IN PRODUCTION — lane `layer2-cap-raise`
+
+**User decision, 2026-08-31: _"deploy web then flip."_** Closes the last step of the
+cards split. `SYNDICATE_LAYER2_CARDS_INLINE=0` live on refresh-worker `7e678674`
+(22:30:57Z); web `7e678674` deployed FIRST (22:05:33Z).
+
+### verify: BOTH halves, on the first rebuild under the flip
+
+```
+22:50:26Z  board written_at 22:18:57Z -> 22:50:26Z
+  LAYER2_CARD_SHARDS_WRITTEN sports=['mlb','ncaaf','soccer'] cards=2216 combined_keeps_cards=False
+  LAYER2_SHARDS_WRITTEN      sports=['mlb','ncaaf','soccer'] rows=2216  combined_keeps_rows=False
+  cards_present = 2216,  == rows
+```
+
+**Both halves were required and both hold.** The writer stopped filling the
+combined key AND web served all 2,216 cards back out of the shards.
+`combined_keeps_cards=False` alone would have been the silent zero this whole
+sequence existed to avoid. **The hydration path is now proven in production**, which
+the unit tests could not do — they mock the store.
+
+### the gate that did the real work
+
+Web was on `132559e1` with **ZERO** occurrences of `_hydrate_layer2_cards` an hour
+before the flip. Flipping first would have served `cards_present=0` with nothing
+raised. The sequence deployed web, then **grepped the DEPLOYED SHA** for the
+function rather than trusting a green deploy, then confirmed the board still served
+BEFORE any flag change so a web fault could not be blamed on the flip.
+
+### what the numbers do NOT say
+
+The board went 1534 → 2216 rows across the flip. **That is SLATE, not headroom** —
+soccer went 187 → 834 on the evening fixtures, and **no sport is at the 1000 cap**
+(mlb 970, soccer 834, ncaaf 196 within the returned slice). The flip removes a BYTE
+ceiling; it does not raise a row cap. Do not cite it as a capacity gain.
+
+Also: `/api/board/layer2-shortlist` caps returned `rows` at **2000** regardless of
+`limit`, while `cards_present` reports the true 2216. The two disagreeing is that
+slice cap, NOT lost cards.
+
+### state now
+
+```
+web / refresh-worker  7e678674     live-odds-worker d04d9f49
+CARDS_INLINE=0  COMBINED_ROWS=0  ROWS_PER_SPORT=1000  ROWS_TOTAL=3000
+```
+The combined key is now FLAT in row count (451 → 0 B/row on the real writer), so
+the ~3,600-row ceiling that made `per_sport=3000` corrupt the board is GONE. **A cap
+raise is now defensible — but it has not been attempted and must still be measured
+against the COMBINED key, not the shards.** That is the exact mistake that caused
+the 18:25Z incident.
+
+**REVERT, still one step:** `SYNDICATE_LAYER2_CARDS_INLINE=1` and redeploy.
+
+### remaining from the incident: ONE defect
+
+3. `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key and
+   its advice to lower `ROWS_PER_SPORT` is backwards. Unfixed.
