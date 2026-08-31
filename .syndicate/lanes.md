@@ -3003,6 +3003,8 @@ caaf-no-orders`). NOT
   tests/test_polymarket_yes_leg_binding.py
   syndicate/features/shared/execution_ledger.py
   tests/test_reconcile_not_found_recovery.py
+  syndicate/features/shared/portfolio_commit.py
+  tests/test_position_carries_commence_time.py
 - Claims taken under `[2026-08-30, USER OVERRIDE]` x3 ("take it to the
   user-override route", "take it and fix it"). Conflicts were surfaced to the
   user BEFORE each override and the holders were messaged. Deploy claim on

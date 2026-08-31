@@ -551,6 +551,27 @@ def commit_portfolio(
         position = {field: row.get(field) for field in _POSITION_IDENTITY_FIELDS}
         position.update(
             {
+                # WHAT A POSITION *IS* AND WHAT IT *CARRIES* ARE TWO LISTS, and
+                # this line used to be the only one. The projection above is
+                # over the IDENTITY tuple, so the moment `commence_time` left
+                # that tuple -- correctly, it had put ~$9.12 on the board where
+                # one bet was intended -- it also left the position PAYLOAD,
+                # the `OrderRequest` built from it, and every ledger row after.
+                #
+                # MEASURED 2026-08-31, a perfect temporal split across 59 live
+                # orders and every sport:
+                #     WITH commence_time    28   submitted 16:41:53 .. 18:59:26
+                #     WITHOUT               31   submitted 19:05:14 .. 03:40:39
+                # Zero overlap. It reads as a SOCCER gap (18 of 19 missing)
+                # only because soccer's orders are the recent ones; MLB and
+                # WNBA lose it identically after the cutover.
+                #
+                # It is restored HERE, in the carried block, and deliberately
+                # NOT in `_POSITION_IDENTITY_FIELDS` -- putting it back there
+                # would re-create the double-bet this repo just paid for. A
+                # restated kickoff must not mint a new position; it must still
+                # be legible on the order.
+                "commence_time": row.get("commence_time"),
                 "position_key": position_key(row),
                 # Carried so `record_order` can recognise a pre-fix order. See
                 # `legacy_position_key`.
