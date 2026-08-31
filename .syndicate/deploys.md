@@ -39328,3 +39328,56 @@ refused on a premise `#262` settled; pitcher strikeouts published under
 `batter_strikeouts`. Plus `[user decision]` the one-sided rows are now valued on
 EV against the MODEL's probability rather than the book's own margin, because
 `-hold` is the same number for every such row and buried them.
+
+### 2026-08-31 01:43Z — `#601` the OWED shortlist-side reading, DISCHARGED — lane `layer1-model-edge-join`
+
+The entry above recorded these as STILL OWED because the worker artifact had not
+rebuilt. It rebuilt at `written_at 2026-08-31T01:43:28Z`. Both readings below are
+from that build, against a SAME-EVENING control taken at 01:29Z (pre-deploy),
+not against the 22:2xZ baseline — the slate moved too far for that one to be a
+fair comparison and using it would have flattered the result.
+
+**Worker counters, `rows_with_model_edge / sides_priced`, 01:29Z -> 01:43Z:**
+
+    soccer   342/16923  ( 2.0%)  ->  2082/16940  (12.3%)
+    nfl      670/2490   (26.9%)  ->   990/2490   (39.8%)
+    ncaaf      0/945    ( 0.0%)  ->     0/945    ( 0.0%)   policy, unchanged
+    mlb        6/5252   ( 0.1%)  ->     3/5209   ( 0.1%)   slate over, see below
+    wnba       6/2339   ( 0.3%)  ->     6/2193   ( 0.3%)   slate over, see below
+
+soccer `modelled_edge_rows_priced` ABSENT -> **3,159**; the served soccer pregame
+board went `mfair` 0 -> **3,090** rows.
+
+**Served shortlist top-200: rows carrying `model_edge_pct` went 1 -> 100.**
+`rows_uninformative_ev` 274 -> 184. `opportunities_considered` 8459 -> 8124.
+
+**MLB AND WNBA CANNOT BE JUDGED FROM THIS AND THEIR FLAT NUMBERS ARE NOT
+EVIDENCE.** Both are 0 pregame games at the time of reading (mlb 13 final /
+1 live, wnba 3 final / 1 live). The fix touches pregame rows only, and the sweep
+correctly refuses live and settled ones — `mfair_priced` is 0 for both, which is
+the sweep RUNNING and declining, not the sweep missing. Their real reading is
+tomorrow's first build.
+
+**Why the board's `edge` column barely moved on soccer (3.1% -> 3.2%) while the
+worker's coverage went 2.0% -> 12.3%, which reads as a contradiction and is
+not.** They count different fields. The board column counts
+`edge_vs_market_pct`, the MEASURED market edge, which this change does not touch
+by design (`#242`). The worker's `rows_with_model_edge` counts `model_edge_pct`
+on the candidate, which now also accepts the modelled-fair fallback. Both are
+correct; a reader comparing them without knowing that would conclude the deploy
+did nothing.
+
+**The `[user decision]` EV change works and reached TWO rows.** Of the 200
+served rows, `ev_basis` is `market_fair` on 198 and `model_probability` on 2 —
+both soccer `player_shots_on_target`:
+
+    Teo Quintero    over   ev_pct -8.611  model_ev_pct +16.194  score  4.0485  rank ~93
+    Thijs Oosting   over   ev_pct -8.604  model_ev_pct  -1.724  score -1.7235  rank ~133
+
+Quintero is the mechanism working end to end: a row whose market EV is the
+book's own margin (-8.6, identical for every such row) became rankable at 4.05.
+But the reach is SMALL — 3,159 rows were priced against the modelled fair and 2
+of them cleared the top 200, because the one-sided pool still scores below the
+two-sided one. Both carry
+`model_skill: {"sample_games": 0, "status": "unmeasured"}` on the row, which is
+the guard working as specified rather than a caveat added after the fact.
