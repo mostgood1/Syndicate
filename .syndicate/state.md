@@ -8308,6 +8308,45 @@ submitted, which means resolving tick/cross BEFORE the gate or applying the same
 arithmetic in it. Anything else re-derives the venue's rounding by hand and goes
 stale the next time tick size changes.
 
+## [polymarket-held-population-is-6-of-6-POSITIVE-EV] 2026-08-31T17:33Z — the gate suppresses positive-EV bets; its whole defence is that they cannot fill
+
+**FIRST MEASUREMENT OF WHAT THE HOLD COSTS.** `9d0fcb11` stamps `ev_pct` on every
+gate line (live 17:28:43Z); the first tick after it, 17:32:20-22Z:
+
+    ticker                       submit  ev_pct  edge_pct
+    tsc-epl-ast-ars-2pt5          0.460   22.68     6.80
+    aec-mlb-nyy-laa               0.465   16.32     2.45
+    aec-mlb-det-min               0.470   14.03     2.29
+    tsc-mlb-det-min-8pt5          0.460    8.14     8.64
+    aec-mlb-mia-wsh               0.495    4.82    11.52
+    tsc-mlb-bal-col-10pt5         0.465    3.27     2.51
+
+    EXECUTED positions=8 placed=0 skipped=6 refused={'pregame_price_too_high': 6}
+             duplicates=2   (the two resting experiments)
+
+**6 of 6 POSITIVE. Mean +11.5% EV.** Unweighted — the log does not carry stake,
+so this is per-position and NOT the dollar-weighted number.
+
+**WHAT THIS DOES AND DOES NOT SAY.** It does NOT say the gate is wrong. EV is
+only realisable if the order FILLS, and the gate's entire premise is that these
+do not fill pregame — 8 resting observations, zero pregame fills above 0.410. If
+that premise holds, suppressing them costs nothing and the +11.5% is unreachable
+paper EV.
+
+**BUT THE PREMISE IS NOW LOAD-BEARING IN DOLLARS, NOT JUST IN TIDINESS.** Before
+this reading the hold looked free — churn avoidance. It is not free: it is a bet
+that ~11.5% mean EV across six positions is unreachable. If the kickoff
+experiment shows these fill, the gate is expensive and the ceiling must move.
+
+**DO NOT TREAT `ev_pct` AND `edge_pct` AS THE SAME RANKING.** They disagree
+sharply and consistently — `nyy-laa` is 16.32 EV on 2.45 edge, `mia-wsh` is 4.82
+EV on 11.52 edge. They measure different things (return per stake vs probability
+edge in points). Whichever one a decision uses must be named.
+
+**AND EV HERE IS THE MODEL'S OWN CLAIM.** It is `ev_pct` off the plan position,
+not a realised result. Nothing in this section is evidence the model is right —
+today's six settle overnight and that is the first honest scoring.
+
 ## [polymarket-explore-arm-FIRING] 2026-08-31T16:05Z — the arm fired, STALLED on a float edge, and fires again; the falsifier is live
 
 **`e8392f1b` live 15:21:40Z at rate 0.5. First tick after rollout:**
