@@ -3074,9 +3074,15 @@ def select_shortlist(
     # 20:56:30Z right after the cap went 100 -> 400. An all-clear from a
     # subset-measuring guard is worse than no guard at all.
     #
-    # The warning now lives at the only place the whole payload exists:
-    # `intelligence_state._warn_if_shortlist_near_keyvalue_ceiling`, called from
-    # `write_layer2_shortlist` BEFORE the write.
+    # The warning now lives at `intelligence_state._warn_if_layer2_keys_near_ceiling`,
+    # called from `write_layer2_shortlist` AFTER the shards are written, and it
+    # measures ONE NUMBER PER KEY -- combined, each rows shard, each cards shard.
+    #
+    # It used to measure the whole payload, which was correct until the board was
+    # sharded and then measured an object that is no longer written as one key:
+    # `pct=93.3` on a perfectly healthy 1,600-row board on 2026-08-31, advising a
+    # cap that was not the constraint. The store raises PER KEY; there is no
+    # ceiling on "the payload".
     #
     # The two numbers below are kept because they are honest as long as they are
     # named for what they measure: `persisted_bytes` is the ROWS' contribution,
@@ -3146,7 +3152,7 @@ def select_shortlist(
         # Kept under the old key so nothing downstream breaks, and its meaning
         # is now stated rather than implied.
         "persisted_bytes": persisted_bytes,
-        "persisted_bytes_note": "rows only; the written artifact is larger -- see SHORTLIST_PERSIST_LARGE",
+        "persisted_bytes_note": "rows only, and NOT what the store refuses -- since sharding, rows/cards live in per-sport keys; see LAYER2_KEY_LARGE for per-key sizes",
         "rows_pct_of_keyvalue_max": round(100.0 * persisted_bytes / _keyvalue_ceiling, 1)
         if _keyvalue_ceiling
         else None,
