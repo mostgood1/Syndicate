@@ -5,6 +5,56 @@
 
 ---
 
+## 2026-08-31 15:11:29Z — **THE SHARD MERGE IS PROVEN ON REAL DATA** — refresh-worker `2f4af574` — lane `polymarket-yes-leg-binding`
+
+    refresh-worker  a5e16ae6 -> 2f4af574   trigger=manual, DEPLOYED BY THE USER
+    live-odds-worker             b6c02dff  15:07:47Z, also the user
+    web                          0fc174c6  UNCHANGED (03:49Z) -- still the pre-shard reader
+
+**verify: `LAYER2_SHARD_SHADOW OK`, and the deploy stayed a no-op.**
+
+    15:20:16  LAYER2_SHARD_SHADOW OK date=2026-08-31 rows=963
+              shards=['mlb','ncaaf','soccer'] -- the merge reproduces the board exactly
+
+    board BEFORE  rows=200  written_at=14:54:12Z
+    board AFTER   rows=200  written_at=15:20:16Z  rows_from_shards=None
+    reader still on combined rows: True
+
+963 real rows across three sports, reconstructed from the shards and compared
+POSITION BY POSITION against what was actually persisted. Zero divergence. First
+time the merge has ever run on production data -- until now its only evidence
+was an in-memory stand-in, which is the class of proof that failed repeatedly
+this session.
+
+**n=1 CYCLE, AND THAT IS NOT ENOUGH TO FLIP ON.** One OK proves the mechanism.
+It does not cover the cases a position-based merge could actually get wrong: a
+sport appearing or dropping between builds, a shard trimmed, a sport emptied.
+None occurred in this cycle. The verifier runs on every build, so the evidence
+accrues for free at ~1 reading / 20 min.
+
+**THE MLB SIM WAS KILLED BY THIS DEPLOY.** Preflight read HOLD with 10 jobs
+including `run_mlb_daily_sim_job.py`; the deploy went manually, outside the
+guard. Recoverable -- the sim re-runs -- but recorded because a half-finished sim
+later presents as a data gap with no obvious cause, and the cause is here.
+
+**I ALSO GAVE A REASSURANCE THAT WENT STALE MID-TURN.** I said the sim was safe
+because refresh-worker was not being touched. True when said, false ninety
+seconds later. Recorded rather than quietly dropped.
+
+**THE EXPLORATION ARM WENT LIVE ON THE MONEY PATH, NOT PAPER.** `0acf4581`
+reached live-odds-worker at 15:07:47Z, so boundary orders the price gate would
+have held are now placed with REAL money and tagged `EXPLORE_PREGAME_BOUNDARY`.
+Approved (`[2026-08-31, user decision] Build it`) and correct -- the gate was
+suppressing exactly the evidence that could falsify it -- but it had no paper
+dry-run ahead of it. Watcher armed.
+
+**STILL NOT DONE, and the original ask is untouched: THE CAPS ARE STILL 400.**
+The chain is shards written -> merge proven -> flag flip -> headroom -> only
+THEN can the per-sport cap rise. `SYNDICATE_LAYER2_COMBINED_ROWS=0` is env-only
+and reversible in seconds. Web is still on the PRE-SHARD reader (`0fc174c6`) and
+**must be deployed before the flag flips**, or it will read an empty combined
+key and serve nothing.
+
 ## 2026-08-31 05:10:09Z — **`#595` DISCHARGED: THE LEG CHOICE IS VALIDATED IN PRODUCTION, WITH REAL MONEY** — live-odds-worker `abc48553` — lane `polymarket-yes-leg-binding`
 
     dep-daagpc942hec73af0ie0   fired by me, claim held and preflight CLEAR (no bypass)
