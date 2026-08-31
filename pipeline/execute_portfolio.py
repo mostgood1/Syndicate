@@ -452,12 +452,37 @@ def run_execution(
         # intended position). Holding costs no stake: an unfilled order reserves
         # no funds (balance flat at $87.26 across a cancellation).
         #
-        # **THE 24h THRESHOLD IS NOW UNVALIDATED.** It was derived from the
-        # refuted reading. A fill at +18.6h is inside the window so nothing is
-        # known to have been lost, but the number should be RE-DERIVED, not
-        # trusted. What actually separates fills from rests is still unknown --
-        # the live candidate is liquidity by MARKET FAMILY (every fill on record
-        # is MLB or NFL; no soccer `tsc-` total has ever filled), not the clock.
+        # **THIS GATE IS ON THE WRONG AXIS. IT IS TIME; THE SEPARATOR IS PRICE.**
+        #
+        # Measured 2026-08-31T05:33Z over 12 tracked orders, verified in this
+        # session independently of the lane that first reported it:
+        #
+        #     PREGAME   filled   0.240  0.250  0.335
+        #               resting  0.410  0.435  0.460  0.460  0.490 x3
+        #               -> max filled 0.335 < min resting 0.410, ZERO OVERLAP
+        #     PAST      filled   0.210  0.490      resting: none
+        #
+        # **Pregame, only CHEAP sides fill -- near-even sides have no book.
+        # Once the market is live, everything fills, including 0.490.** That is
+        # a 2-D structure, and every one-variable story broke on it: the +18.6h
+        # fill that killed the time rule was CHEAP (0.335); the 0.490 fill that
+        # kills a price-only rule was PAST (`lar-lac`, 08-27).
+        #
+        # CONSEQUENCE FOR THIS GATE: `hours_to_commence > 24` filters the wrong
+        # thing in BOTH directions -- it suppresses cheap pregame sides that DO
+        # fill, while still placing near-even ones that never will. A PRICE
+        # condition pregame would keep everything the churn argument wants held
+        # and stop suppressing the fills.
+        #
+        # ALSO CORRECTED: an earlier revision of this comment said "no soccer
+        # `tsc-` total has ever filled". FALSE -- `tsc-sea-juv-par-2026-08-29`
+        # filled at 0.210, and two soccer h2h filled pregame at 0.240 and 0.250.
+        # Soccer fills; it fills CHEAP.
+        #
+        # NOT YET ACTED ON, deliberately: n=3 pregame fills. The boundary lies
+        # somewhere in the unobserved gap 0.335 -> 0.410, so ~0.37 is a midpoint
+        # GUESS, not a measured threshold, and "already started" is currently
+        # derived from the slug date rather than a live-state feed.
         #
         # WHAT PLACING EARLY ACTUALLY COSTS. Not the stake -- an unfilled order
         # holds no reserved funds (balance was flat at $87.26 across a
