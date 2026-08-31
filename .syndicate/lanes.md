@@ -998,10 +998,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   pipeline/intelligence_state.py `[2026-08-31, USER OVERRIDE: "take the override
     and build it now"]` — held by OPEN lane `soccer-overview-cost` (session
     3e5a9659, last checkpoint 08-29, no marker, not in the running list).
-    Surfaced to the user BEFORE the override. Narrow: the board persist/read
-    pair only (`write_layer2_shortlist`, `read_layer2_shortlist` and new shard
-    helpers); nothing in the soccer cost path that lane actually worked on.
+    Surfaced to the user BEFORE the override. Narrow scope: only the two board
+    functions named `write_layer2_shortlist` and `read_layer2_shortlist`, plus
+    the new shard helpers; nothing in the soccer cost path that lane worked on.
+    (Reworded 2026-08-31 -- the previous wording carried a slash-separated
+    phrase that `lane-guard._claims` parsed as a FILE PATH, so this lane held a
+    PHANTOM claim on a path that does not exist. Flagged by session 1c88bcca.)
   tests/test_layer2_shard_by_sport.py
+  tests/test_shortlist_persist_ceiling_guard.py
+  syndicate/features/shared/layer2_board.py `[2026-08-31, RELEASED TO ME by lane
+    layer1-model-edge-join / session 1c88bcca, who struck it from their own
+    Files: block this turn]` -- NOT an override. They granted it after
+    reproducing the diagnosis independently and adding the decisive argument
+    against their own work, with one condition honoured in the code: the flag
+    DEFAULTS TO CURRENT behaviour until the user rules on it.
+  tests/test_layer2_model_value_term.py
 - Claims taken under `[2026-08-30, USER OVERRIDE]` x3 ("take it to the
   user-override route", "take it and fix it"). Conflicts were surfaced to the
   user BEFORE each override and the holders were messaged. Deploy claim on
