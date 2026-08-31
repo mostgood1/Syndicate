@@ -2095,7 +2095,97 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
         # having SEEN the shards land.
         combined["rows"] = []
     write_json_file(_layer2_shortlist_path(normalized_date), combined)
+    if shards and keeps_rows:
+        _shadow_verify_layer2_shards(normalized_date, combined, rows)
     return payload
+
+
+def _row_identity(row: Any) -> tuple:
+    """A cheap per-row fingerprint for the shadow compare.
+
+    DELIBERATELY NOT `json.dumps(row)`. The board is ~5MB and this worker runs
+    at 95%+ of its container memory; serialising every row twice to prove an
+    ordering property would risk the OOM it is meant to protect against. These
+    five fields identify a row uniquely enough to catch what can actually go
+    wrong here -- a row in the WRONG PLACE, or MISSING -- which is exactly what
+    a position-based merge can get wrong.
+
+    STATED LIMIT: this cannot catch a row whose CONTENT changed while its key
+    stayed the same. That is not a failure mode of the merge -- shards store the
+    same row objects the combined key holds -- so it is out of scope rather than
+    overlooked.
+    """
+    if not isinstance(row, Mapping):
+        return ("_",)
+    return (
+        str(row.get("sport") or ""),
+        str(row.get("event_id") or ""),
+        str(row.get("market") or ""),
+        str(row.get("side") or ""),
+        str(row.get("line") or ""),
+    )
+
+
+def _shadow_verify_layer2_shards(
+    selected_date: str, combined: Mapping[str, Any], rows: list[Any]
+) -> None:
+    """Merge the shards back and prove they reproduce the board EXACTLY.
+
+    WHY THIS RUNS BEFORE THE CUTOVER RATHER THAN AFTER. `read_layer2_shortlist`
+    only merges when the combined key arrives empty, so until the flag flips the
+    merge path is never exercised on real data -- its only evidence is a unit
+    test against an in-memory store. Flipping and watching would mean finding out
+    in production, on the main page, with a mis-ordered or short board as the
+    symptom. This does the same reconstruction against the SAME rows that were
+    just written and compares, changing nothing.
+
+    Reports the FIRST divergence with its index, not a count. "1,180 rows and
+    933 matched" says a number; "index 412 is soccer where mlb was expected"
+    says which shard to look at.
+
+    Never raises. A verifier that can break the write it verifies is the defect
+    it is checking for, one layer out.
+    """
+    if str(os.environ.get("SYNDICATE_LAYER2_SHARD_SHADOW") or "").strip().lower() in {"0", "false", "no", "off"}:
+        return
+    try:
+        probe = dict(combined)
+        probe["rows"] = []
+        merged = _merge_layer2_shards(selected_date, probe, list(shards_of(combined)))
+        got = merged.get("rows") or []
+        if len(got) != len(rows):
+            print(
+                f"[intelligence_state] LAYER2_SHARD_SHADOW MISMATCH date={selected_date}"
+                f" merged={len(got)} expected={len(rows)}"
+                f" missing_shards={merged.get('shards_missing')}"
+                " -- DO NOT set SYNDICATE_LAYER2_COMBINED_ROWS=0",
+                flush=True,
+            )
+            return
+        for index, (a, b) in enumerate(zip(got, rows)):
+            if _row_identity(a) != _row_identity(b):
+                print(
+                    f"[intelligence_state] LAYER2_SHARD_SHADOW MISMATCH date={selected_date}"
+                    f" first_divergence_at={index} merged={_row_identity(a)}"
+                    f" expected={_row_identity(b)}"
+                    " -- DO NOT set SYNDICATE_LAYER2_COMBINED_ROWS=0",
+                    flush=True,
+                )
+                return
+        print(
+            f"[intelligence_state] LAYER2_SHARD_SHADOW OK date={selected_date}"
+            f" rows={len(got)} shards={merged.get('shards_loaded')}"
+            " -- the merge reproduces the board exactly",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[intelligence_state] LAYER2_SHARD_SHADOW_FAILED {exc!r}", flush=True)
+
+
+def shards_of(payload: Mapping[str, Any]) -> list[str]:
+    """The sports a combined payload advertises, or `[]`."""
+    value = payload.get("shards")
+    return [str(x) for x in value] if isinstance(value, list) else []
 
 
 def _write_layer2_shards(

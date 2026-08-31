@@ -44,10 +44,19 @@ def store(monkeypatch, tmp_path):
 
 def _rows():
     """A RANKED board, interleaved by sport on purpose."""
+    # `event_id` is not decoration: `_row_identity` keys on it, and without it
+    # every mlb row is indistinguishable from every other mlb row. A reversal
+    # test then reports its first divergence at index 2 rather than 0, because
+    # the SPORT sequence happens to be palindromic at the front -- which is a
+    # true statement about a fixture that cannot tell rows apart, and says
+    # nothing about the merge.
     return [
-        {"sport": "mlb", "rank": 0}, {"sport": "soccer", "rank": 1},
-        {"sport": "mlb", "rank": 2}, {"sport": "ncaaf", "rank": 3},
-        {"sport": "soccer", "rank": 4}, {"sport": "mlb", "rank": 5},
+        {"sport": "mlb", "event_id": "e0", "rank": 0},
+        {"sport": "soccer", "event_id": "e1", "rank": 1},
+        {"sport": "mlb", "event_id": "e2", "rank": 2},
+        {"sport": "ncaaf", "event_id": "e3", "rank": 3},
+        {"sport": "soccer", "event_id": "e4", "rank": 4},
+        {"sport": "mlb", "event_id": "e5", "rank": 5},
     ]
 
 
@@ -113,3 +122,69 @@ def test_the_flag_rejects_unknown_values_permissively_toward_safety(monkeypatch)
     for on in ("1", "true", "yes", "banana", ""):
         monkeypatch.setenv("SYNDICATE_LAYER2_COMBINED_ROWS", on)
         assert st._layer2_combined_keeps_rows() is True
+
+
+# --------------------------------------------------------------------------
+# THE SHADOW VERIFIER. It must prove the merge on the write path, BEFORE the
+# flag flip makes the merge load-bearing on the main page.
+# --------------------------------------------------------------------------
+
+
+def test_shadow_reports_OK_when_the_merge_reproduces_the_board(store, monkeypatch, capsys):
+    monkeypatch.delenv("SYNDICATE_LAYER2_COMBINED_ROWS", raising=False)
+    monkeypatch.delenv("SYNDICATE_LAYER2_SHARD_SHADOW", raising=False)
+    st.write_layer2_shortlist("2026-08-31", {"rows": _rows()})
+    out = capsys.readouterr().out
+    assert "LAYER2_SHARD_SHADOW OK" in out
+    assert "rows=6" in out
+
+
+def test_shadow_names_the_FIRST_DIVERGENCE_not_a_count(store, monkeypatch, capsys):
+    """A count says a number; an index says which shard to look at.
+
+    Simulated by corrupting one shard's positions AFTER the write, which is the
+    shape of the bug that matters: rows present, order wrong.
+    """
+    monkeypatch.delenv("SYNDICATE_LAYER2_COMBINED_ROWS", raising=False)
+    real = st._merge_layer2_shards
+
+    def corrupt(date, payload, shards):
+        merged = real(date, payload, shards)
+        merged["rows"] = list(reversed(merged["rows"]))      # order destroyed
+        return merged
+
+    monkeypatch.setattr(st, "_merge_layer2_shards", corrupt)
+    st.write_layer2_shortlist("2026-08-31", {"rows": _rows()})
+    out = capsys.readouterr().out
+    assert "LAYER2_SHARD_SHADOW MISMATCH" in out
+    assert "first_divergence_at=0" in out
+    assert "DO NOT set SYNDICATE_LAYER2_COMBINED_ROWS=0" in out
+
+
+def test_shadow_catches_a_SHORT_merge(store, monkeypatch, capsys):
+    """A missing shard must be caught here rather than on the board."""
+    monkeypatch.delenv("SYNDICATE_LAYER2_COMBINED_ROWS", raising=False)
+    real = st._merge_layer2_shards
+    monkeypatch.setattr(
+        st, "_merge_layer2_shards",
+        lambda d, p, s: {**real(d, p, s), "rows": real(d, p, s)["rows"][:-1]},
+    )
+    st.write_layer2_shortlist("2026-08-31", {"rows": _rows()})
+    out = capsys.readouterr().out
+    assert "MISMATCH" in out and "merged=5 expected=6" in out
+
+
+def test_shadow_never_breaks_the_write_it_verifies(store, monkeypatch, capsys):
+    """A verifier that can break the write is the defect it checks for."""
+    monkeypatch.delenv("SYNDICATE_LAYER2_COMBINED_ROWS", raising=False)
+    monkeypatch.setattr(st, "_merge_layer2_shards", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    st.write_layer2_shortlist("2026-08-31", {"rows": _rows()})
+    assert "LAYER2_SHARD_SHADOW_FAILED" in capsys.readouterr().out
+    got = st.read_layer2_shortlist("2026-08-31")
+    assert [r["rank"] for r in got["rows"]] == [0, 1, 2, 3, 4, 5], "the board was damaged by its own verifier"
+
+
+def test_shadow_is_off_switchable(store, monkeypatch, capsys):
+    monkeypatch.setenv("SYNDICATE_LAYER2_SHARD_SHADOW", "0")
+    st.write_layer2_shortlist("2026-08-31", {"rows": _rows()})
+    assert "LAYER2_SHARD_SHADOW" not in capsys.readouterr().out
