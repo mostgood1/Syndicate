@@ -863,6 +863,134 @@ class RefreshWorkerTests(unittest.TestCase):
             self.assertIsNotNone(second)
             self.assertEqual(mocked_run.call_count, 2)
 
+    def test_betting_day_backfill_accepts_a_comma_separated_list(self) -> None:
+        """A 7-day backlog used to cost SEVEN deploys.
+
+        Render only injects env vars on a deploy and every refresh-worker
+        deploy kills the in-flight sim, so one-date-per-env-var made
+        re-grading a window prohibitively expensive. Order is preserved and
+        duplicates dropped -- the tick does one date per tick, so this order
+        is the regrade order.
+        """
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+        with patch.dict(
+            module.os.environ,
+            {"MLB_BETTING_DAY_BACKFILL_DATE": "2026-08-24, 2026-08-25 ,2026-08-24;2026-08-26"},
+            clear=True,
+        ):
+            self.assertEqual(
+                module._mlb_betting_day_backfill_target_dates(),
+                ["2026-08-24", "2026-08-25", "2026-08-26"],
+            )
+        with patch.dict(module.os.environ, {}, clear=True):
+            self.assertEqual(module._mlb_betting_day_backfill_target_dates(), [])
+
+    def test_betting_day_backfill_runs_one_date_per_tick_and_drains_in_order(self) -> None:
+        """ONE subprocess per tick, same as the single-date version.
+
+        The builder is a 600s subprocess on a worker with ~1.4GB of
+        headroom; draining a backlog inside one tick would multiply this
+        tick's cost by the backlog length, which is the shape that put #241
+        into a production restart loop.
+        """
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
+                    "MLB_BETTING_DAY_BACKFILL_DATE": "2026-08-24,2026-08-25,2026-08-26",
+                },
+                clear=True,
+            ), patch.object(module.subprocess, "run") as mocked_run:
+                mocked_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok", stderr="")
+                ticked = [module._run_mlb_betting_day_backfill_tick() for _ in range(4)]
+
+            self.assertEqual(mocked_run.call_count, 3, "one subprocess per tick, and no re-runs")
+            self.assertEqual([t["date"] for t in ticked[:3]], ["2026-08-24", "2026-08-25", "2026-08-26"])
+            self.assertIsNone(ticked[3], "must self-disable once every date is done")
+
+    def test_betting_day_backfill_merges_rather_than_overwrites_completion_markers(self) -> None:
+        """The markers ARE the self-disable.
+
+        A write that dropped the other dates' records would make every
+        finished date outstanding again on the next tick -- an infinite
+        rebuild loop that looks like progress.
+        """
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
+                    "MLB_BETTING_DAY_BACKFILL_DATE": "2026-08-24,2026-08-25",
+                },
+                clear=True,
+            ), patch.object(module.subprocess, "run") as mocked_run:
+                mocked_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok", stderr="")
+                module._run_mlb_betting_day_backfill_tick()
+                module._run_mlb_betting_day_backfill_tick()
+                document = json.loads(module._mlb_betting_day_backfill_status_path().read_text(encoding="utf-8"))
+
+        self.assertEqual(sorted(document["dates"].keys()), ["2026-08-24", "2026-08-25"])
+        self.assertEqual(document["completed_dates"], ["2026-08-24", "2026-08-25"])
+        self.assertEqual(document["requested_dates"], ["2026-08-24", "2026-08-25"])
+
+    def test_betting_day_backfill_legacy_single_date_marker_still_self_disables(self) -> None:
+        """The pre-2026-08-31 marker was `{"date": ..., "ok": true}`.
+
+        Ignoring it would silently re-run a date that had already completed.
+        """
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+        legacy = {"date": "2026-08-24", "ok": True}
+        self.assertEqual(module._mlb_betting_day_backfill_completed_dates(legacy), {"2026-08-24"})
+        self.assertEqual(module._mlb_betting_day_backfill_completed_dates({"date": "2026-08-24", "ok": False}), set())
+        self.assertEqual(module._mlb_betting_day_backfill_completed_dates(None), set())
+
+    def test_betting_day_backfill_a_failing_date_does_not_starve_the_rest(self) -> None:
+        """HEAD-OF-LINE BLOCKING, introduced by multi-date and fixed here.
+
+        A failed attempt must still retry (that invariant predates this and
+        is tested above), but taking a flat `remaining[0]` would retry a
+        permanently-failing date forever while the dates behind it were
+        NEVER attempted. Untried dates go first; retries follow,
+        oldest-attempt-first.
+        """
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
+                    "MLB_BETTING_DAY_BACKFILL_DATE": "2026-08-24,2026-08-25,2026-08-26",
+                },
+                clear=True,
+            ), patch.object(module.subprocess, "run") as mocked_run:
+                def _fail_only_the_first(command, **kwargs):
+                    date = command[command.index("--date") + 1]
+                    code = 1 if date == "2026-08-24" else 0
+                    return subprocess.CompletedProcess(args=command, returncode=code, stdout="", stderr="x")
+
+                mocked_run.side_effect = _fail_only_the_first
+                ticked = [module._run_mlb_betting_day_backfill_tick() for _ in range(3)]
+
+        attempted = [t["date"] for t in ticked]
+        self.assertEqual(attempted, ["2026-08-24", "2026-08-25", "2026-08-26"])
+        self.assertFalse(ticked[0]["ok"])
+        self.assertTrue(ticked[1]["ok"] and ticked[2]["ok"])
+
     def test_betting_day_backfill_tick_reports_an_unparseable_date_without_running_the_subprocess(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)

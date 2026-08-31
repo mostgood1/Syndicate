@@ -1347,9 +1347,56 @@ def _run_mlb_actuals_writer_tick() -> dict[str, Any] | None:
     return status
 
 
-def _mlb_betting_day_backfill_target_date() -> str | None:
+def _mlb_betting_day_backfill_target_dates() -> list[str]:
+    """Every date named in `MLB_BETTING_DAY_BACKFILL_DATE`, in order.
+
+    WAS SINGLE-DATE, and that made a backlog cost one DEPLOY PER DATE.
+    Render only injects env vars on a deploy, so re-grading a 7-day window
+    meant seven env writes and seven deploys -- and every refresh-worker
+    deploy kills whatever sim is in flight. A comma-separated list makes the
+    same backlog one env write and one deploy.
+
+    Shaped after `_mlb_actuals` directly above, which already takes a list
+    and records `dates` -- matching the neighbour rather than inventing a
+    second convention for the same idea.
+
+    Order is preserved and duplicates dropped: the caller does ONE date per
+    tick, so the order here is the order they are regraded.
+    """
     raw = str(os.environ.get("MLB_BETTING_DAY_BACKFILL_DATE") or "").strip()
-    return raw or None
+    if not raw:
+        return []
+    seen: set[str] = set()
+    dates: list[str] = []
+    for part in raw.replace(";", ",").split(","):
+        token = part.strip()
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        dates.append(token)
+    return dates
+
+
+def _mlb_betting_day_backfill_completed_dates(last_status: Mapping[str, Any] | None) -> set[str]:
+    """Dates this backfill has already finished successfully.
+
+    Reads BOTH shapes on purpose. The pre-2026-08-31 marker was a single
+    `{"date": ..., "ok": true}`; ignoring it would silently re-run a date
+    that had already completed, which is the sort of "harmless" repeat that
+    turns into a builder subprocess firing on every tick forever.
+    """
+    if not isinstance(last_status, Mapping):
+        return set()
+    done: set[str] = set()
+    legacy_date = str(last_status.get("date") or "").strip()
+    if legacy_date and bool(last_status.get("ok")):
+        done.add(legacy_date)
+    per_date = last_status.get("dates")
+    if isinstance(per_date, Mapping):
+        for key, value in per_date.items():
+            if isinstance(value, Mapping) and bool(value.get("ok")):
+                done.add(str(key))
+    return done
 
 
 def _mlb_betting_day_backfill_status_path() -> Path:
@@ -1381,13 +1428,51 @@ def _run_mlb_betting_day_backfill_tick() -> dict[str, Any] | None:
     would otherwise overwrite the real season-wide manifest with a
     single-day version.
     """
-    target_date = _mlb_betting_day_backfill_target_date()
-    if not target_date:
+    target_dates = _mlb_betting_day_backfill_target_dates()
+    if not target_dates:
         return None
     status_path = _mlb_betting_day_backfill_status_path()
     last_status = _refresh_state_store()["read_json_file"](status_path) or {}
-    if str(last_status.get("date") or "") == target_date and bool(last_status.get("ok")):
+    completed = _mlb_betting_day_backfill_completed_dates(last_status)
+
+    # ONE DATE PER TICK, deliberately. The builder is a subprocess with a
+    # 600s timeout on a worker that has run at 2.6GB RSS and has ~1.4GB of
+    # headroom; running a 7-date backlog back-to-back inside one tick would
+    # multiply this tick's cost by seven and is exactly the shape that put
+    # `#241` into a production restart loop. Taking the first outstanding
+    # date and returning keeps the per-tick cost identical to the
+    # single-date version it replaces -- the backlog just drains over
+    # successive ticks instead of one long one.
+    # UNTRIED DATES FIRST, THEN RETRIES OLDEST-ATTEMPT-FIRST.
+    #
+    # A failed attempt still retries -- that invariant predates this change
+    # and is deliberate ("a failed attempt must NOT self-disable"), so it is
+    # preserved exactly: with one date, a failure retries on the very next
+    # tick, unchanged.
+    #
+    # The ORDER is what multi-date needs and single-date never did. Taking a
+    # flat `remaining[0]` would mean a date that fails permanently -- a slate
+    # whose batch report was never written, say -- is retried forever while
+    # dates 2..N behind it are NEVER attempted at all. Head-of-line blocking
+    # that the single-date version could not exhibit, introduced by this
+    # change, so it is this change's job to not introduce it.
+    prior = last_status.get("dates") if isinstance(last_status.get("dates"), Mapping) else {}
+
+    def _last_attempt_epoch(date: str) -> float:
+        record = prior.get(date) if isinstance(prior, Mapping) else None
+        if not isinstance(record, Mapping):
+            return 0.0
+        try:
+            return float(record.get("epoch") or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    outstanding = [date for date in target_dates if date not in completed]
+    if not outstanding:
         return None
+    untried = [date for date in outstanding if _last_attempt_epoch(date) <= 0.0]
+    retries = sorted((date for date in outstanding if _last_attempt_epoch(date) > 0.0), key=_last_attempt_epoch)
+    target_date = untried[0] if untried else retries[0]
 
     try:
         season = int(target_date[:4])
@@ -1441,8 +1526,28 @@ def _run_mlb_betting_day_backfill_tick() -> dict[str, Any] | None:
             "error": f"{type(exc).__name__}: {exc}",
             "command": [str(part) for part in command],
         }
-    _refresh_state_store()["write_json_file"](status_path, status)
-    print(f"[refresh_worker] MLB_BETTING_DAY_BACKFILL_TICK date={target_date} ok={status.get('ok')}", flush=True)
+    # MERGE, never overwrite. The completion markers ARE the self-disable, so
+    # a write that dropped the other dates' records would make every finished
+    # date outstanding again on the next tick.
+    merged_dates: dict[str, Any] = {str(k): v for k, v in prior.items()} if isinstance(prior, Mapping) else {}
+    merged_dates[target_date] = status
+    document = {
+        "epoch": status.get("epoch") or time.time(),
+        # Top-level `date`/`ok` describe THIS tick and keep the pre-2026-08-31
+        # marker shape readable by anything that already parses it.
+        "date": target_date,
+        "ok": status.get("ok"),
+        "requested_dates": list(target_dates),
+        "completed_dates": sorted(completed | ({target_date} if status.get("ok") else set())),
+        "dates": merged_dates,
+    }
+    _refresh_state_store()["write_json_file"](status_path, document)
+    done = len(document["completed_dates"])
+    print(
+        f"[refresh_worker] MLB_BETTING_DAY_BACKFILL_TICK date={target_date} "
+        f"ok={status.get('ok')} progress={done}/{len(target_dates)}",
+        flush=True,
+    )
     return status
 
 
