@@ -240,7 +240,7 @@ data/odds_events/
 # it answers a LOCAL question (did this machine run it recently) and hourly
 # commits would be the noise the task's silence exists to avoid. Ignored so it
 # cannot be swept into another session's `git add` from the shared tree.
-.syndicate/.unknown_submit_watch_heartbeat
+.syndicate/.unknown_submit_watch_heartbeat*
 
 # Deploy claims are runtime state about RIGHT NOW, not history. A claim in git
 # would be a claim that outlives its truth.
