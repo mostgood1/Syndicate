@@ -5,6 +5,59 @@
 
 ---
 
+## 2026-08-31 — live-odds-worker — the soccer WRONG-SIDE fix (user-reported live-money bug)
+
+    dep-daaujkafngtc73afqthg  8876b823  live 20:56:30Z  leg decided by team names
+    dep-daaum2qfngtc73ag0fb0  d04d9f49  live 21:02:07Z  request's teams reach the test
+
+Claim `6b5a09e75a3cf782`, holder `polymarket-pregame-price-gate`. Preflight CLEAR
+before each; the second waited out 3 in-flight jobs rather than killing them.
+
+**THE BUG.** Two live orders bought the OPPOSITE team. `atc-lal-osa-get`, board
+"Getafe @ CA Osasuna", bet HOME -> bought Getafe; Osasuna won, the bet LOST,
+-$5.96. `atc-sea-ata-bol`, "Bologna @ Atalanta BC", bet HOME -> bought Bologna,
+still OPEN on the wrong side. Blast radius EXACTLY 2: every other Polymarket slug
+in retention is a totals or team-named market that never routes through the
+subject test.
+
+`parse_slug` documents `<away>-<home>` and applies it to every sport. MLB really
+is away-first (`aec-mlb-bal-col` reports away_index=1 = Baltimore, `bal` leads);
+both soccer fixtures are home-first. The "definitive NO" guard reads the SAME
+inverted parse, so it confirmed the wrong answer rather than contradicting it --
+two checks, one shared broken input. The alias check that gets all four legs
+right was already present as a third-stage fallback and never ran.
+
+**verify:** first tick after the completion, 21:05-21:06Z --
+`EXECUTED positions=4 placed=0 skipped=4 refused={'pregame_price_too_high': 4}`,
+MLB `YES_LEG` still resolving (`nyy-laa agree=True`), and ZERO
+`POLYMARKET_SIDE_REFUSED`. No regression on the markets that trade.
+
+**THE FIRST COMMIT ALONE WAS HALF A FIX.** `execute_portfolio` passed the SLATE
+row to the leg test, and `_SLATE_STORAGE_FIELDS` carries no team names -- so a
+check that now decides on team names could confirm NOTHING and every soccer
+moneyline would refuse. Fail-safe, and a whole market silently dark. Measured on
+the real slug: slate row -> home False AND away False; request's teams -> home
+False (the losing bet) and away True.
+
+**NOT DEPLOYED: refresh-worker**, which BUILDS the plan and therefore chooses the
+slug (`portfolio_commit` -> `join_polymarket_to_board` -> `polymarket_ticker_resolver`).
+It runs `132559e1`, which does NOT contain the fix. Blocked on TWO things, neither
+overridden: its claim was HELD by a live session (`layer2-accuracy-audit`, 32 min)
+and an MLB daily sim was in flight (`run_mlb_daily_sim_job.py`) that a deploy kills.
+
+**THE EXPOSURE IS CLOSED ANYWAY, and that is why waiting was right.**
+live-odds-worker refuses any wrong slug refresh-worker hands it, so no bad bet can
+be placed. What remains is soccer h2h staying DARK until refresh-worker ships --
+a functionality gap, not a money risk.
+
+**STILL OPEN, NOT FIXABLE BY DEPLOY:** `atc-sea-ata-bol` is a live position on the
+wrong side (Bologna, not Atalanta). No code change unwinds it.
+
+**AND IT CONFOUNDS EARLIER EVIDENCE.** Two of the three pregame fills cited all
+day as "cheap sides fill" (0.240, 0.250) ARE these wrong-side orders -- cheap
+BECAUSE they were away underdogs. The fill behaviour stands; the sample was
+thinner and dirtier than it was presented.
+
 ## 2026-08-31 — live-odds-worker — the pregame gate reads the SUBMITTED price, and the band includes its edge
 
 Two deploys, both `live-odds-worker`, claim `be4ed2687fc79ed8`, holder
