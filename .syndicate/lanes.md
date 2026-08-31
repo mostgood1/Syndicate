@@ -922,8 +922,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `mlb.sources.daily_artifact_path` -> `_resolve_data_path_with_reconcile` ->
   `shutil.copy2` (`mlb/sources.py:116`). The copy then looks present, so
   `_missing_required_artifact_relative_paths` does not request it.
-- Files: `syndicate/features/mlb/sources.py`,
-  `syndicate/features/shared/artifact_publisher.py`. **NOT CLAIMED.**
+- Files: **NOT CLAIMED** — this lane is FINDING ONLY and changed nothing. The
+  marker is moved to the FRONT of this line `[2026-08-31, lane
+  soccer-shot-shrinkage]` so the PARSER agrees with what the lane already said:
+  `_claimable_prefix` cuts at the first marker and keeps everything BEFORE it, so
+  with the paths written first they were still being enforced as live claims, and
+  the two paths it named read as contested against a lane that explicitly
+  disclaims them. Nothing is taken from this lane. The paths are deliberately
+  NOT repeated here: any path-like token inside a Files block becomes a CLAIM,
+  which is the same trap, and writing them again would recreate it.
 - **THE TRIGGER IS WORSE THAN "AN MTIME RACE", WHICH THIS BLOCK GOT WRONG.**
   `if target_stat is None: should_copy = True` — a MISSING target copies
   unconditionally, which is exactly the case the repair exists for.
