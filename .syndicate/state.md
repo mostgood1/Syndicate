@@ -8123,6 +8123,47 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-crossing-RESULT] 2026-08-31 — CROSSING DOES NOT HELP. Price is not the constraint pregame.
+
+**THE EXPERIMENT RAN PROPERLY AND ANSWERED.** The user cancelled the three
+resting orders on the venue, freeing their position keys; the next tick
+re-placed all three ONE TICK ABOVE the quote:
+
+    04:07:01  tsc-sea-lec-rom-2026-08-31-2pt5  0.49  (quote 0.48)  kickoff ~12h
+    04:07:06  tsc-bun-scp-scf-2026-09-05-2pt5  0.46  (quote 0.45)  kickoff 5 DAYS
+    04:07:08  tsc-epl-ast-ars-2026-08-31-2pt5  0.49  (quote 0.48)  kickoff ~12h
+
+    EXECUTED positions=17 placed=3 filled=0 duplicates=0
+
+**AND THEY STILL DID NOT FILL** — reported by the USER from the venue's own
+Orders screen. That is the tenth eliminated cause: **PRICE**.
+
+**WHAT IT MEANS.** We bid the quote: rests. We bid a tick above: rests. On the
+same markets, at two prices, pregame. The book is not there at any price we have
+tried. Combined with 8 of 8 fills occurring on LIVE-or-PAST markets and 3 of 3
+pregame orders resting, **time-to-event is now supported by a direct experiment
+rather than by correlation alone.**
+
+**THE FIX IS PLACEMENT TIMING, NOT PRICING.** Nothing in the pricing path is
+wrong: the tick snap is a no-op on on-grid quotes, the slippage guard gates the
+sent price, the quote is a real ask (sums 1.005-1.030), and crossing it changes
+nothing.
+
+**HONEST LIMITS, because this was ~15 minutes:**
+- One tick may be too small. The dial reaches 3 (`SYNDICATE_POLYMARKET_CROSS_TICKS`).
+- `nfl lar-lac` once took **67 minutes** to fill, so a short no-fill window is
+  suggestive, not proof.
+- Two fixtures are ~12h out and one is 5 days; none is near kickoff, which is
+  exactly the regime the hypothesis says DOES fill.
+- The clean confirmation is free and arrives on its own: if these same orders
+  fill as their kickoffs approach, time-to-event is settled outright.
+
+**CALIBRATION GAINED FOR FREE.** The user's three cancels produced DISTINCT
+`lastTransactTime` values 0.66-0.82s apart, spanning 1.47s. So a real
+multi-order cancel action looks like sub-second-spaced DISTINCT timestamps, not
+one shared one — the yardstick that was missing when the 18:18:51 "four at once"
+claim had to be withdrawn as unverified.
+
 ## [polymarket-crossing-experiment] 2026-08-31 — LIVE and CORRECT, but it has no test case yet
 
 **Deployed `0fc174c6`, live 03:48:28Z. It fired on all three pending orders at
