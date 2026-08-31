@@ -7710,3 +7710,59 @@ narrow a window (6 ticks vs 12h). Every one read as "this does not exist". The
 only one caught before it was recorded was caught by a CONTROL -- running the
 same query against a case known to be non-empty.
 
+
+---
+
+## 2026-08-30 — A GATE WRITTEN AGAINST DATA THE SYSTEM DOES NOT RETAIN DOES NOT GATE. IT BLOCKS.
+
+`yes_leg_index_from_market` required its rule be "scored against all 8
+venue-settled moneylines" before `polymarket_us_orders`' team-side refusal came
+off. That can NEVER be done: `marketSides` is deliberately never persisted (8MB
+keyvalue ceiling), so the rule cannot be re-run against a market that has
+already settled. The sentence read as ordinary caution and sat there from 08-28
+to 08-30 holding the whole h2h book — including every cross-venue arb, since an
+arb is a moneyline trade.
+
+HOW TO APPLY. When you write a gate, name the READING that opens it and check
+that reading is still obtainable at the moment somebody would take it. A
+precondition referencing data with a retention window shorter than the gate's
+own lifetime is a permanent block wearing the costume of rigour. If the gate is
+already written and unsatisfiable, say so and REPLACE it — do not quietly
+proceed past it, and do not treat "the docstring said to" as licence to wait
+forever.
+
+WHAT REPLACED IT, and the shape is reusable: a SECOND INDEPENDENT WITNESS plus a
+refusal on disagreement. The venue's `marketSides[].long` on one side, our own
+board's away-team designation on the other; resolve only where they agree. The
+asymmetry is what makes it safe — every team side was ALREADY refused, so a
+disagreement is refused exactly as before and the gate can only ADD the cases
+two encodings concur on.
+
+---
+
+## 2026-08-30 — A RETRACTION: I DIAGNOSED THE `not_found` LATCH CORRECTLY IN GENERAL AND WRONGLY IN THE INSTANCE
+
+I found the mechanism: `reconcile_live_orders`' `not_found` branch was a bare
+`continue`, so the order was counted, never stamped, and never named —
+`_reconciled_recently` stayed false forever and one order blocked live execution
+on BOTH venues. That part held and is fixed (`dd33c865`).
+
+**The cause I attributed to the actual blocking order was wrong.** I said it had
+FILLED or been CANCELLED and so legitimately left Kalshi's open book. It had
+`venue_order_id=None`, no ticker, `market=spreads_alt`, $1.45 — it was NEVER
+SENT. A write-ahead record was left `submitted` when the build failed with
+`OrderBuildError(ticker=None)`. A peer's `63661af1` found that and is what
+cleared the 55-minute outage; my fix requires a venue id to read by and would
+have named the order and kept blocking.
+
+HOW TO APPLY. A mechanism that explains a class is not evidence about the
+instance. I had the discriminating field available the whole time — the order's
+own `venue_order_id` — and reasoned from the branch's general shape instead of
+reading it. Before attributing an incident to a mechanism, print the ROW: the
+one record's fields decide which member of the class this is.
+
+WHAT SAVED THE CLAIM FROM BEING WORSE: I predicted `RECONCILE_RECOVERED = 0`
+BEFORE taking the post-deploy reading, precisely because my path needs a venue
+id. It read 0. A prediction made before the measurement is the only thing that
+made "my fix is not what unblocked this" worth stating rather than a
+face-saving reconstruction afterwards.

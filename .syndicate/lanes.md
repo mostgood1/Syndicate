@@ -2975,61 +2975,46 @@ caaf-no-orders`). NOT
   CONTESTED — the trap its own `[hint]` line warns about.
 - Blocked by: none.
 
-### polymarket-yes-leg-binding — OPEN — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+### polymarket-yes-leg-binding — OPEN — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3 — **SHIPPED + DEPLOYED; THE LEG CHOICE IS STILL UNVALIDATED; ONE LIVE-MONEY RISK OPEN AND IT IS NOT MINE TO DEPLOY**
 - Goal: a Polymarket moneyline resolves its YES/NO leg from the VENUE's own
   `yesLegIndex` instead of being refused, and refuses BY NAME where the venue
-  did not state it. Testable outcome: an `aec-mlb-az-sf`-shaped market (outcomes
-  REVERSED vs slug) builds side NO, not YES.
+  did not state it.
 - Files: syndicate/features/shared/polymarket_us_orders.py
   pipeline/execute_portfolio.py
   tests/test_polymarket_yes_leg_binding.py
   syndicate/features/shared/execution_ledger.py
   tests/test_reconcile_not_found_recovery.py
-- **CLAIM PROVENANCE — `[2026-08-30, USER OVERRIDE: "take it to the
-  user-override route"]`.** The first two are held by
-  `polymarket-buy-limit-tick-floor` (session `6475567d`, opened TODAY, session
-  RUNNING). That is a LIVE claim, not a phantom — surfaced to the user BEFORE
-  the override, and a scope request went to that session first
-  (`local_c1fb3f4e`) and was unanswered. NON-OVERLAPPING BY FUNCTION: they hold
-  `round_price_to_tick` in `order_body` (~:428); this lane touches
-  `_resolve_outcome_side` (~:240-310), the `outcomeSide` key (~:484), and
-  `_polymarket_resolve_market` (execute_portfolio ~:1000-1112). They can
-  reclaim by striking this note. `tests/test_polymarket_us_orders.py` is
-  DELIBERATELY NOT TAKEN — it is theirs.
-- **THE STATED GATE IS UNSATISFIABLE AND IS BEING REPLACED, NOT IGNORED.**
-  `yes_leg_index_from_market` requires scoring "against all 8 venue-settled
-  moneylines" first. `marketSides` is NEVER PERSISTED, so the rule cannot be
-  re-run on a settled market — that sentence blocks the fix permanently rather
-  than gating it. Replaced by a CORROBORATION GATE: resolve only where the
-  venue's `yesLegIndex` and the SLUG-derived index AGREE; refuse, named, where
-  they do not. Evidence:
-  `.syndicate/findings_2026-08-30_polymarket_yes_leg_evidence.md`.
-- **SCOPE EXTENDED `[2026-08-30, USER OVERRIDE: "take it and fix it"]` —
-  `execution_ledger.py`.** A SECOND latch halted live execution on both venues
-  for 18 min from 19:47:34Z, unrelated to the yes-leg work but blocking its
-  verification. `unknown-submit-retry-provenance`, which held this file, is
-  CLOSED-VERIFIED and archived, so no OPEN lane held it; taken under override
-  anyway because `live-venue-order-placement` is the de-facto owner of this
-  code and was told. THE DEFECT: `kalshi_orders.fetch_orders` covers "the whole
-  OPEN book", so a FILLED or CANCELLED order is legitimately absent from a
-  successful read; that absence counted `not_found` and hit `continue`, which
-  SKIPS the freshness stamp — and the stamp is the only input to
-  `unreconciled_orders()`. An order the book can never show again blocked every
-  venue permanently. `fetch_orders`' own docstring names the fix — "the single
-  read is the FALLBACK" — and the fallback was built, documented and never
-  called. Third instance of "a gap in the read side is a latch" in six days.
-  NOTHING IS RELAXED: an order still unaccounted for after a direct per-order
-  read keeps blocking.
-- Hypothesis: `outcomes[0]` is not the YES leg, `yesLegIndex` is, and the order
-  path already has the answer on the stored row and never reads it.
-- Falsification test: the fix is WRONG if, on a market whose `outcomes` are
-  reversed vs its slug, it still builds the leg the positional rule built.
-  Scored on `aec-mlb-az-sf-2026-08-27`, where the venue graded us LOST on a team
-  that WON: correct behaviour is side NO.
-- Verification: unit `off != on` in BOTH directions, then a production reading —
-  `POLYMARKET_YES_LEG` agree/disagree counts, and a moneyline order whose
-  submitted side matches the team we intended.
-- Blocked by: none. NOT DEPLOYING without a separate decision.
+- Claims taken under `[2026-08-30, USER OVERRIDE]` x3 ("take it to the
+  user-override route", "take it and fix it"). Conflicts were surfaced to the
+  user BEFORE each override and the holders were messaged. Deploy claim on
+  live-odds-worker taken 20:18:42Z and RELEASED. Holding no locks.
+- **LANDED (all on `origin/main`):** `8b0d27df` yes-leg binding + corroboration
+  gate; `dd33c865` the `not_found` per-order recovery; `bf1dd290` a peer's
+  `leavesQuantity` instrument cherry-picked with authorship intact; ledger
+  `17a0ac2f` `13efd528` `466968e0` `69eba57f`.
+- **DEPLOYED:** live-odds-worker `bf1dd290`, 20:38:53Z, fired by me, preflight
+  CLEAR (the HOLD cleared on its own; no guard bypass was used or needed).
+- **VERIFIED:** h2h `market_unresolved` x5 -> `would_build` at 19:54:08 with
+  `yes_leg_index=0 away_index=0 agree=True`; live execution recovered after 55
+  min (`EXECUTION status=ok placed=2`, 5 orders by 20:55, `BLOCKED` 0).
+- **OWED — THE LEG CHOICE IS NOT VALIDATED.** Every reading is
+  `yes_leg_index=0`, which IS `outcomes[0]`, so the OLD positional rule agrees
+  and none of them discriminates. Needs a `yes_leg_index=1` market (4 wnba + 1
+  boxing carry that shape). `agree=False` has never fired; the gate's refusal
+  path is unit-tested only. NO moneyline has ever been SUBMITTED.
+- **OPEN LIVE-MONEY RISK, NOT MINE, SURFACED `[2026-08-30 ~21:0xZ]`:**
+  live-odds-worker runs `bf1dd290`, which CONTAINS `63661af1` (a peer's
+  `never_sent` auto-reject) and does NOT contain `ef0d2d47` (their own REVERT of
+  it as unsafe). Their reasoning is correct and I verified it: an order that
+  FILLED after a LOST SUBMIT RESPONSE has no venue id, does not match by client
+  id, and is absent from the OPEN book — exactly that branch's conditions — so
+  it would be marked `rejected`, deleting a real position from the money record.
+  It also ran immediately AFTER my three deliberate refusals and converted each
+  into a silent write. **THE REVERT NEEDS A DEPLOY. I deployed the SHA that
+  carries the risk, so this is mine to surface and theirs to land.**
+- Narrative: `log/2026-08-30.md`. Evidence:
+  `findings_2026-08-30_polymarket_yes_leg_evidence.md`.
+- Blocked by: none.
 
 ### polymarket-buy-limit-tick-floor — CLOSED 2026-08-30 — PREMISE REFUTED BY ITS OWN DEPLOY
 - Goal: stop Polymarket buy limits resting below the venue's quote. NOT ACHIEVED — the premise was wrong.

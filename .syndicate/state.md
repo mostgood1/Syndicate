@@ -373,10 +373,21 @@ CAVEAT: `book_prices` is a quote snapshot (`book_age_seconds` ~294s), not a
 firm ask, and n=12. Read as "no arb on tonight's 12 observable pairs", NOT as
 "no arb between these venues".
 
-STILL BLOCKING EXECUTION: Polymarket refuses every moneyline
-(`team_side_needs_verified_yes_leg`) and an arb IS a moneyline trade; `#600`
-(ledger read-modify-write race) is landed and NOT deployed; and no two-leg
-executor exists — a one-sided fill is a naked position.
+STILL BLOCKING EXECUTION `[updated 2026-08-30, session 5611932c]`: the
+BLANKET moneyline refusal is GONE — `_resolve_outcome_side` now reads the
+venue's own `yesLegIndex` off the stored row and a Polymarket h2h BUILDS
+(`ORDER_PATH h2h {'would_build': 1}` at 19:54:08, after five consecutive
+`market_unresolved`; live-odds-worker `bf1dd290`). **It still refuses where the
+venue states no leg, and where `yesLegIndex` disagrees with our own away-team
+position** — a corroboration gate, because `#595`'s stated gate ("score against
+all 8 venue-settled moneylines") is UNSATISFIABLE: `marketSides` is never
+persisted, so the rule cannot be re-run on a settled market.
+**THE LEG CHOICE IS NOT VALIDATED.** All observed reads are `yes_leg_index=0`,
+which IS `outcomes[0]`, so the old positional rule agrees and they discriminate
+nothing; a `yes_leg_index=1` market is required. `agree=False` has never fired.
+NO moneyline has ever been SUBMITTED — `would_build` is not a bet. Also still
+true: `#600` (ledger read-modify-write race) landed and NOT deployed, and no
+two-leg executor exists — a one-sided fill is a naked position.
 
 `.syndicate/findings_2026-08-29_live_venue_arb_economics.md` carries the tables.
 
