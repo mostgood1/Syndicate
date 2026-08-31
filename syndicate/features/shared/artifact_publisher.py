@@ -276,6 +276,11 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # its projections and silently drop its momentum.
     "*_source/data/live_lens/live_momentum_*.jsonl",
     "*_source/data/live_lens/momentum_events_*.json",
+    # Fitted model calibration, read by the engines at build time. Disk-backed
+    # under SYNDICATE_DATA_ROOT and allowlisted here because an input that is
+    # not in this list cannot be published to the worker OR audited through
+    # /api/ops/artifacts/*, which makes every question about it a local guess.
+    "*_source/calibration/*.json",
     "*_source/data/processed/recommendations*.json",
     "*_source/data/processed/recommendations*.csv",
     "*_source/data/processed/props_recommendations*.json",

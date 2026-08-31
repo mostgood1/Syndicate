@@ -31,7 +31,7 @@ CONFOUND STATED UP FRONT: the archive's league mix is not uniform over time
 LEAGUE mix. Per-league test results are printed for exactly this reason -- a
 pooled win driven by one league is not a win.
 """
-import collections, datetime, glob, io, json, os, sys, unicodedata
+import collections, datetime, glob, io, json, os, pathlib, sys, unicodedata
 
 sys.path.insert(0, os.getcwd())
 from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
@@ -153,3 +153,50 @@ for lg, g in sorted(byl.items(), key=lambda kv: -len(kv[1])):
     m2 = score(g, lambda x: x/c, "")[1]
     print("  %-20s %6d %9.4f %9.4f %9.4f  %s" % (
         lg, len(g), m0, m1, m2, "affine better" if m1 < m0 else "affine WORSE"))
+
+
+# ---------------------------------------------------------------- --apply
+if "--apply" in sys.argv:
+    # WRITES THE ARTIFACT THE ENGINE READS. Deliberately the SCALAR fitted on
+    # the WHOLE dataset, not the train split: the split exists to VALIDATE the
+    # form of the correction, and once it has, throwing away half the data to
+    # ship the estimate would be strictly worse. The held-out numbers that
+    # justified it are stamped alongside so the artifact carries its own
+    # evidence and can be audited without re-running anything.
+    c_all = fit_scalar(D)
+    if not (1.0 <= c_all <= 2.0):
+        print("REFUSING to write: fitted divisor %.4f is outside [1.0, 2.0]. "
+              "The engine would ignore it anyway; a value this far out means the "
+              "join or the sample is wrong, not the model." % c_all)
+        raise SystemExit(1)
+    payload = {
+        "divisor": round(c_all, 4),
+        "fitted_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "n": len(D),
+        "matches": len({r[2] for r in D}),
+        "leagues": sorted({r[1] for r in D}),
+        "excluded_leagues": sorted(BAD),
+        "date_window": [min(r[0] for r in D), max(r[0] for r in D)],
+        "held_out": {
+            "split_date": cut,
+            "n_train": len(train), "n_test": len(test),
+            "mae_raw": round(res["RAW"][0], 4),
+            "mae_scalar": round(res["SCALAR"][0], 4),
+            "mae_affine": round(res["AFFINE"][0], 4),
+            "mae_constant_baseline": round(res["constant-mean baseline"][0], 4),
+            "bias_raw": round(res["RAW"][1], 4),
+            "bias_scalar": round(res["SCALAR"][1], 4),
+        },
+        "note": ("Divides expected_shots at the single choke point in "
+                 "player_props.project_player_props. Shots-on-target inherits it: "
+                 "the model's on-target RATE is already correct (0.345 vs an "
+                 "actual 0.342). Absent or out-of-range -> the engine uses 1.0."),
+    }
+    root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    base = pathlib.Path(root) if root else pathlib.Path("data")
+    out_path = base / "soccer_source" / "calibration" / "shot_shrinkage.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, indent=1, sort_keys=True), encoding="utf-8")
+    print("")
+    print("WROTE %s" % out_path)
+    print("  divisor %.4f  (whole-dataset scalar; the split validated the FORM)" % c_all)
