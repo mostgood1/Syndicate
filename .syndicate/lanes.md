@@ -3230,6 +3230,35 @@ caaf-no-orders`). NOT
      trailing the market on 8 of 9 dates. Prop live skill has NOT been measured
      either way. Publishing a live prop edge is not the same as it being safe to
      bet, and this lane does not claim otherwise.
+- **FIX LANDED, NOT DEPLOYED `[2026-08-31 02:30Z]` — `5bab0685` on `origin/main`.**
+  `_carry_live_probability` stamps the MC row's `liveModelProbOver` (and its own
+  `liveEdge`) onto the matching card row before the cards set replaces the MC
+  set. Keyed with `live_projection_join`'s OWN rule, imported not re-derived.
+  Rows stay the cards' (124 vs 27); only the probability travels; nothing is
+  dropped on either side. 248 tests green across the live-lens surface, 11 new,
+  leading with a reachability test.
+- **NOT DEPLOYED, TWO REASONS, and neither is caution for its own sake.**
+  (1) `deploy_preflight` returned `HOLD: 7 job(s) in flight` — the MLB daily sim
+  that an earlier deploy killed tonight had RESTARTED, and a second kill in one
+  evening is not worth it. (2) There is nothing to verify: the last MLB game was
+  in its final outs, `LIVE_MC_PRICED rows=0`, so a deploy tonight buys a green
+  build and no reading. **Deploy target is refresh-worker** — see the state.md
+  correction; the loop is NOT on live-odds-worker any more.
+- **VERIFICATION OWED, and it is cheap:** on tomorrow's first live MLB game,
+  `snapshot_live_prob_seen > 0` and `rows_live_edged > 0` from
+  `/api/board/layer2-shortlist` -> `per_sport_ingest.mlb.enrichment.live_projections`,
+  plus the new `[live_lens] LIVE_PROB_CARRIED gamePk=... carried=N` line on
+  refresh-worker. `carried=0` with `mc_rows_with_prob>0` would mean the KEY does
+  not match and the fix is inert — that is the failure mode to watch for, not a
+  crash.
+- **MY OWN TOOLING BIT ME TWICE AND BOTH ARE RECORDED.** `TaskStop` killed the
+  harness task but NOT the shell child: `bash /c/tmp/wait_rw.sh` (pid 119148)
+  kept re-acquiring the refresh-worker claim every 2 minutes for 55 minutes
+  under a lane I had already closed out of, so the claim read as held by a stale
+  holder. Killed with `kill -9` after `ps -ef`. And the clean release is
+  `release --service <svc> --token <token>` — without the token it consults a
+  value a re-acquire has invalidated and refuses, which reads as someone else
+  holding it when the holder is you.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
