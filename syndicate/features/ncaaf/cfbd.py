@@ -14,6 +14,10 @@ from typing import Any
 import requests
 
 from syndicate.features.ncaaf.cfbd_backoff import call_with_retry
+from syndicate.features.ncaaf.cfbd_quota_latch import (
+    note_quota_exhausted,
+    raise_if_latched,
+)
 from syndicate.features.ncaaf.sources import coach_continuity_snapshot_path
 from syndicate.features.ncaaf.sources import player_game_stats_snapshot_path
 from syndicate.features.ncaaf.sources import player_identity_snapshot_path
@@ -357,9 +361,30 @@ class CfbdClient:
         how the defect survives.
         """
 
+        # SAME LATCH AS THE GENERATOR, AND FOR THE SAME REASON THIS CLIENT WAS
+        # FIXED ALONGSIDE IT. Ten snapshot builders reach CFBD through here on
+        # the SAME API key, so leaving this side calling a quota the other side
+        # has already been told is gone spends the budget both are waiting for.
+        # Fixing only the call site in the traceback is how the defect survives.
+        raise_if_latched(f"GET {path}", log=lambda message: print(message, flush=True))
+
         def _once() -> Any:
             url = f"{self.base_url}{path}"
             response = self.session.get(url, params=params or {}, timeout=self.timeout, headers=dict(self.session.headers))
+            if getattr(response, "status_code", None) == 429:
+                # The BODY discriminates a monthly quota from a short-window
+                # throttle; an unrecognised 429 still falls through to the
+                # ordinary retries below.
+                #
+                # `getattr`, not `response.text`: a transport whose response
+                # object lacks a body attribute must not turn a recoverable 429
+                # into an AttributeError. The latch exists to protect this call,
+                # so it must never be the thing that breaks it -- an unreadable
+                # body simply does not latch.
+                note_quota_exhausted(
+                    getattr(response, "text", "") or "",
+                    log=lambda message: print(message, flush=True),
+                )
             response.raise_for_status()
             return response.json()
 

@@ -39,6 +39,11 @@ from syndicate.features.football.sim_engine.smartsim2.game_simulator import simu
 from syndicate.features.football.sim_engine.smartsim2.ncaaf_calibration_profile import NCAAF_CALIBRATION_PROFILE
 from syndicate.features.football.sim_engine.smartsim2.ncaaf_calibration_profile import NCAAF_CALIBRATION_PROFILE_METADATA
 from syndicate.features.ncaaf.cfbd_backoff import call_with_retry
+from syndicate.features.ncaaf.cfbd_quota_latch import (
+    QuotaExhausted,
+    note_quota_exhausted,
+    raise_if_latched,
+)
 from syndicate.features.ncaaf.smartsim2_projection import SmartSimNcaafProjection
 from syndicate.features.ncaaf.smartsim2_projection import write_projection_artifact
 from syndicate.features.ncaaf.sources import default_ncaaf_source_root
@@ -82,13 +87,34 @@ def _cfbd_get(path: str, params: dict[str, object]) -> object:
     is the one that was throttled, ~30 times over 2h45m on 2026-08-29, leaving
     the projection artifact three days stale.
     """
+    # THE MONTHLY QUOTA IS NOT A THROTTLE AND MUST NOT BE RETRIED LIKE ONE.
+    # Measured 2026-08-31: this script relaunched HOURLY for days against a
+    # quota CFBD had already said was gone, because a failed run leaves the
+    # artifact stale and the staleness trigger refires every tick
+    # (`interval_seconds=86400`, firing ~24x that). `raise_if_latched` makes
+    # this fail in microseconds with NO request until the month rolls.
+    raise_if_latched(f"GET {path}", log=lambda message: print(message, flush=True))
+
     query = "&".join(f"{key}={value}" for key, value in params.items())
     url = f"{CFBD_API_BASE}{path}?{query}"
     request = urllib.request.Request(url, headers={"Authorization": f"Bearer {_api_key()}", "User-Agent": "syndicate-smartsim2-shadow/1.0"})
 
     def _once() -> object:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return json.loads(response.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            # THE BODY IS THE DISCRIMINATOR, NOT THE STATUS. A short-window
+            # throttle and an exhausted monthly quota are both 429 and need
+            # opposite responses, so an unrecognised 429 falls through to
+            # `cfbd_backoff`'s retries exactly as before.
+            if getattr(exc, "code", None) == 429:
+                try:
+                    body = exc.read().decode("utf-8", "replace")
+                except Exception:
+                    body = ""
+                note_quota_exhausted(body, log=lambda message: print(message, flush=True))
+            raise
 
     return call_with_retry(
         _once,
@@ -209,8 +235,106 @@ def load_cfbd_games(season: int, week: int) -> dict[tuple[str, str], dict]:
     return index
 
 
+def _ppa_cache_path(season: int) -> Path:
+    root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    base = Path(root) if root else Path(__file__).resolve().parents[1] / "data"
+    return base / "ncaaf_source" / "historical_truth" / f"ppa_teams_{season}.json.gz"
+
+
+def _read_ppa_cache(season: int) -> tuple[list, float] | None:
+    """`(rows, age_seconds)` from the local PPA cache, or None."""
+    path = _ppa_cache_path(season)
+    if not path.exists():
+        return None
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        rows = payload.get("rows") if isinstance(payload, dict) else payload
+        if not isinstance(rows, list) or not rows:
+            return None
+        written = float((payload or {}).get("written_epoch") or 0.0) if isinstance(payload, dict) else 0.0
+        age = max(0.0, time.time() - written) if written else float("inf")
+        return rows, age
+    except Exception:
+        return None
+
+
+def _write_ppa_cache(season: int, rows: list) -> None:
+    """Best effort. A cache that cannot be written must not fail the run."""
+    if not rows:
+        return
+    try:
+        path = _ppa_cache_path(season)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        with gzip.open(tmp, "wt", encoding="utf-8") as handle:
+            json.dump({"written_epoch": time.time(), "season": season, "rows": rows}, handle)
+        tmp.replace(path)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[ppa] CACHE_WRITE_FAILED season={season} {type(exc).__name__}", flush=True)
+
+
+# How old a cached PPA may be before we prefer a fresh fetch. PPA is a
+# season-aggregate that moves as games are played, so a day is the natural
+# grain -- the artifact this feeds regenerates daily by design
+# (`interval_seconds=86400`).
+_PPA_CACHE_FRESH_SECONDS = 86400.0
+
+# The last PPA age actually used, in hours, or None when the fetch was fresh.
+# Read by `main` to stamp provenance into the output CSV: a cached rating that
+# cannot be told apart from a fresh one is the failure this whole file's
+# `rating_source` column exists to prevent.
+PPA_CACHE_AGE_HOURS: float | None = None
+
+
 def load_ppa_ratings(season: int) -> dict[str, dict]:
-    payload = _cfbd_get("/ppa/teams", {"year": season, "excludeGarbageTime": "true"})
+    """Season-aggregate PPA, from cache when fresh and from cache when the
+    quota is gone.
+
+    `/ppa/teams` WAS THE LAST HARD CFBD DEPENDENCY IN A REGENERATION. `/games`
+    has been served from `historical_truth` since `514d5ed4` and `/ratings/sp`
+    is cached, so this one endpoint was the difference between "regenerates"
+    and "dies" for the whole NCAAF projection artifact. Measured 2026-08-31:
+    the artifact had been stale 4.25 days and every hourly attempt died here.
+
+    THE STALE FALLBACK IS THE POINT, AND IT MUST ANNOUNCE ITSELF. When the
+    quota is exhausted the choice is not "fresh PPA vs cached PPA", it is
+    "cached PPA vs NO PROJECTIONS AT ALL" -- and a week-old season aggregate is
+    a far better input than nothing. But a silent stale read is how a cached
+    number gets mistaken for a measured one, so the age is logged AND stamped
+    into `rating_source` on every row it produces.
+    """
+    global PPA_CACHE_AGE_HOURS
+    PPA_CACHE_AGE_HOURS = None
+
+    cached = _read_ppa_cache(season)
+    if cached is not None and cached[1] <= _PPA_CACHE_FRESH_SECONDS:
+        rows, age = cached
+        PPA_CACHE_AGE_HOURS = round(age / 3600.0, 1)
+        print(f"[ppa] season={season} source=cache age_hours={PPA_CACHE_AGE_HOURS} rows={len(rows)}", flush=True)
+        payload: object = rows
+    else:
+        try:
+            payload = _cfbd_get("/ppa/teams", {"year": season, "excludeGarbageTime": "true"})
+            print(f"[ppa] season={season} source=api", flush=True)
+            if isinstance(payload, list):
+                _write_ppa_cache(season, payload)
+        except QuotaExhausted:
+            # The quota is KNOWN gone -- distinct from a network failure, which
+            # is why the latch raises its own type. Serve the stale cache and
+            # say how stale, or re-raise if there is nothing to serve.
+            if cached is None:
+                print(f"[ppa] season={season} source=none reason=quota_exhausted_and_cache_empty", flush=True)
+                raise
+            rows, age = cached
+            PPA_CACHE_AGE_HOURS = round(age / 3600.0, 1)
+            print(
+                f"[ppa] season={season} source=cache_stale age_hours={PPA_CACHE_AGE_HOURS} "
+                f"rows={len(rows)} reason=quota_exhausted -- STALE, and stamped into rating_source",
+                flush=True,
+            )
+            payload = rows
+
     index: dict[str, dict] = {}
     if isinstance(payload, list):
         for row in payload:
@@ -678,6 +802,16 @@ def main() -> None:
               "BOUND, not a measurement.", flush=True)
     else:
         ppa_index, rating_source = load_ppa_ratings_asof(args.season, args.week)
+    # PROVENANCE TRAVELS WITH THE NUMBER. When PPA came from a stale cache --
+    # which is what happens while the CFBD monthly quota is exhausted -- every
+    # row this run writes carries that fact in `rating_source`, the same column
+    # that already distinguishes which SEASON's ratings were used. A cached
+    # rating that reads identically to a fresh one is precisely the confusion
+    # this column exists to prevent, and the whole reason the stale fallback is
+    # safe to have at all.
+    if PPA_CACHE_AGE_HOURS is not None:
+        rating_source = f"{rating_source}[ppa_cache_age_hours={PPA_CACHE_AGE_HOURS:g}]"
+        log(f"PPA_FROM_CACHE age_hours={PPA_CACHE_AGE_HOURS:g} -- stamped into rating_source")
     log(f"PPA_RATINGS teams={len(ppa_index)} rating_source={rating_source}")
 
     # SP+ is the primary rating source; PPA above stays as the per-team fallback.
