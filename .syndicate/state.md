@@ -8123,6 +8123,48 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-pregame-orders-rest] 2026-08-31 — THREE pending orders, ALL pregame, ALL bid AT the quote
+
+**USER SCREENSHOT of Polymarket's own Orders screen, 03:2xZ**, corroborated
+against our logs. Three PENDING, every one a SOCCER TOTAL on a fixture that has
+not kicked off:
+
+    Buy Over 2.5   Aston Villa v Arsenal   17.37 @ 48c   $8.34   Until Cancelled
+    Buy Under 2.5  US Lecce v AS Roma       5.97 @ 52c   $3.10   Until Cancelled
+    Buy Over 2.5   SC Paderborn v Freiburg 27.97 @ 44c  $12.31   Until Cancelled
+
+**"Until Cancelled" is the venue's own UI confirming `goodTillTime=None`** —
+independent corroboration of the API measurement.
+
+**WE ARE BIDDING EXACTLY THE VENUE'S QUOTE, not under it.** Measured at our last
+evaluation of each:
+
+    tsc-sea-lec-rom-2026-08-31-2pt5   quote 0.48  sent 0.48  snapped=False  Under
+    tsc-bun-scp-scf-2026-09-05-2pt5   quote 0.44  sent 0.44  snapped=False  Over
+
+The 52c shown for lec-rom is the NO-side display complement of our 0.48, not a
+different price. All three orders ARE tracked in our ledger (the third is
+`tsc-epl-ast-ars-2026-08-31-2pt5`, order C6SRM9D8MKDN) — no ledger gap.
+
+**THE PATTERN IS NOW CONSISTENT ACROSS EVERY ORDER WE HAVE OBSERVED:**
+
+    PREGAME market   ->  rests, cum=0, never touched   (3 of 3 pending)
+    LIVE/PAST market ->  fills                          (8 of 8 settled)
+
+That is the peer's TIME-TO-EVENT hypothesis, and it has survived every test that
+killed the others: tick floor, stale ask, bidding a mid, our own cancel loop,
+market close, venue expiry, insufficient collateral, restart/OOM, deploy.
+
+**STILL INFERENCE, AND THIS IS THE LIMIT:** we cannot see the order BOOK. The
+slate gives ONE price per outcome, not depth. "The quote exists but no size sits
+behind it pregame" explains everything observed and remains untested, because
+nothing we have reads depth.
+
+**THE EXPERIMENT THAT WOULD SETTLE IT** is a live-money change and needs a
+decision: bid ONE TICK ABOVE the quote on pregame markets. If size exists just
+above, it fills; if nothing fills at any price pregame, the market genuinely has
+no book yet and the fix is placement TIMING, not price.
+
 ## [polymarket-fill-time-to-event] 2026-08-30 — the leading hypothesis is TIME TO EVENT, not liquidity at our size
 
 **Raised by `polymarket-yes-leg-binding` off the `ORDER_STATE` instrument, and it
