@@ -7859,3 +7859,68 @@ lane I had closed out of. The harness task was gone; the process was not.
 `release --service <svc> --token <t>`. After any `TaskStop` on a shell loop,
 confirm with `ps -ef | grep <script>` and `kill -9` the survivor. Prefer bounded
 loops (`for i in $(seq 1 N)`) so a stray child expires on its own.
+
+---
+
+## 2026-08-31 — THREE HYPOTHESES DIED ON ONE DATASET, AND ALL THREE WERE ONE-DIMENSIONAL PROJECTIONS OF A TWO-VARIABLE RULE
+
+**THE RULE, measured.** Polymarket fills separate on PRICE, CONDITIONED ON
+PREGAME. n=14, zero overlap:
+
+    PREGAME (game had not started while the order worked)
+       FILLED   n=3   0.240, 0.250, 0.335
+       RESTING  n=8   0.410, 0.435, 0.460, 0.460, 0.490 x4
+       max filled 0.335  <  min resting 0.410
+
+    ALREADY STARTED / PAST
+       FILLED   n=3   0.210, 0.220, 0.490
+       RESTING  n=0
+
+Pregame, only cheap sides fill — a near-even side has no pregame book. Once the
+market is live, everything fills, INCLUDING 0.490.
+
+**WHAT DIED.**
+
+1. *Mine, "time to event":* untouched orders are simply far from kickoff. Built
+   on a clean-looking 8/8 split — every fill on a past/today market, every
+   untouched one on a future market. **CONFOUNDED**: those fills were older
+   orders on games ALREADY UNDER WAY, so "already started" was doing the work,
+   not "hours to kickoff". Killed by `ath-tex` filling at **+18.8h**, between
+   two resting orders at +16.8h and +20.4h.
+2. *Mine, "price alone":* cheap fills, expensive rests. Killed by a **0.490
+   fill** (`tsc-nfl-lar-lac-2026-08-27`) sitting above four 0.490 rests.
+3. *A peer's, `f6f45321`:* "pregame orders do not fill at any price we have
+   tried", shipped as a >24h placement hold. Same counter-example: a pregame
+   fill at 0.240 and another at 0.250, both inside 24h, both real filled bets.
+
+Each looked CLEAN on its own axis. Each was that 2-D structure flattened onto
+one variable, and the sample was small enough that the other variable happened
+to correlate.
+
+**HOW TO APPLY. A clean separation is not a finding until you know what ELSE
+varies with it.** My 8/8 split had no overlap and was still wrong, because the
+grouping variable I chose (future vs past) was collinear with the one that
+mattered (started vs not) AND with a third (cheap vs near-even). Before
+reporting a separator: list what else differs between the two groups, and say
+which of them you have RULED OUT rather than merely not looked at. "No overlap"
+is a property of the sample, not evidence about the cause.
+
+**AND THE SECOND-ORDER LESSON, which is the expensive one: a wrong separator
+gets SHIPPED AS A GATE.** The peer's hold filters on TIME while the pregame
+separator is PRICE, so it suppresses cheap pregame sides that DO fill while
+still placing near-even ones that never will — wrong axis in both directions,
+and it was already live on the money path. A rule derived from a confounded
+split does not stay a note; somebody builds a threshold out of it.
+
+**WHAT MADE IT VISIBLE AT ALL, and neither half was enough alone:** restoring
+`commence_time` (`0fc174c6`) gave real hours-to-commence for the first time, and
+the peer's `leavesQuantity` instrument gave `cum`/`leaves` so a REST could be
+told from a CANCEL. Before both, `leaves=0` was being counted as a fill —
+a cancelled order sat in my "settled" bucket and I only caught it because one
+slug appeared in two lists at once.
+
+**STATED LIMITS, so the next reader does not over-trust this either:** n=3
+pregame fills. Nothing has been observed between 0.335 and 0.410, so ~0.37 is a
+MIDPOINT, not a measured threshold. "Already started" is derived from the slug
+date, not a live-state feed, so that bucket is coarse. What is solid is the
+ORDERING across 11 pregame orders, not the boundary value.
