@@ -425,11 +425,39 @@ def run_execution(
 
         # TOO EARLY TO PLACE  [2026-08-31, user decision]
         #
-        # MEASURED, and this is the only cause left standing after ten were
-        # eliminated: Polymarket fills happen on LIVE-or-PAST markets (8 of 8)
-        # and pregame orders rest (3 of 3). PRICE IS NOT THE CONSTRAINT -- we
-        # bid the quote and they rested, then bid a tick ABOVE it and they
-        # rested again, same markets, same session. There is no book to hit.
+        # >>> THE ORIGINAL PREMISE OF THIS GATE IS REFUTED. READ THIS FIRST. <<<
+        #
+        # It was built on "pregame orders do not fill at any price -- 8 of 8
+        # fills came on live-or-past markets, 3 of 3 pregame orders rest".
+        # **THAT IS FALSE**, measured 2026-08-31T05:29Z, ONE HOUR after it
+        # shipped:
+        #
+        #     aec-mlb-ath-tex-2026-08-31  h2h  kickoff +18.6h  FILLED in ~18 min
+        #     tsc-sea-lec-rom-...-2pt5    tot  kickoff +11.0h  resting
+        #     tsc-epl-ast-ars-...-2pt5    tot  kickoff +13.5h  resting
+        #
+        # **The order that FILLED was FURTHER from kickoff than the two that did
+        # not.** Time does not separate them. Confirmed independently by
+        # `polymarket-yes-leg-binding`, whose filled/resting bands OVERLAP
+        # (+18.8h filled between +16.8h and +20.4h resting).
+        #
+        # The original 8-of-8 reading was CONFOUNDED: those fills were older
+        # orders on games ALREADY UNDER WAY, so "past" was doing the work, not
+        # "hours to kickoff".
+        #
+        # WHY THE GATE STAYS ANYWAY, on a DIFFERENT and still-standing argument:
+        # CHURN. An order that cannot fill rests, the venue cancels it, the next
+        # tick re-places it -- and that submit/cancel/resubmit loop is what
+        # produced a DUPLICATE LIVE BET ($9.12 on lad-det, two orders for one
+        # intended position). Holding costs no stake: an unfilled order reserves
+        # no funds (balance flat at $87.26 across a cancellation).
+        #
+        # **THE 24h THRESHOLD IS NOW UNVALIDATED.** It was derived from the
+        # refuted reading. A fill at +18.6h is inside the window so nothing is
+        # known to have been lost, but the number should be RE-DERIVED, not
+        # trusted. What actually separates fills from rests is still unknown --
+        # the live candidate is liquidity by MARKET FAMILY (every fill on record
+        # is MLB or NFL; no soccer `tsc-` total has ever filled), not the clock.
         #
         # WHAT PLACING EARLY ACTUALLY COSTS. Not the stake -- an unfilled order
         # holds no reserved funds (balance was flat at $87.26 across a
