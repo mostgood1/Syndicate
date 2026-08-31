@@ -885,7 +885,29 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
         "copied": copied,
         "archived": archived,
     }
-    _write_json_file(_cron_meta_dir(source_root=source_root) / "latest_refresh_oddsapi.json", meta)
+    meta_path = _cron_meta_dir(source_root=source_root) / "latest_refresh_oddsapi.json"
+    _write_json_file(meta_path, meta)
+    # PUBLISH IT. `meta["frozenPregame"]` is the freeze's own record of every
+    # destination it copied, and it was written worker-side where nothing could
+    # read it -- so "did the pregame seal fire for hitter/pitcher props" had to
+    # be inferred from file sizes and a card's `inputs`. `#611`.
+    publish_hot_artifact(meta_path)
+    # AND SAY IT IN THE LOG, because the artifact route needs a WEB deploy
+    # before the export will serve it while this line needs only this service.
+    # `print`, not `logger.info` -- logger.info does not reach Render's
+    # collector. One line per family, naming the trees it sealed into, so
+    # "the prop seal did not fire" is greppable instead of inferred.
+    frozen_by_family: dict[str, int] = {}
+    for destination in (frozen_pregame or {}):
+        name = str(destination).replace("\\", "/").rsplit("/", 1)[-1]
+        for family in ("game_lines", "hitter_props", "pitcher_props"):
+            if f"oddsapi_{family}_" in name and name.endswith("_pregame.json"):
+                frozen_by_family[family] = frozen_by_family.get(family, 0) + 1
+    print(
+        f"[refresh_mlb_oddsapi] PREGAME_FREEZE date={date_str} "
+        f"destinations={len(frozen_pregame or {})} by_family={json.dumps(frozen_by_family, sort_keys=True)}",
+        flush=True,
+    )
 
     live_lens = _refresh_live_lens_artifacts(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
 
