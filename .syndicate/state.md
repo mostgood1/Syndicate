@@ -8978,3 +8978,60 @@ aimed at the team total would have moved a term that is not wrong.
 correction:** the Poisson form is exonerated (dispersion 1.07, P(shots>=2) bias
 -0.0001 pooled over 597 players and 759 matches), and the served board's model
 means run above the players' own realized rates (median 1.19x, 11 of 15).
+
+### CORRECTION 2 `[2026-08-31]` — "nothing supplies the historical INPUTS" is WRONG. Stored dated PREDICTIONS exist, and the block is a season gap plus an id-space mismatch
+
+**I wrote above that the real backtest is blocked because the usage-profile
+inputs are undated season aggregates, so the model cannot be replayed as-of a
+past date. That reasoning is sound and the CONCLUSION IS WRONG, because it
+assumed a replay is the only route. It is not: the model's own OUTPUT is
+already archived, dated, with the mean stored.**
+
+`data/soccer_source/<league>/api/recommendations/recommendations_<DATE>.json`
+carries `league`, `date`, `generated_at`, `matches` and `player_props`. Each
+player-prop row holds exactly what a skill measurement needs, with **no
+inversion and no replay**:
+
+    player_id, player_name, team, side, position, match_id,
+    expected_shots, expected_shots_if_playing,
+    expected_shots_on_target, expected_shots_on_target_if_playing,
+    expected_minutes_share, anytime_scorer_probability
+
+**Coverage in the git mirror: 2,476 prediction rows over 55 distinct matches,
+17 dated files, 10 leagues** (la_liga 6 dates, mls 4, serie_a 4, epl 2). Per
+CLAUDE.md the mirror is a lossy subset — **production almost certainly holds
+more, and that is where anyone should look first.**
+
+**WHAT ACTUALLY BLOCKS THE JOIN — two things, both fixable, neither the one I
+named:**
+
+1. **The id spaces differ.** Predictions carry ESPN match ids
+   (`401874745`, 9-digit); `shot_events_2025.csv` carries 6-digit ids
+   (`740596`, Understat). Direct join: **0 of 55 overlapping.**
+2. **AND THE SEASONS DO NOT OVERLAP, which is the binding one.** The stored
+   predictions are dated 2026-07..2026-08; the shot outcomes on hand are the
+   `2025` season file. No mapping fixes a window that does not intersect —
+   this is the CLAUDE.md per-family coverage trap, firing on exactly the join
+   it warns about.
+
+**THE UNBLOCK IS SMALL AND SPECIFIC, and it follows from (1) rather than
+around it: the predictions are keyed by ESPN match id, and
+`syndicate/features/soccer/ingestion/espn_shot_events.py` already fetches shot
+events FROM ESPN.** Pulling shot events for those 55 ESPN match ids yields a
+DIRECT join — same id space, no mapping table, and the outcomes are for exactly
+the matches that were predicted. That is a bounded fetch against a store that
+already exists, not a modelling project.
+
+**WHAT THE MEASUREMENT WOULD THEN BE, stated now so it is not designed after
+seeing the numbers:** predicted `expected_shots` against realized shot count,
+per (player, match). Report the RATE and its denominator; report bias
+(mean predicted minus mean realized) and calibration separately, because the
+Poisson form is already exonerated and only the MEAN is in question. Split by
+`expected_minutes_share`, since starter awareness is the named suspect for the
+top shooter's share being roughly double its realized value.
+
+**Unchanged by this correction:** the Poisson exoneration (dispersion 1.07,
+P(shots>=2) bias -0.0001 over 597 players / 759 matches) and the finding that
+the fixture's team total is approximately right while the top shooter's share is
+roughly double. Both rest on the 2025 outcome file alone and neither needs the
+prediction archive.
