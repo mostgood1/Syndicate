@@ -863,6 +863,112 @@ class RefreshWorkerTests(unittest.TestCase):
             self.assertIsNotNone(second)
             self.assertEqual(mocked_run.call_count, 2)
 
+    def test_season_betting_day_filename_matches_the_canonical_helper(self) -> None:
+        """Pins the duplicated filename rule against drift.
+
+        The rule is not obvious -- the season prefix is STRIPPED from the
+        slug, so 2026-08-30 is `season_betting_day_2026_08_30.json` and not
+        `..._2026_2026_08_30.json`. It is duplicated rather than imported
+        because the canonical helper resolves against its own data root while
+        the backfill must publish the file its subprocess actually wrote.
+        """
+        from syndicate.features.mlb.sources import season_betting_card_day_path
+
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+        for date in ("2026-08-30", "2026-08-24", "2026-01-05", "2025-10-01"):
+            season = int(date[:4])
+            self.assertEqual(
+                module._season_betting_day_filename(season, date),
+                season_betting_card_day_path(season, date, profile="retuned").name,
+                f"filename rule drifted for {date}",
+            )
+
+    def test_betting_day_backfill_publishes_the_rebuilt_payload(self) -> None:
+        """Without this the backfill is UNOBSERVABLE.
+
+        It writes to refresh-worker's disk; /mlb/api/market-accuracy reads
+        WEB's. This worker publishes explicitly per path and has no blanket
+        sweep, so nothing bridged a backfilled payload across. Measured
+        2026-08-31: watchers polled market-accuracy for ~35 minutes for a
+        change that was structurally impossible.
+        """
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir) / "data"
+            payload_dir = data_root / "mlb_source" / "source_artifacts" / "data" / "eval" / "seasons" / "2026" / "betting_day_payloads_retuned"
+            payload_dir.mkdir(parents=True)
+            payload = payload_dir / "season_betting_day_2026_08_30.json"
+            payload.write_text('{"games": {}}', encoding="utf-8")
+
+            published = []
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                    "MLB_BETTING_DAY_BACKFILL_DATE": "2026-08-30",
+                },
+                clear=True,
+            ), patch.object(module.subprocess, "run") as mocked_run, patch(
+                "syndicate.features.shared.artifact_publisher.publish_hot_artifact",
+                side_effect=lambda path, **kw: published.append(Path(path)) or True,
+            ):
+                mocked_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok", stderr="")
+                status = module._run_mlb_betting_day_backfill_tick()
+
+        self.assertTrue(status["ok"])
+        self.assertTrue(status.get("published"), f"payload must be published; status={status}")
+        self.assertEqual([p.name for p in published], ["season_betting_day_2026_08_30.json"])
+
+    def test_betting_day_backfill_does_not_publish_a_failed_build(self) -> None:
+        """A failed build must not push whatever stale file is on disk."""
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        published = []
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
+                    "MLB_BETTING_DAY_BACKFILL_DATE": "2026-08-30",
+                },
+                clear=True,
+            ), patch.object(module.subprocess, "run") as mocked_run, patch(
+                "syndicate.features.shared.artifact_publisher.publish_hot_artifact",
+                side_effect=lambda path, **kw: published.append(Path(path)) or True,
+            ):
+                mocked_run.return_value = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="boom")
+                status = module._run_mlb_betting_day_backfill_tick()
+
+        self.assertFalse(status["ok"])
+        self.assertEqual(published, [], "a failed build must publish nothing")
+
+    def test_betting_day_backfill_names_the_path_when_the_payload_is_absent(self) -> None:
+        """A silent False is the same blindness this block exists to remove."""
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                module.os.environ,
+                {
+                    "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+                    "SYNDICATE_DATA_ROOT": str(Path(tmp_dir) / "data"),
+                    "MLB_BETTING_DAY_BACKFILL_DATE": "2026-08-30",
+                },
+                clear=True,
+            ), patch.object(module.subprocess, "run") as mocked_run:
+                mocked_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok", stderr="")
+                status = module._run_mlb_betting_day_backfill_tick()
+
+        self.assertFalse(status.get("published"))
+        self.assertIn("season_betting_day_2026_08_30.json", status.get("publish_skip_reason", ""))
+
     def test_betting_day_backfill_accepts_a_comma_separated_list(self) -> None:
         """A 7-day backlog used to cost SEVEN deploys.
 
