@@ -1025,7 +1025,7 @@ EV_BASIS_MODEL_EDGE = "model_edge"
 
 
 def _model_value_term() -> str:
-    """Rank a model-priced row on its EDGE or on its EV? Default `ev` -- CURRENT.
+    """Rank a model-priced row on its EDGE or on its EV? Default `edge`.
 
     ------------------------------------------------------------------
     WHY EV AMPLIFIES, MEASURED
@@ -1057,13 +1057,24 @@ def _model_value_term() -> str:
     rows carry `model_skill.sample_games: 0`.
 
     ------------------------------------------------------------------
-    WHY IT NONETHELESS DEFAULTS TO `ev`
+    THE DEFAULT IS `edge` BY USER DECISION, 2026-08-31
     ------------------------------------------------------------------
 
-    Because the current behaviour is a USER DECISION `[2026-08-30: "Price EV vs
-    the model everywhere"]`, taken through an explicit question. TWO CLAUDE
-    SESSIONS AGREEING DOES NOT REVERSE IT. The flag exists so the alternative
-    can be MEASURED and put to them; the default changes when they say so.
+    **`[2026-08-31, user decision: "rank on edge, flip the default"]`. This
+    SUPERSEDES `[2026-08-30: "Price EV vs the model everywhere"]` FOR THE
+    RANKING TERM ONLY** -- EV against the model is still computed, still
+    published as `model_ev_pct`, and still what the row reports. What changed is
+    which number the SCORE sorts on.
+
+    Recorded at this length because the 08-30 decision is still in `state.md`,
+    and a reader who finds only that one will read this as a regression rather
+    than as a later ruling by the same person.
+
+    It shipped DEFAULTING TO THE OLD BEHAVIOUR first, deliberately: two Claude
+    sessions agreeing does not reverse a user's decision, so the flag existed to
+    make the alternative measurable and put it to them. The default moved only
+    after they ruled. `SYNDICATE_LAYER2_MODEL_VALUE_TERM=ev` is now the
+    reverse-out rather than the opt-in.
 
     Simulated on the served board before shipping -- top 25 `hr_1plus`
     23 -> 8, and the new #1 is a totals row at `ev_pct` +3.88, market-anchored
@@ -1071,7 +1082,9 @@ def _model_value_term() -> str:
     preserved: the edges are 3.79-12.43 against a #50 that was +0.64.
     """
     raw = str(os.environ.get("SYNDICATE_LAYER2_MODEL_VALUE_TERM") or "").strip().lower()
-    return "edge" if raw == "edge" else "ev"
+    # Absent means EDGE. Only the exact word `ev` reverts, so an unrecognised
+    # value cannot silently restore the 1/p amplification.
+    return "ev" if raw == "ev" else "edge"
 
 
 def _model_value_ev(

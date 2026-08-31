@@ -16,11 +16,14 @@ their own work: `blended_score` CAPS the model's influence when it arrives as
 `model_edge` (`_MODEL_EDGE_MAX_POINTS`, `_SCORE_SIM_CAP_PCT`), and the same
 information was then routed through `value_ev`, which has NO cap.
 
-**THE DEFAULT IS DELIBERATELY THE OLD BEHAVIOUR** and that is the most important
-assertion in this file. Ranking on model EV is a USER DECISION
-(`[2026-08-30: "Price EV vs the model everywhere"]`). Two Claude sessions
-agreeing does not reverse a user's decision; the flag exists so the alternative
-can be measured and put to them.
+**THE DEFAULT IS NOW `edge`, BY USER DECISION `[2026-08-31: "rank on edge, flip
+the default"]`**, superseding `[2026-08-30: "Price EV vs the model everywhere"]`
+FOR THE RANKING TERM ONLY.
+
+It shipped defaulting to the OLD behaviour first and that ordering is the point:
+two Claude sessions agreeing does not reverse a user's decision, so the flag
+existed to make the alternative measurable and put it to them. The default moved
+only after they ruled. `=ev` is now the reverse-out, not the opt-in.
 """
 from __future__ import annotations
 
@@ -29,26 +32,27 @@ import pytest
 from syndicate.features.shared import layer2_board as lb
 
 
-def test_the_default_is_the_CURRENT_behaviour(monkeypatch):
-    """THE GUARD ON A USER DECISION. If this ever defaults to `edge` without
-    the user saying so, a scoring change they explicitly chose has been
-    reversed by agents agreeing with each other."""
+def test_the_default_is_edge_by_user_decision(monkeypatch):
+    """`[2026-08-31]`. Absent means EDGE."""
     monkeypatch.delenv("SYNDICATE_LAYER2_MODEL_VALUE_TERM", raising=False)
-    assert lb._model_value_term() == "ev"
+    assert lb._model_value_term() == "edge"
 
 
-@pytest.mark.parametrize("raw", ["", "ev", "EV", "model_ev", "banana", "0", "true"])
-def test_only_the_exact_word_edge_switches_it(monkeypatch, raw):
-    """Unknown must not land on the NEW branch. Anything unrecognised keeps the
-    behaviour the user actually chose."""
-    monkeypatch.setenv("SYNDICATE_LAYER2_MODEL_VALUE_TERM", raw)
-    assert lb._model_value_term() == "ev"
-
-
-@pytest.mark.parametrize("raw", ["edge", "EDGE", " Edge "])
-def test_edge_is_selectable_without_a_deploy(monkeypatch, raw):
+@pytest.mark.parametrize("raw", ["", "edge", "EDGE", " Edge ", "banana", "0", "true"])
+def test_unknown_cannot_silently_restore_the_amplification(monkeypatch, raw):
+    """Only the exact word `ev` reverts. An unrecognised value must NOT land on
+    the 1/p-amplified branch -- unknown falling to the permissive side is how a
+    scoring regression arrives with nobody having chosen it."""
     monkeypatch.setenv("SYNDICATE_LAYER2_MODEL_VALUE_TERM", raw)
     assert lb._model_value_term() == "edge"
+
+
+@pytest.mark.parametrize("raw", ["ev", "EV", " Ev "])
+def test_the_reverse_out_still_works_without_a_deploy(monkeypatch, raw):
+    """The 08-30 behaviour stays one env var away, in case the re-ranked board
+    is worse in a way the simulation did not show."""
+    monkeypatch.setenv("SYNDICATE_LAYER2_MODEL_VALUE_TERM", raw)
+    assert lb._model_value_term() == "ev"
 
 
 def test_the_two_bases_are_distinct_strings():
