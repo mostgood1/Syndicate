@@ -8159,6 +8159,36 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-price-gate-LIVE] 2026-08-31T05:58Z — the price gate is live and holding the right population
+
+**`0c3f102f` deployed THROUGH a preflight HOLD `[user: "deploy it through
+anything running"]`.** Cost recorded rather than skipped: it killed three
+in-flight jobs — `refresh_odds_sources.py`, its parent `run_refresh_odds_job.py`,
+and a `build_soccer_artifacts.py --league serie_a` build. All re-run next tick.
+
+**First tick:**
+
+    HELD_PREGAME_NEAR_EVEN x5   mia-wsh 0.485 +16.8h │ det-min 0.455 +17.7h
+                                nyy-laa 0.429 +19.7h │ lec-rom 0.481 +10.5h
+                                sf-atl  0.400 +16.1h
+    EXECUTED positions=8 placed=0 duplicates=3 skipped=5
+             refused={'pregame_price_too_high': 5}
+
+Every held order is near-even AND pregame — exactly the population that has
+never filled across 12 observations. **Nothing cheap was suppressed**, which is
+the failure mode the old time gate had.
+
+**A PRECISION CAVEAT WORTH KEEPING.** The gate reads
+`planned_probability(requested_price)`, not the venue quote, and they differ
+slightly: `sf-atl` gates at 0.400 while its venue price was 0.410; `mia-wsh`
+0.485 vs 0.490. The slippage guard bounds that gap at 3c, so a decision NEAR THE
+CEILING could flip on which number is used. Away from 0.37 it makes no
+difference; at the boundary it would.
+
+**STILL UNVALIDATED:** the 0.37 ceiling. n=3 pregame fills, and the boundary
+lies in the never-observed gap 0.335 -> 0.410. `sf-atl` at 0.400 is now the
+closest observation to it — if that price ever fills, the ceiling is too low.
+
 ## [polymarket-TIME-IS-NOT-THE-VARIABLE] 2026-08-31T05:29Z — TIME-TO-EVENT IS REFUTED. The gate's premise is false.
 
 **A PREGAME ORDER FILLED, 18.6 HOURS BEFORE KICKOFF, WITHIN ~18 MINUTES.**
