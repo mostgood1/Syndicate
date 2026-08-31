@@ -7692,8 +7692,24 @@ market we understand and will never price. Segments remain untradeable.
 
 ---
 
-**`#603` CLOSED AND MEASURED 2026-08-30 06:18Z.** Venue quotes no longer answer
-the wrong game. Board `2026-08-30` pool `06:18:37Z`, after `d7cda903`:
+**`#603` REOPENED 2026-08-31 01:11Z — the 06:18Z closure below measured a
+NARROWER property than the ticket.** Venue quotes DO still answer the wrong
+game: 41 of 97 live MLB Kalshi-priced rows, including **9 of 9 live totals**
+(Reds@Cubs priced by `KXMLBTOTAL-26AUG311805SFATL-*`, a San Francisco @ Atlanta
+market), on a pool built by `165c448f` which contains both `#603` fixes. Full
+reading and cause in `deploys.md`. The closure reading was real but is blind to
+a ref imported from a game **not on the priced slate**: it answers exactly one
+of our fixtures — the wrong one — so a collision metric scores it clean.
+Cause: `_unconfirmed_on_a_contested_key` returns False whenever
+`len(claimants[key]) <= 1`, and `_kalshi_game_token` collapses `no_match` into
+the same `None` as "named nothing", which is the permissive branch.
+`CROSS_GAME_REJECTED_GRID` never fired in ~23.7h (positive control:
+`GRID_REPRICE` 544 matches, same window). `verify_603_cross_game.py` shares the
+blind spot — it scores UNMEASURABLE without a collidable pair, and this defect
+needs no collision.
+
+The superseded closure, kept because its reading was sound for what it covered:
+**`#603` closed and measured 2026-08-30 06:18Z.** Board `2026-08-30` pool `06:18:37Z`, after `d7cda903`:
 `refs answering >1 fixture 0 of 96`, `rows served by one 0 of 177`,
 `wrong-game price as served HEADLINE 0` (was 2). **The zero is discriminating**
 — 192 contested keys and 992 rows of opportunity existed, and 166 matched rows
@@ -7741,7 +7757,9 @@ a race between the venue capture cycle and the board build cycle — 0-of-6 at
 64s and 32-of-32 at 4.9s are the same mechanism. Do not tune it as per-quote
 staleness. `VENUE_QUOTE_AGE` now emits the uncensored series.
 
-**`#603` IS CLOSED AND THE READING IS DISCRIMINATING.** Board 06:18:37Z: 0 of 96
+**`#603` IS REOPENED (2026-08-31 01:11Z) — see above. The reading below is
+DISCRIMINATING FOR COLLISIONS ONLY and cannot see an off-slate ref.**
+Board 06:18:37Z: 0 of 96
 refs answer more than one fixture, 0 rows served by one, 0 wrong-game headline
 prices — against 192 contested keys and 992 rows of opportunity, with 166
 matched rows sitting on contested keys.

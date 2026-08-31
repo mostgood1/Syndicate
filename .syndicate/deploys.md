@@ -38212,6 +38212,119 @@ claim: acquired 21:56Z, EXPIRED 22:41Z while waiting for a preflight lull,
   to be capable of failing before it is trusted to pass.
 
 
+### 2026-08-31T01:11-01:40Z — `#603` REOPENED — **the 06:18Z closure is REAL but MEASURED THE WRONG PROPERTY; wrong-game prices are being served right now**
+
+Measurement only, lane `live-venue-order-placement`. No deploy, no claim, no
+source edit. **This reading is against `165c448f` (live on refresh-worker since
+2026-08-30T18:49:39Z), not `0c5243b4`** — content-verified to contain BOTH
+`_unconfirmed_on_a_contested_key` and `CROSS_GAME_REJECTED_GRID`, so the 06:18Z
+closure fix (`d7cda903`) is present in the code that built this pool. Board
+`written_at 2026-08-31T01:11:06Z`. It is filed here because this is where a
+reader chasing `#603` verification will look.
+
+**THE SHARING CENSUS WAS UNMEASURABLE, AND THE REASON IS NOW STRUCTURAL, NOT
+BAD LUCK: THE WHOLE BOARD HAD TWO LIVE GAMES.**
+
+    kalshi     mlb    totals   live=8  keys=7  collidable=0   UNMEASURABLE
+    kalshi     mlb    spreads  live=3  keys=3  collidable=0   UNMEASURABLE
+    kalshi     wnba   totals   live=3  keys=3  collidable=0   UNMEASURABLE
+    polymarket wnba   totals   live=6  keys=6  collidable=0   UNMEASURABLE
+
+    mlb 1 live game (Cincinnati Reds @ Chicago Cubs)   wnba 1 (Conn @ Dallas)
+    ncaaf 0   soccer 0
+
+Retrying could not have helped: with one live game per sport a collision is
+impossible by construction. The retry loop was started, ran one tick, and was
+stopped once a reading landed that needs no collidable pair.
+
+**`venue_ref` SETTLES IT, AND IT NEEDS NO COLLISION.**
+`venue_quote_fanin.py:1394-1397` assigns `side_best["price"]` and
+`side_best["venue_ref"]` from the SAME `quote` object in the same block, so it
+is the price's provenance, not a display field. Every live row was tested by
+resolving its own quote's event blob against the row's OWN game using the repo's
+`match_event_blob`:
+
+    live rows carrying a venue_ref        121
+      mlb   NOT own game                   41      <-- wrong-game prices, SERVED
+      mlb   OWN GAME ok                    56
+      wnba  OWN GAME ok                    18
+      wnba  polymarket (slug)               6      <-- all correct
+
+    market                  blob     event                rows
+    totals                  SFATL    26AUG311805SFATL        9   <-- #603's OWN SCOPE
+    batter_hits             MILCHC / SDCIN                   12
+    batter_hits_runs_rbis   MILCHC / SDCIN                    8
+    batter_rbis             MILCHC / SDCIN                    7
+    batter_total_bases      MILCHC / SDCIN                    5
+                                                    TOTAL    41
+
+**All 9 live MLB totals rows on Reds@Cubs were priced by a San Francisco @
+Atlanta market** (`KXMLBTOTAL-26AUG311805SFATL-*`). Every leaking ticker is a
+**2026-08-31** event — tomorrow's games — answering a 2026-08-30 live row.
+
+**WHY THE 06:18Z CLOSURE READ CLEAN AND WAS NOT WRONG.** It measured *refs
+answering >1 fixture: 0 of 96*. That is a collision metric: it counts a ref
+shared across two of OUR games. **A ref imported from a game that is not on the
+slate at all answers exactly ONE of our fixtures — the wrong one — and scores
+as clean.** The 192 contested keys and 166 matched rows make that reading
+genuinely discriminating for the defect it was aimed at. It is simply blind to
+this one. The closure should not be read as false; it should be read as narrow.
+
+**MEASURED CAUSE — the guard's premise is collidability, so it excuses exactly
+this case.** `_unconfirmed_on_a_contested_key` opens:
+
+    if len(claimants.get(str(candidate_key)) or ()) <= 1:
+        # Only one game could have produced this key...
+        return False
+
+One claimant, quote KEPT, whatever it names. Tonight MLB had one live game, so
+no key is contested and the guard returns False on every row. Its docstring
+justifies this as *"an unnamed quote answering it is unambiguous"* — but
+`claimants` is built from the slate being priced, so **"unambiguous among OUR
+games" is not "came from one of our games."** The SF@ATL market is outside the
+claimant set entirely, and the key it lands on looks uncontested precisely
+because no other slate game claims it.
+
+The upstream half fails the same way, verified locally against the deployed
+resolver:
+
+    KXMLBTOTAL-26AUG311805SFATL-12  blob='SFATL'   -> no_match -> game_token=None
+    KXMLBHIT-26AUG311940MILCHC-...  blob='MILCHC'  -> no_match -> game_token=None
+    KXMLBHIT-26AUG301920CINCHC-...  blob='CINCHC'  -> ok       -> 'chicago cubs+cincinnati reds'
+
+`no_match` (a game we can see is NOT ours) and "the source named nothing" both
+collapse to `None`, and `None` reaches the permissive branch. This is
+`unknown must not default permissive` and `gate on the output, not the input`
+in one defect.
+
+**`CROSS_GAME_REJECTED_GRID = 0`, and it is now decisive in the WRONG
+direction.** `text=`-filtered with backward paging over
+2026-08-30T01:21:03Z..now: `nothing matched`. The reader is not blind — the
+positive control `GRID_REPRICE` over the identical window returned **544 matches
+across 7 pages**. So the rejection never fired in ~23.7h of real traffic while
+41 wrong-game rows were served. That is what the cause predicts: nothing is
+rejected because nothing is recognised.
+
+**Scope:** 32 of the 41 are player props, OUTSIDE `#603`'s stated totals/spreads
+scope — same root cause, wider blast radius than the ticket. The 9 totals rows
+are in scope and are the failure. Kalshi SOCCER could not be re-checked (0 live
+soccer rows); the MLS-alias gap in
+`handoff_2026-08-30_kalshi_soccer_mls_codes.md` is untouched and is a different
+cause.
+
+**THE VERIFIER SHARES THE BUG'S BLIND SPOT.** `verify_603_cross_game.py` scores
+`UNMEASURABLE` whenever no two live games share a `(side, line)` — the same
+collidability premise the guard uses to excuse the quote. Both are built to
+catch a COLLISION; tonight's defect needs none. A wrong-game check should ask
+*does this ref name this row's game*, which is answerable on a single live row.
+
+**verify: 41 of 97 live MLB Kalshi-priced rows carry a price from a different
+game, 9 of 9 live totals among them, on a pool built by `165c448f` which
+contains both `#603` fixes — read from the served `/api/board/layer2-shortlist`
+at 01:11:06Z, fixture resolved by the repo's own `match_event_blob`.**
+`#603` is REOPENED.
+
+
 ## 2026-08-30 02:23-02:34Z — web `843fadc5` — NCAAF market-basis edge, lane `ncaaf-market-basis-picks`
 
 **What shipped.** `843fadc5` (+ `0810e187`): the model-free market-basis edge
