@@ -1516,3 +1516,337 @@ description is what made 45s look like a reasonable guess.
 comparison keeps not happening is now a measured scheduling property rather
 than an open question.
 
+---
+
+## 2026-08-30 evening slate — the lag series, n=78, and the number the ceiling was never set from
+
+**Window:** `2026-08-30T17:17:00Z` (when `ad4bc5c6` put the instrument on
+refresh-worker) → `2026-08-31T01:19:00Z`. Local: 12:17 PM – 8:19 PM CDT,
+**8h02m** across the evening slate. Command:
+
+    py -3 scripts/read_venue_capture_lag.py --start 2026-08-30T17:17:00Z
+
+### Raw output
+
+```
+capture-to-build lag, one value per BUILD per SPORT   ceiling=45.0
+
+sport     builds     min     p50     p90     max  builds<=ceil  quotes
+mlb           32     2.8    51.4    94.7   172.9       14/32      1324
+soccer        12     3.1   114.0   186.9   263.8        4/12        54
+wnba          34     4.6    53.1   104.7   181.2       16/34       304
+
+  mlb: 9.1, 49.5, 40.2, 172.9, 2.8, 31.8, 34.6, 139.2, 48.5, 75.6, 94.7, 21.2, 60.8, 83.0, 93.7, 13.5, 72.5, 38.0, 93.6, 56.9, 59.7, 34.1, 11.0, 12.5
+  soccer: 34.5, 186.9, 160.0, 114.0, 7.3, 160.5, 27.5, 70.2, 3.1, 137.8, 263.8, 53.2
+  wnba: 41.2, 143.9, 43.2, 41.7, 59.2, 4.6, 63.3, 55.6, 36.9, 111.4, 55.1, 21.8, 9.7, 93.4, 104.7, 16.3, 76.5, 41.9, 97.4, 63.9, 64.5, 38.0, 14.7, 18.0
+
+OBSERVED over 78 builds: p90=137.8s p95=160.5s
+  current ceiling 45.0s admits 34/78 builds.
+
+  A ceiling at the observed p95 would admit 95% of builds and is
+  traceable to this series. BUT PREFER REMOVING THE RACE: this lag is a
+  property of two SCHEDULES, not of market data, and widening the bar
+  treats a scheduling artifact as a data-quality tolerance. Having the
+  build read (or trigger) the capture it needs makes the number moot.
+  If the bar is kept, RENAME it -- it gates how far behind the build a
+  capture may be, not how stale a quote may be, and that mis-description
+  is what made 45s look defensible.
+```
+
+### Reading
+
+**The series exists now.** n=78 builds across three sports, against a floor of
+12. The instrument recommended rather than refused, so for the first time the
+45s ceiling can be compared to something measured instead of to another guess.
+
+**45s admits 34 of 78 builds — 44%.** That is the headline. The gate is not
+"occasionally tight", it is **rejecting the majority of builds**, and it rejects
+them for a reason that has nothing to do with the quotes: `age_seconds` is the
+age of the whole venue CAPTURE, inherited identically by every quote in the
+build (all 32 MLB quotes shared it to the decimal). So each build is one
+all-or-nothing coin flip on a race between two schedules, and the coin is
+landing against us more often than not. **This is the measured reason
+`venue_basis_edge` has never produced a scored comparison** — not a data
+problem, a scheduling one.
+
+**Do not read p95=160.5s as "the new ceiling".** Three reasons, and the first
+two are properties of the instrument itself (`scripts/read_venue_capture_lag.py:144`):
+
+1. **p90/p95 are POOLED across sports**, computed over one sorted `all_lags`
+   list. Soccer is systematically the worst performer (p50 **114.0s** vs mlb
+   51.4s and wnba 53.1s; max 263.8s) while contributing only 12 of 78 samples.
+   Both pooled tail figures — 137.8 and 160.5 — are **soccer values**. A single
+   global ceiling set from this pool would be sized by the worst sport's
+   schedule and be far looser than mlb or wnba need.
+2. **The printed per-sport lists are TRUNCATED to the last 24** (`series[-24:]`).
+   mlb shows 24 of 32 and wnba 24 of 34; only soccer's list is complete. The
+   table row is the full series, the list under it is not. Anyone re-deriving a
+   percentile by hand from those lists will get a wrong number for two of the
+   three sports.
+3. The standing objection is unchanged and is the real point: **this is a
+   property of two schedules, not of market data.** Widening the bar to 160s
+   would "pass" 95% of builds by declaring a two-and-a-half-minute-stale capture
+   acceptable — buying the pass rate by abandoning the freshness the gate exists
+   to enforce. Nothing about the market got better.
+
+**No ceiling change made, per the task's standing instruction and
+`.syndicate/state.md`.** `servable=False` untouched. The gate is doing what a
+gate should: refusing a comparison it cannot support. What is now measured is
+that the thing it is refusing is a **race**, and the fix is to remove the race —
+have the board build read, or trigger, the capture it needs — not to widen the
+tolerance for losing it.
+
+**If the bar is kept, it still needs the rename** flagged in the previous
+section. `MAX_VENUE_QUOTE_AGE_SECONDS` describes per-quote staleness. It gates
+how far behind the build a CAPTURE may be. That mis-description is what let 45s
+look defensible for as long as it did, and it will do the same for any
+replacement number.
+
+**Sample-count caveat for the next run:** 8h02m of one evening, one instrument
+build (`ad4bc5c6`), three sports. Soccer's 12 samples are at the refusal floor
+on their own — a per-sport ceiling for soccer would not clear the bar this
+series clears in aggregate.
+
+---
+
+## 2026-08-31 morning — the overnight series (n=90), the LEGACY_KEY_MATCH proof discharged, and a NEW duplicate pair the fix did not stop
+
+**Window:** `2026-08-30T17:17:00Z` (instrument `ad4bc5c6` live) → `2026-08-31T14:30Z`.
+Extends the n=78 evening section above; it does not replace it.
+
+### 1. THE LAG SERIES — n=90, AND IT MOVED THE WRONG WAY
+
+```
+capture-to-build lag, one value per BUILD per SPORT   ceiling=45.0
+
+sport     builds     min     p50     p90     max  builds<=ceil  quotes
+mlb           38     2.8    51.4    94.7   363.2       15/38      1373
+soccer        12     3.1   114.0   186.9   263.8        4/12        54
+wnba          40     4.6    55.1   111.4   367.5       18/40        362
+
+OBSERVED over 90 builds: p90=143.9s p95=186.9s
+  current ceiling 45.0s admits 37/90 builds.
+```
+
+**The overnight slate added 12 builds and made the picture worse, not
+noisier.** Against the evening's n=78:
+
+| | n=78 (evening) | n=90 (overnight) |
+|---|---|---|
+| admitted by 45s | 34/78 = **43.6%** | 37/90 = **41.1%** |
+| pooled p90 | 137.8s | 143.9s |
+| pooled p95 | 160.5s | 186.9s |
+| worst single lag | 263.8s (soccer) | **367.5s (wnba)** |
+
+Two things to read off this, and only two:
+
+**The pass rate is stable, so 43% is not a small-sample artifact.** Twelve more
+builds moved it 2.5 points. The gate rejecting roughly 3 of every 5 builds is
+the system's steady state, not an unlucky evening.
+
+**The tail is NOT stable, and it is no longer a soccer story.** The evening
+section correctly noted that both pooled tail figures were soccer values.
+Overnight that stopped being true: soccer contributed **zero** new builds (still
+12, still 3.1–263.8), while mlb's max went 263.8 → **363.2** and wnba's went
+198.2 → **367.5**. The two worst lags in the whole series are now mlb and wnba —
+the two sports the evening read treated as the well-behaved ones. Anyone who
+had concluded "size a ceiling for mlb/wnba and handle soccer separately" would
+have sized it from a distribution whose tail had not yet shown itself after 78
+samples.
+
+That is the argument against setting any number from this series, sharpened.
+p95 moved 26 seconds on a 15% increase in n. **A percentile that is still
+migrating is not a tolerance, it is a running maximum**, and the reason it keeps
+migrating is that it is measuring a race between two schedules rather than a
+property of market data.
+
+**No ceiling change made.** `MAX_VENUE_QUOTE_AGE_SECONDS` untouched at 45.
+`servable=False` on `venue_basis_edge` untouched — it has still never produced a
+scored comparison. The standing recommendation is unchanged and now better
+evidenced: **remove the race** (have the board build read, or trigger, the
+capture it needs), and if a bar is kept at all, **rename it** — it gates how far
+behind the build a CAPTURE may be, not how stale a quote may be.
+
+**Instrument caveat that survives from the evening section:** the printed
+per-sport lists are truncated to the last 24 (`scripts/read_venue_capture_lag.py`,
+`series[-24:]`). mlb now shows 24 of 38 and wnba 24 of 40. The table row is the
+full series; the list under it is not. Do not re-derive a percentile by hand
+from those lists.
+
+### 2. THE `LEGACY_KEY_MATCH` PROOF — DISCHARGED
+
+**It fired 35 times** between `2026-08-30T19:04:51Z` and `22:54:48Z`. This is the
+positive proof the previous session was owed, and it is the reading that could
+not be faked by `placed=0 duplicates=N`:
+
+```
+2026-08-30T21:08:45Z [execution_ledger] LEGACY_KEY_MATCH position_key='bb0e54608c9839a7'
+  matched_on='539e8702fb9408906d930a87' status='filled'
+  -- a PRE-FIX row for this bet; refused as a duplicate rather than re-placed
+```
+
+Two pre-fix positions (`bb0e54608c9839a7`, `d75466f232497400`) were recognised
+through the legacy path and refused, repeatedly, rather than re-placed under
+their new post-fix identity. The migration guard is **live and non-inert**. The
+`OWED` marker in `.syndicate/deploys.md` for `165c448f` is discharged.
+
+No `LEGACY_KEY_MATCH` after 22:54:48Z, which is expected rather than alarming —
+it fires only when a *pre-fix* row is encountered, and both of those bets have
+since settled. The guard ages itself out by design.
+
+### 3. BUT THE DEFECT CLASS IS NOT CLOSED — THREE NEW DUPLICATE PAIRS, MINTED AFTER THE FIX
+
+The duplicate scan the task asked for found **three (ticker, side, line) triples
+with two orders resting at Polymarket simultaneously**, all created *after*
+`165c448f` went live at 2026-08-30 18:50Z:
+
+| slug | side/line | order A | order B |
+|---|---|---|---|
+| `tsc-sea-lec-rom-2026-08-31-2pt5` | under 2.5 | `C6TTBX3CTKDE` | `C6VQ0R76WKDG` |
+| `tsc-bun-scp-scf-2026-09-05-2pt5` | over 2.5 | `C6RYD4TDWKDH` | `C6TV9VKGAKDD` |
+| `tsc-epl-ast-ars-2026-08-31-2pt5` | over 2.5 | `C6SRM9D8MKDN` | `C6TTBN1E4KDG` |
+
+Both legs of each pair were `ORDER_STATE_NEW` concurrently — the sea-lec-rom
+pair for roughly ten hours, `10:02Z` through `12:29:58Z`, at the same price
+(0.49) on the same side (`OUTCOME_SIDE_NO`).
+
+**Cost this time: zero.** All six legs reached `ORDER_STATE_CANCELED` with
+`contracts=0 fill_price=None`. Unlike the `HOU@NYY` pair that prompted the fix,
+none filled. That is luck about game timing, not the guard working.
+
+Note what did NOT happen: no kalshi duplicates, and `tsc-mlb-phi-laa-2026-08-30-7pt5`
+was submitted three times but produced exactly one venue order
+(`C6MQ3GTW4KDE`, `ORDER_STATE_FILLED`). Repeat submission does not always mint a
+duplicate, which is why counting `LIVE_ORDER` lines alone overstates the problem
+and the venue order ids are the reading that settles it.
+
+#### The retry path is NOT the cause — it is provably correct
+
+The obvious suspect is the intentional `rejected → pop → re-place` retry in
+`syndicate/features/shared/execution_ledger.py:record_order`. It is exonerated,
+by the life history of the FIRST key on sea-lec-rom:
+
+```
+01:07:46  key=26c1f018c8d168e83d4a9227  submitted->submitted  order_state_new
+01:30:32  key=26c1f018c8d168e83d4a9227  submitted->rejected   order_state_canceled
+01:33:33  key=26c1f018c8d168e83d4a9227  submitted->submitted  order_state_new   <- retried
+04:06:42  key=26c1f018c8d168e83d4a9227  submitted->rejected   order_state_canceled
+04:22:31  key=26c1f018c8d168e83d4a9227  submitted->submitted  order_state_new   <- retried
+12:29:58  key=26c1f018c8d168e83d4a9227  submitted->rejected   order_state_canceled
+```
+
+Cancelled twice, retried twice, **under the same key both times**. That is
+exactly the designed behaviour and it never doubled anything.
+
+The duplicate is a *second key* for the same bet:
+
+```
+05:14:18  key=7d59908958ea1952c390cc9f  submitted->submitted  order_state_new
+12:29:58  key=7d59908958ea1952c390cc9f  submitted->rejected   order_state_canceled
+```
+
+`7d59908958ea1952c390cc9f` was minted at `05:09:43Z`, at which moment
+`26c1f018c8d168e83d4a9227` was in status `submitted` and resting at the venue.
+The duplicate check should have refused it. It did not, because it computed a
+**different key for the same bet**.
+
+#### The alarm the task named did fire — `placed>0` on a rebuild
+
+```
+04:53:04  placed=0  duplicates=1  spent={'dollars': 38.61, 'orders': 9}
+05:09:43  placed=5  duplicates=0  spent={'dollars': 19.33, 'orders': 5}   <- ALARM
+05:15:55  placed=3  duplicates=5  spent={'dollars': 35.70, 'orders': 8}
+```
+
+and earlier the same night:
+
+```
+03:51:07  placed=0  duplicates=3
+04:07:09  placed=3  duplicates=0   <- ALARM
+```
+
+`duplicates` collapsing from 3 to 0 while `placed` jumps to 3, then 5, is the
+whole open book reading as *never placed* for one cycle. This is precisely the
+failure mode `_legacy_idempotency_key`'s own docstring describes — "sees the
+ENTIRE OPEN BOOK as bets it has never placed" — occurring for a reason the
+legacy guard does not cover.
+
+This is also the concrete vindication of the task brief's warning: on this same
+service, `placed=0 duplicates=N` was printing happily for hours on either side
+of these cycles. Reading only that field would have reported the guard healthy
+on the exact night it minted three duplicate pairs.
+
+#### The remaining variable field in the position identity is `selected_date`
+
+`idempotency_key` (`syndicate/features/shared/execution_ledger.py:270`) hashes:
+
+```
+position_key | selected_date | venue | sport | event_id | market | side | line | player_name
+```
+
+`165c448f` removed `commence_time` from `position_key`. **`selected_date` is
+still component two** — and it is carried identically into
+`_legacy_idempotency_key`, so the migration guard changes identity across a date
+boundary too and cannot catch this.
+
+A bet still resting when `selected_date` advances therefore gets a brand-new
+identity, and every open order changes identity *at once* — the same
+all-at-once blast radius the legacy guard was written to absorb for the
+position-key change. Corroborating: the `spent` budget counter reset in the same
+cycle as the alarm (`orders: 9 → 5`, `dollars: 38.61 → 19.33`), which is a new
+date's budget, and the three second-legs were all minted in the `04:07` /
+`05:09` / `05:15` window around the rollover.
+
+**Confidence:** the duplicate pairs, the two-keys-one-bet reading, the alarm
+cycles, and `selected_date`'s presence in the hash are all directly measured.
+The attribution to a date rollover specifically is strongly corroborated but
+**not yet traced end-to-end** through whoever sets `selected_date` on the
+request during an overnight rebuild. That trace is the next thing owed, and it
+should be done before any fix, because the previous fix in this family looked
+complete and was not.
+
+The general shape is now twice-confirmed and worth stating as a rule: **a field
+that varies over the life of an open position must not sit inside that
+position's identity.** `commence_time` was one instance. `selected_date` is
+another. Whatever fixes it needs a migration guard for the same reason
+`165c448f` did — and that guard must not itself key on `selected_date`.
+
+### 4. STILL NOT CODE-FIXABLE — the resting pair needs a human
+
+`C6H7WE0DPKDJ` ($4.06) and `C6HN0XD92KDE` ($5.44) produced **no log lines at all**
+in `2026-08-30T18:50Z → now`. That is *not* evidence they were cancelled: the
+`ORDER_STATE` poller only emits for orders it still tracks, so "absent from the
+window" and "no longer resting" look identical from here.
+
+**Correction to the standing brief:** it says there is no `cancel_order`
+adapter. That is stale — `3170db13` shipped
+`syndicate/features/shared/polymarket_us_orders.cancel_order`
+(`polymarket_us_orders.py:953`), dry-run unless `execute=True`, with
+read-before-write and a wrong-leg expectation check. It has never been fired in
+anger, and `deploys.md` records its precondition as explicitly UNMEASURED:
+nobody has established that cancelling costs nothing at Polymarket, and that
+venue's fee model was falsified at low prices the same day it shipped.
+
+So this is no longer "impossible in code", it is "not authorised yet". Firing it
+needs a human decision, not a human's mouse. Until then: **a human should check
+the Polymarket Orders screen and cancel one leg if both are still resting.**
+
+### 5. LEDGER HYGIENE — the evening section was never pushed
+
+The n=78 section above was committed locally as `3dd749d5` in the shared primary
+tree and **is not an ancestor of `origin/main`**. At the time of this run the
+primary tree's `main` was **39 ahead / 136 behind** `origin/main`. This section
+was assembled by taking `origin/main`'s copy as the base and re-appending the
+evening section ahead of it, so nothing is lost — but a scheduled task writing
+findings into the shared tree without pushing is one power cut from losing them,
+and this is the second time the primary tree's staleness has had to be worked
+around by hand.
+
+### STATUS
+
+- Lag series: **n=90, no ceiling change, no `servable` change.** Recommendation
+  unchanged: remove the race; rename the bar if it is kept.
+- `LEGACY_KEY_MATCH`: **proof discharged**, 35 firings.
+- Duplicate defect class: **REOPENED.** Three new pairs, zero cost this time,
+  `selected_date` in the identity is the leading and well-evidenced suspect.
+- `C6H7WE0DPKDJ` / `C6HN0XD92KDE`: **still owed a human**, status unknown.

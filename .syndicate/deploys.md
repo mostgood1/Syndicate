@@ -39835,3 +39835,88 @@ ending.
 
 **Claim** acquired 06:2xZ under this lane, released cleanly with its token — no
 `--force`.
+
+## 2026-08-31 — 165c448f — the LEGACY_KEY_MATCH proof is DISCHARGED, and the defect class is REOPENED
+
+- **No deploy.** Measurement only, by the `venue-lag-series-morning-check`
+  scheduled task under lane `live-venue-order-placement`. Nothing was pushed to
+  a service; no claim taken because none was needed.
+
+### verify: `LEGACY_KEY_MATCH` fired 35 times — the owed proof is settled
+
+```
+py -3 scripts/render_logs.py --service live-odds-worker \
+    --text LEGACY_KEY_MATCH --start 2026-08-30T18:50:00Z --tail 10
+# COVERED 2026-08-30T19:04:51Z .. 22:54:48Z   (35 matches, 2 pages)
+```
+
+Two pre-fix positions — `bb0e54608c9839a7` and `d75466f232497400` — were matched
+through the legacy path and refused rather than re-placed, repeatedly. The
+migration guard in `165c448f` is **live and non-inert**. This is the reading the
+prior entry recorded as OWED; it is now discharged.
+
+The silence after 22:54:48Z is expected, not a regression: the guard fires only
+on a *pre-fix* row and both of those bets have since settled. It ages itself out
+by design.
+
+### BUT: three NEW duplicate pairs were minted after the fix
+
+`165c448f` removed `commence_time` from the position identity. It did not close
+the defect class. Overnight, three (ticker, side, line) triples had two orders
+resting at Polymarket **simultaneously**:
+
+| slug | side/line | order A | order B |
+|---|---|---|---|
+| `tsc-sea-lec-rom-2026-08-31-2pt5` | under 2.5 | `C6TTBX3CTKDE` | `C6VQ0R76WKDG` |
+| `tsc-bun-scp-scf-2026-09-05-2pt5` | over 2.5 | `C6RYD4TDWKDH` | `C6TV9VKGAKDD` |
+| `tsc-epl-ast-ars-2026-08-31-2pt5` | over 2.5 | `C6SRM9D8MKDN` | `C6TTBN1E4KDG` |
+
+**Cost: zero.** All six legs reached `ORDER_STATE_CANCELED` with `contracts=0`,
+`fill_price=None`. That is game timing, not the guard working — the `HOU@NYY`
+pair that prompted the fix did fill, and lost.
+
+**The alarm this entry's predecessor told the morning task to watch for did
+fire.** Not `duplicates>0` — `placed>0` on a rebuild:
+
+```
+03:51:07  placed=0  duplicates=3
+04:07:09  placed=3  duplicates=0   <- whole open book read as never-placed
+04:53:04  placed=0  duplicates=1
+05:09:43  placed=5  duplicates=0   <- again; spent reset 9 orders -> 5
+```
+
+The retry path is **exonerated**: key `26c1f018c8d168e83d4a9227` was cancelled
+and retried twice under *the same key*, exactly as designed. The duplicate is a
+*second key for the same bet* (`7d59908958ea1952c390cc9f`, minted 05:09:43Z
+while the first key was still `submitted` and resting).
+
+**Leading suspect, well evidenced but not yet traced end-to-end:**
+`idempotency_key` (`syndicate/features/shared/execution_ledger.py:270`) still
+hashes `selected_date` as component two, and `_legacy_idempotency_key` carries
+it identically — so the migration guard cannot catch a date-boundary identity
+change either. What is owed before any fix is the trace of who sets
+`selected_date` on the request during an overnight rebuild. The previous fix in
+this family looked complete and was not; this one should not be shipped on the
+same standard of evidence.
+
+Full working in `.syndicate/findings_2026-08-29_live_venue_arb_economics.md`,
+section `2026-08-31 morning`.
+
+### also measured, no action taken
+
+**Venue capture-to-build lag, n=90** (`scripts/read_venue_capture_lag.py`,
+window `2026-08-30T17:17:00Z` →). 45s admits **37 of 90 builds (41%)**. Pooled
+p95 moved 160.5s → 186.9s on a 15% increase in n, and the two worst lags in the
+series are now mlb (363.2s) and wnba (367.5s) rather than soccer — the tail is
+still migrating, so no number from this series is a tolerance yet.
+`MAX_VENUE_QUOTE_AGE_SECONDS` **unchanged at 45**; `servable=False` on
+`venue_basis_edge` **unchanged**; it has still never produced a scored
+comparison.
+
+**Correction to the standing brief:** a Polymarket `cancel_order` adapter DOES
+exist (`3170db13`, `polymarket_us_orders.py:953`, dry-run unless
+`execute=True`). The brief carried by the morning task says it does not. Its
+precondition remains unmeasured — nobody has established cancelling is free at
+Polymarket — so `C6H7WE0DPKDJ` / `C6HN0XD92KDE` still need a human decision, and
+their current status is unknown (no log lines in the window, which is not
+evidence of cancellation).
