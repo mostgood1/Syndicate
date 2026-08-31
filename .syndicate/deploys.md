@@ -39225,3 +39225,45 @@ automatic path like `_cancel_stale_resting` needs someone to establish that
 cancelling costs nothing at Polymarket. That is the load-bearing assumption in
 Kalshi's version, and this venue's fee model was falsified at low prices the
 same day.
+
+## 2026-08-31 — 91e1f69e — both workers — the UNSAFE auto-reject is OFF production
+
+- **Deployed by the USER**, all three services. live-odds-worker and
+  refresh-worker to `91e1f69e` (main tip); web to `4028969e`.
+- **CLOSES the open live-money risk** `polymarket-yes-leg-binding` recorded
+  against `bf1dd290`. Their alarm was correct when written and is now stale.
+
+- **verify: the unsafe predicate is GONE and the safe one is PRESENT**, checked
+  by CONTENT on the deployed SHA rather than by ancestry alone:
+
+      91e1f69e  never_submittable  5 occurrences   <- the tightened fix (07344834)
+      91e1f69e  never_sent         0 occurrences   <- the unsafe version, absent
+
+  live-odds-worker LIVE at 2026-08-31T01:32:30Z.
+
+- **What was actually at risk, and for how long.** `bf1dd290` carried
+  `63661af1`, which auto-rejected on "no venue id" ALONE. That is consistent
+  with never-sent AND with filled-after-a-lost-submit-response, and the second
+  is a real position that would have been deleted from the money record. It ran
+  from 20:38:53Z to 01:32:30Z (~4h50m) and fired EXACTLY ONCE, at 20:39:51Z on
+  `3243b1c994b6a445ae917a45` -- correctly, on an order with no ticker and no
+  venue id. **No money-record corruption occurred.**
+
+- **web is 2 commits behind main and that is fine, checked not assumed:**
+  `4028969e` is an ANCESTOR of main and carries `508a7e79`, so the slate
+  `?slug=`/`?limit=` endpoint is retained. An older-SHA deploy silently
+  reverting a shipped change is a known failure mode here; it did not happen.
+
+- **NOT YET ASSERTED: that the new branch has RUN.** `RECONCILE_NOT_FOUND` only
+  fires when an order is missing from the venue's book -- once in 271 minutes
+  historically. Absence of the line is NOT evidence. Content on the deployed SHA
+  proves the code is PRESENT; only a `never_submittable=` line proves it
+  EXECUTED, and none has appeared yet.
+
+- **The two fixes now compose rather than compete.** `dd33c865`'s per-order
+  recovery runs FIRST and its three refusals (`RECONCILE_NO_VENUE_ID`,
+  `RECONCILE_SINGLE_READ_FAILED`, `recovery_skipped`) still keep blocking any
+  order that HAS a ticker. `07344834` fires only where that path declines AND
+  the order was never submittable at all. The reverted version's defect was
+  running after those refusals and converting each into a silent write.
+
