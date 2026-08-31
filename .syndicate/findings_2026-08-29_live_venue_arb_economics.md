@@ -1706,6 +1706,13 @@ with two orders resting at Polymarket simultaneously**, all created *after*
 | `tsc-bun-scp-scf-2026-09-05-2pt5` | over 2.5 | `C6RYD4TDWKDH` | `C6TV9VKGAKDD` |
 | `tsc-epl-ast-ars-2026-08-31-2pt5` | over 2.5 | `C6SRM9D8MKDN` | `C6TTBN1E4KDG` |
 
+> **SUPERSEDED — see the CORRECTION section at the end of this file.**
+> Only `tsc-sea-lec-rom` is a real duplicate. The other two rows are the
+> retry path working correctly: their first leg was CANCELED at 04:06:41Z,
+> before the replacement was placed. Never concurrent. Corrected count: ONE
+> pair. The `04:07:09 placed=3 duplicates=0` line below is likewise NOT an
+> alarm; the single alarm is `05:09:43`.
+
 Both legs of each pair were `ORDER_STATE_NEW` concurrently — the sea-lec-rom
 pair for roughly ten hours, `10:02Z` through `12:29:58Z`, at the same price
 (0.49) on the same side (`OUTCOME_SIDE_NO`).
@@ -1850,3 +1857,117 @@ around by hand.
 - Duplicate defect class: **REOPENED.** Three new pairs, zero cost this time,
   `selected_date` in the identity is the leading and well-evidenced suspect.
 - `C6H7WE0DPKDJ` / `C6HN0XD92KDE`: **still owed a human**, status unknown.
+
+---
+
+## 2026-08-31 — CORRECTION to the section above: ONE duplicate pair, not three — and the mechanism is now traced, not just suspected
+
+Written ~30 minutes after the section above, same task, after checking a thing
+the first pass asserted without testing. **It narrows the blast radius and
+strengthens the mechanism.** Both halves matter.
+
+### What was wrong: two of the three "pairs" were legitimate retries
+
+The section above lists three duplicate pairs. **Only one of them is real.**
+
+The error was assuming that a second venue order id on the same
+(ticker, side, line) means two orders existed *at once*. It does not: the
+designed `rejected → pop → re-place` retry also mints a new venue order id,
+under the same ledger key. Distinguishing them requires checking **simultaneity**,
+which the first pass did for `sea-lec-rom` and then generalised to the other two
+without checking.
+
+Checked now:
+
+```
+tsc-bun-scp-scf-2026-09-05-2pt5
+  04:06:41  C6RYD4TDWKDH  ORDER_STATE_CANCELED     <- first leg GONE
+  04:22:30  C6TV9VKGAKDD  ORDER_STATE_NEW          <- replacement
+
+tsc-epl-ast-ars-2026-08-31-2pt5
+  04:06:41  C6SRM9D8MKDN  ORDER_STATE_CANCELED     <- first leg GONE
+  04:22:30  C6TTBN1E4KDG  ORDER_STATE_NEW          <- replacement
+```
+
+The first leg was cancelled **before** the replacement was placed, in both
+cases. Never concurrent. These are the retry path working exactly as designed —
+the same behaviour the section above correctly exonerates for `sea-lec-rom`'s
+first key, mis-scored as a defect two paragraphs later.
+
+The one real pair, which does show concurrency:
+
+```
+tsc-sea-lec-rom-2026-08-31-2pt5
+  05:09:22  C6TTBX3CTKDE  ORDER_STATE_NEW
+  05:14:18  C6TTBX3CTKDE  ORDER_STATE_NEW   <- both live, same side,
+  05:14:18  C6VQ0R76WKDG  ORDER_STATE_NEW   <-   same price, from here
+  ...       both NEW continuously through 12:29:58Z, then both CANCELED
+```
+
+**Corrected count: ONE duplicate pair, resting ~7 hours, cost zero (cancelled
+unfilled).** Not three.
+
+### The `04:07:09  placed=3 duplicates=0` line was NOT an alarm
+
+Same error, same cause. Three orders had just been cancelled at the venue at
+`04:06:41/42` and correctly reclassified `rejected`; `placed=3` is those three
+being legitimately retried. `duplicates=0` is correct there — there was nothing
+left open to be a duplicate of.
+
+**There was exactly one alarm cycle overnight:**
+
+```
+05:09:43  placed=5  duplicates=0  spent={'dollars': 19.33, 'orders': 5}
+```
+
+Of those five, four were genuinely new bets (`aec-mlb-ath-tex`, `aec-mlb-sf-atl`,
+`aec-mlb-det-min`, `aec-mlb-nyy-laa` — all first appearances). The fifth was
+`sea-lec-rom`, still resting, and it is the duplicate.
+
+### What got STRONGER: the mechanism is now traced end-to-end
+
+The section above called the date-rollover attribution "corroborated but not yet
+traced" and named the trace as the next thing owed. **It is done, and it
+confirms:**
+
+- `scripts/run_live_odds_refresh_worker.py:1927` — the execution tick calls
+  `run_execution(central_today_iso(), venue_scope=venue)`.
+- `central_today_iso()` (`syndicate/features/shared/timezone.py:20`) is **today
+  in US/Central**.
+- Midnight Central during CDT is **05:00Z**.
+- The single alarm cycle is **05:09:43Z** — the first execution tick after the
+  Central date rolled over.
+- The budget reset in that same cycle (`orders: 9 → 5`) is the new date's
+  budget, not a coincidence.
+- The second key `7d59908958ea1952c390cc9f` first reconciles at `05:14:18Z`,
+  from that cycle.
+
+So: `selected_date` is component two of `idempotency_key`
+(`syndicate/features/shared/execution_ledger.py:270`) and is carried identically
+into `_legacy_idempotency_key`. At midnight Central every open position changes
+identity at once, the migration guard cannot catch it because it keys on the
+same field, and any position still resting across that boundary can be
+re-placed. **Confirmed, not suspected.**
+
+The narrower count does not make it less serious. One duplicate pair happened
+because a bet was still resting at midnight Central; the number of victims on a
+given night is just how many positions happen to straddle 05:00Z. The
+`HOU@NYY` pair that prompted `165c448f` filled and lost.
+
+### The lesson, which is the one this repo already has written down
+
+*Presence is not simultaneity.* A second identifier is evidence that something
+was created twice, not that two things existed at once — and for an order book,
+only the second is a duplicate. The check that separates them (do the intervals
+overlap?) is one query, and the first pass skipped it on two of three cases
+after running it on the first. Generalising from the one case you verified to
+the ones you did not is how a 1× finding gets reported as 3×.
+
+### Unchanged by this correction
+
+- `LEGACY_KEY_MATCH` proof: still **discharged**, 35 firings.
+- Lag series: still n=90, 45s admits 37/90, ceiling unchanged, `servable`
+  unchanged.
+- `C6H7WE0DPKDJ` / `C6HN0XD92KDE`: still unknown, still need a human decision.
+- The retry path: still exonerated — more strongly than before, since two of the
+  three alleged defects turned out to be it working correctly.

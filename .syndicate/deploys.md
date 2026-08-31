@@ -39871,6 +39871,19 @@ resting at Polymarket **simultaneously**:
 | `tsc-bun-scp-scf-2026-09-05-2pt5` | over 2.5 | `C6RYD4TDWKDH` | `C6TV9VKGAKDD` |
 | `tsc-epl-ast-ars-2026-08-31-2pt5` | over 2.5 | `C6SRM9D8MKDN` | `C6TTBN1E4KDG` |
 
+> **CORRECTED same day:** only `tsc-sea-lec-rom` is a real duplicate (both
+> legs concurrently NEW 05:14:18Z-12:29:58Z). The other two rows had their
+> first leg CANCELED at 04:06:41Z before the replacement went in - the retry
+> path working, not a defect. **ONE pair, not three.** The `04:07:09` line
+> is not an alarm either; the single alarm is `05:09:43`, which is the first
+> execution tick after midnight US/Central (05:00Z CDT).
+>
+> The mechanism is now TRACED, not merely suspected:
+> `run_live_odds_refresh_worker.py:1927` passes `central_today_iso()` as
+> `selected_date`, which is component two of `idempotency_key`. At midnight
+> Central every open position changes identity at once. Full working in the
+> findings file's CORRECTION section.
+
 **Cost: zero.** All six legs reached `ORDER_STATE_CANCELED` with `contracts=0`,
 `fill_price=None`. That is game timing, not the guard working — the `HOU@NYY`
 pair that prompted the fix did fill, and lost.
