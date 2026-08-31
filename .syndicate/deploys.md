@@ -40228,3 +40228,102 @@ mlb shard: 2,082,916 B / 999 rows = **2,085 B/row**, so ~3,800 rows fit 95% of a
 shard's own 8 MB. The combined key is ~3.75 MB of cards/metadata and does not
 shrink with rows — that is the fixed cost, and it is the thing to watch, not the
 row count. `ROWS_TOTAL=4000` is the current binding limit, not the keyvalue ceiling.
+
+## 2026-08-31 18:25Z — INCIDENT: `SYNDICATE_LAYER2_ROWS_PER_SPORT=3000` CORRUPTED THE BOARD FOR ~29 MIN — lane `layer2-cap-raise`
+
+**User decision, 2026-08-31: _"raise it to 3000 per sport."_** I set it, it broke
+the board, I reverted it. The board dropped 2,917 rows and **lost NCAAF entirely**
+across at least three build cycles. Nobody else caused this.
+
+### the mechanism — a refused write produced WRONG DATA, not stale data
+
+```
+18:25:44  LAYER2_SHORTLIST rows=4552 (mlb 2570, ncaaf 413, soccer 1569)
+18:25:44  SHORTLIST_PERSIST_LARGE bytes=19957904 ceiling=8388608 pct=237.9 per_sport_limit=3000
+18:25:44  LAYER2_SHARDS_WRITTEN rows=4552 combined_keeps_rows=False      <- shards UPDATED
+18:25:45  LAYER2_SHORTLIST_WRITE_FAILED: 9648192 bytes exceeds 8388608   <- combined REFUSED
+18:27:21  LAYER2_SHARD_MERGE loaded=[mlb,ncaaf,soccer] rows=1635/1635 unplaceable=2917
+```
+
+`_write_layer2_shards` runs BEFORE `write_json_file(combined)` and there is **no
+rollback**. So the shards advanced to a 4,552-row board while the combined key
+stayed frozen at `written_at=18:02:05Z, shard_row_total=1635`. `_merge_layer2_shards`
+sizes `slots` from the STALE total, so every row whose global position exceeded
+1,635 was dropped — 2,917 of them, including all 413 ncaaf rows.
+
+**Served boards during the incident:**
+```
+last good   {mlb 1000, soccer 222, ncaaf 413}   1635 rows
+18:25       {soccer 1569, mlb 66}               ncaaf GONE
+18:43       {soccer 256,  mlb 1744}             ncaaf GONE  <- recurred, not transient
+```
+`mlb 1744` is not a cap working; it is which global positions happened to fall
+under the frozen ceiling.
+
+### the number I should have checked and did not
+
+I verified each SHARD fits its own 8MB ceiling and concluded 3000 was safe. **The
+binding key is the COMBINED one, and I never measured it.** It carries per-row
+card/metadata that sharding never split, at ~2,200 B/row **even with `rows: []`**:
+
+```
+1634 rows -> combined 3,754,595 B  (2,298 B/row)   OK
+4552 rows -> combined 9,648,192 B  (2,120 B/row)   REFUSED
+=> the board's real ceiling is ~3,600-3,800 TOTAL rows, regardless of per-sport
+```
+
+The worst part: **I wrote the fact down myself** in the entry above this one —
+*"the combined key is ~3.75 MB of cards/metadata and does not shrink with rows —
+that is the fixed cost, and it is the thing to watch"* — and then sized the next
+raise off shard bytes anyway. It was not "fixed cost"; it scales with rows.
+
+### recovery — VERIFIED
+
+Env reverted to `PER_SPORT=1000 / ROWS_TOTAL=4000`. Deploy blocked: preflight HELD
+on 7 in-flight jobs and there is **no preflight flag that overrides a job hold**
+(`--allow-rapid` covers spacing only); the guard's off switch is read from Claude
+Code's own process env, so the session could not clear it. **User deployed
+`258c0ea0` manually**, live 18:44:24Z.
+
+```
+18:54:55  board written_at 18:43:22Z -> 18:54:55Z   rows 2000 -> 1600
+          {soccer 256, mlb 1744} -> {soccer 187, mlb 1000, ncaaf 413}
+          per_sport_limit 3000 -> 1000
+18:54:55  LAYER2_SHARDS_WRITTEN rows=1600 combined_keeps_rows=False
+          NO LAYER2_SHORTLIST_WRITE_FAILED  <- the combined key wrote; shards and
+          metadata consistent again, so it cannot re-corrupt next cycle
+```
+
+### follow-up shipped: `ROWS_TOTAL` 4000 -> 3000
+
+`4000` was never safe — it sits ABOVE the ~3,600-row ceiling and only held today
+because ncaaf and soccer are supply-limited. **NFL is already in the ingest list**
+(`sports=['mlb','ncaaf','nfl','soccer']`), so a fourth sport producing rows walks
+straight back into this. Set to `3000` (~6.6 MB combined, 79%). Live on `04185203`
+19:01:56Z. **A NO-OP on today's 1,600-row board by design** — it is a guardrail,
+and there is no positive reading to take, only the absence of a regression.
+
+### THREE DESIGN DEFECTS, none fixed, all mine to have caused
+
+1. **A refused combined write leaves CORRUPTION, not staleness.** Shards are
+   written first with no rollback and the merge trusts a stale `shard_row_total`.
+   The correct behaviour is to serve the last good board. **This is the serious one.**
+2. **The shed is skipped when sharding is on** (`if keeps_rows: payload = _shed(...)`),
+   so nothing trims the combined key when it overflows — the write just fails.
+3. **`SHORTLIST_PERSIST_LARGE` measures the wrong thing.** It reports the payload
+   WITH rows (`pct=93.3` at a perfectly healthy 1,600-row board) and advises
+   lowering `ROWS_PER_SPORT`. Since sharding, that payload is never written as one
+   key. It should measure the combined key and each shard.
+
+### my own errors this sequence, for the record
+
+- Sized a raise off shard bytes when the combined key was binding — **the incident**.
+- Told the user "the flag didn't take effect" from TWO absences that were
+  instrument artifacts: `rows_from_shards` is not in the endpoint's explicit key
+  list, and Render's filtered-text log search returned a stale result set.
+- Told the user setting env vars "triggered nothing." It did this time —
+  `dep-daast5ss728c73e2krl0 trigger=service_updated 18:57:27Z`. True at 17:29,
+  carried forward as a rule without re-checking.
+- A watcher took the deploy claim **while a deploy was in flight**, because it
+  checked the LIVE deploy rather than any in-progress one — the exact race the
+  claim exists to prevent. Released; no second deploy fired.
