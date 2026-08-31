@@ -39,11 +39,27 @@ moneyline would refuse. Fail-safe, and a whole market silently dark. Measured on
 the real slug: slate row -> home False AND away False; request's teams -> home
 False (the losing bet) and away True.
 
-**NOT DEPLOYED: refresh-worker**, which BUILDS the plan and therefore chooses the
-slug (`portfolio_commit` -> `join_polymarket_to_board` -> `polymarket_ticker_resolver`).
-It runs `132559e1`, which does NOT contain the fix. Blocked on TWO things, neither
-overridden: its claim was HELD by a live session (`layer2-accuracy-audit`, 32 min)
-and an MLB daily sim was in flight (`run_mlb_daily_sim_job.py`) that a deploy kills.
+**refresh-worker: RESOLVED 21:20:36Z, AND I DID NOT DEPLOY IT.** While my poller
+waited on the claim, `layer2-accuracy-audit` released near its 45-min expiry and
+`layer2-cap-raise` acquired it within ~90s and deployed refresh-worker at
+`8876b823` -- my own fix commit, because it was already on `origin/main`. Their
+deploy carried it whether or not they intended to.
+
+    refresh-worker live commit 8876b823   carries the fix: True (ancestry-checked
+                                          against the RUNNING commit, not the
+                                          deploy record)
+
+I STOPPED MY POLLER rather than race for the claim. Winning it would have fired a
+second deploy of a commit already going out -- another worker restart, another
+round of killed jobs, for no change. `8876b833`... `8876b823` is also the CORRECT
+commit for this service: the completion `d04d9f49` touches
+`pipeline/execute_portfolio.py`, the EXECUTION path, which runs on
+live-odds-worker. refresh-worker needs only the board-join fix.
+
+**NOT YET VERIFIED END TO END.** No soccer h2h has resolved since either deploy,
+so the positive case -- a correct leg actually selected and placed -- has not been
+observed. Tomorrow's slate is the first opportunity. What IS verified is the
+negative: the wrong-side path cannot execute.
 
 **THE EXPOSURE IS CLOSED ANYWAY, and that is why waiting was right.**
 live-odds-worker refuses any wrong slug refresh-worker hands it, so no bad bet can
