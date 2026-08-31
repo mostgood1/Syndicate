@@ -8076,6 +8076,35 @@ every order and has never been logged: if the four share one timestamp it is a
 single sweep; if they differ, they are independent events being treated as one
 phenomenon.
 
+**DEPLOYED AND READ 2026-08-31T02:50:52Z (96735d8a). One half works, the other
+half was a miss.**
+
+**`lastTransactTime` WORKS, and was validated BEFORE being relied on:**
+
+    resting  sea-lec-rom  created 01:30:36.041  lastTransact 01:30:36.043  (untouched)
+    filled   nfl lar-lac  created 08-27 18:33:31  lastTransact 19:40:20    (+67 min)
+    filled   sea-juv-par  created 19:45:07        lastTransact 19:48:59    (+4 min)
+
+It equals `created` to the millisecond for an untouched order and is the fill
+time for a filled one. So the next cancellation shows whether the orders share
+ONE timestamp (a sweep) or differ (independent events wrongly described as one
+phenomenon). That question is now answerable; it was not before.
+
+**`marketMetadata` IS A MISS — IT CARRIES NO MARKET STATE.** The full object fits
+inside the 240-char bound: `{slug, icon, title, outcome, eventSlug, eventId}`.
+Pure display metadata. **The market-state hypothesis cannot be tested from the
+order payload at all.** Do not re-add this field expecting state — the state
+proxy is `orderable` on the SLATE row, a different read in
+`polymarket_us_markets` (held by `live-venue-order-placement`).
+
+The bound did not hide it: the value came back UNCLIPPED, and that was checked
+rather than assumed.
+
+**Incidental, and it bears on the time-to-event hypothesis:** resting orders DO
+fill, on very different timescales — `nfl lar-lac` at +67 minutes,
+`sea-juv-par` at under 4.
+
+
 **NEXT, CHEAP:** log `lastTransactTime` (exact transition time), `marketMetadata`
 (market state -- the leading remaining explanation) and `intent`. Log-only, same
 ORDER_STATE line, one deploy.
