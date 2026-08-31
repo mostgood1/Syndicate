@@ -16,6 +16,7 @@ problem.
 from __future__ import annotations
 
 import datetime as _dt
+import hashlib as _hashlib
 import os
 import time
 from collections.abc import Sequence
@@ -913,6 +914,73 @@ def _polymarket_max_price_age_seconds() -> float:
     return parsed if parsed > 0 else _slate_ceiling_default()
 
 
+def _polymarket_explore_rate() -> float:
+    """Fraction of would-be-held boundary orders to PLACE anyway, 0.0-1.0.
+
+    `SYNDICATE_POLYMARKET_EXPLORE_RATE`, default 0.10. `0` disables exploration.
+
+    WHY THIS EXISTS: WITHOUT IT THE GATE CANNOT BE RE-DERIVED. Asked on
+    2026-08-31 whether `sf-atl` (pregame, ~0.400, the closest observation to the
+    boundary) had filled, the answer was that it was NEVER PLACED -- the gate
+    held it. Every surviving order then fitted the rule, which is what a
+    self-confirming filter looks like. The stated falsifier ("a pregame fill
+    above 0.410") can only come from the population the gate suppresses, so the
+    evidence was frozen at n=3 and could not grow, and any threshold inside
+    0.335-0.410 would look correct forever.
+    """
+    raw = str(os.environ.get("SYNDICATE_POLYMARKET_EXPLORE_RATE") or "").strip()
+    if not raw:
+        return 0.10
+    try:
+        return max(0.0, min(1.0, float(raw)))
+    except (TypeError, ValueError):
+        print(
+            f"[execute_portfolio] EXPLORE_RATE_UNREADABLE {raw!r} -- not exploring",
+            flush=True,
+        )
+        return 0.0
+
+
+def _polymarket_explore_band() -> float:
+    """How far ABOVE the ceiling still counts as boundary. Default 0.10.
+
+    Exploration is aimed, not uniform. The unknown is the gap 0.335-0.410; a
+    0.490 side has already been observed resting FOUR times and re-testing it
+    buys nothing but churn. With ceiling 0.35 and band 0.10 the arm probes
+    0.35-0.45, which is where the boundary actually lies.
+    """
+    raw = str(os.environ.get("SYNDICATE_POLYMARKET_EXPLORE_BAND") or "").strip()
+    if not raw:
+        return 0.10
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _polymarket_explores(request, price: float, ceiling: float) -> bool:
+    """Deterministically: is this order the exploration arm rather than held?
+
+    **DETERMINISTIC ON `position_key`, NEVER RANDOM PER TICK.** A coin flip each
+    pass would place an order, hold it next tick, place it again after -- which
+    is precisely the submit -> cancel -> resubmit churn this gate exists to stop,
+    and it produced a duplicate live bet once already. The same position must
+    get the same verdict every time it is evaluated.
+    """
+    rate = _polymarket_explore_rate()
+    if rate <= 0:
+        return False
+    if price > ceiling + _polymarket_explore_band():
+        return False
+    key = str(getattr(request, "position_key", "") or "").strip()
+    if not key:
+        # No stable key means no stable verdict, and an unstable verdict is the
+        # churn. Hold, as the gate would have.
+        return False
+    bucket = int(_hashlib.sha1(key.encode("utf-8")).hexdigest()[:8], 16) % 10000
+    return bucket < int(round(rate * 10000))
+
+
 def _polymarket_max_pregame_price() -> float:
     """Hold a PREGAME Polymarket order priced above this. Place it if cheaper.
 
@@ -995,7 +1063,23 @@ def _polymarket_hold_price(request, venue: str) -> tuple[float, float] | None:
     price = planned_probability(getattr(request, "requested_price", None))
     if price is None:
         return None
-    return (price, hours) if price > ceiling else None
+    if price <= ceiling:
+        return None
+    # THE EXPLORATION ARM. A bounded, deterministic slice of boundary orders is
+    # placed so the threshold keeps being TESTED. Logged distinctly so these are
+    # separable in any later analysis -- an exploration fill and an ordinary one
+    # mean different things and must not be pooled.
+    if _polymarket_explores(request, price, ceiling):
+        print(
+            f"[execute_portfolio] EXPLORE_PREGAME_BOUNDARY"
+            f" ticker={getattr(request, 'venue_ticker', None)!r}"
+            f" price={price:.3f} ceiling={ceiling} band={_polymarket_explore_band()}"
+            f" rate={_polymarket_explore_rate()} hours_to_commence={hours:.1f}"
+            " -- placed ON PURPOSE to keep the boundary testable",
+            flush=True,
+        )
+        return None
+    return (price, hours)
 
 
 def _polymarket_cross_ticks() -> int:

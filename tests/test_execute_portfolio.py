@@ -1598,3 +1598,80 @@ def test_the_hold_can_be_switched_off_without_a_code_change(monkeypatch):
     monkeypatch.setenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", "0")
     from pipeline.execute_portfolio import _polymarket_hold_price
     assert _polymarket_hold_price(_req(0.49, 20), "polymarket") is None
+
+
+def _req_keyed(position_key, prob, hours=12):
+    import datetime as dt
+    american = -round(100 * prob / (1 - prob)) if prob >= 0.5 else round(100 * (1 - prob) / prob)
+
+    class _R:
+        pass
+    _R.position_key = position_key
+    _R.requested_price = american
+    _R.commence_time = (dt.datetime.now(dt.timezone.utc)
+                        + dt.timedelta(hours=hours)).isoformat().replace("+00:00", "Z")
+    _R.venue_ticker = "t"
+    _R.market = "totals"
+    return _R()
+
+
+def _placed(prob, key, capsys=None):
+    from pipeline.execute_portfolio import _polymarket_hold_price
+    return _polymarket_hold_price(_req_keyed(key, prob), "polymarket") is None
+
+
+def test_exploration_is_DETERMINISTIC_per_order_never_random_per_tick(monkeypatch, capsys):
+    """THE LOAD-BEARING PROPERTY. A coin flip each pass would place an order,
+    hold it next tick, place it again after -- which is the submit -> cancel ->
+    resubmit churn this gate exists to stop, and that churn produced a duplicate
+    live bet once already. The same position must get the same verdict forever."""
+    for v in ("SYNDICATE_POLYMARKET_EXPLORE_RATE", "SYNDICATE_POLYMARKET_EXPLORE_BAND",
+              "SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE"):
+        monkeypatch.delenv(v, raising=False)
+    verdicts = {_placed(0.40, "pos-abc") for _ in range(50)}
+    capsys.readouterr()
+    assert len(verdicts) == 1, "the verdict must not change between ticks"
+
+
+def test_exploration_hits_roughly_its_configured_rate(monkeypatch, capsys):
+    """Without a real rate the arm is decorative: too low and the boundary never
+    fills in, too high and it is not an arm, it is the absence of a gate."""
+    for v in ("SYNDICATE_POLYMARKET_EXPLORE_RATE", "SYNDICATE_POLYMARKET_EXPLORE_BAND",
+              "SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE"):
+        monkeypatch.delenv(v, raising=False)
+    n = 2000
+    placed = sum(_placed(0.40, f"pos-{i}") for i in range(n))
+    capsys.readouterr()
+    assert 0.06 <= placed / n <= 0.15, f"got {placed / n:.3f}, expected ~0.10"
+
+
+def test_exploration_is_AIMED_at_the_boundary_not_uniform(monkeypatch, capsys):
+    """The unknown is the gap 0.335-0.410. A 0.490 side has been observed resting
+    FOUR times; re-testing it buys nothing but churn."""
+    for v in ("SYNDICATE_POLYMARKET_EXPLORE_RATE", "SYNDICATE_POLYMARKET_EXPLORE_BAND",
+              "SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE"):
+        monkeypatch.delenv(v, raising=False)
+    inside = sum(_placed(0.40, f"in-{i}") for i in range(1000))
+    outside = sum(_placed(0.49, f"out-{i}") for i in range(1000))
+    capsys.readouterr()
+    assert inside > 0, "the boundary band must be explored"
+    assert outside == 0, "beyond the band nothing may be placed"
+
+
+def test_exploration_can_be_switched_off(monkeypatch, capsys):
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_EXPLORE_RATE", "0")
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", raising=False)
+    placed = sum(_placed(0.40, f"off-{i}") for i in range(500))
+    capsys.readouterr()
+    assert placed == 0
+
+
+def test_an_order_with_NO_position_key_is_held_not_explored(monkeypatch, capsys):
+    """No stable key means no stable verdict, and an unstable verdict IS the
+    churn. Hold, as the gate would have."""
+    for v in ("SYNDICATE_POLYMARKET_EXPLORE_RATE", "SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE"):
+        monkeypatch.delenv(v, raising=False)
+    from pipeline.execute_portfolio import _polymarket_hold_price
+    r = _req_keyed("", 0.40)
+    assert _polymarket_hold_price(r, "polymarket") is not None
+    capsys.readouterr()
