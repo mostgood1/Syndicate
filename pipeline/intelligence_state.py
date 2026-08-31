@@ -2023,6 +2023,54 @@ def _layer2_combined_keeps_rows() -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
+def _layer2_shortlist_cards_shard_path(selected_date: str, sport: str) -> Path:
+    """One CARDS key per sport, beside the rows shard for the same sport.
+
+    WHY CARDS NEEDED SPLITTING AT ALL, measured 2026-08-31. Sharding the rows
+    moved only PART of the payload. `cards` is built one-per-row
+    (`layer2_shortlist.py:1643`, `layer2_rows_to_board_cards(rows_for_cards)`),
+    so the combined key kept scaling with exactly the quantity the per-sport cap
+    raises -- ~2,020 bytes/row, measured across two builds:
+
+        1634 rows -> combined 3,754,595 B
+        4552 rows -> combined 9,648,192 B   REFUSED (ceiling 8,388,608)
+
+    That is what capped the whole board at ~3,600 rows no matter how much room
+    the rows shards had, and what `_shed_rows_to_fit_keyvalue` was already
+    reporting as `SHORTLIST_SHED_IMPOSSIBLE` -- "the payload is over the ceiling
+    WITHOUT any rows" -- while naming this exact fix: move `cards`/`openings` to
+    their own keys. Shedding rows could never help, because it does not shrink
+    the cards.
+
+    Per SPORT rather than one cards sidecar, for the reason the rows shards are:
+    a single sidecar just moves the shared budget somewhere else and the ceiling
+    stays global (~3,900 rows at this size). Per-sport gives cards the same 8MB
+    each that the rows already have.
+    """
+    suffix = str(selected_date or "").strip().replace("-", "_") or _intelligence_state_daily_suffix()
+    import re as _re
+
+    token = _re.sub(r"[^a-z0-9]+", "_", str(sport or "").strip().lower()).strip("_") or "unknown"
+    return reports_root() / "intelligence" / f"layer2_shortlist_{suffix}__cards__{token}.json"
+
+
+def _layer2_combined_keeps_cards() -> bool:
+    """Does the COMBINED key still carry `cards`? Default YES, deliberately.
+
+    Same two-deploy hazard as `_layer2_combined_keeps_rows`, and the same
+    answer. `cards` has REAL consumers -- `_collect_layer2_cards` tags and
+    merges them across dates (`intelligence_state.py:1625`) and the board
+    endpoint reports `cards_present` -- so a writer that stops filling the
+    combined key before every reader can hydrate the shards would serve a board
+    with no cards and no error.
+
+    So the default writes BOTH. Flipping `SYNDICATE_LAYER2_CARDS_INLINE=0` is
+    what unlocks the headroom, and it is an env flip rather than a deploy.
+    """
+    raw = str(os.environ.get("SYNDICATE_LAYER2_CARDS_INLINE") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def _shard_rows_by_sport(rows: list[Any]) -> dict[str, dict[str, list[Any]]]:
     """`{sport -> {rows, positions}}`, carrying each row's GLOBAL INDEX.
 
@@ -2038,7 +2086,14 @@ def _shard_rows_by_sport(rows: list[Any]) -> dict[str, dict[str, list[Any]]]:
     for index, row in enumerate(rows):
         sport = ""
         if isinstance(row, Mapping):
-            sport = str(row.get("sport") or "").strip().lower()
+            # `sport_slug` as a fallback because this now buckets CARDS as well
+            # as rows, and a card carries its sport under either name -- see
+            # `_collect_layer2_cards`, which itself does
+            # `tagged.setdefault("sport", tagged.get("sport_slug"))`. Without the
+            # fallback every card would bucket to "unknown", which is not a
+            # crash: it is ONE key holding the whole board's cards, i.e. exactly
+            # the shared budget this split exists to remove, silently.
+            sport = str(row.get("sport") or row.get("sport_slug") or "").strip().lower()
         bucket = buckets.setdefault(sport or "unknown", {"rows": [], "positions": []})
         bucket["rows"].append(row)
         bucket["positions"].append(index)
@@ -2084,10 +2139,24 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
     rows = payload.get("rows") or []
     shards = _write_layer2_shards(normalized_date, payload, rows)
 
+    # CARDS ARE THE OTHER HALF OF THE PAYLOAD, and the half that actually capped
+    # the board. They are built one-per-row, so the combined key scaled at
+    # ~2,020 bytes/row even with `rows: []` -- which is why `per_sport=3000`
+    # refused at 9,648,192 bytes and why shedding rows could not help
+    # (`SHORTLIST_SHED_IMPOSSIBLE`). Sharding rows alone moved the ceiling by
+    # almost nothing; this is the change that removes it.
+    cards = payload.get("cards") or []
+    card_shards = _write_layer2_card_shards(normalized_date, payload, cards)
+
     combined = dict(payload)
     if shards:
         combined["shards"] = sorted(shards)
         combined["shard_row_total"] = len(rows)
+    if card_shards:
+        combined["card_shards"] = sorted(card_shards)
+        combined["card_total"] = len(cards)
+    if card_shards and not _layer2_combined_keeps_cards():
+        combined["cards"] = []
     if shards and not keeps_rows:
         # THE HEADROOM UNLOCK, and the only step that can empty a board that
         # cannot merge shards. Guarded by the env flag, which defaults to
@@ -2276,6 +2345,139 @@ def _write_layer2_shards(
     return written
 
 
+def _write_layer2_card_shards(
+    selected_date: str, payload: Mapping[str, Any], cards: list[Any]
+) -> list[str]:
+    """One CARDS key per sport. Returns the sports actually written.
+
+    NEVER RAISES, and returns `[]` on any failure -- the same contract as
+    `_write_layer2_shards`, for the same reason: the caller only drops `cards`
+    from the combined key when this returns a non-empty list, so a partial
+    failure degrades to exactly today's behaviour rather than to a board with no
+    cards.
+    """
+    if not cards:
+        return []
+    try:
+        from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
+
+        ceiling = int(_keyvalue_max_bytes()) or 0
+    except Exception:  # noqa: BLE001
+        ceiling = 0
+    written: list[str] = []
+    try:
+        buckets = _shard_rows_by_sport(cards)
+        for sport, bucket in sorted(buckets.items()):
+            shard = {
+                "selected_date": str(payload.get("selected_date") or selected_date),
+                "written_at": payload.get("written_at"),
+                "sport": sport,
+                "cards": bucket["rows"],
+                "positions": bucket["positions"],
+            }
+            if ceiling:
+                while len(json.dumps(shard, default=str)) > int(ceiling * 0.95) and shard["cards"]:
+                    shard["cards"] = shard["cards"][:-1]
+                    shard["positions"] = shard["positions"][:-1]
+                if not shard["cards"]:
+                    print(
+                        f"[intelligence_state] LAYER2_CARD_SHARD_EMPTIED sport={sport}"
+                        f" -- a single sport's cards did not fit {ceiling}",
+                        flush=True,
+                    )
+                    continue
+                dropped = len(bucket["rows"]) - len(shard["cards"])
+                if dropped:
+                    print(
+                        f"[intelligence_state] LAYER2_CARD_SHARD_TRIMMED sport={sport}"
+                        f" kept={len(shard['cards'])} dropped={dropped}",
+                        flush=True,
+                    )
+            write_json_file(_layer2_shortlist_cards_shard_path(selected_date, sport), shard)
+            written.append(sport)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[intelligence_state] LAYER2_CARD_SHARD_WRITE_FAILED {exc!r}"
+            " -- falling back to cards on the combined key",
+            flush=True,
+        )
+        return []
+    print(
+        f"[intelligence_state] LAYER2_CARD_SHARDS_WRITTEN sports={written}"
+        f" cards={len(cards)} combined_keeps_cards={_layer2_combined_keeps_cards()}",
+        flush=True,
+    )
+    return written
+
+
+def _hydrate_layer2_cards(selected_date: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Put `cards` back on a payload whose combined key no longer carries them.
+
+    PRECEDENCE MATCHES THE ROWS: cards already on the combined key WIN, so a new
+    reader against an old writer is unaffected and an old reader against a new
+    writer still finds cards inline until the flag is flipped.
+
+    Sizing follows the same rule the rows merge learned the hard way on
+    2026-08-31: the slot count comes from the SHARDS, never from a total on the
+    combined key that a refused write may have frozen. `card_total` is used only
+    when it is LARGER, so a missing shard still leaves its hole.
+    """
+    shards = payload.get("card_shards")
+    if payload.get("cards") or not isinstance(shards, list) or not shards:
+        return payload
+
+    index_total = payload.get("card_total")
+    index_total = int(index_total) if isinstance(index_total, int) and index_total >= 0 else 0
+    collected: list[tuple[list[Any], list[Any]]] = []
+    loaded: list[str] = []
+    missing: list[str] = []
+    for sport in shards:
+        name = str(sport or "").strip().lower()
+        if not name:
+            continue
+        shard = read_json_file(_layer2_shortlist_cards_shard_path(selected_date, name))
+        if not isinstance(shard, dict) or not isinstance(shard.get("cards"), list):
+            missing.append(name)
+            continue
+        items = shard.get("cards") or []
+        positions = shard.get("positions")
+        if not isinstance(positions, list) or len(positions) != len(items):
+            missing.append(name)
+            continue
+        collected.append((items, positions))
+        loaded.append(name)
+
+    high = max(
+        (int(p) for _items, positions in collected for p in positions
+         if isinstance(p, int) and not isinstance(p, bool) and p >= 0),
+        default=-1,
+    )
+    total = max(index_total, high + 1)
+    slots: list[Any] = [None] * total
+    overflow = 0
+    for items, positions in collected:
+        for card, position in zip(items, positions):
+            if isinstance(position, int) and not isinstance(position, bool) and 0 <= position < total:
+                slots[position] = card
+            else:
+                overflow += 1
+    merged = [card for card in slots if card is not None]
+
+    if missing or overflow or len(merged) != total:
+        print(
+            f"[intelligence_state] LAYER2_CARD_SHARD_MERGE date={selected_date}"
+            f" loaded={loaded} missing={missing} cards={len(merged)}/{total}"
+            f" unplaceable={overflow}",
+            flush=True,
+        )
+    out = dict(payload)
+    out["cards"] = merged
+    out["cards_from_shards"] = True
+    out["card_shards_loaded"] = loaded
+    out["card_shards_missing"] = missing
+    return out
+
+
 def _shed_rows_to_fit_keyvalue(payload: dict[str, Any]) -> dict[str, Any]:
     """Drop the lowest-ranked rows until the payload fits. `#525`.
 
@@ -2445,6 +2647,12 @@ def read_layer2_shortlist(selected_date: str | None) -> dict[str, Any] | None:
     payload = read_json_file(_layer2_shortlist_path(normalized_date))
     if not isinstance(payload, dict):
         return None
+    # BEFORE the rows early-return, not after. `cards` and `rows` are split
+    # independently, so a payload can carry rows inline while its cards live in
+    # shards. Hydrating only on the shard path would leave `cards` empty on
+    # exactly the configuration that is live today (rows sharded, cards inline
+    # -> flipped later), and `cards_present` would read 0 with nothing raised.
+    payload = _hydrate_layer2_cards(normalized_date, payload)
     if payload.get("rows"):
         return payload
     shards = payload.get("shards")
