@@ -5,6 +5,87 @@
 
 ---
 
+## 2026-08-31 05:10:09Z — **`#595` DISCHARGED: THE LEG CHOICE IS VALIDATED IN PRODUCTION, WITH REAL MONEY** — live-odds-worker `abc48553` — lane `polymarket-yes-leg-binding`
+
+    dep-daagpc942hec73af0ie0   fired by me, claim held and preflight CLEAR (no bypass)
+    RIDE-ALONGS: none in code. The 3 other commits are ledger-only.
+
+### 1. THE DISCRIMINATING CASE FIRED. `#595` step 3 is closed.
+
+    POLYMARKET_YES_LEG   8 readings   yes_leg_index {0: 2, 1: 6}   agree {True: 8}
+
+**`yes_leg_index` VARIES ON MLB.** The all-NFL/all-MLB constant-`0` window that
+blocked this since 2026-08-28 is dead. Both independent sources — the venue's
+`marketSides[].long` and our own away-team position — AGREED on 8 of 8, so the
+corroboration gate has still never had to refuse.
+
+**THREE OF FOUR SUBMITTED MONEYLINES WOULD HAVE BOUGHT THE WRONG TEAM:**
+
+    aec-mlb-sf-atl   outcomes=['Atlanta Braves','San Francisco Giants']
+                     yes_leg=1 (SF)  our=0 (Atlanta, home)  -> NO
+                     OLD RULE: index 0 -> YES -> buys SAN FRANCISCO
+    aec-mlb-det-min  yes_leg=1 (DET) our=0 (MIN, home)      -> NO
+                     OLD RULE -> YES -> buys DETROIT
+    aec-mlb-nyy-laa  yes_leg=1 (NYY) our=1 (NYY, away)      -> YES
+                     OLD RULE: index 1 -> NO -> buys the ANGELS
+
+A 3-of-4 divergence against the 3-of-8 error rate measured on the settled
+markets. Consistent, and now prevented on live orders.
+
+    05:09:32  aec-mlb-ath-tex   YES  5.25  @ 0.335
+    05:09:35  aec-mlb-sf-atl    NO   16.48 @ 0.41
+    05:09:37  aec-mlb-det-min   NO   5.41  @ 0.46
+    05:09:39  aec-mlb-nyy-laa   YES  12.52 @ 0.435      notional $16.45
+
+**First Polymarket moneylines since 2026-08-28**, when the blanket refusal shipped.
+
+**AND THE MARKET THAT STARTED THIS PLACED CORRECTLY.**
+`aec-mlb-mia-wsh` was rejected as `team_side_needs_verified_yes_leg` at 18:38
+and 18:51 on 08-30 — the reading that first exposed the refusal. At 05:2xZ:
+
+    outcomes=['Washington Nationals','Miami Marlins']
+    yes_leg=1 (Miami)  away=1 (Miami)  our=1 (Miami, away)  -> YES
+    SUBMIT side=OUTCOME_SIDE_YES qty=5.3 @ 0.49
+    OLD RULE: index 1 -> NO -> buys WASHINGTON
+
+Four of five discriminating submits would have bought the wrong team.
+
+### 2. SOCCER Yes/No h2h RESOLVES — `abc48553` verified
+
+    05:15:38  atc-lal-osa-get-2026-08-31-get  agree=subject reason='yes_no_market'
+    05:15:38  atc-sea-ata-bol-2026-08-31-bol  agree=subject
+    atc- refused as team_side_not_in_outcomes: 0
+
+Soccer h2h is three binary Yes/No markets with the subject in the slug; the
+opposite leg and the draw leg still refuse, because `No` on a 3-way pays the
+other team **or a draw**.
+
+**VERIFICATION DESIGNED AROUND A PEER'S GATE, deliberately.** `f6f45321` (live
+04:36Z) holds any order >24h from commence and skips BEFORE resolution, so held
+markets emit no gate line at all. Reading raw counts would have shown few lines
+and looked like an inert fix. The two subjects above sit at +12.2h and +13.5h,
+inside the window, which is why they were reachable.
+
+### 3. MY TIME-TO-EVENT HYPOTHESIS IS WEAKENED BY THE FIRST DATA THAT COULD TEST IT
+
+Now measurable because `0fc174c6` restored `commence_time`:
+
+    FILLED    n=2   +17.5h .. +18.8h     <- aec-mlb-ath-tex h2h FILLED at +18.8h
+    resting   n=4   +11.2h .. +20.4h
+    rejected  n=3   +12.2h .. +18.8h
+
+**Filled and resting OVERLAP.** A moneyline filled at +18.8h while others rest
+at +16.8h, +18.4h and +20.4h. My earlier clean split (8/8 fills on past/today
+markets) was CONFOUNDED — those fills were older orders on games already under
+way. Size does not rescue it either: `det-min` rests at 5.41, `ath-tex` filled
+at 5.25. The only thing that differs is PRICE — the fill was the cheapest side
+(0.335) against 0.41/0.435/0.46 — which is a hint about book depth, not a
+finding, at n=2.
+
+**THIS IS ALSO A COUNTER-EXAMPLE TO `f6f45321`'s PREMISE** ("pregame orders do
+not fill at any price"), and it is that lane's own stated falsifier. A fill at
++18.8h is well outside any near-kickoff story. Handed to them, not filed here.
+
 ## 2026-08-31 03:48:48Z — **`commence_time` RESTORED TO THE POSITION PAYLOAD — VERIFIED 17/17 ON THE SAME SLUGS THAT FAILED** — all three services `0fc174c6` — lane `polymarket-yes-leg-binding`
 
     web / refresh-worker / live-odds-worker  <- 0fc174c6   trigger=manual
