@@ -987,6 +987,19 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Goal: a Polymarket moneyline resolves its YES/NO leg from the VENUE's own
   `yesLegIndex` instead of being refused, and refuses BY NAME where the venue
   did not state it.
+- **`layer2_board.py` WAS RELEASED TO ME, NOT OVERRIDDEN** `[2026-08-31]`, by
+  lane `layer1-model-edge-join` (session 1c88bcca), who struck it from their own
+  `Files:` block after reproducing my diagnosis independently and adding the
+  decisive argument against their own work.
+- **THIS PROSE SITS ABOVE THE `Files:` LINE ON PURPOSE.** `lane-guard._paths_in`
+  treats ANY token containing a slash or a dot as a claimed path, and
+  `_claimable_prefix` only strips text after a disclaimer marker -- so an
+  explanation written INSIDE the block turns words into claims. My previous
+  wording put "layer1-model-edge-join / session" in the continuation and had
+  this lane claiming a bare `/`. The same cause gave 1c88bcca three phantoms
+  (`1/p`, `15.0`, `85.13`) live on main for one commit, and
+  `check_lane_invariants` still reported INVARIANTS HOLD because each phantom
+  had exactly one holder -- so diff the claim SET, do not trust a green checker.
 - Files: syndicate/features/shared/polymarket_us_orders.py
   pipeline/execute_portfolio.py
   tests/test_polymarket_yes_leg_binding.py
@@ -995,13 +1008,23 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   syndicate/features/shared/portfolio_commit.py
   tests/test_position_carries_commence_time.py
   tests/test_soccer_yes_no_h2h_order.py
-  pipeline/intelligence_state.py `[2026-08-31, USER OVERRIDE: "take the override
+  released: pipeline/intelligence_state.py **[2026-08-31 ~19:2xZ — REASSIGNED to lane
+  `layer2-cap-raise`, same session. This lane's work in that file is SHIPPED AND
+  DEPLOYED; the board-shard rollback fix is a different change in a different
+  function and belongs to the sharding lane. Reclaim by striking `released:` if
+  this lane needs the file again.]** `[2026-08-31, USER OVERRIDE: "take the override
     and build it now"]` — held by OPEN lane `soccer-overview-cost` (session
     3e5a9659, last checkpoint 08-29, no marker, not in the running list).
-    Surfaced to the user BEFORE the override. Narrow: the board persist/read
-    pair only (`write_layer2_shortlist`, `read_layer2_shortlist` and new shard
-    helpers); nothing in the soccer cost path that lane actually worked on.
+    Surfaced to the user BEFORE the override. Narrow scope: only the two board
+    functions named `write_layer2_shortlist` and `read_layer2_shortlist`, plus
+    the new shard helpers; nothing in the soccer cost path that lane worked on.
+    (Reworded 2026-08-31 -- the previous wording carried a slash-separated
+    phrase that `lane-guard._claims` parsed as a FILE PATH, so this lane held a
+    PHANTOM claim on a path that does not exist. Flagged by session 1c88bcca.)
   tests/test_layer2_shard_by_sport.py
+  tests/test_shortlist_persist_ceiling_guard.py
+  syndicate/features/shared/layer2_board.py
+  tests/test_layer2_model_value_term.py
 - Claims taken under `[2026-08-30, USER OVERRIDE]` x3 ("take it to the
   user-override route", "take it and fix it"). Conflicts were surfaced to the
   user BEFORE each override and the holders were messaged. Deploy claim on
@@ -1052,8 +1075,25 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 ### layer1-model-edge-join — OPEN — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
 - Goal: Layer 1 must join a MODEL edge on every sport/market, so Layer 2 /
   Kalshi / Polymarket rank on the sim's disagreement rather than on book hold.
+- **SCOPE REQUEST GRANTED 2026-08-31 — the layer2 board scorer goes to lane
+  `layer2-board-opportunities` (session 4465737c), which asked before touching
+  it.** They measured the board this lane's fix produced: top 25 was 24
+  `batter_home_runs` plus one totals, all 25 one-sided, top row model EV 85
+  points against the best market-basis EV anywhere of about 5. Cause: model EV
+  is edge divided by the fair probability, so it multiplies edge by the
+  reciprocal of p and ranks a smaller edge on a longer shot above a bigger edge
+  on a shorter one. I reproduced that reading myself before granting.
+  **THE DECIDING ARGUMENT IS MINE AND IT IS A FLAW IN THIS LANE'S OWN WORK:**
+  `blended_score` caps the model at fifteen points when it arrives as
+  `model_edge`, and I routed the same information through `value_ev`, which has
+  no cap at all. **Their flag must DEFAULT TO CURRENT until the user rules** —
+  "price EV vs the model everywhere" is a user decision of 2026-08-30, and two
+  sessions agreeing does not reverse one.
+  This bullet sits ABOVE `- Files:` deliberately: prose placed inside or just
+  after that block is parsed as a CLAIM, and doing it here is how this lane
+  briefly claimed the tokens `1` over `p`, `15` point `0` and `85` point `13`.
 - Files: syndicate/features/shared/board_enrichment.py
-  syndicate/features/shared/layer2_board.py
+  RELEASED to lane layer2-board-opportunities 2026-08-31: the layer2 board scorer module
   syndicate/features/shared/wnba_game_projections.py
   syndicate/features/shared/wnba_projections.py
   syndicate/features/shared/nfl_game_projections.py
@@ -1139,6 +1179,50 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `<SYNDICATE_DATA_ROOT>/ncaaf_source/state/cfbd_quota_latch.json`.
 - Narrative: `.syndicate/log/2026-08-31.md`, `.syndicate/lanes_history.md`.
 - Blocked by: none
+
+### layer2-cap-raise — OPEN — opened 2026-08-31 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3 — **SHARDING LIVE, CAPS AT 1000 (VERIFIED). 3000 CORRUPTED THE BOARD ~29 MIN AND WAS REVERTED. ROLLBACK FIX LIVE. THE CARDS FLIP IS LIVE 22:30:57Z AND UNVERIFIED — first exercise still pending.**
+- Goal: board carries >400 rows for a sport. **MET** at 1000 (932 → 1634 rows, no sport lost).
+- Files: `pipeline/intelligence_state.py` **[claim REASSIGNED from `polymarket-yes-leg-binding`, same session]**; Render ENV on refresh-worker via the single-key API — never `render.yaml`.
+- Env live: `ROWS_PER_SPORT=1000`, `ROWS_TOTAL=3000`, `COMBINED_ROWS=0` (refresh-worker only; other two services clean).
+- **DO NOT RAISE THE CAP AGAIN AS A CONFIG CHANGE.** The ceiling is the COMBINED key (~2,200 B/row even with `rows: []`) ⇒ ~3,600 TOTAL rows. Shard headroom is not evidence about it.
+- **NEXT ACTION: the flip is LIVE and UNVERIFIED. Watch the FIRST rebuild after 2026-08-31T22:30:57Z. PASS needs BOTH `combined_keeps_cards=False` AND `cards_present` non-zero == rows — the first alone is the silent zero. REVERT if cards are lost: set `SYNDICATE_LAYER2_CARDS_INLINE=1` on `srv-d91dpertqb8s73co8ls0` and redeploy.** Watcher `verify_flip.py` re-armed after the previous one was stopped mid-verification.
+- Verification: DONE for the cap raise and the rollback fix. **UNEXERCISED, BOTH:** `ROWS_TOTAL=3000` (board ~1,600 rows, never bound) and the cards split (deployed, but no rebuild has run under it — `LAYER2_CARD_SHARDS_WRITTEN` never once observed).
+- OWED, code not config: `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key (`pct=93.3` on a healthy board, advice backwards). The skipped-shed item is CLOSED by the cards split — the shed could never have helped (`SHORTLIST_SHED_IMPOSSIBLE`).
+- Narrative: `log/2026-08-31.md` (session 5611932c). Blocked by: none.
+### layer2-accuracy-audit — OPEN, UNOWNED — **CLAIMS: NONE HELD (all four services free, released 2026-08-31 ~22:4xZ).** 7-day board accuracy DELIVERED; MLB game-line join FIXED, DEPLOYED and VERIFIED (`13 -> 0` misses, `(pregame-freeze, 14 games)`, 20:33:17Z) — but it did NOT raise graded rows, which falsified my own causal claim. Two follow-ups opened as `todo #610` (caps: ml 12 candidates -> cap 1) and `todo #611` (prop seal dead since 08-16; cadence is the lead). **ONE THING OWED: `5be4381d` is on main and NOT DEPLOYED** — preflight HOLD, 3 jobs in flight on live-odds-worker. **AT RISK: 18 local commits incl. all ledger writes are NOT on origin/main.** — opened 2026-08-31 — session ef7e22fc-d592-43f7-b326-31ddea9258ef
+- Goal: a per-sport x per-bet-type accuracy read on the Layer 2 board for the last 7 days, with an explicit statement of how many days and rows it actually rests on, plus ranked optimizations.
+- Files: **CLAIMED 2026-08-31 ~18:3xZ, user asked for the MLB join fix:** `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py` (`_odds_paths` + helpers only), `tests/test_season_betting_cards_odds_paths.py`. **EXTENDED ~18:4xZ, user asked for the backlog regrade:** `scripts/run_refresh_worker.py` (`_mlb_betting_day_backfill_*` only — NOT `_season_projection_should_launch`, which lanes.md flags as contended), `tests/test_refresh_worker.py`. Every OPEN-lane reference to `run_refresh_worker.py` is RELEASED; checked. Checked against every OPEN lane: no lane holds either. Still NOT editing `graded_outcomes.py`, `evaluation_settlement.py`, `layer2_shortlist.py`, `layer2_board.py`, `refresh_mlb_oddsapi.py`.
+- Hypothesis: Layer 2 accuracy is NOT measurable end-to-end today. Specifically (a) shortlist artifacts are retained only ~4 days, not 7; (b) the evaluation ledger settles 0.2% of settleable records because the GRADED-ROW SUPPLY is near-zero (mlb=1/day vs a documented ~700-2400), not because the matcher is broken; (c) NCAAF, the largest board sport by row count, has no grader at all.
+- Falsification test: if `graded_rows_for_date('mlb', d)` returns hundreds of rows in production for a recent finished date, (b) is wrong and the defect is in the matcher. If dated shortlist artifacts exist for 2026-08-25..27 under any other read path, (a) is wrong.
+- Verification: a written per-sport/per-bet-type table with denominators, or an explicit statement of which cells are unmeasurable and why, each backed by a production reading recorded here.
+- Blocked by: none. Adjacent, not conflicting: `ncaaf-settlement-resolver` (764eca35) touches NCAAF settlement — will notify rather than edit.
+
+**FINDINGS 2026-08-31 ~17:5xZ — hypothesis CONFIRMED on all three limbs, and the headline is a different number than the one I went looking for.**
+
+**The measurable answer exists after all, and it is NOT the evaluation ledger.** The paper/live PORTFOLIO book is committed straight off `read_layer2_shortlist` (`pipeline/portfolio_commit.py:357`), so `/api/portfolio/paper?date=` and `/api/portfolio/live` ARE a Layer 2 accuracy surface. 7 days, 2026-08-24..08-30:
+
+- **PAPER (our own grading, `settled_by=inferred` on 402/402): 47.9% win, +9.4% ROI, +$156.32 / $1,656.80 staked.**
+- **LIVE (real money, kalshi+polymarket, 239 settled): 42.3% win, −5.5% ROI, −$40.31 / $733.31 staked.**
+- Controlled-ish per venue: `paper:kalshi` **+1.1%** (364 settled) vs LIVE kalshi **−7.6%** (159 orders); `paper:polymarket` **+28.5%** (165) vs LIVE polymarket **−1.3%** (83). Same sign both times; bet sets are NOT identical (venue availability + gate/fill), so this is a flag, not an attribution.
+- The ledger already carried this shape once: 2026-08-26, venue 3 bets −11.88% vs inferred 12 bets +51.07% (`paper_settlement.py:1224`).
+
+By bet type (paper, 7d): game_line 56.7% / **+25.3% ROI [95% CI +7.2..+43.4]**, n=141 — the ONLY bucket whose CI excludes zero. game_total 47.5% / +9.8% [−9.3..+29.0] n=141. player_prop 37.8% / **−13.5%** [−33.5..+6.5] n=119. Real money inverts game_line: h2h+spreads 12W/23L = 34.3%, −23.9%.
+
+By sport (paper, 7d): mlb 375 settled (94%), wnba 22, soccer 5, ncaaf **0**, nfl 0. Real money: mlb −6.8% (182), wnba +3.3% (31), nfl −4.1% (18), soccer −23.2% (8), ncaaf 0.
+
+**Limb (a) CONFIRMED** — `/api/board/layer2-shortlist` returns `no_shortlist_artifact` for 08-25/26/27; only 08-28..08-31 exist. 4 dated snapshots, 2,623 rows.
+**[CORRECTED 2026-08-31 ~18:2xZ] The MLB join cause is NARROWED BY CONTENT, and my first mechanism was wrong.** Read both `daily/snapshots` copies for 08-30: the pregame freeze holds **all 14 games**, names matching the warning strings verbatim, including CIN@CHC — the one game that DID grade. The live copy holds **0 games** (`retrieved_at` 08-31T04:52Z, post-slate). The builder graded 1 and warned 13, so it read a THIRD copy holding exactly one game, necessarily under `market/oddsapi/` — the tree `_odds_paths` resolves and the export endpoint cannot see. That is the **2026-08-16** failure shape (freeze written where the reader does not look; `refresh_mlb_oddsapi.py:646`), not the `_odds_paths` root-loop break I named first. **This is the THIRD occurrence of this symptom with the THIRD candidate cause — do not assume either prior fix.** Still not proven; needs a disk read of `market/oddsapi/`.
+
+**Limb (b) CONFIRMED, and the cause is upstream of the matcher.** Settlement: 19,692 settleable, 35 settled (0.2%). `graded_rows_available` mlb = 1,2,1,1,1,7,0 per day. Independently reproduced on the WEB service from a different code path: `/mlb/api/market-accuracy?date=` returns `rows.all` = 1, 1, 7 for 08-28/29/30, with **12, 12, 13 `Missing game-line match for <game>` warnings** — i.e. ~1 of 13-14 MLB games joins. This is the SAME symptom `build_season_betting_cards_manifest.py:757` says was measured and fixed on 2026-08-07 ("13 of 14 games lost, one graded row for the whole day"). The sealed pregame freeze IS present and full-slate (`oddsapi_game_lines_2026_08_30_pregame.json` 76,872B vs live 1,105B), so the freeze is not the missing piece — `_odds_paths` breaks out of its ROOT loop on the first root that has EITHER file, so a root holding only the thin live copy wins over a later root holding the freeze. NOT VERIFIED — I could not read `market/oddsapi/` (not in `HOT_ARTIFACT_PATTERNS`, so `artifacts/export` is blind to it; absence there is NOT absence on disk).
+**Limb (c) CONFIRMED** — ncaaf grader reads `cfbd_lines_*.json`; 0 such files in the hot-artifact set; 0 graded rows; 0 orders ever.
+
+**The funnel, which is the real optimization target.** Refusals 08-24..08-31: **`no_model_edge_pct` 2,506**, `below_min_ev_pct` 1,567, below_min_stake 46, zero_kelly 37 — ~4,150 refusals against ~425 orders. Board-side this reconciles exactly: **`model_edge_pct` is numeric on only 902 of 2,623 rows (34.4%)**; `model_ev_pct` numeric on 201. `ev_basis` = market_fair 1,451 / model_edge 184 / model_probability 17 / unset 971. `model_skill.status`: measured 625, unmeasured 882, no projection block 1,116.
+Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,498s, p90 36,816s, 21.3% over 6h, 8.8% `suspect_stale`; movement not tracked 42.1%. ev_pct > 0 on only 444 rows (16.9%), median −2.35%.
+
+**Corrected mid-audit:** I first read per-market medians of `model_edge_pct` as 0.00 and nearly reported "no model edge on 1,609 rows". The field is NULL on those rows, not zero — 0 rows carry a numeric 0.00. Same conclusion, different mechanism, and the wrong one would have sent the fix at the wrong function.
+
+**NOT MEASURED, and it is the thing I most wanted:** whether the board's own `ev_pct`/`model_edge_pct`/`score` PREDICT the outcome. The portfolio endpoints expose settlement marginals only (`by_sport`, `by_market_family`, `by_venue_family`), not per-order rows, so no edge-bucket calibration curve was computed. That needs the refresh-worker-side order ledger.
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

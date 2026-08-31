@@ -1153,10 +1153,20 @@ all), wnba 22, soccer 5, nfl 0, **ncaaf 0 — never bet, ever**.
    "the resolver works given these files present" and was used to claim "works
    on the worker", which was never tested. Presence is not reachability, across
    a service boundary this repo documents.
-   **LEADING HYPOTHESIS, UNPROVEN:** the full-slate freeze is absent from
-   refresh-worker's disk, so the builder still resolves a one-game doc. If so
-   the binding defect is **artifact DISTRIBUTION**, not the resolver — and the
-   resolver fix is necessary but not sufficient.
+   **RESOLVED, and the resolver fix WORKS `[verified 2026-08-31 20:33Z]`.** The
+   freeze IS reachable on refresh-worker at `daily/snapshots/<date>/`:
+   2026-08-30 now reads `(pregame-freeze, 14 games)` with `Missing game-line
+   match` **13 -> 0**, and raw moneyline candidates went **1-4 -> 12** against
+   three pre-fix control dates. **The graded ROW count did not move (7 -> 7)**
+   because `caps.ml = 1` absorbs the whole gain — so my claim that the join
+   rate was starving settlement is **FALSIFIED by its own fix**. Graded rows
+   come from the locked card, i.e. the policy's picks. See `todo #610`.
+   **MLB prop supply is a SEPARATE defect (`todo #611`):** the prop pregame
+   seal has produced nothing since 2026-08-16, so hitter/pitcher props grade
+   against a post-slate remnant (~1 game). Leading cause **cadence** — measured
+   2026-08-31, the MLB refresh ran 22:12:30Z against a 22:05:00Z first pitch,
+   so `slate_started` was True and props were skipped by design. Not yet proven
+   to be the whole cause. MLB odds refresh runs on **live-odds-worker**.
    **THE READING THAT DECIDES IT** is the always-on diagnostic shipped in
    `49c43aeb`: `Game lines read: <path> (pregame-freeze|live, N games)` in the
    payload warnings. `(live, 1 games)` => freeze unreachable worker-side, fix
