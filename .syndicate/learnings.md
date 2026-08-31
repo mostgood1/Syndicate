@@ -5397,3 +5397,97 @@ not overlap comparably, the sort is decided by the choice of source and no label
 on the row changes that. The question "should these share one sort at all" is a
 product decision — record it as unsettled rather than letting a deploy imply an
 answer.
+## 2026-08-31 FORBIDDEN: reporting an ROI whose grades we produced ourselves, without naming that we produced them.
+
+`[lane layer2-accuracy-audit, session ef7e22fc]`
+
+The Layer 2 board's paper book reported **+9.4% ROI** over 2026-08-24..08-30.
+The live book, same board, same window, real money, reported **-5.5%**. Per
+venue the sign held both times: `paper:kalshi` +1.1% vs live kalshi -7.6%;
+`paper:polymarket` +28.5% vs live polymarket -1.3%. Every one of the 402 paper
+settlements carried `settled_by = inferred` — our own boxscore join, our own
+aliases, our own over/under vocabulary. Zero were confirmed by a venue.
+
+**The rule this is a second instance of, not a first.** `paper_settlement.py`
+already carries the rule in its own docstring — "THESE ARE NOT THE SAME KIND OF
+NUMBER AND MUST NOT SHARE AN ROI" — written 2026-08-26 off n=3. `state.md`
+carried it as UNVERIFIED AND LOAD-BEARING for five days. The surface kept
+showing the blend the whole time, so the rule existed in prose and nowhere a
+decision could trip over it.
+
+**How to apply.** An ROI is a claim about two things: what we bet, and who
+decided whether it won. Name the second one every time you quote the first. A
+book we grade ourselves is a hypothesis about our grader as much as about our
+model, and when it disagrees with the money by 15 points, the grader is the
+first suspect, not the last. Concretely: never quote a portfolio ROI without
+its `settled_by` split, and treat a bucket with zero venue-settled rows as
+unmeasured rather than as measured-and-good.
+
+**The near-miss.** game_line looked like the one real edge on the board:
+56.7% win, +25.3% ROI, 95% CI [+7.2, +43.4] — the only bucket whose interval
+excluded zero, and the obvious thing to size up. On real fills the same bucket
+went 12-23, **34.3% win, -23.9% ROI**. Sizing up on the paper number would have
+concentrated stake into the exact market where the two books disagree most.
+
+## [08-31 FORBIDDEN: sizing a payload raise against the key you SHARDED, when another key still scales with the same quantity]
+
+**Measured 2026-08-31, and it corrupted the production board for ~29 minutes.**
+
+Sharding the Layer 2 board split `rows` into per-sport keys, each self-trimming
+against its own 8MB ceiling. I raised `SYNDICATE_LAYER2_ROWS_PER_SPORT` 1000 → 3000
+after verifying each SHARD fit. It broke immediately, because the **combined key
+still carries ~2,200 bytes/row of card/metadata even when `rows: []`**:
+
+```
+1634 rows -> combined 3,754,595 B   OK
+4552 rows -> combined 9,648,192 B   REFUSED (ceiling 8,388,608)
+```
+
+Sharding moved PART of the payload. The unsharded remainder scaled with exactly
+the quantity I was raising, so "each shard fits" was true and irrelevant.
+
+**The aggravating detail: I had written the fact down myself**, in the deploys
+entry immediately above the incident — *"the combined key is ~3.75MB of
+cards/metadata and does not shrink with rows — that is the fixed cost, and it is
+the thing to watch"* — then sized the next raise off shard bytes anyway. Calling
+it "fixed cost" was the error; it is per-row. **A note you wrote yourself is not
+protection unless the next decision actually reads it.**
+
+**How to apply.** Before raising any bound that a splitting change was supposed to
+relieve: enumerate EVERY key the write path touches and measure each against the
+quantity being raised. "The thing I split now fits" answers nothing about the
+things you did not split. The instrument to trust is the one naming the key that
+actually refused — `LAYER2_SHORTLIST_WRITE_FAILED` names it and its byte count.
+
+## [08-31 FORBIDDEN: assuming a refused write degrades to STALE. Check what the reader does with a half-updated set]
+
+Same incident, and this is the defect that turned a bad config into wrong data.
+`_write_layer2_shards` runs BEFORE `write_json_file(combined)` with **no
+rollback**. The shards advanced to a 4,552-row board; the combined write refused;
+the combined key stayed frozen at `shard_row_total=1635`. `_merge_layer2_shards`
+sizes its slots from that stale total, so **2,917 rows were unplaceable and an
+entire sport (NCAAF) vanished from the board** — for at least three build cycles,
+because every cycle repeated it. It does not self-heal.
+
+`_shed_rows_to_fit_keyvalue` — the guard that exists for exactly this — is
+**skipped when sharding is on** (`if keeps_rows: payload = _shed(...)`), so nothing
+trimmed the overflowing key.
+
+**How to apply.** A write that can refuse, in a multi-key set, needs the reader to
+be safe against a PARTIAL update — or the writes ordered so the last one is the
+one that makes the new set visible. Writing the data first and the index second,
+with no rollback, means a refused index write publishes data nobody can address
+correctly. "It'll just serve the last good copy" is a claim about the READER, and
+must be verified there, not assumed from the writer's try/except.
+
+## [08-31 FORBIDDEN: a size instrument that measures a payload the code no longer writes]
+
+`SHORTLIST_PERSIST_LARGE` reports the payload WITH rows and advises *"lower
+SYNDICATE_LAYER2_ROWS_PER_SPORT"*. Since sharding, that payload is **never written
+as one key**. It read `pct=93.3` on a perfectly healthy 1,600-row board and
+`pct=237.9` on the build that broke — alarming in both cases, actionable in
+neither, and its advice was backwards for the healthy one.
+
+**How to apply.** When a write is split, every size/health instrument pointed at
+the old single write becomes a liar in both directions. Re-point it at the keys
+that are actually written, in the SAME change that splits them.
