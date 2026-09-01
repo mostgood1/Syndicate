@@ -263,6 +263,46 @@ median is +0.20pp.
 
 ---
 
+## 6b. THE `book_quotes` PUBLISH CLOBBER DOES NOT REACH THIS WINDOW — checked, not assumed
+
+Lane `book-quotes-publish-clobber` (session 3492626c) confirmed on 2026-09-01
+that the daily `book_quotes` shard **loses rows**: two services each keep their
+own local copy, append only their own rows, and `publish_hot_artifact` pushes
+the WHOLE FILE, so web keeps whichever published last. On 2026-09-01 only
+**46.1%** of that date is matchable, and they attribute 76% of `#624` step 6's
+"no time-aligned quote" exclusions to it.
+
+**Every number above reads those same shards, so this had to be checked rather
+than hoped.** Three readings, all mine:
+
+1. **Their own overlap metric, applied to my ten dates: 100.0% matchable on
+   every one**, and the sportsbook and exchange spans are *identical to the
+   minute* on all ten (e.g. 2026-08-27 both `06:16..04:19`). A clobbered shard
+   shows one cohort's tail truncated; none of these does.
+2. **Refetch is byte-identical.** 2026-08-27 (87,809 game rows) and 2026-08-31
+   (156,220) re-exported ~2.5 hours after the run: **0 lost, 0 gained**. Their
+   falsification test was "a clean append target could only ever be a superset";
+   these are equal, which is stronger.
+3. **The mechanism needs two writers, and in this window there is one.** Every
+   one of the 87,809 game rows on 2026-08-27 carries `source: null` — the
+   `source=venue_direct` stamp does not exist before the Kalshi capture landed
+   at 2026-09-01 16:11Z. Before that date the exchange rows arrive through the
+   same OddsAPI writer as the sportsbook rows, which is exactly why their spans
+   coincide.
+
+**This bounds their finding rather than contradicting it:** the race begins when
+the second writer appears, so it is a 2026-09-01-onward defect. Anyone extending
+this measurement past 08-31 must run the overlap check first.
+
+**It does refine one thing I wrote.** The 206
+`fill_price_never_quoted_before_submit` refusals are *not* clobbered rows. They
+are exchange fills whose price came through a path the OddsAPI feed did not
+carry — which is the gap the venue-direct capture was built to close. The
+coverage bound stands; its mechanism is named correctly now rather than by
+resemblance.
+
+---
+
 ## 7. WHAT THIS CHANGES
 
 - **The retracted +1.2% is replaced by +0.74 ROI points**, on the staked
@@ -294,9 +334,10 @@ median is +0.20pp.
 - **Ten dates is not a rate.** The per-date superset spread (+0.59 to +1.26pp)
   is wide enough that a different ten days would move the third figure.
 - **The priced book is not a random sample of the staked book.** 308 of 929
-  settled orders are refused, dominated by venue-direct prices `book_quotes`
-  never captured (polymarket 124, kalshi 117), and those rows returned **+15.85%**
-  against the priced rows' **+6.14%**. The curve's level is therefore
+  settled orders are refused, dominated by exchange fills priced through a path
+  the OddsAPI feed did not carry (polymarket 124, kalshi 117 {DASH} and see 6b: they
+  are not clobbered rows), and those rows returned **+15.85%** against the
+  priced rows' **+6.14%**. The curve's level is therefore
   conservative. The residual is plausibly *overstated* by the same exclusion —
   a venue-direct fill is already at the venue's price, so it has less left to
   claim — which cuts against +0.74 rather than for it.
