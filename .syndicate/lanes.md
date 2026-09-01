@@ -66,7 +66,7 @@ markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
 ## OPEN
-### open-bet-live-status — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+### open-bet-live-status — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-26 — session syndicate-27 (749848)
 - Goal: `/portfolio` is the live buying engine — merged book, editable caps,
   venue balances, venue settlement, live status on open bets. `[user 2026-08-26]`
 - Files: released: `blueprints/intelligence.py`,
@@ -75,7 +75,7 @@ death, never life — do not invert it.
   released: `features/shared/execution_limits_settings.py`,
   released: `execution_guard.py`, `venue_balances.py`,
   released: `venue_settlement.py`, `paper_settlement.py`,
-  ~~`polymarket_board_join.py`~~ **INSTRUMENTATION-ONLY CLAIM TRANSFERRED to
+  released: ~~`polymarket_board_join.py`~~ **INSTRUMENTATION-ONLY CLAIM TRANSFERRED to
   `venue-refresh-decoupling` `[2026-08-28, session 3e5a9659]`** — an additive
   timing span around `join_polymarket_to_board`, NO behaviour change. Taken
   because this lane's session (`syndicate-27`) is NOT RUNNING (`list_sessions`
@@ -186,7 +186,7 @@ death, never life — do not invert it.
 - Blocked by: none.
 - Full working record (measurements, phase log, hypothesis/falsification detail) moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### repo-coordination — OPEN — **POSSIBLY ORPHANED, unconfirmed `[flagged 2026-08-19]`: no currently-running session found narrating its own work under `repo-coordination` — every hit is a session reading the shared `lanes.md` digest or its own guard output (one session's transcript shows `your lane: repo-coordination` printed to a session that is clearly NOT this lane — `Modeling Session (fork 2)` / `abf487e4…` — the exact bare-file misattribution bug fixed earlier 2026-08-19, not evidence of real ownership). No `.current-lane.<session_id>` marker exists for it. Not closed and not force-reassigned on this evidence alone — a live session claiming this lane should confirm by opening it fresh (which now also backfills its own per-session marker).** deployment, assignment and documentation. NOT any sport, model or engine. — opened 2026-08-18 — session: repo-coordination
+### repo-coordination — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — **POSSIBLY ORPHANED, unconfirmed `[flagged 2026-08-19]`: no currently-running session found narrating its own work under `repo-coordination` — every hit is a session reading the shared `lanes.md` digest or its own guard output (one session's transcript shows `your lane: repo-coordination` printed to a session that is clearly NOT this lane — `Modeling Session (fork 2)` / `abf487e4…` — the exact bare-file misattribution bug fixed earlier 2026-08-19, not evidence of real ownership). No `.current-lane.<session_id>` marker exists for it. Not closed and not force-reassigned on this evidence alone — a live session claiming this lane should confirm by opening it fresh (which now also backfills its own per-session marker).** deployment, assignment and documentation. NOT any sport, model or engine. — opened 2026-08-18 — session: repo-coordination
 - **Goal (single testable outcome):** the machinery that decides WHO deploys,
   WHO owns which files, and WHERE a fact is written stays coherent and
   self-checking. Testable: `lane_identity_check.py`, `todo_id_reconcile.py` and
@@ -224,7 +224,7 @@ death, never life — do not invert it.
 - Blocked by: none.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### wnba-live-odds-capture-gap — OPEN, NARROWED — **THE AUTORUN FIRED FOR REAL `[2026-08-21T00:07:24.782Z / 19:07 CT]`, observed by a third party (scheduled task `verify-wnba-live-scale-481`, session `1f76348c`) on IND@DAL. The "never fired" blocker is DISCHARGED. What replaces it: the autorun launches every ~4.3 min and refreshes the LIVE-LENS path, but `book_quotes/<date>.jsonl` advanced ONCE (00:07:49Z) and was still byte-identical 26 min later. The lane's literal testable outcome PASSES, but passing cannot be attributed to the autorun — see FINDINGS.** **ROOT CAUSE FOUND `[00:45Z]`: the autorun is fine; `refresh_wnba_oddsapi_props.py`'s REUSE GUARD sits upstream of it and returns `reused_artifact_bundle` every tick, so the child that appends `book_quotes` never spawns. The guard's staleness bound is the PREGAME sweep interval (2h) and its reuse key carries no phase term, so a 240s live autorun cannot outrun it. THE FIX BELONGS IN THE GUARD, NOT THE AUTORUN.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
+### wnba-live-odds-capture-gap — OPEN, NARROWED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — **THE AUTORUN FIRED FOR REAL `[2026-08-21T00:07:24.782Z / 19:07 CT]`, observed by a third party (scheduled task `verify-wnba-live-scale-481`, session `1f76348c`) on IND@DAL. The "never fired" blocker is DISCHARGED. What replaces it: the autorun launches every ~4.3 min and refreshes the LIVE-LENS path, but `book_quotes/<date>.jsonl` advanced ONCE (00:07:49Z) and was still byte-identical 26 min later. The lane's literal testable outcome PASSES, but passing cannot be attributed to the autorun — see FINDINGS.** **ROOT CAUSE FOUND `[00:45Z]`: the autorun is fine; `refresh_wnba_oddsapi_props.py`'s REUSE GUARD sits upstream of it and returns `reused_artifact_bundle` every tick, so the child that appends `book_quotes` never spawns. The guard's staleness bound is the PREGAME sweep interval (2h) and its reuse key carries no phase term, so a 240s live autorun cannot outrun it. THE FIX BELONGS IN THE GUARD, NOT THE AUTORUN.** — opened 2026-08-20 — session 2bffd747-efb5-45d8-b4f3-ae067b645eb7
 - Goal: WNBA's in-game (live-phase) odds capture actually refreshes once a game
   goes live, instead of freezing at its last pregame quote. **Testable outcome:**
   for a live WNBA game, `wnba_source/tracking/book_quotes/<date>.jsonl` carries a
@@ -440,7 +440,7 @@ death, never life — do not invert it.
 - Blocked by: none.
 - Full working record (measurements, phase log, hypothesis/falsification detail) moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### portfolio-ledger-service-split — OPEN — opened 2026-08-22 — session 74a0966a-a9fe-57cd-8320-f46f235aeed1
+### portfolio-ledger-service-split — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-22 — session 74a0966a-a9fe-57cd-8320-f46f235aeed1
 - Goal: a bet logged on WEB can be settled by the autorun on REFRESH-WORKER, so
   `/portfolio` stops reading every position as pending.
 - Files: released: `syndicate/features/prediction_ledger.py`,
@@ -487,7 +487,7 @@ death, never life — do not invert it.
 - Blocked by: none.
 - Full working record (measurements, phase log, hypothesis/falsification detail) moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### portfolio-decision-and-execution — OPEN — opened 2026-08-22 — session 9324a3e5-364e-5fb4-9b4a-b0568019e37f
+### portfolio-decision-and-execution — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-22 — session 9324a3e5-364e-5fb4-9b4a-b0568019e37f
 - Goal: a staged, gated path from the Layer 2 shortlist to a COMMITTED
   position, with every stage measurable before the next opens.
   Plan: `.syndicate/plan_2026-08-22_portfolio_execution.md` (stages A-D).
@@ -543,7 +543,7 @@ death, never life — do not invert it.
 - Blocked by: none for stages A-C.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### exchange-markets-api-integration — OPEN, GOAL COMPLETE, lane idle — opened 2026-08-24 — session 71a74bb7-67ff-5c39-af7a-c11c2d94cce8
+### exchange-markets-api-integration — OPEN, GOAL COMPLETE, lane idle, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-24 — session 71a74bb7-67ff-5c39-af7a-c11c2d94cce8
 - Goal (DONE): read-only market/odds-pulling client modules for six
   prediction/event-market venues (coinbase, prophetx, novig, polymarket,
   robinhood, crypto.com). Canonical detail: `todo.md #544`.
@@ -575,7 +575,7 @@ death, never life — do not invert it.
 - Blocked by: none. All deploy claims released.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### kalshi-line-aware-rungs — OPEN — **CLAIMS RELEASED 2026-08-26 03:3xZ, session archived** — BLOCKED ON TWO MEASUREMENTS, do not resume the original goal first — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45 (GONE)
+### kalshi-line-aware-rungs — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — **CLAIMS RELEASED 2026-08-26 03:3xZ, session archived** — BLOCKED ON TWO MEASUREMENTS, do not resume the original goal first — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45 (GONE)
 - Goal: line-aware Kalshi rungs. **DO NOT RESUME THE ORIGINAL GOAL FIRST** —
   it is currently unjustified and blocked on two measurements below.
 - **CLAIMS RELEASED. The files below are FREE to take.** The lane stays OPEN
@@ -727,7 +727,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 - Full working record (measurements, phase log, hypothesis/falsification detail) moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### ncaaf-pace-block — OPEN — NCAAF calibration re-fitted and PROMOTED (15.00% -> 7.24%, impossible drives 159 -> 0); NFL deliberately NOT re-fitted (best as shipped); production read of the profile still owed — opened 2026-08-27 — session de363735
+### ncaaf-pace-block — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — NCAAF calibration re-fitted and PROMOTED (15.00% -> 7.24%, impossible drives 159 -> 0); NFL deliberately NOT re-fitted (best as shipped); production read of the profile still owed — opened 2026-08-27 — session de363735
 - **The NCAAF sources module WAS EDITED OUT FROM UNDER THIS LANE ON EXPLICIT
   USER OVERRIDE** `[2026-08-29, lane ncaaf-compact-card-state]`, scoped to
   `ncaaf_week_and_card_keys_for_date` ONLY -- it depended on `cfbd_lines_*.json`,
@@ -759,7 +759,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### boot-sync-healthcheck-kill — OPEN — opened 2026-08-27 — session 64625b4d
+### boot-sync-healthcheck-kill — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-27 — session 64625b4d
 - Goal: a web boot must not cost the container a long blocking file walk, so
   sync I/O cannot starve `/healthz` inside Render's 5s budget.
 - Status: **both fixes LIVE.** Boot sync **72.20s -> 0.65s**, reproduced at
@@ -779,7 +779,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### venue-candidate-key-token-guard — OPEN — opened 2026-08-27 — session 764eca35-178c-4c29-afbd-ec621894aaf1
+### venue-candidate-key-token-guard — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-27 — session 764eca35-178c-4c29-afbd-ec621894aaf1
 - Goal: `_candidate_keys` stops emitting city/nickname token keys built from a
   team name alone, which matched unrelated games — e.g. `over 7.5 @ -400` shared
   across four games at once.
@@ -791,7 +791,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### ncaaf-settlement-resolver — OPEN — opened 2026-08-28 — session 764eca35-178c-4c29-afbd-ec621894aaf1
+### ncaaf-settlement-resolver — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-28 — session 764eca35-178c-4c29-afbd-ec621894aaf1
 - Goal: NCAAF bets can be GRADED, and are graded against the RIGHT GAME.
 - Files: released: NEW `syndicate/features/shared/ncaaf_team_registry.py`, NEW
   **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
@@ -808,7 +808,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### soccer-overview-cost — OPEN — soccer cost SOLVED and VERIFIED (363s -> 80.5s); board staleness cause FOUND, fix SCOPED not built — opened 2026-08-28 — session 3e5a9659 (checkpointed 2026-08-29)
+### soccer-overview-cost — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — soccer cost SOLVED and VERIFIED (363s -> 80.5s); board staleness cause FOUND, fix SCOPED not built — opened 2026-08-28 — session 3e5a9659 (checkpointed 2026-08-29)
 - Goal: name where soccer's overview time goes, then remove it. **Done.** Cause was
   `_normalized_market_text` (39,281,743 calls / 713.5s cum per soccer pass, six
   `re.sub` with STRING patterns -> 238,477,602 `re._compile`). Precompiled + memoized.
@@ -829,7 +829,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - **NEXT ACTION:** verify `SLOW_REFRESH_SECONDS` actually BINDS before widening the
   build window — widening without it halves today's refresh rate.
 - Blocked by: none.
-### mlb-final-zero-placeholder — OPEN — opened 2026-08-28 — session 28195565
+### mlb-final-zero-placeholder — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-28 — session 28195565
 - Goal: a 0-0 "FINAL" in a sport that cannot end level is treated as the
   placeholder it is, rather than published as a real result.
 - Files: NONE — **all claims RELEASED 2026-08-28 at checkpoint.** The code
@@ -852,7 +852,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: a deploy. Not urgent.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### ncaaf-no-orders — OPEN — opened 2026-08-29 — session 7b278ebe-b1fa-4ea4-9648-834fb63961b7
+### ncaaf-no-orders — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-29 — session 7b278ebe-b1fa-4ea4-9648-834fb63961b7
 - Goal: name the FIRST stage in the NCAAF chain that is zero, with a production
   reading rather than a belief.
 - Files: released: `scripts/generate_smartsim2_ncaaf_projections.py`,
@@ -881,12 +881,13 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### live-prob-producer-reader-gap — OPEN — opened 2026-08-29 — session d617eefd-1628-4795-9e11-7b6aaa3f2ff3
+### live-prob-producer-reader-gap — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-29 — session d617eefd-1628-4795-9e11-7b6aaa3f2ff3
 - Goal: decide, with ONE measurement, whether MLB live prop probabilities are
   LOST IN THE JOIN or NEVER PRODUCED. No code change until it is decided.
-- Files: syndicate/features/shared/live_projection_join.py,
-  syndicate/features/shared/polymarket_board_join.py,
-  pipeline/portfolio_commit.py
+- Files: released: syndicate/features/shared/live_projection_join.py,
+  **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: syndicate/features/shared/polymarket_board_join.py,
+  released: pipeline/portfolio_commit.py
 - **THE QUESTION IS ANSWERED, AND IT IS NEITHER OPTION** `[2026-08-31, lane
   mlb-live-prop-prob-merge]`: the probabilities are **PRODUCED AND THEN
   DISCARDED**. `_merge_cards_context_into_live_row` replaced the MC row set
@@ -922,8 +923,9 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `mlb.sources.daily_artifact_path` -> `_resolve_data_path_with_reconcile` ->
   `shutil.copy2` (`mlb/sources.py:116`). The copy then looks present, so
   `_missing_required_artifact_relative_paths` does not request it.
-- Files: `syndicate/features/mlb/sources.py`,
-  `syndicate/features/shared/artifact_publisher.py`. **NOT CLAIMED.**
+- Files: released: `syndicate/features/mlb/sources.py`,
+  **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: `syndicate/features/shared/artifact_publisher.py`. **NOT CLAIMED.**
 - **THE TRIGGER IS WORSE THAN "AN MTIME RACE", WHICH THIS BLOCK GOT WRONG.**
   `if target_stat is None: should_copy = True` — a MISSING target copies
   unconditionally, which is exactly the case the repair exists for.
@@ -956,8 +958,9 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Goal: establish, as a MEASUREMENT rather than a belief, how many of the
   exchange quotes the Layer 2 board discards at the venue-adapter boundary are
   RECOVERABLE, and by which mechanism. No fix in this lane.
-- Files: `scripts/probe_polymarket_ncaaf_slug_role_join.py`,
-  `.syndicate/findings_2026-08-30_layer2_board_assessment.md`
+- Files: released: `scripts/probe_polymarket_ncaaf_slug_role_join.py`,
+  **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: `.syndicate/findings_2026-08-30_layer2_board_assessment.md`
 - NOT CLAIMED, AND DELIBERATELY NAMED OUTSIDE THE `Files:` BLOCK ABOVE: the two
   fix sites (the venue quote adapters module and the venue quote fan-in module,
   both under syndicate/features/shared/) are held by `live-venue-order-placement`.
@@ -1000,14 +1003,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   (`1/p`, `15.0`, `85.13`) live on main for one commit, and
   `check_lane_invariants` still reported INVARIANTS HOLD because each phantom
   had exactly one holder -- so diff the claim SET, do not trust a green checker.
-- Files: syndicate/features/shared/polymarket_us_orders.py
-  pipeline/execute_portfolio.py
-  tests/test_polymarket_yes_leg_binding.py
-  syndicate/features/shared/execution_ledger.py
-  tests/test_reconcile_not_found_recovery.py
-  syndicate/features/shared/portfolio_commit.py
-  tests/test_position_carries_commence_time.py
-  tests/test_soccer_yes_no_h2h_order.py
+- Files: released: syndicate/features/shared/polymarket_us_orders.py
+  **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: pipeline/execute_portfolio.py
+  released: tests/test_polymarket_yes_leg_binding.py
+  released: syndicate/features/shared/execution_ledger.py
+  released: tests/test_reconcile_not_found_recovery.py
+  released: syndicate/features/shared/portfolio_commit.py
+  released: tests/test_position_carries_commence_time.py
+  released: tests/test_soccer_yes_no_h2h_order.py
   released: pipeline/intelligence_state.py **[2026-08-31 ~19:2xZ — REASSIGNED to lane
   `layer2-cap-raise`, same session. This lane's work in that file is SHIPPED AND
   DEPLOYED; the board-shard rollback fix is a different change in a different
@@ -1021,9 +1025,9 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
     (Reworded 2026-08-31 -- the previous wording carried a slash-separated
     phrase that `lane-guard._claims` parsed as a FILE PATH, so this lane held a
     PHANTOM claim on a path that does not exist. Flagged by session 1c88bcca.)
-  tests/test_layer2_shard_by_sport.py
-  syndicate/features/shared/layer2_board.py
-  tests/test_layer2_model_value_term.py
+  released: tests/test_layer2_shard_by_sport.py
+  released: syndicate/features/shared/layer2_board.py
+  released: tests/test_layer2_model_value_term.py
 - Claims taken under `[2026-08-30, USER OVERRIDE]` x3 ("take it to the
   user-override route", "take it and fix it"). Conflicts were surfaced to the
   user BEFORE each override and the holders were messaged. Deploy claim on
@@ -1071,7 +1075,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `findings_2026-08-30_polymarket_yes_leg_evidence.md`.
 - Blocked by: none.
 
-### layer1-model-edge-join — OPEN — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+### layer1-model-edge-join — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
 - Goal: Layer 1 must join a MODEL edge on every sport/market, so Layer 2 /
   Kalshi / Polymarket rank on the sim's disagreement rather than on book hold.
 - **SCOPE REQUEST GRANTED 2026-08-31 — the layer2 board scorer goes to lane
@@ -1091,15 +1095,16 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   This bullet sits ABOVE `- Files:` deliberately: prose placed inside or just
   after that block is parsed as a CLAIM, and doing it here is how this lane
   briefly claimed the tokens `1` over `p`, `15` point `0` and `85` point `13`.
-- Files: syndicate/features/shared/board_enrichment.py
+- Files: released: syndicate/features/shared/board_enrichment.py
+  **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
   RELEASED to lane layer2-board-opportunities 2026-08-31: the layer2 board scorer module
-  syndicate/features/shared/wnba_game_projections.py
-  syndicate/features/shared/wnba_projections.py
-  syndicate/features/shared/nfl_game_projections.py
-  syndicate/features/shared/prop_projections.py
-  scripts/audit_layer1_completeness.py
-  tests/test_modelled_fair_edge_reachability.py
-  tests/test_wnba_game_projections.py tests/test_nfl_game_projections.py
+  released: syndicate/features/shared/wnba_game_projections.py
+  released: syndicate/features/shared/wnba_projections.py
+  released: syndicate/features/shared/nfl_game_projections.py
+  released: syndicate/features/shared/prop_projections.py
+  released: scripts/audit_layer1_completeness.py
+  released: tests/test_modelled_fair_edge_reachability.py
+  released: tests/test_wnba_game_projections.py tests/test_nfl_game_projections.py
 - NOT CLAIMED, DELIBERATELY: `syndicate/features/shared/live_projection_join.py`
   is held by OPEN lane `live-prob-producer-reader-gap`. Imported read-only.
 - STATUS: **DEPLOYED AND MEASURED** (`0fc174c6`, all three services). Seven
@@ -1118,10 +1123,11 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   superseded block in `.syndicate/lanes_history.md`.
 - Blocked by: none
 
-### mlb-live-prop-prob-merge — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+### mlb-live-prop-prob-merge — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
 - Goal: get MLB's live prop probability onto the board. The producer emits it and
   a merge threw it away. `rows_live_edged` must become non-zero on a live game.
-- Files: syndicate/features/mlb/live_lens.py, tests/test_mlb_live_prop_prob_merge.py (new)
+- Files: released: syndicate/features/mlb/live_lens.py, tests/test_mlb_live_prop_prob_merge.py (new)
+  **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
 - NOT CLAIMED, DELIBERATELY: `syndicate/features/shared/live_projection_join.py`
   is held by `live-prob-producer-reader-gap`. That lane's open question — LOST IN
   THE JOIN vs NEVER PRODUCED — is ANSWERED here: **produced, then discarded**,
@@ -1146,13 +1152,14 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `.syndicate/lanes_history.md`.
 - Blocked by: none
 
-### ncaaf-cfbd-quota-latch — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+### ncaaf-cfbd-quota-latch — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
 - Goal: stop NCAAF regeneration burning a MONTHLY CFBD quota it has already been
   told is exhausted, and let it succeed from cache while exhausted.
-- Files: syndicate/features/ncaaf/cfbd_quota_latch.py (NEW),
-  scripts/generate_smartsim2_ncaaf_projections.py,
-  syndicate/features/ncaaf/cfbd.py,
-  tests/test_cfbd_quota_latch.py (NEW)
+- Files: released: syndicate/features/ncaaf/cfbd_quota_latch.py (NEW),
+  **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: scripts/generate_smartsim2_ncaaf_projections.py,
+  released: syndicate/features/ncaaf/cfbd.py,
+  released: tests/test_cfbd_quota_latch.py (NEW)
 - RECLAIMED from `ncaaf-no-orders` (owning session gone), which marks these paths
   `released:` and whose own analysis proposed the PPA cache.
 - NOT TOUCHED, DELIBERATELY:
@@ -1181,7 +1188,8 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 
 ### layer2-cap-raise — OPEN, **UNOWNED** `[session 5611932c ARCHIVED 2026-09-01 ~01:4xZ]` — opened 2026-08-31 — **GOAL MET; ALL THREE INCIDENT DEFECTS CLOSED + VERIFIED IN PRODUCTION. ONE THING OWED: the 2000-cap raise is STAGED AND UNVERIFIED.**
 - Goal: board carries >400 rows for a sport. **MET** at 1000 (932 → 1634 rows, no sport lost).
-- Files: `pipeline/intelligence_state.py` **[claim REASSIGNED from `polymarket-yes-leg-binding`, same session]**; Render ENV on refresh-worker via the single-key API — never `render.yaml`. **NOW ALSO CLAIMS CODE:** `pipeline/intelligence_state.py`, `tests/test_layer2_shard_index_stale.py`, `tests/test_layer2_cards_shards.py`, `tests/test_shortlist_persist_ceiling_guard.py` — the last MOVED here from `polymarket-yes-leg-binding`, which had misfiled it. Same session owns both lanes; the file is the layer2 size instrument, not a venue file.
+- Files: released: `pipeline/intelligence_state.py` **[claim REASSIGNED from `polymarket-yes-leg-binding`, same session]**; Render ENV on refresh-worker via the single-key API — never `render.yaml`. **NOW ALSO CLAIMS CODE:** `pipeline/intelligence_state.py`, `tests/test_layer2_shard_index_stale.py`, `tests/test_layer2_cards_shards.py`, `tests/test_shortlist_persist_ceiling_guard.py` — the last MOVED here from `polymarket-yes-leg-binding`, which had misfiled it. Same session owns both lanes; the file is the layer2 size instrument, not a venue file.
+  **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
 - Env live: `ROWS_PER_SPORT=1000`, `ROWS_TOTAL=3000`, `COMBINED_ROWS=0` (refresh-worker only; other two services clean).
 - **DO NOT RAISE THE CAP AGAIN AS A CONFIG CHANGE.** The ceiling is the COMBINED key (~2,200 B/row even with `rows: []`) ⇒ ~3,600 TOTAL rows. Shard headroom is not evidence about it.
 - **NEXT ACTION (owed, for whoever picks this up): the 2000/sport cap and ROWS_TOTAL=6000 are STAGED on refresh-worker but UNDEPLOYED, and the 75% warn threshold `c461693e` is on main and undeployed. Both ride the next refresh-worker deploy. They are UNTESTABLE until a full multi-sport slate — tonight the board is MLB-ONLY at ~547 rows, below even the old 1000 cap. VERIFY BY: a sport actually reaching >1000 rows; if none does, the raise stays untested however long it sits deployed.** Measured safe against REAL production rows (combined 220 B, worst shard 50.6–55.2%). Two caveats: the percentage is SLATE-DEPENDENT, and 3000/sport reads 74.6% — under the 75% line, so the warning is NOT a guard against a 3000 raise. REVERT of the cards flip remains one step: `SYNDICATE_LAYER2_CARDS_INLINE=1` + redeploy.
@@ -1190,7 +1198,8 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Narrative: `log/2026-08-31.md` (session 5611932c). Blocked by: none.
 ### layer2-accuracy-audit — OPEN, UNOWNED, SESSION ARCHIVED 2026-08-31 ~23:5xZ — **CLAIMS: NONE HELD, all four services free.** Handoff armed: scheduled task `check-mlb-pregame-freeze-611` fires 2026-09-01 08:30 CT (needs a manual Run-now for tool approval). **`#611`'s deployed log line is UNREADABLE — do not plan around it; read the artifact + run history instead.** 7-day board accuracy DELIVERED; MLB game-line join FIXED, DEPLOYED and VERIFIED (`13 -> 0` misses, `(pregame-freeze, 14 games)`, 20:33:17Z) — but it did NOT raise graded rows, which falsified my own causal claim. Two follow-ups opened as `todo #610` (caps: ml 12 candidates -> cap 1) and `todo #611` (prop seal dead since 08-16; cadence is the lead). **ONE THING OWED: `5be4381d` is on main and NOT DEPLOYED** — preflight HOLD, 3 jobs in flight on live-odds-worker. **AT RISK: 18 local commits incl. all ledger writes are NOT on origin/main.** — opened 2026-08-31 — session ef7e22fc-d592-43f7-b326-31ddea9258ef
 - Goal: a per-sport x per-bet-type accuracy read on the Layer 2 board for the last 7 days, with an explicit statement of how many days and rows it actually rests on, plus ranked optimizations.
-- Files: **CLAIMED 2026-08-31 ~18:3xZ, user asked for the MLB join fix:** `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py` (`_odds_paths` + helpers only), `tests/test_season_betting_cards_odds_paths.py`. **EXTENDED ~18:4xZ, user asked for the backlog regrade:** `scripts/run_refresh_worker.py` (`_mlb_betting_day_backfill_*` only — NOT `_season_projection_should_launch`, which lanes.md flags as contended), `tests/test_refresh_worker.py`. Every OPEN-lane reference to `run_refresh_worker.py` is RELEASED; checked. Checked against every OPEN lane: no lane holds either. Still NOT editing `graded_outcomes.py`, `evaluation_settlement.py`, `layer2_shortlist.py`, `layer2_board.py`, `refresh_mlb_oddsapi.py`.
+- Files: released: **CLAIMED 2026-08-31 ~18:3xZ, user asked for the MLB join fix:** `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py` (`_odds_paths` + helpers only), `tests/test_season_betting_cards_odds_paths.py`. **EXTENDED ~18:4xZ, user asked for the backlog regrade:** `scripts/run_refresh_worker.py` (`_mlb_betting_day_backfill_*` only — NOT `_season_projection_should_launch`, which lanes.md flags as contended), `tests/test_refresh_worker.py`. Every OPEN-lane reference to `run_refresh_worker.py` is RELEASED; checked. Checked against every OPEN lane: no lane holds either. Still NOT editing `graded_outcomes.py`, `evaluation_settlement.py`, `layer2_shortlist.py`, `layer2_board.py`, `refresh_mlb_oddsapi.py`.
+  **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
 - Hypothesis: Layer 2 accuracy is NOT measurable end-to-end today. Specifically (a) shortlist artifacts are retained only ~4 days, not 7; (b) the evaluation ledger settles 0.2% of settleable records because the GRADED-ROW SUPPLY is near-zero (mlb=1/day vs a documented ~700-2400), not because the matcher is broken; (c) NCAAF, the largest board sport by row count, has no grader at all.
 - Falsification test: if `graded_rows_for_date('mlb', d)` returns hundreds of rows in production for a recent finished date, (b) is wrong and the defect is in the matcher. If dated shortlist artifacts exist for 2026-08-25..27 under any other read path, (a) is wrong.
 - Verification: a written per-sport/per-bet-type table with denominators, or an explicit statement of which cells are unmeasurable and why, each backed by a production reading recorded here.
