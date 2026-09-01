@@ -1800,7 +1800,30 @@ def _source_game_market_recommendations(picks: list[dict[str, Any]]) -> list[dic
                 # the game's real sim `score` dict (margin_mean/total_mean),
                 # since that's a per-game value this per-pick loop doesn't have.
                 "projected": _safe_float(pick.get("projection") if pick.get("projection") is not None else pick.get("projected")),
-                "card_bucket": "playable",
+                # T2-4. `"playable"` was HARDCODED here, so all 466 of the
+                # season's game-market recommendations carried it -- the UI
+                # renders that as "Playable addition", a promotion label, on a
+                # set whose graded return was **-9.68%** (n=105, 50-55, hit
+                # 47.62% against 52.65% implied; ATS -10.61%, TOTAL -8.80%).
+                #
+                # There is no tier to promote INTO, because the fields a tier
+                # would rank on carry no information: measured 2026-08-31,
+                # `corr(claimed EV%, win) = +0.0466` and
+                # `corr(claimed p_win, win) = +0.0147` on these very rows, and
+                # `p_win` is overstated by 25.58pp (claims 73.20%, delivers
+                # 47.62%). Ranking by them would invent a hierarchy, which is
+                # the same trap that blocks turning on moneyline picks.
+                #
+                # So this is a DEMOTION, not a new ranking: nothing here has
+                # earned promotion, and `candidate` is what that looks like.
+                # Re-promoting requires a ranking key that passes a held-out
+                # `corr > 0` test first (`todo #615`).
+                #
+                # SIZING IS DELIBERATELY STILL ABSENT. `stake_units` is null on
+                # all 466 rows and stays null: a stake derived from an
+                # uninformative ranking is worse than no stake, because it
+                # converts noise into position size.
+                "card_bucket": "candidate",
                 "recommendation_priority_score": _safe_float(pick.get("recommendation_priority_score") or pick.get("basketball_priority_score") or pick.get("score")),
                 "score": _safe_float(pick.get("score") or pick.get("ev_pct")),
                 "stake_amount": None,

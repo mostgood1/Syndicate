@@ -2050,8 +2050,27 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
                 # "0.5 plus the edge" reads on the board as a confident
                 # 50-something percent that nothing computed. Absence
                 # propagates; the card renders it as an em dash.
+                # THE INVERSION WAS DIMENSIONALLY WRONG: it read
+                # `implied_prob + ev`, adding a RETURN FRACTION to a
+                # PROBABILITY. For a bet at implied probability p with true
+                # probability q, EV per unit staked is
+                #     ev = q*(1/p - 1) - (1 - q) = q/p - 1
+                # so the inversion is q = p * (1 + ev), NOT p + ev.
+                #
+                # Corroborated by the board's own published aggregates
+                # (2026-08-31, 105 graded rows): mean implied 0.5265, mean
+                # claimed EV +22.7%, mean claimed p_win 0.7320. `p + ev` gives
+                # 0.7535; `p * (1 + ev)` gives 0.6460. The aggregates are means
+                # over slightly different subsets so this is corroboration, not
+                # proof -- the code is wrong on dimensions alone.
+                #
+                # This does NOT make the number right, only arithmetically
+                # sound: realized was 0.4762, so the model's edge is still
+                # overstated by ~17pp after the fix. That residual is the
+                # measured `corr(claimed EV, win) = +0.0466` problem and is
+                # tracked as `todo #615`, not something a formula fixes.
                 win_prob = (
-                    _clamp_probability(implied_prob + (ev or 0.0))
+                    _clamp_probability(implied_prob * (1.0 + (ev or 0.0)))
                     if implied_prob is not None
                     else _clamp_probability(None)
                 )

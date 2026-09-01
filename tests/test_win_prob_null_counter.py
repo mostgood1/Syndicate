@@ -47,17 +47,40 @@ def test_chokepoint_counts_both_branches(sport):
     m._clamp_probability(None)
     m._clamp_probability(1.4)
     m._clamp_probability(None)
-    assert m._WIN_PROB_STATS == {"rows": 4, "null_no_price": 2}
+    # Assert the two counters this test is ABOUT, not dict identity. Exact
+    # equality made the test fail the moment a THIRD counter was added
+    # (`certainty_clamped`), which is a brittleness that punishes adding
+    # observability -- the opposite of what this file exists to encourage.
+    assert m._WIN_PROB_STATS["rows"] == 4, "every call must be counted"
+    assert m._WIN_PROB_STATS["null_no_price"] == 2, "the None branch must be counted"
 
 
 @pytest.mark.parametrize("sport", sorted(PRODUCERS))
 def test_clamp_behaviour_is_unchanged(sport):
-    """Counting must not alter what the producer publishes."""
+    """Counting must not alter what the producer publishes.
+
+    The BOUNDS are now sport-specific and that is deliberate, not drift. WNBA
+    was measured on 2026-08-31 publishing `p_win = 1.000` on 36 of 466
+    recommendations against a realized 47.62%, so its clamp refuses certainty at
+    [0.01, 0.99]. NBA has NOT been measured, and tightening it here on WNBA's
+    evidence would be exactly the assume-symmetry error this repo keeps paying
+    for -- so NBA keeps [0, 1] until someone measures it.
+
+    What this test still guards, for both, is the original invariant: counting
+    did not change the mapping of an ORDINARY probability.
+    """
     m = _load(sport)
     assert m._clamp_probability(None) is None
-    assert m._clamp_probability(1.4) == 1.0
-    assert m._clamp_probability(-0.2) == 0.0
     assert m._clamp_probability(0.5) == 0.5  # a REAL 0.5 still survives
+    assert m._clamp_probability(0.73) == 0.73
+
+    if sport == "wnba":
+        assert m._clamp_probability(1.4) == m._CERTAINTY_CEILING
+        assert m._clamp_probability(-0.2) == m._CERTAINTY_FLOOR
+        assert m._CERTAINTY_CEILING < 1.0 and m._CERTAINTY_FLOOR > 0.0
+    else:
+        assert m._clamp_probability(1.4) == 1.0
+        assert m._clamp_probability(-0.2) == 0.0
 
 
 @pytest.mark.parametrize("sport", sorted(PRODUCERS))

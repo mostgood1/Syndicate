@@ -129,3 +129,52 @@ def test_totals_rows_are_dropped_and_ats_survives(monkeypatch, tmp_path):
         "the refusal must be COUNTED -- a silent drop is indistinguishable from "
         "the generator never producing totals"
     )
+
+
+# ------------------------------------------------------------------ tiering
+def test_game_market_recommendations_are_not_labelled_playable():
+    """T2-4. All 466 of the season's rows carried `playable`, a promotion label,
+    on a set whose graded return was -9.68%.
+
+    Demotion, not a new ranking: the fields a tier would rank on measure
+    corr(EV, win) = +0.0466 and corr(p_win, win) = +0.0147 on these rows.
+    """
+    from syndicate.features.wnba import cards
+
+    picks = [
+        {"market": "ATS", "selection": "Atlanta Dream", "line": -3.5,
+         "price": -110, "ev_pct": 26.1, "p_win": 0.732},
+        {"market": "ML", "selection": "Minnesota Lynx", "price": 145, "p_win": 0.41},
+    ]
+    rows = cards._source_game_market_recommendations(picks)
+    assert rows, "fixture must produce rows or the assertion is vacuous"
+    assert {row["card_bucket"] for row in rows} == {"candidate"}
+    assert all(row["stake_units"] is None for row in rows), (
+        "sizing must stay absent: a stake from an uninformative ranking converts "
+        "noise into position size"
+    )
+
+
+# ---------------------------------------------------- the probability inversion
+def test_win_prob_inversion_is_dimensionally_correct():
+    """`p + ev` adds a RETURN FRACTION to a PROBABILITY. The inversion is p*(1+ev).
+
+    For a bet at implied probability p with true probability q,
+        ev = q*(1/p - 1) - (1 - q) = q/p - 1   ->   q = p * (1 + ev)
+
+    Round-tripping a known q through the EV definition must return q.
+    """
+    for implied, true_q in ((0.5265, 0.6460), (0.4000, 0.5000), (0.7500, 0.7000)):
+        ev = true_q / implied - 1.0
+        assert implied * (1.0 + ev) == pytest.approx(true_q), (implied, true_q)
+        # the old rule does NOT round-trip
+        if abs(ev) > 1e-9:
+            assert implied + ev != pytest.approx(true_q)
+
+
+def test_a_zero_ev_bet_is_priced_at_the_implied_probability():
+    """The anchor case: no edge means the book's number IS your number."""
+    for implied in (0.35, 0.5, 0.62):
+        assert implied * (1.0 + 0.0) == pytest.approx(implied)
+        # `p + ev` happens to agree here, which is why the bug survived.
+        assert implied + 0.0 == pytest.approx(implied)
