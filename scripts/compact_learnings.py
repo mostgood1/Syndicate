@@ -47,6 +47,13 @@ EVID = pathlib.Path(".syndicate/learnings_evidence.md")
 SECTION_RE = re.compile(r"^##\s")
 DATED_RE = re.compile(r"^##\s+(2026-\d\d-\d\d)")
 SKIP_HEADS = ("## Index", "## Compacted entries")
+# THE STUB THIS TOOL WRITES, AND THEREFORE THE ONE IT MUST REFUSE TO RE-COMPACT.
+# Measured 2026-08-31: without this, every re-run "compacted" 223 already-stubbed
+# sections -- reclaiming 0 B from `learnings.md` while appending 96,555 B of
+# duplicate stubs to a 1.2 MB `learnings_evidence.md`, which is the exact size of
+# those entries. The date cutoff cannot prevent it: a stub's heading keeps its
+# original date forever, so it falls before EVERY future `--keep-from`.
+COMPACTED_MARKER = "*(evidence in `learnings_evidence.md`)*"
 
 
 def _rule_line(body):
@@ -114,7 +121,7 @@ def main(argv=None):
 
     lines = text.split("\n")
     heads = [(i, l) for i, l in enumerate(lines) if SECTION_RE.match(l)]
-    out, moved, n_comp, no_rule = [], [], 0, []
+    out, moved, n_comp, no_rule, n_already = [], [], 0, [], 0
     prev_end = heads[0][0] if heads else len(lines)
     out.extend(lines[:prev_end])
 
@@ -124,6 +131,12 @@ def main(argv=None):
         m = DATED_RE.match(head)
         if (not m) or m.group(1) >= args.keep_from or head.startswith(SKIP_HEADS):
             out.extend(body)
+            continue
+        if any(COMPACTED_MARKER in l for l in body[1:]):
+            # Already compacted by an earlier run: its evidence is in the
+            # evidence file, and moving the stub there again would duplicate it.
+            out.extend(body)
+            n_already += 1
             continue
         rule = _rule_line(body[1:])
         if rule is None:
@@ -167,6 +180,9 @@ def main(argv=None):
         return 2
 
     print(f"compacted sections : {n_comp}  (entries before {args.keep_from})")
+    if n_already:
+        print(f"already compacted  : {n_already}  (left alone; re-moving them "
+              f"duplicates evidence and reclaims nothing)")
     print(f"learnings.md       : {len(text)} -> {len(new_text)} B  ({len(text)-len(new_text)} reclaimed)")
     print(f"cap {args.cap}       : {len(text)/args.cap:.2f}x -> {len(new_text)/args.cap:.2f}x  "
           f"{'UNDER' if len(new_text) < args.cap else '*** STILL OVER ***'}")
@@ -185,6 +201,14 @@ def main(argv=None):
         print(f"REFUSED: learnings.md changed while this ran ({len(text)} -> {len(current)} B). "
               "Nothing written; re-run.")
         return 1
+
+    if not moved:
+        # NOTHING MOVED, SO THE EVIDENCE FILE MUST NOT BE TOUCHED. Writing the
+        # banner unconditionally was the second half of the same non-idempotence
+        # bug: `learnings.md` would settle after one run while
+        # `learnings_evidence.md` gained a dated header on every subsequent one.
+        print("\nNothing to move; both files left unchanged.")
+        return 0
 
     stamp = datetime.date.today().isoformat()
     banner = (f"\n\n## EVIDENCE COMPACTED OUT OF `learnings.md` — {stamp}\n\n"
