@@ -225,10 +225,22 @@ football instance; a contract-registry walker in `#619` prevents the class).
    (+0.01..+0.04); tails are wrong exactly where "model > market" fires
    (LogLoss 1.92 vs Brier 0.269). Gate: held-out fortnight LogLoss beats
    uncalibrated; bucket errors within ±0.05.
-2. **THEN the HRR null** (992 of 993 zero-prob rows are `batter_hits_runs_rbis`
-   — no calibration entry exists). Fixing it before step 1 makes the book
-   WORSE (−5.83% → −6.35%, measured); after, it stops staking 14.2% of the
-   book off a null.
+2. **THEN the HRR null — CLOSED 2026-09-01 AS ALREADY FIXED. NOT ACTIONABLE.**
+   Measured on production: all 993 zero-probability graded HRR rows fall in
+   **2026-06-04..07-08**; from 08-07 every graded HRR row is non-zero. On the
+   batch surface the boundary is exact — **100% zeros on six dates
+   (2026-06-14..06-25), 0% on all 43 dates from 07-20 onward**. The producer
+   healed between 06-25 and 07-20 (consistent with `#429`'s `hrr_mean` fix),
+   so there is no null left to fix and the "removing them makes the book
+   worse" ordering advice is moot.
+   **CONTAMINATION WARNING, which is what survives of this item:** any
+   evaluation window spanning June/early-July is poisoned for HRR. The
+   assessment's "14.2% of the prop book is staked off a null" is true of ITS
+   window (2026-04-10..08-30) and **false of today**. `scripts/fit_mlb_prop_calibration.py`
+   now detects wholly-degenerate dates, excludes them, and prints what it
+   dropped — because the first run of that script was itself poisoned by these
+   six dates and produced a confident wrong conclusion (see step 1's
+   correction).
 3. **Substitution ON + joint refit** — the built-but-dark hazard model
    (`position_substitutions=False`) whose absence inflates `pa_mean` +19.7%
    (55% of the prop bias is opportunity). Mechanism+estimator pair per the

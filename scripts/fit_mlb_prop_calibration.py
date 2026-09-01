@@ -115,6 +115,49 @@ def collect(batch_dir: Path) -> dict[str, list[tuple[float, int]]]:
     return out
 
 
+def degenerate_dates(batch_dir: Path, prop: str) -> list[str]:
+    """Dates where EVERY observation of `prop` is a literal 0.0 probability.
+
+    A producer null looks exactly like this, and it poisons a fit without
+    failing anything. MEASURED 2026-09-01, and this guard exists because the
+    first run of this very script walked into it: `hits_runs_rbis_*` was 100%
+    zeros on six dates (2026-06-14..06-25) and 0% on all 43 dates from 07-20,
+    so a 60/20/20 chronological split put 1,422 of 7,074 HRR observations
+    (20.1%) of literal zeros into FIT. The fitter did the only sane thing with
+    them -- it pinned the slope at the clamp floor -- and I read that as
+    "HRR carries no signal", which was a statement about the broken window and
+    not about HRR. Refitted on clean dates the same prop yields healthy slopes
+    (0.77-1.14).
+
+    Whole-date and per-prop on purpose. A partial zero rate is a real (if ugly)
+    distribution and excluding it would be editing data; a date that is 100%
+    zeros for one prop while its neighbours are fine is a producer outage, and
+    the `hits_1plus` control -- zero zeros on every date -- is what separates
+    the two.
+    """
+    out: list[str] = []
+    for path in _iter_reports_from_batch(batch_dir):
+        match = re.search(r"(\d{4}-\d{2}-\d{2})", path.name)
+        report = json.loads(path.read_text(encoding="utf-8"))
+        ps, _ys, _ws = _extract_prop_pairs(report, prop)
+        if ps and all(p == 0.0 for p in ps):
+            out.append(match.group(1) if match else path.name)
+    return out
+
+
+def report_degenerate(batch_dir: Path, props: list[str]) -> dict[str, list[str]]:
+    """Announce what is being dropped. A silent exclusion is how a fit starts
+    describing a population nobody chose."""
+    found: dict[str, list[str]] = {}
+    for prop in props:
+        dates = degenerate_dates(batch_dir, prop)
+        if dates:
+            found[prop] = dates
+            print(f"  DEGENERATE {prop}: {len(dates)} date(s) are 100% p=0.0 -> EXCLUDED "
+                  f"({dates[0]}..{dates[-1]})", flush=True)
+    return found
+
+
 # ----------------------------------------------------------------- production
 def _token(explicit: str) -> str:
     if explicit:
@@ -188,10 +231,40 @@ def main() -> int:
     print("Pulling production sim_vs_actual reports (substrate: Render, not data/**)", flush=True)
     windows = download_splits(args.base_url, token, work)
 
+    # SCAN FOR PRODUCER NULLS BEFORE FITTING ANYTHING. A date that is 100%
+    # p=0.0 for one prop is an outage, not a distribution, and it silently
+    # drags that prop's slope to the clamp floor -- which is precisely how the
+    # first run of this script produced a confident wrong conclusion about
+    # hits_runs_rbis. Dropping the report entirely is deliberate: the fitter
+    # takes a DIRECTORY, so per-prop exclusion is not expressible, and a date
+    # broken for one prop has no claim to be trusted for its neighbours.
+    print("\nScanning for degenerate (100% p=0.0) dates before fitting:", flush=True)
+    all_props = sorted(collect(work / "fit"))
+    dropped = report_degenerate(work / "fit", all_props)
+    if dropped:
+        clean_dir = work / "fit_clean"
+        if clean_dir.exists():
+            for stale in clean_dir.glob("sim_vs_actual_*.json"):
+                stale.unlink()
+        clean_dir.mkdir(parents=True, exist_ok=True)
+        bad = {date for dates in dropped.values() for date in dates}
+        kept = 0
+        for path in _iter_reports_from_batch(work / "fit"):
+            match = re.search(r"(\d{4}-\d{2}-\d{2})", path.name)
+            if match and match.group(1) in bad:
+                continue
+            (clean_dir / path.name).write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+            kept += 1
+        print(f"  fitting on {kept} clean report(s) instead of {kept + len(bad)}", flush=True)
+        fit_dir = clean_dir
+    else:
+        print("  none", flush=True)
+        fit_dir = work / "fit"
+
     candidate_path = work / "candidate_props.json"
     subprocess.run(
         [sys.executable, str(FITTER),
-         "--batch-dir", str(work / "fit"), "--val-batch-dir", str(work / "val"),
+         "--batch-dir", str(fit_dir), "--val-batch-dir", str(work / "val"),
          "--out-props", str(candidate_path), "--out-hr", str(work / "candidate_hr.json"),
          "--min-n", str(args.min_n)],
         check=True, cwd=str(REPO_ROOT),
@@ -237,7 +310,8 @@ def main() -> int:
     print(f"\nGATE (must beat the INCUMBENT on both metrics held-out): {'PASS' if beats else 'FAIL'}")
     (work / "report.json").write_text(json.dumps(
         {"windows": {k: list(v) for k, v in windows.items()}, "test": results,
-         "selected": chosen, "gate_pass": beats}, indent=2), encoding="utf-8")
+         "selected": chosen, "gate_pass": beats,
+         "degenerate_dates_excluded": dropped}, indent=2), encoding="utf-8")
 
     if args.write_config:
         if not beats:

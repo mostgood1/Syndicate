@@ -56,13 +56,29 @@ class HrrMustStayUncalibratedTests(unittest.TestCase):
         hrr = [prop for prop in _config()["props"] if "runs_rbis" in prop]
         self.assertEqual(hrr, [], "adding HRR was tested and REGRESSED it held-out; see _meta")
 
-    def test_the_falsification_is_recorded_where_someone_would_look(self) -> None:
-        """A negative result nobody can find gets re-run as a fresh idea."""
-        meta = _config().get("_meta") or {}
-        note = str(meta.get("hits_runs_rbis_deliberately_absent") or "")
+    def test_the_reasoning_recorded_is_the_CORRECTED_one(self) -> None:
+        """A negative result nobody can find gets re-run as a fresh idea -- and a
+        negative result recorded with the WRONG reason is worse, because it
+        teaches the wrong lesson with authority.
+
+        The first version of this note said the clamp-floor fit proved HRR
+        carries no signal. That was withdrawn: the clamp floor was an artifact
+        of a fit window that was 20.1% literal zeros. On clean dates HRR fits
+        healthy slopes. The decision (no entry) survives because the clean fit
+        still regresses held-out."""
+        note = str((_config().get("_meta") or {}).get("hits_runs_rbis_deliberately_absent") or "")
         self.assertTrue(note, "_meta must say WHY HRR is absent")
-        self.assertIn("clamp floor", note)
-        self.assertIn("0.05", note)
+        self.assertIn("WITHDRAWN", note)
+        self.assertIn("CORRECTED", note)
+        self.assertIn("does not generalise", note)
+
+    def test_the_producer_null_closure_is_recorded(self) -> None:
+        """`#624` step 2 is not actionable, and the dates matter: an evaluation
+        window spanning June/early-July is contaminated for HRR."""
+        note = str((_config().get("_meta") or {}).get("hits_runs_rbis_producer_null_closed") or "")
+        self.assertTrue(note, "_meta must record that the producer null is already fixed")
+        self.assertIn("2026-06-14", note)
+        self.assertIn("07-20", note)
 
     def test_the_fitter_still_omits_hrr_so_a_plain_refit_cannot_add_it(self) -> None:
         """If someone adds HRR to `prop_keys`, this fails — which is the point:
