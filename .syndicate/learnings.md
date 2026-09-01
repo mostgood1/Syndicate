@@ -3452,3 +3452,43 @@ writer produces.
 **Seasonal sports make this the normal case, not an edge case.** Any producer
 fixed during an off-season or a mid-season break is in exactly this state, and
 the break is precisely when there is time to fix things.
+
+---
+
+## 2026-09-01 REQUIRED: on the shared tree, read the DIFF of a ledger file before committing it, not its --stat. `[lane wnba-accuracy-assessment]`
+
+**What happened, twice in one day, in both directions.**
+
+* A peer's broad `git add` swept MY `log/2026-09-01.md` entry into their commit
+  `7b31a766`. Content durable, attribution theirs.
+* I staged `.syndicate/lanes.md` to record a one-line claim and swept **112
+  lines of a third session's brand-new lane block** (`mlb-live-gameline-skill-audit`,
+  session `250953ef`) into my commit `c544b30c`.
+
+Nothing was lost either time — both were purely additive, and I verified the
+swept block is complete on `origin/main` before moving on. That is luck about the
+shape of the edit, not a property of the process.
+
+**The specific miss, and it is not "I forgot to check".** I DID run
+`git diff --cached --stat`. It printed `.syndicate/lanes.md | 113 +++...` for a
+change I knew was one line, and I read the file list rather than the number. A
+`--stat` answers *which files* am I committing; only the diff answers *what*.
+
+**The rule.** For any file in `.syndicate/` or another shared ledger, `--stat` is
+not sufficient before commit:
+
+    git diff --cached -- .syndicate/lanes.md | grep -E "^\+### |^-"
+
+Two things to look for: a `### ` heading you did not write (someone else's lane
+block rode along) and ANY deletion line (which is the case where content is lost
+rather than merely re-attributed).
+
+**Why the number is the tell.** A one-line edit that stages as 113 lines is
+arithmetic that cannot be right, and it was visible before the commit. The check
+that catches this costs one command; the version where the edit is *not* additive
+costs someone their work.
+
+**This is the same shape as `[shared index can hold a revert]`** — 4,993 staged
+deletions invisible in the worktree — and the same fix applies: the index on a
+shared tree contains whatever anyone put there, so read it, do not assume it
+holds only what you touched.
