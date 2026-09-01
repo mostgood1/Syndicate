@@ -13,6 +13,13 @@ import io, re, sys
 PATH = ".syndicate/learnings.md"
 EVIDENCE = ".syndicate/learnings_evidence.md"
 EVIDENCE_LINK = "learnings_evidence.md"
+# THE ARCHIVE IS SPANNED FOR THE SAME REASON THE EVIDENCE FILE IS. Entries older
+# than 2026-08-20 were moved out of learnings.md on 2026-09-01 to fit its size
+# budget; a rule you cannot find is a rule you will break again, so moving a
+# rule must never cost discoverability. If this file stops being scanned, 149
+# rules silently leave the index.
+ARCHIVE = ".syndicate/learnings_archive.md"
+ARCHIVE_LINK = "learnings_archive.md"
 # The index lives in its OWN file. learnings.md is read at every session start
 # and has a size budget; a generated navigation block that grows with the rule
 # count does not belong inside it. Spanning the evidence file took the index
@@ -71,6 +78,16 @@ def main():
     for h in _headings(ev):
         if h not in seen:  # a heading kept in both places is listed once, here
             entries.append((h, EVIDENCE_LINK))
+            seen.add(h)
+
+    try:
+        ar = io.open(ARCHIVE, encoding="utf-8").read()
+    except OSError:
+        ar = ""
+    for h in _headings(ar):
+        if h not in seen:
+            entries.append((h, ARCHIVE_LINK))
+            seen.add(h)
 
     if not entries:
         print("no rule headings found; refusing to write an empty index")
