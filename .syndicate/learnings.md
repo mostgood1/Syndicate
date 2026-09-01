@@ -3348,3 +3348,49 @@ is a guess wearing a measurement's clothes.
 discriminating field that is already in hand. This is about not HAVING the field
 and proceeding anyway. Both end in a confident wrong mechanism; the fix here is
 to go and get the field.
+
+---
+
+## 2026-09-01 FORBIDDEN: naming a MECHANISM from a SYMPTOM. Three times in one session, on three different subjects. `[lane wnba-accuracy-assessment]`
+
+Same error, three subjects, one day. Recording the set rather than any one of
+them, because the pattern is the finding.
+
+| I measured (true) | I claimed (invented) | what it actually was |
+|---|---|---|
+| `book_quotes` file is **45.8MB** | "captured but not joined — a JOIN gap" | **0 exchange rows in it.** Nothing to join. |
+| `artifacts/export` count **0** for recon | "gate 2 is STRUCTURALLY unreachable" | It crossed on its own. The count predated the producer's first run. |
+| `active_sports: ['ncaaf','soccer']` | "Layer 2 EXCLUDES WNBA upstream" | **No allowlist exists.** The field is derived from whichever sports had rows. |
+
+Each measurement was correct. Each mechanism was fiction, stated with the
+confidence the measurement had earned — and in two of the three I named a FIX,
+which would have been a no-op.
+
+**The shape.** A symptom is a value you read. A mechanism is a claim about *why*
+that value is what it is. Reading one does not give you the other, and the gap is
+invisible from inside because the number is real and right there. The tell is
+grammatical: *"the board can't see it"*, *"it's structurally unreachable"*,
+*"excluded upstream"* — all causal claims, none of which any of those readings
+could support.
+
+**The check that would have caught all three**, and it is one question:
+
+> **What else would produce this same reading?**
+
+- 45.8MB → "a file full of sportsbook rows" would too. → count by `bookmaker`.
+- count 0 → "the producer hasn't run yet" would too. → check the producer ran first.
+- `active_sports` without wnba → "no WNBA rows in the pool" would too. → read the code that builds the field.
+
+In all three the disambiguating evidence was **one command away** and I did not
+run it, because the symptom already felt like an explanation.
+
+**Corollary that cost the most time:** two of the three were *fixes I nearly
+shipped*. A mechanism invented from a symptom generates a plausible, specific,
+wrong repair — and it will pass its own tests, because the tests are written
+against the invented mechanism too.
+
+**How to apply.** Before writing a causal sentence about a system, name the
+reading it rests on and one alternative that would produce the same reading.
+If you cannot rule the alternative out with evidence in hand, the honest form is
+*"symptom X; cause not established"* — which is a finding, and is what `#614`
+and `#616` now say.

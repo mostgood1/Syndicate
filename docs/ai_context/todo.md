@@ -126,21 +126,48 @@ plan that produced it had the ordering wrong.**
 
 ---
 
-### `#614` — **LAYER 2 EXCLUDES WNBA UPSTREAM, so the only settleable surface has never seen it** — lane `wnba-accuracy-assessment`, 2026-08-31 — **MEASURED, NOT FIXED**
+### `#614` — **WNBA REACHES THE LAYER 2 SHORTLIST ON 1 OF 14 DAYS. The MECHANISM IS UNVERIFIED and cannot be checked before 2026-09-17.** — lane `wnba-accuracy-assessment`, 2026-08-31 — **SYMPTOM MEASURED, CAUSE NOT**
 
-`/api/board/layer2-shortlist` returns **0 WNBA rows on 13 of 14 days**; the one
-exception is 2026-08-29 (8 rows, all `game`, **0 `prop`**). It is not a value
-floor — the payload reports **`active_sports: ['ncaaf', 'soccer']`** and WNBA has
-no `per_sport` entry at all. Of 7,724 opportunities considered on 2026-08-30,
-ncaaf took 322 and soccer 400 against a `per_sport_limit` of 400.
+> **CORRECTED 2026-09-01.** This entry first said *"Layer 2 excludes WNBA
+> upstream, not on value"*. **That is a mechanism I never verified.** I measured
+> `active_sports: ['ncaaf', 'soccer']` — a symptom — and named a cause. Reading
+> `layer2_board.py`: `active_sports` is **derived**, `sorted(per_sport_report.keys())`,
+> and `per_sport_report` is keyed off whatever rows arrive
+> (`by_sport.setdefault(sport, []).append(row)`). **There is no sport allowlist
+> anywhere in that path.** So WNBA's absence means *no WNBA candidate rows
+> reached the pool at build time*, which is not the same claim at all.
 
-Layer 2 is the surface the ledger notes call the only one that CAN be settled,
-because it persists what it recommended. So this is a second, independent reason
-WNBA profitability is unmeasurable — distinct from the settlement gap in the same
-lane, and not fixed by it.
+**The symptom, which stands:** `/api/board/layer2-shortlist` returns **0 WNBA
+rows on 13 of 14 days**; the exception is 2026-08-29 (8 rows, all `game`, **0
+`prop`**). On 2026-08-30 — a real 4-game WNBA slate — 7,724 opportunities were
+considered, ncaaf took 322 and soccer 400 against a `per_sport_limit` of 400,
+and WNBA had no `per_sport` entry.
 
-Related, same lane, same surface: only **4-6%** of WNBA Layer 1 rows carry a
-model fair value (`rows_modelled_fair` 20-56 of 522-1,276 per day over 13 days).
+**Why the cause is undeterminable right now, and this is the load-bearing part:**
+there are **no WNBA games between 2026-08-31 and 2026-09-16** (FIBA World Cup
+break). Every shortlist build in that window reads a pool containing zero WNBA
+rows *correctly*. So the three live candidate explanations —
+
+1. no WNBA slate inside the build's horizon at build time,
+2. WNBA candidates filtered out before this function,
+3. WNBA candidate generation producing nothing,
+
+— are **indistinguishable until a live slate**, and any reading taken during the
+break will look identical to all three. That is the same "population does not
+contain the subject" trap that also parks `#616`.
+
+**Do not attempt this before 2026-09-17.** When it can be run, the discriminating
+read is upstream of `active_sports`: count WNBA rows entering
+`_build_candidate_pool` on a live slate. If rows enter and do not survive, it is
+a filter; if none enter, it is generation. `active_sports` itself can never tell
+you which — it is downstream of both.
+
+Layer 2 is the only surface the ledger notes call settleable, because it persists
+what it recommended, so this remains worth resolving. Related and separately
+measured: only **4–6%** of WNBA Layer 1 rows carry a model fair value
+(`rows_modelled_fair` 20–56 of 522–1,276 per day over 13 days).
+
+---
 
 ---
 
