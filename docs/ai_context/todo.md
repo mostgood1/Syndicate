@@ -1,5 +1,103 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#617` — **43% OF THE WNBA CARD ARCHIVE IS UNUSABLE: a vendor artifact root whose MARKET LINES correlate -0.04 with the games they are attached to** — lane `wnba-accuracy-assessment`, 2026-08-31 — **MEASURED, NOT FIXED**
+
+`/wnba/api/cards` serves from `wnba_source/data/processed/` (Syndicate) or
+`wnba_source/source_artifacts/...` (vendor), resolved per requested file (`#309`).
+Split the same measurement on that one field, graded against ESPN over
+2026-05-17..08-30:
+
+| root | n | Brier skill | AUC | corr(**market line**, actual margin) |
+|---|---|---|---|---|
+| Syndicate | 106 | **+16.53%** | **0.7631** | **+0.6785** |
+| vendor | 79 | **-72.36%** | **0.4018** | **-0.0396** |
+
+**The decisive column is the market's, not the model's.** A real book line
+correlates ~+0.68 with margin; on the vendor root it is -0.04, so those rows are
+mis-joined at source and nothing computed from them means anything.
+Corroborated: |spread| > 20.5 on 9.2% of rows (max **55.0**), totals outside
+145-200 on 11.9% (max **253.0**). Not a side flip (flipping reaches only AUC
+0.598) and not a bad join (all 74 fallback matches are the same team pair, same
+day, minutes of tip drift; fallback rate equal across roots). Controlled on the
+month: July carries both, Syndicate AUC **0.905** (n=26) vs vendor **0.292**
+(n=23).
+
+**Why it matters beyond WNBA:** pooled across both roots the sim reads Brier
+skill **-21.5%** — "worse than climatology, delete it". Split, it is **+16.5%**
+and the best pregame asset on the platform. **The first pass of the assessment
+that found this reported the pooled number.** Any sport with a vendor bundle
+behind it has the same exposure. Fix is not a deletion — it is that every
+evaluation must record per-row provenance and report the split beside the pooled
+number.
+
+---
+
+### `#616` — **THE WNBA BOARD CANNOT SEE 45.8MB OF EXCHANGE QUOTES SITTING ON THE SAME DISK** — lane `wnba-accuracy-assessment`, 2026-09-01 — **MEASURED, NOT FIXED**
+
+Measured on 2026-08-30, a real 4-game slate:
+
+- `/api/board/book-grid?sport=wnba`: **787 book references across 10 books** —
+  draftkings, fanduel, fanatics, betmgm, betrivers, betonlineag, williamhill_us,
+  betus, mybookieag, bovada. **Kalshi and Polymarket: zero.** Same on Layer 1
+  (1,115 rows).
+- `wnba_source/tracking/book_quotes/2026-08-30.jsonl`: **45,776,899 bytes.**
+
+So this is **a join gap, not an ingestion gap** — the prices are already captured,
+on the same service, in a 45MB file. Meanwhile real money IS executed on those two
+venues (29 Kalshi + 3 Polymarket WNBA orders). **The surface that picks the bet
+cannot see the price the bet is filled at**, so no edge it computes is the edge
+that gets traded.
+
+Known mechanism, already documented at `kalshi_board_join.py:503`: the board reads
+`quote.book_prices["kalshi"]`, OddsAPI's view, which carries game lines only for
+exchanges. Lane `mlb-accuracy-assessment` found the same blind spot on MLB props
+the same evening and describes it as a one-function-call fix. **WNBA's loss is
+worse than MLB's: MLB keeps exchange game lines and loses props; WNBA gets
+nothing at all.**
+
+---
+
+### `#615` — **THE WNBA EDGE GENERATOR EMITS NO MONEYLINE ROWS, and turning them on depends on a ranking key that does not work yet** — lane `wnba-accuracy-assessment`, 2026-08-31 — **MEASURED, NOT FIXED, AND THE ORDERING IS THE POINT**
+
+The moneyline is the WNBA sim's one measured edge — **AUC 0.7631** (n=106),
+**0.8413** over the last 14 days, **89.7% straight up** in its top confidence
+band. The board issued **2 ML recommendations all season out of 466**, spending
+its volume on ATS (**-10.61%**, n=51) and TOTAL (**-8.80%**, n=54).
+
+The board does not choose markets — it renders what the generator emits.
+`recommendations_2026-08-30.csv` on production contains **exactly 2 rows: 1 ATS,
+1 TOTAL, zero ML**. The consumer side is already ready (`_recommendation_tier`
+has an explicit ML branch; the slate builder handles ML at
+`refresh_wnba_oddsapi_props.py:1425`). So this is purely a producer gap.
+
+**But do not simply switch ML on.** It would be ranked by the same `ev_pct` /
+`p_win` / `edge` fields measured as uninformative on the same data:
+`corr(edge, win) = +0.0002` (n=656), `corr(claimed EV, win) = +0.0466` on game
+lines, and board `p_win` overstated by **25.58pp** (claims 73.20%, delivers
+47.62%). Enabling ML under that ranking ships the platform's best signal through
+its worst selector. **This item is blocked on a validated ranking key, and the
+plan that produced it had the ordering wrong.**
+
+---
+
+### `#614` — **LAYER 2 EXCLUDES WNBA UPSTREAM, so the only settleable surface has never seen it** — lane `wnba-accuracy-assessment`, 2026-08-31 — **MEASURED, NOT FIXED**
+
+`/api/board/layer2-shortlist` returns **0 WNBA rows on 13 of 14 days**; the one
+exception is 2026-08-29 (8 rows, all `game`, **0 `prop`**). It is not a value
+floor — the payload reports **`active_sports: ['ncaaf', 'soccer']`** and WNBA has
+no `per_sport` entry at all. Of 7,724 opportunities considered on 2026-08-30,
+ncaaf took 322 and soccer 400 against a `per_sport_limit` of 400.
+
+Layer 2 is the surface the ledger notes call the only one that CAN be settled,
+because it persists what it recommended. So this is a second, independent reason
+WNBA profitability is unmeasurable — distinct from the settlement gap in the same
+lane, and not fixed by it.
+
+Related, same lane, same surface: only **4-6%** of WNBA Layer 1 rows carry a
+model fair value (`rows_modelled_fair` 20-56 of 522-1,276 per day over 13 days).
+
+---
+
 ### `#611` — **THE MLB PROP PREGAME FREEZE STOPPED ON 2026-08-16. Every hitter/pitcher prop since has been graded against a post-slate remnant covering ~ONE GAME.** — found by lane `layer2-accuracy-audit`, 2026-08-31 — **OPEN, MEASURED, NOT FIXED — belongs to the freeze WRITER (`scripts/refresh_mlb_oddsapi.py`), not to card generation**
 
 **THE EVIDENCE, worker-side and direct.** `locked_cards_retuned/daily_summary_2026_08_30_locked_policy.json`
