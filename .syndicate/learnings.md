@@ -4140,3 +4140,57 @@ undetected.
 line source; (2) delete or hard-fail any fallback on either; (3) only then
 publish the missing inputs. Doing (3) first turns a visible null into an
 invisible falsehood.
+
+---
+
+## 2026-09-01 REQUIRED: assert on the VALUE THAT CROSSED THE BOUNDARY, not on the call returning. "It didn't raise" and "the counter moved" are different claims, and only the second is evidence. `[lane wnba-accuracy-assessment]`
+
+**What happened.** I added a block to publish WNBA recon artifacts from
+refresh-worker to web, because the producer was writing to the worker's disk and
+the web-facing endpoint reads web's. The block ran cleanly, raised nothing,
+returned, and **published zero files.**
+
+The bug: the tick builds a small summary off the producer's result for the log
+line —
+
+    result["recon"] = {key: recon.get(key) for key in ("status", "games", "quarters", "props")}
+
+— and `paths` is not one of those four keys. The publish loop then iterated
+`(result.get("recon") or {}).get("paths", {})`, which was **always empty**. Every
+observable said fine: no exception, `status: ok`, a well-formed log line, and a
+`published` map that was simply `{}` rather than obviously wrong.
+
+**What caught it, and it is the only thing that would have.** The test asserted
+on *what reached the publisher* — it patched `publish_hot_artifact` with a
+recorder and asserted the four expected filenames were in it:
+
+    names = {p.rsplit("/", 1)[-1] for p in sent}
+    assert "recon_quarters_2026-08-30.csv" in names
+
+A test that asserted the tick returned without raising, or that `published` was
+present, or that the producer reported `ok`, would have **passed on the broken
+version**.
+
+**THE GENERALISATION.** This is the same failure as a test asserting *a deploy
+happened* rather than *the code ran*, and the same as an off/on check asserting
+*the call succeeded* rather than *the counter's value changed*. Any time work
+crosses a boundary — a process, a service, a disk, a queue, a network — the
+assertion has to name **the thing on the far side**:
+
+| weak assertion | what it actually proves |
+|---|---|
+| the call did not raise | the caller survived |
+| the function returned a dict | the caller survived, verbosely |
+| status == "ok" | the PRODUCER is happy |
+| **the recipient received X** | **the boundary was crossed** |
+
+**This is distinct from the readability rule** (`before reading a null result,
+find the thing that says the signal could have arrived`) and the two were nearly
+folded together. Readability is about **when a reading is interpretable**; this is
+about **what the assertion is even claiming**. A test can be perfectly readable
+and still assert nothing that matters.
+
+**How to apply.** For any cross-boundary work: patch or observe the RECIPIENT,
+and assert on the value it received. If the recipient cannot be observed in a
+test, that is itself the finding — an unobservable boundary is where silent
+failures live, and it is exactly where this one lived for its whole short life.
