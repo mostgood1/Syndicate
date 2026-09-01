@@ -1,0 +1,476 @@
+# FINDINGS — MLB accuracy and profitability, full assessment
+
+**Session** `3bb44ef2-a199-430e-afce-c3034bf48d9d`, lane `mlb-accuracy-assessment`.
+**Date** 2026-08-31. **Every number below is read off production**
+(`https://syndicate-an21.onrender.com`), not off the local checkout, and each
+carries its n and window. Where a conclusion is an inference it says so.
+
+Builds on `layer2-accuracy-audit` (2026-08-31, UNOWNED) rather than repeating
+it. That lane's named gap — *"whether the board's own `ev_pct` /
+`model_edge_pct` / `score` PREDICT the outcome"* — is **CLOSED here**, section 4.
+
+---
+
+## 0. The headline, in one paragraph
+
+The MLB sim is **well calibrated and weakly informative**. The market is
+**more** informative. `model_edge_pct` is defined as sim minus market, so it
+isolates the sim's *error* rather than its *information* — and it is measurably
+anti-predictive: `corr(claimed edge, win) = -0.1379` on 360 moneyline sides.
+Every surface that stakes money on that edge loses; every surface that stakes
+money on price dispersion wins. The player-prop engine is worse than that: its
+side selection is **inverted** — the batters it takes OVER *under*-produce the
+batters it takes UNDER, in 5 of 6 (market, line) cells, significant at
+z = -4.12 on home runs (n=1,690).
+
+---
+
+## 1. Instrument state — what is and is not measurable (read this first)
+
+| instrument | verdict |
+|---|---|
+| `/mlb/api/market-accuracy` | **USABLE, but it is not a slate instrument.** 8,918 graded rows 2026-04-10..08-31. Supply collapsed: 5,292 rows in June, 2,781 in July, **285 in August**. The published headline is the `official` tier only: 66 bets in 30 days, ~1 game-line/day. Confirms `todo #610` / `#611`. |
+| `/mlb/api/live-lens-accuracy` | **PROVABLY BROKEN. Do not read it.** Over 2026-07-01..08-31 the pooled `by_klass` is `over: 0 wins / 1,578` and `under: 206 wins / 206`. A model cannot go 0-for-1578 and 206-for-206. The grader is comparing the projection against an **in-progress** stat line, so the side that is behind at snapshot time always "loses". The published 6.5% hitter-prop hit rate is an artefact, not a measurement. Separately the input artifact exists on only **11 of 61 days**. |
+| `markets.ml` / `markets.totals` on a finished card | **CONTAMINATED on 13 of 193 (6.7%) priced games** — settled/dead prices (`-100000` / `+99900`, overround 1.0000). A naive backtest over this field returned **+101% to +331% ROI**; after filtering (`abs(odds)>1000`, or overround outside 1.010-1.12) the same backtest returns **-2.80%**. Anyone reading this field must filter. |
+| `/api/portfolio/live?date=` | **The `date` param is IGNORED.** `?date=2026-08-29` and `?date=2026-08-26` both return the 2026-08-31 payload byte-for-byte. Real-money history is not retrievable from the web service. |
+| Polymarket real-money ROI | **ACCOUNTING DEFECT.** `polymarket/game_line` reports `roi_pct: -159.38` on `staked_dollars: 16.37`, `pnl_dollars: -26.09` — a loss larger than the stake on binary contracts. Fees or contract cost sit outside the stake denominator. |
+
+---
+
+## 2. Pregame sim, GAME markets — calibrated, weakly informative, dominated
+
+`n = 482` finals over **39 dates, 2026-06-17..2026-08-30**, from
+`/mlb/api/cards?date=`. Sim probabilities are pregame (range 0.119-0.799,
+mean 0.5070 vs a 0.5104 base rate; zero values pinned at 0 or 1, so not
+live-contaminated).
+
+**Moneyline**
+- mean sim home prob 0.5070 vs actual home-win 0.5104 — **bias -0.34pp**: calibrated.
+- Brier **0.24307** vs climatology 0.24989 — **skill score +2.73%**.
+- AUC **0.5904**. Straight-up favourite accuracy 56.43%.
+
+**vs the market**, on the 180 games with clean two-sided prices:
+
+| | Brier | LogLoss | AUC | skill |
+|---|---|---|---|---|
+| SIM | 0.23719 | 0.66683 | 0.6155 | +0.70% |
+| MARKET (de-vig) | **0.22663** | **0.64701** | **0.6746** | **+5.12%** |
+| 50/50 blend | 0.22827 | 0.64863 | 0.6682 | +4.43% |
+| climatology | 0.23886 | 0.67069 | 0.5000 | 0.00% |
+
+On the **69 games where sim and market disagree on the favourite, the market is
+right 59.4% and the sim 40.6%.** A 50/50 blend does not beat the market alone.
+
+**Run totals** — the shape is genuinely good and the signal is not:
+- sim mean total 8.708 vs actual 8.861 — bias **-0.153 runs/game**
+- sim distribution sd 4.821 vs the sd actually needed 4.717 — dispersion is right
+- PIT deciles `[42 50 37 45 57 44 57 48 54 48]` against 48.2 expected — **uniform**; mean PIT 0.5162
+- **`corr(sim mean total, actual total) = 0.169`** — near-zero discrimination
+- vs the posted line: sim projects over 51.2% of the time, actual went over 43.9%
+
+---
+
+## 3. Pregame sim, PLAYER PROPS — the side selection is INVERTED
+
+`n = 8,918` graded rows, 2026-04-10..2026-08-31, both tiers.
+
+Pooled: `official` **-7.43% ROI** (n=2,066, hit 52.37% vs 55.53% implied);
+`candidate` **-11.60%** (n=6,852, 42.79% vs 45.72%).
+
+**The loss is concentrated entirely on the OVER side.** Restricting to
+near-symmetric prices (market-implied 40-60%), where the vig splits evenly and
+the comparison is clean:
+
+| side | n | realized | market implied | gap | ROI |
+|---|---|---|---|---|---|
+| **over** | 1,332 | 44.67% | 50.37% | **-5.70pp** | **-12.24%** |
+| under | 1,554 | 53.15% | 53.19% | -0.04pp | -0.08% |
+
+Unders are exactly market-neutral. Overs are 5.7pp worse than the price.
+
+**The discrimination test — controlled on (market, line), asking whether the
+batters taken OVER actually out-produce the batters taken UNDER:**
+
+| market | line | over n / mean | under n / mean | diff | t | verdict |
+|---|---|---|---|---|---|---|
+| hitter_home_runs | 0.5 | 1,497 / 0.119 | 193 / 0.238 | **-0.119** | **-3.32** | INVERTED |
+| hitter_hits | 0.5 | 1,222 / 0.797 | 401 / 0.803 | -0.006 | -0.12 | INVERTED |
+| hitter_total_bases | 1.5 | 660 / 1.474 | 752 / 1.605 | -0.131 | -1.31 | INVERTED |
+| hitter_rbis | 0.5 | 637 / 0.399 | 671 / 0.475 | -0.077 | -1.63 | INVERTED |
+| hitter_runs | 0.5 | 356 / 0.458 | 516 / 0.483 | -0.025 | -0.51 | INVERTED |
+| hitter_hits | 1.5 | 51 / 1.275 | 108 / 1.028 | +0.247 | +1.47 | correct |
+
+**Home runs, the load-bearing cell.** P(>=1 HR): model says OVER gives
+**10.96%** (n=1,497); model says UNDER gives **21.24%** (n=193); population base
+rate across all graded HR rows **12.13%**. Two-proportion **z = -4.12**. The
+model's over picks homer *below* the base rate of the very population it is
+choosing from, and its under picks homer at nearly twice it. Home runs alone
+are **-233u of the -489u total** across all 8,918 rows.
+
+**Two alternatives considered and both weakened:**
+- *DNP graded as 0 rather than voided.* Would depress overs and **lift** unders
+  by roughly z(1-m), about +4pp. Unders sit at -0.04pp, so this cannot be the
+  mechanism. It also cannot touch the over-vs-under *difference*, which is
+  where the inversion lives.
+- *Partial box scores (the live-lens bug leaking into pregame grading).* Tested
+  by first-pitch time: zero-rate 51.8% / 59.9% / 54.4% / 57.3% across
+  `<15:00 / 15-18 / 18-20 / 20:00+` — **no gradient**, so no late-game
+  contamination. The elevated absolute zero rate (43.1% on hits vs a ~33%
+  qualified-starter reference) is explained by coverage: **median 49 graded prop
+  rows per game**, about 24 per side, which reaches well past the starting nine.
+
+---
+
+## 4. Does the claimed edge predict the outcome? NO. This closes `layer2-accuracy-audit`'s open item.
+
+MLB moneyline, clean prices, **360 candidate sides**:
+
+| claimed edge | n | sim p | market p | ACTUAL | ROI at the quoted price |
+|---|---|---|---|---|---|
+| -1.00..-0.10 | 75 | 0.455 | 0.610 | **0.627** | +1.04% |
+| -0.10..-0.05 | 64 | 0.475 | 0.535 | 0.547 | -4.71% |
+| -0.05..0.00 | 55 | 0.483 | 0.496 | 0.455 | -12.21% |
+| 0.00..+0.05 | 65 | 0.524 | 0.485 | 0.508 | -5.62% |
+| +0.05..+0.10 | 55 | 0.525 | 0.438 | **0.382** | -16.71% |
+| +0.10..+0.20 | 33 | 0.558 | 0.415 | 0.424 | -5.50% |
+
+- **`corr(claimed edge, win) = -0.1379`**
+- `corr(sim prob, win) = +0.2344`
+- `corr(market de-vig prob, win) = +0.3184`
+
+Game totals, 392 sides: `corr(claimed edge, win) = -0.0202`,
+`corr(sim prob, win) = +0.0331`, `corr(market, win) = +0.1224`.
+
+**The mechanism, stated plainly.** The sim carries real information (+0.234 on
+moneyline) but strictly less than the market (+0.318). `model_edge = sim -
+market` therefore subtracts a *better* estimator from a *worse* one, and what
+survives is the sim's error term. Staking on it is staking on the error. This
+is not a plumbing defect, and no amount of joining `model_edge_pct` onto more
+rows will fix it.
+
+---
+
+## 5. Layer 1 and Layer 2 boards, MLB
+
+**Layer 1 (model edge) is absent from MLB Layer 2 today.** On the served
+`/api/board/layer2-shortlist` (2026-08-31, 200 MLB rows of 10,804 considered):
+`model_edge_pct` numeric on **0 / 200**; `model_ev_pct` **0 / 200**; `ev_pct`
+200/200 with `ev_basis = market_fair` on every row. 140 of 200 rows are LIVE.
+
+The paper exchange books refuse everything for the same reason:
+`kalshi rows_in=143 refusals={"no_model_edge_pct": 143}`,
+`novig 249/249`, `prophetx 192/192`. **100% refusal.**
+
+Given section 4, that is currently protecting the bankroll, not costing it.
+
+**What IS on the board is price dispersion, and MLB's is healthy.**
+`book_age_seconds` median **202s**, p90 1,308s, only 0.5% beyond an hour —
+far better than the platform-wide median of 4,498s the prior lane measured.
+On the 137 shortlist rows quoting 3 or more books, best price vs the *median*
+book is **+9.45% median payout** (mean +11.59%, p25 +7.23%). Median books
+quoting per row is only **5** (p10 = 3), so the dispersion is real but thinly
+sampled. Best price is held by draftkings 35, **kalshi 25**, betmgm 14,
+prophetx 9, pinnacle 8. Exchange presence: kalshi on 69 of 200 rows,
+prophetx 41, novig 31, **polymarket 25**.
+
+---
+
+## 6. Realized profitability, 2026-08-22..2026-08-31
+
+From `/api/portfolio/paper?date=` over 16 fetched dates (10 carry settlement).
+MLB is 470 of 511 settled rows (92%).
+
+**Pooled: 511 settled, 46.38% win, staked $2,354.28, pnl +$88.45, ROI +3.76%.**
+By sport: mlb +4.90% (470), wnba -2.17% (34), soccer -33.27% (7).
+
+**By market family — the same decomposition as sections 2 and 3, in dollars:**
+
+| family | settled | win | staked | pnl | ROI |
+|---|---|---|---|---|---|
+| game_line | 178 | 52.8% | $868.43 | +$135.06 | **+15.55%** |
+| game_total | 188 | 47.3% | $924.62 | +$61.53 | +6.65% |
+| **player_prop** | 145 | 37.2% | $561.23 | **-$108.16** | **-19.27%** |
+
+**By paper venue book** (these are NOT additive — each venue prices the same
+slate in its own book, so one opportunity can appear in several):
+
+| book | settled | win | ROI |
+|---|---|---|---|
+| paper:polymarket/game_line | 85 | 44.7% | **+40.89%** |
+| paper:kalshi/game_line | 80 | 48.8% | **+30.82%** |
+| paper:polymarket/game_total | 99 | 54.5% | +25.63% |
+| paper:novig/game_line | 33 | 51.5% | +16.64% |
+| paper:prophetx/game_total | 49 | 51.0% | +12.71% |
+| paper:novig/game_total | 31 | 48.4% | +9.13% |
+| paper:kalshi/game_total | 110 | 40.9% | +2.12% |
+| paper:prophetx/game_line | 62 | 50.0% | -4.64% |
+| **paper:kalshi/player_prop** | 207 | 38.2% | **-11.96%** |
+
+**CAVEAT, and it is a large one: all 511 are `settled_by = inferred` — our own
+grading, no venue confirmation.** Real money on 2026-08-31: 14 settled,
+21.43% win, -$47.96 on $61.05, **-78.56% ROI**; kalshi -39.29% (10),
+polymarket -141.40% (4, and see the accounting defect in section 1). The
+`layer2-accuracy-audit` lane measured the 2026-08-24..08-30 real-money book at
+**239 settled, 42.3% win, -5.5% ROI** against paper's +9.4% over the same days.
+Paper is optimistic against real money in every reading either lane has taken.
+
+---
+
+## 7. What is unmeasured, and why
+
+- **Live sim accuracy, games and props.** The only instrument is broken
+  (section 1) and its input artifact is missing on 50 of 61 days. 140 of the 200
+  served MLB Layer 2 rows are live and none carries a model number, so there is
+  nothing to grade even if the grader worked. **Unmeasurable today.**
+- **Segment markets (F1/NRFI, F3, F5).** The card publishes a full
+  `total_runs_dist` for each segment but carries **no segment ACTUAL**, and the
+  scoreboard block holds only a label. Not gradeable from any served surface.
+- **Real-money history beyond today**, because of the ignored `date` param.
+- **Layer 2 board rows joined to outcomes.** Shortlist artifacts are retained
+  about 4 days (prior lane, confirmed), so an edge-bucket curve on the *board's*
+  own score cannot be built retrospectively. Section 4 answers the same question
+  through the sim, which is the input to that score.
+
+---
+
+## 7b. WHAT WOULD MAKE PROPS VIABLE — measured 2026-08-31, after the first pass
+
+**This section REPLACES the first pass's "stop staking MLB props" recommendation.**
+A narrow subset already is viable, and closing the gap is a PRICE problem, not a
+model problem. The plan in section 8 is reordered accordingly.
+
+**The identity that governs it.** `ROI = p_realized / q_quoted - 1`, exactly.
+Two levers only: raise what the picks realize, or lower the price paid.
+
+**The under book already realizes what it is priced at.** 1,554 symmetric-priced
+unders: realized **53.15%** against quoted-implied **53.19%**, gap **-0.04pp**.
+The quote INCLUDES the hold, so a book landing on its own quoted implied is
+beating the FAIR line by exactly the hold it pays. It does not need a better
+model.
+
+**Lever 1 — delete the over side.** No price filter rescues it; this is a
+uniform over-side defect, not longshot bias:
+
+| band | n | gap vs implied | ROI |
+|---|---|---|---|
+| <= -150 | 1,024 | -7.80pp | -11.14% |
+| -150..-100 | 694 | -6.95pp | -13.09% |
+| +100..+150 | 608 | -4.06pp | -11.67% |
+| +150..+300 | 1,164 | -3.29pp | -10.33% |
+| > +300 | 1,528 | -4.21pp | -31.56% |
+
+**Lever 2 — delete home runs and hits+runs+RBIs:**
+
+| under book | n | gap | ROI |
+|---|---|---|---|
+| all unders | 3,764 | -0.27pp | -0.64% |
+| minus home runs | 3,571 | +0.13pp | -0.19% |
+| **minus HR and HRR** | **2,571** | **+0.68pp** | **+0.65%** (SE 0.96pp) |
+
+Survivors: **hits, total bases, runs, RBIs — unders only.** 2,571 bets over five
+months, marginally positive.
+
+**Lever 3 — buy a better price. This is where viability comes from.** Holding
+realized fixed at the measured 0.5315:
+
+| target ROI | drop in implied | payout gain needed |
+|---|---|---|
+| +2% | 1.08pp | +2.08% |
+| +5% | 2.57pp | +5.08% |
+| +10% | 4.87pp | +10.08% |
+
+Measured dispersion on MLB **prop** rows on the served board: **+10.61% median
+payout** (best vs median book, p25 +7.83%, p75 +14.95%). **The requirement sits
+inside the dispersion that exists.**
+
+**THE BINDING CONSTRAINT, and it lands on the exchange thesis.** Of 103 MLB prop
+rows on the served shortlist, only **51 carry >= 3 books**; median **3 books**,
+max **7**; best price is draftkings on 31 of 51. **ZERO of the 103 rows are
+quoted by kalshi, polymarket, novig or prophetx.** The venues where the hold
+would collapse do not quote MLB player props on this board at all.
+**CONTRADICTION TO RESOLVE:** `paper:kalshi/player_prop` carries 207 settled rows
+(section 6). One of those two readings is wrong. Not resolved here.
+
+**Lever 4 — market admission by cost of entry, which varies 13x.** Points of
+real skill required to break even against a random pick from the same pool,
+measured on the OVER side where the model takes 75-92% of the pool so selection
+barely distorts the comparison:
+
+| market | line | n | pool rate | quoted | BAR | delivered |
+|---|---|---|---|---|---|---|
+| pitcher_strikeouts | 4.5 | 79 | 38.75% | 52.85% | **+14.10pp** | -0.78pp |
+| hitter_total_bases | 0.5 | 260 | 49.65% | 57.59% | +7.95pp | +0.35pp |
+| hitter_hits | 0.5 | 1,222 | 55.58% | 63.20% | +7.63pp | -0.50pp |
+| hitter_total_bases | 1.5 | 660 | 36.90% | 39.87% | +2.97pp | -2.05pp |
+| hitter_home_runs | 0.5 | 1,497 | 12.13% | 14.95% | +2.82pp | -1.17pp |
+| hitter_rbis | 0.5 | 637 | 28.13% | 29.99% | +1.85pp | -0.98pp |
+| **hitter_runs** | 0.5 | 356 | 37.61% | 38.68% | **+1.07pp** | +0.03pp |
+
+Nothing wins pitcher strikeouts at a 14-point bar. **CAVEAT: this decomposition
+is CONFOUNDED on the UNDER side** by which players get selected into it — the
+ROI figures elsewhere in this section are not. Directional only.
+
+**TWO THINGS THIS RULES OUT.**
+- **Inverting home runs is NOT the play.** The inversion is real (z = -4.12) but
+  flipping does not pay: entry costs +2.82pp there and the flipped signal is
+  worth roughly +1.2pp.
+- **The inversion cannot be priced from the GRADED LEDGER.** **0 of 8,778**
+  player-date-market-line keys carry both sides; only the chosen side's price is
+  ever recorded.
+  **[CORRECTED 2026-08-31, later the same session.]** I wrote that recording both
+  prices going forward "makes the sign-error question answerable RETROACTIVELY
+  across the 8,918 existing rows". **That was wrong** — a forward-looking write
+  cannot populate rows already graded. The conclusion survives by a different
+  route, and a better one: **the opposite side is ALREADY in the odds history.**
+  Measured on `data/mlb_source/tracking/odds_mlb_hitter_props_history_2026-07-11.csv`
+  (622 rows, schema `player_name,market,selection,line,price,snapshot_ts`):
+  **185 of 227 player/market/line groups carry BOTH sides — 81.5%.** So the
+  inversion is priceable TODAY by joining the graded ledger against odds history,
+  with no code change and no waiting.
+  Production route: those per-market CSVs are **NOT** in `HOT_ARTIFACT_PATTERNS`
+  (`/api/ops/artifacts/export?pattern=*hitter_props_history*` returns `count: 0`,
+  and absence there is not absence on disk). `*_source/tracking/book_quotes/*.jsonl`
+  IS allowlisted and carries the bookmaker dimension, so that is the route for a
+  full-season join.
+  Recording both sides at selection time is still worth doing — 81.5% is not
+  100%, and the mirror is lossy — but it is **no longer the unblocker** and it
+  drops down the list accordingly.
+
+**DISCIPLINE:** ~20 cells were tested. `hitter_hits @ 1.5` looks excellent on
+both sides and is n=51 / n=108. Do not trade it.
+
+---
+
+## 8. The plan, ranked by measured dollars per unit of work
+
+Each item names the gate that decides whether it worked. Nothing here is
+"believed"; each is a reading someone must take.
+
+### Tier 0 — stop the bleeding (hours, no modelling)
+
+1. **[REVISED after section 7b — this is NOT a wholesale prop shutdown.]**
+   **Cut prop OVERS, home runs and hits+runs+RBIs; KEEP the under book on hits,
+   total bases, runs and RBIs.** Overs are negative in all five price bands
+   (-3.29 to -7.80pp) and in every market cell, so no filter rescues that side.
+   The under book minus HR and HRR is **+0.65% ROI on 2,571 bets** over five
+   months.
+   *Gate:* over stake and HR/HRR stake at zero, then the surviving under book
+   measured on its own over the next 500 graded rows against the +0.65% baseline.
+
+1b. **Record BOTH sides' prices at selection time.** 0 of 8,778 keys carry both
+   today. This unblocks the inversion test retroactively across 8,918 existing
+   rows instead of waiting on 500 fresh ones.
+   *Gate:* share of graded keys carrying both sides above 90% within one slate.
+
+**REORDERING NOTE.** Item 9 (widen the book panel) moves from Tier 2 to Tier 1
+and is renamed: it is no longer a general improvement, it is the PRECONDITION
+for the surviving prop book existing at all. The under book needs a **+5.1%
+payout improvement for +5% ROI**; measured prop-row dispersion is +10.61% median
+but the panel is **3 books deep with no exchange in it**. Two items are added
+alongside it: resolve the Kalshi prop contradiction (0 board rows quoted vs 207
+settled), and gate prop markets on a measured entry bar of <= 3pp. Full ordered
+list is in the artifact.
+
+2. **Kill `/mlb/api/live-lens-accuracy` as a decision input, and fix its grader.**
+   It reports 0-for-1,578 on overs and 206-for-206 on unders. Until the grader
+   compares against a FINAL stat line rather than `actualSoFar`, every number it
+   emits is an artefact.
+   *Gate:* on a re-run over the same 61 days, `by_klass` over-hit and under-hit
+   must both land strictly inside (0%, 100%). Anything at a boundary means it is
+   still reading in-progress state.
+
+3. **Fix the Polymarket stake/PnL denominator.** `roi_pct` of -141% and -159%
+   on binary contracts is arithmetically impossible; fees or contract cost are
+   outside `staked_dollars`. Every venue-level ROI comparison is wrong by that
+   amount until it is fixed.
+   *Gate:* no `by_venue_family` row reports `roi_pct < -100`.
+
+### Tier 1 — the strategic correction (days)
+
+4. **Retire `model_edge_pct` as a staking signal; keep the sim as a
+   *feature*, not an *estimator*.** Measured: `corr(claimed edge, win) =
+   -0.1379`. The sim probability itself is informative (+0.2344) and the market
+   is more so (+0.3184). The correct combination is not a difference, it is a
+   **fitted blend** — logistic regression of the outcome on
+   `logit(market_devig)` and `logit(sim)`, refit weekly.
+   *Gate:* out-of-sample Brier of the fitted blend must beat market-alone
+   (0.22663) on a held-out fortnight. If the fitted sim weight is not
+   significantly different from zero, the honest answer is to drop the sim from
+   pricing entirely and say so.
+
+5. **Invert or gate the prop side selection.** The HR cell is the proof:
+   over picks homer 10.96%, under picks 21.24%, base rate 12.13%, z = -4.12.
+   That is real signal pointed the wrong way. Two candidate causes, and they are
+   distinguishable in one afternoon: (a) a **sign error** in the prop
+   over/under comparator, (b) the projection is right and the *selection rule*
+   takes the side with the worse price. Check (a) first — it is one comparator
+   and it would explain all six cells at once.
+   *Gate:* re-run the same controlled (market, line) discrimination table on
+   the next 500 graded rows. Every cell must flip to a positive diff.
+
+6. **Fit the moneyline recalibration the calibration table already asks for.**
+   The sim is unbiased in aggregate but the buckets are not monotone
+   (0.42-0.46 predicts 0.442 and delivers 0.341; 0.58-0.65 predicts 0.608 and
+   delivers 0.521). A single Platt scaling on 482 games will not fix
+   discrimination (AUC 0.590 is the ceiling) but it removes the bucket errors
+   that the edge calculation amplifies.
+   *Gate:* bucket errors all within +/-0.05 on a held-out month.
+
+### Tier 2 — where the money actually is: price dispersion, Kalshi and Polymarket (weeks)
+
+7. **Double down on price shopping; it is the only thing measurably winning.**
+   game_line +15.55% and game_total +6.65% while props lose; polymarket and
+   kalshi game_line paper books at +40.89% and +30.82%. Best-vs-median payout
+   dispersion is **+9.45% median** on MLB rows. This edge is mechanical and does
+   not depend on the sim being right.
+   *Gate:* the profitable half must survive real-money settlement, not
+   `settled_by = inferred`. That is item 8.
+
+8. **Close the paper-vs-real-money gap before scaling stake — this is the
+   single biggest risk in the whole assessment.** Paper says +3.76%; the only
+   real-money readings available are -5.5% (239 settled, prior lane) and -78.6%
+   (14 settled, today). The candidate causes are fill quality, fees, and
+   selection (paper takes prices real orders never get). None is measured.
+   *Gate:* a controlled join — for every real order, the paper book's price for
+   the same `position_key` at the same instant. Report the mean slippage in
+   basis points. Do not raise stake until that number exists.
+
+9. **Widen the book panel.** Median **5 books quoting per row**, p10 = 3. Price
+   shopping is a max over a sample; a 5-book max leaves most of the dispersion
+   unseen. The shortlist already sees up to 37 books on some rows, so this is a
+   coverage problem, not an integration one.
+   *Gate:* median books-per-row above 10, and the best-vs-median payout gap
+   re-measured on the wider panel.
+
+10. **Restore the ignored `date` param on `/api/portfolio/live`.** Without it,
+    real-money performance cannot be tracked over time by anyone, which is why
+    item 8 currently rests on 14 settled orders.
+    *Gate:* `?date=2026-08-29` returns 2026-08-29.
+
+### Tier 3 — only after tiers 0-2 have readings
+
+11. **Rebuild game-total discrimination or stop pricing totals.**
+    `corr(sim mean, actual) = 0.169` and `corr(sim prob, win) = +0.0331` — the
+    run engine has *calibration without information*. The distribution shape is
+    already right (PIT uniform, dispersion 4.821 vs 4.717 needed), so the work
+    is entirely in the conditional mean: lineups, bullpen state, park, weather.
+    *Gate:* correlation above 0.30 on a held-out month, else drop model totals
+    and price them on market-fair alone.
+
+12. **Make live measurable at all.** 140 of 200 MLB board rows are live, the
+    live grader is broken, and no live row carries a model number. Until a live
+    projection is both produced and correctly graded, live MLB is an unmeasured
+    surface carrying most of the board's volume.
+    *Gate:* a live accuracy table with n, a window, and both hit rates strictly
+    inside (0%, 100%).
+
+---
+
+## 9. Reproduction
+
+Scratchpad scripts (read-only, production HTTP only), this session:
+`flat.py` (cards to `games_flat.json`), `calib2.py` (sections 2 and 4),
+`totals.py` (run-total PIT and totals backtest), plus inline analyses over
+`/mlb/api/market-accuracy?since=2026-04-01&until=2026-08-31` (section 3) and 16
+`/api/portfolio/paper?date=` payloads (section 6). 75 dates of
+`/mlb/api/cards?date=` were pulled, 2026-06-17..2026-08-30.

@@ -910,3 +910,207 @@ def test_an_order_with_no_key_is_skipped_not_given_a_synthetic_one(monkeypatch):
 def test_no_trail_yields_unknown_for_the_page_too(monkeypatch):
     out = _evidence(monkeypatch, [_the_503()], [])
     assert out["5c53789d4d21d05fc501b05d"]["verdict"] == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# A venue P&L larger than the order's own fill can produce
+#
+# MEASURED IN PRODUCTION 2026-08-31: Polymarket order `C7AZA3MBEKDD`
+# (`aec-mlb-mia-wsh-2026-08-31`), 6.4 contracts filled at $0.50 so
+# `fill_stake_dollars=3.20`, was graded LOST with `pnl_dollars=-12.9188`.
+# A binary contract's floor is its cost. That one row drove
+# `polymarket/game_line` to a reported -159.38% ROI on $16.37 staked.
+# ---------------------------------------------------------------------------
+
+
+def _poly_rows(monkeypatch, rows):
+    monkeypatch.setattr(vs, "fetch_polymarket_resolutions", lambda **kw: (rows, None))
+
+
+def _poly_order(**over):
+    order = {
+        "idempotency_key": "p1",
+        "mode": "live",
+        "venue": "polymarket",
+        "venue_ticker": "aec-mlb-mia-wsh-2026-08-31",
+        "status": "filled",
+        "side": "away",
+        "fill_stake_dollars": 3.20,
+        "fill_price": 0.50,
+        "selected_date": "2026-08-31",
+    }
+    order.update(over)
+    return order
+
+
+def _poly_resolution(before=0.0, after=-12.9188):
+    return {
+        "marketSlug": "aec-mlb-mia-wsh-2026-08-31",
+        "side": "POSITION_RESOLUTION_SIDE_SHORT",
+        "updateTime": "2026-09-01T01:43:58Z",
+        "beforePosition": {"realized": {"value": str(before), "currency": "USD"}},
+        "afterPosition": {"realized": {"value": str(after), "currency": "USD"}},
+    }
+
+
+def test_OFF_IS_NOT_ON_a_possible_venue_pnl_is_still_taken_verbatim(ledger, monkeypatch):
+    """REACHABILITY BEFORE CORRECTNESS. The bound must not fire on a normal row,
+    or the guard would look like it works while simply discarding every venue
+    number. $3.20 lost on a $3.20 fill is exactly the floor and must pass."""
+    ledger["orders"] = [_poly_order()]
+    _poly_rows(monkeypatch, [_poly_resolution(after=-3.20)])
+    result = vs.settle_from_venue()
+    assert result["settled"] == 1
+    assert result["pnl_exceeded_own_fill"] == 0
+    assert result["pnl_derived"] == 0
+    assert ledger["orders"][0]["outcome"] == "lost"
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(-3.20)
+
+
+def test_a_loss_deeper_than_the_fill_falls_back_to_the_orders_own_arithmetic(ledger, monkeypatch):
+    """THE PRODUCTION ROW. -$12.9188 booked against a $3.20 fill is 4.04x the
+    most that contract can lose. The outcome is still the venue's -- only the
+    number it could not have produced is replaced."""
+    ledger["orders"] = [_poly_order()]
+    _poly_rows(monkeypatch, [_poly_resolution()])
+    result = vs.settle_from_venue()
+    assert result["settled"] == 1
+    assert result["pnl_exceeded_own_fill"] == 1
+    assert result["pnl_derived"] == 1
+    order = ledger["orders"][0]
+    assert order["outcome"] == "lost", "the venue still says which way it went"
+    assert order["settled_by"] == "venue"
+    assert order["pnl_dollars"] == pytest.approx(-3.20)
+
+
+def test_the_resulting_roi_can_no_longer_pass_MINUS_100_on_a_binary_contract(ledger, monkeypatch):
+    """The symptom that surfaced this, stated as the invariant it violates."""
+    ledger["orders"] = [_poly_order()]
+    _poly_rows(monkeypatch, [_poly_resolution()])
+    vs.settle_from_venue()
+    order = ledger["orders"][0]
+    roi = 100.0 * order["pnl_dollars"] / order["fill_stake_dollars"]
+    assert roi >= -100.0
+
+
+def test_a_win_larger_than_the_contract_pays_is_also_refused(ledger, monkeypatch):
+    """The bound is two-sided. $3.20 at 50c can return at most $3.20 profit;
+    a venue delta of +$40 describes a position, not this fill."""
+    ledger["orders"] = [_poly_order()]
+    _poly_rows(monkeypatch, [_poly_resolution(after=40.0)])
+    result = vs.settle_from_venue()
+    assert result["pnl_exceeded_own_fill"] == 1
+    assert ledger["orders"][0]["outcome"] == "won"
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(3.20)
+
+
+def test_fees_and_rounding_do_not_trip_the_bound(ledger, monkeypatch):
+    """Kalshi books a total loss as stake PLUS the fee it charged, so the venue
+    number is legitimately a few cents past the bare stake. Refusing that would
+    throw away the only real fee figure the system ever sees."""
+    ledger["orders"] = [_poly_order(fees_dollars=0.05)]
+    _poly_rows(monkeypatch, [_poly_resolution(after=-3.25)])
+    result = vs.settle_from_venue()
+    assert result["pnl_exceeded_own_fill"] == 0
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(-3.25)
+
+
+def test_an_order_with_no_fill_stake_is_not_bounded_and_not_refused(ledger, monkeypatch):
+    """Nothing to bound against. The guard claims nothing rather than inventing
+    a ceiling -- the same choice `_derived_pnl` makes for a stakeless row."""
+    ledger["orders"] = [_poly_order(fill_stake_dollars=None)]
+    _poly_rows(monkeypatch, [_poly_resolution()])
+    result = vs.settle_from_venue()
+    assert result["pnl_exceeded_own_fill"] == 0
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(-12.9188)
+
+
+# ---------------------------------------------------------------------------
+# Reaching back for the row that is ALREADY graded
+# ---------------------------------------------------------------------------
+
+
+def _graded_poly(**over):
+    order = _poly_order(
+        outcome="lost",
+        settled_by="venue",
+        pnl_dollars=-12.9188,
+        held_side="POSITION_RESOLUTION_SIDE_SHORT",
+        graded_at="2026-09-01T01:46:11Z",
+    )
+    order.update(over)
+    return order
+
+
+def test_the_guard_ALONE_cannot_reach_a_row_that_is_already_graded(ledger, monkeypatch):
+    """Reachability, stated as the reason the repair has to exist. Grading skips
+    a row carrying an outcome, so without a repair the -159% ROI stays on the
+    money record forever no matter how good the guard is."""
+    ledger["orders"] = [_graded_poly()]
+    _poly_rows(monkeypatch, [_poly_resolution()])
+    result = vs.settle_from_venue(dry_run=True)
+    assert result["already"] == 1, "grading really does skip it"
+    assert result["settled"] == 0
+
+
+def test_the_repair_corrects_the_impossible_number_in_place(ledger, monkeypatch):
+    """THE PRODUCTION ROW, reached after the fact."""
+    ledger["orders"] = [_graded_poly()]
+    out = vs.repair_impossible_venue_pnl()
+    assert out["corrected"] == 1
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(-3.20)
+
+
+def test_the_repair_keeps_the_VENUES_OWN_outcome(ledger, monkeypatch):
+    """The outcome was never the impossible part. Un-grading would throw away
+    the venue's own word and drop the row to inference -- a worse source."""
+    ledger["orders"] = [_graded_poly()]
+    vs.repair_impossible_venue_pnl()
+    order = ledger["orders"][0]
+    assert order["outcome"] == "lost"
+    assert order["settled_by"] == "venue"
+    assert order["held_side"] == "POSITION_RESOLUTION_SIDE_SHORT"
+    assert order["graded_at"] == "2026-09-01T01:46:11Z"
+
+
+def test_the_repair_is_self_limiting(ledger):
+    """A corrected row is inside the bound, so the next tick finds nothing.
+    This is what makes it safe on every tick instead of as a one-off."""
+    ledger["orders"] = [_graded_poly()]
+    assert vs.repair_impossible_venue_pnl()["corrected"] == 1
+    assert vs.repair_impossible_venue_pnl()["corrected"] == 0
+
+
+def test_the_repair_never_touches_a_POSSIBLE_pnl(ledger):
+    """A row inside its own bound is another tick's correct work."""
+    ledger["orders"] = [_graded_poly(pnl_dollars=-3.20)]
+    assert vs.repair_impossible_venue_pnl()["corrected"] == 0
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(-3.20)
+
+
+def test_the_repair_never_touches_an_INFERRED_grade(ledger):
+    """Another module's record. Same rule the other two repairs keep."""
+    ledger["orders"] = [_graded_poly(settled_by="inferred")]
+    assert vs.repair_impossible_venue_pnl()["corrected"] == 0
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(-12.9188)
+
+
+def test_the_repair_never_touches_paper(ledger):
+    ledger["orders"] = [_graded_poly(mode="paper")]
+    assert vs.repair_impossible_venue_pnl()["corrected"] == 0
+
+
+def test_the_repair_runs_inside_the_tick_and_is_reported(ledger, monkeypatch):
+    """It must be wired in, not merely defined. An unreachable repair is the
+    failure mode this repo has paid for more than once."""
+    ledger["orders"] = [_graded_poly()]
+    result = vs.settle_from_venue()
+    assert result.get("repaired_pnl", {}).get("corrected") == 1
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(-3.20)
+
+
+def test_a_dry_run_repair_changes_nothing_on_disk(ledger):
+    ledger["orders"] = [_graded_poly()]
+    before = ledger["_persisted"]["count"]
+    assert vs.repair_impossible_venue_pnl(dry_run=True)["corrected"] == 1
+    assert ledger["_persisted"]["count"] == before

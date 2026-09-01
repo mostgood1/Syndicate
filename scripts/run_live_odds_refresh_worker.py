@@ -1850,12 +1850,23 @@ def _run_execution_tick() -> None:
             # EVERY COUNTER, not just the good one. `settled=0 awaiting=12` and
             # `settled=0 unjoinable=12` are opposite problems, and a line that
             # printed only the first number would read the same for both.
+            #
+            # **PRINT KEYS THAT EXIST.** This line carried `pnl_unattributed`
+            # for as long as it has existed and NOTHING has ever produced that
+            # key -- one grep hit repo-wide, and it was this print. So the
+            # field read `pnl_unattributed=None` on every tick, which is
+            # indistinguishable from a real zero. The counter was renamed
+            # `pnl_derived` when several orders on one market stopped being
+            # left with no number at all. A log line that names a dead key is
+            # worse than one that omits it: it reports health on a field that
+            # cannot go unhealthy.
             print(
                 "[live_odds_worker] VENUE_SETTLEMENT "
                 f"status={_settled.get('status')} settled={_settled.get('settled')} "
                 f"already={_settled.get('already')} awaiting={_settled.get('awaiting')} "
                 f"unjoinable={_settled.get('unjoinable')} "
-                f"pnl_unattributed={_settled.get('pnl_unattributed')} "
+                f"pnl_derived={_settled.get('pnl_derived')} "
+                f"pnl_exceeded_own_fill={_settled.get('pnl_exceeded_own_fill')} "
                 f"refused={_settled.get('refused')} errors={_settled.get('errors')} "
                 f"by_venue={_settled.get('by_venue')}",
                 flush=True,
