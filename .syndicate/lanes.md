@@ -1473,11 +1473,124 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 ### wnba-accuracy-assessment — OPEN, GOAL MET, ALL DOABLE-NOW ITEMS SHIPPED AND DEPLOYED — opened 2026-08-31 — session e542848e-6451-41a1-9e60-fd5a5675665d
 - Goal: MET. WNBA went from six accuracy instruments reading zero to a settling, graded surface. `n_settled 38` (08-29) + `54` (08-30), `win_rate 0.6415094339622641` — byte-identical to the pre-deploy local run; `gradeable` false → true; `verify_wnba_settlement_gate.py` exit 0 on both dates.
 - Deployed: web `ad33df21`, refresh-worker + live-odds-worker `1c078f46`. Four deploys, each verified on the SERVED PAYLOAD, not on deploy status. **ALL CLAIMS RELEASED; all four services free.**
+- **CLAIMED 2026-09-01 (exchange prices onto the board):** `syndicate/features/shared/{book_shortlist,book_grid,odds_regions}.py`; `pipeline/kalshi_odds_refresh.py` (**`_capture_kalshi_quotes` ONLY** — the sibling lane's claim is `join_to_board`; they verified and accepted the one-line stamp); `syndicate/features/shared/odds_book_quotes.py` (**NEW `quote_rows_from_polymarket_matches` ONLY** — that lane claims its own `quote_rows_from_kalshi_matches`, explicitly NOT `_normalize`/`append_book_quotes`, and handed me Polymarket); `pipeline/portfolio_commit.py` (**`_capture_polymarket_quotes` + its one call site ONLY** — `portfolio-decision-and-execution` marks the file `released:`); NEW `tests/{test_direct_feed_provenance,test_wnba_odds_regions}.py`. NOT editing `polymarket_board_join.py` (`released:` by `open-bet-live-status`).
 - Files (all landed on `origin/main`, nothing held): `syndicate/features/shared/{live_lens_paths,wnba_card_provenance}.py` NEW, `{live_lens_local,basketball_live_artifacts,artifact_publisher}.py`; `syndicate/features/wnba/{cards,live_lens_daily_accuracy,live_game_accuracy,live_prop_accuracy,live_prop_audit}.py`; `scripts/{build_wnba_recon,verify_wnba_settlement_gate,assess_wnba_accuracy}.py` NEW, `scripts/{run_refresh_worker,refresh_wnba_oddsapi_props}.py`; 6 new test files.
 - Verification: settlement gate PASS ×2; signals `exists` false → true on **14/14 days** (1,814 records, matching an independent count); served card max `p_win` **0.99**, zero certainty claims; leakage note populated on the served payload.
 - **OWED / NOT VERIFIED:** (a) T0-2, the T2-3 producer clamp and the `p*(1+ev)` inversion are **deployed but NOT IN FORCE** — those fields are baked into `recommendations_slate_*.json` and WNBA does not rebuild until **2026-09-17**; unit-verified only. (b) `_run_wnba_postgame_producer_tick`'s memory cost is REASONED, not measured (refresh-worker headroom read 96.8MB at 14:23Z). (c) `refresh_nba_oddsapi_props` shares the `_clamp_probability` chokepoint — its inversion is UNREAD, not cleared.
 - Blocked on a live slate (2026-09-17): T0-1, T0-3, T1-5, T2-1, T2-2, T3-1..T3-5, T4-1/3/4. `todo #614`–`#617` carry the findings; **`#614` and `#616` were CORRECTED in place** after I named mechanisms from symptoms.
 - Blocked by: none. Next: **T2-1** — a ranking key that passes a held-out `corr > 0`, which unblocks T0-1; buildable during the break against the 106-game clean-root sample.
+
+
+### mlb-live-gameline-skill-audit — OPEN — opened 2026-09-01 — session 250953ef-3461-4628-b326-415a35a97a74
+- Goal: decide, against the RAW ledger and authoritative finals, whether the MLB
+  live game-line model has any skill the market does not already have — and if
+  not, name the mechanism. DIAGNOSTIC ONLY so far; no code changed.
+- Files: syndicate/features/shared/live_gameline_score.py,
+  syndicate/features/shared/live_gameline_ledger.py,
+  syndicate/features/shared/live_gameline_join.py,
+  scripts/snapshot_live_gameline_score.py,
+  scripts/score_live_gameline_offline.py,
+  tests/test_live_gameline_quote_age.py
+- Hypothesis (written BEFORE testing): the model trails the market because its
+  live re-sim discards the pregame prior, so it is uninformed early and only
+  catches up once the score carries the information.
+- Falsification test: if the model's probability at 0-0 has dispersion
+  comparable to the market's, the "no prior" story is wrong.
+- RESULT — HYPOTHESIS FALSIFIED, and something worse found:
+  1. **The reported trend was a SCORER ARTIFACT.** Production scored totals and
+     spreads probabilities against "did the home team win" until the
+     `_SCOREABLE_MARKETS` fix landed 2026-08-30. Proof by n: offline h2h-only
+     scoring matches production EXACTLY on 08-30 (n=249/249, briers
+     0.13400/0.19644 identical) and closely on 08-31 (186 vs 178), but
+     production n is 10-20x larger on every pre-fix date (08-20: 3098 vs 156).
+     **`reports/live_gameline_accuracy/history.jsonl` therefore pools across a
+     scorer-version boundary and its headline is not a measurement of the model.**
+  2. Dispersion at 0-0 is HEALTHY (model sd 0.198 vs market 0.184), so the
+     prior is not missing. Hypothesis dead.
+  3. **The real defect is QUOTE STALENESS, and it flatters the model.** 27-30%
+     of live rows are priced against quotes >10 min old; on the high-edge late
+     subset the MEDIAN quote age is 42.9 min and p90 is ~21 hours. Split by
+     freshness (all priceable h2h): >30 min stale -> model "beats" market by
+     -0.05438; <=120s fresh -> model LOSES by +0.02597. The late-game edge is
+     entirely an artifact of comparing a fresh model to a dead price.
+  4. **On the tradeable population (quote age <=120s, n=2,574 rows / 147 games):
+     model Brier 0.18145 vs market 0.17049, diff +0.01096, bootstrap 95% CI over
+     games [+0.00167, +0.02111], model worse in 98.8% of resamples.** The model
+     IS worse — just by a quarter of the reported amount, and for a different
+     reason than the history suggested.
+  5. Loss concentrates exactly where the board publishes: |edge| >= 20pp on
+     fresh quotes scores +0.16305. The biggest claimed edges are the biggest
+     errors. `priceable` rate is flat ~41-53% across the whole game and ignores
+     quote age entirely.
+  6. Encompassing regression on fresh quotes, leave-one-date-out: optimal blend
+     is logit(p) = +0.0975 +1.1246*logit(market) **-0.0391*logit(model)**. The
+     model carries no incremental information over the market at this n.
+  7. A 2-param recalibration (home lift + shrink) **FAILS out of sample**
+     (+0.00243 vs raw) despite a clean in-sample story — mean model prob 0.5178
+     vs actual 0.5412 / market 0.5376, and sd 0.283 vs 0.253. Not shipped.
+  8. 120-sim MC noise costs 0.00141 Brier — only 8.9% of the excess dispersion,
+     but ~13% of the whole tradeable gap. Free to fix, not sufficient alone.
+- Verification: any proposed fix must beat the market on the FRESH-QUOTE
+  population under leave-one-date-out, not in-sample and not on all records.
+- **DELIVERED 2026-09-01 — ALL THREE TIERS BUILT AND TESTED, NOTHING DEPLOYED.**
+  223 -> 821 targeted tests pass (`-k "live_gameline or live_lens or book_grid or
+  board_contract or grid_reprice or live_projection"`, 0 failures).
+  - **T0.1 provenance** (`snapshot_live_gameline_score.py`): rows now stamp
+    `scored_markets` / `records_by_market` / `fresh_quotes_only`. A row with
+    `scored_markets` ABSENT is pre-`75cf9aec` by construction, so the boundary
+    that invalidated the old pooling is now visible IN THE DATA.
+  - **T0.2 fresh cut** (`live_gameline_score.py`): `fresh_quotes_only`
+    (<=120s) + a `by_quote_age` breakdown + `quote_age_absent`. Verified
+    against the real 12-date ledger: reproduces the offline numbers EXACTLY
+    (all_records -0.00201, priceable -0.00487, **fresh +0.01096**), and the
+    age gradient is monotone: +0.01096 / +0.00646 / -0.00218 / -0.01569 /
+    -0.04024.
+  - **T0.3 authoritative scorer** (`scripts/score_live_gameline_offline.py`,
+    NEW): scores the retained ledger against StatsAPI finals (157 games vs the
+    board index's 143), IMPORTS `score_ledger_records` rather than
+    reimplementing it, bootstraps over GAMES, and carries the `--calibrate`
+    leave-one-date-out harness. Run 08-20..08-31: pooled **+0.01096, 95% CI
+    [+0.00171, +0.02132], model worse in 98.9%**; LOO recalibration
+    **+0.00243 -> "DOES NOT HELP -- do not ship it"**.
+  - **T1 staleness gate** (`live_gameline_join.py`): `REASON_STALE_QUOTE` /
+    `REASON_QUOTE_AGE_ABSENT`, `max_quote_age_seconds()` (env
+    `SYNDICATE_LIVE_GAMELINE_MAX_QUOTE_AGE_SECONDS`, default **600s**), applied
+    at the ONE choke point above the h2h/dist/analytic fork. Absent age
+    REFUSES. This removes the ~39.5% of rows priced off quotes older than ten
+    minutes, including a p99 of 74,997s.
+  - **T2a sims decoupling** (`live_gameline_join.py`): `min_edge_pp()` (env
+    `SYNDICATE_LIVE_GAMELINE_MIN_EDGE_PP`, default **0.0 = off**, so no
+    behaviour change today). **THIS IS A PREREQUISITE, NOT A NICE-TO-HAVE:**
+    the publish bar is `sigma*se*100` and `se` shrinks with sims, so raising
+    `MLB_LIVE_GAME_MC_SIMS` 120 -> 1000 drops the bar 8.98pp -> 3.16pp and
+    roughly triples published volume for a model that is worse than the market
+    in EVERY edge band. The floor is applied with `max`, so it can only tighten.
+  - **T2b ledger v4** (`live_gameline_ledger.py` + join): records `inning`,
+    `half`, `outs`, `outs_recorded`, `progress_fraction` and
+    **`pregame_home_win_prob`**. Both were already on the lens and neither was
+    ever read.
+- **AN INERT SHIP WAS CAUGHT IN FLIGHT AND IS NOW TESTED AGAINST.**
+  `_apply_verdict` copies an EXPLICIT key list into `row["live_gameline"]`, so
+  extending the lens reader and `build_records` was not enough — the v4 fields
+  arrived as `None` with every test green, and a null is indistinguishable from
+  "this game had no clock". `TestTheV4LedgerFieldsAreActuallyPOPULATED` asserts
+  on VALUES, and there is a companion test that an OLD snapshot degrades to the
+  previous behaviour rather than to a wrong number.
+- **SIMS: MEASURED, AND MY EARLIER "free and risk-free" CLAIM WAS WRONG.**
+  Mean p(1-p) on fresh rows is 0.17056, so MC noise costs 0.00142 Brier at 120
+  sims. Removing ALL of it closes only **12.7%** of the +0.01096 gap (1,000
+  sims gets 11.4%). `MLB_LIVE_GAME_MC_SIMS` is NOT in `render.yaml`, so the
+  code default 120 is live. It is also "the single heaviest piece of live
+  compute" on a 2GB worker and its cost at higher n is **UNMEASURED** — so this
+  is a deploy decision with a real risk, not a free win. NOT TAKEN.
+- **T2c anchoring is NOT built, deliberately.** The encompassing regression on
+  fresh quotes gives an optimal blend of `+0.0975 +1.1246*logit(market)
+  -0.0391*logit(model)` — the model's weight is ~0. There is nothing to
+  recalibrate toward, so the work is MODELLING, and it needs the v4 clock and
+  pregame baseline to accumulate first. Building it now would be fitting to 147
+  games with a wall-clock proxy.
+- Blocked by: none. Bound: 147 games. Ledger records no inning/outs/base state,
+  so "game clock" is a wall-clock proxy throughout.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
