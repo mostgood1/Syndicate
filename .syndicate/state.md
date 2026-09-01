@@ -1086,8 +1086,28 @@ demonstrating the bug. Pinned is not fixed.
   things: the venue LISTS player props (its largest bucket); what we lacked
   was a measured player-token decode, which now exists (97/99 exact,
   `.syndicate/findings_2026-09-01_polymarket_prop_census.md`). ORDER
-  placement on Polymarket props remains OUT of scope behind
-  `SYNDICATE_POLYMARKET_PROP_RESOLVERS` (off) — see `todo #628`.
+  placement on Polymarket props sits behind `SYNDICATE_POLYMARKET_PROP_RESOLVERS`
+  — **staged '1' (user-authorized, lane polymarket-prop-resolver-arming) and
+  INJECTED by the `bde67379` deploy live 19:06:37Z `[verified present pre-deploy
+  by lane prop-unmatched-decomposition; the armed=True/venue_priced log read
+  belongs to the arming lane]`** — see `todo #628`.
+  **Prop no-match refusals are DECOMPOSABLE as of `bde67379` `[verified
+  2026-09-01T19:18:45Z, lane prop-unmatched-decomposition]`:** each prop
+  `unmatched_sample` names `player`/`token`/`fixture_tokens` (same
+  fixture+family, near-tokens first, bounded 6)/`token_lines`, so one
+  `POLYMARKET_UNMATCHED` read separates token-miss (`wilcon2`-class) vs
+  rung-miss vs player-not-listed. First read: 2 rung-miss (Soto hits 0.5 vs
+  venue 1.5; Gasser K 4.5 vs {1.5,2.5,6.5}), 1 player-not-listed (Rocchio),
+  0 token-miss; counts unchanged (224 ≈ 230 baseline — instrumentation only).
+  **UPDATED 2026-09-01 19:18Z `[lane polymarket-prop-resolver-arming, USER
+  DECISION]`: the resolvers are ARMED** (key set by the user, injected by
+  dep-dabi38dcqm1c73dmhdjg live 19:06:37Z). Verified first cycle:
+  `armed=True withheld=0`, polymarket `venue_priced` 62 → **462**/485. Props
+  are now venue-priced and ticker-stamped, **but prop POSITIONS (and
+  therefore prop orders) are still closed by the portfolio commit's own
+  `market_family_excluded` policy (402/485 refused, positions unchanged at
+  4/$14.71)** — pricing opened, position-taking did not; opening the family
+  policy is a separate decision nobody has made.
 - **Soccer competition bucketing FIXED, and it bought nothing yet.**
   `soccer_competition_tokens` now unions the flat alias test with the PAIR test
   (`soccer_fixture_clubs`), which `_teams_match` had already trusted since
