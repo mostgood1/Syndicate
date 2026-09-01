@@ -17079,3 +17079,105 @@ Gate remains: `POLYMARKET_QUOTE_CAPTURE` with `appended > 0`, on the first
 `[portfolio_commit]` cycle after 16:55Z. A watcher is running; if it exhausts,
 the honest report is "never observed to run", and the FIRST thing to check is
 whether `[portfolio_commit]` appears at all in that window.
+
+
+## 2026-09-01 16:55:20Z — SHIPPED BY PIGGYBACK, VERIFIED BY CONTENT, BEHAVIOUR UNOBSERVED — `c01dabb1` live-gameline staleness gate — lane `mlb-live-gameline-skill-audit`
+
+**I did not trigger this deploy and did not need to.** I pushed `c01dabb1` to
+`origin/main` at ~16:20Z; `wnba-accuracy-assessment` deployed refresh-worker at
+**16:55:20Z** and their commit `417e19ed` carries mine. That is the
+"deploy a commit that is ON `origin/main`" rule paying off in the direction it
+was written for — **being on main is what makes deploys cumulative**, and the
+claim only orders them.
+
+Confirmed by CONTENT, not by ancestry alone:
+
+    git show 417e19ed:syndicate/features/shared/live_gameline_join.py
+      -> 7 hits for REASON_STALE_QUOTE / quote_age_verdict / max_quote_age_seconds
+      -> line 1044:  stale = quote_age_verdict(row.get("age_seconds"))
+
+I acquired the claim at 17:04:52Z intending to deploy, preflight returned
+**`target commit c01dabb1 ALREADY LIVE -- redundant`** plus `TOO_SOON` (10 min
+into a 25 min spacing), and I released it at 17:0xZ without deploying. Nothing
+was reverted and no reboot was spent. Preflight also showed **12 processes
+in flight including `run_mlb_daily_sim_job.py`** — a deploy there would have
+killed a live sim for no gain.
+
+### THE MEASUREMENT IS OWED, AND A ZERO RIGHT NOW IS NOT IT
+
+Served board 16:56:16Z, `source=precomputed_artifact`:
+
+    row states                    {'pregame': 300}
+    rows_live_gameline_considered 0
+    withheld_by_reason            {}
+    live_gameline_score.reason    no_final_games_on_this_grid
+
+**Every one of those zeros is explained by there being no live MLB game at
+17:0xZ, and none of them is evidence the gate works.** `attach_live_gamelines`
+increments `considered` only after `game.state in {live, in_progress}`, so a
+pregame board cannot exercise the gate at all; and the scorer returns early on
+`no_final_games_on_this_grid` before `score_ledger_records` is reached, so the
+new `fresh_quotes_only` / `by_quote_age` fields are absent for that reason and
+NOT because the code is missing. Pair every null with proof the thing could
+have fired: here it demonstrably could not.
+
+`verify:` on tonight's live slate, two readings on the SAME payload:
+
+1. **The gate fired** — `live_gamelines.withheld_by_reason` carries
+   `quote_older_than_live_pricing_ceiling` with a count > 0, while
+   `rows_live_gameline_considered` > 0. Expected magnitude from the retained
+   ledger: **~39.5% of live rows** are priced off quotes older than 600s, so a
+   count near zero against a healthy `considered` is the bug report, not a pass.
+2. **The scorer's new cut is live** — `live_gameline_score.fresh_quote_seconds`
+   reads `120.0` and `fresh_quotes_only` is populated. Its ABSENCE tonight,
+   with finals on the grid, would mean the scorer half did not ship.
+
+`REASON_QUOTE_AGE_ABSENT` appearing at all is a defect signal: all 72,587
+measured records carried `age_seconds`.
+
+### WHAT ELSE WENT LIVE IN THE SAME COMMIT, AND ITS BLAST RADIUS
+
+`min_edge_pp()` defaults to **0.0 = off**, so the publish bar is unchanged.
+Ledger v4 fields are additive; `record_key` is untouched. The one behaviour
+change on this deploy is the staleness gate. Refresh-worker ONLY — the served
+grid is `source=precomputed_artifact` and both callers of
+`attach_live_gamelines_for_sport` (`book_grid_artifact.py:252`,
+`layer2_shortlist.py:1087`) are worker-side; web reads the artifact.
+
+#### RESULT — the Polymarket capture RAN, and appended ZERO. Gate NOT met.
+
+    17:06:12Z  [portfolio_commit] POLYMARKET_QUOTE_CAPTURE matches=60
+               sports=['mlb', 'soccer'] appended=0 no_sport=0
+
+First cycle after the deploy, exactly as traced. So the mechanism is reachable
+and is wired correctly -- `matches=60` and `no_sport=0` prove it received real
+joined markets and classified every one -- **and it wrote nothing.**
+
+The cause is my own props-only bound, and it is behaving as designed:
+
+    if not player:
+        continue        # a game market: OddsAPI already writes polymarket here
+
+All 60 matched Polymarket markets were GAME markets. Polymarket had zero
+player-prop matches on this board, so a props-only builder correctly produced
+zero rows.
+
+**Do not "fix" this by removing the bound.** It exists because OddsAPI already
+writes a `polymarket` row under the same `_KEY_FIELDS` dedup key for game
+markets, so a second writer would make the two sources ALTERNATE rather than
+add. The measured gap was exchange PROPS (mlb 2,350 game / 0 prop; soccer and
+wnba 0 exchange rows of any kind), and props are still the gap.
+
+**What this means for "exchange prices on the board", honestly stated:**
+
+- **Kalshi: YES, proven.** `kept_direct=830`, directly observed venue prices
+  surviving the grid where they were previously discarded.
+- **Polymarket GAME prices: already arrive**, via OddsAPI, unchanged by any of
+  this.
+- **Polymarket DIRECT prices: contribute nothing today**, and will contribute
+  exactly when Polymarket lists a player prop that joins the board. The capture
+  is in place and will fire on its own when that happens; nothing further is
+  needed for it.
+
+`appended=0` here is a fact about Polymarket's listings, not a defect -- but it
+is a NEGATIVE result against the gate I set, and it is recorded as one.
