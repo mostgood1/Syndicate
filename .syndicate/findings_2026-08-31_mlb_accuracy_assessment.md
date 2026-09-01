@@ -302,7 +302,15 @@ them**, which is a visibility defect in the board rather than an absence in the
 market. The +10.61% dispersion below was therefore computed across sportsbooks
 ALONE.
 
-**Lever 4 — market admission by cost of entry, which varies 13x.** Points of
+**Lever 4 — market admission by cost of entry.** ~~which varies 13x~~
+**[RETRACTED 2026-09-01 — SEE SECTION 7g. The 13x is an artifact of this
+measure's confound, and the clean measure inverts the ordering.]** Vig share on
+the quoted price — a property of the PRICE, immune to selection — runs
+**3.07pp to 4.63pp, a 1.5x spread**, and `pitcher_strikeouts 4.5` is the
+CHEAPEST market rather than the most expensive. There are no cheap rooms to
+select into; MLB prop vig is uniform at roughly 7.5-8% two-way. The table below
+is kept as the record of what was measured and must not be used for admission
+decisions. Points of
 real skill required to break even against a random pick from the same pool,
 measured on the OVER side where the model takes 75-92% of the pool so selection
 barely distorts the comparison:
@@ -848,6 +856,109 @@ not "demonstrated" — the same standard section 7b set for itself.
 **Also unchanged:** none of this argues for re-enabling prop staking. Item 01's
 exclusion rests on the portfolio's own realized -19.27%, which is independent of
 where the prices come from.
+
+---
+
+## 7g. TIER 1 ITEM 07 — CLOSED AS NOT ACTIONABLE. Its premise was an artifact, and killing it produces the strongest number in this assessment.
+
+**Done 2026-09-01.** Item 07 was *"gate prop markets on cost of entry, which
+varies 13x"*. **The 13x does not exist.** It was an artifact of a confounded
+measurement, and the clean one says the opposite.
+
+### THE OLD MEASURE WAS CONFOUNDED, AND SECTION 7b SAID SO IN A CAVEAT NOBODY WOULD ACT ON
+
+Lever 4 compared a **pool base rate** against the quoted price and called the
+gap the cost of entry: `pitcher_strikeouts 4.5 = +14.10pp` down to
+`hitter_runs 0.5 = +1.07pp`. The caveat said *"CONFOUNDED on the UNDER side by
+which players get selected into it; directional only."*
+
+**That caveat was too weak.** The confound is not a footnote on one side — a
+pool rate mixes the price's vig with how the model's selected population
+differs from the pool, and those are different quantities. A number that mixes
+them cannot be the basis of an admission rule.
+
+### THE CLEAN MEASURE: vig share on the quoted price
+
+`quoted_implied(side) - no_vig(side)`. This is a property of the **price**, not
+of who was picked, so selection cannot touch it. Over the 7,015 joined rows:
+
+| market | line | n | vig p25 | **VIG MEDIAN** | vig p75 |
+|---|---|---|---|---|---|
+| strikeouts | 4.5 | 80 | 2.70pp | **3.07pp** | 3.35pp |
+| batter_total_bases | 0.5 | 284 | 3.31pp | **3.57pp** | 3.87pp |
+| batter_total_bases | 1.5 | 1,145 | 2.79pp | **3.63pp** | 3.96pp |
+| batter_rbis | 0.5 | 1,307 | 2.02pp | **3.71pp** | 4.98pp |
+| batter_hits_runs_rbis | 1.5 | 956 | 3.46pp | **3.77pp** | 4.09pp |
+| batter_runs_scored | 0.5 | 872 | 2.84pp | **3.88pp** | 4.51pp |
+| batter_hits | 0.5 | 1,618 | 3.19pp | **3.90pp** | 4.20pp |
+| outs | 17.5 | 69 | 3.64pp | **4.04pp** | 4.49pp |
+| batter_hits | 1.5 | 158 | 2.39pp | **4.15pp** | 4.36pp |
+| batter_home_runs | 0.5 | 199 | 4.39pp | **4.63pp** | 4.68pp |
+
+**Range 3.07pp to 4.63pp — a 1.5x spread, not 13x.** And the ordering is
+INVERTED against the old table: `strikeouts 4.5`, which lever 4 called the most
+expensive room at +14.10pp, is the **cheapest** at 3.07pp. `runs 0.5`, called
+the cheapest at +1.07pp, is mid-table at 3.88pp.
+
+### WHY ITEM 07 IS DEAD
+
+1. **There are no cheap rooms.** MLB prop vig is uniform at roughly **7.5-8%
+   two-way**. Market selection cannot buy a better price because every market
+   is priced the same.
+2. **Its gate is unachievable as written.** *"No staked prop market has a
+   measured entry bar above 3pp"* — **nothing clears 3pp.** The threshold was
+   set from a number that does not survive a clean measurement.
+3. **It is moot for the live book anyway.** Item 01 excludes `mlb:player_prop`
+   from staking, so "no staked prop market" is currently vacuous.
+
+**Closed. Not deferred — the premise is false, and a deferred item invites
+someone to pick it up later on the same wrong number.**
+
+### WHAT KILLING IT PRODUCED — the clearest number in this assessment
+
+If entry cost is uniform, market admission cannot be the lever and **venue
+choice is the only one left.** Priced exactly, per row, flat 1u, on the
+surviving book (unders, minus home runs and HRR, n=2,569):
+
+| two-way venue hold | per side | book ROI |
+|---|---|---|
+| **8.1% (roughly today)** | 4.05pp | **+0.98%** |
+| 7.5% | 3.75pp | +1.50% |
+| 5.0% | 2.50pp | +3.72% |
+| 3.0% | 1.50pp | +5.57% |
+| 2.0% | 1.00pp | +6.52% |
+| 1.0% | 0.50pp | +7.49% |
+| **0.0%** | 0.00pp | **+8.48%** |
+
+**The surviving prop book carries a genuine edge of about +8.5 points before
+costs, and today's ~8.1% two-way hold consumes roughly seven and a half of
+them.** That is why it reads as break-even. It is not a weak book being
+carried by luck; it is a real edge being spent almost entirely on vig.
+
+**Sanity anchors, both stated rather than hidden:** the ledger's own
+stake-weighted return on that book is **+0.67%**; the flat-1u reconstruction at
+the quoted price is **+1.29%**; the model at today's hold gives **+0.98%**. The
+three bracket each other, and they differ because the ledger does not stake
+flat. The SHAPE of the sensitivity is what this table is for, not its third
+decimal.
+
+**What it holds fixed, and therefore does not prove:** the picks and the no-vig
+probabilities. It prices the venue change ONLY. It does **not** assume an
+exchange quotes every row — section 7f measured that MLB exchange prop prices
+are not captured at all today, which is item 05's actual work.
+
+### NET EFFECT ON THE PLAN
+
+- **Item 07: closed, premise falsified.**
+- **Item 05: strengthened, and re-priced.** Section 7b framed the target as
+  "+5.1% payout improvement for +5% ROI". The correct framing is that the edge
+  already exists and is being spent: at a 2% venue hold the same picks return
+  **+6.5%**. That is the size of the prize, and it is much larger than the
+  dispersion argument suggested.
+- **Still true, and it bounds all of this:** the exclusion in item 01 stays.
+  This is a case for what re-enabling props would require, not an argument that
+  they should be re-enabled now. The gate for that is a measured venue hold on
+  rows the board can actually see.
 
 ---
 
