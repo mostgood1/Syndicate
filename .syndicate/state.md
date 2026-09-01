@@ -8480,7 +8480,7 @@ day as "cheap sides fill" (0.240, 0.250) ARE these wrong-side orders — cheap
 BECAUSE they were away underdogs. The `ast-ars` confirmation stands alone; the
 sample around it was thinner and dirtier than it was presented.
 
-## [polymarket-two-dimensional-rule-CONFIRMED] 2026-08-31T19:25Z — the probe rested 3h54m pregame and filled 17m47s after kickoff
+## [polymarket-two-dimensional-rule-PARTLY-CONFIRMED] 2026-09-01T01:20Z — the PREGAME half is solid on two probes; the LIVE half rests on ONE and is NOT replicating
 
 **THE FIRST DELIBERATE TEST OF THE RULE, AND IT PASSED.** `ast-ars` was placed ON
 PURPOSE at a price the rule predicted could not fill, to try to break it.
@@ -8515,6 +8515,36 @@ measured $9.12 incident) and buys nothing else that this fill demonstrates.
 
 **WHAT IS STILL UNMEASURED:** whether the model was RIGHT. `ev_pct=22.68` on this
 position is the model's own claim. The bet settles with the match.
+
+**REVISED, and this DOWNGRADES what I recorded at 19:25Z.** I wrote "the rule is
+CONFIRMED" on ONE probe. The second probe is not behaving the same way.
+
+    ast-ars  EPL totals   rested 3h54m pregame, FILLED kick+17m47s @ avgPx 0.4500
+    bal-col  MLB h2h      rested 9h13m pregame, STILL RESTING at pitch+35m
+
+`bal-col` reads at pitch -15/-10/-5/0/+5/+10/+15/+20/+25/+30/+35, every one
+`cum=0 leaves=2.44`. `lastTransact` never moved off its 15:25:43Z submit.
+
+**WHAT IS SOLID: the PREGAME half.** Two deliberately-placed probes at 0.45, ~20
+book reads each, zero fills, zero partials, across two sports and two markets.
+Near-even pregame orders do not fill. That is now well-supported.
+
+**WHAT IS NOT: the LIVE half.** "Once live, everything fills" rests on ONE
+observation (`ast-ars`) plus 8 earlier settled orders that were ALREADY under way
+when observed — never a probe placed pregame and watched through the transition.
+`bal-col` is exactly that probe and it is not filling.
+
+**A DEADLINE WAS NEVER PART OF THE RULE.** `ast-ars` filling at +18m does not
+make +35m late for a different market. This is a divergence in progress, not a
+refutation. But the rule cannot be stated as general until it is qualified by
+sport or market, or `bal-col` fills.
+
+**CANNOT INDEPENDENTLY CONFIRM LIVENESS.** `gameStartTime` is ABSENT on all 10
+`bal-col` slate rows (same class as the documented `line: None` gap), so "live"
+here means only the board's `commence_time` — two readings agreeing on ~00:38-40Z
+(`7.1h @ 17:32Z`, `5.2h @ 19:28Z`). If that value is wrong, the game is not live
+and none of this is a live-window observation at all.
+
 
 ## [polymarket-held-population-is-6-of-6-POSITIVE-EV] 2026-08-31T17:33Z — the gate suppresses positive-EV bets; its whole defence is that they cannot fill
 

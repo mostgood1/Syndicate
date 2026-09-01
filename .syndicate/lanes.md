@@ -1203,9 +1203,10 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   or it is refused by name.
 - Files: tests/test_execute_portfolio.py, tests/test_polymarket_board_join.py
 - Hypothesis: pregame only CHEAP sides fill; once live everything fills.
-- Falsification test: an explored order filling above 0.410 PREGAME. One probe
-  (`ast-ars`) rested 3h54m pregame and filled 17m47s after kickoff — the rule
-  survived. `bal-col` is the second probe, resting at 0.45, first pitch ~00:40Z.
+- Falsification test: an explored order filling above 0.410 PREGAME. NEITHER
+  probe did — pregame half SOLID (2 probes, 2 sports, ~20 reads each, 0 fills).
+  LIVE half NOT replicating: `ast-ars` filled kick+17m47s, `bal-col` still
+  resting at pitch+35m. The rule is PARTLY confirmed; see state.md.
 - Verification: DONE — submit-price gate (`submit_price=` 15:53:26Z), band edge
   (`EXPLORE ... 0.450` 16:03:16Z), EV stamping (6/6 positive, 17:32Z), fill rule
   (`avgPx=0.4500 lastTransact=19:20:09Z`), wrong-side fix deployed both services
@@ -1215,9 +1216,11 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none
 - OPEN, NOT FIXABLE BY DEPLOY: `atc-sea-ata-bol` is a live position on the WRONG
   side (Bologna, not Atalanta). Manual close on the venue.
-- WATCHER LOST: the `bal-col` first-pitch watcher was killed by a session
-  interrupt at ~22:2xZ and re-armed at this checkpoint. If this lane is picked up
-  cold, confirm a watcher exists before assuming the reading will arrive.
+- NO WATCHER RUNNING. `btb81lzt8` died with the session at ~01:2xZ; reads from
+  pitch+40m to +80m were never captured. Re-read `ORDER_STATE` for
+  `aec-mlb-bal-col-2026-08-31` directly; do not assume a reading is coming.
+- `gameStartTime` is ABSENT on all 10 `bal-col` slate rows, so liveness cannot be
+  confirmed from the venue — only from the board's `commence_time`.
 
 ### soccer-shot-shrinkage — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Divisor SHIPPED to all three services and published; NEVER OBSERVED working (soccer had `available_today: 0`). Owed reading carried by `todo.md #612` and scheduled task `refit-soccer-shot-shrinkage` (monthly, 1st 09:00).
 - Goal: the soccer shots model stops over-predicting by ~1.4x. Ship the
