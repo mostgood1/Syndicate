@@ -1075,6 +1075,23 @@ def _score_day(root: Path, date_str: str, *, allowed_markets: set[str], assume_p
     }
 
 
+def _hoist_leakage_note(payload: dict[str, Any], summaries: list[dict[str, Any]]) -> None:
+    """Put the leakage warning at the TOP LEVEL, not only under `overall`.
+
+    `per_day` rows carry a `win_rate` and nothing else -- no breakdown, no
+    warning -- and they are the rows most likely to be charted. A consumer
+    reading `per_day[*].props.win_rate` would plot a number that is mostly
+    information leakage, with no signal that it is one.
+
+    Attaching the note per DAY was rejected: a single WNBA slate settles 24-94
+    rows, and a per-day early-vs-late spread on that n is noise. The honest
+    placement is one flag on the payload itself, which no consumer can read
+    around by picking a different sub-object.
+    """
+    notes = [summary.get("leakage_note") for summary in summaries if summary.get("leakage_note")]
+    payload["leakage_note"] = notes[0] if notes else None
+
+
 def build_local_live_accuracy_payload(query_string: str, artifact_root: Path, *, mode: str) -> dict[str, Any] | None:
     params = parse_qs(query_string or "", keep_blank_values=True)
     date_list = _parse_window(params, default_days=14, allow_date_single=False)
@@ -1142,6 +1159,7 @@ def build_local_live_accuracy_payload(query_string: str, artifact_root: Path, *,
             "debug": {"days": debug_days},
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         }
+        _hoist_leakage_note(payload, [overall["totals"], overall["ats"]])
         if payload["status"] == "empty":
             payload["message"] = "No settled BET rows (missing signals and/or recon outputs)."
         return payload
@@ -1157,6 +1175,7 @@ def build_local_live_accuracy_payload(query_string: str, artifact_root: Path, *,
         "debug": {"days": debug_days},
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }
+    _hoist_leakage_note(payload, [props_overall])
     if payload["status"] == "empty":
         payload["message"] = "No settled BET player-prop rows (missing signals and/or recon outputs)."
     return payload

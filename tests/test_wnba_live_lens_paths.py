@@ -223,3 +223,72 @@ def test_self_priced_rows_are_counted_not_silently_dropped(tmp_path):
     )
     assert meta["signals"]["self_priced_excluded"] == 2
     assert meta["signals"]["filtered"] == 1
+
+
+def test_leakage_note_is_reachable_at_the_top_level(tmp_path, monkeypatch):
+    """A warning only a consumer of `overall` can see is not a warning.
+
+    `per_day` rows carry win_rate and no breakdown, and they are what gets
+    charted -- so the flag has to sit where no sub-object choice can miss it.
+    """
+    from syndicate.features.shared import live_lens_local
+
+    processed = tmp_path / "wnba_source" / "data" / "processed"
+    live_lens = tmp_path / "wnba_source" / "data" / "live_lens"
+    processed.mkdir(parents=True)
+    live_lens.mkdir(parents=True)
+
+    gid = "0401857186"
+    rows = []
+    # Q1 mostly losing, Q4 all winning -> the leakage shape.
+    for period, wins, total in ((1, 5, 20), (4, 20, 20)):
+        for i in range(total):
+            rows.append(json.dumps({
+                "market": "player_prop", "klass": "BET", "line_source": "oddsapi",
+                "game_id_canon": gid, "player": f"P{period}{i}", "name_key": f"P{period}{i}",
+                "stat": "pts", "side": "OVER", "line": 10.0, "period": period,
+            }))
+            # the player's final is above the line only for the intended wins
+    (live_lens / SIGNALS).write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    recon = ["date,game_id,player_name,pts"]
+    for period, wins, total in ((1, 5, 20), (4, 20, 20)):
+        for i in range(total):
+            recon.append(f"{DATE},{gid},P{period}{i},{11 if i < wins else 9}")
+    (processed / f"recon_props_{DATE}.csv").write_text("\n".join(recon) + "\n", encoding="utf-8")
+
+    payload = live_lens_local.build_local_live_accuracy_payload(
+        f"start={DATE}&end={DATE}", [processed], mode="prop"
+    )
+    assert payload is not None
+    assert "leakage_note" in payload, "the flag must exist at the top level"
+    assert payload["leakage_note"], "and must be populated on the leakage shape"
+    assert "PREGAME" in payload["leakage_note"]
+    # still present in its original home, for consumers that already read there
+    assert payload["overall"]["props"]["leakage_note"]
+
+
+def test_top_level_leakage_note_is_none_when_flat(tmp_path):
+    from syndicate.features.shared import live_lens_local
+
+    processed = tmp_path / "wnba_source" / "data" / "processed"
+    live_lens = tmp_path / "wnba_source" / "data" / "live_lens"
+    processed.mkdir(parents=True)
+    live_lens.mkdir(parents=True)
+    gid = "0401857186"
+    rows, recon = [], ["date,game_id,player_name,pts"]
+    for period in (1, 4):
+        for i in range(20):
+            rows.append(json.dumps({
+                "market": "player_prop", "klass": "BET", "line_source": "oddsapi",
+                "game_id_canon": gid, "player": f"P{period}{i}", "name_key": f"P{period}{i}",
+                "stat": "pts", "side": "OVER", "line": 10.0, "period": period,
+            }))
+            recon.append(f"{DATE},{gid},P{period}{i},{11 if i < 11 else 9}")
+    (live_lens / SIGNALS).write_text("\n".join(rows) + "\n", encoding="utf-8")
+    (processed / f"recon_props_{DATE}.csv").write_text("\n".join(recon) + "\n", encoding="utf-8")
+
+    payload = live_lens_local.build_local_live_accuracy_payload(
+        f"start={DATE}&end={DATE}", [processed], mode="prop"
+    )
+    assert payload["leakage_note"] is None
