@@ -89,6 +89,44 @@ def test_the_grid_keeps_a_direct_row_and_counts_both_sides(capsys):
     out = capsys.readouterr().out
     assert "AGGREGATOR_DUPLICATE_DROPPED" in out
     assert "kept_direct=1" in out, "kept must print beside dropped, or the pair is not a rate"
+    assert "near_misses={}" in out, (
+        "a DELIBERATELY KEPT venue_direct row is not a near miss. Measured in "
+        "production 2026-09-01: kept_direct=603 near_misses={'kalshi': 603} -- "
+        "identical counts, i.e. one population reported twice, the second time "
+        "as a spelling bug that does not exist."
+    )
+
+
+def test_an_unrecognised_spelling_IS_still_reported_as_a_near_miss(capsys):
+    """The counter must keep firing for the case it exists to catch.
+
+    Silencing the false positive by simply not counting would be the worse bug:
+    an unrecognised POLYMARKET spelling is the live risk, and it is exactly what
+    this signal is for. So this asserts the OTHER side -- a name the exact filter
+    does not recognise still reports.
+    """
+    from syndicate.features.shared import book_grid
+    from syndicate.features.shared.book_shortlist import is_direct_feed_book
+
+    misspelled = "polymarket-us"
+    assert not is_direct_feed_book(misspelled), (
+        "fixture must be a name the exact filter MISSES, or this test is vacuous"
+    )
+    common = {
+        "sport": "wnba", "date": "2026-09-18", "kind": "game",
+        "event_id": "e1", "home_team": "Atlanta Dream", "away_team": "Minnesota Lynx",
+        "market": "h2h", "segment": "full", "selection": "home",
+        "commence_time": "2026-09-18T23:00:00Z",
+        "snapshot_ts": "2026-09-18T22:00:00Z", "book_updated_at": "2026-09-18T22:00:00Z",
+    }
+    book_grid.freshest_rows_for_grid([
+        {**common, "bookmaker": "fanduel", "price": 118},
+        {**common, "bookmaker": misspelled, "price": 124},
+    ])
+    out = capsys.readouterr().out
+    assert f"'{misspelled}': 1" in out, (
+        f"an unrecognised exchange spelling must still surface; got: {out!r}"
+    )
 
 
 # ------------------------------------------------------- the writing side
