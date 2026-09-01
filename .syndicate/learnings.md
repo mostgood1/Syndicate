@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 647 rules `[generated]`
+## Index — 648 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3407,3 +3407,48 @@ reading it rests on and one alternative that would produce the same reading.
 If you cannot rule the alternative out with evidence in hand, the honest form is
 *"symptom X; cause not established"* — which is a finding, and is what `#614`
 and `#616` now say.
+
+---
+
+## 2026-09-01 REQUIRED: a PRODUCER fix is not in force on data that already exists. Ask when the artifact is next written. `[lane wnba-accuracy-assessment]`
+
+**What happened.** I fixed three things in the WNBA odds producer — totals
+withheld, impossible EV refused, certainty clamped — deployed them to all three
+services, verified all three deploys reached `live`, and was about to report the
+items done. Then I read the SERVED PAYLOAD:
+
+    card_bucket: candidate      <- live, changed
+    p_win:       1.0            <- unchanged
+    market:      TOTAL present  <- unchanged
+
+Not a failed deploy. `card_bucket` is assigned at READ time, so it changed the
+instant web restarted. `p_win`, `ev_pct` and `market` are **baked into
+`recommendations_slate_*.json`** and copied verbatim by the card builder — the
+producer governs what is *written*, and **WNBA does not rebuild until
+2026-09-17**. The fix was live and in force on nothing anyone could see, for
+sixteen days.
+
+**THE DISTINCTION, which is not the same as the deploy one.** "Deployed" vs
+"running" is already a rule here. This is a third state past it:
+
+| state | question it answers |
+|---|---|
+| landed | is it on `origin/main`? |
+| deployed | is the process running it? |
+| **in force** | **has the artifact it governs been rewritten since?** |
+
+A producer fix reaches production instantly and reaches *the data* only at the
+next write. Between those two moments every reading looks exactly like the fix
+failing.
+
+**How to apply.** For any change to a producer, name the artifact it writes and
+answer *"when is that artifact next written?"* before claiming the item is done.
+If the answer is "not for N days", the change is **deployed, not in force**, and
+that is what to report. Where the gap matters — here, a board serving
+`p_win = 1.0` and `EV 2264.8%` for sixteen days — apply the same rule at READ
+time as well, so the fix governs what a reader sees and not only what a future
+writer produces.
+
+**Seasonal sports make this the normal case, not an edge case.** Any producer
+fixed during an off-season or a mid-season break is in exactly this state, and
+the break is precisely when there is time to fix things.

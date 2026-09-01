@@ -169,7 +169,67 @@ decision that reads `available_dates` and pulls cards without recording
 `source_path` will silently mix the two and reach the wrong verdict. August 2026
 is 100% Syndicate root; May–July is mixed.
 
-## [wnba-instruments-all-zero] EVERY WNBA ACCURACY INSTRUMENT READS ZERO, AND THE PRODUCERS ARE MOSTLY FINE — three located causes `[verified 2026-08-31, lane wnba-accuracy-assessment]`
+## [wnba-winprob-inversion] THE WIN-PROBABILITY INVERSION ADDED A RETURN FRACTION TO A PROBABILITY `[fixed + deployed 2026-09-01, lane wnba-accuracy-assessment, commit bef61c33]`
+
+`refresh_wnba_oddsapi_props` computed
+
+    win_prob = _clamp_probability(implied_prob + (ev or 0.0))
+
+`ev` is EV per unit staked; `implied_prob` is a probability. **Adding them is a
+category error, not a wrong constant.** For a bet at implied probability p with
+true probability q, `ev = q*(1/p - 1) - (1 - q) = q/p - 1`, so the inversion is
+**`q = p * (1 + ev)`**.
+
+Corroborated by the board's own published aggregates (105 graded rows): mean
+implied 0.5265, mean claimed EV +22.7%, mean claimed `p_win` **0.7320** —
+`p + ev` gives 0.7535, `p * (1 + ev)` gives 0.6460. Those means are over slightly
+different subsets so that is corroboration; the dimensions settle it alone.
+
+**It does not make the number right, only sound.** Realized was 0.4762, so the
+edge is still overstated ~17pp after the fix — that residual is the measured
+`corr(claimed EV, win) = +0.0466` problem (`todo #615`), which no formula fixes.
+
+**Why it survived:** the expression is exactly correct at `ev = 0`, which is the
+case anyone eyeballing it would check. **Worth checking the other sports'
+producers for the same shape** — `refresh_nba_oddsapi_props` has the parallel
+`_clamp_probability` chokepoint and was NOT measured, so its formula is unread,
+not cleared.
+
+## [wnba-settlement-live] WNBA SETTLES AGAIN — all three causes fixed, deployed and verified on the served payload `[verified 2026-09-01, lane wnba-accuracy-assessment]`
+
+**SUPERSEDES the 2026-08-31 "every instrument reads zero" reading.** Measured on
+production 2026-09-01:
+
+    /wnba/api/live-player-props-lens-accuracy
+      2026-08-29  n_settled 38    2026-08-30  n_settled 54
+      win_rate 0.6415094339622641   recon {games, props, quarters} all true
+    /api/ops/wnba/artifact-counts   games.gradeable & props.gradeable  false -> TRUE
+    scripts/verify_wnba_settlement_gate.py  exit 0 (PASS) on both dates
+
+`0.6415094339622641` is **byte-identical** to the local end-to-end run built
+before any of it deployed. Live-lens signals went `exists: false -> true` on
+**14 of 14 days**, **1,814 raw records** — the same count read independently off
+the raw JSONL from a different code path.
+
+**THE 0.6889 POOLED WIN RATE IS NOT A PERFORMANCE FIGURE.** It is the clock
+leakage documented in `[wnba-live-edge-is-leakage]`, now measured by the
+platform's own instrument. The payload says so itself; see that section.
+
+Deployed: web `ad33df21`, refresh-worker + live-odds-worker `1c078f46`. All three
+services carry it; both workers run `refresh_wnba_oddsapi_props`, so leaving one
+behind would have had one writing slate rows with the corrected probability
+inversion and the other with the broken one.
+
+**What is NOT yet in force:** the producer-side fixes (totals withheld, EV
+refusal, certainty clamp, the inversion) govern what is WRITTEN.
+`p_win`/`ev_pct`/`market` are baked into `recommendations_slate_*.json`, and WNBA
+does not rebuild until **2026-09-17**. A read-time clamp covers the display gap
+(verified: max `p_win` 0.99, zero certainty claims) but the withholding does not
+take effect until a rebuild.
+
+### The three original causes, and what each turned out to be
+
+## [wnba-instruments-all-zero] THE THREE CAUSES, AS FOUND `[historical, 2026-08-31; all three now fixed — see above]`
 
 All six production surfaces return empty over the last 30 days:
 `/wnba/api/market-accuracy` (`available: false`, 30/30), `live-lens-accuracy`,
@@ -376,6 +436,90 @@ that was not the constraint. **Do not act on any surviving reference to
 **The board is GROUPED BY SPORT and always was** (FLOOR-THEN-MERIT, `layer2_board.py:2744`,
 `4ef894e3`/#524) — NOT a sharding artifact. Reading `rows[:25]` reads the top of the
 FIRST SPORT, not the board.
+## [mlb-sim-edge-is-anti-predictive] THE MLB SIM'S CLAIMED EDGE IS ANTI-PREDICTIVE, AND THE PROP BOOK IS A REAL EDGE SPENT ON VIG `[verified 2026-09-01, lane mlb-accuracy-assessment]`
+
+**DO NOT STAKE ON `model_edge_pct`.** `corr(claimed edge, win) = -0.1379` over
+360 MLB moneyline sides at clean prices. The sim itself carries information
+(`corr(sim, win) = +0.2344`) and the market carries more (`+0.3184`), so
+`model_edge = sim - market` subtracts the better estimator from the worse and
+what survives is the sim's ERROR. Totals: -0.0202 / +0.0331 / +0.1224.
+Joining `model_edge_pct` onto more rows makes this worse, not better.
+
+**Games, n=482 finals / 39 dates (2026-06-17..08-30).** ML calibrated (bias
+-0.34pp), Brier 0.24307 vs climatology 0.24989, AUC 0.5904. On the 180
+clean-priced games the market wins on every measure (0.22663 / 0.6746) and a
+50/50 blend does not beat it. On 69 favourite-disagreements **the market is
+right 59.4%**. Run totals are calibrated (PIT near-uniform, dispersion 4.821 vs
+4.717 needed) with `corr(sim mean, actual) = 0.169` — calibration WITHOUT
+information.
+
+**Props, n=8,918 graded / n=7,015 joined to probabilities.** There is NO
+comparator sign error: 7,014/7,015 pick over exactly when `model_prob_over >
+market_prob_over`. **Inverting does not pay** — as-bet -5.83%, flipped -10.22%
+at the measured vig, still -2.55% at a free opposite price, positive in 0 of 8
+cells. The defect is CALIBRATION: LogLoss **1.92046** against a Brier of
+0.26913, and **993 rows (14.2%) carry `model_prob_over` exactly 0.000** — 992
+of them `batter_hits_runs_rbis` — on events the market prices at a median 48%
+that go over 45.5%. **Removing them makes the book WORSE (-5.83% -> -6.35%),
+so calibrate BEFORE fixing the null.**
+
+**ENTRY COST IS UNIFORM — there are no cheap prop markets.** Vig share on the
+quoted price runs **3.07pp to 4.63pp, a 1.5x spread**, and the ordering is the
+INVERSE of the pool-based estimate that preceded it (`strikeouts 4.5` is the
+cheapest, not the dearest). **A pool-rate-vs-quoted comparison mixes vig with
+selection and must not be used for admission decisions.**
+
+**THE BOOK IS A REAL EDGE BEING SPENT ON VIG.** Surviving book (unders, minus
+home runs and HRR, n=2,569) priced exactly per row: **+8.48% at zero hold,
++0.98% at today's ~8.1% two-way, +6.52% at a 2% venue hold.** Anchors: ledger
+stake-weighted +0.67%, flat-1u reconstruction at the quoted price +1.29%. So
+venue economics is the whole lever; market selection is not.
+
+**MLB PLAYER PROPS ARE EXCLUDED FROM STAKING** — `commit_portfolio`, env
+`SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES`, default `mlb:player_prop`, refusal
+`market_family_excluded`. **VERIFIED IN PRODUCTION 2026-09-01T12:46Z: 1,860
+refused against 1,876 MLB prop rows (99.1%), top market `batter_rbis:379`.**
+Justified on the portfolio's own -19.27% ROI / 145 settled, NOT on the
+over-side defect — that defect lives in the vendor season betting card, which
+grep confirms is **not a staking input anywhere**.
+
+**EXCHANGE PROP PRICES ARE NOT CAPTURED, and this is a SOURCE gap not a join.**
+`mlb_source/tracking/book_quotes/2026-08-31.jsonl` — 274,129 rows / 124.4MB —
+holds **26,710 exchange quotes on GAME markets and 0 on PROP markets**, because
+`book_quotes` is fed by OddsAPI and OddsAPI carries game lines only for
+exchanges. Kalshi DOES quote MLB props (23 filled orders, `KXMLB*` tickers);
+those prices reach us only through the direct feed
+(`kalshi_markets.json` -> `kalshi_price_resolver`), wired into `venue_scope` for
+paper2 and nowhere else. On the board, exchanges hold `best_any_book` on **45
+of 97** MLB game rows and **0 of 103** prop rows. **"Join what we already have"
+is a no-op on MLB props.**
+
+## [mlb-live-lens-accuracy-refuses] THE MLB LIVE-LENS GRADER SETTLED FROM A RUNNING TALLY; it now refuses, and reads EMPTY because its feed never reaches web `[verified 2026-09-01, lane mlb-accuracy-assessment, commit 4b8d5436]`
+
+**`/mlb/api/live-lens-accuracy` WAS FAIL-UNSAFE.** Pooled 2026-07-01..08-31 it
+reported `over: 0 wins / 1,578` and `under: 206 / 206`. When the statsapi feed
+was unavailable the grader fell back to `lastSeenSnapshot.actual` — the stat SO
+FAR — so at a line of 0.5 an early tally of 0 graded every `over` a loss and
+every `under` a win. A snapshot carries `actual` / `actualSoFar` /
+`modelMean` / `liveProjection` and **no game state**, so in-progress and final
+are indistinguishable there and both are now refused.
+
+**THE FALLBACK WAS THE ONLY PATH THAT EVER RAN: `feedResolved = 0` on all 11
+days that produced rows, against `feed_live_miss: 1,802`.** The cause is that
+`data/raw/statsapi/feed_live/` is **not in `HOT_ARTIFACT_PATTERNS`**, so the
+feed never reaches the web service that serves the endpoint.
+
+**Post-fix, verified on the served payload:** `by_klass` is EMPTY, 0 of 61 days
+available, `snapshotActualNotFinal: 1,784` (= 1,578 + 206 exactly), 11 days
+carrying `snapshot_actual_not_final:N`. **MLB live accuracy remains
+UNMEASURABLE; the endpoint now agrees with that instead of contradicting it.**
+
+**SCHEDULED DEFECT, NOT FIXED:** `live_lens_daily_accuracy.py:207-211` falls
+back `entry.marketLine` -> **`last_seen.marketLine`** -> `first_seen.marketLine`
+— the LATEST line rather than the line at signal time. Unreachable while the
+outcome-side refusal returns 0 rows. **It comes due the moment `feed_live` is
+published; whoever takes that decision must fix it in the same change.**
+
 ## [layer2-realized-accuracy] THE LAYER 2 BOARD'S REALIZED ACCURACY — the portfolio book is the surface, and the measurement chain is broken in four places `[verified 2026-08-31T17:3x-18:0xZ, lane layer2-accuracy-audit]`
 
 **START HERE FOR ANY BOARD-ACCURACY QUESTION, NOT AT THE EVALUATION LEDGER.**
