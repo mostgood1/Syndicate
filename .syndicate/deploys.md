@@ -16735,3 +16735,39 @@ deploy and costs a CFBD call to refill.
 
 **Retry-ladder fix:** no reading, as expected. It only shows on a run that
 DISCOVERS a fresh exhaustion. Its absence proves nothing.
+### verify (SAME RUN, ~15:2xZ): **THE OWED READING IS DISCHARGED — the divisor IS live in the engine, measured**
+
+The obligation above said the reading could not be forced because the served
+board carried no soccer shot rows. **It did not have to be the board.** The
+engine writes `expected_shots` into the recommendation archive on every sim
+run, and that archive IS exportable — so the same question was asked of the
+artifact the engine produces instead of the surface that renders it.
+
+Self-normalised, so slate composition cannot drive it: only the **3,434**
+players appearing BOTH before and on/after the 2026-08-31 ship date, each
+compared to **himself**. Fixtures dated before the ship are frozen at their
+pre-divisor write; fixtures dated on/after have been re-written since.
+
+| median post/pre, same player | value |
+|---|---|
+| `expected_shots` | **0.720** |
+| `expected_minutes_share` | **1.000** |
+| shots **per unit of minutes share** | **0.720** |
+
+**1 / 1.3979 = 0.715.** Measured 0.720.
+
+**The confound is killed, not waved past.** A shots-only drop could equally
+have been "future fixtures carry lower minutes". Minutes share ratios to
+**exactly 1.000**, and the per-minute shots ratio is unchanged at 0.720 — so
+the step is the divisor and nothing else. Had the artifact reached web but not
+live-odds-worker — the failure mode the lane named — this would read ~1.00.
+
+`scripts/check_soccer_divisor_reached_engine.py` is the check, parameterised on
+`SHIP_DATE` / `SHIPPED_DIVISOR` so the 1.3930 published today can be confirmed
+the same way once fixtures re-write past it.
+
+**What this does NOT say:** it confirms the engine applied the divisor, not
+that the board renders it. `players_*.csv` is not in `HOT_ARTIFACT_PATTERNS`
+(export returned 0 files), so the `shots_per90` form of the reading still
+cannot be run from the web service. `todo.md #612` closes on the engine
+evidence; the board-render reading is a smaller separate question.
