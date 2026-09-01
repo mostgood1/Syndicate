@@ -1766,6 +1766,145 @@ def _merge_append_only_publish(target_path: Path, incoming_path: Path) -> dict:
     }
 
 
+# `odds_history` shards are a SINGLE JSON DOCUMENT, so the line-union above
+# would concatenate two documents and destroy both. They get their own merge.
+#
+# MEASURED 2026-09-01 on the real 39,581,487-byte / 2,745-market soccer shard:
+# `json.loads` costs 2.5x the document (97 MB one copy), and END-TO-END THIS
+# FUNCTION PEAKED AT 189 MB against 72 MB of inputs -- 2.6x combined input.
+#
+# Web is a 2Gi service with 8 gunicorn slots and a documented history of
+# request-path OOMs (see the envelope-form note below, `#318`/`#319`), so this
+# is CAPPED on combined input rather than trusted to stay small. At the cap the
+# peak is ~275 MB, and the publishes are minutes apart rather than concurrent.
+# Over the cap it falls back to today's replace and SAYS SO -- a merge that
+# OOMs the receiver would be worse than the clobber it fixes, and the two
+# observed shard sizes (39.6 MB and 43.9 MB) leave real headroom under it.
+_ODDS_HISTORY_MERGE_MAX_INPUT_BYTES = 100 * 1024 * 1024
+
+
+def _is_mergeable_odds_history(relative_path: str) -> bool:
+    text = str(relative_path or "")
+    return "/odds_history/" in text and text.endswith(".json")
+
+
+def _odds_history_recency(entry: Any) -> str:
+    """How recent an entry is, for picking a winner. Never guesses a shape."""
+    if not isinstance(entry, dict):
+        return ""
+    for field in ("last_updated", "last_snapshot_ts"):
+        value = str(entry.get(field) or "").strip().replace("Z", "+00:00")
+        if value:
+            return value
+    return ""
+
+
+def _merge_odds_history_publish(target_path: Path, incoming_path: Path) -> dict:
+    """UNION two `odds_history` documents by market key. `#630`.
+
+    Shape (measured on the live soccer shard, 2,745 markets):
+
+        {schema_version, sport, shard_key, date, updated_at, history_limit,
+         markets: {<market_key>: {history: [...], last_line, previous_line,
+                                  delta, movement, last_updated, ...}}}
+
+    ENTRIES ARE TAKEN WHOLESALE, NEVER FIELD-MIXED, and that is the safety
+    property. Each entry carries a `history` list AND scalars DERIVED from
+    consecutive history points (`previous_line`, `delta`, `percent_change`).
+    Merging two histories and keeping one side's scalars would publish an entry
+    whose `previous_line` does not correspond to its own history -- an
+    inconsistency nothing downstream could detect. So for a key present in both,
+    the entry with the newer `last_updated` wins ENTIRE. Every entry in the
+    output is one some publisher actually wrote.
+
+    THIS IS STRICTLY BETTER THAN THE REPLACE IT REMOVES, for every key:
+      * key only in the existing copy -> today it is DESTROYED; here it survives.
+      * key only in the incoming copy -> unchanged, it lands either way.
+      * key in both -> today the INCOMING always wins even when it is the
+        STALER of the two; here the newer one wins.
+
+    Never raises. On any refusal the caller keeps the plain replace.
+    """
+    try:
+        existing_bytes = target_path.stat().st_size
+        incoming_bytes = incoming_path.stat().st_size
+    except Exception as exc:
+        return {"merged": False, "error": f"stat_failed: {type(exc).__name__}: {exc}"}
+    combined = existing_bytes + incoming_bytes
+    if combined > _ODDS_HISTORY_MERGE_MAX_INPUT_BYTES:
+        return {"merged": False, "error": f"over_size_cap: {combined} > "
+                                          f"{_ODDS_HISTORY_MERGE_MAX_INPUT_BYTES}"}
+
+    try:
+        existing = json.loads(target_path.read_text(encoding="utf-8-sig"))
+        incoming = json.loads(incoming_path.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return {"merged": False, "error": f"parse_failed: {type(exc).__name__}: {exc}"}
+
+    # SHAPE GATE. An unrecognised document is REPLACED, not merged -- guessing a
+    # shape is how a merge corrupts something it was never meant to touch.
+    for doc in (existing, incoming):
+        if not isinstance(doc, dict) or doc.get("schema_version") != 1:
+            return {"merged": False, "error": "shape_gate: not a schema_version=1 document"}
+        if not isinstance(doc.get("markets"), dict):
+            return {"merged": False, "error": "shape_gate: markets is not a mapping"}
+
+    existing_markets: dict = existing["markets"]
+    incoming_markets: dict = incoming["markets"]
+    kept_existing = 0
+    replaced = 0
+    added = 0
+    for key, entry in incoming_markets.items():
+        current = existing_markets.get(key)
+        if current is None:
+            existing_markets[key] = entry
+            added += 1
+        elif _odds_history_recency(entry) >= _odds_history_recency(current):
+            existing_markets[key] = entry
+            replaced += 1
+        else:
+            kept_existing += 1
+
+    merged_doc = dict(incoming)          # the newer publish owns the metadata ...
+    merged_doc["markets"] = existing_markets
+    merged_doc["updated_at"] = max(      # ... except the clock, which only moves forward
+        str(existing.get("updated_at") or ""), str(incoming.get("updated_at") or "")
+    ) or incoming.get("updated_at")
+    incoming = None
+
+    merged_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.merge"
+    try:
+        # json.dump streams; json.dumps would materialise another ~40MB string.
+        with merged_path.open("w", encoding="utf-8") as out:
+            json.dump(merged_doc, out, separators=(",", ":"))
+        os.replace(merged_path, target_path)
+    except Exception as exc:
+        try:
+            merged_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return {"merged": False, "error": f"{type(exc).__name__}: {exc}"}
+    return {"merged": True, "markets": len(existing_markets),
+            "added": added, "replaced_by_newer": replaced,
+            "kept_existing_newer": kept_existing}
+
+
+def _merge_published_artifact(relative_path: str, target_path: Path, incoming_path: Path):
+    """Dispatch to the right merge for this family, or None to replace.
+
+    ONE dispatcher because there are TWO receive forms, and a family merged by
+    one path and replaced by the other would clobber on exactly the transport
+    nobody was watching.
+    """
+    if not target_path.is_file():
+        return None                       # first write is a plain write
+    if _is_append_only(relative_path):
+        return _merge_append_only_publish(target_path, incoming_path)
+    if _is_mergeable_odds_history(relative_path):
+        return _merge_odds_history_publish(target_path, incoming_path)
+    return None
+
+
 def _iter_lines(path: Path):
     """Yield newline-stripped lines as bytes, skipping blanks. Bounded memory."""
     try:
@@ -1895,7 +2034,9 @@ def _publish_streamed_body() -> Any:
                 400,
             )
         publisher = str(request.headers.get("X-Artifact-Publisher") or "").strip()
-        merge = _is_append_only(relative_path) and target_path.is_file()
+        will_merge = target_path.is_file() and (
+            _is_append_only(relative_path) or _is_mergeable_odds_history(relative_path)
+        )
         refuse, marker = _publish_divergence_verdict(relative_path, written, publisher)
         if marker:
             print(marker, flush=True)
@@ -1904,7 +2045,14 @@ def _publish_streamed_body() -> Any:
         # refusal was the only protection available. A merge keeps both sides,
         # so refusing here would reject the very publish that carries the other
         # service's rows -- turning the fix off. The marker still prints.
-        if refuse and not merge:
+        #
+        # That guard also has a defect of its own, measured 2026-09-01 and NOT
+        # fixed here: it sets `_PUBLISH_LAST_PUBLISHER` on the REFUSED branch
+        # too, so the refused publisher becomes "last" and its next attempt
+        # passes as same-publisher. `22:01:15 REFUSED` -> `22:05:03
+        # ALLOWED_WITH_WARNING`, 9.2MB replaced by 5.2MB. The refusal buys one
+        # cycle. Merging is what actually removes the hazard.
+        if refuse and not will_merge:
             temp_path.unlink(missing_ok=True)
             return (
                 jsonify({
@@ -1916,16 +2064,15 @@ def _publish_streamed_body() -> Any:
                 }),
                 409,
             )
-        merged = None
-        if merge:
-            merged = _merge_append_only_publish(target_path, temp_path)
+        merged = _merge_published_artifact(relative_path, target_path, temp_path)
+        if merged is not None:
             if merged.get("merged"):
                 temp_path.unlink(missing_ok=True)
                 print(
-                    f"[ops.publish] APPEND_ONLY_MERGE path={relative_path} "
-                    f"publisher={publisher or 'UNKNOWN'} existing_lines={merged.get('existing_lines')} "
-                    f"added={merged.get('added')} duplicates={merged.get('duplicates')} "
-                    f"bytes={target_path.stat().st_size}",
+                    f"[ops.publish] ARTIFACT_MERGE path={relative_path} "
+                    f"publisher={publisher or 'UNKNOWN'} transport=stream "
+                    f"bytes={target_path.stat().st_size} "
+                    f"{json.dumps({k: v for k, v in merged.items() if k != 'merged'}, sort_keys=True)}",
                     flush=True,
                 )
                 return jsonify({
@@ -1933,11 +2080,12 @@ def _publish_streamed_body() -> Any:
                     "bytes": target_path.stat().st_size, "transport": "stream",
                     "merged": merged,
                 }), 200
-            # Merge failed: fall through to the plain replace, which is exactly
-            # today's behaviour. Named, not swallowed.
+            # Merge refused or failed: fall through to the plain replace, which
+            # is exactly today's behaviour. NAMED, not swallowed -- a silent
+            # fallback would make the clobber look fixed while it continued.
             print(
-                f"[ops.publish] APPEND_ONLY_MERGE_FAILED path={relative_path} "
-                f"error={merged.get('error')} -- falling back to replace",
+                f"[ops.publish] ARTIFACT_MERGE_FALLBACK path={relative_path} "
+                f"reason={merged.get('error')} -- replacing instead",
                 flush=True,
             )
         os.replace(temp_path, target_path)
@@ -1976,19 +2124,19 @@ def _write_published_artifact(relative_path: str, content: Any) -> Any:
         with temp_path.open("wb") as handle:
             for start in range(0, len(content), _PUBLISH_ENCODE_CHUNK_CHARS):
                 handle.write(content[start : start + _PUBLISH_ENCODE_CHUNK_CHARS].encode("utf-8"))
-        # `#630`: the envelope form merges too. It is not the path most
-        # publishes take, but live-odds-worker is PINNED to an older commit and
-        # this is the form it sends -- so fixing only the streamed path would
-        # leave the clobber live for one of the two writers that cause it, which
-        # is the whole defect. Same helper, so the two forms cannot diverge.
-        if _is_append_only(relative_path) and target_path.is_file():
-            merged = _merge_append_only_publish(target_path, temp_path)
+        # `#630`: the envelope form merges too, through the SAME dispatcher. It
+        # is not the path most publishes take, but live-odds-worker is PINNED to
+        # an older commit and this is the form it sends -- so fixing only the
+        # streamed path would leave the clobber live for one of the two writers
+        # that cause it, which is the whole defect.
+        merged = _merge_published_artifact(relative_path, target_path, temp_path)
+        if merged is not None:
             if merged.get("merged"):
                 temp_path.unlink(missing_ok=True)
                 print(
-                    f"[ops.publish] APPEND_ONLY_MERGE path={relative_path} transport=envelope "
-                    f"existing_lines={merged.get('existing_lines')} added={merged.get('added')} "
-                    f"duplicates={merged.get('duplicates')} bytes={target_path.stat().st_size}",
+                    f"[ops.publish] ARTIFACT_MERGE path={relative_path} transport=envelope "
+                    f"bytes={target_path.stat().st_size} "
+                    f"{json.dumps({k: v for k, v in merged.items() if k != 'merged'}, sort_keys=True)}",
                     flush=True,
                 )
                 return jsonify({
@@ -1996,8 +2144,8 @@ def _write_published_artifact(relative_path: str, content: Any) -> Any:
                     "bytes": target_path.stat().st_size, "merged": merged,
                 }), 200
             print(
-                f"[ops.publish] APPEND_ONLY_MERGE_FAILED path={relative_path} transport=envelope "
-                f"error={merged.get('error')} -- falling back to replace",
+                f"[ops.publish] ARTIFACT_MERGE_FALLBACK path={relative_path} transport=envelope "
+                f"reason={merged.get('error')} -- replacing instead",
                 flush=True,
             )
         os.replace(temp_path, target_path)

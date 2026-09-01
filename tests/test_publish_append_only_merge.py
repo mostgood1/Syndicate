@@ -22,6 +22,7 @@ would fail silently:
 """
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -284,6 +285,176 @@ class NonAppendOnlyStillReplacesTests(unittest.TestCase):
         second = self._publish("small\n", path)
         self.assertEqual(second.status_code, 200, second.get_data(as_text=True))
         self.assertEqual((self.root / path).read_text(encoding="utf-8"), "small\n")
+
+
+def _hist(stamp: str, line: float) -> dict:
+    return {"captured_at": stamp, "timestamp": stamp, "line": line}
+
+
+def _entry(stamp: str, line: float, previous: float) -> dict:
+    """An odds_history entry, shaped like the live one: a capped history list
+    PLUS scalars DERIVED from consecutive points."""
+    return {
+        "history": [_hist(stamp, line)],
+        "is_live": False,
+        "last_line": line,
+        "previous_line": previous,
+        "last_odds": line,
+        "last_snapshot_ts": stamp,
+        "delta": line - previous,
+        "movement": "up" if line > previous else "down",
+        "last_updated": stamp,
+    }
+
+
+def _doc(markets: dict, updated_at: str) -> dict:
+    return {"schema_version": 1, "sport": "soccer", "shard_key": "2026-09-05",
+            "date": "2026-09-01", "updated_at": updated_at, "history_limit": 20,
+            "markets": markets}
+
+
+EARLY = "2026-09-01T18:00:00+00:00"
+LATE = "2026-09-01T19:00:00+00:00"
+LATEST = "2026-09-01T20:00:00+00:00"
+
+
+class OddsHistoryMergeTests(unittest.TestCase):
+    """`soccer_source/tracking/odds_history/<date>.json` is a SINGLE JSON
+    document, so the line-union above would concatenate two documents and
+    destroy both. Measured 2026-09-01: refresh-worker vs live-odds-worker,
+    ALLOWED_WITH_WARNING at ratio ~0.79 — 43.9MB to 34.8MB, several times an
+    hour, still live after the append-only fix shipped."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.target = self.root / "target.json"
+        self.incoming = self.root / "incoming.json"
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _merge(self, target_doc: dict, incoming_doc: dict) -> dict:
+        self.target.write_text(json.dumps(target_doc), encoding="utf-8")
+        self.incoming.write_text(json.dumps(incoming_doc), encoding="utf-8")
+        return ops._merge_odds_history_publish(self.target, self.incoming)
+
+    def _stored(self) -> dict:
+        return json.loads(self.target.read_text(encoding="utf-8"))
+
+    def test_a_market_only_the_existing_copy_has_SURVIVES(self) -> None:
+        """THE REGRESSION. Today that market is destroyed on every publish."""
+        result = self._merge(
+            _doc({"only_mine": _entry(EARLY, 2.0, 1.0)}, EARLY),
+            _doc({"only_theirs": _entry(LATE, 3.0, 2.0)}, LATE),
+        )
+        self.assertTrue(result["merged"])
+        self.assertEqual(sorted(self._stored()["markets"]), ["only_mine", "only_theirs"])
+        self.assertEqual(result["added"], 1)
+
+    def test_the_newer_entry_wins_for_a_shared_key(self) -> None:
+        result = self._merge(
+            _doc({"k": _entry(EARLY, 2.0, 1.0)}, EARLY),
+            _doc({"k": _entry(LATE, 5.0, 4.0)}, LATE),
+        )
+        self.assertEqual(result["replaced_by_newer"], 1)
+        self.assertEqual(self._stored()["markets"]["k"]["last_line"], 5.0)
+
+    def test_a_STALER_incoming_does_not_overwrite_a_newer_existing(self) -> None:
+        """Strictly better than the replace it removes: today the incoming
+        always wins, even when it is the older of the two copies."""
+        result = self._merge(
+            _doc({"k": _entry(LATEST, 9.0, 8.0)}, LATEST),
+            _doc({"k": _entry(EARLY, 2.0, 1.0)}, EARLY),
+        )
+        self.assertEqual(result["kept_existing_newer"], 1)
+        self.assertEqual(self._stored()["markets"]["k"]["last_line"], 9.0)
+
+    def test_entries_are_never_FIELD_MIXED(self) -> None:
+        """The safety property. Each entry's scalars (previous_line, delta,
+        movement) are derived from its OWN history; splicing one entry's history
+        onto another's scalars publishes a self-inconsistent entry that nothing
+        downstream could detect."""
+        winner = _entry(LATE, 5.0, 4.0)
+        self._merge(_doc({"k": _entry(EARLY, 2.0, 1.0)}, EARLY), _doc({"k": winner}, LATE))
+        self.assertEqual(self._stored()["markets"]["k"], winner, "entry must arrive intact")
+
+    def test_updated_at_only_moves_forward(self) -> None:
+        self._merge(_doc({"k": _entry(LATEST, 9.0, 8.0)}, LATEST),
+                    _doc({"k": _entry(EARLY, 2.0, 1.0)}, EARLY))
+        self.assertEqual(self._stored()["updated_at"], LATEST)
+
+    def test_an_unrecognised_shape_is_REPLACED_not_merged(self) -> None:
+        """Guessing a shape is how a merge corrupts something it was never meant
+        to touch. Unknown falls back to today's behaviour."""
+        for bad in ({"schema_version": 2, "markets": {}}, {"markets": "not-a-dict"}, {"nope": 1}, []):
+            self.target.write_text(json.dumps(_doc({"k": _entry(EARLY, 2.0, 1.0)}, EARLY)), encoding="utf-8")
+            self.incoming.write_text(json.dumps(bad), encoding="utf-8")
+            result = ops._merge_odds_history_publish(self.target, self.incoming)
+            self.assertFalse(result["merged"], bad)
+            self.assertIn("shape_gate", result["error"])
+
+    def test_unparseable_input_falls_back_rather_than_raising(self) -> None:
+        self.target.write_text("{not json", encoding="utf-8")
+        self.incoming.write_text(json.dumps(_doc({}, EARLY)), encoding="utf-8")
+        result = ops._merge_odds_history_publish(self.target, self.incoming)
+        self.assertFalse(result["merged"])
+        self.assertIn("parse_failed", result["error"])
+
+    def test_the_size_cap_refuses_rather_than_risking_the_receiver(self) -> None:
+        """Measured 2.5x parse cost on the real 39.6MB shard (97MB resident).
+        Web is 2Gi with 8 gunicorn slots and a documented request-path OOM
+        history, so a merge that could OOM the receiver would be worse than the
+        clobber it fixes."""
+        self.target.write_text(json.dumps(_doc({}, EARLY)), encoding="utf-8")
+        self.incoming.write_text(json.dumps(_doc({}, EARLY)), encoding="utf-8")
+        with patch.object(ops, "_ODDS_HISTORY_MERGE_MAX_INPUT_BYTES", 1):
+            result = ops._merge_odds_history_publish(self.target, self.incoming)
+        self.assertFalse(result["merged"])
+        self.assertIn("over_size_cap", result["error"])
+
+    def test_no_merge_temp_files_are_left_behind(self) -> None:
+        self._merge(_doc({"a": _entry(EARLY, 1.0, 1.0)}, EARLY),
+                    _doc({"b": _entry(LATE, 2.0, 1.0)}, LATE))
+        self.assertEqual([p.name for p in self.root.glob("*.merge")], [])
+
+
+class MergeDispatcherTests(unittest.TestCase):
+    """ONE dispatcher, because there are TWO receive forms. A family merged by
+    one transport and replaced by the other would clobber on exactly the
+    transport nobody was watching."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.target = self.root / "t"
+        self.incoming = self.root / "i"
+        self.target.write_text("{}", encoding="utf-8")
+        self.incoming.write_text("{}", encoding="utf-8")
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_a_first_write_never_merges(self) -> None:
+        self.target.unlink()
+        self.assertIsNone(ops._merge_published_artifact(BOOK_QUOTES, self.target, self.incoming))
+
+    def test_an_unmergeable_family_returns_None(self) -> None:
+        self.assertIsNone(ops._merge_published_artifact(
+            "reports/intelligence/clv_openings/2026-09-01.jsonl", self.target, self.incoming))
+        self.assertIsNone(ops._merge_published_artifact(STATE_SIDECAR, self.target, self.incoming))
+
+    def test_it_routes_each_family_to_its_own_merge(self) -> None:
+        with patch.object(ops, "_merge_append_only_publish",
+                          return_value={"merged": True, "which": "lines"}) as lines, \
+             patch.object(ops, "_merge_odds_history_publish",
+                          return_value={"merged": True, "which": "json"}) as js:
+            self.assertEqual(ops._merge_published_artifact(
+                BOOK_QUOTES, self.target, self.incoming)["which"], "lines")
+            self.assertEqual(ops._merge_published_artifact(
+                "soccer_source/tracking/odds_history/2026-09-05.json",
+                self.target, self.incoming)["which"], "json")
+        self.assertEqual((lines.call_count, js.call_count), (1, 1))
 
 
 if __name__ == "__main__":
