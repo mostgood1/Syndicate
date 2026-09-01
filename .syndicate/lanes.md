@@ -1232,6 +1232,66 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 **NOT MEASURED, and it is the thing I most wanted:** whether the board's own `ev_pct`/`model_edge_pct`/`score` PREDICT the outcome. The portfolio endpoints expose settlement marginals only (`by_sport`, `by_market_family`, `by_venue_family`), not per-order rows, so no edge-bucket calibration curve was computed. That needs the refresh-worker-side order ledger.
 
 
+### mlb-accuracy-assessment — OPEN — opened 2026-08-31 — session 3bb44ef2-a199-430e-afce-c3034bf48d9d
+- Goal: one written MLB accuracy + profitability read covering (a) pregame sim engine on games and props, (b) live sim, (c) Layer 1 model-edge board, (d) Layer 2 shortlist board, each with an explicit denominator and window, plus a ranked optimization plan aimed at Kalshi/Polymarket profitability. Builds on `layer2-accuracy-audit` (2026-08-31) rather than repeating it; the specific gap it must close is that lane's own "NOT MEASURED" item — whether `ev_pct` / `model_edge_pct` / `score` PREDICT the outcome.
+- Files: `.syndicate/findings_2026-08-31_mlb_accuracy_assessment.md` (new), `scripts/assess_mlb_accuracy.py` (new, read-only analysis).
+  **EXTENDED 2026-08-31 for Tier 0 implementation, user said "start on tier 0":** `syndicate/features/shared/venue_settlement.py` (the venue-vs-derived P&L choice in `settle_from_venue` ONLY -- not the graders, not the repair paths), `tests/test_venue_settlement.py`, and `scripts/run_live_odds_refresh_worker.py` (the ONE `VENUE_SETTLEMENT` print at ~:1855 only). That log line prints `pnl_unattributed`, a counter NOTHING has produced since it was renamed to `pnl_derived` -- confirmed by grep, one hit repo-wide and it is the print itself. It is in scope because it is the only production readout for this fix: without it there is no way to see `pnl_exceeded_own_fill` fire. `open-bet-live-status` marks the file `released:`; `wnba-live-odds-capture-gap` says explicitly "Not claimed, read-only reference".
+  Checked against every OPEN lane before taking them: `venue_settlement.py` appears only in `open-bet-live-status`, marked `released:`; `paper_settlement.py` appears in three lanes, all `released:` or explicitly RECORD-not-a-claim. No live holder for either path. Not touching `paper_settlement.py`, `layer2_board.py`, `portfolio_commit.py` or `graded_outcomes.py` under this lane.
+- Hypothesis: MLB's headline accuracy numbers are supply-limited, not skill-limited — the graded-row supply (~1 game-line/day, props sealed dead since 2026-08-16) makes the published accuracy instrument unable to distinguish a good model from a bad one, and the real profitability signal lives in the portfolio order ledger, not in `/mlb/api/market-accuracy`.
+- Falsification test: if a full-slate sim-vs-outcome join over >= 14 days produces calibration curves materially different from the curated betting card's numbers, the card is unrepresentative (hypothesis stands). If the card's 66 official bets and a full-slate join agree within their CIs, the card is representative and the supply argument is cosmetic.
+- Verification: a findings file with, for each of the four surfaces, either a number carrying n + window + source path, or an explicit "unmeasurable, because <reading>".
+- Blocked by: none. Adjacent, not conflicting: `layer2-accuracy-audit` and `layer1-model-edge-join`, both UNOWNED with claims released.
+
+**FINDINGS 2026-08-31 — DELIVERED. Full write-up: `.syndicate/findings_2026-08-31_mlb_accuracy_assessment.md`. Every number read off production HTTP.**
+
+**Hypothesis PARTLY CONFIRMED and PARTLY FALSIFIED, and the falsified half is the important one.** Supply IS limited (August 285 graded rows vs June 5,292; official tier ~1 game-line/day) — but the card is NOT unrepresentative, and the model is NOT merely unmeasured. A full-slate join over 482 finals / 39 dates reaches the SAME verdict the 66-bet card does, so the supply argument does not exonerate the engine.
+
+**THE RESULT: `model_edge` is anti-predictive.** `corr(claimed edge, win) = -0.1379` on 360 MLB moneyline sides (clean prices); `corr(sim prob, win) = +0.2344`; `corr(market de-vig, win) = +0.3184`. The sim has real information and strictly less of it than the market, so sim-minus-market isolates the sim ERROR. **This closes `layer2-accuracy-audit`'s explicit NOT-MEASURED item.** Totals repeat it at lower amplitude (-0.0202 / +0.0331 / +0.1224).
+
+**GAMES (n=482, 2026-06-17..08-30):** ML calibrated (bias -0.34pp), Brier 0.24307 vs climatology 0.24989 (skill +2.73%), AUC 0.5904. vs market on 180 clean-priced: sim Brier 0.23719/AUC 0.6155 against market 0.22663/0.6746; 50/50 blend does NOT beat market. On 69 favourite-disagreements the MARKET is right 59.4%. Run totals: PIT uniform, dispersion 4.821 vs 4.717 needed, bias -0.153 runs — calibration WITHOUT information, `corr(sim mean, actual) = 0.169`.
+
+**PROPS (n=8,918, 04-10..08-31): the SIDE SELECTION IS INVERTED.** Symmetric-priced overs 44.67% vs 50.37% implied (-5.70pp, ROI -12.24%); unders 53.15% vs 53.19% (-0.04pp). Controlled on (market, line), 5 of 6 cells inverted. HR is load-bearing: P(>=1 HR) over-picks **10.96%** (n=1,497) vs under-picks **21.24%** (n=193) against a **12.13%** population base, **z = -4.12**. HR alone is -233u of the -489u total. DNP-as-zero REJECTED as the mechanism (it would LIFT unders; unders are at 0.00). Partial-box-score contamination REJECTED (no first-pitch-time gradient: 51.8/59.9/54.4/57.3%).
+
+**FOUR INSTRUMENT DEFECTS FOUND, all new:**
+1. **`/mlb/api/live-lens-accuracy` IS PROVABLY BROKEN — do not read it.** Pooled 61 days: `over 0 wins / 1,578`, `under 206 / 206`. It grades against an IN-PROGRESS stat line. Its published 6.5% hitter-prop hit rate is an artefact. Input artifact also missing on 50 of 61 days. **This makes LIVE sim accuracy UNMEASURABLE today.**
+2. **`markets.ml` on finished cards carries SETTLED DEAD PRICES** on 13/193 (6.7%) — `-100000`/`+99900`, overround 1.0000. Unfiltered backtest returned **+101%..+331% ROI**; filtered, the same backtest is **-2.80%**. I nearly reported the fake number; filter is `abs(odds)>1000` or overround outside 1.010-1.12.
+3. **`/api/portfolio/live?date=` IGNORES the date param** — 08-29 and 08-26 both return 08-31 byte-for-byte. Real-money history is not retrievable from web.
+4. **Polymarket ROI accounting is impossible** — `roi_pct: -159.38` on `staked_dollars: 16.37` with `pnl: -26.09`. Loss > stake on a binary contract.
+
+**BOARDS:** Layer 1 does not reach MLB — served shortlist 2026-08-31 has `model_edge_pct` numeric on **0/200**, `ev_basis=market_fair` on 200/200, 140/200 live. Paper exchange books refuse 100% on `no_model_edge_pct` (kalshi 143/143, novig 249/249, prophetx 192/192). Given the -0.1379 result that is PROTECTING the bankroll. What works is dispersion: MLB quote age median 202s (p90 1,308s, 0.5% >1h — far better than the 4,498s platform median), best-vs-median payout **+9.45%**, but median only **5 books/row** (p10=3).
+
+**MONEY (2026-08-22..08-31, 511 settled, MLB 92%):** pooled 46.38% win, **+3.76% ROI**, +$88.45/$2,354. game_line **+15.55%** (178), game_total +6.65% (188), **player_prop -19.27%** (145). Paper venue books: polymarket/game_line +40.89% (85), kalshi/game_line +30.82% (80), polymarket/game_total +25.63% (99), kalshi/player_prop -11.96% (207). **ALL 511 are `settled_by=inferred` — our own grading.** Real money today: 14 settled, -78.56%. Prior lane measured 08-24..30 real money at 239 settled / -5.5% vs paper +9.4%. **Paper is optimistic against real money in every reading either lane has taken; do not scale stake until the slippage join exists.**
+
+**PLAN (12 items, each gated on a named reading) is in section 8 of the findings file.** Tier 0: stop staking MLB props; retire+fix the live-lens grader; fix the polymarket denominator. Tier 1: replace `sim - market` with a FITTED blend (logit market + logit sim, refit weekly); find the prop comparator sign error; Platt-scale the ML. Tier 2: measure paper-vs-real slippage BEFORE scaling; lean into price shopping; widen the book panel 5 -> 10+; honour the live `date` param. Tier 3: rebuild total discrimination or drop model totals; make live measurable at all.
+
+Artifact for the user: `https://claude.ai/code/artifact/9989c17f-e27b-4332-a555-bed909241ef8`.
+
+**FOLLOW-UP 2026-08-31, user asked "what COULD make props viable" BEFORE starting the plan. ANSWER MEASURED; IT REVISES MY OWN TIER-0 ITEM 1. Full detail: section 7b of the findings file.**
+
+**"Stop staking MLB props" was TOO BROAD and is RETRACTED.** The identity is `ROI = p_realized / q_quoted - 1` exactly, and **the under book already realizes what it is priced at** — 1,554 symmetric-priced unders realize 53.15% against a quoted-implied 53.19% (gap -0.04pp). Quoted-implied INCLUDES the hold, so a book landing on its own quote is beating the FAIR line by exactly the hold it pays. **It does not need a better model, it needs a cheaper entry.**
+
+- **Overs cannot be saved by any filter** — negative in ALL FIVE price bands (-3.29pp at +150..+300 to -7.80pp at <=-150) and in every market cell. Uniform over-side defect, NOT longshot bias.
+- **Trim the under book:** all unders -0.64% (n=3,764) -> minus HR -0.19% (3,571) -> **minus HR and HRR +0.65% (n=2,571, SE 0.96pp)**. Survivors: hits / total_bases / runs / rbis, UNDERS ONLY.
+- **The viability lever is PRICE, and the requirement is exact:** +5% ROI needs a 2.57pp drop in implied = **+5.08% payout**; +10% needs +10.08%. **Measured prop-row dispersion is +10.61% median payout** (best vs median book). The requirement is INSIDE the dispersion that exists.
+- **BINDING CONSTRAINT, and it hits the exchange thesis directly:** of 103 MLB prop rows on the served shortlist only **51 carry >=3 books**; median **3 books**, max 7; best price is draftkings on 31 of 51; and **ZERO rows are quoted by kalshi, polymarket, novig or prophetx**. **CONTRADICTION NOT RESOLVED:** `paper:kalshi/player_prop` carries 207 settled rows. One of those two readings is wrong.
+- **Entry cost varies 13x** and should be a hard admission filter: pitcher_strikeouts 4.5 **+14.10pp**, total_bases 0.5 +7.95, hits 0.5 +7.63, total_bases 1.5 +2.97, home_runs 0.5 +2.82, rbis 0.5 +1.85, **runs 0.5 +1.07**. (CONFOUNDED on the under side by selection; directional only.)
+- **INVERTING HR IS NOT THE PLAY** — entry costs +2.82pp there and the flipped signal is worth ~+1.2pp. DELETE home runs, do not reverse them.
+- **THE INVERSION CANNOT BE PRICED AT ALL TODAY: 0 of 8,778 player-date-market-line keys carry BOTH sides.** Only the chosen side's price is ever recorded. Recording both is the cheapest high-value change on the list — it makes the sign-error question answerable RETROACTIVELY across the 8,918 existing rows instead of needing 500 fresh ones.
+- DISCIPLINE: ~20 cells tested. `hitter_hits @ 1.5` looks great and is n=51/108. Do not trade it.
+
+**PLAN REORDERED, 12 -> 15 items.** Tier 0 item 1 is now "cut prop OVERS + HR + HRR, KEEP the under book"; new item 2 is "record both sides' prices". **Panel-widening moved Tier 2 -> Tier 1 and reframed: it is the PRECONDITION for the surviving prop book, not an optimization.** New Tier 1 also carries "resolve the kalshi prop contradiction" and "gate prop markets on a measured entry bar <= 3pp". Games work (fitted blend, comparator sign, Platt scaling) drops to Tier 2; real-money slippage / price shopping / live `date` param to Tier 3; totals + live measurability to Tier 4.
+
+Artifact REPUBLISHED to the same URL with section 05 (prop viability) and the reordered plan.
+Claims: NONE held (read-only assessment; no production code edited).
+
+### wnba-accuracy-assessment — OPEN — opened 2026-08-31 — session e542848e-6451-41a1-9e60-fd5a5675665d
+- Goal: A full, measured WNBA accuracy + profitability assessment — pregame sim (game markets and player props), live sim, Layer 1 and Layer 2 board accuracy pregame and live, and real-money/exchange (Kalshi, Polymarket) profitability — delivered as a systematic optimization plan with every number carrying its n and window.
+- Files: `.syndicate/findings_2026-08-31_wnba_accuracy_assessment.md` (new), `scripts/assess_wnba_accuracy.py` (new, read-only analysis). No production code edited under this lane without extending this claim first. Checked against every OPEN lane: neither path is claimed by any of them.
+- Hypothesis: n/a (assessment, not a single diagnostic). Sub-hypotheses are written into the findings file before each test.
+- Falsification test: each sub-test states its own; the lane fails if any headline number cannot be reproduced from a named production endpoint with a stated n.
+- Verification: findings file exists with per-section n + window, instrument-state table first, and a prioritized plan.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -56,9 +56,20 @@ The P&L is not: the row states the market total, and splitting it across orders
 would be an invented number wearing an exact one's clothes.
 
 So: one ungraded order on a market gets the outcome AND the venue's P&L; several
-get the outcome and no P&L, counted as `pnl_unattributed`. Holding BOTH sides
-refuses outright -- the outcome is genuinely ambiguous per order then, and a
-guess would be a coin flip recorded as a fact.
+get the outcome and a P&L DERIVED from each order's own fill, counted as
+`pnl_derived` -- nothing is apportioned, because a binary contract bought at $p
+settles at $1 and that arithmetic is exact per order. Holding BOTH sides refuses
+outright -- the outcome is genuinely ambiguous per order then, and a guess would
+be a coin flip recorded as a fact.
+
+**"ONE ORDER IN OUR BOOK" IS NOT "ONE FILL AT THE VENUE", and the difference cost
+real money.** `attributable` counts OUR ledger rows for the market; a Polymarket
+`realized` delta covers the venue's whole position there, including fills we
+never recorded separately. Measured 2026-08-31: a $3.20 fill was graded LOST at
+-$12.9188 and reported -159.38% ROI on a binary contract. So the venue's number
+is preferred but BOUNDED by what the fill it lands on can physically produce
+(`_pnl_exceeds_own_fill`); past that bound the per-order arithmetic wins and the
+row is counted as `pnl_exceeded_own_fill`.
 
 --------------------------------------------------------------------------
 IDEMPOTENT, AND IT WRITES INTO A MONEY RECORD SOMEBODY ELSE ALSO WRITES
@@ -433,6 +444,54 @@ def _derived_pnl(order: Mapping[str, Any], outcome: str) -> float | None:
     if multiple is None:
         return None
     return round(stake * multiple - fees, 4)
+
+
+def _pnl_exceeds_own_fill(order: Mapping[str, Any], outcome: str, pnl: float) -> bool:
+    """Is a venue-stated P&L larger than this ONE order's fill can produce?
+
+    MEASURED IN PRODUCTION 2026-08-31, and it is the reason this exists rather
+    than a hypothetical. Polymarket order `C7AZA3MBEKDD`
+    (`aec-mlb-mia-wsh-2026-08-31`, 6.4 contracts filled at $0.50, so
+    `fill_stake_dollars=3.20`) was graded LOST with `pnl_dollars=-12.9188`.
+    A binary contract cannot lose more than it cost: the floor is -$3.20 either
+    way round, and -$12.92 is 4.04x it. That single row drove
+    `polymarket/game_line` to a reported **-159.38% ROI on $16.37 staked** and
+    about 40% of that day's whole reported loss. An ROI past -100% on a binary
+    contract is arithmetically impossible and is the symptom to watch for.
+
+    THE CAUSE IS THE ATTRIBUTION TEST, NOT THE ARITHMETIC. `attributable` asks
+    whether OUR LEDGER holds one order for the market. A PositionResolution's
+    `realized` delta covers the venue's WHOLE position there -- including fills
+    our ledger never recorded as separate orders. That order carries a
+    `prior_attempts` entry for a replaced order the venue reported canceled, so
+    "one order in our book" was true and "the whole delta belongs to this
+    order" was not. The two are not the same claim and the code treated them as
+    one.
+
+    So the venue's number stays PREFERRED -- it nets fees the venue actually
+    charged, which `_derived_pnl` can only guess at -- but it must first be
+    POSSIBLE for the fill it is being written onto. Where it is not, the caller
+    falls back to per-order arithmetic and counts it, rather than writing a
+    number it can prove wrong onto a money record.
+
+    The tolerance is relative and small: fees and the venue's own rounding move
+    these by cents, never by multiples.
+    """
+    from syndicate.features.shared.paper_settlement import OUTCOME_LOST, OUTCOME_WON
+
+    bound = _derived_pnl(order, outcome)
+    if bound is None:
+        # No fill to bound against. Nothing is claimed and nothing is refused --
+        # the same choice `_derived_pnl` itself makes for a stakeless row.
+        return False
+    tolerance = max(0.01, abs(bound) * 0.02)
+    if outcome == OUTCOME_LOST:
+        # A loss deeper than stake + fees, or a "loss" that made money.
+        return pnl < bound - tolerance or pnl > tolerance
+    if outcome == OUTCOME_WON:
+        # A win larger than the contract pays, or a "win" that lost money.
+        return pnl > bound + tolerance or pnl < -tolerance
+    return False
 
 
 # Fields this module writes, and therefore the only fields a repair may clear.
@@ -847,6 +906,75 @@ def repair_zero_delta_pushes(*, dry_run: bool = False) -> dict[str, Any]:
     return {"status": "ok", **counters}
 
 
+def repair_impossible_venue_pnl(*, dry_run: bool = False) -> dict[str, Any]:
+    """Correct an already-graded P&L that the order's own fill cannot produce.
+
+    THE GUARD ALONE CANNOT MEET ITS OWN GATE. `_pnl_exceeds_own_fill` stops the
+    next bad write, but grading is idempotent -- a row carrying an `outcome` is
+    skipped forever -- so the row measured on 2026-08-31 (a $3.20 fill graded
+    LOST at -$12.9188, driving `polymarket/game_line` to -159.38% ROI) would sit
+    on the money record unchanged. Something has to reach back for it.
+
+    THIS CORRECTS, IT DOES NOT UN-GRADE, and the distinction is the whole design.
+    `repair_multi_side_grades` clears the outcome because the OUTCOME was the
+    thing that could not be true. Here the outcome is fine: the venue said LOST
+    and it is the venue's own word, which is exactly the estimator-free fact this
+    module exists to capture. Only the MAGNITUDE is impossible. Un-grading would
+    discard a correct venue outcome and drop the row to inference -- trading a
+    wrong number for a worse source.
+
+    NARROW BY CONSTRUCTION, because this writes to a money record:
+
+      * only `mode=live` rows;
+      * only rows THIS module graded (`settled_by == "venue"`) -- an inferred
+        grade is another module's record and is never touched;
+      * only rows whose stored P&L is outside what their OWN fill can produce,
+        by the same bound the grading path now applies;
+      * only `pnl_dollars`. The outcome, `settled_by`, `held_side` and the
+        venue timestamps are left exactly as the venue stated them.
+
+    SELF-LIMITING. A corrected row sits inside the bound, so the next tick finds
+    nothing to correct. That is what makes it safe to run every tick rather than
+    as a one-off migration -- and a one-off is what left the previous two repair
+    paths needing to exist at all.
+    """
+    from syndicate.features.shared.execution_ledger import LIVE, _load, _persist
+
+    counters: dict[str, Any] = {"corrected": 0, "keys": []}
+    try:
+        state = _load()
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}", **counters}
+
+    changed = False
+    for order in (state.get("orders") or []):
+        if str(order.get("mode") or "") != LIVE:
+            continue
+        if str(order.get("settled_by") or "") != "venue":
+            continue
+        outcome = str(order.get("outcome") or "")
+        if not outcome:
+            continue
+        stored = _num(order.get("pnl_dollars"))
+        if stored is None:
+            continue
+        if not _pnl_exceeds_own_fill(order, outcome, stored):
+            continue
+        corrected = _derived_pnl(order, outcome)
+        if corrected is None:
+            continue
+        order["pnl_dollars"] = corrected
+        counters["corrected"] += 1
+        key = str(order.get("idempotency_key") or order.get("venue_ticker") or "")
+        if key and key not in counters["keys"]:
+            counters["keys"].append(key)
+        changed = True
+
+    if changed and not dry_run:
+        _persist(state)
+    return {"status": "ok", **counters}
+
+
 def repair_multi_side_grades(*, dry_run: bool = False) -> dict[str, Any]:
     """Un-grade rows this module wrongly settled by sharing one verdict across
     OPPOSITE SIDES of a market. Runs before grading, on the worker.
@@ -965,6 +1093,7 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
         "awaiting": 0,
         "unjoinable": 0,
         "pnl_derived": 0,
+        "pnl_exceeded_own_fill": 0,
         "refused": {},
         "by_venue": {},
         "errors": {},
@@ -991,6 +1120,18 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
             )
     except Exception as exc:
         counters["errors"]["repair_pushes"] = f"{type(exc).__name__}: {exc}"
+
+    try:
+        rebounded = repair_impossible_venue_pnl(dry_run=dry_run)
+        if rebounded.get("corrected"):
+            counters["repaired_pnl"] = rebounded
+            print(
+                f"[venue_settlement] IMPOSSIBLE_PNL_CORRECTED n={rebounded['corrected']}"
+                f" keys={rebounded.get('keys')}",
+                flush=True,
+            )
+    except Exception as exc:
+        counters["errors"]["repair_pnl"] = f"{type(exc).__name__}: {exc}"
 
     try:
         state = _load()
@@ -1153,7 +1294,20 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
                 # Storing it makes `repair_zero_delta_pushes` able to terminate
                 # instead of clearing a correct grade every tick forever.
                 order["held_side"] = verdict.get("held_side")
-                if attributable and verdict.get("pnl_dollars") is not None:
+                # ONE ORDER IN OUR BOOK IS NOT THE SAME CLAIM AS ONE FILL AT THE
+                # VENUE. See `_pnl_exceeds_own_fill` -- a position built by
+                # fills we never recorded separately makes `attributable` true
+                # while the delta still belongs to more than this row.
+                impossible = (
+                    attributable
+                    and verdict.get("pnl_dollars") is not None
+                    and _pnl_exceeds_own_fill(
+                        order, verdict["outcome"], float(verdict["pnl_dollars"])
+                    )
+                )
+                if impossible:
+                    counters["pnl_exceeded_own_fill"] += 1
+                if attributable and verdict.get("pnl_dollars") is not None and not impossible:
                     # ONE ORDER: take the venue's own arithmetic, which nets
                     # fees the venue actually charged.
                     order["pnl_dollars"] = verdict["pnl_dollars"]
