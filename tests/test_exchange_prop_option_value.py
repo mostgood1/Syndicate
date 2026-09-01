@@ -121,5 +121,65 @@ class KeyingTests(unittest.TestCase):
         self.assertNotEqual(MOD.quote_key(base), MOD.quote_key(other_side))
 
 
+class GateBookTests(unittest.TestCase):
+    """`#624` step 6 is a gate on ONE book — unders, minus HR and HRR. Measuring
+    entry improvement over all props and spending it against that book's ROI
+    sensitivity assumes the two move together, and on 2026-09-01 they did not:
+    all-props gave +1.121pp where the gate book gave +0.955pp."""
+
+    def test_the_gate_book_is_unders_only(self) -> None:
+        self.assertTrue(MOD.in_gate_book({"selection": "under", "market": "batter_hits"}))
+        self.assertFalse(MOD.in_gate_book({"selection": "over", "market": "batter_hits"}))
+
+    def test_home_runs_and_hrr_are_excluded(self) -> None:
+        """The two markets item 07 removed. HR overs are separately marked DO
+        NOT INVERT, and HRR carried the producer null."""
+        self.assertFalse(MOD.in_gate_book({"selection": "under", "market": "batter_home_runs"}))
+        self.assertFalse(MOD.in_gate_book({"selection": "under", "market": "batter_hits_runs_rbis"}))
+
+    def test_a_missing_selection_is_excluded_not_admitted(self) -> None:
+        """Unknown must not default permissive: a row with no side is not
+        evidence that it is an under."""
+        self.assertFalse(MOD.in_gate_book({"market": "batter_hits"}))
+        self.assertFalse(MOD.in_gate_book({"selection": None, "market": "batter_hits"}))
+
+
+class SensitivityTests(unittest.TestCase):
+    def test_the_table_reproduces_item_07_exactly_at_its_own_points(self) -> None:
+        for side_cost, roi in MOD.GATE_SENSITIVITY:
+            self.assertAlmostEqual(MOD.roi_at_side_cost(side_cost), roi, places=6, msg=str(side_cost))
+
+    def test_the_slope_is_about_1_77_not_0_75(self) -> None:
+        """The correction this module exists to carry. The 08-31 write-up said
+        1pp of better entry is worth ~+0.75pp of ROI and attributed it to this
+        very table; the table says otherwise, and step 5 spent the wrong one."""
+        slope = (MOD.roi_at_side_cost(2.50) - MOD.roi_at_side_cost(4.05)) / (4.05 - 2.50)
+        self.assertAlmostEqual(slope, 1.7677, places=3)
+        self.assertGreater(slope, 2 * 0.75, "0.75 understates by more than half")
+
+    def test_cheaper_entry_never_lowers_roi(self) -> None:
+        previous = None
+        for step in range(0, 41):
+            roi = MOD.roi_at_side_cost(step / 10.0)
+            if previous is not None:
+                self.assertLessEqual(roi, previous + 1e-9)
+            previous = roi
+
+    def test_it_clamps_instead_of_extrapolating(self) -> None:
+        """Past a measured endpoint there is no measurement, so it must not
+        invent one -- a negative entry cost is not +9% ROI."""
+        self.assertEqual(MOD.roi_at_side_cost(-3.0), 8.48)
+        self.assertEqual(MOD.roi_at_side_cost(99.0), 0.98)
+
+    def test_the_measured_gate_readings_fail_both_conditions(self) -> None:
+        """2026-09-01, gate book, n=653: +0.955pp (m=0.5) and +0.703pp (m=1.0).
+        Neither reaches +3% ROI, and neither brings the two-way hold to <=5%."""
+        for gain, expected_roi in ((0.955, 2.66), (0.703, 2.22)):
+            side_cost = MOD.GATE_PER_SIDE_TODAY - gain
+            self.assertAlmostEqual(MOD.roi_at_side_cost(side_cost), expected_roi, places=1)
+            self.assertLess(MOD.roi_at_side_cost(side_cost), MOD.GATE_ROI_TARGET_PCT)
+            self.assertGreater(2 * side_cost, MOD.GATE_HOLD_TARGET_PCT)
+
+
 if __name__ == "__main__":
     unittest.main()
