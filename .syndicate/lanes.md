@@ -1740,6 +1740,69 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
+### ncaaf-games-cache-refresh — OPEN — opened 2026-09-01 — session b85e895e-dde2-4066-8336-dc6c1d4c3c61 — **LANDED `bc2365fc` + `c1c3cf12` on origin/main. NOT DEPLOYED. Production reading OWED.**
+- Goal: `ncaaf_target_week` returns the real current week instead of a permanent
+  1, on BOTH services, without web ever calling CFBD.
+- THE DEFECT: `ensure_games_cached` returns early on `path.exists()`, so
+  `games_2026.json.gz` (written 2026-07-21, one commit `5da1dd21`) was never
+  re-fetched. 888 games, `completed: False` on **888 of 888**, so
+  `min(week with an unplayed game)` is 1 forever.
+  `/ncaaf/api/cards?week=2` and `?week=3` both served `"2026 Week 1"` with nav
+  `next=prev="1"`; ops `season-weeks` reported artifacts for weeks [1-13, 15]
+  and `resolved_active_weeks: [1]`.
+- NOT WRONG YET, COMES DUE 2026-09-08: week 1 spans 08-29..09-07, so target=1 is
+  correct today by accident. Week 2 kicks off 09-11. Verified against the real
+  file that an honest refresh does NOT advance the week early (8 games past
+  kickoff, matching the board's own `Final: 8` from a different code path).
+- NOT the cause of the 0-NCAAF-orders gap — the Layer 2 / book-grid path
+  resolves the week from the schedule BY DATE
+  (`game_projections.py::load_ncaaf_game_projections`) and bypasses this gate.
+  That gap is `edge_vs_market_pct = None` on all three NCAAF markets, deliberate
+  and documented in `ncaaf/game_projections.py`.
+- Files: syndicate/features/football/sim_engine/smartsim2/historical_truth/ncaaf_historical_loader.py,
+  scripts/generate_smartsim2_ncaaf_projections.py,
+  syndicate/features/ncaaf/week_state.py (NEW),
+  syndicate/features/ncaaf/sources.py,
+  tests/test_ncaaf_games_cache_refresh.py (NEW),
+  tests/test_ncaaf_week_state.py (NEW),
+  tests/test_ncaaf_sp_ratings_cache.py (docstring only)
+- **CROSS-LANE, AUTHORISED AND LOGGED. NOT CLAIMED HERE ON PURPOSE:**
+  `artifact_publisher.py` is claimed by OPEN lane
+  `football-projection-publish-allowlist` (`#618`), and the claim STAYS THERE —
+  my edit is finished and landed, so holding a second claim would only block
+  that lane for no benefit. It is listed in this bullet rather than in `Files:`
+  for exactly that reason; the edit is recorded, the lock is not taken. **USER OVERRIDE
+  2026-09-01: "go ahead and land it, the allowlist edit is additive."** It is
+  one pattern plus its note, appended after that lane's two entries; both of
+  theirs verified intact on origin/main after the rebase, and THEIR OWN test
+  (`tests/test_football_projection_publish_allowlist.py`) passes against the
+  landed tree. No alternative route existed — the allowlist is the only
+  mechanism that can permit the transfer.
+- TWO CONSTRAINTS THAT SHAPED THE FIX, both measured:
+  (a) this loader's `_cfbd_get` is raw urllib with NO `cfbd_backoff` and NO
+  `cfbd_quota_latch` — a refresh added naively here rebuilds the hourly hammer
+  `ncaaf-cfbd-quota-latch` shipped to stop, on a path the latch cannot see.
+  `_cfbd_get_latched` runs `raise_if_latched` INSIDE the retry ladder and
+  classifies urllib errors (`cfbd.py`'s classifier reads `exc.response`, which
+  urllib errors lack — reusing it would have been inert while looking wired).
+  (b) the refreshed cache CANNOT reach web: `publish_hot_artifact` reads
+  sub-4MB files as UTF-8 text, so the 39KB `.gz` raises UnicodeDecodeError ->
+  `SKIP_READ_FAILED`. Hence a small owned JSON artifact (`week_state.py`):
+  worker derives per-week played/unplayed COUNTS, web reads those. Facts, not
+  the decision — the "lowest week with an unplayed game" rule stays in code.
+- Verification LOCAL, DONE: 210 tests green post-rebase across ncaaf +
+  publisher + `#618`'s own test, no regressions. Covers off!=on for the
+  refresh, the artifact WINNING over the stale cache (order, not just parsing),
+  the fallback when no artifact exists, `ncaaf_target_week` never reaching
+  CFBD, and the written path being one `HOT_ARTIFACT_PATTERNS` actually
+  matches — the half that was inert for 13 days on the sibling entry.
+- **OWED — NOT DEPLOYED, NO PRODUCTION READING.** Needs BOTH services (worker
+  writes+publishes, web reads). The readings that would prove it:
+  `WEEK_STATE season=2026 ... stale_completion_flags=0 published=True` on
+  refresh-worker, then `resolved_active_weeks` moving past [1] after 09-07.
+  Until deployed, the board stays pinned to week 1 — harmless until 09-08.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
