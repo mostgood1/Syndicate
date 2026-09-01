@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 652 rules `[generated]`
+## Index — 653 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 200**
+**FORBIDDEN — 201**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -136,6 +136,7 @@
 - [2026-09-01 FORBIDDEN: inferring a MECHANISM from a file's SIZE. Count the composition,…](#2026-09-01-forbidden-inferring-a-mechanism-from-a-files-size-count-the-composition-or-say-you-havent-lane-wnba-accuracy-assessment-caught-by-lane-mlb-accuracy-assessment)
 - [2026-09-01 FORBIDDEN: naming a MECHANISM from a SYMPTOM. Three times in one session, on…](#2026-09-01-forbidden-naming-a-mechanism-from-a-symptom-three-times-in-one-session-on-three-different-subjects-lane-wnba-accuracy-assessment)
 - [2026-09-01 FORBIDDEN: recording a LIVENESS field that the recorder itself cannot outlive](#2026-09-01-forbidden-recording-a-liveness-field-that-the-recorder-itself-cannot-outlive)
+- [2026-09-01 FORBIDDEN: leaving anything staged in the SHARED index that you are not comm…](#2026-09-01-forbidden-leaving-anything-staged-in-the-shared-index-that-you-are-not-committing-in-the-same-breath)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
