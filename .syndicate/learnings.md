@@ -3627,3 +3627,151 @@ holds only what you touched.
   the record: a commit message that misdescribes two of its three files, and an
   authorship trail that says a session did work it never did. On a repo whose
   ledger is read as evidence, that is the expensive kind of wrong.
+
+## 2026-09-01 — FORBIDDEN: prescribing a fix in a spun-off task from a symptom you never traced to its enclosing control flow. My `continue` would have deleted the feature it was meant to instrument. `[lane phase0-basketball-integrity]`
+
+**What I did.** I found a real defect by reading a log line — `book_grid.py`
+counted every correctly-matched direct-feed row as a `near_miss`, so production
+read `kept_direct=603 near_misses={'kalshi': 603}`, an alarm firing at exactly
+the rate the feature succeeded. I filed it as a background task and, because
+the cause looked obvious, **I wrote the remedy into the chip: "add the missing
+`continue` after `kept_direct_feed += 1`."**
+
+**Why that was wrong.** The near-miss block is not the end of the loop body.
+`instance`, `key`, `freshest[key]` and `anchors[anchor_key]` all follow it, so
+a `continue` there skips the KEPT row's registration and the row never reaches
+the grid — measured by the peer who caught it:
+`assert 'kalshi' in books` → `AssertionError: assert 'kalshi' in {'fanduel'}`.
+**And it would have looked like a total success**: `kept_direct` high,
+`near_misses={}`, both counters perfect, and zero exchange prices on the board —
+the exact failure the whole thread exists to fix, reintroduced by the fix to its
+own instrument. The real fix (already shipped as `07cb592a`) is an `else`, which
+restores the old reachability under the new drop rule without touching the row's
+path.
+
+**Two distinct errors, and the second is the one worth keeping.**
+1. The chip was **stale on arrival in a way I could not see** — the fix had
+   shipped and gone live before the session started. A spun-off task carries a
+   timestamped symptom into a future where it may already be false.
+2. **I prescribed without tracing.** I read the counter and the increment; I
+   never read what came AFTER the block I was proposing to `continue` past.
+   Diagnosing a defect and prescribing its remedy are different amounts of
+   reading, and a task chip makes the prescription authoritative for whoever
+   picks it up — they will trust it precisely because it looks specific.
+
+**The rule.** A spun-off task states **the symptom, the evidence, and its
+timestamp** — and names the remedy only if the enclosing control flow has been
+read end to end. Otherwise say "cause not traced; verify against current main
+first". Prefer a chip that under-claims: a vague chip costs a few minutes of
+rediscovery, a confidently wrong one ships a silent regression on a working
+feature. Every chip should also carry the pin that would catch its own worst
+outcome — here `tests/test_direct_feed_provenance.py`, which already asserts
+both directions and would have failed instantly.
+
+**Corollary, from the same evening and the same shape:** when a peer challenges
+a finding of yours, **re-derive it against the substrate yourself.** I verified
+this one by reading `origin/main` before relaying the stop, and only then found
+the second half — that the block sits mid-loop-body — which the peer's message
+had asserted and which I would otherwise have been repeating on trust.
+
+## 2026-09-01 FORBIDDEN: running any git working-tree restore (`checkout --`, `restore`, `reset`) without pinning the repo with `-C <path>`. The cwd is not a fact; on this machine it is a liability that destroys OTHER SESSIONS' work. `[lane polymarket-prop-quote-capture]`
+
+- **What we believed.** "I am in my worktree" — because the previous command
+  `cd`'d there. So `git checkout -- .syndicate/lanes.md`, meant to discard a
+  botched insert in MY worktree copy, was safe.
+- **What was actually true.** An intervening one-off command (`cd <primary> &&
+  py -3 scripts/render_logs.py ...`) had silently moved the persistent shell
+  cwd back to the PRIMARY, SHARED tree. The checkout ran there, restored
+  `lanes.md` from HEAD, and destroyed EVERY uncommitted edit in the file:
+  my own lane-close block AND two closed-lane blocks belonging to a live
+  peer session (syndicate-8d: `phase0-graded-supply`, `phase0-accuracy-autorun`)
+  — ledger records of landed work, existing nowhere else. A foreign
+  cherry-pick was also in progress in that tree at that moment.
+- **How we found out.** The next command in the chain printed the PRIMARY
+  tree's `git status` (branch main, 10/45 diverged, cherry-pick in progress)
+  where worktree output was expected; `grep -c` then found 0 of the 3 blocks.
+- **The rule going forward.** THREE layers, because each alone has now failed:
+  (1) every git command that can DISCARD working-tree content must carry an
+  explicit `git -C <absolute-path>` — never rely on the shell's cwd;
+  (2) a file-wide restore is NEVER the tool for undoing a targeted
+  experiment — reverse the specific edit (string-swap back) instead, which
+  cannot exceed its own blast radius (this same session had already wiped its
+  own uncommitted implementation once with `checkout --` in the worktree —
+  same instrument, and the second firing hit ANOTHER session);
+  (3) on the shared tree, `checkout/restore` of a ledger file is forbidden
+  OUTRIGHT — uncommitted peer edits live there by design, and the command
+  cannot distinguish yours from theirs.
+- **Cost.** Two peer ledger blocks destroyed (peer notified immediately with
+  partial text; a HOLE MARKER stands in `lanes.md` until they rewrite from
+  their own context — deliberately not reconstructed from fragments). My own
+  block was reconstructible from context. No code, no production state, and
+  no pushed history were touched.
+
+## 2026-09-01 — FORBIDDEN: comparing a model against a market price without conditioning on QUOTE AGE. A stale price is a weak forecast, so staleness flatters the model — the error runs in the reassuring direction `[lane mlb-live-gameline-skill-audit]`
+
+One ledger, two opposite conclusions, decided entirely by which prices were
+admitted. MLB live game-lines, 12 dates / 72,587 records / 157 games, h2h scored
+against StatsAPI finals:
+
+    quote age   n     model    market   model-minus-market
+    <= 120s     954   0.20000  0.17403  +0.02597   <- the model honestly LOSES
+    300-600s    320   0.16264  0.17011  -0.00747
+    600-1800s   501   0.16326  0.19047  -0.02721
+    > 1800s     592   0.16459  0.21897  -0.05438   <- the model "WINS"
+
+Pooled over every age: **-0.00202, CI straddles zero — reads as parity.**
+Restricted to quotes that were alive: **+0.01096, CI [+0.00171, +0.02132],
+model worse in 98.9% of game-level resamples.**
+
+**The model does not improve as the quote ages. The MARKET decays**, because a
+price that has not moved in half an hour is a bad forecast of an outcome it has
+not seen. Quote-age distribution in that file: p50 410s, p90 1,848s, **p99
+74,997s** — roughly 1 row in 100 was priced against a quote over 20 hours old.
+
+**The failure mode is a FABRICATED EDGE, not a wrong number.** The subset the
+board liked best — late game, `|edge| >= 20pp` — had a MEDIAN quote age of 42.9
+minutes and scored a fair-odds "return" of **+98.7%**. That is not an edge; it is
+the arithmetic of pricing against a quote nobody could have taken. On FRESH
+quotes the same `|edge| >= 20pp` band scores **+0.16305** — the biggest claimed
+edges are the biggest errors, the exact inversion.
+
+Generalises past game-lines: any `model vs market` comparison — props, CLV,
+settlement, venue routing — inherits this the moment its market side can be
+stale. **Ask what the p99 quote age of your comparison population is before you
+believe its sign.**
+
+## 2026-09-01 — FORBIDDEN: pooling an accuracy history across a SCORER-version boundary, and shipping a scorer whose payload cannot say which version produced it `[lane mlb-live-gameline-skill-audit]`
+
+`reports/live_gameline_accuracy/history.jsonl` reported "model worse on 10 of 12
+dates, +0.04839". It was measuring a bug fixed on day 11. Until `75cf9aec` the
+scorer compared totals `P(over)` and spreads `P(home covers)` against "did the
+home team win" — ~92% of the population was a category error. Proof by n:
+offline h2h-only scoring matches production EXACTLY on 08-30 (249/249 rows,
+briers identical to 5dp) and is 10-20x smaller on every earlier date.
+
+**Nothing in the row said which scorer wrote it**, so the boundary was invisible
+and had to be rediscovered by matching record counts. The rule has two halves:
+
+1. Every evaluation row carries the identity of the code that produced it
+   (`scored_markets`, `scorer_contract`). Absence is itself a version signal.
+2. **A branch that has nothing to measure must STILL report that identity.**
+   Measured the same day: a pregame board served exactly
+   `['enabled','finals_index','games_with_outcome','reason']`, so "the new
+   scorer shipped and had nothing to score" and "the new scorer did not ship"
+   were the same null, and a deploy could not be verified until a game finished.
+   These are constants — they never needed a sample to be reportable.
+
+## 2026-09-01 — FORBIDDEN: `ast.parse` as a syntax check for an edit, and building a `write` and a `read` of the same path in one expression `[lane mlb-live-gameline-skill-audit]`
+
+Two self-inflicted breakages in one session, both from a check that looked
+sufficient.
+
+* **`ast.parse` does NOT catch `return` outside a function** — that is a
+  compile-time check, not a parse-time one. A bad dedent while extracting a
+  function passed `ast.parse` cleanly and the module raised `SyntaxError` on
+  import, surfacing as an unrelated NFL test failure three files away. Use
+  `py_compile.compile(path, doraise=True)`, and import the module.
+* **`io.open(p,'w').write(io.open(p).read().replace(...))` TRUNCATES THE FILE.**
+  Python evaluates the `'w'` open first, so the inner read sees an empty file.
+  It silently zeroed a 368-line module. Caught only by `git diff --stat` showing
+  368 deletions. Read to a variable first, then write.
