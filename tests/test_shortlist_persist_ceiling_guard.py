@@ -33,7 +33,11 @@ import pipeline.intelligence_state as state
 from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
 
 CEIL = int(_keyvalue_max_bytes())
-BIG = "x" * (CEIL // 2 + 1000)
+WARN_AT = int(CEIL * state._LAYER2_KEY_WARN_FRACTION)
+BIG = "x" * (WARN_AT + 10_000)
+# 55% of the ceiling: what a full three-sport slate at per_sport=2000 actually
+# measures. It must be SILENT -- that is the whole point of the 0.5 -> 0.75 raise.
+FULL_SLATE_SHARD = int(CEIL * 0.552)
 
 
 def test_small_keys_are_silent(capsys) -> None:
@@ -48,7 +52,7 @@ def test_a_big_SHARD_is_reported_even_when_the_combined_key_is_tiny(capsys) -> N
     key is small and one sport's shard is the thing near the ceiling."""
     state._warn_if_layer2_keys_near_ceiling(
         {"rows": [], "cards": [], "per_sport_limit": 1000},
-        {"rows:ncaaf": CEIL // 2 + 5000, "rows:mlb": 100},
+        {"rows:ncaaf": WARN_AT + 50_000, "rows:mlb": 100},
         rows=3000, cards=3000,
     )
     out = capsys.readouterr().out
@@ -116,3 +120,41 @@ def test_the_stale_instrument_is_GONE() -> None:
     """It measured a payload the code no longer writes as one key. Leaving it
     beside the replacement would give two answers to one question."""
     assert not hasattr(state, "_warn_if_shortlist_near_keyvalue_ceiling")
+
+
+# --- the 0.5 -> 0.75 raise ------------------------------------------------
+
+def test_a_full_slate_at_2000_per_sport_is_SILENT(capsys) -> None:
+    """THE REASON THE THRESHOLD MOVED. Measured against real production rows, a
+    three-sport slate at per_sport=2000 puts every shard at ~55.2% of the
+    ceiling. At the old 50% trigger that is a warning on EVERY build forever, on
+    a completely healthy board -- which is precisely how this instrument's
+    predecessor became unreadable noise."""
+    state._warn_if_layer2_keys_near_ceiling(
+        {"rows": [], "cards": [], "per_sport_limit": 2000},
+        {f"{kind}:{sport}": FULL_SLATE_SHARD
+         for kind in ("rows", "cards") for sport in ("mlb", "ncaaf", "soccer")},
+        rows=6000, cards=6000,
+    )
+    assert "LAYER2_KEY_LARGE" not in capsys.readouterr().out
+
+
+def test_it_still_fires_above_75_percent(capsys) -> None:
+    """Raising the threshold must not silence it entirely."""
+    state._warn_if_layer2_keys_near_ceiling(
+        {"rows": [], "cards": [], "per_sport_limit": 2000},
+        {"rows:mlb": WARN_AT + 1000}, rows=6000, cards=6000,
+    )
+    assert "LAYER2_KEY_LARGE" in capsys.readouterr().out
+
+
+def test_the_threshold_leaves_room_to_ACT_before_rows_are_dropped() -> None:
+    """A warning that fires after the damage is done is a post-mortem. The
+    per-shard trim discards rows at 95%, so the gap between warning and loss is
+    what makes this actionable."""
+    trim_at = 0.95
+    assert state._LAYER2_KEY_WARN_FRACTION < trim_at, "must warn BEFORE rows are discarded"
+    headroom_bytes = int(CEIL * (trim_at - state._LAYER2_KEY_WARN_FRACTION))
+    assert headroom_bytes // 2320 > 500, (
+        f"only {headroom_bytes // 2320} rows of warning at ~2,320 B/row -- too late to act"
+    )

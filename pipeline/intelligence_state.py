@@ -2599,6 +2599,27 @@ def _shed_rows_to_fit_keyvalue(payload: dict[str, Any]) -> dict[str, Any]:
         return payload
 
 
+# WARN AT 75% OF ONE KEY'S CEILING, not 50%.
+#
+# RAISED 0.5 -> 0.75 `[user decision, 2026-09-01]`, together with the per-sport
+# cap going 1000 -> 2000. Measured against REAL production rows, a full
+# three-sport slate at 2000/sport puts every shard at ~55% of the ceiling:
+#
+#     per_sport=2000   worst key cards:soccer 4,629,408 B = 55.2%
+#     combined                                       220 B =  0.0%
+#
+# At the old 50% threshold that is a warning on EVERY BUILD, permanently, on a
+# board that is completely healthy. **That is the exact failure this instrument
+# was just rebuilt to remove** -- its predecessor cried `pct=122.5` on a healthy
+# board until nobody could read it as signal. A guard that always fires has the
+# same information content as one that never does.
+#
+# 75% still leaves real room to act: the per-shard trim starts discarding rows at
+# 95%, so a key crossing 75% has ~20 points of headroom, and at ~2,320 bytes/row
+# that is roughly 700 more rows in that sport before anything is dropped.
+_LAYER2_KEY_WARN_FRACTION = 0.75
+
+
 def _warn_if_layer2_keys_near_ceiling(
     combined: Mapping[str, Any],
     shard_sizes: Mapping[str, int],
@@ -2638,7 +2659,7 @@ def _warn_if_layer2_keys_near_ceiling(
 
     keys = dict(shard_sizes or {})
     keys["combined"] = combined_bytes
-    over = {k: v for k, v in keys.items() if v > ceiling // 2}
+    over = {k: v for k, v in keys.items() if v > int(ceiling * _LAYER2_KEY_WARN_FRACTION)}
     if not over:
         return
 
