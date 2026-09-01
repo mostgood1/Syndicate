@@ -103,26 +103,73 @@ venue-level counter does not.
 
 ---
 
-### `#615` — **THE WNBA EDGE GENERATOR EMITS NO MONEYLINE ROWS, and turning them on depends on a ranking key that does not work yet** — lane `wnba-accuracy-assessment`, 2026-08-31 — **MEASURED, NOT FIXED, AND THE ORDERING IS THE POINT**
+### `#615` — **T2-1 RUN AND ANSWERED: NO MODEL RANKING KEY EXISTS. And the same pass FALSIFIES `T0-1`'s premise — the market beats the sim on the moneyline.** — lane `wnba-accuracy-assessment`, 2026-09-01 — **MEASURED; T0-1 MUST NOT PROCEED**
 
-The moneyline is the WNBA sim's one measured edge — **AUC 0.7631** (n=106),
-**0.8413** over the last 14 days, **89.7% straight up** in its top confidence
-band. The board issued **2 ML recommendations all season out of 466**, spending
-its volume on ATS (**-10.61%**, n=51) and TOTAL (**-8.80%**, n=54).
+> **This entry replaces the earlier "turn ML on once a ranking key exists"
+> framing. The ranking key was searched for and is not there, and the reason to
+> want ML in the first place turned out to be wrong.**
 
-The board does not choose markets — it renders what the generator emits.
-`recommendations_2026-08-30.csv` on production contains **exactly 2 rows: 1 ATS,
-1 TOTAL, zero ML**. The consumer side is already ready (`_recommendation_tier`
-has an explicit ML branch; the slate builder handles ML at
-`refresh_wnba_oddsapi_props.py:1425`). So this is purely a producer gap.
+**1. The market beats the sim on the moneyline.** Same 101 clean-root games, same
+rows, market probability taken from the SPREAD (verified informative,
+corr +0.6047 with actual margin) rather than the corrupted ML prices:
 
-**But do not simply switch ML on.** It would be ranked by the same `ev_pct` /
-`p_win` / `edge` fields measured as uninformative on the same data:
-`corr(edge, win) = +0.0002` (n=656), `corr(claimed EV, win) = +0.0466` on game
-lines, and board `p_win` overstated by **25.58pp** (claims 73.20%, delivers
-47.62%). Enabling ML under that ranking ships the platform's best signal through
-its worst selector. **This item is blocked on a validated ranking key, and the
-plan that produced it had the ordering wrong.**
+| | Brier | skill | AUC | acc |
+|---|---|---|---|---|
+| SIM `p_home` | 0.21531 | +12.84% | 0.7440 | 65.35% |
+| **MARKET (spread-implied)** | **0.16224** | **+34.32%** | **0.8444** | **74.26%** |
+| 50/50 blend | 0.17590 | +28.79% | 0.8095 | 71.29% |
+
+**When they disagree the market is right 13 of 17 (76.5%)** — the sim's side is
+**−2.18 SE** from a coin flip, i.e. significantly worse than random.
+`corr(sim − market, market's residual) = +0.0695`, 95% CI **[−0.128, +0.261]**:
+the sim adds nothing detectable on top of the market.
+
+**So the assessment's headline — "the moneyline sim is the best pregame asset,
+AUC 0.7631" — is true in isolation and MISLEADING as a betting claim.** AUC 0.744
+against a market at 0.844 means routing volume to the sim's ML picks loses. The
+plan's Tier 0 item 1 rested on that headline and is hereby withdrawn.
+
+**2. No sim-derived ranking key.** Candidates tested against BET outcome on 101
+constructed flat −110 ATS bets (base 55-46, 54.46%, +3.96%, +0.42 SE):
+
+| key | corr with winning | 95% CI |
+|---|---|---|
+| `sim_conf` (\|p_cover−0.5\|) | −0.0353 | [−0.229, +0.161] |
+| **`ml_conf` (\|p_home−0.5\|)** | **−0.2073** | **[−0.387, −0.012] — excludes 0** |
+| `edge_margin` (\|sim − market\|) | −0.0839 | [−0.275, +0.113] |
+| `agree` (sim side == market side) | −0.0622 | [−0.255, +0.135] |
+
+`ml_conf` is **significantly ANTI-predictive**. Held out (threshold fit on the
+first 2/3 by date), its top half returned **36.36%, ROI −30.58%** on n=11.
+`sim_conf` and `edge_margin` selected n=3 and n=5 in the test window — UNREADABLE,
+not passes.
+
+**3. A market-side favourite-lean is the only positive signal, it is NOT
+significant, and it is NOT a model key.** On 656 clean-root priced props the
+whole-population gap is **+1.80pp, +0.92 SE**. Splitting at implied ≥ 0.528 the
+direction is positive in every partition tried — time halves +3.99 / +4.89pp,
+OVER +1.24 / UNDER +5.59pp, `pr` +6.27 / `threes` +10.58 / `pts` +12.94pp — with
+the complement negative or flat in 4 of 6. **Those six cells are six views of one
+effect on one 656-row sample, not six independent draws**, so their agreement is
+suggestive and is not a p-value; the honest single number is +0.92 SE. The
+exploratory pass took **~30 looks**, and +1.5 SE is the expected maximum from 30
+draws of noise.
+
+Critically, this rule says *"prefer the side the book already prices higher"*. It
+uses **no Syndicate model output at all**, so confirming it would not unblock
+routing model picks — it is a market-side selection rule, a different and smaller
+thing.
+
+**PRE-REGISTERED, committed before the data exists:**
+`scripts/prereg_wnba_favourite_lean.py` — threshold frozen at 0.528, decision
+rule fixed (CONFIRMED z ≥ 1.96 / REFUTED gap ≤ 0 / INCONCLUSIVE / UNREADABLE at
+n < 150), to be read on the **2026-09-17..09-25** sprint. `UNREADABLE` is a
+separate outcome so a thin window cannot masquerade as a refutation.
+
+**What would actually unblock model-ranked betting:** a signal the market does
+not already contain. Nothing in the current sim output is that. The residual test
+above (`+0.0695`, CI spanning zero) is the measurement to repeat on the sprint;
+until it clears zero, there is no model edge to rank.
 
 ---
 
@@ -171,7 +218,7 @@ measured: only **4–6%** of WNBA Layer 1 rows carry a model fair value
 
 ---
 
-### `#611` — **THE MLB PROP PREGAME FREEZE STOPPED ON 2026-08-16. Every hitter/pitcher prop since has been graded against a post-slate remnant covering ~ONE GAME.** — found by lane `layer2-accuracy-audit`, 2026-08-31 — **OPEN, MEASURED, NOT FIXED — belongs to the freeze WRITER (`scripts/refresh_mlb_oddsapi.py`), not to card generation**
+### `#611` — **THE MLB PROP PREGAME FREEZE STOPPED ON 2026-08-16. Every hitter/pitcher prop since has been graded against a post-slate remnant covering ~ONE GAME.** — found by lane `layer2-accuracy-audit`, 2026-08-31 — **OPEN, MEASURED, NOT FIXED — belongs to the freeze WRITER (`scripts/refresh_mlb_oddsapi.py`), not to card generation** — **VERDICT 2026-09-01: SEAL BROKEN. CADENCE IS EXONERATED — three MLB passes ran ~8 HOURS PRE-SLATE and sealed nothing.**
 
 **THE EVIDENCE, worker-side and direct.** `locked_cards_retuned/daily_summary_2026_08_30_locked_policy.json`
 records the paths the builder ACTUALLY read (`inputs`):
@@ -422,6 +469,111 @@ instead: whether `oddsapi_*_props_<date>_pregame.json` appears under the allowli
 **DO NOT "FIX" THE SOURCE-PATH SEARCH ON THE STRENGTH OF THIS ITEM.** The multi-directory
 search would be harmless, but the retraction above means it is not established that
 `source_path` is the problem, and shipping it would look like a fix while changing nothing.
+
+---
+
+**2026-09-01 10:03 CDT — THE TEST THIS ITEM ASKED FOR HAS NOW RUN, AND IT DISCRIMINATES.
+VERDICT: SEAL BROKEN. CADENCE IS EXONERATED.** (scheduled settle pass; times US Central.)
+
+The item's own closing test was: *"find one date where an MLB orchestrator run completed
+BEFORE that day's first pitch, and check whether prop `_pregame.json` files exist for it."*
+Today is that date, and the answer is **no seal**.
+
+    first pitch (earliest commence_time, 15-game 09-01 game-line freeze)   17:41 CDT
+    MLB orchestrator passes today, from the GLOBAL history:
+      09:23:59 CDT   refresh-worker     pregame   mlb,wnba,nfl,ncaaf,soccer
+      09:26:34 CDT   refresh-worker     pregame   mlb,wnba,nfl,ncaaf,soccer
+      09:48:43 CDT   live-odds-worker   pregame   mlb                        rc=0
+    prop `*_pregame.json` for 2026-09-01                                    ZERO
+
+All three ran **~8 hours before first pitch**, so `slate_started` was False for every one of
+them; richness cannot block a first seal (`best_frozen` = -1); and the source doc is
+demonstrably present and rich — today's live hitter capture is **633,176 bytes**. A valid
+pre-slate window, a rich source, three passes, zero seals. **`if slate_started: continue` is
+not what stopped this.** The 08-31 reading (one MLB pass, 7 min POST first pitch) was a
+genuine cadence miss, but it was not the cause — it was a coincidence that one night.
+
+**THE INSTRUMENT WAS VALIDATED BEFORE THE NULL WAS BELIEVED**, which the last three passes on
+this question did not do. `/api/ops/artifacts/export?names_only=1&pattern=*oddsapi_*props_*_pregame.json`
+returns **18 files, 2026-08-08..2026-08-16**, all under
+`mlb_source/data/daily/snapshots/<date>/`. So this export reads POSITIVE when the prop seal
+fires, at exactly the path today's query covers. Today's empty result is an **absence**, not
+the structural blindness that produced two wrong conclusions on 08-31.
+
+Same query, recent dates — the seal is dead and the collapse is visible:
+
+    date         hitter live   pitcher live   prop _pregame
+    2026-08-29        43,587            940        0
+    2026-08-30           573            544        0
+    2026-08-31         1,359            544        0     <- was 501,103 pre-slate on 08-31
+    2026-09-01       633,176         56,490        0     <- 15-game slate, still pre-slate
+
+08-31 is the clean before/after: the 501KB pre-slate capture recorded earlier in this item is
+now a 1,359-byte remnant. Nothing sealed it, so nothing survived.
+
+**WHAT THE CAPTURED COMMAND SAYS (step 5 of the settle pass).** From
+`/api/ops/odds-refresh/logs?stream=stdout&lane=live-odds-worker`, run_stamp `20260901_144843`,
+step `mlb_oddsapi_refresh`, rc=0, 09:48:45 -> 09:48:54 CDT:
+
+    --source-root    /opt/render/project/src/data/mlb_source     <- EPHEMERAL CHECKOUT
+    --artifact-root  /opt/render/project/data/mlb_source         <- mounted disk
+
+and in the SAME result object the orchestrator reports
+
+    source_repo         /opt/render/project/data/mlb_source      <- the DISK
+    source_root_origin  render_data_root
+    source_root_env_var SYNDICATE_SOURCE_ROOT_MLB
+
+**Those two disagree, and the reason is in the code.** `refresh_odds_sources._build_mlb_steps`
+(`:667`) hardcodes `source_root = REPO_ROOT / "data" / "mlb_source"` and never consults
+`_source_root_resolution` / `_source_repo_root`. Every other sport does — nba/wnba via
+`_basketball_source_root` (`:743`), nfl/nhl/soccer via `_source_repo_root` (`:494`), all of
+which honour the `SYNDICATE_SOURCE_ROOT_<SPORT>` override and the Render data root. **MLB is
+the only sport whose command ignores the resolution the orchestrator itself computed and
+logged.** The `source_repo` field is reporting-only; the subprocess gets `REPO_ROOT`.
+
+**WHY THAT IS FATAL FOR PROPS AND SURVIVABLE FOR GAME LINES — the asymmetry is the whole
+finding, and it is now grounded in code rather than in elimination.** In
+`_freeze_oddsapi_pregame_markets`:
+
+- The prop source is read from **`market_dirs[0]` ONLY** — `source_path = market_dir /
+  f"{prefix}_{slug}.json"`, and `market_dirs[0]` is `source_root/data/market/oddsapi`, i.e.
+  the checkout. Not the disk copy, not the `MLB_BETTING_DATA_ROOT` copy, not the
+  `source_artifacts` copy — those three are consulted only for `best_frozen` (the richness
+  comparison) and used as write destinations. A prop seal therefore requires a live prop doc
+  **in the checkout specifically**.
+- Game lines never depend on that: `_merge_pregame_game_lines` seeds from **every** copy in
+  `market_dirs`, so an existing seal on the disk regenerates the merged freeze regardless of
+  what the checkout holds. That is precisely why the 09-01 game-line freeze exists (15 games,
+  `retrieved_at` 06:07:21Z) while props have sealed nothing for 16 days.
+- And the freeze runs **before** the fetch (`_refresh_source_artifacts:858` calls the freeze,
+  then `fetch_and_write_live_odds_for_date`), whose `out_dir` is also
+  `source_root/data/market/oddsapi` — the checkout again.
+
+So: **game lines are self-sustaining from a seed and cannot notice a wrong source root; props
+are a bare `shutil.copy2` out of one directory and fail silently when that one directory is
+the wrong one.** This is the mechanism the item has been circling since 08-31, and it now has
+a code-level discriminator instead of an elimination argument.
+
+**STILL NOT PROVEN, AND SAY SO.** Nobody has read
+`/opt/render/project/src/data/mlb_source/data/market/oddsapi/` on a live worker. The
+hypothesis predicts the prop doc is absent or stale there while the disk copy is fresh; it
+also predicts the *snapshot* destination (`snapshot_dir = source_root/data/daily/snapshots/
+<date>`, `:393`) lands in the checkout — yet the 08-08..08-16 seals reached the DISK at
+`mlb_source/data/daily/snapshots/`, which needs reconciling before this is called settled.
+Do not ship a fix on the strength of the asymmetry alone.
+
+**THE SINGLE NEXT ACTION** — a read, not a change: allowlist
+`*/market/oddsapi/oddsapi_*props_*.json` in `HOT_ARTIFACT_PATTERNS`, plus
+`live_lens/cron_meta/latest_refresh_oddsapi.json`, and read `frozenPregame` — the freeze's own
+list of every destination it copied. It names exactly which families sealed and to which
+trees, and turns three sessions of inference into one read. Same step this item recommended on
+08-31; nobody has taken it. It is a `.py`-only change (free to push) but needs a
+**web deploy** to take effect, behind the usual two locks.
+
+**WHAT IS NOW CLOSED ON THIS ITEM:** cadence (`odds-cadence-off-the-mlb-peak`) is a real
+scheduling weakness but is **NOT** the cause of the 08-16 stoppage. Do not spend the fix
+there.
 
 
 ### `#610` — **MLB graded-row supply is PICK-limited, not join-limited. ~14 graded rows per WEEK, and repairing the join changed it by zero.** — found by lane `layer2-accuracy-audit`, 2026-08-31 — **OPEN, MEASURED, NOT MINE TO FIX (MLB card generation)**
