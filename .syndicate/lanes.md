@@ -1516,6 +1516,65 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 
 > **HOLE MARKER `[2026-09-01 ~18:3xZ, session 41d46db0 / lane polymarket-prop-quote-capture]` — TWO CLOSED-LANE BLOCKS BELONGING TO SESSION syndicate-8d (3492626c) WERE DESTROYED HERE BY MY ERROR AND AWAIT THEIR RESTORATION:** `phase0-graded-supply — CLOSED 2026-09-01` (landed `e9090bc0`) and `phase0-accuracy-autorun — CLOSED 2026-09-01` (landed `258d312f`, including the note narrowing its todo.md claim to the `#626` block). A `git checkout -- .syndicate/lanes.md` I intended for my session worktree ran in THIS shared tree after a cwd slip and restored the file from HEAD, discarding every uncommitted edit in it. Their CODE is safe on origin/main; only these ledger blocks were lost. syndicate-8d was notified immediately with what partial text I hold; deliberately NOT reconstructed from my fragments — a partial restore that reads as whole is worse than this visible gap. Remove this marker when the blocks are rewritten.
 
+### ncaaf-games-cache-refresh — OPEN — opened 2026-09-01 — session b85e895e-dde2-4066-8336-dc6c1d4c3c61
+- Goal: `ncaaf_target_week` returns the real current week instead of a permanent
+  1, on BOTH services, without web ever calling CFBD.
+- Measured (production + local): `ensure_games_cached` returns early on
+  `path.exists()`, so `games_2026.json.gz` (written 2026-07-21, one commit
+  `5da1dd21`) is never re-fetched. 888 games, `completed: False` on **888 of
+  888**, so `min(week with an unplayed game)` is 1 forever.
+  `/ncaaf/api/cards?week=2` and `?week=3` both serve `"2026 Week 1"` with nav
+  `next=prev="1"`; ops `season-weeks` reports artifacts for weeks [1-13, 15]
+  and `resolved_active_weeks: [1]`.
+- NOT WRONG YET, COMES DUE 2026-09-08: week 1 spans 08-29..09-07, so target=1 is
+  correct today by accident. Week 2 kicks off 09-11. Verified against the real
+  file that an honest refresh does NOT advance the week early (8 games past
+  kickoff, matching the board's own `Final: 8` from a different code path).
+- NOT the cause of the 0-NCAAF-orders gap — the Layer 2 / book-grid path
+  resolves the week from the schedule BY DATE
+  (`game_projections.py::load_ncaaf_game_projections`) and bypasses this gate.
+- Files: syndicate/features/football/sim_engine/smartsim2/historical_truth/ncaaf_historical_loader.py,
+  scripts/generate_smartsim2_ncaaf_projections.py,
+  syndicate/features/ncaaf/week_state.py (NEW),
+  syndicate/features/ncaaf/sources.py,
+  syndicate/features/shared/artifact_publisher.py (CONTESTED — see below),
+  tests/test_ncaaf_games_cache_refresh.py (NEW),
+  tests/test_ncaaf_week_state.py (NEW),
+  tests/test_ncaaf_sp_ratings_cache.py (docstring only: it carried the same
+  wrong "weeks 1-6" belief; the real file is weeks 1-13 and 15)
+  RECLAIMED from `ncaaf-cfbd-quota-latch` / `ncaaf-no-orders` (both UNOWNED,
+  phantom-swept) for the generator; `ncaaf/sources.py` was `released:`.
+- **CONTESTED, SURFACED NOT MERGED: `syndicate/features/shared/artifact_publisher.py`
+  is claimed by OPEN lane `football-projection-publish-allowlist` (`#618`),
+  which opened AFTER this work began. **That lane is on `origin/main` and is
+  NOT in this tree's copy of `lanes.md` (local `main` is behind), so
+  `check_lane_invariants.py` reports INVARIANTS HOLD here — a healthy reading
+  for the wrong reason. The contest is real and will appear on the rebase this
+  branch has to do before it can land.** My edit is purely additive — one pattern
+  plus its note, appended after that lane's two entries, changing nothing about
+  them — and the allowlist is the only mechanism that can permit the transfer,
+  so there is no alternative route. Committed on the session branch only.
+  DO NOT LAND until that lane's owner or the user agrees.**
+- TWO CONSTRAINTS THAT SHAPED THE FIX, both measured:
+  (a) this loader's `_cfbd_get` is raw urllib with NO `cfbd_backoff` and NO
+  `cfbd_quota_latch` — a refresh added naively here rebuilds the hourly hammer
+  `ncaaf-cfbd-quota-latch` shipped to stop, on a path the latch cannot see.
+  (b) the refreshed cache CANNOT reach web: `publish_hot_artifact` reads
+  sub-4MB files as UTF-8 text, so the 39KB `.gz` raises UnicodeDecodeError ->
+  `SKIP_READ_FAILED`. Hence a small owned JSON artifact (`week_state.py`)
+  rather than a web-side CFBD call: web reads counts the worker derived.
+- Verification: DONE LOCALLY. 276 tests green (153 ncaaf + 123 publisher), no
+  regressions. Covers off!=on for the refresh, the artifact WINNING over the
+  stale cache (order, not just parsing), the fallback when no artifact exists,
+  `ncaaf_target_week` never reaching CFBD, and the written path being one
+  `HOT_ARTIFACT_PATTERNS` actually matches — that last is the half that was
+  inert for 13 days on the sibling entry.
+- **OWED: no production reading. NOT DEPLOYED, NOT PUSHED.** The reading that
+  would prove it: `WEEK_STATE season=2026 ... published=True` on refresh-worker,
+  then `resolved_active_weeks` moving past [1] after 09-07.
+- Commits (session branch `session/ncaaf-games-cache-refresh`, not pushed):
+  `cf41d1a9` refresh producer, `5a88f20b` week-state artifact.
+- Blocked by: none (the contested file needs a decision, not a blocker).
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
