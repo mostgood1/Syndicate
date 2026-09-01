@@ -491,11 +491,15 @@ def quote_rows_from_kalshi_matches(
     price source): Kalshi's game prices keep coming from OddsAPI, its prop
     prices come from the direct feed, and no bet has two.
 
-    **A provenance field would be the general fix** and would let the direct
-    feed supply game prices too. That is a schema change to a shared artifact
-    and is NOT taken here; lane `wnba-accuracy-assessment` is doing it for the
-    Layer 1 board. When it lands, the `kind` guard below can be relaxed to a
-    source check -- and NOT before, or the alternation returns.
+    **A provenance field alone does NOT lift this bound, and that is the trap.**
+    `wnba-accuracy-assessment` shipped one for the Layer 1 board, and the stamp
+    travels in `extra` -- which puts it on the ROW, not in the KEY. Verified:
+    `QUOTE_SOURCE_FIELD not in _KEY_FIELDS`. So the alternation is unmitigated
+    by the stamp existing. **The condition for relaxing this guard is pinned by
+    `tests/test_direct_feed_provenance.py::test_the_source_stamp_is_NOT_in_the_dedup_key`,
+    not by this paragraph** -- that test fails the moment `source` enters
+    `_KEY_FIELDS`, which is exactly when a source check becomes safe. Prose
+    relies on a reader believing it; a test fails if they are wrong.
     """
     out: list[dict[str, Any]] = []
     for match in matches or ():
@@ -523,10 +527,22 @@ def quote_rows_from_kalshi_matches(
                 # applies, stated here so a match with no player is not
                 # silently reclassified if that default ever changes.
                 "kind": "prop" if player else "game",
-                # The contract this price was quoted for. Not part of the quote
-                # contract, but it is the only field that makes a row traceable
-                # back to a specific Kalshi market when one looks wrong.
-                "venue_ticker": match.get("ticker"),
+                # NO `venue_ticker`. It was here, documented as "the only field
+                # that makes a row traceable back to a specific Kalshi market",
+                # and it never persisted: `_normalize` builds a FIXED key set
+                # and silently drops anything outside it. Measured on the first
+                # real run -- 603 prop rows written, 0 carrying the field.
+                #
+                # The test that was supposed to protect it asserted on THIS
+                # function's return value rather than on what reached disk, so
+                # it passed the whole time. Removed rather than left as a
+                # comment: a field named in a docstring and absent from the data
+                # is worse than no field, because the next reader debugging a
+                # bad quote will go looking for it.
+                #
+                # Persisting it would mean adding a key to `_normalize`, which
+                # is a shared contract every writer shares. Worth doing if
+                # traceability is wanted; not worth smuggling in here.
             }
         )
     return out

@@ -59,10 +59,19 @@ def test_a_prop_match_becomes_a_kalshi_quote_row():
     assert row["event_id"] == "evt-1"
 
 
-def test_the_row_carries_the_contract_it_was_quoted_for():
-    """Not part of the quote contract, but it is the only field that makes a
-    row traceable back to a specific Kalshi market when one looks wrong."""
-    assert quote_rows_from_kalshi_matches([_match()])[0]["venue_ticker"].startswith("KXMLBHR-")
+def test_the_builder_emits_only_fields_NORMALIZE_will_keep():
+    """A field this builder sets that `_normalize` does not know about is
+    silently dropped, and a test asserting on the builder's OUTPUT cannot see
+    that. This one asserted `venue_ticker` was present -- it passed for the
+    whole first deploy, while the real run wrote 603 prop rows and 0 carried
+    the field. Assert against `_normalize`'s key set, which is the boundary
+    that decides what survives."""
+    from syndicate.features.shared.odds_book_quotes import _normalize
+
+    row = quote_rows_from_kalshi_matches([_match()])[0]
+    kept = _normalize(row, sport="mlb", date_str="2026-08-31", captured_at="2026-08-31T00:00:00Z")
+    dropped = set(row) - set(kept)
+    assert dropped == set(), f"builder emits fields _normalize discards: {sorted(dropped)}"
 
 
 def test_a_GAME_match_is_REFUSED_because_two_sources_would_share_a_dedup_key():
