@@ -2101,6 +2101,189 @@ def _report_evaluation_ledger_index_size() -> None:
         print(f"[evaluation_settlement] LEDGER_INDEX_SIZE_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 
+# ACCURACY SUMMARY AUTORUN (`#626`(h), Phase 0 of the edge plan).
+#
+# `build_accuracy_summary` -- overall metrics, the segmented
+# (sport, market_family, confidence_tier) reliability surface, and
+# win-rate/CLV drift -- has existed since the learning-loop plan's Stage 5 and
+# has had NO scheduled caller. Its own docstring names this autorun as the
+# intended home: "the natural body of a future refresh-worker autorun that
+# publishes its result through refresh_state_store the same way
+# evaluation-settlement's autorun status already does". Until then the loop
+# could only score itself when a person ran a CLI, which is why every finding
+# of the 2026-08-31 assessments was made by hand and none by the platform.
+#
+# MEMORY, because periodic work on this host is never free (`#241` restart
+# loop, `#256`'s 110 OOM kills over eleven hours). The peak here is the
+# DEDUPED record set, not the ledger's bytes: `_latest_by_recommendation_id`
+# is single-pass and iterate-only over a generator "so the peak is the reduced
+# set" (`#254`), which puts this in the same order as the settlement pass that
+# already runs daily (~40MB / 71s measured 2026-08-22). That was checked by
+# reading the reducer, not inferred from the call site -- the call site alone
+# reads like the all-records shape `#256` forbade, and stopping there would
+# have blocked a safe job on a wrong reading.
+#
+# OFF BY DEFAULT, which is this file's own convention for a new periodic job
+# (`EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN` is absent = OFF for
+# exactly this reason). Arming it is a one-key decision that should be taken
+# WITH the cost telemetry this job emits about itself on its first real run.
+def _accuracy_summary_auto_refresh_enabled() -> bool:
+    raw_value = str(os.environ.get("ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _accuracy_summary_target_hour_central() -> int:
+    """Central hour after which the daily summary may run.
+
+    Default 7, one hour behind settlement's 6: this summarises what settlement
+    just wrote, so running it first would score yesterday's ledger and report a
+    drift window that is one day stale every single day.
+    """
+    raw_value = str(os.environ.get("ACCURACY_SUMMARY_TARGET_HOUR_CENTRAL") or "").strip()
+    try:
+        value = int(raw_value or 7)
+    except ValueError:
+        value = 7
+    return max(0, min(23, value))
+
+
+def _accuracy_summary_autorun_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "accuracy_summary_autorun_status.json"
+
+
+def _accuracy_summary_should_run_now(*, now_epoch: float, last_epoch: float) -> bool:
+    """Once per Central day, at or after the target hour.
+
+    Same shape as settlement's gate and for the same reason: an
+    interval-since-last-run has no concept of time of day, so "when it runs"
+    becomes an accident of when it last happened to fire.
+    """
+    now_central = central_datetime_from_epoch(now_epoch)
+    if now_central.hour < _accuracy_summary_target_hour_central():
+        return False
+    if last_epoch <= 0:
+        return True
+    return central_datetime_from_epoch(last_epoch).date() < now_central.date()
+
+
+def _bounded_accuracy_summary(summary: Mapping[str, Any], *, max_segments: int = 50) -> dict[str, Any]:
+    """What gets PERSISTED, as opposed to what was computed.
+
+    The status store is keyvalue-backed with an 8MB ceiling per key, and the
+    segmented reliability surface is (sport x market_family x confidence_tier)
+    -- it grows with coverage, which is the whole point of it, and is therefore
+    exactly the field that would one day exceed the key. Truncating with a
+    stated `segments_total` keeps the artifact readable AND keeps the fact that
+    it was truncated visible; dropping the field silently, or persisting it
+    whole and discovering the ceiling in production, are the two failure modes
+    this repo has already paid for (`state.md [layer2-board-keyvalue-ceiling]`,
+    where a raised cap corrupted the board for ~29 minutes).
+    """
+    out: dict[str, Any] = {
+        "sport": summary.get("sport"),
+        "generated_at": summary.get("generated_at"),
+        "sample_size": summary.get("sample_size"),
+        "settled_count": summary.get("settled_count"),
+        "metrics": summary.get("metrics"),
+        "drift": summary.get("drift"),
+    }
+    segments = summary.get("segmented_reliability")
+    if isinstance(segments, Mapping):
+        items = list(segments.items())
+        out["segments_total"] = len(items)
+        out["segmented_reliability"] = dict(items[:max_segments])
+        out["segments_truncated"] = len(items) > max_segments
+    elif isinstance(segments, list):
+        out["segments_total"] = len(segments)
+        out["segmented_reliability"] = segments[:max_segments]
+        out["segments_truncated"] = len(segments) > max_segments
+    return out
+
+
+def _launch_autorun_accuracy_summary(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    if not _accuracy_summary_auto_refresh_enabled():
+        return False
+
+    status_path = _accuracy_summary_autorun_status_path()
+    last_status = _refresh_state_store()["read_json_file"](status_path) or {}
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if not _accuracy_summary_should_run_now(now_epoch=time.time(), last_epoch=last_epoch):
+        return False
+
+    # `#256`: CLAIM THE RUN BEFORE DOING THE WORK. A status written only at the
+    # end plus a self-catching-up gate is the crash loop that cost eleven hours
+    # -- a death mid-pass leaves the epoch unadvanced, so the next boot runs it
+    # again, forever. Claiming first makes a crash cost ONE run.
+    if str((last_status or {}).get("state") or "") == "started":
+        print(
+            "[accuracy_summary] PREVIOUS_RUN_NEVER_COMPLETED "
+            f"claimed_epoch={last_epoch} -- the worker died inside the summary. "
+            "Not retrying today (see #256); investigate before re-enabling.",
+            flush=True,
+        )
+    _refresh_state_store()["write_json_file"](
+        status_path,
+        {
+            "epoch": time.time(),
+            "state": "started",
+            "note": "#256: claimed before the work; the final write replaces this with results",
+        },
+    )
+
+    started_at = time.time()
+    summaries: dict[str, Any] = {}
+    error_text: str | None = None
+    try:
+        from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
+        from syndicate.features.shared.intelligence_evaluation import build_accuracy_summary
+
+        for sport in sorted(GRADED_OUTCOME_GRADERS.keys()):
+            try:
+                summary = build_accuracy_summary(sport=sport) or {}
+            except Exception as exc:
+                # One sport's failure must not cost the other seven their
+                # summary -- the per-sport try is the difference between a
+                # partial artifact and no artifact at all.
+                summaries[sport] = {"error": f"{type(exc).__name__}: {exc}"}
+                continue
+            summaries[sport] = _bounded_accuracy_summary(summary)
+            # ITS OWN COST, EMITTED. This is what makes arming it a decision
+            # rather than a hope: the first real run reports the size of the
+            # set it reduced and how long it took, against the settlement
+            # pass's known ~40MB / 71s.
+            print(
+                f"[accuracy_summary] SPORT_SCORED sport={sport} "
+                f"sample_size={summary.get('sample_size')} "
+                f"settled={summary.get('settled_count')}",
+                flush=True,
+            )
+    except Exception as exc:
+        error_text = f"{type(exc).__name__}: {exc}"
+
+    elapsed = round(time.time() - started_at, 3)
+    print(
+        f"[accuracy_summary] AUTORUN_DONE sports={len(summaries)} "
+        f"elapsed_s={elapsed} error={error_text or 'none'}",
+        flush=True,
+    )
+    _refresh_state_store()["write_json_file"](
+        status_path,
+        {
+            "epoch": time.time(),
+            "state": "error" if error_text else "ok",
+            "elapsed_seconds": elapsed,
+            "error": error_text,
+            "sports": summaries,
+        },
+    )
+    return True
+
+
 def _launch_autorun_evaluation_settlement(
     *,
     latest_manifest_path: Path,
@@ -5351,6 +5534,19 @@ def main() -> int:
             # bound that makes this acceptable is `EVALUATION_SETTLEMENT_LOOKBACK_DAYS`,
             # and `#256`'s claim-before-work means a death mid-pass advances the
             # epoch instead of hot-looping.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_accuracy_summary(
+            # DIRECTLY BEHIND SETTLEMENT, because it scores what settlement
+            # writes. Its target hour (7 Central) is one behind settlement's
+            # (6), so on a normal day settlement wins a tick, finishes for the
+            # day, and this wins a later one -- rather than the two racing for
+            # the same tick and this one scoring a ledger that has not been
+            # settled yet.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,
