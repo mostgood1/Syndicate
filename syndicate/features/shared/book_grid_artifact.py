@@ -125,6 +125,72 @@ def book_grid_artifact_path(sport: str, date_str: str) -> Path:
     )
 
 
+def score_block_for_grid(grid: Any, *, sport: str, date_str: str) -> dict[str, Any]:
+    """The `live_gameline_score` payload block. NEVER RAISES.
+
+    EXTRACTED SO ITS BRANCHES ARE TESTABLE. This was inline in
+    `build_book_grid_artifact`, which cannot run without a source bundle -- so
+    the only way to see what a PREGAME board publishes was to read production.
+    That is exactly how the missing capability stamp below survived a deploy.
+
+    Three branches, and ALL THREE carry `scorer_capabilities()`:
+      * no finals on the grid -- the normal mid-slate state, not a failure;
+      * finals present -- the real score;
+      * an exception -- reported in the payload, because the board is the
+        product and this is instrumentation.
+    """
+    live_gameline_score: dict[str, Any] = {"enabled": False, "reason": "not_attempted"}
+    # STAMPED ONTO EVERY BRANCH BELOW, INCLUDING THE FAILURE ONES.
+    #
+    # Measured 2026-09-01T16:56:16Z, 56s after the staleness gate went live: a
+    # pregame board took the `no_final_games_on_this_grid` branch, which
+    # hand-built its dict and carried none of the scorer's own identity. The
+    # served block was exactly ['enabled', 'finals_index', 'games_with_outcome',
+    # 'reason'] -- so "shipped and had nothing to score" and "did not ship" were
+    # the same null, and the deploy could not be verified until a game finished.
+    #
+    # These are CONSTANTS. They need no records, no finals and no slate, so
+    # there was never a reason for them to be conditional on having a sample.
+    # Bound OUTSIDE the try: `{}` here means the IMPORT failed, which is a
+    # different and honest answer rather than a missing one.
+    caps: dict[str, Any] = {}
+    try:
+        from syndicate.features.shared.live_gameline_ledger import ledger_path, read_records
+        from syndicate.features.shared.live_gameline_score import (
+            build_finals_index,
+            score_ledger_records,
+            scorer_capabilities,
+        )
+
+        caps = scorer_capabilities()
+
+        # `sport` IS LOAD-BEARING HERE, not decoration: it decides whether a
+        # level final is a draw (a real "home did not win") or a corrupt row.
+        # Passing nothing is what made soccer's score exclude 17-38% of its
+        # matches -- see `build_finals_index`. `finals_diag` rides along on the
+        # payload so that exclusion can never again be invisible.
+        finals_diag: dict[str, Any] = {}
+        finals = build_finals_index(grid, sport=sport, diagnostics=finals_diag)
+        if not finals:
+            # No final game on this grid is the NORMAL state mid-slate, and it
+            # is not a failure. Saying so keeps it distinct from a scorer that
+            # ran and found the model worthless.
+            live_gameline_score = {"enabled": True, "reason": "no_final_games_on_this_grid",
+                                   "games_with_outcome": 0, "finals_index": finals_diag,
+                                   **caps}
+        else:
+            records = read_records(ledger_path(sport, date_str))
+            # `caps` first: where `score_ledger_records` reports the same key it
+            # is the authority, because it actually ran.
+            live_gameline_score = {"enabled": True, **caps,
+                                   **score_ledger_records(records, finals),
+                                   "finals_index": finals_diag}
+    except Exception as exc:  # pragma: no cover - instrumentation must not break the board
+        live_gameline_score = {"enabled": True, "error": f"{type(exc).__name__}: {exc}"[:200],
+                               **caps}
+    return live_gameline_score
+
+
 def build_book_grid_artifact(
     sport: str, date_str: str, *, max_rows: int = BOOK_GRID_ARTIFACT_MAX_ROWS
 ) -> dict[str, Any] | None:
@@ -278,33 +344,7 @@ def build_book_grid_artifact(
     # and this is instrumentation. A failure is reported in the payload rather
     # than logged only, so a silent zero cannot be mistaken for "model scored
     # nothing".
-    live_gameline_score: dict[str, Any] = {"enabled": False, "reason": "not_attempted"}
-    try:
-        from syndicate.features.shared.live_gameline_ledger import ledger_path, read_records
-        from syndicate.features.shared.live_gameline_score import (
-            build_finals_index,
-            score_ledger_records,
-        )
-
-        # `sport` IS LOAD-BEARING HERE, not decoration: it decides whether a
-        # level final is a draw (a real "home did not win") or a corrupt row.
-        # Passing nothing is what made soccer's score exclude 17-38% of its
-        # matches -- see `build_finals_index`. `finals_diag` rides along on the
-        # payload so that exclusion can never again be invisible.
-        finals_diag: dict[str, Any] = {}
-        finals = build_finals_index(grid, sport=sport, diagnostics=finals_diag)
-        if not finals:
-            # No final game on this grid is the NORMAL state mid-slate, and it
-            # is not a failure. Saying so keeps it distinct from a scorer that
-            # ran and found the model worthless.
-            live_gameline_score = {"enabled": True, "reason": "no_final_games_on_this_grid",
-                                   "games_with_outcome": 0, "finals_index": finals_diag}
-        else:
-            records = read_records(ledger_path(sport, date_str))
-            live_gameline_score = {"enabled": True, **score_ledger_records(records, finals),
-                                   "finals_index": finals_diag}
-    except Exception as exc:  # pragma: no cover - instrumentation must not break the board
-        live_gameline_score = {"enabled": True, "error": f"{type(exc).__name__}: {exc}"[:200]}
+    live_gameline_score = score_block_for_grid(grid, sport=sport, date_str=date_str)
 
     # RETAIN the score, here, for the same reason it is COMPUTED here: this is
     # the only place the sample and the outcomes are both in hand, and nothing

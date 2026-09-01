@@ -280,3 +280,93 @@ class TestTheV4LedgerFieldsAreActuallyPOPULATED:
         assert rec["pregame_home_win_prob"] is None
         assert rec["model_home_win_prob"] == 0.6842
         assert rec["priceable"] is True
+
+
+class TestTheScorerSaysWhatItIsWithoutASample:
+    """`scorer_contract` must reach the payload on EVERY branch.
+
+    MEASURED 2026-09-01T16:56:16Z, 56 seconds after the staleness gate went
+    live: the board carried 300 pregame rows, `book_grid_artifact` took its
+    `no_final_games_on_this_grid` branch, and the served block was exactly
+    ['enabled', 'finals_index', 'games_with_outcome', 'reason']. No
+    `fresh_quote_seconds`, no `scored_markets`. So "the new scorer shipped and
+    had nothing to score" and "the new scorer did not ship" were the same null,
+    and the deploy could not be verified until a game finished.
+
+    A healthy reading is evidence only once you know what makes it read
+    unhealthy. These are constants; they never needed a sample.
+    """
+
+    def test_the_capabilities_are_constants_and_need_no_records(self):
+        from syndicate.features.shared.live_gameline_score import (
+            SCORER_CONTRACT, scorer_capabilities,
+        )
+
+        caps = scorer_capabilities()
+        assert caps["scorer_contract"] == SCORER_CONTRACT
+        assert caps["scored_markets"] == ["h2h"]
+        assert caps["fresh_quote_seconds"] == 120.0
+        assert "le_120s" in caps["quote_age_buckets"]
+        assert "gt_1800s" in caps["quote_age_buckets"]
+
+    def test_the_no_finals_branch_carries_the_stamp(self):
+        """THE REGRESSION TEST FOR THE REAL DEFECT.
+
+        A grid of pregame rows is the normal mid-slate state. The exact payload
+        production served at 16:56:16Z was
+        ['enabled', 'finals_index', 'games_with_outcome', 'reason'] -- this
+        asserts the two keys that were missing from it.
+        """
+        from syndicate.features.shared.book_grid_artifact import score_block_for_grid
+
+        pregame = [{"kind": "game", "market": "h2h", "segment": "full",
+                    "away_team": "Colorado Rockies",
+                    "home_team": "San Francisco Giants",
+                    "game": {"state": "pregame", "home_score": None,
+                             "away_score": None}}]
+        block = score_block_for_grid(pregame, sport="mlb", date_str="2026-09-01")
+        assert block["reason"] == "no_final_games_on_this_grid"
+        assert block["games_with_outcome"] == 0
+        assert block["scorer_contract"] is not None, (
+            f"no scorer_contract in {sorted(block)} -- the payload cannot say "
+            f"whether this scorer is deployed")
+        assert block["fresh_quote_seconds"] == 120.0
+        assert block["scored_markets"] == ["h2h"]
+
+    def test_the_error_branch_also_carries_the_stamp(self, monkeypatch):
+        """A scorer that threw still has an identity. Without this, an exception
+        and an old deploy look the same from the payload."""
+        import syndicate.features.shared.live_gameline_score as mod
+        from syndicate.features.shared.book_grid_artifact import score_block_for_grid
+
+        def boom(*_a, **_k):
+            raise RuntimeError("synthetic")
+
+        monkeypatch.setattr(mod, "build_finals_index", boom)
+        block = score_block_for_grid([], sport="mlb", date_str="2026-09-01")
+        assert "error" in block and "RuntimeError" in block["error"]
+        assert block["scorer_contract"] is not None
+        assert block["fresh_quote_seconds"] == 120.0
+
+    def test_the_block_never_raises(self, monkeypatch):
+        """The board is the product; this is instrumentation."""
+        import syndicate.features.shared.live_gameline_score as mod
+        from syndicate.features.shared.book_grid_artifact import score_block_for_grid
+
+        monkeypatch.setattr(mod, "build_finals_index",
+                            lambda *a, **k: (_ for _ in ()).throw(ValueError("x")))
+        assert score_block_for_grid(None, sport="mlb", date_str="bad-date")["enabled"] is True
+
+    def test_score_ledger_records_still_reports_its_own_markets(self):
+        """The stamp must not shadow the scorer's own output when it ran."""
+        from syndicate.features.shared.live_gameline_score import score_ledger_records
+
+        out = score_ledger_records(
+            [{"market": "h2h", "game_pk": "1", "model_home_win_prob": 0.6,
+              "market_fair_prob": 0.5, "priceable": True, "recorded_at": "2026-09-01T00:00:00Z",
+              "quote_age_seconds": 30.0}],
+            {"1": True},
+        )
+        assert out["scored_markets"] == ["h2h"]
+        assert out["fresh_quote_seconds"] == 120.0
+        assert out["games_with_outcome"] == 1
