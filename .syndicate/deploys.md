@@ -16559,3 +16559,87 @@ fire on a STALE clear, which is what preflight exists to prevent.
 - boxscore publish path (keyvalue vs filesystem), above.
 - `todo #614`-`#617`: Layer 2 excludes WNBA; ML generator gap blocked on a
   validated ranking key; vendor artifact root; exchange capture carries no WNBA.
+
+---
+
+## 2026-09-01 15:0xZ — **NO DEPLOY. SOCCER SHOT-SHRINKAGE RE-FIT AND PUBLISHED** — artifact `soccer_source/calibration/shot_shrinkage_2026-09-01.json` — lane `soccer-shot-shrinkage`
+
+Scheduled task `refit-soccer-shot-shrinkage` (monthly). **No code changed, no
+service was deployed, no deploy claim was taken** — this publishes an artifact
+the running engine already knows how to read. Recorded here because it changes
+production behaviour.
+
+**New divisor `1.3930`. Previous `1.3979`** (`shot_shrinkage_2026-08-31.json`).
+Move of **0.0049**, far inside the ~0.15 scrutiny band. The point of re-fitting
+is that this value drifts — 1.244 / 1.314 / 1.333 / 1.438 across four splits on
+2026-08-31 — so a small move is a reading, not a no-op.
+
+**Sample.** n=**10,176** pairs over **254** matches, 9 leagues,
+2026-07-22..2026-08-31 (previous fit: n=9,840 / 247 matches). The production
+archive returned **146** recommendation files, 2 more than the 144 of a day
+ago; the growth is one slate, which is why the divisor barely moved.
+
+### INSTRUMENT VALIDATED BEFORE THE NUMBER WAS TRUSTED
+
+Per-league shots-per-match extracted from ESPN, against a ~23.4 benchmark,
+capture floor 0.75:
+
+| league | matches | shots/match | capture |
+|---|---|---|---|
+| mls | 80 | 24.73 | 1.06 |
+| eredivisie | 29 | 29.46 | 1.26 |
+| la_liga | 29 | 24.79 | 1.06 |
+| **belgian_pro_league** | 28 | **3.00** | **0.13 — EXCLUDED** |
+| primeira_liga | 28 | 22.48 | 0.96 |
+| championship | 25 | 26.88 | 1.15 |
+| serie_a | 20 | 27.70 | 1.18 |
+| epl | 19 | 27.32 | 1.17 |
+| ligue_1 | 17 | 26.71 | 1.14 |
+| bundesliga | 9 | 31.44 | 1.34 |
+
+**No league other than Belgium has degraded** — the next-lowest is 0.96.
+Belgium reads 0.13 for the same reason as before: ESPN's `bel.1` commentary
+carries no shot detail, so its outcomes are MISSING, not zero. Left in, it
+prices at ratio **12.13** (pred 0.485 vs realized 0.040 over n=1,225) and
+flips the pooled verdict — the unfiltered production backtest over all 10
+leagues reads "model WORSE than baseline by 1.4%".
+
+### verify: HELD OUT BY DATE, split 2026-08-22, train n=3,435 / test n=6,741
+
+| candidate | test MAE | test bias |
+|---|---|---|
+| RAW | 0.6178 | +0.1687 |
+| **SCALAR** | **0.5491** | **+0.0281** |
+| AFFINE | 0.5698 | +0.0355 |
+| constant-mean baseline | 0.6226 | 0.0000 |
+
+SCALAR **PASSES** the pre-registered criterion — better than RAW on MAE *and*
+on absolute bias — and beats the constant-mean baseline by 11.8%. SCALAR beats
+AFFINE **in all 9 leagues**, again; the affine slope is fitting the bottom
+deciles, which predict 0.00–0.22 shots and carry almost none of the loss.
+
+### verify: PUBLISHED AND READ BACK, not just 200'd
+
+`POST /api/ops/artifacts/publish` → `200 {"bytes":867,"ok":true}`. That is the
+sender's opinion, so it was read back through
+`GET /api/ops/artifacts/export?path=soccer_source/calibration/shot_shrinkage_2026-09-01.json`:
+**`divisor=1.393, n=10176, matches=254, fitted_at=2026-09-01T15:04:23Z`** —
+matches the bytes written, field for field. No 403, so web's
+`HOT_ARTIFACT_PATTERNS` is current.
+
+The filename is date-suffixed because live-odds-worker receives no pushes and
+PULLS via `pull_hot_artifacts` scoped to `?pattern=*<today>*`. An undated name
+can never reach it. The engine resolves the newest dated file; `shot_shrinkage.json`
+and the 08-31 file stay on disk and are ignored.
+
+### STILL OWED — unchanged, and this run does not discharge it
+
+**The divisor has never been OBSERVED working.** The soccer sim runs every 4h
+(`SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS=14400`) and the board must
+be carrying `player_shots` rows at that moment. The closing reading is
+composition-invariant: back the Poisson mean out of each row's
+`model_prob_over` and divide by that player's own season `shots_per90` from
+`data/soccer_source/*/players/players_*.csv`. That ratio was **1.19** before
+the first divisor shipped and must land near **0.85**. Rows present WITH a
+median still near 1.19 means the artifact reached web but not the worker —
+that is the failure mode, not absence of rows. Carried by `todo.md #612`.
