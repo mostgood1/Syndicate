@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 730 rules `[generated]`
+## Index — 733 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 205**
+**FORBIDDEN — 208**
 
 - [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
 - [2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch…](#2026-08-30-forbidden-inferring-who-wrote-a-commit-from-adjacency-in-a-shared-branch-where-every-commit-carries-one-bot-author-lane-exchange-join-refusals)
@@ -19,9 +19,6 @@
 - [2026-08-25 — FORBIDDEN: never ship a venue's submit side without its read side](#2026-08-25-forbidden-never-ship-a-venues-submit-side-without-its-read-side)
 - [2026-08-21 — FORBIDDEN: never publish a field under a name that describes a DIFFERENT q…](#2026-08-21-forbidden-never-publish-a-field-under-a-name-that-describes-a-different-quantity-however-well-documented-the-real-one-is)
 - [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, an…](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
-- [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname)
-- [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content)
-- [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session)
 - [2026-08-23 — FORBIDDEN: claiming a feature works when no test runs the path that CALLS…](#2026-08-23-forbidden-claiming-a-feature-works-when-no-test-runs-the-path-that-calls-it)
 - [2026-08-23 — FORBIDDEN: a module may not hold its own list of market names. It WILL dri…](#2026-08-23-forbidden-a-module-may-not-hold-its-own-list-of-market-names-it-will-drift-from-market_keys-silently)
 - [2026-08-23 — FORBIDDEN: never read `settled_at` on an order as "the bet was decided"](#2026-08-23-forbidden-never-read-settled_at-on-an-order-as-the-bet-was-decided)
@@ -164,6 +161,12 @@
 - [2026-08-31 FORBIDDEN: fixing a decision's INPUT without checking every CALLER supplies…](#2026-08-31-forbidden-fixing-a-decisions-input-without-checking-every-caller-supplies-it)
 - [2026-08-31 FORBIDDEN: treating `Auto-merging <file>` as a verification of a ledger merge](#2026-08-31-forbidden-treating-auto-merging-file-as-a-verification-of-a-ledger-merge)
 - [2026-08-31 FORBIDDEN: taking a tool's DEFAULT liveness detection as the answer to "is t…](#2026-08-31-forbidden-taking-a-tools-default-liveness-detection-as-the-answer-to-is-this-session-gone)
+- [2026-08-31 FORBIDDEN: pooling an evaluation sample across artifact ROOTS. Split on prov…](#2026-08-31-forbidden-pooling-an-evaluation-sample-across-artifact-roots-split-on-provenance-before-the-first-statistic-and-report-the-split-lane-wnba-accuracy-assessment)
+- [2026-08-31 FORBIDDEN: reporting a live-model hit rate without splitting by GAME CLOCK a…](#2026-08-31-forbidden-reporting-a-live-model-hit-rate-without-splitting-by-game-clock-and-by-line-source-a-number-that-improves-as-the-game-ends-is-leakage-not-edge-lane-wnba-accuracy-assessment)
+- [2026-08-31 FORBIDDEN: shipping a calibration refit validated only in-sample — and treat…](#2026-08-31-forbidden-shipping-a-calibration-refit-validated-only-in-sample-and-treating-a-pooled-miscalibration-as-a-current-one-lane-wnba-accuracy-assessment)
+- [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
+- [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
+- [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -220,9 +223,9 @@
 
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause)
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
-- [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
+- [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](learnings_evidence.md#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works) `[evidence]`
 
 **Rules and corrections — 520**
 
@@ -240,70 +243,6 @@
 - [2026-08-15 — A CADENCE IS A DISTRIBUTION ACROSS REGIMES, NOT A CONSTANT](#2026-08-15-a-cadence-is-a-distribution-across-regimes-not-a-constant)
 - [2026-08-15 — ANCESTRY OF `origin/main` IS NOT DEPLOYMENT; READ THE DEPLOYED TREE](#2026-08-15-ancestry-of-originmain-is-not-deployment-read-the-deployed-tree)
 - [2026-08-15 — RULE: a "baseline" is a FILE you diffed, not a number you quoted](#2026-08-15-rule-a-baseline-is-a-file-you-diffed-not-a-number-you-quoted)
-- [2026-08-13 — A guard can measure a number that moves without the system moving](#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving)
-- [2026-08-13 — A criterion has a DIRECTION, and checking it is free](#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free)
-- [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero)
-- [2026-08-13 — A pooled denominator can make a measurement unreadable](#2026-08-13-a-pooled-denominator-can-make-a-measurement-unreadable)
-- [2026-08-13 — `git log --format=%an` is zero evidence in this repo](#2026-08-13-git-log---formatan-is-zero-evidence-in-this-repo)
-- [2026-08-10 — an instrument's blind spot will be mistaken for a finding](#2026-08-10-an-instruments-blind-spot-will-be-mistaken-for-a-finding)
-- [2026-08-10 — segment on process boundaries before any neighbour-based test](#2026-08-10-segment-on-process-boundaries-before-any-neighbour-based-test)
-- [2026-08-10 — counts are the wrong denominator when the cost is bytes](#2026-08-10-counts-are-the-wrong-denominator-when-the-cost-is-bytes)
-- [2026-08-13 — Presence is not reachability: verify the PATH, not the symbol](#2026-08-13-presence-is-not-reachability-verify-the-path-not-the-symbol)
-- [2026-08-13 — A safety gate answers ITS question, not the one you were asked](#2026-08-13-a-safety-gate-answers-its-question-not-the-one-you-were-asked)
-- [2026-08-13 — "Identical to origin" does not mean "absent from the commit"](#2026-08-13-identical-to-origin-does-not-mean-absent-from-the-commit)
-- [2026-08-13 — "Who reads this env var" is a grep question; "does this service read it" i…](#2026-08-13-who-reads-this-env-var-is-a-grep-question-does-this-service-read-it-is-not)
-- [2026-08-13 — A guard that has never once PASSED is not a guard](#2026-08-13-a-guard-that-has-never-once-passed-is-not-a-guard)
-- [2026-08-13 — A discriminator that is only emitted on FAILURE cannot confirm a fix](#2026-08-13-a-discriminator-that-is-only-emitted-on-failure-cannot-confirm-a-fix)
-- [2026-08-13 — A watcher's headline can contradict its own body](#2026-08-13-a-watchers-headline-can-contradict-its-own-body)
-- [2026-08-13 — A guard's "is this mine" input must not default to the locked state](#2026-08-13-a-guards-is-this-mine-input-must-not-default-to-the-locked-state)
-- [2026-08-13 — A path one toolchain resolves and another cannot makes a guard pass silent…](#2026-08-13-a-path-one-toolchain-resolves-and-another-cannot-makes-a-guard-pass-silently)
-- [2026-08-13 — A free-text status field cannot be a predicate; test guards against the le…](#2026-08-13-a-free-text-status-field-cannot-be-a-predicate-test-guards-against-the-ledger-not-against-synthetics)
-- [2026-08-13 — A discriminator that only emits on FAILURE cannot confirm success](#2026-08-13-a-discriminator-that-only-emits-on-failure-cannot-confirm-success)
-- [2026-08-13 — A watcher's LABEL must be entailed by its exit CONDITION](#2026-08-13-a-watchers-label-must-be-entailed-by-its-exit-condition)
-- [2026-08-13 — "Pushed to origin" is not "applied to production"](#2026-08-13-pushed-to-origin-is-not-applied-to-production)
-- [2026-08-13 — The enforcement layer cannot protect itself, and a lane is one deletable l…](#2026-08-13-the-enforcement-layer-cannot-protect-itself-and-a-lane-is-one-deletable-line)
-- [2026-08-13 — A FAILED READ RENDERS AS A RESULT. Five instances, one session, five diffe…](#2026-08-13-a-failed-read-renders-as-a-result-five-instances-one-session-five-different-tools)
-- [2026-08-13 — The stale-read rule failed on its second application, in a form it did not…](#2026-08-13-the-stale-read-rule-failed-on-its-second-application-in-a-form-it-did-not-cover)
-- [2026-08-13 — A guard has TWO failure directions, and fixing the loud one is where the s…](#2026-08-13-a-guard-has-two-failure-directions-and-fixing-the-loud-one-is-where-the-silent-one-survives)
-- [2026-08-13 — Cite the SHA that will exist on origin, not the one your clone minted](#2026-08-13-cite-the-sha-that-will-exist-on-origin-not-the-one-your-clone-minted)
-- [2026-08-13 — MY OWN DISPLAY TRUNCATION BECAME A FINDING, AND THEN A LANE'S PREMISE](#2026-08-13-my-own-display-truncation-became-a-finding-and-then-a-lanes-premise)
-- [2026-08-13 — A BROKEN GUARD CAN MASK THE REAL PROBLEM. Fixing it is how you find out](#2026-08-13-a-broken-guard-can-mask-the-real-problem-fixing-it-is-how-you-find-out)
-- [2026-08-13 — Symptom relief resets the clock that would have proved the cause](#2026-08-13-symptom-relief-resets-the-clock-that-would-have-proved-the-cause)
-- [2026-08-13 — Check whether the obvious fix was already tried, BEFORE building an instru…](#2026-08-13-check-whether-the-obvious-fix-was-already-tried-before-building-an-instrument)
-- [2026-08-13 — I RETRACTED POINT-SAMPLING, THEN BUILT A HEADLINE ON IT ANYWAY](#2026-08-13-i-retracted-point-sampling-then-built-a-headline-on-it-anyway)
-- [2026-08-13 — A habit that fails silently needs a tool, not more care](#2026-08-13-a-habit-that-fails-silently-needs-a-tool-not-more-care)
-- [2026-08-14 — A TROUGH THAT CLEARS AN EARLIER PEAK IS A RATCHET. That is the test](#2026-08-14-a-trough-that-clears-an-earlier-peak-is-a-ratchet-that-is-the-test)
-- [2026-08-14 — I RE-READ THE DEPLOYED SHA BEFORE EVERY *READ* AND SKIPPED IT BEFORE A *WR…](#2026-08-14-i-re-read-the-deployed-sha-before-every-read-and-skipped-it-before-a-write)
-- [2026-08-13 — A "PURE READ" endpoint is a reader you will not find by grepping the attach](#2026-08-13-a-pure-read-endpoint-is-a-reader-you-will-not-find-by-grepping-the-attach)
-- [2026-08-13 — A CONSTANT that reproduces exactly is a data outage, not a weak model](#2026-08-13-a-constant-that-reproduces-exactly-is-a-data-outage-not-a-weak-model)
-- [2026-08-13 — A FIXTURE THAT OMITS A MARKER FILE TESTS A DIFFERENT DIRECTORY, AND SCORES…](#2026-08-13-a-fixture-that-omits-a-marker-file-tests-a-different-directory-and-scores-it-as-a-defect)
-- [2026-08-13 — CLOSING A TICKET IS A SCOPE DECISION, AND WHOLESALE CLOSURE SILENTLY RETIR…](#2026-08-13-closing-a-ticket-is-a-scope-decision-and-wholesale-closure-silently-retires-the-part-nobody-worked)
-- [2026-08-14 — A PLATEAU IS A STRONGER SIGNAL THAN A PERCENTAGE](#2026-08-14-a-plateau-is-a-stronger-signal-than-a-percentage)
-- [2026-08-14 — I MEASURED A STAGE WITHOUT THE THING THAT DOMINATES IT, AND ALMOST SHIPPED…](#2026-08-14-i-measured-a-stage-without-the-thing-that-dominates-it-and-almost-shipped-the-fix)
-- [2026-08-14 — A guard's floor is a claim about ONE stage; refusing everything downstream…](#2026-08-14-a-guards-floor-is-a-claim-about-one-stage-refusing-everything-downstream-of-it-is-a-separate-bug)
-- [2026-08-14 — A CADENCE IS NOT AN OUTAGE, AND I ESCALATED ONE AS THE OTHER](#2026-08-14-a-cadence-is-not-an-outage-and-i-escalated-one-as-the-other)
-- [2026-08-14 — A CONSTANT THAT REPRODUCES EXACTLY FROM AN EMPTY INPUT IS A DATA OUTAGE, N…](#2026-08-14-a-constant-that-reproduces-exactly-from-an-empty-input-is-a-data-outage-not-a-weak-model)
-- [2026-08-14 — A LANE LEFT OPEN AFTER ITS WORK SHIPS IS AN ACTIVE LOCK, NOT A STALE NOTE](#2026-08-14-a-lane-left-open-after-its-work-ships-is-an-active-lock-not-a-stale-note)
-- [2026-08-14 — `git add <paths>` SCOPES THE INDEX; ONLY A PATHSPEC ON `commit` SCOPES THE…](#2026-08-14-git-add-paths-scopes-the-index-only-a-pathspec-on-commit-scopes-the-commit)
-- [2026-08-14 — DECOMPOSE BIAS BEFORE PUBLISHING A SKILL VERDICT](#2026-08-14-decompose-bias-before-publishing-a-skill-verdict)
-- [2026-08-14 — A GUARD MUST COUNT THE ROWS THE STATISTIC USES, NOT THE ROWS THE JOIN PROD…](#2026-08-14-a-guard-must-count-the-rows-the-statistic-uses-not-the-rows-the-join-produced)
-- [2026-08-14 — THREE wrong root causes in one session, one shape: a single sample of a mo…](#2026-08-14-three-wrong-root-causes-in-one-session-one-shape-a-single-sample-of-a-moving-quantity)
-- [2026-08-14 — I CALLED A CORRELATION A PROOF, TWICE IN ONE SESSION](#2026-08-14-i-called-a-correlation-a-proof-twice-in-one-session)
-- [2026-08-14 — A HEALTHY-LOOKING SIBLING MASKED A PLATFORM-WIDE OUTAGE](#2026-08-14-a-healthy-looking-sibling-masked-a-platform-wide-outage)
-- [2026-08-14 — A fallback CHAIN has a rung that fires; find it before costing the fix](#2026-08-14-a-fallback-chain-has-a-rung-that-fires-find-it-before-costing-the-fix)
-- [2026-08-14 — A MANGLED SHELL ARGUMENT NEARLY BECAME "THE LEDGER LOST MY WORK"](#2026-08-14-a-mangled-shell-argument-nearly-became-the-ledger-lost-my-work)
-- [2026-08-14 — A watcher that compares TIMESTAMPS to identify a thing will misidentify it…](#2026-08-14-a-watcher-that-compares-timestamps-to-identify-a-thing-will-misidentify-it-by-microseconds)
-- [2026-08-14 — I PREDICTED FILE OWNERSHIP INSTEAD OF PROBING IT, TWICE](#2026-08-14-i-predicted-file-ownership-instead-of-probing-it-twice)
-- [2026-08-14 — PINNED DEPLOYS PUT CODE IN PRODUCTION THAT WAS NEVER ON MAIN](#2026-08-14-pinned-deploys-put-code-in-production-that-was-never-on-main)
-- [2026-08-14 — Separating `add` from `commit` is not enough if you chain them with `&&`](#2026-08-14-separating-add-from-commit-is-not-enough-if-you-chain-them-with)
-- [2026-08-14 — A saturated log window proves nothing, and the untouched sibling is the co…](#2026-08-14-a-saturated-log-window-proves-nothing-and-the-untouched-sibling-is-the-control)
-- [2026-08-14 — A regex over a hand-written ledger inverts "NOT claimed" into "claimed"](#2026-08-14-a-regex-over-a-hand-written-ledger-inverts-not-claimed-into-claimed)
-- [2026-08-14 — An audit's CAUSAL claim is a hypothesis; its MEASUREMENT is evidence](#2026-08-14-an-audits-causal-claim-is-a-hypothesis-its-measurement-is-evidence)
-- [2026-08-14 — A COUNT can rise because the population grew, not because the property got…](#2026-08-14-a-count-can-rise-because-the-population-grew-not-because-the-property-got-worse)
-- [2026-08-14 — An audit brief's "known already" inputs are claims, not axioms](#2026-08-14-an-audit-briefs-known-already-inputs-are-claims-not-axioms)
-- [2026-08-14 — the Render logs API returns the NEWEST N in a window; paging forward silen…](#2026-08-14-the-render-logs-api-returns-the-newest-n-in-a-window-paging-forward-silently-reports-a-peak-over-a-sliver)
-- [2026-08-14 — a before/after is void if the change moved work INSIDE the measured span](#2026-08-14-a-beforeafter-is-void-if-the-change-moved-work-inside-the-measured-span)
-- [2026-08-14 — "it cannot fit" from one sample, when the same shape runs fine twice](#2026-08-14-it-cannot-fit-from-one-sample-when-the-same-shape-runs-fine-twice)
 - [2026-08-16 — verify a watcher's FIRST line, or it will report failure as patience](#2026-08-16-verify-a-watchers-first-line-or-it-will-report-failure-as-patience)
 - [2026-08-16 — do not rebase onto a deploy target that has not shipped](#2026-08-16-do-not-rebase-onto-a-deploy-target-that-has-not-shipped)
 - [2026-08-16 — A DEPLOY HAS TWO LAGS IN SERIES. I GUARDED ONE AND MISREAD THE SYSTEM THRE…](#2026-08-16-a-deploy-has-two-lags-in-series-i-guarded-one-and-misread-the-system-three-times)
@@ -537,9 +476,73 @@
 - [2026-08-31 — A miscalibration can be REAL and still not worth correcting. Check what ca…](#2026-08-31-a-miscalibration-can-be-real-and-still-not-worth-correcting-check-what-carries-the-loss-not-what-looks-wrong-in-a-ratio-table)
 - [2026-08-31 A CONVENTION VERIFIED ON ONE SPORT IS NOT A CONVENTION](#2026-08-31-a-convention-verified-on-one-sport-is-not-a-convention)
 - [2026-08-31 A TEST CAN PASS THROUGH THE BUG IT IS NAMED FOR](#2026-08-31-a-test-can-pass-through-the-bug-it-is-named-for)
+- [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
+- [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
+- [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
+- [2026-08-13 — A pooled denominator can make a measurement unreadable](learnings_evidence.md#2026-08-13-a-pooled-denominator-can-make-a-measurement-unreadable) `[evidence]`
+- [2026-08-13 — `git log --format=%an` is zero evidence in this repo](learnings_evidence.md#2026-08-13-git-log---formatan-is-zero-evidence-in-this-repo) `[evidence]`
+- [2026-08-10 — an instrument's blind spot will be mistaken for a finding](learnings_evidence.md#2026-08-10-an-instruments-blind-spot-will-be-mistaken-for-a-finding) `[evidence]`
+- [2026-08-10 — segment on process boundaries before any neighbour-based test](learnings_evidence.md#2026-08-10-segment-on-process-boundaries-before-any-neighbour-based-test) `[evidence]`
+- [2026-08-10 — counts are the wrong denominator when the cost is bytes](learnings_evidence.md#2026-08-10-counts-are-the-wrong-denominator-when-the-cost-is-bytes) `[evidence]`
+- [2026-08-13 — Presence is not reachability: verify the PATH, not the symbol](learnings_evidence.md#2026-08-13-presence-is-not-reachability-verify-the-path-not-the-symbol) `[evidence]`
+- [2026-08-13 — A safety gate answers ITS question, not the one you were asked](learnings_evidence.md#2026-08-13-a-safety-gate-answers-its-question-not-the-one-you-were-asked) `[evidence]`
+- [2026-08-13 — "Identical to origin" does not mean "absent from the commit"](learnings_evidence.md#2026-08-13-identical-to-origin-does-not-mean-absent-from-the-commit) `[evidence]`
+- [2026-08-13 — "Who reads this env var" is a grep question; "does this service read it" i…](learnings_evidence.md#2026-08-13-who-reads-this-env-var-is-a-grep-question-does-this-service-read-it-is-not) `[evidence]`
+- [2026-08-13 — A guard that has never once PASSED is not a guard](learnings_evidence.md#2026-08-13-a-guard-that-has-never-once-passed-is-not-a-guard) `[evidence]`
+- [2026-08-13 — A discriminator that is only emitted on FAILURE cannot confirm a fix](learnings_evidence.md#2026-08-13-a-discriminator-that-is-only-emitted-on-failure-cannot-confirm-a-fix) `[evidence]`
+- [2026-08-13 — A watcher's headline can contradict its own body](learnings_evidence.md#2026-08-13-a-watchers-headline-can-contradict-its-own-body) `[evidence]`
+- [2026-08-13 — A guard's "is this mine" input must not default to the locked state](learnings_evidence.md#2026-08-13-a-guards-is-this-mine-input-must-not-default-to-the-locked-state) `[evidence]`
+- [2026-08-13 — A path one toolchain resolves and another cannot makes a guard pass silent…](learnings_evidence.md#2026-08-13-a-path-one-toolchain-resolves-and-another-cannot-makes-a-guard-pass-silently) `[evidence]`
+- [2026-08-13 — A free-text status field cannot be a predicate; test guards against the le…](learnings_evidence.md#2026-08-13-a-free-text-status-field-cannot-be-a-predicate-test-guards-against-the-ledger-not-against-synthetics) `[evidence]`
+- [2026-08-13 — A discriminator that only emits on FAILURE cannot confirm success](learnings_evidence.md#2026-08-13-a-discriminator-that-only-emits-on-failure-cannot-confirm-success) `[evidence]`
+- [2026-08-13 — A watcher's LABEL must be entailed by its exit CONDITION](learnings_evidence.md#2026-08-13-a-watchers-label-must-be-entailed-by-its-exit-condition) `[evidence]`
+- [2026-08-13 — "Pushed to origin" is not "applied to production"](learnings_evidence.md#2026-08-13-pushed-to-origin-is-not-applied-to-production) `[evidence]`
+- [2026-08-13 — The enforcement layer cannot protect itself, and a lane is one deletable l…](learnings_evidence.md#2026-08-13-the-enforcement-layer-cannot-protect-itself-and-a-lane-is-one-deletable-line) `[evidence]`
+- [2026-08-13 — A FAILED READ RENDERS AS A RESULT. Five instances, one session, five diffe…](learnings_evidence.md#2026-08-13-a-failed-read-renders-as-a-result-five-instances-one-session-five-different-tools) `[evidence]`
+- [2026-08-13 — The stale-read rule failed on its second application, in a form it did not…](learnings_evidence.md#2026-08-13-the-stale-read-rule-failed-on-its-second-application-in-a-form-it-did-not-cover) `[evidence]`
+- [2026-08-13 — A guard has TWO failure directions, and fixing the loud one is where the s…](learnings_evidence.md#2026-08-13-a-guard-has-two-failure-directions-and-fixing-the-loud-one-is-where-the-silent-one-survives) `[evidence]`
+- [2026-08-13 — Cite the SHA that will exist on origin, not the one your clone minted](learnings_evidence.md#2026-08-13-cite-the-sha-that-will-exist-on-origin-not-the-one-your-clone-minted) `[evidence]`
+- [2026-08-13 — MY OWN DISPLAY TRUNCATION BECAME A FINDING, AND THEN A LANE'S PREMISE](learnings_evidence.md#2026-08-13-my-own-display-truncation-became-a-finding-and-then-a-lanes-premise) `[evidence]`
+- [2026-08-13 — A BROKEN GUARD CAN MASK THE REAL PROBLEM. Fixing it is how you find out](learnings_evidence.md#2026-08-13-a-broken-guard-can-mask-the-real-problem-fixing-it-is-how-you-find-out) `[evidence]`
+- [2026-08-13 — Symptom relief resets the clock that would have proved the cause](learnings_evidence.md#2026-08-13-symptom-relief-resets-the-clock-that-would-have-proved-the-cause) `[evidence]`
+- [2026-08-13 — Check whether the obvious fix was already tried, BEFORE building an instru…](learnings_evidence.md#2026-08-13-check-whether-the-obvious-fix-was-already-tried-before-building-an-instrument) `[evidence]`
+- [2026-08-13 — I RETRACTED POINT-SAMPLING, THEN BUILT A HEADLINE ON IT ANYWAY](learnings_evidence.md#2026-08-13-i-retracted-point-sampling-then-built-a-headline-on-it-anyway) `[evidence]`
+- [2026-08-13 — A habit that fails silently needs a tool, not more care](learnings_evidence.md#2026-08-13-a-habit-that-fails-silently-needs-a-tool-not-more-care) `[evidence]`
+- [2026-08-14 — A TROUGH THAT CLEARS AN EARLIER PEAK IS A RATCHET. That is the test](learnings_evidence.md#2026-08-14-a-trough-that-clears-an-earlier-peak-is-a-ratchet-that-is-the-test) `[evidence]`
+- [2026-08-14 — I RE-READ THE DEPLOYED SHA BEFORE EVERY *READ* AND SKIPPED IT BEFORE A *WR…](learnings_evidence.md#2026-08-14-i-re-read-the-deployed-sha-before-every-read-and-skipped-it-before-a-write) `[evidence]`
+- [2026-08-13 — A "PURE READ" endpoint is a reader you will not find by grepping the attach](learnings_evidence.md#2026-08-13-a-pure-read-endpoint-is-a-reader-you-will-not-find-by-grepping-the-attach) `[evidence]`
+- [2026-08-13 — A CONSTANT that reproduces exactly is a data outage, not a weak model](learnings_evidence.md#2026-08-13-a-constant-that-reproduces-exactly-is-a-data-outage-not-a-weak-model) `[evidence]`
+- [2026-08-13 — A FIXTURE THAT OMITS A MARKER FILE TESTS A DIFFERENT DIRECTORY, AND SCORES…](learnings_evidence.md#2026-08-13-a-fixture-that-omits-a-marker-file-tests-a-different-directory-and-scores-it-as-a-defect) `[evidence]`
+- [2026-08-13 — CLOSING A TICKET IS A SCOPE DECISION, AND WHOLESALE CLOSURE SILENTLY RETIR…](learnings_evidence.md#2026-08-13-closing-a-ticket-is-a-scope-decision-and-wholesale-closure-silently-retires-the-part-nobody-worked) `[evidence]`
+- [2026-08-14 — A PLATEAU IS A STRONGER SIGNAL THAN A PERCENTAGE](learnings_evidence.md#2026-08-14-a-plateau-is-a-stronger-signal-than-a-percentage) `[evidence]`
+- [2026-08-14 — I MEASURED A STAGE WITHOUT THE THING THAT DOMINATES IT, AND ALMOST SHIPPED…](learnings_evidence.md#2026-08-14-i-measured-a-stage-without-the-thing-that-dominates-it-and-almost-shipped-the-fix) `[evidence]`
+- [2026-08-14 — A guard's floor is a claim about ONE stage; refusing everything downstream…](learnings_evidence.md#2026-08-14-a-guards-floor-is-a-claim-about-one-stage-refusing-everything-downstream-of-it-is-a-separate-bug) `[evidence]`
+- [2026-08-14 — A CADENCE IS NOT AN OUTAGE, AND I ESCALATED ONE AS THE OTHER](learnings_evidence.md#2026-08-14-a-cadence-is-not-an-outage-and-i-escalated-one-as-the-other) `[evidence]`
+- [2026-08-14 — A CONSTANT THAT REPRODUCES EXACTLY FROM AN EMPTY INPUT IS A DATA OUTAGE, N…](learnings_evidence.md#2026-08-14-a-constant-that-reproduces-exactly-from-an-empty-input-is-a-data-outage-not-a-weak-model) `[evidence]`
+- [2026-08-14 — A LANE LEFT OPEN AFTER ITS WORK SHIPS IS AN ACTIVE LOCK, NOT A STALE NOTE](learnings_evidence.md#2026-08-14-a-lane-left-open-after-its-work-ships-is-an-active-lock-not-a-stale-note) `[evidence]`
+- [2026-08-14 — `git add <paths>` SCOPES THE INDEX; ONLY A PATHSPEC ON `commit` SCOPES THE…](learnings_evidence.md#2026-08-14-git-add-paths-scopes-the-index-only-a-pathspec-on-commit-scopes-the-commit) `[evidence]`
+- [2026-08-14 — DECOMPOSE BIAS BEFORE PUBLISHING A SKILL VERDICT](learnings_evidence.md#2026-08-14-decompose-bias-before-publishing-a-skill-verdict) `[evidence]`
+- [2026-08-14 — A GUARD MUST COUNT THE ROWS THE STATISTIC USES, NOT THE ROWS THE JOIN PROD…](learnings_evidence.md#2026-08-14-a-guard-must-count-the-rows-the-statistic-uses-not-the-rows-the-join-produced) `[evidence]`
+- [2026-08-14 — THREE wrong root causes in one session, one shape: a single sample of a mo…](learnings_evidence.md#2026-08-14-three-wrong-root-causes-in-one-session-one-shape-a-single-sample-of-a-moving-quantity) `[evidence]`
+- [2026-08-14 — I CALLED A CORRELATION A PROOF, TWICE IN ONE SESSION](learnings_evidence.md#2026-08-14-i-called-a-correlation-a-proof-twice-in-one-session) `[evidence]`
+- [2026-08-14 — A HEALTHY-LOOKING SIBLING MASKED A PLATFORM-WIDE OUTAGE](learnings_evidence.md#2026-08-14-a-healthy-looking-sibling-masked-a-platform-wide-outage) `[evidence]`
+- [2026-08-14 — A fallback CHAIN has a rung that fires; find it before costing the fix](learnings_evidence.md#2026-08-14-a-fallback-chain-has-a-rung-that-fires-find-it-before-costing-the-fix) `[evidence]`
+- [2026-08-14 — A MANGLED SHELL ARGUMENT NEARLY BECAME "THE LEDGER LOST MY WORK"](learnings_evidence.md#2026-08-14-a-mangled-shell-argument-nearly-became-the-ledger-lost-my-work) `[evidence]`
+- [2026-08-14 — A watcher that compares TIMESTAMPS to identify a thing will misidentify it…](learnings_evidence.md#2026-08-14-a-watcher-that-compares-timestamps-to-identify-a-thing-will-misidentify-it-by-microseconds) `[evidence]`
+- [2026-08-14 — I PREDICTED FILE OWNERSHIP INSTEAD OF PROBING IT, TWICE](learnings_evidence.md#2026-08-14-i-predicted-file-ownership-instead-of-probing-it-twice) `[evidence]`
+- [2026-08-14 — PINNED DEPLOYS PUT CODE IN PRODUCTION THAT WAS NEVER ON MAIN](learnings_evidence.md#2026-08-14-pinned-deploys-put-code-in-production-that-was-never-on-main) `[evidence]`
+- [2026-08-14 — Separating `add` from `commit` is not enough if you chain them with `&&`](learnings_evidence.md#2026-08-14-separating-add-from-commit-is-not-enough-if-you-chain-them-with) `[evidence]`
+- [2026-08-14 — A saturated log window proves nothing, and the untouched sibling is the co…](learnings_evidence.md#2026-08-14-a-saturated-log-window-proves-nothing-and-the-untouched-sibling-is-the-control) `[evidence]`
+- [2026-08-14 — A regex over a hand-written ledger inverts "NOT claimed" into "claimed"](learnings_evidence.md#2026-08-14-a-regex-over-a-hand-written-ledger-inverts-not-claimed-into-claimed) `[evidence]`
+- [2026-08-14 — An audit's CAUSAL claim is a hypothesis; its MEASUREMENT is evidence](learnings_evidence.md#2026-08-14-an-audits-causal-claim-is-a-hypothesis-its-measurement-is-evidence) `[evidence]`
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
+- [2026-08-14 — A COUNT can rise because the population grew, not because the property got…](learnings_evidence.md#2026-08-14-a-count-can-rise-because-the-population-grew-not-because-the-property-got-worse) `[evidence]`
+- [2026-08-14 — An audit brief's "known already" inputs are claims, not axioms](learnings_evidence.md#2026-08-14-an-audit-briefs-known-already-inputs-are-claims-not-axioms) `[evidence]`
+- [2026-08-14 — the Render logs API returns the NEWEST N in a window; paging forward silen…](learnings_evidence.md#2026-08-14-the-render-logs-api-returns-the-newest-n-in-a-window-paging-forward-silently-reports-a-peak-over-a-sliver) `[evidence]`
+- [2026-08-14 — a before/after is void if the change moved work INSIDE the measured span](learnings_evidence.md#2026-08-14-a-beforeafter-is-void-if-the-change-moved-work-inside-the-measured-span) `[evidence]`
+- [2026-08-14 — "it cannot fit" from one sample, when the same shape runs fine twice](learnings_evidence.md#2026-08-14-it-cannot-fit-from-one-sample-when-the-same-shape-runs-fine-twice) `[evidence]`
 - [2026-08-15 — Pinned deploys do not merge; they REPLACE, so they have to be stacked](learnings_evidence.md#2026-08-15-pinned-deploys-do-not-merge-they-replace-so-they-have-to-be-stacked) `[evidence]`
 - [2026-08-15 — The lane marker is repo-global, so only one session can hold it](learnings_evidence.md#2026-08-15-the-lane-marker-is-repo-global-so-only-one-session-can-hold-it) `[evidence]`
 - [2026-08-14 — a "targeted regression" that omits the changed function's own test file is…](learnings_evidence.md#2026-08-14-a-targeted-regression-that-omits-the-changed-functions-own-test-file-is-not-a-regression-run) `[evidence]`
