@@ -165,6 +165,44 @@ _QUOTE_AGE_BUCKETS: tuple[tuple[str, float, float], ...] = (
 )
 
 
+# WHAT THIS SCORER IS, ANSWERABLE WITHOUT A SAMPLE.
+#
+# **WHY THIS EXISTS: THE PAYLOAD COULD NOT SAY WHETHER THE SCORER WAS DEPLOYED
+# UNLESS IT HAD SOMETHING TO SCORE.** Measured 2026-09-01T16:56:16Z, 56 seconds
+# after the staleness gate went live: the board carried 300 pregame rows and no
+# finals, so `book_grid_artifact` took its `no_final_games_on_this_grid` branch
+# and hand-built a four-key dict. `fresh_quote_seconds` was absent, and there
+# was NO WAY from the served payload to tell "the new scorer shipped and had
+# nothing to do" from "the new scorer did not ship". Both look like a null.
+#
+# That is the instrument-blindness shape this module already documents twice: a
+# healthy-looking reading is evidence only once you know what makes it read
+# unhealthy. These are CONSTANTS -- they need no records, no finals and no
+# slate -- so there is no reason for them to be conditional on having a sample.
+#
+# `scorer_contract` is the deploy discriminator. Absent means a build from
+# before 2026-09-01, which is also every build that scored totals and spreads
+# against "did the home team win" (see `_SCOREABLE_MARKETS`). Bump it when the
+# SHAPE of what this module returns changes, not when a number moves.
+SCORER_CONTRACT = 2
+
+
+def scorer_capabilities() -> dict[str, Any]:
+    """The invariant facts about this scorer, for stamping on every branch.
+
+    Callers must spread this into the payload on the no-finals and error paths
+    too, not only the path that scored something. A branch that omits it is
+    indistinguishable from an old deploy.
+    """
+    return {
+        "scorer_contract": SCORER_CONTRACT,
+        "scored_markets": sorted(_SCOREABLE_MARKETS),
+        "fresh_quote_seconds": FRESH_QUOTE_SECONDS,
+        "quote_age_buckets": [name for name, _lo, _hi in _QUOTE_AGE_BUCKETS],
+    }
+
+
+
 def _quote_age(value: Any) -> float | None:
     """Seconds, or None. A bool is not a number here."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
