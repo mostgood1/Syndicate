@@ -40,6 +40,60 @@
 
 
 
+### 2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is READABLE YET. Find the thing that says the signal could have arrived, then read it — four instances in one evening, two false positives and two false negatives `[lanes mlb-accuracy-assessment + wnba-accuracy-assessment]`
+
+- **What we believed:** verification is "deploy, then look at the number". If
+  the number looks right the change worked; if it looks wrong it did not. Both
+  halves feel like measurement and neither is, because a reading taken before
+  the change could possibly have reached the surface says nothing in either
+  direction.
+- **What was actually true:** in one evening the same defect produced FOUR
+  wrong readings across two lanes, in both directions:
+  1. **False positive, rolled date.** `/api/portfolio/live` showed no
+     `by_venue_family` row below -100% after a P&L fix — but the date had
+     rolled, the payload came back dated `2026-08-26`, and the offending order
+     `C7AZA3MBEKDD` **was not in it at all**. A clean table was equally
+     consistent with "different orders today".
+  2. **False negative, pre-deploy tick.** `PLAN_WRITTEN` showed
+     `no_model_edge_pct: 1092` and no `market_family_excluded` — stamped
+     **03:47:51Z against a 03:52:11Z deploy**. Old code. Read carelessly it
+     says "the fix does not work".
+  3. **Unreadable null, neighbour not reached.** `WNBA_POSTGAME_PRODUCER` had
+     0 matches — but the tick immediately upstream of it in `main()`,
+     `BOOK_GRID_TICK`, had also not emitted since the deploy. The worker had
+     not reached the dispatch point, so the absence carried no information.
+  4. **Never-readable null.** `/api/ops/artifacts/export` returned `count 0`
+     for a freshly produced artifact, and it always would have: the worker
+     publishes explicitly per path and **allowlisting a path makes it eligible
+     to cross, it does not carry it**. No amount of waiting could have changed
+     that number.
+- **How we found out:** two sessions checking each other. (1) and (2) were
+  caught by asking "does this reading post-date the change?" before quoting it.
+  (3) was caught by the neighbour technique — find the marker immediately
+  upstream of the one you want, and treat your null as unreadable until the
+  neighbour fires. (4) was caught by a code comment written by the other lane
+  hours earlier, which recorded that **two previous watchers had already burned
+  ~35 minutes polling for a change that was structurally impossible**.
+- **The rule going forward:** **before reading a null or a clean result, find
+  and check the thing that tells you the signal could have arrived.** In order
+  of preference: (a) a timestamp on the reading that you compare against the
+  deploy/change time — not "recent", the actual comparison; (b) the marker
+  immediately upstream of the one you want, so a missing signal is
+  distinguishable from an unreached one; (c) proof that a path from producer to
+  reader EXISTS at all — for cross-service artifacts that means a publish call,
+  not an allowlist entry. **Write the falsifier down before the reading
+  arrives.** A pre-registered band with an explicit "falsified if" cannot be
+  fitted to the result afterwards, and it forces you to name the neighbour.
+  **And prefer a gate on the one line only your code can emit** over a
+  downstream count that something else could also flip.
+- **Cost:** ~35 minutes of watcher time on the WNBA side before the code
+  comment stopped a third watcher being armed; two wrong conclusions drafted
+  and withdrawn on the MLB side before either was quoted; and one WNBA
+  web-facing accuracy path that would have stayed at zero forever while its
+  producer reported `status: ok` every hour. Nothing reached a user, because
+  both sessions checked before quoting — which is the only reason this is a
+  learnings entry rather than a postmortem.
+
 ### 2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form commits the WORKING TREE, which in this repo holds every other session's uncommitted edits to that file `[lane stale-row-cause-blind-spot]`
 
 - **What we believed:** `git commit --only -- <paths>` is the safe way to commit
