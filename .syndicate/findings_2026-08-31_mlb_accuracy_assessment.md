@@ -286,10 +286,21 @@ inside the dispersion that exists.**
 **THE BINDING CONSTRAINT, and it lands on the exchange thesis.** Of 103 MLB prop
 rows on the served shortlist, only **51 carry >= 3 books**; median **3 books**,
 max **7**; best price is draftkings on 31 of 51. **ZERO of the 103 rows are
-quoted by kalshi, polymarket, novig or prophetx.** The venues where the hold
-would collapse do not quote MLB player props on this board at all.
-**CONTRADICTION TO RESOLVE:** `paper:kalshi/player_prop` carries 207 settled rows
-(section 6). One of those two readings is wrong. Not resolved here.
+quoted by kalshi, polymarket, novig or prophetx** *(count correct; see the
+retraction below)*.
+~~The venues where the hold would collapse do not quote MLB player props on this
+board at all.~~
+**RETRACTED 2026-09-01 — SEE SECTION 7f. The count is right and the conclusion
+drawn from it is wrong.** It was read off `quote.book_prices`, which is the
+OddsAPI AGGREGATOR view, and OddsAPI carries **game lines only for exchanges**.
+Kalshi demonstrably quotes MLB props: **23 filled orders with real Kalshi
+tickers** (`KXMLBHR-`, `KXMLBHIT-`, `KXMLBTB-`, `KXMLBHA-`). The
+CONTRADICTION with `paper:kalshi/player_prop`'s 207 settled rows is RESOLVED —
+both readings were true of different things. **The real finding is that the
+board cannot SEE exchange prop prices, so its price shopping never considers
+them**, which is a visibility defect in the board rather than an absence in the
+market. The +10.61% dispersion below was therefore computed across sportsbooks
+ALONE.
 
 **Lever 4 — market admission by cost of entry, which varies 13x.** Points of
 real skill required to break even against a random pick from the same pool,
@@ -690,6 +701,109 @@ against the engine's own model line, `line_live_age_sec` null on 1,777 of
 files are `syndicate/features/wnba/...` and `shared/live_lens_local.py`
 (`_artifact_path` only); nothing here touches those. Worth treating as a
 platform-level pattern rather than two coincidences.
+
+---
+
+## 7f. TIER 1 ITEM 06 — RESOLVED, and it RETRACTS section 7b's binding constraint
+
+**Done 2026-09-01.** The contradiction was real and both halves were true; they
+measured different things. **The conclusion I drew from one of them was wrong
+and is withdrawn.**
+
+### WHAT SECTION 7b SAID, AND WHY IT IS WRONG
+
+> "Zero of the 103 MLB prop rows are quoted by Kalshi, Polymarket, Novig or
+> ProphetX. The venues where the hold would actually collapse do not quote MLB
+> player props on this board at all."
+
+The number is correct. **The conclusion drawn from it is not.**
+
+That count came from `quote.book_prices`, and `venue_scope.scope_rows_to_venue`
+states in its own docstring what that field is:
+
+> "the price is read from `quote.book_prices[venue]`, which is the AGGREGATOR's
+> view — and **for these exchanges OddsAPI carries game lines only**, which is
+> why every coverage number in this system was about OddsAPI rather than the
+> venue."
+
+So `0 of 103` never measured whether Kalshi quotes props. It measured whether
+**OddsAPI reports Kalshi prop prices**, which it structurally does not, for any
+exchange, ever.
+
+### WHAT IS ACTUALLY TRUE — measured on the live order book
+
+**23 filled Kalshi MLB player-prop orders**, carrying real Kalshi contract
+tickers:
+
+    KXMLBHR-26AUG311840SDCIN-SDTFRANCE4-1        batter_home_runs  over  @0.15
+    KXMLBHIT-26AUG311940DETMIN-MINKCLEMENS2-1    batter_hits       under @0.37
+    KXMLBTB-26AUG312140PHIAZ-AZTTAWA13-2         batter_total_bases over @0.30
+    KXMLBHA-26AUG311940MILCHC-MILKHARRISON52-5   hits_allowed      over  @0.53
+
+Distribution: `batter_hits` 8, `strikeouts` 6, `batter_total_bases` 2,
+`hits_allowed` 2, `batter_home_runs` 2, `batter_rbis` 1, `earned_runs` 1,
+`batter_hits_runs_rbis` 1. Plus `paper:kalshi/player_prop` carrying **207
+settled rows** over 16 days (section 6).
+
+**Kalshi quotes MLB player props, and we trade them.**
+
+### THE REAL FINDING, WHICH IS SHARPER THAN THE ONE IT REPLACES
+
+Not *"the exchanges have no prop liquidity"* but:
+
+**THE BOARD CANNOT SEE EXCHANGE PROP PRICES, SO ITS PRICE SHOPPING NEVER
+CONSIDERS THEM.**
+
+The venue feeds exist and are already wired — but only into the *venue-scoped*
+books, via `scope_rows_to_venue(..., price_resolver=...)`. The main board's
+best-price selection reads `quote.book_prices`, which is aggregator-only. So
+the +10.61% best-vs-median dispersion measured in section 7b was computed
+across **sportsbooks alone**, with the exchange prices sitting one function
+call away and never entering the comparison.
+
+That is a visibility defect in the board, not an absence in the market — and it
+is a much better target than "go find more books".
+
+### THE PER-VENUE PICTURE, corrected
+
+| venue | price source | can price a named prop? |
+|---|---|---|
+| **kalshi** | direct feed (`kalshi_markets.json`) | **yes — proven, 23 filled orders** |
+| **polymarket** | direct feed (`_polymarket_price_resolver`) | yes |
+| **novig** | aggregator only | **NO, structurally** |
+| **prophetx** | aggregator only | not through the board |
+
+**Two further corrections found while checking:**
+
+1. `pipeline/portfolio_commit.py:815` comments *"Only Kalshi has a direct feed
+   today"*. **Stale** — `_venue_price_resolver` dispatches to
+   `_polymarket_price_resolver` as well. Polymarket has one too.
+2. **Novig cannot ever price a named bet through its public mirror**, and this
+   is documented rather than accidental: the CSV mirror is "anonymized at the
+   game/player/team level (measured 2026-08-24), so `reportTicker` names a
+   CATEGORY and can never price a named bet." Its credentialed REST tier could.
+   So Novig is a hard ceiling, not a coverage gap to close by widening.
+
+### WHAT THIS DOES TO ITEM 05
+
+Section 7b priced the under book as needing **+5.1% payout for +5% ROI**
+against a measured **+10.61%** dispersion, and called the panel — 3 books deep,
+no exchange — the binding constraint. **The arithmetic stands; the constraint
+was mis-identified.**
+
+Item 05 is no longer "integrate more books". It is: **make the board's price
+comparison read the venue feeds it already has.** The plumbing exists, it is
+proven in production by filled orders, and it is currently confined to the
+venue-scoped books.
+
+**NOT YET MEASURED, and it is the next thing:** what the best-vs-median
+dispersion becomes once exchange prop prices are in the comparison. Until that
+number exists, the prop-viability case remains "arithmetically reachable" and
+not "demonstrated" — the same standard section 7b set for itself.
+
+**Also unchanged:** none of this argues for re-enabling prop staking. Item 01's
+exclusion rests on the portfolio's own realized -19.27%, which is independent of
+where the prices come from.
 
 ---
 
