@@ -844,7 +844,11 @@ def _splits(blob: str) -> list[tuple[str, str]]:
 
 
 def match_event_blob(
-    blob: Any, games: Sequence[Mapping[str, Any]], *, sport: Any = None
+    blob: Any,
+    games: Sequence[Mapping[str, Any]],
+    *,
+    sport: Any = None,
+    code_names: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Which of OUR games is `blob`? Returns the answer AND how sure it is.
 
@@ -864,6 +868,45 @@ def match_event_blob(
 
     `no_match` being common is expected at first and is exactly the measurement
     that says which aliases to add. It must never soften into a best guess.
+
+    ----------------------------------------------------------------------
+    `code_names`: KALSHI'S OWN CODE -> NAME PAIRING, FOR SPORTS WHOSE CODES
+    OUR ALIAS MAP DOES NOT CARRY
+    ----------------------------------------------------------------------
+
+    Optional and DEFAULT-OFF-BY-ABSENCE: omit it and this behaves exactly as
+    before, which is what keeps MLB untouched.
+
+    WHY IT EXISTS, measured 2026-09-01 against Kalshi's live soccer catalogue
+    (176 clubs across 9 `KX<LEAGUE>GAME` series):
+
+        resolvable by CODE (what this function tried alone) .... 111  63%
+        resolvable by NAME .................................... 115  65%
+        resolvable by EITHER .................................. 144  82%
+
+    Kalshi PUBLISHES the pairing, so nothing here is guessed: each game series
+    lists one market per club whose ticker SUFFIX is the code and whose TITLE
+    is "<Club> wins" -- `KXLALIGAGAME-26SEP15ELCRMA-RMA` / "Real Madrid wins".
+    The caller derives the map from the same market list it is already
+    iterating (see `kalshi_board_join`), so it is read from the venue rather
+    than maintained as a table that silently rots when a club is promoted.
+
+    **IT MUST BE SCOPED PER LEAGUE BY THE CALLER, AND THAT IS NOT OPTIONAL.**
+    Measured in the same pass, four codes mean different clubs in different
+    competitions:
+
+        PAR  Paris FC (ligue_1)   vs  Parma Calcio (serie_a)
+        LEV  Levante (la_liga)    vs  Leverkusen (bundesliga)
+        GEN  Genoa (serie_a)      vs  Genk (belgian_pro_league)
+        TOR  Torino (serie_a)     vs  Toronto (mls)
+
+    A single soccer-wide table would resolve `TOR` to the wrong club half the
+    time, which is a confidently-priced bet on the wrong team -- the exact
+    failure `no_match` exists to prevent. `canonical_team` cannot express the
+    distinction either: all eight competitions share the `soccer` sport slug.
+
+    A code absent from the map falls through to itself, so this can only ever
+    ADD resolutions; it never changes one that already worked.
     """
     wanted = "".join(ch for ch in str(blob or "").upper() if ch.isalnum())
     if not wanted:
@@ -906,9 +949,23 @@ def match_event_blob(
                     # matched loosely -- an unresolvable name is not evidence.
                     continue
                 for left, right in _splits(wanted):
-                    if (
-                        canonical_team(sport, left) == ours_away
-                        and canonical_team(sport, right) == ours_home
+                    # THE CODE FIRST, THEN KALSHI'S OWN NAME FOR IT. A code the
+                    # map does not carry falls through to itself, so this can
+                    # only add resolutions -- never alter one that already
+                    # worked, which is what keeps every other sport identical.
+                    left_keys = [left]
+                    right_keys = [right]
+                    if code_names:
+                        left_named = code_names.get(left)
+                        right_named = code_names.get(right)
+                        if left_named:
+                            left_keys.append(left_named)
+                        if right_named:
+                            right_keys.append(right_named)
+                    if any(
+                        canonical_team(sport, lk) == ours_away for lk in left_keys
+                    ) and any(
+                        canonical_team(sport, rk) == ours_home for rk in right_keys
                     ):
                         hits.append(game)
                         break

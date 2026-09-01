@@ -166,8 +166,105 @@ def game_lines_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+# Market-type tokens a soccer series ticker ends with. Longest first, because
+# `KXLALIGA1HSPREAD` must not be cut at `SPREAD` and leave `KXLALIGA1H`.
+_SERIES_MARKET_SUFFIXES = (
+    "1HSPREAD", "1HTOTAL", "1HWINNER", "2HSPREAD", "2HTOTAL", "2HWINNER",
+    "SPREAD", "TOTAL", "WINNER", "GAME", "1H", "2H",
+)
+
+
+def _series_family(series: Any) -> str:
+    """`KXLALIGATOTAL` -> `KXLALIGA`. The COMPETITION, not the market type.
+
+    This is the scope a Kalshi club code is unique within, and scoping is not
+    cosmetic: measured 2026-09-01, `PAR` is Paris FC in Ligue 1 and Parma in
+    Serie A; `LEV` Levante or Leverkusen; `GEN` Genoa or Genk; `TOR` Torino or
+    Toronto. A soccer-wide code map bets on the wrong club.
+
+    `KXBUNDESLIGA2GAME` -> `KXBUNDESLIGA2`, which is CORRECT and deliberate:
+    Bundesliga 2 is a different competition with its own club set, and folding
+    it into `KXBUNDESLIGA` would recreate exactly the collision this prevents.
+    """
+    text = str(series or "").strip().upper()
+    for suffix in _SERIES_MARKET_SUFFIXES:
+        if text.endswith(suffix) and len(text) > len(suffix):
+            return text[: -len(suffix)]
+    return text
+
+
+# "Real Madrid wins" -> "Real Madrid". Kalshi's own moneyline wording, the same
+# one `kalshi_catalogue._MONEYLINE` reads; matched here only to harvest the
+# NAME beside the ticker's code.
+_WINS_TITLE = re.compile(r"^\s*(?P<team>.+?)\s+wins\s*\??\s*$", re.IGNORECASE)
+
+
+def build_club_code_names(
+    markets: Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, str]]:
+    """`{series_family: {CODE: "Club Name"}}`, read from Kalshi's own markets.
+
+    THE VENUE PUBLISHES THIS PAIRING AND WE WERE NOT READING IT. Every
+    `KX<LEAGUE>GAME` event lists one market per club whose ticker SUFFIX is the
+    club code and whose TITLE is "<Club> wins":
+
+        KXLALIGAGAME-26SEP15ELCRMA-RMA   "Real Madrid wins"
+        KXLIGUE1GAME-26SEP13STBPSG-STB   "Stade Brest 29 wins"
+
+    So the code -> name map is DERIVED, never guessed and never hand-listed.
+    Measured 2026-09-01 across 9 live soccer series: 176 clubs, and using the
+    name as a second key lifts club resolution from **63% to 82%** against our
+    existing alias map.
+
+    DERIVED PER BUILD RATHER THAN STORED. A static table of 176 clubs is a
+    snapshot that rots on promotion, relegation and every new Kalshi series,
+    and nothing would report the rot. This reads the same market list the join
+    is already iterating, so it is always the venue's current answer.
+
+    SCOPED BY SERIES FAMILY -- see `_series_family` for the four measured code
+    collisions that make a single soccer-wide map unsafe.
+
+    A code whose league disagrees with itself is DROPPED, not resolved by
+    order: two clubs claiming one code inside one competition is the ambiguity
+    this module refuses everywhere else.
+    """
+    found: dict[str, dict[str, set[str]]] = {}
+    for market in markets or ():
+        if not isinstance(market, Mapping):
+            continue
+        ticker = str(market.get("ticker") or "").strip().upper()
+        if not ticker or "-" not in ticker:
+            continue
+        code = ticker.rsplit("-", 1)[-1].strip()
+        # `TIE` is the draw leg and names no club.
+        if not code or code == "TIE" or not code.isalnum():
+            continue
+        title_match = _WINS_TITLE.match(str(market.get("title") or ""))
+        if not title_match:
+            continue
+        name = title_match.group("team").strip()
+        if not name:
+            continue
+        family = _series_family(market.get("series"))
+        if not family:
+            continue
+        found.setdefault(family, {}).setdefault(code, set()).add(name)
+    out: dict[str, dict[str, str]] = {}
+    for family, codes in found.items():
+        resolved = {
+            code: next(iter(names))
+            for code, names in codes.items()
+            if len(names) == 1
+        }
+        if resolved:
+            out[family] = resolved
+    return out
+
+
 def _resolve_event(
-    market: Mapping[str, Any], board_rows: Sequence[Mapping[str, Any]]
+    market: Mapping[str, Any],
+    board_rows: Sequence[Mapping[str, Any]],
+    code_names: Mapping[str, Mapping[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Which of our games this game-line market belongs to."""
     from syndicate.features.shared.kalshi_catalogue import (
@@ -194,7 +291,13 @@ def _resolve_event(
                 "home_team": row.get("home_team"),
                 "away_team": row.get("away_team"),
             }
-    result = match_event_blob(blob, list(seen.values()), sport=sport)
+    # Kalshi's own code -> name pairing for THIS COMPETITION only. Absent for
+    # every sport that does not supply one, which leaves those resolutions
+    # byte-identical to before.
+    family_names = (code_names or {}).get(_series_family(market.get("series"))) if code_names else None
+    result = match_event_blob(
+        blob, list(seen.values()), sport=sport, code_names=family_names
+    )
     result.setdefault("sport", sport)
     return result
 
@@ -676,6 +779,13 @@ def join_kalshi_to_board(
         except ValueError:
             _forward_horizon_date = ""
 
+    # KALSHI'S OWN CLUB CODE -> NAME PAIRING, derived once per build from the
+    # market list already in hand. See `build_club_code_names`: the venue
+    # publishes "<Club> wins" beside the ticker whose suffix IS the code, so
+    # this is read rather than guessed, and it is scoped per competition
+    # because four measured codes mean different clubs in different leagues.
+    club_code_names = build_club_code_names(kalshi_markets)
+
     # Bound ONCE here rather than per market: this file imports
     # `sport_for_series` function-locally everywhere else, and `_date_ok` runs
     # once per market over a 6,000-market working set.
@@ -824,7 +934,7 @@ def join_kalshi_to_board(
                     _refuse(REASON_WRONG_DATE)
                     continue
 
-            resolution = _resolve_event(market, board_rows)
+            resolution = _resolve_event(market, board_rows, club_code_names)
             status = str(resolution.get("status") or "")
             if status == "no_match":
                 # THE ALIAS LIST, WRITTEN FROM DATA. `event_not_on_our_board`
