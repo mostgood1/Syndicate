@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs
 
+from syndicate.features.shared import live_lens_paths
+
 
 # `#309`. Accepts EITHER a single root (unchanged behaviour, which is what nba
 # and nhl pass) OR an ordered list of candidate roots, in which case the file is
@@ -31,19 +33,27 @@ from urllib.parse import parse_qs
 # Falling back to the first candidate when nothing matches keeps the reported
 # path stable, so a genuinely absent artifact names the same location it always
 # did rather than a new and different-looking one.
+#
+# `live_lens_paths.resolve` adds the SECOND half of the same lesson, measured
+# 2026-08-31: asking the right root for the file is not enough if you ask it for
+# the wrong DIRECTORY. Live-lens JSONL is written to the `live_lens` sibling of
+# `data/processed` (production sets `<SPORT>_LIVE_LENS_DIR` to exactly that), so
+# every `live_lens_signals_*` / `live_lens_projections_*` read here resolved to a
+# path that had never existed -- for 34 consecutive days of real, healthy output.
+# Resolution is additive: for every other filename these candidates are exactly
+# the ones this function already produced.
+#
+# The single-`Path` branch had to change too, and it is where the bug bit
+# hardest: it returned `root / filename` WITHOUT trying any candidate, so the
+# four WNBA accuracy modules that pass `processed_root()` (a bare Path) got no
+# resolution at all.
 def _artifact_path(root: Path | Sequence[Path], filename: str) -> Path:
     if isinstance(root, Path):
-        return root / filename
-    candidates = [Path(candidate) / filename for candidate in root]
-    if not candidates:
+        return live_lens_paths.resolve(root, filename)
+    roots = list(root)
+    if not roots:
         raise ValueError("_artifact_path requires at least one candidate root")
-    for candidate in candidates:
-        try:
-            if candidate.is_file():
-                return candidate
-        except OSError:
-            continue
-    return candidates[0]
+    return live_lens_paths.resolve(roots, filename)
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -834,9 +844,80 @@ def _tags_from_row(row: dict[str, Any]) -> list[str]:
     return [str(tag) for tag in value if str(tag).strip()]
 
 
+def _period_bucket(row: dict[str, Any]) -> str:
+    """Which quarter a live signal fired in, as a sortable label.
+
+    **Why this is on the payload at all**, measured 2026-08-31 on 1,689 WNBA
+    live prop signals graded against final box scores: the pooled hit rate is
+    73.95%, and it decomposes almost entirely into the clock. Against real
+    `oddsapi` lines it walks **Q1 55.87% -> Q2 60.00% -> Q3 75.73% -> Q4 88.00%**;
+    against the engine's own `model` lines it ends at 99.17%.
+
+    The line these are scored against is a PREGAME full-game prop. Beating it in
+    Q4, once the player has already cleared it, is not a bet anyone could have
+    placed -- `line_live_age_sec` is null on 1,777 of 1,777 signals, so no live
+    market price has ever been captured. A rate that rises monotonically with
+    elapsed time is the signature of scoring against a stale line, and a headline
+    that pools it reports leakage as performance.
+
+    Exposing the split does not fix the engine; it stops the instrument from
+    lying about it.
+    """
+    period = row.get("period")
+    try:
+        value = int(float(period))
+    except Exception:
+        return "unknown"
+    if value < 1:
+        return "unknown"
+    return f"Q{value}" if value <= 4 else "OT"
+
+
+def _leakage_note(by_period: list[dict[str, Any]]) -> str | None:
+    """Say so when the hit rate climbs with the game clock.
+
+    **Deliberately NOT a monotonicity test.** The first version of this required
+    each period to be >= the one before, and it stayed silent on the very data it
+    was written for: the real WNBA reading is Q1 55.13% -> Q2 78.82% -> Q3 78.05%
+    -> Q4 97.96%, and the 0.77-point Q2/Q3 dip was enough to suppress the
+    warning. A guard that encodes an assumption about the SHAPE of a failure is
+    silent in the actual failure.
+
+    What is diagnostic is the SPREAD between early and late, so that is what this
+    measures: the last qualifying period against the first.
+    """
+    ordered = [
+        row for row in sorted(by_period, key=lambda item: str(item.get("period") or ""))
+        if str(row.get("period") or "").startswith("Q") and (row.get("n") or 0) >= 20
+    ]
+    rates = [(str(row.get("period")), row.get("win_rate")) for row in ordered]
+    rates = [(label, rate) for label, rate in rates if isinstance(rate, (int, float))]
+    if len(rates) < 2:
+        return None
+    (first_label, first_rate), (last_label, last_rate) = rates[0], rates[-1]
+    if last_rate - first_rate < 0.10:
+        return None
+    return (
+        f"hit rate climbs {100 * first_rate:.1f}% ({first_label}) -> "
+        f"{100 * last_rate:.1f}% ({last_label}) across the game clock. "
+        "These rows are scored against a PREGAME line, so the later periods are "
+        "information leakage, not realizable edge -- read the earliest period, "
+        "not the total."
+    )
+
+
 def _attach_breakdowns(summary: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any]:
     payload = dict(summary)
     payload["by_lens_side"] = _group_stats(rows, ["lens", "side"])
+
+    period_rows = [{**row, "period": _period_bucket(row)} for row in rows]
+    payload["by_period"] = _group_stats(period_rows, ["period"])
+    payload["by_line_source"] = _group_stats(
+        [{**row, "line_source": row.get("line_source") or "unknown"} for row in rows],
+        ["line_source"],
+    )
+    note = _leakage_note(payload["by_period"])
+    payload["leakage_note"] = note
 
     tag_rows: list[dict[str, Any]] = []
     tagset_rows: list[dict[str, Any]] = []
@@ -912,6 +993,7 @@ def _score_day(root: Path, date_str: str, *, allowed_markets: set[str], assume_p
         return [], {"signals": {"exists": False, "raw": 0, "filtered": 0, "dedup": 0, "path": str(signal_path)}}
 
     filtered: list[dict[str, Any]] = []
+    self_priced = 0
     for row in raw_rows:
         market = str(row.get("market") or "").strip().lower()
         if market not in allowed_markets:
@@ -919,6 +1001,12 @@ def _score_day(root: Path, date_str: str, *, allowed_markets: set[str], assume_p
         if str(row.get("klass") or "").strip().upper() != "BET":
             continue
         if market == "player_prop" and str(row.get("line_source") or "").strip().lower() == "model":
+            # Priced against the engine's OWN line: a self-comparison cannot
+            # lose. Measured 2026-08-31, these were 701 of 1,777 WNBA signals and
+            # "hit" 91.21% (99.17% in Q4). Counted, not silently dropped -- a
+            # `by_line_source` with no `model` row otherwise reads as "the engine
+            # never did this" rather than "the grader refused them".
+            self_priced += 1
             continue
         filtered.append(dict(row))
 
@@ -957,6 +1045,11 @@ def _score_day(root: Path, date_str: str, *, allowed_markets: set[str], assume_p
                 "date": date_str,
                 "market": market,
                 "horizon": horizon,
+                # `period` and `line_source` are carried so `_attach_breakdowns`
+                # can expose the two splits that decide whether a live hit rate
+                # is edge or leakage. See the note on `_period_bucket`.
+                "period": _number(row.get("period")),
+                "line_source": str(row.get("line_source") or "").strip().lower() or None,
                 "game_id": gid,
                 "home": home,
                 "away": away,
@@ -977,7 +1070,7 @@ def _score_day(root: Path, date_str: str, *, allowed_markets: set[str], assume_p
         )
 
     return scored, {
-        "signals": {"exists": True, "raw": len(raw_rows), "filtered": len(filtered), "dedup": len(deduped), "path": str(signal_path)},
+        "signals": {"exists": True, "raw": len(raw_rows), "filtered": len(filtered), "dedup": len(deduped), "self_priced_excluded": self_priced, "path": str(signal_path)},
         "recon": {"games": bool(indexes.get("games_ok")), "quarters": bool(indexes.get("quarters_ok")), "props": bool(indexes.get("props_ok"))},
     }
 

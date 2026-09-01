@@ -7,6 +7,8 @@ from datetime import timezone
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared import live_lens_paths
+
 
 def _safe_float(value: Any) -> float | None:
     try:
@@ -501,7 +503,7 @@ def build_live_player_lens_payload_from_artifacts(
     event_games: dict[str, dict[str, Any]],
     source: str,
 ) -> dict[str, Any] | None:
-    projection_path = processed_root / f"live_lens_projections_{date_str}.jsonl"
+    projection_path = live_lens_paths.resolve(processed_root, f"live_lens_projections_{date_str}.jsonl")
     rows = _latest_projection_rows(_read_jsonl_rows(projection_path))
     if not rows or not event_games:
         return None
@@ -632,7 +634,7 @@ def build_live_lines_payload_from_artifacts(
     source: str,
 ) -> dict[str, Any] | None:
     snapshot_path = processed_root / "live_snapshots" / f"live_lines_{date_str}.jsonl"
-    signal_path = processed_root / f"live_lens_signals_{date_str}.jsonl"
+    signal_path = live_lens_paths.resolve(processed_root, f"live_lens_signals_{date_str}.jsonl")
     if not event_games:
         return None
 

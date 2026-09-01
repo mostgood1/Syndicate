@@ -262,6 +262,16 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "wnba_source/source_artifacts/data/processed/recon_games_*.csv",
     "wnba_source/source_artifacts/data/processed/recon_props_*.csv",
     "wnba_source/source_artifacts/data/processed/boxscores_2*.csv",
+    # `recon_quarters_*` settles the half- and quarter-total markets
+    # (`live_lens_local::_actual_total` reads `actual_q1..q4_total` and
+    # `actual_h1/h2_total` from it, and from nothing else). It was absent from
+    # this list while its two siblings were present, so once
+    # `scripts/build_wnba_recon.py` began producing it the file would have sat
+    # on the worker disk and never reached web -- the exact shape of gap this
+    # block already exists to close. Added 2026-08-31 with the producer, not
+    # after the first period-total reads zero.
+    "wnba_source/data/processed/recon_quarters_*.csv",
+    "wnba_source/source_artifacts/data/processed/recon_quarters_*.csv",
     # Same set again, one directory shallower: some sports (confirmed for WNBA)
     # write their processed artifacts straight to "<sport>_source/data/processed/"
     # rather than nesting under a "source_artifacts" nested root, so the patterns
