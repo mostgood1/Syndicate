@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 647 rules `[generated]`
+## Index — 648 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 197**
+**FORBIDDEN — 198**
 
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
 - [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
@@ -133,6 +133,7 @@
 - [2026-08-31 FORBIDDEN: reporting a live-model hit rate without splitting by GAME CLOCK a…](#2026-08-31-forbidden-reporting-a-live-model-hit-rate-without-splitting-by-game-clock-and-by-line-source-a-number-that-improves-as-the-game-ends-is-leakage-not-edge-lane-wnba-accuracy-assessment)
 - [2026-08-31 FORBIDDEN: shipping a calibration refit validated only in-sample — and treat…](#2026-08-31-forbidden-shipping-a-calibration-refit-validated-only-in-sample-and-treating-a-pooled-miscalibration-as-a-current-one-lane-wnba-accuracy-assessment)
 - [2026-09-01 FORBIDDEN: inferring a MECHANISM from a file's SIZE. Count the composition,…](#2026-09-01-forbidden-inferring-a-mechanism-from-a-files-size-count-the-composition-or-say-you-havent-lane-wnba-accuracy-assessment-caught-by-lane-mlb-accuracy-assessment)
+- [2026-09-01 FORBIDDEN: naming a MECHANISM from a SYMPTOM. Three times in one session, on…](#2026-09-01-forbidden-naming-a-mechanism-from-a-symptom-three-times-in-one-session-on-three-different-subjects-lane-wnba-accuracy-assessment)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -548,15 +549,12 @@
 - [2026-08-16 — A RESTART CONFOUNDS ANY FIX WHOSE CLAIM IS ABOUT STATE PERSISTING](learnings_evidence.md#2026-08-16-a-restart-confounds-any-fix-whose-claim-is-about-state-persisting) `[evidence]`
 - [2026-08-14 — read the system's clock, not the wall clock](learnings_evidence.md#2026-08-14-read-the-systems-clock-not-the-wall-clock) `[evidence]`
 - [2026-08-15 — RULE: merge in the object database when the shared tree is dirty](learnings_evidence.md#2026-08-15-rule-merge-in-the-object-database-when-the-shared-tree-is-dirty) `[evidence]`
-- [2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 2: five beliefs overturned](learnings_evidence.md#2026-08-16-ask-answer-substance-checkpoint-2-five-beliefs-overturned) `[evidence]`
 - [REFUTED: "sorting the pool fixed the negative-edge problem"](learnings_evidence.md#refuted-sorting-the-pool-fixed-the-negative-edge-problem) `[evidence]`
 - [REFUTED: "mirroring the ranker makes eligibility safe"](learnings_evidence.md#refuted-mirroring-the-ranker-makes-eligibility-safe) `[evidence]`
 - [REFUTED: "`quote_seen_age_seconds` is how stale the quote is"](learnings_evidence.md#refuted-quote_seen_age_seconds-is-how-stale-the-quote-is) `[evidence]`
 - [REFUTED: "a generator that reads correctly on the rows I checked is correct"](learnings_evidence.md#refuted-a-generator-that-reads-correctly-on-the-rows-i-checked-is-correct) `[evidence]`
 - [REFUTED (my own hypothesis, same session): "the sim-vs-side mismatch is a](learnings_evidence.md#refuted-my-own-hypothesis-same-session-the-sim-vs-side-mismatch-is-a) `[evidence]`
-- [2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 3: two more](learnings_evidence.md#2026-08-16-ask-answer-substance-checkpoint-3-two-more) `[evidence]`
 - [REFUTED: "a metric that moved right after my deploys is my regression"](learnings_evidence.md#refuted-a-metric-that-moved-right-after-my-deploys-is-my-regression) `[evidence]`
-- [2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 4: fixing a fix, and two bad inferences](learnings_evidence.md#2026-08-16-ask-answer-substance-checkpoint-4-fixing-a-fix-and-two-bad-inferences) `[evidence]`
 - [REFUTED: "the guard I added to stop a false claim is therefore correct"](learnings_evidence.md#refuted-the-guard-i-added-to-stop-a-false-claim-is-therefore-correct) `[evidence]`
 - [REFUTED (mine, same session): "these two findings are unrelated because no row fails bo…](learnings_evidence.md#refuted-mine-same-session-these-two-findings-are-unrelated-because-no-row-fails-both) `[evidence]`
 - [2026-08-16 — RE-READ THE LIVE SHA IMMEDIATELY BEFORE CUTTING, NOT WHEN YOU DECIDED TO](learnings_evidence.md#2026-08-16-re-read-the-live-sha-immediately-before-cutting-not-when-you-decided-to) `[evidence]`
@@ -612,6 +610,9 @@
 - [2026-08-18 — A BACKGROUND POLL'S EXIT CONDITION MUST MATCH THE ACTUAL SIGNAL, NOT ONE W…](learnings_evidence.md#2026-08-18-a-background-polls-exit-condition-must-match-the-actual-signal-not-one-wording-of-it) `[evidence]`
 - [2026-08-18 — RULE: a session worktree protects your INDEX, not your EDIT. Shared-file c…](learnings_evidence.md#2026-08-18-rule-a-session-worktree-protects-your-index-not-your-edit-shared-file-carry-is-not-absorption) `[evidence]`
 - [2026-08-18 — RULE: a check that answers a SLIGHTLY DIFFERENT question returns a confide…](learnings_evidence.md#2026-08-18-rule-a-check-that-answers-a-slightly-different-question-returns-a-confident-wrong-answer-six-in-one-session) `[evidence]`
+- [2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 2: five beliefs overturned](learnings_evidence.md#2026-08-16-ask-answer-substance-checkpoint-2-five-beliefs-overturned) `[evidence]`
+- [2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 3: two more](learnings_evidence.md#2026-08-16-ask-answer-substance-checkpoint-3-two-more) `[evidence]`
+- [2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 4: fixing a fix, and two bad inferences](learnings_evidence.md#2026-08-16-ask-answer-substance-checkpoint-4-fixing-a-fix-and-two-bad-inferences) `[evidence]`
 - [2026-08-19 — RULE: no active owner, no claims. And a liveness read EXPIRES.](learnings_evidence.md#2026-08-19-rule-no-active-owner-no-claims-and-a-liveness-read-expires) `[evidence]`
 - [2026-08-19 — CORRECTION: the PATHSPEC commit does NOT cover a NEW file. Staging is stil…](learnings_evidence.md#2026-08-19-correction-the-pathspec-commit-does-not-cover-a-new-file-staging-is-still-the-race-and-it-bit) `[evidence]`
 - [2026-08-19 — RULE: before building a feature pipeline for an unwired input, check wheth…](learnings_evidence.md#2026-08-19-rule-before-building-a-feature-pipeline-for-an-unwired-input-check-whether-the-engine-has-a-better-wired-input-already-doing-that-job) `[evidence]`
