@@ -27,6 +27,7 @@ from math import exp
 from typing import Any
 
 from syndicate.features.soccer.sim_engine.soccersim.distribution import MatchDistributionSummary
+from syndicate.features.soccer.sim_engine.soccersim.shot_calibration import shot_shrinkage_divisor
 
 _SHOT_LINES = (0.5, 1.5, 2.5, 3.5)
 _SOT_LINES = (0.5, 1.5, 2.5)
@@ -196,7 +197,23 @@ def project_player_props(
             saves_over_probabilities=_over_probabilities(expected_saves, _SAVE_LINES),
         )
 
+    # THE SINGLE CHOKE POINT FOR THE SHOT MEAN. Everything shot-derived below
+    # reads `expected_shots`: shots-on-target (`* on_target_rate`), the
+    # conditional-on-appearing rescale, and BOTH `_over_probabilities` ladders.
+    # Correcting here therefore corrects every shot prop at once, which is why
+    # the divisor is applied at this line and nowhere else.
+    #
+    # AND SHOTS-ON-TARGET INHERITS IT CORRECTLY, measured rather than assumed:
+    # shots over-predict 1.398x and SOT over-predicts 1.408x, so the model's
+    # on-target RATE is already right (0.345 against an actual 0.342, ratio
+    # 1.007). One divisor fixes both; a second constant for SOT would be
+    # correcting an error that is not there.
+    #
+    # 1.0 when no fitted artifact is present, i.e. exactly the pre-2026-08-31
+    # behaviour. See `shot_calibration` for why it is an artifact and not a
+    # constant: the fitted value drifts 1.24-1.44 with the training window.
     expected_shots = team_shots * _clamp(usage_profile.shot_share, 0.0, 1.0)
+    expected_shots /= shot_shrinkage_divisor()
     team_on_target_rate = (team_shots_on_target / team_shots) if team_shots > 0 else 0.33
     on_target_rate = (
         _clamp(float(usage_profile.on_target_rate), 0.05, 0.80)

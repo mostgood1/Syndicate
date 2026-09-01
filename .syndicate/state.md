@@ -115,6 +115,103 @@ that was not the constraint. **Do not act on any surviving reference to
 **The board is GROUPED BY SPORT and always was** (FLOOR-THEN-MERIT, `layer2_board.py:2744`,
 `4ef894e3`/#524) — NOT a sharding artifact. Reading `rows[:25]` reads the top of the
 FIRST SPORT, not the board.
+## [layer2-realized-accuracy] THE LAYER 2 BOARD'S REALIZED ACCURACY — the portfolio book is the surface, and the measurement chain is broken in four places `[verified 2026-08-31T17:3x-18:0xZ, lane layer2-accuracy-audit]`
+
+**START HERE FOR ANY BOARD-ACCURACY QUESTION, NOT AT THE EVALUATION LEDGER.**
+`pipeline/portfolio_commit.py:357` commits BOTH the paper and live portfolios
+straight off `read_layer2_shortlist`, so `/api/portfolio/paper?date=` and
+`/api/portfolio/live` are direct measurements of this board. The evaluation
+ledger is the learning loop's INPUT, not the accuracy surface, and it currently
+settles 0.2% (19,692 settleable, 35 settled).
+
+**7 days, 2026-08-24..08-30, by bet type (paper):** game_line 142 settled 56.7%
+**+25.3% ROI [95% CI +7.2..+43.4]** — the only bucket excluding zero;
+game_total 141 / 47.5% / +9.8% [-9.3..+29.0]; player_prop 119 / 37.8% /
+**-13.5%** [-33.5..+6.5]. **REAL MONEY INVERTS game_line:** h2h+spreads
+12W-23L = **34.3% win, -23.9% ROI**. By sport (paper): mlb 375 settled (93% of
+all), wnba 22, soccer 5, nfl 0, **ncaaf 0 — never bet, ever**.
+
+**FOUR BROKEN LINKS, each measured, working backward from the board:**
+1. **Board retention is ~4 days.** `/api/board/layer2-shortlist?date=` answers
+   `no_shortlist_artifact` for 08-25/26/27. No retrospective longer than that
+   is possible.
+2. **MLB grading joins ~1 game in 14. FIX IS LIVE AND HAS NOT MOVED THE
+   NUMBER. DO NOT RECORD THIS AS FIXED.** `[2026-08-31, lane layer2-accuracy-audit]`
+   Baseline across the full window, both disks agreeing: `rows.all` =
+   1/1/2/1/1/1/7 for 08-24..08-30 with 0/14/14/6/12/12/13 `Missing game-line
+   match` warnings — **14 graded rows total, 71 lost joins.** That supply is
+   what starves settlement (19,692 settleable, 35 settled).
+   **WHAT IS LIVE:** `49c43aeb` (`_odds_paths` best-found-not-first-found +
+   `daily/snapshots/` search), `04185203` (multi-date backfill), `a35591dc`
+   (publish the rebuilt payload). `132559e1` (re-run a date that built but
+   never published) is on main, NOT live.
+   **THE BACKLOG REGRADE RAN AND RECOVERED NOTHING.** All seven dates rebuilt
+   `ok=True` 19:03:47-19:08:33Z, each in **0.4-0.9 seconds** reporting
+   `cards: 1`. A 14-game slate cannot be joined and graded in 0.4s. `ok=True`
+   is an exit code, not a result.
+   **WHY THE 14/14 PROOF DID NOT TRANSFER — READ THIS BEFORE TRUSTING ANY
+   ARTIFACT-BASED PROOF IN THIS REPO.** The fix was proven on the freeze and
+   live docs pulled from `/api/ops/artifacts/export`, **which runs on WEB and
+   reads WEB's disk**. refresh-worker has its own disk. The proof established
+   "the resolver works given these files present" and was used to claim "works
+   on the worker", which was never tested. Presence is not reachability, across
+   a service boundary this repo documents.
+   **RESOLVED, and the resolver fix WORKS `[verified 2026-08-31 20:33Z]`.** The
+   freeze IS reachable on refresh-worker at `daily/snapshots/<date>/`:
+   2026-08-30 now reads `(pregame-freeze, 14 games)` with `Missing game-line
+   match` **13 -> 0**, and raw moneyline candidates went **1-4 -> 12** against
+   three pre-fix control dates. **The graded ROW count did not move (7 -> 7)**
+   because `caps.ml = 1` absorbs the whole gain — so my claim that the join
+   rate was starving settlement is **FALSIFIED by its own fix**. Graded rows
+   come from the locked card, i.e. the policy's picks. See `todo #610`.
+   **MLB prop supply is a SEPARATE defect (`todo #611`):** the prop pregame
+   seal has produced nothing since 2026-08-16, so hitter/pitcher props grade
+   against a post-slate remnant (~1 game). Leading cause **cadence** — measured
+   2026-08-31, the MLB refresh ran 22:12:30Z against a 22:05:00Z first pitch,
+   so `slate_started` was True and props were skipped by design. Not yet proven
+   to be the whole cause. MLB odds refresh runs on **live-odds-worker**.
+   **THE READING THAT DECIDES IT** is the always-on diagnostic shipped in
+   `49c43aeb`: `Game lines read: <path> (pregame-freeze|live, N games)` in the
+   payload warnings. `(live, 1 games)` => freeze unreachable worker-side, fix
+   inert in production. `(pregame-freeze, 14 games)` => freeze found, failure
+   is elsewhere. **It needs `132559e1` deployed** — the seven payloads carrying
+   it were built before the publish call existed and nothing exports them.
+   **MARKERS CANNOT BE CLEARED FROM OUTSIDE, measured:**
+   `keyvalue/expire-run-artifacts` returns `matched_keys: 1` (surgical) and
+   `skipped_no_run_stamp: 1` (refuses — run-stamped keys only); `keyvalue/sweep`
+   only touches 10-day-stale keys. Hence the self-heal in `132559e1`.
+   **THREE INSTRUMENTS WERE BLIND, all chosen for reachability rather than for
+   answering the question:** `/mlb/api/market-accuracy` (wrong disk, and the
+   backfill had no publisher), `graded_rows_available` (STALE — `epoch`
+   unchanged for ~2h; moves only when the settlement autorun fires), and the
+   builder's `stdout_tail` (JSON summary only, no warnings).
+3. **NCAAF has never produced a graded row.** `_ncaaf_graded_rows_for_date`
+   reads `cfbd_lines_*.json`; zero in the hot-artifact set.
+4. **Soccer's biggest board market is ungradeable by construction.** Grader
+   covers 3-way ML / totals@2.5 / BTTS; the board's #1 market is
+   `alternate_totals_corners`, **573 of 2,623 rows (22%)**.
+
+**THE FUNNEL IS THE OPTIMIZATION TARGET.** Refusals 08-24..08-31:
+`no_model_edge_pct` **2,506**, `below_min_ev_pct` 1,567, below_min_stake 46,
+zero_kelly 37 — ~4,150 against ~458 orders. Board side agrees:
+**`model_edge_pct` is numeric on only 902 of 2,623 rows (34.4%)**,
+`model_ev_pct` on 201. `ev_basis` = market_fair 1,451 / model_edge 184 /
+model_probability 17 / unset 971 — on a `market_fair` basis the board is a
+stale-price detector, not a model-vs-market edge.
+
+**BOARD QUALITY, n=2,623 over the 4 dated snapshots:** books_quoting<=1 on
+**1,511 (57.6%)**; book_age median 4,498s, **p90 36,816s (10.2h)**, >6h 21.3%,
+`suspect_stale` 8.8%; movement not tracked 42.1%; `ev_pct`>0 on only 444
+(16.9%), median **-2.35%**; model_skill measured 625 / unmeasured 882 / no
+projection block 1,116. **Composition mismatch:** soccer 51% of board / 1.2% of
+settled bets; ncaaf 33% / 0%; mlb 16% / 93%.
+
+**NOT MEASURED, and it is the read that decides how to rank:** whether the
+board's own `ev_pct`/`model_edge_pct`/`score` PREDICT the outcome. The
+portfolio endpoints serve settlement marginals only (`by_sport`,
+`by_market_family`, `by_venue_family`), never per-order rows, so no calibration
+curve exists. Exposing settled orders with their board fields is the unblock.
+
 
 ## [lane-ledger-conflict-guard] THE LANE CHECKER USED TO PASS A FILE WITH CONFLICT MARKERS IN IT `[fixed 2026-08-30, `10f45a0c`]`
 
@@ -1997,6 +2094,22 @@ unsaved anywhere.
 
 ## [session-harness] SESSION HARNESS — what the hooks actually enforce
 
+- **`lane-guard` STRIPPED THE LEADING DOT until 2026-08-31, so every claim under
+  `.syndicate/` or `.claude/` guarded NOTHING** — `.syndicate/x.md` parsed to
+  `syndicate/x.md` and matching is `rel.endswith("/" + f)`, which can never
+  match. Fixed asymmetrically (right side keeps the original strip set, left
+  side drops the dot). Audited before applying: no shared ledger among the
+  affected claims, so no session newly blocks on ledger writes.
+- **`py -3 scripts/lane_claim_audit.py` is the one tool for "what does the guard
+  actually claim".** It loads the hook by AST (running it blocks on stdin) and
+  applies BOTH checks, because either alone misses half: a token that does not
+  look like a path (prose written inside a `- Files:` block becomes a claim —
+  `1/p`, `15.0` and a bare `/` all did this in one day), and a path absent from
+  `git ls-files` (the dot-strip class, which looks well-formed). **Run it from a
+  worktree pinned to `origin/main`** — the shared primary tree drifts behind and
+  reports live files as phantom. `check_lane_invariants` catches neither: one
+  holder per claim is true of a claim that guards nothing.
+
 - **THE LEDGERS ARE KEYED AND CHECKED** `[verified 2026-08-18]`. One checker per
   ledger, all three ENFORCED in CI and reported at session start as
   `LEDGER INCOHERENT`: `scripts/lane_identity_check.py` (slug, one OPEN block,
@@ -2969,6 +3082,64 @@ what would make the shed unreachable rather than merely rare.
   made `expected_value_pct` a restatement of the book's own hold. **`ev_pct`
   itself is deliberately UNTOUCHED — `portfolio_commit` back-derives fair from
   it.**
+  **SUPERSEDED FOR THE RANKING TERM `[user decision 2026-08-31]`: the board
+  ranks one-sided rows on `model_edge_pct`, NOT on model EV.** The 08-30
+  decision stands for PRICING — `model_ev_pct` and `ev_basis` still travel on
+  the row — but EV is edge divided by the fair probability, so ranking on it
+  multiplied edge by the reciprocal of p and a smaller edge on a longer shot
+  outranked a bigger edge on a shorter one. MEASURED on the served shortlist
+  2026-08-31 by lane `layer2-board-opportunities` and reproduced independently:
+  the top 25 was 24 `batter_home_runs` plus one totals, all 25 one-sided, top
+  row model EV about 85 points against the best market-basis EV anywhere of
+  about 5. **And the flaw was structural, not just a scale mismatch:**
+  `blended_score` caps the model at fifteen points when it arrives as
+  `model_edge`, while the `value_ev` path it was routed through has no cap —
+  the same signal capped in one path and uncapped in the next line. EV ranking
+  also amplifies model error hardest where the model is weakest: at p near
+  one-tenth a two-point probability error moves EV about twenty points, and
+  these rows carry `model_skill.sample_games: 0`. `layer2_board.py` is released
+  to that lane; the flag defaults to the NEW behaviour.
+  **LIVE AND MEASURED `[cffbbd89, board rebuilt 2026-08-31T17:00:33Z]`.** The
+  identity inverted exactly: `score.value_pct == model_ev_pct` 50/50 -> **0/52**,
+  `== model_edge_pct` 0/50 -> **52/52**; scores compressed 5x (36.16 -> 7.23);
+  top-25 market-priced rows 3 -> 14. **BUT THE INTENDED OUTCOME IS NOT
+  ACHIEVED: the top NINE rows are still model-basis and the best
+  market-anchored row reaches only RANK 10** (`ev_pct` 4.91, score 1.31 against
+  the leader's 7.23). Cause, and it is structural rather than a tuning miss:
+  `value_ev` carries edge in PROBABILITY POINTS while market rows carry EV in
+  PERCENT — model edges run 3.4-12.0 against a best market EV of 4.94, so the
+  bigger unit wins the sort on units alone and `ev_basis` cannot fix that.
+  **Whether the two should share one sort at all is UNSETTLED and this deploy
+  did not settle it.** Full working: `deploys.md`, 2026-08-31 16:48Z.
+  **AND THE UNDERLYING CAUSE IS NOW MEASURED AND CORRECTED AT SOURCE
+  `[2026-08-31, lane soccer-shot-shrinkage]`:** the soccer shots model
+  over-predicts 1.398x, so the large model edges feeding those rows were mostly
+  a level error rather than disagreement. A fitted divisor (1.3979) is deployed
+  to all three services and published; see `[soccer-shots-prop-skill]`. **It has
+  NOT yet been observed changing the board** — the soccer sim runs every 4h and
+  the board carried no shot props at publish time.
+
+## [artifact-delivery-topology] AN ARTIFACT AN ENGINE READS IS A THREE-SERVICE CHANGE `[measured 2026-08-31]`
+
+Getting an 867-byte calibration file to the engine that reads it required all
+three of these to agree, and two plausible choices were silently wrong:
+
+- **`/api/ops/artifacts/publish` is a RECEIVER ON WEB.** Workers push TO it, so
+  publishing lands on WEB's disk. Workers run no HTTP server and cannot be
+  pushed to.
+- **Workers PULL, DATE-SCOPED.** `pull_hot_artifacts` requests
+  `?pattern=*<today>*` (an unfiltered pull hit Render's proxy timeout), so **a
+  file with no date in its name can never arrive** — as `run_refresh_worker`
+  already records for `schedule_2026.json`. Hence `shot_shrinkage_<DATE>.json`.
+- **THE RECEIVER VALIDATES AGAINST ITS OWN ALLOWLIST.** Deploying
+  `HOT_ARTIFACT_PATTERNS` to the workers alone produced
+  `403 relative_path is not an allowed hot artifact` because WEB was behind.
+  **web needs the deploy even when it runs none of the code.**
+
+Rejected, both look right: the boot seeder copies only into a directory with
+NONE matching yet, so it can seed a first value and never a re-fit; keyvalue
+`write_json_file` is cross-service but applies a TTL, so a constant would
+silently expire back to its default.
   **COVERAGE IS UNREAD, NOT FLAT.** MLB/WNBA/NCAAF all read zero at the
   post-deploy check because there were **zero PREGAME games** at that moment.
   Read it with `py -3 scripts/measure_model_edge_coverage.py`, which prints the
@@ -8364,7 +8535,235 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
-## [polymarket-explore-arm-FIRING] 2026-08-31T15:25Z — the arm is placing boundary orders; the falsifier is live
+## [polymarket-resting-orders-do-not-encumber-cash] 2026-08-31T15:45Z — CONFIRMED by a before/after pair, after I doubted it
+
+**The claim under test:** "an unfilled order holds no reserved funds", used as
+the argument that placing early costs only CHURN, never capital. It rested on a
+balance that was flat at $87.26 across a cancellation — weaker evidence than it
+sounded, because a cancellation restoring funds looks identical to funds never
+having been taken.
+
+**The doubt:** the user's order screen showed Cash $75.55 against Portfolio
+$89.95 with $10.09 of pending orders sitting in the gap.
+
+**THE MEASUREMENT — the same instant either side of two real submits:**
+
+    15:25:23Z  VENUE_BALANCES polymarket=ok:75.56   BEFORE both explores
+    15:25:43Z  SUBMIT bal-col  $1.10
+    15:25:45Z  SUBMIT ast-ars  $8.99
+    15:42:16Z  VENUE_BALANCES polymarket=ok:75.56   AFTER, unchanged
+
+$10.09 of NEW resting orders moved spendable capital by **$0.00**. The gap on
+the screen is position value and reconciles exactly: 75.55 + 14.40 = 89.95.
+
+**WHY THIS READING IS THE RIGHT ONE.** `venue_balances.py:372` sets
+`spendable = buying_power if buying_power is not None else current`, and
+`buyingPower` is the venue's own "unencumbered capital available for trading".
+Encumbrance is precisely what that field would express, and it did not move.
+
+**SO CHURN REALLY IS THE ONLY COST OF A RESTING ORDER**, and the pregame hold is
+justified by duplicate-exposure risk alone — never by tied-up capital. Anyone
+arguing the hold saves money is arguing something this measurement refutes.
+
+## [polymarket-price-gate-leaks-by-crossing] 2026-08-31T16:05Z — FIXED AND DEPLOYED. The ceiling used to be checked against a price the venue never receives
+
+**VERIFIED BY CODE TRACE, not by inference:**
+
+    execute_portfolio.py:498   gate  _polymarket_hold_price(request, venue)
+                               reads planned_probability(request.requested_price)
+    execute_portfolio.py:1816  submit _polymarket_resolve_market(request)
+                               applies crossing (+N ticks) THEN snap direction="up"
+
+The gate runs ~1300 lines EARLIER than price resolution. Both crossing and the
+snap round UP by design, so **the submitted price is systematically higher than
+the price the ceiling was tested against.** Measured on the two live explores:
+
+    gate saw   0.444 / 0.441      (logged in EXPLORE_PREGAME_BOUNDARY)
+    venue got  0.45  / 0.45       (SUBMIT ... price={'value': '0.45'})
+
+**CONSEQUENCE 1 — the ceiling is NOMINAL.** A planned 0.349 against a 0.35
+ceiling passes the gate and is submitted at ~0.355+. There is no price at which
+the gate actually bounds what is bought; it bounds an intermediate value.
+
+**CONSEQUENCE 2 — every HELD/EXPLORE price in the logs is the WRONG NUMBER to
+reason from.** Anyone deriving a boundary from those lines is reading planned
+prices and attributing them to orders that rested at a higher price.
+
+**NOT CURRENTLY MOVING A DECISION, and that is luck, not design.** The overshoot
+is one tick, and 0.349 -> 0.36 stays inside the unobserved gap 0.335..0.410, so
+no hold/place call flips today. The moment the ceiling is tuned NEAR the real
+boundary — which is the whole point of the exploration arm — the leak lands
+exactly where it does damage.
+
+**FIXED `34d43512`, live 15:50:18Z.** `_polymarket_submit_price` resolves through
+the SAME `_polymarket_resolve_market` placement uses, so there is no second copy
+of the venue's rounding to go stale. Every `None` path — unresolvable side, stale
+artifact, `_SlippageExceeded` — means "cannot tell" and PLACES, because the real
+path refuses each by name moments later. The raise is caught deliberately: the
+gate's call site does not handle it, so an escape would abort the placement loop
+for every remaining position on the tick.
+
+**VERIFIED by branch assertion:** `submit_price=` exists only in the new code and
+appeared 4x at 15:53:26Z. HELD/EXPLORE now log `submit_price=` for the same
+reason — the old field was a planned price attributed to an order resting higher,
+and I reasoned from it wrongly once.
+
+**FIX IS NOT "subtract a tick".** The gate must evaluate the price that will be
+submitted, which means resolving tick/cross BEFORE the gate or applying the same
+arithmetic in it. Anything else re-derives the venue's rounding by hand and goes
+stale the next time tick size changes.
+
+## [polymarket-soccer-h2h-bought-the-OPPOSITE-team] 2026-08-31T21:25Z — FIXED AND DEPLOYED on both services; the positive case is UNVERIFIED
+
+**USER-REPORTED, LIVE MONEY.** Two orders bought the other team.
+
+    atc-lal-osa-get   board "Getafe @ CA Osasuna", bet HOME -> bought GETAFE
+                      Osasuna WON, the bet LOST.  -$5.96 realised
+    atc-sea-ata-bol   board "Bologna @ Atalanta BC", bet HOME -> bought BOLOGNA
+                      STILL OPEN on the wrong side. No deploy unwinds it.
+
+**CAUSE.** `parse_slug` documents `<away>-<home>` and applies it to EVERY sport.
+MLB really is away-first (`aec-mlb-bal-col` reports away_index=1 = Baltimore and
+`bal` leads); both soccer fixtures are HOME-first. `_subject_is_side` checked
+`subject == parsed[wanted]` FIRST and returned True. Its "definitive NO" guard
+reads the SAME inverted parse, so it CONFIRMED the wrong answer rather than
+contradicting it — two checks, one shared broken input. The alias check that
+answers all four legs correctly sat below both and never ran.
+
+**BLAST RADIUS EXACTLY 2**, by enumerating all 69 distinct Polymarket slugs
+submitted in log retention: the other 67 are totals or team-named markets that
+never route through the subject test.
+
+**FIXED.** `8876b823` — the board's own team names decide, refusing when the
+subject names both or neither; the positional parse is gone from this decision.
+`d04d9f49` — `execute_portfolio` was handing that test the SLATE row, and
+`_SLATE_STORAGE_FIELDS` has no team names, so alone it would have refused EVERY
+soccer moneyline: fail-safe and silently dark.
+
+    live-odds-worker  d04d9f49  live 21:02:07Z
+    refresh-worker    8876b823  live 21:20:36Z  (ancestry-checked on the RUNNING
+                                commit; deployed by `layer2-cap-raise`, not me)
+
+**`parse_slug` IS NOT CHANGED.** Its orientation is still used for FIXTURE
+matching, where both teams are present and the roles do not decide which game is
+found. Anyone touching it should know the soccer orientation is inverted.
+
+**VERIFIED: only the NEGATIVE.** The wrong-side path cannot execute — first tick
+after showed `positions=4 placed=0 skipped=4`, MLB `YES_LEG agree=True`, zero
+`POLYMARKET_SIDE_REFUSED`. **NO soccer h2h has resolved since either deploy**, so
+a correct leg being selected and placed has NOT been observed. Tomorrow's slate.
+
+**AND IT CONFOUNDS THE FILL EVIDENCE.** Two of the three pregame fills cited all
+day as "cheap sides fill" (0.240, 0.250) ARE these wrong-side orders — cheap
+BECAUSE they were away underdogs. The `ast-ars` confirmation stands alone; the
+sample around it was thinner and dirtier than it was presented.
+
+## [polymarket-two-dimensional-rule-PARTLY-CONFIRMED] 2026-09-01T01:20Z — the PREGAME half is solid on two probes; the LIVE half rests on ONE and is NOT replicating
+
+**THE FIRST DELIBERATE TEST OF THE RULE, AND IT PASSED.** `ast-ars` was placed ON
+PURPOSE at a price the rule predicted could not fill, to try to break it.
+
+    created      15:25:45Z   pregame, submit_price 0.45
+    kickoff      19:02:22Z   (hours_to_commence=1.5 @ 17:32:22Z)
+    lastTransact 19:20:09Z   FILLED, kick+17m47s
+    avgPx        0.4500      exactly the limit, no price improvement
+    cum          19.97/19.97 leaves=0, complete fill
+    ledger       RECONCILED submitted->filled fill_price=0.45
+
+**PREGAME: ~20 book reads over 3h54m, cum=0 throughout, zero partials.
+LIVE: filled inside 18 minutes.** `bal-col` is still resting and still pregame
+(kickoff ~00:45Z), which is the control and it behaves.
+
+**THE PRICE RULE IS NOT REFUTED.** It did NOT fill pregame at 0.45, well above
+the 0.410 top of the observed resting range. The ceiling does not move on this.
+
+**AND THE BIG ONE: THE HELD POPULATION IS DEFERRED, NOT FORFEITED.** The gate's
+cost was recorded hours ago as "a bet that ~11.5% mean EV across six positions is
+unreachable". That framing is now WRONG in the good direction: a held order
+places once `hours <= 0` and fills like this one did. The EV is not thrown away.
+
+**BUT DO NOT READ THIS AS A WIN FOR THE GATE — IT WEAKENS THE CASE FOR IT.**
+This order was PLACED EARLY and nothing bad happened: no churn, no cancel, no
+duplicate, and it filled at exactly its limit. Meanwhile the price it locked was
+0.45 while the same market read 0.460 at 17:32Z, so placing early plausibly beat
+placing at kickoff by ~1c on 19.97 shares. One instance, and the earlier drift
+measurement was 3 up / 2 down / 2 flat with mean +0.005 — no systematic
+direction. The honest position: the gate prevents duplicate exposure (a real,
+measured $9.12 incident) and buys nothing else that this fill demonstrates.
+
+**WHAT IS STILL UNMEASURED:** whether the model was RIGHT. `ev_pct=22.68` on this
+position is the model's own claim. The bet settles with the match.
+
+**REVISED, and this DOWNGRADES what I recorded at 19:25Z.** I wrote "the rule is
+CONFIRMED" on ONE probe. The second probe is not behaving the same way.
+
+    ast-ars  EPL totals   rested 3h54m pregame, FILLED kick+17m47s @ avgPx 0.4500
+    bal-col  MLB h2h      rested 9h13m pregame, STILL RESTING at pitch+35m
+
+`bal-col` reads at pitch -15/-10/-5/0/+5/+10/+15/+20/+25/+30/+35, every one
+`cum=0 leaves=2.44`. `lastTransact` never moved off its 15:25:43Z submit.
+
+**WHAT IS SOLID: the PREGAME half.** Two deliberately-placed probes at 0.45, ~20
+book reads each, zero fills, zero partials, across two sports and two markets.
+Near-even pregame orders do not fill. That is now well-supported.
+
+**WHAT IS NOT: the LIVE half.** "Once live, everything fills" rests on ONE
+observation (`ast-ars`) plus 8 earlier settled orders that were ALREADY under way
+when observed — never a probe placed pregame and watched through the transition.
+`bal-col` is exactly that probe and it is not filling.
+
+**A DEADLINE WAS NEVER PART OF THE RULE.** `ast-ars` filling at +18m does not
+make +35m late for a different market. This is a divergence in progress, not a
+refutation. But the rule cannot be stated as general until it is qualified by
+sport or market, or `bal-col` fills.
+
+**CANNOT INDEPENDENTLY CONFIRM LIVENESS.** `gameStartTime` is ABSENT on all 10
+`bal-col` slate rows (same class as the documented `line: None` gap), so "live"
+here means only the board's `commence_time` — two readings agreeing on ~00:38-40Z
+(`7.1h @ 17:32Z`, `5.2h @ 19:28Z`). If that value is wrong, the game is not live
+and none of this is a live-window observation at all.
+
+
+## [polymarket-held-population-is-6-of-6-POSITIVE-EV] 2026-08-31T17:33Z — the gate suppresses positive-EV bets; its whole defence is that they cannot fill
+
+**FIRST MEASUREMENT OF WHAT THE HOLD COSTS.** `9d0fcb11` stamps `ev_pct` on every
+gate line (live 17:28:43Z); the first tick after it, 17:32:20-22Z:
+
+    ticker                       submit  ev_pct  edge_pct
+    tsc-epl-ast-ars-2pt5          0.460   22.68     6.80
+    aec-mlb-nyy-laa               0.465   16.32     2.45
+    aec-mlb-det-min               0.470   14.03     2.29
+    tsc-mlb-det-min-8pt5          0.460    8.14     8.64
+    aec-mlb-mia-wsh               0.495    4.82    11.52
+    tsc-mlb-bal-col-10pt5         0.465    3.27     2.51
+
+    EXECUTED positions=8 placed=0 skipped=6 refused={'pregame_price_too_high': 6}
+             duplicates=2   (the two resting experiments)
+
+**6 of 6 POSITIVE. Mean +11.5% EV.** Unweighted — the log does not carry stake,
+so this is per-position and NOT the dollar-weighted number.
+
+**WHAT THIS DOES AND DOES NOT SAY.** It does NOT say the gate is wrong. EV is
+only realisable if the order FILLS, and the gate's entire premise is that these
+do not fill pregame — 8 resting observations, zero pregame fills above 0.410. If
+that premise holds, suppressing them costs nothing and the +11.5% is unreachable
+paper EV.
+
+**BUT THE PREMISE IS NOW LOAD-BEARING IN DOLLARS, NOT JUST IN TIDINESS.** Before
+this reading the hold looked free — churn avoidance. It is not free: it is a bet
+that ~11.5% mean EV across six positions is unreachable. If the kickoff
+experiment shows these fill, the gate is expensive and the ceiling must move.
+
+**DO NOT TREAT `ev_pct` AND `edge_pct` AS THE SAME RANKING.** They disagree
+sharply and consistently — `nyy-laa` is 16.32 EV on 2.45 edge, `mia-wsh` is 4.82
+EV on 11.52 edge. They measure different things (return per stake vs probability
+edge in points). Whichever one a decision uses must be named.
+
+**AND EV HERE IS THE MODEL'S OWN CLAIM.** It is `ev_pct` off the plan position,
+not a realised result. Nothing in this section is evidence the model is right —
+today's six settle overnight and that is the first honest scoring.
+
+## [polymarket-explore-arm-FIRING] 2026-08-31T16:05Z — the arm fired, STALLED on a float edge, and fires again; the falsifier is live
 
 **`e8392f1b` live 15:21:40Z at rate 0.5. First tick after rollout:**
 
@@ -8395,6 +8794,22 @@ the line is logged distinctly.
 **AND STILL: A FILL HERE IS NOT PROFIT.** These are near-even sides chosen to
 test a boundary, not because they are good bets. Whatever they do, the EV
 question is separate and unanswered.
+
+**CORRECTION, and it is why "the arm is firing" was not enough.** It fired twice
+at 15:25Z and then STALLED. `0.35 + 0.10` is `0.44999999999999996`, so a 0.450
+order fell outside a band whose configured top is 0.45. LATENT ALL DAY and made
+reachable by the submit-price fix: planned prices (0.441, 0.444) are arbitrary
+and never land on the edge, while SUBMIT prices are snapped to the tick and land
+on round boundaries constantly — 0.45 is exactly where a 0.44 or 0.445 quote
+crosses to. The arm's single most probable price was the one it could not place.
+Fixed `3db201bc`, live 15:59:13Z; verified 16:03:16Z, `EXPLORE bal-col
+submit_price=0.450`, with 0.460/0.465/0.490 correctly held.
+
+**THE EXPERIMENTS, as of 16:20Z:** both rest at 0.45, `cum=0`, full `leaves`,
+across FIVE independent book reads. The pregame price rule holds on its first
+DELIBERATE test — the evidence moved from 3 passive observations to 5, and from
+observed to probed. Kickoff is the decisive reading: `ast-ars` ~18:57Z,
+`bal-col` ~00:45Z.
 
 ## [polymarket-explore-arm-too-slow] 2026-08-31T15:11Z — the arm is LIVE and CORRECT, and its sample rate is close to zero
 
@@ -8843,3 +9258,406 @@ by one order with no venue id. Fixed correctly by `dd33c865` (per-order read;
 three refusing paths keep blocking). My `63661af1` auto-reject was UNSAFE and is
 reverted (`ef0d2d47`) — absent from the OPEN book is not absent from the venue.
 
+﻿
+## [soccer-shots-prop-skill] SOCCER SHOTS PROPS â€” THE POISSON SHAPE IS RIGHT AND THE MEAN IS INFLATED `[measured 2026-08-31, lane layer1-model-edge-join]`
+
+**Asked to measure model skill on the props carrying the board's largest model
+edges. Two things are now measured and they point in opposite directions, which
+is the whole result: the model's DISTRIBUTIONAL FORM is exonerated, and its
+CENTRAL TENDENCY is not.**
+
+The engine is `soccersim/player_props.py`: `poisson_at_least(mean, k)` over
+`_SHOT_LINES = (0.5, 1.5, 2.5, 3.5)`. So a prop probability is exactly
+`P(X >= k)` for `X ~ Poisson(mean)`, and only two things can be wrong â€” the
+Poisson assumption, or the mean fed to it.
+
+### 1. THE POISSON FORM IS EXONERATED, replicated across two leagues
+
+Realized per-match, per-player shot counts from
+`data/soccer_source/<league>/shot_events/shot_events_2025.csv` (`event_id` is
+the match, `player_name` the shooter). **Zeros recovered** from the season
+table's `games` minus the matches in which the player actually shot â€” without
+that, the sample is shooters-only and every rate is biased high.
+
+    league    matches  players   disp(var/mean)   P(>=2) obs   P(>=2) Poisson      bias
+    la_liga       380      294             1.05       0.1926           0.1935   +0.0008
+    epl           379      303             1.07       0.2129           0.2118   -0.0011
+    POOLED          -      597             1.07       0.2029           0.2028   -0.0001
+
+**Poisson assumes dispersion 1.00 and gets 1.07. It predicts P(shots>=2) to
+within 0.01 percentage points pooled, on 597 players across 759 matches.** Both
+leagues agree and the sign of the bias flips between them, which is what noise
+looks like rather than a defect. **Do not "fix" the distribution.**
+
+### 2. THE MEAN RUNS ABOVE THE PLAYER'S OWN REALIZED RATE
+
+Inverting `poisson_at_least` on the served board's own `model_prob_over` gives
+the mean the model actually used, comparable directly against that player's
+season `shots_per90` â€” the model's OWN input file.
+
+    board soccer shots-prop model rows   27
+    matched to a season rate             23  (85%)
+    SHOTS props (n=15): implied mean / player's own shots_per90
+        median 1.19   mean 1.13   min 0.43   max 1.54
+        ABOVE the player's own rate: 11 of 15 (73%)
+
+**The worked case, which is also the board's #1 row.** Ante Budimir, over 1.5
+shots: model `0.9423`, implied mean **4.57**. His actual season rate is **3.0952
+shots/90 over 2995 minutes / 37 games** â€” and 4.57 would sit at roughly the
+99th percentile of the league (max 5.01, p90 2.63, median 0.83). Under the
+model's own Poisson, his realized rate implies **P = 0.7951**. The market's fair
+was **0.8275**. **The market is pricing this within ~3 points of the player's own
+realized rate; the model's entire 11.46-point "edge" is the mean inflation.**
+
+**IT CLUSTERS BY TEAM, which points at the team-total step rather than at
+players.** The five most inflated rows are all Osasuna (1.54, 1.53, 1.45, 1.19,
+1.05). A per-player error would not line up by club; a team shot-total that is
+too high, then distributed by `shot_share`, would.
+
+### WHAT THIS IS NOT
+
+**This is not a skill measurement of the model's per-match predictions**, and it
+must not be quoted as one. Section 1 scores the FORM given a correct mean;
+section 2 compares the model's mean to a season rate on ONE board snapshot,
+n=15, dominated by one club. A model is entitled to deviate from a season rate
+for opponent, home/away and expected minutes â€” **ratio is not error.**
+
+**The real backtest is blocked on the same wall the `soccer-model-dispersion`
+lane already recorded:** the usage-profile inputs are UNDATED SEASON
+AGGREGATES (`players_2025.csv`), so the model cannot be replayed as-of a past
+date. `shot_events` supplies the outcomes; nothing supplies the historical
+INPUTS. Closing that needs dated player inputs, not another scorer.
+
+### CONSEQUENCE FOR THE BOARD
+
+`model_skill` on these rows reads `sample_games: 0, status: unmeasured` and that
+is still literally true. But the board's largest model edges now have a named,
+measured, non-speculative cause â€” **an inflated shot mean, clustered by team** â€”
+which is a better basis for shrinking them than the units argument that was
+tried and withdrawn. **The lever is the team shot total, not the scorer, and not
+the distribution.**
+
+### CORRECTION `[2026-08-31]` — the team shot total is APPROXIMATELY RIGHT. The defect is the per-player SHARE, and I inferred the wrong term from clustering
+
+**Asked to fix the team shot total, went to measure it first, and the
+measurement refutes my own diagnosis. Recorded before any code was touched.**
+
+**WHAT I CLAIMED**, from the section above: the five most inflated rows were all
+Osasuna, so "a per-player error would not line up by club; a team shot-total
+that is too high, then distributed by `shot_share`, would."
+
+**THE CLUSTERING WAS AN ARTEFACT OF THE BOARD, NOT OF THE MODEL.** The board
+carried ONE Osasuna fixture with seven players listed and every other fixture
+with one or two. Grouping by club therefore reproduces the fixture, not a
+mechanism. The inflation ratios also ranged 1.05-1.54, which a single team-level
+multiplier cannot produce.
+
+**THE DECIDING MEASUREMENT — sum the implied means over one fixture:**
+
+    CA Osasuna vs Getafe, 7 players on the board, summed implied mean   11.4
+      Budimir 4.57 | Oroz 1.54 | R.Garcia 1.50 | Munoz 1.07
+      Moncayola 1.05 | Catena 0.89 | Bretones 0.76
+    Osasuna realized team shots/match (38 matches)                      11.03
+    league realized team shots/match                                    11.72
+
+**Seven players already account for 11.4 against a team that averages 11.0.**
+The full XI would carry it somewhat higher — so the team total is mildly high at
+most, nothing like the 1.95x my earlier back-calculation implied. That
+calculation assumed the model used Budimir's realized share; it does not, which
+is precisely the thing being measured.
+
+**THE ACTUAL DEFECT IS THE TOP SHOOTER'S SHARE.** Budimir takes **4.57 of the
+fixture's 11.4 modelled shots, about 40%**, against a realized share of
+**89/419 = 21.2%** of Osasuna's shots across the season. Roughly double. The
+allocation conserves the team total and mis-distributes within it — which is
+why the mean looked inflated per player while the total looked fine.
+
+**A MECHANISM IS NAMED IN THE CODE AND IS NOT YET CONFIRMED AS THE CAUSE.**
+`build_usage_profiles`' docstring describes starter awareness: shares are
+normalized across the squad weighted by expected minutes, and bench rows are
+discounted to `bench_minutes_share = 0.15` rather than dropped, because season
+per-90 rates "dilute a squad's volume across everyone who saw the field". That
+renormalization necessarily RAISES every starter's share. Whether it raises the
+top shooter's by ~1.9x, and whether that is the whole story, has **not** been
+established — it needs the profile builder run on the real inputs, not inferred
+from the served numbers.
+
+**NOTHING WAS CHANGED.** `model_engine_standard.md` requires a documented
+pipeline trace with file:line at each hop before an engine edit, and this repo's
+own rule is that adding or altering a mechanism in a CALIBRATED engine requires
+re-fitting the rates that were absorbing it — the soccer lane already has a
+standing rule that any single-parameter fit must clear a held-out validation,
+written after the most trustworthy-looking in-sample result failed one. A fix
+aimed at the team total would have moved a term that is not wrong.
+
+**Two model facts do survive intact and neither is affected by this
+correction:** the Poisson form is exonerated (dispersion 1.07, P(shots>=2) bias
+-0.0001 pooled over 597 players and 759 matches), and the served board's model
+means run above the players' own realized rates (median 1.19x, 11 of 15).
+
+### CORRECTION 2 `[2026-08-31]` — "nothing supplies the historical INPUTS" is WRONG. Stored dated PREDICTIONS exist, and the block is a season gap plus an id-space mismatch
+
+**I wrote above that the real backtest is blocked because the usage-profile
+inputs are undated season aggregates, so the model cannot be replayed as-of a
+past date. That reasoning is sound and the CONCLUSION IS WRONG, because it
+assumed a replay is the only route. It is not: the model's own OUTPUT is
+already archived, dated, with the mean stored.**
+
+`data/soccer_source/<league>/api/recommendations/recommendations_<DATE>.json`
+carries `league`, `date`, `generated_at`, `matches` and `player_props`. Each
+player-prop row holds exactly what a skill measurement needs, with **no
+inversion and no replay**:
+
+    player_id, player_name, team, side, position, match_id,
+    expected_shots, expected_shots_if_playing,
+    expected_shots_on_target, expected_shots_on_target_if_playing,
+    expected_minutes_share, anytime_scorer_probability
+
+**Coverage in the git mirror: 2,476 prediction rows over 55 distinct matches,
+17 dated files, 10 leagues** (la_liga 6 dates, mls 4, serie_a 4, epl 2). Per
+CLAUDE.md the mirror is a lossy subset — **production almost certainly holds
+more, and that is where anyone should look first.**
+
+**WHAT ACTUALLY BLOCKS THE JOIN — two things, both fixable, neither the one I
+named:**
+
+1. **The id spaces differ.** Predictions carry ESPN match ids
+   (`401874745`, 9-digit); `shot_events_2025.csv` carries 6-digit ids
+   (`740596`, Understat). Direct join: **0 of 55 overlapping.**
+2. **AND THE SEASONS DO NOT OVERLAP, which is the binding one.** The stored
+   predictions are dated 2026-07..2026-08; the shot outcomes on hand are the
+   `2025` season file. No mapping fixes a window that does not intersect —
+   this is the CLAUDE.md per-family coverage trap, firing on exactly the join
+   it warns about.
+
+**THE UNBLOCK IS SMALL AND SPECIFIC, and it follows from (1) rather than
+around it: the predictions are keyed by ESPN match id, and
+`syndicate/features/soccer/ingestion/espn_shot_events.py` already fetches shot
+events FROM ESPN.** Pulling shot events for those 55 ESPN match ids yields a
+DIRECT join — same id space, no mapping table, and the outcomes are for exactly
+the matches that were predicted. That is a bounded fetch against a store that
+already exists, not a modelling project.
+
+**WHAT THE MEASUREMENT WOULD THEN BE, stated now so it is not designed after
+seeing the numbers:** predicted `expected_shots` against realized shot count,
+per (player, match). Report the RATE and its denominator; report bias
+(mean predicted minus mean realized) and calibration separately, because the
+Poisson form is already exonerated and only the MEAN is in question. Split by
+`expected_minutes_share`, since starter awareness is the named suspect for the
+top shooter's share being roughly double its realized value.
+
+**Unchanged by this correction:** the Poisson exoneration (dispersion 1.07,
+P(shots>=2) bias -0.0001 over 597 players / 759 matches) and the finding that
+the fixture's team total is approximately right while the top shooter's share is
+roughly double. Both rest on the 2025 outcome file alone and neither needs the
+prediction archive.
+
+### THE SKILL NUMBER `[measured 2026-08-31]` — the shots model OVER-PREDICTS BY 36%, and it is worst exactly where the board's edges come from
+
+**`model_skill` on these rows has read `sample_games: 0, status: unmeasured`
+since they shipped. It is now measured. n=2,476 (player, match) pairs over 55
+matches and 8 leagues.**
+
+The join nobody had made: archived predictions
+(`api/recommendations/recommendations_<DATE>.json`) carry `expected_shots` — the
+model's MEAN, already stored, no inversion and no replay — keyed by **ESPN**
+match id; `espn_shot_events.extract_shot_events` reads shot events **from ESPN**.
+Same id space, direct join. 55 of 55 matches fetched.
+
+    predicted mean   0.5242
+    realized  mean   0.3849
+    BIAS            +0.1393        RATIO 1.362
+    MAE              0.5558        constant-mean baseline 0.6035
+                                   -> the model BEATS the baseline by 7.9%
+
+**IT CARRIES REAL SIGNAL AND IS BADLY SCALED. Both halves matter.** Beating a
+constant-mean baseline by 7.9% means the per-player ordering is informative —
+this is not noise, and the fix is not to discard the model. It is level.
+
+**CALIBRATION — over-prediction in every decile above the second, worsening:**
+
+     pred range      n     pred   real     bias   ratio
+     0.00-0.03     247    0.000  0.016   -0.016    0.03
+     0.03-0.12     247    0.081  0.089   -0.008    0.91
+     0.13-0.19     247    0.158  0.134   +0.024    1.18
+     0.19-0.27     247    0.232  0.206   +0.025    1.12
+     0.27-0.36     247    0.311  0.227   +0.084    1.37
+     0.36-0.45     247    0.397  0.279   +0.117    1.42
+     0.45-0.58     247    0.514  0.381   +0.134    1.35
+     0.58-0.77     247    0.673  0.538   +0.134    1.25
+     0.77-1.18     247    0.937  0.623   +0.313    1.50
+     1.18-3.69     247    1.849  1.348   +0.501    1.37
+     3.76-4.92       6    4.254  0.667   +3.587    6.38   <- n=6, treat as a flag
+
+**THE TOP BUCKET IS WHERE THE BOARD'S EDGES LIVE.** Budimir's implied mean was
+**4.57**, which lands in that last row. Six observations is not a result — but
+the direction is consistent with every bucket beneath it and the magnitude is
+not marginal, so it is recorded as **a flag with its denominator attached**, not
+as a measurement.
+
+**STARTER AWARENESS IS NOT CLEANLY IMPLICATED — the earlier suspect weakens.**
+Bias by `expected_minutes_share`: sub/fringe **1.28** (n=860), rotation **1.44**
+(n=1007), near-ever-present **1.33** (n=609). Present in every band and NOT
+concentrated in the players a lineup renormalization would inflate most. This is
+a broad level error, not a starter-share artefact.
+
+**VALIDATION OF THE INSTRUMENT ITSELF, because a wrong outcome side would
+manufacture exactly this result:**
+- ESPN capture is complete: **24.15 shots/match extracted vs a 23.4/match
+  season benchmark, ratio 1.03**, and all 1,328 events carry a player name.
+- **A first pass reported ratio 1.434 and was WRONG.** Name matching was exact,
+  so accented shooters (`Martin Ødegaard`, `Gabriel Magalhães`) scored as ZERO
+  shots — 48 events, inflating the bias. Re-run with NFKD folding gives 1.362.
+  The number above is the folded one.
+- The remaining 375 unattributed shots belong to players absent from the
+  prediction set entirely. That does not bias a per-row comparison; each
+  predicted row is scored against its own realized count.
+
+**STATED LIMITS.** 55 matches, dates 2026-07-20..2026-08-28 — the season's
+opening weeks, when the model's own per-90 inputs rest on the fewest games, so
+this may be a worst case rather than a steady state. Single snapshot of the
+mirror; production holds more recommendation files and the measurement should be
+re-run against them before anything is calibrated on it.
+
+**WHAT THIS LICENSES.** `model_skill` for soccer shot props can stop saying
+`unmeasured`: the honest verdict is **"beats a constant baseline by 7.9%, and
+over-predicts the mean by 36%"**. A 1.36x level error is a sufficient and
+measured reason to shrink these edges — the thing the units argument was
+reaching for and could not justify. **It is NOT yet a licence to divide by 1.36
+in the engine:** a calibrated engine needs the rates that were absorbing this
+re-fit alongside it, and this lane's standing rule is that any single-parameter
+fit clears a HELD-OUT validation on different matches than the fit.
+
+### PRODUCTION RE-RUN `[2026-08-31]` — ratio 1.398 on 4x the data, and it is a SLOPE error, not a level error. **This supersedes the mirror number above.**
+
+**n = 9,840 (player, match) pairs, 247 matches, 9 leagues**, against the mirror
+run's 2,476 / 55 / 8. Predictions pulled from production via
+`/api/ops/artifacts/export?pattern=soccer_source/*/api/recommendations/*.json`
+— **144 files / 15,978 rows against the mirror's 22 / 2,476.**
+
+    predicted mean   0.5844
+    realized  mean   0.4181
+    BIAS            +0.1663        RATIO 1.398      (mirror said 1.362)
+    MAE              0.6263        constant-mean baseline 0.6494
+                                   -> model BETTER by 3.6%   (mirror said 7.9%)
+
+The direction and rough magnitude REPLICATE at 4x the sample. The model's margin
+over a constant baseline is **half** what the mirror suggested, which is the
+usual direction for a small-sample advantage.
+
+### THE FINDING THAT CHANGES THE FIX: the bias has a SLOPE
+
+     pred range        n     pred    real    ratio
+     0.00-0.00       984    0.000   0.020     0.00
+     0.00-0.13       984    0.072   0.132     0.55   <- UNDER-predicts
+     0.13-0.22       984    0.176   0.189     0.93   <- UNDER-predicts
+     0.22-0.31       984    0.263   0.226     1.17
+     0.31-0.41       984    0.356   0.238     1.50
+     0.41-0.53       984    0.466   0.335     1.39
+     0.53-0.68       984    0.600   0.478     1.26
+     0.68-0.91       984    0.787   0.577     1.36
+     0.91-1.36       984    1.106   0.679     1.63
+     1.36-5.64       984    2.019   1.307     1.54   <- OVER-predicts
+
+**The model UNDER-predicts the bottom two deciles and OVER-predicts everything
+from the fourth up. Its spread is too WIDE, not uniformly too high.** I recorded
+"the error is level, not discard" off the mirror run; on production that is
+wrong. **A constant divide-by-1.4 would over-correct the bottom and
+under-correct the top.** What this shape calls for is shrinkage toward the mean
+— a regression of predicted onto realized — and that is a re-fit, not a scalar.
+
+**Universal across leagues, magnitude varies:** epl and eredivisie 1.22,
+mls and bundesliga 1.31, serie_a 1.36, ligue_1 1.44, la_liga 1.51,
+championship 1.85, primeira_liga 1.94. **Every league over-predicts**, so this is
+the engine, not one league's inputs.
+
+**By `expected_minutes_share`: 1.29 / 1.47 / 1.41** (sub-fringe / rotation /
+near-ever-present). Broad. Starter awareness remains unimplicated.
+
+### A DATA DEFECT FOUND BY THE INSTRUMENT CHECK, and it nearly inverted the result
+
+**`belgian_pro_league` shot outcomes are UNUSABLE through ESPN: 3.00 shots per
+match extracted against a ~23.4 benchmark, capture 0.13.** ESPN's `bel.1`
+commentary carries no shot detail. Those matches DO return some events, so they
+pass a naive "has events" filter and score as real matches in which nobody shot.
+
+**Included, the pooled result reads ratio 1.524 and "model WORSE than baseline
+by 1.7%". Excluded, it reads 1.398 and "BETTER by 3.6%".** One league with
+missing outcomes flipped the headline verdict. Every other league validates at
+0.92-1.34 capture. **Any future run of this measurement must validate capture
+per league and exclude `belgian_pro_league`** — a missing outcome is not a zero,
+and it biases in the direction that condemns the model.
+
+### WHAT THIS LICENSES NOW
+
+`model_skill` for soccer shot props: **"beats a constant baseline by 3.6% on
+n=9,840; over-predicts the mean by 40%; the error has a slope — too wide, not
+merely too high."** That is enough to justify shrinking these edges and enough to
+say a scalar divisor is the WRONG correction. It is still not a licence to ship
+a fitted shrinkage: this lane's standing rule is that any fit clears a HELD-OUT
+validation on different matches than the fit, and the natural split here is by
+DATE, since the archive spans 2026-07-20..2026-08-30.
+
+### SHRINKAGE FITTED AND HELD-OUT VALIDATED `[2026-08-31]` — **a SCALAR DIVISOR WINS, and my pre-registered expectation was WRONG**
+
+Criterion fixed before the held-out numbers were seen, per this lane's standing
+rule. Split by DATE, never by row, so no match straddles it. Three candidates,
+deliberately including the one I had argued against.
+
+**MY RECORDED EXPECTATION: "AFFINE beats SCALAR, because the error has a SLOPE."
+IT DOES NOT. A plain divisor is better held out, in every split and every
+league.**
+
+    HELD-OUT TEST, dates >= 2026-08-22, n=6,405 (train n=3,435, 88 matches)
+      candidate                    MAE      bias    pred mean
+      RAW                       0.6251   +0.1743      0.5726
+      SCALAR   (x / 1.3331)     0.5551   +0.0312      0.4295
+      AFFINE   (0.1021+0.5818x) 0.5748   +0.0370      0.4352
+      constant-mean baseline    0.6278   +0.0000      0.3983
+      realized mean on test                           0.3983
+
+**Both pass the criterion; SCALAR passes by more.** It beats AFFINE on MAE and
+on absolute bias, **in all 9 leagues individually** (mls, la_liga, serie_a, epl,
+championship, ligue_1, eredivisie, primeira_liga, bundesliga) — so this is not a
+pooled win carried by one league, which the date/league confound made a real
+risk.
+
+**STABLE ACROSS SPLIT POINTS AND DIRECTION:**
+
+    split                 train n  test n   c(train)   SCALAR   AFFINE
+    forward cut 08-08        1129    8711     1.2441   0.5691   0.6017
+    forward cut 08-15        1818    8022     1.3135   0.5588   0.5854
+    forward cut 08-22        3435    6405     1.3331   0.5551   0.5748
+    REVERSE cut 08-22        6405    3435     1.4376   0.5535   0.5625
+
+SCALAR wins all four. **But `c` drifts 1.24 -> 1.44 as the training window moves
+later**, so the constant is NOT a fixed property of the engine over this window —
+whether that is the over-prediction worsening or the league mix shifting is not
+established, and it is the reason to re-fit on a schedule rather than hard-code a
+number.
+
+**WHY MY SLOPE READING WAS REAL AND STILL WRONG AS A DECISION.** The
+under-prediction in the bottom two deciles is real (ratios 0.55 and 0.93), but
+those rows predict 0.00-0.22 shots, so their absolute error is tiny. MAE is
+dominated by the large-prediction rows, where the error is a clean level
+over-shoot. **A miscalibration can be genuine and still not be worth correcting
+for** — I inferred "slope, therefore a scalar is the wrong fix" from a ratio
+table and did not check what carried the loss.
+
+**THE SIZE OF THE PRIZE:** RAW barely beats predicting the average (0.6251 vs
+0.6278, **0.4%**). Corrected, it beats it by **11.6%**. The model's ordering was
+always informative; the level was eating almost all of the value.
+
+### NOT SHIPPED, AND WHAT SHIPPING WOULD NEED
+
+Nothing in the engine was changed. `scripts/fit_soccer_shot_shrinkage.py` is
+committed so the fit is reproducible and re-runnable as the archive grows.
+
+Shipping this divisor is a MECHANISM change to a calibrated engine, which this
+repo requires be accompanied by a re-fit of the rates that were absorbing it —
+the shot mean feeds `poisson_at_least`, whose FORM is already exonerated
+(dispersion 1.07, P(>=2) bias -0.0001), so correcting the mean moves every shots
+prop and every derived probability at once. It is also a live money-path change
+on a board that currently ranks one-sided rows on model edge. **That is a
+product decision, and the drifting `c` says it wants a scheduled re-fit rather
+than a constant.**

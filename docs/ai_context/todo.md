@@ -1397,6 +1397,36 @@ the ROI report's 64,007-bet denominator does not move.
 
 **OWED — PARTIALLY DISCHARGED 2026-08-27 13:3xZ.**
 
+- **#612 SOCCER SHOT PROPS: the divisor is SHIPPED and has never been OBSERVED working.**
+  The shots model over-predicts **1.398x** (n=9,840 pairs / 247 matches / 9 leagues,
+  production predictions joined to ESPN outcomes). A scalar divisor of **1.3979**
+  is deployed on all three services and the dated artifact is published and read
+  back. **The board has never shown it working**: zero soccer shot-prop rows
+  existed at publish time and `available_today: 0` for soccer, so the check has
+  not had a chance to run.
+  **The reading that closes it, on the next day soccer is carded:** back the
+  Poisson mean out of each row's `model_prob_over` and divide by that player's
+  own season `shots_per90` — it was **1.19** before and must land near **0.85**.
+  Composition-invariant on purpose; the slate rotates faster than the 4-hourly
+  soccer sim, so a top-N count would measure the slate.
+  **Failure mode to watch for:** rows present and the median still ~1.19 means
+  the artifact reached WEB but not live-odds-worker, which pulls on its own
+  cycle. Absence of rows means nothing at all.
+  Lane `soccer-shot-shrinkage`; working in `state.md [soccer-shots-prop-skill]`.
+
+- **#613 `lane-guard` unenforced every claim under a dot-directory — FIXED, and
+  the audit tool that found it is now the standing check.** `_paths_in` stripped
+  punctuation symmetrically, so `.syndicate/x.md` parsed to `syndicate/x.md`
+  while matching is `rel.endswith("/" + f)` — a claim that could never match the
+  file it named. Fixed asymmetrically; claims naming a nonexistent path 1 -> 0.
+  `py -3 scripts/lane_claim_audit.py` is the tool: it loads the hook by AST
+  (running it blocks on stdin) and applies BOTH checks, because either alone
+  misses half — a token that does not look like a path (prose inside a `Files:`
+  block becomes a claim), AND a path absent from `git ls-files` (the dot-strip
+  class, which looks well-formed). `check_lane_invariants` catches neither.
+  **Run it from a worktree pinned to `origin/main`** — the shared primary tree
+  drifts behind and reports live files as phantom.
+
 - ✅ **Board attach VERIFIED IN PRODUCTION.** `/nfl/api/cards?week=1` went
   **0 → 112 `shared_prop_rows` across 14 of 16 games** (web `e3c168f3`,
   03:04:31Z), e.g. `NE | A.J. Brown | Anytime TD | 165`.

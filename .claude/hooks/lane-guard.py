@@ -182,7 +182,22 @@ def _paths_in(text):
     """Pull path-looking tokens out of a claim line."""
     out = []
     for tok in re.split(r"[,\s]+", text or ""):
-        tok = tok.strip().strip("`<>*_()[].,;")
+        # STRIP ASYMMETRICALLY. The right side keeps the original set; the
+        # left side is the same set MINUS the dot, because a LEADING dot is
+        # part of the path, not punctuation.
+        #
+        # Measured 2026-08-31: the symmetric strip turned `.syndicate/x.md`
+        # into `syndicate/x.md`, and since matching is `rel.endswith("/" + f)`,
+        # `.syndicate/x.md`.endswith("/syndicate/x.md") is FALSE -- so EVERY
+        # claim under a dot-directory (`.syndicate/`, `.claude/`) named a file
+        # it could never match and guarded nothing, silently. One live instance:
+        # `exchange-join-refusals` on a findings doc.
+        #
+        # The right side must keep the dot so a trailing sentence period still
+        # goes; dropping it there leaves a token like ``x.py`.`` ending in a
+        # backtick, which is how the first cut of this fix broke a DIFFERENT
+        # claim while repairing this one.
+        tok = tok.strip().rstrip("`<>*_()[].,;").lstrip("`<>*_()[],;")
         if not tok or tok.lower() in ("n/a", "none", "fill", "in", "tbd"):
             continue
         if "/" in tok or "\\" in tok or PATHISH_RE.match(tok):

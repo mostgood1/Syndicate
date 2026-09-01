@@ -47,7 +47,18 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LANES = REPO_ROOT / ".syndicate" / "lanes.md"
-CLOSED = REPO_ROOT / ".syndicate" / "lanes_closed.md"
+# The closed-lane archive is TWO files since 2026-08-31: `lanes_closed.md` was
+# split by date into `lanes_closed_archive.md` to bound its growth. Check 3
+# ("OPEN in lanes.md while also present in the archive") and the archived-block-
+# still-asserting-OPEN check both need the WHOLE archive, so a split that this
+# file did not learn about would narrow them silently -- exactly the failure
+# this script's own docstring describes as "a block can fall between any two of
+# them". Add any further archive file HERE.
+CLOSED_FILES = (
+    REPO_ROOT / ".syndicate" / "lanes_closed.md",
+    REPO_ROOT / ".syndicate" / "lanes_closed_archive.md",
+)
+CLOSED = CLOSED_FILES[0]  # retained: existing references expect a single path
 HISTORY = REPO_ROOT / ".syndicate" / "lanes_history.md"
 GUARD = REPO_ROOT / ".claude" / "hooks" / "lane-guard.py"
 
@@ -131,7 +142,9 @@ def main() -> int:
         elif "CLOSED" in status.upper():
             closed_in_lanes.add(slug)
 
-    closed_blocks = list(blocks(guard, _read(CLOSED)))
+    closed_blocks = []
+    for _closed_path in CLOSED_FILES:
+        closed_blocks.extend(blocks(guard, _read(_closed_path)))
     archived = {s for s, _, _ in closed_blocks if s}
     # PRESENCE in the archive is not a contradiction. A lane can legitimately be
     # closed, archived, and later RE-OPENED -- `live-game-line-projection` was --

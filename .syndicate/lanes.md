@@ -926,6 +926,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Files: released: `syndicate/features/mlb/sources.py`,
   **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
   released: `syndicate/features/shared/artifact_publisher.py`. **NOT CLAIMED.**
+- Files: **NOT CLAIMED** — this lane is FINDING ONLY and changed nothing. The
+  marker is moved to the FRONT of this line `[2026-08-31, lane
+  soccer-shot-shrinkage]` so the PARSER agrees with what the lane already said:
+  `_claimable_prefix` cuts at the first marker and keeps everything BEFORE it, so
+  with the paths written first they were still being enforced as live claims, and
+  the two paths it named read as contested against a lane that explicitly
+  disclaims them. Nothing is taken from this lane. The paths are deliberately
+  NOT repeated here: any path-like token inside a Files block becomes a CLAIM,
+  which is the same trap, and writing them again would recreate it.
 - **THE TRIGGER IS WORSE THAN "AN MTIME RACE", WHICH THIS BLOCK GOT WRONG.**
   `if target_stat is None: should_copy = True` — a MISSING target copies
   unconditionally, which is exactly the case the repair exists for.
@@ -1017,6 +1026,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   DEPLOYED; the board-shard rollback fix is a different change in a different
   function and belongs to the sharding lane. Reclaim by striking `released:` if
   this lane needs the file again.]** `[2026-08-31, USER OVERRIDE: "take the override
+- Files: syndicate/features/shared/polymarket_us_orders.py
+  pipeline/execute_portfolio.py
+  tests/test_polymarket_yes_leg_binding.py
+  syndicate/features/shared/execution_ledger.py
+  tests/test_reconcile_not_found_recovery.py
+  syndicate/features/shared/portfolio_commit.py
+  tests/test_position_carries_commence_time.py
+  tests/test_soccer_yes_no_h2h_order.py
+  pipeline/intelligence_state.py `[2026-08-31, USER OVERRIDE: "take the override
     and build it now"]` — held by OPEN lane `soccer-overview-cost` (session
     3e5a9659, last checkpoint 08-29, no marker, not in the running list).
     Surfaced to the user BEFORE the override. Narrow scope: only the two board
@@ -1028,6 +1046,9 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   released: tests/test_layer2_shard_by_sport.py
   released: syndicate/features/shared/layer2_board.py
   released: tests/test_layer2_model_value_term.py
+  tests/test_layer2_shard_by_sport.py
+  syndicate/features/shared/layer2_board.py
+  tests/test_layer2_model_value_term.py
 - Claims taken under `[2026-08-30, USER OVERRIDE]` x3 ("take it to the
   user-override route", "take it and fix it"). Conflicts were surfaced to the
   user BEFORE each override and the holders were messaged. Deploy claim on
@@ -1076,6 +1097,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 
 ### layer1-model-edge-join — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+### layer1-model-edge-join — OPEN — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Scorer released to lane `layer2-board-opportunities`, whose change is live and verified. Owed: MLB/WNBA/NCAAF coverage is UNREAD not flat — run `py -3 scripts/measure_model_edge_coverage.py` on the first build with a PREGAME slate.
 - Goal: Layer 1 must join a MODEL edge on every sport/market, so Layer 2 /
   Kalshi / Polymarket rank on the sim's disagreement rather than on book hold.
 - **SCOPE REQUEST GRANTED 2026-08-31 — the layer2 board scorer goes to lane
@@ -1105,6 +1127,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   released: scripts/audit_layer1_completeness.py
   released: tests/test_modelled_fair_edge_reachability.py
   released: tests/test_wnba_game_projections.py tests/test_nfl_game_projections.py
+- Files: syndicate/features/shared/board_enrichment.py
+  RELEASED to lane layer2-board-opportunities 2026-08-31: the layer2 board scorer module
+  syndicate/features/shared/wnba_game_projections.py
+  syndicate/features/shared/wnba_projections.py
+  syndicate/features/shared/nfl_game_projections.py
+  syndicate/features/shared/prop_projections.py
+  scripts/audit_layer1_completeness.py
+  tests/test_modelled_fair_edge_reachability.py
+  tests/test_wnba_game_projections.py tests/test_nfl_game_projections.py
 - NOT CLAIMED, DELIBERATELY: `syndicate/features/shared/live_projection_join.py`
   is held by OPEN lane `live-prob-producer-reader-gap`. Imported read-only.
 - STATUS: **DEPLOYED AND MEASURED** (`0fc174c6`, all three services). Seven
@@ -1112,6 +1143,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `mfair_priced` 0 -> 3159, served top-200 rows with a model edge **1 -> 130**,
   `rows_uninformative_ev` **1269 -> 138**. EV is now priced against the model
   where a modelled fair exists (`ev_basis`), per user decision.
+- **THE MODEL-EDGE WORK IS NOW MEASURED END TO END `[2026-08-31 17:00:33Z]`.**
+  The scorer was released to lane `layer2-board-opportunities` on a scope
+  request; their change is live on `cffbbd89` and verified: the ranking identity
+  inverted exactly (`value_pct==model_ev` 50/50 -> 0/52, `==model_edge` 0/50 ->
+  52/52), scores compressed 5x, top-25 market rows 3 -> 14. **The intended
+  outcome is NOT achieved** — the top nine are still model-basis, best market
+  row at rank 10, because edge is in probability points and market EV is in
+  percent. `deploys.md` 16:48Z carries the working; the units question is
+  UNSETTLED and is not this lane's to settle.
 - **STILL OWED — the only reason this lane is OPEN:** MLB, WNBA and NCAAF are
   **UNREAD, NOT FLAT** (zero PREGAME games at every reading; `mfair_priced: 0`
   there is the sweep declining settled rows, not the sweep missing). WNBA's
@@ -1124,6 +1164,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none
 
 ### mlb-live-prop-prob-merge — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+### mlb-live-prop-prob-merge — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Fix deployed, unverified. Owed on the first live MLB game: `snapshot_live_prob_seen > 0` and `[live_lens] LIVE_PROB_CARRIED ... carried=N`. Watch for `carried=0` with `mc_rows_with_prob>0` — a key mismatch reads as success.
 - Goal: get MLB's live prop probability onto the board. The producer emits it and
   a merge threw it away. `rows_live_edged` must become non-zero on a live game.
 - Files: released: syndicate/features/mlb/live_lens.py, tests/test_mlb_live_prop_prob_merge.py (new)
@@ -1153,6 +1194,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none
 
 ### ncaaf-cfbd-quota-latch — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+### ncaaf-cfbd-quota-latch — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Latch + PPA cache live and proven across processes. Owed reading is ARMED as one-time scheduled task `verify-ncaaf-cfbd-quota-latch-roll` (2026-09-01 08:00). If `LATCHED_SKIP` still fires after the roll the latch is CAUSING an outage.
 - Goal: stop NCAAF regeneration burning a MONTHLY CFBD quota it has already been
   told is exhausted, and let it succeed from cache while exhausted.
 - Files: released: syndicate/features/ncaaf/cfbd_quota_latch.py (NEW),
@@ -1193,6 +1235,89 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Env live: `ROWS_PER_SPORT=1000`, `ROWS_TOTAL=3000`, `COMBINED_ROWS=0` (refresh-worker only; other two services clean).
 - **DO NOT RAISE THE CAP AGAIN AS A CONFIG CHANGE.** The ceiling is the COMBINED key (~2,200 B/row even with `rows: []`) ⇒ ~3,600 TOTAL rows. Shard headroom is not evidence about it.
 - **NEXT ACTION (owed, for whoever picks this up): the 2000/sport cap and ROWS_TOTAL=6000 are STAGED on refresh-worker but UNDEPLOYED, and the 75% warn threshold `c461693e` is on main and undeployed. Both ride the next refresh-worker deploy. They are UNTESTABLE until a full multi-sport slate — tonight the board is MLB-ONLY at ~547 rows, below even the old 1000 cap. VERIFY BY: a sport actually reaching >1000 rows; if none does, the raise stays untested however long it sits deployed.** Measured safe against REAL production rows (combined 220 B, worst shard 50.6–55.2%). Two caveats: the percentage is SLATE-DEPENDENT, and 3000/sport reads 74.6% — under the 75% line, so the warning is NOT a guard against a 3000 raise. REVERT of the cards flip remains one step: `SYNDICATE_LAYER2_CARDS_INLINE=1` + redeploy.
+### polymarket-pregame-price-gate — OPEN — opened 2026-08-31 — session 6475567d-f806-45a7-880c-f633718f2411
+- Rationale: opened retroactively at the midday checkpoint; the two earlier
+  deploys that day went out under the holder `ncaaf-totals-dispersion`, a BLOCKED
+  NCAAF lane. Later deploys used this name. The engine files
+  (`pipeline/execute_portfolio.py`, `syndicate/features/shared/polymarket_board_join.py`)
+  are claimed by `polymarket-yes-leg-binding` and are DELIBERATELY NOT listed
+  below: every edit was cross-lane with explicit user authorisation, and claiming
+  them here contests a lane that owns them.
+- Goal: a Polymarket order buys the side we chose, at a price the venue receives,
+  or it is refused by name.
+- Files: tests/test_execute_portfolio.py, tests/test_polymarket_board_join.py
+- Hypothesis: pregame only CHEAP sides fill; once live everything fills.
+- Falsification test: an explored order filling above 0.410 PREGAME. NEITHER
+  probe did — pregame half SOLID (2 probes, 2 sports, ~20 reads each, 0 fills).
+  LIVE half NOT replicating: `ast-ars` filled kick+17m47s, `bal-col` still
+  resting at pitch+35m. The rule is PARTLY confirmed; see state.md.
+- Verification: DONE — submit-price gate (`submit_price=` 15:53:26Z), band edge
+  (`EXPLORE ... 0.450` 16:03:16Z), EV stamping (6/6 positive, 17:32Z), fill rule
+  (`avgPx=0.4500 lastTransact=19:20:09Z`), wrong-side fix deployed both services
+  (live-odds-worker d04d9f49 21:02:07Z, refresh-worker 8876b823 21:20:36Z, no
+  regression 21:06Z). NOT DONE — the POSITIVE soccer case: no soccer h2h has
+  resolved since the fix, so a CORRECT leg being selected has never been observed.
+- Blocked by: none
+- OPEN, NOT FIXABLE BY DEPLOY: `atc-sea-ata-bol` is a live position on the WRONG
+  side (Bologna, not Atalanta). Manual close on the venue.
+- NO WATCHER RUNNING. `btb81lzt8` died with the session at ~01:2xZ; reads from
+  pitch+40m to +80m were never captured. Re-read `ORDER_STATE` for
+  `aec-mlb-bal-col-2026-08-31` directly; do not assume a reading is coming.
+- `gameStartTime` is ABSENT on all 10 `bal-col` slate rows, so liveness cannot be
+  confirmed from the venue — only from the board's `commence_time`.
+
+### soccer-shot-shrinkage — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Divisor SHIPPED to all three services and published; NEVER OBSERVED working (soccer had `available_today: 0`). Owed reading carried by `todo.md #612` and scheduled task `refit-soccer-shot-shrinkage` (monthly, 1st 09:00).
+- Goal: the soccer shots model stops over-predicting by ~1.4x. Ship the
+  held-out-validated divisor as a DISK-BACKED, RE-FITTABLE calibration artifact,
+  never a hard-coded constant. Testable: the served board's shot-prop
+  probabilities fall, and `expected_shots` bias on the next backtest run moves
+  toward 0 from +0.166.
+- Files: syndicate/features/soccer/sim_engine/soccersim/player_props.py
+  syndicate/features/soccer/sim_engine/soccersim/shot_calibration.py
+  syndicate/features/shared/artifact_publisher.py
+  scripts/fit_soccer_shot_shrinkage.py
+  tests/test_soccer_shot_shrinkage.py
+- Evidence this rests on (all in `state.md [soccer-shots-prop-skill]`): n=9,840
+  pairs / 247 matches / 9 leagues from production; ratio 1.398; held-out SCALAR
+  MAE 0.5551 vs raw 0.6251 vs baseline 0.6278; SCALAR beats AFFINE in all 9
+  leagues and all 4 splits. On-target RATE is already correct (model 0.345 vs
+  actual 0.342, ratio 1.007), so one divisor at the `expected_shots` choke point
+  fixes shots AND shots-on-target without a second constant.
+- Hypothesis: correcting the MEAN is sufficient; the Poisson FORM needs no change
+  (dispersion 1.07, P(>=2) bias -0.0001 over 597 players / 759 matches).
+- Falsification test: if the served shot-prop probabilities do not fall after
+  deploy, the artifact is not reaching the engine and the change is INERT --
+  which is this repo's most common failure and the reason for the reachability
+  test below.
+- Verification: reachability FIRST (divisor 1.0 vs 1.4 produce different
+  probabilities, driving the real shipped function), then a PRODUCTION read of
+  the served board, then a re-run of
+  `scripts/backtest_soccer_shot_props_production.py` on dates AFTER the deploy.
+- SAFETY: absent/unreadable/out-of-range artifact -> divisor 1.0, i.e. exactly
+  today's behaviour. Clamped to [1.0, 2.0] so a corrupt fit cannot zero the board.
+- STATUS: **SHIPPED TO ALL THREE SERVICES, NOT YET OBSERVED WORKING.** web
+  `132559e1` (allowlist), both workers `a35591dc` (wiring + dated resolver), all
+  content-verified on the deployed blob. Artifact published 200 and READ BACK:
+  `divisor=1.3979, n=9840, matches=247`. Divisor measured at 1.398x
+  over-prediction; a SCALAR beat an AFFINE fit held out in all 9 leagues and all
+  4 date splits.
+- **THE VERIFICATION IS OWED AND CANNOT BE FORCED.** At publish time the board
+  carried ZERO soccer shot-prop rows, and the soccer sim runs every FOUR HOURS
+  (`SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS=14400`). **Nothing is
+  confirmed to have reached live-odds-worker.** The closing reading is
+  composition-invariant: implied Poisson mean divided by that player's own
+  season `shots_per90`, which was **1.19** before and must land near **0.85**.
+  A median still near 1.19 WITH rows present means the artifact reached web but
+  not the worker — that is the failure mode, not absence of rows.
+- Blocked by: none. The soccer engine was unclaimed at open (verified with
+  `lane_claim_audit.py`).
+
+### layer2-cap-raise — OPEN — opened 2026-08-31 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3 — **GOAL MET. Sharding live, caps at 1000, rollback fix live, and THE CARDS FLIP IS VERIFIED IN PRODUCTION 22:50:26Z — the ~3,600-row ceiling is gone. 3000/sport corrupted the board ~29 min earlier and was reverted; that cause is now FIXED, not merely avoided.**
+- Goal: board carries >400 rows for a sport. **MET** at 1000 (932 → 1634 rows, no sport lost).
+- Files: `pipeline/intelligence_state.py` **[claim REASSIGNED from `polymarket-yes-leg-binding`, same session]**; Render ENV on refresh-worker via the single-key API — never `render.yaml`. **NOW ALSO CLAIMS CODE:** `pipeline/intelligence_state.py`, `tests/test_layer2_shard_index_stale.py`, `tests/test_layer2_cards_shards.py`, `tests/test_shortlist_persist_ceiling_guard.py` — the last MOVED here from `polymarket-yes-leg-binding`, which had misfiled it. Same session owns both lanes; the file is the layer2 size instrument, not a venue file.
+- Env live: `ROWS_PER_SPORT=1000`, `ROWS_TOTAL=3000`, `COMBINED_ROWS=0` (refresh-worker only; other two services clean).
+- **DO NOT RAISE THE CAP AGAIN AS A CONFIG CHANGE.** The ceiling is the COMBINED key (~2,200 B/row even with `rows: []`) ⇒ ~3,600 TOTAL rows. Shard headroom is not evidence about it.
+- **NEXT ACTION: nothing is owed on this lane. A cap raise above 1000 is now DEFENSIBLE but UNATTEMPTED — and must be measured against the COMBINED key, not the shards, which is the exact mistake that corrupted the board at 18:25Z. One defect remains unfixed and will mislead: `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key and its advice to lower `ROWS_PER_SPORT` is backwards.** REVERT of the flip is one step: `SYNDICATE_LAYER2_CARDS_INLINE=1` and redeploy.
 - Verification: DONE for the cap raise and the rollback fix. **UNEXERCISED, BOTH:** `ROWS_TOTAL=3000` (board ~1,600 rows, never bound) and the cards split (deployed, but no rebuild has run under it — `LAYER2_CARD_SHARDS_WRITTEN` never once observed).
 - OWED, code not config: `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key (`pct=93.3` on a healthy board, advice backwards). The skipped-shed item is CLOSED by the cards split — the shed could never have helped (`SHORTLIST_SHED_IMPOSSIBLE`).
 - Narrative: `log/2026-08-31.md` (session 5611932c). Blocked by: none.
@@ -1200,6 +1325,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Goal: a per-sport x per-bet-type accuracy read on the Layer 2 board for the last 7 days, with an explicit statement of how many days and rows it actually rests on, plus ranked optimizations.
 - Files: released: **CLAIMED 2026-08-31 ~18:3xZ, user asked for the MLB join fix:** `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py` (`_odds_paths` + helpers only), `tests/test_season_betting_cards_odds_paths.py`. **EXTENDED ~18:4xZ, user asked for the backlog regrade:** `scripts/run_refresh_worker.py` (`_mlb_betting_day_backfill_*` only — NOT `_season_projection_should_launch`, which lanes.md flags as contended), `tests/test_refresh_worker.py`. Every OPEN-lane reference to `run_refresh_worker.py` is RELEASED; checked. Checked against every OPEN lane: no lane holds either. Still NOT editing `graded_outcomes.py`, `evaluation_settlement.py`, `layer2_shortlist.py`, `layer2_board.py`, `refresh_mlb_oddsapi.py`.
   **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+- Files: **CLAIMED 2026-08-31 ~18:3xZ, user asked for the MLB join fix:** `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py` (`_odds_paths` + helpers only), `tests/test_season_betting_cards_odds_paths.py`. **EXTENDED ~18:4xZ, user asked for the backlog regrade:** `scripts/run_refresh_worker.py` (`_mlb_betting_day_backfill_*` only — NOT `_season_projection_should_launch`, which lanes.md flags as contended), `tests/test_refresh_worker.py`. Every OPEN-lane reference to `run_refresh_worker.py` is RELEASED; checked. Checked against every OPEN lane: no lane holds either. Still NOT editing `graded_outcomes.py`, `evaluation_settlement.py`, `layer2_shortlist.py`, `layer2_board.py`, `refresh_mlb_oddsapi.py`.
 - Hypothesis: Layer 2 accuracy is NOT measurable end-to-end today. Specifically (a) shortlist artifacts are retained only ~4 days, not 7; (b) the evaluation ledger settles 0.2% of settleable records because the GRADED-ROW SUPPLY is near-zero (mlb=1/day vs a documented ~700-2400), not because the matcher is broken; (c) NCAAF, the largest board sport by row count, has no grader at all.
 - Falsification test: if `graded_rows_for_date('mlb', d)` returns hundreds of rows in production for a recent finished date, (b) is wrong and the defect is in the matcher. If dated shortlist artifacts exist for 2026-08-25..27 under any other read path, (a) is wrong.
 - Verification: a written per-sport/per-bet-type table with denominators, or an explicit statement of which cells are unmeasurable and why, each backed by a production reading recorded here.

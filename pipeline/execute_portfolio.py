@@ -495,7 +495,7 @@ def run_execution(
         # HOLD, DO NOT DROP. `skipped` means "not placed on this pass", and the
         # position stays in the plan, so the next tick inside the window places
         # it normally. Nothing is abandoned.
-        held = _polymarket_hold_price(request, venue)
+        held = _polymarket_hold_price(request, venue, position)
         if held is not None:
             price, hours = held
             skipped += 1
@@ -504,7 +504,8 @@ def run_execution(
                 f"[execute_portfolio] HELD_PREGAME_NEAR_EVEN venue={venue}"
                 f" ticker={getattr(request, 'venue_ticker', None)!r}"
                 f" market={getattr(request, 'market', None)}"
-                f" price={price:.3f} ceiling={_polymarket_max_pregame_price()}"
+                f" submit_price={price:.3f} ceiling={_polymarket_max_pregame_price()}"
+                f" {_ev_fields_of(position)}"
                 f" hours_to_commence={hours:.1f}"
                 " -- pregame, no book on a near-even side; it places once live",
                 flush=True,
@@ -986,7 +987,21 @@ def _polymarket_explores(request, price: float, ceiling: float) -> bool:
     rate = _polymarket_explore_rate()
     if rate <= 0:
         return False
-    if price > ceiling + _polymarket_explore_band():
+    # ROUNDED, because the band's top edge is a price we will actually see.
+    #
+    # MEASURED 2026-08-31T15:53Z, minutes after the gate started reading SUBMIT
+    # prices: `0.35 + 0.10` is `0.44999999999999996`, so `0.45 > band_top` is
+    # True and a 0.450 order fell OUTSIDE a band whose configured top is 0.45.
+    # Both live experiments -- bal-col and ast-ars, each submit_price=0.450 --
+    # were held instead of explored, and the arm stopped being able to fire.
+    #
+    # THIS WAS LATENT UNTIL THE SUBMIT-PRICE FIX MADE IT REACHABLE. Planned
+    # prices are arbitrary (0.441, 0.444) and essentially never land on the
+    # edge; submit prices are SNAPPED TO THE TICK, so they land on round
+    # boundaries constantly -- and 0.45 is exactly where a 0.44 or 0.445 quote
+    # crosses to. The arm's most probable price was the one value it excluded.
+    band_top = round(ceiling + _polymarket_explore_band(), 9)
+    if price > band_top:
         return False
     key = str(getattr(request, "position_key", "") or "").strip()
     if not key:
@@ -1040,7 +1055,81 @@ def _polymarket_max_pregame_price() -> float:
         return 0.0
 
 
-def _polymarket_hold_price(request, venue: str) -> tuple[float, float] | None:
+def _ev_fields_of(position) -> str:
+    """`ev_pct=` / `edge_pct=` for a gate log line, or explicit unknowns.
+
+    WHY THE GATE LOGS EV AT ALL. The held population is the ONLY population this
+    gate creates, and a held order is `skipped` -- it is never recorded in the
+    execution ledger, so it exists nowhere except this log line. Asked to score
+    the holds on EV on 2026-08-31, the answer was that it could not be done from
+    outside the worker at all: `ev_pct` sits on the PLAN position, the
+    venue-scoped plan is served by no endpoint (`/api/portfolio/paper` exposes
+    per-venue COUNTS only), and the unscoped plan is a different selection
+    entirely -- it picks props where Polymarket picks h2h and totals, so a join
+    by matchup silently matches the wrong rows.
+
+    So the number is stamped where the decision is made, by the code that makes
+    it, rather than reconstructed later from something that was never the same
+    set. `None` prints as `?` and never as a number.
+    """
+    def _one(key):
+        value = position.get(key) if hasattr(position, "get") else None
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "?"
+        return f"{value:.2f}"
+
+    return f"ev_pct={_one('ev_pct')} edge_pct={_one('model_edge_pct')}"
+
+
+def _polymarket_submit_price(request) -> float | None:
+    """The price this order will ACTUALLY BE SENT AT, or `None` if unknowable.
+
+    THE GATE HAS TO JUDGE THE PRICE THE VENUE RECEIVES. This function exists
+    because it did not. MEASURED 2026-08-31T15:25Z on two live orders:
+
+        gate saw   0.444 / 0.441   `planned_probability(requested_price)`
+        venue got  0.45  / 0.45    SUBMIT price={'value': '0.45'}
+
+    `_polymarket_resolve_market` snaps UP to the tick and then crosses UP by
+    `SYNDICATE_POLYMARKET_CROSS_TICKS`, so the submitted price is systematically
+    ABOVE the planned one. A ceiling checked against the planned price bounds a
+    number nobody pays: planned 0.349 under a 0.35 ceiling is bought at ~0.355+.
+
+    This is the SAME correction `_polymarket_resolve_market` already applied one
+    level down -- its own comment reads "SNAP FIRST, THEN GUARD -- the guard has
+    to judge the price we will ACTUALLY SEND", for the slippage check, for
+    exactly this reason. The pregame gate was the same bug one layer up.
+
+    `None` MEANS "CANNOT TELL", AND THE GATE TREATS THAT AS PLACE. Every way
+    this returns `None` -- an unresolvable side, a stale artifact, a slippage
+    raise -- is a condition the REAL placement path is about to refuse by name,
+    a few lines later, with a log line that says which. Holding here would
+    replace a named refusal with a silent skip and hide it. Refusal ownership
+    stays in one place.
+    """
+    try:
+        resolved = _polymarket_resolve_market(request)
+    except Exception:
+        # INCLUDING `_SlippageExceeded`, which this call CAN raise. Nothing at
+        # the gate's call site catches it -- it is handled around the real
+        # submit -- so letting it escape here would take down the placement
+        # loop for every remaining position on the tick. The order is refused
+        # by that same raise moments later, where it is caught and recorded.
+        return None
+    if not resolved or len(resolved) < 2:
+        return None
+    try:
+        price = float(resolved[1])
+    except (TypeError, ValueError):
+        return None
+    # A price outside (0,1) is not a probability and cannot be compared to a
+    # ceiling. `order_body` refuses it downstream; say nothing about it here.
+    if not 0.0 < price < 1.0:
+        return None
+    return price
+
+
+def _polymarket_hold_price(request, venue: str, position=None) -> tuple[float, float] | None:
     """`(price, hours_to_commence)` if this order should be HELD, else None.
 
     THE RULE, and it is two-dimensional because one dimension never fitted:
@@ -1076,7 +1165,11 @@ def _polymarket_hold_price(request, venue: str) -> tuple[float, float] | None:
     if hours <= 0:
         return None
 
-    price = planned_probability(getattr(request, "requested_price", None))
+    # THE PRICE THE VENUE WILL RECEIVE, not the one we planned. See
+    # `_polymarket_submit_price`: snap and cross both round UP, so the planned
+    # price this used to read is always at or below what is actually bought,
+    # and a ceiling tested against it does not bound the purchase.
+    price = _polymarket_submit_price(request)
     if price is None:
         return None
     if price <= ceiling:
@@ -1089,8 +1182,9 @@ def _polymarket_hold_price(request, venue: str) -> tuple[float, float] | None:
         print(
             f"[execute_portfolio] EXPLORE_PREGAME_BOUNDARY"
             f" ticker={getattr(request, 'venue_ticker', None)!r}"
-            f" price={price:.3f} ceiling={ceiling} band={_polymarket_explore_band()}"
+            f" submit_price={price:.3f} ceiling={ceiling} band={_polymarket_explore_band()}"
             f" rate={_polymarket_explore_rate()} hours_to_commence={hours:.1f}"
+            f" {_ev_fields_of(position)}"
             " -- placed ON PURPOSE to keep the boundary testable",
             flush=True,
         )
@@ -1461,7 +1555,17 @@ def _polymarket_resolve_market(request) -> tuple | None:
                 [(str(n), None) for n in outcomes]
             ):
                 candidate = {"parsed": parse_slug(slug) or {}}
-                if _subject_is_side(candidate, row, our_side, sport):
+                # THE REQUEST'S TEAMS, NOT THE SLATE ROW. `_subject_is_side`
+                # decides the leg from `home_team`/`away_team` since
+                # 2026-08-31 -- the positional parse it used before bought
+                # Getafe on a bet for CA Osasuna. `_SLATE_STORAGE_FIELDS`
+                # carries no team names at all (slug, outcomes, prices, line,
+                # gameStartTime, tick, min qty, orderable), so passing `row`
+                # here means the resolver can never confirm ANY leg and every
+                # soccer moneyline refuses -- fail-safe, and silently dead.
+                # `resolution` is built from the request a few lines above and
+                # is the same pair the price lookup already matched on.
+                if _subject_is_side(candidate, resolution, our_side, sport):
                     for position, name in enumerate(outcomes):
                         if str(name or "").strip().lower() != "yes":
                             continue

@@ -1016,6 +1016,75 @@ _MODEL_EDGE_MAX_POINTS = 15.0
 
 EV_BASIS_MARKET = "market_fair"
 EV_BASIS_MODEL = "model_probability"
+# The model row ranked on its EDGE (probability points) rather than on EV.
+# A SEPARATE BASIS BECAUSE THE UNITS GENUINELY DIFFER -- probability points vs
+# EV percent -- so this string is load-bearing, not decoration. `#242`: a
+# modelled number must not wear a measured one's clothes, and neither may a
+# probability-scale number wear an EV's.
+EV_BASIS_MODEL_EDGE = "model_edge"
+
+
+def _model_value_term() -> str:
+    """Rank a model-priced row on its EDGE or on its EV? Default `edge`.
+
+    ------------------------------------------------------------------
+    WHY EV AMPLIFIES, MEASURED
+    ------------------------------------------------------------------
+
+    `_model_value_ev` returns `expected_value_pct(price, model_prob)`, and near
+    fair that is `edge / p`. So EV multiplies the edge by `1/p`, and the served
+    shortlist shows it exactly (2026-08-31):
+
+        edge 10.18 -> ev 85.13   ratio  8.36   1/p =  9.62  (p=0.104)
+        edge  4.11 -> ev 50.92   ratio 12.39   1/p = 14.99  (p=0.067)
+        edge 12.43 -> ev 41.80   ratio  3.36   1/p =  4.18  (p=0.239)
+
+    A SMALLER edge on a LONGER shot outranks a bigger edge on a shorter one:
+    4.11 points at 6.7% beats 12.43 points at 24%. Mechanical, not a judgement
+    about the bets. Result: 23 of the top 25 were `hr_1plus`.
+
+    THE STRUCTURAL ARGUMENT, and it is the strongest one `[peer session
+    1c88bcca, who wrote the EV path and raised this against their own work]`:
+    `blended_score` CAPS the model's influence when it arrives as `model_edge`
+    (`_MODEL_EDGE_MAX_POINTS`, `_SCORE_SIM_CAP_PCT`) -- and the same information
+    was then routed through `value_ev`, which has NO cap. The top row's own
+    breakdown says it: `sim_component None, movement_component None,
+    ev_component 85.13`. The model was capped in one path and given an uncapped
+    one in the next line.
+
+    AND IT AMPLIFIES MODEL ERROR HARDEST WHERE THE MODEL IS WEAKEST. At p=0.10 a
+    2-point probability error moves EV ~20 points; at p=0.50 it moves ~4. These
+    rows carry `model_skill.sample_games: 0`.
+
+    ------------------------------------------------------------------
+    THE DEFAULT IS `edge` BY USER DECISION, 2026-08-31
+    ------------------------------------------------------------------
+
+    **`[2026-08-31, user decision: "rank on edge, flip the default"]`. This
+    SUPERSEDES `[2026-08-30: "Price EV vs the model everywhere"]` FOR THE
+    RANKING TERM ONLY** -- EV against the model is still computed, still
+    published as `model_ev_pct`, and still what the row reports. What changed is
+    which number the SCORE sorts on.
+
+    Recorded at this length because the 08-30 decision is still in `state.md`,
+    and a reader who finds only that one will read this as a regression rather
+    than as a later ruling by the same person.
+
+    It shipped DEFAULTING TO THE OLD BEHAVIOUR first, deliberately: two Claude
+    sessions agreeing does not reverse a user's decision, so the flag existed to
+    make the alternative measurable and put it to them. The default moved only
+    after they ruled. `SYNDICATE_LAYER2_MODEL_VALUE_TERM=ev` is now the
+    reverse-out rather than the opt-in.
+
+    Simulated on the served board before shipping -- top 25 `hr_1plus`
+    23 -> 8, and the new #1 is a totals row at `ev_pct` +3.88, market-anchored
+    and positive. Reachability, which is what the 08-30 decision was FOR, is
+    preserved: the edges are 3.79-12.43 against a #50 that was +0.64.
+    """
+    raw = str(os.environ.get("SYNDICATE_LAYER2_MODEL_VALUE_TERM") or "").strip().lower()
+    # Absent means EDGE. Only the exact word `ev` reverts, so an unrecognised
+    # value cannot silently restore the 1/p amplification.
+    return "ev" if raw == "ev" else "edge"
 
 
 def _model_value_ev(
@@ -1567,8 +1636,17 @@ def build_layer2_rows(
             # nowhere else.
             model_ev = _model_value_ev(row, side, price, fair_method)
             if model_ev is not None:
-                value_ev = model_ev
-                ev_basis = EV_BASIS_MODEL
+                # THE VALUE TERM, and only this. `ev_pct` below is untouched:
+                # `portfolio_commit` back-derives the market fair from it and
+                # refuses a row `no_model_edge_pct` at Kelly 0, so letting a
+                # probability-scale number leak into that field would corrupt
+                # the sizer rather than merely re-rank the board.
+                if _model_value_term() == "edge" and model_edge is not None:
+                    value_ev = model_edge
+                    ev_basis = EV_BASIS_MODEL_EDGE
+                else:
+                    value_ev = model_ev
+                    ev_basis = EV_BASIS_MODEL
                 # `model_edge` is DROPPED from the blend for these rows, not
                 # kept alongside. The two are the same information twice over --
                 # `model_ev` is EV against the model probability and

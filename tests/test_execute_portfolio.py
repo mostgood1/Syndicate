@@ -1505,6 +1505,41 @@ def test_cross_ticks_UNREADABLE_takes_the_safe_arm_and_says_so(monkeypatch):
     assert _polymarket_cross_ticks() == 0
 
 
+@pytest.fixture
+def submit_price_echoes_planned(monkeypatch):
+    """Make the resolved SUBMIT price equal the planned price for rule tests.
+
+    The gate reads `_polymarket_submit_price` -> `_polymarket_resolve_market`,
+    which needs the slate artifact. These tests have none, so without this every
+    resolution returns `None` and the gate places UNCONDITIONALLY -- the correct
+    PRODUCTION reading of "cannot tell", and a useless one here, because it makes
+    every assertion about the RULE pass or fail for a reason that has nothing to
+    do with the rule.
+
+    MEASURED when the gate switched to the submit price: 8 tests failed outright
+    and the four `test_exploration_*` cases passed VACUOUSLY -- `_placed()`
+    returned "placed" for every input, so "beyond the band nothing may be
+    placed" and "switched off places 0" were both being satisfied by a broken
+    resolution rather than by the gate. A silently vacuous test is worse than a
+    failing one; this fixture is what keeps these meaning what their names say.
+
+    submit == planned is the honest identity for a RULE test: the tick and cross
+    arithmetic have their own tests, and
+    `test_the_gate_holds_on_the_SUBMITTED_price_not_the_planned_one` is what
+    proves the two are actually wired together.
+    """
+    import pipeline.execute_portfolio as ep
+
+    def _echo(request):
+        price = ep.planned_probability(getattr(request, "requested_price", None))
+        if price is None:
+            return None
+        return ("slug", price, 0.01, 0.01, 0, (None, None))
+
+    monkeypatch.setattr(ep, "_polymarket_resolve_market", _echo)
+    return _echo
+
+
 def _req(prob, hours_from_now):
     """An order at `prob` on a fixture `hours_from_now` hours out.
 
@@ -1540,7 +1575,7 @@ def _req(prob, hours_from_now):
     (0.490, 13.5, True, "ast-ars resting"),
     (0.490, 11.0, True, "lec-rom resting"),
 ])
-def test_the_rule_reproduces_every_observed_order(monkeypatch, prob, hours, should_hold, why):
+def test_the_rule_reproduces_every_observed_order(monkeypatch, submit_price_echoes_planned, prob, hours, should_hold, why):
     """MEASURED 2026-08-31T05:33Z, 12 orders, verified in two sessions:
 
         PREGAME  filled  0.240 0.250 0.335
@@ -1571,7 +1606,7 @@ def test_kalshi_is_untouched(monkeypatch):
     assert _polymarket_hold_price(_req(0.49, 20), "kalshi") is None
 
 
-def test_UNKNOWN_kickoff_or_price_places_rather_than_suppresses(monkeypatch):
+def test_UNKNOWN_kickoff_or_price_places_rather_than_suppresses(monkeypatch, submit_price_echoes_planned):
     """"We cannot tell" and "this will not fill" are different facts, and only
     the second is a reason not to bet."""
     monkeypatch.delenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", raising=False)
@@ -1594,7 +1629,7 @@ def test_UNKNOWN_kickoff_or_price_places_rather_than_suppresses(monkeypatch):
     assert _polymarket_hold_price(_Garbage(), "polymarket") is None
 
 
-def test_the_hold_can_be_switched_off_without_a_code_change(monkeypatch):
+def test_the_hold_can_be_switched_off_without_a_code_change(monkeypatch, submit_price_echoes_planned):
     monkeypatch.setenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", "0")
     from pipeline.execute_portfolio import _polymarket_hold_price
     assert _polymarket_hold_price(_req(0.49, 20), "polymarket") is None
@@ -1620,7 +1655,7 @@ def _placed(prob, key, capsys=None):
     return _polymarket_hold_price(_req_keyed(key, prob), "polymarket") is None
 
 
-def test_exploration_is_DETERMINISTIC_per_order_never_random_per_tick(monkeypatch, capsys):
+def test_exploration_is_DETERMINISTIC_per_order_never_random_per_tick(monkeypatch, submit_price_echoes_planned, capsys):
     """THE LOAD-BEARING PROPERTY. A coin flip each pass would place an order,
     hold it next tick, place it again after -- which is the submit -> cancel ->
     resubmit churn this gate exists to stop, and that churn produced a duplicate
@@ -1633,7 +1668,7 @@ def test_exploration_is_DETERMINISTIC_per_order_never_random_per_tick(monkeypatc
     assert len(verdicts) == 1, "the verdict must not change between ticks"
 
 
-def test_exploration_hits_roughly_its_configured_rate(monkeypatch, capsys):
+def test_exploration_hits_roughly_its_configured_rate(monkeypatch, submit_price_echoes_planned, capsys):
     """Without a real rate the arm is decorative: too low and the boundary never
     fills in, too high and it is not an arm, it is the absence of a gate."""
     for v in ("SYNDICATE_POLYMARKET_EXPLORE_RATE", "SYNDICATE_POLYMARKET_EXPLORE_BAND",
@@ -1648,7 +1683,7 @@ def test_exploration_hits_roughly_its_configured_rate(monkeypatch, capsys):
     assert 0.44 <= placed / n <= 0.56, f"got {placed / n:.3f}, expected ~0.50"
 
 
-def test_exploration_is_AIMED_at_the_boundary_not_uniform(monkeypatch, capsys):
+def test_exploration_is_AIMED_at_the_boundary_not_uniform(monkeypatch, submit_price_echoes_planned, capsys):
     """The unknown is the gap 0.335-0.410. A 0.490 side has been observed resting
     FOUR times; re-testing it buys nothing but churn."""
     for v in ("SYNDICATE_POLYMARKET_EXPLORE_RATE", "SYNDICATE_POLYMARKET_EXPLORE_BAND",
@@ -1661,7 +1696,7 @@ def test_exploration_is_AIMED_at_the_boundary_not_uniform(monkeypatch, capsys):
     assert outside == 0, "beyond the band nothing may be placed"
 
 
-def test_exploration_can_be_switched_off(monkeypatch, capsys):
+def test_exploration_can_be_switched_off(monkeypatch, submit_price_echoes_planned, capsys):
     monkeypatch.setenv("SYNDICATE_POLYMARKET_EXPLORE_RATE", "0")
     monkeypatch.delenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", raising=False)
     placed = sum(_placed(0.40, f"off-{i}") for i in range(500))
@@ -1669,7 +1704,7 @@ def test_exploration_can_be_switched_off(monkeypatch, capsys):
     assert placed == 0
 
 
-def test_an_order_with_NO_position_key_is_held_not_explored(monkeypatch, capsys):
+def test_an_order_with_NO_position_key_is_held_not_explored(monkeypatch, submit_price_echoes_planned, capsys):
     """No stable key means no stable verdict, and an unstable verdict IS the
     churn. Hold, as the gate would have."""
     for v in ("SYNDICATE_POLYMARKET_EXPLORE_RATE", "SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE"):
@@ -1678,3 +1713,172 @@ def test_an_order_with_NO_position_key_is_held_not_explored(monkeypatch, capsys)
     r = _req_keyed("", 0.40)
     assert _polymarket_hold_price(r, "polymarket") is not None
     capsys.readouterr()
+
+
+def test_the_gate_holds_on_the_SUBMITTED_price_not_the_planned_one(monkeypatch, capsys):
+    """THE FIX, 2026-08-31. The ceiling used to be checked against a price the
+    venue never receives.
+
+    `_polymarket_resolve_market` snaps UP to the tick and crosses UP by
+    `SYNDICATE_POLYMARKET_CROSS_TICKS`, so the submitted price is systematically
+    ABOVE the planned one. MEASURED on two live orders at 15:25Z: the gate
+    logged 0.444 and 0.441, and the venue received 0.45 for both.
+
+    So a planned price UNDER the ceiling could be bought OVER it -- planned
+    0.349 against a 0.35 ceiling is submitted at ~0.355+. The ceiling bounded an
+    intermediate value nobody pays.
+    """
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", raising=False)
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_EXPLORE_RATE", "0")
+    import pipeline.execute_portfolio as ep
+    # planned 0.340 is UNDER the 0.35 ceiling. The venue receives 0.360.
+    monkeypatch.setattr(ep, "_polymarket_resolve_market",
+                        lambda request: ("slug", 0.360, 0.01, 0.01, 0, (None, None)))
+    held = ep._polymarket_hold_price(_req(0.340, 20), "polymarket")
+    capsys.readouterr()
+    assert held is not None, (
+        "a planned price under the ceiling whose SUBMIT price is over it must HOLD"
+    )
+    assert abs(held[0] - 0.360) < 1e-9, (
+        "the gate must report the price the venue receives, not the planned one"
+    )
+
+
+def test_the_gate_PLACES_when_only_the_planned_price_is_over_the_ceiling(monkeypatch, capsys):
+    """The converse, and the reason this is a correction rather than a tightening.
+
+    A planned price above the ceiling whose SUBMITTED price lands under it is a
+    bet the old gate suppressed for no reason. Direction matters: reading the
+    wrong price is not uniformly conservative."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", raising=False)
+    import pipeline.execute_portfolio as ep
+    monkeypatch.setattr(ep, "_polymarket_resolve_market",
+                        lambda request: ("slug", 0.340, 0.01, 0.01, 0, (None, None)))
+    assert ep._polymarket_hold_price(_req(0.360, 20), "polymarket") is None
+    capsys.readouterr()
+
+
+def test_a_resolution_that_RAISES_places_rather_than_killing_the_tick(monkeypatch):
+    """`_polymarket_resolve_market` raises `_SlippageExceeded`, and the gate's
+    call site does NOT catch it -- that handler sits around the real submit. An
+    escape here would abort the placement loop for every REMAINING position on
+    the tick, turning a one-order refusal into a slate-wide outage.
+
+    The order is refused by that same raise moments later, where it is caught
+    and recorded by name."""
+    import pipeline.execute_portfolio as ep
+
+    def _boom(request):
+        raise ep._SlippageExceeded("polymarket_slippage: slug=x drift=+0.9")
+
+    monkeypatch.setattr(ep, "_polymarket_resolve_market", _boom)
+    assert ep._polymarket_hold_price(_req(0.49, 20), "polymarket") is None
+
+
+def test_an_UNRESOLVABLE_market_places_so_the_refusal_keeps_its_name(monkeypatch):
+    """"Cannot resolve" is not "will not fill". The real path refuses this a few
+    lines later with POLYMARKET_SIDE_REFUSED / _STALE / _NOT_FOUND, each naming
+    which. Holding here would replace a named refusal with a silent skip."""
+    import pipeline.execute_portfolio as ep
+    monkeypatch.setattr(ep, "_polymarket_resolve_market", lambda request: None)
+    assert ep._polymarket_hold_price(_req(0.49, 20), "polymarket") is None
+
+
+def test_the_band_INCLUDES_its_own_top_edge(monkeypatch, capsys):
+    """`0.35 + 0.10` is `0.44999999999999996`, so a 0.450 order was excluded from
+    a band whose configured top is 0.45.
+
+    LATENT UNTIL THE SUBMIT-PRICE FIX MADE IT REACHABLE. Planned prices are
+    arbitrary and never land on the edge; SUBMIT prices are snapped to the tick,
+    so they land on round boundaries constantly. Measured 15:53Z: both live
+    experiments read submit_price=0.450 and were held instead of explored, which
+    silently stalled the arm."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", raising=False)
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_EXPLORE_BAND", raising=False)
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_EXPLORE_RATE", "1")
+    import pipeline.execute_portfolio as ep
+    monkeypatch.setattr(ep, "_polymarket_resolve_market",
+                        lambda request: ("slug", 0.450, 0.005, 0.01, 0, (None, None)))
+    held = ep._polymarket_hold_price(_req_keyed("edge-key", 0.45), "polymarket")
+    capsys.readouterr()
+    assert held is None, "0.450 sits ON the band top (0.35+0.10) and must be explorable"
+
+
+def test_just_ABOVE_the_band_top_is_still_held(monkeypatch, capsys):
+    """The rounding must not widen the band -- 0.455 stays outside."""
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE", raising=False)
+    monkeypatch.delenv("SYNDICATE_POLYMARKET_EXPLORE_BAND", raising=False)
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_EXPLORE_RATE", "1")
+    import pipeline.execute_portfolio as ep
+    monkeypatch.setattr(ep, "_polymarket_resolve_market",
+                        lambda request: ("slug", 0.455, 0.005, 0.01, 0, (None, None)))
+    assert ep._polymarket_hold_price(_req_keyed("edge-key", 0.455), "polymarket") is not None
+    capsys.readouterr()
+
+
+def test_EV_fields_are_formatted_or_explicitly_unknown_never_invented():
+    """The held population exists ONLY in the gate's log lines.
+
+    A held order is `skipped` and never reaches the execution ledger, and the
+    venue-scoped plan that holds `ev_pct` is served by no endpoint -- so asked
+    to score the holds on EV, the answer was that it could not be done from
+    outside the worker at all. The number is now stamped where the decision is
+    made.
+
+    An absent or non-numeric EV must print `?`, never a number: the unscoped
+    plan is a DIFFERENT selection (props where Polymarket picks h2h/totals), so
+    a plausible-looking figure taken from the wrong row is worse than none.
+
+    `_ev_fields_of` is tested directly because the HELD line is printed at the
+    CALL SITE, not inside `_polymarket_hold_price` -- asserting it against the
+    gate function tested nothing and passed on an empty string."""
+    from pipeline.execute_portfolio import _ev_fields_of
+    assert _ev_fields_of({"ev_pct": 3.71, "model_edge_pct": 8.64}) == "ev_pct=3.71 edge_pct=8.64"
+    assert _ev_fields_of({}) == "ev_pct=? edge_pct=?"
+    assert _ev_fields_of(None) == "ev_pct=? edge_pct=?"
+    assert _ev_fields_of({"ev_pct": None, "model_edge_pct": "n/a"}) == "ev_pct=? edge_pct=?"
+    # bool is an int in Python; a flag must not print as an EV.
+    assert _ev_fields_of({"ev_pct": True, "model_edge_pct": False}) == "ev_pct=? edge_pct=?"
+
+
+def test_the_EXPLORE_line_carries_EV_from_its_PARAMETER_not_another_frame(monkeypatch, capsys):
+    """REGRESSION. The EXPLORE print lives inside `_polymarket_hold_price`,
+    where `position` is not a local -- stamping it there by name would
+    NameError on every explore, on a live money path. It is a parameter."""
+    for v in ("SYNDICATE_POLYMARKET_EXPLORE_RATE", "SYNDICATE_POLYMARKET_EXPLORE_BAND",
+              "SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE"):
+        monkeypatch.delenv(v, raising=False)
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_EXPLORE_RATE", "1")
+    import pipeline.execute_portfolio as ep
+    monkeypatch.setattr(ep, "_polymarket_resolve_market",
+                        lambda request: ("slug", 0.44, 0.01, 0.01, 0, (None, None)))
+    assert ep._polymarket_hold_price(_req_keyed("ev-key", 0.44), "polymarket",
+                                     {"ev_pct": 1.25, "model_edge_pct": 2.5}) is None
+    out = capsys.readouterr().out
+    assert "EXPLORE_PREGAME_BOUNDARY" in out, out
+    assert "ev_pct=1.25" in out and "edge_pct=2.50" in out, out
+
+
+def test_a_soccer_yes_no_leg_is_tested_against_the_REQUESTS_teams(monkeypatch):
+    """`_SLATE_STORAGE_FIELDS` carries NO team names -- slug, outcomes, prices,
+    line, gameStartTime, tick, min qty, orderable.
+
+    `_subject_is_side` decides the leg from `home_team`/`away_team` since the
+    2026-08-31 wrong-side loss. Handing it the slate row means it can never
+    confirm any leg, so every soccer moneyline refuses: fail-safe, and silently
+    dead. This pins that the REQUEST's teams reach it, so a correct leg still
+    resolves and the wrong one still refuses."""
+    from syndicate.features.shared.polymarket_board_join import _subject_is_side, parse_slug
+    from syndicate.features.shared.polymarket_us_markets import _SLATE_STORAGE_FIELDS
+    assert "home_team" not in _SLATE_STORAGE_FIELDS
+    assert "away_team" not in _SLATE_STORAGE_FIELDS
+
+    candidate = {"parsed": parse_slug("atc-lal-osa-get-2026-08-31-get") or {}}
+    slate_row = {"slug": "atc-lal-osa-get-2026-08-31-get", "orderable": True}
+    # The slate row cannot answer either way.
+    assert _subject_is_side(candidate, slate_row, "home", "soccer") is False
+    assert _subject_is_side(candidate, slate_row, "away", "soccer") is False
+    # The request's teams answer both, and refuse the side that lost money.
+    resolution = {"home_team": "CA Osasuna", "away_team": "Getafe"}
+    assert _subject_is_side(candidate, resolution, "home", "soccer") is False
+    assert _subject_is_side(candidate, resolution, "away", "soccer") is True
