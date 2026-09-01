@@ -333,7 +333,7 @@ death, never life — do not invert it.
 - Blocked by: none.
 - Full working record (measurements, phase log, hypothesis/falsification detail) moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### mlb-native-ladders-producer — OPEN, UNOWNED (session 822e1e5a archived 2026-08-20 ~20:4xZ) — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`; `todo.md #493`). ALL CODE SHIPPED AND LIVE — fix `a54dffa3` (18:27:40Z), force knob + one-shot guard live in `a0396411` (20:28:43Z, verified by CONTENT), `SYNDICATE_MLB_LADDERS_FORCE_DATE=2026-08-20` SET. THE PRODUCTION VERIFICATION IS UNDISCHARGED AND IS A ONE-CURL READ: last status `skipped_fresh` at 20:11:24Z PREDATES the deploy, so nothing had run with the knob yet — pending, NOT failed.** — opened 2026-08-20
+### mlb-native-ladders-producer — CLOSED 2026-09-01 — **PRODUCER PROVEN, GOAL PARTLY MET, REMAINING WORK MOVED TO `todo.md #493`.** VERIFIED: `generatedBy == syndicate.features.mlb.ladders_build` on the SERVED `daily_ladders_2026_09_01.json` (was ABSENT), `generatedAt 16:38:21Z` — after the `c2f3efe4` deploy finished 16:02:39Z — pitcher `ladder` 30/30, `gamePk` 30/30, artifact 16,625,227 -> 1,529,320 B; measurement in `deploys.md`. **NOT MET, and closed anyway by explicit user decision:** the goal also said *vendor stage removed* (it is NOT — correctly, removing it short of parity converts a degraded path into an outage) and *both consumers rendering unchanged* (they do NOT — `/mlb/api/hitter-ladders` now shows `PA mean` and `Order` as `-`, 2 of 4 presenter fields at 0/30; hitter `ladder` 0/391 vs vendor 234/234, which does not break the page). No outage; the regression is scoped to 2026-09-01 because the force knob is one-shot and date-scoped. **All three unmet items live on in `todo.md #493` — this closure archives the block, not the work.** — opened 2026-08-20
   SERVED artifact is now `syndicate.features.mlb.ladders_build` (was ABSENT), at
   `generatedAt 2026-09-01T16:38:21Z` — AFTER the `c2f3efe4` deploy finished
   16:02:39Z — with pitcher `ladder` 30/30 and `gamePk` 30/30, and the artifact
@@ -1411,7 +1411,8 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked on a live slate (2026-09-17): T0-1, T0-3, T1-5, T2-1, T2-2, T3-1..T3-5, T4-1/3/4. `todo #614`–`#617` carry the findings; **`#614` and `#616` were CORRECTED in place** after I named mechanisms from symptoms.
 - **2026-09-01 EXCHANGE PRICES — VERIFIED.** `kept_direct=603` on the first grid build after the first Kalshi capture (`0` on every build before it); second capture +153; both post-capture builds agree. The provenance stamp and the grid rule that honours it are mine, the capture is `syndicate-e2`'s. Re-derived off Render by me, not taken from their report. Evidence in `deploys.md`.
 - **The `near_misses` defect they reported in this file is FIXED — `07cb592a`.** It was my regression: provenance-based dropping created a second class of survivor and the counter's precondition assumed one. Moved under `else`. **Their suggested `continue` is a SILENT REVERT** — `freshest[key]`/`anchors[]` follow that block, so it deletes the kept row from the grid; measured (`assert 'kalshi' in {'fanduel'}`). Do not apply it.
-- **OWED, and it is the one thing left: refresh-worker has never run the POLYMARKET capture.** Kalshi is proven end to end; Polymarket is not. Undeployed on refresh-worker: `c544b30c` (Polymarket capture), `07cb592a` (near-miss fix), WNBA `us_ex` regions. Gate: `POLYMARKET_QUOTE_CAPTURE` with `appended > 0`, plus `near_misses={}` beside a non-zero `kept_direct`. Same-day readable — the capture is cross-sport, so MLB exercises it without waiting for WNBA.
+- **DEPLOYED `417e19ed`, live 16:55:23Z. Both gates read.** `near_misses` gate **MET**: `kept_direct=603 near_misses={'kalshi': 603}` → `kept_direct=830 near_misses={}` (kept GREW while the false alarm went empty, so the counter was fixed rather than the rows suppressed). Polymarket gate **NOT MET**: `POLYMARKET_QUOTE_CAPTURE matches=60 sports=['mlb','soccer'] appended=0` — the capture is reachable and correctly wired, and wrote nothing because all 60 were GAME markets and the builder is props-only **by design**. **Do not remove that bound to make the number rise** — OddsAPI already writes `polymarket` game rows under the same dedup key, so a second writer alternates rather than adds.
+- **Honest state of "exchange prices on the board":** Kalshi direct — YES, proven (830). Polymarket game — already arrived via OddsAPI, untouched. Polymarket direct — contributes nothing until Polymarket lists a player prop that joins the board; the capture then fires on its own, nothing further needed.
 - **Traceability gap, both venues, by choice:** `venue_ticker` persisted on 0 of 603 rows (`_normalize` keeps a fixed key set). Removed from my builder; a boundary test now asserts EVERY builder's keys survive `_normalize`. One-line fix (`venue_ticker` into `_normalize`) written down and deliberately not taken — a shared-schema change that would leave one venue traceable and the other not.
 - Blocked by: none. Next: **`#623`** (the 09-17 sprint + pre-registered gates + parked `#614`/`#616` reads) and **`#626`(d)(e)** (reuse-guard/live-capture, klass-hole). **`#622`** owns the ranking-key question — per `#615` T2-1 is ANSWERED (no sim-derived key exists; do NOT keep re-looking at the 656-row sample, ~30 looks are already on record). `scripts/prereg_wnba_favourite_lean.py` is frozen and waiting for the sprint.
 
@@ -1535,7 +1536,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   by file-write to avoid shared-index/CRLF hazards.
 - Files: released: `docs/ai_context/todo.md`, released: `.syndicate/findings_2026-09-01_sim_engine_edge_analysis.md`
 
-### phase0-basketball-integrity — OPEN — opened 2026-09-01 — session syndicate-8d (3492626c)
+### phase0-basketball-integrity — CLOSED 2026-09-01 — **LANDED on `origin/main` as `417e19ed`: `#626`(c) NBA integrity ports + (e) the live-lens tick klass line-source gate, BOTH vendor repos.** Verification ran: 100 targeted tests pass incl. off!=on both directions (gate: model→NONE vs oddsapi→BET; knob env off!=on; consensus old-rule reproduction; clamp counters); tripwire pins `implied + ev` at zero in BOTH refresh scripts — including the TWO WNBA sites `bef61c33` missed (top_by_game + cards_props_snapshot). Two prior tests updated with supersession documented (NBA clamp [0,1]→[0.01,0.99] was that test's own WNBA-lane scoping choice, not a finding; certainty refusal is a validity constraint and the fabrication cause was removed in the same change). `test_nba_refresh_runner` one failure is PRE-EXISTING on origin/main (stale `force_refresh` mock — chip filed), baselined via stash, not mine. — session syndicate-8d (3492626c)
 - Goal: `#626`(c) + (e) executed. (c) NBA carries none of the WNBA integrity
   defects: consensus prices averaged on the implied-probability scale with
   (−100,100) rejection; no `p_win = implied + ev` anywhere; probabilities
@@ -1558,13 +1559,35 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Falsification test: if NBA's served p_win already routes through the WNBA
   clamp chokepoint, the `implied + ev` sites are dead code and the fix is
   deletion + a pin test, not a port.
-- Verification: off-is-not-on tests per `model_engine_standard.md` §4.3 (the
-  klass gate test FAILS with the old re-derivation restored; the price test
-  FAILS with arithmetic averaging restored); targeted pytest green; landed on
-  `origin/main`. Production verification (zero (−100,100) prices, zero
-  p_win ≥ 0.999, zero model-line BET rows) is a NEXT-SLATE reading — NBA is
-  off-season, so serve-path effects are code+test-verified now and read in
-  production at the first NBA slate; stated as such, not claimed now.
+- **OWED, DATED, riding existing plan gates (no live session needed):** the
+  production readings — zero (−100,100) prices + zero `p_win ≥ 0.999` on the
+  FIRST NBA SLATE (pre-season ~Oct); zero `line_source=model` rows with
+  `klass: BET` on the 2026-09-17 WNBA slate (this IS `#623`'s pre-registered
+  gate 6 / T0-3 — the tick gate is the mechanism that makes it pass).
+- Blocked by: none.
+
+### nba-runner-force-refresh-mock — CLOSED 2026-09-01 — **LANDED on `origin/main` as `cbfe0c7d` (on `45b531ee`): 3 stale keyword-only mocks in `test_main_materializes_core_artifacts_into_bundle_root` now accept `force_refresh=False`, matching the real exporters since `85ff37dc`.** Verification ran: red confirmed pre-fix in a fresh worktree (TypeError on the slate mock), the lane's falsification test PASSED (fixing only the slate mock moved the SAME TypeError to the cards-props mock, proving the 3-mock scope), then 40/40 green on the pushed SHA post-rebase; sibling `tests/test_export_snapshot_force_refresh.py` 34/34 unaffected. Test-only `.py` push — no `render.yaml`, no deploy, nothing owed. No todo id existed (chip-spawned); recorded here only. — session 9222c035 (chip filed by phase0-basketball-integrity)
+- Goal: `tests/test_nba_refresh_runner.py` green on origin/main — specifically
+  `test_main_materializes_core_artifacts_into_bundle_root`, which failed with
+  `TypeError: unexpected keyword argument 'force_refresh'` (pre-existing,
+  baselined by phase0-basketball-integrity 2026-09-01, not caused by it). **MET.**
+- Files: released: `tests/test_nba_refresh_runner.py` (claim released at close,
+  2026-09-01, session archived; work is on `origin/main` as `cbfe0c7d`)
+- Hypothesis: `85ff37dc` (2026-08-16) made `_materialize_artifact_bundle` pass
+  `force_refresh=` to exactly three exporters (script lines 4400/4403/4409);
+  the test's keyword-only mocks for `_export_recommendations_slate_snapshot`,
+  `_export_cards_props_snapshot` and `_export_top_by_game_snapshot` predate the
+  kwarg, and the slate one raises first only because its call site is first.
+  The file's other fakes patch exporters whose call sites pass no
+  `force_refresh` (NBA's `_export_cards_sim_detail_snapshot` takes none —
+  unlike WNBA's), and `test_wnba_refresh_runner.py` never mocks these
+  exporters, so scope is exactly 3 mocks in this one file.
+- Falsification test: fix ONLY the slate mock and re-run — the test must fail
+  again with the SAME TypeError on the cards-props mock (then top-by-game).
+  If it passes with one mock fixed, the other two call sites don't really
+  pass the kwarg and the 3-mock scope claim is wrong.
+- Verification: red confirmed pre-fix in the lane worktree, then
+  `python -m pytest tests/test_nba_refresh_runner.py` fully green post-fix.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
