@@ -2781,3 +2781,121 @@ def test_game_lines_are_untouched_by_the_prop_path():
     assert out["matched"] == 1
     assert out["matches"][0]["market"] == "h2h"
     assert out["matches"][0]["player_name"] is None
+
+
+# ==========================================================================
+# THE PROP NO-MATCH SAMPLE NAMES THE PLAYER. Measured 2026-09-01T18:20:10Z:
+# ~230 `no_match|mlb|<prop market>` refusals per cycle, and the sample could
+# not say WHICH miss each was -- `want` is market|side|line, `offered` is
+# fixtures drawn unfiltered from the whole bucket, and the census strips the
+# digit that marks a collision-extended token. Token-miss, rung-miss and
+# player-not-listed printed identically; they need opposite responses.
+# ==========================================================================
+
+
+def test_a_prop_no_match_sample_puts_both_spellings_side_by_side():
+    """`wilcon2` is the venue's own collision-extended William Contreras; our
+    derived `wilcon` deliberately never matches it. The sample now shows the
+    venue's spelling beside ours -- a TOKEN-miss, readable from one log line
+    instead of a census."""
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hr-wilcon2-gte1")
+    board = _prop_board(market="batter_home_runs", player="William Contreras",
+                        line=0.5)
+    out = mod.join_polymarket_to_board([market], [board])
+    assert out["matched"] == 0
+    sample = out["unmatched_samples"][0]
+    assert sample["kind"] == "no_match"
+    assert sample["player"] == "William Contreras"
+    assert sample["token"] == "wilcon"
+    assert sample["fixture_tokens"] == ["wilcon2"]
+    assert sample["token_lines"] == []
+
+
+def test_a_rung_miss_shows_the_lines_the_venue_DOES_offer_for_our_token():
+    """The player IS listed and the rung is not: `token_lines` beside `want`'s
+    line is the whole story, with no token or listing question left open."""
+    markets = [
+        _prop_market(),  # hits-jacmer-gte2 -> over 1.5
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte3"),
+    ]
+    out = mod.join_polymarket_to_board(markets, [_prop_board(line=4.5)])
+    assert out["matched"] == 0
+    sample = out["unmatched_samples"][0]
+    assert sample["player"] == "Jackson Merrill"
+    assert sample["token"] == "jacmer"
+    assert sample["fixture_tokens"] == ["jacmer"]
+    assert sorted(sample["token_lines"]) == [1.5, 2.5]
+
+
+def test_a_player_the_venue_never_listed_shows_teammates_not_our_token():
+    """The venue quotes the family for OTHER players in this game only. Our
+    token absent from a populated `fixture_tokens` -- with no near variant --
+    is the player-not-listed read."""
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-manmac-gte2")
+    out = mod.join_polymarket_to_board([market], [_prop_board()])
+    assert out["matched"] == 0
+    sample = out["unmatched_samples"][0]
+    assert sample["token"] == "jacmer"
+    assert sample["fixture_tokens"] == ["manmac"]
+    assert sample["token_lines"] == []
+
+
+def test_a_near_token_survives_the_bound_teammates_would_crowd_it_out_of():
+    """`fixture_tokens` is bounded to 6 and a fixture lists more players than
+    that. A collision-extended variant shares our token's first-name prefix,
+    so it orders FIRST: truncation drops teammates, never the token-miss
+    evidence the field exists to carry."""
+    slugs = [
+        f"astatc-mlb-pit-sd-2026-08-24-hits-{tok}-gte2"
+        for tok in ("aaabbb", "cccddd", "eeefff", "ggghhh", "iiijjj",
+                    "kkklll", "mmmnnn", "wilcon2")
+    ]
+    out = mod.join_polymarket_to_board(
+        [_prop_market(slug=s) for s in slugs],
+        [_prop_board(player="William Contreras", line=1.5)],
+    )
+    assert out["matched"] == 0
+    sample = out["unmatched_samples"][0]
+    assert sample["fixture_tokens"][0] == "wilcon2"
+    assert len(sample["fixture_tokens"]) == 6
+
+
+def test_another_games_players_do_not_leak_into_fixture_tokens():
+    """Same family and date, different fixture: `offered` shows the bucket has
+    rows while `fixture_tokens` stays empty -- OUR game is what the family
+    bucket lacks, which is a fixture question, not a player one."""
+    market = _prop_market(slug="astatc-mlb-min-ath-2026-08-24-hits-othgu1-gte2")
+    out = mod.join_polymarket_to_board([market], [_prop_board()])
+    assert out["matched"] == 0
+    sample = out["unmatched_samples"][0]
+    assert sample["offered"] != []
+    assert sample["fixture_tokens"] == []
+    assert sample["token_lines"] == []
+
+
+def test_a_prop_family_with_no_candidates_at_all_still_names_the_player():
+    """The `no_candidates` kind for a prop row carries the same fields, empty:
+    the family+date bucket is what is missing, and the sample says for whom."""
+    out = mod.join_polymarket_to_board([], [_prop_board()])
+    sample = out["unmatched_samples"][0]
+    assert sample["kind"] == "no_candidates"
+    assert sample["player"] == "Jackson Merrill"
+    assert sample["token"] == "jacmer"
+    assert sample["fixture_tokens"] == []
+    assert sample["token_lines"] == []
+
+
+def test_a_game_line_sample_keeps_its_exact_shape():
+    """The control: the prop fields are prop-only. A game-line sample gains
+    nothing, so the established readers of this log line see what they saw."""
+    report = mod.join_polymarket_to_board(
+        [_total_market("tsc-mlb-min-sac-2026-08-25-10pt5")],
+        [{"sport": "mlb", "market": "totals", "side": "under", "line": 10.5,
+          "away_team": "Minnesota Twins", "home_team": "Athletics",
+          "date": "2026-08-25", "event_id": "e1"}],
+        selected_date="2026-08-25",
+    )
+    sample = report["unmatched_samples"][0]
+    assert sample["kind"] == "no_match"
+    for prop_only in ("player", "token", "fixture_tokens", "token_lines"):
+        assert prop_only not in sample

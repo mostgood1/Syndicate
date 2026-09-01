@@ -1263,13 +1263,14 @@ def join_polymarket_to_board(
         league: str,
         date: str,
         candidates: Sequence[Mapping[str, Any]],
+        prop_token: str | None = None,
     ) -> None:
         key = f"{kind}|{league}|{board_market}"
         unmatched_counts[key] = unmatched_counts.get(key, 0) + 1
         if key in unmatched_seen or len(unmatched_samples) >= 10:
             return
         unmatched_seen.add(key)
-        unmatched_samples.append({
+        sample: dict[str, Any] = {
             "kind": kind,
             "board": f"{board_row.get('away_team')} @ {board_row.get('home_team')}"[:52],
             "want": f"{board_market}|{board_row.get('side')}|{board_row.get('line')}",
@@ -1281,7 +1282,70 @@ def join_polymarket_to_board(
                 f"{c['parsed']['away']}-{c['parsed']['home']}@{c.get('line')}"
                 for c in list(candidates)[:5]
             ],
-        })
+        }
+        if prop_token is not None:
+            # WHO THE PROP IS ABOUT, because for a prop the fields above name
+            # everything EXCEPT the player: `want` is market|side|line and
+            # `offered` is fixtures drawn unfiltered from the whole
+            # (league, date, market) bucket. Measured 2026-09-01T18:20:10Z:
+            # ~230 `no_match|mlb|<prop market>` per cycle, and a token-encoding
+            # miss -- `wilcon2` (William Contreras) or `bretbat` (Brett
+            # Bateman), the venue's own collision-extended forms our derived
+            # 3+3 encoding deliberately never produces -- was indistinguishable
+            # in the sample from a rung the venue does not list or a player it
+            # does not list. (`prop_modifier_census` cannot see them either:
+            # it strips digit-bearing tokens, so `wilcon2`-class rows collapse
+            # to bare family shapes there.)
+            #
+            # `fixture_tokens` is the venue's player tokens for the SAME
+            # fixture and family, NEAR tokens first -- collision-extended
+            # forms share the 3-char first-name prefix (`wilcon2`/`wilcon`,
+            # `bretbat`/`brebat`), so ordering on that prefix keeps them
+            # inside the bound instead of truncated behind teammates.
+            # `token_lines` is the venue's rungs for OUR token in this
+            # fixture. One read now decomposes:
+            #   token-miss         near variant in fixture_tokens, ours absent
+            #   rung-miss          token_lines non-empty, our line not in them
+            #   player-not-listed  fixture_tokens filled by other players only
+            #   fixture-miss       offered non-empty, fixture_tokens empty
+            #
+            # Runs only while building a NEW sample (<=10 per join, above), so
+            # the per-candidate fixture test adds nothing to the refusal path.
+            # Diagnostic only: nothing here changes what is matched.
+            near_tokens: list[str] = []
+            far_tokens: list[str] = []
+            token_lines: list[Any] = []
+            seen_tokens: set[str] = set()
+            for c in candidates:
+                cand_prop = c.get("prop")
+                if not isinstance(cand_prop, Mapping):
+                    continue
+                cand_token = str(cand_prop.get("token") or "")
+                if not cand_token:
+                    continue
+                if not _teams_match(
+                    board_row, c["parsed"], board_row.get("sport") or sport,
+                    board_fixtures.get((league, date)),
+                ):
+                    continue
+                if (
+                    cand_token == prop_token
+                    and c.get("line") is not None
+                    and len(token_lines) < 6
+                ):
+                    token_lines.append(c.get("line"))
+                if cand_token in seen_tokens:
+                    continue
+                seen_tokens.add(cand_token)
+                if cand_token[:3] == prop_token[:3]:
+                    near_tokens.append(cand_token)
+                else:
+                    far_tokens.append(cand_token)
+            sample["player"] = str(board_row.get("player_name") or "")[:28]
+            sample["token"] = prop_token
+            sample["fixture_tokens"] = (near_tokens + far_tokens)[:6]
+            sample["token_lines"] = token_lines
+        unmatched_samples.append(sample)
 
     def _note_out_of_scope(venue_type: str, parsed: Mapping[str, Any], row: Mapping[str, Any]) -> None:
         key = f"{venue_type}|{parsed.get('league')}"
@@ -1815,7 +1879,10 @@ def join_polymarket_to_board(
                     # name is the disagreement.
                     "markets_for_our_league_date": same_league_date,
                 })
-            _note_unmatched("no_candidates", board_row, board_market, league, date, [])
+            _note_unmatched(
+                "no_candidates", board_row, board_market, league, date, [],
+                prop_token=prop_token,
+            )
             refuse("no_polymarket_market_for_league_date_market")
             continue
 
@@ -1879,10 +1946,16 @@ def join_polymarket_to_board(
             # denominator-first in production; letting ~200 prop rows per
             # cycle into `tried` would move every rate it reports without
             # touching the question it answers. A prop that found candidates
-            # and paired none is a token/line miss, and `unmatched_samples`'
-            # offered list already shows what the venue had.
+            # and paired none is a token, rung, or listing miss -- and which
+            # one is readable from the sample: `prop_token` makes
+            # `_note_unmatched` print the player, our derived token, and the
+            # venue's tokens for this fixture+family beside the rungs it
+            # offers for ours. See the decomposition table there.
             if refusals.get("ambiguous_polymarket_match", 0) == _ambiguous_before:
-                _note_unmatched("no_match", board_row, board_market, league, date, candidates)
+                _note_unmatched(
+                    "no_match", board_row, board_market, league, date, candidates,
+                    prop_token=prop_token,
+                )
                 refuse("no_matching_polymarket_market")
             continue
         if picked is None:
