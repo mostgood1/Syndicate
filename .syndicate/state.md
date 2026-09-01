@@ -85,7 +85,18 @@ FLAT in row count, so the ~3,600-row ceiling that made `per_sport=3000` corrupt 
 board is GONE. **A cap raise is now defensible but UNATTEMPTED, and must be measured
 against the COMBINED key, not the shards** — that mistake caused the 18:25Z incident.
 The 1534 → 2216 row change is SLATE (soccer 187 → 834), not headroom. **REVERT:** set
-`SYNDICATE_LAYER2_CARDS_INLINE=1` and redeploy. `openings` needs no split — `openings_index` never reaches the artifact.
+`SYNDICATE_LAYER2_CARDS_INLINE=1` and redeploy.
+
+**ALL THREE INCIDENT DEFECTS ARE CLOSED AND VERIFIED `[2026-09-01 00:15Z]`:** (1) the
+refused write that left CORRUPTION not staleness — `865c89be`; (2) the shed that could
+not shrink the combined key — cards split + flip; (3) the size instrument that measured
+a payload nothing writes — `6d024dc7`, live 23:41:30Z on refresh-worker.
+`SHORTLIST_PERSIST_LARGE` is GONE; `LAYER2_KEY_LARGE` reports **one number per KEY** and
+names the lever that matches whichever key is biggest. Verified over two builds
+(23:54:28Z, 00:15:02Z): both counters 0, `cards_present == rows`. Before the fix it fired
+on EVERY build at `88.5 → 90.6 → 116.8 → 122.5` pct on a healthy board, advising a cap
+that was not the constraint. **Do not act on any surviving reference to
+`SHORTLIST_PERSIST_LARGE`; it no longer exists.** `openings` needs no split — `openings_index` never reaches the artifact.
 
 **The board is GROUPED BY SPORT and always was** (FLOOR-THEN-MERIT, `layer2_board.py:2744`,
 `4ef894e3`/#524) — NOT a sharding artifact. Reading `rows[:25]` reads the top of the
