@@ -1694,6 +1694,14 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Files: released. `scripts/refresh_mlb_oddsapi.py`,
   `tests/test_mlb_prop_freeze_source_trees.py`.
 
+### polymarket-prop-resolver-arming — CLOSED 2026-09-01 — **ARMED AND VERIFIED WORKING, first post-boot cycle 19:18:21Z on `bde67379`:** `POLYMARKET_PROP_RESOLVERS armed=True prop_matches=386 withheld=0`; `PAPER2_PLAN_WRITTEN date=2026-09-01 venue=polymarket venue_priced=462` of 485 rows_in (pre-arm baseline 62, game lines only) — the `#628` raw-vs-canonical asymmetry is NOT binding, the falsification test did not fire. Env key set BY THE USER (my own env-set attempt was permission-blocked and surfaced, not worked around); injected by `prop-unmatched-decomposition`'s deploy dep-dabi38dcqm1c73dmhdjg (live 19:06:37Z, one deploy carrying both lanes by agreement, killed nothing). **Blast radius measured: positions 4/$14.71 (unchanged) — `market_family_excluded: 402` still closes prop POSITIONS; arming opened pricing + tickers only. Opening the family policy is a separate, unrequested decision.** Measurement in `deploys.md` 19:18Z. — opened 2026-09-01 — session 41d46db0-4017-4d9b-91bf-c9392f13c9de
+- Goal: `SYNDICATE_POLYMARKET_PROP_RESOLVERS` armed on refresh-worker `[USER AUTHORIZATION 2026-09-01: "arm the prop resolvers once a book_grid cycle confirms clean prices" — condition MET: three consecutive clean grid cycles 18:11/18:21/18:31Z (books incl. polymarket, near_misses={}), prop ladders all monotonic, ladder_bad=[], capture converged 374→53→0]`. Testable outcome: `POLYMARKET_PROP_RESOLVERS armed=True ... withheld=0` AND the date-scoped polymarket `PAPER2_PLAN_WRITTEN venue_priced` rises decisively from its game-line-only baseline (62 of 444 rows_in, read 18:20:10Z).
+- Files: NONE — Render ENV on refresh-worker via the single-key API, never `render.yaml`; the arming deploy carries origin/main (rides: `9a768443` #611 prop seal, `258d312f` #626(h) autorun default-OFF — both landed by phase0 lanes, deploy-ready by the deploy-main rule).
+- Hypothesis: prop matches carry CANONICAL market names and shortlist rows carry the same, so `_resolver_key` symmetry holds and props resolve.
+- Falsification test: `armed=True` with `venue_priced` NOT rising above ~62 — the raw-vs-canonical market-name asymmetry named in `todo #628` is real and the armed resolvers are INERT on props; report as such, never as armed-and-working.
+- Verification: post-deploy log read of both lines above for date=2026-09-01; then first prop-order behavior (ORDER_PATH/LIVE_ORDER) reported, execution caps unchanged ($100/day polymarket, $10/order, 15/day).
+- Blocked by: none (closed).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
