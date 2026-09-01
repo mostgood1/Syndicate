@@ -105,7 +105,15 @@ def cmd_acquire(args: argparse.Namespace) -> int:
             print(
                 f"HELD by {existing.get('holder')} for {age/60:.1f} min "
                 f"(target {str(existing.get('target_commit'))[:8] or '?'}). "
-                f"Not acquiring.\nIf that session is gone, re-run with --force "
+                f"Not acquiring. "
+                f"holder session: {existing.get('holder_session') or 'unrecorded'} "
+                f"-- check it with list_sessions (isRunning). "
+                f"THIS CLAIM RECORDS NO PID: the one it used to record was the "
+                f"acquire CLI's own and always read dead. An unrecorded session "
+                f"is UNKNOWN, not gone. TTL is the real bound -- this expires on "
+                f"its own in "
+                f"{max(0, int((existing.get('ttl_seconds') or 0) - age))//60} min. "
+                f"If that session is genuinely gone, re-run with --force "
                 f"-- it will record that you broke their claim."
             )
             return 1
@@ -122,7 +130,25 @@ def cmd_acquire(args: argparse.Namespace) -> int:
         "acquired_at": time.time(),
         "acquired_at_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "ttl_seconds": args.ttl,
-        "pid": os.getpid(),
+        # THE HOLDER IS A SESSION, NOT A PROCESS -- this field used to say
+        # otherwise. It recorded `os.getpid()`: the pid of THIS `deploy_claim.py
+        # acquire` CLI invocation, which exits ~1s after writing the claim. So
+        # EVERY claim read as "held by a dead process" within seconds of being
+        # taken. Measured 2026-09-01: a live claim with 15 min of TTL left was
+        # force-broken by a session whose liveness check was CORRECT --
+        # `Get-Process 22884` really did report dead. The FIELD lied, not the
+        # checker, and it turned `--force` from an escape hatch into the default.
+        #
+        # `holder_session` outlives the CLI process and can actually be checked
+        # (`list_sessions`, `isRunning`). None when the env var is absent, and
+        # None must NOT be read as "gone": absent identity is UNKNOWN, and
+        # unknown is not permission to force.
+        #
+        # NO `pid` IS WRITTEN ANY MORE. `deploy_preflight.py` never read it, so
+        # its only consumer was a human deciding whether to break a lock, and it
+        # could not be used correctly. THE TTL IS THE LIVENESS INVARIANT and
+        # always was -- it is what actually held here.
+        "holder_session": os.environ.get("CLAUDE_CODE_SESSION_ID") or None,
     }
     if existing:
         payload["replaced"] = {
@@ -198,6 +224,9 @@ def cmd_status(args: argparse.Namespace) -> int:
             f"  {svc:<17} {state} by {claim.get('holder')} "
             f"{age/60:.1f} min  target={str(claim.get('target_commit') or '')[:8]}"
         )
+        if claim.get("holder_session"):
+            print(f"  {'':<17} session: {claim['holder_session']}"
+                  f"  (liveness: list_sessions, NOT pid)")
         if claim.get("reason"):
             print(f"  {'':<17} reason: {claim['reason']}")
     return 1 if held else 0

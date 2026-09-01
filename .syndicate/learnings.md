@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 648 rules `[generated]`
+## Index — 652 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3530,3 +3530,29 @@ costs someone their work.
 deletions invisible in the worktree — and the same fix applies: the index on a
 shared tree contains whatever anyone put there, so read it, do not assume it
 holds only what you touched.
+
+## 2026-09-01 FORBIDDEN: recording a LIVENESS field that the recorder itself cannot outlive
+
+- **What we believed.** `deploy_claim.py`'s `"pid"` identified the session holding
+  a deploy lock, so the documented `--force` procedure — "verify the holder is
+  gone" — could distinguish a live holder from a dead one.
+- **What was actually true.** It recorded `os.getpid()` **inside the
+  `deploy_claim.py acquire` CLI process**, which exits about a second after
+  writing the claim. **Every claim in the repo read as "held by a dead process"
+  within seconds of being taken.** The field could only ever say "gone", so
+  `--force` was not an escape hatch, it was the default outcome.
+- **How we found out.** A live claim with **15 minutes of TTL left** was
+  force-broken by another session citing "pid 22884, verified DEAD via
+  Get-Process". `Get-Process` was right and the checker was right — **the FIELD
+  lied.** Nothing programmatic ever read it (`deploy_preflight.py` never did), so
+  its only consumer was a human deciding whether to break someone's lock.
+- **The rule going forward.** A liveness field must name something that OUTLIVES
+  the code writing it — a session id, checkable with `list_sessions`
+  (`isRunning`) — never the pid of the short-lived CLI that records it. If no
+  such identity is available, **write nothing and let the TTL be the invariant**:
+  a missing field reads as UNKNOWN, which correctly refuses to authorise a force,
+  whereas a dead-on-arrival pid reads as PERMISSION. Absent identity is not
+  absence of a holder.
+- **Cost.** One force-broken live claim and a deploy handed to another session
+  mid-work. No production damage — the TTL was doing the real work the whole
+  time, which is exactly why the pid was safe to delete rather than repair.

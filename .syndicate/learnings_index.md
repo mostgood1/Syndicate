@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 648 rules `[generated]`
+## Index — 652 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,8 +8,9 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 198**
+**FORBIDDEN — 200**
 
+- [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
 - [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
 - [2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch…](#2026-08-30-forbidden-inferring-who-wrote-a-commit-from-adjacency-in-a-shared-branch-where-every-commit-carries-one-bot-author-lane-exchange-join-refusals)
@@ -134,6 +135,7 @@
 - [2026-08-31 FORBIDDEN: shipping a calibration refit validated only in-sample — and treat…](#2026-08-31-forbidden-shipping-a-calibration-refit-validated-only-in-sample-and-treating-a-pooled-miscalibration-as-a-current-one-lane-wnba-accuracy-assessment)
 - [2026-09-01 FORBIDDEN: inferring a MECHANISM from a file's SIZE. Count the composition,…](#2026-09-01-forbidden-inferring-a-mechanism-from-a-files-size-count-the-composition-or-say-you-havent-lane-wnba-accuracy-assessment-caught-by-lane-mlb-accuracy-assessment)
 - [2026-09-01 FORBIDDEN: naming a MECHANISM from a SYMPTOM. Three times in one session, on…](#2026-09-01-forbidden-naming-a-mechanism-from-a-symptom-three-times-in-one-session-on-three-different-subjects-lane-wnba-accuracy-assessment)
+- [2026-09-01 FORBIDDEN: recording a LIVENESS field that the recorder itself cannot outlive](#2026-09-01-forbidden-recording-a-liveness-field-that-the-recorder-itself-cannot-outlive)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -217,7 +219,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 445**
+**Rules and corrections — 447**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -354,6 +356,8 @@
 - [2026-08-31 A TEST CAN PASS THROUGH THE BUG IT IS NAMED FOR](#2026-08-31-a-test-can-pass-through-the-bug-it-is-named-for)
 - [2026-09-01 REQUIRED: for every grader, ask what it does when its OUTCOME SOURCE IS ABSE…](#2026-09-01-required-for-every-grader-ask-what-it-does-when-its-outcome-source-is-absent-a-fallback-there-is-a-false-result-generator-lanes-wnba-accuracy-assessment-mlb-accuracy-assessment-independently)
 - [2026-09-01 REQUIRED: assert on the VALUE THAT CROSSED THE BOUNDARY, not on the call ret…](#2026-09-01-required-assert-on-the-value-that-crossed-the-boundary-not-on-the-call-returning-it-didnt-raise-and-the-counter-moved-are-different-claims-and-only-the-second-is-evidence-lane-wnba-accuracy-assessment)
+- [2026-09-01 REQUIRED: a PRODUCER fix is not in force on data that already exists. Ask wh…](#2026-09-01-required-a-producer-fix-is-not-in-force-on-data-that-already-exists-ask-when-the-artifact-is-next-written-lane-wnba-accuracy-assessment)
+- [2026-09-01 REQUIRED: on the shared tree, read the DIFF of a ledger file before committi…](#2026-09-01-required-on-the-shared-tree-read-the-diff-of-a-ledger-file-before-committing-it-not-its---stat-lane-wnba-accuracy-assessment)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
