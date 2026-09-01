@@ -334,6 +334,28 @@ death, never life — do not invert it.
 - Full working record (measurements, phase log, hypothesis/falsification detail) moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
 ### mlb-native-ladders-producer — OPEN, UNOWNED (session 822e1e5a archived 2026-08-20 ~20:4xZ) — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`; `todo.md #493`). ALL CODE SHIPPED AND LIVE — fix `a54dffa3` (18:27:40Z), force knob + one-shot guard live in `a0396411` (20:28:43Z, verified by CONTENT), `SYNDICATE_MLB_LADDERS_FORCE_DATE=2026-08-20` SET. THE PRODUCTION VERIFICATION IS UNDISCHARGED AND IS A ONE-CURL READ: last status `skipped_fresh` at 20:11:24Z PREDATES the deploy, so nothing had run with the knob yet — pending, NOT failed.** — opened 2026-08-20
+  SERVED artifact is now `syndicate.features.mlb.ladders_build` (was ABSENT), at
+  `generatedAt 2026-09-01T16:38:21Z` — AFTER the `c2f3efe4` deploy finished
+  16:02:39Z — with pitcher `ladder` 30/30 and `gamePk` 30/30, and the artifact
+  16,625,227 -> 1,529,320 B. Measurement in `deploys.md`.
+- **CORRECTION to this block: the knob was NOT unset, it was STALE.** It read
+  `2026-08-20`. Being date-scoped and self-expiring, it evaluated FALSE once that
+  date passed — present in config, inert in effect. "Env var NOT set and the
+  deploy is parked on it" was the right symptom with the wrong cause, and would
+  have sent the next reader looking in the wrong place.
+- **I DID NOT DEPLOY.** `mlb-accuracy-assessment` held the refresh-worker claim
+  and deployed `c2f3efe4` for its own two lanes; the armed knob rode along. Env
+  set via the single-key API, so no `render.yaml` and no `blueprint_sync`.
+- **THE PARITY GAPS ARE NOW VISIBLE IN PRODUCTION, and measured on the consumers:**
+  both ladder pages render real projections with no empty state, but
+  `/mlb/api/hitter-ladders` shows `PA mean` and `Order` as `-` (`paMean` and
+  `lineupOrder`, 2 of the 4 known presenter gaps; all 4 are 0/30). Hitter
+  `ladder` is **0/391** against the vendor 234/234 and does NOT break the page,
+  which corroborates "no consumer reads them". **Scoped to today**: the knob is
+  one-shot and inert tomorrow, when the vendor writer resumes.
+- **STILL OPEN, and this lane should stay open:** the 4 presenter fields, the
+  hitter-ladder decision, and removal of the vendor stage — which must NOT be
+  done until native reaches parity, per this block's own rule.
 - **PRODUCTION READ 2026-09-01 09:3xZ — OBLIGATION STILL UNDISCHARGED, and now precisely
   characterised.** Served `daily_ladders_2026_09_01.json` (16,623,227 B, `generatedAt`
   2026-09-01T09:18:17-05:00, status `skipped_fresh`, 15 games): **`generatedBy` is ABSENT from the
@@ -354,7 +376,7 @@ death, never life — do not invert it.
   consumers rendering unchanged.
 - **Files: released:** `syndicate/features/mlb/ladders_build.py`, `tests/test_mlb_ladders_build.py`, `scripts/run_mlb_daily_sim_job.py`, `tests/test_run_mlb_daily_sim_job.py`.
   **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
-- **INHERITED OBLIGATION:** `a54dffa3` is live and UNVERIFIED in production.
+- **INHERITED OBLIGATION: DISCHARGED 2026-09-01 16:38Z.** `generatedBy` on the
   Discharge by arming `SYNDICATE_MLB_LADDERS_FORCE_DATE=<central date>` on
   refresh-worker and reading `generatedBy == syndicate.features.mlb.ladders_build`
   PLUS populated `ladder[]`/`gamePk` on 18/18 pitcher rows. **Chips on the board
