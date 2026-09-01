@@ -1702,6 +1702,17 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Verification: post-deploy log read of both lines above for date=2026-09-01; then first prop-order behavior (ORDER_PATH/LIVE_ORDER) reported, execution caps unchanged ($100/day polymarket, $10/order, 15/day).
 - Blocked by: none (closed).
 
+### kalshi-soccer-forward-date — OPEN — opened 2026-09-01 — session 41d46db0-4017-4d9b-91bf-c9392f13c9de
+- Goal: Kalshi soccer PRICES reach `book_quotes` (so soccer is cross-venue comparable) **without opening Kalshi soccer to live orders**. `[USER DECISION 2026-09-01: "do it that way" — widen, but gate the position side]`. Testable: `[kalshi_odds] QUOTE_CAPTURE ... sports=['mlb','soccer']` with soccer rows landing in `soccer_source/tracking/book_quotes/`, AND `KALSHI_SOCCER_RESOLVERS armed=False withheld>0`.
+- **THE REQUESTED FIX WAS A NO-OP AND IS NOT WHAT SHIPPED.** "Fix the Kalshi soccer title parser" — the parser has been FIXED since 2026-08-28/30 (`unreadable_title` 18 of 6,000 at 19:51:47Z, every sampled family NCAAF awards, zero soccer). state.md corrected in `39f00736`.
+- **THE REAL BLOCKER, MEASURED:** `kalshi_board_join` matches on ONE scalar `wanted_date` (slate date) at lines 599/722/950; Kalshi's working set holds **918 soccer markets dated 2026-09-02..09-15 and ZERO today** (`BY_GAME_DATE` + `TRIM_BY_SPORT demand={'soccer': 1541}`), so an exact-date join matches zero soccer by construction. `market_is_for_another_date` is the largest refusal at **3,495 of 6,000**. Same defect `polymarket_board_join` fixed with a SOCCER-ONLY FORWARD-ONLY widening at `_FORWARD_HORIZON_DAYS = 14`.
+- **THE POSITION-GATE PRECONDITION FAILED, WHICH IS WHY THE RESOLVER GATE EXISTS.** I predicted `no_model_edge_pct` would hold soccer out. **It does not: 4 soccer positions in the last 7 days** (08-26/28/29/30, `/api/portfolio/paper`), soccer is NOT in `DEFAULT_EXCLUDED_FAMILIES` (`mlb:player_prop` only), `SYNDICATE_EXECUTION_ENABLED=1` and soccer is in `SYNDICATE_ACTIVE_SPORTS`. Verified rather than assumed — the same class of stale-belief error the parser premise already was.
+- Files: `syndicate/features/shared/kalshi_board_join.py`, `pipeline/portfolio_commit.py`, `tests/test_kalshi_board_join.py`, `tests/test_kalshi_soccer_forward_date.py` (NEW)
+- Hypothesis: soccer club pairs do not repeat inside a 14-day horizon, so widening cannot pair a board row to the wrong fixture; the existing `event_matches_two_games` ambiguity refusal is the backstop, and nothing about fixture identity is relaxed.
+- Falsification test: `event_matches_two_games` rising for soccer after the change, or a soccer match whose paired board row names a different fixture — either means the horizon is too wide and this reverts.
+- Verification: production read of the Kalshi capture line carrying soccer, soccer rows present in the soccer book_quotes shard, `KALSHI_SOCCER_RESOLVERS armed=False withheld>0`, and MLB match counts UNCHANGED (the control — widening is soccer-only).
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
