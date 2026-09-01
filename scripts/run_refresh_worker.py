@@ -1547,9 +1547,14 @@ def _run_wnba_postgame_producer_tick() -> dict[str, Any] | None:
 
     data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or None
     result: dict[str, Any] = {"date": target}
+    recon_paths: dict[str, str] = {}
     try:
         recon = build_wnba_recon.build_date(target, data_root=Path(data_root) if data_root else None)
         result["recon"] = {key: recon.get(key) for key in ("status", "games", "quarters", "props")}
+        # Kept OUT of the summary above (absolute worker paths are noise in a log
+        # line) but needed by the publish block below. Dropping it there is what
+        # made the first version of this publish nothing at all.
+        recon_paths = {key: str(value) for key, value in (recon.get("paths") or {}).items()}
     except Exception as exc:
         result["recon"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
     try:
@@ -1557,6 +1562,44 @@ def _run_wnba_postgame_producer_tick() -> dict[str, Any] | None:
         result["boxscores"] = {"status": box.get("status"), "rows": box.get("rows")}
     except Exception as exc:
         result["boxscores"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
+
+    # PUBLISH TO WEB, or none of this is observable.
+    #
+    # Same trap as the MLB backfill block below, and its comment is the
+    # precedent: this worker writes to ITS disk, `/wnba/api/live-lens-accuracy`
+    # reads WEB's, and **there is no blanket sweep on this service** --
+    # `sweep_changed_hot_artifacts`'s only production caller is `live_lens_loop`,
+    # on another service. Allowlisting a path in `HOT_ARTIFACT_PATTERNS` makes it
+    # ELIGIBLE to cross; it does not carry it.
+    #
+    # MEASURED 2026-09-01: the tick logged `recon.status ok, games 4, quarters 4,
+    # props 86` at 03:54:53Z, and web still reported `recon_games: false` and
+    # `boxscores_present: false` for the same date -- because the files existed
+    # only on the worker. Without this block the web-facing gate is
+    # STRUCTURALLY unreachable, and polling it would have read as "the producer
+    # failed" after a long enough wait. The MLB block records two watchers
+    # burning ~35 minutes on exactly that.
+    #
+    # Failures are recorded per path, never silent: a `published: false` with no
+    # reason is the same blindness this exists to remove.
+    published: dict[str, Any] = {}
+    try:
+        from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+        from syndicate.features.shared.refresh_state_store import data_root as _data_root
+
+        targets: list[Path] = [Path(value) for value in recon_paths.values()]
+        if str((result.get("boxscores") or {}).get("status") or "") == "ok":
+            from scripts.build_wnba_boxscores import artifact_relative_path
+
+            targets.append(Path(_data_root()) / artifact_relative_path(target))
+        for path in targets:
+            if not path.is_file():
+                published[path.name] = "missing"
+                continue
+            published[path.name] = bool(publish_hot_artifact(path, timeout_seconds=120))
+    except Exception as exc:
+        published["error"] = f"{type(exc).__name__}: {exc}"
+    result["published"] = published
 
     # `no_final` is DONE, not a failure: a date with no completed WNBA games
     # (an off day, or the World Cup break) will never produce rows and must not

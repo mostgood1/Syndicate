@@ -161,3 +161,75 @@ def test_interval_has_a_floor():
         assert worker._wnba_postgame_interval_seconds() >= 300.0
     finally:
         os.environ.pop("SYNDICATE_WNBA_POSTGAME_INTERVAL_SECONDS", None)
+
+
+# ------------------------------------------------- cross-disk reachability
+def _publish_patch(recorder, ok=True):
+    def _publish(path, timeout_seconds=None):
+        recorder.append(str(path))
+        return ok
+    return patch("syndicate.features.shared.artifact_publisher.publish_hot_artifact", _publish)
+
+
+def test_produced_artifacts_are_published_to_web(store, tmp_path):
+    """Writing to the worker's disk is NOT the same as web being able to read it.
+
+    Measured 2026-09-01: the tick logged recon ok / games 4 / props 86 while web
+    still reported `recon_games: false` for the same date, because there is no
+    blanket sweep on this service. Allowlisting makes a path ELIGIBLE to cross;
+    it does not carry it.
+    """
+    recon_dir = tmp_path / "wnba_source" / "data" / "processed"
+    recon_dir.mkdir(parents=True)
+    written = {}
+    for kind in ("games", "quarters", "props"):
+        p = recon_dir / f"recon_{kind}_2026-08-30.csv"
+        p.write_text("date\n", encoding="utf-8")
+        written[kind] = str(p)
+    box = recon_dir / "boxscores_2026-08-30.csv"
+    box.write_text("game_id\n", encoding="utf-8")
+
+    sent: list[str] = []
+    with patch("scripts.build_wnba_recon.build_date",
+               return_value={"status": "ok", "games": 4, "quarters": 4, "props": 86, "paths": written}), \
+         patch("scripts.build_wnba_boxscores.build_date", return_value={"status": "ok", "rows": 86}), \
+         patch("scripts.build_wnba_boxscores.artifact_relative_path",
+               return_value="wnba_source/data/processed/boxscores_2026-08-30.csv"), \
+         patch("syndicate.features.shared.refresh_state_store.data_root", return_value=tmp_path), \
+         _publish_patch(sent):
+        result = worker._run_wnba_postgame_producer_tick()
+
+    names = {p.rsplit("\\", 1)[-1].rsplit("/", 1)[-1] for p in sent}
+    assert "recon_games_2026-08-30.csv" in names
+    assert "recon_quarters_2026-08-30.csv" in names, "quarters is the one that had no allowlist entry"
+    assert "recon_props_2026-08-30.csv" in names
+    assert "boxscores_2026-08-30.csv" in names, "the boxscore is web-facing too"
+    assert all(value is True for value in result["published"].values())
+
+
+def test_a_missing_file_is_named_not_silently_false(store, tmp_path):
+    """A `published: false` with no reason is the blindness this block removes."""
+    sent: list[str] = []
+    with patch("scripts.build_wnba_recon.build_date",
+               return_value={"status": "ok", "games": 1, "quarters": 1, "props": 1,
+                             "paths": {"games": str(tmp_path / "nope.csv")}}), \
+         patch("scripts.build_wnba_boxscores.build_date", return_value={"status": "empty", "rows": 0}), \
+         _publish_patch(sent):
+        result = worker._run_wnba_postgame_producer_tick()
+    assert result["published"]["nope.csv"] == "missing"
+    assert sent == [], "a missing file must not be handed to the publisher"
+
+
+def test_publish_failure_does_not_undo_the_build(store, tmp_path):
+    recon_dir = tmp_path / "p"
+    recon_dir.mkdir()
+    p = recon_dir / "recon_games_2026-08-30.csv"
+    p.write_text("date\n", encoding="utf-8")
+    with patch("scripts.build_wnba_recon.build_date",
+               return_value={"status": "ok", "games": 1, "quarters": 1, "props": 1, "paths": {"games": str(p)}}), \
+         patch("scripts.build_wnba_boxscores.build_date", return_value={"status": "empty", "rows": 0}), \
+         patch("syndicate.features.shared.artifact_publisher.publish_hot_artifact",
+               side_effect=RuntimeError("web unreachable")):
+        result = worker._run_wnba_postgame_producer_tick()
+    assert "error" in result["published"]
+    assert result["marked_done"] is True, "the recon is on disk; a publish failure must not force a rebuild"
