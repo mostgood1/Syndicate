@@ -5760,3 +5760,59 @@ longer needs it.
 when WNBA restarts after a three-week FIBA World Cup break. An adaptive sigma is
 worth building *for that*, which is the opposite conclusion from "rescale by
 1.7×" and the only one the data supports.
+
+---
+
+## 2026-09-01 REQUIRED: for every grader, ask what it does when its OUTCOME SOURCE IS ABSENT. A fallback there is a false-result generator. `[lanes wnba-accuracy-assessment + mlb-accuracy-assessment, independently]`
+
+Two lanes hit the same instrument family on the same evening, on different
+sports, and compared notes. The comparison is worth more than either finding.
+
+**MLB** (`mlb-accuracy-assessment`): the live-lens grader settled from
+`lastSeenSnapshot.actual` — **a running tally** — whenever the statsapi feed was
+unavailable, which was 100% of the time (`feedResolved` 0 on all 11 days that
+produced rows, against `feed_live_miss: 1,802`). Published reading:
+**`over 0 wins / 1,578`, `under 206 / 206`.**
+
+**WNBA** (`wnba-accuracy-assessment`): the same shared module,
+`live_lens_local._settle_over_under`, returns **`None`** when the outcome is
+absent. Grep that module for a running-tally fallback — `get("actual")`,
+`lastSeen`, snapshot-actual — and it is **zero hits**. The signal row *carries*
+an in-progress `actual` and the grader never reads it. Published reading:
+**`n_settled: 0`.**
+
+**Same missing input. Opposite blast radius. Zero is a null result; 0-for-1578 is
+a false one, and a number gets acted on.** The discriminating variable is not
+whether the input is published, not which sport, and not the shape of the
+plumbing. It is one question:
+
+> **When the outcome source is missing, does this grader return UNSETTLED, or
+> does it settle from something else?**
+
+That question is cheap, needs no knowledge of a sport's pipeline, and would have
+caught every instance below. **Ask it of every grader.** If there is a fallback,
+that fallback is a false-result generator, and publishing its real input does not
+fix it — it only changes which wrong number you get.
+
+**The family is NOT "unpublished input".** That was the first hypothesis and it
+is too narrow. The family is **"one side of the comparison is not what it claims
+to be"**, and it already has three distinct mechanisms:
+
+| mechanism | side that lies | measured |
+|---|---|---|
+| proxy outcome | outcome | MLB: running tally for a final ⇒ 0/1,578 |
+| stale line | line | WNBA: pregame full-game prop line, `line_live_age_sec` null on 1,777/1,777 ⇒ hit rate walks Q1 55.9% → Q4 88.0% on the clock alone |
+| self-priced line | line | WNBA: 701 of 1,777 signals graded against the engine's OWN model line ⇒ 91.2% |
+
+The unpublished-input hypothesis IS instantiated on the WNBA side and was worth
+chasing — `recon_quarters_*`, the sole settlement source for every half- and
+quarter-total market, was in **no** `HOT_ARTIFACT_PATTERNS` entry while both its
+siblings were (`git show 9dbb870d~1:...artifact_publisher.py | grep -c
+recon_quarters` → **0**). It is fixed. But it was never why WNBA read zero, and
+treating it as the common cause would have left the two line-side mechanisms
+undetected.
+
+**How to apply, in order:** (1) for each grader, name its outcome source and its
+line source; (2) delete or hard-fail any fallback on either; (3) only then
+publish the missing inputs. Doing (3) first turns a visible null into an
+invisible falsehood.
