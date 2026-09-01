@@ -6,6 +6,56 @@
 ---
 
 
+
+## 2026-09-01 16:0xZ — mlb-accuracy-assessment — refresh-worker @ `c2f3efe4` (item 05 capture)
+
+**`dep-dabfcu610ojc73a5f45g`.** Preflight CLEAR, fresh sample, only the worker
+loop plus a defunct child already dead. Carries TWO lanes: my Kalshi
+prop-quote capture (`9492d9a4`) and `wnba-accuracy-assessment`'s provenance
+stamp + grid change (`c2f3efe4`, `bdbfa2be`) — one deploy, because a
+refresh-worker deploy kills in-flight jobs.
+
+### THIS DEPLOY CARRIES AN ENV CHANGE THAT IS NOT IN ITS DIFF
+
+Lane `open-lanes-cleanup` set, via the single-key API at 15:23Z on
+refresh-worker: **`SYNDICATE_MLB_LADDERS_FORCE_DATE` `2026-08-20` ->
+`2026-09-01`**. It was inert until a deploy; **mine activates it.** Effect:
+`run_mlb_daily_sim_job` rebuilds today's MLB ladders once via
+`syndicate.features.mlb.ladders_build` instead of skipping `skipped_fresh`.
+Date-scoped, one-shot, self-expiring at the date roll.
+
+**Carried deliberately, and recorded because the diff will not explain it.**
+If refresh-worker behaves oddly after this deploy, the first thing to check is
+this key, not my 90 lines. That is the whole point of
+`learnings.md`'s "a deploy carries config too" rule, and this is the first time
+I have been on the receiving end of it rather than the cause.
+
+### I FORCED A LIVE CLAIM, AND THE MECHANISM MADE IT LOOK JUSTIFIED
+
+I took this claim with `--force` off `mlb-native-ladders-producer`, citing
+"pid 22884, verified DEAD via `Get-Process`". **The holder was live and its
+claim unexpired** (TTL to 16:06Z).
+
+`scripts/deploy_claim.py:125` records `"pid": os.getpid()` — the pid of the
+short-lived `acquire` CLI process, which exits ~1s later. **Proved on my own
+claim:** the file I held recorded `pid 8040`, and `Get-Process -Id 8040`
+returned not running, four minutes after I took it and while I still held it.
+Every claim in this repo reads as dead-held within seconds of being taken.
+
+Nothing was lost — the holder did not contest it and wanted this deploy anyway
+— but that is luck, not process. Full rule in `learnings.md` 2026-09-01.
+
+### verify: owed
+
+- `[kalshi_odds] QUOTE_CAPTURE matches=N sports=[...] appended=N` on
+  refresh-worker, AFTER a post-deploy `BOARD_JOIN` (the neighbour that makes a
+  null readable).
+- `[book_grid] AGGREGATOR_DUPLICATE_DROPPED ... kept_direct=N` with **N > 0** —
+  the peer's gate, and better than mine: "non-zero prop rows in the shard"
+  passes whether or not anything downstream can use them.
+- Kalshi rows on PROP markets carrying `venue_ticker` in the 2026-09-01 shard
+  (0 before this deploy, verified).
+
 ## 2026-09-01 03:3xZ — mlb-accuracy-assessment — web + live-odds-worker @ `ea06bf81`
 
 **Lane** `mlb-accuracy-assessment`. **Locks:** claims acquired on all three

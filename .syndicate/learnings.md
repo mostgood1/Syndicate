@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 648 rules `[generated]`
+## Index — 652 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -39,6 +39,44 @@
 
 
 
+
+### 2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is gone. It records the CLI process's own pid, which exits in ~1s, so EVERY claim reads as dead within seconds of being taken — I broke a live claim on it `[lane mlb-accuracy-assessment, reported by lane open-lanes-cleanup]`
+
+- **What we believed:** the protocol says a claim held by a session that is gone
+  may be taken with `--force`. The claim file carries a `pid`, so checking
+  whether that process is alive looked like the way to establish "gone" — an
+  actual reading rather than an assumption, which is exactly what this repo
+  keeps asking for.
+- **What was actually true:** `scripts/deploy_claim.py:125` writes
+  `"pid": os.getpid()` — **the pid of the short-lived `deploy_claim.py acquire`
+  CLI process, not of the owning session.** That process exits about a second
+  after writing the file. So the field is dead-on-arrival for every claim ever
+  taken, and a liveness check built on it **cannot return anything but "dead"**.
+  It is a guard whose unknown case defaults permissive, in the worst possible
+  place: it makes `--force` look justified against a perfectly live holder.
+- **How we found out:** I forced `refresh-worker` off lane
+  `mlb-native-ladders-producer`, citing "pid 22884, verified DEAD via
+  `Get-Process`". The holder was live and its claim unexpired (TTL to 16:06Z);
+  they told me so, and did not contest the claim. **The proof is on my own
+  claim:** I then read `.syndicate/deploy_claims/refresh-worker.json` for the
+  claim *I* had taken four minutes earlier and still held —
+  `pid 8040` — and `Get-Process -Id 8040` returned **not running**. A live,
+  unexpired, actively-held claim reads as dead by the same check I had just
+  relied on.
+- **The rule going forward:** **never cite the claim's `pid` as evidence of
+  anything.** To establish a holder is gone, use signals that describe the
+  SESSION rather than the CLI that wrote the file: the claim's `acquired_at_iso`
+  against its `ttl_seconds` (an expired claim is genuinely stale), `ListAgents`
+  for a live session, or — best — ask the holder, since `SendMessage` reaches
+  peers in seconds and a claim exists precisely to make that conversation
+  happen. **If the only thing saying "gone" is the pid, you know nothing.**
+  Forcing may still be right; it must be argued from the TTL or from silence
+  after asking, and recorded as such.
+- **Cost:** one live claim broken. Nothing was lost — the holder was not
+  mid-deploy, did not contest it, and in fact wanted the deploy my claim was
+  for. That is luck, not process: the same reasoning would have killed a deploy
+  someone was in the middle of, and the field would have looked just as
+  authoritative.
 
 ### 2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is READABLE YET. Find the thing that says the signal could have arrived, then read it — four instances in one evening, two false positives and two false negatives `[lanes mlb-accuracy-assessment + wnba-accuracy-assessment]`
 
@@ -3492,3 +3530,29 @@ costs someone their work.
 deletions invisible in the worktree — and the same fix applies: the index on a
 shared tree contains whatever anyone put there, so read it, do not assume it
 holds only what you touched.
+
+## 2026-09-01 FORBIDDEN: recording a LIVENESS field that the recorder itself cannot outlive
+
+- **What we believed.** `deploy_claim.py`'s `"pid"` identified the session holding
+  a deploy lock, so the documented `--force` procedure — "verify the holder is
+  gone" — could distinguish a live holder from a dead one.
+- **What was actually true.** It recorded `os.getpid()` **inside the
+  `deploy_claim.py acquire` CLI process**, which exits about a second after
+  writing the claim. **Every claim in the repo read as "held by a dead process"
+  within seconds of being taken.** The field could only ever say "gone", so
+  `--force` was not an escape hatch, it was the default outcome.
+- **How we found out.** A live claim with **15 minutes of TTL left** was
+  force-broken by another session citing "pid 22884, verified DEAD via
+  Get-Process". `Get-Process` was right and the checker was right — **the FIELD
+  lied.** Nothing programmatic ever read it (`deploy_preflight.py` never did), so
+  its only consumer was a human deciding whether to break someone's lock.
+- **The rule going forward.** A liveness field must name something that OUTLIVES
+  the code writing it — a session id, checkable with `list_sessions`
+  (`isRunning`) — never the pid of the short-lived CLI that records it. If no
+  such identity is available, **write nothing and let the TTL be the invariant**:
+  a missing field reads as UNKNOWN, which correctly refuses to authorise a force,
+  whereas a dead-on-arrival pid reads as PERMISSION. Absent identity is not
+  absence of a holder.
+- **Cost.** One force-broken live claim and a deploy handed to another session
+  mid-work. No production damage — the TTL was doing the real work the whole
+  time, which is exactly why the pid was safe to delete rather than repair.
