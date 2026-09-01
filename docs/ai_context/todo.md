@@ -1,5 +1,54 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#628` — **Polymarket MLB player props admitted to the board join; the quote capture's structural zero is fixed pending its first production reading** — lane `polymarket-prop-quote-capture`, 2026-09-01 — **SHIPPED `9a436fab`, DEPLOYED refresh-worker, FIRST READING OWED**
+
+> Entry id note: this session first took `#618` from the PRIMARY tree's
+> todo.md, which was STALE — worktree commits never update it, and `#618` had
+> already been taken twice today. Id re-derived from `origin/main` (top was
+> `#627`, the edge plan) after lane `phase0-accuracy-autorun` flagged it.
+
+`POLYMARKET_QUOTE_CAPTURE appended=0` was structural: the join refused ALL
+`SPORTS_MARKET_TYPE_PROP` (`market_type_not_a_game_line`) so every match was a
+game line, and `quote_rows_from_polymarket_matches` is props-only by
+correctness bound. Fixed join-side after the measured characterisation the
+join's own comment demanded — and the characterisation **falsified** state.md's
+"POLYMARKET LISTS NONE [player props]": PROP|mlb is the venue's LARGEST bucket
+(2,644/cycle at 17:06Z), ~170 player props per fixture across
+hits/tb/hr/hrr/k/outs/er/wa/ha. Evidence incl. 99 ground-truth (token, name)
+pairs from the venue's own `question` text:
+`.syndicate/findings_2026-09-01_polymarket_prop_census.md`.
+
+Mechanics: per-family admission (never PROP wholesale); token derived from OUR
+`player_name` (97/99 exact; the 2 misses are the venue's own collision
+handling and fail SAFE), exact-match-or-refuse; player in the prop ladder key;
+same-token board ambiguity refuses BOTH; `gte<N>` pins Yes==over N-0.5 by slug
+grammar. **Money path unchanged:** resolvers withhold prop matches unless
+`SYNDICATE_POLYMARKET_PROP_RESOLVERS` is armed (off; arming is its own
+decision — check `live-prob-producer-reader-gap`'s standing constraints and
+the `_resolver_key` raw-vs-canonical market-name asymmetry first). Join kill
+switch: `SYNDICATE_POLYMARKET_PROP_JOIN=off`.
+
+**Where this sits in `#624` (per lane `phase0-accuracy-autorun`, measured by
+the archived MLB lane):** exchange PROP prices existed in `book_quotes`
+NOWHERE before today (0 rows against 26,710 exchange GAME quotes) — this plus
+Kalshi's `08ecb418` is what makes prop-side price comparison possible at all.
+**Caveat that must travel with it:** capture makes the prop side MEASURABLE
+and says nothing about whether it PAYS — the only option-value number
+(+1.57pp, ~+1.2% ROI, n=13,093) is from GAME markets and must not be carried
+into prop expectations; `#624` step 2 is "THEN measure", deliberately.
+
+**OWED:** (1) first post-deploy `POLYMARKET_QUOTE_CAPTURE appended>0` on
+refresh-worker (deploy dep-dabh3sv10e5c7380l03g, live 17:59:56Z) → record in
+`deploys.md`, correct state.md `[polymarket-low-activity]` + the "structurally
+out of scope BOTH WAYS" line; (2) later, `kept_direct` polymarket rows with
+`near_misses={}` on a book_grid build (the unrecognised-spelling near-miss is
+unexercised until then); (3) follow-ups NOT taken here: NFL PROP (448/cycle,
+unmeasured vocabulary), `/api/ops/polymarket/slate` still skips PROP before
+sampling (reader now disagrees with the decider about props), `venue_ticker`
+untraceable on captured rows (both venues, schema decision).
+
+---
+
 ### `#627` — **THE EDGE PLAN (INDEX) — phased execution of the 2026-09-01 sim-engine edge analysis** — lane `edge-plan`, 2026-09-01 — **OPEN, this is the index; the phases are `#626`..`#619` below**
 
 Full analysis: artifact **"Where the Edge Lives"**
