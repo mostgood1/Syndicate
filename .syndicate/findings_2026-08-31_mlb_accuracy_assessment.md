@@ -796,8 +796,33 @@ comparison read the venue feeds it already has.** The plumbing exists, it is
 proven in production by filled orders, and it is currently confined to the
 venue-scoped books.
 
-**NOT YET MEASURED, and it is the next thing:** what the best-vs-median
-dispersion becomes once exchange prop prices are in the comparison. Until that
+**MEASURED 2026-09-01, and it re-sizes the prize.** On the served MLB board:
+exchanges appear in `book_prices` on **76 of 97 game rows** and **0 of 103 prop
+rows** — and where they appear they **hold `best_any_book` on 45 of 97 game
+rows, 46%**. So when an exchange price is visible it wins the best-price slot
+almost half the time. That is a far better argument for making them visible on
+props than the +10.61% dispersion figure, which was computed across sportsbooks
+alone.
+
+**AND THE MLB FIX IS NOT THE ONE THE WNBA LANE PROPOSED FOR ITSELF.** Counted
+`mlb_source/tracking/book_quotes/2026-08-31.jsonl` — 274,129 rows, 124.4 MB:
+exchange quotes on GAME markets **26,710** (kalshi 13,768, prophetx 5,605,
+novig 4,987, polymarket 2,350); exchange quotes on PROP markets **0**. So there
+is nothing on disk to join: for MLB props the exchange price is never captured,
+because `book_quotes` is fed by OddsAPI and OddsAPI carries game lines only for
+exchanges. The prop prices exist ONLY in the direct feed
+(`kalshi_markets.json` -> `kalshi_price_resolver`), which is wired into
+`venue_scope` for paper2 and nowhere else — confirmed by
+`PAPER2_PLAN_WRITTEN venue=kalshi rows_in=193 venue_priced=13`.
+
+**So item 05 is a SOURCE change, not a join.** "Join what we already have"
+would be a no-op on MLB props. The lane `wnba-accuracy-assessment` initially
+described their case as a join on the strength of a 45.8MB file size, then
+counted it and retracted: WNBA's capture holds **zero** exchange quotes of any
+kind. Both sports are source gaps — MLB partial (props only), WNBA total.
+
+**STILL NOT MEASURED:** what the best-vs-median dispersion becomes once
+exchange prop prices enter the comparison. Until that
 number exists, the prop-viability case remains "arithmetically reachable" and
 not "demonstrated" — the same standard section 7b set for itself.
 
