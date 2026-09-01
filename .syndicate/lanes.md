@@ -1814,6 +1814,16 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
+
+### orphan-branch-census — CLOSED 2026-09-01 — 193 of 215 local session/deploy branches + ALL 257 `origin/deploy/*` deleted; origin deploy/* now ZERO (`ls-remote` verified) and remote-tracking refs pruned; the 22 kept are exactly the checked-out/OPEN-lane protected set (+1 branch born mid-census). Deletion made LOSSLESS BY CONSTRUCTION: every deleted tip under `refs/archive/branch-census-2026-09-01/{local,remote}/<name>` with name-by-name coverage verified (comm=0, twice) BEFORE deletion — restore is one `update-ref`; chosen over 248 per-tip blob proofs whose "not blob-landed" reading is EXPECTED for divergent deploy tips main evolved past. Out-of-scope families noted (backup/claude/dep-*/fix; remote claude/safety/hotfix/wip/staging); `recover/stash-*` explicitly NOT stale. Table + recipe: `findings_2026-09-01_branch_census.md` — opened 2026-09-01 — session fbf1a34b-cfd3-4248-8194-8d9ce16d8596
+- Goal: stale `session/*` and `deploy/*` branches (215 local + 257 `origin/deploy/*`) censused with the day's discipline `[USER AUTHORIZATION 2026-09-01: "same treatment for the stale session and deploy branches"]`: a branch is deletable ONLY when tier-verified — tip ancestor of origin/main, or every `git cherry +` commit content-verified landed (blob/twin level, never cherry alone per the 08-31 rule); anything unverified or protected stays and is reported.
+- Files: NONE tracked — branch refs (git state) only; ledger appends + findings doc `.syndicate/findings_2026-09-01_branch_census.md`. No code edits.
+- Hypothesis: deploy branches are compositions cut from live SHAs whose fix content landed on main via twins (the 08-15 lesson: two deploy branches do not contain each other); session branches of closed lanes landed via worktree pushes. Tier-1 ancestry will clear most; the tier-3 remainder concentrates the risk.
+- Falsification test: per branch — a unique commit whose changed-path blobs are neither in origin/main's history nor superseded by main's evolution of those paths; such a branch is KEPT and surfaced.
+- Verification: tiered TSV (ancestor / patch-equivalent / content-verified / KEPT) in the findings doc; protected set = OPEN-lane + active-session + checked-out-in-worktree branches + `recover/*` (out of scope, content owners); deletions batched with per-batch disposition echo; final ref counts.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
