@@ -17414,3 +17414,85 @@ into the slate.
   a different lane and a different decision.
 - Money path untouched throughout: `KALSHI_SOCCER_RESOLVERS` gate shipped
   default-OFF; zero soccer matches means it has still never had to withhold one.
+
+## 2026-09-01 21:21Z / 21:56Z — web + refresh-worker `cc1feccc` — NCAAF GAMES-CACHE REFRESH + week_state ARTIFACT. **DEPLOYED AND HALF-VERIFIED. The producer reading is OWED and CANNOT be taken tonight — see `verify:`.**
+
+- lane: `ncaaf-games-cache-refresh` (session b85e895e). Carries `bc2365fc` +
+  `c1c3cf12`. Only other commit in range is a `deploys.md` row, so this deploy
+  is effectively the lane alone. **No `render.yaml` in range — no
+  `blueprint_sync`, no env rewrite.**
+- web    dep-dabk10ajobas73a9tlj0  created 21:15:45Z  LIVE **21:21:43Z**
+- worker dep-dabk62gjo6nc7391gq1g  created 21:26:34Z  LIVE **21:56:06Z**
+  (build 28 min against ~2-3 min for the five deploys before it; `build_ended`
+  and `deploy_ended` both `succeeded` in the events API. Slow, not failed — and
+  a poller that gave up at 27 min would have called it stuck. It was not.)
+- Both preflights CLEAR pinned to the SHA, claims held by this lane. The worker
+  preflight first returned **TOO_SOON** (22 min into a 25 min window) and I
+  WAITED rather than `--allow-rapid`: the worker needs ~21 min from boot to its
+  first board publish, so cutting that short freezes the board (`#563`). The
+  refresh-worker claim was taken only after the previous holder's TTL EXPIRED on
+  its own — not forced.
+
+**THE DEFECT.** `ensure_games_cached` returns early on `path.exists()`, so
+`games_2026.json.gz` (written 2026-07-21) was never re-fetched: **888 games,
+`completed: False` on 888 of 888.** `ncaaf_target_week` is `min(week holding an
+unplayed game)` -> 1, permanently. `_week_is_within_pregame_window` then trimmed
+the board to `week <= 1`: `/ncaaf/api/cards?week=2` and `?week=3` both served
+`"2026 Week 1"`, 51 games, nav `next=prev="1"`, while projection artifacts
+existed for weeks 1-13 and 15.
+
+**MEASURED — the web half, and it is DISCRIMINATING.** Both old and new code
+answer "Week 1" today, so the week number proves nothing. The allowlist does:
+
+    21:16:49Z  PRE   resolved_active_weeks [1]; cards?week=1 and ?week=2 both
+                     "2026 Week 1" / 51 games (byte-identical: the bug)
+    21:27:48Z  POST  GET /api/ops/artifacts/export
+                       ?path=ncaaf_source/data/week_state/ncaaf_week_state_2026.json
+                     -> HTTP 200 {"count":0,"artifacts":{}}
+               CONTROL same endpoint, ...week_state/definitely_not_allowlisted.txt
+                     -> HTTP 403
+
+200-vs-403 is the reading. The path is allowlisted only on this build, so the
+200 proves web is running `cc1feccc`; the control proves the endpoint really
+does refuse, so the 200 is not a blanket-permit artefact. `count:0` is correct —
+the producer has not run yet. `cards?week=2` still returns Week 1 with no error,
+which is the FALLBACK working: no artifact, so it reads the cache, exactly as
+before. No regression.
+
+**NOT MEASURED, AND WHY IT IS NOT AN OVERSIGHT.** The producer runs from
+`generate_smartsim2_ncaaf_projections.main()` on a DAILY staleness gate against
+an artifact generated 2026-09-01T00:26:15Z. That artifact lives on the
+PERSISTENT disk, so the deploy does not reset its age and the gate does not fire
+until ~2026-09-02T00:26Z. There is no ops endpoint to trigger it, and forcing
+one would spend a CFBD call against a MONTHLY quota. So the worker half is LIVE
+BUT UNPROVEN tonight. Recording that rather than banking the deploy as a fix.
+
+**verify:** OWED, in two parts, both ARMED as scheduled tasks so neither depends
+on anyone remembering.
+1. `verify-ncaaf-week-state-producer`, 2026-09-01 21:00 CDT. PASS =
+   `GAMES_CACHE_REFRESH status=refreshed completed_before=0 completed_after>0`
+   and `WEEK_STATE season=2026 ... stale_completion_flags=0 published=True` in
+   refresh-worker logs, plus the export endpoint above returning `count:1` with
+   a `weeks` map — that last is the one that proves the artifact CROSSED to web.
+2. `verify-ncaaf-week-advance`, 2026-09-08 10:00 CDT. PASS =
+   `resolved_active_weeks` contains 2, and `cards?week=1` vs `?week=2` now
+   DIFFER (identical responses is the failure signature).
+
+**`resolved_active_weeks: [1]` IS THE CORRECT ANSWER UNTIL 2026-09-07 and must
+not be read as a failure before then.** 2026 week 1 spans 08-29..09-07, so the
+frozen `1` and the true `1` are the same number today — the defect is real but
+unobservable until week 1 ends. Verified against the real file that an honest
+refresh does NOT advance the week early: 8 games past kickoff, matching the
+board's own `Final: 8` from a different code path. **2026-09-08 is the first
+date on which a frozen 1 is observably wrong.**
+
+**Cross-lane, authorised:** the one additive `HOT_ARTIFACT_PATTERNS` entry is in
+`artifact_publisher.py`, claimed by `football-projection-publish-allowlist`
+(`#618`). USER OVERRIDE 2026-09-01: *"go ahead and land it, the allowlist edit
+is additive."* Their two entries verified intact on origin/main after the
+rebase, and their own test passes against the landed tree.
+
+**Noted, not caused by this deploy:** the pre-reboot worker was running at
+`memory_headroom_mb: 0.055` of 4096 at 21:54:12Z under a kalshi/polymarket
+refresh. Post-boot it reads 3491 MB headroom — the usual boot-confounded floor,
+recorded here so a later reader does not attribute either number to this change.

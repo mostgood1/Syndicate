@@ -1741,7 +1741,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### ncaaf-games-cache-refresh — OPEN — opened 2026-09-01 — session b85e895e-dde2-4066-8336-dc6c1d4c3c61 — **LANDED `bc2365fc` + `c1c3cf12` on origin/main. NOT DEPLOYED. Production reading OWED.**
+### ncaaf-games-cache-refresh — OPEN — opened 2026-09-01 — session b85e895e-dde2-4066-8336-dc6c1d4c3c61 — **DEPLOYED `cc1feccc` to BOTH services (web 21:21:43Z, refresh-worker 21:56:06Z). Web half VERIFIED discriminatingly (200 vs 403 allowlist probe). Producer half LIVE BUT UNPROVEN — the daily gate does not fire until ~00:26Z. Two verifications ARMED as scheduled tasks.**
 - Goal: `ncaaf_target_week` returns the real current week instead of a permanent
   1, on BOTH services, without web ever calling CFBD.
 - THE DEFECT: `ensure_games_cached` returns early on `path.exists()`, so
@@ -1797,11 +1797,27 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   the fallback when no artifact exists, `ncaaf_target_week` never reaching
   CFBD, and the written path being one `HOT_ARTIFACT_PATTERNS` actually
   matches — the half that was inert for 13 days on the sibling entry.
-- **OWED — NOT DEPLOYED, NO PRODUCTION READING.** Needs BOTH services (worker
-  writes+publishes, web reads). The readings that would prove it:
-  `WEEK_STATE season=2026 ... stale_completion_flags=0 published=True` on
-  refresh-worker, then `resolved_active_weeks` moving past [1] after 09-07.
-  Until deployed, the board stays pinned to week 1 — harmless until 09-08.
+- **DEPLOYED 2026-09-01. Measurement in `deploys.md` 21:21Z/21:56Z.**
+  - WEB VERIFIED, and by a DISCRIMINATING reading rather than the week number
+    (old and new code both answer "Week 1" today, so the week proves nothing):
+    `GET /api/ops/artifacts/export?path=ncaaf_source/data/week_state/ncaaf_week_state_2026.json`
+    -> **HTTP 200 `count:0`**, with the CONTROL (an unallowlisted path) -> **403**.
+    The path is allowlisted only on this build, so 200-vs-403 proves web runs
+    `cc1feccc`. `count:0` is correct: the producer has not run yet. Cards still
+    serve Week 1 with no error = the fallback working, no regression.
+  - PRODUCER NOT YET PROVEN. It runs on a DAILY gate against an artifact
+    generated 00:26:15Z that lives on the PERSISTENT disk, so the deploy does
+    not reset its age and the gate does not fire until ~00:26Z. No ops endpoint
+    triggers it and forcing one spends a CFBD call against a MONTHLY quota.
+  - **BOTH REMAINING READINGS ARMED AS SCHEDULED TASKS**, so neither depends on
+    anyone remembering: `verify-ncaaf-week-state-producer` (2026-09-01 21:00
+    CDT — `GAMES_CACHE_REFRESH status=refreshed completed_after>0`, `WEEK_STATE
+    ... published=True`, export returning `count:1`) and
+    `verify-ncaaf-week-advance` (2026-09-08 10:00 CDT — `resolved_active_weeks`
+    contains 2, and `?week=1` vs `?week=2` finally DIFFER).
+  - **`resolved_active_weeks: [1]` stays CORRECT until 09-07 and must not be
+    read as a failure before then** — the frozen 1 and the true 1 are the same
+    number today. Both task prompts say so explicitly.
 - Blocked by: none.
 
 
