@@ -7975,6 +7975,42 @@ Production effect is UNOBSERVED. Lane `board-cycle-overview-throughput`.
 
 None of the above is fixed. No lane holds them.
 
+## [polymarket-vs-kalshi-prop-prices] — MEASURED 2026-09-01, MLB, production shard
+
+**First cross-venue PROP price comparison the platform has ever been able to
+make** (exchange prop prices were in `book_quotes` nowhere before today). Full
+method + bounds: `.syndicate/findings_2026-09-01_polymarket_vs_kalshi_prop_prices.md`.
+
+- **Both venues quote ASKS, not mids** — settled from the data by summing both
+  sides of one bet at one venue (kalshi median **101.04%**, polymarket
+  **101.93%**, ~0-1% below 100). Without this gate the whole comparison would
+  have been an ask-vs-mid artifact.
+- **The two books agree to about one 1c tick.** 390 bets quoted by both (61.7%
+  of polymarket's 632, 48.2% of kalshi's 809): median difference **+0.00pp**,
+  median |diff| **0.95pp**, p10/p90 -1.09/+1.13.
+- **Staleness control PASSED:** median capture gap 111.8 min, but the
+  within-10-minute subset (n=93) returns the same answer (median +0.00, |diff|
+  0.90pp) — the agreement is real, not an artifact of comparing across time.
+- **KALSHI IS THE TIGHTER BOOK: median spread 1.04pp vs polymarket 1.93pp**
+  (~1.9x, and a much fatter tail: p90 2.07% vs 4.93%). That is where "better
+  price: kalshi 37% / polymarket 26% / tie 37%" comes from.
+- **POLYMARKET WINS ON PITCHER VOLUME MARKETS, and that is the only
+  price-shopping signal here:** `earned_runs` 73% cheaper (median -1.13pp),
+  `hits_allowed` 58% (-1.13pp). Kalshi wins `batter_total_bases` (15% poly),
+  `outs` (12%), `strikeouts` (21%).
+- **CROSS-VENUE ARBITRAGE: EFFECTIVELY NONE.** 502 two-sided cross-venue pairs,
+  median 101.92%; **6 distinct** below 100% (1.2%), only **2 surviving a
+  10-minute same-instant bound**, both ~99%. The other 4 have legs 49-119 min
+  apart — stale legs, not mispricings. ~1pp gross is erased by any plausible
+  fee, and **Polymarket's fee remains an OPEN question** (the "measured zero"
+  was retracted as an instrument artifact; `DEFAULT_FEE_BUFFER = 0.04` is a
+  placeholder). **DO NOT build an arb strategy on this.**
+- **A doubled count was caught and is recorded:** the first pass reported 12
+  sub-100% pairs; each was counted twice (both leg orderings). 6 is the number.
+- **NOT ESTABLISHED:** anything about MODEL edge. This is venue-vs-venue price
+  quality on one sport, one slate. Spread figures rest on the two-sided subset
+  only (coverage is heavily one-sided at both venues).
+
 ## [polymarket-low-activity] — VERIFIED 2026-08-27, refresh-worker + live-odds-worker
 
 **WHY POLYMARKET PLACES ALMOST NOTHING. Three stacked structural facts, NOT a
