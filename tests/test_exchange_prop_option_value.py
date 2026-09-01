@@ -181,5 +181,69 @@ class SensitivityTests(unittest.TestCase):
             self.assertGreater(2 * side_cost, MOD.GATE_HOLD_TARGET_PCT)
 
 
+class KalshiMultiplierTests(unittest.TestCase):
+    """Read live from `GET /trade-api/v2/series/<ticker>` on 2026-09-01, all 14
+    registered MLB series — reproduce with `scripts/read_kalshi_fee_params.py`.
+    These pin the two things the read established."""
+
+    def test_every_batter_prop_series_is_half_rate(self) -> None:
+        """The question `#624` step 6 could not answer, now answered. It was
+        reported as a bound m=0.5..1.0 whose width was 0.44 ROI points."""
+        for market in ("batter_hits", "batter_home_runs", "batter_hits_runs_rbis",
+                       "batter_rbis", "batter_total_bases", "batter_stolen_bases"):
+            multiplier, resolved = MOD.kalshi_multiplier_for_market(market)
+            self.assertTrue(resolved, market)
+            self.assertEqual(multiplier, 0.5, market)
+
+    def test_pitcher_rate_stats_are_FULL_rate(self) -> None:
+        """Why "MLB is half rate" is the wrong rule: these three are full rate
+        AND they sit inside the gate book, which is unders-minus-HR/HRR rather
+        than batter-unders. One multiplier would be wrong in both directions."""
+        for market in ("earned_runs", "hits_allowed", "walks_allowed"):
+            multiplier, resolved = MOD.kalshi_multiplier_for_market(market)
+            self.assertTrue(resolved, market)
+            self.assertEqual(multiplier, 1.0, market)
+
+    def test_the_map_is_not_uniform(self) -> None:
+        """If it ever collapses to one value, the per-market machinery is
+        pointless and something upstream has flattened it."""
+        self.assertEqual(set(MOD.KALSHI_MULTIPLIER_BY_MARKET.values()), {0.5, 1.0})
+
+    def test_an_unknown_market_rounds_AGAINST_us(self) -> None:
+        """`venue_fees`: a fee model that is too LOW manufactures fake edges and
+        loses money on every fill. Unknown must not land on the cheap branch."""
+        multiplier, resolved = MOD.kalshi_multiplier_for_market("batter_doubles_off_lefties")
+        self.assertFalse(resolved)
+        self.assertEqual(multiplier, MOD.KALSHI_UNKNOWN_MULTIPLIER)
+        self.assertEqual(MOD.KALSHI_UNKNOWN_MULTIPLIER, max(MOD.KALSHI_MULTIPLIER_BY_MARKET.values()))
+
+    def test_the_unknown_default_is_the_expensive_branch_not_the_common_one(self) -> None:
+        """The common case is 0.5 (11 of 14 series). Defaulting to the COMMON
+        value would be cheaper and wrong; the rule is conservative, not modal."""
+        values = list(MOD.KALSHI_MULTIPLIER_BY_MARKET.values())
+        modal = max(set(values), key=values.count)
+        self.assertEqual(modal, 0.5)
+        self.assertNotEqual(MOD.KALSHI_UNKNOWN_MULTIPLIER, modal)
+
+    def test_resolution_is_case_and_whitespace_insensitive(self) -> None:
+        self.assertEqual(MOD.kalshi_multiplier_for_market("  Batter_Hits "), (0.5, True))
+
+    def test_a_missing_market_does_not_crash_and_is_conservative(self) -> None:
+        for bad in (None, "", 0):
+            multiplier, resolved = MOD.kalshi_multiplier_for_market(bad)
+            self.assertFalse(resolved)
+            self.assertEqual(multiplier, MOD.KALSHI_UNKNOWN_MULTIPLIER)
+
+    def test_the_resolved_gate_reading_still_fails_both_conditions(self) -> None:
+        """2026-09-01, gate book, per-series multipliers: +0.949pp. Resolving the
+        multiplier COLLAPSED the bound to its optimistic end — it did not close
+        the gate, and saying it was 'worth 0.44 points' overstated it."""
+        side_cost = MOD.GATE_PER_SIDE_TODAY - 0.949
+        roi = MOD.roi_at_side_cost(side_cost)
+        self.assertAlmostEqual(roi, 2.65, places=1)
+        self.assertLess(roi, MOD.GATE_ROI_TARGET_PCT)
+        self.assertGreater(2 * side_cost, MOD.GATE_HOLD_TARGET_PCT)
+
+
 if __name__ == "__main__":
     unittest.main()

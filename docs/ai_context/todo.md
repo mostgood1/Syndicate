@@ -120,7 +120,7 @@ weight allowed to hit 0), on a feedback loop that actually settles (today:
 |---|---|---|---|
 | 0 · Measurement restoration | `#626` | now → 09-17 | graded supply restored; instruments non-zero |
 | M · Local mirror + replay gate | `#625` | parallel with 0 | replay-diff reproduces a prod day |
-| 1 · MLB prop program | `#624` | Sept | surviving under book ≥ +3% at ≤5% hold — **evaluated 09-01: NOT MET (+2.2–2.7% at 6.2–6.7%); staking stays off** |
+| 1 · MLB prop program | `#624` | Sept | surviving under book ≥ +3% at ≤5% hold — **evaluated 09-01: NOT MET (+2.65% at 6.2% hold, Kalshi multiplier resolved); staking stays off** |
 | 2 · WNBA sprint | `#623` | 09-17 → 09-25 | its 8 pre-registered gates |
 | 3 · Probability plane + fitted blend | `#622` | late Sept → Oct | held-out Brier(blend) ≤ market-alone per market |
 | 4 · Joint distributions + derivatives | `#621` | Oct | SGP/ladder paper surface vs Kalshi rungs |
@@ -338,31 +338,44 @@ football instance; a contract-registry walker in `#619` prevents the class).
 
    Measured on the gate's own book via
    `scripts/measure_exchange_prop_option_value.py --book gate` (n=653
-   time-aligned comparisons, 2026-09-01):
+   time-aligned comparisons, 2026-09-01), with the **Kalshi multiplier
+   RESOLVED per series** — so this is a point estimate, not a bound:
 
-   | Kalshi multiplier | entry gain | two-way hold | book ROI | gate |
+   | entry gain | per-side | two-way hold | book ROI | gate |
    |---|---|---|---|---|
-   | m=0.5 (MLB half-rate) | +0.955pp | 8.1% → **6.2%** | **+2.66%** | FAIL |
-   | m=1.0 (full rate) | +0.703pp | 8.1% → **6.7%** | **+2.22%** | FAIL |
+   | **+0.949pp** | 4.05 → 3.10pp | 8.1% → **6.2%** | **+2.65%** | **FAIL** |
 
    **Both conditions fail, and the hold is the binding one** — at ≤5% the
    table already pays +3.72%, so reaching the hold reaches the target. Note
-   the gain on the gate book is **smaller** than on all props (+0.955 vs
-   +1.121), so the broad measurement flattered it.
+   the gain on the gate book is **smaller** than on all props (+0.949 vs
+   +1.121), so the broad measurement flattered it. **Shortfall: 0.35 ROI
+   points.**
 
-   **The shortfall is NARROW — 0.3 to 0.8 ROI points — not the ~1.2–1.4 the
-   uncorrected arithmetic implied.** That is a reason to re-measure, not to
-   proceed: n=653 on ONE day, and 1,795 exchange quotes had no time-aligned
-   sportsbook price. **Do not re-run this and stake on a pass without also
-   widening the window** — a single date that clears +3% would be the same
-   sample-size mistake in the other direction.
+   **THE KALSHI MULTIPLIER IS RESOLVED — and it did NOT close the gate.**
+   Read live from `GET /trade-api/v2/series/<ticker>` across all 14 registered
+   MLB series (`scripts/read_kalshi_fee_params.py`, re-runnable):
+   **every batter-prop series is HALF RATE** (KXMLBHIT/HR/HRR/RBI/TB/SB), so
+   the m=0.5..1.0 bound collapsed onto its own optimistic end (+2.66% →
+   +2.65%). **I had called that width "worth 0.44 ROI points, more than half
+   the shortfall" — that was wrong about what it was.** It was the width of an
+   UNCERTAINTY, not a recoverable gain; what it bought is certainty, which is
+   worth having and is not ROI.
+   **The read also killed the rule "MLB is half rate":** `KXMLBERA`,
+   `KXMLBHA` and `KXMLBWA` — pitcher rate stats — are **full rate**, and all
+   three sit inside this gate book (which is *unders minus HR/HRR*, not
+   *batter unders*). A single per-sport multiplier is wrong in both directions
+   at once. Resolve per series; the map is in the measurement script with
+   tests, and an unmapped market rounds **against** us.
 
-   What would actually close the remaining ~1.2pp of per-side hold, in the
-   order worth trying: (a) re-measure over a full week, which is the cheapest
-   and is now just a re-run; (b) **resolve the Kalshi batter-prop multiplier**
-   — the m=0.5/m=1.0 spread is 0.44 ROI points, more than half the shortfall,
-   and it is a fee-schedule lookup rather than a modelling problem;
-   (c) exchange **maker** rather than taker entry, unpriced here.
+   **What is left, and it is now a genuinely thinner list.** n=653 on ONE day,
+   and 1,795 exchange quotes had no time-aligned sportsbook price. **Do not
+   re-run and stake on a single passing date** — that is the same sample-size
+   mistake in the other direction. In cost order: (a) re-measure over a full
+   week — cheapest, now just a re-run; (b) exchange **maker** rather than taker
+   entry, unpriced here and the only remaining lever of the right size, since
+   a `quadratic` series charges no maker fee at all — but `venue_fees`
+   deliberately REFUSES to price maker fills without a fill of our own behind
+   it, so this needs evidence before it needs code.
    DO NOT invert HR overs (flip is negative at any vig); DO NOT trade
    `hitter_hits @ 1.5` (n=51/108).
 

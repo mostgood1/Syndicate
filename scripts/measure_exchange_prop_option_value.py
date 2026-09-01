@@ -17,15 +17,21 @@ exchange wins ~56-63% of the time, which sits right next to the game-market
 52.5% instead of looking anomalous.
 
 THE GATE BOOK (`--book gate`: unders, minus HR and HRR), n=653 -- and this is
-the one step 6 is written about:
+the one step 6 is written about. **The Kalshi multiplier is now RESOLVED per
+series, so this is a point estimate rather than the bound first reported:**
 
-    multiplier   mean gain   per-side cost   two-way hold   book ROI
-    m=0.5         +0.955pp    4.05 -> 3.10    8.1% -> 6.2%   +2.66%
-    m=1.0         +0.703pp    4.05 -> 3.35    8.1% -> 6.7%   +2.22%
+    mean gain   per-side cost   two-way hold   book ROI
+     +0.949pp    4.05 -> 3.10    8.1% -> 6.2%   +2.65%
 
 STEP 6 IS NOT MET, on BOTH of its conditions: it needs >= +3% ROI at a <= 5%
-effective two-way hold, and price-shopping reaches +2.2% to +2.7% at a 6.2-6.7%
-hold. The shortfall is real but NARROW -- roughly 0.3 to 0.8 ROI points.
+effective two-way hold. The shortfall is **0.35 ROI points**.
+
+**RESOLVING THE MULTIPLIER DID NOT CLOSE THE GATE, and the claim that it was
+"worth 0.44 ROI points" was wrong about what that width meant.** It was the
+width of an UNCERTAINTY, not a recoverable gain: every batter series turned out
+to be half rate, so the range collapsed onto its own optimistic end (+2.66% ->
++2.65%, the tiny move being the 13 full-rate pitcher rows). What was bought is
+CERTAINTY, which is worth having and is not ROI.
 
 TWO CORRECTIONS TO THE FIRST VERSION OF THIS NUMBER, which offset each other
 and are recorded because either alone would have produced a confident wrong
@@ -122,6 +128,48 @@ def fee_pp(venue: str, probability: float, multiplier: float) -> float:
     if venue == "polymarket":
         return POLYMARKET_FEE_PP
     return 100.0 * KALSHI_BASE_RATE * multiplier * probability * (1.0 - probability)
+
+
+# ---------------------------------------------------------------------------
+# THE KALSHI MULTIPLIER IS RESOLVED PER MARKET. IT IS NOT A PROPERTY OF "MLB".
+# ---------------------------------------------------------------------------
+# Read live from `GET /trade-api/v2/series/<ticker>` on 2026-09-01, all 14
+# registered MLB series -- reproduce with `scripts/read_kalshi_fee_params.py`.
+#
+# The first version of this measurement could not resolve the batter-prop
+# multiplier and reported a BOUND, m=0.5..1.0, whose 0.44-ROI-point width was
+# more than half of `#624` step 6's shortfall. Every BATTER series turned out to
+# be half rate, so that bound is retired.
+#
+# But "MLB is half rate" is the WRONG rule and this map is why: earned runs,
+# hits allowed and walks -- PITCHER RATE STATS -- are FULL rate, and all three
+# sit inside the gate book, which is "unders minus HR/HRR", not "batter unders".
+# A single multiplier would be wrong in both directions at once.
+KALSHI_MULTIPLIER_BY_MARKET = {
+    "batter_hits": 0.5,             # KXMLBHIT
+    "batter_home_runs": 0.5,        # KXMLBHR
+    "batter_hits_runs_rbis": 0.5,   # KXMLBHRR
+    "batter_rbis": 0.5,             # KXMLBRBI
+    "batter_total_bases": 0.5,      # KXMLBTB
+    "batter_stolen_bases": 0.5,     # KXMLBSB
+    "strikeouts": 0.5,              # KXMLBKS
+    "outs": 0.5,                    # KXMLBOUTS
+    "earned_runs": 1.0,             # KXMLBERA  -- full rate
+    "hits_allowed": 1.0,            # KXMLBHA   -- full rate
+    "walks_allowed": 1.0,           # KXMLBWA   -- full rate
+}
+# An unmapped market rounds AGAINST us, per `venue_fees`'s stated rule that a
+# fee model which is too LOW manufactures fake edges and loses money on every
+# fill. Unknown must not land on the cheap branch, and the count is reported.
+KALSHI_UNKNOWN_MULTIPLIER = 1.0
+
+
+def kalshi_multiplier_for_market(market: str) -> tuple[float, bool]:
+    """`(multiplier, was_resolved)` for a board market name."""
+    key = str(market or "").strip().lower()
+    if key in KALSHI_MULTIPLIER_BY_MARKET:
+        return KALSHI_MULTIPLIER_BY_MARKET[key], True
+    return KALSHI_UNKNOWN_MULTIPLIER, False
 
 
 def quote_key(row: dict) -> tuple:
@@ -256,12 +304,16 @@ def main() -> int:
     print(f"keys quoted by both: {len(set(books) & set(exch))}")
 
     window = args.window_minutes * 60
-    for multiplier, label in ((0.5, "m=0.5 (MLB half-rate)"), (1.0, "m=1.0 (full rate)")):
+    for label in ("per-series multipliers, read from Kalshi 2026-09-01",):
         gains: dict[str, list[float]] = defaultdict(list)
         taken: dict[str, int] = defaultdict(int)
         unmatched = 0
+        unresolved: dict[str, int] = defaultdict(int)
+        used: dict[float, int] = defaultdict(int)
         for key in set(books) & set(exch):
             series = books[key]
+            market = key[1]
+            multiplier, resolved = kalshi_multiplier_for_market(market)
             for stamp, venue, exchange_prob in exch[key]:
                 best = None
                 for book_ts, _book, book_prob in series:
@@ -272,6 +324,10 @@ def main() -> int:
                 if best is None:
                     unmatched += 1
                     continue
+                if venue == "kalshi":
+                    used[multiplier] += 1
+                    if not resolved:
+                        unresolved[market] += 1
                 effective = exchange_prob + fee_pp(venue, exchange_prob, multiplier) / 100.0
                 gains[venue].append(max(0.0, best - effective) * 100.0)
                 if effective < best:
@@ -281,6 +337,12 @@ def main() -> int:
             print("\nno comparable quotes")
             return 0
         print(f"\nFEE-AWARE SELECTION, {label}  (take whichever is cheaper AFTER fees)")
+        if used:
+            spread = "  ".join(f"x{m}: {c}" for m, c in sorted(used.items()))
+            print(f"  kalshi rows by resolved multiplier: {spread}")
+        if unresolved:
+            print(f"  UNRESOLVED markets priced at x{KALSHI_UNKNOWN_MULTIPLIER} "
+                  f"(against us, never toward cheap): {dict(unresolved)}")
         print(f"  excluded, no sportsbook quote within {args.window_minutes} min: {unmatched}")
         print(f"  {'venue':<12}{'n':>7}{'exch taken':>12}{'mean':>10}{'median':>9}{'p90':>8}")
         for venue in sorted(gains, key=lambda v: -len(gains[v])):
