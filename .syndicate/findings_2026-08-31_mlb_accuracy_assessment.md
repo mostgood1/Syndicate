@@ -30,7 +30,7 @@ z = -4.12 on home runs (n=1,690).
 | instrument | verdict |
 |---|---|
 | `/mlb/api/market-accuracy` | **USABLE, but it is not a slate instrument.** 8,918 graded rows 2026-04-10..08-31. Supply collapsed: 5,292 rows in June, 2,781 in July, **285 in August**. The published headline is the `official` tier only: 66 bets in 30 days, ~1 game-line/day. Confirms `todo #610` / `#611`. |
-| `/mlb/api/live-lens-accuracy` | **PROVABLY BROKEN. Do not read it.** Over 2026-07-01..08-31 the pooled `by_klass` is `over: 0 wins / 1,578` and `under: 206 wins / 206`. A model cannot go 0-for-1578 and 206-for-206. The grader is comparing the projection against an **in-progress** stat line, so the side that is behind at snapshot time always "loses". The published 6.5% hitter-prop hit rate is an artefact, not a measurement. Separately the input artifact exists on only **11 of 61 days**. |
+| `/mlb/api/live-lens-accuracy` | **PROVABLY BROKEN — GRADER FIXED 2026-08-31, see section 7e; still UNMEASURABLE because the feed it needs is not published to web.** Over 2026-07-01..08-31 the pooled `by_klass` is `over: 0 wins / 1,578` and `under: 206 wins / 206`. A model cannot go 0-for-1578 and 206-for-206. The grader is comparing the projection against an **in-progress** stat line, so the side that is behind at snapshot time always "loses". The published 6.5% hitter-prop hit rate is an artefact, not a measurement. Separately the input artifact exists on only **11 of 61 days**. |
 | `markets.ml` / `markets.totals` on a finished card | **CONTAMINATED on 13 of 193 (6.7%) priced games** — settled/dead prices (`-100000` / `+99900`, overround 1.0000). A naive backtest over this field returned **+101% to +331% ROI**; after filtering (`abs(odds)>1000`, or overround outside 1.010-1.12) the same backtest returns **-2.80%**. Anyone reading this field must filter. |
 | `/api/portfolio/live?date=` | **The `date` param is IGNORED.** `?date=2026-08-29` and `?date=2026-08-26` both return the 2026-08-31 payload byte-for-byte. Real-money history is not retrievable from the web service. |
 | Polymarket real-money ROI | **ACCOUNTING DEFECT.** `polymarket/game_line` reports `roi_pct: -159.38` on `staked_dollars: 16.37`, `pnl_dollars: -26.09` — a loss larger than the stake on binary contracts. Fees or contract cost sit outside the stake denominator. |
@@ -591,6 +591,105 @@ machinery and so silently depended on which families are excluded.
 refusals with a non-zero count and `player_prop` disappears from
 `by_market_family` on new dates; then pooled ROI over the following ten days
 measured against the +3.76% baseline that included props.
+
+---
+
+## 7e. ITEM 03 EXECUTED — the live grader settled from a running tally, and a green test held it in place
+
+**Done 2026-08-31.** The mechanism is confirmed on production, not inferred,
+and it is arithmetic rather than modelling.
+
+### The confirmation
+
+`/mlb/api/live-lens-accuracy` builds from `live_lens_daily_accuracy._registry_rows`.
+For each entry it tries the raw statsapi feed first and **falls back to
+`lastSeenSnapshot.actual` / `firstSeenSnapshot.actual`** — the stat SO FAR.
+
+For a line of 0.5, an early tally of 0 grades every `over` a LOSS and every
+`under` a WIN regardless of what happened afterwards. That is exactly the
+production signature: **over 0 wins / 1,578, under 206 / 206** pooled over
+2026-07-01..08-31.
+
+**And the fallback was not an edge case. It was the only path that ever ran:**
+
+| date | n | W | L | feedResolved | registryFallback |
+|---|---|---|---|---|---|
+| 2026-07-17 | 16 | 6 | 10 | **0** | 16 |
+| 2026-07-18 | 89 | 13 | 76 | **0** | 89 |
+| 2026-07-22 | 403 | 35 | 368 | **0** | 403 |
+| 2026-07-28 | 359 | 25 | 334 | **0** | 359 |
+| 2026-08-06 | 339 | 42 | 297 | **0** | 339 |
+| 2026-08-09 | 261 | 26 | 235 | **0** | 261 |
+
+**`feedResolved` is 0 on all 11 days that produced rows**, against
+`feed_live_miss: 1,802`. **100% of everything this instrument ever graded came
+from the in-progress branch.**
+
+### Why it cannot be repaired by reading the snapshot more carefully
+
+A snapshot is written by `cards._registry_live_prop_rows` and carries `actual`,
+`actualSoFar`, `modelMean`, `liveProjection`, `liveEdge`, `odds` — and **no
+game state**. In-progress and final are indistinguishable there. So the only
+honest choice is to refuse both, which is what shipped.
+
+### What shipped
+
+The fallback no longer settles. It counts, under two new named signals:
+`snapshotActualNotFinal` and the warning `snapshot_actual_not_final:N`.
+`pending_actuals` still means something different and is kept separate — *"the
+registry never carried a value"* and *"we have a tally and refuse to trust it"*
+are opposite problems, and collapsing them would hide which one a day has.
+
+The consequence is that **on production this instrument will now read EMPTY
+rather than wrong**, which is the true state. An empty instrument is a visible
+gap; a confident wrong one is not.
+
+### THE STRUCTURAL BLOCKER, NAMED AND DELIBERATELY NOT FIXED
+
+`_actual_from_feed` reads `raw_feed_live_path`, under
+`data/raw/statsapi/feed_live/`. **That tree is not in
+`HOT_ARTIFACT_PATTERNS`**, so it is never published to the web service that
+serves this endpoint — which is why `feedResolved` is 0 and always has been.
+
+Publishing per-game raw feeds has a real disk cost (the repo already carries a
+207MB `book_quotes` shard as the cautionary case) and belongs to whoever owns
+that budget. It is a separate decision and is left as one. **Until it is taken,
+MLB live accuracy remains unmeasurable — which section 7 already said, and this
+change makes the endpoint agree with it instead of contradicting it.**
+
+Second, smaller reachability note, unfixed: `raw_feed_live_path` resolves
+against `_artifact_roots()[0]` — the FIRST root only. Even with the tree
+published, a bundle under a later root would not be found.
+
+### A GREEN TEST WAS HOLDING THE BUG IN PLACE
+
+`tests/test_live_lens_local.py::test_mlb_daily_accuracy_uses_local_registry_artifacts`
+writes a registry with **no feed artifact** and asserted **`wins == 1,
+losses == 1`** — outcomes reachable only by settling from a snapshot. It was
+passing, and it encoded the defect as the expected contract.
+
+Corrected to assert the true behaviour. Its stated subject — that the LOCAL
+registry artifact is the one being read — is unchanged and still asserted by
+`lines == 3`; what changed is that reading three entries no longer implies
+grading them. Its sibling
+`test_mlb_daily_accuracy_prefers_feed_live_actuals_over_registry_snapshots`
+already guarantees the with-feed path and is untouched.
+
+Tests: 8 new. **Off-is-not-on verified: 4 of the 8 fail when the old settling
+branch is restored**, and the 4 that assert the with-feed path and the
+pending/miss counters pass in both states, which is correct. A prior sweep of
+the whole `live_lens` area returned 410 passed / 1 failed, that one failure
+being the test above.
+
+### CROSS-SPORT NOTE
+
+The live lane `wnba-accuracy-assessment` (session e542848e) independently found
+their live engine's **+41% ROI to be FICTIONAL** — 39.4% of signals priced
+against the engine's own model line, `line_live_age_sec` null on 1,777 of
+1,777. **Same instrument family, same class of defect, second sport.** Their
+files are `syndicate/features/wnba/...` and `shared/live_lens_local.py`
+(`_artifact_path` only); nothing here touches those. Worth treating as a
+platform-level pattern rather than two coincidences.
 
 ---
 

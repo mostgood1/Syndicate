@@ -194,6 +194,7 @@ def _registry_rows(path: Path, selected_date: str) -> tuple[list[dict[str, Any]]
     feed_resolved = 0
     registry_fallback = 0
     feed_miss = 0
+    snapshot_not_final = 0
     for entry in entries.values():
         if not isinstance(entry, dict):
             continue
@@ -228,13 +229,57 @@ def _registry_rows(path: Path, selected_date: str) -> tuple[list[dict[str, Any]]
         if actual is not None:
             feed_resolved += 1
         else:
+            # ------------------------------------------------------------------
+            # A RUNNING TALLY IS NOT AN OUTCOME. `#616`
+            # ------------------------------------------------------------------
+            #
+            # This branch used to SETTLE from `lastSeenSnapshot.actual` when the
+            # feed was unavailable, and the arithmetic of that is not subtle: a
+            # snapshot taken mid-game holds the stat SO FAR, so for a line of
+            # 0.5 an early tally of 0 grades every `over` a LOSS and every
+            # `under` a WIN, whatever actually happened afterwards.
+            #
+            # MEASURED ON PRODUCTION over 2026-07-01..08-31, and it is exactly
+            # that shape: pooled `by_klass` was **over 0 wins / 1,578** and
+            # **under 206 / 206**. No model produces 0-for-1578 and 206-for-206.
+            # The instrument was reporting a 6.5% hitter-prop hit rate that was
+            # an artefact of WHEN it looked, not of what was projected.
+            #
+            # It cannot be rescued by looking harder at the snapshot, because a
+            # snapshot carries no game state: `cards._registry_live_prop_rows`
+            # writes `actual` / `actualSoFar` / `modelMean` / `liveProjection`
+            # and nothing that says whether the game had finished. In-progress
+            # and final are INDISTINGUISHABLE here, so the only honest choice is
+            # to refuse both.
+            #
+            # THE ROW IS COUNTED, NOT DROPPED. `registryFallback` still records
+            # the volume, and `snapshot_actual_not_final` names why it did not
+            # settle -- so this reads as "we cannot grade these yet" rather than
+            # as a quiet shrinkage nobody can see. An empty instrument is a
+            # visible gap; a confident wrong one is not.
+            #
+            # WHY IT WILL READ EMPTY ON WEB UNTIL SOMETHING ELSE CHANGES, which
+            # is a separate decision and deliberately NOT taken here:
+            # `_actual_from_feed` reads `raw_feed_live_path`, under
+            # `data/raw/statsapi/feed_live/`, and that tree is NOT in
+            # `HOT_ARTIFACT_PATTERNS` -- so it is never published to the web
+            # service that serves this endpoint. Measured over the same window:
+            # `feedResolved` was **0 on every one of the 11 days that produced
+            # rows**, against `feed_live_miss: 1,802`. 100% of what this
+            # instrument ever graded came from the branch below. Publishing
+            # per-game raw feeds has a real disk cost and belongs to whoever
+            # owns that budget.
             if game_pk_int > 0:
                 feed_miss += 1
-            actual = _safe_float(last_seen.get("actual"))
-            if actual is None:
-                actual = _safe_float(first_seen.get("actual"))
-            if actual is not None:
+            snapshot_actual = _safe_float(last_seen.get("actual"))
+            if snapshot_actual is None:
+                snapshot_actual = _safe_float(first_seen.get("actual"))
+            if snapshot_actual is not None:
                 registry_fallback += 1
+                snapshot_not_final += 1
+            else:
+                pending += 1
+            continue
         result = _settle_pick(actual, line, selection)
         if actual is None:
             pending += 1
@@ -267,6 +312,11 @@ def _registry_rows(path: Path, selected_date: str) -> tuple[list[dict[str, Any]]
         warnings.append(f"unsupported_picks:{unsupported}")
     if feed_miss:
         warnings.append(f"feed_live_miss:{feed_miss}")
+    if snapshot_not_final:
+        # NAMED, so an empty day reads as "not gradeable yet" rather than as
+        # "nothing was projected". Those are opposite facts and the old code
+        # could not tell them apart.
+        warnings.append(f"snapshot_actual_not_final:{snapshot_not_final}")
     signal_info = {
         "exists": path.exists(),
         "lines": len(entries),
@@ -274,6 +324,7 @@ def _registry_rows(path: Path, selected_date: str) -> tuple[list[dict[str, Any]]
         "bytes": path.stat().st_size if path.exists() else 0,
         "feedResolved": feed_resolved,
         "registryFallback": registry_fallback,
+        "snapshotActualNotFinal": snapshot_not_final,
     }
     return rows, {"signals": signal_info, "warnings": warnings}
 

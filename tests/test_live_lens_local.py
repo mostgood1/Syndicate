@@ -307,13 +307,29 @@ class LocalDailyAccuracyTests(unittest.TestCase):
             ):
                 payload = build_mlb_daily_accuracy("date=2026-05-16")
 
+        # `#616`: THIS TEST USED TO ASSERT THE DEFECT. It writes NO feed
+        # artifact, and it expected `wins == 1, losses == 1` -- outcomes the
+        # grader could only reach by settling from `lastSeenSnapshot.actual`,
+        # a running tally. That is the branch that produced `over 0/1,578` and
+        # `under 206/206` on production over 2026-07-01..08-31. A green test
+        # was holding the bug in place.
+        #
+        # The stated subject -- that the LOCAL registry artifact is the one
+        # being read -- is unchanged and still asserted, by `lines == 3`. What
+        # changed is that reading three entries no longer implies grading them.
+        # The with-feed path is guaranteed by
+        # `test_mlb_daily_accuracy_prefers_feed_live_actuals_over_registry_snapshots`
+        # directly above, which is untouched.
         self.assertIsInstance(payload, dict)
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["version"], "live-lens-accuracy-v1")
-        self.assertTrue(payload["summary"]["available"])
-        self.assertEqual(payload["summary"]["summary"]["wins"], 1)
-        self.assertEqual(payload["summary"]["summary"]["losses"], 1)
-        self.assertEqual(((payload["days"] or [])[0].get("signals") or {}).get("lines"), 3)
+        day = (payload["days"] or [])[0]
+        self.assertEqual((day.get("signals") or {}).get("lines"), 3)
+        self.assertEqual(payload["summary"]["summary"]["wins"], 0)
+        self.assertEqual(payload["summary"]["summary"]["losses"], 0)
+        self.assertFalse(day.get("available"))
+        self.assertEqual((day.get("signals") or {}).get("snapshotActualNotFinal"), 2)
+        self.assertIn("snapshot_actual_not_final:2", day.get("warnings") or [])
 
     def test_mlb_live_lens_refreshes_after_sixty_seconds(self) -> None:
         with TemporaryDirectory() as tmp_dir:
