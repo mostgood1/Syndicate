@@ -1344,7 +1344,35 @@ def _local_worker_env() -> dict[str, str]:
     return env
 
 
+def _wnba_regions(regions: str) -> str:
+    """WNBA's OddsAPI regions, widened by `SYNDICATE_WNBA_ODDS_REGIONS`.
+
+    THE CAUSE THIS FIXES, measured 2026-09-01. WNBA's served book set was **11
+    books with ZERO exchanges** -- `book_quotes/2026-08-30.jsonl`, 101,129 rows:
+    fanduel, draftkings, fanatics, betrivers, betmgm, betonlineag,
+    williamhill_us, betus, bovada, mybookieag, lowvig, and **no novig, prophetx,
+    betopenly, kalshi or polymarket at all**. MLB's grid carries novig 33 /
+    prophetx 13 on the same day, so this is not "exchanges do not quote WNBA".
+
+    It is the region. Those books live in OddsAPI's `us_ex`, and this fetcher
+    asked for `us` alone. `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS=eu,us_ex` has
+    been SET on both workers the whole time and had exactly two readers, neither
+    of them WNBA -- **the same inert-env-var failure `odds_regions.py` records
+    for NCAAF on 2026-08-29, repeating on a third sport.**
+
+    Its own env var rather than the shared game-line one, because WNBA's calls
+    are PER-EVENT and that is the expensive side of the billing split. See
+    `WNBA_REGIONS_ENV`.
+    """
+    from syndicate.features.shared.odds_regions import wnba_regions
+
+    return wnba_regions(regions)
+
+
 def _owned_snapshot_cli_args(*, date_str: str, out_path: Path, regions: str, bookmakers: str, markets: str) -> list[str]:
+    resolved_regions = _wnba_regions(str(regions or "us").strip() or "us")
+    if resolved_regions != (str(regions or "us").strip() or "us"):
+        print(f"[refresh_wnba_oddsapi_props] REGIONS_WIDENED base={regions!r} -> {resolved_regions!r}", flush=True)
     args = [
         _local_python(),
         str(REPO_ROOT / "scripts" / "fetch_basketball_oddsapi_props_local.py"),
@@ -1355,7 +1383,7 @@ def _owned_snapshot_cli_args(*, date_str: str, out_path: Path, regions: str, boo
         "--out",
         str(out_path),
         "--regions",
-        str(regions or "us").strip() or "us",
+        resolved_regions,
     ]
     if bookmakers:
         args.extend(["--bookmakers", bookmakers])

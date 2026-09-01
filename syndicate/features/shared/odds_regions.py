@@ -50,6 +50,55 @@ import os
 #: string rather than three string literals that can drift apart.
 GAME_LINE_REGIONS_ENV = "SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS"
 
+#: WNBA's own knob, and it is SEPARATE ON PURPOSE.
+#:
+#: WNBA has no cheap game-line call to widen. Measured 2026-09-01:
+#: `fetch_basketball_oddsapi_props_local.py` makes only PER-EVENT requests
+#: (`/events/{id}/markets` and `/events/{id}/odds`), and its game lines
+#: (h2h/spreads/totals) ride the same per-event call as its player props. So
+#: pointing WNBA at `GAME_LINE_REGIONS_ENV` would silently put `eu,us_ex` on the
+#: EXPENSIVE side of the billing split this module exists to keep apart -- the
+#: one costing ~1M rather than ~30K.
+#:
+#: It is affordable anyway, on this sport, at today's budget: quota read
+#: **4,959,329 of 5,000,000 remaining (99.2% unused)** on 2026-09-01, WNBA is
+#: ~0.7% of credits, and a WNBA slate is 1-6 games against MLB's ~15. But that
+#: is a JUDGEMENT ABOUT WNBA'S SIZE, not the billing property the shared knob
+#: encodes, so it gets its own name and can be turned off alone.
+WNBA_REGIONS_ENV = "SYNDICATE_WNBA_ODDS_REGIONS"
+
+
+def widened_regions(regions: str, env_var: str, *, env: "dict[str, str] | None" = None) -> str:
+    """`regions` widened by `env_var`'s extras. Never narrowed.
+
+    The merge every caller shares. `game_line_regions` and `wnba_regions` are
+    thin wrappers so each one's BILLING contract stays visible at its own name.
+    """
+    source = os.environ if env is None else env
+    extra = str(source.get(env_var) or "").strip()
+    if not extra:
+        return regions
+    seen: set[str] = set()
+    merged: list[str] = []
+    for candidate in list(str(regions or "").split(",")) + list(extra.split(",")):
+        name = candidate.strip().lower()
+        if name and name not in seen:
+            seen.add(name)
+            merged.append(name)
+    return ",".join(merged) or regions
+
+
+def wnba_regions(regions: str, *, env: "dict[str, str] | None" = None) -> str:
+    """WNBA's per-event regions. Unset is exactly today's behaviour (`us`).
+
+    Widening this reaches novig, prophetx and betopenly via `us_ex` -- the books
+    that made NCAAF's board go from 0 of 5 sharps to a real consensus. It does
+    NOT reach kalshi or polymarket: `book_grid` drops those by name
+    (`is_direct_feed_book`) because the direct venue feed owns them, so they
+    arrive by a different route entirely.
+    """
+    return widened_regions(regions, WNBA_REGIONS_ENV, env=env)
+
 
 def game_line_regions(regions: str, *, env: "dict[str, str] | None" = None) -> str:
     """`regions` widened by the configured extras. Never narrowed.
