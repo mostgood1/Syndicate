@@ -8007,6 +8007,30 @@ method + bounds: `.syndicate/findings_2026-09-01_polymarket_vs_kalshi_prop_price
   placeholder). **DO NOT build an arb strategy on this.**
 - **A doubled count was caught and is recorded:** the first pass reported 12
   sub-100% pairs; each was counted twice (both leg orderings). 6 is the number.
+- **SOCCER: NO COMPARISON EXISTS, and it is not a reader problem.** ZERO
+  exchange rows of ANY kind (kalshi or polymarket, prop or game) in **92,795
+  soccer quote rows across SIX fixture dates** (08-31..09-05) — soccer shards by
+  FIXTURE date, so one date would be the wrong window. Instrument calibrated:
+  the same reader found 2,870 MLB exchange prop rows the same day. **TWO
+  INDEPENDENT CAUSES, each sufficient:** (1) Kalshi soccer never reaches the
+  join — `[kalshi_odds] QUOTE_CAPTURE ... sports=['mlb']`, upstream the known
+  `unreadable_title` PARSER gap on ~665 real Kalshi soccer markets; (2)
+  Polymarket soccer DOES match (~25 rows/cycle: `soccer|h2h` 4, `soccer|totals`
+  21) but every one is GAME/TEAM level with an empty `player_name`, and the
+  capture is props-only by its correctness bound — all 25 discarded per cycle.
+- **THE PROPS-ONLY BOUND'S PREMISE IS EMPIRICALLY FALSE FOR SOCCER**, and this is
+  the actionable half. The bound exists because OddsAPI already writes exchange
+  GAME lines under the same dedup key (measured on MLB: 2,350 polymarket game
+  rows 08-31). In soccer OddsAPI carries **no exchange rows at all**, so there is
+  nothing to collide with. **NOT changed** — the guard also hedges against
+  OddsAPI starting to carry them, and its stated release condition (`source` in
+  `_KEY_FIELDS`, pinned by `tests/test_direct_feed_provenance.py`) is unmet.
+- **CORRECTION, read from production:** `_capture_kalshi_quotes` runs on
+  **refresh-worker**, not live-odds-worker (zero hits there). The docstring in
+  `portfolio_commit._capture_polymarket_quotes` still says otherwise.
+- **INSTRUMENT AMBIGUITY worth carrying:** `POLYMARKET_QUOTE_CAPTURE ...
+  sports=['mlb','soccer']` lists sports with MATCHES, not sports with APPENDED
+  ROWS. Soccer is in that field every cycle and contributes exactly zero quotes.
 - **NOT ESTABLISHED:** anything about MODEL edge. This is venue-vs-venue price
   quality on one sport, one slate. Spread figures rest on the two-sided subset
   only (coverage is heavily one-sided at both venues).
