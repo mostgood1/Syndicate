@@ -89,3 +89,52 @@ def test_the_grid_keeps_a_direct_row_and_counts_both_sides(capsys):
     out = capsys.readouterr().out
     assert "AGGREGATOR_DUPLICATE_DROPPED" in out
     assert "kept_direct=1" in out, "kept must print beside dropped, or the pair is not a rate"
+
+
+# ------------------------------------------------------- the writing side
+def test_the_kalshi_capture_stamps_provenance(tmp_path, monkeypatch):
+    """END TO END: capture -> shard -> grid. The only assertion that proves it.
+
+    Each half passes on its own while the chain stays broken -- the capture
+    appends rows (true), and the grid keeps stamped rows (true), and the board
+    still shows nothing because nobody stamped. So this asserts on what reaches
+    the GRID, not on either half in isolation.
+    """
+    from syndicate.features.shared import book_grid, odds_book_quotes
+    from pipeline import kalshi_odds_refresh
+
+    appended: dict = {}
+
+    def _fake_append(*, sport, date_str, rows, captured_at, publish=True, extra=None):
+        appended["rows"] = [dict(r, **(extra or {})) for r in rows]
+        appended["extra"] = extra
+        return {"appended": len(rows)}
+
+    monkeypatch.setattr(odds_book_quotes, "append_book_quotes", _fake_append)
+    monkeypatch.setattr(
+        odds_book_quotes, "quote_rows_from_kalshi_matches",
+        lambda matches: [{
+            "sport": "wnba", "date": "2026-09-18", "kind": "game", "event_id": "e1",
+            "home_team": "Atlanta Dream", "away_team": "Minnesota Lynx",
+            "market": "h2h", "segment": "full", "selection": "home",
+            "commence_time": "2026-09-18T23:00:00Z",
+            "snapshot_ts": "2026-09-18T22:00:00Z",
+            "book_updated_at": "2026-09-18T22:00:00Z",
+            "bookmaker": "kalshi", "price": 124,
+        }],
+    )
+
+    kalshi_odds_refresh._capture_kalshi_quotes(
+        report={"matches": [{"board_event_id": "e1"}]},
+        board_rows=[{"event_id": "e1", "sport": "wnba"}],
+        selected_date="2026-09-18",
+    )
+
+    assert appended.get("extra") == {QUOTE_SOURCE_FIELD: QUOTE_SOURCE_VENUE_DIRECT}, (
+        "the capture must stamp provenance, or the grid discards its rows"
+    )
+    # and the stamped row must actually survive the grid
+    kept = book_grid.freshest_rows_for_grid(appended["rows"])
+    assert any(str(r.get("bookmaker") or "").lower() == "kalshi" for r in kept), (
+        "a stamped, directly-observed Kalshi price must reach the grid"
+    )
