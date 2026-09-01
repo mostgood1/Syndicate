@@ -434,6 +434,41 @@ def _polymarket_price_resolver(selected_date: str | None):
             flush=True,
         )
     matches = joined.get("matches") or []
+    # ------------------------------------------------------------------
+    # PLAYER-PROP MATCHES FEED THE QUOTE LOG, NOT THE ORDER PATH -- yet.
+    # ------------------------------------------------------------------
+    #
+    # The join admits MLB player props as of 2026-09-01 (lane
+    # `polymarket-prop-quote-capture`) so `_capture_polymarket_quotes` above
+    # can record the venue's own prop prices. The RESOLVERS below are a
+    # different consumer: whatever they index becomes priceable and
+    # ticker-stamped for the paper AND LIVE books, and `execute_portfolio`
+    # places real venue orders off exactly that. Widening the money path was
+    # not this change's decision to make, so prop matches are withheld here
+    # behind an explicit switch, OFF by default.
+    #
+    # Before arming it, check the two standing constraints in
+    # `live-prob-producer-reader-gap`'s lane block (a live prop edge was
+    # shipped and BACKED OUT once already), and the resolver-key asymmetry:
+    # a prop match carries the CANONICAL market name while `_resolver_key`
+    # reads a board row's market RAW -- identical for today's shortlist rows
+    # (`batter_hits` et al.), but verify before trusting a resolve.
+    #
+    # PRINTED ALWAYS, ZEROES INCLUDED: `withheld=0` on a slate with prop
+    # matches means the switch is armed, and a line printed only when
+    # withholding could not say so.
+    prop_matches = [m for m in matches if str(m.get("player_name") or "").strip()]
+    props_armed = str(
+        os.environ.get("SYNDICATE_POLYMARKET_PROP_RESOLVERS") or ""
+    ).strip().lower() in {"1", "on", "true", "yes"}
+    if prop_matches and not props_armed:
+        matches = [m for m in matches if not str(m.get("player_name") or "").strip()]
+    print(
+        "[portfolio_commit] POLYMARKET_PROP_RESOLVERS"
+        f" armed={props_armed} prop_matches={len(prop_matches)}"
+        f" withheld={0 if props_armed else len(prop_matches)}",
+        flush=True,
+    )
     if not matches:
         return (None, None)
     return polymarket_price_resolver(matches), polymarket_ticker_resolver(matches)
