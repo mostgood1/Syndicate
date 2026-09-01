@@ -1,5 +1,79 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#618` — **The NFL/NCAAF season projections publish into an allowlist pattern that never existed. Both generators have been no-ops for 13 days.** — lane `football-projection-publish-allowlist`, 2026-09-01 — **FIXED AND LANDED (`fcbbcc62`), NOT DEPLOYED — DELIBERATE RIDEALONG, NO DEDICATED DEPLOY**
+
+Both `generate_smartsim2_ncaaf_projections.py` and its NFL sibling have called
+`publish_hot_artifact` on their output since 2026-08-19. Every call returned
+False, because neither output path was in `HOT_ARTIFACT_PATTERNS`. The NFL
+generator's own comment says *"Fixed in both generators together because the
+allowlist pattern covers both"* — **the pattern it names does not exist.** That
+sentence is why nobody looked: the publish side was written, reviewed and
+believed, and the half that PERMITS it was never written. `#208` in reverse —
+the usual failure is allowlisting something nothing publishes; this is
+publishing something nothing allowlists, and it is exactly as silent.
+
+Measured on refresh-worker 2026-09-01, while verifying the CFBD quota-latch roll:
+
+    2026-09-01T00:33:24Z  projections_written=51
+    2026-09-01T00:33:24Z  artifact_path=/opt/render/project/data/ncaaf_source/data/smartsim2_projections_2026_wk1.csv
+    2026-09-01T00:33:24Z  artifact_published=False
+
+No `artifact_publish_error`, so this was the clean "not allowlisted" return, not
+a network failure. Meanwhile `/ncaaf/api/cards` was serving values
+byte-identical to the CSV committed on 2026-08-19
+(`generated_at=2026-08-19T22:00:39Z`). **The board only ever moved when someone
+COMMITTED a regenerated CSV and rode a web deploy** — a deploy per model change,
+which is precisely what the worker autorun exists to avoid. NFL is the same
+(`2026-08-31T21:28:40Z artifact_published=False`).
+
+FIX (`fcbbcc62`): two entries, `ncaaf_source/data/smartsim2_projections_*_wk*.csv`
+and `nfl_source/smartsim2_projections_*_wk*.csv`. Depths differ because `#389`
+put NFL's output a level shallower; NOT collapsible into one `*_source/`
+wildcard. `tests/test_football_projection_publish_allowlist.py` derives the path
+from the WRITER functions, never a literal — a hardcoded relative path would
+keep passing after a writer moved, which is `#389` exactly. Verified `off != on`.
+
+**RIDEALONG, BY DECISION [2026-09-01, user]. Do not schedule a deploy for this.**
+It is two allowlist strings; it costs nothing to carry and does not justify
+restarting a worker running an MLB sim. `nfl-props-odds-allowlist` closed the
+identical situation the same way and its prediction held.
+
+**THE TRAP, AND IT IS THE WHOLE REASON THIS ITEM IS LONG: THIS NEEDS *BOTH*
+SERVICES, AND A PARTIAL RIDEALONG IS INDISTINGUISHABLE FROM THE UNFIXED BUG.**
+The SENDER (`artifact_publisher.publish_hot_artifact`) and the RECEIVER
+(`ops._write_published_artifact`) each call `is_hot_artifact_relative_path`.
+So:
+
+  - web alone at a SHA containing `fcbbcc62` -> worker still refuses locally,
+    logs `artifact_published=False`.
+  - refresh-worker alone -> web answers **403**, logs `artifact_published=False`.
+
+Both partial states produce the SAME log line as doing nothing at all. **Before
+concluding this failed, read the live SHA on BOTH services** — the natural
+reading of "still False" is "the fix does not work", and it will usually mean
+"only one side has it yet".
+
+AND EVEN WITH BOTH: nothing republishes retroactively. There is no blanket
+sweep on refresh-worker (`sweep_changed_hot_artifacts`'s only production caller
+is `live_lens_loop`), so the CSV already on disk is NOT picked up. It publishes
+when the GENERATOR next runs — ncaaf on the 86400s interval, nfl likewise.
+
+VERIFY (all three, in order — reusing `nfl-props-odds-allowlist`'s own recipe,
+which caught this class once already):
+  1. both services live on a SHA containing `fcbbcc62`;
+  2. `artifact_published=True` in the generator's log for that run;
+  3. `/api/ops/artifacts/export?path=ncaaf_source/data/smartsim2_projections_2026_wk1.csv`
+     returns `count=1` with a **FRACTIONAL** mtime — a whole-second mtime is a
+     boot copy, not a publish.
+A fresh mtime alone could be a rewrite of stale bytes, and the generator is
+DETERMINISTIC (`seeds_used=300`, stable `rating_source`), so identical served
+values would NOT disprove a successful publish. Do not grade this on the board
+values alone.
+
+NOT DONE, DELIBERATELY: `nfl_source/smartsim2_preseason_projections_*_wk*.csv`.
+That generator has no `publish_hot_artifact` call at all, so an entry would be
+the inert half of this same defect. Wire the publisher in the same change.
+
 ### `#617` — **43% OF THE WNBA CARD ARCHIVE IS UNUSABLE: a vendor artifact root whose MARKET LINES correlate -0.04 with the games they are attached to** — lane `wnba-accuracy-assessment`, 2026-08-31 — **MEASURED, NOT FIXED**
 
 `/wnba/api/cards` serves from `wnba_source/data/processed/` (Syndicate) or
@@ -1720,6 +1794,21 @@ the ROI report's 64,007-bet denominator does not move.
 
 **OWED — PARTIALLY DISCHARGED 2026-08-27 13:3xZ.**
 
+- **#612 CLOSED 2026-09-01 — SOCCER SHOT PROPS: the divisor IS live in the engine, MEASURED.**
+  Discharged NOT on the board (which still carried no shot rows) but on the
+  PREDICTION ARCHIVE the engine writes, which is exportable. Self-normalised over
+  the 3,434 players present both before and after the 2026-08-31 ship date, each
+  compared to himself: median post/pre `expected_shots` **0.720** against a
+  predicted **1/1.3979 = 0.715**. Confound killed — `expected_minutes_share`
+  ratios to **exactly 1.000**, so the step is not "future fixtures carry fewer
+  minutes"; shots PER minute-share is also 0.720. Tool:
+  `scripts/check_soccer_divisor_reached_engine.py`. Re-fit 2026-09-01 moved the
+  divisor 1.3979 -> 1.3930 and published it. Detail in `.syndicate/deploys.md`.
+  Residual, much smaller: `players_*.csv` is not in `HOT_ARTIFACT_PATTERNS`, so
+  the `shots_per90` form of the reading cannot run from web.
+
+  <details><summary>original item</summary>
+
 - **#612 SOCCER SHOT PROPS: the divisor is SHIPPED and has never been OBSERVED working.**
   The shots model over-predicts **1.398x** (n=9,840 pairs / 247 matches / 9 leagues,
   production predictions joined to ESPN outcomes). A scalar divisor of **1.3979**
@@ -1736,6 +1825,8 @@ the ROI report's 64,007-bet denominator does not move.
   the artifact reached WEB but not live-odds-worker, which pulls on its own
   cycle. Absence of rows means nothing at all.
   Lane `soccer-shot-shrinkage`; working in `state.md [soccer-shots-prop-skill]`.
+
+  </details>
 
 - **#613 `lane-guard` unenforced every claim under a dot-directory — FIXED, and
   the audit tool that found it is now the standing check.** `_paths_in` stripped

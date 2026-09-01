@@ -1207,7 +1207,72 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `.syndicate/lanes_history.md`.
 - Blocked by: none
 
-### ncaaf-cfbd-quota-latch — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Latch + PPA cache live and proven across processes. Owed reading is ARMED as one-time scheduled task `verify-ncaaf-cfbd-quota-latch-roll` (2026-09-01 08:00). If `LATCHED_SKIP` still fires after the roll the latch is CAUSING an outage.
+### football-projection-publish-allowlist — OPEN — opened 2026-09-01 — **CODE ON MAIN (`fcbbcc62`). NO DEDICATED DEPLOY — RIDEALONG BY USER DECISION. Tracked as `#618`.** Needs BOTH services, and a PARTIAL ridealong logs the same line as the unfixed bug.
+- Goal: the NFL/NCAAF season-projection CSVs the worker regenerates daily
+  actually reach the board, instead of the board only moving when someone
+  COMMITS a CSV and rides a web deploy.
+- Files: `syndicate/features/shared/artifact_publisher.py` (2 allowlist entries),
+  `tests/test_football_projection_publish_allowlist.py` (NEW).
+- Origin: handed off from `ncaaf-cfbd-quota-latch`, which measured it on
+  2026-09-01 while verifying the quota-latch roll.
+- THE DEFECT: both generators have called `publish_hot_artifact` since
+  2026-08-19 and both calls were **no-ops for 13 days** — neither output path
+  was in `HOT_ARTIFACT_PATTERNS`. `generate_smartsim2_nfl_projections.py` says
+  in its own comment *"the allowlist pattern covers both"*; that pattern never
+  existed. `#208` in reverse: the usual failure is allowlisting something
+  nothing publishes, this is publishing something nothing allowlists, and it is
+  just as silent (`artifact_published=False`, no error).
+- Added: `ncaaf_source/data/smartsim2_projections_*_wk*.csv` and
+  `nfl_source/smartsim2_projections_*_wk*.csv`. Depths differ because `#389`
+  put NFL's output one level shallower; NOT collapsible into one wildcard.
+- WRITE->READ CHECKED, not assumed: worker writes
+  `<SYNDICATE_DATA_ROOT>/ncaaf_source/data/...`; web reads
+  `default_ncaaf_source_root()/"data"` == `$SYNDICATE_NCAAF_SOURCE_ROOT/data`
+  == the same directory. NFL likewise via `_source_roots()`. The sibling lane
+  `nfl-props-odds-allowlist` already proved this chain end-to-end on
+  `nfl_source/schedule_2026.csv`.
+- **RIDEALONG, BY DECISION `[2026-09-01, user]`. DO NOT SCHEDULE A DEPLOY.**
+  Two allowlist strings cost nothing to carry and do not justify restarting a
+  worker running an MLB sim. `nfl-props-odds-allowlist` closed the identical
+  situation the same way ("WHOEVER DEPLOYS MAIN TO refresh-worker NEXT PICKS
+  THIS UP FOR FREE") and its prediction held. **No claim was ever acquired by
+  this lane; nothing is held.**
+- **NEEDS BOTH refresh-worker AND web, AND A PARTIAL RIDEALONG IS
+  INDISTINGUISHABLE FROM THE UNFIXED BUG.** The SENDER
+  (`publish_hot_artifact`) and the RECEIVER (`ops._write_published_artifact`)
+  each call `is_hot_artifact_relative_path`. web-only -> the worker still
+  refuses locally; refresh-worker-only -> web answers 403. **Both partial
+  states log `artifact_published=False`, the same line as doing nothing.**
+  Before concluding this failed, READ THE LIVE SHA ON BOTH SERVICES — the
+  natural reading of "still False" is "the fix does not work", and it will
+  usually mean "only one side has it yet".
+- **AND THE BOARD STILL WILL NOT MOVE ON DEPLOY ALONE.** There is no blanket
+  sweep on refresh-worker (`sweep_changed_hot_artifacts`'s only production
+  caller is `live_lens_loop`), so the already-written 2026-09-01T00:33Z CSV is
+  NOT picked up retroactively. It publishes when the GENERATOR next runs —
+  ncaaf on the 86400s interval, nfl likewise.
+- Deploy state at hand-off (2026-09-01T15:2xZ): web `ad33df21`, refresh-worker
+  `1c078f46`, live-odds-worker `1c078f46`. `fcbbcc62` is a strict FORWARD move
+  for both services (checked, not assumed) and an ancestor of `origin/main`, so
+  any later main deploy carries it without an `OFF_MAIN` or rollback refusal.
+- Whoever deploys refresh-worker next also picks up `layer2-cap-raise`'s staged
+  env: `SYNDICATE_LAYER2_ROWS_PER_SPORT=2000`, `SYNDICATE_LAYER2_ROWS_TOTAL=6000`.
+  **Confirmed by reading LIVE env-vars, not from the ledger.** That is that
+  lane's intended pickup, not a surprise.
+- VERIFY BY (reuse `nfl-props-odds-allowlist`'s own recipe, which caught this
+  class once already): `artifact_published=True` in the generator's log, THEN
+  `/api/ops/artifacts/export?path=ncaaf_source/data/smartsim2_projections_2026_wk1.csv`
+  returns count=1 with a **FRACTIONAL** mtime (a whole-second mtime is a boot
+  copy, not a publish), THEN `/ncaaf/api/cards` values DIVERGE from the
+  git-committed `generated_at=2026-08-19T22:00:39Z` CSV. All three: a fresh
+  mtime alone could be a rewrite of stale bytes, and the generator is
+  deterministic so identical values would NOT disprove a successful publish.
+- NOT DONE, DELIBERATELY: `nfl_source/smartsim2_preseason_projections_*_wk*.csv`.
+  That generator has no `publish_hot_artifact` call, so the entry would be the
+  inert half of this same defect. Wire the publisher in the same change.
+- Blocked by: none.
+
+### ncaaf-cfbd-quota-latch — **CLOSED 2026-09-01** — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 (archived) — **THE ROLL READING IS IN. The latch expired on time, released with zero manual intervention, and the PPA cache ARMED.** Goal met; measurement in `.syndicate/deploys.md` 2026-09-01 15:0xZ. One SEPARATE, PRE-EXISTING defect surfaced and is NOT this lane's: the regenerated artifact never reaches the board (`artifact_published=False` — path matches zero `HOT_ARTIFACT_PATTERNS`).
 - Goal: stop NCAAF regeneration burning a MONTHLY CFBD quota it has already been
   told is exhausted, and let it succeed from cache while exhausted.
 - Files: released: syndicate/features/ncaaf/cfbd_quota_latch.py (NEW),
@@ -1228,16 +1293,45 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   production found and the tests did not — `raise_if_latched` ran once BEFORE
   `call_with_retry` and never inside it, so the first 429 set the latch and the
   four retries behind it still went out.
-- **OWED, AND NOT IMMINENT — do not treat as a live obligation.** (a) The ladder
-  fix's own number (1 call, not 5) needs a FRESH exhaustion event; the latch is
-  set until the roll, so this may be weeks away. (b) The PPA cache is EMPTY and
-  arming it needs the call that is failing — inert until 2026-09-01.
-- **AFTER THE 2026-09-01 ROLL, and this is the reading that matters:**
-  `[ppa] source=api` arming the cache, `age_seconds` resetting from ~378,000, and
-  cadence dropping ~24/day -> the configured 1/day. **`LATCHED_SKIP` still firing
-  on or after 09-01 means the latch did NOT expire and is CAUSING an outage** —
-  override is `clear_latch()`, file at
-  `<SYNDICATE_DATA_ROOT>/ncaaf_source/state/cfbd_quota_latch.json`.
+- **ROLL READING TAKEN 2026-09-01T15:00Z, read-only, no deploy.** All four
+  expected signals resolved. Full evidence in `.syndicate/deploys.md`.
+  1. **PPA cache ARMED** — `2026-09-01T00:23:31Z [ppa] season=2025 source=api`,
+     after 17 consecutive `source=none reason=quota_exhausted_and_cache_empty`
+     on 08-31. Write is durable (`SYNDICATE_DATA_ROOT` -> mounted disk, no
+     `CACHE_WRITE_FAILED`).
+  2. **Artifact regenerated** — `projections_written=51` at `00:33:24Z` to
+     `/opt/render/project/data/ncaaf_source/data/smartsim2_projections_2026_wk1.csv`,
+     the exact path the staleness guard stats. `age_seconds` therefore reset at
+     00:33:24Z; the direct log line cannot exist before 2026-09-02T00:33Z
+     because the guard is DELIBERATELY SILENT on `artifact_fresh`. Recorded
+     because silence alone is ambiguous — autorun-disabled, sport-not-active,
+     week-None and process-still-running are all silent too. The WRITE is the
+     evidence, not the quiet.
+  3. **Cadence collapsed** — 23 launches / 24.0 h (**23.0/day**) on 08-31
+     vs 1 launch / 15.0 h (**1.6/day**) post-roll. Configured: 1/day.
+  4. **No new `LATCH_SET`, and NO `LATCHED_SKIP`** — zero `[cfbd_quota]` lines
+     of any kind in `2026-09-01T00:00Z..15:00Z`. `clears_in_hours` counted
+     17.7 -> 0.6 across 18 hourly skips and stopped. **The feared failure mode
+     did not occur: `_next_month_roll` expired the latch on time and
+     `clear_latch()` was never needed.** The latch file was NOT touched.
+- **STILL OWED, STILL NOT IMMINENT:** the ladder fix's own number (1 call, not
+  5) needs a FRESH exhaustion event. Its absence today proves nothing.
+- **HANDED OFF, NOT FIXED HERE (read-only task): the artifact regenerates and
+  the BOARD DOES NOT MOVE.** `artifact_published=False` at `00:33:24Z`, no
+  publish error — `is_hot_artifact_relative_path("ncaaf_source/data/smartsim2_projections_2026_wk1.csv")`
+  returns **False** (verified by running it; the only ncaaf allowlist entry is
+  `ncaaf_source/api/live_state/live_state_*.json`). Push and pull share that
+  allowlist, so nothing can move the file. `/ncaaf/api/cards` serves values
+  byte-identical to the git-committed CSV stamped `generated_at=2026-08-19T22:00:39Z`.
+  Values alone do not discriminate — the generator is deterministic
+  (`seeds_used=300`, identical `rating_source`) — the allowlist miss is what
+  makes it decisive. **NFL has the identical defect**
+  (`2026-08-31T21:28:40Z artifact_published=False`), so fix the allowlist for
+  both or it survives in the sibling. Predates this lane.
+- **ALSO NOTED, NOT FIXED:** `[sp_ratings]` caches to
+  `/opt/render/project/src/data/...` — the EPHEMERAL checkout — so it dies on
+  every deploy and costs a CFBD call to refill. The latch and PPA cache
+  correctly use `SYNDICATE_DATA_ROOT`.
 - Narrative: `.syndicate/log/2026-08-31.md`, `.syndicate/lanes_history.md`.
 - Blocked by: none
 
@@ -1280,7 +1374,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - `gameStartTime` is ABSENT on all 10 `bal-col` slate rows, so liveness cannot be
   confirmed from the venue — only from the board's `commence_time`.
 
-### soccer-shot-shrinkage — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Divisor SHIPPED to all three services and published; NEVER OBSERVED working (soccer had `available_today: 0`). Owed reading carried by `todo.md #612` and scheduled task `refit-soccer-shot-shrinkage` (monthly, 1st 09:00).
+### soccer-shot-shrinkage — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED. GOAL MET 2026-09-01 — the divisor IS live in the engine, MEASURED, and `todo.md #612` is CLOSED.** Discharged not on the board but on the PREDICTION ARCHIVE the engine writes: self-normalised over the 3,434 players present both sides of the 2026-08-31 ship date, median post/pre `expected_shots` **0.720** against a predicted 1/1.3979 = **0.715**, with `expected_minutes_share` flat at **1.000** so the step cannot be "future fixtures carry fewer minutes". Tool `scripts/check_soccer_divisor_reached_engine.py`. Monthly re-fit ran the same day: **1.3979 -> 1.3930**, published and read back, no deploy. Residual (small): `players_*.csv` is not in `HOT_ARTIFACT_PATTERNS`, so the board-render form of the reading still cannot run from web. Detail in `.syndicate/deploys.md` 2026-09-01 15:0xZ.
 - Goal: the soccer shots model stops over-predicting by ~1.4x. Ship the
   held-out-validated divisor as a DISK-BACKED, RE-FITTABLE calibration artifact,
   never a hard-coded constant. Testable: the served board's shot-prop

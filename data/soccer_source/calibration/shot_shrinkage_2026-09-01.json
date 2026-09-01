@@ -1,0 +1,36 @@
+{
+ "date_window": [
+  "2026-07-22",
+  "2026-08-31"
+ ],
+ "divisor": 1.393,
+ "excluded_leagues": [
+  "belgian_pro_league"
+ ],
+ "fitted_at": "2026-09-01T15:04:23.256635+00:00",
+ "held_out": {
+  "bias_raw": 0.1687,
+  "bias_scalar": 0.0281,
+  "mae_affine": 0.5698,
+  "mae_constant_baseline": 0.6226,
+  "mae_raw": 0.6178,
+  "mae_scalar": 0.5491,
+  "n_test": 6741,
+  "n_train": 3435,
+  "split_date": "2026-08-22"
+ },
+ "leagues": [
+  "bundesliga",
+  "championship",
+  "epl",
+  "eredivisie",
+  "la_liga",
+  "ligue_1",
+  "mls",
+  "primeira_liga",
+  "serie_a"
+ ],
+ "matches": 254,
+ "n": 10176,
+ "note": "Divides expected_shots at the single choke point in player_props.project_player_props. Shots-on-target inherits it: the model's on-target RATE is already correct (0.345 vs an actual 0.342). Absent or out-of-range -> the engine uses 1.0."
+}
