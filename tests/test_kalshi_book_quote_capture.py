@@ -65,10 +65,26 @@ def test_the_row_carries_the_contract_it_was_quoted_for():
     assert quote_rows_from_kalshi_matches([_match()])[0]["venue_ticker"].startswith("KXMLBHR-")
 
 
-def test_a_match_with_no_player_is_a_GAME_row_not_a_prop():
-    rows = quote_rows_from_kalshi_matches([_match(player_name=None, market="totals", line=8.5)])
-    assert rows[0]["kind"] == "game"
-    assert rows[0]["player_name"] is None
+def test_a_GAME_match_is_REFUSED_because_two_sources_would_share_a_dedup_key():
+    """THE COLLISION THIS BOUND EXISTS TO PREVENT, and it shipped before it was
+    caught. `_KEY_FIELDS` is (sport, kind, event_id, bookmaker, segment, market,
+    selection, player_name, line) -- NO source field. So a directly-captured
+    Kalshi game row and OddsAPI's copy of the same market share a key, and
+    `append_book_quotes` appends whenever (line, price) differs from that key's
+    last observation. They do not merge, they ALTERNATE, and every alternation
+    reads as a Kalshi price change that never happened.
+
+    Measured on the 2026-08-31 MLB shard: existing Kalshi rows are 13,768 GAME
+    and 0 PROP. So props cannot collide and games always would."""
+    assert quote_rows_from_kalshi_matches(
+        [_match(player_name=None, market="totals", line=8.5)]
+    ) == []
+
+
+def test_a_prop_still_passes_so_the_bound_is_not_a_blanket_refusal():
+    """Off is not on: a guard that refused everything would satisfy the test
+    above while destroying the entire point of the capture."""
+    assert len(quote_rows_from_kalshi_matches([_match()])) == 1
 
 
 def test_a_match_with_no_price_is_SKIPPED_not_defaulted():
@@ -83,9 +99,12 @@ def test_a_match_with_no_market_is_skipped():
 
 def test_the_BOARD_line_is_kept_not_kalshis_strike():
     """`_match_key`'s docstring: storing the strike instead of the board's
-    signed line rebuilds the +X/-X collision. The builder must not re-derive."""
-    rows = quote_rows_from_kalshi_matches([_match(market="spreads", line=-1.5, player_name=None)])
-    assert rows[0]["line"] == -1.5
+    signed line rebuilds the +X/-X collision. The builder must not re-derive.
+    Uses a PROP with a signed line, since game rows are refused above."""
+    rows = quote_rows_from_kalshi_matches(
+        [_match(market="batter_total_bases", line=1.5, player_name="Nolan Arenado")]
+    )
+    assert rows[0]["line"] == 1.5
 
 
 def test_non_mappings_and_empties_do_not_raise():

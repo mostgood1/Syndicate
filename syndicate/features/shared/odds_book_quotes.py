@@ -464,6 +464,38 @@ def quote_rows_from_kalshi_matches(
     `kalshi_american` is Kalshi's own price already in American odds, which is
     what `_normalize` expects; rows without one are skipped rather than
     defaulted, because a quote with no price records nothing.
+
+    ------------------------------------------------------------------
+    PROPS ONLY, AND THIS IS A CORRECTNESS BOUND RATHER THAN A SCOPE CHOICE
+    ------------------------------------------------------------------
+
+    `_KEY_FIELDS` -- the dedup key `append_book_quotes` appends against -- is
+    `(sport, kind, event_id, bookmaker, segment, market, selection, player_name,
+    line)`. **There is no source or provenance field.** So a directly-captured
+    Kalshi row and OddsAPI's copy of the same Kalshi market share a key, and
+    `append_book_quotes` appends whenever `(line, price)` differs from that
+    key's last observation. Two sources under one key do not merge; they
+    ALTERNATE, and every alternation reads as a price change by "kalshi" that
+    never happened -- corrupting movement, latest-price and dispersion for the
+    one venue this was meant to illuminate.
+
+    **MEASURED, which is what bounds the fix:** on
+    `mlb_source/tracking/book_quotes/2026-08-31.jsonl` the existing Kalshi rows
+    are **13,768 on GAME markets and 0 on PROP markets.** OddsAPI carries
+    exchange game lines and no exchange props at all. So restricting this to
+    props removes the collision COMPLETELY -- there is nothing to collide with
+    -- while keeping the entire value, since props are the gap.
+
+    It also preserves the invariant the drop in `book_grid.is_direct_feed_book`
+    exists to protect (`[2026-08-25 user decision]`, one venue must have ONE
+    price source): Kalshi's game prices keep coming from OddsAPI, its prop
+    prices come from the direct feed, and no bet has two.
+
+    **A provenance field would be the general fix** and would let the direct
+    feed supply game prices too. That is a schema change to a shared artifact
+    and is NOT taken here; lane `wnba-accuracy-assessment` is doing it for the
+    Layer 1 board. When it lands, the `kind` guard below can be relaxed to a
+    source check -- and NOT before, or the alternation returns.
     """
     out: list[dict[str, Any]] = []
     for match in matches or ():
@@ -474,6 +506,10 @@ def quote_rows_from_kalshi_matches(
         if price is None or not market:
             continue
         player = str(match.get("player_name") or "").strip()
+        if not player:
+            # A game market. OddsAPI already writes Kalshi here, and a second
+            # source under the same dedup key alternates rather than merges.
+            continue
         out.append(
             {
                 "bookmaker": "kalshi",
