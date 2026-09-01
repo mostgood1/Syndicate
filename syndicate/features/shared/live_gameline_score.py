@@ -127,6 +127,55 @@ LEVEL_FINAL_IS_A_BAD_ROW: frozenset[str] = frozenset({
 })
 
 
+# THE QUOTE THE MODEL WAS SCORED AGAINST MUST HAVE BEEN ALIVE.
+#
+# **WITHOUT THIS CUT THIS MODULE REPORTS THE MODEL AS BETTER THAN IT IS, WHICH
+# IS THE DANGEROUS DIRECTION FOR AN INSTRUMENT TO BE WRONG IN.** Measured
+# 2026-09-01 over 12 dates / 72,587 retained MLB records / 157 games, h2h scored
+# against StatsAPI finals (`lane mlb-live-gameline-skill-audit`):
+#
+#   quote age at record time   n     model    market   model-minus-market
+#   <= 120s                    954   0.20000  0.17403  +0.02597
+#   300-600s                   320   0.16264  0.17011  -0.00747
+#   600-1800s                  501   0.16326  0.19047  -0.02721
+#   > 1800s                    592   0.16459  0.21897  -0.05438
+#
+# The model does not improve as the quote ages -- the MARKET decays, because a
+# price that has not moved in half an hour is a worse forecast of an outcome it
+# has not seen. Pooled over every age the model looked like it was at parity
+# (-0.00202). On quotes that were actually alive it LOSES by +0.01096, bootstrap
+# 95% CI over games [+0.00167, +0.02111]. Those are opposite conclusions drawn
+# from one file, and the difference is entirely which prices were included.
+#
+# `FRESH_QUOTE_SECONDS` is the research cut -- the population any model change
+# must be validated on. It is deliberately TIGHTER than
+# `live_gameline_join.max_quote_age_seconds()` (the publish gate, 600s): a
+# safety ceiling and an evidence standard are different questions and coupling
+# them would let a product decision move the measurement.
+FRESH_QUOTE_SECONDS = 120.0
+
+# Reported as a breakdown so a shift in the AGE MIX can never again be mistaken
+# for a shift in model quality.
+_QUOTE_AGE_BUCKETS: tuple[tuple[str, float, float], ...] = (
+    ("le_120s", 0.0, 120.0),
+    ("120_300s", 120.0, 300.0),
+    ("300_600s", 300.0, 600.0),
+    ("600_1800s", 600.0, 1800.0),
+    ("gt_1800s", 1800.0, float("inf")),
+)
+
+
+def _quote_age(value: Any) -> float | None:
+    """Seconds, or None. A bool is not a number here."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    age = float(value)
+    if age != age or age < 0.0:  # NaN-safe
+        return None
+    return age
+
+
+
 def _finite_prob(value: Any) -> float | None:
     """A probability in (0, 1), or None. Bounds are EXCLUSIVE on purpose.
 
@@ -371,6 +420,15 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
     # market branch (i.e. already have an outcome and a model probability), so
     # it describes the scoreable population, not the raw file.
     by_market: dict[str, int] = {}
+    # --- THE FRESH-QUOTE CUT AND THE AGE MIX (see `FRESH_QUOTE_SECONDS`) ---
+    model_fresh: list[tuple[float, bool]] = []
+    market_fresh: list[tuple[float, bool]] = []
+    model_fresh_paired: list[tuple[float, bool]] = []
+    # bucket -> [model pairs, market pairs, model-paired pairs]
+    age_buckets: dict[str, list[list[tuple[float, bool]]]] = {
+        name: [[], [], []] for name, _lo, _hi in _QUOTE_AGE_BUCKETS
+    }
+    quote_age_absent = 0
     considered = 0
 
     for rec in records if isinstance(records, (list, tuple)) else []:
@@ -434,6 +492,26 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
             if market_p is not None:
                 market_priceable.append((market_p, won))
                 model_priceable_paired.append((model_p, won))
+        # AGE-STRATIFIED, over the same rows the populations above use. Kept
+        # separate from `priceable` on purpose: freshness is a property of the
+        # PRICE and priceability is a property of the EDGE, and conflating them
+        # is how the pooled number came to describe neither.
+        age = _quote_age(rec.get("quote_age_seconds"))
+        if age is None:
+            quote_age_absent += 1
+        else:
+            if age <= FRESH_QUOTE_SECONDS:
+                model_fresh.append((model_p, won))
+                if market_p is not None:
+                    market_fresh.append((market_p, won))
+                    model_fresh_paired.append((model_p, won))
+            for name, lo, hi in _QUOTE_AGE_BUCKETS:
+                if lo <= age < hi:
+                    age_buckets[name][0].append((model_p, won))
+                    if market_p is not None:
+                        age_buckets[name][1].append((market_p, won))
+                        age_buckets[name][2].append((model_p, won))
+                    break
         # LATEST record per game, chosen by `recorded_at` rather than by file
         # order. The ledger is append-only so the two normally agree -- but
         # "normally" is not a guarantee, and a merged or re-pulled file would
@@ -509,4 +587,17 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         "all_records": _paired(all_model, all_model_pair, all_market),
         "last_per_game": _paired(lp_model, lp_model_pair, lp_market),
         "priceable_only": _paired(pr_model, pr_model_pair, pr_market),
+        # THE POPULATION A MODEL CLAIM MUST BE MADE ON. Listed after the
+        # others rather than replacing them: `all_records` is still the honest
+        # description of every row the ledger holds, it just answers a question
+        # nobody is betting on.
+        "fresh_quotes_only": _paired(
+            _score(model_fresh), _score(model_fresh_paired), _score(market_fresh)
+        ),
+        "fresh_quote_seconds": FRESH_QUOTE_SECONDS,
+        "quote_age_absent": quote_age_absent,
+        "by_quote_age": {
+            name: _paired(_score(b[0]), _score(b[2]), _score(b[1]))
+            for name, b in age_buckets.items()
+        },
     }

@@ -212,6 +212,83 @@ REASON_UNSUPPORTED_MARKET = "market_not_priced_from_a_live_distribution"
 # them out would have repeated the pregame defect `prop_projections:615` records:
 # 53 of 107 live game-line rows carrying no projection at all, every one of them
 # `spreads_alt` or `totals_alt`, because neither key was in the set.
+# THE QUOTE MUST STILL BE A LIVE QUOTE.
+#
+# **THIS IS THE GATE THAT WAS MISSING, AND IT MANUFACTURED EDGES.** The
+# precision gate below asks "is the edge bigger than the model's own noise". It
+# never asked whether the PRICE the edge is measured against still exists. A
+# live re-sim compared to a dead price produces a large, confident, and entirely
+# fictional edge, and the size of the fiction grows with the staleness.
+#
+# MEASURED 2026-09-01 over the retained MLB ledger, 12 dates / 72,587 records /
+# 157 games, h2h scored against StatsAPI finals (`lane
+# mlb-live-gameline-skill-audit`):
+#
+#   quote age   n     model    market   model-minus-market
+#   <= 120s     954   0.20000  0.17403  +0.02597   <- the model HONESTLY loses
+#   300-600s    320   0.16264  0.17011  -0.00747
+#   600-1800s   501   0.16326  0.19047  -0.02721
+#   > 1800s     592   0.16459  0.21897  -0.05438   <- the model "wins"
+#
+# The model does not get better as the quote ages; the MARKET gets worse,
+# because a stale number is a worse forecast of an outcome it has not seen. On
+# the subset the board liked most -- late game, `|edge| >= 20pp` -- the MEDIAN
+# quote age was **42.9 minutes** and p90 was ~21 hours, and that subset scored a
+# fair-odds "return" of +98.7%. That number is not an edge. It is the arithmetic
+# of pricing against a quote nobody could have taken.
+#
+# Across the whole file the ages are: p50 410s, p75 950s, p90 1,848s,
+# p99 **74,997s**. So ~1 row in 100 was being priced off a price over 20 hours
+# old, and 39.5% off one older than ten minutes.
+#
+# WHY 600s AND NOT 120s. 120s is the population the model was actually validated
+# on and is the defensible research cut, but it keeps only 23.1% of rows and
+# choosing it here would be a product decision disguised as a safety fix. 600s
+# removes the population that is unambiguously dead -- an in-play baseball
+# moneyline that has not moved in ten minutes is not a live quote -- and keeps
+# 60.5%. Tighten with the env knob once someone owns that decision.
+#
+# ABSENT AGE IS REFUSED, NOT PASSED. `unknown must not default permissive` is a
+# standing rule here. Every one of the 72,587 measured records carried
+# `age_seconds`, so this branch should never fire; if it starts firing, that is
+# the bug report, not a relaxed gate.
+REASON_STALE_QUOTE = "quote_older_than_live_pricing_ceiling"
+REASON_QUOTE_AGE_ABSENT = "row_carries_no_quote_age"
+_DEFAULT_MAX_QUOTE_AGE_SECONDS = 600.0
+
+
+def max_quote_age_seconds() -> float:
+    """Ceiling on how old a quote may be and still be priced live.
+
+    `SYNDICATE_LIVE_GAMELINE_MAX_QUOTE_AGE_SECONDS`. A non-positive value or an
+    unparseable one falls back to the default rather than disabling the gate --
+    a knob that can be typo'd into "off" is the shape this repo has already been
+    burned by (`#603` shipped inert twice).
+    """
+    raw = str(os.environ.get("SYNDICATE_LIVE_GAMELINE_MAX_QUOTE_AGE_SECONDS") or "").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return _DEFAULT_MAX_QUOTE_AGE_SECONDS
+    return value if value > 0.0 else _DEFAULT_MAX_QUOTE_AGE_SECONDS
+
+
+def quote_age_verdict(age_seconds: Any) -> dict[str, Any] | None:
+    """`None` if the quote is fresh enough to price; a refusal verdict if not.
+
+    Returns a verdict shaped like `price_moneyline`'s so `record` folds it into
+    the same counters and the refusal is named in `withheld_by_reason`.
+    """
+    if isinstance(age_seconds, bool) or not isinstance(age_seconds, (int, float)):
+        return {"priceable": False, "withheld_reason": REASON_QUOTE_AGE_ABSENT,
+                "model_prob": None, "market_prob": None, "edge_pp": None}
+    age = float(age_seconds)
+    if age != age or age > max_quote_age_seconds():  # NaN-safe
+        return {"priceable": False, "withheld_reason": REASON_STALE_QUOTE,
+                "model_prob": None, "market_prob": None, "edge_pp": None}
+    return None
+
+
 _TOTALS_MARKETS = frozenset({"totals", "total", "totals_alt", "alternate_totals"})
 _SPREAD_MARKETS = frozenset({"spreads", "run_line", "ats", "spreads_alt", "alternate_spreads"})
 _DIST_MARKETS = _TOTALS_MARKETS | _SPREAD_MARKETS
@@ -225,6 +302,42 @@ def _min_sims() -> int:
     except ValueError:
         return _DEFAULT_MIN_SIMS
     return value if value > 0 else _DEFAULT_MIN_SIMS
+
+
+def min_edge_pp() -> float:
+    """An ABSOLUTE floor under the publish bar, in percentage points.
+
+    **WHY THIS EXISTS: THE PRECISION GATE GETS LOOSER AS THE MODEL GETS MORE
+    PRECISE, AND THAT IS BACKWARDS WHEN THE MODEL HAS NO MEASURED SKILL.** The
+    gate below is `|edge| >= sigma * se * 100`, and `se = sqrt(p(1-p)/n)`. At
+    MLB's 120 sims that bar is ~8.98pp at p=0.5. Raise `MLB_LIVE_GAME_MC_SIMS`
+    to 1,000 -- which is a genuine accuracy improvement, worth ~0.0014 Brier of
+    pure sampling noise -- and the bar falls to ~3.2pp, roughly TRIPLING the
+    published volume as a side effect nobody asked for.
+
+    That side effect is only acceptable if the extra rows are good. Measured
+    2026-09-01 on fresh quotes (<=120s, the only prices anyone could take),
+    h2h against StatsAPI finals:
+
+        |edge|       n      model    market   model-minus-market
+        0-10pp       2052   0.16061  0.15814  +0.00247
+        10-20pp      452    0.24861  0.22264  +0.02597
+        >= 20pp      70     0.35888  0.19584  +0.16305
+
+    The model is worse than the market in EVERY band, and worst exactly where
+    it claims the most. So widening publication is strictly harmful here, and
+    the sim count must not be allowed to decide it.
+
+    DEFAULT 0.0 -- OFF, so behaviour is unchanged today. This is the knob that
+    must be set BEFORE `MLB_LIVE_GAME_MC_SIMS` is raised, not after.
+    """
+    raw = str(os.environ.get("SYNDICATE_LIVE_GAMELINE_MIN_EDGE_PP") or "").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return 0.0
+    return value if value > 0.0 else 0.0
+
 
 
 def prob_std_err(probability: Any, sims: Any) -> float | None:
@@ -340,6 +453,29 @@ def live_gameline_from_lens(
             # other -- see `price_analytic_line_market`. Absent on MLB's lens,
             # so this is `{}` there and the distribution path is untouched.
             "analytic_markets": _analytic_markets_from_lens(lens),
+            # THE GAME CLOCK, AND THE PREGAME NUMBER THE LIVE ONE REPLACED.
+            #
+            # Both were already on the lens and neither was ever read. Their
+            # absence is why the 2026-09-01 skill audit had to use WALL-CLOCK
+            # MINUTES SINCE A GAME'S FIRST LEDGER ROW as a proxy for how far the
+            # game had gone -- a proxy that is wrong for every rain delay and
+            # extra-inning game, and that cannot tell "bottom 9, tied, two outs"
+            # from "top 5 of a blowout".
+            #
+            # `progress` carries {fraction, inning, half, outs, outsRecorded,
+            # remainingOuts}. `baselineHomeWinProb` is the PREGAME probability
+            # the live re-sim supersedes. Recording the baseline beside the live
+            # number is what makes the next question answerable at all: the
+            # audit's encompassing regression found the live model carries
+            # almost no information the market lacks EARLY (weight 0.13 against
+            # the market's 1.18) and most of it LATE (0.74 against 0.30) -- the
+            # signature of a live estimate that discarded a prior it should have
+            # kept. That blend cannot be fitted without both terms on one row.
+            #
+            # Read defensively: an older snapshot has neither key, and `{}` /
+            # `None` degrade to exactly the previous behaviour downstream.
+            "progress": lens.get("progress") if isinstance(lens.get("progress"), Mapping) else {},
+            "pregame_home_win_prob": lens.get("baselineHomeWinProb"),
         }
     return None
 
@@ -536,8 +672,11 @@ def price_moneyline(
     out["edge_pp"] = edge
 
     # The gate. `se` is a probability, `edge` is in points -- convert once, here,
-    # rather than letting a unit mismatch decide what gets published.
-    if abs(edge) < float(sigma) * se * 100.0:
+    # rather than letting a unit mismatch decide what gets published. The
+    # absolute floor is applied with `max`, so it can only ever TIGHTEN the
+    # precision bar; it is off (0.0) unless set. See `min_edge_pp`.
+    bar = max(float(sigma) * se * 100.0, min_edge_pp())
+    if abs(edge) < bar:
         out["withheld_reason"] = REASON_NOT_PRICEABLE
         return out
 
@@ -892,6 +1031,21 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
             record(coverage, {"priceable": False, "withheld_reason": REASON_NO_LIVE_PROJECTION}, projected=False)
             continue
 
+        # THE STALENESS GATE SITS HERE, ABOVE THE MARKET BRANCH, ON PURPOSE.
+        # Below this line the code forks three ways (moneyline, distribution,
+        # analytic) and a check placed in any one of them would leave the other
+        # two pricing against dead quotes. `learnings.md`: fix the choke point
+        # every caller shares, not the one you can see. See `REASON_STALE_QUOTE`
+        # for the measurement that motivates it.
+        #
+        # `projected=False` because the row never reached a projection -- this
+        # is a refusal to price against a dead MARKET quote, not a failure of
+        # the model, and folding it into `projected` would misattribute it.
+        stale = quote_age_verdict(row.get("age_seconds"))
+        if stale is not None:
+            record(coverage, stale, projected=False)
+            continue
+
         projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
         if market_key in _DIST_MARKETS:
             # THE SIDE THE PROJECTION DESCRIBES, taken from the row's own side
@@ -983,6 +1137,13 @@ def _apply_verdict(
         block["total_mean"] = hit.get("total_mean")
         block["as_of"] = hit.get("as_of")
         block["carried_forward"] = hit.get("carried_forward")
+        # v4 LEDGER FIELDS. This copy list is EXPLICIT, so a key added to
+        # `live_gameline_from_lens` and to `build_records` but not here reaches
+        # the ledger as `None` and the feature ships inert with every test
+        # green. That is `presence != reachability`, and it is why the ledger
+        # test below asserts on the VALUES rather than on the keys existing.
+        block["progress"] = hit.get("progress")
+        block["pregame_home_win_prob"] = hit.get("pregame_home_win_prob")
         row["live_gameline"] = block
         updated = dict(projection)
         updated["live_aware"] = True
