@@ -44,7 +44,7 @@ families: `btts`, corners, and — as of 2026-09-01 — MLB PLAYER PROPS.
 Player props were refused wholesale here for as long as resolving a slug token
 like `jakman` to a roster name was a guess, because a prop priced by a guessed
 player is a real order on the wrong person. That token is a guess NO LONGER:
-the encoding was measured against the venue's own `question` text (98 ground
+the encoding was measured against the venue's own `question` text (99 ground
 -truth pairs across 8 fixtures, 2026-09-01,
 `.syndicate/findings_2026-09-01_polymarket_prop_census.md`) — and `jakman` is
 Jake MANGUM, not any of the names a reader might have guessed. See
@@ -117,7 +117,9 @@ _JOINABLE_BOARD_MARKETS: frozenset[str] = frozenset(MARKET_TYPE_TO_BOARD.values(
 # Slug grammar, measured on 8 of 8 live fixtures 2026-09-01 against the
 # venue's own `question` text (the field `persist_game_slate` drops; fetched
 # from the public web gateway -- full evidence with all 98 (token, name)
-# pairs in `.syndicate/findings_2026-09-01_polymarket_prop_census.md`):
+# pairs in `.syndicate/findings_2026-09-01_polymarket_prop_census.md`;
+# the implemented encoder reproduces 97 of 99, and both misses are the
+# venue's own collision-extended forms, which fail SAFE -- underivable):
 #
 #     astatc-mlb-<away>-<home>-<date>-<family>-<playertoken>-gte<N>
 #     e.g.  astatc-mlb-sd-cin-2026-09-01-hits-jacmer-gte2
@@ -895,7 +897,7 @@ _PROP_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
 def _polymarket_player_token(player_name: Any) -> str | None:
     """OUR player's name -> the venue's slug token, or None when underivable.
 
-    The rule, validated on 96 of 98 measured (token, question-name) pairs
+    The rule, validated on 97 of 99 measured (token, question-name) pairs
     across 8 fixtures on 2026-09-01 (the other 2 are the venue's own
     collision-extended forms, which this NEVER produces -- see below):
 

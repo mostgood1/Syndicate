@@ -2510,7 +2510,7 @@ def test_a_PERMISSIVE_resolver_now_REFUSES_instead_of_picking_positionally(monke
 
 # ==========================================================================
 # MLB PLAYER PROPS -- admitted per family from the 2026-09-01 measurement
-# (`.syndicate/findings_2026-09-01_polymarket_prop_census.md`): 98 ground-truth
+# (`.syndicate/findings_2026-09-01_polymarket_prop_census.md`): 99 ground-truth
 # (token, question-name) pairs across 8 fixtures. The join derives the venue's
 # token from OUR player_name and requires exact equality -- a token we cannot
 # derive is a COVERAGE miss, never a wrong-person match.
