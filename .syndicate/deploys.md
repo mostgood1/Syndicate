@@ -17018,3 +17018,49 @@ capture-side; the capture needs no change.
 verify: the reading is the 17:06:12Z pair above — `matched=60` beside
 `appended=0 no_sport=0` — plus the two file:line refusals on `417e19ed` that
 make the zero permanent.
+
+#### CORRECTION to the entry above — `appended > 0` is UNREACHABLE, not merely unobserved
+
+I wrote that the Polymarket capture "will contribute exactly when Polymarket
+lists a player prop that joins the board" and that "nothing further is needed
+for it". **Both halves are wrong.** `syndicate-21` found it; I verified it on the
+code rather than accepting the report.
+
+`polymarket_board_join.py` maps a venue market type to a board market, and
+anything unmapped hits:
+
+    if board_market is None:
+        # PROP lands here -- a real market, deliberately out of scope
+        _note_out_of_scope(venue_type, parsed, row)
+        refuse("market_type_not_a_game_line")
+        continue
+
+So the join emits GAME LINES ONLY and never sets `player_name`.
+`quote_rows_from_polymarket_matches` consumes only rows WITH `player_name`.
+**The intersection is empty by construction**, which is exactly what
+`matches=60 ... appended=0 no_sport=0` was reporting: 60 joined markets, all
+game lines, none consumable.
+
+Polymarket is NOT failing to list props — it lists thousands. The join throws
+them away. So the capture cannot fire on its own, and a join-side change is
+required. **Stop watching `appended > 0` on this code; it is not a cadence
+question and no amount of waiting resolves it.**
+
+**The join-side fix is NOT "allow PROP through", and the module says why.**
+`PROP` is a MIXED bucket. Measured 2026-08-25 in that file:
+
+    slug='astatc-lol-bam-gng-2026-08-20-game1'
+    type='SPORTS_MARKET_TYPE_PROP'
+    question='Will Baam Esports win Game 1 vs GnG Amazigh?'
+
+— a League of Legends MAP WINNER, not a player prop. Admitting the bucket
+wholesale would price esports map winners as player props. The module's own note
+says assuming its contents "already produced one wrong claim". Characterise the
+bucket first.
+
+**What was actually delivered stands unchanged:** Kalshi direct prices reach the
+board (`kept_direct=869 near_misses={}` at 17:06:46Z). That was the request, and
+it is met. Polymarket direct props are a SEPARATE, now-correctly-scoped piece of
+work sitting behind the join — chip `task_4889e312`, which will need
+`polymarket_board_join.py` (listed by `open-bet-live-status`, UNOWNED since
+2026-08-31).
