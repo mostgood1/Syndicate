@@ -33,6 +33,8 @@ from the Layer 1 array so that moving the owner changes no rendering.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from typing import Any, Iterable, Mapping
 
 # Verbatim from `layer1_board.html`'s DEFAULT_BOOKS, order preserved.
@@ -82,6 +84,56 @@ _DEFAULT_BOOK_SET = frozenset(DEFAULT_BOOKS)
 # aggregator was supplying them at all is MEASURED rather than assumed: see the
 # drop counter at the call site.
 DIRECT_FEED_BOOKS: frozenset[str] = frozenset({"kalshi", "polymarket"})
+
+
+#: The field a quote row carries to say WHO observed it, and the value that means
+#: "straight from the venue". Stamped via `append_book_quotes(extra=...)`, which
+#: already exists for constant per-row fields.
+QUOTE_SOURCE_FIELD = "source"
+QUOTE_SOURCE_VENUE_DIRECT = "venue_direct"
+
+
+def is_venue_direct_row(row: Any) -> bool:
+    """Was this row observed at the venue rather than through the aggregator?
+
+    **ABSENT MEANS NO, and that is the conservative branch here** -- an untagged
+    row keeps today's behaviour exactly (a direct-feed book gets dropped from the
+    grid). The permissive direction would admit an aggregator's copy of a venue
+    under the venue's own name, which is the double-count
+    `is_direct_feed_book`'s caller exists to prevent.
+    """
+    if not isinstance(row, Mapping):
+        return False
+    return str(row.get(QUOTE_SOURCE_FIELD) or "").strip().lower() == QUOTE_SOURCE_VENUE_DIRECT
+
+
+def drop_from_grid(row: Any) -> bool:
+    """Should this quote row be refused before it becomes a grid cell?
+
+    THE RULE IS "ONE PRICE SOURCE PER VENUE", NOT "NO EXCHANGES"
+    -----------------------------------------------------------
+    `[USER DECISION 2026-08-25]` dropped kalshi/polymarket rows by NAME, because
+    the direct venue feed wrote those venues into `best` separately and an
+    OddsAPI row under the same name would put a second, different number for the
+    same venue into the same de-vig.
+
+    That premise held while the shard carried only the aggregator's copy.
+    Measured 2026-09-01, it no longer does: a second lane began writing Kalshi's
+    OWN prices into `book_quotes`, and a row carries no provenance -- schema is
+    `away_team, book_updated_at, bookmaker, captured_at, commence_time, date,
+    event_id, home_team, kind, line, market, player_name, price, segment,
+    selection, snapshot_ts, sport`, where `kind` is game/prop. So the name-only
+    rule discards the DIRECT price too, and Layer 1 and the book-grid see no
+    exchange at all: `apply_venue_quotes_to_grid`, which supplies them the other
+    way, has exactly one caller (`pipeline/layer2_shortlist.py`).
+
+    So the refusal now asks the question the rule was always about -- is this the
+    aggregator's copy of a venue we read directly? -- instead of the proxy it
+    used when only one answer was possible.
+    """
+    if not is_direct_feed_book((row or {}).get("bookmaker") if isinstance(row, Mapping) else None):
+        return False
+    return not is_venue_direct_row(row)
 
 
 def is_direct_feed_book(book: Any) -> bool:
