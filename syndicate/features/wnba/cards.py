@@ -20,6 +20,7 @@ from typing import Any
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 
+from syndicate.features.shared import wnba_card_provenance as _wnba_provenance
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.basketball_live_artifacts import build_live_lines_payload_from_artifacts
 from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
@@ -1783,8 +1784,17 @@ def _source_game_market_recommendations(picks: list[dict[str, Any]]) -> list[dic
                 "market_label": _source_market_label(pick.get("market")),
                 "display_pick": str(pick.get("display_pick") or pick.get("selection") or "").strip() or None,
                 "selection": str(pick.get("selection") or pick.get("side") or "").strip().upper() or None,
-                "p_win": _safe_float(pick.get("p_win") or pick.get("win_prob")),
-                "ev_pct": _safe_float(pick.get("ev_pct")),
+                # Applied on the way OUT, not only at production: these two
+                # fields are baked into `recommendations_slate_*.json` and copied
+                # verbatim, so the producer's clamp does not reach an artifact
+                # that already exists -- and WNBA does not rebuild until
+                # 2026-09-17. Verified on the served payload 2026-09-01: a
+                # 2026-08-30 card still showed `p_win = 1.0` AFTER the producer
+                # fix was live.
+                "p_win": _wnba_provenance.sane_win_probability(
+                    _safe_float(pick.get("p_win") or pick.get("win_prob"))
+                ),
+                "ev_pct": _wnba_provenance.sane_ev_pct(_safe_float(pick.get("ev_pct"))),
                 "basketball_summary": str(pick.get("basketball_summary") or "").strip() or None,
                 "why_explain": str(pick.get("basketball_summary") or pick.get("display_pick") or "").strip() or None,
                 "historical_context": pick.get("historical_context") if isinstance(pick.get("historical_context"), dict) else None,

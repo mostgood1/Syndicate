@@ -126,3 +126,51 @@ def coverage_note(buckets: dict[str, list]) -> str:
     parts = [f"{name} {len(rows)} ({100 * len(rows) / total:.1f}%)"
              for name, rows in buckets.items() if rows]
     return f"{total} rows: " + ", ".join(parts)
+
+
+# --------------------------------------------------------------------------
+# Confidence hygiene, applied at READ time as well as at production.
+#
+# The producer's clamp (refresh_wnba_oddsapi_props) fixes what it WRITES. But
+# `p_win` and `ev_pct` are baked into `recommendations_slate_*.json` and copied
+# verbatim by the card builder, so every artifact already on disk keeps whatever
+# it was written with -- and WNBA does not rebuild until 2026-09-17. Measured on
+# the served payload 2026-09-01, AFTER the producer fix deployed: a 2026-08-30
+# card still showed `p_win = 1.0`.
+#
+# So the same rule is applied on the way out. Not belt-and-braces for its own
+# sake: a fix that only affects future artifacts is not in force on anything a
+# reader can currently see.
+CONFIDENCE_FLOOR, CONFIDENCE_CEILING = 0.01, 0.99
+MAX_PLAUSIBLE_EV_PCT = 100.0
+
+
+def sane_win_probability(value: Any) -> float | None:
+    """Refuse certainty. A pregame WNBA bet is never 100%.
+
+    Measured 2026-08-31: 36 of 466 recommendations claimed `p_win = 1.000` on a
+    board realizing 47.62%.
+    """
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return max(CONFIDENCE_FLOOR, min(CONFIDENCE_CEILING, numeric))
+
+
+def sane_ev_pct(value: Any) -> float | None:
+    """Absence, not a clamped value, for an EV that cannot be real.
+
+    A refused EV renders as an em dash, which is true. A clamped one renders as
+    exactly 100.0%, which is a number nobody computed and reads as a real edge.
+    The measured outlier was 2264.8%.
+    """
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if abs(numeric) > MAX_PLAUSIBLE_EV_PCT else numeric

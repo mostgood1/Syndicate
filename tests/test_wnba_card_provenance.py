@@ -54,3 +54,37 @@ def test_coverage_note_names_what_was_excluded():
     note = prov.coverage_note(buckets)
     assert "185 rows" in note and "syndicate 106" in note and "vendor 79" in note
     assert "42.7%" in note, "the vendor share must be stated, not implied"
+
+
+# ------------------------------------------------- read-time confidence hygiene
+def test_read_time_refuses_certainty():
+    """The producer clamp does not reach artifacts that already exist.
+
+    Verified on the served payload 2026-09-01, AFTER the producer fix deployed:
+    a 2026-08-30 card still showed p_win = 1.0, because p_win is baked into
+    recommendations_slate_*.json and copied verbatim.
+    """
+    assert prov.sane_win_probability(1.0) == prov.CONFIDENCE_CEILING
+    assert prov.sane_win_probability(0.0) == prov.CONFIDENCE_FLOOR
+    assert prov.sane_win_probability(0.732) == 0.732
+    assert prov.sane_win_probability(None) is None
+    assert prov.sane_win_probability("n/a") is None
+
+
+def test_read_time_refuses_impossible_ev_rather_than_clamping():
+    assert prov.sane_ev_pct(2264.8) is None
+    assert prov.sane_ev_pct(57.8) == 57.8
+    assert prov.sane_ev_pct(None) is None
+
+
+def test_card_builder_applies_both():
+    """The wiring: a stale artifact's impossible values must not reach a reader."""
+    from syndicate.features.wnba import cards
+
+    rows = cards._source_game_market_recommendations([
+        {"market": "TOTAL", "selection": "UNDER", "line": 185.5,
+         "price": -110, "p_win": 1.0, "ev_pct": 2264.8},
+    ])
+    assert rows, "fixture must produce a row"
+    assert rows[0]["p_win"] == prov.CONFIDENCE_CEILING
+    assert rows[0]["ev_pct"] is None
