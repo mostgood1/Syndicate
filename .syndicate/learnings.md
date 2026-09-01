@@ -40,6 +40,44 @@
 
 
 
+### 2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is gone. It records the CLI process's own pid, which exits in ~1s, so EVERY claim reads as dead within seconds of being taken — I broke a live claim on it `[lane mlb-accuracy-assessment, reported by lane open-lanes-cleanup]`
+
+- **What we believed:** the protocol says a claim held by a session that is gone
+  may be taken with `--force`. The claim file carries a `pid`, so checking
+  whether that process is alive looked like the way to establish "gone" — an
+  actual reading rather than an assumption, which is exactly what this repo
+  keeps asking for.
+- **What was actually true:** `scripts/deploy_claim.py:125` writes
+  `"pid": os.getpid()` — **the pid of the short-lived `deploy_claim.py acquire`
+  CLI process, not of the owning session.** That process exits about a second
+  after writing the file. So the field is dead-on-arrival for every claim ever
+  taken, and a liveness check built on it **cannot return anything but "dead"**.
+  It is a guard whose unknown case defaults permissive, in the worst possible
+  place: it makes `--force` look justified against a perfectly live holder.
+- **How we found out:** I forced `refresh-worker` off lane
+  `mlb-native-ladders-producer`, citing "pid 22884, verified DEAD via
+  `Get-Process`". The holder was live and its claim unexpired (TTL to 16:06Z);
+  they told me so, and did not contest the claim. **The proof is on my own
+  claim:** I then read `.syndicate/deploy_claims/refresh-worker.json` for the
+  claim *I* had taken four minutes earlier and still held —
+  `pid 8040` — and `Get-Process -Id 8040` returned **not running**. A live,
+  unexpired, actively-held claim reads as dead by the same check I had just
+  relied on.
+- **The rule going forward:** **never cite the claim's `pid` as evidence of
+  anything.** To establish a holder is gone, use signals that describe the
+  SESSION rather than the CLI that wrote the file: the claim's `acquired_at_iso`
+  against its `ttl_seconds` (an expired claim is genuinely stale), `ListAgents`
+  for a live session, or — best — ask the holder, since `SendMessage` reaches
+  peers in seconds and a claim exists precisely to make that conversation
+  happen. **If the only thing saying "gone" is the pid, you know nothing.**
+  Forcing may still be right; it must be argued from the TTL or from silence
+  after asking, and recorded as such.
+- **Cost:** one live claim broken. Nothing was lost — the holder was not
+  mid-deploy, did not contest it, and in fact wanted the deploy my claim was
+  for. That is luck, not process: the same reasoning would have killed a deploy
+  someone was in the middle of, and the field would have looked just as
+  authoritative.
+
 ### 2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is READABLE YET. Find the thing that says the signal could have arrived, then read it — four instances in one evening, two false positives and two false negatives `[lanes mlb-accuracy-assessment + wnba-accuracy-assessment]`
 
 - **What we believed:** verification is "deploy, then look at the number". If
