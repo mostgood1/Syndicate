@@ -245,5 +245,75 @@ class KalshiMultiplierTests(unittest.TestCase):
         self.assertGreater(2 * side_cost, MOD.GATE_HOLD_TARGET_PCT)
 
 
+def _row(stamp: float, book: str, probability: float = 0.5, **over) -> tuple:
+    payload = {"event_id": "e1", "market": "batter_hits", "player_name": "A",
+               "line": 0.5, "selection": "under"}
+    payload.update(over)
+    return (stamp, book, probability, payload)
+
+
+class FeedOverlapGuardTests(unittest.TestCase):
+    """The shard can be clobbered by a competing whole-file publish, and the
+    damage is INVISIBLE in the output — every surviving row is real and
+    correctly aligned, so a clobbered date still prints a tidy ROI. Measured
+    2026-09-01: the sportsbook feed stops at 20:18:49 while exchange rows run to
+    22:22:27, and 76% of the 'no time-aligned quote' exclusions are that gap."""
+
+    def test_a_healthy_date_passes(self) -> None:
+        rows = [_row(t, "fanduel") for t in range(0, 1000, 100)]
+        rows += [_row(t, "kalshi") for t in range(0, 900, 100)]
+        self.assertTrue(MOD.feed_overlap(rows)["ok"])
+
+    def test_a_clobbered_tail_is_caught(self) -> None:
+        """Sportsbook stops early; most exchange rows come after it."""
+        rows = [_row(t, "fanduel") for t in range(0, 300, 100)]
+        rows += [_row(t, "kalshi") for t in range(0, 2000, 100)]
+        overlap = MOD.feed_overlap(rows)
+        self.assertFalse(overlap["ok"])
+        self.assertIn("clobber", overlap["reason"])
+
+    def test_the_real_2026_09_01_shape_is_refused(self) -> None:
+        """The actual measured proportion — 46.1% matchable — must NOT pass.
+        This is the date the published +2.65% came from."""
+        rows = [_row(float(i), "fanduel") for i in range(461)]
+        rows += [_row(float(i), "kalshi") for i in range(461)]
+        rows += [_row(float(1000 + i), "kalshi") for i in range(539)]
+        overlap = MOD.feed_overlap(rows)
+        self.assertAlmostEqual(overlap["matchable"], 0.461, places=2)
+        self.assertFalse(overlap["ok"])
+
+    def test_an_absent_feed_is_refused_not_scored(self) -> None:
+        """08-26..08-31 have zero exchange rows. That is 'no data', which must
+        not be reported as an overlap failure or folded into a total."""
+        for rows in ([_row(1.0, "fanduel")], [_row(1.0, "kalshi")], []):
+            overlap = MOD.feed_overlap(rows)
+            self.assertFalse(overlap["ok"])
+            self.assertNotIn("book_span", overlap)
+
+    def test_the_floor_is_a_named_constant_not_a_literal(self) -> None:
+        self.assertGreater(MOD.FEED_OVERLAP_FLOOR, 0.5)
+        self.assertLess(MOD.FEED_OVERLAP_FLOOR, 1.0)
+
+
+class DateExpansionTests(unittest.TestCase):
+    def test_a_span_expands_inclusively(self) -> None:
+        """'A full week' must be 7 dates, not 6 — an off-by-one here silently
+        shrinks the sample the conclusion rests on."""
+        dates = MOD.expand_dates([], "2026-09-02", "2026-09-08")
+        self.assertEqual(len(dates), 7)
+        self.assertEqual(dates[0], "2026-09-02")
+        self.assertEqual(dates[-1], "2026-09-08")
+
+    def test_a_single_day_span_is_one_date(self) -> None:
+        self.assertEqual(MOD.expand_dates([], "2026-09-01", "2026-09-01"), ["2026-09-01"])
+
+    def test_repeated_and_comma_forms_both_work(self) -> None:
+        self.assertEqual(MOD.expand_dates(["a", "b,c"], "", ""), ["a", "b", "c"])
+
+    def test_a_reversed_span_is_refused(self) -> None:
+        with self.assertRaises(SystemExit):
+            MOD.expand_dates([], "2026-09-08", "2026-09-02")
+
+
 if __name__ == "__main__":
     unittest.main()

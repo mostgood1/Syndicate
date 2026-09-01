@@ -74,13 +74,28 @@ THREE THINGS THIS GETS RIGHT THAT AN OBVIOUS VERSION GETS WRONG
 
 FEES ARE MEASURED, NOT ASSUMED (`syndicate/features/shared/venue_fees.py`):
 Polymarket is **150 bps of notional, FLAT and price-independent**; Kalshi is
-`0.07 x multiplier x P x (1-P)`. **Kalshi's multiplier for BATTER-PROP series is
-unresolved** -- `kalshi_fee_params` refuses without a series payload, and the
-half-rate finding is documented for "MLB game/total/spread/K" series, which does
-not name batter props. Both bounds are reported rather than one guessed.
+`0.07 x multiplier x P x (1-P)`, and the multiplier is now RESOLVED PER SERIES
+-- read live across all 14 registered MLB series, re-runnable with
+`scripts/read_kalshi_fee_params.py`. Every batter-prop series is half rate;
+earned runs / hits allowed / walks are FULL rate. See the map below.
+
+--------------------------------------------------------------------------
+THE WEEK-LONG RE-RUN, AND WHY ONE DATE IS STILL ALL THERE IS
+--------------------------------------------------------------------------
+
+`--since/--until` pools dates. As of 2026-09-01 that cannot yet produce a week:
+
+  * EXCHANGE PROP CAPTURE EXISTS ON ONE DATE. Measured across 08-26..09-02:
+    2026-09-01 has 5,840-7,158 exchange prop rows (the range is the defect
+    below); every prior date has **exactly zero**. A 7-day window closes no
+    earlier than **2026-09-08**.
+  * THE SHARD LOSES ROWS. See the clobber note above `feed_overlap`. Dates whose
+    two feeds barely overlap are REFUSED rather than folded into a total,
+    because the surviving rows are all real and the number looks fine.
 
 Usage:
-    py -3 scripts/measure_exchange_prop_option_value.py --date 2026-09-01
+    py -3 scripts/measure_exchange_prop_option_value.py --date 2026-09-01 --book gate
+    py -3 scripts/measure_exchange_prop_option_value.py --since 2026-09-02 --until 2026-09-08 --book gate
 """
 from __future__ import annotations
 
@@ -91,7 +106,7 @@ import sys
 import urllib.parse
 import urllib.request
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -170,6 +185,64 @@ def kalshi_multiplier_for_market(market: str) -> tuple[float, bool]:
     if key in KALSHI_MULTIPLIER_BY_MARKET:
         return KALSHI_MULTIPLIER_BY_MARKET[key], True
     return KALSHI_UNKNOWN_MULTIPLIER, False
+
+
+# ---------------------------------------------------------------------------
+# THE SHARD CAN BE CLOBBERED, AND A CLOBBERED SHARD PRODUCES A CONFIDENT NUMBER
+# ---------------------------------------------------------------------------
+# Measured 2026-09-01: two services each keep their OWN local copy of
+# `mlb_source/tracking/book_quotes/<date>.jsonl`, append only their own rows to
+# it (`odds_book_quotes.append_book_quotes` opens "a"), and then
+# `artifact_publisher.publish_hot_artifact` reads the WHOLE FILE and pushes it
+# to web -- a whole-file REPLACE, not a merge. Web therefore holds whichever
+# service published last, and the other writer's rows are gone.
+#
+# Proof it is not append-only: a refetch an hour later LOST 1,318 exchange rows
+# and gained 0, as a clean tail truncation (0 losses at or before the cutoff),
+# while sportsbook rows gained an entire new hour.
+#
+# WHY THIS NEEDS A GUARD RATHER THAN A COMMENT. The damage is invisible in the
+# output: the surviving rows are all real and correctly time-aligned, so the
+# measurement still prints a tidy ROI. On 2026-09-01 the sportsbook feed stops
+# at 20:18:49 while exchange rows run to 22:22:27, and **1,365 of 1,795
+# "no time-aligned sportsbook price" exclusions -- 76% -- are that gap**, which
+# the first version of this script reported as a property of market liquidity
+# ("plausibly the more liquid subset"). It was a file-clobbering artifact.
+#
+# So: a date whose two feeds do not overlap for most of their span is REFUSED
+# by default. Gate on the OUTPUT (do the two series actually coexist?) rather
+# than on an assumption about how the file gets damaged.
+FEED_OVERLAP_FLOOR = 0.65
+
+
+def feed_overlap(rows: list) -> dict:
+    """How much of the exchange feed's span the sportsbook feed actually covers.
+
+    Returns the spans and the fraction of exchange quotes that fall at or before
+    the last sportsbook quote -- the ones that COULD match. A low fraction means
+    one writer's tail was clobbered, not that the market went quiet.
+    """
+    book_stamps = [s for s, book, _p, _r in rows if book not in EXCHANGES]
+    exch_stamps = [s for s, book, _p, _r in rows if book in EXCHANGES]
+    if not book_stamps or not exch_stamps:
+        return {"ok": False, "reason": "a feed is entirely absent",
+                "book_n": len(book_stamps), "exch_n": len(exch_stamps), "matchable": 0.0}
+    last_book = max(book_stamps)
+    matchable = sum(1 for s in exch_stamps if s <= last_book) / len(exch_stamps)
+    return {
+        "ok": matchable >= FEED_OVERLAP_FLOOR,
+        "reason": "" if matchable >= FEED_OVERLAP_FLOOR else
+                  "sportsbook feed ends long before the exchange feed -- "
+                  "the shard was very likely clobbered by a competing publish",
+        "book_n": len(book_stamps), "exch_n": len(exch_stamps),
+        "book_span": (_hhmmss(min(book_stamps)), _hhmmss(last_book)),
+        "exch_span": (_hhmmss(min(exch_stamps)), _hhmmss(max(exch_stamps))),
+        "matchable": matchable,
+    }
+
+
+def _hhmmss(stamp: float) -> str:
+    return datetime.utcfromtimestamp(stamp).strftime("%H:%M:%S")
 
 
 def quote_key(row: dict) -> tuple:
@@ -261,16 +334,89 @@ def fetch_shard(date: str, token: str, dest: Path) -> Path:
     return dest
 
 
+def measure_date(rows: list, window: int) -> dict:
+    """Fee-aware gains for one date's rows. Pure -- no printing, no fetching."""
+    books: dict[tuple, list] = defaultdict(list)
+    exch: dict[tuple, list] = defaultdict(list)
+    for stamp, book, probability, row in rows:
+        (exch if book in EXCHANGES else books)[quote_key(row)].append((stamp, book, probability))
+    for store in (books, exch):
+        for series in store.values():
+            series.sort()
+
+    gains: dict[str, list[float]] = defaultdict(list)
+    taken: dict[str, int] = defaultdict(int)
+    unmatched = 0
+    unresolved: dict[str, int] = defaultdict(int)
+    used: dict[float, int] = defaultdict(int)
+    for key in set(books) & set(exch):
+        series = books[key]
+        multiplier, resolved = kalshi_multiplier_for_market(key[1])
+        for stamp, venue, exchange_prob in exch[key]:
+            best = None
+            for book_ts, _book, book_prob in series:
+                if book_ts > stamp:
+                    break
+                if stamp - book_ts <= window:
+                    best = book_prob if best is None else min(best, book_prob)
+            if best is None:
+                unmatched += 1
+                continue
+            if venue == "kalshi":
+                used[multiplier] += 1
+                if not resolved:
+                    unresolved[market_of(key)] += 1
+            effective = exchange_prob + fee_pp(venue, exchange_prob, multiplier) / 100.0
+            gains[venue].append(max(0.0, best - effective) * 100.0)
+            if effective < best:
+                taken[venue] += 1
+    return {"gains": gains, "taken": taken, "unmatched": unmatched,
+            "unresolved": unresolved, "used": used,
+            "both_keys": len(set(books) & set(exch)),
+            "exchange_rows": sum(len(v) for v in exch.values())}
+
+
+def market_of(key: tuple) -> str:
+    return key[1]
+
+
+def expand_dates(explicit: list, since: str, until: str) -> list:
+    """Dates to measure. `--since/--until` is the week-long form."""
+    if since or until:
+        start = datetime.strptime(since or until, "%Y-%m-%d").date()
+        end = datetime.strptime(until or since, "%Y-%m-%d").date()
+        if end < start:
+            raise SystemExit(f"--until {end} is before --since {start}")
+        span = (end - start).days
+        return [(start + timedelta(days=i)).isoformat() for i in range(span + 1)]
+    out: list = []
+    for item in explicit or []:
+        out.extend(part.strip() for part in str(item).split(",") if part.strip())
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--date", required=True)
+    ap.add_argument("--date", action="append", default=[],
+                    help="repeatable, or comma-separated; use --since/--until for a span")
+    ap.add_argument("--since", default="", help="first date of a span, e.g. 2026-09-02")
+    ap.add_argument("--until", default="", help="last date of a span, e.g. 2026-09-08")
     ap.add_argument("--window-minutes", type=int, default=30)
     ap.add_argument("--admin-token", default="")
     ap.add_argument("--book", choices=("all", "gate"), default="all",
                     help="'gate' restricts to the book `#624` step 6 is about: "
                          "unders, minus batter_home_runs and batter_hits_runs_rbis")
+    ap.add_argument("--allow-clobbered", action="store_true",
+                    help="measure a date whose two feeds barely overlap. The shard was "
+                         "probably clobbered by a competing whole-file publish; the number "
+                         "will look fine and describe a window chosen by a race.")
+    ap.add_argument("--refetch", action="store_true", help="ignore any cached shard")
     ap.add_argument("--cache-dir", default=str(REPO_ROOT / "reports" / "exchange_prop_value"))
     args = ap.parse_args()
+
+    dates = expand_dates(args.date, args.since, args.until)
+    if not dates:
+        raise SystemExit("give --date (repeatable) or --since/--until")
 
     token = args.admin_token
     if not token:
@@ -281,61 +427,68 @@ def main() -> int:
     if not token:
         raise SystemExit("no ADMIN_TOKEN")
 
-    shard = Path(args.cache_dir) / f"book_quotes_{args.date}.jsonl"
-    if not shard.exists():
-        print(f"fetching {args.date} from production ...", flush=True)
-        fetch_shard(args.date, token, shard)
-    rows = load_rows(shard)
-    if args.book == "gate":
-        before = len(rows)
-        rows = [r for r in rows if in_gate_book(r[3])]
-        print(f"\nBOOK = gate (unders, minus HR and HRR): {len(rows)} of {before} prop quote rows")
-
-    books: dict[tuple, list] = defaultdict(list)
-    exch: dict[tuple, list] = defaultdict(list)
-    for stamp, book, probability, row in rows:
-        (exch if book in EXCHANGES else books)[quote_key(row)].append((stamp, book, probability))
-    for store in (books, exch):
-        for series in store.values():
-            series.sort()
-
-    exchange_rows = sum(len(v) for v in exch.values())
-    print(f"\nprop quote rows: {len(rows)}   exchange {exchange_rows}   sportsbook {len(rows)-exchange_rows}")
-    print(f"keys quoted by both: {len(set(books) & set(exch))}")
-
     window = args.window_minutes * 60
-    for label in ("per-series multipliers, read from Kalshi 2026-09-01",):
-        gains: dict[str, list[float]] = defaultdict(list)
-        taken: dict[str, int] = defaultdict(int)
-        unmatched = 0
-        unresolved: dict[str, int] = defaultdict(int)
-        used: dict[float, int] = defaultdict(int)
-        for key in set(books) & set(exch):
-            series = books[key]
-            market = key[1]
-            multiplier, resolved = kalshi_multiplier_for_market(market)
-            for stamp, venue, exchange_prob in exch[key]:
-                best = None
-                for book_ts, _book, book_prob in series:
-                    if book_ts > stamp:
-                        break
-                    if stamp - book_ts <= window:
-                        best = book_prob if best is None else min(best, book_prob)
-                if best is None:
-                    unmatched += 1
-                    continue
-                if venue == "kalshi":
-                    used[multiplier] += 1
-                    if not resolved:
-                        unresolved[market] += 1
-                effective = exchange_prob + fee_pp(venue, exchange_prob, multiplier) / 100.0
-                gains[venue].append(max(0.0, best - effective) * 100.0)
-                if effective < best:
-                    taken[venue] += 1
+    pooled: dict[str, list[float]] = defaultdict(list)
+    pooled_taken: dict[str, int] = defaultdict(int)
+    pooled_used: dict[float, int] = defaultdict(int)
+    pooled_unresolved: dict[str, int] = defaultdict(int)
+    unmatched = 0
+    measured: list = []
+    refused: list = []
+
+    print(f"\n{'date':<12}{'exch':>7}{'book':>8}{'matchable':>11}  feed spans (UTC)")
+    print("-" * 78)
+    for date in dates:
+        shard = Path(args.cache_dir) / f"book_quotes_{date}.jsonl"
+        if args.refetch or not shard.exists():
+            try:
+                fetch_shard(date, token, shard)
+            except SystemExit as exc:
+                print(f"{date:<12}  no shard on production ({exc})")
+                refused.append((date, "no shard"))
+                continue
+        rows = load_rows(shard)
+        if args.book == "gate":
+            rows = [r for r in rows if in_gate_book(r[3])]
+        overlap = feed_overlap(rows)
+        if not overlap.get("book_span"):
+            print(f"{date:<12}{overlap['exch_n']:>7}{overlap['book_n']:>8}"
+                  f"{'--':>11}  {overlap['reason']}")
+            refused.append((date, overlap["reason"]))
+            continue
+        print(f"{date:<12}{overlap['exch_n']:>7}{overlap['book_n']:>8}"
+              f"{100*overlap['matchable']:>10.1f}%  "
+              f"exch {overlap['exch_span'][0]}..{overlap['exch_span'][1]}   "
+              f"book {overlap['book_span'][0]}..{overlap['book_span'][1]}")
+        if not overlap["ok"] and not args.allow_clobbered:
+            print(f"{'':<12}  REFUSED -- {overlap['reason']}")
+            refused.append((date, overlap["reason"]))
+            continue
+        result = measure_date(rows, window)
+        measured.append(date)
+        unmatched += result["unmatched"]
+        for venue, values in result["gains"].items():
+            pooled[venue].extend(values)
+        for venue, count in result["taken"].items():
+            pooled_taken[venue] += count
+        for multiplier, count in result["used"].items():
+            pooled_used[multiplier] += count
+        for market, count in result["unresolved"].items():
+            pooled_unresolved[market] += count
+
+    if refused:
+        print(f"\n{len(refused)} date(s) REFUSED -- not silently folded into the total:")
+        for date, why in refused:
+            print(f"   {date}: {why}")
+        print("   A refused date is a SHARD problem, not a market problem. See the")
+        print("   clobber note at the top of this file. --allow-clobbered overrides.")
+
+    gains, taken, used, unresolved = pooled, pooled_taken, pooled_used, pooled_unresolved
+    for label in (f"per-series multipliers; {len(measured)} date(s): {', '.join(measured) or 'none'}",):
         every = [g for v in gains.values() for g in v]
         if not every:
-            print("\nno comparable quotes")
-            return 0
+            print("\nno comparable quotes on any measured date")
+            return 1
         print(f"\nFEE-AWARE SELECTION, {label}  (take whichever is cheaper AFTER fees)")
         if used:
             spread = "  ".join(f"x{m}: {c}" for m, c in sorted(used.items()))
@@ -362,8 +515,13 @@ def main() -> int:
               f"   [gate needs >= +{GATE_ROI_TARGET_PCT:.0f}% at <= {GATE_HOLD_TARGET_PCT:.0f}% hold]")
     print("\nCAVEATS, which the number does not survive without:")
     print("  * a single date is not a rate -- re-run over a week before sizing anything")
-    print("  * excluded quotes above are exchange prices with NO time-aligned sportsbook")
-    print("    quote; this measures the OVERLAP, plausibly the more liquid subset")
+    print("  * MOST EXCLUSIONS ARE A SHARD DEFECT, NOT MARKET ILLIQUIDITY. On 2026-09-01,")
+    print("    1,365 of the 1,795 exclusions (76%) are exchange rows stamped AFTER the")
+    print("    sportsbook feed stops in that copy of the file -- they could not have")
+    print("    matched anything. An earlier version of this line called the survivors")
+    print("    'plausibly the more liquid subset', which attributed to the market what")
+    print("    is a whole-file publish race. The survivors are a TIME window (16:11-20:18)")
+    print("    chosen by which service published last, and the bias direction is unknown.")
     print("  * item 05's game-market +1.57pp is GROSS by this same method, so compare")
     print("    props-to-games gross-to-gross, not this net number against that one")
     return 0
