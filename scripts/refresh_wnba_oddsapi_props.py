@@ -1451,10 +1451,81 @@ def _float_or_none(value: object) -> float | None:
 
 
 def _mean_or_none(values: list[float]) -> float | None:
+    """Arithmetic mean. Correct for LINES (spread, total) -- those are linear.
+
+    NOT correct for prices; see `_consensus_price_or_none`.
+    """
     cleaned = [float(value) for value in values if value is not None]
     if not cleaned:
         return None
     return float(sum(cleaned) / len(cleaned))
+
+
+def _american_to_probability(odds: float) -> float | None:
+    """Implied probability, or None for a value that is not an American price.
+
+    American odds have a HOLE between -100 and +100: there is no such price. A
+    value in that range is a parse error or an averaging artefact, and is
+    rejected rather than coerced, because coercing it invents a probability.
+    """
+    try:
+        value = float(odds)
+    except (TypeError, ValueError):
+        return None
+    if -100.0 < value < 100.0:
+        return None
+    return (-value) / ((-value) + 100.0) if value < 0 else 100.0 / (value + 100.0)
+
+
+def _probability_to_american(probability: float) -> float | None:
+    """Inverse of `_american_to_probability`.
+
+    Even money has TWO valid spellings, `+100` and `-100`, and they are the same
+    probability. `+100` is returned as the canonical one -- `>` rather than `>=`
+    at the branch -- so a consensus of even-money books does not surface as
+    `-100`, which reads like a favourite.
+    """
+    if not (0.0 < probability < 1.0):
+        return None
+    if probability > 0.5:
+        return -(100.0 * probability / (1.0 - probability))
+    return 100.0 * (1.0 - probability) / probability
+
+
+def _consensus_price_or_none(values: list[float]) -> float | None:
+    """Consensus American price across books, via implied probability.
+
+    **Averaging American odds arithmetically is invalid**, and it is what this
+    function replaces. The scale is discontinuous at +/-100 -- -110 and +110 are
+    adjacent prices about 9 points of probability apart, but their arithmetic
+    mean is 0, which is not a price at all.
+
+    MEASURED 2026-08-31 on production WNBA cards (lane
+    `wnba-accuracy-assessment`): **55 of 128 priced card fields (43.0%) were
+    strictly between -100 and +100** -- `-89.125`, `-94.375`, `-62.25`,
+    `-59.14`. None of those is an American price, and every EV computed from one
+    was wrong.
+
+    Averaging in probability space and converting back is exact for a single
+    book and correct for many. The result keeps each book's vig (this is a
+    consensus PRICE, not a fair line) -- de-vigging here would silently change
+    what the field means to every reader of it.
+    """
+    probabilities = [
+        probability
+        for probability in (_american_to_probability(value) for value in values if value is not None)
+        if probability is not None
+    ]
+    if not probabilities:
+        return None
+    price = _probability_to_american(sum(probabilities) / len(probabilities))
+    if price is None:
+        return None
+    # Round-tripping through probability space leaves float noise: a single book
+    # at -140 comes back as -140.00000000000003. Two decimals removes it while
+    # keeping sub-integer consensus granularity (books quote integers, a
+    # consensus of several does not have to).
+    return round(price, 2)
 
 
 def _aggregate_game_odds_from_market_rows(
@@ -1510,15 +1581,15 @@ def _aggregate_game_odds_from_market_rows(
         away_spread = -float(home_spread)
 
     return {
-        "home_ml": _mean_or_none(home_ml_values),
-        "away_ml": _mean_or_none(away_ml_values),
+        "home_ml": _consensus_price_or_none(home_ml_values),
+        "away_ml": _consensus_price_or_none(away_ml_values),
         "home_spread": home_spread,
         "away_spread": away_spread,
-        "home_spread_price": _mean_or_none(home_spread_price_values),
-        "away_spread_price": _mean_or_none(away_spread_price_values),
+        "home_spread_price": _consensus_price_or_none(home_spread_price_values),
+        "away_spread_price": _consensus_price_or_none(away_spread_price_values),
         "total": _mean_or_none(total_values),
-        "total_over_price": _mean_or_none(total_over_price_values),
-        "total_under_price": _mean_or_none(total_under_price_values),
+        "total_over_price": _consensus_price_or_none(total_over_price_values),
+        "total_under_price": _consensus_price_or_none(total_under_price_values),
     }
 
 
