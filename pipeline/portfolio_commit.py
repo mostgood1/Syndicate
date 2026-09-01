@@ -329,6 +329,11 @@ def _polymarket_price_resolver(selected_date: str | None):
             "[portfolio_commit] POLYMARKET_UNMATCHED"
             f" counts={joined.get('unmatched_counts')}"
             f" samples={joined.get('unmatched_samples')}"
+            # The COMPLETE prop no-match classification -- class/family over
+            # the matching no_match count on this same line IS the rate the
+            # bounded samples cannot give (rung_miss vs near_token vs
+            # player_not_listed vs fixture_miss).
+            f" prop_classes={joined.get('prop_unmatched_classes')}"
             # WHICH COMPONENT of the key disagreed. `no_candidates` alone
             # cannot distinguish a league mismatch from a date or a market one,
             # and BTTS is currently unexplained for exactly that reason.

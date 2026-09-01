@@ -2899,3 +2899,106 @@ def test_a_game_line_sample_keeps_its_exact_shape():
     assert sample["kind"] == "no_match"
     for prop_only in ("player", "token", "fixture_tokens", "token_lines"):
         assert prop_only not in sample
+
+
+# ==========================================================================
+# THE COMPLETE PROP NO-MATCH CLASSIFICATION. The samples above decompose one
+# row per family; the counter decomposes ALL of them, so class/family is a
+# RATE. Invariant: per family the classes sum to `no_match|mlb|<family>`.
+# ==========================================================================
+
+
+def test_each_prop_no_match_class_is_counted_by_name():
+    markets = [
+        # rung_miss: venue lists jacmer hits at 1.5, board wants 4.5
+        _prop_market(),
+        # near_token: venue lists wilcon2, our William Contreras derives wilcon
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hr-wilcon2-gte1"),
+        # player_not_listed: venue lists tb for Machado only, board asks Merrill
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-tb-manmac-gte2"),
+        # fixture_miss: venue lists k only for ANOTHER game on the date
+        _prop_market(slug="astatc-mlb-min-ath-2026-08-24-k-somepi-gte5"),
+    ]
+    rows = [
+        _prop_board(line=4.5),
+        _prop_board(market="batter_home_runs", player="William Contreras", line=0.5),
+        _prop_board(market="batter_total_bases", player="Jackson Merrill", line=1.5),
+        _prop_board(market="strikeouts", player="Paul Skenes", line=4.5),
+    ]
+    out = mod.join_polymarket_to_board(markets, rows)
+    assert out["matched"] == 0
+    assert out["prop_unmatched_classes"] == {
+        "rung_miss|batter_hits": 1,
+        "near_token|batter_home_runs": 1,
+        "player_not_listed|batter_total_bases": 1,
+        "fixture_miss|strikeouts": 1,
+    }
+    # The invariant that makes class/family a rate: per family, classes sum
+    # exactly to the no_match count on the same report.
+    per_family = {}
+    for key, n in out["prop_unmatched_classes"].items():
+        fam = key.split("|", 1)[1]
+        per_family[fam] = per_family.get(fam, 0) + n
+    for fam, total in per_family.items():
+        assert out["unmatched_counts"][f"no_match|mlb|{fam}"] == total, fam
+
+
+def test_prop_classes_count_completely_while_samples_stay_bounded():
+    """Seven unlisted players are SEVEN in the counter and one in the sample --
+    the same complete-count/bounded-sample split every other instrument in
+    this file keeps."""
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-manmac-gte2")
+    rows = [
+        _prop_board(player=name, line=1.5)
+        for name in ("Luis Arraez", "Xander Bogaerts", "Jake Cronenworth",
+                     "Gavin Sheets", "Tyler Wade", "Elias Diaz", "Mason McCoy")
+    ]
+    out = mod.join_polymarket_to_board([market], rows)
+    assert out["prop_unmatched_classes"] == {"player_not_listed|batter_hits": 7}
+    assert out["unmatched_counts"]["no_match|mlb|batter_hits"] == 7
+    assert sum(1 for s in out["unmatched_samples"] if s.get("player")) == 1
+
+
+def test_mixed_classes_in_one_family_sum_to_its_no_match_count():
+    markets = [
+        _prop_market(),  # jacmer hits 1.5
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte3"),  # 2.5
+    ]
+    rows = [
+        _prop_board(line=4.5),                       # rung_miss (jacmer listed)
+        _prop_board(line=9.5),                       # rung_miss again
+        _prop_board(player="Manny Machado", line=1.5),  # player_not_listed
+    ]
+    out = mod.join_polymarket_to_board(markets, rows)
+    assert out["prop_unmatched_classes"] == {
+        "rung_miss|batter_hits": 2,
+        "player_not_listed|batter_hits": 1,
+    }
+    assert out["unmatched_counts"]["no_match|mlb|batter_hits"] == 3
+
+
+def test_game_line_misses_never_enter_prop_classes():
+    out = mod.join_polymarket_to_board(
+        [_total_market("tsc-mlb-min-sac-2026-08-25-10pt5")],
+        [{"sport": "mlb", "market": "totals", "side": "under", "line": 10.5,
+          "away_team": "Minnesota Twins", "home_team": "Athletics",
+          "date": "2026-08-25", "event_id": "e1"}],
+        selected_date="2026-08-25",
+    )
+    assert out["unmatched_counts"]  # the game-line miss is counted...
+    assert out["prop_unmatched_classes"] == {}  # ...and never classified
+
+
+def test_a_matched_prop_is_not_classified():
+    out = mod.join_polymarket_to_board([_prop_market()], [_prop_board()])
+    assert out["matched"] == 1
+    assert out["prop_unmatched_classes"] == {}
+
+
+def test_an_ambiguous_prop_is_refused_as_ambiguous_not_classified():
+    """The ambiguity guard's refusal is the whole story for that row; the
+    class counter must not add a second reading of it."""
+    out = mod.join_polymarket_to_board(
+        [_prop_market(), _prop_market()], [_prop_board()])
+    assert out["refusals"].get("ambiguous_polymarket_match") == 1
+    assert out["prop_unmatched_classes"] == {}

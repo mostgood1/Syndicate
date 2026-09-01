@@ -1256,6 +1256,59 @@ def join_polymarket_to_board(
     unmatched_samples: list[dict[str, Any]] = []
     unmatched_seen: set[str] = set()
 
+    # THE COMPLETE CLASSIFICATION beside the bounded sample. The samples above
+    # decompose ONE row per (kind, league, market); a RATE needs the whole
+    # population, and "2 of 3 samples are rung-misses" is an anecdote wearing a
+    # percentage. `<class>|<family>` -> count, counted for EVERY prop no-match
+    # row, so `rung_miss|batter_hits / no_match|mlb|batter_hits` is readable
+    # from one log line. Invariant, asserted in tests: per family, the class
+    # counts sum exactly to `no_match|mlb|<family>`.
+    prop_unmatched_classes: dict[str, int] = {}
+
+    # token -> sorted venue lines, for ONE fixture+family. Built at most once
+    # per (family, date, fixture) per join and shared by the classifier and
+    # the sample builder -- two scanners over the same candidates would be two
+    # implementations that must agree, which is the two-guards trap. Cache is
+    # naturally bounded by families x dates x fixtures on the slate.
+    prop_fixture_profiles: dict[tuple[str, str, str], dict[str, list[float]]] = {}
+
+    def _prop_fixture_profile(
+        board_row: Mapping[str, Any],
+        board_market: str,
+        league: str,
+        date: str,
+        candidates: Sequence[Mapping[str, Any]],
+    ) -> dict[str, list[float]]:
+        cache_key = (
+            board_market,
+            date,
+            str(board_row.get("event_id") or "")
+            or f"{board_row.get('away_team')}|{board_row.get('home_team')}",
+        )
+        cached = prop_fixture_profiles.get(cache_key)
+        if cached is not None:
+            return cached
+        profile: dict[str, list[float]] = {}
+        for c in candidates:
+            cand_prop = c.get("prop")
+            if not isinstance(cand_prop, Mapping):
+                continue
+            cand_token = str(cand_prop.get("token") or "")
+            if not cand_token:
+                continue
+            if not _teams_match(
+                board_row, c["parsed"], board_row.get("sport") or sport,
+                board_fixtures.get((league, date)),
+            ):
+                continue
+            slot = profile.setdefault(cand_token, [])
+            if c.get("line") is not None and float(c["line"]) not in slot:
+                slot.append(float(c["line"]))
+        for slot in profile.values():
+            slot.sort()
+        prop_fixture_profiles[cache_key] = profile
+        return profile
+
     def _note_unmatched(
         kind: str,
         board_row: Mapping[str, Any],
@@ -1264,6 +1317,7 @@ def join_polymarket_to_board(
         date: str,
         candidates: Sequence[Mapping[str, Any]],
         prop_token: str | None = None,
+        prop_profile: Mapping[str, Sequence[float]] | None = None,
     ) -> None:
         key = f"{kind}|{league}|{board_market}"
         unmatched_counts[key] = unmatched_counts.get(key, 0) + 1
@@ -1309,42 +1363,23 @@ def join_polymarket_to_board(
             #   player-not-listed  fixture_tokens filled by other players only
             #   fixture-miss       offered non-empty, fixture_tokens empty
             #
-            # Runs only while building a NEW sample (<=10 per join, above), so
-            # the per-candidate fixture test adds nothing to the refusal path.
+            # Derived from the SHARED fixture profile (see
+            # `_prop_fixture_profile`) when the caller already built one for
+            # the complete classifier; the no_candidates call site passes none
+            # and the empty-bucket scan below produces empties at zero cost.
+            # Profile keys keep candidate insertion order, so near-first here
+            # orders identically to the original per-sample scan.
             # Diagnostic only: nothing here changes what is matched.
-            near_tokens: list[str] = []
-            far_tokens: list[str] = []
-            token_lines: list[Any] = []
-            seen_tokens: set[str] = set()
-            for c in candidates:
-                cand_prop = c.get("prop")
-                if not isinstance(cand_prop, Mapping):
-                    continue
-                cand_token = str(cand_prop.get("token") or "")
-                if not cand_token:
-                    continue
-                if not _teams_match(
-                    board_row, c["parsed"], board_row.get("sport") or sport,
-                    board_fixtures.get((league, date)),
-                ):
-                    continue
-                if (
-                    cand_token == prop_token
-                    and c.get("line") is not None
-                    and len(token_lines) < 6
-                ):
-                    token_lines.append(c.get("line"))
-                if cand_token in seen_tokens:
-                    continue
-                seen_tokens.add(cand_token)
-                if cand_token[:3] == prop_token[:3]:
-                    near_tokens.append(cand_token)
-                else:
-                    far_tokens.append(cand_token)
+            if prop_profile is None:
+                prop_profile = _prop_fixture_profile(
+                    board_row, board_market, league, date, candidates
+                )
+            near_tokens = [t for t in prop_profile if t[:3] == prop_token[:3]]
+            far_tokens = [t for t in prop_profile if t[:3] != prop_token[:3]]
             sample["player"] = str(board_row.get("player_name") or "")[:28]
             sample["token"] = prop_token
             sample["fixture_tokens"] = (near_tokens + far_tokens)[:6]
-            sample["token_lines"] = token_lines
+            sample["token_lines"] = list(prop_profile.get(prop_token) or ())[:6]
         unmatched_samples.append(sample)
 
     def _note_out_of_scope(venue_type: str, parsed: Mapping[str, Any], row: Mapping[str, Any]) -> None:
@@ -1951,10 +1986,36 @@ def join_polymarket_to_board(
             # `_note_unmatched` print the player, our derived token, and the
             # venue's tokens for this fixture+family beside the rungs it
             # offers for ours. See the decomposition table there.
+            #
+            # AND COUNTED COMPLETELY, not just sampled. The first production
+            # read of the samples (2026-09-01T19:18:45Z) showed 2 rung-misses
+            # and 1 player-not-listed -- three rows standing in for ~224, which
+            # is a reading, not a rate. The class counter makes the rate: per
+            # family, these buckets sum exactly to `no_match|mlb|<family>`.
+            # Class order is decisive-first: our token listed at other lines
+            # (rung_miss) beats a shared 3-char prefix (near_token, the
+            # `wilcon2`-class candidate), beats other players only
+            # (player_not_listed), beats a bucket holding no row for OUR
+            # fixture at all (fixture_miss).
             if refusals.get("ambiguous_polymarket_match", 0) == _ambiguous_before:
+                _profile = _prop_fixture_profile(
+                    board_row, board_market, league, date, candidates
+                )
+                if _profile.get(prop_token):
+                    _cls = "rung_miss"
+                elif any(t[:3] == prop_token[:3] for t in _profile):
+                    _cls = "near_token"
+                elif _profile:
+                    _cls = "player_not_listed"
+                else:
+                    _cls = "fixture_miss"
+                _cls_key = f"{_cls}|{board_market}"
+                prop_unmatched_classes[_cls_key] = (
+                    prop_unmatched_classes.get(_cls_key, 0) + 1
+                )
                 _note_unmatched(
                     "no_match", board_row, board_market, league, date, candidates,
-                    prop_token=prop_token,
+                    prop_token=prop_token, prop_profile=_profile,
                 )
                 refuse("no_matching_polymarket_market")
             continue
@@ -2358,6 +2419,12 @@ def join_polymarket_to_board(
             sorted(unmatched_counts.items(), key=lambda kv: -kv[1])
         ),
         "unmatched_samples": unmatched_samples,
+        # The COMPLETE prop no-match classification (`<class>|<family>` ->
+        # count). Per family these sum exactly to `no_match|mlb|<family>`
+        # above, so class/family IS a rate, not a sampled reading.
+        "prop_unmatched_classes": dict(
+            sorted(prop_unmatched_classes.items(), key=lambda kv: -kv[1])
+        ),
         # One per board market that found an empty bucket, with the
         # neighbouring index keys that say WHICH component disagreed.
         "key_miss_samples": key_miss_samples,
