@@ -3627,3 +3627,36 @@ holds only what you touched.
   the record: a commit message that misdescribes two of its three files, and an
   authorship trail that says a session did work it never did. On a repo whose
   ledger is read as evidence, that is the expensive kind of wrong.
+
+## 2026-09-01 FORBIDDEN: running any git working-tree restore (`checkout --`, `restore`, `reset`) without pinning the repo with `-C <path>`. The cwd is not a fact; on this machine it is a liability that destroys OTHER SESSIONS' work. `[lane polymarket-prop-quote-capture]`
+
+- **What we believed.** "I am in my worktree" — because the previous command
+  `cd`'d there. So `git checkout -- .syndicate/lanes.md`, meant to discard a
+  botched insert in MY worktree copy, was safe.
+- **What was actually true.** An intervening one-off command (`cd <primary> &&
+  py -3 scripts/render_logs.py ...`) had silently moved the persistent shell
+  cwd back to the PRIMARY, SHARED tree. The checkout ran there, restored
+  `lanes.md` from HEAD, and destroyed EVERY uncommitted edit in the file:
+  my own lane-close block AND two closed-lane blocks belonging to a live
+  peer session (syndicate-8d: `phase0-graded-supply`, `phase0-accuracy-autorun`)
+  — ledger records of landed work, existing nowhere else. A foreign
+  cherry-pick was also in progress in that tree at that moment.
+- **How we found out.** The next command in the chain printed the PRIMARY
+  tree's `git status` (branch main, 10/45 diverged, cherry-pick in progress)
+  where worktree output was expected; `grep -c` then found 0 of the 3 blocks.
+- **The rule going forward.** THREE layers, because each alone has now failed:
+  (1) every git command that can DISCARD working-tree content must carry an
+  explicit `git -C <absolute-path>` — never rely on the shell's cwd;
+  (2) a file-wide restore is NEVER the tool for undoing a targeted
+  experiment — reverse the specific edit (string-swap back) instead, which
+  cannot exceed its own blast radius (this same session had already wiped its
+  own uncommitted implementation once with `checkout --` in the worktree —
+  same instrument, and the second firing hit ANOTHER session);
+  (3) on the shared tree, `checkout/restore` of a ledger file is forbidden
+  OUTRIGHT — uncommitted peer edits live there by design, and the command
+  cannot distinguish yours from theirs.
+- **Cost.** Two peer ledger blocks destroyed (peer notified immediately with
+  partial text; a HOLE MARKER stands in `lanes.md` until they rewrite from
+  their own context — deliberately not reconstructed from fragments). My own
+  block was reconstructible from context. No code, no production state, and
+  no pushed history were touched.
