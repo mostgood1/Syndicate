@@ -4,6 +4,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import shutil
 import sys
 import threading
 import subprocess
@@ -25,6 +26,12 @@ from flask import url_for
 from syndicate.features.shared.artifact_publisher import HOT_ARTIFACT_PATTERNS
 from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
 from syndicate.features.shared.artifact_publisher import relative_to_data_root
+# Private on purpose, and imported rather than re-stated. It is the SAME
+# predicate that decides a Range/tail pull in `pull_streamed_artifact`, and the
+# two must not drift: merging establishes the append-only invariant that the
+# tail pull already assumes. A second copy of this list is a way for one to
+# start merging a family the other still replaces, or vice versa.
+from syndicate.features.shared.artifact_publisher import _is_append_only
 from syndicate.features.shared.ops_refresh import build_refresh_plan
 from syndicate.features.shared.ops_refresh import _assert_no_active_refresh_run
 from syndicate.features.shared.ops_refresh import cancel_latest_refresh_run
@@ -1677,6 +1684,112 @@ _PUBLISH_DIVERGENCE_SHRINK_RATIO = 0.80
 _PUBLISH_LAST_PUBLISHER: dict[str, str] = {}
 
 
+def _merge_append_only_publish(target_path: Path, incoming_path: Path) -> dict:
+    """UNION an incoming append-only artifact into the one already on disk.
+
+    `#630`. Two services each keep their OWN copy of
+    `<sport>_source/tracking/book_quotes/<date>.jsonl`, append only their own
+    rows to it, and then publish the WHOLE FILE. A replace therefore drops
+    whatever the other service had appended since. Measured 2026-09-01: a
+    refetch an hour later had LOST 1,318 exchange rows and gained none, a clean
+    tail truncation, while sportsbook rows gained a whole hour.
+
+    Merging makes publishes COMMUTATIVE: whichever service publishes last, the
+    result holds both services' rows, so the order stops mattering.
+
+    THE LOAD-BEARING INVARIANT IS THAT THE EXISTING FILE STAYS A BYTE PREFIX OF
+    THE RESULT. Existing bytes are copied through untouched and new lines are
+    only ever appended -- never reordered, never rewritten. That is not
+    tidiness: `artifact_publisher.pull_streamed_artifact` fetches these families
+    by HTTP Range from the worker's local size, so any edit before that offset
+    would splice two different files together on the worker. `_is_append_only`
+    is imported rather than restated so the two can never disagree about which
+    families those are. Merging is what finally MAKES that assumption true --
+    until now the file could be replaced wholesale underneath it.
+
+    DEDUP IS ON THE WHOLE LINE, deliberately, not on a parsed semantic key.
+    A semantic key needs a schema, and getting one wrong collapses two genuinely
+    different observations into one -- silent, unrecoverable data loss, the
+    expensive direction. Whole-line identity can only ever collapse rows that
+    are already byte-identical, which is exactly what a re-publish of the same
+    file produces. It also makes this idempotent: republishing an unchanged file
+    adds nothing.
+
+    RACES ARE SELF-HEALING, which is why this needs no cross-process lock.
+    Two simultaneous publishes can interleave read-modify-write and lose one
+    side's additions. That side is not lost for good: every publisher sends its
+    COMPLETE file every time, so the next publish re-offers those rows and they
+    merge then. A lock would narrow a window that already closes by itself.
+
+    Returns a dict of counts. Never raises -- on any failure the caller keeps
+    the plain replace, which is exactly today's behaviour.
+    """
+    digests: set[bytes] = set()
+    existing_lines = 0
+    for line in _iter_lines(target_path):
+        digests.add(hashlib.blake2b(line, digest_size=16).digest())
+        existing_lines += 1
+
+    merged_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.merge"
+    added = 0
+    duplicates = 0
+    try:
+        with merged_path.open("wb") as out:
+            # Byte-for-byte copy of what is already there. This is the prefix
+            # guarantee, and it is why this is a copy rather than a re-encode.
+            with target_path.open("rb") as current:
+                shutil.copyfileobj(current, out, _PUBLISH_STREAM_CHUNK_BYTES)
+            if existing_lines and not _ends_with_newline(target_path):
+                # Without this, the first appended row would be glued onto the
+                # last existing one and BOTH would stop parsing.
+                out.write(b"\n")
+            for line in _iter_lines(incoming_path):
+                digest = hashlib.blake2b(line, digest_size=16).digest()
+                if digest in digests:
+                    duplicates += 1
+                    continue
+                digests.add(digest)
+                out.write(line + b"\n")
+                added += 1
+        os.replace(merged_path, target_path)
+    except Exception as exc:
+        try:
+            merged_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return {"merged": False, "error": f"{type(exc).__name__}: {exc}"}
+    return {
+        "merged": True,
+        "existing_lines": existing_lines,
+        "added": added,
+        "duplicates": duplicates,
+    }
+
+
+def _iter_lines(path: Path):
+    """Yield newline-stripped lines as bytes, skipping blanks. Bounded memory."""
+    try:
+        with path.open("rb") as handle:
+            for raw in handle:
+                line = raw.rstrip(b"\r\n")
+                if line:
+                    yield line
+    except Exception:
+        return
+
+
+def _ends_with_newline(path: Path) -> bool:
+    try:
+        size = path.stat().st_size
+        if size <= 0:
+            return True
+        with path.open("rb") as handle:
+            handle.seek(-1, os.SEEK_END)
+            return handle.read(1) in (b"\n", b"\r")
+    except Exception:
+        return True
+
+
 def _publish_divergence_verdict(relative_path: str, incoming_bytes: int, publisher: str):
     """(should_refuse, marker) for `#488` -- two services overwriting one path.
 
@@ -1782,10 +1895,16 @@ def _publish_streamed_body() -> Any:
                 400,
             )
         publisher = str(request.headers.get("X-Artifact-Publisher") or "").strip()
+        merge = _is_append_only(relative_path) and target_path.is_file()
         refuse, marker = _publish_divergence_verdict(relative_path, written, publisher)
         if marker:
             print(marker, flush=True)
-        if refuse:
+        # `#630`: for a MERGED family the shrink guard must not refuse. It was
+        # built for `#488`, where a replace really did destroy rows, and a
+        # refusal was the only protection available. A merge keeps both sides,
+        # so refusing here would reject the very publish that carries the other
+        # service's rows -- turning the fix off. The marker still prints.
+        if refuse and not merge:
             temp_path.unlink(missing_ok=True)
             return (
                 jsonify({
@@ -1796,6 +1915,30 @@ def _publish_streamed_body() -> Any:
                     "publisher": publisher,
                 }),
                 409,
+            )
+        merged = None
+        if merge:
+            merged = _merge_append_only_publish(target_path, temp_path)
+            if merged.get("merged"):
+                temp_path.unlink(missing_ok=True)
+                print(
+                    f"[ops.publish] APPEND_ONLY_MERGE path={relative_path} "
+                    f"publisher={publisher or 'UNKNOWN'} existing_lines={merged.get('existing_lines')} "
+                    f"added={merged.get('added')} duplicates={merged.get('duplicates')} "
+                    f"bytes={target_path.stat().st_size}",
+                    flush=True,
+                )
+                return jsonify({
+                    "ok": True, "relative_path": relative_path,
+                    "bytes": target_path.stat().st_size, "transport": "stream",
+                    "merged": merged,
+                }), 200
+            # Merge failed: fall through to the plain replace, which is exactly
+            # today's behaviour. Named, not swallowed.
+            print(
+                f"[ops.publish] APPEND_ONLY_MERGE_FAILED path={relative_path} "
+                f"error={merged.get('error')} -- falling back to replace",
+                flush=True,
             )
         os.replace(temp_path, target_path)
     except Exception as exc:
@@ -1833,6 +1976,30 @@ def _write_published_artifact(relative_path: str, content: Any) -> Any:
         with temp_path.open("wb") as handle:
             for start in range(0, len(content), _PUBLISH_ENCODE_CHUNK_CHARS):
                 handle.write(content[start : start + _PUBLISH_ENCODE_CHUNK_CHARS].encode("utf-8"))
+        # `#630`: the envelope form merges too. It is not the path most
+        # publishes take, but live-odds-worker is PINNED to an older commit and
+        # this is the form it sends -- so fixing only the streamed path would
+        # leave the clobber live for one of the two writers that cause it, which
+        # is the whole defect. Same helper, so the two forms cannot diverge.
+        if _is_append_only(relative_path) and target_path.is_file():
+            merged = _merge_append_only_publish(target_path, temp_path)
+            if merged.get("merged"):
+                temp_path.unlink(missing_ok=True)
+                print(
+                    f"[ops.publish] APPEND_ONLY_MERGE path={relative_path} transport=envelope "
+                    f"existing_lines={merged.get('existing_lines')} added={merged.get('added')} "
+                    f"duplicates={merged.get('duplicates')} bytes={target_path.stat().st_size}",
+                    flush=True,
+                )
+                return jsonify({
+                    "ok": True, "relative_path": relative_path,
+                    "bytes": target_path.stat().st_size, "merged": merged,
+                }), 200
+            print(
+                f"[ops.publish] APPEND_ONLY_MERGE_FAILED path={relative_path} transport=envelope "
+                f"error={merged.get('error')} -- falling back to replace",
+                flush=True,
+            )
         os.replace(temp_path, target_path)
     except Exception as exc:
         # write_text() left the .tmp behind on any failure, on the same disk
