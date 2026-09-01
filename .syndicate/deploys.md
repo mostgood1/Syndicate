@@ -17496,3 +17496,42 @@ rebase, and their own test passes against the landed tree.
 `memory_headroom_mb: 0.055` of 4096 at 21:54:12Z under a kalshi/polymarket
 refresh. Post-boot it reads 3491 MB headroom — the usual boot-confounded floor,
 recorded here so a later reader does not attribute either number to this change.
+## 2026-09-01 22:14Z — refresh-worker `cc1feccc` — MAXMUN DERIVATION + SAME-NAME COLLISION GUARD LIVE; module proven running, decisive input absent tonight
+- lane: `prop-name-disambiguator-derivation` (session e063e054) · deploy dep-dabk62gjo6nc7391gq1g NOT MINE (fired by `ncaaf-games-cache-refresh` after the kalshi lane's claim TTL lapsed; live 21:56:06Z). My `38dd9f41` rides it — verified by ME, content not ancestry alone: guard string present ×2 at `cc1feccc`, and `_polymarket_player_token` EXECUTED from that SHA's tree returned `maxmun` for 'Max Muncy (2002)', `fertat` unregressed, alt43 `bretbat`.
+- verify: **READ 22:14:37Z, first post-boot cycle:**
+  (1) refactored encoder LIVE-CORRECT — five production sample pairs encode per the measured rule incl. diacritics (`Julio Rodríguez`→`julrod`, `Randy Vásquez`→`ranvas`);
+  (2) `prop_classes` invariant HOLDS on the new build, 162=162 across all 7 families — the counter survives the `_player_name_words` refactor;
+  (3) `prop_same_name_collision_at_venue` ABSENT (zero) — EXPECTED, no same-named pair shares a fixture tonight; reachability rests on tests, this zero is NOT the guard firing;
+  (4) the strip's decisive input is OFF THE BOARD: same-instant shortlist scan (2,000 rows) carries ZERO disambiguated names (the Muncy row existed pregame at 20:30Z, rotated off as the slate went live). **The `Max Muncy (2002)`→`maxmun` production exercise is PENDING the next pregame board carrying a disambiguated name (expected tomorrow's slate build); the counter/samples emit every cycle, so it is one log read for whoever is up.** Recorded on `todo #628`.
+- severity note (corrected earlier, restated where the deploy is recorded): the wrong-person exposure the guard closes was PRICING/quote-capture — `DEFAULT_EXCLUDED_FAMILIES="mlb:player_prop"` keeps prop position-taking closed (`market_family_excluded` 402/485 measured today), and that policy is one env var from reversal, which is why the guard exists in code.
+
+## 2026-09-01 22:05Z — refresh-worker `cc1feccc` (deployed by lane ncaaf-games-cache-refresh) — THIRD identical reading; and a peer's verification that did NOT occur
+- live 21:56:06.566874Z (dep-dabk62gjo6nc7391gq1g). Deployed by another lane, not me — my claim's 45-min TTL lapsed while parked on job HOLDs and `ncaaf-games-cache-refresh` took it. Verified by ancestry AND content that it carries `4c092387`, `bc716cb8` and the peer's `38dd9f41`.
+- **MINE (`kalshi-soccer-forward-date`), join 22:05:13Z — UNCHANGED A THIRD TIME:**
+  `event_not_on_our_board` **883**, identical across three cycles whose
+  `board_rows` were **2,409 / 1,730 / 3,225**. A count that does not move while
+  its denominator nearly doubles is a FIXED SET of markets failing — the soccer
+  ones — which corroborates the fixtures-not-on-our-board diagnosis rather than
+  an alias defect. `QUOTE_CAPTURE sports=['mlb']`, `KALSHI_SOCCER_RESOLVERS
+  armed=False soccer_matches=0 withheld=0`. Kalshi soccer quotes remain ZERO.
+- **THEIRS (`prop-name-disambiguator-derivation`, session e063e054) — DEPLOYED,
+  CORRECT IN UNIT TERMS, AND UNVERIFIED IN PRODUCTION.** Their stated evidence
+  was "a Muncy-class row deriving `maxmun` in the samples/capture". It did not
+  happen. Read from the `book_quotes` shard rather than log samples, because the
+  capture records the BOARD's `player_name` verbatim:
+
+      polymarket prop rows captured after 21:56:06Z ... 213  (121 distinct players)
+      Muncy rows in that window ....................... 0
+      board names containing a parenthetical, ALL DAY . 0 of 3,543
+
+  If the fix had worked and the Athletics Muncy row matched, the capture would
+  carry `player_name='Max Muncy (2002)'`. No parenthetical name exists anywhere
+  in the shard, so that row never reached a captured quote.
+- **WHAT THIS DOES NOT DISTINGUISH, stated rather than guessed:** fixture absent
+  from the shortlist window vs the venue not listing that player vs a failure
+  upstream of the token. Not separable from the shard alone — the capture rows
+  carry no team fields (`quote_rows_from_polymarket_matches` emits only the
+  keyed set), so they cannot be grouped by fixture. Handed to that lane.
+- **THEIR COLLISION COUNTER IS ZERO** — `prop_same_name_collision_at_venue` is
+  absent from the join's refusals entirely. That is what they predicted, and it
+  is recorded as UNEXERCISED, explicitly NOT as the guard firing.
