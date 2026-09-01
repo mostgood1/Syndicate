@@ -15,7 +15,19 @@ import io
 import json
 import math
 import os
+import sys
 from collections import Counter, defaultdict
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+# The provenance split is NOT optional here and is not re-implemented locally.
+# Pooling the two artifact roots turns this sim's +16.53% Brier skill into
+# -21.52%, and the first pass of this very assessment reported the pooled
+# number. `wnba_card_provenance` is the single place that knows the rule.
+from syndicate.features.shared import wnba_card_provenance as provenance  # noqa: E402
 
 SC = os.environ["SC"]
 
@@ -199,3 +211,21 @@ def corr(xs, ys):
 
 def wilson_se(p, n):
     return math.sqrt(max(p * (1 - p), 1e-12) / n)
+
+
+def root_of_payload(payload: dict) -> str:
+    """Provenance of a whole `/wnba/api/cards` payload."""
+    return provenance.root_of((payload or {}).get("source_path"))
+
+
+def clean_root_only(joined):
+    """`(rows, coverage_note)` -- Syndicate root only, and it SAYS what it dropped.
+
+    Never returns a filtered sample without the note: a silently filtered sample
+    reads as a complete one, which is how a 43%-contaminated archive produced a
+    confident wrong verdict.
+    """
+    tagged = [{"source_path": row.get("source_path"), "row": row} for row in joined]
+    buckets = provenance.split_by_root(tagged)
+    kept = [item["row"] for item in buckets[provenance.SYNDICATE]]
+    return kept, provenance.coverage_note(buckets)
