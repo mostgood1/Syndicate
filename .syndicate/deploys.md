@@ -17051,3 +17051,31 @@ is expected rather than reassuring — the capture sits at the JOIN site
 absence this early says nothing either way. **Absence in a window is not
 absence.** A watcher is polling a 30-minute window; if it exhausts, the correct
 statement is "never observed to run", not "does not work".
+
+#### Polymarket capture: NOT "unverified", specifically "has not yet had an opportunity to run"
+
+Traced rather than waited on, because a silent absence and a broken capture look
+identical from the log:
+
+    intelligence_state.py:6432   run_portfolio_commit(selected_date)   <- background loop, UNCONDITIONAL
+      portfolio_commit.py:911    _venue_price_resolver("polymarket")
+      portfolio_commit.py:484    _polymarket_price_resolver
+      portfolio_commit.py:298    join_polymarket_to_board
+      portfolio_commit.py:300    _capture_polymarket_quotes            <- mine
+
+Reachable: no flag, no conditional, on the board-build loop that runs on THIS
+service. Cadence before the deploy: 151 `[portfolio_commit]` lines 14:34..16:51,
+about one commit every 5-6 minutes, the last at **16:51:25Z — four minutes
+BEFORE the deploy went live**.
+
+Since 16:55:23Z: `text='portfolio_commit'` matches **nothing at all**. So the
+enclosing loop has not completed a cycle since the reboot, and my capture has
+not been reached even once. **The absence is of the CALLER, not of my line** —
+which is the whole difference between "does not work" and "not yet asked to
+run", and the reason to check the emitter before concluding anything from a
+missing signal.
+
+Gate remains: `POLYMARKET_QUOTE_CAPTURE` with `appended > 0`, on the first
+`[portfolio_commit]` cycle after 16:55Z. A watcher is running; if it exhausts,
+the honest report is "never observed to run", and the FIRST thing to check is
+whether `[portfolio_commit]` appears at all in that window.
