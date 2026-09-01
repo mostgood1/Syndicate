@@ -1505,9 +1505,9 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked on a live slate (2026-09-17): T0-1, T0-3, T1-5, T2-1, T2-2, T3-1..T3-5, T4-1/3/4. `todo #614`–`#617` carry the findings; **`#614` and `#616` were CORRECTED in place** after I named mechanisms from symptoms.
 - **2026-09-01 EXCHANGE PRICES — VERIFIED.** `kept_direct=603` on the first grid build after the first Kalshi capture (`0` on every build before it); second capture +153; both post-capture builds agree. The provenance stamp and the grid rule that honours it are mine, the capture is `syndicate-e2`'s. Re-derived off Render by me, not taken from their report. Evidence in `deploys.md`.
 - **The `near_misses` defect they reported in this file is FIXED — `07cb592a`.** It was my regression: provenance-based dropping created a second class of survivor and the counter's precondition assumed one. Moved under `else`. **Their suggested `continue` is a SILENT REVERT** — `freshest[key]`/`anchors[]` follow that block, so it deletes the kept row from the grid; measured (`assert 'kalshi' in {'fanduel'}`). Do not apply it.
-- **DEPLOYED `417e19ed`, live 16:55:23Z. Both gates read.** `near_misses` gate **MET**: `kept_direct=603 near_misses={'kalshi': 603}` → `kept_direct=830 near_misses={}` (kept GREW while the false alarm went empty, so the counter was fixed rather than the rows suppressed). Polymarket gate **NOT MET**: `POLYMARKET_QUOTE_CAPTURE matches=60 sports=['mlb','soccer'] appended=0` — the capture is reachable and correctly wired, and wrote nothing because all 60 were GAME markets and the builder is props-only **by design**. **Do not remove that bound to make the number rise** — OddsAPI already writes `polymarket` game rows under the same dedup key, so a second writer alternates rather than adds.
+- **DEPLOYED `417e19ed`, live 16:55:23Z. Both gates read.** `near_misses` gate **MET**: `kept_direct=603 near_misses={'kalshi': 603}` → `kept_direct=830 near_misses={}` (kept GREW while the false alarm went empty, so the counter was fixed rather than the rows suppressed). Polymarket gate **NOT MET**: `POLYMARKET_QUOTE_CAPTURE matches=60 sports=['mlb','soccer'] appended=0` — the capture is reachable and correctly wired, and wrote nothing because all 60 were GAME markets and the builder is props-only **by design**. **CORRECTED 2026-09-01 (chip session dee09146, deploys.md `c587010a`): matches can ONLY ever be game markets — the join refuses every PROP type (`polymarket_board_join.py:1329`, "PROP is fetched every cycle and thrown away"), so `appended > 0` is UNREACHABLE on `417e19ed` by construction, not pending a slate. Do not leave a watcher on this gate.** **Do not remove that bound to make the number rise** — OddsAPI already writes `polymarket` game rows under the same dedup key, so a second writer alternates rather than adds.
 - **ALL FILES RELEASED, including `book_grid.py` — nothing here is claimed.** The near-miss counter fix is DONE and live (`07cb592a` in `417e19ed`); `kept_direct=869 near_misses={}` at 17:06:46Z. **A chip session was scoped on the pre-deploy symptom (`near_misses=603`) and on adding `continue` after `kept_direct_feed += 1` — DO NOT DO THAT.** `instance` / `freshest[key]` / `anchors[]` follow that block, so `continue` skips the kept row's registration and it never reaches the grid: measured `assert 'kalshi' in {'fanduel'}`. It presents as a perfect reading with zero exchange prices on the board. The shipped fix is `else`. `tests/test_direct_feed_provenance.py` pins both sides and will catch it.
-- **Honest state of "exchange prices on the board":** Kalshi direct — YES, proven (830). Polymarket game — already arrived via OddsAPI, untouched. Polymarket direct — contributes nothing until Polymarket lists a player prop that joins the board; the capture then fires on its own, nothing further needed.
+- **Honest state of "exchange prices on the board":** Kalshi direct — YES, proven (830). Polymarket game — already arrived via OddsAPI, untouched. Polymarket direct — contributes nothing, and **CANNOT until the JOIN is changed**. CORRECTED 2026-09-01 (found by `syndicate-21`, verified by me on the code): `polymarket_board_join.py` refuses every unmapped type incl. PROP (`market_type_not_a_game_line`), so it emits game lines only and never sets `player_name`, while my builder consumes only rows WITH `player_name` — **empty intersection by construction**. Polymarket lists thousands of props; the join discards them. My earlier "fires on its own, nothing further needed" was wrong and would have left someone watching a gate that can never pass. The join-side fix is NOT "allow PROP": that bucket is MIXED (LoL map winners measured inside it), so characterise it first. Chip `task_4889e312` owns this; it needs `polymarket_board_join.py`, listed by `open-bet-live-status` (UNOWNED).
 - **Traceability gap, both venues, by choice:** `venue_ticker` persisted on 0 of 603 rows (`_normalize` keeps a fixed key set). Removed from my builder; a boundary test now asserts EVERY builder's keys survive `_normalize`. One-line fix (`venue_ticker` into `_normalize`) written down and deliberately not taken — a shared-schema change that would leave one venue traceable and the other not.
 - Blocked by: none. Next: **`#623`** (the 09-17 sprint + pre-registered gates + parked `#614`/`#616` reads) and **`#626`(d)(e)** (reuse-guard/live-capture, klass-hole). **`#622`** owns the ranking-key question — per `#615` T2-1 is ANSWERED (no sim-derived key exists; do NOT keep re-looking at the 656-row sample, ~30 looks are already on record). `scripts/prereg_wnba_favourite_lean.py` is frozen and waiting for the sprint.
 
@@ -1620,6 +1620,35 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   recalibrate toward, so the work is MODELLING, and it needs the v4 clock and
   pregame baseline to accumulate first. Building it now would be fitting to 147
   games with a wall-clock proxy.
+- **COMMITTED AND LIVE 2026-09-01 — `c01dabb1` on `origin/main`, live on refresh-worker inside `417e19ed` (16:55:20Z). VERIFIED BY CONTENT, BEHAVIOUR UNOBSERVED.**
+  I never triggered a deploy. I pushed to main at ~16:20Z and
+  `wnba-accuracy-assessment` deployed at 16:55:20Z carrying my commit — the
+  "deploy a commit that is ON `origin/main`" rule working in the direction it
+  was written for. Confirmed in the deployed tree, not by ancestry alone:
+  `git show 417e19ed:.../live_gameline_join.py` has the choke-point call at
+  **line 1044**. I acquired the claim at 17:04:52Z intending to deploy,
+  preflight said **`ALREADY LIVE -- redundant`** plus `TOO_SOON`, and I released
+  it without spending a reboot — preflight also showed **12 processes in flight
+  including `run_mlb_daily_sim_job.py`**.
+- **THE CLAIM WAS CONTENDED ALL AFTERNOON AND I NEVER FORCED IT.**
+  `mlb-accuracy-assessment` held it (expired 16:42:31Z), then
+  `wnba-accuracy-assessment` took it mid-wait at 16:17:54Z with
+  `target_commit: null`. Neither holder session appeared in the live roster, and
+  I declined to read that as "gone" — the 2026-09-01 rule against exactly that
+  inference is one day old. TTL was the bound both times, and waiting cost
+  nothing because the 25-min deploy spacing was binding anyway.
+- **THE MEASUREMENT IS OWED AND A ZERO IS NOT IT.** Board at 16:56:16Z:
+  `{'pregame': 300}`, `rows_live_gameline_considered 0`, `withheld_by_reason {}`,
+  `live_gameline_score.reason no_final_games_on_this_grid`. Every zero is
+  explained by there being no live MLB game at 17:0xZ — the gate could not fire
+  and the scorer returns early before `score_ledger_records`. First pitch 22:40Z.
+  Scheduled task **`verify-live-gameline-staleness-gate`** fires 18:45 CT with
+  both readings and a strict "an absence is not a pass" rule.
+- **KNOWN INSTRUMENT GAP, not worth its own deploy:** the scorer's early-return
+  path (`no_final_games_on_this_grid`) omits `fresh_quote_seconds`, so on a
+  board with no finals there is no way to confirm from the served payload that
+  the new scorer shipped. Tonight's slate answers it naturally once finals
+  exist; if it ever needs answering pre-slate, add the field to that branch.
 - Blocked by: none. Bound: 147 games. Ledger records no inning/outs/base state,
   so "game clock" is a wall-clock proxy throughout.
 
