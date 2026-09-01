@@ -952,7 +952,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### exchange-join-refusals — OPEN — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+### exchange-join-refusals — OPEN, **UNOWNED** `[session 5611932c ARCHIVED 2026-09-01 ~01:4xZ]` — opened 2026-08-30
 - Goal: establish, as a MEASUREMENT rather than a belief, how many of the
   exchange quotes the Layer 2 board discards at the venue-adapter boundary are
   RECOVERABLE, and by which mechanism. No fix in this lane.
@@ -983,7 +983,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: `live-venue-order-placement` (holds both fix sites).
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### polymarket-yes-leg-binding — OPEN — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3 — **SHIPPED + DEPLOYED; THE LEG CHOICE IS STILL UNVALIDATED; ONE LIVE-MONEY RISK OPEN AND IT IS NOT MINE TO DEPLOY**
+### polymarket-yes-leg-binding — OPEN, **UNOWNED** `[session 5611932c ARCHIVED 2026-09-01 ~01:4xZ]` — opened 2026-08-30 — **SHIPPED + DEPLOYED; THE LEG CHOICE IS STILL UNVALIDATED; ONE LIVE-MONEY RISK OPEN AND IT IS NOT MINE TO DEPLOY**
 - Goal: a Polymarket moneyline resolves its YES/NO leg from the VENUE's own
   `yesLegIndex` instead of being refused, and refuses BY NAME where the venue
   did not state it.
@@ -1179,12 +1179,12 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Narrative: `.syndicate/log/2026-08-31.md`, `.syndicate/lanes_history.md`.
 - Blocked by: none
 
-### layer2-cap-raise — OPEN — opened 2026-08-31 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3 — **GOAL MET AND ALL THREE INCIDENT DEFECTS CLOSED + VERIFIED IN PRODUCTION.** Sharding live, caps 1000/3000, cards flip verified 22:50Z, size instrument fixed and verified over two builds 00:15Z. The ~3,600-row ceiling is GONE.
+### layer2-cap-raise — OPEN, **UNOWNED** `[session 5611932c ARCHIVED 2026-09-01 ~01:4xZ]` — opened 2026-08-31 — **GOAL MET; ALL THREE INCIDENT DEFECTS CLOSED + VERIFIED IN PRODUCTION. ONE THING OWED: the 2000-cap raise is STAGED AND UNVERIFIED.**
 - Goal: board carries >400 rows for a sport. **MET** at 1000 (932 → 1634 rows, no sport lost).
 - Files: `pipeline/intelligence_state.py` **[claim REASSIGNED from `polymarket-yes-leg-binding`, same session]**; Render ENV on refresh-worker via the single-key API — never `render.yaml`. **NOW ALSO CLAIMS CODE:** `pipeline/intelligence_state.py`, `tests/test_layer2_shard_index_stale.py`, `tests/test_layer2_cards_shards.py`, `tests/test_shortlist_persist_ceiling_guard.py` — the last MOVED here from `polymarket-yes-leg-binding`, which had misfiled it. Same session owns both lanes; the file is the layer2 size instrument, not a venue file.
 - Env live: `ROWS_PER_SPORT=1000`, `ROWS_TOTAL=3000`, `COMBINED_ROWS=0` (refresh-worker only; other two services clean).
 - **DO NOT RAISE THE CAP AGAIN AS A CONFIG CHANGE.** The ceiling is the COMBINED key (~2,200 B/row even with `rows: []`) ⇒ ~3,600 TOTAL rows. Shard headroom is not evidence about it.
-- **NEXT ACTION: nothing owed. A cap raise above 1000 is DEFENSIBLE but UNATTEMPTED and must be measured against the COMBINED key, not the shards — measuring the shards is exactly what corrupted the board at 18:25Z. `LAYER2_KEY_LARGE` will now name the right lever if it does go wrong.** `ROWS_TOTAL=3000` has still never bound (board ~2,246 rows). REVERT of the flip is one step: `SYNDICATE_LAYER2_CARDS_INLINE=1` and redeploy.
+- **NEXT ACTION (owed, for whoever picks this up): the 2000/sport cap and ROWS_TOTAL=6000 are STAGED on refresh-worker but UNDEPLOYED, and the 75% warn threshold `c461693e` is on main and undeployed. Both ride the next refresh-worker deploy. They are UNTESTABLE until a full multi-sport slate — tonight the board is MLB-ONLY at ~547 rows, below even the old 1000 cap. VERIFY BY: a sport actually reaching >1000 rows; if none does, the raise stays untested however long it sits deployed.** Measured safe against REAL production rows (combined 220 B, worst shard 50.6–55.2%). Two caveats: the percentage is SLATE-DEPENDENT, and 3000/sport reads 74.6% — under the 75% line, so the warning is NOT a guard against a 3000 raise. REVERT of the cards flip remains one step: `SYNDICATE_LAYER2_CARDS_INLINE=1` + redeploy.
 - Verification: DONE for the cap raise and the rollback fix. **UNEXERCISED, BOTH:** `ROWS_TOTAL=3000` (board ~1,600 rows, never bound) and the cards split (deployed, but no rebuild has run under it — `LAYER2_CARD_SHARDS_WRITTEN` never once observed).
 - OWED, code not config: `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key (`pct=93.3` on a healthy board, advice backwards). The skipped-shed item is CLOSED by the cards split — the shed could never have helped (`SHORTLIST_SHED_IMPOSSIBLE`).
 - Narrative: `log/2026-08-31.md` (session 5611932c). Blocked by: none.

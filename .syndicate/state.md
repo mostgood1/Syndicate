@@ -87,6 +87,20 @@ against the COMBINED key, not the shards** — that mistake caused the 18:25Z in
 The 1534 → 2216 row change is SLATE (soccer 187 → 834), not headroom. **REVERT:** set
 `SYNDICATE_LAYER2_CARDS_INLINE=1` and redeploy.
 
+**CAPS NOW STAGED AT 2000/6000, NOT DEPLOYED `[2026-09-01 01:3xZ]`.**
+`SYNDICATE_LAYER2_ROWS_PER_SPORT=2000` + `ROWS_TOTAL=6000` are SET on
+refresh-worker but the live SHA `6d024dc7` predates them; the 75% warn threshold
+(`c461693e`) is on main and also undeployed. Both apply on the next
+refresh-worker deploy by anyone. **MEASURED SAFE against REAL production rows —
+combined key 220 B (0.0%), worst shard 50.6–55.2%** — which is the check that was
+skipped before the 18:25Z incident. **UNTESTED AND UNTESTABLE TONIGHT: the board
+is MLB-ONLY at ~547 rows** (slates finished; `LAYER2_BOARD_HEALTH` 01:14:48Z mlb
+547, ncaaf 0, soccer 0), so nothing approaches even the OLD 1000 cap. Verifiable
+only on a full multi-sport slate. **Two caveats:** the shard percentage is
+SLATE-DEPENDENT (same config read 55.2% on a three-sport board, 50.6% on tonight's),
+and 3000/sport sits at 74.6% — just UNDER the 75% line, so the warning is NOT a
+guard against a 3000 raise.
+
 **ALL THREE INCIDENT DEFECTS ARE CLOSED AND VERIFIED `[2026-09-01 00:15Z]`:** (1) the
 refused write that left CORRUPTION not staleness — `865c89be`; (2) the shed that could
 not shrink the combined key — cards split + flip; (3) the size instrument that measured
