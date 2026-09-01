@@ -543,7 +543,7 @@ death, never life — do not invert it.
 - Blocked by: none for stages A-C.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### exchange-markets-api-integration — OPEN, GOAL COMPLETE, lane idle, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-24 — session 71a74bb7-67ff-5c39-af7a-c11c2d94cce8
+### exchange-markets-api-integration — CLOSED 2026-09-01 — six read-only venue client modules delivered and present in git; execution caps verified live 2026-08-25T19:35Z (bankroll $1000, Kalshi $50/day, Polymarket $100/day, $10 max order, 15 orders/day) after correcting a drifted flat $40/day on live-odds-worker. Nothing outstanding: Polymarket order automation shipped via a sibling session, Novig buy-side OFF by user decision 2026-08-24, ProphetX blocked on a partner credential with no self-serve path. All claims and deploy claims released. — opened 2026-08-24 — session 71a74bb7-67ff-5c39-af7a-c11c2d94cce8
 - Goal (DONE): read-only market/odds-pulling client modules for six
   prediction/event-market venues (coinbase, prophetx, novig, polymarket,
   robinhood, crypto.com). Canonical detail: `todo.md #544`.
