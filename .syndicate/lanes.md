@@ -1208,6 +1208,53 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `.syndicate/lanes_history.md`.
 - Blocked by: none
 
+### football-projection-publish-allowlist — OPEN — opened 2026-09-01 — **CODE ON MAIN, NOT YET DEPLOYED. NEEDS TWO SERVICES, AND THE BOARD DOES NOT MOVE UNTIL THE NEXT GENERATOR RUN.**
+- Goal: the NFL/NCAAF season-projection CSVs the worker regenerates daily
+  actually reach the board, instead of the board only moving when someone
+  COMMITS a CSV and rides a web deploy.
+- Files: `syndicate/features/shared/artifact_publisher.py` (2 allowlist entries),
+  `tests/test_football_projection_publish_allowlist.py` (NEW).
+- Origin: handed off from `ncaaf-cfbd-quota-latch`, which measured it on
+  2026-09-01 while verifying the quota-latch roll.
+- THE DEFECT: both generators have called `publish_hot_artifact` since
+  2026-08-19 and both calls were **no-ops for 13 days** — neither output path
+  was in `HOT_ARTIFACT_PATTERNS`. `generate_smartsim2_nfl_projections.py` says
+  in its own comment *"the allowlist pattern covers both"*; that pattern never
+  existed. `#208` in reverse: the usual failure is allowlisting something
+  nothing publishes, this is publishing something nothing allowlists, and it is
+  just as silent (`artifact_published=False`, no error).
+- Added: `ncaaf_source/data/smartsim2_projections_*_wk*.csv` and
+  `nfl_source/smartsim2_projections_*_wk*.csv`. Depths differ because `#389`
+  put NFL's output one level shallower; NOT collapsible into one wildcard.
+- WRITE->READ CHECKED, not assumed: worker writes
+  `<SYNDICATE_DATA_ROOT>/ncaaf_source/data/...`; web reads
+  `default_ncaaf_source_root()/"data"` == `$SYNDICATE_NCAAF_SOURCE_ROOT/data`
+  == the same directory. NFL likewise via `_source_roots()`. The sibling lane
+  `nfl-props-odds-allowlist` already proved this chain end-to-end on
+  `nfl_source/schedule_2026.csv`.
+- **DEPLOY NEEDS BOTH refresh-worker AND web.** The SENDER
+  (`publish_hot_artifact`) and the RECEIVER (`ops._write_published_artifact`)
+  each call `is_hot_artifact_relative_path`. Worker-only ships a 403 and
+  `artifact_published=False` continues, which would read exactly like the
+  unfixed bug.
+- **AND THE BOARD STILL WILL NOT MOVE ON DEPLOY.** There is no blanket sweep on
+  refresh-worker (`sweep_changed_hot_artifacts`'s only production caller is
+  `live_lens_loop`), so the already-written 2026-09-01T00:33Z CSV is NOT picked
+  up retroactively. It publishes when the GENERATOR next runs — ~2026-09-02T00:23Z
+  for ncaaf on the 86400s interval, ~2026-09-01T21:24Z for nfl.
+- VERIFY BY (reuse `nfl-props-odds-allowlist`'s own recipe, which caught this
+  class once already): `artifact_published=True` in the generator's log, THEN
+  `/api/ops/artifacts/export?path=ncaaf_source/data/smartsim2_projections_2026_wk1.csv`
+  returns count=1 with a **FRACTIONAL** mtime (a whole-second mtime is a boot
+  copy, not a publish), THEN `/ncaaf/api/cards` values DIVERGE from the
+  git-committed `generated_at=2026-08-19T22:00:39Z` CSV. All three: a fresh
+  mtime alone could be a rewrite of stale bytes, and the generator is
+  deterministic so identical values would NOT disprove a successful publish.
+- NOT DONE, DELIBERATELY: `nfl_source/smartsim2_preseason_projections_*_wk*.csv`.
+  That generator has no `publish_hot_artifact` call, so the entry would be the
+  inert half of this same defect. Wire the publisher in the same change.
+- Blocked by: none.
+
 ### ncaaf-cfbd-quota-latch — **CLOSED 2026-09-01** — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 (archived) — **THE ROLL READING IS IN. The latch expired on time, released with zero manual intervention, and the PPA cache ARMED.** Goal met; measurement in `.syndicate/deploys.md` 2026-09-01 15:0xZ. One SEPARATE, PRE-EXISTING defect surfaced and is NOT this lane's: the regenerated artifact never reaches the board (`artifact_published=False` — path matches zero `HOT_ARTIFACT_PATTERNS`).
 - Goal: stop NCAAF regeneration burning a MONTHLY CFBD quota it has already been
   told is exhausted, and let it succeed from cache while exhausted.
