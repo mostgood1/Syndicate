@@ -16433,3 +16433,80 @@ false negative silently; the script made it reproducible in one command.
 - Deploy of `1da0a328` + `cedfbb83`: HELD. refresh-worker preflight is `HOLD` on
   5-8 in-flight jobs including `run_mlb_daily_sim_job.py`. Not forced; WNBA has
   no games for 17 days.
+
+---
+
+## 2026-09-01 04:38–05:0xZ — THREE DEPLOYS, ALL VERIFIED ON THE SERVED PAYLOAD. Lane goal MET.
+
+**lane** `wnba-accuracy-assessment`. Claims taken and released per service; both
+free at close.
+
+| deploy | service | commit | verified by |
+|---|---|---|---|
+| `dep-dab5do49v7es73c3blgg` | refresh-worker | `d23e8851` | producer tick + publish map |
+| `dep-dab5mqks728c739m4sc0` | web | `d23e8851` | `leakage_note` key reached the payload |
+| `dep-dab5pnrtqb8s73esgko0` | web | `7d5cae4e` | the note is POPULATED, not merely present |
+
+### verify — settlement, the lane's goal
+
+    /wnba/api/live-player-props-lens-accuracy
+      2026-08-29   n_settled 38   win_rate 0.7568
+      2026-08-30   n_settled 54   win_rate 0.6415
+      pooled       n_settled 92   win_rate 0.6889
+      recon {games, props, quarters} all true
+
+`0.6415094339622641` on 08-30 is **byte-identical** to the local end-to-end run
+built before any of this deployed. `artifact-counts`: `games.gradeable` and
+`props.gradeable` **false → true**. `scripts/verify_wnba_settlement_gate.py`
+returns **PASS (exit 0)** on both dates.
+
+**WNBA went from six accuracy instruments reading zero to a settling, graded
+surface.** Backlog drains one date per tick at 1h; 12 dates remain.
+
+### verify — the publish block, including its failure path
+
+    04:56:31Z WNBA_POSTGAME_PRODUCER {"date": "2026-08-29", "marked_done": true,
+      "published": {"recon_games_2026-08-29.csv": true,
+                    "recon_props_2026-08-29.csv": true,
+                    "recon_quarters_2026-08-29.csv": true,
+                    "boxscores_2026-08-29.csv": "missing"},
+      "recon": {"games": 2, "props": 42, "quarters": 2, "status": "ok"}}
+
+All three recon files crossed. **The boxscore reported `"missing"` — NAMED, not a
+silent `false`** — and that names a real defect: `build_wnba_boxscores` writes
+through `refresh_state_store.write_text_file` (KEYVALUE), so the publish block
+looks for a filesystem path that was never written. **NOT blocking** (settlement
+joins recon, not boxscores) but real, and OPEN.
+
+### A defect the fix itself exposed, found and closed in the same round
+
+Landing the hoist made web serve `n_settled 92, win_rate 0.6889,
+leakage_note: null` — while only Q1 had reached n>=20 and the split was already
+Q1 0.627 / Q2 0.800 / Q4 1.000. **`null` was doing double duty**: "assessed and
+clear" AND "cannot tell yet". A reader takes that as "this 68.9% is clean".
+Unknown defaulting to the permissive branch, beside a number people quote.
+
+Fixed in `7d5cae4e`; verified on the served payload:
+
+    leakage_note: "CANNOT ASSESS clock leakage yet: 1 of 4 periods have n >= 20.
+                   This is NOT a clean bill of health -- these rows are scored
+                   against a PREGAME line, so a pooled hit rate here may be
+                   mostly information leakage. Read by_period before quoting it."
+
+Threshold checked against what it guards rather than left round: with the backlog
+drained, Q1 456 / Q2 85 / Q3 41 / Q4 49 all clear 20, so the guard reaches a real
+verdict — it is silent today because the backlog is 2 days in.
+
+### Method note worth keeping
+
+The job tree churns faster than a hand-off can act: a watcher reported CLEAR at
+04:35:57Z and a FRESH preflight 90s later was already HOLD on three new soccer
+builds. Deploy had to poll-and-fire in one process to catch a genuine window
+(attempt 2 HOLD → attempt 3 CLEAR, 48s apart). A notify-then-act loop can only
+fire on a STALE clear, which is what preflight exists to prevent.
+
+### OPEN
+
+- boxscore publish path (keyvalue vs filesystem), above.
+- `todo #614`-`#617`: Layer 2 excludes WNBA; ML generator gap blocked on a
+  validated ranking key; vendor artifact root; exchange capture carries no WNBA.
