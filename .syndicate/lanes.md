@@ -1207,7 +1207,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `.syndicate/lanes_history.md`.
 - Blocked by: none
 
-### football-projection-publish-allowlist — OPEN — opened 2026-09-01 — **CODE ON MAIN, NOT YET DEPLOYED. NEEDS TWO SERVICES, AND THE BOARD DOES NOT MOVE UNTIL THE NEXT GENERATOR RUN.**
+### football-projection-publish-allowlist — OPEN — opened 2026-09-01 — **CODE ON MAIN (`fcbbcc62`). NO DEDICATED DEPLOY — RIDEALONG BY USER DECISION. Tracked as `#618`.** Needs BOTH services, and a PARTIAL ridealong logs the same line as the unfixed bug.
 - Goal: the NFL/NCAAF season-projection CSVs the worker regenerates daily
   actually reach the board, instead of the board only moving when someone
   COMMITS a CSV and rides a web deploy.
@@ -1231,16 +1231,34 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   == the same directory. NFL likewise via `_source_roots()`. The sibling lane
   `nfl-props-odds-allowlist` already proved this chain end-to-end on
   `nfl_source/schedule_2026.csv`.
-- **DEPLOY NEEDS BOTH refresh-worker AND web.** The SENDER
+- **RIDEALONG, BY DECISION `[2026-09-01, user]`. DO NOT SCHEDULE A DEPLOY.**
+  Two allowlist strings cost nothing to carry and do not justify restarting a
+  worker running an MLB sim. `nfl-props-odds-allowlist` closed the identical
+  situation the same way ("WHOEVER DEPLOYS MAIN TO refresh-worker NEXT PICKS
+  THIS UP FOR FREE") and its prediction held. **No claim was ever acquired by
+  this lane; nothing is held.**
+- **NEEDS BOTH refresh-worker AND web, AND A PARTIAL RIDEALONG IS
+  INDISTINGUISHABLE FROM THE UNFIXED BUG.** The SENDER
   (`publish_hot_artifact`) and the RECEIVER (`ops._write_published_artifact`)
-  each call `is_hot_artifact_relative_path`. Worker-only ships a 403 and
-  `artifact_published=False` continues, which would read exactly like the
-  unfixed bug.
-- **AND THE BOARD STILL WILL NOT MOVE ON DEPLOY.** There is no blanket sweep on
-  refresh-worker (`sweep_changed_hot_artifacts`'s only production caller is
-  `live_lens_loop`), so the already-written 2026-09-01T00:33Z CSV is NOT picked
-  up retroactively. It publishes when the GENERATOR next runs — ~2026-09-02T00:23Z
-  for ncaaf on the 86400s interval, ~2026-09-01T21:24Z for nfl.
+  each call `is_hot_artifact_relative_path`. web-only -> the worker still
+  refuses locally; refresh-worker-only -> web answers 403. **Both partial
+  states log `artifact_published=False`, the same line as doing nothing.**
+  Before concluding this failed, READ THE LIVE SHA ON BOTH SERVICES — the
+  natural reading of "still False" is "the fix does not work", and it will
+  usually mean "only one side has it yet".
+- **AND THE BOARD STILL WILL NOT MOVE ON DEPLOY ALONE.** There is no blanket
+  sweep on refresh-worker (`sweep_changed_hot_artifacts`'s only production
+  caller is `live_lens_loop`), so the already-written 2026-09-01T00:33Z CSV is
+  NOT picked up retroactively. It publishes when the GENERATOR next runs —
+  ncaaf on the 86400s interval, nfl likewise.
+- Deploy state at hand-off (2026-09-01T15:2xZ): web `ad33df21`, refresh-worker
+  `1c078f46`, live-odds-worker `1c078f46`. `fcbbcc62` is a strict FORWARD move
+  for both services (checked, not assumed) and an ancestor of `origin/main`, so
+  any later main deploy carries it without an `OFF_MAIN` or rollback refusal.
+- Whoever deploys refresh-worker next also picks up `layer2-cap-raise`'s staged
+  env: `SYNDICATE_LAYER2_ROWS_PER_SPORT=2000`, `SYNDICATE_LAYER2_ROWS_TOTAL=6000`.
+  **Confirmed by reading LIVE env-vars, not from the ledger.** That is that
+  lane's intended pickup, not a surprise.
 - VERIFY BY (reuse `nfl-props-odds-allowlist`'s own recipe, which caught this
   class once already): `artifact_published=True` in the generator's log, THEN
   `/api/ops/artifacts/export?path=ncaaf_source/data/smartsim2_projections_2026_wk1.csv`
