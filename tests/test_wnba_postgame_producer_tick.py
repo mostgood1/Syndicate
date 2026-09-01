@@ -233,3 +233,19 @@ def test_publish_failure_does_not_undo_the_build(store, tmp_path):
         result = worker._run_wnba_postgame_producer_tick()
     assert "error" in result["published"]
     assert result["marked_done"] is True, "the recon is on disk; a publish failure must not force a rebuild"
+
+
+def test_keyvalue_backed_artifacts_are_named_not_called_missing(store, tmp_path):
+    """A keyvalue artifact is not a lost file and must not be reported as one.
+
+    `write_text_file` returns after `client.set` without touching disk, so a
+    keyvalue-backed path never becomes a file. Reporting `missing` sends the
+    next reader looking for something that was written correctly.
+    """
+    sent: list[str] = []
+    with patch("scripts.build_wnba_recon.build_date",
+               return_value={"status": "ok", "games": 1, "quarters": 1, "props": 1,
+                             "paths": {"games": str(tmp_path / "recon_games_2026-08-30.csv")}}),          patch("scripts.build_wnba_boxscores.build_date", return_value={"status": "empty", "rows": 0}),          patch("syndicate.features.shared.refresh_state_store._keyvalue_backed", return_value=True),          _publish_patch(sent):
+        result = worker._run_wnba_postgame_producer_tick()
+    assert result["published"]["recon_games_2026-08-30.csv"] == "keyvalue_backed_not_a_file"
+    assert sent == [], "a keyvalue artifact must not be handed to the file publisher"

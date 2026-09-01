@@ -1592,7 +1592,22 @@ def _run_wnba_postgame_producer_tick() -> dict[str, Any] | None:
             from scripts.build_wnba_boxscores import artifact_relative_path
 
             targets.append(Path(_data_root()) / artifact_relative_path(target))
+        from syndicate.features.shared.refresh_state_store import _keyvalue_backed
+
         for path in targets:
+            # A keyvalue-backed artifact is NOT a file and never will be:
+            # `write_text_file` returns after the `client.set` without touching
+            # disk. Publishing it is not "failing", it is asking the wrong
+            # question -- and reporting that as `missing` (which the first
+            # version did) invites someone to go looking for a lost file.
+            # Measured 2026-09-01: `boxscores_2026-08-29.csv` reported `missing`
+            # for exactly this reason while the producer had written it fine.
+            try:
+                if _keyvalue_backed(path):
+                    published[path.name] = "keyvalue_backed_not_a_file"
+                    continue
+            except Exception:
+                pass
             if not path.is_file():
                 published[path.name] = "missing"
                 continue

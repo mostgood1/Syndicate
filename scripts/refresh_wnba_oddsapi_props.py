@@ -1635,12 +1635,50 @@ _WIN_PROB_STATS: dict[str, int] = {"rows": 0, "null_no_price": 0}
 _WIN_PROB_RUN_DATE: dict[str, str | None] = {"date": None}
 
 
+# A pregame WNBA bet is never certain. MEASURED 2026-08-31 across the season's
+# 466 game-market recommendations: **36 claimed `p_win = 1.000`** and one claimed
+# **EV 2264.8%**, on a board whose realized hit rate was 47.62%. Clamping to
+# [0, 1] admitted both -- 1.0 IS in [0, 1].
+_CERTAINTY_FLOOR, _CERTAINTY_CEILING = 0.01, 0.99
+# EV above this is not a price, it is a broken input. The largest legitimate
+# pregame edge on a graded market is a fraction of this; 2264.8% is 22x it.
+_MAX_PLAUSIBLE_EV_PCT = 100.0
+
+
 def _clamp_probability(value: float | None) -> float | None:
     _WIN_PROB_STATS["rows"] += 1
     if value is None:
         _WIN_PROB_STATS["null_no_price"] += 1
         return None
-    return max(0.0, min(1.0, float(value)))
+    numeric = float(value)
+    # A row that WOULD have claimed certainty is a defect signal, so it is
+    # counted rather than silently squashed -- the clamp makes the board honest,
+    # the counter is how anyone learns the inputs are wrong.
+    if numeric >= 0.999 or numeric <= 0.001:
+        _WIN_PROB_STATS["certainty_clamped"] = _WIN_PROB_STATS.get("certainty_clamped", 0) + 1
+    return max(_CERTAINTY_FLOOR, min(_CERTAINTY_CEILING, numeric))
+
+
+def _wnba_totals_recommendations_enabled() -> bool:
+    """False unless explicitly re-enabled. See the T0-2 note at the call site."""
+    return str(os.environ.get("SYNDICATE_WNBA_TOTALS_RECOMMENDATIONS") or "").strip().lower() in {"on", "1", "true", "yes"}
+
+
+def _plausible_ev_pct(value: float | None) -> float | None:
+    """Refuse an implausible EV rather than print it.
+
+    House style in this file, stated at the `win_prob` site: *"Absence
+    propagates; the card renders it as an em dash."* A refused EV shows as a
+    dash, which is true. A clamped one shows as exactly `100.0%`, which is a
+    number nobody computed and which reads as a real edge.
+    """
+    if value is None:
+        return None
+    numeric = float(value)
+    if abs(numeric) > _MAX_PLAUSIBLE_EV_PCT:
+        _WIN_PROB_STATS["ev_refused_implausible"] = _WIN_PROB_STATS.get("ev_refused_implausible", 0) + 1
+        return None
+    return numeric
 
 
 _WIN_PROB_LAST: dict[str, int] = {"rows": 0, "null_no_price": 0}
@@ -2007,7 +2045,7 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
                 pred_margin = _float_or_none(row.get("pred_margin"))
                 pred_total = _float_or_none(row.get("pred_total"))
                 market_home_margin = _float_or_none(row.get("market_home_margin"))
-                ev_pct = (ev * 100.0) if ev is not None else None
+                ev_pct = _plausible_ev_pct((ev * 100.0) if ev is not None else None)
                 # No implied probability means no price to imply it from, and
                 # "0.5 plus the edge" reads on the board as a confident
                 # 50-something percent that nothing computed. Absence
@@ -2017,6 +2055,31 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
                     if implied_prob is not None
                     else _clamp_probability(None)
                 )
+
+                # T0-2: WITHHOLD TOTALS. Not a de-weighting -- a refusal.
+                #
+                # MEASURED 2026-08-31 against ESPN over 102 games on the clean
+                # artifact root: the sim is a WORSE total estimator than the line
+                # it is betting into, on every metric.
+                #
+                #     sim  MAE 14.23   corr 0.419
+                #     line MAE 11.87   corr 0.581
+                #
+                # Side selection at flat -110 went 47-54 (**-11.16%**), the OVER
+                # subset -15.50%, and `p_over` leans over by +8.08pp. The board's
+                # own graded TOTAL recommendations returned **-8.80%** (n=54).
+                # There is no tuning here to do: you cannot price a market with
+                # an estimator that is beaten by the market's own number.
+                #
+                # Re-enable with SYNDICATE_WNBA_TOTALS_RECOMMENDATIONS=on once a
+                # HELD-OUT `corr(sim total, actual) > corr(line, actual)` says
+                # the estimator has changed. ABSENT MEANS WITHHELD -- stated
+                # explicitly because absent-means-off is not a safe default to
+                # assume in this repo, and here the measured-correct behaviour
+                # is the refusal.
+                if market == "TOTAL" and not _wnba_totals_recommendations_enabled():
+                    _WIN_PROB_STATS["totals_withheld"] = _WIN_PROB_STATS.get("totals_withheld", 0) + 1
+                    continue
 
                 if market == "ATS":
                     side_is_home = side.lower() == home_name.lower()
