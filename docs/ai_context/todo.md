@@ -32,28 +32,44 @@ number.
 
 ---
 
-### `#616` — **THE WNBA BOARD CANNOT SEE 45.8MB OF EXCHANGE QUOTES SITTING ON THE SAME DISK** — lane `wnba-accuracy-assessment`, 2026-09-01 — **MEASURED, NOT FIXED**
+### `#616` — **THE WNBA QUOTE CAPTURE CONTAINS NO EXCHANGE PRICES AT ALL, while real money trades on two exchanges** — lane `wnba-accuracy-assessment`, 2026-09-01 — **MEASURED, NOT FIXED**
 
-Measured on 2026-08-30, a real 4-game slate:
+> **CORRECTED 2026-09-01, and the correction is the lesson.** This entry first
+> said "a join gap, not an ingestion gap — 45.8MB captured, board sees none of
+> it". **That was inferred from the FILE SIZE and it is wrong.** Lane
+> `mlb-accuracy-assessment` pushed back with a composition count of its own file,
+> which prompted counting mine. See the counts below. I asserted a mechanism from
+> bytes; the bytes were real and the mechanism was invented.
 
-- `/api/board/book-grid?sport=wnba`: **787 book references across 10 books** —
-  draftkings, fanduel, fanatics, betmgm, betrivers, betonlineag, williamhill_us,
-  betus, mybookieag, bovada. **Kalshi and Polymarket: zero.** Same on Layer 1
-  (1,115 rows).
-- `wnba_source/tracking/book_quotes/2026-08-30.jsonl`: **45,776,899 bytes.**
+Measured on 2026-08-30, a real 4-game WNBA slate:
 
-So this is **a join gap, not an ingestion gap** — the prices are already captured,
-on the same service, in a 45MB file. Meanwhile real money IS executed on those two
-venues (29 Kalshi + 3 Polymarket WNBA orders). **The surface that picks the bet
-cannot see the price the bet is filled at**, so no edge it computes is the edge
-that gets traded.
+- `wnba_source/tracking/book_quotes/2026-08-30.jsonl` — 45,776,899 bytes,
+  **101,129 rows**, **11 bookmakers**: fanduel 34,653, draftkings 29,049,
+  fanatics 13,436, betrivers 13,265, betmgm 2,899, betonlineag 2,730,
+  williamhill_us 2,298, betus 976, bovada 755, mybookieag 658, lowvig 410.
+- **kalshi / polymarket / novig / prophetx rows: ZERO.** Not on game markets,
+  not on props, not anywhere.
+- Consequently `/api/board/book-grid?sport=wnba` and Layer 1 show no exchange
+  book, which is correct behaviour over this input, not a board defect.
 
-Known mechanism, already documented at `kalshi_board_join.py:503`: the board reads
-`quote.book_prices["kalshi"]`, OddsAPI's view, which carries game lines only for
-exchanges. Lane `mlb-accuracy-assessment` found the same blind spot on MLB props
-the same evening and describes it as a one-function-call fix. **WNBA's loss is
-worse than MLB's: MLB keeps exchange game lines and loses props; WNBA gets
-nothing at all.**
+**So this is a SOURCE gap, and WNBA's is worse than MLB's.** `book_quotes` is
+OddsAPI-fed, and OddsAPI carries exchange **game lines** for MLB (measured by
+`mlb-accuracy-assessment` on 2026-08-31: 26,710 exchange game quotes — kalshi
+13,768, prophetx 5,605, novig 4,987, polymarket 2,350 — and **0** exchange prop
+quotes). For WNBA it carries **nothing from any exchange**.
+
+**Why it matters:** real WNBA money IS executed on those venues — 29 Kalshi and
+3 Polymarket orders. So the board cannot price-shop the only two venues it
+actually trades on, and no edge it computes is the edge that gets filled.
+
+**NOT VERIFIED and load-bearing for the fix:** whether the DIRECT venue feed
+(the `kalshi_markets.json` → `kalshi_price_resolver` path, which is how Kalshi
+prop prices reach MLB) carries WNBA at all. `state.md` records 121 WNBA Kalshi
+quotes in the venue feed, which suggests it does, but that is a different store
+from `book_quotes` and I have not counted it. **Until someone counts it, "join
+the direct feed" is a hypothesis, not a fix** — and on MLB props the equivalent
+"join what you already have" would have been a no-op, because there was nothing
+captured to join.
 
 ---
 

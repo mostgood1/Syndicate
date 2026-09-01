@@ -4206,3 +4206,49 @@ and still assert nothing that matters.
 and assert on the value it received. If the recipient cannot be observed in a
 test, that is itself the finding — an unobservable boundary is where silent
 failures live, and it is exactly where this one lived for its whole short life.
+
+---
+
+## 2026-09-01 FORBIDDEN: inferring a MECHANISM from a file's SIZE. Count the composition, or say you haven't. `[lane wnba-accuracy-assessment, caught by lane mlb-accuracy-assessment]`
+
+**What I claimed.** WNBA's board shows zero Kalshi/Polymarket quotes across 787
+book references, while `wnba_source/tracking/book_quotes/2026-08-30.jsonl` is
+**45,776,899 bytes**. I wrote that up — into `todo.md #616`, into a peer message,
+and into a user-facing summary — as:
+
+> *"a JOIN gap, not an ingestion gap. The prices are already captured, on the
+> same service, in a 45MB file."*
+
+**What was actually in the file.** 101,129 rows, 11 bookmakers, and
+**ZERO exchange rows** — no kalshi, no polymarket, no novig, no prophetx, on any
+market. The board showing no exchange price was **correct behaviour over its
+input**, not a defect. There was nothing to join.
+
+**The bytes were real and the mechanism was invented.** 45.8MB is a true fact
+about the file and says nothing whatever about whose prices are in it. I used
+size as a proxy for content and then named a fix ("a join, one function call")
+that would have been a **no-op**.
+
+**How it was caught, which is the part to copy.** The peer lane refused to accept
+the symmetry I offered it and counted ITS OWN file instead — 274,129 lines,
+26,710 exchange quotes on game markets, 0 on props — concluding MLB's was a
+SOURCE gap, not a join. That composition count is what made me count mine. **I
+had told that same lane, twice, to measure rather than assume symmetry, and then
+did not do it myself on the one file my own conclusion rested on.**
+
+**The tell, in hindsight.** I had the file's *name* and *size* from a
+`names_only=1` listing. `names_only` is a listing, not a reading. Every number I
+had was metadata, and I reasoned about contents.
+
+**The rule.** A claim about WHAT IS IN a store must come from counting what is in
+it — by the field that decides the claim (here: `bookmaker`). Size, row count,
+mtime and existence are all metadata and support none of:
+"the data is there", "it's a join problem", "the producer ran", "coverage is
+fine". If counting is too expensive right now, the honest form is *"N bytes
+exist; composition uncounted"* — which is a fact — rather than a mechanism, which
+is a guess wearing a measurement's clothes.
+
+**Related and distinct:** `[read the field you already have]` is about ignoring a
+discriminating field that is already in hand. This is about not HAVING the field
+and proceeding anyway. Both end in a confident wrong mechanism; the fix here is
+to go and get the field.
