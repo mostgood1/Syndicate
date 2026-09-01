@@ -334,6 +334,21 @@ death, never life — do not invert it.
 - Full working record (measurements, phase log, hypothesis/falsification detail) moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
 ### mlb-native-ladders-producer — OPEN, UNOWNED (session 822e1e5a archived 2026-08-20 ~20:4xZ) — **MAKE `ladders_build.py` THE PRODUCER AND DELETE THE VENDOR LADDERS STAGE. Stage 1 of 20 in the MLB vendor exit (`state.md [mlb-vendor-exit-audit]`; `todo.md #493`). ALL CODE SHIPPED AND LIVE — fix `a54dffa3` (18:27:40Z), force knob + one-shot guard live in `a0396411` (20:28:43Z, verified by CONTENT), `SYNDICATE_MLB_LADDERS_FORCE_DATE=2026-08-20` SET. THE PRODUCTION VERIFICATION IS UNDISCHARGED AND IS A ONE-CURL READ: last status `skipped_fresh` at 20:11:24Z PREDATES the deploy, so nothing had run with the knob yet — pending, NOT failed.** — opened 2026-08-20
+- **PRODUCTION READ 2026-09-01 09:3xZ — OBLIGATION STILL UNDISCHARGED, and now precisely
+  characterised.** Served `daily_ladders_2026_09_01.json` (16,623,227 B, `generatedAt`
+  2026-09-01T09:18:17-05:00, status `skipped_fresh`, 15 games): **`generatedBy` is ABSENT from the
+  artifact entirely** — not wrong, absent — so nothing attributes it to
+  `syndicate.features.mlb.ladders_build`. Consistent with the knob never being armed.
+- **`ladder[]`/`gamePk` are 30/30 on pitcher strikeouts and that proves NOTHING** — the same trap
+  this lane already recorded for chips: the vendor writer populates them too. Only `generatedBy`
+  discriminates. The 4 known presenter gaps confirm the vendor shape: `lineupOrder`, `paMean`,
+  `matchupReasons`, `matchupSummary` all **0/30**, and a hitter group is present (16.6 MB against
+  native+pitcher's measured 635,001 B).
+- **The blocker is unchanged and confirmed by reading, not assumed:**
+  `SYNDICATE_MLB_LADDERS_FORCE_DATE` is not armed on refresh-worker, so the native path has never
+  run. Arming it is a single-key env write PLUS a deploy (env changes need one), and was NOT done
+  here — it is a production config change nobody asked for.
+- **Goal (single testable outcome):** `daily_ladders_<date>.json` produced by
 - **Goal (single testable outcome):** `daily_ladders_<date>.json` produced by
   `syndicate.features.mlb.ladders_build` on the NORMAL path — `generatedBy`
   stamped on the SERVED artifact — with the vendor ladders stage removed and both
@@ -378,7 +393,7 @@ death, never life — do not invert it.
 - Blocked by: none.
 - Full working record (measurements, phase log, hypothesis/falsification detail) moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
-### nfl-props-odds-allowlist — OPEN, **UNOWNED** (session e5e93171 checkpointed and archived 2026-08-21) — NARROWED TO ONE UNDEPLOYED FIX — **THE CAPTURE FIX IS VERIFIED IN PRODUCTION.** `oddsapi_player_props_2026_wk1.csv` went **5 bytes -> 12,142** at 2026-08-21T14:08:06Z with a FRACTIONAL mtime (runtime write, not a boot copy): **84 rows, 84 distinct players, real DraftKings Anytime TD prices**, captured unattended by refresh-worker. First real NFL player-prop capture this platform has ever made. The model was also PRICED for the first time: **-7.35% over 64,007 bets** — it does not beat the market (fading it loses 16.93%, so the picks are correctly signed, they just do not clear the vig). Price shopping **+2.95 ROI pts** (controlled, identical bets); game context **+1.18 pts** (paired, held-out). **REMAINING: one landed-but-undeployed fix, deliberately left to ride along on the next main deploy — see OWED.** — opened 2026-08-20 — session e5e93171-243f-485e-8ade-9116f0130519
+### nfl-props-odds-allowlist — CLOSED 2026-09-01 — **the one owed item is DISCHARGED, read on production.** `a41f88f8` needed no dedicated deploy and was carried by a later main deploy as predicted: it is an ancestor of refresh-worker's live `1c078f46` AND the live code content uses `nfl_artifact_output_root()`, not the probing `default_nfl_source_root()`. Both halves of the lane's own test pass on `nfl_source/schedule_2026.csv`: mtime **1788273215.1262631 — FRACTIONAL** (a runtime write, not a whole-second boot copy), and lined games **67 -> 112 of 272** (`spread_line`/`total_line`/both moneylines each filled 112/272). Goal was already MET: 64,007 graded bets, model priced at -7.35%. — opened 2026-08-20 — session e5e93171-243f-485e-8ade-9116f0130519
 - Goal: a real ROI number for NFL player props. **MET** — 64,007 graded bets,
   `reports/nfl_props_roi.json`. Model priced at **-7.35%**; it does not beat the
   market (fading it loses 16.93%, so the picks are correctly signed and simply do
