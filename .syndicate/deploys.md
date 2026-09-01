@@ -17148,3 +17148,27 @@ into the slate.
   `POLYMARKET_QUOTE_CAPTURE matches=447 appended=58` — capture unaffected, as designed.
 - **BLAST RADIUS, measured not assumed:** positions did NOT widen — `positions=4 staked=$14.71` (was 4/$14.82), because `market_family_excluded: 402` still refuses prop FAMILIES at the position-taking layer. Arming changed the PRICING source and stamps venue tickers; committing prop positions (and therefore prop orders) stays closed behind the family policy — a separate knob nobody has asked to open.
 - claim: none held by this lane — the deploy was `prop-unmatched-decomposition`'s, released by them 19:1xZ.
+
+## 2026-09-01 20:30Z — refresh-worker `839bfa06` — PROP NO-MATCH RATE MEASURED: player_not_listed 65.2%, rung_miss 27.4% — HYPOTHESIS FALSIFIED
+- lane: `prop-rung-miss-rate` (session e063e054) · deploy dep-dabj4v7avr4c738ij7d0, created 20:15:56Z, live 20:18:42Z, trigger=api, claim+preflight (CLEAR at 20:14:57Z after a props sim (19:54:35Z, reason=props_now_available) + board build + odds sweep drained; re-pinned 356d65b9→839bfa06 to carry the peer's commit; deploy killed nothing).
+- carries: `356d65b9` (mine: `prop_unmatched_classes` complete counter + shared `_prop_fixture_profile`, emitted as `prop_classes=`) **+ `4c092387`** (lane `kalshi-soccer-forward-date`, syndicate-7a: Kalshi soccer forward-date widening, soccer resolver gate default OFF — their verification is theirs; my print line verified intact at 839bfa06 content pre-deploy).
+- verify: **READ ~20:30Z, first post-boot cycle — the counter is licensed and the rate is read:**
+  `prop_classes=` sums to `no_match|mlb|<family>` EXACTLY on all 7 families (532=532; hits 131+36+8=175, tb 91+58+8+10=167, hrr 120+4+10=134, k 35=35, outs 12+3+2=17, er 2+1=3, ha 1=1).
+  **Rate (denominator 532): player_not_listed 347 (65.2%) > rung_miss 146 (27.4%) > near_token 26 (4.9%) > fixture_miss 13 (2.4%).** Lane hypothesis (rung-miss plurality) FALSIFIED — the 2-of-3 sample read had suggested it; the complete count reverses it.
+  Split that matters: PITCHER props are 85.7% rung_miss (strikeouts 100%: 35/35); BATTER props are 71.8% player_not_listed. Cost: same-cycle `POLYMARKET_BOARD_JOIN elapsed_s=11.92` (baseline 20.24s on a smaller board) — no regression.
+  Full table + caveats (one-cycle rate on a board that grew 1375→2409 rows between readings; `Max Muncy (2002)`→`max200` derivation poisoning, named as follow-up, do-not-hotfix): `findings_2026-09-01_prop_rung_miss_rate.md`.
+- claim released after this entry.
+
+## 2026-09-01 20:30Z — refresh-worker `839bfa06` (deployed by lane prop-unmatched-decomposition) — KALSHI SOCCER DATE WIDENING: the predicted refusal shift happened, exactly
+- lane: `kalshi-soccer-forward-date` (session 41d46db0). Carries `4c092387`. Deploy dep-dabj4v7avr4c738ij7d0, live 20:18:42Z — fired by syndicate-e4 with my change riding, by agreement; I held no claim.
+- **PREDICTION MADE BEFORE THE READ** (`log/2026-09-01.md`, and in the lane block): "soccer refusals move from `market_is_for_another_date` to `event_not_on_our_board`". **CONFIRMED:**
+
+      [kalshi_odds] BOARD_JOIN            19:51:47Z (before)   20:30:26Z (after)
+      market_is_for_another_date          3,495                  910      -2,585
+      event_not_on_our_board                  0 (absent)         883      NEW
+      matched                               478                  716      +238
+
+- **THE MECHANISM IS PROVEN; THE COVERAGE IS NOT.** Soccer is now DATE-eligible and immediately hits the next gate — club-blob resolution — which is what `event_not_on_our_board: 883` is. `KALSHI_SOCCER_RESOLVERS armed=False soccer_matches=0 withheld=0` and `QUOTE_CAPTURE sports=['mlb']`: **still zero Kalshi soccer quotes**, exactly as predicted. Do not read this as soccer coverage.
+- **CONFOUNDERS, STATED RATHER THAN GLOSSED.** The two reads are NOT a clean A/B: `board_rows` 1,518 -> 2,409 and `TRIM_BY_SPORT kept_by_sport` shifted (mlb 2,546 -> 3,576), so the working set is a different population. `unreadable_title` 18 -> 413 and `no_matching_board_row` 1,139 -> 2,305 move with that composition, NOT with this change — classification runs BEFORE the date test in the loop, so the date widening cannot touch `unreadable_title` in either direction. **Only the two counters named in the prediction are attributable here**, and they are the two that moved in the predicted direction.
+- `matched=478 -> 716` is therefore NOT claimed as this change's doing either: more board rows and more MLB in the set explain it at least as well, and soccer contributed zero matches.
+- OWED: `bc716cb8` (club code -> name resolution, measured 63% -> 82% on 176 clubs) is on main and UNDEPLOYED. Its reading is `event_not_on_our_board` falling and soccer entering `QUOTE_CAPTURE sports=[...]`. Deploy blocked at 20:3xZ by 25-min spacing (17 min elapsed) AND an in-flight `run_mlb_daily_sim_job.py` — waiting rather than `--allow-rapid`.
