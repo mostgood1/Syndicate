@@ -6,11 +6,13 @@ Opened by session fbf1a34b after the day's four censuses (sequencer, stashes,
 worktrees, branches — `findings_2026-09-01_stash_census.md` /
 `_worktree_census.md` / `_branch_census.md`, all landed).
 
-1. **Three worktrees verified safe but PARKED on the permission classifier**
-   (content = untracked `data/live/`-class runtime only, lanes long-archived):
-   `git worktree remove --force C:/tmp/syndicate-sessions/nfl-fantasy-projections`
-   (ditto `wnba-halftime-elapsed`, `wnba-live-props-data`). One command each,
-   then `rm -rf .git/worktrees/<name>` for the OneDrive husk.
+1. **DONE 2026-09-01 ~23:1xZ (user-authorized, same session):** the three
+   parked worktrees are REMOVED — content re-verified same-instant (unchanged,
+   `data/live/`-class untracked only), working dirs + registrations + OneDrive
+   husks all gone (verified 0/0). Their three `session/*` branches, no longer
+   checked out, got the branch-census treatment too: archive-ref'd (all three
+   tips ANCESTORS of origin/main — fully landed) then deleted; archive
+   namespace now 453 refs.
 2. **Ref families deliberately out of the branch census's scope**, for a fifth
    pass if wanted: local `backup/*`, `claude/*`, `dep-*` strays,
    `fix/soccer-backtest-leakage`, `wnba-only-daily-update`; remote `claude/*`
