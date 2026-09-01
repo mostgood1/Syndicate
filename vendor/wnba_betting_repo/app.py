@@ -45187,6 +45187,24 @@ def api_cron_live_lens_tick():
     return jsonify(payload)
 
 
+def _tick_prop_klass_line_gate(klass: str, line_source: object) -> str:
+    """Hard constraint, same as /api/live_player_lens: no BET/WATCH on a model line.
+
+    The lens API forces `klass = "NONE"` when `line_source in {None, "model"}`
+    (a model fallback line is not a bettable market). This tick RE-DERIVES
+    klass from tuning thresholds, and until 2026-09-01 it skipped that
+    constraint -- so rows the API had already refused came back as BET in the
+    signals JSONL. Measured (lane `wnba-accuracy-assessment`, 2026-08-31):
+    701 of 1,777 live prop signals were priced against the model's own line
+    and "hit" 91.21%, the single largest contributor to a fictional +41% live
+    ROI. The gate must be applied wherever klass is derived, not only where
+    the API derives it.
+    """
+    if line_source in (None, "model"):
+        return "NONE"
+    return klass
+
+
 def _live_lens_tick_payload(
     ds: str,
     *,
@@ -46303,7 +46321,9 @@ def _live_lens_tick_payload(
                         if ev is None:
                             continue
                         strength = abs(float(ev))
-                        klass = _klass(strength, pp_watch, pp_bet)
+                        klass = _tick_prop_klass_line_gate(
+                            _klass(strength, pp_watch, pp_bet), r0.get("line_source")
+                        )
                         if not _allow(log_mode_props, klass):
                             continue
 

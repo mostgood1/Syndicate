@@ -59,12 +59,20 @@ def test_chokepoint_counts_both_branches(sport):
 def test_clamp_behaviour_is_unchanged(sport):
     """Counting must not alter what the producer publishes.
 
-    The BOUNDS are now sport-specific and that is deliberate, not drift. WNBA
-    was measured on 2026-08-31 publishing `p_win = 1.000` on 36 of 466
-    recommendations against a realized 47.62%, so its clamp refuses certainty at
-    [0.01, 0.99]. NBA has NOT been measured, and tightening it here on WNBA's
-    evidence would be exactly the assume-symmetry error this repo keeps paying
-    for -- so NBA keeps [0, 1] until someone measures it.
+    HISTORY, because the asymmetry this test used to pin was deliberate and its
+    removal must be too. WNBA was measured on 2026-08-31 publishing
+    `p_win = 1.000` on 36 of 466 recommendations, so its clamp refuses
+    certainty at [0.01, 0.99]; NBA was left at [0, 1] because tightening it
+    FROM A WNBA LANE on WNBA's outcome evidence would have been the
+    assume-symmetry error. That was correct scoping for that lane, not a
+    finding that NBA should keep [0, 1]. `#626`(c) (lane
+    `phase0-basketball-integrity`, 2026-09-01) is the NBA lane making the
+    change deliberately, on a sport-independent argument: refusing exact
+    certainty is a VALIDITY constraint, not a fitted parameter -- a pregame
+    bet is never certain in any sport, and a price-implied p >= 0.999 requires
+    a settled/dead price (the same contamination class MLB measured at
+    -100000). The `implied + ev` fabrication that produced those values in
+    this file was removed in the same change.
 
     What this test still guards, for both, is the original invariant: counting
     did not change the mapping of an ORDINARY probability.
@@ -74,13 +82,9 @@ def test_clamp_behaviour_is_unchanged(sport):
     assert m._clamp_probability(0.5) == 0.5  # a REAL 0.5 still survives
     assert m._clamp_probability(0.73) == 0.73
 
-    if sport == "wnba":
-        assert m._clamp_probability(1.4) == m._CERTAINTY_CEILING
-        assert m._clamp_probability(-0.2) == m._CERTAINTY_FLOOR
-        assert m._CERTAINTY_CEILING < 1.0 and m._CERTAINTY_FLOOR > 0.0
-    else:
-        assert m._clamp_probability(1.4) == 1.0
-        assert m._clamp_probability(-0.2) == 0.0
+    assert m._clamp_probability(1.4) == m._CERTAINTY_CEILING
+    assert m._clamp_probability(-0.2) == m._CERTAINTY_FLOOR
+    assert m._CERTAINTY_CEILING < 1.0 and m._CERTAINTY_FLOOR > 0.0
 
 
 @pytest.mark.parametrize("sport", sorted(PRODUCERS))

@@ -88,13 +88,19 @@ class HelperAbsenceTests(unittest.TestCase):
         self.assertEqual(0.5, self.module._american_price_to_prob(-100))
 
     def test_clamp_passes_absence_through(self) -> None:
+        # Bounds moved to the certainty clamp (`#626`(c), 2026-09-01): out-of-
+        # range values land on [0.01, 0.99], never on exact certainty.
         self.assertIsNone(self.module._clamp_probability(None))
-        self.assertEqual(0.0, self.module._clamp_probability(-1.0))
-        self.assertEqual(1.0, self.module._clamp_probability(2.0))
+        self.assertEqual(self.module._CERTAINTY_FLOOR, self.module._clamp_probability(-1.0))
+        self.assertEqual(self.module._CERTAINTY_CEILING, self.module._clamp_probability(2.0))
 
     def test_a_genuine_zero_probability_is_not_falsy_swallowed(self) -> None:
-        # The `or` chain this replaced fired on 0.0 as well as on None.
-        self.assertEqual(0.0, self.module._clamp_probability(0.0))
+        # The `or` chain this replaced fired on 0.0 as well as on None. The
+        # property guarded here is that 0.0 is DATA, not absence: it must come
+        # back as a number (the certainty floor, counted), never as None.
+        clamped = self.module._clamp_probability(0.0)
+        self.assertIsNotNone(clamped)
+        self.assertEqual(self.module._CERTAINTY_FLOOR, clamped)
 
 
 if __name__ == "__main__":

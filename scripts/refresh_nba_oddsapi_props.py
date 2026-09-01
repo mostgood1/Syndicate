@@ -869,10 +869,62 @@ def _float_or_none(value: object) -> float | None:
 
 
 def _mean_or_none(values: list[float]) -> float | None:
+    """Arithmetic mean. Correct for LINES (spreads, totals); NOT for prices --
+    see `_consensus_price_or_none`.
+    """
     cleaned = [float(value) for value in values if value is not None]
     if not cleaned:
         return None
     return float(sum(cleaned) / len(cleaned))
+
+
+def _american_to_probability(odds: float) -> float | None:
+    """Implied probability, or None for a value that is not an American price.
+
+    American odds have a HOLE between -100 and +100: there is no such price. A
+    value in that range is a parse error or an averaging artefact, and is
+    rejected rather than coerced, because coercing it invents a probability.
+    """
+    try:
+        value = float(odds)
+    except (TypeError, ValueError):
+        return None
+    if -100.0 < value < 100.0:
+        return None
+    return (-value) / ((-value) + 100.0) if value < 0 else 100.0 / (value + 100.0)
+
+
+def _probability_to_american(probability: float) -> float | None:
+    """Inverse of `_american_to_probability`; `+100` is canonical even money."""
+    if not (0.0 < probability < 1.0):
+        return None
+    if probability > 0.5:
+        return -(100.0 * probability / (1.0 - probability))
+    return 100.0 * (1.0 - probability) / probability
+
+
+def _consensus_price_or_none(values: list[float]) -> float | None:
+    """Consensus American price across books, via implied probability.
+
+    **Averaging American odds arithmetically is invalid** -- the scale is
+    discontinuous at +/-100 (-110 and +110 average to 0, which is not a
+    price). Ported from `refresh_wnba_oddsapi_props.py`, where the WNBA
+    accuracy assessment measured 55 of 128 priced card fields (43.0%) strictly
+    inside (-100, +100) on production cards (2026-08-31); this file carried the
+    same arithmetic mean on its price fields, unread because NBA is
+    off-season. Result keeps each book's vig (consensus PRICE, not fair).
+    """
+    probabilities = [
+        probability
+        for probability in (_american_to_probability(value) for value in values if value is not None)
+        if probability is not None
+    ]
+    if not probabilities:
+        return None
+    price = _probability_to_american(sum(probabilities) / len(probabilities))
+    if price is None:
+        return None
+    return round(price, 2)
 
 
 def _structured_literal_or_none(value: object) -> object | None:
@@ -917,12 +969,41 @@ _WIN_PROB_STATS: dict[str, int] = {"rows": 0, "null_no_price": 0}
 _WIN_PROB_RUN_DATE: dict[str, str | None] = {"date": None}
 
 
+# A pregame NBA bet is never certain. WNBA measured 36 recommendations claiming
+# `p_win = 1.000` and one claiming EV 2264.8% before its clamp landed; clamping
+# to [0, 1] admitted both -- 1.0 IS in [0, 1]. Same bounds ported here.
+_CERTAINTY_FLOOR, _CERTAINTY_CEILING = 0.01, 0.99
+_MAX_PLAUSIBLE_EV_PCT = 100.0
+
+
 def _clamp_probability(value: float | None) -> float | None:
     _WIN_PROB_STATS["rows"] += 1
     if value is None:
         _WIN_PROB_STATS["null_no_price"] += 1
         return None
-    return max(0.0, min(1.0, float(value)))
+    numeric = float(value)
+    # A row that WOULD have claimed certainty is a defect signal, so it is
+    # counted rather than silently squashed.
+    if numeric >= 0.999 or numeric <= 0.001:
+        _WIN_PROB_STATS["certainty_clamped"] = _WIN_PROB_STATS.get("certainty_clamped", 0) + 1
+    return max(_CERTAINTY_FLOOR, min(_CERTAINTY_CEILING, numeric))
+
+
+def _plausible_ev_pct(value: float | None) -> float | None:
+    """Refuse an implausible EV rather than print it (absence propagates)."""
+    if value is None:
+        return None
+    numeric = float(value)
+    if abs(numeric) > _MAX_PLAUSIBLE_EV_PCT:
+        _WIN_PROB_STATS["ev_refused_implausible"] = _WIN_PROB_STATS.get("ev_refused_implausible", 0) + 1
+        return None
+    return numeric
+
+
+def _nba_totals_recommendations_enabled() -> bool:
+    """True unless explicitly disabled. See the TOTAL branch for why the
+    default is the opposite of WNBA's (unmeasured vs measured-bad)."""
+    return str(os.environ.get("SYNDICATE_NBA_TOTALS_RECOMMENDATIONS") or "").strip().lower() not in {"off", "0", "false", "no"}
 
 
 _WIN_PROB_LAST: dict[str, int] = {"rows": 0, "null_no_price": 0}
@@ -1151,15 +1232,34 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
             pred_margin = _float_or_none(row.get("pred_margin"))
             pred_total = _float_or_none(row.get("pred_total"))
             market_home_margin = _float_or_none(row.get("market_home_margin"))
-            ev_pct = (ev * 100.0) if ev is not None else None
+            ev_pct = _plausible_ev_pct((ev * 100.0) if ev is not None else None)
             # No implied probability means no price to imply it from, and
             # "0.5 plus the edge" reads on the board as a confident
             # 50-something percent that nothing computed. Absence propagates.
+            # THE INVERSION WAS DIMENSIONALLY WRONG (ported fix, WNBA
+            # `bef61c33`): it read `implied_prob + ev`, adding a RETURN
+            # FRACTION to a PROBABILITY. For a bet at implied probability p
+            # with true probability q, EV per unit staked is q/p - 1, so the
+            # inversion is q = p * (1 + ev), NOT p + ev. Arithmetically sound,
+            # not thereby RIGHT -- WNBA's residual overstatement is todo #615.
             win_prob = (
-                _clamp_probability(implied_prob + (ev or 0.0))
+                _clamp_probability(implied_prob * (1.0 + (ev or 0.0)))
                 if implied_prob is not None
                 else _clamp_probability(None)
             )
+
+            # Totals knob, mirroring `SYNDICATE_WNBA_TOTALS_RECOMMENDATIONS` --
+            # with the OPPOSITE default, deliberately. WNBA withholds by
+            # default because its totals estimator was MEASURED worse than the
+            # line it bets into (MAE 14.23 vs 11.87, board TOTAL ROI -8.80%).
+            # NBA totals are UNMEASURED, not proven-bad, and silently changing
+            # served behaviour without a measurement is its own defect class.
+            # Absent means SERVE (today's behaviour); set off/0/false/no to
+            # withhold once an NBA measurement justifies it -- config, not
+            # code.
+            if market == "TOTAL" and not _nba_totals_recommendations_enabled():
+                _WIN_PROB_STATS["totals_withheld"] = _WIN_PROB_STATS.get("totals_withheld", 0) + 1
+                continue
 
             if market == "ATS":
                 side_is_home = side.lower() == home_name.lower()
@@ -1245,13 +1345,15 @@ def _build_local_top_by_game_snapshot(*, processed_root: Path, date_str: str) ->
         game_key = f"{away_tri}@{home_tri}"
         if per_game_counts.get(game_key, 0) >= 3:
             continue
-        ev_pct = _float_or_none(top_play.get("ev_pct"))
-        implied_prob = _american_price_to_prob(top_play.get("price"))
-        win_prob = (
-            _clamp_probability(implied_prob + (_float_or_none(top_play.get("ev")) or 0.0))
-            if implied_prob is not None
-            else _clamp_probability(None)
-        )
+        ev_pct = _plausible_ev_pct(_float_or_none(top_play.get("ev_pct")))
+        # Prefer the play's own model probability; explicit None tests, not an
+        # `or` chain -- `or` also fires on a genuine 0.0, and a missing price
+        # then fabricates 0.5. Fallback is the price-implied probability, never
+        # `implied + ev` (a return fraction added to a probability; ported fix).
+        p_win_value = _float_or_none(top_play.get("p_win"))
+        if p_win_value is None:
+            p_win_value = _american_price_to_prob(top_play.get("price"))
+        win_prob = _clamp_probability(p_win_value)
         enriched_top_play = dict(top_play)
         enriched_top_play.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))
         enriched_top_play["p_win"] = win_prob
@@ -1309,13 +1411,15 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
         away_tri = str(meta.get("away_tri") or "").strip().upper()
         if (home_tri, away_tri) not in grouped:
             continue
-        ev_pct = _float_or_none(top_play.get("ev_pct"))
-        implied_prob = _american_price_to_prob(top_play.get("price"))
-        win_prob = (
-            _clamp_probability(implied_prob + (_float_or_none(top_play.get("ev")) or 0.0))
-            if implied_prob is not None
-            else _clamp_probability(None)
-        )
+        ev_pct = _plausible_ev_pct(_float_or_none(top_play.get("ev_pct")))
+        # Prefer the play's own model probability; explicit None tests, not an
+        # `or` chain -- `or` also fires on a genuine 0.0, and a missing price
+        # then fabricates 0.5. Fallback is the price-implied probability, never
+        # `implied + ev` (a return fraction added to a probability; ported fix).
+        p_win_value = _float_or_none(top_play.get("p_win"))
+        if p_win_value is None:
+            p_win_value = _american_price_to_prob(top_play.get("price"))
+        win_prob = _clamp_probability(p_win_value)
         base_pick = dict(top_play)
         base_pick.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))
         base_pick["player"] = str(row.get("player") or "").strip()
@@ -2145,15 +2249,15 @@ def _aggregate_game_odds_from_market_rows(
         away_spread = -float(home_spread)
 
     return {
-        "home_ml": _mean_or_none(home_ml_values),
-        "away_ml": _mean_or_none(away_ml_values),
+        "home_ml": _consensus_price_or_none(home_ml_values),
+        "away_ml": _consensus_price_or_none(away_ml_values),
         "home_spread": home_spread,
         "away_spread": away_spread,
-        "home_spread_price": _mean_or_none(home_spread_price_values),
-        "away_spread_price": _mean_or_none(away_spread_price_values),
+        "home_spread_price": _consensus_price_or_none(home_spread_price_values),
+        "away_spread_price": _consensus_price_or_none(away_spread_price_values),
         "total": _mean_or_none(total_values),
-        "total_over_price": _mean_or_none(total_over_price_values),
-        "total_under_price": _mean_or_none(total_under_price_values),
+        "total_over_price": _consensus_price_or_none(total_over_price_values),
+        "total_under_price": _consensus_price_or_none(total_under_price_values),
     }
 
 
