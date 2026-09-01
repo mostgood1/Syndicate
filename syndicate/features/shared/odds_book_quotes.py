@@ -626,10 +626,22 @@ def quote_rows_from_polymarket_matches(
                 "player_name": player or None,
                 "event_id": match.get("event_id"),
                 "kind": "prop" if player else "game",
-                # The market this price was quoted for -- the only field that
-                # makes a row traceable back to a specific Polymarket market
-                # when one looks wrong. `venue_ticker` for symmetry with Kalshi.
-                "venue_ticker": match.get("polymarket_slug"),
+                # NO `venue_ticker`. It WOULD be the only field making a row
+                # traceable back to the specific Polymarket market that quoted
+                # it -- and it cannot survive: `_normalize` builds a FIXED key
+                # set and silently drops anything outside it.
+                #
+                # Measured 2026-09-01 on the Kalshi sibling, which shipped the
+                # field and documented that exact value: 603 captured rows,
+                # `venue_ticker` present on **0** of them. Emitting it here would
+                # be the same dead field, documented as load-bearing.
+                #
+                # THE TRACEABILITY GAP IS REAL AND NOW AFFECTS BOTH VENUES. The
+                # one-line fix is to add `venue_ticker` to `_normalize`'s
+                # returned dict, which is a shared-artifact schema change and is
+                # deliberately NOT taken here -- the Kalshi lane removed its
+                # field rather than widen the schema, and diverging would leave
+                # one venue traceable and the other not.
             }
         )
     return out

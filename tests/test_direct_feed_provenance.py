@@ -168,7 +168,10 @@ def test_polymarket_builder_emits_a_prop_row():
     assert row["bookmaker"] == "polymarket" and row["kind"] == "prop"
     assert row["price"] == -115 and row["line"] == 18.5
     assert row["selection"] == "over" and row["player_name"] == "A Player"
-    assert row["venue_ticker"] == "sl", "traceable back to the market that quoted it"
+    assert "venue_ticker" not in row, (
+        "a field _normalize cannot keep must not be emitted -- see the "
+        "boundary test below"
+    )
 
 
 def test_polymarket_builder_skips_rows_with_no_price():
@@ -194,3 +197,47 @@ def test_the_source_stamp_is_NOT_in_the_dedup_key():
     from syndicate.features.shared.book_shortlist import QUOTE_SOURCE_FIELD
 
     assert QUOTE_SOURCE_FIELD not in _KEY_FIELDS
+
+
+def test_no_builder_emits_a_field_normalize_would_silently_drop():
+    """THE BOUNDARY TEST. Assert on what SURVIVES, not on what the builder returns.
+
+    `_normalize` constructs a FIXED dict, so any key a builder emits outside that
+    set is dropped without a word. Measured 2026-09-01: the Kalshi builder
+    shipped `venue_ticker`, documented as "the only field that makes a row
+    traceable back to a specific market", and it was present on **0 of 603**
+    captured rows. Its test asserted on the BUILDER's return value, so it passed
+    through an entire deploy.
+
+    This asserts across the boundary that actually decides survival, for EVERY
+    builder, so the next one added cannot repeat it.
+    """
+    from syndicate.features.shared import odds_book_quotes as obq
+
+    survivors = set(
+        obq._normalize(
+            {"bookmaker": "kalshi", "market": "player_points", "price": -110,
+             "line": 18.5, "selection": "over", "player_name": "A Player",
+             "event_id": "e1", "kind": "prop"},
+            sport="mlb", date_str="2026-09-01", captured_at="2026-09-01T00:00:00Z",
+        ).keys()
+    )
+
+    match = {
+        "event_id": "e1", "market": "player_points", "side": "over", "board_side": "over",
+        "line": 18.5, "player_name": "A Player",
+        "polymarket_american": -115, "polymarket_slug": "sl",
+        "kalshi_american": -115, "ticker": "KX",
+    }
+    builders = {
+        "polymarket": obq.quote_rows_from_polymarket_matches,
+        "kalshi": obq.quote_rows_from_kalshi_matches,
+    }
+    for name, build in builders.items():
+        for row in build([dict(match, board_event_id="e1")]):
+            dropped = set(row) - survivors
+            assert not dropped, (
+                f"{name} builder emits {sorted(dropped)}, which `_normalize` "
+                f"discards silently -- either add them to `_normalize` or do not "
+                f"emit them"
+            )
