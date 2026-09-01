@@ -1028,6 +1028,27 @@ to be better *sometimes*, and you take it only then. Improvement =
 each 1pp of better entry is worth roughly +0.75pp of ROI): **+1.57pp is worth
 about +1.2% ROI.**
 
+> **CORRECTION `[2026-09-01, lane mlb-prop-staking-gate-not-met]` — THE 0.75 IS
+> WRONG, AND SO IS APPLYING IT HERE. Do not reuse this +1.2%; re-derive it.**
+>
+> **The constant contradicts the table it cites.** Item 07's sensitivity is
+> printed in this same document (section "WHAT KILLING IT PRODUCED"): 4.05pp
+> per side → +0.98%, and 2.50pp per side → +3.72%. That is **2.74 ROI points
+> across 1.55pp, a slope of ~1.77 — not 0.75.** The conversion understates by
+> ~2.4×. `#624` step 5 took the 0.75 at face value from this line and had to be
+> corrected the same day (`d7928307`).
+>
+> **Second, separate defect:** the numbers above are GAME markets, and item
+> 07's sensitivity prices the ROI of a *prop* book — "unders, minus home runs
+> and HRR, n=2,569". A prop book's ROI curve does not convert a game-market
+> entry improvement. Even at the right slope, this row would need a
+> game-market sensitivity that has not been measured.
+>
+> The corrected machinery lives in
+> `scripts/measure_exchange_prop_option_value.py`, which now interpolates the
+> published table instead of carrying a constant, with a test asserting the
+> slope against 0.75 so it cannot return.
+
 **That is real and it is roughly a quarter of what the plan implied.** Section
 7b's "+5.1% payout improvement" framing and item 07's "+5.57% at a 3% hold" row
 both described what a *low-hold venue* would give. This measures what
