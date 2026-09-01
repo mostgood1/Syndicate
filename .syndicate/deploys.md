@@ -16370,3 +16370,66 @@ is armed on the same service.
 2. `/api/ops/artifacts/export?names_only=1&pattern=wnba_source/**/recon_*` → count > 0 **on web**.
 3. `n_settled > 0` on `/wnba/api/live-lens-accuracy` — the capability itself.
 4. `gradeable` flags as corroboration ONLY (a backfill flips them too).
+
+---
+
+## 2026-09-01 ~04:2xZ — **WNBA SETTLEMENT IS WORKING IN PRODUCTION.** Gate PASSES. And my "structurally unreachable" claim from 30 minutes earlier was WRONG.
+
+**verify — `/wnba/api/live-player-props-lens-accuracy?start=2026-08-30&end=2026-08-30`:**
+
+    status ok
+    n_settled 54   wins 34   losses 19   pushes 1
+    win_rate 0.6415094339622641   roi_units_per_bet +0.2205
+    recon {games: true, props: true, quarters: true}
+    signals raw 102, dedup 55, self_priced_excluded 28
+    by_period  Q1 n=41 0.600 | Q2 n=6 0.667 | Q3 n=3 0.667 | Q4 n=4 1.000
+
+`n_settled 54 / 34-19 / 0.6415094339622641` is **byte-identical** to the local
+end-to-end run for that date built before the deploy. Corroboration:
+`/api/ops/wnba/artifact-counts` flipped `games.gradeable` and `props.gradeable`
+**false → true**.
+
+### RETRACTION — "gate 2 is structurally unreachable" was FALSIFIED
+
+The 03:5xZ entry above says the web-facing gate could not pass without
+`1da0a328`'s publish call. **It passed without it.** Measured:
+
+| artifact | written how | on web? |
+|---|---|---|
+| `recon_{games,quarters,props}_2026-08-30.csv` | plain `Path.write_text` (filesystem) | **YES — count 3** |
+| `boxscores_2026-08-30.csv` | `refresh_state_store.write_text_file` (KEYVALUE) | **NO — count 0**, `boxscores_present: false` |
+
+So the recon crossed and the boxscore did not, split exactly on **which write
+path was used**. That is the keyvalue/filesystem split this ledger already
+records, and it means `SYNDICATE_DATA_ROOT` filesystem writes from
+refresh-worker ARE visible to web, contrary to what I asserted. **I inferred
+"structurally unreachable" from one `count 0` reading taken before the producer
+had run for the first time** — the count was true and the mechanism was invented,
+which is the same error as the 45.8MB one, twice in one evening.
+
+**What this does NOT change:** `1da0a328` is still worth deploying, for reasons
+that survive the retraction — (a) the boxscore genuinely has not crossed and an
+explicit publish is the only thing that would carry it, and (b) relying on a
+sharing property I have not characterised is not a guarantee. But it is an
+improvement, **not** the unblocker I called it.
+
+### The gate is now a SCRIPT, and it caught its own false negative
+
+`scripts/verify_wnba_settlement_gate.py`, exits 0 PASS / 1 FAIL / 3 UNREADABLE
+(following `verify_wnba_totals_pricing.py`'s convention). **Its first version
+returned FAIL against this working system** — it read
+`/wnba/api/live-lens-accuracy`, the DAILY payload, which carries no
+`overall.props.n_settled` at all. A prose checklist would have produced the same
+false negative silently; the script made it reproducible in one command.
+
+### OPEN
+
+- Backlog: the producer does **one date per tick at a 1h interval**, so only
+  2026-08-30 is settled. 13 more days drain overnight.
+- `leakage_note` is **absent** (`cedfbb83` not deployed) and the guard correctly
+  declines to fire on this sample anyway — only Q1 has n>=20. **As the backlog
+  drains it will fire, and the hoist should land before anyone quotes 0.6415 as
+  performance.** The gate prints a WARNING for exactly this.
+- Deploy of `1da0a328` + `cedfbb83`: HELD. refresh-worker preflight is `HOLD` on
+  5-8 in-flight jobs including `run_mlb_daily_sim_job.py`. Not forced; WNBA has
+  no games for 17 days.
