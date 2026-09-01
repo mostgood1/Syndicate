@@ -50,9 +50,16 @@ state.md corrected; lane CLOSED.
 unmeasured — same mechanism once week-1 fixtures are resolvable);
 `/api/ops/polymarket/slate` still skips PROP before sampling (the reader now
 disagrees with the decider about props); `venue_ticker` untraceable on captured
-rows (both venues, `_normalize` schema decision); arming
-`SYNDICATE_POLYMARKET_PROP_RESOLVERS` (a money-path decision with its own
-prerequisites, named above).
+rows (both venues, `_normalize` schema decision); ~~arming
+`SYNDICATE_POLYMARKET_PROP_RESOLVERS`~~ — **DONE 2026-09-01 19:18Z, USER-AUTHORIZED
+and verified:** `armed=True withheld=0`, polymarket `venue_priced` 62→462/485
+(the raw-vs-canonical asymmetry did NOT bind); the env key was set by the USER
+and injected by `prop-unmatched-decomposition`'s `bde67379` deploy. **The next
+gate is a DIFFERENT knob nobody has opened:** prop POSITIONS remain refused by
+the portfolio commit's `market_family_excluded` policy (402/485 rows), so no
+prop order can commit — positions unchanged at 4/$14.71. Opening prop families
+for position-taking is its own decision with its own evidence bar (`#624` step
+2: THEN measure).
 
 ---
 
