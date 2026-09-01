@@ -55,6 +55,38 @@ code had not ticked yet. Watcher armed for a `VENUE_SETTLEMENT` line carrying
 `pnl_exceeded_own_fill=`, which is the proof that the new code RAN, plus
 `IMPOSSIBLE_PNL_CORRECTED n>=1` for the repair.
 
+### RETARGETED 03:4xZ — refresh-worker now aims at `c0a0c622`, not `ea06bf81`
+
+**Peer request from lane `wnba-accuracy-assessment` (session `syndicate-cd`),
+accepted after independent verification.** They landed `c0a0c622` (newer than
+my pin) adding a WNBA post-game producer tick to `scripts/run_refresh_worker.py`
+and asked me to deploy HEAD so one deploy carries both lanes.
+
+**Accepted, and for a stronger reason than they gave: every refresh-worker
+deploy kills an in-flight MLB sim.** Two deploys = two dead sims. That
+outweighs my reason for pinning (not shipping unread commits).
+
+**I verified their disjointness claim rather than taking it:**
+`run_refresh_worker.py` has **0 deleted lines** — purely additive, +126 after
+`_mlb_betting_day_backfill_status_path` and +10 in `main()`;
+`_run_mlb_betting_day_backfill_tick` appears only as unchanged CONTEXT and as a
+prose reference inside their comment, and `_season_projection_should_launch` is
+untouched. `build_wnba_recon.py` changes one line (a `data_root` default),
+WNBA-only. Their `test_wnba_postgame_producer_tick.py` 11 passed; my three
+suites re-run at that content 92 passed; all five of my commits are ancestors
+of `c0a0c622`.
+
+**Claim retarget needed `release --token`** — a bare `release` is REFUSED with
+"the token does not match", even to the holding lane, because the shell does
+not carry the token from `acquire`. Released with `94aee28c0be9e9af`,
+re-acquired at `c0a0c622`, new token `46fc34532be1cc1b`. Worth knowing before
+anyone reaches for `--force` on their own claim.
+
+**Independent corroboration of the ea06bf81 web deploy, from that lane:**
+`/wnba/api/live-lens-accuracy` went `signals.exists false -> true` on **14 of
+14 days**, 1,814 raw records now readable. Their measurement, not mine, and it
+is evidence for the deploy rather than for my change.
+
 ### owed
 
 - **ITEM 04 verification** — as above.
