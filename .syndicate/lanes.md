@@ -1804,6 +1804,16 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   Until deployed, the board stays pinned to week 1 — harmless until 09-08.
 - Blocked by: none.
 
+
+### orphan-worktree-census — CLOSED 2026-09-01 — 166 of 186 C:/tmp worktrees removed after per-worktree verification (155 clean + 11 verified-dirty, all dirty content proven runtime exhaust / landed drafts / superset-elsewhere docs); every HEAD proven ref-reachable BEFORE removal so zero commits orphaned; 17 PROTECTED (10 OPEN lanes, 6 active-session/task incl. the ENABLED nightly gameline snapshot, + today's refit closure), 3 PARKED on the permission classifier (`nfl-fantasy-projections`, `wnba-halftime-elapsed`, `wnba-live-props-data` — verified data/live-runtime only; one human `git worktree remove --force` each finishes it); 39 headless admin husks deleted, prune clean. Zero recoveries needed. Table: `findings_2026-09-01_worktree_census.md` — opened 2026-09-01 — session fbf1a34b-cfd3-4248-8194-8d9ce16d8596
+- Goal: every worktree under `C:/tmp` censused with the stash-census discipline `[USER AUTHORIZATION 2026-09-01: "same treatment for the stale worktrees in C:/tmp"]`: live-session and OPEN-lane worktrees PROTECTED and untouched; clean stale ones removed (branch/commits survive removal — only uncommitted+untracked content is ever at risk); dirty ones content-verified against origin/main first and recovered where unlanded. No `--force` past unverified content, ever.
+- Files: NONE tracked — worktree registrations (git state) only; ledger appends + census findings doc `.syndicate/findings_2026-09-01_worktree_census.md`. No code edits.
+- Hypothesis: the ~110 detached `C:/tmp` scratch worktrees (deploy/push/checkpoint era) are clean husks on landed or ref-reachable commits; the risk concentrates in dirty session worktrees whose lanes are closed.
+- Falsification test: per worktree — any uncommitted/untracked file whose content is neither on origin/main, in a landed twin, regenerable by policy (data mirror/reports/caches), nor recovered to the ledger; such a worktree is NOT removed.
+- Verification: sweep TSV (dirty counts, HEAD ancestry, ref-reachability) driving a per-worktree disposition table in the findings doc; removals only via `git worktree remove` (which itself refuses dirty trees unless forced — force only after per-file verification, recorded); final `git worktree list` retains exactly primary + protected.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
