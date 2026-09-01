@@ -225,6 +225,61 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # and an unallowlisted input is an unauditable one.
     "nfl_source/tracking/nflverse/roster/roster_*.csv",
     "nfl_source/tracking/nflverse/depth_charts/depth_charts_*.csv",
+    # THE SEASON-PROJECTION ARTIFACTS -- THE BOARD'S OWN MODEL OUTPUT FOR BOTH
+    # FOOTBALL SPORTS. `lane ncaaf-cfbd-quota-latch`, measured 2026-09-01.
+    #
+    # Both generators have called `publish_hot_artifact` on their output since
+    # 2026-08-19, and BOTH CALLS HAVE BEEN NO-OPS THE ENTIRE TIME, because
+    # neither path was ever added here. `generate_smartsim2_nfl_projections.py`
+    # says in its own comment "Fixed in both generators together because the
+    # allowlist pattern covers both" -- the pattern it names does not exist.
+    # That sentence is why this went unnoticed for 13 days: the publish side
+    # was written, reviewed, and believed, and the half that PERMITS it was
+    # never written. `#208` in reverse -- the usual failure is allowlisting
+    # something nothing publishes; this is publishing something nothing
+    # allowlists, and it is just as silent.
+    #
+    # MEASURED, refresh-worker, the run that proved it:
+    #   2026-09-01T00:33:24Z  projections_written=51
+    #   2026-09-01T00:33:24Z  artifact_path=/opt/render/project/data/ncaaf_source/data/smartsim2_projections_2026_wk1.csv
+    #   2026-09-01T00:33:24Z  artifact_published=False
+    # No `artifact_publish_error`, so this was the clean "not allowlisted"
+    # return, not a network failure. Meanwhile `/ncaaf/api/cards` was serving
+    # values byte-identical to the git-committed CSV stamped
+    # `generated_at=2026-08-19T22:00:39Z`. NFL is the same
+    # (`2026-08-31T21:28:40Z artifact_published=False`), which is why both go in
+    # together -- fixing only the sport in front of you is how this class of
+    # defect survives in the sibling.
+    #
+    # The board therefore only ever moved when someone COMMITTED a regenerated
+    # CSV and rode a web deploy -- a deploy per model change, which is exactly
+    # what the worker autorun exists to avoid.
+    #
+    # WRITE PATH -> READ PATH, checked rather than assumed, because an entry
+    # that lands where nothing reads is inert and looks identical to this bug:
+    #   ncaaf  worker writes  <SYNDICATE_DATA_ROOT>/ncaaf_source/data/...
+    #          web reads      default_ncaaf_source_root()/"data" ==
+    #                         $SYNDICATE_NCAAF_SOURCE_ROOT/data ==
+    #                         /opt/render/project/data/ncaaf_source/data  [same]
+    #   nfl    worker writes  nfl_artifact_output_root()/... ==
+    #                         $SYNDICATE_NFL_SOURCE_ROOT/...
+    #          web reads      shared/nfl_game_projections._source_roots()  [same]
+    # NFL's shallower layout is `#389`'s doing and is deliberate; the two
+    # patterns differ in depth for that reason and are NOT collapsible into one
+    # `*_source/` wildcard.
+    #
+    # Bounded: ~10 KB per file, one file per sport per week. The wildcard also
+    # covers prior seasons already on disk (17 files in the ncaaf mirror), a
+    # one-time ~170 KB, and `sweep_changed_hot_artifacts` publishes only what
+    # CHANGED, so the steady state is one file a day.
+    #
+    # NOT ADDED: `nfl_source/smartsim2_preseason_projections_*_wk*.csv`. That
+    # generator has no `publish_hot_artifact` call at all, so an entry for it
+    # would be the inert half of this same defect. `preseason_cards.py` and
+    # `game_board_contract.py` both carry comments compensating for its
+    # absence via `projection_provenance`; wire the publisher first.
+    "ncaaf_source/data/smartsim2_projections_*_wk*.csv",
+    "nfl_source/smartsim2_projections_*_wk*.csv",
     # `#310`, DIAGNOSTIC. The WNBA grader's actual result inputs, and the file
     # both recon builders are built from. Until now `recon_games_*`,
     # `recon_props_*` and dated `boxscores_*` were in no pattern here (only the

@@ -1720,6 +1720,21 @@ the ROI report's 64,007-bet denominator does not move.
 
 **OWED — PARTIALLY DISCHARGED 2026-08-27 13:3xZ.**
 
+- **#612 CLOSED 2026-09-01 — SOCCER SHOT PROPS: the divisor IS live in the engine, MEASURED.**
+  Discharged NOT on the board (which still carried no shot rows) but on the
+  PREDICTION ARCHIVE the engine writes, which is exportable. Self-normalised over
+  the 3,434 players present both before and after the 2026-08-31 ship date, each
+  compared to himself: median post/pre `expected_shots` **0.720** against a
+  predicted **1/1.3979 = 0.715**. Confound killed — `expected_minutes_share`
+  ratios to **exactly 1.000**, so the step is not "future fixtures carry fewer
+  minutes"; shots PER minute-share is also 0.720. Tool:
+  `scripts/check_soccer_divisor_reached_engine.py`. Re-fit 2026-09-01 moved the
+  divisor 1.3979 -> 1.3930 and published it. Detail in `.syndicate/deploys.md`.
+  Residual, much smaller: `players_*.csv` is not in `HOT_ARTIFACT_PATTERNS`, so
+  the `shots_per90` form of the reading cannot run from web.
+
+  <details><summary>original item</summary>
+
 - **#612 SOCCER SHOT PROPS: the divisor is SHIPPED and has never been OBSERVED working.**
   The shots model over-predicts **1.398x** (n=9,840 pairs / 247 matches / 9 leagues,
   production predictions joined to ESPN outcomes). A scalar divisor of **1.3979**
@@ -1736,6 +1751,8 @@ the ROI report's 64,007-bet denominator does not move.
   the artifact reached WEB but not live-odds-worker, which pulls on its own
   cycle. Absence of rows means nothing at all.
   Lane `soccer-shot-shrinkage`; working in `state.md [soccer-shots-prop-skill]`.
+
+  </details>
 
 - **#613 `lane-guard` unenforced every claim under a dot-directory — FIXED, and
   the audit tool that found it is now the standing check.** `_paths_in` stripped
