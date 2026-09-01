@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 718 rules `[generated]`
+## Index — 729 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5836,3 +5836,36 @@ each supplies the new field — the schema is the evidence
 (`_SLATE_STORAGE_FIELDS`), not the passing suite. And when the new failure mode
 is "refuses", a green suite is especially weak evidence: most safety tests assert
 exactly that.
+
+## 2026-08-31 FORBIDDEN: treating `Auto-merging <file>` as a verification of a ledger merge
+
+- **What we believed.** A `git merge` that reports `Auto-merging .syndicate/lanes.md`
+  and exits 0 produced a correct file. And, after that assumption bit once: that
+  re-checking the ONE file which failed was enough.
+- **What was actually true.** Both sides had independently rewritten the same
+  header lines, and git's line merge takes that as two insertions, not a conflict.
+  `lanes.md` came out with three bare orphan `### <slug>` headers and one
+  duplicated lane block; `state.md` came out with `[layer2-realized-accuracy]`
+  as a full 97-line section at BOTH line 118 and line 1239. **A duplicate `###`
+  header is not cosmetic: `lane-guard._claims()` binds every `- Files:` path to
+  the nearest preceding header, so a duplicate silently re-parents a whole claim
+  set.** 39 claims came back armed on a ledger reported as 0 one minute earlier.
+- **How we found out.** Not from the merge. By re-reading the PUSHED blob with
+  `lane-guard`'s own parser after the push. The `state.md` half was caught only
+  by `ledger-postwrite-check.py` firing on a fast-forward an hour later — and its
+  message says "may have been another session", which was wrong: `git log` put it
+  on our own merge commit.
+- **The rule going forward.** Before pushing ANY merge that touches `.syndicate/`,
+  run each ledger file's own invariant against the MERGED blob, never the merge
+  exit code, and never only the file that failed last time:
+  `py -3 scripts/lane_claim_audit.py` plus an explicit **one OPEN `### <slug>`
+  header per slug** assertion for `lanes.md`; **one `## [subject]` section per
+  subject** for `state.md`; then `echo '{}' | py -3
+  .claude/hooks/ledger-postwrite-check.py` — it reads stdin like every hook here,
+  so on a bare TTY it hangs and reads as a pass. Prefer `git merge-tree` /
+  `commit-tree` when other sessions are live: it lets you inspect the merged tree
+  before it exists anywhere.
+- **Cost.** Two defects from one root cause, the second because the first fix was
+  applied to one file instead of the class. A duplicated 97-line `state.md`
+  section sat on `origin/main` for ~1h, and `lanes.md` shipped 40 OPEN lanes with
+  39 re-armed claims immediately after being reported clean at 34/0.

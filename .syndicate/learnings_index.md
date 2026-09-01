@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 718 rules `[generated]`
+## Index — 729 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 195**
+**FORBIDDEN — 204**
 
 - [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
 - [2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch…](#2026-08-30-forbidden-inferring-who-wrote-a-commit-from-adjacency-in-a-shared-branch-where-every-commit-carries-one-bot-author-lane-exchange-join-refusals)
@@ -153,7 +153,16 @@
 - [[08-31 FORBIDDEN: sizing a payload raise against the key you SHARDED, when another key…](#08-31-forbidden-sizing-a-payload-raise-against-the-key-you-sharded-when-another-key-still-scales-with-the-same-quantity)
 - [[08-31 FORBIDDEN: assuming a refused write degrades to STALE. Check what the reader doe…](#08-31-forbidden-assuming-a-refused-write-degrades-to-stale-check-what-the-reader-does-with-a-half-updated-set)
 - [[08-31 FORBIDDEN: a size instrument that measures a payload the code no longer writes]](#08-31-forbidden-a-size-instrument-that-measures-a-payload-the-code-no-longer-writes)
+- [[08-31 FORBIDDEN: trusting `git cherry` alone. It gives FALSE POSITIVES, and they push…](#08-31-forbidden-trusting-git-cherry-alone-it-gives-false-positives-and-they-push-duplicates)
+- [[08-31 FORBIDDEN: running a long test sweep while editing the files under test]](#08-31-forbidden-running-a-long-test-sweep-while-editing-the-files-under-test)
+- [2026-08-31 — FORBIDDEN: choosing a hypothesis from what is VISIBLE rather than what DIS…](#2026-08-31-forbidden-choosing-a-hypothesis-from-what-is-visible-rather-than-what-discriminates)
+- [[08-31 FORBIDDEN: matching a guarded status on a GUESSED STRING instead of the conditio…](#08-31-forbidden-matching-a-guarded-status-on-a-guessed-string-instead-of-the-condition-you-care-about)
+- [2026-08-31 — FORBIDDEN: shipping a diagnostic without first proving its OUTPUT is reada…](#2026-08-31-forbidden-shipping-a-diagnostic-without-first-proving-its-output-is-readable)
 - [2026-08-31 — FORBIDDEN: shipping a model INPUT artifact without tracing its delivery to…](#2026-08-31-forbidden-shipping-a-model-input-artifact-without-tracing-its-delivery-topology-first-publish-does-not-mean-the-engine-can-read-it)
+- [2026-08-31 FORBIDDEN: two guards that read the SAME input are one guard](#2026-08-31-forbidden-two-guards-that-read-the-same-input-are-one-guard)
+- [2026-08-31 FORBIDDEN: two guards that read the SAME input are ONE guard](#2026-08-31-forbidden-two-guards-that-read-the-same-input-are-one-guard)
+- [2026-08-31 FORBIDDEN: fixing a decision's INPUT without checking every CALLER supplies…](#2026-08-31-forbidden-fixing-a-decisions-input-without-checking-every-caller-supplies-it)
+- [2026-08-31 FORBIDDEN: treating `Auto-merging <file>` as a verification of a ledger merge](#2026-08-31-forbidden-treating-auto-merging-file-as-a-verification-of-a-ledger-merge)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -214,7 +223,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 518**
+**Rules and corrections — 520**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -525,6 +534,8 @@
 - [2026-08-31 — TWO THINGS ABOUT GATED DEPLOYS THAT COST AN HOUR EACH TO REDISCOVER](#2026-08-31-two-things-about-gated-deploys-that-cost-an-hour-each-to-rediscover)
 - [2026-08-31 — A basis LABEL does not make two scales commensurable](#2026-08-31-a-basis-label-does-not-make-two-scales-commensurable)
 - [2026-08-31 — A miscalibration can be REAL and still not worth correcting. Check what ca…](#2026-08-31-a-miscalibration-can-be-real-and-still-not-worth-correcting-check-what-carries-the-loss-not-what-looks-wrong-in-a-ratio-table)
+- [2026-08-31 A CONVENTION VERIFIED ON ONE SPORT IS NOT A CONVENTION](#2026-08-31-a-convention-verified-on-one-sport-is-not-a-convention)
+- [2026-08-31 A TEST CAN PASS THROUGH THE BUG IT IS NAMED FOR](#2026-08-31-a-test-can-pass-through-the-bug-it-is-named-for)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
