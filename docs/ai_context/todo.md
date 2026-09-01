@@ -46,7 +46,36 @@ absorbs that track's intent; `#440`'s Phase-7 CRPS scorer is consumed by
 
 ---
 
-### `#626` — **PHASE 0 — MEASUREMENT RESTORATION (now → 09-17). Nothing downstream is verifiable until these land.** — lane `edge-plan`, 2026-09-01 — **OPEN**
+### `#626` — **PHASE 0 — MEASUREMENT RESTORATION (now → 09-17). Nothing downstream is verifiable until these land.** — lane `edge-plan`, 2026-09-01 — **OPEN — PROGRESS 2026-09-01 (same day): (c)+(e) LANDED `417e19ed`, (d) DISCOVERED ALREADY LANDED, (a) owned**
+
+> **STATUS 2026-09-01 evening, lane `phase0-basketball-integrity` (CLOSED, landed `417e19ed`):**
+> - **(c) DONE, production reading dated:** NBA integrity ports all landed —
+>   consensus price averaging in probability space (6 fields), `implied + ev`
+>   removed at all 3 sites, [0.01,0.99] clamp + counters, EV plausibility
+>   refusal, `SYNDICATE_NBA_TOTALS_RECOMMENDATIONS` knob (default SERVE,
+>   documented opposite-default rationale). BONUS: two WNBA sites `bef61c33`
+>   missed (top_by_game + cards_props_snapshot) fixed in the same commit;
+>   tripwire test pins the additive expression at zero in BOTH scripts.
+>   Owed reading: zero (−100,100) prices + zero `p_win ≥ 0.999` on the FIRST
+>   NBA slate.
+> - **(e) DONE, verification = `#623` gate 6:** `_tick_prop_klass_line_gate`
+>   wraps the `_klass` re-derivation in BOTH vendor ticks; AST tests prove the
+>   wiring, off!=on both directions.
+> - **(d) ALREADY LANDED before this plan — do not rebuild:** commit
+>   `f7a9e992` made the reuse bound phase-aware
+>   (`_reuse_max_age_seconds(phase="live")` → 240s live cadence, pregame
+>   bound untouched). Remaining work is ONLY the 09-17 reading
+>   (`book_quotes` `captured_at` advances during a live WNBA game), which
+>   `#623` already carries.
+> - **(a) owned** by the scheduled session "Check mlb pregame freeze 611".
+> - Remaining unowned: **(b)** caps refit (gated on (a)), **(f)** closing
+>   sweeps — scoped: the T-window needs a per-sport COMMENCE-TIME PROVIDER
+>   (`_T_WINDOW_COMMENCE_PROVIDERS`, `live_refresh_loop.py`); soccer + NBA are
+>   clean mirrors of the existing two and land on the worker that already
+>   ticks them; NFL/NCAAF/NHL/NCAAB need the run-plane ownership question
+>   answered first (`#619`) — a provider alone does nothing on a service
+>   whose loop never ticks that sport. **(g)** both-side prices, **(h)**
+>   scheduled evaluation autorun.
 
 Mostly execution of already-measured items; references, not duplicates:
 
