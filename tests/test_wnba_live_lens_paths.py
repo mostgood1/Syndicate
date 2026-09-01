@@ -292,3 +292,37 @@ def test_top_level_leakage_note_is_none_when_flat(tmp_path):
         f"start={DATE}&end={DATE}", [processed], mode="prop"
     )
     assert payload["leakage_note"] is None
+
+
+def test_insufficient_data_is_not_reported_as_clear():
+    """`None` must mean "assessed and clear", never "could not tell".
+
+    Measured on production 2026-09-01: 92 settled rows publishing win_rate
+    0.6889 with leakage_note null, where only Q1 had reached n>=20 and the real
+    split was already Q1 0.627 / Q2 0.800 / Q4 1.000. A null there reads as
+    "this 68.9% is clean" -- an unknown defaulting to the permissive branch,
+    beside a pooled number a reader will quote.
+    """
+    from syndicate.features.shared import live_lens_local
+
+    rows = (
+        _scored(1, "win", 42) + _scored(1, "loss", 27)   # Q1 n=69, qualifies
+        + _scored(2, "win", 8) + _scored(2, "loss", 2)   # Q2 n=10, does not
+        + _scored(4, "win", 8)                            # Q4 n=8,  does not
+    )
+    payload = live_lens_local._attach_breakdowns({"n_settled": len(rows)}, rows)
+    note = payload["leakage_note"]
+    assert note is not None, "one qualifying period must NOT read as clear"
+    assert "CANNOT ASSESS" in note
+    assert "NOT a clean bill of health" in note
+
+
+def test_clear_is_only_returned_once_two_periods_qualify():
+    from syndicate.features.shared import live_lens_local
+
+    rows = (
+        _scored(1, "win", 11) + _scored(1, "loss", 9)
+        + _scored(4, "win", 11) + _scored(4, "loss", 9)
+    )
+    payload = live_lens_local._attach_breakdowns({"n_settled": len(rows)}, rows)
+    assert payload["leakage_note"] is None, "two qualifying flat periods IS a clean read"

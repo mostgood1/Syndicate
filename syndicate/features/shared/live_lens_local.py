@@ -844,6 +844,12 @@ def _tags_from_row(row: dict[str, Any]) -> list[str]:
     return [str(tag) for tag in value if str(tag).strip()]
 
 
+# Below this, a period's win_rate is too noisy to compare. A period that has
+# not reached it does not vote -- and if fewer than two have, the guard says
+# so rather than returning a null that reads as 'clear'.
+_LEAKAGE_MIN_PERIOD_N = 20
+
+
 def _period_bucket(row: dict[str, Any]) -> str:
     """Which quarter a live signal fired in, as a sortable label.
 
@@ -876,25 +882,38 @@ def _period_bucket(row: dict[str, Any]) -> str:
 def _leakage_note(by_period: list[dict[str, Any]]) -> str | None:
     """Say so when the hit rate climbs with the game clock.
 
-    **Deliberately NOT a monotonicity test.** The first version of this required
-    each period to be >= the one before, and it stayed silent on the very data it
-    was written for: the real WNBA reading is Q1 55.13% -> Q2 78.82% -> Q3 78.05%
-    -> Q4 97.96%, and the 0.77-point Q2/Q3 dip was enough to suppress the
-    warning. A guard that encodes an assumption about the SHAPE of a failure is
-    silent in the actual failure.
+    **Deliberately NOT a monotonicity test.** The first version required each
+    period to be >= the one before, and it stayed silent on the very data it was
+    written for: the real WNBA reading is Q1 55.13% -> Q2 78.82% -> Q3 78.05% ->
+    Q4 97.96%, and the 0.77-point Q2/Q3 dip suppressed the warning. A guard that
+    encodes an assumption about the SHAPE of a failure is silent in the actual
+    failure. What is diagnostic is the SPREAD between early and late.
 
-    What is diagnostic is the SPREAD between early and late, so that is what this
-    measures: the last qualifying period against the first.
+    **`None` MEANS "ASSESSED AND CLEAR" AND NOTHING ELSE.** Insufficient data
+    returns its own note, because a null that means BOTH "no leakage" and "could
+    not tell" is an unknown defaulting to the permissive branch -- and this
+    payload publishes a pooled `win_rate` beside it. Measured 2026-09-01 on
+    production: 92 settled rows reading 0.6889 with `leakage_note: null`, where
+    only Q1 had reached n>=20 and the true split was already Q1 0.627 / Q2 0.800
+    / Q4 1.000. A reader would have taken the null as "this 68.9% is clean".
     """
-    ordered = [
+    qualifying = [
         row for row in sorted(by_period, key=lambda item: str(item.get("period") or ""))
-        if str(row.get("period") or "").startswith("Q") and (row.get("n") or 0) >= 20
+        if str(row.get("period") or "").startswith("Q")
+        and (row.get("n") or 0) >= _LEAKAGE_MIN_PERIOD_N
+        and isinstance(row.get("win_rate"), (int, float))
     ]
-    rates = [(str(row.get("period")), row.get("win_rate")) for row in ordered]
-    rates = [(label, rate) for label, rate in rates if isinstance(rate, (int, float))]
-    if len(rates) < 2:
-        return None
-    (first_label, first_rate), (last_label, last_rate) = rates[0], rates[-1]
+    if len(qualifying) < 2:
+        present = len(qualifying)
+        periods = sum(1 for row in by_period if str(row.get("period") or "").startswith("Q"))
+        return (
+            f"CANNOT ASSESS clock leakage yet: {present} of {periods} periods have "
+            f"n >= {_LEAKAGE_MIN_PERIOD_N}. This is NOT a clean bill of health -- these rows are "
+            "scored against a PREGAME line, so a pooled hit rate here may be mostly "
+            "information leakage. Read by_period before quoting it."
+        )
+    first_label, first_rate = str(qualifying[0].get("period")), qualifying[0]["win_rate"]
+    last_label, last_rate = str(qualifying[-1].get("period")), qualifying[-1]["win_rate"]
     if last_rate - first_rate < 0.10:
         return None
     return (
