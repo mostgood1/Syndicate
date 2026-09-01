@@ -120,9 +120,44 @@ anyone reaches for `--force` on their own claim.
 14 days**, 1,814 raw records now readable. Their measurement, not mine, and it
 is evidence for the deploy rather than for my change.
 
+### refresh-worker LIVE at `c0a0c622`, 2026-09-01T03:52:11Z
+
+`dep-dab4l0142hec739rdvi0`. **Preflight cleared at 03:45:42Z on its own — the
+MLB sim finished; nothing was killed.** Job count fell 10 -> 5 -> 2 -> 3 -> 0
+over ~14 minutes of watching. Re-ran preflight FRESH before firing rather than
+deploying on the cached CLEAR: `CLEAR: only infrastructure processes running`,
+sample age 14s.
+
+All three services now on one line: web `ea06bf81`, live-odds-worker
+`ea06bf81`, refresh-worker `c0a0c622`.
+
+### verify: ITEM 01 — PENDING, and the first reading was a FALSE NEGATIVE
+
+`PLAN_WRITTEN date=2026-08-31 rows_in=1380 sized=9 positions=0
+refusals={'below_min_ev_pct': 276, 'below_min_stake': 9, 'no_model_edge_pct':
+1092, 'zero_kelly_stake': 3}` — **no `market_family_excluded`.**
+
+**That line is stamped 03:47:51Z, four minutes BEFORE the 03:52:11Z deploy.**
+It is the OLD code and says nothing. Recorded because read carelessly it looks
+like "the fix did not work" — the mirror image of the clean-ROI-table reading
+that looked like "the fix worked". **A pre-deploy tick produces a false
+NEGATIVE exactly as readily as a rolled date produces a false positive; in both
+cases the defect is reading a log line without checking it post-dates the
+thing it is supposed to be evidence about.**
+
+Watcher armed for a `PLAN_WRITTEN` stamped after 03:52:11Z.
+
+**What to look for beyond the counter existing:** `no_model_edge_pct: 1092` is
+the count the exclusion should partly ABSORB, because
+`market_family_excluded` fires FIRST in the commit loop. If that number does
+not move on a post-deploy tick, the two counters are looking at different row
+populations and neither should be quoted until that is understood.
+
 ### owed
 
-- **ITEM 04 verification** — as above.
+- **ITEM 01 verification** — a post-03:52:11Z `PLAN_WRITTEN` carrying
+  `market_family_excluded`, and `no_model_edge_pct` moving.
+- ~~**ITEM 04 verification**~~ — DISCHARGED, see above.
 - **ITEM 01 UNDEPLOYED.** `commit_portfolio` is reached via
   `run_portfolio_commit` from `pipeline/intelligence_state.py`, and
   `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is **true only on
