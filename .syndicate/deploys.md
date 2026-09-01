@@ -7,6 +7,95 @@
 
 
 
+## 2026-09-01 16:11–16:26Z — VERIFIED — `c2f3efe4` item 05 capture — the `verify: owed` above is DISCHARGED, with ONE BULLET FAILED — lane `mlb-accuracy-assessment`
+
+Discharges the three-bullet `verify:` on the 16:0xZ row. Two passed, **one
+failed and found a real defect in my own change.** Cross-references the edge
+plan: this is **`#624` step 5, step 1 of 3** (capture -> accumulate -> measure
+-> board change).
+
+### BULLET 1 — PASS. The capture runs and writes.
+
+    2026-09-01T16:11:31Z  [kalshi_odds] QUOTE_CAPTURE matches=662 sports=['mlb'] appended=603 no_sport=0
+    2026-09-01T16:26:07Z  [kalshi_odds] QUOTE_CAPTURE matches=658 sports=['mlb'] appended=153 no_sport=0
+
+603 Kalshi PROP rows in the 2026-09-01 MLB shard against **0 before this
+deploy**, every one stamped `source=venue_direct`. Game rows 225, unchanged —
+the props-only bound held. `no_sport=0`: every match resolved to a board row.
+
+**The SECOND tick is the better evidence, and it was not in the plan.**
+`appended` falls 603 -> 153 on a near-identical match count. `append_book_quotes`
+writes only when `(line, price)` differs from that key's last observation, so
+153 is the real price movement between ticks. **Had the dedup-key collision I
+shipped and the peer caught still been live, `appended` would have stayed near
+the full match count every tick** — the directly-captured row and OddsAPI's copy
+alternating under one key, each alternation a price change that never happened.
+The decay from 603 to 153 is that collision being absent, measured rather than
+argued.
+
+### BULLET 2 — PASS. The peer's gate reads non-zero.
+
+    2026-09-01T16:13:39Z  [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=483 kept_direct=603 books=['kalshi', 'polymarket'] near_misses={'kalshi': 603}
+    2026-09-01T16:24:02Z  [book_grid] ... identical
+
+`kept_direct=603`, equal to the appended count exactly. At the time I first
+looked this read 0 — and I did not report it as a failure, because the only grid
+lines then available were stamped **16:03, eight minutes BEFORE the 16:11
+capture.** They predated the rows they would have counted. Readability first:
+a null result is not a result until the thing that would have produced a signal
+has run.
+
+### BULLET 3 — **FAILED. The field never persisted, and the test could not see it.**
+
+`venue_ticker` reads **0 on all 603 rows.** `_normalize` in
+`odds_book_quotes.py` builds a **fixed key set** and silently discards anything
+outside it. I had documented that field as *"the only field that makes a row
+traceable back to a specific Kalshi market"*; it never reached disk on a single
+row, through an entire deploy.
+
+**The test asserted on the BUILDER's return value, not on what crossed
+`_normalize`.** It was green the whole time. That is `learnings.md` 2026-09-01
+*"assert on the value that CROSSED THE BOUNDARY"* — the peer's rule, written
+about their own `paths` bug, which I had cited to them approvingly about an hour
+before committing the same error in my own file.
+
+Fixed by REMOVING the field (`05c46105`, on `origin/main` in `12b628db`) rather
+than by teaching `_normalize` a new key — the capture's value does not depend on
+it, and widening a normaliser to rescue a field nothing reads is scope I did not
+have. The replacement test diffs the builder's output against `_normalize`'s
+kept keys, so any future field that would be dropped fails at the boundary that
+actually decides.
+
+### AN INSTRUMENT DEFECT FOUND WHILE READING BULLET 2 — NOT MINE, NOT FIXED HERE
+
+`near_misses={'kalshi': 603}` on that same line is **counting the rows the
+filter matched CORRECTLY.** `book_grid.py:270-276` increments `kept_direct_feed`
+and then falls through to the near-miss block with no `continue`/`else`, so
+every exact match is also counted as a miss. Proved on a single row rather than
+by reading:
+
+    [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=0 kept_direct=1 books=['kalshi', 'polymarket'] near_misses={'kalshi': 1}
+
+The counter's own comment says it is *"reached only when the exact match above
+already refused"*, and its docstring calls each key *"a spelling the filter is
+missing TODAY"*. Neither is true as written. **It is an alarm that fires at
+exactly the rate the feature succeeds** — so it reads as 603 missing spellings
+at the moment 603 rows were handled correctly, and it can never distinguish a
+real missing spelling from success.
+
+`book_grid.py` is lane `wnba-accuracy-assessment`'s claimed file. Reported to
+them with the proof; **not edited across lanes.** One-line fix.
+
+### What this does NOT establish
+
+The prop-side price data now EXISTS, which is all step 1 claimed. **It does not
+show price shopping on props is worth anything** — that is step 2 (`#624`), and
+it needs a slate of accumulated quotes. The only option-value number measured so
+far (+1.57pp, ~+1.2% ROI, n=13,093) is from GAME markets and must not be quoted
+for props.
+
+---
+
 ## 2026-09-01 16:0xZ — mlb-accuracy-assessment — refresh-worker @ `c2f3efe4` (item 05 capture)
 
 **`dep-dabfcu610ojc73a5f45g`.** Preflight CLEAR, fresh sample, only the worker

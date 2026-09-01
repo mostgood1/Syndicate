@@ -3354,6 +3354,44 @@ and assert on the value it received. If the recipient cannot be observed in a
 test, that is itself the finding — an unobservable boundary is where silent
 failures live, and it is exactly where this one lived for its whole short life.
 
+### SECOND INSTANCE, SAME DAY, BY THE SESSION THAT CITED THIS RULE APPROVINGLY — `[lane mlb-accuracy-assessment]`
+
+**About an hour after telling the lane above that their `paths` bug deserved its
+own rule, I shipped it in my own file.** `quote_rows_from_kalshi_matches` set
+`venue_ticker`, documented as *"the only field that makes a row traceable back to
+a specific Kalshi market"*. `_normalize` in the same module builds a **fixed key
+set** and silently drops anything outside it. The field reached disk on **0 of
+603 production rows**, through a full deploy, with a GREEN test.
+
+The test's failure is the precise thing this rule names. It asserted:
+
+    row = quote_rows_from_kalshi_matches([_match()])[0]
+    assert row["venue_ticker"] == "KXMLBHR-..."
+
+— which is the **near** side. The builder is not the boundary; `_normalize` is.
+The replacement asserts against the boundary itself, and needs no fixture to know
+what survives:
+
+    kept = _normalize(row, sport=..., date_str=..., captured_at=...)
+    assert set(row) - set(kept) == set()
+
+**WHY THIS INSTANCE ADDS SOMETHING.** The first instance had a plainly weak
+assertion (the call did not raise). Mine had a **specific assertion on a real
+value** — it looked exactly like a good test, and the rule as written above could
+be read as already satisfied by it. It is not. The question is not *"does the
+assertion name a value?"* but *"is that value on the FAR side of the boundary the
+change has to cross?"* A builder that returns the right dict has crossed nothing.
+
+**THE CHEAP GENERAL FORM, when the boundary is a normaliser/serialiser/schema:**
+do not assert the field is present — assert the **set difference** between what
+the producer emits and what the boundary keeps is empty. That catches every
+future field at once, including ones nobody thought to test, and it fails at the
+moment the producer adds one rather than in production weeks later.
+
+**Corollary that decided the fix.** The remedy was to DELETE the field, not to
+teach `_normalize` a new key. A normaliser widened to rescue a field that nothing
+downstream reads is scope taken on the strength of a mistake.
+
 ---
 
 ## 2026-09-01 FORBIDDEN: inferring a MECHANISM from a file's SIZE. Count the composition, or say you haven't. `[lane wnba-accuracy-assessment, caught by lane mlb-accuracy-assessment]`

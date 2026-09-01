@@ -1365,7 +1365,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 **NOT MEASURED, and it is the thing I most wanted:** whether the board's own `ev_pct`/`model_edge_pct`/`score` PREDICT the outcome. The portfolio endpoints expose settlement marginals only (`by_sport`, `by_market_family`, `by_venue_family`), not per-order rows, so no edge-bucket calibration curve was computed. That needs the refresh-worker-side order ledger.
 
 
-### mlb-accuracy-assessment — **REOPENED 2026-09-01 for Tier 1 item 05** (was CLOSED same day) — opened 2026-08-31 — session 3bb44ef2-a199-430e-afce-c3034bf48d9d — **ALL FOUR TIER 0 GATES DISCHARGED IN PRODUCTION; TIER 1 06 and 07 CLOSED; **05 MEASURED, NOT BUILT — the measurement re-prices it DOWN ~4x and REORDERS it.**
+### mlb-accuracy-assessment — **CLOSED 2026-09-01** — opened 2026-08-31 — session 3bb44ef2-a199-430e-afce-c3034bf48d9d — **ALL FOUR TIER 0 GATES DISCHARGED; TIER 1 06/07 CLOSED; 05 MEASURED AND ITS STEP 1 (CAPTURE) BUILT, DEPLOYED AND VERIFIED IN PRODUCTION.** Work continues under the edge plan, NOT under this lane's item numbers.
 - **ITEM 05 RESULT 2026-09-01: worth ~+1.2% ROI, not the ~+5% the plan implied, and CAPTURE comes before the board change.** Detail: findings section 7h. Three measurements, the first two wrong. (1) Naive join of 23 filled Kalshi prop orders vs best sportsbook: cheaper 11/23, mean **-0.0187** — WRONG, compared against prices that did not exist at fill time (`book_quotes` is a TIME SERIES; williamhill walked Ty France HR **+475 -> +2600** across the day). (2) Time-aligned to the fill: cheaper **22/23, mean +0.0324**, stable to a 2-min window — but a SELECTED sample (the props the system chose Kalshi for). (3) **UNCONDITIONAL, n=9,557 paired same-snapshot quotes: kalshi cheaper only 50.7%, median +0.0017.** Exchanges are NOT systematically cheaper; the +3.24pp was selection. **HONEST NUMBER — OPTION VALUE, n=13,093: an exchange beats the best sportsbook 52.5% of the time, mean improvement +1.57pp, ~+1.2% ROI on item 07's sensitivity.** **REORDERED:** every number is from GAME markets, the only ones where an exchange appears in `book_quotes`; for PROPS **no exchange quote is captured anywhere** (7f: 0 rows). Step 1 CAPTURE exchange prop quotes, step 2 measure the prop-side gain, step 3 change the board. The plan had step 3 as the item. **NOT BUILT, deliberately** — a board-ranking change built on a number I corrected twice in one sitting is not warranted.
 - Goal: one MLB accuracy + profitability read across pregame sim (games + props), live sim, Layer 1 and Layer 2, plus a ranked optimization plan. **MET.** Deliverable: `.syndicate/findings_2026-08-31_mlb_accuracy_assessment.md` (~1,100 lines, sections 0-9 + 7b-7g); artifact `https://claude.ai/code/artifact/9989c17f-e27b-4332-a555-bed909241ef8`.
 - Headline: **`corr(claimed edge, win) = -0.1379`** — `model_edge` is anti-predictive because it subtracts a better estimator (market, +0.318) from a worse one (sim, +0.234). Full verified numbers: `state.md [mlb-sim-edge-is-anti-predictive]` and `[mlb-live-lens-accuracy-refuses]`. Narrative: `log/2026-09-01.md`.
@@ -1374,8 +1374,11 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Files: ALL CLAIMS RELEASED. Touched and released: `syndicate/features/shared/{venue_settlement,portfolio_commit}.py`, `syndicate/features/mlb/live_lens_daily_accuracy.py`, `scripts/{run_live_odds_refresh_worker,verify_mlb_prop_exclusion,assess_mlb_prop_join}.py`, `tests/{test_venue_settlement,test_portfolio_commit,test_portfolio_commit_excluded_families,test_mlb_live_lens_daily_accuracy_grader,test_live_lens_local,test_clv_position_join}.py`. Deploy claims on all three services released. **EXTENDED 2026-09-01 for item 05 step 1 (CAPTURE), user said "do the capture":** `syndicate/features/shared/odds_book_quotes.py` (an ADDITIVE row builder only — not `_normalize`, not `append_book_quotes`), `pipeline/kalshi_odds_refresh.py` (`join_to_board` only), `tests/test_kalshi_book_quote_capture.py` (new). Checked against every OPEN lane: none names any of the three.
 - **OWED, and it is a MEASUREMENT not a deploy:** whether excluding props improves realized ROI — ten days against the +3.76% baseline that included them. The exclusion is verified to FIRE; its effect on returns is not measured.
 - **SCHEDULED DEFECT, not fixed, deliberately:** `live_lens_daily_accuracy.py:207-211` falls back to `last_seen.marketLine` — the latest line, not the line at signal time. Unreachable while the outcome-side refusal returns 0 rows. **Comes due the moment `data/raw/statsapi/feed_live/` is added to `HOT_ARTIFACT_PATTERNS`; that decision cannot be taken in isolation.**
-- Next action for whoever picks this up: **item 05** — make the board's price comparison read the direct venue feed. It is a SOURCE change, not a join (`book_quotes` holds 0 exchange prop rows). Worth +6.52% vs +0.98% at a 2% venue hold on the same picks.
-- Blocked by: none.
+- **ITEM 05 STEP 1 IS DONE AND VERIFIED, 2026-09-01 16:11Z.** `[kalshi_odds] QUOTE_CAPTURE matches=662 sports=['mlb'] appended=603 no_sport=0`; 603 Kalshi PROP rows in the MLB shard against 0 before, all stamped `source=venue_direct`; game rows 225 unchanged (props-only bound held). Peer gate `kept_direct=603`. Second tick `appended` decays 603 -> 153, which is the ABSENCE of the dedup-key collision measured rather than argued. **One verify bullet FAILED:** `venue_ticker` persisted on 0 rows — `_normalize` has a fixed key set and my test asserted on the BUILDER's output, so it was green through a whole deploy. Field removed (`05c46105`, landed `12b628db`); replacement test diffs builder output against `_normalize`'s kept keys. Full measurement: `deploys.md` 2026-09-01 16:11-16:26Z.
+- **NUMBERING: this lane's item numbers are RETIRED. Use the edge plan (`todo.md` `#627` index).** Mapping, per lane `edge-plan` 2026-09-01: item 05 = **`#624` step 5** (capture DONE -> accumulate -> measure -> board change, in that order); the calibration item (per-(market,line) isotonic + refuse `p in {0,1}`, THEN the HRR null) = **`#624` steps 1-2**; `#611` freeze + `#610` caps = **`#626` (a)(b)**; the `marketLine` scheduled defect below = **`#620`**. Do not open new scope under Tier 0/1 numbering — two live numbering systems is the confusion being avoided.
+- **NOT MINE, REPORTED NOT FIXED — an instrument that alarms at the success rate.** `book_grid.py:270-276` counts every CORRECTLY-matched direct-feed row as a `near_miss` (no `continue` after `kept_direct_feed += 1`), so the production line reads `kept_direct=603 near_misses={'kalshi': 603}`. Proved on one row: `kept_direct=1 near_misses={'kalshi': 1}`. Its comment claims it is "reached only when the exact match above already refused" and its docstring calls each key "a spelling the filter is missing TODAY" — neither is true as written. File is lane `wnba-accuracy-assessment`'s; one-line fix; they have the proof.
+- Next action for whoever picks this up: **`#624` step 2** — with prop quotes now accumulating, measure the PROP-side option value the same way game markets were measured (an exchange beats the best sportsbook 52.5% of 13,093 paired snapshots, mean +1.57pp, ~+1.2% ROI). **That game-market number must NOT be quoted for props** — measuring it is the whole point of step 2. Step 3 (the board change) is gated on step 2's result.
+- Blocked by: none. **ALL DEPLOY CLAIMS RELEASED; all three services free.**
 ### wnba-accuracy-assessment — OPEN, GOAL MET, ALL DOABLE-NOW ITEMS SHIPPED AND DEPLOYED — opened 2026-08-31 — session e542848e-6451-41a1-9e60-fd5a5675665d
 - Goal: MET. WNBA went from six accuracy instruments reading zero to a settling, graded surface. `n_settled 38` (08-29) + `54` (08-30), `win_rate 0.6415094339622641` — byte-identical to the pre-deploy local run; `gradeable` false → true; `verify_wnba_settlement_gate.py` exit 0 on both dates.
 - Deployed: web `ad33df21`, refresh-worker + live-odds-worker `1c078f46`. Four deploys, each verified on the SERVED PAYLOAD, not on deploy status. **ALL CLAIMS RELEASED; all four services free.**
@@ -1497,6 +1500,46 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   games with a wall-clock proxy.
 - Blocked by: none. Bound: 147 games. Ledger records no inning/outs/base state,
   so "game clock" is a wall-clock proxy throughout.
+
+### edge-plan — CLOSED 2026-09-01 — **LANDED on `origin/main` as `8acd3eaf`: THE EDGE PLAN `#627` (index) + phases `#626`..`#619` in `todo.md`, plus the analysis findings file committed.** Verification ran: `todo_id_reconcile.py` clean (334 ids, every current-era id in exactly one file — `#618` was already taken on origin, which the fresh-worktree ID check caught; ids assigned #619-#627), and `land`'s own `ledger/todo ids clean` gate passed on the rebase. — session syndicate-8d (3492626c)
+- Outcome: the 2026-09-01 sim-engine edge analysis is now an executable phased
+  plan in the canonical TODO. NOTE for primary-tree readers: the PRIMARY tree's
+  `todo.md` is BEHIND origin (worktree commit does not update it — standing
+  lesson); fresh worktrees and pulls see the plan; deliberately NOT synced back
+  by file-write to avoid shared-index/CRLF hazards.
+- Files: released: `docs/ai_context/todo.md`, released: `.syndicate/findings_2026-09-01_sim_engine_edge_analysis.md`
+
+### phase0-basketball-integrity — OPEN — opened 2026-09-01 — session syndicate-8d (3492626c)
+- Goal: `#626`(c) + (e) executed. (c) NBA carries none of the WNBA integrity
+  defects: consensus prices averaged on the implied-probability scale with
+  (−100,100) rejection; no `p_win = implied + ev` anywhere; probabilities
+  clamped [0.01,0.99]; |EV|>100% refused with counters; a totals-withhold knob
+  exists (default = current behaviour — NBA totals are UNMEASURED, not
+  proven-bad; flipping it is a config decision for a future measurement).
+  (e) the live-lens JSONL tick writer (BOTH vendor repos if mirrored) respects
+  the API layer's gated klass — it can no longer emit `klass: BET` for
+  `line_source ∈ {None, model}` rows.
+- Files: `scripts/refresh_nba_oddsapi_props.py`,
+  `vendor/wnba_betting_repo/app.py` (tick-writer klass section only),
+  `vendor/nba_betting_repo/app.py` (same section if present),
+  new tests (names set during work) under `tests/`.
+  NOT claimed: `scripts/refresh_wnba_oddsapi_props.py` (read-only reference —
+  the WNBA implementations being ported).
+- Hypothesis: the WNBA assessment lane's note says NBA "shares the
+  `_clamp_probability` chokepoint — its inversion is UNREAD, not cleared";
+  read NBA's current state FIRST — some of (c) may already be covered via a
+  shared path, and porting blindly would double-fix.
+- Falsification test: if NBA's served p_win already routes through the WNBA
+  clamp chokepoint, the `implied + ev` sites are dead code and the fix is
+  deletion + a pin test, not a port.
+- Verification: off-is-not-on tests per `model_engine_standard.md` §4.3 (the
+  klass gate test FAILS with the old re-derivation restored; the price test
+  FAILS with arithmetic averaging restored); targeted pytest green; landed on
+  `origin/main`. Production verification (zero (−100,100) prices, zero
+  p_win ≥ 0.999, zero model-line BET rows) is a NEXT-SLATE reading — NBA is
+  off-season, so serve-path effects are code+test-verified now and read in
+  production at the first NBA slate; stated as such, not claimed now.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

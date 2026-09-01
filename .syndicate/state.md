@@ -483,16 +483,31 @@ Justified on the portfolio's own -19.27% ROI / 145 settled, NOT on the
 over-side defect — that defect lives in the vendor season betting card, which
 grep confirms is **not a staking input anywhere**.
 
-**EXCHANGE PROP PRICES ARE NOT CAPTURED, and this is a SOURCE gap not a join.**
-`mlb_source/tracking/book_quotes/2026-08-31.jsonl` — 274,129 rows / 124.4MB —
-holds **26,710 exchange quotes on GAME markets and 0 on PROP markets**, because
-`book_quotes` is fed by OddsAPI and OddsAPI carries game lines only for
-exchanges. Kalshi DOES quote MLB props (23 filled orders, `KXMLB*` tickers);
-those prices reach us only through the direct feed
+**EXCHANGE PROP PRICES WERE NOT CAPTURED — a SOURCE gap, not a join. FIXED AND
+VERIFIED IN PRODUCTION 2026-09-01 16:11Z.** `mlb_source/tracking/book_quotes/2026-08-31.jsonl`
+— 274,129 rows / 124.4MB — held **26,710 exchange quotes on GAME markets and 0
+on PROP markets**, because `book_quotes` is fed by OddsAPI and OddsAPI carries
+game lines only for exchanges. Kalshi's own prices are now captured directly:
+`[kalshi_odds] QUOTE_CAPTURE matches=662 sports=['mlb'] appended=603 no_sport=0`,
+**603 PROP rows in the 2026-09-01 shard against 0 the day before**, all stamped
+`source=venue_direct`; game rows unchanged at 225 (the capture is bounded to
+props — a game row would collide with OddsAPI's copy under `_KEY_FIELDS`, which
+has no source term, and the two would ALTERNATE rather than merge). **This makes
+the prop side MEASURABLE; it does not show price shopping on props is worth
+anything** — that is `todo #624` step 2, and the only option-value number
+measured to date (+1.57pp, ~+1.2% ROI, n=13,093) is from GAME markets and must
+not be quoted for props.
+
+Kalshi DOES quote MLB props (23 filled orders, `KXMLB*` tickers). **Until
+2026-09-01 those prices reached us ONLY through the direct feed**
 (`kalshi_markets.json` -> `kalshi_price_resolver`), wired into `venue_scope` for
-paper2 and nowhere else. On the board, exchanges hold `best_any_book` on **45
-of 97** MLB game rows and **0 of 103** prop rows. **"Join what we already have"
-is a no-op on MLB props.**
+paper2 and nowhere else; they now also reach `book_quotes`. On the board as
+measured 2026-08-31, exchanges held `best_any_book` on **45 of 97** MLB game
+rows and **0 of 103** prop rows — **"join what we already have" was a no-op on
+MLB props, which is why step 1 was a CAPTURE and not a join.** The board's
+comparison is UNCHANGED by that capture and the 0-of-103 reading still stands:
+`quote.book_prices` is what the board reads, and changing it is step 3, gated on
+step 2.
 
 ## [mlb-live-lens-accuracy-refuses] THE MLB LIVE-LENS GRADER SETTLED FROM A RUNNING TALLY; it now refuses, and reads EMPTY because its feed never reaches web `[verified 2026-09-01, lane mlb-accuracy-assessment, commit 4b8d5436]`
 
@@ -4373,7 +4388,9 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
   carries it in a book list too. So closing the 0% on other sports' props is a
   **config change on an existing knob**, not a build. `[from-code 08-15]`
   **Cost it before flipping it:** every added book spends OddsAPI credits
-  against a cap already at **92.8% projected burn**, and props are the highest-
+  against the 5M cap — **STALE→UPDATED 2026-09-01: 4,959,329 of 5,000,000
+  remaining (99.2% unused) per `odds_regions.py:63-66` after the #15/#16 cuts;
+  quota is no longer the binding constraint** — and props are the highest-
   volume market family. Measure the per-call delta on one sport first.
 - **This removes the standing caveat on the whole CLV program** — "beating a
   closing consensus of eleven soft books can read positive where no exploitable
@@ -9986,3 +10003,47 @@ prop and every derived probability at once. It is also a live money-path change
 on a board that currently ranks one-sided rows on model edge. **That is a
 product decision, and the drifting `c` says it wants a scheduled re-fit rather
 than a constant.**
+
+## [sim-edge-analysis-2026-09-01] FULL-PLATFORM SIM-ENGINE EDGE ANALYSIS — strategy synthesis + new from-code facts `[2026-09-01, session syndicate-8d, read-only]`
+
+Full report: artifact "Where the Edge Lives"
+(https://claude.ai/code/artifact/342e3562-d25c-43e4-a617-28e2039001ee); condensed
+version + all file:line cites: `.syndicate/findings_2026-09-01_sim_engine_edge_analysis.md`.
+Synthesis of the three accuracy assessments + six code surveys. Headline: the
+market wins every properly-measured game main line (only unpowered exception:
+NHL totals n=14-15); `sim − market` staking is the sim's error term; the plan is
+(1) fitted market+sim blend per market, (2) volume to props/derivatives/
+correlations/live, (3) venue-hold routing, (4) loop closure, (5) abstention+
+sizing. NEW from-code facts this session `[from-code, agent surveys]`:
+
+- **MLB per-sim JOINT outcomes are generated and DISCARDED at aggregation**
+  (`daily_update.py:4380-4505` keeps marginal histograms only; H+R+RBI is the
+  lone within-sim sum). Persisting per-sim vectors/moments = SGP/ladder/
+  derivative pricing asset. A TRUE live MC exists (`live_mc.py`, 120 sims, full
+  state incl. count/runner-ids/pitch-counts).
+- **Basketball sim is market-anchored UPSTREAM**: quarter means blend to market
+  at `margin_w=0.95` / `total_w=0.7` (`sim/quarters.py:66-67`) — downstream
+  "edges" vs the same market are noise by construction (mechanically explains
+  `#615`). Production `n_sims=100` (`render.yaml:1017`) ⇒ ±5pp MC error.
+- **NBA still carries the WNBA bugs**: `p_win = implied + ev`
+  (`refresh_nba_oddsapi_props.py:1159,1251,1315`) + arithmetic American-price
+  averaging (`:2148-2152`); no clamps, no totals withhold. Port before season.
+- **The WNBA live T0-3 hole located**: the JSONL tick writer re-derives `klass`
+  in absolute points, bypassing the API layer's "never BET on
+  line_source=model" gate (`app.py:46302-46316` vs `:40612-40616`).
+- `is_home` hardcoded 0.0 at basketball props inference
+  (`basketball_props_features.py:371`); opponent features never fed.
+- **`manager_tendencies.json` CANNOT exist on Render** (untracked +
+  repo-relative path) — resolves the convergence-phase7-crps open question; all
+  30 teams share one ManagerProfile. MLB umpire input likewise unfeedable in
+  prod (Windows-only prefetch; mechanism live at ±8%). MLB NWS weather is
+  captured on schedule and NOT joined to the sim (open half of `#84`).
+- NHL/NCAAB: no settlement resolver, no live poller (bets cannot settle); NHL
+  fetcher never requests p1/p2/p3 segment odds. T-window closing sweeps exist
+  for MLB+WNBA ONLY — every other sport's "close" is cadence luck.
+- Soccer `fit_soccer_probability_calibration.py` output has NO consumer; drift
+  detector has no scheduled caller; the only closed auto-calibration loop
+  platform-wide is basketball's 7-day mean-bias.
+- **OddsAPI: 4,959,329 of 5,000,000 remaining (99.2% unused)** per
+  `odds_regions.py:63-66` — the [sharp-reference-price] 92.8%-burn line above
+  is overwritten as stale. Historical endpoints: 10 credits/market-region.
