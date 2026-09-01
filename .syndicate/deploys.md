@@ -16273,3 +16273,64 @@ games until **2026-09-17**.
 `/api/ops/wnba/artifact-counts` must flip `games.gradeable` and `props.gradeable`
 to true. Until then WNBA settlement stays 0 and no WNBA accuracy number should be
 quoted as a performance figure.
+
+---
+
+## 2026-09-01 03:54:53Z — WNBA post-game producer FIRED (gate 1 MET); gate 2 was STRUCTURALLY UNREACHABLE and is fixed in `1da0a328` (NOT deployed)
+
+**lane** `wnba-accuracy-assessment`. refresh-worker went live on `c0a0c622` at
+03:52:11Z (`dep-dab4l0142hec739rdvi0`, deployed by lane
+`mlb-accuracy-assessment` after retargeting from `ea06bf81` at my request, so one
+deploy carried both lanes; the MLB sim finished on its own and nothing was
+killed).
+
+**verify (gate 1), the line only my code can emit:**
+
+    03:54:53Z  WNBA_POSTGAME_PRODUCER {"boxscores": {"rows": 86, "status": "ok"},
+                 "date": "2026-08-30", "marked_done": true,
+                 "recon": {"games": 4, "props": 86, "quarters": 4, "status": "ok"}}
+
+`games 4, quarters 4, props 86` is byte-for-byte what I built locally for that
+date before the deploy. `boxscores` ran too — that producer had been dead since
+2026-08-25. It fired **2m42s after boot**, which also confirms the tick fires on
+the FIRST cycle (`now - 0 >= 3600` on a cold `lastRunEpoch`), not after an hour;
+the peer had read the pre-deploy silence as "consistent with the 1h interval" and
+that reading was wrong in a way that mattered — under it a 60-min silence is
+benign, under the correct one it is a defect.
+
+**GATE 2 FAILED, AND COULD NEVER HAVE PASSED.** Same instant:
+`/wnba/api/live-lens-accuracy` `n: 55, wins 0, losses 0`; `artifact-counts`
+`recon_games: false`, `boxscores_present: false`; `/api/ops/artifacts/export`
+**count 0** on web for both patterns.
+
+**Cause, and it is already documented in this repo:**
+`run_refresh_worker.py:1696` — *"this worker publishes explicitly per path and
+there is no blanket sweep here — `sweep_changed_hot_artifacts`'s only production
+caller is `live_lens_loop`, on another service."* The producer wrote to the
+worker's disk; the web-facing endpoint reads web's. **Allowlisting a path in
+`HOT_ARTIFACT_PATTERNS` makes it ELIGIBLE to cross; it does not carry it.** I had
+checked the allowlist and stopped there — "presence ≠ reachability", one layer up
+from the defect that opened this lane. That same comment records **two watchers
+burning ~35 minutes polling for a change that was structurally impossible**; I
+was about to be the third.
+
+**Fixed in `1da0a328` (on `origin/main`, NOT DEPLOYED).** The tick publishes each
+written file per path, names a missing file instead of returning a silent false,
+and does not mark the date undone on a publish failure. **The first version of
+that block published NOTHING** — the result summary copies four keys off the
+recon result for the log line and `paths` was not one of them, so the loop
+iterated an empty dict. Caught only because the test asserted on *what reached
+the publisher*, not on the function returning cleanly; a "did it run" assertion
+would have passed.
+
+**OWED — a second refresh-worker deploy, and it is not cosmetic.** Without
+`1da0a328` the WNBA web-facing accuracy path stays at zero forever no matter how
+many times the producer succeeds. No urgency (no WNBA games until 2026-09-17).
+Not taken yet: the peer lane's deploy round is still in progress and its watcher
+is armed on the same service.
+
+**Gate on the NEXT deploy, in attribution order:**
+1. `WNBA_POSTGAME_PRODUCER` carrying a `published` map with `true` per file.
+2. `/api/ops/artifacts/export?names_only=1&pattern=wnba_source/**/recon_*` → count > 0 **on web**.
+3. `n_settled > 0` on `/wnba/api/live-lens-accuracy` — the capability itself.
+4. `gradeable` flags as corroboration ONLY (a backfill flips them too).
