@@ -213,7 +213,7 @@ portfolio endpoints serve settlement marginals only (`by_sport`,
 curve exists. Exposing settled orders with their board fields is the unblock.
 
 
-## [lane-ledger-conflict-guard] THE LANE CHECKER USED TO PASS A FILE WITH CONFLICT MARKERS IN IT `[fixed 2026-08-30, `10f45a0c`]`
+## [lane-ledger-conflict-guard] THE LANE CHECKER USED TO PASS A FILE WITH CONFLICT MARKERS IN IT `[fixed 2026-08-30, `10f45a0c`; scope MEASURED 2026-08-31T02:5xZ]`
 
 MEASURED: `.syndicate/lanes.md` sat `UU` in the shared tree from an unfinished
 stash pop — markers at 3724/3778/3966 — and `scripts/check_lane_invariants.py`
@@ -245,6 +245,23 @@ nothing explains what made it or what popped it — `rebase.autoStash` and
 headings, all four lanes once. It is the RESOLVED file misnamed; the
 pre-resolution state was never captured.
 
+
+**WHAT IT CATCHES AND WHAT IT MISSES — MEASURED 2026-08-31T02:5xZ, on a real
+failure.** A merge that produced NO conflict markers duplicated four lane blocks
+in `lanes.md` and shipped as `48cc0770`. Run against that exact file,
+`check_lane_invariants.py` **exits 1**: `VIOLATED: 1 contested file(s)`,
+`pipeline/intelligence_state.py held by: layer2-cap-raise,
+polymarket-yes-leg-binding`. **The checker was not blind — it was not run.** The
+duplicate re-parented a claim set (`_claims` binds `- Files:` paths to the
+nearest preceding header), and re-parenting surfaces as a contested file, which
+is exactly what the existing check tests.
+
+**The residual gap is the harmless half.** A bare duplicate `### <slug>` header
+carrying no body claims nothing, so nothing is contested: injecting one gives
+**exit 0, `INVARIANTS HOLD`**, with the lane simply counted twice. So the tool's
+guarantee is "no claim has two holders", NOT "each slug appears once" — read its
+green that way. A duplicate header is worth removing on sight, but only the
+claim-bearing kind is load-bearing, and that kind IS caught.
 ## [603-cross-game-quote-keys] VENUE QUOTES NAMED NO GAME; FIXED ON EVERY PATH, DEPLOYED, AND STILL UNPROVEN AFTER THREE READINGS `[2026-08-30, lane live-venue-order-placement]`
 
 `quote_key` was `sport|market|side|line` and the fan-in resolves it against a
