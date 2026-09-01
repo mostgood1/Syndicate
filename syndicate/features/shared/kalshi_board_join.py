@@ -42,6 +42,8 @@ erase the spread and invent an edge that is not there.
 
 from __future__ import annotations
 
+import datetime as _dt
+import os
 import re
 import unicodedata
 from collections.abc import Mapping, Sequence
@@ -75,6 +77,26 @@ from syndicate.features.shared.kalshi_catalogue import (  # noqa: E402
 # check USED rather than the fact it asserts -- and that field turned out to be
 # the wrong one. A reason string that describes a mechanism goes stale the
 # moment the mechanism is corrected; this one describes the finding.
+# The horizon a soccer fixture may sit ahead of the slate being committed.
+# NOT A NEW NUMBER: `polymarket_board_join._FORWARD_HORIZON_DAYS` is 14 and
+# fixed this identical defect for this identical sport. Two joins that must
+# agree about which fixtures are reachable should not disagree by a constant.
+_SOCCER_FORWARD_HORIZON_DAYS = 14
+
+
+def _soccer_forward_dates_enabled() -> bool:
+    """Kill switch for the soccer forward-date widening. ON by default.
+
+    Present so the widening can be turned off without a code deploy if a
+    production reading ever shows a soccer market pairing to the wrong
+    fixture -- the one failure this change could cause. `off` restores the
+    exact-date behaviour for every sport.
+    """
+    return str(
+        os.environ.get("SYNDICATE_KALSHI_SOCCER_FORWARD_DATES") or ""
+    ).strip().lower() not in {"0", "off", "false", "no"}
+
+
 REASON_WRONG_DATE = "market_is_for_another_date"
 # Split out from the above: this one means the player, market and line all
 # matched a board row and ONLY the date disagreed. Same refusal, opposite
@@ -597,6 +619,85 @@ def join_kalshi_to_board(
         reasons[reason] = reasons.get(reason, 0) + 1
 
     wanted_date = str(selected_date or "").strip()[:10]
+
+    # ----------------------------------------------------------------------
+    # SOCCER DATES BY FIXTURE; THE BOARD DATES BY SLATE.
+    # ----------------------------------------------------------------------
+    #
+    # `wanted_date` is ONE date -- the slate being committed, i.e. today -- and
+    # every market whose ticker names another game date refuses
+    # `market_is_for_another_date`. For a same-day sport that is exactly right.
+    #
+    # SOCCER IS NEVER SAME-DAY, so for soccer that check can only ever return
+    # zero. MEASURED 2026-09-01T19:51:44Z from this join's own `BY_GAME_DATE`
+    # and `TRIM_BY_SPORT` lines, on a build with `demand={'soccer': 1541}` and
+    # `kept_by_sport={'soccer': 918}`:
+    #
+    #     soccer markets dated 2026-09-01 (today) ...........   0
+    #     soccer markets dated 2026-09-02 .. 2026-09-15 ...... 918
+    #       KXMLSTOTAL, KXMLSSPREAD, KXLALIGA{GAME,SPREAD,TOTAL},
+    #       KXLIGUE1{...}, KXSERIEA{...}, KXBUNDESLIGA{...},
+    #       KXEREDIVISIE{...}, KXBELGIANPLGAME, KXBUNDESLIGA2GAME
+    #
+    # 918 markets fetched, trimmed INTO the working set on soccer's own demand,
+    # and then refused by a date test -- while `market_is_for_another_date` was
+    # the largest refusal in the join at 3,495 of 6,000.
+    #
+    # THE TITLE PARSER IS NOT THE BLOCKER AND MUST NOT BE "FIXED" AGAIN.
+    # `unreadable_title` is 18 of 6,000 and every sampled family is an NCAAF
+    # season award. `_SOCCER_DRAW`/`_SOCCER_BTTS`/`_SOCCER_TOTAL` and the
+    # `more than`/`less than` spread wording have all read production titles
+    # since 2026-08-28.
+    #
+    # SOCCER ONLY, AND THAT GATE IS THE WHOLE SAFETY ARGUMENT -- copied
+    # deliberately from `polymarket_board_join`, which fixed this same defect
+    # for this same sport and states it: MLB plays the SAME FIXTURE on
+    # consecutive days, so widening there could price tonight's game off
+    # tomorrow's market, which is a worse bug than the one being fixed. Soccer
+    # club pairs do not repeat inside the horizon.
+    #
+    # FORWARD ONLY. A market dated BEFORE the slate is a settled or in-progress
+    # contract; matching one would price a live board row off a resolved market.
+    #
+    # NOTHING HERE RELAXES FIXTURE IDENTITY. The widened markets go through the
+    # same `_resolve_event` club-blob match, and its `event_matches_two_games`
+    # refusal is the backstop if a club pair ever does repeat in the window.
+    #
+    # THE HORIZON IS THE SIBLING JOIN'S, not a new number:
+    # `polymarket_board_join._FORWARD_HORIZON_DAYS = 14`, and Kalshi's soccer
+    # set occupies exactly that span (09-02..09-15 on the measured build).
+    _forward_horizon_date = ""
+    if wanted_date:
+        try:
+            _forward_horizon_date = (
+                _dt.date.fromisoformat(wanted_date)
+                + _dt.timedelta(days=_SOCCER_FORWARD_HORIZON_DAYS)
+            ).isoformat()
+        except ValueError:
+            _forward_horizon_date = ""
+
+    # Bound ONCE here rather than per market: this file imports
+    # `sport_for_series` function-locally everywhere else, and `_date_ok` runs
+    # once per market over a 6,000-market working set.
+    from syndicate.features.shared.kalshi_catalogue import (
+        sport_for_series as _sport_for_series,
+    )
+
+    def _date_ok(game_date: str, market: Mapping[str, Any]) -> bool:
+        """Does this market's game date serve the slate being committed?
+
+        Exact for every sport. Soccer additionally accepts a FUTURE fixture
+        inside the horizon, because soccer's board rows carry the slate date
+        while its markets carry the fixture date.
+        """
+        if game_date == wanted_date:
+            return True
+        if not _soccer_forward_dates_enabled() or not _forward_horizon_date:
+            return False
+        if _sport_for_series(market.get("series")) != "soccer":
+            return False
+        return bool(wanted_date < game_date <= _forward_horizon_date)
+
     for market in kalshi_markets:
         # THE CATALOGUE DECIDES WHAT THIS MARKET IS, for every sport at once.
         # This used to be a two-entry series table plus a private title parser,
@@ -719,7 +820,7 @@ def join_kalshi_to_board(
                 if game_date is None:
                     _refuse(REASON_UNDATABLE)
                     continue
-                if game_date != wanted_date:
+                if not _date_ok(game_date, market):
                     _refuse(REASON_WRONG_DATE)
                     continue
 
@@ -947,7 +1048,7 @@ def join_kalshi_to_board(
                 # market gets its own reason so the count is visible.
                 _refuse(REASON_UNDATABLE)
                 continue
-            if game_date != wanted_date:
+            if not _date_ok(game_date, market):
                 _refuse(REASON_WOULD_MATCH_WRONG_DATE if rows else REASON_WRONG_DATE)
                 continue
 

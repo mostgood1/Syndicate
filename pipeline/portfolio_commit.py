@@ -656,6 +656,63 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
             f" unmatched_events={joined.get('unmatched_events')}",
             flush=True,
         )
+    # ------------------------------------------------------------------
+    # SOCCER MATCHES FEED THE QUOTE LOG, NOT THE ORDER PATH -- yet.
+    # ------------------------------------------------------------------
+    #
+    # `kalshi_board_join` gained a SOCCER-ONLY forward-date widening
+    # (2026-09-01, lane `kalshi-soccer-forward-date`) so Kalshi's ~918 soccer
+    # markets stop refusing `market_is_for_another_date` and their prices reach
+    # `book_quotes`. That capture runs off `kalshi_odds_refresh`'s OWN join and
+    # is unaffected by this gate.
+    #
+    # THESE RESOLVERS ARE A DIFFERENT CONSUMER: whatever they index becomes
+    # priceable and ticker-stamped for the paper AND LIVE books, and
+    # `execute_portfolio` places real venue orders off exactly that.
+    #
+    # WHY THE GATE EXISTS, and it is a MEASUREMENT that overturned my own
+    # prediction rather than a precaution. I expected `no_model_edge_pct` to
+    # keep soccer out of positions on its own. **It does not:** `/api/portfolio
+    # /paper` shows **4 soccer positions in the 7 days to 2026-09-01**
+    # (08-26/28/29/30), soccer is NOT in `DEFAULT_EXCLUDED_FAMILIES`
+    # (`mlb:player_prop` only), `SYNDICATE_EXECUTION_ENABLED=1` and soccer is in
+    # `SYNDICATE_ACTIVE_SPORTS`. So widening the join without this would have
+    # added 918 markets of a sport whose model is recorded as NOT beating the
+    # market (`soccer-model-dispersion`: worse than market in 8 of 9 leagues) to
+    # a live order path, as a side effect of a coverage fix.
+    #
+    # Coverage and profitability are different questions. This keeps them apart
+    # until someone decides the second one on evidence.
+    #
+    # PRINTED ALWAYS, ZEROES INCLUDED: `withheld=0` on a slate with soccer
+    # matches means the switch is armed, and a line printed only when
+    # withholding could not say so.
+    # THROUGH `sport_for_series`, THE JOIN'S OWN MAPPER, and off `series` --
+    # the field a match actually carries. **A match has no `sport` key**:
+    # verified against both `matches.append` blocks, which write
+    # ticker/series/market/player_name/line/board_side/kalshi_*/board_event_id
+    # and no sport. A gate keyed on `m.get("sport")` would have read None for
+    # every row, withheld nothing, and printed `withheld=0` -- indistinguishable
+    # from an armed switch. Caught before shipping; recorded because that is the
+    # inert-guard shape this repo keeps paying for.
+    from syndicate.features.shared.kalshi_catalogue import sport_for_series
+
+    soccer_idx = {
+        i for i, m in enumerate(matches)
+        if sport_for_series((m or {}).get("series")) == "soccer"
+    }
+    soccer_armed = str(
+        os.environ.get("SYNDICATE_KALSHI_SOCCER_RESOLVERS") or ""
+    ).strip().lower() in {"1", "on", "true", "yes"}
+    soccer_matches = soccer_idx
+    if soccer_idx and not soccer_armed:
+        matches = [m for i, m in enumerate(matches) if i not in soccer_idx]
+    print(
+        "[portfolio_commit] KALSHI_SOCCER_RESOLVERS"
+        f" armed={soccer_armed} soccer_matches={len(soccer_matches)}"
+        f" withheld={0 if soccer_armed else len(soccer_matches)}",
+        flush=True,
+    )
     if not matches:
         # Named, and `(None, None)` so the venue reverts to the aggregator
         # rather than losing its book -- but the line above says it happened,
