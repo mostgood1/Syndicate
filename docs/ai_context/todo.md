@@ -37,15 +37,22 @@ and says nothing about whether it PAYS — the only option-value number
 (+1.57pp, ~+1.2% ROI, n=13,093) is from GAME markets and must not be carried
 into prop expectations; `#624` step 2 is "THEN measure", deliberately.
 
-**OWED:** (1) first post-deploy `POLYMARKET_QUOTE_CAPTURE appended>0` on
-refresh-worker (deploy dep-dabh3sv10e5c7380l03g, live 17:59:56Z) → record in
-`deploys.md`, correct state.md `[polymarket-low-activity]` + the "structurally
-out of scope BOTH WAYS" line; (2) later, `kept_direct` polymarket rows with
-`near_misses={}` on a book_grid build (the unrecognised-spelling near-miss is
-unexercised until then); (3) follow-ups NOT taken here: NFL PROP (448/cycle,
-unmeasured vocabulary), `/api/ops/polymarket/slate` still skips PROP before
-sampling (reader now disagrees with the decider about props), `venue_ticker`
-untraceable on captured rows (both venues, schema decision).
+**DISCHARGED 2026-09-01 18:1xZ — both readings landed on the FIRST post-deploy
+cycle:** (1) `POLYMARKET_QUOTE_CAPTURE matches=436 appended=374` at 18:10:22Z
+(was 60/0) with `POLYMARKET_PROP_RESOLVERS armed=False withheld=374`, and
+(2) 66s later `[book_grid] kept_direct=1479 books=['kalshi','polymarket']
+near_misses={}` — the spelling near-miss detector exercised for the first time
+and empty. Refusals collapsed as designed: `market_type_not_a_game_line`
+6,960→3,375, `board_market_not_a_game_line` 935→138. Recorded in `deploys.md`;
+state.md corrected; lane CLOSED.
+
+**STILL OPEN (follow-ups, unowned):** NFL PROP admission (448/cycle, vocabulary
+unmeasured — same mechanism once week-1 fixtures are resolvable);
+`/api/ops/polymarket/slate` still skips PROP before sampling (the reader now
+disagrees with the decider about props); `venue_ticker` untraceable on captured
+rows (both venues, `_normalize` schema decision); arming
+`SYNDICATE_POLYMARKET_PROP_RESOLVERS` (a money-path decision with its own
+prerequisites, named above).
 
 ---
 
