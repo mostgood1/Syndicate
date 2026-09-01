@@ -7797,7 +7797,32 @@ seed-only branch refusing real overwrites on the real disk.
 `BOOTSTRAP_FILES` and the per-date `reports/intelligence/*` globs had never
 synced. They were DELETED rather than repaired.
 
-### `#493` — **MLB VENDOR EXIT: make `ladders_build` the PRODUCER and delete the vendor ladders stage. Stage 1 of 20.** Fix SHIPPED and LIVE; production verification UNDISCHARGED — lane `mlb-native-ladders-producer`
+### `#493` — **MLB VENDOR EXIT: make `ladders_build` the PRODUCER and delete the vendor ladders stage. Stage 1 of 20.** PRODUCER **PROVEN IN PRODUCTION 2026-09-01**; VENDOR STAGE NOT REMOVED and PARITY NOT REACHED — lane `mlb-native-ladders-producer` CLOSED 2026-09-01, remaining work carried here
+
+**DISCHARGED 2026-09-01 16:38Z — the reading this item demanded.** Served
+`daily_ladders_2026_09_01.json`: `generatedBy == "syndicate.features.mlb.ladders_build"`
+(was ABSENT), `generatedAt 2026-09-01T16:38:21Z` — AFTER the `c2f3efe4` deploy finished
+16:02:39Z — with pitcher `ladder` 30/30 and `gamePk` 30/30, artifact 16,625,227 -> 1,529,320 B.
+Armed by `SYNDICATE_MLB_LADDERS_FORCE_DATE=2026-09-01`; that knob had been sitting STALE at
+`2026-08-20`, not unset — date-scoped and self-expiring, so it was present in config and inert
+in effect. Measurement: `.syndicate/deploys.md`, 2026-09-01 16:38Z.
+
+**WHAT REMAINS, and it is why this item is NOT closed** (the lane closed; the work did not):
+1. **4 presenter fields are 0/30** — `lineupOrder`, `paMean`, `matchupReasons`,
+   `matchupSummary`. **Two are now VISIBLE IN PRODUCTION**: `/mlb/api/hitter-ladders`
+   renders `PA mean` and `Order` as `-`. Measured on the consumer, not inferred.
+2. **Hitter `ladder` is 0/391** against the vendor 234/234. It does NOT break the page —
+   the cards read line/over/mode — which corroborates "no consumer reads them". **Decide,
+   do not default**: native+pitcher was 635,001 B and this artifact has silently exceeded
+   `_PUBLISH_MAX_BYTES` before.
+3. **The vendor stage is still in place, and MUST stay** until 1 and 2 are settled.
+   Removing the writer while native is short of parity converts a degraded path into an
+   outage — the board is served by that artifact.
+
+**The regression above is scoped to 2026-09-01 only.** The force knob is one-shot and
+date-scoped, so it is inert tomorrow and the vendor writer resumes. Anyone re-arming it for a
+new date re-introduces the two dashes for that date — that is the cost of each proof run, and
+it should be spent deliberately, not left armed.
 
 **What was wrong.** MLB pregame starter ladder chips rendered nothing, and on 12
 of 18 sides the starter's NAME vanished too. Cause was not missing data:

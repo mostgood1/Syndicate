@@ -16812,3 +16812,33 @@ one-shot: it fired once for 2026-09-01 and is inert tomorrow, when the vendor
 writer resumes. So the two dashes are scoped to today. The vendor stage was NOT
 removed — correct, per this lane's own rule that removing it before native is
 proven converts a degraded path into an outage.
+
+### refresh-worker `417e19ed` — deployed 2026-09-01, live 16:55:23Z
+
+Claim + preflight CLEAR, both taken by me; window waited out honestly (the guard
+held ~28 min on a soccer artifact chain — MLS week 2, then championship — and I
+did not force it). Contents verified BY CONTENT on the deployed SHA, not by
+ancestry alone: `_capture_polymarket_quotes` present (2 refs), the near-miss
+`else` present, and the 4 remaining `venue_ticker` hits all comments, no live
+emit. Health at 16:56: anon 415.2MB, headroom 3317.4MB, zero tracebacks.
+
+**VERIFIED — the near-miss false alarm is gone, same log line, before/after:**
+
+    16:24:02Z  c2f3efe4   rows=483  kept_direct=603  near_misses={'kalshi': 603}
+    16:56:13Z  417e19ed   rows=483  kept_direct=830  near_misses={}
+
+Two independent things read correctly there. `near_misses` collapsed to empty
+while `kept_direct` stayed non-zero and in fact GREW to 830 as captures
+accumulated — so the counter was silenced by fixing the misattribution, NOT by
+suppressing the rows it was miscounting, which is the way this fix could have
+looked right and been wrong. And a second build in the same window
+(`rows=16584 kept_direct=0 near_misses={}`) reads empty on both because it
+genuinely has no direct rows — the counter is not simply stuck at zero.
+
+**STILL NOT VERIFIED: the Polymarket capture has not yet emitted.**
+`POLYMARKET_QUOTE_CAPTURE` matched nothing in the first minute after boot. That
+is expected rather than reassuring — the capture sits at the JOIN site
+(`portfolio_commit`), whose cadence is not the ~15 min Kalshi odds refresh, so
+absence this early says nothing either way. **Absence in a window is not
+absence.** A watcher is polling a 30-minute window; if it exhausts, the correct
+statement is "never observed to run", not "does not work".
