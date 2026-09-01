@@ -1,5 +1,280 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#627` — **THE EDGE PLAN (INDEX) — phased execution of the 2026-09-01 sim-engine edge analysis** — lane `edge-plan`, 2026-09-01 — **OPEN, this is the index; the phases are `#626`..`#619` below**
+
+Full analysis: artifact **"Where the Edge Lives"**
+(https://claude.ai/code/artifact/342e3562-d25c-43e4-a617-28e2039001ee),
+condensed with file:line cites in
+`.syndicate/findings_2026-09-01_sim_engine_edge_analysis.md`, ledger section
+`state.md [sim-edge-analysis-2026-09-01]`. Built on the MLB/WNBA accuracy
+assessments (2026-08-31), the NCAAF strategy doc, and six code surveys.
+
+**The organising verdict:** the market beats the sim on every properly-measured
+game main line (sole unpowered exception: NHL totals n=15). `sim − market` is
+the sim's ERROR term (`corr(edge, win) = −0.1379`) — never stake on it. The
+edge lives where a sim is structurally advantaged (props, derivatives/ladders,
+correlations, live, news-speed) executed at low hold, priced through ONE
+pipeline (market prior + calibrated sim deviation, fitted weight per market,
+weight allowed to hit 0), on a feedback loop that actually settles (today:
+0.2% of settleable rows).
+
+| phase | item | window | gate that closes it |
+|---|---|---|---|
+| 0 · Measurement restoration | `#626` | now → 09-17 | graded supply restored; instruments non-zero |
+| M · Local mirror + replay gate | `#625` | parallel with 0 | replay-diff reproduces a prod day |
+| 1 · MLB prop program | `#624` | Sept | surviving under book ≥ +3% at ≤5% hold |
+| 2 · WNBA sprint | `#623` | 09-17 → 09-25 | its 8 pre-registered gates |
+| 3 · Probability plane + fitted blend | `#622` | late Sept → Oct | held-out Brier(blend) ≤ market-alone per market |
+| 4 · Joint distributions + derivatives | `#621` | Oct | SGP/ladder paper surface vs Kalshi rungs |
+| 5 · Live as a product | `#620` | Nov | live paper book with honest grader, latency measured |
+| 6 · Centralization (five planes, Daily Run) | `#619` | continuous | per-plane adoption, no big-bang |
+
+**Standing rules for every phase** (each already paid for — see the analysis
+§09): no main-line mechanism shopping; no staking on `sim − market`; held-out
+validation only (two in-sample refits looked better and were worse OOS this
+month); provenance splits before any statistic (the vendor-root trap);
+mechanism additions owe a re-fit (negative interaction 4/4 measured); no
+real-stake scaling before the paper-vs-real slippage join (paper +9.4% vs real
+−5.5%, same week); breadth freeze holds (69 pairs ship predictions, 2 have
+backtests). **Platform constitution: football's `pick_gate` LIFT_CONDITION
+generalized** — a market stakes real money only when it beats the naive side
+baseline AND its 95% CI lower bound clears the venue's actual vig AND the test
+is out-of-sample with pre-specified subsets AND denominators are bets not rows
+— plus positive CLV vs a named reference. Relation to `#440`: this plan
+absorbs that track's intent; `#440`'s Phase-7 CRPS scorer is consumed by
+`#626`(h).
+
+---
+
+### `#626` — **PHASE 0 — MEASUREMENT RESTORATION (now → 09-17). Nothing downstream is verifiable until these land.** — lane `edge-plan`, 2026-09-01 — **OPEN**
+
+Mostly execution of already-measured items; references, not duplicates:
+
+- (a) **`#611` MLB prop pregame freeze** — leading lead recorded there: the
+  freeze is never INVOKED for MLB (the only lane whose scope includes mlb went
+  quiet 08-06). Verify: `seals>0` in a real pre-slate window, then hitter/
+  pitcher `raw_candidates_n` returns to slate-scale (was 1 on a 14-game slate).
+- (b) **`#610` caps.ml** — a POLICY REFIT (12 ML candidates vs cap 1), not a
+  knob turn; re-fit the locked-card cap profile with the restored supply.
+  Verify: MLB graded rows/week 14 → 100+.
+- (c) **NBA integrity ports** (NBA still ships what WNBA fixed): implied-prob
+  consensus averaging w/ (−100,100) rejection (`refresh_nba_oddsapi_props.py:2148-2152`),
+  kill `p_win = implied + ev` (`:1159, :1251, :1315`), add the [0.01,0.99]
+  clamp + |EV|>100% refusal, add the totals-withhold knob. Verify on an NBA
+  slate: zero prices in (−100,100), zero `p_win ≥ 0.999`.
+- (d) **WNBA live odds capture** — fix the REUSE GUARD, not the autorun (root
+  cause located by lane `wnba-live-odds-capture-gap`: reuse key carries no
+  phase/time term, staleness bound = 2h pregame interval vs 240s live tick).
+  Verify (09-17+): `book_quotes/<date>.jsonl` `captured_at` advances during a
+  live WNBA game.
+- (e) **The live klass hole (WNBA T0-3)** — the JSONL tick writer re-derives
+  `klass` in absolute points, bypassing the API layer's "never BET on
+  `line_source ∈ {None, model}`" gate (vendor `app.py:46302-46316` vs
+  `:40612-40616`). Make the tick respect the gated klass. Verify: next live
+  slate's signal file contains zero `line_source=model` rows with `klass: BET`.
+- (f) **Closing sweeps beyond MLB/WNBA** — `_T_WINDOW_COMMENCE_PROVIDERS`
+  (`live_refresh_loop.py:4027-4030`) covers 2 of 8 sports; every other
+  sport's "close" is cadence luck, degrading all non-MLB CLV. Extend to every
+  sport with a slate. Verify: ramp/closing phase stamps present per sport in
+  `book_quotes`.
+- (g) **Both-side prices at selection time** — 0 of 8,778 graded MLB prop keys
+  carry both sides. Record the opposite side's quote on every selection, all
+  sports. Verify: >90% of NEW graded keys carry both sides within one slate.
+- (h) **Schedule the evaluation loop** — `score_projections.py` (CRPS),
+  `build_accuracy_summary.py`, drift detection all exist with NO caller. One
+  refresh-worker autorun (pattern: `run_refresh_worker.py:2104`), publishing a
+  bounded summary through the state store. Verify: a published accuracy
+  artifact with a fresh `generated_at` daily, and drift alerts wired to a
+  surface someone reads.
+- DO NOT report (d)/(e) as working from a zero during the break — "a zero is
+  indistinguishable from an inert feature" (`verify_wnba_totals_pricing.py`
+  exit-3 pattern); the WNBA reads are 09-17+.
+
+---
+
+### `#625` — **PHASE M — LOCAL MIRROR + REPLAY GATE. Prod→local full mirror; local-first development under three laws.** — lane `edge-plan`, 2026-09-01 — **OPEN, parallel with `#626`; accelerates every later phase**
+
+Endorsed in the analysis §12 as an UPGRADE of "Render is the source of truth":
+every incident behind that rule was a PARTIAL, unverifiable mirror. Laws:
+**(1) one-way flows** (data prod→local only; code/config local→prod only via
+git + deploy locks; never bidirectional); **(2) parity or it isn't evidence**
+(per-family manifest — counts+hashes per date — shipped with every sync; a
+local claim cites its manifest id, extending `model_engine_standard.md` §3b);
+**(3) replay-first** (`book_quotes` IS a tick tape; live-lens/`feed_live`
+replayable; fetch mode explicit — protects the shared OddsAPI key).
+
+Build items: (1) one manifest-driven sync replacing the per-sport
+`refresh_*_source_mirror.ps1` + backup workflow; (2) an **export-only**
+pattern list for worker-local families (evaluation ledger chunks,
+`roster_objs`, raw `feed_live`, prop-history CSVs) — distinct from
+web-serving patterns so the `#413` freeze-live-scores trap stays protected;
+(3) nightly env-var snapshots per service into the mirror; (4) a local
+3-role fleet runner (production run-modes, paper-only, file/redis state,
+replay default; optional memory-capped containers at 2/2/4GB); (5) a
+**replay-diff gate**: run the real `run_*_worker` entrypoints over a mirrored
+day, diff artifacts vs production's actual outputs tolerance-aware, wire into
+`migration_gate.py`; (6) the §3b substrate-label edit to the standard.
+
+Verify: parity manifest covering at least the families `#624` uses; one full
+replay-diff day reproducing prod within tolerance; first "deployed-inert"-class
+defect caught locally, recorded here. Practicals: mirror lives OUTSIDE OneDrive
+and outside the git tree (`SYNDICATE_DATA_ROOT`); verify syncs by manifest not
+timestamp (Modern Standby's 9h dispatch/run gap is on record); long-arc
+(git stops being a data channel — 34,690/37,745 tracked files are data) only
+AFTER git-delivered families move to the publish path (`#618` fixed the
+football instance; a contract-registry walker in `#619` prevents the class).
+
+---
+
+### `#624` — **PHASE 1 — MLB PROP PROGRAM (Sept). The +8.5pp-gross under book, converted from vig into ROI.** — lane `edge-plan`, 2026-09-01 — **OPEN; order is load-bearing**
+
+1. **Tail calibration FIRST**: per-(market, line) isotonic/Platt on
+   `model_prob_over` + hard refusal of p ∈ {0.0, 1.0}. The middle is calibrated
+   (+0.01..+0.04); tails are wrong exactly where "model > market" fires
+   (LogLoss 1.92 vs Brier 0.269). Gate: held-out fortnight LogLoss beats
+   uncalibrated; bucket errors within ±0.05.
+2. **THEN the HRR null** (992 of 993 zero-prob rows are `batter_hits_runs_rbis`
+   — no calibration entry exists). Fixing it before step 1 makes the book
+   WORSE (−5.83% → −6.35%, measured); after, it stops staking 14.2% of the
+   book off a null.
+3. **Substitution ON + joint refit** — the built-but-dark hazard model
+   (`position_substitutions=False`) whose absence inflates `pa_mean` +19.7%
+   (55% of the prop bias is opportunity). Mechanism+estimator pair per the
+   standard §4.4. Then re-run the de-biased model-skill measurement (prior
+   reading: de-biasing flips 5 of 7 markets past a constant baseline).
+4. **Execute `#202`** — the pre-registered conditional-edge scan, rules frozen
+   2026-08-05, NEVER RUN. Run it as written; report survivors vs the chance
+   expectation.
+5. **Exchange prop economics** — as `book_quotes` accumulates kalshi prop rows
+   (`08ecb418`), measure prop-side option value the way item 05 measured game
+   markets (time-aligned, unconditional); only then change the board's price
+   comparison (the 7h ordering: capture → measure → board).
+6. **Gate to re-enable staking** (exclusion `mlb:player_prop` stays until):
+   the surviving book (unders minus HR/HRR) re-measured at ≤5% effective hold
+   on board-visible rows, target ≥ +3% (sensitivity: +0.98% @ 8.1%, +3.72% @
+   5%, +6.52% @ 2%). DO NOT invert HR overs (flip is negative at any vig);
+   DO NOT trade `hitter_hits @ 1.5` (n=51/108).
+
+---
+
+### `#623` — **PHASE 2 — WNBA SPRINT 2026-09-17..09-25, run as a TEST (30 games in 9 days).** — lane `edge-plan`, 2026-09-01 — **OPEN; preconditions are `#626` (c)(d)(e)**
+
+Execute against the pre-registered gates — nothing here is discretionary:
+the 8-gate table in `findings_2026-08-31_wnba_accuracy_assessment.md`
+("What to measure over 2026-09-17..09-25"), plus
+`scripts/prereg_wnba_favourite_lean.py` (threshold frozen 0.528; UNREADABLE is
+an outcome), plus the two parked discriminating reads: `#614` (count WNBA rows
+ENTERING `_build_candidate_pool` on a live slate — `active_sports` can never
+answer it) and `#616` (does the direct venue feed carry WNBA — decide by a
+WNBA-tickered fill/refusal, NEVER by `venue_priced`). Sigma watch: the
+implied-SD/residual-SD ratio was 1.61 in May's restart — ship the ADAPTIVE
+(trailing-window) sigma, not a pooled rescale (the pooled refit was worse OOS,
+measured). Size on CLV, not ROI (31 lifetime settled orders is noise). DO NOT
+route volume to sim ML picks — `#615` withdrew that; the unblock condition is
+`corr(sim − market, market residual)` clearing zero out-of-sample, and it is
+the measurement to repeat on this sprint.
+
+---
+
+### `#622` — **PHASE 3 — THE PROBABILITY PLANE + FITTED BLEND (late Sept → Oct). One pricing pipeline for every staked probability.** — lane `edge-plan`, 2026-09-01 — **OPEN**
+
+- **Shared calibration store**: generalize football's versioned
+  `calibration_profile` + promotion-gate pattern (the one good instance) to a
+  per-(sport, market) map artifact; nightly refit; shadow-then-promote on
+  held-out score with a variance margin. Soccer's already-fitted temperature
+  scaler gets a consumer or gets deleted.
+- **The blend**: `logit(p_staked) = α·logit(market_devig) + β·logit(sim_cal)`
+  per market, refit weekly, β shrunk on thin samples, **β CI published so a
+  zero is a finding**. Adoption order: soccer first (choose
+  `market_anchoring`'s weight — validated −40..−51% MAE and idle), MLB props
+  (blend replaces raw model prob in selection), then basketball — which first
+  needs DE-ANCHORING upstream (quarter means blend to market at margin_w=0.95
+  / total_w=0.7 in `sim/quarters.py:66-67` BEFORE simulating; run the sim
+  independent, blend downstream) and n_sims 100 → 1000+ (render.yaml:1017 was
+  an OOM economy; schedule it, don't quantize the product). Football keeps
+  β=0 by measurement.
+- **Uncertainty + abstention + sizing**: every probability carries an SE (MC +
+  input + calibration-map); generalize `prob_interval_swamps_edge`; tiers from
+  the segmented reliability profile (built, unwired) instead of claimed EV;
+  fractional Kelly on the blended prob at the executable price.
+- Gate per market: held-out Brier(blend) ≤ market-alone, else the sim exits
+  pricing for that market and the row says so. DO NOT ship any blend or
+  calibration validated only in-sample (standing rule, 2 failures on record).
+
+---
+
+### `#621` — **PHASE 4 — JOINT DISTRIBUTIONS + DERIVATIVES (Oct). Stop discarding the one thing no price-taker can copy.** — lane `edge-plan`, 2026-09-01 — **OPEN**
+
+- **Persist per-sim joint outcomes** (MLB first): the aggregation loop
+  (`vendor/mlb_bettingv2/tools/daily_update.py:4380-4505`) keeps only marginal
+  histograms; keep per-sim outcome vectors (or joint moments / a fitted copula
+  per game), size-budgeted — the publish-ceiling history (`_PUBLISH_MAX_BYTES`)
+  applies.
+- **Grade segment actuals** (F1/F3/F5) — full distributions are published and
+  no actual is captured anywhere; derivative pricing needs graded segments.
+- **SGP / ladder fair-value surface**: price multi-leg combinations and alt
+  rungs off the joint draws; compare vs Kalshi's quoted NCAAF/MLB ladders
+  (2,026 spread + 1,482 total NCAAF rungs, median widths 0.25-0.39, mostly
+  thin — quoted ≠ tradeable). PAPER ONLY behind a LIFT-class gate.
+- **NHL**: powered totals re-run when the season starts (the n=15 green cell →
+  n≥200); build `bet_status_nhl` + a live-state poller (NHL bets cannot settle
+  today); request p1/p2/p3 segment odds (vocabulary exists in
+  `market_segments.py:59`, fetcher never asks). Props CLV vs its own anchored
+  line is near-circular — grade props against outcomes only.
+
+---
+
+### `#620` — **PHASE 5 — LIVE AS A PRODUCT (Nov). The largest unmeasured surface, blocked on capture, not modelling.** — lane `edge-plan`, 2026-09-01 — **OPEN; gated on `#626`(d)(f) + `#625`**
+
+A true live MC already exists (MLB `live_mc.py`: runners/count/pitch counts,
+120 sims, live-odds-worker) and WNBA/soccer have live signal engines; no sport
+captures a live prop line (`line_live_age_sec` null 1,777/1,777). Work: live
+line capture per sport (the `#626`(d) pattern generalized); MLB live MC priced
+vs CAPTURED live lines, paper book, honest grader (the fixed refusing grader +
+a bounded published final-actuals artifact — and fix the
+`live_lens_daily_accuracy.py:207-211` marketLine-fallback scheduled defect IN
+THE SAME CHANGE that publishes actuals, as the ledger demands); latency
+measured feed→price→paper-order before any real stake; WNBA playoffs live off
+the honest baseline (Q1 + real line, 55.87%, +1.62 SE — suggestive only);
+football live-state conditional prototype off the drive engine (no football
+live model exists; Kalshi trades in-play). Every live hit-rate SPLITS by game
+clock and line source (standing FORBIDDEN rule) — a number that improves as
+the game ends is leakage.
+
+---
+
+### `#619` — **PHASE 6 — CENTRALIZATION: five shared planes + the fixture-state Daily Run (continuous; adopt, never big-bang).** — lane `edge-plan`, 2026-09-01 — **OPEN**
+
+The copy-drift bug class (NBA carrying WNBA's fixed defects; ≥4 tier
+implementations; 3 blend implementations; 5 calibration stores; seal MLB-only;
+closing sweeps 2-of-8) is the platform's dominant integrity failure. Direction
+(analysis §11): **centralize contracts, not content** — sport engines stay
+sport-specific; single-implementation planes around them:
+1. **Probability plane** = `#622` (its shared store IS this plane's seed).
+2. **Market-data plane**: one phased capture policy (opener→drift→ramp→seal→
+   live per fixture), the seal generalized (today: one sport, and it broke
+   silently), regions/books as one config table replacing scattered env vars.
+3. **Evaluation plane** = `#626`(h) scheduled run + provenance stamps on every
+   graded row; per-sport graders stay plugins.
+4. **Run plane**: the fixture-state **Daily Run manifest** (scheduled →
+   capture_open T-72h → drift → ramp T-75m → sealed T-10m → live → final →
+   settled → graded → archived), standard verbs per transition as per-sport
+   plugins, ownership declared in the manifest (not `SYNDICATE_ACTIVE_SPORTS`
+   variants that differ per service), a PRIORITY SIM QUEUE (live resims >
+   today > tomorrow > backfills; drains before deploys — the n_sims=100 cut
+   and the 97.2%-of-2GB worker are scheduling problems), one per-fixture ops
+   day-board. This is CLAUDE.md's own stated destination ("state-aware
+   execution controller with run modes").
+5. **Contract plane**: every artifact family declared once (producer, consumer
+   services, allowlist pattern, retention tier, freshness SLO) + a daily
+   walker that fails loudly on orphans — `#618` fixed the football instance;
+   the walker prevents the class.
+Adoption rule: one sport at a time per plane, behind reachability tests
+(`off != on`), never a cutover. DO NOT centralize sim mechanics,
+league-specific ingestion, or per-sport graders.
+
+---
+
 ### `#618` — **The NFL/NCAAF season projections publish into an allowlist pattern that never existed. Both generators have been no-ops for 13 days.** — lane `football-projection-publish-allowlist`, 2026-09-01 — **FIXED AND LANDED (`fcbbcc62`), NOT DEPLOYED — DELIBERATE RIDEALONG, NO DEDICATED DEPLOY**
 
 Both `generate_smartsim2_ncaaf_projections.py` and its NFL sibling have called
