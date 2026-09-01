@@ -269,11 +269,29 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
             continue
         if is_direct_feed_book(row.get("bookmaker")):
             kept_direct_feed += 1
-        _book_name = str(row.get("bookmaker") or "").strip().lower()
-        if _book_name and ("kalshi" in _book_name or "polymarket" in _book_name):
-            # Reached only when the exact match above already refused, so every
-            # key counted here is a spelling the filter is missing TODAY.
-            direct_feed_near_misses[_book_name] = direct_feed_near_misses.get(_book_name, 0) + 1
+        else:
+            # ELSE, not a second unconditional check. The near-miss counter means
+            # "the exact-name filter is MISSING A SPELLING", so it must only see
+            # rows the exact match refused -- which was automatic while
+            # `drop_from_grid` was name-only, because every recognised name hit
+            # the `continue` above.
+            #
+            # Provenance-based dropping broke that: a `venue_direct` row is now
+            # deliberately KEPT, so it fell through to here and was reported as a
+            # spelling bug. Measured in production 2026-09-01, first grid build
+            # after the first real capture:
+            #
+            #     kept_direct=603 near_misses={'kalshi': 603}
+            #
+            # The identical counts are the tell -- one population, counted once
+            # correctly and once as a false alarm. Left alone this reads 603 on a
+            # PERFECTLY WORKING system, permanently, and the standing cost is not
+            # the noise: it trains a reader to ignore `near_misses`, which
+            # disables the real signal for the case it exists to catch -- an
+            # unrecognised POLYMARKET spelling, still unproven at this writing.
+            _book_name = str(row.get("bookmaker") or "").strip().lower()
+            if _book_name and ("kalshi" in _book_name or "polymarket" in _book_name):
+                direct_feed_near_misses[_book_name] = direct_feed_near_misses.get(_book_name, 0) + 1
         instance = tuple(str(row.get(field) or "") for field in _INSTANCE_FIELDS)
         materialised = row if isinstance(row, dict) else dict(row)
         key = instance + (
