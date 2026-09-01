@@ -40,7 +40,40 @@ from a running tally is now refused BY NAME and none is lost. Sample warning,
 The gate allowed either hit rates strictly inside (0%,100%) or
 `available:false` with the named refusal; the second branch is met exactly.
 
-### verify: ITEM 04 — NOT YET DISCHARGED. Do not read the ROI as proof.
+### verify: ITEM 04 — DISCHARGED 03:37:34Z, on the worker's own log
+
+`IMPOSSIBLE_PNL_CORRECTED n=5 keys=['5c53789d4d21d05fc501b05d',
+'2865547f7b237142c4a362b4', '78fc32da6909145050edf756',
+'8a23bb357e2fa1bb4cb689cc', '4e330fae2f602c410e8d2335']`
+
+**`4e330fae2f602c410e8d2335` is the idempotency key of the exact order I
+diagnosed** — `C7AZA3MBEKDD`, `aec-mlb-mia-wsh-2026-08-31`, -$12.9188 booked
+against a $3.20 fill. So this is not "n>=1 therefore probably worked"; it is
+the named row.
+
+**Five, not one.** Four further impossible P&Ls were in the ledger that I had
+not found by hand. The single order I traced was the visible instance of a
+class.
+
+Same tick: `VENUE_SETTLEMENT ... pnl_derived=0 pnl_exceeded_own_fill=0` —
+the NEW log line, which is what proves the new code is the code that ran
+(the old line printed the dead `pnl_unattributed=None`). The guard reads 0
+because `settled=0` on that tick: the guard prevents new bad writes, the
+repair fixed the existing ones. Both halves behaved as designed.
+
+Served payload after: **0 orders whose loss exceeds their fill; 0
+`by_venue_family` rows below -100%.**
+
+### the reading I recorded as REJECTED before the evidence arrived
+
+Before the tick, the ROI table already showed no row below -100%
+(`polymarket/game_line` -45.05% against -159.38%). I did not bank it: the date
+had rolled, the payload came back dated 2026-08-26, and the offending order was
+not in it — a clean table was as consistent with "different orders" as with
+"the fix worked". The log line is what settled it. Keeping this note because
+the wrong evidence was available first and was tempting.
+
+### (superseded) ITEM 04 — NOT YET DISCHARGED. Do not read the ROI as proof.
 
 `/api/portfolio/live` now shows no `by_venue_family` row below -100%
 (`polymarket/game_line` -45.05% against -159.38% before). **THAT IS NOT
