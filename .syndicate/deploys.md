@@ -17126,3 +17126,25 @@ into the slate.
 - **SECOND READING, 18:11:28Z (66s after the first) — the grid half is also discharged:**
   `[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=510 kept_direct=1479 books=['kalshi', 'polymarket'] near_misses={}` —
   polymarket rows are IN `kept_direct` (book set was kalshi-only before) and the unrecognised-spelling near-miss detector, exercised for the first time by real polymarket rows, is EMPTY. Both halves of lane `polymarket-prop-quote-capture`'s verification are now read; nothing owed on this deploy.
+
+## 2026-09-01 19:18Z — refresh-worker `bde67379` — PROP NO-MATCH SAMPLES NAME THE PLAYER: token/rung/listing decomposed on the first read
+- lane: `prop-unmatched-decomposition` (session e063e054) · deploy dep-dabi38dcqm1c73dmhdjg, created 19:04:01Z, live 19:06:37Z, trigger=api, claim+preflight (CLEAR pinned to bde67379 at 19:03Z, after holding ~21 min for an odds sweep, a soccer build, then the 18:50:17Z MLB daily sim; deploy killed nothing).
+- carries: `bde67379` (prop `_note_unmatched` extension: `player`/`token`/`fixture_tokens` near-first bounded 6/`token_lines` bounded 6; sample-build only, <=10 per join, zero matching change) **+ env injection of `SYNDICATE_POLYMARKET_PROP_RESOLVERS='1'`** (lane `polymarket-prop-resolver-arming`, user-authorized, staged 18:44Z via single-key API, read back PRESENT='1' by me pre-deploy; THAT lane owns its armed=True/venue_priced verification — coordinated by message, both directions).
+- verify: **READ 19:18:45Z, first post-boot commit cycle — the field decomposes on real data:**
+  `no_match|mlb` prop counts unchanged in magnitude (hr 65, hits 47, tb 47, k 29, hrr 21, outs 13, er 2 = 224 vs ~230 baseline — instrumentation moved no counts, as designed). Three prop samples, three distinct reads:
+  - `batter_hits over 0.5` Juan Soto (nym@tb): `token=juasot`, `fixture_tokens=['juasot','bobic','chasim','fralin','carben','jondel']`, `token_lines=[1.5]` → **RUNG-MISS** (venue lists Soto only at 1.5).
+  - `strikeouts over 4.5` Robert Gasser (mil@chc): `fixture_tokens=['robgas','matboy']`, `token_lines=[2.5,6.5,1.5]` → **RUNG-MISS** (near-token-first ordering placed our own token at index 0 both times).
+  - `batter_hits_runs_rbis over 1.5` Brayan Rocchio (tor@cle): `fixture_tokens=['jessan','natluk','kazoka','vlague','geospr','bretbat']`, `token_lines=[]` → **PLAYER-NOT-LISTED**, and the list itself surfaces a collision-extended token (`bretbat`) in-sample — the class `prop_modifier_census` strips.
+  - Control: every game-line sample in the same line kept the exact old shape (no `player`/`token`/`fixture_tokens` keys).
+  No token-miss instance in this read (needs a board row for a venue-disambiguated player, e.g. William Contreras/`wilcon2`); the mechanism that would show it (near variant sorted first in `fixture_tokens`) is exercised and test-pinned.
+- claim released after this entry.
+
+## 2026-09-01 19:18Z — refresh-worker `bde67379` (deployed by lane `prop-unmatched-decomposition`) — PROP RESOLVERS ARMED: venue_priced 62 -> 462, withheld 374 -> 0
+- lane: `polymarket-prop-resolver-arming` (session 41d46db0) · **USER-AUTHORIZED** ("arm the prop resolvers once a book_grid cycle confirms clean prices" — condition met: three clean grid cycles 18:11/18:21/18:31Z, `near_misses={}`, prop ladders monotonic, `ladder_bad=[]`, capture converged 374→53→0)
+- mechanism: `SYNDICATE_POLYMARKET_PROP_RESOLVERS=1` set by the USER via `scripts/render_env_set.py` (single-key API, before None → '1', ~18:44Z; my own attempt was permission-blocked and surfaced rather than worked around); injected by `prop-unmatched-decomposition`'s deploy dep-dabi38dcqm1c73dmhdjg (live 19:06:37Z, killed nothing — the 18:50Z MLB daily sim drained first; they read the key back PRESENT='1' before firing). One deploy carried both lanes' changes by explicit agreement, each lane owning its own read.
+- verify: **READ 19:18:21Z, first post-boot commit cycle —**
+  `POLYMARKET_PROP_RESOLVERS armed=True prop_matches=386 withheld=0` (was armed=False withheld=374).
+  `PAPER2_PLAN_WRITTEN date=2026-09-01 venue=polymarket rows_in=485 venue_priced=462` (pre-arm baseline **62**, game lines only) — the `#628` raw-vs-canonical resolver-key asymmetry is NOT binding; shortlist prop market names are canonical and props resolve.
+  `POLYMARKET_QUOTE_CAPTURE matches=447 appended=58` — capture unaffected, as designed.
+- **BLAST RADIUS, measured not assumed:** positions did NOT widen — `positions=4 staked=$14.71` (was 4/$14.82), because `market_family_excluded: 402` still refuses prop FAMILIES at the position-taking layer. Arming changed the PRICING source and stamps venue tickers; committing prop positions (and therefore prop orders) stays closed behind the family policy — a separate knob nobody has asked to open.
+- claim: none held by this lane — the deploy was `prop-unmatched-decomposition`'s, released by them 19:1xZ.
