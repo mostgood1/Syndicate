@@ -241,10 +241,37 @@ def build_module_links(selected_week: int, active_label: str, *, season: int | N
 def ncaaf_target_week(season: int) -> int | None:
     """Real calendar-driven "which week should we be preparing simulations
     for right now" -- mirrors syndicate.features.nfl.sources.nfl_target_week
-    exactly: the lowest week number in the real schedule
-    (historical_truth/games_{season}.json.gz, via load_games_season) with
-    any game whose real `completed` field is False. None if the season
-    isn't loaded yet, or every loaded game is already marked completed."""
+    exactly: the lowest week number in the real schedule with any game whose
+    real `completed` field is False. None if the season isn't loaded yet, or
+    every loaded game is already marked completed.
+
+    READS THE PUBLISHED ARTIFACT FIRST, and falls back to the raw CFBD games
+    cache. The rule below is unchanged; only where the counts come from moved.
+
+    WHY THE ARTIFACT HAD TO EXIST. The fallback is
+    `historical_truth/games_{season}.json.gz`, which `ensure_games_cached`
+    writes ONCE and never refreshes. Measured 2026-09-01: written 2026-07-21,
+    888 games, `completed: False` on 888 of 888 -- so this function returned 1
+    for the whole 2026 season, and `_week_is_within_pregame_window` trimmed the
+    board to `week <= 1` while artifacts existed for weeks 1-13 and 15.
+
+    Refreshing that cache fixes the WORKER's copy only: web and worker do not
+    share a disk, and the gzip cannot be published across (a sub-4MB file goes
+    up as UTF-8 text and a `.gz` fails `SKIP_READ_FAILED`). So the worker
+    derives `week_state` -- small, JSON, publishable -- and this reads it. Web
+    never calls CFBD, which is the worker/web split rather than an exception
+    to it.
+
+    ORDER MATTERS AND IS NOT A PREFERENCE. The fallback is the STALE source by
+    construction; reading it first would mean the artifact never had an effect
+    and this change would be inert while looking wired.
+    """
+    from syndicate.features.ncaaf.week_state import read_week_state, target_week_from_state
+
+    from_artifact = target_week_from_state(read_week_state(season))
+    if from_artifact is not None:
+        return from_artifact
+
     from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import load_games_season
 
     try:

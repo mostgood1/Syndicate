@@ -280,6 +280,37 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # absence via `projection_provenance`; wire the publisher first.
     "ncaaf_source/data/smartsim2_projections_*_wk*.csv",
     "nfl_source/smartsim2_projections_*_wk*.csv",
+    # WHICH NCAAF WEEKS HAVE BEEN PLAYED. `lane ncaaf-games-cache-refresh`,
+    # measured 2026-09-01.
+    #
+    # `ncaaf_target_week` -- "lowest week with an unplayed game" -- read
+    # `historical_truth/games_<season>.json.gz` directly, and
+    # `ensure_games_cached` writes that file ONCE. The 2026 copy was written
+    # 2026-07-21 and still said `completed: False` on 888 of 888 games, so the
+    # answer was 1 for the whole season and `_week_is_within_pregame_window`
+    # trimmed the board to `week <= 1`: `/ncaaf/api/cards?week=2` and `?week=3`
+    # both served "2026 Week 1" while projection artifacts existed for weeks
+    # 1-13 and 15.
+    #
+    # THE CACHE ITSELF CANNOT BE THE TRANSFER. Refreshing it fixes the worker's
+    # disk only, and this publisher cannot carry it: below
+    # `_PUBLISH_STREAM_MIN_BYTES` a file goes up as `read_text(encoding="utf-8")`
+    # and the 39 KB gzip raises `UnicodeDecodeError` -> SKIP_READ_FAILED. So the
+    # worker derives per-week played/unplayed COUNTS -- small, JSON, and the
+    # platform's own statement rather than a mirror of a vendor payload -- and
+    # web reads those instead of calling CFBD from a request handler.
+    #
+    # WRITE PATH -> READ PATH: both sides call
+    # `week_state.week_state_path(season)`, which is `ncaaf/sources.data_path`,
+    # which is `$SYNDICATE_NCAAF_SOURCE_ROOT/data/week_state/...` ==
+    # /opt/render/project/data/ncaaf_source/data/week_state/... on both
+    # services. ONE function, so the two cannot drift -- the sibling entry
+    # above was inert for 13 days because two different expressions were
+    # believed to name one location.
+    #
+    # Bounded: one ~2 KB file per season, rewritten daily by the projection
+    # generator, and `sweep_changed_hot_artifacts` publishes only what changed.
+    "ncaaf_source/data/week_state/ncaaf_week_state_*.json",
     # `#310`, DIAGNOSTIC. The WNBA grader's actual result inputs, and the file
     # both recon builders are built from. Until now `recon_games_*`,
     # `recon_props_*` and dated `boxscores_*` were in no pattern here (only the

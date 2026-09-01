@@ -840,6 +840,38 @@ def main() -> None:
     # appears because a stale cache is acted on rather than reported.
     log(f"GAMES_CACHE_REFRESH {' '.join(f'{k}={v}' for k, v in games_refresh.items())}")
 
+    # DERIVE AND PUBLISH THE WEEK STATE. The refresh above fixes THIS service's
+    # copy of the games cache; web has its own disk and cannot receive that file
+    # (a sub-4MB publish goes up as UTF-8 text, so a `.gz` returns
+    # SKIP_READ_FAILED). This is the small owned artifact that does cross, and
+    # it is what `ncaaf_target_week` reads on web -- so without it the whole
+    # refresh is worker-only and the cards board stays pinned to week 1.
+    try:
+        from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import (
+            load_games_season,
+        )
+        from syndicate.features.ncaaf.week_state import build_week_state, write_week_state
+
+        state = build_week_state(args.season, games=load_games_season(args.season), now=time.time())
+        state_path = write_week_state(state)
+        try:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+            state_published = publish_hot_artifact(state_path)
+        except Exception as exc:  # noqa: BLE001 - transfer must never fail generation
+            state_published = False
+            log(f"WEEK_STATE_PUBLISH_ERROR {type(exc).__name__}: {exc}")
+        # `stale_completion_flags` is the number this exists to surface: games
+        # whose kickoff is well past that the source still calls unplayed. It
+        # was 8 on the frozen 2026 snapshot and is 0 on a healthy one.
+        log(
+            f"WEEK_STATE season={args.season} games={state['games']} "
+            f"weeks={len(state['weeks'])} stale_completion_flags={state['stale_completion_flags']} "
+            f"published={state_published} path={state_path}"
+        )
+    except Exception as exc:  # noqa: BLE001 - a derived artifact must not fail generation
+        log(f"WEEK_STATE_ERROR {type(exc).__name__}: {exc}")
+
     schedule_rows = load_engine_schedule(args.season, args.week)
     log(f"ENGINE_SCHEDULE rows={len(schedule_rows)}")
 
