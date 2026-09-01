@@ -371,5 +371,116 @@ class SupersetKeyTests(unittest.TestCase):
             self.assertAlmostEqual(gain, 0.0, places=9)
 
 
+class ShardIntegrityTests(unittest.TestCase):
+    """`#630`: two publishers, one whole-file publish each, web keeps the last.
+
+    The sibling lane's guard compares the EXCHANGE cohort against the SPORTSBOOK
+    cohort. That is right for a prop measurement and BLIND for a game one, which
+    is why this module has its own -- see `test_the_cohort_metric_would_be_blind`.
+    """
+
+    @staticmethod
+    def _row(stamp, source=None, kind="prop", bookmaker="fanduel"):
+        return {"captured_at": _stamp(stamp), "source": source, "kind": kind,
+                "bookmaker": bookmaker}
+
+    def test_a_single_writer_shard_passes_and_says_so(self) -> None:
+        """Before 2026-09-01 16:11Z the venue-direct capture did not exist, so
+        every shard in the published window has one writer. That is a real
+        exoneration -- the race needs two -- but it must be LABELLED, not
+        silently indistinguishable from a healthy two-writer file."""
+        rows = [self._row(1000.0 + 60 * i) for i in range(20)]
+        report = MOD.writer_report(rows)
+        self.assertTrue(report["ok"])
+        self.assertTrue(report["single_writer"])
+        self.assertEqual(report["direct_n"], 0)
+        self.assertIn("needs two", report["reason"])
+
+    def test_a_healthy_two_writer_shard_passes(self) -> None:
+        rows = [self._row(1000.0 + 60 * i) for i in range(20)]
+        rows += [self._row(1000.0 + 60 * i, source="venue_direct") for i in range(5, 19)]
+        report = MOD.writer_report(rows)
+        self.assertTrue(report["ok"], report)
+        self.assertFalse(report["single_writer"])
+        self.assertGreaterEqual(report["matchable"], MOD.WRITER_OVERLAP_FLOOR)
+
+    def test_a_truncated_writer_is_caught(self) -> None:
+        """The measured shape: one publisher's rows run hours past the other's
+        last row, because the other's tail was overwritten."""
+        rows = [self._row(1000.0 + 60 * i) for i in range(5)]
+        rows += [self._row(1000.0 + 60 * i, source="venue_direct") for i in range(40)]
+        report = MOD.writer_report(rows)
+        self.assertFalse(report["ok"], report)
+        self.assertFalse(report["single_writer"])
+        self.assertLess(report["matchable"], MOD.WRITER_OVERLAP_FLOOR)
+        self.assertIn("clobbered", report["reason"])
+
+    def test_the_cohort_metric_would_be_blind(self) -> None:
+        """THE reason this guard is not a copy of the prop lane's.
+
+        Measured on that lane's own worst date: of 58,820 GAME rows on
+        2026-09-01, `venue_direct` is ZERO -- every game row comes from the one
+        OddsAPI writer, so its exchange and sportsbook cohorts span identically
+        and an exchange-vs-sportsbook check reads ~100% while the file is short.
+        This fixture reproduces that: game rows healthy on the cohort view, and
+        a truncated venue-direct prop tail that only the WRITER view sees."""
+        # The OddsAPI writer's tail was overwritten: its rows -- game AND prop --
+        # stop at minute 9. Both book cohorts inside them stop together.
+        game = []
+        for i in range(10):
+            game.append(self._row(1000.0 + 60 * i, kind="game", bookmaker="fanduel"))
+            game.append(self._row(1000.0 + 60 * i, kind="game", bookmaker="kalshi"))
+        props = [self._row(1000.0 + 60 * i, kind="prop") for i in range(10)]
+        # The venue-direct writer's rows survive to minute 29.
+        props += [self._row(1000.0 + 60 * i, source="venue_direct", kind="prop",
+                            bookmaker="kalshi") for i in range(30)]
+
+        # The cohort view, on the game rows the measurement actually uses.
+        exchanges = [MOD.parse_ts(r["captured_at"]) for r in game
+                     if r["bookmaker"] in MOD.EXCHANGES_NARROW]
+        books = [MOD.parse_ts(r["captured_at"]) for r in game
+                 if r["bookmaker"] not in MOD.EXCHANGES_NARROW]
+        cohort_matchable = sum(1 for s in exchanges if s <= max(books)) / len(exchanges)
+        self.assertEqual(cohort_matchable, 1.0, "the cohort view sees nothing wrong")
+
+        # The writer view, over the whole shard, does.
+        report = MOD.writer_report(game + props)
+        self.assertFalse(report["ok"], report)
+
+    def test_a_missing_report_is_unknown_not_clear(self) -> None:
+        """Unknown must not land on the permissive branch: a cache built before
+        this check keeps only game rows, so the second writer's evidence is
+        already gone and cannot be recovered from it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            report = MOD.load_writer_report("2026-08-27", Path(tmp))
+        self.assertFalse(report["ok"])
+        self.assertFalse(report["known"])
+        self.assertFalse(report["single_writer"])
+
+    def test_an_unreadable_report_is_unknown_not_clear(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            MOD.writer_report_path("2026-08-27", Path(tmp)).write_text("{not json",
+                                                                       encoding="utf-8")
+            report = MOD.load_writer_report("2026-08-27", Path(tmp))
+        self.assertFalse(report["ok"])
+        self.assertFalse(report["known"])
+
+    def test_a_written_report_reads_back(self) -> None:
+        rows = [self._row(1000.0 + 60 * i) for i in range(10)]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = MOD.writer_report_path("2026-08-27", Path(tmp))
+            path.write_text(json.dumps(MOD.writer_report(rows)), encoding="utf-8")
+            report = MOD.load_writer_report("2026-08-27", Path(tmp))
+        self.assertTrue(report["ok"])
+        self.assertTrue(report["known"])
+        self.assertTrue(report["single_writer"])
+
+    def test_the_floor_is_the_sibling_lane_s(self) -> None:
+        """Deliberately the same 65% as `measure_exchange_prop_option_value`'s
+        `FEED_OVERLAP_FLOOR`. Two guards on the same defect that disagree on
+        where the line is would be worse than one."""
+        self.assertEqual(MOD.WRITER_OVERLAP_FLOOR, 0.65)
+
+
 if __name__ == "__main__":
     unittest.main()

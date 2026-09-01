@@ -270,10 +270,101 @@ def fetch_orders(day: str, cache_dir: Path) -> list[dict]:
     return rows
 
 
+# `book_quotes` shards silently LOSE ROWS (`#630`, lane `book-quotes-publish-clobber`,
+# guard `51cf8b83`, fix `e78aee52`). Two services each append to their own local
+# copy of the same daily file and then publish the WHOLE FILE, so web keeps
+# whichever published last and the other writer's tail vanishes. Measured on
+# 2026-09-01: a refetch an hour later LOST 1,318 exchange rows and gained none.
+#
+# THAT LANE'S GUARD CANNOT BE COPIED HERE, and the reason is worth stating because
+# a verbatim copy looks like it works. It compares the EXCHANGE cohort's span
+# against the SPORTSBOOK cohort's. The clobber is per-FILE, so it truncates every
+# cohort one writer holds, TOGETHER. Measured on that lane's own worst date, the
+# 2026-09-01 shard: of 58,820 GAME rows, `venue_direct` is ZERO -- every game row
+# comes from the single OddsAPI writer, and its exchange and sportsbook cohorts
+# span identically (06:07:26..23:43:15). Their metric therefore reads ~100% on a
+# game-market measurement while the file is short: blind to exactly the failure it
+# exists to catch, and silent about it.
+#
+# The discriminator has to be the WRITER, not the book. `source == "venue_direct"`
+# marks the venue-direct capture; everything else is the OddsAPI path. Both write
+# the same file, so if one's rows stop long before the other's, that file lost a
+# tail. The check runs over the WHOLE shard -- prop rows included -- because the
+# clobber is a property of the file, and on game markets the second writer leaves
+# no rows to see.
+WRITER_OVERLAP_FLOOR = 0.65
+VENUE_DIRECT = "venue_direct"
+
+
+def writer_report(rows) -> dict:
+    """Do the two publishers of this shard cover the same span?
+
+    `rows` is any iterable of raw shard rows (game AND prop). Returns the spans
+    and the fraction of each writer's rows falling at or before the other's last
+    row. One writer present is not a failure -- the race needs two, and before
+    2026-09-01 16:11Z the venue-direct capture did not exist -- but it is
+    reported as `single_writer` rather than silently passing as healthy."""
+    direct, other = [], []
+    for row in rows:
+        stamp = parse_ts(row.get("captured_at") or row.get("snapshot_ts"))
+        if stamp is None:
+            continue
+        (direct if row.get("source") == VENUE_DIRECT else other).append(stamp)
+    if not direct or not other:
+        return {"ok": True, "single_writer": True, "known": True,
+                "direct_n": len(direct), "other_n": len(other),
+                "reason": "one writer wrote this shard; the publish race needs two"}
+    last_direct, last_other = max(direct), max(other)
+    covered_direct = sum(1 for s in direct if s <= last_other) / len(direct)
+    covered_other = sum(1 for s in other if s <= last_direct) / len(other)
+    matchable = min(covered_direct, covered_other)
+    return {
+        "ok": matchable >= WRITER_OVERLAP_FLOOR, "single_writer": False, "known": True,
+        "direct_n": len(direct), "other_n": len(other),
+        "direct_span": (_hhmmss(min(direct)), _hhmmss(last_direct)),
+        "other_span": (_hhmmss(min(other)), _hhmmss(last_other)),
+        "matchable": matchable,
+        "reason": "" if matchable >= WRITER_OVERLAP_FLOOR else
+                  "one publisher's rows stop long before the other's -- this shard "
+                  "was very likely clobbered by a competing whole-file publish",
+    }
+
+
+def _hhmmss(stamp: float) -> str:
+    return datetime.utcfromtimestamp(stamp).strftime("%H:%M:%S")
+
+
+def writer_report_path(day: str, cache_dir: Path) -> Path:
+    return cache_dir / f"shard_writers_{day}.json"
+
+
+def load_writer_report(day: str, cache_dir: Path) -> dict:
+    """The report written when the shard was compacted.
+
+    A cache built before this check existed has no sidecar, and that is UNKNOWN,
+    not clear: the compacted file keeps only game rows, so the second writer's
+    evidence is already gone and cannot be recovered from it. Unknown must not
+    land on the permissive branch -- refetch, or say `--allow-clobbered` out
+    loud."""
+    path = writer_report_path(day, cache_dir)
+    if not path.exists():
+        return {"ok": False, "known": False, "single_writer": False,
+                "reason": "no writer report -- the cache predates this check and the "
+                          "compacted file cannot answer it; delete it and refetch"}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"ok": False, "known": False, "single_writer": False,
+                "reason": "writer report unreadable"}
+
+
 def fetch_quotes(day: str, token_arg: str, cache_dir: Path) -> Path:
-    """One date's GAME quote rows, compacted out of the production shard."""
+    """One date's GAME quote rows, compacted out of the production shard.
+
+    Also writes `shard_writers_<day>.json` from the WHOLE shard, before the game
+    filter drops the evidence -- see the clobber note above."""
     dest = cache_dir / f"game_quotes_{day}.jsonl"
-    if dest.exists():
+    if dest.exists() and writer_report_path(day, cache_dir).exists():
         return dest
     token = admin_token(token_arg)
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -288,7 +379,8 @@ def fetch_quotes(day: str, token_arg: str, cache_dir: Path) -> Path:
     doc = next(iter(artifacts.values()))
     lines = doc.splitlines() if isinstance(doc, str) else [json.dumps(r) for r in doc]
     keep = ("snapshot_ts", "captured_at", "event_id", "bookmaker", "market",
-            "segment", "selection", "line", "price")
+            "segment", "selection", "line", "price", "source")
+    every = []
     with dest.open("w", encoding="utf-8") as handle:
         for line in lines:
             line = line.strip()
@@ -298,9 +390,15 @@ def fetch_quotes(day: str, token_arg: str, cache_dir: Path) -> Path:
                 row = json.loads(line)
             except Exception:
                 continue
+            every.append(row)
             if row.get("kind") != "game":
                 continue
             handle.write(json.dumps({k: row.get(k) for k in keep}) + "\n")
+    report = writer_report(every)
+    report["day"] = day
+    report["shard_rows"] = len(every)
+    writer_report_path(day, cache_dir).write_text(
+        json.dumps(report, indent=2), encoding="utf-8")
     return dest
 
 
@@ -599,6 +697,10 @@ def main() -> int:
     parser.add_argument("--cache-dir",
                         default=str(REPO_ROOT / "reports" / "game_market_option_value"))
     parser.add_argument("--emit-table", action="store_true")
+    parser.add_argument("--allow-clobbered", action="store_true",
+                        help="score a date whose shard lost rows to the publish "
+                             "race anyway. Reproduces a pre-guard number exactly; "
+                             "say so wherever you quote the result.")
     args = parser.parse_args()
 
     exchanges = EXCHANGES_WIDE if args.exchange_set == "wide" else EXCHANGES_NARROW
@@ -607,9 +709,37 @@ def main() -> int:
 
     orders: list[dict] = []
     indexes: dict = {}
+    shard_health: dict = {}
     for day in dates_between(args.start, args.end):
         orders.extend(fetch_orders(day, cache))
         indexes[day] = load_quote_index(fetch_quotes(day, args.admin_token, cache))
+        shard_health[day] = load_writer_report(day, cache)
+
+    # A clobbered shard hands back a clean-looking curve, so this refuses BEFORE
+    # anything is priced rather than footnoting it afterwards.
+    print(f"\nSHARD INTEGRITY  (`#630` publish race -- WRITER spans, not book cohorts)")
+    bad = []
+    for day, report in shard_health.items():
+        if report.get("single_writer"):
+            note = f"single writer ({report.get('other_n', 0)} rows) -- race needs two"
+        elif not report.get("known"):
+            note = report.get("reason", "unknown")
+        else:
+            note = (f"venue_direct {report['direct_n']} {report['direct_span'][0]}"
+                    f"..{report['direct_span'][1]}  |  other {report['other_n']} "
+                    f"{report['other_span'][0]}..{report['other_span'][1]}  "
+                    f"matchable {100 * report['matchable']:.1f}%")
+        print(f"  {day}  {'ok ' if report.get('ok') else 'BAD'}  {note}")
+        if not report.get("ok"):
+            bad.append(day)
+    if bad and not args.allow_clobbered:
+        print(f"\nREFUSING {len(bad)} date(s): {', '.join(bad)}")
+        print("  A shard that lost a publish race produces a confident curve off a")
+        print("  truncated file. Re-fetch (delete the cache entry), or pass")
+        print("  --allow-clobbered and say so wherever you quote the number.")
+        return 2
+    if bad:
+        print(f"\n  --allow-clobbered: scoring {len(bad)} date(s) that FAILED the check.")
 
     staked = [o for o in orders
               if str(o.get("sport")) == "mlb"
@@ -802,6 +932,10 @@ def main() -> int:
     print("  * refused rows are orders whose fill price never appears in their own")
     print("    book's captured series before submission; a coverage bound, not a")
     print("    random sample.")
+    if any(r.get("single_writer") for r in shard_health.values()):
+        print("  * the shard-integrity check above passes on SINGLE-WRITER dates by")
+        print("    construction. That is a real exoneration for them -- the race needs")
+        print("    two publishers -- but it is not a general clean bill for the file.")
     return 0
 
 

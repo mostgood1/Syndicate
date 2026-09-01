@@ -291,8 +291,58 @@ than hoped.** Three readings, all mine:
    coincide.
 
 **This bounds their finding rather than contradicting it:** the race begins when
-the second writer appears, so it is a 2026-09-01-onward defect. Anyone extending
-this measurement past 08-31 must run the overlap check first.
+the second writer appears, so it is a 2026-09-01-onward defect.
+
+### The guard is now IN the script, and it is NOT a copy of theirs
+
+Leaving that as a caveat would have been a scheduled defect: `--start/--end`
+reach past 08-31, and on a clobbered date this would hand back a clean-looking
+curve. `writer_report()` now runs over the WHOLE shard at fetch time, writes a
+`shard_writers_<date>.json` sidecar, and `main()` **refuses** a failing date
+before anything is priced (`--allow-clobbered` to override, out loud). A cache
+with no sidecar reads UNKNOWN and is refused too — the compacted file keeps only
+game rows, so the second writer's evidence is already gone and cannot be
+recovered from it.
+
+**Copying their `feed_overlap()` would have been blind, and this is the part
+worth remembering.** Theirs discriminates the EXCHANGE cohort from the
+SPORTSBOOK cohort. The clobber is per-FILE, so it truncates every cohort one
+writer holds *together*. Measured on their own worst date, 2026-09-01: of
+**58,820 game rows, `venue_direct` is zero** — every one comes from the single
+OddsAPI writer, and its exchange and sportsbook cohorts span **identically**
+(06:07:26..23:43:15). Their metric reads ~100% on a game-market measurement
+while the file is short. The discriminator has to be the WRITER
+(`source == "venue_direct"` vs the rest), not the book. Both floors are 0.65, on
+purpose: two guards on one defect that disagree about where the line sits would
+be worse than one.
+
+All ten dates in this window now carry an explicit **`ok  single writer`**
+verdict rather than silence. And the whole cache was **deleted and refetched**
+under the guard: **10/10 shards came back identical** (79,538 / 89,477 / 4,468 /
+229,278 / 223,652 / 87,809 / 130,052 / 39,724 / 68,069 / 156,220 game rows,
+0 lost and 0 gained on every date), and **every number in this document is
+unchanged** — 621 priced, 0.883pp, slopes +1.91 / +2.46, the ladder
++4.49 / +6.69 / +7.43 / +8.45 / +8.98, headline +0.74.
+
+### THEIR REFUSAL DATE NOW PASSES — the fix is deployed
+
+`/api/ops/version` returns **`e78aee525fde4367ee63cd8f311371c0a284f4e9`** on web,
+which IS the merge-on-receive commit. So this is the deployed cause, not a
+correlation. Refetching their date and running **their own metric** on it:
+
+| | bytes | rows | matchable |
+|---|---|---|---|
+| their fetch | 37,045,354 | 81,039 lines | **46.1%** |
+| mine, after the fix | 63,546,681 | 139,741 rows | **100.0%** (prop *and* game) |
+
+The sportsbook feed no longer stops at 20:18:49; it runs to 23:43. **Their 65%
+floor now admits 2026-09-01**, `--allow-clobbered` is no longer needed for it,
+and the +2.65% they published off it can be re-measured on an intact file — as
+can their "1,365 of 1,795 exclusions (76%) are the feed stopping", which was
+true of the file as it stood. Their "blocked until 2026-09-08" still holds on
+the capture-start ground; the clobber ground is discharged.
+
+Anyone extending this measurement past 08-31 gets the check for free now.
 
 **It does refine one thing I wrote.** The 206
 `fill_price_never_quoted_before_submit` refusals are *not* clobbered rows. They
