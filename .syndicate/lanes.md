@@ -349,7 +349,6 @@ death, never life — do not invert it.
   run. Arming it is a single-key env write PLUS a deploy (env changes need one), and was NOT done
   here — it is a production config change nobody asked for.
 - **Goal (single testable outcome):** `daily_ladders_<date>.json` produced by
-- **Goal (single testable outcome):** `daily_ladders_<date>.json` produced by
   `syndicate.features.mlb.ladders_build` on the NORMAL path — `generatedBy`
   stamped on the SERVED artifact — with the vendor ladders stage removed and both
   consumers rendering unchanged.
@@ -1366,7 +1365,8 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 **NOT MEASURED, and it is the thing I most wanted:** whether the board's own `ev_pct`/`model_edge_pct`/`score` PREDICT the outcome. The portfolio endpoints expose settlement marginals only (`by_sport`, `by_market_family`, `by_venue_family`), not per-order rows, so no edge-bucket calibration curve was computed. That needs the refresh-worker-side order ledger.
 
 
-### mlb-accuracy-assessment — **CLOSED 2026-09-01** — opened 2026-08-31 — session 3bb44ef2-a199-430e-afce-c3034bf48d9d — **ALL FOUR TIER 0 GATES DISCHARGED IN PRODUCTION; TIER 1 COMPLETE (05 sized, 06 and 07 closed).**
+### mlb-accuracy-assessment — **REOPENED 2026-09-01 for Tier 1 item 05** (was CLOSED same day) — opened 2026-08-31 — session 3bb44ef2-a199-430e-afce-c3034bf48d9d — **ALL FOUR TIER 0 GATES DISCHARGED IN PRODUCTION; TIER 1 06 and 07 CLOSED; 05 IN PROGRESS.**
+- **ITEM 05 SCOPE, and the first step is deliberately a MEASUREMENT not a code change.** The board's price comparison reads `quote.book_prices` (aggregator; game lines only for exchanges) while the direct venue feeds are wired only into `venue_scope` for paper2. Making the board read them is a real change to what it ranks and stakes. **But MLB props are currently EXCLUDED from staking (item 01), so this buys no revenue today — it buys the measurement that decides whether it is worth building.** Measure first: what does best-vs-median dispersion become once exchange prop prices are in the comparison. If small, do not build.
 - Goal: one MLB accuracy + profitability read across pregame sim (games + props), live sim, Layer 1 and Layer 2, plus a ranked optimization plan. **MET.** Deliverable: `.syndicate/findings_2026-08-31_mlb_accuracy_assessment.md` (~1,100 lines, sections 0-9 + 7b-7g); artifact `https://claude.ai/code/artifact/9989c17f-e27b-4332-a555-bed909241ef8`.
 - Headline: **`corr(claimed edge, win) = -0.1379`** — `model_edge` is anti-predictive because it subtracts a better estimator (market, +0.318) from a worse one (sim, +0.234). Full verified numbers: `state.md [mlb-sim-edge-is-anti-predictive]` and `[mlb-live-lens-accuracy-refuses]`. Narrative: `log/2026-09-01.md`.
 - Shipped + deployed: venue P&L bound + repair (`600ad6c3`); `mlb:player_prop` staking exclusion (`6f41efa1`); live-lens grader refuses in-progress tallies (`4b8d5436`); gate verifier `scripts/verify_mlb_prop_exclusion.py` (`f5912ba3`). Deploys: web + live-odds-worker `ea06bf81`, refresh-worker `c0a0c622`.

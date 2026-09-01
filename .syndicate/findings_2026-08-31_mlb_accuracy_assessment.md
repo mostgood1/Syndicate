@@ -962,6 +962,102 @@ are not captured at all today, which is item 05's actual work.
 
 ---
 
+## 7h. TIER 1 ITEM 05 MEASURED — worth about +1.2% ROI, not the ~+5% the plan implied, and the first step is CAPTURE not the board change
+
+**Done 2026-09-01.** Item 05 said *"make the board's price comparison read the
+venue feeds it already has"*. Before building it I measured what it buys. **Two
+measurements, and the first one was wrong in a way that would have justified
+building the wrong thing.**
+
+### FIRST MEASUREMENT — WRONG, and the error is instructive
+
+Compared each of the 23 filled Kalshi MLB prop orders against the best
+sportsbook quote for the same `(player, market, line, side)` in
+`book_quotes`. Result: Kalshi cheaper on 11 of 23, mean **−0.0187** — i.e.
+Kalshi looked WORSE, which would have killed the item.
+
+**That comparison was against prices that did not exist when we bet.**
+`book_quotes` is a time series; taking the minimum across the whole date picks
+the deepest in-play price. Ty France `batter_home_runs 0.5 over` at
+williamhill_us walks **+475 → +2600 across the day**, all the same market —
+so the "best sportsbook price" I was using was a late in-play quote, not
+something available at fill time. Same defect class as the WNBA lane's stale
+line and as the scheduled defect in section 7e: **one side of the comparison
+was not what it claimed to be.**
+
+### SECOND MEASUREMENT — time-aligned, and it inverted
+
+Best sportsbook quote **at or before** the fill, within 30 minutes:
+**Kalshi cheaper on 22 of 23, mean +0.0324, median +0.0321.** Stable as the
+window tightens: 30m `+0.0346` (11/11), 15m `+0.0272` (5/5), 10m `+0.0345`
+(3/3), 5m `+0.0268` (2/2), 2m `+0.0297` (2/2). Every comparison at every
+window favours Kalshi.
+
+**But this is a SELECTED sample and I said so before testing it.** Those 23 are
+the props the system chose to place on Kalshi, partly *because* the price
+looked good.
+
+### THIRD MEASUREMENT — unconditional, and it deflates the second
+
+Every snapshot where an exchange and a sportsbook quote the same
+`(event, market, line, side, snapshot)` — no selection:
+
+| venue | n | cheaper than best sportsbook | mean | median |
+|---|---|---|---|---|
+| kalshi | 9,557 | **50.7%** | −0.0239 | **+0.0017** |
+| polymarket | 1,918 | 41.7% | −0.0381 | −0.0040 |
+| novig | 3,882 | 38.9% | −0.0364 | −0.0048 |
+| prophetx | 4,259 | 36.1% | −0.0193 | −0.0061 |
+
+**Exchanges are NOT systematically cheaper.** Kalshi is a coin flip. **So the
++3.24pp on the fills was almost entirely selection**, exactly as flagged —
+now quantified rather than hedged.
+
+### THE HONEST ITEM 05 NUMBER — option value, not a systematic edge
+
+Price shopping does not need the exchange to be better on average; it needs it
+to be better *sometimes*, and you take it only then. Improvement =
+`best(sportsbooks) − best(sportsbooks + exchanges)` per snapshot, n=13,093:
+
+- an exchange improves on the best sportsbook on **6,880 (52.5%)**
+- **mean improvement across all rows: +1.57pp**
+- mean improvement *when* an exchange wins: +2.99pp
+- median +0.24pp, p75 +1.98pp, p90 +3.81pp, p99 +17.16pp
+
+**Anchored to item 07's sensitivity** (the surviving book pays 4.05pp per side;
+each 1pp of better entry is worth roughly +0.75pp of ROI): **+1.57pp is worth
+about +1.2% ROI.**
+
+**That is real and it is roughly a quarter of what the plan implied.** Section
+7b's "+5.1% payout improvement" framing and item 07's "+5.57% at a 3% hold" row
+both described what a *low-hold venue* would give. This measures what
+*price-shopping across the venues we have* gives, which is a different and much
+smaller thing.
+
+### WHAT THIS CHANGES ABOUT THE ORDER OF WORK
+
+**The board change is NOT the first step, and building it now would produce an
+unmeasurable result.** Every number above is from GAME markets, because those
+are the only ones where an exchange appears in `book_quotes` at all. For props
+— the book this was supposed to rescue — **there is no exchange quote captured
+anywhere** (section 7f: 0 rows). So:
+
+1. **CAPTURE exchange prop quotes into `book_quotes`.** Until this exists the
+   prop-side gain cannot be measured, and the board has nothing extra to read.
+2. **THEN measure the prop-side option value** the same way as above.
+3. **THEN change the board's comparison**, if step 2 justifies it.
+
+The plan had step 3 as the item. Doing it first would add a code path with
+nothing flowing through it on props, and would change game-row ranking — which
+already sees exchanges via OddsAPI — for a benefit measured at +1.2% and
+extrapolated from a different market type.
+
+**NOT BUILT THIS SESSION, deliberately.** The measurement is the deliverable;
+it re-prices the item downward by ~4x and reorders it. Building a board-ranking
+change on a number I had just corrected twice in one sitting is not warranted.
+
+---
+
 ## 8. The plan, ranked by measured dollars per unit of work
 
 Each item names the gate that decides whether it worked. Nothing here is
