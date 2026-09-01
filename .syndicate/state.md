@@ -1079,6 +1079,15 @@ demonstrating the bug. Pinned is not fixed.
   `board_market_not_a_game_line` (70% of our board — `batter_*`,
   `alternate_totals_corners`, `spreads_alt`, `player_*`). Polymarket carries no
   player-prop resolution; Kalshi does and its 7 prop families place fine.
+  **SUPERSEDED 2026-09-01 `[lane polymarket-prop-quote-capture]`: MLB player
+  props are IN SCOPE for the JOIN + QUOTE CAPTURE as of `9a436fab`**
+  (verified 18:10:22Z, capture appended 0→374; both counters above collapsed:
+  6,960→3,375 / 935→138). "Carries no player-prop resolution" conflated two
+  things: the venue LISTS player props (its largest bucket); what we lacked
+  was a measured player-token decode, which now exists (97/99 exact,
+  `.syndicate/findings_2026-09-01_polymarket_prop_census.md`). ORDER
+  placement on Polymarket props remains OUT of scope behind
+  `SYNDICATE_POLYMARKET_PROP_RESOLVERS` (off) — see `todo #628`.
 - **Soccer competition bucketing FIXED, and it bought nothing yet.**
   `soccer_competition_tokens` now unions the flat alias test with the PAIR test
   (`soccer_fixture_clubs`), which `_teams_match` had already trusted since
@@ -7971,6 +7980,23 @@ side_not_an_outcome_of_this_market     17
    gap — Kalshi DOES list MLB props (`ORDER_PATH venue=kalshi` shows
    `batter_rbis`/`strikeouts`/`batter_hits_runs_rbis`; Polymarket's shows
    `{'totals': {'would_build': 3}}` and nothing else).
+   **CORRECTED 2026-09-01 `[lane polymarket-prop-quote-capture]` — "LISTS
+   NONE" was FALSE, and the inference shape is the lesson.** It rested on two
+   refusal counters that refuse INDEPENDENTLY (venue-side
+   `market_type_not_a_game_line` fires before any prop is compared to our
+   board; board-side `board_market_not_a_game_line` fires before any board
+   prop is compared to the venue), so neither could measure overlap. Measured
+   against the venue's own catalogue (99 slug↔question pairs, 8/8 fixtures):
+   PROP|mlb is the venue's LARGEST bucket (2,644/cycle), ~170 player props
+   per fixture (hits/tb/hr/hrr/k/outs/er/wa/ha). The join now admits them —
+   verified in production 18:10:22Z: `POLYMARKET_QUOTE_CAPTURE matches=436
+   appended=374` (was 60/0), `market_type_not_a_game_line` 6,960→3,375,
+   `board_market_not_a_game_line` 935→138. Props feed the QUOTE CAPTURE only;
+   resolvers withhold them (`POLYMARKET_PROP_RESOLVERS armed=False
+   withheld=374`) unless `SYNDICATE_POLYMARKET_PROP_RESOLVERS` is armed.
+   Evidence: `.syndicate/findings_2026-09-01_polymarket_prop_census.md`;
+   `todo #628`. Point 1's ~76%-props board composition remains TRUE — only
+   the "lists none" half is retired.
 2. **POLYMARKET LISTS A PARTIAL SLATE** of the remaining game lines.
    `POLYMARKET_UNMATCHED` samples show the venue offering entirely different
    fixtures — board wants `Baltimore Orioles @ St. Louis Cardinals`, venue
