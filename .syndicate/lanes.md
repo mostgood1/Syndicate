@@ -1608,7 +1608,91 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Verification: ran — capture line 18:10:22Z (`appended=374`), grid line 18:11:28Z (`books=['kalshi','polymarket'] near_misses={}`), resolver gate withholding (`withheld=374`). Recorded in `deploys.md`.
 - Blocked by: none.
 
-> **HOLE MARKER `[2026-09-01 ~18:3xZ, session 41d46db0 / lane polymarket-prop-quote-capture]` — TWO CLOSED-LANE BLOCKS BELONGING TO SESSION syndicate-8d (3492626c) WERE DESTROYED HERE BY MY ERROR AND AWAIT THEIR RESTORATION:** `phase0-graded-supply — CLOSED 2026-09-01` (landed `e9090bc0`) and `phase0-accuracy-autorun — CLOSED 2026-09-01` (landed `258d312f`, including the note narrowing its todo.md claim to the `#626` block). A `git checkout -- .syndicate/lanes.md` I intended for my session worktree ran in THIS shared tree after a cwd slip and restored the file from HEAD, discarding every uncommitted edit in it. Their CODE is safe on origin/main; only these ledger blocks were lost. syndicate-8d was notified immediately with what partial text I hold; deliberately NOT reconstructed from my fragments — a partial restore that reads as whole is worse than this visible gap. Remove this marker when the blocks are rewritten.
+### phase0-graded-supply — CLOSED 2026-09-01 — **LANDED `e9090bc0`: game markets (`ml`, `totals`) now retain their cap overflow as `other_playable_candidates`, exactly as `pitcher_props` and every hitter market already did — so capped-out game picks are graded as tier `candidate` instead of discarded.** — session syndicate-8d (3492626c)
+- **NOT a cap raise, and the premise correction IS the result.** `#626`(b) said
+  "re-fit the cap profile". The code says otherwise: prop markets keep their
+  overflow, game markets dropped it, in BOTH card builders, with no comment
+  anywhere giving a reason — copy-drift. Retaining it leaves `recommendations`
+  capped, so the OFFICIAL tier is byte-identical and NO betting policy changes;
+  raising `caps.ml` would instead redefine OFFICIAL on a deliberately-fitted
+  profile and multiply a paper book measured at -7.43%.
+- Verification RAN: 11 new tests (overflow arithmetic on `#610`'s measured
+  12-vs-1 slate, zero-cap and uncapped edges, `_rank_and_cap`'s added `rank`
+  key not breaking identity subtraction; reachability on both builders and both
+  consumers), 71 existing card-builder/MLB-job tests pass. Reachability checked
+  BEFORE writing: the manifest grades extras `tier="candidate"` and the settler
+  settles them `"candidate"`, both market-agnostic — no grader/settler change.
+- **Production gate, deliberately narrower than `#626`(b) claims:**
+  `candidate`-tier `ml`/`totals` rows > 0 on the first card built after this
+  ships. NOT "graded rows/week 14 -> 100+" — that also depends on `#611` and on
+  a join whose health two ledger entries disagree about.
+- Files: released. `vendor/mlb_bettingv2/tools/daily_update_multi_profile.py`,
+  `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py`,
+  `tests/test_game_market_overflow_retained.py`.
+
+### phase0-accuracy-autorun — CLOSED 2026-09-01 — **LANDED `258d312f`: `build_accuracy_summary` finally has a scheduled caller — a refresh-worker autorun, default OFF, claim-before-work, daily at Central hour 7, per-sport isolation, bounded persistence, and its own cost telemetry.** — session syndicate-8d (3492626c)
+- **The memory check is the load-bearing part, and I nearly got it wrong.** I
+  read the call site `_latest_by_recommendation_id(_stream_record_payloads(...))`,
+  concluded it materialises the whole ledger — the exact shape `#256` diagnosed
+  as 110 OOM kills over 11h — and was about to block the job. Reading the
+  REDUCER corrected it: it is "single pass, iterate-only -- so it consumes a
+  GENERATOR without materialising it. That is what lets the peak be the reduced
+  set" (`#254`). Peak is the deduped record set (~20k), the same order as the
+  settlement pass already running daily (~40MB / 71s). **A call site is not an
+  allocation; the function is.**
+- Safety, each item from a logged incident: OFF by default (this file's own
+  convention for a new periodic job); claim-before-work per `#256`, with a
+  still-`started` status reported loudly and not retried that day; hour 7 sits
+  one BEHIND settlement's 6 because it scores what settlement writes; per-sport
+  try/except so one sport cannot cost the other seven; bounded persistence with
+  `segments_total`/`segments_truncated` because the keyvalue key has an 8MB
+  ceiling and the segmented surface grows with coverage.
+- Verification RAN: 16 new tests incl. off!=on both directions, that a disabled
+  gate does NO work at all (the cost guarded is the read), claim-ordering
+  asserted on write SEQUENCE, and reachability that the `elif` sits behind
+  settlement. 74 refresh-worker/ordering tests pass; 3 soccer-seed failures are
+  PRE-EXISTING (baselined via stash — they need `data/`, excluded from worktrees).
+- **Production reading deferred BY DESIGN, not inert:** arming is a one-key
+  config change and should be taken with the first run's cost telemetry in hand.
+- **todo.md claim NARROWED to the `#626` block and released for additive
+  top-inserts** (peer request, lane `polymarket-prop-quote-capture`).
+- Files: released. `scripts/run_refresh_worker.py`,
+  `tests/test_accuracy_summary_autorun.py`.
+
+### mlb-prop-freeze-source-trees — CLOSED 2026-09-01 — **LANDED `9a768443`: `#626`(a) / `#611`. The MLB prop pregame seal now sources the richest doc across EVERY `market_dir` instead of `market_dirs[0]` alone, and every refusal is NAMED.** — session syndicate-8d (3492626c)
+- **The asymmetry was inside one loop body.** `best_frozen` was already computed
+  across every tree — its own comment says *"'Already frozen' is asked of EVERY
+  tree, not just this one"* — while the SOURCE was `market_dirs[0]` and a miss
+  was a bare skip that emitted nothing. Game lines cannot fail that way
+  (`_merge_pregame_game_lines` seeds from every copy), which is exactly why
+  2026-09-01 had a 15-game game-line freeze and ZERO prop seals on the same runs.
+  `market_dirs[0]` is the tree the fetch writes to LATER in the same pass, and
+  git tracks zero files under it.
+- **NOT claimed as proven to be THE cause.** Nobody has read
+  `.../data/market/oddsapi/` on a live worker; `#611` says do not ship on the
+  asymmetry alone. What shipped is narrower and defensible on its own terms: an
+  internal inconsistency in one function, plus the instrumentation `#611` has
+  asked for three sessions running.
+- **THE FALSIFIER IS BUILT IN:** if the next MLB pregame pass reports
+  `reason=no_live_doc_in_any_tree`, this change's own hypothesis is WRONG — the
+  doc is in no tree at freeze time and the cause is upstream (fetch cadence, or
+  the source root `_build_mlb_steps` hardcodes). The counter says so rather than
+  hiding it.
+- **Deliberately NOT fixed:** `refresh_odds_sources._build_mlb_steps` hardcodes
+  `source_root = REPO_ROOT / "data" / "mlb_source"`, making MLB the only sport
+  that ignores the resolution the orchestrator computes and logs. Real, but it
+  moves where every MLB read and write lands on the platform's most mature
+  sport, on an unproven mechanism. **Own lane, behind a production read.**
+- Verification RAN: 10 new tests; **off-is-not-on proven by running them against
+  HEAD's copy of the module — 7 of 10 FAIL pre-fix, and the 3 that pass in both
+  states are exactly the ones asserting UNCHANGED behaviour** (first-tree seal,
+  monotonic replacement, game lines). 71 existing freeze/odds tests pass.
+- **Production gate:** on the next MLB pregame pass, either a
+  `*_props_*_pregame.json` appears for the date, or the emitted reason names
+  which branch refused. Both are progress; the second is the read `#611` has
+  been unable to take for three sessions.
+- Files: released. `scripts/refresh_mlb_oddsapi.py`,
+  `tests/test_mlb_prop_freeze_source_trees.py`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
