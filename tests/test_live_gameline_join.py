@@ -231,9 +231,15 @@ class TestIndexAndAttach:
                           "simsRun": sims, "projection": {"total": 8.5, "homeMargin": 0.7}}],
         }]}
 
-    def _row(self, state="live", market="h2h", kind="game", market_prob=0.50, segment="full"):
+    def _row(self, state="live", market="h2h", kind="game", market_prob=0.50,
+             segment="full", age_seconds=30.0):
         return {"kind": kind, "market": market, "segment": segment,
                 "away_team": "Colorado Rockies", "home_team": "San Francisco Giants",
+                # A LIVE ROW CARRIES A LIVE QUOTE. Absent `age_seconds` is
+                # refused by `quote_age_verdict` (unknown must not default
+                # permissive), so a fixture that omits it is testing the
+                # staleness gate rather than whatever it meant to test.
+                "age_seconds": age_seconds,
                 "game": {"state": state},
                 "projection": {"market_fair_prob_over": market_prob,
                                "edge_unavailable_reason": "game is live: a pregame projection cannot be priced against a live market",
@@ -426,9 +432,10 @@ class TestSegmentFilter:
             "gameLens": [{"key": "live", "source": "live_mc", "modelHomeWinProb": 0.9667,
                           "simsRun": 120, "projection": {"total": 7.5, "homeMargin": 0.7}}]}]}
 
-    def _row(self, segment, market_prob):
+    def _row(self, segment, market_prob, age_seconds=30.0):
         return {"kind": "game", "market": "h2h", "segment": segment,
                 "away_team": "San Diego Padres", "home_team": "Cleveland Guardians",
+                "age_seconds": age_seconds,
                 "game": {"state": "live"},
                 "projection": {"market_fair_prob_over": market_prob}}
 

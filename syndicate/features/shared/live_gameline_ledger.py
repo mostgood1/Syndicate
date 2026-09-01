@@ -58,7 +58,15 @@ from typing import Any
 # repaired -- the line is not recoverable from the stored probability -- so a
 # reader that needs `line` (scoring totals/spreads against their own outcomes)
 # must filter to `v >= 3` and will find no history before this date.
-LEDGER_VERSION = 3
+#
+# v4 (2026-09-01) carries the GAME CLOCK (`inning`, `half`, `outs`,
+# `outs_recorded`, `progress_fraction`) and `pregame_home_win_prob`. This is
+# ADDITIVE and NOT a population change -- `record_key` is untouched, so v3 and
+# v4 records count the same things and may be pooled for any question that does
+# not read the new fields. A reader that needs them must filter to `v >= 4`;
+# earlier records cannot be repaired, because neither the clock nor the pregame
+# baseline is recoverable from what was stored.
+LEDGER_VERSION = 4
 
 # A live slate tops out around 15 games x a handful of priceable markets. 500
 # is far above that and still bounds a pathological build.
@@ -234,6 +242,28 @@ def build_records(
                 "sims_run": lg.get("sims_run"),
                 "live_state_as_of": lg.get("as_of"),
                 "carried_forward": bool(lg.get("carried_forward")),
+                # --- WHERE IN THE GAME THIS PROBABILITY WAS FORMED (v4) ---
+                #
+                # The 2026-09-01 skill audit could only split by WALL-CLOCK
+                # minutes since a game's first ledger row, because nothing here
+                # recorded the game clock. That proxy cannot tell a rain delay
+                # from a long inning, and cannot separate "bottom 9, tied, two
+                # outs" from "top 5 of a blowout" -- which is precisely the axis
+                # the model's skill turned out to vary along.
+                #
+                # `progress` comes from the lens verbatim; the fields are
+                # unpacked here rather than stored whole so a reader does not
+                # have to know the producer's camelCase.
+                "inning": (lg.get("progress") or {}).get("inning"),
+                "half": (lg.get("progress") or {}).get("half"),
+                "outs": (lg.get("progress") or {}).get("outs"),
+                "outs_recorded": (lg.get("progress") or {}).get("outsRecorded"),
+                "progress_fraction": (lg.get("progress") or {}).get("fraction"),
+                # THE PREGAME NUMBER THE LIVE ONE REPLACED. Without it, "should
+                # the live estimate have stayed closer to its prior" is not a
+                # question this file can answer -- and the audit's encompassing
+                # regression says that is the question. Present from v4 only.
+                "pregame_home_win_prob": lg.get("pregame_home_win_prob"),
                 "game_state": game.get("state"),
                 "home_score": game.get("home_score"),
                 "away_score": game.get("away_score"),

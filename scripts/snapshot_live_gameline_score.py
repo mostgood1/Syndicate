@@ -147,6 +147,32 @@ def main() -> int:
         "priceable_only": score.get("priceable_only"),
         "all_records": score.get("all_records"),
         "last_per_game": score.get("last_per_game"),
+        # --- SCORER PROVENANCE. THE FIELD THAT MAKES THESE ROWS POOLABLE ---
+        #
+        # **ROWS WRITTEN BEFORE 2026-08-30 DESCRIBE A DIFFERENT MEASUREMENT AND
+        # MUST NOT BE POOLED WITH LATER ONES.** Until `75cf9aec` the scorer
+        # compared a totals `P(over)` and a spreads `P(home covers)` against
+        # "did the home team win", so ~92% of the scored population was a
+        # category error. The evidence is the row counts: offline h2h-only
+        # scoring matches production EXACTLY on 08-30 (n=249/249, briers
+        # 0.13400/0.19644 identical) and is 10-20x SMALLER on every earlier date
+        # (08-20: 156 vs 3,098).
+        #
+        # Nothing in the row said which scorer produced it, so a pooling pass on
+        # 2026-09-01 averaged across the boundary and reported "+0.04839, model
+        # worse on 10 of 12 dates" -- a statement about a fixed bug, not about
+        # the model. `scored_markets` is now recorded from the payload so the
+        # boundary is visible IN THE DATA rather than by remembering a date.
+        # A row with `scored_markets` absent is pre-fix by construction.
+        "scored_markets": score.get("scored_markets"),
+        "records_by_market": score.get("records_by_market"),
+        # --- THE CUT A MODEL CLAIM MUST BE MADE ON (see the scorer) ---
+        # Pooled over every quote age the model reads as parity (-0.00202);
+        # restricted to quotes that were actually alive it LOSES (+0.01096).
+        # Absent on rows captured before this field existed.
+        "fresh_quotes_only": score.get("fresh_quotes_only"),
+        "fresh_quote_seconds": score.get("fresh_quote_seconds"),
+        "by_quote_age": score.get("by_quote_age"),
         # v2 discriminator: `written` above `priceable` proves non-priceable
         # rows are recorded, i.e. the ledger measures the MODEL and not the
         # publish gate.
@@ -162,6 +188,13 @@ def main() -> int:
     print(f"date={row['date']} games_with_outcome={row['games_with_outcome']} "
           f"priceable_only model_brier={m.get('brier')} market_brier={k.get('brier')} "
           f"diff={po.get('model_minus_market_brier')} n={m.get('n')}/{k.get('n')}")
+    fq = row.get("fresh_quotes_only") or {}
+    fm, fk = (fq.get("model") or {}), (fq.get("market") or {})
+    print(f"  fresh_quotes_only (<={row.get('fresh_quote_seconds')}s) "
+          f"model_brier={fm.get('brier')} market_brier={fk.get('brier')} "
+          f"diff={fq.get('model_minus_market_brier')} n={fm.get('n')}/{fk.get('n')}")
+    print(f"  scored_markets={row.get('scored_markets')} "
+          f"(absent => PRE-2026-08-30 SCORER, not poolable with later rows)")
     print(f"  ledger written={row['ledger_written']} candidates={row['ledger_candidates']} "
           f"priceable={row['rows_priceable']} "
           f"(v2 discriminator satisfied: {bool((row['ledger_written'] or 0) > (row['rows_priceable'] or 0))})")
