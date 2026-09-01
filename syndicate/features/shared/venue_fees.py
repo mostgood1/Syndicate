@@ -30,25 +30,38 @@ number every third-party fee explainer quotes -- would have doubled the
 modelled cost on exactly the sport with the most volume, and killed real arbs
 on paper before anything ever looked at them.
 
-**COMPLETED 2026-09-01 across all 14 registered MLB series** -- re-read any time
-with `py -3 scripts/read_kalshi_fee_params.py`, which is the thing that should
-have existed instead of a hand reading:
+**EXTENDED 2026-09-01 to 19 MLB series, 0 failures** -- re-read any time with
+`py -3 scripts/read_kalshi_fee_params.py`, which is the thing that should have
+existed instead of a hand reading:
 
     x0.5  KXMLBGAME  KXMLBSPREAD  KXMLBTOTAL  KXMLBKS  KXMLBOUTS
           KXMLBHIT  KXMLBHR  KXMLBHRR  KXMLBRBI  KXMLBTB  KXMLBSB
-    x1.0  KXMLBERA  KXMLBHA  KXMLBWA
+          KXMLBF5TOTAL  KXMLBF5SPREAD  KXMLBTEAMTOTAL
+    x1.0  KXMLBERA  KXMLBHA  KXMLBWA  KXMLBASGAME  KXMLBINNINGTOTAL
 
 **Every BATTER-PROP series is half rate.** That closed a real open question:
 `#624` step 6 could not resolve it, so it priced exchange entry as a BOUND
 (m=0.5..1.0) whose 0.44-ROI-point width was more than half the gate's shortfall.
 
-**But "MLB is half rate" is STILL the wrong rule, and this read is what shows
-it.** The three full-rate series are PITCHER RATE STATS -- earned runs, hits
-allowed, walks -- and they sit inside the same prop book as the half-rate batter
-series. A single per-sport multiplier is wrong in BOTH directions at once
-depending on which market it is pointed at. `KXMLBERA` was already visible as
-x1.0 in the 08-29 table above; what was missing was the inference that the split
-is per-STAT, not per-sport. **Resolve the multiplier per series. Always.**
+**THE MULTIPLIER IS A PROPERTY OF THE SERIES AND NOTHING ELSE.** Every broader
+rule this table might tempt you into is falsified BY this table:
+
+  * **not per sport** -- five MLB series are full rate;
+  * **not props-vs-games** -- `KXMLBASGAME` is a GAME at x1.0 while `KXMLBGAME`
+    is x0.5, and both are `quadratic_with_maker_fees`;
+  * **not per market family**, the sharpest one -- `KXMLBTOTAL` and
+    `KXMLBF5TOTAL` are x0.5 while `KXMLBINNINGTOTAL` is **x1.0**. Three totals
+    series, two rates.
+
+Three of the full-rate series (the pitcher rate stats) sit inside the same prop
+book as the half-rate batter series, so a per-sport multiplier is wrong in BOTH
+directions at once. `KXMLBERA` was already visible as x1.0 in the 08-29 table
+above; what was missing was the inference. **Resolve per series. Always.**
+
+**REGISTERED != FETCHED.** The first pass read the 14 series in
+`kalshi_catalogue.SERIES_SPORT` and called itself complete; five more are fetched
+without being registered there, and **two of those are full rate**. The fee
+question follows what is FETCHED. Add a series anywhere, re-run the reader.
 
 --------------------------------------------------------------------------
 THE BASE RATE IS MEASURED OFF OUR OWN FILLS, NOT TAKEN FROM A WEB SOURCE

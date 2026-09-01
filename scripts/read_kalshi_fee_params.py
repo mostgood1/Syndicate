@@ -14,29 +14,39 @@ rate, so it reported a BOUND (+2.22% to +2.66% ROI) instead of a number, and the
 script is the thing that should have existed: one command, every series, read
 from the venue.
 
-WHAT THE 2026-09-01 READ FOUND, all 14 registered MLB series:
+WHAT THE 2026-09-01 READ FOUND, 19 MLB series, 0 failures:
 
-    KXMLBGAME    quadratic_with_maker_fees  0.5     KXMLBERA   quadratic  1.0
-    KXMLBSPREAD  quadratic                  0.5     KXMLBHA    quadratic  1.0
-    KXMLBTOTAL   quadratic                  0.5     KXMLBWA    quadratic  1.0
-    KXMLBKS      quadratic                  0.5
-    KXMLBOUTS    quadratic                  0.5
-    KXMLBHIT     quadratic                  0.5
-    KXMLBHR      quadratic                  0.5
-    KXMLBHRR     quadratic                  0.5
-    KXMLBRBI     quadratic                  0.5
-    KXMLBTB      quadratic                  0.5
-    KXMLBSB      quadratic                  0.5
+    x0.5  KXMLBGAME  KXMLBSPREAD  KXMLBTOTAL  KXMLBKS  KXMLBOUTS
+          KXMLBHIT  KXMLBHR  KXMLBHRR  KXMLBRBI  KXMLBTB  KXMLBSB
+          KXMLBF5TOTAL  KXMLBF5SPREAD  KXMLBTEAMTOTAL
+    x1.0  KXMLBERA  KXMLBHA  KXMLBWA  KXMLBASGAME  KXMLBINNINGTOTAL
 
-**Every batter-prop series is HALF RATE.** So step 6's m=1.0 bound was pure
-caution and can be retired.
+**Every batter-prop series is HALF RATE.** So `#624` step 6's m=1.0 bound was
+pure caution and can be retired.
 
-**But "MLB is half rate" is still the wrong rule, and this read is what shows
-it.** The three full-rate series -- earned runs, hits allowed, walks -- are
-PITCHER RATE STATS, and they sit inside `#624`'s gate book, which is "unders
-minus HR/HRR" rather than "batter unders". A single multiplier for MLB is wrong
-in both directions depending on which market you point it at. The multiplier is
-a property of the SERIES and nothing else.
+**THE MULTIPLIER IS A PROPERTY OF THE SERIES AND NOTHING ELSE. Every broader
+rule anyone might reach for is FALSIFIED by this table:**
+
+  * not per SPORT -- five MLB series are full rate;
+  * not props-vs-games -- `KXMLBASGAME` is a GAME at 1.0 while `KXMLBGAME` is
+    0.5, and both are `quadratic_with_maker_fees`;
+  * not per MARKET FAMILY, which is the sharpest one -- `KXMLBTOTAL` and
+    `KXMLBF5TOTAL` are 0.5 while `KXMLBINNINGTOTAL` is **1.0**. Three totals
+    series, two different rates.
+
+The five full-rate series are pitcher rate stats (earned runs, hits allowed,
+walks), the All-Star game, and inning totals. Three of those sit inside `#624`'s
+gate book, which is "unders minus HR/HRR" rather than "batter unders", so a
+single multiplier would be wrong in both directions at once.
+
+**REGISTERED != FETCHED, and the fee question follows what is FETCHED.** The
+first version of this list carried the 14 series in
+`kalshi_catalogue.SERIES_SPORT` and called itself complete. Five more are
+fetched without being registered there (`KXMLBASGAME`, `KXMLBF5TOTAL`,
+`KXMLBF5SPREAD`, `KXMLBINNINGTOTAL`, `KXMLBTEAMTOTAL`) -- **two of them full
+rate** -- and they surfaced only because a stale background grep of non-test
+`.py` finished after the read had already been declared complete. If you add a
+series anywhere, re-run this.
 
 `fee_multiplier` is venue configuration and can change. This writes a dated
 snapshot rather than a constant of nature; re-run it before leaning on the
@@ -63,9 +73,16 @@ SERIES_ENDPOINT = "https://api.elections.kalshi.com/trade-api/v2/series/"
 # Listed here so the default run covers the sport the gate is about; pass
 # --series for anything else.
 MLB_SERIES = (
+    # registered in `kalshi_catalogue.SERIES_SPORT`
     "KXMLBGAME", "KXMLBSPREAD", "KXMLBTOTAL",
     "KXMLBKS", "KXMLBOUTS", "KXMLBERA", "KXMLBHA", "KXMLBWA",
     "KXMLBHIT", "KXMLBHR", "KXMLBHRR", "KXMLBRBI", "KXMLBTB", "KXMLBSB",
+    # FETCHED but not in SERIES_SPORT -- found only because a stale background
+    # grep of non-test .py surfaced them after the first read had been called
+    # "complete". Two of them are FULL rate. Registration and fetching are
+    # different lists, and the fee question follows what is FETCHED.
+    "KXMLBASGAME", "KXMLBF5TOTAL", "KXMLBF5SPREAD",
+    "KXMLBINNINGTOTAL", "KXMLBTEAMTOTAL",
 )
 
 
@@ -108,13 +125,13 @@ def main() -> int:
 
     rows = [read_series(ticker) for ticker in args.series]
 
-    print(f"{'series':<14}{'fee_type':<30}{'mult':>6}   title")
-    print("-" * 92)
+    print(f"{'series':<18}{'fee_type':<30}{'mult':>6}   title")
+    print("-" * 96)
     for row in rows:
         if row.get("error"):
-            print(f"{row['series']:<14}READ FAILED -- {row['error'][:60]}")
+            print(f"{row['series']:<18}READ FAILED -- {row['error'][:60]}")
             continue
-        print(f"{row['series']:<14}{str(row.get('fee_type')):<30}"
+        print(f"{row['series']:<18}{str(row.get('fee_type')):<30}"
               f"{str(row.get('fee_multiplier')):>6}   {str(row.get('title') or '')[:34]}")
 
     good = [r for r in rows if not r.get("error")]
