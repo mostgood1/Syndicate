@@ -812,8 +812,27 @@ is nothing on disk to join: for MLB props the exchange price is never captured,
 because `book_quotes` is fed by OddsAPI and OddsAPI carries game lines only for
 exchanges. The prop prices exist ONLY in the direct feed
 (`kalshi_markets.json` -> `kalshi_price_resolver`), which is wired into
-`venue_scope` for paper2 and nowhere else — confirmed by
-`PAPER2_PLAN_WRITTEN venue=kalshi rows_in=193 venue_priced=13`.
+`venue_scope` for paper2 and nowhere else.
+
+**[CORRECTED 2026-09-01, and the correction is mine to own.]** I first cited
+`PAPER2_PLAN_WRITTEN venue=kalshi rows_in=193 venue_priced=13` as confirming
+this. **That line carries NO `sport=` term** — verified in
+`pipeline/portfolio_commit.py`, the fields are `venue / rows_in / venue_priced /
+positions / staked / sim_view_on / placeable_committed` — so a non-zero
+`venue_priced` cannot be attributed to MLB rows. I had also recommended that
+same counter to lane `wnba-accuracy-assessment` as a sport-level test; it is
+not one, and they caught it. Struck.
+
+The claim stands on the two readings that DO attribute:
+1. **23 filled Kalshi MLB player-prop orders** whose tickers name both sport and
+   market (`KXMLBHR-`, `KXMLBHIT-`, `KXMLBTB-`, `KXMLBHA-`). You cannot fill a
+   contract that is not quoted.
+2. **The `book_quotes` count** — 0 exchange rows on prop markets against 26,710
+   on game markets, counted on the `market` field itself.
+
+`venue_priced` also swings with the slate (kalshi 0 at 03:28Z, 12 at 03:47Z,
+polymarket 379/384), which is check (d) again and a second reason it is a poor
+gate.
 
 **So item 05 is a SOURCE change, not a join.** "Join what we already have"
 would be a no-op on MLB props. The lane `wnba-accuracy-assessment` initially
