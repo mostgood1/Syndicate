@@ -72,7 +72,16 @@ and empty. Refusals collapsed as designed: `market_type_not_a_game_line`
 6,960→3,375, `board_market_not_a_game_line` 935→138. Recorded in `deploys.md`;
 state.md corrected; lane CLOSED.
 
-**STILL OPEN (follow-ups, unowned):** NFL PROP admission (448/cycle, vocabulary
+**STILL OPEN (follow-ups, unowned):** ONE PENDING PRODUCTION READ, due next
+pregame board (added 2026-09-01 22:1xZ, lane `prop-name-disambiguator-derivation`):
+the `Max Muncy (2002)`→`maxmun` derivation fix + `prop_same_name_collision_at_venue`
+guard are LIVE on `cc1feccc` (module proven running: 5 sample pairs encode per the
+measured rule, `prop_classes` invariant 162=162), but the board carried ZERO
+disambiguated names after first pitches — the decisive read is one
+`POLYMARKET_UNMATCHED`/capture line on a pregame board carrying such a name
+(sample token must read `maxmun`-style, never `max200`); the collision counter's
+zero is expected and is NOT the guard firing (reachability is test-pinned). See
+`findings_2026-09-01_prop_rung_miss_rate.md` + `deploys.md` 22:14Z. NFL PROP admission (448/cycle, vocabulary
 unmeasured — same mechanism once week-1 fixtures are resolvable);
 `/api/ops/polymarket/slate` still skips PROP before sampling (the reader now
 disagrees with the decider about props); `venue_ticker` untraceable on captured
