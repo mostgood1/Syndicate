@@ -1380,12 +1380,28 @@ def _build_card_from_report(
     for market_name in ("totals", "ml"):
         rows = list(raw_game_rows.get(market_name) or [])
         selected = _rank_and_cap(rows, caps.get(market_name))
+        # Mirrors `daily_update_multi_profile.py`'s game-market loop, which is
+        # where the same gap was fixed -- see the long note there. THE SECOND
+        # COPY IS THE POINT: this file rebuilds the identical card shape for
+        # replay, and both copies discarded game-market overflow while giving
+        # `pitcher_props` (five lines below) its own. A fix to one and not the
+        # other is how a replayed card stops matching the card production
+        # actually wrote, which is precisely the drift that makes a backtest
+        # measure a build nobody shipped.
+        #
+        # Plain subtraction here, matching this file's own `pitcher_props`
+        # line rather than the writer's support-filtered form: this builder
+        # has no support-filter stage at all, and inventing one for two markets
+        # would make the replayed card differ from the writer's in a NEW way.
+        extra = _subtract_selected_rows(rows, selected)
         markets[market_name] = {
             "raw_candidates_n": int(len(rows)),
             "selected_n": int(len(selected)),
+            "other_playable_candidates_n": int(len(extra)),
             "cap": (int(caps[market_name]) if caps.get(market_name) is not None else None),
             "stake_u": float(DEFAULT_STANDARD_STAKE_U),
             "recommendations": selected,
+            "other_playable_candidates": extra,
         }
 
     selected_pitcher_rows = _rank_and_cap_unique_players(pitcher_rows, caps.get("pitcher_props"))
