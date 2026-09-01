@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 652 rules `[generated]`
+## Index — 653 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3594,3 +3594,36 @@ holds only what you touched.
 - **Cost.** One force-broken live claim and a deploy handed to another session
   mid-work. No production damage — the TTL was doing the real work the whole
   time, which is exactly why the pid was safe to delete rather than repair.
+
+## 2026-09-01 FORBIDDEN: leaving anything staged in the SHARED index that you are not committing in the same breath
+
+- **What we believed.** The hazard of the shared index is `git add <path>`
+  sweeping ANOTHER session's edits into MY commit — the 2026-08-20 rule above —
+  and the standing guidance "never chain add and commit" follows from it. So
+  staging, then pausing to inspect `git diff --cached` before committing, reads
+  like the careful thing to do.
+- **What was actually true.** **The exposure is the DURATION, and it runs in both
+  directions.** `git commit` commits the WHOLE index, so anything of mine sitting
+  staged is fair game for any other session's next commit — whatever files it
+  names, whatever its message says. Measured 2026-09-01: I staged a `lanes.md`
+  closure and a 27-line `todo.md` carry-forward, paused to inspect, and another
+  session's commit `fff3a3f8` — titled *"deploys: 417e19ed — the near-miss false
+  alarm is gone"* — absorbed both. Content survived; two of its three files have
+  nothing to do with its message.
+- **How we found out.** `git diff --cached --stat` listed a file I had not
+  staged (`deploys.md`), then moments later listed NOTHING and `HEAD` had moved.
+  An index that empties itself under you is another session committing, not a
+  git quirk.
+- **The rule going forward.** Stage and commit **atomically** or not at all:
+  `git commit --only -- <paths>` takes the worktree copies of exactly those paths
+  and leaves the rest of the index alone. When the commit needs content that is
+  NOT the worktree copy (rebuilding `origin/main` + only your edits), build it in
+  a **temporary index** — `GIT_INDEX_FILE=<tmp> git read-tree/update-index/
+  write-tree` then `git commit-tree` — which never touches the shared index at
+  all. **Inspect BEFORE staging, never between staging and committing.** The
+  older "never chain add and commit" is not wrong, but it is not the invariant:
+  the invariant is that no staged state of yours may outlive your own commit.
+- **Cost.** None to content — both edits reached `origin/main`. The damage is to
+  the record: a commit message that misdescribes two of its three files, and an
+  authorship trail that says a session did work it never did. On a repo whose
+  ledger is read as evidence, that is the expensive kind of wrong.
