@@ -894,6 +894,35 @@ def _is_yes_no_market(outcomes: Any) -> bool:
 _PROP_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
 
 
+def _player_name_words(player_name: Any) -> list[str]:
+    """The name words BOTH encoders read. One cleaner, not two that drift.
+
+    Drops, in order: parenthetical groups -- our board disambiguates two real
+    same-named players with them (`Max Muncy (2002)` is the Athletics' Muncy,
+    b. 2002, beside the Dodgers' 1990 one) and the year was surviving cleaning
+    to become the "surname" (`max200`, measured in production 2026-09-01
+    20:30Z, classified player_not_listed with a token no venue will ever
+    write); hyphens to spaces (the venue keys `Crow-Armstrong` off
+    `armstrong`); diacritics and punctuation; generational suffixes; and
+    pure-digit words, which can never be a name half regardless of where the
+    board writes them.
+    """
+    import unicodedata
+
+    text = str(player_name or "").strip().lower()
+    if not text:
+        return []
+    text = re.sub(r"\([^)]*\)", " ", text)
+    text = text.replace("-", " ")
+    folded = unicodedata.normalize("NFKD", text)
+    stripped = "".join(ch for ch in folded if not unicodedata.combining(ch))
+    cleaned = re.sub(r"[^a-z0-9 ]", "", stripped)
+    return [
+        w for w in cleaned.split()
+        if w and w not in _PROP_NAME_SUFFIXES and not w.isdigit()
+    ]
+
+
 def _polymarket_player_token(player_name: Any) -> str | None:
     """OUR player's name -> the venue's slug token, or None when underivable.
 
@@ -910,37 +939,52 @@ def _polymarket_player_token(player_name: Any) -> str | None:
           `ajsha` (AJ Smith-Shawver)
         - diacritics and punctuation folded: `eugsua` (Eugenio Suarez),
           `julrod` (Julio Rodriguez)
+        - board disambiguators dropped: `maxmun` (Max Muncy (2002))
 
-    WHY DERIVE-AND-COMPARE IS SAFE WHERE DECODING WOULD BE A GUESS. The venue
+    WHY DERIVE-AND-COMPARE STILL NEEDS A COLLISION GUARD. The venue
     disambiguates its token space LEAGUE-WIDE: `wilcon2` (William Contreras,
-    because Willson collides at `wilcon`), `bretbat` (Brett Bateman at 4+3,
-    because Brett Baty collides at `brebat`). We only ever produce the plain
-    3+3 form, so a venue token that carries a disambiguator cannot match ours
-    -- a COVERAGE miss on exactly the names the venue itself considers
-    ambiguous, which is the refusal this module prefers everywhere. The
-    residual wrong-person case needs the venue's own collision handling to
-    have missed a same-token pair AND our board to carry the other player in
-    the same game; the board-side ambiguity refusal in the join covers our
-    half of that.
-    """
-    import unicodedata
+    beside Willson) and `bretbat` (Brett Bateman at 4+3, beside Brett Baty).
+    We only produce the plain 3+3 form, so an EXTENDED venue token can never
+    match ours -- a coverage miss, the refusal this module prefers. But the
+    PLAIN form is not safe by construction: whichever of a same-named pair
+    owns it at the venue, the OTHER one's name derives to exactly that plain
+    token, and when the two appear in ONE fixture (Willson's and William's
+    clubs meet repeatedly every season) a plain-token match would price the
+    wrong person. That is what `prop_same_name_collision_at_venue` in the
+    match loop refuses: both forms coexisting in the matched fixture makes
+    the plain form's identity undecidable from our side, so BOTH same-named
+    players refuse there. Board-side, two of OUR rows sharing a token in one
+    game still refuse via `prop_player_token_ambiguous`.
 
-    text = str(player_name or "").strip().lower()
-    if not text:
-        return None
-    # Hyphens become spaces FIRST: the venue keys `Crow-Armstrong` off
-    # `armstrong`, and `normalize_person`-style deletion would weld the two
-    # halves into one word and read `cro`.
-    text = text.replace("-", " ")
-    folded = unicodedata.normalize("NFKD", text)
-    stripped = "".join(ch for ch in folded if not unicodedata.combining(ch))
-    cleaned = re.sub(r"[^a-z0-9 ]", "", stripped)
-    words = [w for w in cleaned.split() if w and w not in _PROP_NAME_SUFFIXES]
+    NAMED RESIDUAL, not closed: both players in one game, the venue listing
+    ONLY the plain-owner, and our board quoting ONLY the extended-owner --
+    no variant token exists anywhere to detect, and deciding it needs lineup
+    knowledge the join does not have. Refusing every league-ambiguous token
+    outright would cost the plain-owner's legitimate matches all season, so
+    the fixture-scoped guard is the deliberate stopping point.
+    """
+    words = _player_name_words(player_name)
     if len(words) < 2:
         # One word cannot fill both halves of the encoding; inventing a
         # repeat would be the guess this function exists to avoid.
         return None
     return words[0][:3] + words[-1][:3]
+
+
+def _polymarket_token_alt43(player_name: Any) -> str | None:
+    """The 4+3 encoding of OUR OWN name, or None when it adds nothing.
+
+    `bretbat` is Brett Bateman at 4+3 because Brett Baty collides at
+    `brebat` -- the venue's longer-prefix collision mechanism, beside the
+    digit suffix. This exists ONLY for the collision guard: seeing our own
+    4+3 beside our plain 3+3 in one fixture proves a same-named pair there.
+    It is never used to MATCH -- decoding which player owns which form is
+    the guess this file refuses to make.
+    """
+    words = _player_name_words(player_name)
+    if len(words) < 2 or len(words[0]) <= 3:
+        return None
+    return words[0][:4] + words[-1][:3]
 
 
 def _parse_player_prop(parsed: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -2225,6 +2269,47 @@ def join_polymarket_to_board(
             continue
 
         if is_prop:
+            # THE SAME-NAME COLLISION GUARD, and it runs ONLY on a row that
+            # just matched -- a refusal path cannot pick a wrong person. The
+            # venue extends a colliding token league-wide (`wilcon2` beside
+            # `wilcon`, `bretbat` beside `brebat`); we derive only the plain
+            # form, so when BOTH forms sit in the fixture we just matched,
+            # the plain rows we picked belong to WHICHEVER of the two the
+            # venue keyed plain -- undecidable from our side, and Willson's
+            # and William's clubs meet repeatedly every season. Both
+            # same-named board rows refuse here; a fixture holding only one
+            # form keeps matching exactly as before (test-pinned both ways).
+            # FIXTURE-SCOPED deliberately: a variant in another game says the
+            # pair exists, not that OUR fixture's plain rows are ambiguous --
+            # and refusing league-wide would cost the plain-owner's
+            # legitimate matches every day both are listed. The residual this
+            # cannot see is named in `_polymarket_player_token`'s docstring.
+            _alt43 = _polymarket_token_alt43(board_row.get("player_name"))
+            _collision_token = None
+            for c in candidates:
+                cand_prop = c.get("prop")
+                if not isinstance(cand_prop, Mapping):
+                    continue
+                _ct = str(cand_prop.get("token") or "")
+                if not _ct or _ct == prop_token:
+                    continue
+                _digit_ext = (
+                    _ct.startswith(prop_token)
+                    and _ct[len(prop_token):].isdigit()
+                    and len(_ct) - len(prop_token) <= 2
+                )
+                if not _digit_ext and _ct != _alt43:
+                    continue
+                if not _teams_match(
+                    board_row, c["parsed"], board_row.get("sport") or sport,
+                    board_fixtures.get((league, date)),
+                ):
+                    continue
+                _collision_token = _ct
+                break
+            if _collision_token is not None:
+                refuse("prop_same_name_collision_at_venue")
+                continue
             probability = _prop_probability_for_side(side, picked)
         else:
             probability = _probability_for_side(side, picked, board_row.get("sport") or sport, board_row)

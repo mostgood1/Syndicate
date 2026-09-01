@@ -3002,3 +3002,94 @@ def test_an_ambiguous_prop_is_refused_as_ambiguous_not_classified():
         [_prop_market(), _prop_market()], [_prop_board()])
     assert out["refusals"].get("ambiguous_polymarket_match") == 1
     assert out["prop_unmatched_classes"] == {}
+
+
+# ==========================================================================
+# BOARD-NAME DISAMBIGUATORS AND THE SAME-NAME COLLISION GUARD. `Max Muncy
+# (2002)` derived `max200` in production (20:30Z read) -- a token no venue
+# writes, so every such row died as player_not_listed. Stripping the
+# disambiguator is only safe WITH the guard: the venue keys ONE of a
+# same-named pair plain, and the OTHER one's derivation lands on exactly
+# that plain token.
+# ==========================================================================
+
+
+@pytest.mark.parametrize("name,token", [
+    ("Max Muncy (2002)", "maxmun"),   # parenthetical disambiguator dropped
+    ("Max Muncy 2002", "maxmun"),     # bare digit word can never be a name half
+    ("Luis Garcia (WSH)", "luigar"),  # non-numeric disambiguators too
+])
+def test_board_disambiguators_do_not_poison_the_token(name, token):
+    assert mod._polymarket_player_token(name) == token
+
+
+def test_a_disambiguated_board_name_matches_its_venue_row():
+    market = _prop_market(slug="astatc-mlb-ath-tex-2026-08-24-hrr-maxmun-gte2")
+    board = _prop_board(market="batter_hits_runs_rbis", player="Max Muncy (2002)",
+                        line=1.5, home="Texas Rangers", away="Athletics",
+                        event_id="evt-ath-tex")
+    out = mod.join_polymarket_to_board([market], [board])
+    assert out["matched"] == 1, out["refusals"]
+    assert out["matches"][0]["player_name"] == "Max Muncy (2002)"
+
+
+def test_both_token_forms_in_one_fixture_refuse_BOTH_same_named_players():
+    """Whichever Contreras owns the venue's plain `wilcon`, the other one's
+    derivation produces it. With both forms in the fixture the plain rows'
+    identity is undecidable, so William AND Willson refuse by name -- a
+    wrong-person order is the single most expensive mistake available here."""
+    markets = [
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-wilcon-gte2"),
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-wilcon2-gte2"),
+    ]
+    for player in ("William Contreras", "Willson Contreras"):
+        out = mod.join_polymarket_to_board(markets, [_prop_board(player=player, line=1.5)])
+        assert out["matched"] == 0, (player, out["matches"])
+        assert out["refusals"].get("prop_same_name_collision_at_venue") == 1, (player, out["refusals"])
+
+
+def test_a_lone_plain_token_still_matches_its_owner():
+    """The control, and the guard's off-state: no variant in the fixture, no
+    refusal -- the plain form is whoever is in this game."""
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-wilcon-gte2")
+    out = mod.join_polymarket_to_board([market], [_prop_board(player="Willson Contreras", line=1.5)])
+    assert out["matched"] == 1, out["refusals"]
+    assert "prop_same_name_collision_at_venue" not in out["refusals"]
+
+
+def test_an_extended_only_fixture_stays_a_coverage_miss():
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-wilcon2-gte2")
+    out = mod.join_polymarket_to_board([market], [_prop_board(player="William Contreras", line=1.5)])
+    assert out["matched"] == 0
+    assert out["refusals"].get("no_matching_polymarket_market") == 1
+    assert "prop_same_name_collision_at_venue" not in out["refusals"]
+
+
+def test_the_4_plus_3_variant_also_trips_the_guard_for_both_players():
+    """`bretbat` is the venue's longer-prefix mechanism -- and it is the 4+3
+    of BOTH Brett Baty and Brett Bateman, so the guard is symmetric from
+    either board row."""
+    markets = [
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hr-brebat-gte1"),
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hr-bretbat-gte1"),
+    ]
+    for player in ("Brett Baty", "Brett Bateman"):
+        out = mod.join_polymarket_to_board(
+            markets,
+            [_prop_board(market="batter_home_runs", player=player, line=0.5)])
+        assert out["matched"] == 0, (player, out["matches"])
+        assert out["refusals"].get("prop_same_name_collision_at_venue") == 1, (player, out["refusals"])
+
+
+def test_a_variant_in_a_DIFFERENT_fixture_does_not_refuse():
+    """Fixture-scoped by design: `wilcon2` in another game proves the pair
+    exists league-wide, not that OUR fixture's plain rows are ambiguous --
+    and a league-wide refusal would cost the plain-owner every day both are
+    listed."""
+    markets = [
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-wilcon-gte2"),
+        _prop_market(slug="astatc-mlb-min-ath-2026-08-24-hits-wilcon2-gte2"),
+    ]
+    out = mod.join_polymarket_to_board(markets, [_prop_board(player="Willson Contreras", line=1.5)])
+    assert out["matched"] == 1, out["refusals"]
+    assert "prop_same_name_collision_at_venue" not in out["refusals"]
