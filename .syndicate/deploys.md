@@ -145,7 +145,37 @@ NEGATIVE exactly as readily as a rolled date produces a false positive; in both
 cases the defect is reading a log line without checking it post-dates the
 thing it is supposed to be evidence about.**
 
-Watcher armed for a `PLAN_WRITTEN` stamped after 03:52:11Z.
+Watcher armed for a `PLAN_WRITTEN` stamped after 03:52:11Z. **The watcher
+encodes the readability test itself:** it reports `ITEM01_GATE_MET` only on a
+`market_family_excluded` line, and `POST_DEPLOY_TICK_NO_EXCLUSION` on a
+`PLAN_WRITTEN` that post-dates the deploy and lacks it. Until one of those two
+fires, the absence of the counter is not evidence of anything.
+
+### PRE-REGISTERED, written BEFORE the result — what would confirm and what would falsify
+
+Peer lane `wnba-accuracy-assessment` offered a caution worth testing rather than
+accepting: on their board, `rows_modelled_fair` is 20-56 of 522-1,276 rows
+(~4-6%), so a four-figure `no_model_edge_pct` might be the expected SIZE of the
+population rather than a signal. **Measured for MLB rather than assumed
+symmetric: the baseline tick gives `1 - 1092/1380 = 20.9%` model-edge coverage.
+~21% against their ~4-6% — the populations are NOT alike, so that reasoning does
+not transfer unchanged.**
+
+Shortlist composition (2026-08-31 build, a SNAPSHOT and not the exact commit
+input, so treat as order-of-magnitude): mlb selected 1000 of which **prop 663**,
+game 337; soccer 1000 (prop 88); ncaaf 376 (prop 0).
+
+**EXPECT on a post-deploy tick, if the exclusion works:**
+- `market_family_excluded` on the order of **500-700** (MLB props that date)
+- `no_model_edge_pct` **falls from 1092 by roughly that amount**, because props
+  are where the missing model edge is concentrated
+- `rows_in` **unchanged** at ~1380 — the exclusion REFUSES, it does not filter
+  upstream
+
+**FALSIFIED IF** `market_family_excluded` appears and `no_model_edge_pct` does
+NOT move. That would mean the excluded rows are not the rows lacking a model
+edge — two different populations — and neither number should be quoted until
+that is understood.
 
 **What to look for beyond the counter existing:** `no_model_edge_pct: 1092` is
 the count the exclusion should partly ABSORB, because
