@@ -83,11 +83,23 @@ venue_priced=0`). For WNBA it answers nothing, on two independent grounds:
    2026-08-31 and 2026-09-16 (FIBA World Cup break), so every current tick reads
    over a slate with zero WNBA rows in it.
 
+3. **`venue_priced` swings with the slate**, so even inside a live window one
+   reading is not a capability answer. Measured on the same worker twenty
+   minutes apart by lane `mlb-accuracy-assessment`: `kalshi 168 -> 0` at 03:28Z,
+   `kalshi 189 -> 12` at 03:47Z, `polymarket 384 -> 379`.
+
 Ground 2 is the more instructive: a reading over a population that does not
 contain the subject is unreadable regardless of mechanism, and would have looked
 exactly like "the direct feed does not carry WNBA". **This question is parked
 until a live WNBA slate on or after 2026-09-17**, and any attempt to answer it
 sooner is answering a different question.
+
+**When it IS run, do not run it on `venue_priced`.** Grounds 1 and 3 disqualify
+that counter permanently, not just during the break. Use a signal that names the
+sport: a filled or refused order carrying a WNBA ticker settles it, the way
+Kalshi's `KXMLBHR-` / `KXMLBHIT-` tickers settled the equivalent MLB question —
+a ticker string names both sport and market, so it decides the claim; a
+venue-level counter does not.
 
 ---
 
