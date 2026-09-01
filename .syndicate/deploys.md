@@ -16643,3 +16643,95 @@ composition-invariant: back the Poisson mean out of each row's
 the first divisor shipped and must land near **0.85**. Rows present WITH a
 median still near 1.19 means the artifact reached web but not the worker —
 that is the failure mode, not absence of rows. Carried by `todo.md #612`.
+
+---
+
+## 2026-09-01 15:0xZ — ncaaf-cfbd-quota-latch — MEASUREMENT ONLY, no deploy — refresh-worker @ `bf0811bb` / `13afa27f`
+
+**This row discharges the obligation opened by the 2026-08-31 latch + PPA-cache
+deploys.** No deploy, no code change, no latch file touched — read-only
+verification that the monthly CFBD quota latch RELEASED at the month roll.
+Scheduled task `verify-ncaaf-cfbd-quota-latch-roll`.
+
+### verify: the latch expired on time and did NOT become the outage
+
+**`_next_month_roll` fired exactly as designed. The headline failure mode did
+not occur.** Zero `[cfbd_quota]` lines of ANY kind on refresh-worker in
+`2026-09-01T00:00:00Z .. 15:00Z` — no `LATCHED_SKIP`, no `LATCH_SET`. The last
+one ever emitted:
+
+    2026-08-31T23:22:30.450348974Z  [cfbd_quota] LATCHED_SKIP GET /ppa/teams clears_in_hours=0.6
+
+`clears_in_hours` counted down monotonically 17.7 -> 0.6 across 18 hourly
+skips and then stopped. Nothing had to be cleared by hand.
+
+### verify: the PPA cache ARMED — the line that could not previously exist
+
+    2026-08-31T23:22:30.450367574Z  [ppa] season=2025 source=none reason=quota_exhausted_and_cache_empty
+    2026-09-01T00:23:31.042923621Z  [ppa] season=2025 source=api
+
+17 consecutive `source=none reason=quota_exhausted_and_cache_empty` on 08-31,
+then `source=api` 23 minutes after the roll. The cache was empty and could only
+be filled by the call that was failing; this is the first fill. Write is
+DURABLE: `_ppa_cache_path` resolves under `SYNDICATE_DATA_ROOT`, the same root
+that produced `artifact_path=/opt/render/project/data/...` (the MOUNTED disk,
+not `/src`), and no `[ppa] CACHE_WRITE_FAILED` was emitted. SP+ also came back:
+
+    2026-09-01T00:23:34.623841667Z  [sp_ratings] season=2026 source=api teams=138 cached=/opt/render/project/src/data/ncaaf_source/historical_truth/sp_ratings_2026.json
+
+### verify: the relaunch storm collapsed — a RATE, with its denominator
+
+| window | length | ncaaf `SEASON_PROJECTION_LAUNCHING` | rate |
+|---|---|---|---|
+| 2026-08-31T00:00Z .. 09-01T00:00Z | 24.0 h | 23 | **23.0 / day** |
+| 2026-09-01T00:00Z .. 15:00Z | 15.0 h | 1 | **1.6 / day** |
+
+Configured `interval_seconds=86400` = 1/day. The single post-roll launch
+(`00:23:23Z`, `age_seconds=442924`) was itself triggered by the pre-existing
+staleness; it succeeded, and nothing has re-fired in the 14.6 h since.
+
+### verify: the artifact REGENERATED — positive evidence, not a quiet log
+
+    2026-09-01T00:33:24.512294914Z  projections_written=51
+    2026-09-01T00:33:24.512305135Z  artifact_path=/opt/render/project/data/ncaaf_source/data/smartsim2_projections_2026_wk1.csv
+    2026-09-01T00:33:24.512292403Z  rating_source=cfbd_sp_plus_2026[scale=10]+cfbd_ppa_season_2025_fallback_for_2026
+
+That path is **the exact path `_season_projection_artifact_path` stats**, so
+`age_seconds` reset at 00:33:24Z and stays under 86400 until 2026-09-02T00:33Z.
+The direct `age_seconds=<small>` log line cannot exist before then — the guard
+logs `artifact_stale`/`missing` and is DELIBERATELY SILENT on `artifact_fresh`.
+Recorded because silence alone is ambiguous here (autorun disabled, sport not
+active, week None and process-still-running are all silent too); the WRITE is
+the evidence, not the quiet.
+
+### THE ARTIFACT REGENERATED AND THE BOARD DID NOT MOVE — pre-existing, separate
+
+    2026-09-01T00:33:24.512310835Z  artifact_published=False
+
+No `artifact_publish_error`, so `publish_hot_artifact` returned False cleanly.
+**Cause is mechanism-level and confirmed by running the predicate**, not
+inferred:
+
+    is_hot_artifact_relative_path("ncaaf_source/data/smartsim2_projections_2026_wk1.csv") -> False
+
+The path matches ZERO of the 165 `HOT_ARTIFACT_PATTERNS` (`ncaaf_source/api/live_state/live_state_*.json`
+is the only ncaaf entry). The PULL side is gated on the same allowlist, so
+neither push nor pull can move it. `/ncaaf/api/cards` on
+`syndicate-an21.onrender.com` serves 51 games whose values (TCU 30.3 –
+North Carolina 20.037, margin 10.263, total 50.337, stdev 13.291/11.719) are
+byte-identical to the git-committed CSV stamped
+`generated_at=2026-08-19T22:00:39Z`. **Caveat, stated rather than glossed:**
+values alone do not discriminate — the generator is deterministic
+(`seeds_used=300`, identical `rating_source`) and a re-run could reproduce
+them. The allowlist miss is what makes it decisive.
+
+NFL is the same defect (`2026-08-31T21:28:40Z artifact_published=False`), so it
+is not ncaaf-specific and predates this lane. **Not fixed here — read-only task.**
+
+**Also noted, not fixed:** `[sp_ratings]` caches to `/opt/render/project/src/data/...`,
+the EPHEMERAL checkout, while the PPA cache and the latch correctly use
+`SYNDICATE_DATA_ROOT` (mounted disk). The SP+ cache therefore dies on every
+deploy and costs a CFBD call to refill.
+
+**Retry-ladder fix:** no reading, as expected. It only shows on a run that
+DISCOVERS a fresh exhaustion. Its absence proves nothing.

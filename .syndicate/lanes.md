@@ -1193,7 +1193,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `.syndicate/lanes_history.md`.
 - Blocked by: none
 
-### ncaaf-cfbd-quota-latch — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Latch + PPA cache live and proven across processes. Owed reading is ARMED as one-time scheduled task `verify-ncaaf-cfbd-quota-latch-roll` (2026-09-01 08:00). If `LATCHED_SKIP` still fires after the roll the latch is CAUSING an outage.
+### ncaaf-cfbd-quota-latch — **CLOSED 2026-09-01** — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 (archived) — **THE ROLL READING IS IN. The latch expired on time, released with zero manual intervention, and the PPA cache ARMED.** Goal met; measurement in `.syndicate/deploys.md` 2026-09-01 15:0xZ. One SEPARATE, PRE-EXISTING defect surfaced and is NOT this lane's: the regenerated artifact never reaches the board (`artifact_published=False` — path matches zero `HOT_ARTIFACT_PATTERNS`).
 - Goal: stop NCAAF regeneration burning a MONTHLY CFBD quota it has already been
   told is exhausted, and let it succeed from cache while exhausted.
 - Files: released: syndicate/features/ncaaf/cfbd_quota_latch.py (NEW),
@@ -1214,16 +1214,45 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   production found and the tests did not — `raise_if_latched` ran once BEFORE
   `call_with_retry` and never inside it, so the first 429 set the latch and the
   four retries behind it still went out.
-- **OWED, AND NOT IMMINENT — do not treat as a live obligation.** (a) The ladder
-  fix's own number (1 call, not 5) needs a FRESH exhaustion event; the latch is
-  set until the roll, so this may be weeks away. (b) The PPA cache is EMPTY and
-  arming it needs the call that is failing — inert until 2026-09-01.
-- **AFTER THE 2026-09-01 ROLL, and this is the reading that matters:**
-  `[ppa] source=api` arming the cache, `age_seconds` resetting from ~378,000, and
-  cadence dropping ~24/day -> the configured 1/day. **`LATCHED_SKIP` still firing
-  on or after 09-01 means the latch did NOT expire and is CAUSING an outage** —
-  override is `clear_latch()`, file at
-  `<SYNDICATE_DATA_ROOT>/ncaaf_source/state/cfbd_quota_latch.json`.
+- **ROLL READING TAKEN 2026-09-01T15:00Z, read-only, no deploy.** All four
+  expected signals resolved. Full evidence in `.syndicate/deploys.md`.
+  1. **PPA cache ARMED** — `2026-09-01T00:23:31Z [ppa] season=2025 source=api`,
+     after 17 consecutive `source=none reason=quota_exhausted_and_cache_empty`
+     on 08-31. Write is durable (`SYNDICATE_DATA_ROOT` -> mounted disk, no
+     `CACHE_WRITE_FAILED`).
+  2. **Artifact regenerated** — `projections_written=51` at `00:33:24Z` to
+     `/opt/render/project/data/ncaaf_source/data/smartsim2_projections_2026_wk1.csv`,
+     the exact path the staleness guard stats. `age_seconds` therefore reset at
+     00:33:24Z; the direct log line cannot exist before 2026-09-02T00:33Z
+     because the guard is DELIBERATELY SILENT on `artifact_fresh`. Recorded
+     because silence alone is ambiguous — autorun-disabled, sport-not-active,
+     week-None and process-still-running are all silent too. The WRITE is the
+     evidence, not the quiet.
+  3. **Cadence collapsed** — 23 launches / 24.0 h (**23.0/day**) on 08-31
+     vs 1 launch / 15.0 h (**1.6/day**) post-roll. Configured: 1/day.
+  4. **No new `LATCH_SET`, and NO `LATCHED_SKIP`** — zero `[cfbd_quota]` lines
+     of any kind in `2026-09-01T00:00Z..15:00Z`. `clears_in_hours` counted
+     17.7 -> 0.6 across 18 hourly skips and stopped. **The feared failure mode
+     did not occur: `_next_month_roll` expired the latch on time and
+     `clear_latch()` was never needed.** The latch file was NOT touched.
+- **STILL OWED, STILL NOT IMMINENT:** the ladder fix's own number (1 call, not
+  5) needs a FRESH exhaustion event. Its absence today proves nothing.
+- **HANDED OFF, NOT FIXED HERE (read-only task): the artifact regenerates and
+  the BOARD DOES NOT MOVE.** `artifact_published=False` at `00:33:24Z`, no
+  publish error — `is_hot_artifact_relative_path("ncaaf_source/data/smartsim2_projections_2026_wk1.csv")`
+  returns **False** (verified by running it; the only ncaaf allowlist entry is
+  `ncaaf_source/api/live_state/live_state_*.json`). Push and pull share that
+  allowlist, so nothing can move the file. `/ncaaf/api/cards` serves values
+  byte-identical to the git-committed CSV stamped `generated_at=2026-08-19T22:00:39Z`.
+  Values alone do not discriminate — the generator is deterministic
+  (`seeds_used=300`, identical `rating_source`) — the allowlist miss is what
+  makes it decisive. **NFL has the identical defect**
+  (`2026-08-31T21:28:40Z artifact_published=False`), so fix the allowlist for
+  both or it survives in the sibling. Predates this lane.
+- **ALSO NOTED, NOT FIXED:** `[sp_ratings]` caches to
+  `/opt/render/project/src/data/...` — the EPHEMERAL checkout — so it dies on
+  every deploy and costs a CFBD call to refill. The latch and PPA cache
+  correctly use `SYNDICATE_DATA_ROOT`.
 - Narrative: `.syndicate/log/2026-08-31.md`, `.syndicate/lanes_history.md`.
 - Blocked by: none
 
