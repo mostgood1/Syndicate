@@ -183,10 +183,46 @@ the count the exclusion should partly ABSORB, because
 not move on a post-deploy tick, the two counters are looking at different row
 populations and neither should be quoted until that is understood.
 
+### ITEM 01 — the post-deploy tick arrived and is STILL UNREADABLE. Not falsified, not confirmed.
+
+`2026-09-01T04:09:11Z [portfolio_commit] PLAN_WRITTEN date=2026-08-31
+rows_in=1554 sized=9 positions=0 refusals={'below_min_ev_pct': 281,
+'below_min_stake': 9, 'no_model_edge_pct': 1260, 'zero_kelly_stake': 4}`
+
+Post-deploy (03:52:11Z), so the readability check I HAD written was satisfied.
+No `market_family_excluded`, and `no_model_edge_pct` went UP, 1,092 -> 1,260.
+**Against the pre-registered band that reads as falsified. It is not.**
+
+`top_market_per_refusal={'no_model_edge_pct': 'alternate_totals_corners:690'}`
+— a **SOCCER** market, 690 of the 1,260. And the board at that hour carries
+**0 MLB prop rows**: `per_sport` mlb `selected=31, game=31, prop=0`. The 08-31
+slate finished around 23:15 CT. **The exclusion had nothing to act on.**
+
+**MY PRE-REGISTRATION WAS INCOMPLETE AND THIS IS THE LESSON.** I named a
+falsifier — "counter appears and `no_model_edge_pct` does not move" — and did
+NOT name a precondition. A reading taken over a population that no longer
+contains the subject looks identical to a failing one. The 663-prop figure came
+from a snapshot taken while the slate was live; by the time the tick landed it
+was 0, and nothing in the test said to check that first.
+
+Recorded as a fifth instance on the readability rule (`learnings.md`
+2026-09-01), which now carries a check **(d) the SUBJECT is present in the
+population you are reading**.
+
+**What the unit tests do and do not settle:** 9 tests pass including
+`test_the_default_refuses_an_mlb_player_prop_by_name`, and off-is-not-on is
+verified (4 of 9 fail with the exclusion disabled). So the LOGIC is proven. What
+is unproven is production REACHABILITY — that board rows reaching
+`commit_portfolio` carry `sport` and a market the shared classifier calls
+`player_prop`. Presence is not reachability; that distinction is why this stays
+open rather than being called done on green tests.
+
 ### owed
 
-- **ITEM 01 verification** — a post-03:52:11Z `PLAN_WRITTEN` carrying
-  `market_family_excluded`, and `no_model_edge_pct` moving.
+- **ITEM 01 verification** — a `PLAN_WRITTEN` from a tick during a LIVE MLB
+  slate with `per_sport.mlb.prop > 0`, carrying `market_family_excluded`.
+  Next MLB slate is 2026-09-01. **Check the precondition before reading the
+  counter.**
 - ~~**ITEM 04 verification**~~ — DISCHARGED, see above.
 - **ITEM 01 UNDEPLOYED.** `commit_portfolio` is reached via
   `run_portfolio_commit` from `pipeline/intelligence_state.py`, and

@@ -81,11 +81,23 @@
   immediately upstream of the one you want, so a missing signal is
   distinguishable from an unreached one; (c) proof that a path from producer to
   reader EXISTS at all — for cross-service artifacts that means a publish call,
-  not an allowlist entry. **Write the falsifier down before the reading
-  arrives.** A pre-registered band with an explicit "falsified if" cannot be
+  not an allowlist entry; and **(d) that the SUBJECT is present in the
+  population you are reading** — a post-deploy tick over a slate that no longer
+  contains the rows your change acts on is as unreadable as a pre-deploy one.
+  **Write the falsifier down before the reading arrives, and write its
+  PRECONDITION next to it.** A pre-registered band with an explicit "falsified if" cannot be
   fitted to the result afterwards, and it forces you to name the neighbour.
   **And prefer a gate on the one line only your code can emit** over a
   downstream count that something else could also flip.
+- **A FIFTH instance, 04:09Z, which is why (d) is in the rule:** the MLB
+  exclusion gate finally got a post-deploy `PLAN_WRITTEN` — check (a) satisfied
+  — showing no `market_family_excluded` and `no_model_edge_pct` UP from 1,092 to
+  1,260. Read as written, the pre-registered test was falsified. It was not:
+  `top_market_per_refusal` named `alternate_totals_corners:690`, a SOCCER
+  market, and the board at that hour carried **0 MLB prop rows** (MLB down to 31
+  game rows, slate over). **The change had nothing to act on.** The
+  pre-registration named a falsifier and did not name a precondition, so a
+  reading with no subject in it looked exactly like a failing one.
 - **Cost:** ~35 minutes of watcher time on the WNBA side before the code
   comment stopped a third watcher being armed; two wrong conclusions drafted
   and withdrawn on the MLB side before either was quoted; and one WNBA
