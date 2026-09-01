@@ -17123,3 +17123,6 @@ into the slate.
   `POLYMARKET_BOARD_JOIN elapsed_s=20.24 markets=17459 indexed=12042 board_rows=1375 matched=436` with the two structural refusals collapsing exactly as designed: `market_type_not_a_game_line` 6,960 (2026-08-27 baseline) -> **3,375**, `board_market_not_a_game_line` 935 -> **138**. None of the new named refusals (`prop_player_token_ambiguous`/`_underivable`/`prop_row_missing_player`) fired on the real slate.
 - NOT yet read, owed on `todo #628`: `kept_direct` polymarket rows beside `near_misses={}` on the next book_grid build (the unrecognised-spelling near-miss is unexercised until a grid build consumes these rows).
 - cost note: join elapsed 20.24s with 12,042 indexed (props added ~2.6k index entries); inside the existing portfolio_commit span, no new stage.
+- **SECOND READING, 18:11:28Z (66s after the first) — the grid half is also discharged:**
+  `[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=510 kept_direct=1479 books=['kalshi', 'polymarket'] near_misses={}` —
+  polymarket rows are IN `kept_direct` (book set was kalshi-only before) and the unrecognised-spelling near-miss detector, exercised for the first time by real polymarket rows, is EMPTY. Both halves of lane `polymarket-prop-quote-capture`'s verification are now read; nothing owed on this deploy.
