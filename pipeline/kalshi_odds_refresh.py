@@ -1481,6 +1481,10 @@ def _capture_kalshi_quotes(
         matches = report.get("matches") if isinstance(report, Mapping) else None
         if not matches:
             return
+        from syndicate.features.shared.book_shortlist import (
+            QUOTE_SOURCE_FIELD,
+            QUOTE_SOURCE_VENUE_DIRECT,
+        )
         from syndicate.features.shared.odds_book_quotes import (
             append_book_quotes,
             quote_rows_from_kalshi_matches,
@@ -1516,6 +1520,20 @@ def _capture_kalshi_quotes(
                 date_str=str(selected_date or "").strip(),
                 rows=rows,
                 captured_at=_now_stamp(),
+                # STAMP THE PROVENANCE, or the grid throws these away.
+                #
+                # `book_grid` refuses a row whose bookmaker is a direct-feed
+                # venue, to keep the 2026-08-25 "one price source per venue"
+                # invariant against OddsAPI's copy of kalshi/polymarket. A quote
+                # row carries no source field, so measured 2026-09-01 that
+                # refusal could not tell THESE rows -- the venue's own prices --
+                # from the aggregator's, and discarded both: Layer 1 and the
+                # book-grid saw no exchange at all.
+                #
+                # `drop_from_grid` now asks for provenance instead of the name,
+                # and absent still means dropped, so this stamp is what actually
+                # lets a directly-observed price reach a board.
+                extra={QUOTE_SOURCE_FIELD: QUOTE_SOURCE_VENUE_DIRECT},
             )
             captured += int((result or {}).get("appended") or 0)
         # ONE LINE, ALWAYS, INCLUDING THE ZEROES. `no_sport` and an empty
