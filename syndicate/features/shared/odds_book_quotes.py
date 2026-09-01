@@ -427,6 +427,75 @@ def append_book_quotes(
         return {"error": f"{type(exc).__name__}: {exc}", "appended": 0}
 
 
+def quote_rows_from_kalshi_matches(
+    matches: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Kalshi board-join matches -> quote rows. `#617`.
+
+    WHY THIS EXISTS, and it is a measured gap rather than a tidiness one.
+
+    `book_quotes` is fed from OddsAPI, and **OddsAPI carries GAME LINES ONLY for
+    exchanges.** Measured on `mlb_source/tracking/book_quotes/2026-08-31.jsonl`
+    -- 274,129 rows, 124.4 MB -- exchange quotes on game markets: **26,710**
+    (kalshi 13,768, prophetx 5,605, novig 4,987, polymarket 2,350). Exchange
+    quotes on PROP markets: **ZERO**.
+
+    Kalshi does quote MLB props: 23 filled orders on 2026-08-31 carrying real
+    `KXMLBHR-` / `KXMLBHIT-` / `KXMLBTB-` / `KXMLBHA-` contract tickers. Those
+    prices reach the system only through the direct feed, and only into the
+    VENUE-SCOPED books via `venue_scope(price_resolver=...)`. Nothing that reads
+    `book_quotes` -- the board's price comparison, any dispersion measurement,
+    any backtest -- can see them.
+
+    **CONSEQUENCE, AND IT IS THE REASON THIS IS STEP ONE.** The prop-side value
+    of price-shopping the exchanges cannot be MEASURED until the quotes are
+    captured. On game markets, where both are present, adding exchanges to the
+    comparison improves the best available price on 52.5% of 13,093 paired
+    snapshots by a mean of 1.57pp. Whether props behave the same way is
+    unmeasured and unmeasurable today. This makes it measurable; it does not
+    change what the board ranks.
+
+    BUILT FROM THE JOIN, NOT FROM THE RAW FEED, ON PURPOSE. A match already
+    carries the identity `_match_key` paired on -- `board_event_id`, canonical
+    `market`, `player_name`, the BOARD's signed `line`, `board_side`. Deriving a
+    second identity here is exactly what `_match_key`'s own docstring says
+    produced a CIN@SF contract priced at BAL@STL's number. One keying path.
+
+    `kalshi_american` is Kalshi's own price already in American odds, which is
+    what `_normalize` expects; rows without one are skipped rather than
+    defaulted, because a quote with no price records nothing.
+    """
+    out: list[dict[str, Any]] = []
+    for match in matches or ():
+        if not isinstance(match, Mapping):
+            continue
+        price = match.get("kalshi_american")
+        market = str(match.get("market") or "").strip()
+        if price is None or not market:
+            continue
+        player = str(match.get("player_name") or "").strip()
+        out.append(
+            {
+                "bookmaker": "kalshi",
+                "market": market,
+                "price": price,
+                "line": match.get("line"),
+                "selection": match.get("board_side"),
+                "player_name": player or None,
+                "event_id": match.get("board_event_id"),
+                # `prop` vs `game` is decided by the same rule `_normalize`
+                # applies, stated here so a match with no player is not
+                # silently reclassified if that default ever changes.
+                "kind": "prop" if player else "game",
+                # The contract this price was quoted for. Not part of the quote
+                # contract, but it is the only field that makes a row traceable
+                # back to a specific Kalshi market when one looks wrong.
+                "venue_ticker": match.get("ticker"),
+            }
+        )
+    return out
+
+
 def quote_rows_from_oddsapi_events(
     events: Iterable[Mapping[str, Any]],
     *,

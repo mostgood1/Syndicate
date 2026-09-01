@@ -50,7 +50,7 @@ from __future__ import annotations
 import os
 import time
 from datetime import datetime, timezone
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 def default_sports_series() -> tuple[str, ...]:
@@ -1441,7 +1441,95 @@ def join_to_board(
             flush=True,
         )
     _record_board_demand(rows)
+    _capture_kalshi_quotes(report, rows, selected_date=selected_date)
     return report
+
+
+def _capture_kalshi_quotes(
+    report: Mapping[str, Any],
+    board_rows: Sequence[Mapping[str, Any]],
+    *,
+    selected_date: str | None,
+) -> None:
+    """Write Kalshi's matched prices into `book_quotes`. `#617`.
+
+    WHY HERE. This is the one place that holds Kalshi's own prices already
+    paired to board rows. `book_quotes` is otherwise fed from OddsAPI, which
+    carries GAME LINES ONLY for exchanges -- measured on MLB 2026-08-31,
+    26,710 exchange quotes on game markets and **ZERO on prop markets**, while
+    Kalshi filled 23 real MLB prop orders the same day. Anything that reads
+    `book_quotes` has been blind to exchange prop prices.
+
+    THIS CHANGES NOTHING THE BOARD RANKS. It only makes the prices visible to
+    whatever reads the quote log, which is what turns the prop-side value of
+    price-shopping from unmeasurable into measurable. The board change, if the
+    measurement justifies one, is a separate decision.
+
+    PER SPORT, because `book_quotes` is sharded per sport. **A match does NOT
+    carry a sport** -- verified, neither `matches.append` block writes one -- so
+    it is looked up from the BOARD ROW the match paired with, by
+    `board_event_id`. That is the same row the join keyed on, so the sport is
+    the board's own and not a second derivation. A match whose event is not in
+    the board index is dropped rather than filed under a guess: a quote in the
+    wrong shard is worse than a missing one, because it would later be read as
+    another sport's price.
+
+    NEVER RAISES. The quote log is instrumentation; the join is the product.
+    Same contract `append_book_quotes` itself keeps, and the same reason.
+    """
+    try:
+        matches = report.get("matches") if isinstance(report, Mapping) else None
+        if not matches:
+            return
+        from syndicate.features.shared.odds_book_quotes import (
+            append_book_quotes,
+            quote_rows_from_kalshi_matches,
+        )
+
+        sport_by_event: dict[str, str] = {}
+        for row in board_rows or ():
+            if not isinstance(row, Mapping):
+                continue
+            event_id = str(row.get("event_id") or "").strip()
+            sport = str(row.get("sport") or "").strip().lower()
+            if event_id and sport:
+                sport_by_event.setdefault(event_id, sport)
+
+        by_sport: dict[str, list[dict[str, Any]]] = {}
+        no_sport = 0
+        for match in matches:
+            if not isinstance(match, Mapping):
+                continue
+            sport = sport_by_event.get(str(match.get("board_event_id") or "").strip())
+            if not sport:
+                no_sport += 1
+                continue
+            by_sport.setdefault(sport, []).append(dict(match))
+
+        captured = 0
+        for sport, sport_matches in by_sport.items():
+            rows = quote_rows_from_kalshi_matches(sport_matches)
+            if not rows:
+                continue
+            result = append_book_quotes(
+                sport=sport,
+                date_str=str(selected_date or "").strip(),
+                rows=rows,
+                captured_at=_now_stamp(),
+            )
+            captured += int((result or {}).get("appended") or 0)
+        # ONE LINE, ALWAYS, INCLUDING THE ZEROES. `no_sport` and an empty
+        # `by_sport` are different failures -- "the match carries no sport" and
+        # "the join produced nothing" -- and a line that printed only on
+        # success could not tell them apart.
+        print(
+            "[kalshi_odds] QUOTE_CAPTURE"
+            f" matches={len(matches)} sports={sorted(by_sport)}"
+            f" appended={captured} no_sport={no_sport}",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 -- instrumentation must not fail the join
+        print(f"[kalshi_odds] QUOTE_CAPTURE_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 
 def _record_board_demand(rows: list[dict[str, Any]]) -> None:
