@@ -39,6 +39,7 @@ from syndicate.features.shared.odds_book_quotes import (
 )
 from syndicate.features.shared.book_shortlist import (
     DIRECT_FEED_BOOKS,
+    drop_from_grid,
     is_direct_feed_book,
 )
 from syndicate.features.shared.opportunity_signals import consensus_vigged_price
@@ -233,6 +234,10 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
     # it drops real prices with no way to notice. Measure first; widen the
     # frozenset by NAME once a real spelling is observed.
     direct_feed_near_misses: dict[str, int] = {}
+    # Counted beside the drop so the two are readable as a RATE: a
+    # `dropped` with no `kept` cannot distinguish "no direct rows exist"
+    # from "the provenance stamp never arrived".
+    kept_direct_feed = 0
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
             continue
@@ -248,9 +253,22 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
         #
         # Counted, not silent: whether OddsAPI supplies these two at all was an
         # open question when this was written, and a zero here answers it.
-        if is_direct_feed_book(row.get("bookmaker")):
+        # `drop_from_grid` asks "is this the AGGREGATOR's copy of a venue we read
+        # directly", which is the question the 2026-08-25 one-price-per-venue
+        # rule was always about. It used the bookmaker NAME as a proxy, correct
+        # while the shard carried only the aggregator's copy -- and measured
+        # 2026-09-01 that stopped being true when a second lane began writing
+        # Kalshi's OWN prices into `book_quotes`. Name-only discarded those too,
+        # so Layer 1 and the book-grid saw no exchange at all.
+        #
+        # UNTAGGED ROWS ARE UNCHANGED: absent provenance still drops, so every
+        # existing writer keeps today's behaviour and only a row explicitly
+        # stamped `source=venue_direct` newly survives.
+        if drop_from_grid(row):
             dropped_direct_feed += 1
             continue
+        if is_direct_feed_book(row.get("bookmaker")):
+            kept_direct_feed += 1
         _book_name = str(row.get("bookmaker") or "").strip().lower()
         if _book_name and ("kalshi" in _book_name or "polymarket" in _book_name):
             # Reached only when the exact match above already refused, so every
@@ -270,7 +288,7 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
         if anchor_key not in anchors:
             anchors[anchor_key] = (index, materialised)
 
-    if dropped_direct_feed or direct_feed_near_misses:
+    if dropped_direct_feed or direct_feed_near_misses or kept_direct_feed:
         # print, not logger.info -- CLAUDE.md: logger.info does not reach
         # Render's collector from this process.
         #
@@ -280,6 +298,11 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
         # its zeroes.
         print(
             f"[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows={dropped_direct_feed} "
+            # A RATE, NOT A COUNT. `dropped` alone cannot distinguish "no direct
+            # rows exist yet" from "the provenance stamp never arrived", and
+            # those demand opposite responses -- wait, versus go and fix the
+            # writer. `kept` is the denominator that separates them.
+            f"kept_direct={kept_direct_feed} "
             f"books={sorted(DIRECT_FEED_BOOKS)} "
             f"near_misses={dict(sorted(direct_feed_near_misses.items()))}",
             flush=True,
