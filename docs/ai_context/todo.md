@@ -284,10 +284,34 @@ football instance; a contract-registry walker in `#619` prevents the class).
    **Precondition to run the other five: graded rows must retain the mechanism
    payload.** Full result stamped into the pre-registration doc; its rules were
    NOT edited.
-5. **Exchange prop economics** — as `book_quotes` accumulates kalshi prop rows
-   (`08ecb418`), measure prop-side option value the way item 05 measured game
-   markets (time-aligned, unconditional); only then change the board's price
-   comparison (the 7h ordering: capture → measure → board).
+5. **Exchange prop economics — MEASURED 2026-09-01. Worth ~+0.64% to +0.84%
+   ROI net of fees, NOT the +1.45% the gross number implies.**
+   `scripts/measure_exchange_prop_option_value.py`. The capture works: **6,523
+   exchange prop rows** on day one (polymarket 3,330, kalshi 3,193) against
+   37,391 sportsbook prop rows — before this it was zero everywhere.
+   On n=2,062 time-aligned comparisons:
+
+   | | gross | fee-aware |
+   |---|---|---|
+   | exchange is cheaper | 82.3% | **55.8%–62.9%** |
+   | mean gain | +1.939 pp | **+0.859 / +1.121 pp** |
+
+   **The 82.3% gross win-rate is a FEE ILLUSION** — net of measured fees the
+   exchange wins ~56–63%, right next to the game-market 52.5%. Fees are
+   measured, not assumed: Polymarket **150 bps of notional, flat and
+   price-independent**; Kalshi `0.07 × multiplier × P(1−P)`, and **the
+   multiplier for BATTER-PROP series is unresolved** (the half-rate finding
+   names "MLB game/total/spread/K" series, not batter props), so both bounds
+   are reported.
+   **CONSEQUENCE FOR STEP 6:** the surviving under book is +0.98% at today's
+   ~8.1% hold; adding this reaches **~+1.6–1.8%**, short of the **+3%** gate.
+   **Exchange price-shopping alone does not clear it.**
+   Caveats: ONE DAY of capture; **67% of exchange quotes had no time-aligned
+   sportsbook price and were excluded**, so this measures the overlap;
+   item 05's game-market +1.57pp is GROSS by the same method, so compare
+   gross-to-gross. Re-run over a full week before sizing anything.
+   The board change (step 3 of the 7h ordering) is therefore **still not
+   justified** on this evidence.
 6. **Gate to re-enable staking** (exclusion `mlb:player_prop` stays until):
    the surviving book (unders minus HR/HRR) re-measured at ≤5% effective hold
    on board-visible rows, target ≥ +3% (sensitivity: +0.98% @ 8.1%, +3.72% @
