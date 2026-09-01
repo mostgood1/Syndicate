@@ -3660,3 +3660,72 @@ holds only what you touched.
   their own context — deliberately not reconstructed from fragments). My own
   block was reconstructible from context. No code, no production state, and
   no pushed history were touched.
+
+## 2026-09-01 — FORBIDDEN: comparing a model against a market price without conditioning on QUOTE AGE. A stale price is a weak forecast, so staleness flatters the model — the error runs in the reassuring direction `[lane mlb-live-gameline-skill-audit]`
+
+One ledger, two opposite conclusions, decided entirely by which prices were
+admitted. MLB live game-lines, 12 dates / 72,587 records / 157 games, h2h scored
+against StatsAPI finals:
+
+    quote age   n     model    market   model-minus-market
+    <= 120s     954   0.20000  0.17403  +0.02597   <- the model honestly LOSES
+    300-600s    320   0.16264  0.17011  -0.00747
+    600-1800s   501   0.16326  0.19047  -0.02721
+    > 1800s     592   0.16459  0.21897  -0.05438   <- the model "WINS"
+
+Pooled over every age: **-0.00202, CI straddles zero — reads as parity.**
+Restricted to quotes that were alive: **+0.01096, CI [+0.00171, +0.02132],
+model worse in 98.9% of game-level resamples.**
+
+**The model does not improve as the quote ages. The MARKET decays**, because a
+price that has not moved in half an hour is a bad forecast of an outcome it has
+not seen. Quote-age distribution in that file: p50 410s, p90 1,848s, **p99
+74,997s** — roughly 1 row in 100 was priced against a quote over 20 hours old.
+
+**The failure mode is a FABRICATED EDGE, not a wrong number.** The subset the
+board liked best — late game, `|edge| >= 20pp` — had a MEDIAN quote age of 42.9
+minutes and scored a fair-odds "return" of **+98.7%**. That is not an edge; it is
+the arithmetic of pricing against a quote nobody could have taken. On FRESH
+quotes the same `|edge| >= 20pp` band scores **+0.16305** — the biggest claimed
+edges are the biggest errors, the exact inversion.
+
+Generalises past game-lines: any `model vs market` comparison — props, CLV,
+settlement, venue routing — inherits this the moment its market side can be
+stale. **Ask what the p99 quote age of your comparison population is before you
+believe its sign.**
+
+## 2026-09-01 — FORBIDDEN: pooling an accuracy history across a SCORER-version boundary, and shipping a scorer whose payload cannot say which version produced it `[lane mlb-live-gameline-skill-audit]`
+
+`reports/live_gameline_accuracy/history.jsonl` reported "model worse on 10 of 12
+dates, +0.04839". It was measuring a bug fixed on day 11. Until `75cf9aec` the
+scorer compared totals `P(over)` and spreads `P(home covers)` against "did the
+home team win" — ~92% of the population was a category error. Proof by n:
+offline h2h-only scoring matches production EXACTLY on 08-30 (249/249 rows,
+briers identical to 5dp) and is 10-20x smaller on every earlier date.
+
+**Nothing in the row said which scorer wrote it**, so the boundary was invisible
+and had to be rediscovered by matching record counts. The rule has two halves:
+
+1. Every evaluation row carries the identity of the code that produced it
+   (`scored_markets`, `scorer_contract`). Absence is itself a version signal.
+2. **A branch that has nothing to measure must STILL report that identity.**
+   Measured the same day: a pregame board served exactly
+   `['enabled','finals_index','games_with_outcome','reason']`, so "the new
+   scorer shipped and had nothing to score" and "the new scorer did not ship"
+   were the same null, and a deploy could not be verified until a game finished.
+   These are constants — they never needed a sample to be reportable.
+
+## 2026-09-01 — FORBIDDEN: `ast.parse` as a syntax check for an edit, and building a `write` and a `read` of the same path in one expression `[lane mlb-live-gameline-skill-audit]`
+
+Two self-inflicted breakages in one session, both from a check that looked
+sufficient.
+
+* **`ast.parse` does NOT catch `return` outside a function** — that is a
+  compile-time check, not a parse-time one. A bad dedent while extracting a
+  function passed `ast.parse` cleanly and the module raised `SyntaxError` on
+  import, surfacing as an unrelated NFL test failure three files away. Use
+  `py_compile.compile(path, doraise=True)`, and import the module.
+* **`io.open(p,'w').write(io.open(p).read().replace(...))` TRUNCATES THE FILE.**
+  Python evaluates the `'w'` open first, so the inner read sees an empty file.
+  It silently zeroed a 368-line module. Caught only by `git diff --stat` showing
+  368 deletions. Read to a variable first, then write.
