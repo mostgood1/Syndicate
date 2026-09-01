@@ -16772,3 +16772,43 @@ exchange prices on the board. Shipped the `else`. Told them.
   shared-schema change; diverging would leave one venue traceable, one not).
 - WNBA `us_ex` regions are on live-odds-worker only, not refresh-worker.
 - WNBA cannot exercise any of this until the **2026-09-17** slate.
+
+## 2026-09-01 16:38Z — MLB native ladders producer PROVEN IN PRODUCTION (lane `mlb-native-ladders-producer`)
+
+**Change:** env only. `SYNDICATE_MLB_LADDERS_FORCE_DATE` `2026-08-20` -> `2026-09-01`
+on refresh-worker via the single-key API (no `render.yaml`, no `blueprint_sync`).
+**I did not run the deploy** — `mlb-accuracy-assessment` held the claim and
+deployed `c2f3efe4` at 16:02:39Z for its own two lanes; the armed knob rode along.
+
+**verify:** `generatedBy` on the SERVED `daily_ladders_2026_09_01.json`, read via
+`/api/ops/artifacts/export`:
+
+```
+generatedBy   syndicate.features.mlb.ladders_build     <- was ABSENT
+generatedAt   2026-09-01T16:38:21Z                     <- AFTER the 16:02:39Z deploy
+bytes         1,529,320                                <- was 16,625,227 (vendor)
+pitcher       30 rows, ladder 30/30, gamePk 30/30
+```
+
+**The gate that made this a real reading:** an earlier ladders rebuild at
+15:44:41Z was NEWER than my 14:18Z baseline and would have passed a naive
+"mtime advanced" check — but it PREDATED the deploy by 18 minutes. The pass
+above required `mtime > deploy.finishedAt`, not `mtime > when I last looked`.
+
+**PRODUCTION IMPACT, MEASURED ON THE CONSUMERS, NOT ASSUMED.** Both pages serve
+from the native artifact and render real projections — no outage, no empty state:
+- `/mlb/api/hitter-ladders` — "Samad Taylor projects for 1.47 hits against CIN",
+  market line 0.5, over 81.4%, mode 1. **BUT `PA mean` and `Order` render `-`.**
+- `/mlb/api/pitcher-ladders` — "Gavin Williams projects for 8.08 strikeouts
+  against TOR", line 6.5, over 77.0%, mode 8, 993 sims. No visible gaps.
+
+Those dashes are `paMean`/`lineupOrder`, two of the 4 presenter fields this lane
+already documented as unfinished (all 4 are 0/30). **Hitter `ladder` is 0/391
+against the vendor's 234/234** and does NOT break the page — the cards read
+line/over/mode, which corroborates the lane's "no consumer reads them".
+
+**SELF-HEALING, deliberately not reverted.** The knob is date-scoped and
+one-shot: it fired once for 2026-09-01 and is inert tomorrow, when the vendor
+writer resumes. So the two dashes are scoped to today. The vendor stage was NOT
+removed — correct, per this lane's own rule that removing it before native is
+proven converts a degraded path into an outage.
