@@ -62,14 +62,32 @@ quotes). For WNBA it carries **nothing from any exchange**.
 3 Polymarket orders. So the board cannot price-shop the only two venues it
 actually trades on, and no edge it computes is the edge that gets filled.
 
-**NOT VERIFIED and load-bearing for the fix:** whether the DIRECT venue feed
-(the `kalshi_markets.json` → `kalshi_price_resolver` path, which is how Kalshi
-prop prices reach MLB) carries WNBA at all. `state.md` records 121 WNBA Kalshi
-quotes in the venue feed, which suggests it does, but that is a different store
-from `book_quotes` and I have not counted it. **Until someone counts it, "join
-the direct feed" is a hypothesis, not a fix** — and on MLB props the equivalent
-"join what you already have" would have been a no-op, because there was nothing
-captured to join.
+**NOT VERIFIED, load-bearing for the fix, and NOT VERIFIABLE UNTIL 2026-09-17:**
+whether the DIRECT venue feed (the `kalshi_markets.json` → `kalshi_price_resolver`
+path, which is how Kalshi prop prices reach MLB) carries WNBA at all. `state.md`
+records 121 WNBA Kalshi quotes in the venue feed, which suggests it does, but
+that is a different store from `book_quotes` and it has not been counted.
+**Until someone counts it, "join the direct feed" is a hypothesis, not a fix** —
+on MLB props the equivalent "join what you already have" would have been a
+no-op, because nothing was captured to join.
+
+The obvious cheap test does NOT work here, and the reason is worth recording.
+`PAPER2_PLAN_WRITTEN` prints `venue_priced=N` — rows priced from the venue's own
+feed rather than the aggregator — and on MLB it discriminates cleanly
+(`venue=polymarket rows_in=384 venue_priced=379`; `venue=kalshi rows_in=168
+venue_priced=0`). For WNBA it answers nothing, on two independent grounds:
+
+1. **The line is sport-agnostic.** It is emitted per VENUE, not per sport, so a
+   non-zero `venue_priced` cannot be attributed to WNBA rows.
+2. **The population contains no WNBA.** There are no WNBA games between
+   2026-08-31 and 2026-09-16 (FIBA World Cup break), so every current tick reads
+   over a slate with zero WNBA rows in it.
+
+Ground 2 is the more instructive: a reading over a population that does not
+contain the subject is unreadable regardless of mechanism, and would have looked
+exactly like "the direct feed does not carry WNBA". **This question is parked
+until a live WNBA slate on or after 2026-09-17**, and any attempt to answer it
+sooner is answering a different question.
 
 ---
 
