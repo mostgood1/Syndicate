@@ -1511,8 +1511,22 @@ def _capture_kalshi_quotes(
             by_sport.setdefault(sport, []).append(dict(match))
 
         captured = 0
+        appended_by_sport: dict[str, int] = {}
+        game_line_rows = 0
         for sport, sport_matches in by_sport.items():
-            rows = quote_rows_from_kalshi_matches(sport_matches)
+            # GAME LINES FOR SOCCER ONLY -- see `_GAME_LINE_CAPTURE_SPORTS`.
+            # Soccer's venue matches are ALL game lines (h2h/totals: a club
+            # is not a player), so the props-only bound discarded 51 of 51
+            # matched soccer markets on 2026-09-01T23:41Z while the sport has
+            # zero OddsAPI exchange rows to collide with.
+            from syndicate.features.shared.odds_book_quotes import (
+                sport_allows_game_line_capture,
+            )
+
+            rows = quote_rows_from_kalshi_matches(
+                sport_matches,
+                allow_game_lines=sport_allows_game_line_capture(sport),
+            )
             if not rows:
                 continue
             result = append_book_quotes(
@@ -1535,15 +1549,26 @@ def _capture_kalshi_quotes(
                 # lets a directly-observed price reach a board.
                 extra={QUOTE_SOURCE_FIELD: QUOTE_SOURCE_VENUE_DIRECT},
             )
-            captured += int((result or {}).get("appended") or 0)
+            _n = int((result or {}).get("appended") or 0)
+            captured += _n
+            if _n:
+                appended_by_sport[sport] = appended_by_sport.get(sport, 0) + _n
+            game_line_rows += sum(1 for r in rows if not r.get("player_name"))
         # ONE LINE, ALWAYS, INCLUDING THE ZEROES. `no_sport` and an empty
         # `by_sport` are different failures -- "the match carries no sport" and
         # "the join produced nothing" -- and a line that printed only on
         # success could not tell them apart.
         print(
             "[kalshi_odds] QUOTE_CAPTURE"
+            # `sports=` LISTS SPORTS WITH MATCHES, NOT SPORTS WITH ROWS, and
+            # that ambiguity cost a wrong reading on 2026-09-01: soccer sat in
+            # this field for hours while contributing zero quotes, which reads
+            # as working capture. `appended_by_sport` is the discriminating
+            # field -- a sport present in `sports` and absent here matched and
+            # wrote nothing.
             f" matches={len(matches)} sports={sorted(by_sport)}"
-            f" appended={captured} no_sport={no_sport}",
+            f" appended={captured} appended_by_sport={appended_by_sport}"
+            f" game_lines={game_line_rows} no_sport={no_sport}",
             flush=True,
         )
     except Exception as exc:  # noqa: BLE001 -- instrumentation must not fail the join

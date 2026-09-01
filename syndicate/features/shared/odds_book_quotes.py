@@ -126,6 +126,54 @@ _KEY_FIELDS: tuple[str, ...] = (
 )
 
 
+# ---------------------------------------------------------------------------
+# WHICH SPORTS MAY CAPTURE A VENUE'S GAME LINES, NOT JUST ITS PROPS.
+# ---------------------------------------------------------------------------
+#
+# The props-only bound on `quote_rows_from_*_matches` exists because
+# `_KEY_FIELDS` carries NO `source`, so a directly-captured venue row and
+# OddsAPI's copy of the same market share a key and ALTERNATE rather than
+# merge -- every alternation reads as a price change that never happened.
+#
+# THAT PREMISE IS SPORT-SPECIFIC, AND FOR SOCCER IT IS MEASURABLY FALSE.
+# The collision needs OddsAPI to be writing exchange rows for that sport.
+# Measured on production shards:
+#
+#     mlb    2026-08-31   2,350 polymarket GAME rows, 26,710 exchange quotes
+#     soccer 2026-08-31   0 exchange rows of ANY kind in 35,672
+#     soccer 08-31..09-05  0 exchange rows of ANY kind in 92,795 (six dates)
+#     soccer 2026-09-01    0 of 6,205, re-read 23:5xZ after 51 Kalshi soccer
+#                          matches existed -- so the zero is current, not stale
+#
+# There is nothing for a soccer venue row to collide WITH, so the bound costs
+# the entire soccer capture and buys nothing. MLB keeps it, because there the
+# collision is real and measured.
+#
+# **THE CONDITION THAT INVALIDATES THIS IS NAMED SO IT CAN BE RE-CHECKED:** if
+# OddsAPI ever starts carrying exchange (kalshi/polymarket/novig/prophetx) rows
+# for soccer, the alternation returns for exactly these keys. `_capture_*`
+# emits `game_lines=` so the volume is visible, and the grid already refuses an
+# unstamped direct-feed venue row (`book_grid.drop_from_grid`), which bounds
+# the damage to the quote log's own movement series rather than the board.
+# Re-measure with: count `bookmaker in {kalshi,polymarket}` rows in a soccer
+# shard; a non-zero that this capture did not write is the signal to revert.
+#
+# NOT a blanket relaxation and NOT the `source`-in-`_KEY_FIELDS` fix, which
+# remains the real remedy and remains unbuilt --
+# `tests/test_direct_feed_provenance.py::test_the_source_stamp_is_NOT_in_the_dedup_key`
+# still pins that condition and still passes.
+_GAME_LINE_CAPTURE_SPORTS: frozenset[str] = frozenset({"soccer"})
+
+
+def sport_allows_game_line_capture(sport: Any) -> bool:
+    """May this sport's venue GAME lines be captured, not just its props?
+
+    One definition read by both venue capture sites. Two literals that must
+    agree is the drift this module keeps paying for.
+    """
+    return str(sport or "").strip().lower() in _GAME_LINE_CAPTURE_SPORTS
+
+
 def book_quotes_path(sport: str, date_str: str) -> Path:
     """The WRITE path for a shard. Always the plain `.jsonl`.
 
@@ -429,6 +477,8 @@ def append_book_quotes(
 
 def quote_rows_from_kalshi_matches(
     matches: Iterable[Mapping[str, Any]],
+    *,
+    allow_game_lines: bool = False,
 ) -> list[dict[str, Any]]:
     """Kalshi board-join matches -> quote rows. `#617`.
 
@@ -510,7 +560,7 @@ def quote_rows_from_kalshi_matches(
         if price is None or not market:
             continue
         player = str(match.get("player_name") or "").strip()
-        if not player:
+        if not player and not allow_game_lines:
             # A game market. OddsAPI already writes Kalshi here, and a second
             # source under the same dedup key alternates rather than merges.
             continue
@@ -550,6 +600,8 @@ def quote_rows_from_kalshi_matches(
 
 def quote_rows_from_polymarket_matches(
     matches: Iterable[Mapping[str, Any]],
+    *,
+    allow_game_lines: bool = False,
 ) -> list[dict[str, Any]]:
     """Polymarket board-join matches -> quote rows. The sibling of the Kalshi one.
 
@@ -612,7 +664,7 @@ def quote_rows_from_polymarket_matches(
         if price is None or not market:
             continue
         player = str(match.get("player_name") or "").strip()
-        if not player:
+        if not player and not allow_game_lines:
             # A game market: OddsAPI already writes polymarket here, and a
             # second source under the same dedup key alternates. See above.
             continue

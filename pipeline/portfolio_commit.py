@@ -205,8 +205,21 @@ def _capture_polymarket_quotes(
             by_sport.setdefault(sport, []).append(dict(match))
 
         captured = 0
+        appended_by_sport: dict[str, int] = {}
+        game_line_rows = 0
         for sport, sport_matches in by_sport.items():
-            rows = quote_rows_from_polymarket_matches(sport_matches)
+            # GAME LINES FOR SOCCER ONLY -- the sibling of the Kalshi capture's
+            # opt-in, reading the SAME predicate so the two cannot drift.
+            # Polymarket's soccer matches are h2h/totals/btts/corners, none of
+            # which carry a player, so the props-only bound discarded every one.
+            from syndicate.features.shared.odds_book_quotes import (
+                sport_allows_game_line_capture,
+            )
+
+            rows = quote_rows_from_polymarket_matches(
+                sport_matches,
+                allow_game_lines=sport_allows_game_line_capture(sport),
+            )
             if not rows:
                 continue
             result = append_book_quotes(
@@ -219,15 +232,24 @@ def _capture_polymarket_quotes(
                 # the venue, and absent means dropped.
                 extra={QUOTE_SOURCE_FIELD: QUOTE_SOURCE_VENUE_DIRECT},
             )
-            captured += int((result or {}).get("appended") or 0)
+            _n = int((result or {}).get("appended") or 0)
+            captured += _n
+            if _n:
+                appended_by_sport[sport] = appended_by_sport.get(sport, 0) + _n
+            game_line_rows += sum(1 for r in rows if not r.get("player_name"))
         # ONE LINE, ALWAYS, INCLUDING THE ZEROES. `no_sport` and an empty
         # `by_sport` are different failures -- "the match carries no sport" and
         # "the join produced nothing" -- and a line printed only on success
         # cannot tell them apart.
         print(
             "[portfolio_commit] POLYMARKET_QUOTE_CAPTURE"
+            # `sports=` lists sports with MATCHES, not sports with ROWS. Soccer
+            # sat in that field contributing nothing for a whole day, which
+            # reads as working capture -- `appended_by_sport` is what
+            # discriminates.
             f" matches={len(matches)} sports={sorted(by_sport)}"
-            f" appended={captured} no_sport={no_sport}",
+            f" appended={captured} appended_by_sport={appended_by_sport}"
+            f" game_lines={game_line_rows} no_sport={no_sport}",
             flush=True,
         )
     except Exception as exc:  # noqa: BLE001 -- instrumentation must not fail the commit
