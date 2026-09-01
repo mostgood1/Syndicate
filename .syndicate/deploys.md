@@ -217,12 +217,61 @@ is unproven is production REACHABILITY — that board rows reaching
 `player_prop`. Presence is not reachability; that distinction is why this stays
 open rather than being called done on green tests.
 
+### verify: ITEM 01 — DISCHARGED 2026-09-01T12:46:16Z. And my falsifier was wrong.
+
+`scripts/verify_mlb_prop_exclusion.py` returned **READY, exit 0**,
+`board_date=2026-09-01 mlb_prop_rows=1876` — precondition (d) satisfied for the
+first time. Then the counter:
+
+    [portfolio_commit] PLAN_WRITTEN date=2026-09-01 rows_in=3701 sized=9
+      positions=1 staked=$1.46
+      refusals={'below_min_ev_pct': 550, 'below_min_stake': 8,
+                'market_family_excluded': 1860, 'no_model_edge_pct': 1277,
+                'zero_kelly_stake': 5}
+      top_market_per_refusal={..., 'market_family_excluded': 'batter_rbis:379', ...}
+
+- **`market_family_excluded: 1860`** against **1,876** MLB prop rows on the
+  board — **99.1%**. (Two different moments, so not an exact reconciliation;
+  the 16-row gap is unexplained and small.)
+- **`top_market_per_refusal` for it is `batter_rbis:379`** — an MLB player prop.
+  The counter fired on the intended subject, not on something incidental.
+- Confirmed on the venue book too: `PAPER2_PLAN_WRITTEN venue=kalshi
+  rows_in=872 ... market_family_excluded: 617`.
+
+### MY PRE-REGISTERED FALSIFIER WOULD HAVE CONDEMNED A WORKING CHANGE
+
+I wrote: *"FALSIFIED IF `market_family_excluded` appears and
+`no_model_edge_pct` does NOT move."* It appeared, and `no_model_edge_pct` did
+not fall — 1,092 -> 1,277. **By my own written test this is a failure. It is
+not.**
+
+The falsifier rested on a MECHANISM ASSUMPTION — that MLB props are where the
+missing model edge sits — and that assumption is false. On this tick
+`no_model_edge_pct`'s top market is **`alternate_totals_corners:658`**, a
+SOCCER market. The rows lacking a model edge are soccer corners; the rows the
+exclusion removes are MLB props. **Two different populations, which is exactly
+what my falsifier said would be the case — but the conclusion I attached to it
+("neither number should be quoted") did not follow.**
+
+**THE LESSON, and it is a distinct one from check (d): a falsifier must test
+the CLAIM, not a side-assumption about mechanism.** The claim was "the
+exclusion refuses MLB player props". The falsifier tested "props are the bulk
+of the unmodelled rows". The first is true and the second is false, and a test
+of the second would have thrown away a change that does exactly what it says.
+
+**The band was also wrong, and I said in advance that I would say so.**
+Predicted 500-700; actual 1,860. The 663 figure came from a 2026-08-31
+snapshot; the 09-01 slate carries 2,000 MLB rows of which 1,876 are props
+against 1,000 / 663 on the snapshot. The caveat held: it was an
+order-of-magnitude band from a different population, and it missed by 3x.
+
+**What the primary evidence does NOT depend on:** neither the band nor the
+`no_model_edge_pct` movement. `market_family_excluded: 1860` with
+`batter_rbis` as its top market is the claim, measured directly.
+
 ### owed
 
-- **ITEM 01 verification** — a `PLAN_WRITTEN` from a tick during a LIVE MLB
-  slate with `per_sport.mlb.prop > 0`, carrying `market_family_excluded`.
-  Next MLB slate is 2026-09-01. **Check the precondition before reading the
-  counter.**
+- **Nothing on this deploy round.** All four Tier 0 gates discharged.
 - ~~**ITEM 04 verification**~~ — DISCHARGED, see above.
 - **ITEM 01 UNDEPLOYED.** `commit_portfolio` is reached via
   `run_portfolio_commit` from `pipeline/intelligence_state.py`, and

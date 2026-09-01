@@ -98,6 +98,19 @@
   game rows, slate over). **The change had nothing to act on.** The
   pre-registration named a falsifier and did not name a precondition, so a
   reading with no subject in it looked exactly like a failing one.
+- **A SIXTH instance, 2026-09-01T12:46Z, and it is a DIFFERENT lesson worth its
+  own line: A FALSIFIER MUST TEST THE CLAIM, NOT A SIDE-ASSUMPTION ABOUT
+  MECHANISM.** The gate finally became readable (`verify_mlb_prop_exclusion.py`
+  READY, 1,876 MLB prop rows) and PASSED: `market_family_excluded: 1860`, top
+  market `batter_rbis:379`, i.e. 99.1% of MLB props refused, exactly as
+  designed. **But my pre-registered falsifier said "FALSIFIED IF the counter
+  appears and `no_model_edge_pct` does not move" — and it did not move
+  (1,092 -> 1,277). By my own written test, a working change fails.** The
+  falsifier rested on an assumption that MLB props are where the missing model
+  edge sits; they are not — `no_model_edge_pct`'s top market is
+  `alternate_totals_corners`, a SOCCER market. Pre-registering is necessary and
+  not sufficient: a test aimed at a mechanism you have assumed rather than at
+  the claim you are making will condemn a change that does exactly what it says.
 - **Cost:** ~35 minutes of watcher time on the WNBA side before the code
   comment stopped a third watcher being armed; two wrong conclusions drafted
   and withdrawn on the MLB side before either was quoted; and one WNBA
