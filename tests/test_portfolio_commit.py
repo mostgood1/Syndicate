@@ -797,7 +797,14 @@ def test_the_plan_log_names_where_the_bankroll_came_from(capsys, monkeypatch, tm
 # ---------------------------------------------------------------------------
 
 
-def test_refusals_are_attributed_to_the_market_that_was_refused():
+def test_refusals_are_attributed_to_the_market_that_was_refused(monkeypatch):
+    # POLICY-INDEPENDENT ON PURPOSE. These fixtures are MLB prop rows and this
+    # test is about the ATTRIBUTION machinery, not about which families are
+    # staked. `#615` added a sport-scoped family exclusion whose default is
+    # `mlb:player_prop`, which made these rows land under
+    # `market_family_excluded` and this test read as a regression in a counter
+    # it does not test. Pinning the knob keeps the subject fixed.
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES", "")
     from syndicate.features.shared.portfolio_commit import commit_portfolio
     from syndicate.features.shared.portfolio_settings import PortfolioSettings
 
@@ -838,9 +845,16 @@ def test_refusals_are_attributed_to_the_market_that_was_refused():
         assert sum(by_market[reason].values()) == count, reason
 
 
-def test_markets_are_ordered_by_count_so_the_leader_is_first():
+def test_markets_are_ordered_by_count_so_the_leader_is_first(monkeypatch):
     """The log line prints only the leader per reason; if ordering were
     arbitrary it would print an arbitrary market and read as the cause."""
+    # POLICY-INDEPENDENT ON PURPOSE. These fixtures are MLB prop rows and this
+    # test is about the ATTRIBUTION machinery, not about which families are
+    # staked. `#615` added a sport-scoped family exclusion whose default is
+    # `mlb:player_prop`, which made these rows land under
+    # `market_family_excluded` and this test read as a regression in a counter
+    # it does not test. Pinning the knob keeps the subject fixed.
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES", "")
     from syndicate.features.shared.portfolio_commit import commit_portfolio
     from syndicate.features.shared.portfolio_settings import PortfolioSettings
 

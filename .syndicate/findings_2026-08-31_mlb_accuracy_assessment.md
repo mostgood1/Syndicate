@@ -500,6 +500,100 @@ positive on their own: `batter_hits` +4.29% (n=515), `strikeouts` +13.95%
 
 ---
 
+## 7d. ITEM 01 EXECUTED — and the rule I wrote was aimed at the wrong book
+
+**Done 2026-08-31.** Item 01 shipped, but not as specified. The specification
+said *cut prop OVERS, home runs and HRR, keep the under book*. **That rule was
+derived from a book that does not risk any money, and applied to the staking
+path it would have been inert.** What shipped is a sport-scoped market-FAMILY
+exclusion, justified on the staked book's own evidence.
+
+### THERE ARE TWO PROP BOOKS AND I HAD BEEN CONFLATING THEM
+
+**Book A — the vendor season betting card.** 8,918 graded rows; everything in
+sections 3, 7b and 7c is measured on this. `grep` across `pipeline/`,
+`portfolio_commit.py` and `layer2_board.py` returns **zero** references to
+`season_betting_card`, `betting_day_payloads` or `locked_cards`. **It is not a
+staking input anywhere.** It is a paper surface, and its measured -5.70pp
+over-side defect risks nothing.
+
+**Book B — the portfolio, which does risk money.** It commits off
+`read_layer2_shortlist`. Measured across 16 dates, 2026-08-22..08-31:
+
+| | n decided | win% |
+|---|---|---|
+| MLB game markets | 359 | 47.9% |
+| **MLB player props** | **257** | **42.0%** |
+
+and from the settlement totals, `player_prop` **-19.27% ROI on $561.23**
+(145 settled) against `game_line` +15.55% and `game_total` +6.65%.
+`paper:kalshi/player_prop` is -11.96% over 207 settled.
+
+### THE SIDE RULE DOES NOT TRANSFER, AND THAT IS MEASURED, NOT ASSUMED
+
+In Book B the sides are indistinguishable:
+
+| side | n | win% |
+|---|---|---|
+| over | 99 | 41.4% |
+| under | 158 | 42.4% |
+
+Against Book A's over 44.05% / under 60.58%. **The over-side defect simply is
+not present in the staked book**, and the reason is visible on the served
+board: `model_edge_pct` is numeric on **0 of 103** MLB prop rows and `ev_basis`
+is `market_fair` on all 103. **Side selection on the staking path is price, not
+projection.** A side rule there would have refused nothing that deserved it.
+
+The two books do not even trade the same markets. Book B stakes `strikeouts`
+(98), `totals_alt` (64), `outs` (38), `hits_allowed` (28), `earned_runs` (20),
+`h2h_3_way` (22) and `walks_allowed` -- `earned_runs` and `hits_allowed` appear
+nowhere in the graded ledger at all.
+
+### WHAT SHIPPED
+
+`resolve_excluded_families()` in `portfolio_commit.py`, env
+`SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES`, default **`mlb:player_prop`**.
+Refusal name `market_family_excluded`, applied FIRST in the commit loop -- the
+same ordering `layer2_board`'s `excluded_markets` uses, so an excluded row
+cannot be re-seated and the surviving refusal counters describe only in-scope
+rows.
+
+- **Sport-scoped on purpose.** The finding is MLB-only; NFL and NBA prop books
+  have never been measured this way and must not inherit an MLB verdict
+  silently. A test asserts an NFL prop is not swept up.
+- **Family classifier is the SHARED one.** `market_family_of` delegates to
+  `paper_settlement._market_family` rather than re-deriving. That module's own
+  docstring records what a second definition costs. A test asserts the two
+  agree.
+- **Counted, not vanished.** `refusals_by_market` attributes each refusal to
+  its market, and a test asserts the reasons still sum to `rows_in`.
+- **Reversible with one env var**, and it is a POLICY DEFAULT, not a defect fix.
+
+Tests: 9 new, plus two pre-existing tests in `test_portfolio_commit.py` pinned
+policy-independent -- they used MLB prop rows as fixtures for the ATTRIBUTION
+machinery and so silently depended on which families are excluded.
+**Off-is-not-on verified: 4 of the 9 fail with the exclusion disabled**, and the
+5 that assert the rule does NOT fire pass in both states, which is correct.
+
+### WHAT THIS DOES *NOT* CLAIM
+
+- It does not fix Book A. The calibration defect and the 993 zero-probability
+  rows in section 7c are untouched and still real.
+- It does not assert props are unprofitable in principle. Section 7b's
+  arithmetic stands: the under book clears its hold and needs roughly a **+5.1%
+  payout improvement** to reach +5% ROI, against a measured +10.61% dispersion
+  on a panel that is **3 books deep with no exchange in it**. If the panel
+  widens, this default should be re-measured, not assumed permanent.
+- **It is UNDEPLOYED.** `commit_portfolio` runs on the worker; nothing changes
+  in production until a deploy.
+
+**Gate:** after deploy, `market_family_excluded` appears in the commit
+refusals with a non-zero count and `player_prop` disappears from
+`by_market_family` on new dates; then pooled ROI over the following ten days
+measured against the +3.76% baseline that included props.
+
+---
+
 ## 8. The plan, ranked by measured dollars per unit of work
 
 Each item names the gate that decides whether it worked. Nothing here is
@@ -507,9 +601,14 @@ Each item names the gate that decides whether it worked. Nothing here is
 
 ### Tier 0 — stop the bleeding (hours, no modelling)
 
-1. **[REVISED after section 7b — this is NOT a wholesale prop shutdown.]**
-   **Cut prop OVERS, home runs and hits+runs+RBIs; KEEP the under book on hits,
-   total bases, runs and RBIs.** Overs are negative in all five price bands
+1. **[SUPERSEDED BY SECTION 7d — SHIPPED, but as a FAMILY rule, not a SIDE
+   rule. The side rule below describes the VENDOR CARD, which grep confirms is
+   not a staking input; in the staked book the sides are indistinguishable
+   (over 41.4% n=99, under 42.4% n=158) because the board carries no model view
+   on prop rows. What shipped is `mlb:player_prop` excluded from
+   `commit_portfolio`. Read 7d before acting on this paragraph.]**
+   ~~Cut prop OVERS, home runs and hits+runs+RBIs; KEEP the under book on hits,
+   total bases, runs and RBIs.~~ Overs are negative in all five price bands
    (-3.29 to -7.80pp) and in every market cell, so no filter rescues that side.
    The under book minus HR and HRR is **+0.65% ROI on 2,571 bets** over five
    months.

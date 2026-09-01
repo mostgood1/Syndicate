@@ -369,6 +369,73 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def market_family_of(row: Mapping[str, Any]) -> str:
+    """`game_line`, `game_total` or `player_prop`, from the SHARED classifier.
+
+    Deliberately delegates to `paper_settlement._market_family` rather than
+    re-deriving it here. That module's own docstring warns what a second
+    definition costs: the settlement page, the day budget and the execution
+    guard each grew their own idea of "never a position" and the totals drifted
+    apart. A family used to REFUSE a bet and a family used to REPORT on it must
+    be the same function, or the funnel and the results table stop describing
+    the same book.
+    """
+    from syndicate.features.shared.paper_settlement import _market_family
+
+    return _market_family(row)
+
+
+def resolve_excluded_families() -> frozenset[str]:
+    """Sport-scoped `sport:family` tokens that may never be staked.
+
+    Env: `SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES`, comma-separated. An empty
+    string disables the rule entirely; unset takes the default below.
+
+    ------------------------------------------------------------------
+    WHY `mlb:player_prop` IS THE DEFAULT, AND WHY IT IS SCOPED TO A SPORT
+    ------------------------------------------------------------------
+
+    MEASURED on the portfolio's OWN book, 2026-08-22..08-31, 16 dates:
+    MLB player props settled **145 rows at -19.27% ROI on $561.23** while
+    `game_line` returned +15.55% and `game_total` +6.65% over the same slate.
+    On decided rows the split is **props 42.0% (n=257) against game markets
+    47.9% (n=359)**. `paper:kalshi/player_prop` is -11.96% over 207 settled.
+
+    **THE REASON IS STRUCTURAL, NOT DIRECTIONAL, AND THAT MATTERS FOR THE
+    SCOPE OF THIS RULE.** An earlier draft of this exclusion was going to cut
+    prop OVERS, from a measured -5.70pp over-side defect. That defect is real
+    but it lives in a DIFFERENT BOOK: the vendor season betting card, which
+    grep confirms is not a staking input anywhere in `pipeline/` or this file.
+    In the book that actually risks money the sides are indistinguishable --
+    **over 41.4% (n=99) against under 42.4% (n=158)** -- because the board
+    brings no model view to prop rows at all: measured on the served
+    `layer2-shortlist`, `model_edge_pct` is numeric on **0 of 103** MLB prop
+    rows and `ev_basis` is `market_fair` on all 103. Side selection there is
+    price, not projection, so a side rule would have been inert.
+
+    What remains is entry cost. Prop markets carry several times the hold of a
+    game line, and price shopping alone does not pay it. That is a per-sport,
+    per-family fact, so the knob is per-sport: NFL and NBA prop books have not
+    been measured this way and must not inherit an MLB verdict silently.
+
+    **THIS IS A POLICY DEFAULT, NOT A DEFECT FIX.** It is reversible with one
+    env var and it is counted by name (`market_family_excluded`) so the volume
+    it removes stays visible rather than becoming an unexplained drop in
+    `rows_in`.
+    """
+    import os
+
+    raw = os.environ.get("SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES")
+    text = DEFAULT_EXCLUDED_FAMILIES if raw is None else raw
+    return frozenset(
+        token.strip().lower() for token in text.split(",") if token.strip()
+    )
+
+
+# See `resolve_excluded_families` for the measurement behind this default.
+DEFAULT_EXCLUDED_FAMILIES = "mlb:player_prop"
+
+
 def commit_portfolio(
     rows: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...],
     *,
@@ -414,12 +481,25 @@ def commit_portfolio(
         key = market or "unkeyed"
         bucket[key] = bucket.get(key, 0) + 1
 
+    excluded_families = resolve_excluded_families()
+
     priced: list[dict[str, Any]] = []
     for row in rows or ():
         rows_in += 1
         if not isinstance(row, Mapping):
             refuse("row_not_a_mapping", None)
             continue
+
+        # `#615`: SPORT-SCOPED MARKET-FAMILY EXCLUSION. Applied FIRST, before
+        # pricing, so an excluded row cannot be re-seated later and so the
+        # remaining refusal counters describe only rows that were in scope --
+        # the same ordering `layer2_board`'s `excluded_markets` already uses,
+        # for the same reason.
+        if excluded_families:
+            family = f"{str(row.get('sport') or '').strip().lower()}:{market_family_of(row)}"
+            if family in excluded_families:
+                refuse("market_family_excluded", row)
+                continue
         inputs, reason = sizing_inputs_from_row(row)
         if inputs is None:
             refuse(reason or "unknown", row)
