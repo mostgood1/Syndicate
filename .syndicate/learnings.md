@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 729 rules `[generated]`
+## Index — 730 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5869,3 +5869,32 @@ exactly that.
   applied to one file instead of the class. A duplicated 97-line `state.md`
   section sat on `origin/main` for ~1h, and `lanes.md` shipped 40 OPEN lanes with
   39 re-armed claims immediately after being reported clean at 34/0.
+
+## 2026-08-31 FORBIDDEN: taking a tool's DEFAULT liveness detection as the answer to "is this session gone"
+
+- **What we believed.** `release_phantom_lane_claims.py` decides liveness from
+  transcript mtime (`--stale-minutes`, default 60), and its own docstring says
+  the break was "unambiguous" when it was written — so the default is the answer.
+- **What was actually true.** **Archiving a session WRITES its transcript.** So a
+  session reads as live for up to `--stale-minutes` AFTER it ends, and the final
+  flush is byte-for-byte indistinguishable from work. Measured 2026-08-31
+  ~01:4xZ: `5611932c`, `6475567d`, `6f5693b7`, `ddc8dc5a` all had transcripts
+  written 10-15 minutes earlier and **all four were archived**, with
+  `isRunning: false`. On the default, the sweep printed `LIVE-OWNED (untouched):
+  mlb-resolver-write-side-effect` — a lane whose own header already read
+  `UNOWNED, handed off` — and would have left its claims armed for nobody.
+- **How we found out.** The session ROSTER, not the filesystem:
+  `list_sessions(include_archived=true)` reports `isRunning` directly, and the
+  four "live" ids did not appear in the non-archived listing at all. The
+  discrepancy was visible only because the roster was read as well as the mtimes.
+- **The rule going forward.** Establish liveness from the roster, then pass
+  `--live <id>` explicitly for each session that is genuinely running; never let
+  the mtime default decide. **And re-read liveness immediately before the write,
+  not once at the start** — "no active sessions" was true at 01:4xZ, false by
+  02:0xZ when a new session opened a lane, and a second one appeared at 02:4xZ.
+  Note the default errs CONSERVATIVE (a dead session looks live, so a lane is
+  skipped); the dangerous direction — sweeping a lane whose session is running —
+  is what the re-read before writing protects against.
+- **Cost.** None realised: caught before the write, 1 of 9 phantom lanes would
+  have been skipped. The same session then swept `lanes.md` twice more as new
+  lanes arrived, which is the recurring shape of the mistake.

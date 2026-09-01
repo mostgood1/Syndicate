@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 729 rules `[generated]`
+## Index — 730 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 204**
+**FORBIDDEN — 205**
 
 - [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
 - [2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch…](#2026-08-30-forbidden-inferring-who-wrote-a-commit-from-adjacency-in-a-shared-branch-where-every-commit-carries-one-bot-author-lane-exchange-join-refusals)
@@ -163,6 +163,7 @@
 - [2026-08-31 FORBIDDEN: two guards that read the SAME input are ONE guard](#2026-08-31-forbidden-two-guards-that-read-the-same-input-are-one-guard)
 - [2026-08-31 FORBIDDEN: fixing a decision's INPUT without checking every CALLER supplies…](#2026-08-31-forbidden-fixing-a-decisions-input-without-checking-every-caller-supplies-it)
 - [2026-08-31 FORBIDDEN: treating `Auto-merging <file>` as a verification of a ledger merge](#2026-08-31-forbidden-treating-auto-merging-file-as-a-verification-of-a-ledger-merge)
+- [2026-08-31 FORBIDDEN: taking a tool's DEFAULT liveness detection as the answer to "is t…](#2026-08-31-forbidden-taking-a-tools-default-liveness-detection-as-the-answer-to-is-this-session-gone)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
