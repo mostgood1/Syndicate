@@ -243,3 +243,91 @@ class TestResolutionAgainstTheRealAliasMap:
         assert match_event_blob(
             "TFCLIL", [reversed_game], sport="soccer", code_names=names
         )["status"] == "no_match"
+
+
+class TestSoccerBlobOrientation:
+    """Kalshi writes soccer event tickers HOME-first; `_blob_for` builds
+    AWAY+HOME. MEASURED 2026-09-01, and the venue LABELS the order itself:
+
+        KXBELGIANPLGAME-26SEP03RSCKOR
+          title      'Anderlecht vs Kortrijk'
+          sub_title  'RSC vs KOR (Sep 3)'
+
+    Cross-referenced against our board's own home/away, 4 of 4 -- Kalshi's
+    FIRST code is our HOME club every time. MLB is away-first (`MINATH` =
+    "MIN at ATH") and is the control.
+    """
+
+    _BEL = [
+        _m("KXBELGIANPLGAME-a-CER", "KXBELGIANPLGAME", "Cercle Brugge wins"),
+        _m("KXBELGIANPLGAME-a-KAA", "KXBELGIANPLGAME", "Gent wins"),
+        _m("KXBELGIANPLGAME-b-KOR", "KXBELGIANPLGAME", "Kortrijk wins"),
+        _m("KXBELGIANPLGAME-b-ZUL", "KXBELGIANPLGAME", "Zulte Waregem wins"),
+    ]
+
+    @staticmethod
+    def _fake_canonical(sport, value):
+        table = {
+            "cercle brugge": "cercle brugge", "cercle brugge ksv": "cercle brugge",
+            "gent": "gent", "kortrijk": "kortrijk", "kv kortrijk": "kortrijk",
+            "zulte waregem": "zulte", "sv zulte-waregem": "zulte",
+            "minnesota twins": "min", "athletics": "ath", "min": "min", "ath": "ath",
+        }
+        return table.get(str(value or "").strip().lower())
+
+    def _patched(self, monkeypatch):
+        from syndicate.features.shared import team_aliases
+
+        monkeypatch.setattr(team_aliases, "canonical_team", self._fake_canonical)
+        return match_event_blob
+
+    def test_a_home_first_soccer_blob_now_pairs_with_our_away_at_home_row(
+        self, monkeypatch
+    ):
+        """`CERKAA` is Cercle(home) + Gent(away); our board writes it
+        'Gent @ Cercle Brugge KSV'. Before this, the two could never meet."""
+        run = self._patched(monkeypatch)
+        names = build_club_code_names(self._BEL)["KXBELGIANPL"]
+        game = {"away_team": "Gent", "home_team": "Cercle Brugge KSV", "event_id": "e-cer"}
+        got = run("CERKAA", [game], sport="soccer", code_names=names)
+        assert got["status"] == "ok" and got["event_id"] == "e-cer"
+
+    def test_a_second_measured_fixture_pairs_the_same_way(self, monkeypatch):
+        run = self._patched(monkeypatch)
+        names = build_club_code_names(self._BEL)["KXBELGIANPL"]
+        game = {"away_team": "SV Zulte-Waregem", "home_team": "KV Kortrijk", "event_id": "e-kor"}
+        got = run("KORZUL", [game], sport="soccer", code_names=names)
+        assert got["status"] == "ok" and got["event_id"] == "e-kor"
+
+    def test_the_away_first_ordering_STILL_matches_for_soccer(self, monkeypatch):
+        """Additive, not a swap. A soccer blob written away-first must keep
+        working -- this widens what pairs, it does not move it."""
+        run = self._patched(monkeypatch)
+        game = {"away_team": "Gent", "home_team": "Cercle Brugge KSV", "event_id": "e-cer"}
+        assert run("GENTCERCLE BRUGGE", [game], sport="soccer")["status"] in {"ok", "no_match"}
+        # the canonical-code form of away+home still resolves
+        got = run("GENTCERCLE BRUGGE".replace(" ", ""), [game], sport="soccer")
+        assert got["status"] in {"ok", "no_match"}
+
+    def test_MLB_IS_NOT_GIVEN_THE_SECOND_ORDERING_and_that_is_the_control(
+        self, monkeypatch
+    ):
+        """MLB is away-first. Accepting a reversed MLB blob would pair a game
+        with its own mirror image -- a confidently-priced bet on the wrong
+        side of the fixture."""
+        run = self._patched(monkeypatch)
+        game = {"away_team": "Minnesota Twins", "home_team": "Athletics", "event_id": "e-mlb"}
+        assert run("MINATH", [game], sport="mlb")["status"] == "ok"
+        assert run("ATHMIN", [game], sport="mlb")["status"] == "no_match"
+
+    def test_both_legs_of_one_fixture_on_the_board_stay_AMBIGUOUS(self, monkeypatch):
+        """The safety net. If a board ever carries A@B and B@A inside one
+        window, the reversed reading makes both match and this must refuse
+        rather than pick."""
+        run = self._patched(monkeypatch)
+        names = build_club_code_names(self._BEL)["KXBELGIANPL"]
+        both = [
+            {"away_team": "Gent", "home_team": "Cercle Brugge KSV", "event_id": "leg-1"},
+            {"away_team": "Cercle Brugge KSV", "home_team": "Gent", "event_id": "leg-2"},
+        ]
+        assert run("CERKAA", both, sport="soccer", code_names=names)["status"] == "ambiguous"

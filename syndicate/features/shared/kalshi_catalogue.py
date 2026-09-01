@@ -829,6 +829,50 @@ def _blob_for(away: Any, home: Any) -> str:
     return f"{_clean_code(away)}{_clean_code(home)}"
 
 
+# Sports whose Kalshi event ticker names the HOME club FIRST. Everything else
+# is AWAY+HOME, which is what `_blob_for` builds and what MLB uses.
+#
+# MEASURED 2026-09-01, and the venue LABELS the order itself rather than
+# leaving it to be inferred: an event's `sub_title` spells the code pair beside
+# the club names, so the mapping is read, not guessed.
+#
+#     KXBELGIANPLGAME-26SEP03RSCKOR  title 'Anderlecht vs Kortrijk'
+#                                    sub_title 'RSC vs KOR (Sep 3)'
+#
+# Cross-referenced against OUR board's own home/away on every fixture the two
+# venues share, 4 of 4 -- Kalshi's FIRST code is our HOME club each time:
+#
+#     RSCKOR   Kortrijk        @ Anderlecht
+#     CERKAA   Gent            @ Cercle Brugge KSV
+#     KORZUL   SV Zulte-Waregem@ KV Kortrijk
+#     STTRAAL  RAAL La Louviere@ Sint Truiden
+#
+# MLB IS THE CONTROL AND IS DELIBERATELY ABSENT: `KXMLBHR-26AUG242140MINATH`
+# is "MIN at ATH", away-first, which `_blob_for` already produces. This is the
+# same sport-dependent split `polymarket_board_join` measured for the venue's
+# soccer SLUGS (home-first there too) -- two venues, one convention per sport.
+#
+# WHY THIS FAILS SAFE IF THE READING IS EVER WRONG: a reversed blob describes
+# the RETURN LEG, a different fixture that is almost never on the same 6-day
+# board. So a wrong orientation yields NO match rather than a wrong one, and
+# the `ambiguous` refusal below catches the rare case where both legs are
+# present. Nothing here relaxes club identity.
+_HOME_FIRST_BLOB_SPORTS = frozenset({"soccer"})
+
+
+def _candidate_blobs(game: Mapping[str, Any], sport: Any) -> list[tuple[str, str]]:
+    """Every `(away_code, home_code)` ordering this game could be written as.
+
+    One entry for most sports. Soccer adds the home-first ordering, because the
+    venue writes it that way -- see `_HOME_FIRST_BLOB_SPORTS`.
+    """
+    away, home = game.get("away_team"), game.get("home_team")
+    orderings = [(away, home)]
+    if str(sport or "").strip().lower() in _HOME_FIRST_BLOB_SPORTS:
+        orderings.append((home, away))
+    return orderings
+
+
 def _splits(blob: str) -> list[tuple[str, str]]:
     """Every way `MINATH` could be two club codes.
 
@@ -917,7 +961,10 @@ def match_event_blob(
     hits = [
         game
         for game in (games or [])
-        if _blob_for(game.get("away_team"), game.get("home_team")) == wanted
+        if any(
+            _blob_for(first, second) == wanted
+            for first, second in _candidate_blobs(game, sport)
+        )
     ]
 
     if not hits:
@@ -942,33 +989,45 @@ def match_event_blob(
 
         if canonical_team is not None:
             for game in games or []:
-                ours_away = canonical_team(sport, game.get("away_team"))
-                ours_home = canonical_team(sport, game.get("home_team"))
-                if not ours_away or not ours_home:
+                # BOTH ORDERINGS FOR SOCCER, one for everything else. The pair
+                # is (first_written, second_written) -- for MLB that is
+                # (away, home); for soccer the venue writes (home, away).
+                orderings = [
+                    (canonical_team(sport, first), canonical_team(sport, second))
+                    for first, second in _candidate_blobs(game, sport)
+                ]
+                orderings = [(a, b) for a, b in orderings if a and b]
+                if not orderings:
                     # A club OUR side cannot resolve. Skipped rather than
                     # matched loosely -- an unresolvable name is not evidence.
                     continue
-                for left, right in _splits(wanted):
-                    # THE CODE FIRST, THEN KALSHI'S OWN NAME FOR IT. A code the
-                    # map does not carry falls through to itself, so this can
-                    # only add resolutions -- never alter one that already
-                    # worked, which is what keeps every other sport identical.
-                    left_keys = [left]
-                    right_keys = [right]
-                    if code_names:
-                        left_named = code_names.get(left)
-                        right_named = code_names.get(right)
-                        if left_named:
-                            left_keys.append(left_named)
-                        if right_named:
-                            right_keys.append(right_named)
-                    if any(
-                        canonical_team(sport, lk) == ours_away for lk in left_keys
-                    ) and any(
-                        canonical_team(sport, rk) == ours_home for rk in right_keys
-                    ):
-                        hits.append(game)
+                matched_here = False
+                for ours_first, ours_second in orderings:
+                    if matched_here:
                         break
+                    for left, right in _splits(wanted):
+                        # THE CODE FIRST, THEN KALSHI'S OWN NAME FOR IT. A code
+                        # the map does not carry falls through to itself, so
+                        # this can only add resolutions -- never alter one that
+                        # already worked, which keeps every other sport
+                        # identical.
+                        left_keys = [left]
+                        right_keys = [right]
+                        if code_names:
+                            left_named = code_names.get(left)
+                            right_named = code_names.get(right)
+                            if left_named:
+                                left_keys.append(left_named)
+                            if right_named:
+                                right_keys.append(right_named)
+                        if any(
+                            canonical_team(sport, lk) == ours_first for lk in left_keys
+                        ) and any(
+                            canonical_team(sport, rk) == ours_second for rk in right_keys
+                        ):
+                            hits.append(game)
+                            matched_here = True
+                            break
     if not hits:
         return {"status": "no_match", "blob": wanted}
     if len(hits) > 1:
