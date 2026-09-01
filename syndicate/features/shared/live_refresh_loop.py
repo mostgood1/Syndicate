@@ -4024,9 +4024,82 @@ def _wnba_commence_times(date_str: str) -> list[tuple[str, float]]:
 	return out
 
 
+def _soccer_commence_times(date_str: str) -> list[tuple[str, float]]:
+	"""Kickoff epochs per event, across the leagues in season on `date_str`.
+
+	Soccer is the sport Phase 3 was WRITTEN FOR. The pregame-cadence block
+	below records the intent verbatim -- soccer is "a weekly sport whose
+	pre-matchday drift is worth 2-3 points a day, so 8h ... the proper
+	matchday ramp (T-75/T-10 per game) is Phase 3" -- and an 8h drift
+	interval can miss a kickoff by nearly four hours, the widest close-miss
+	of any sport here. CLV's close is the last pregame price, so every
+	soccer CLV number taken so far rests on whichever drift point happened
+	to land.
+
+	Reads the per-league bundle the odds fetcher already writes
+	(`fetch_soccer_oddsapi_odds_local.py --out .../api/odds/game_odds_current.csv`)
+	and scopes leagues with `active_leagues_for_date` -- the SAME scoping
+	`_soccer_has_live_game` above and `_build_soccer_steps` in
+	`refresh_odds_sources.py` use. A third spelling of "which leagues are in
+	season" is exactly the drift this file must not add.
+
+	NOT filtered to `date_str`, deliberately. That CSV is a CURRENT snapshot
+	which can carry fixtures days out, and `_t_window_due_sports` already
+	admits only events inside 75 minutes -- so a date filter buys nothing and
+	would WRONGLY drop a late kickoff that lands on the next Central date,
+	which European fixtures routinely do.
+
+	Fails open to `[]` on any read error, same as every provider here: a
+	missing bundle costs precision, never a sweep storm.
+	"""
+	try:
+		from syndicate.features.soccer.sources import active_leagues_for_date
+		leagues = active_leagues_for_date(date_str)
+	except Exception:
+		return []
+	# One row per (market, side, book) per event, so the same fixture appears
+	# many times; key by event so the provider returns fixtures, not rows.
+	by_event: dict[str, float] = {}
+	for league in leagues or []:
+		path = data_root() / "soccer_source" / str(league) / "api" / "odds" / "game_odds_current.csv"
+		try:
+			with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+				for row in csv.DictReader(handle):
+					event_id = str(row.get("event_id") or "").strip()
+					if not event_id or event_id in by_event:
+						continue
+					epoch = _parse_commence_epoch(row.get("commence_time"))
+					if epoch is not None:
+						by_event[event_id] = epoch
+		except (OSError, csv.Error, UnicodeDecodeError):
+			continue
+	return sorted(by_event.items(), key=lambda item: item[1])
+
+
+# WHY ONLY THESE THREE, and what the other five need. Registering a sport here
+# is SAFE regardless of ownership -- the caller intersects the due set with
+# `resolved_launch_sports`, so a provider for a sport this service does not
+# launch can never fire a sweep. What a registration needs is a real
+# commence-time SOURCE and a `_LIVE_STATUS_CHECKERS` entry (without the
+# checker the sport is never skipped while live, which is cost with no data).
+#
+#   nba     -- checker EXISTS; source does NOT. The WNBA provider's mirror
+#              (`vendor/nba_betting_repo/data/processed/schedule_2026.json`)
+#              is absent from the repo, verified 2026-09-01. A provider
+#              written against it would fail open forever, which is an unfed
+#              feature wearing a working one's shape.
+#   nhl     -- checker exists; needs its scoreboard/schedule commence times.
+#   nfl     -- checker exists; `nfl_source/schedule_{season}.csv` carries the
+#              slate, and its kickoff column has not been confirmed here.
+#   ncaaf   -- checker exists; CFBD `/games` carries kickoffs.
+#   ncaab   -- no checker and no in-repo source.
+#
+# Each is a provider function plus one line, once its source is CONFIRMED to
+# exist in production -- not inferred from a filename.
 _T_WINDOW_COMMENCE_PROVIDERS = {
 	"mlb": _mlb_commence_times,
 	"wnba": _wnba_commence_times,
+	"soccer": _soccer_commence_times,
 }
 
 
