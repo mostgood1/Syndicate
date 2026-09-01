@@ -1450,6 +1450,126 @@ def _mlb_betting_day_backfill_status_path() -> Path:
     return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "mlb_betting_day_backfill_status.json"
 
 
+# --------------------------------------------------------------------------
+# WNBA post-game producers: the outcome half of WNBA settlement.
+#
+# WHY THIS EXISTS. Measured 2026-08-31 (lane `wnba-accuracy-assessment`), every
+# WNBA accuracy surface on production reported zero, and two of the three causes
+# were missing post-game artifacts:
+#
+#   recon_games_*.csv    4 files in ALL of production, and in every one the
+#                        outcome columns are EMPTY STRINGS -- written pregame
+#                        carrying `pred_margin`, never rewritten with what
+#                        happened. recon_quarters_*.csv has NEVER existed.
+#   boxscores_*.csv      last date 2026-08-25, then nothing.
+#
+# `scripts/build_wnba_recon.py` and `scripts/build_wnba_boxscores.py` are the
+# producers. Neither was scheduled anywhere, which is why they are wired here.
+#
+# WHY THIS IS NOT `#241` ("periodic worker work is never free" -- which put this
+# worker into a production restart loop at ~1.4GB headroom):
+#
+#   * ONE DATE PER TICK, the same rule `_run_mlb_betting_day_backfill_tick`
+#     already follows. A backlog drains over successive ticks; it never
+#     multiplies a single tick's cost. This is the exact shape `#241` got wrong.
+#   * The per-tick cost is one ESPN scoreboard fetch plus at most ~6 summary
+#     fetches -- a WNBA slate is 1-6 games -- and ~10KB of CSV writes. Transient
+#     JSON is well under 2MB and is freed inside the call. No subprocess, no
+#     model, no sim.
+#   * Interval-gated at 1 hour by default, and it self-skips entirely once every
+#     target date is done, so the steady state on a finished backlog is a single
+#     dict lookup.
+#   * Dates are only attempted once they are COMPLETE (yesterday and earlier in
+#     US-Central), so a live slate is never half-written.
+#
+# Off switch: SYNDICATE_WNBA_POSTGAME_PRODUCER=off.
+_WNBA_POSTGAME_INTERVAL_DEFAULT_SECONDS = 3600.0
+
+
+def _wnba_postgame_producer_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_WNBA_POSTGAME_PRODUCER") or "").strip().lower()
+    # Absent means ON. Stated explicitly because CLAUDE.md's standing rule is
+    # that absent != off and the code's default is what decides.
+    return raw not in {"off", "0", "false", "no"}
+
+
+def _wnba_postgame_interval_seconds() -> float:
+    raw = str(os.environ.get("SYNDICATE_WNBA_POSTGAME_INTERVAL_SECONDS") or "").strip()
+    try:
+        return max(300.0, float(raw))
+    except (TypeError, ValueError):
+        return _WNBA_POSTGAME_INTERVAL_DEFAULT_SECONDS
+
+
+def _wnba_postgame_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "wnba_postgame_producer.json"
+
+
+def _wnba_postgame_target_dates(lookback_days: int = 21) -> list[str]:
+    """Completed Central dates, most recent first.
+
+    Most recent first because a fresh slate is worth more than a three-week-old
+    one, and because the backlog is drained one per tick.
+    """
+    from syndicate.features.shared.timezone import central_today
+
+    today = central_today()
+    return [(today - timedelta(days=offset)).isoformat() for offset in range(1, lookback_days + 1)]
+
+
+def _run_wnba_postgame_producer_tick() -> dict[str, Any] | None:
+    """Build recon + boxscores for ONE outstanding completed WNBA date."""
+    if not _wnba_postgame_producer_enabled():
+        return None
+
+    status_path = _wnba_postgame_status_path()
+    store = _refresh_state_store()
+    last_status = store["read_json_file"](status_path) or {}
+    now = time.time()
+
+    last_run = last_status.get("lastRunEpoch")
+    try:
+        last_run_epoch = float(last_run)
+    except (TypeError, ValueError):
+        last_run_epoch = 0.0
+    if now - last_run_epoch < _wnba_postgame_interval_seconds():
+        return None
+
+    done = last_status.get("done") if isinstance(last_status.get("done"), dict) else {}
+    target = next((date_str for date_str in _wnba_postgame_target_dates() if not done.get(date_str)), None)
+    if target is None:
+        # Backlog drained. Stamp the run so the interval gate keeps this to one
+        # dict lookup per hour rather than one per cycle.
+        store["write_json_file"](status_path, {**last_status, "lastRunEpoch": now, "done": done})
+        return None
+
+    from scripts import build_wnba_boxscores, build_wnba_recon
+
+    data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or None
+    result: dict[str, Any] = {"date": target}
+    try:
+        recon = build_wnba_recon.build_date(target, data_root=Path(data_root) if data_root else None)
+        result["recon"] = {key: recon.get(key) for key in ("status", "games", "quarters", "props")}
+    except Exception as exc:
+        result["recon"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
+    try:
+        box = build_wnba_boxscores.build_date(target)
+        result["boxscores"] = {"status": box.get("status"), "rows": box.get("rows")}
+    except Exception as exc:
+        result["boxscores"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
+
+    # `no_final` is DONE, not a failure: a date with no completed WNBA games
+    # (an off day, or the World Cup break) will never produce rows and must not
+    # be retried forever. An `error` is left undone so it retries.
+    recon_status = str((result.get("recon") or {}).get("status") or "")
+    settled = recon_status in {"ok", "no_final"}
+    if settled:
+        done = {**done, target: recon_status}
+    store["write_json_file"](status_path, {"lastRunEpoch": now, "done": done, "last": result})
+    result["marked_done"] = settled
+    return result
+
+
 def _run_mlb_betting_day_backfill_tick() -> dict[str, Any] | None:
     """One-off backfill (2026-08-04): re-runs
     vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py
@@ -5025,6 +5145,16 @@ def main() -> int:
                 print(f"[refresh_worker] MLB_BETTING_DAY_BACKFILL {json.dumps(mlb_betting_day_backfill_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] MLB_BETTING_DAY_BACKFILL_ERROR {type(exc).__name__}: {exc}", flush=True)
+
+        # Unconditional for the same reason as the tick above: it is interval-
+        # gated internally and self-skips once its backlog is drained, so it has
+        # no reason to wait on the claimed_count/elif chain below.
+        try:
+            wnba_postgame_meta = _run_wnba_postgame_producer_tick()
+            if wnba_postgame_meta:
+                print(f"[refresh_worker] WNBA_POSTGAME_PRODUCER {json.dumps(wnba_postgame_meta, sort_keys=True, default=str)}", flush=True)
+        except Exception as exc:
+            print(f"[refresh_worker] WNBA_POSTGAME_PRODUCER_ERROR {type(exc).__name__}: {exc}", flush=True)
 
         refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
         if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):

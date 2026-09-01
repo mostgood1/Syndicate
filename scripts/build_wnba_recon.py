@@ -282,7 +282,16 @@ def build_date(date_str: str, *, dry_run: bool = False, data_root: Path | None =
         print(f"[wnba_recon] {date_str} fetched {len(event_ids)} events, produced NO rows", flush=True)
         return {"status": "empty", "date": date_str, "games": 0}
 
-    root = Path(data_root) if data_root else (REPO_ROOT / "data")
+    if data_root:
+        root = Path(data_root)
+    else:
+        # The SAME resolver `build_wnba_boxscores` uses, deliberately, rather
+        # than a second local default. On Render this is the MOUNTED DISK; a
+        # `REPO_ROOT / "data"` fallback would write into the ephemeral checkout
+        # and the artifact would vanish on the next deploy.
+        from syndicate.features.shared.refresh_state_store import data_root as _resolved_data_root
+
+        root = Path(_resolved_data_root())
     paths = artifact_relative_paths(date_str)
     payloads = {
         "games": (paths["games"], to_csv(games, GAME_COLUMNS)),
