@@ -17548,3 +17548,74 @@ recorded here so a later reader does not attribute either number to this change.
   The capture was still running an hour after the name stopped appearing, so this is the NAME leaving the feed, not the instrument stopping. **Verdict: SHORTLIST-ABSENT, confirmed on an independent instrument.** Their fix is correct and simply had nothing to act on.
 - **AND IT CORRECTS AN IMPRESSION MY OWN ENTRY COULD LEAVE.** I wrote "no board name containing a parenthetical has EVER been captured today" — true, but scoped to POLYMARKET rows, and the reason is precisely the bug their fix repairs: pre-fix the token derived `max200`, so a Muncy-class row could never match and therefore could never be captured. Across all books the name is present 76 times. Both facts are consistent; the scoped one alone reads as "the name never existed", which is false.
 - **The decisive positive read stays owed and is named on `todo #628`:** a fresh PREGAME board carrying a disambiguated name, one capture read, sample token must read `maxmun`-style. Not obtainable tonight — the slate is live.
+- TIMELINE SEALED 22:3xZ (same peer, third instrument — OddsAPI-sourced rows in the same shard, a different writer): 'Max Muncy (2002)' captured 76×/day across five books, LAST at 20:18:52Z — 97 minutes BEFORE `cc1feccc` went live — while polymarket captures continued through 22:13:46Z. The name left the FEED pre-deploy; the instrument never stopped. Shortlist-absent is now held by three independent instruments (my served-shortlist scans, their polymarket-capture null, their cross-book last-seen timestamp). Peer also self-corrected their "no parenthetical EVER captured" line in their own entry to scope it to polymarket rows — unscoped it read as "the name never existed", and pre-fix polymarket could never capture it BECAUSE of the max200 bug this deploy fixed.
+
+## 2026-09-01 23:38:56Z — web ← `e78aee52` — `#630` merge-on-receive for append-only artifacts — lane `book-quotes-publish-clobber`
+
+- **Deploy** `dep-dabm440n74is73fl8gqg`, trigger=api. Previous live `cc1feccc`
+  (21:21:43Z). Both locks taken: claim held by this lane from 23:38:07Z;
+  preflight **CLEAR** for `--target-commit e78aee52`, sample age 0s, only
+  gunicorn infra processes on web — no job to kill.
+- **WHY:** two services each publish a WHOLE-FILE replace of
+  `<sport>_source/tracking/book_quotes/<date>.jsonl`; web kept whichever
+  published last. Measured: a refetch an hour later had **LOST 1,318 exchange
+  rows, gained 0**, a clean tail truncation, while sportsbook rows gained a
+  whole hour.
+- **WEB ONLY.** The fix is receiver-side. Workers unchanged, and deliberately
+  so — the publishers are correct; the receiver was destructive. Confirms the
+  design: preflight shows **live-odds-worker pinned on `7e76478f` (15:45Z)**
+  while refresh-worker runs `51cf8b83`, which is exactly why the ENVELOPE
+  receive form merges too and not only the streamed one.
+- **PRE-DEPLOY EVIDENCE the fix works, replayed on the two REAL captured
+  snapshots** (not fixtures): `existing_lines 56,184 / added 26,173 /
+  duplicates 54,866`; exchange 5,840 → **7,158**, recovering **exactly 1,318**
+  — the precise count the clobber destroyed; sportsbook 49,194 (the max);
+  merged file carries BOTH last stamps (exch 22:22:27 AND book 22:56:32) which
+  neither snapshot had; **byte-prefix invariant True**.
+- **verify:** the shard must stop losing rows. Read
+  `mlb_source/tracking/book_quotes/<date>.jsonl` TWICE across at least one
+  publish cycle from each writer and assert the second read is a **strict
+  superset** of the first — the property that was FALSE on 2026-09-01 and is
+  the exact test that found the bug. Corroborating (weaker, log-based):
+  `APPEND_ONLY_MERGE path=... added=N` in web logs.
+- **STATUS: DEPLOY TRIGGERED, VERIFICATION PENDING.** Nothing here is claimed
+  as working until that superset read is recorded below.
+
+## 2026-09-01 23:41Z — refresh-worker `51cf8b83` — SOCCER ORIENTATION FIX WORKS: event_not_on_our_board 883 -> 314, first soccer matches ever
+- lane: `kalshi-soccer-blob-orientation` (session 41d46db0). Deploy dep-dablqrqjobas7388cmeg, created 23:19:11Z, live **23:22:47Z**, claim+preflight CLEAR pinned to the SHA. **Killed nothing** — the job HOLD cleared on its own in the same minute; no override was used (`--allow-rapid` covers spacing, not in-flight work, and I checked before firing).
+- verify, first post-boot join **23:41:17Z**:
+
+      event_not_on_our_board   883 -> 314    -569, a 64% fall
+      QUOTE_CAPTURE sports     ['mlb'] -> ['mlb', 'soccer']
+      KALSHI_SOCCER_RESOLVERS  armed=False soccer_matches=51 withheld=51
+
+  **883 had been frozen to the digit across three prior cycles whose board_rows
+  were 2,409 / 1,730 / 3,225.** A number invariant to a near-doubling of its
+  denominator, that then moves 569 the moment the orientation changes, is the
+  cleanest attribution available here.
+- **THE MONEY-PATH GATE FIRED FOR THE FIRST TIME AND HELD:** `withheld=51`. Until
+  now it had never had a soccer match to withhold, so `withheld=0` was
+  unexercised; this is the first reading where the guard actually did work.
+- **BUT SOCCER QUOTES ARE STILL ZERO, AND I AM NOT CLAIMING OTHERWISE.** Read the
+  shards directly: `soccer_source/tracking/book_quotes/2026-09-01.jsonl` has
+  6,205 rows and **kalshi=0, polymarket=0**; 09-04/05/06 have no exchange rows
+  either. `appended=482` on that capture line is **entirely MLB**.
+- **CAUSE, AND IT IS THE ONE I ALREADY DOCUMENTED THIS MORNING:** `sports=` lists
+  sports with MATCHES, not sports with APPENDED ROWS — the same instrument
+  ambiguity recorded for the Polymarket capture. All 51 soccer matches are GAME
+  LINES with no `player_name`, and `quote_rows_from_kalshi_matches` skips
+  player-less matches by its props-only correctness bound. Identical to
+  Polymarket's sibling bound and identical to this morning's soccer finding.
+- **THE REMAINING STEP IS A DECISION, NOT A DEFECT.** That bound exists because
+  OddsAPI already writes exchange GAME lines under the same dedup key (measured
+  on MLB). **In soccer there is nothing to collide with** — 0 exchange rows of
+  any kind in 92,795 soccer rows over six dates, re-confirmed tonight at 0 in
+  6,205. Relaxing it for soccer is what turns these 51 matches into quotes.
+  NOT taken here: the guard also hedges against OddsAPI starting to carry soccer
+  exchange lines, and its stated release condition (`source` in `_KEY_FIELDS`,
+  pinned by `tests/test_direct_feed_provenance.py`) is still unmet.
+- residual `event_not_on_our_board: 314` is consistent with the measured NAME gap
+  (Kalshi spells clubs `St. Truidense` / `La Louviere`; our alias map carries
+  `Sint Truiden` and neither Kalshi form) — the 18% that neither orientation nor
+  the code->name map reaches. `unreadable_title` 413 is working-set composition,
+  not this change; it has swung 18/413/18/413 across cycles independent of it.
