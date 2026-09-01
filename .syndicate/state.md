@@ -45,6 +45,267 @@
 > wrong, EDIT THE LINE. Do not append a newer section that contradicts it. The
 > reasoning trail belongs in `deploys.md` (append-only measurement log).
 
+## [wnba-live-lens-directory] THE WNBA LIVE-LENS READERS OPENED THE WRONG DIRECTORY — fixed and verified locally, NOT DEPLOYED `[verified 2026-08-31, lane wnba-accuracy-assessment, commit 9dbb870d]`
+
+**Root cause, confirmed against LIVE Render config rather than inferred.**
+`WNBA_LIVE_LENS_DIR=/opt/render/project/data/wnba_source/source_artifacts/data/live_lens`
+is set on **both refresh-worker and web** (read via the Render env-vars API this
+session). The vendored writer honours it
+(`vendor/wnba_betting_repo/app.py::_live_lens_artifacts_dir`). Every
+Syndicate-side reader built `.../data/**processed**/<file>`. Both halves were
+internally consistent and never pointed at the same directory — and
+`data/processed` is the writer's DEFAULT when the env is unset, which is exactly
+why this reads correctly on a laptop and returns nothing in production.
+
+`live_lens_local::_artifact_path`'s single-`Path` branch returned
+`root / filename` **with no candidate search at all**, which is where it bit
+hardest: four WNBA accuracy modules pass a bare `processed_root()`. They now
+pass every candidate root (`#309`).
+
+**FIXED:** NEW `syndicate/features/shared/live_lens_paths.py` resolves live-lens
+filenames against the `live_lens` sibling of `data/processed`, and against
+`<SPORT>_LIVE_LENS_DIR` when set — matched on the sport in the ROOT PATH, so a
+WNBA read can never resolve against MLB's env (a filename carries a date but not
+a sport, and a cross-sport hit would be silent). Additive: it can only turn a
+miss into a hit, and CSV resolution is byte-identical.
+
+**VERIFIED END-TO-END on REAL production files** (signals pulled off Render,
+recon built from ESPN), in a temp tree with the production layout:
+
+    old rule path exists  False   ->   new rule path exists  True
+    one date   signals.exists true, recon all true,  n_settled  54   (was: payload None)
+    14 days                                          n_settled 631
+    by_period  Q1 55.1% (n=456) -> Q2 78.8% -> Q3 78.1% -> Q4 98.0%
+    self_priced_excluded                                        701
+
+**The last two reproduce `[wnba-live-edge-is-leakage]`'s independently-measured
+numbers EXACTLY, from a different code path.** Two graders agreeing is the
+evidence here, not either one alone.
+
+**NOT DEPLOYED.** Production still reads the old paths and still returns zero on
+every WNBA accuracy surface. The recon files exist only in a session scratchpad.
+
+## [wnba-recon-producer] `recon_games` WAS WRITTEN PREGAME AND NEVER REWRITTEN; the producer now exists `[2026-08-31, lane wnba-accuracy-assessment, commit 9dbb870d]`
+
+Settlement for every graded WNBA row joins against `recon_games_*.csv`,
+`recon_quarters_*.csv` and `recon_props_*.csv`. Measured on production: **4
+`recon_games` files in all of production**, and **in every one the outcome
+columns (`home_pts`, `visitor_pts`, `actual_margin`, `total_actual`,
+`margin_error`) are EMPTY STRINGS** — the file carries `pred_margin` and nothing
+ever comes back to fill in what happened. `recon_quarters` has **never existed**.
+
+`scripts/build_wnba_recon.py` is the missing half: outcome-only (it deliberately
+does NOT write `pred_margin`, because a producer that writes both is how the
+pregame version came to overwrite the outcome one), native ESPN, completed games
+only. **DNPs are omitted rather than written as zeros** — a zero would settle
+every UNDER on a player who never took the floor. OT periods are not folded into
+Q4.
+
+`recon_quarters_*` was **absent from `HOT_ARTIFACT_PATTERNS` while both its
+siblings were present**, so once produced it would have sat on the worker disk
+and never reached web. Allowlisted with the producer, not after the first
+period-total reads zero.
+
+**NEITHER `build_wnba_recon.py` NOR `build_wnba_boxscores.py` IS SCHEDULED
+ANYWHERE.** That is the remaining half and it was deliberately not wired:
+periodic work on refresh-worker is what `#241` did when it caused a prod restart
+loop (~1.4GB headroom), so it needs its own decision and its own measurement.
+
+## [wnba-consensus-price] BOOK PRICES WERE AVERAGED ON THE AMERICAN SCALE; 43% OF CARD PRICES WERE IMPOSSIBLE `[2026-08-31, lane wnba-accuracy-assessment, commit 697c41f0]`
+
+`_aggregate_game_odds_from_market_rows` took an **arithmetic mean of American
+odds** across books for `home_ml`, `away_ml`, `home/away_spread_price` and
+`total_over/under_price`. The American scale is discontinuous at ±100: `-110` and
+`+110` are adjacent prices about 9 points of probability apart and their
+arithmetic mean is `0`, which is not a price.
+
+MEASURED on production WNBA cards: **55 of 128 priced fields (43.0%) were
+strictly between -100 and +100** — `-89.125`, `-94.375`, `-62.25`, `-59.14`.
+**Every EV computed off those fields was wrong.**
+
+`_consensus_price_or_none` converts each book to implied probability, averages
+there, converts back, and **rounds to 2dp** (the round-trip leaves float noise:
+`-140` returns `-140.00000000000003`). Vig is deliberately KEPT — this is a
+consensus PRICE, not a fair line. Values inside the ±100 hole are **rejected, not
+coerced**; coercing one invents a probability. `+100` is the canonical spelling
+of even money, because `-100` reads as a favourite at a glance. Lines (spreads,
+totals) are linear and keep the arithmetic mean.
+
+**Unit-verified only — no production card has been rebuilt through it, and it is
+not deployed.**
+
+## [wnba-two-artifact-roots] THE WNBA ARCHIVE HAS TWO ROOTS AND ONE OF THEM IS UNUSABLE — split on `source_path` before drawing ANY conclusion from a WNBA card `[verified 2026-08-31, lane wnba-accuracy-assessment]`
+
+`/wnba/api/cards` serves from `wnba_source/data/processed/` (Syndicate-owned) or
+`wnba_source/source_artifacts/…` (vendor bundle), resolved per requested file by
+`#309`. **They are not two qualities of the same data; one of them is not data.**
+
+Graded against ESPN ground truth over 2026-05-17..08-30:
+
+| root | n | Brier skill | AUC | corr(**market line**, actual margin) |
+|---|---|---|---|---|
+| Syndicate | 106 | **+16.53%** | **0.7631** | **+0.6785** |
+| vendor | 79 | **-72.36%** | **0.4018** | **-0.0396** |
+
+**The decisive column is the last one, not the model's.** A real market spread
+correlates ~+0.68 with the result. On the vendor root the LINE ITSELF carries no
+information about the game it is attached to — those rows are mis-joined at
+source. Corroborated by impossible lines concentrated there: |spread| > 20.5 on
+9.2% of rows (max **55.0**), totals outside 145–200 on 11.9% (max **253.0**).
+
+Two alternatives were tested and BOTH FAIL: it is **not a side flip** (flipping
+`p_home` only reaches AUC 0.598, skill -30.6%) and **not a bad join** (all 74
+fallback matches are the same team pair on the same day with minutes of tip
+drift, and the fallback rate is equal across roots — SYND 48/107, VENDOR 26/85).
+Controlled on the month, July carries both: Syndicate AUC **0.905** (n=26) vs
+vendor **0.292** (n=23).
+
+**WHY THIS IS STATED AT THIS LENGTH.** Pooled across both roots the WNBA sim
+measures Brier skill **-21.5%**, AUC 0.595 — "worse than climatology, delete it".
+Split on the root the same sim is **+16.5%**, AUC 0.763 — the best pregame asset
+on the platform. **The first pass of the assessment that produced this line
+reported the pooled number.** Any WNBA backtest, calibration fit or promotion
+decision that reads `available_dates` and pulls cards without recording
+`source_path` will silently mix the two and reach the wrong verdict. August 2026
+is 100% Syndicate root; May–July is mixed.
+
+## [wnba-instruments-all-zero] EVERY WNBA ACCURACY INSTRUMENT READS ZERO, AND THE PRODUCERS ARE MOSTLY FINE — three located causes `[verified 2026-08-31, lane wnba-accuracy-assessment]`
+
+All six production surfaces return empty over the last 30 days:
+`/wnba/api/market-accuracy` (`available: false`, 30/30), `live-lens-accuracy`,
+`live-game-lens-accuracy`, `live-player-props-lens-accuracy`,
+`live-player-props-audit`, and `/api/ops/clv/report?sport=wnba` (`resolved: 0`,
+`openings: 0` — **WNBA CLV has never been measured**).
+`/api/ops/wnba/artifact-counts` reports `games.gradeable: false` and
+`props.gradeable: false` on 30 of 30 days.
+
+**This is mostly a READER problem, not a missing-producer problem:**
+
+1. **The live-lens readers open the wrong directory.** They report reading
+   `…/data/`**`processed`**`/live_lens_signals_<date>.jsonl`. The files are in
+   `…/data/`**`live_lens`**`/`. Verified by `artifacts/export?names_only=1`:
+   **34 consecutive dates 2026-07-28..08-30 carry 106KB–1.23MB each**, and 14 of
+   them parse to 1,814 real signal records. The live sim has been emitting a
+   quarter-megabyte a day for five weeks and nothing reads it. **Fixing the path
+   backfills five weeks of measurement retroactively — it does not need a game.**
+2. **`recon_games_*.csv` is written pregame and never rewritten.** Only **4
+   exist in all of production** (05-27, 05-28, 06-21, 06-23), and in every one
+   `home_pts` / `visitor_pts` / `actual_margin` / `total_actual` /
+   `margin_error` / `total_error` are **empty strings**. The file carries a
+   prediction and nothing to compare it to. `recon_props_*.csv`: 33 dates, all
+   05-20..06-26.
+3. **The boxscore producer died 2026-08-26.** `boxscores_*.csv` runs
+   2023-05-05..**2026-08-25** and stops. `scripts/build_wnba_boxscores.py` is the
+   Syndicate-owned replacement and already exists.
+
+Also: `/wnba/api/cards` **never marks a past WNBA game final** — all 213 cards
+across 93 dates read `status: "Scheduled"`, `final: false`, including May. MLB's
+equivalent endpoint does carry finals.
+
+## [wnba-model-vs-board-mismatch] THE WNBA SIM'S ONE EDGE IS THE MONEYLINE, AND THE BOARD BET IT TWICE ALL SEASON `[verified 2026-08-31, lane wnba-accuracy-assessment]`
+
+Measured on the **Syndicate root only** (see `[wnba-two-artifact-roots]`), graded
+against ESPN.
+
+**The asset.** Moneyline, n=106: Brier 0.20599 vs climatology 0.24680 (**skill
++16.53%**), **AUC 0.7631**, favourite accuracy 66.98%. Last 14 days (n=39):
+skill **+34.50%**, **AUC 0.8413**, 76.92%. Top confidence band **89.7% straight
+up** (n=29).
+
+**What the board bets instead.** Of 466 recommendations: PROPS 277, ATS 85,
+TOTAL 85, PROP 17, **ML 2**. Graded game lines (n=105): 50-55, hit 47.62% vs
+implied 52.65%, **ROI -9.68%** (ATS -10.61% n=51, TOTAL -8.80% n=54). Totals are
+not a tuning problem — the sim is a **strictly worse total estimator than the
+line it bets into** (MAE 14.23 vs 11.87, corr 0.419 vs 0.581).
+
+**Every stated confidence field is anti-informative and is used to rank and
+size.** `corr(prop edge, win) = +0.0002` (n=656); `corr(prop ev_pct, win) =
+-0.0157`; `corr(prop p_win, win) = -0.0552`; `corr(board EV, win) = +0.0466`.
+Board `p_win` claims 73.20% and delivers **47.62% — overstated 25.58pp**. Prop
+tier `High` (n=382) returns **-1.61%** while `Medium` (n=85) returns +15.72%; the
+only calibrated band is `p_win` 0.4–0.6 (claimed 0.558, realized 0.563, +12.68%,
+n=119). All 466 board rows are `card_bucket: "playable"` (no tiering),
+`stake_units` is null on all 466 (no sizing), 36 claim `p_win = 1.000`, max
+claimed EV **2264.8%**.
+
+Props themselves are **break-even, not an edge**: n=656, hit 53.96% vs implied
+52.17%, gap +1.80pp = **+0.92 SE**; ROI +3.32% ± 3.75pp. Neither significant.
+
+**DO NOT BLANKET-RESCALE THE WIN PROBABILITY.** The implied margin SD in the
+mapping is 10.87 against a pooled residual SD of 12.81, and refitting sigma to
+18.25 lifts in-sample skill +16.53% → +21.51%. **It fails out of sample:** fit on
+the first two-thirds by date (sigma 24.00), test on the last third → **+35.43%
+vs the shipped +39.56%**. The overconfidence ratio decays **1.61 (May–Jun) → 1.15
+(Jul) → 1.03 (Aug) → 1.02 (last 14d)**; the pooled figure is an early-season
+legacy and current calibration is already near-exact. An **adaptive** (trailing
+residual) sigma is justified; a constant rescale is not.
+
+## [wnba-live-edge-is-leakage] THE WNBA LIVE ENGINE'S +41% ROI IS AN ARTEFACT — no live line has ever been captured `[verified 2026-08-31, lane wnba-accuracy-assessment]`
+
+1,689 live player-prop signals over 2026-08-17..08-30, graded against FINAL ESPN
+box scores (not the in-progress `actual` the record carries). Taken at face value
+the engine reads **1249-440, hit 73.95%, ROI +41.18% at -110**. Three independent
+proofs that it is not real:
+
+1. **There is no live line.** `line_live_age_sec`, `line_live_span` and
+   `line_live_n` are **null on 1,777 of 1,777** player-prop signals.
+2. **39.4% of signals are priced against the model's own line.** `line_source` =
+   oddsapi 944 / **model 701** / pregame 132. The `model` rows hit **91.21%**,
+   and **99.17% in Q4**. It is grading itself.
+3. **The hit rate tracks the clock.** On real `oddsapi` lines:
+   **Q1 55.87% (n=537) → Q2 60.00% → Q3 75.73% → Q4 88.00%.** A full-game prop
+   line from before tip is not purchasable in Q4.
+
+**The only honest cell is Q1 + a real market line: n=537, 55.87%, +6.65% ROI —
++1.62 SE above the 52.38% breakeven. Suggestive, NOT significant.** `win_prob`
+claims 0.6693 and realizes 0.5684 (overstated 10.09pp). All 1,814 signals are
+`klass: BET` — no tiering, no abstention. Projections run low (Q1 `sim_mu` bias
+**-2.240**, `pace_proj` **-1.098**), producing a structural UNDER lean (1,058
+UNDER vs 744 OVER).
+
+**A better estimator sits unused in the same record:** `corr(pace_proj, final) =
++0.7493` vs `corr(sim_mu, final) = +0.5611`, and on the honest cell `pace_proj`
+picks the side at 56.84% vs `sim_mu`'s 54.72%. But in Q1 `sim_mu` is the better
+POINT estimate (MAE 6.636 vs 7.453) and a naive 50/50 blend beat **neither**
+(54.72%). Fit the combination; do not assume it.
+
+## [wnba-execution-disconnect] THE WNBA BOARD NEVER SEES THE VENUE IT TRADES ON, AND LAYER 2 NEVER SEES WNBA `[verified 2026-08-31, lane wnba-accuracy-assessment]`
+
+- **Zero Kalshi and zero Polymarket quotes across a full day's 1,115 WNBA Layer 1
+  board rows.** The best-price set is draftkings, fanduel, betrivers, fanatics,
+  betmgm, betonlineag, williamhill_us, bovada, mybookieag, betus — while **29
+  Kalshi and 3 Polymarket WNBA orders have filled**. The surface that picks the
+  bet cannot see the price the bet is filled at.
+- **Layer 2 excludes WNBA upstream, not on value.** `/api/board/layer2-shortlist`
+  reports `active_sports: ['ncaaf', 'soccer']`; WNBA has no `per_sport` entry at
+  all. 0 rows on 13 of 14 days; 8 rows on 08-29 (all `game`, **0 `prop`**). Layer
+  2 is the only surface that persists what it recommended and can be settled, so
+  this is a second independent reason WNBA profitability is unmeasurable.
+- **Layer 1 model coverage is 4–6%** — `rows_modelled_fair` is 20–56 of
+  522–1,276 rows/day over 13 playing days. For the other ~95% it is a pure
+  price-shopping board.
+- **Real money, all-time:** wnba **31 settled, $124.96 staked, +$4.09 / +3.31%**,
+  14-17 (45.16%). Kalshi 29 orders **-$3.48**; Polymarket 3 orders **+$7.57**.
+  The only sport in the black (mlb -13.39%, nfl -4.06%, soccer -46.87%) — and
+  **n=31 on $125 is noise; do not scale stakes on it.** Settlement now records
+  losses as well as wins, so the wins-only defect in
+  `[wnba-game-lines-gradeable]` is closed.
+- **43.0% of priced card fields (55 of 128) are arithmetically impossible** —
+  strictly between -100 and +100 (`-89.125`, `-94.375`). Averaging American odds
+  across books is invalid across the ±100 discontinuity; average implied
+  probabilities instead. Any EV off that field is wrong.
+- **Schedule (ESPN, verified):** FIBA World Cup break — **no WNBA games
+  2026-08-31..2026-09-16**, then **30 games 09-17..09-25**, then playoffs to
+  10-20. The absent WNBA quote shard right now (`status: unknown`, "no quote
+  shard for this sport and date") is the schedule, not a defect.
+- Slate coverage season-to-date: 192 of 277 completed games carded (69.3%); the
+  gap is 11 zero-coverage days + 32 partial days, all June/July. **Last 14 days
+  is 39/39 = 100% — that gap has already closed.**
+
+Full assessment and the 5-tier plan:
+`.syndicate/findings_2026-08-31_wnba_accuracy_assessment.md`.
+
+
 ## [layer2-board-keyvalue-ceiling] THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 min `[verified 2026-08-31 18:25-20:0xZ, lane layer2-cap-raise]`
 
 **Rows are sharded per sport and the merge SERVES the board.** `combined_keeps_rows=False`

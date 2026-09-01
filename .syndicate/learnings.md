@@ -5898,3 +5898,124 @@ exactly that.
 - **Cost.** None realised: caught before the write, 1 of 9 phantom lanes would
   have been skipped. The same session then swept `lanes.md` twice more as new
   lanes arrived, which is the recurring shape of the mistake.
+
+---
+
+## 2026-08-31 FORBIDDEN: pooling an evaluation sample across artifact ROOTS. Split on provenance BEFORE the first statistic, and report the split. `[lane wnba-accuracy-assessment]`
+
+**What happened.** I graded the WNBA pregame sim over the whole 2026 season off
+`/wnba/api/cards` and reported: **Brier skill -21.5%, AUC 0.5954, spread AUC
+0.4806, totals +10.45 pts/game biased.** That reads as "the model is worse than
+climatology and its spread signal is inverted" — a delete-it verdict. It was
+wrong.
+
+`/wnba/api/cards` serves from **two artifact roots** — `wnba_source/data/processed/`
+and `wnba_source/source_artifacts/…` — chosen per requested file by `#309`. Split
+on `source_path`:
+
+| root | n | Brier skill | AUC | corr(**market line**, actual) |
+|---|---|---|---|---|
+| Syndicate | 106 | **+16.53%** | **0.7631** | **+0.6785** |
+| vendor | 79 | **-72.36%** | **0.4018** | **-0.0396** |
+
+The same sim is the platform's best pregame asset or its worst, depending
+entirely on a field I had not looked at.
+
+**THE DISCRIMINATING TEST, and it is not a model metric.** I nearly explained the
+vendor rows as "an older, worse model" and moved on. What settles it is
+**`corr(market line, actual result)` on the same rows**: a real book line
+correlates ~+0.68 with the margin. On the vendor root it is **-0.0396**. The
+market cannot be wrong about its own games — so the rows are **mis-joined at
+source**, and nothing computed from them means anything. Corroborated by spreads
+reaching **55.0** and totals reaching **253.0** in a league where neither exists.
+
+**Grade the CONTEXT, not just the model.** When a model measures anti-predictive,
+first ask whether the *market column on the same rows* still behaves like a
+market. If it does not, you are measuring a join, not a model. That check cost
+one line and reversed the entire verdict.
+
+**Two alternatives were tested and both fail** — record them so nobody re-runs
+them: it is **not a side flip** (flipping `p_home` reaches only AUC 0.598, skill
+-30.6%, so the information is absent rather than reversed), and it is **not my
+join** (all 74 fallback matches are the same team pair on the same day with
+minutes of scheduled-vs-actual tip drift, and the fallback rate is equal across
+roots — SYND 48/107, VENDOR 26/85, so it cannot produce a difference between
+them). Controlled on the month: July carries both roots, Syndicate AUC **0.905**
+(n=26) vs vendor **0.292** (n=23).
+
+**Scope — this is not about WNBA.** `#309`'s "resolve per requested file across
+every candidate root" is a *reader* convenience that makes provenance a function
+of what happens to exist on disk. Any sport with a vendor bundle behind it has
+the same exposure. **Rule: every evaluation, backtest, calibration fit or
+promotion decision must record the provenance of each row it consumed and report
+the per-provenance split alongside the pooled number.** A pooled number with no
+split is not a measurement.
+
+## 2026-08-31 FORBIDDEN: reporting a live-model hit rate without splitting by GAME CLOCK and by LINE SOURCE. A number that improves as the game ends is leakage, not edge. `[lane wnba-accuracy-assessment]`
+
+**What happened.** The WNBA live prop engine grades out at **1249-440, hit
+73.95%, +41.18% ROI at -110** over 1,689 signals — graded correctly, against
+*final* box scores. Every step of that arithmetic is right and the conclusion
+would have been catastrophic.
+
+Two splits kill it:
+
+**By line source.** `line_source` = oddsapi 944 / **model 701** / pregame 132.
+The `model` rows — **39.4% of the sample** — are priced against a line the engine
+itself produced, and they "hit" **91.21%**. A model compared to its own output
+cannot lose.
+
+**By quarter, on real market lines only.**
+**Q1 55.87% → Q2 60.00% → Q3 75.73% → Q4 88.00%** (99.17% on `model` lines).
+The line is a **pregame** full-game prop; `line_live_age_sec`, `line_live_span`
+and `line_live_n` are **null on 1,777 of 1,777** signals, so no live market price
+has ever been captured. "Beating" a pregame line in Q4, once the player has
+already cleared it, is bookkeeping. **Only the Q1 + oddsapi cell is honest:
+n=537, 55.87%, +6.65%, +1.62 SE — suggestive, not significant.**
+
+**THE SHAPE TO RECOGNISE.** *Accuracy that rises monotonically with elapsed game
+time is the signature of scoring against a stale line.* A genuine live edge does
+not get better as uncertainty disappears — the market's price absorbs the same
+information you did. The MLB assessment found the mirror image of this
+(`0 wins / 1,578` from grading against an **in-progress** stat line); here the
+outcome was final and the **line** was stale. **Both halves of the comparison
+have to be contemporaneous — check the line's timestamp, not only the result's.**
+
+**Rule, for any live engine on any sport:** before reporting a live hit rate,
+(a) drop every row whose line the model generated, (b) report the rate by period
+or elapsed bucket, and (c) state the age of the line. If (b) trends upward or (c)
+is null, the headline number is not a performance figure and must not be shown
+as one.
+
+## 2026-08-31 FORBIDDEN: shipping a calibration refit validated only in-sample — and treating a POOLED miscalibration as a current one. `[lane wnba-accuracy-assessment]`
+
+**What happened.** I measured the WNBA win-prob mapping's implied margin SD at
+**10.87** against a pooled residual SD of **12.81**, refit sigma to **18.25**, and
+watched in-sample Brier skill go **+16.53% → +21.51%**. A clean one-parameter
+win, and I was one step from recommending it.
+
+**Out of sample it is worse than what ships.** Fit on the first two-thirds by
+date (n=70, → sigma 24.00), test on the last third (n=36): **test Brier skill
++35.43% recalibrated vs +39.56% shipped.**
+
+**Why: the defect was real and had already healed.** The overconfidence ratio
+(needed SD ÷ assumed SD) decays by month — **1.61 (May–Jun) → 1.15 (Jul) → 1.03
+(Aug) → 1.02 (last 14 days)**. The pooled 1.18× is an early-season legacy. A
+sigma fit on stale, badly-calibrated games **over-widens** for a period that no
+longer needs it.
+
+**Two rules out of this.**
+1. **A calibration constant fit on a pooled window is fit on a period that may
+   no longer exist.** Before prescribing any refit, plot the target quantity BY
+   PERIOD. If it trends, the answer is an **adaptive** estimator (trailing
+   window), not a new constant.
+2. **In-sample improvement is not evidence.** A +5-point in-sample skill gain
+   became a -4-point out-of-sample loss. Any recalibration must be shown on a
+   held-out split before it is recommended, and the held-out number is the one to
+   report.
+
+**The corollary that has forward value here:** the condition that produced ratio
+1.61 — stale priors, roster churn at a season's start — **recurs on 2026-09-17**,
+when WNBA restarts after a three-week FIBA World Cup break. An adaptive sigma is
+worth building *for that*, which is the opposite conclusion from "rescale by
+1.7×" and the only one the data supports.
