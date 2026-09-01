@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 733 rules `[generated]`
+## Index — 734 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -227,7 +227,7 @@
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](learnings_evidence.md#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works) `[evidence]`
 
-**Rules and corrections — 520**
+**Rules and corrections — 521**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -476,6 +476,7 @@
 - [2026-08-31 — A miscalibration can be REAL and still not worth correcting. Check what ca…](#2026-08-31-a-miscalibration-can-be-real-and-still-not-worth-correcting-check-what-carries-the-loss-not-what-looks-wrong-in-a-ratio-table)
 - [2026-08-31 A CONVENTION VERIFIED ON ONE SPORT IS NOT A CONVENTION](#2026-08-31-a-convention-verified-on-one-sport-is-not-a-convention)
 - [2026-08-31 A TEST CAN PASS THROUGH THE BUG IT IS NAMED FOR](#2026-08-31-a-test-can-pass-through-the-bug-it-is-named-for)
+- [2026-09-01 REQUIRED: for every grader, ask what it does when its OUTCOME SOURCE IS ABSE…](#2026-09-01-required-for-every-grader-ask-what-it-does-when-its-outcome-source-is-absent-a-fallback-there-is-a-false-result-generator-lanes-wnba-accuracy-assessment-mlb-accuracy-assessment-independently)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
