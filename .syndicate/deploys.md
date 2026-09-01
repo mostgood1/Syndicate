@@ -16698,3 +16698,77 @@ fire on a STALE clear, which is what preflight exists to prevent.
 - boxscore publish path (keyvalue vs filesystem), above.
 - `todo #614`-`#617`: Layer 2 excludes WNBA; ML generator gap blocked on a
   validated ranking key; vendor artifact root; exchange capture carries no WNBA.
+
+---
+
+## 2026-09-01 — exchange prices reach a board for the first time (`wnba-accuracy-assessment`)
+
+### VERIFIED — the gate I named in advance, read by me off Render
+
+User asked to "get the exchange prices onto the wnba board", then specifically
+Kalshi and Polymarket. The gate stated BEFORE the deploy was: `kept_direct > 0`
+on `[book_grid] AGGREGATOR_DUPLICATE_DROPPED`. Above zero means a directly
+observed exchange price survived the grid instead of being discarded as the
+aggregator's duplicate.
+
+    16:03:31Z  rows=483  kept_direct=0    <- every build BEFORE the first capture
+    16:11:31Z  [kalshi_odds] QUOTE_CAPTURE matches=662 sports=['mlb'] appended=603
+    16:13:39Z  rows=483  kept_direct=603  <- first build AFTER it
+    16:24:02Z  rows=483  kept_direct=603
+    16:26:07Z  QUOTE_CAPTURE ... appended=153   (recurring, not a one-off)
+
+**PASS.** 603 directly observed Kalshi prices kept, on refresh-worker
+`c2f3efe4`. The capture is a peer's (`syndicate-e2`); the provenance stamp
+`source=venue_direct` and the grid rule that honours it are mine, and
+`kept_direct` counts exactly the rows where both worked.
+
+Re-derived off Render myself rather than taken from the peer's report, per the
+standing rule on cross-lane numbers — and that found the second capture the
+report predated.
+
+**Why zero was NOT a failure at 16:03.** Those builds are stamped eight minutes
+BEFORE the first capture, so they predate the rows they would count. Reading
+them as a refutation would have condemned a working mechanism on a window that
+could not contain the evidence. The peer flagged this against their own result.
+
+### The reading that was wrong on the same line, and it was mine
+
+    kept_direct=603  near_misses={'kalshi': 603}
+
+Identical counts: ONE population, reported once correctly and once as a spelling
+bug that does not exist. `near_misses` means "the exact-name filter is MISSING A
+SPELLING". That held automatically while `drop_from_grid` was name-only -- every
+recognised name hit `continue`, so reaching the counter proved the name was
+unrecognised. Making the drop PROVENANCE-based broke the invariant without
+touching the line: a `venue_direct` row is now deliberately kept, falls through,
+and is reported as a defect.
+
+**The cost was never the noise.** It reads 603 on a perfectly working system,
+permanently, which trains a reader to ignore `near_misses` -- disabling the real
+signal for the one case it exists to catch: an unrecognised POLYMARKET spelling,
+still unproven, landing in this same deploy.
+
+Fixed as `07cb592a` (`else`, restoring the old reachability under the new rule).
+Reverting it fails the test and reproduces the production signature at n=1.
+
+**A near-miss on the fix itself.** The peer offered "`continue` after the
+increment, or `elif`". Those are NOT equivalent: `instance` / `freshest[key]` /
+`anchors[]` all follow that block, so `continue` skips the kept row's
+registration and it never reaches the grid. Measured, not reasoned --
+`assert 'kalshi' in books` -> `assert 'kalshi' in {'fanduel'}`. It would have
+presented as a clean success (`kept_direct=603 near_misses={}`) with zero
+exchange prices on the board. Shipped the `else`. Told them.
+
+### NOT VERIFIED — do not report as working
+
+- **The Polymarket capture (`c544b30c`) is on no service.** Kalshi is proven end
+  to end; Polymarket has never run in production. Its gate is a
+  `POLYMARKET_QUOTE_CAPTURE` line with `appended > 0`.
+- `venue_ticker` persisted on **0 of 603** rows -- `_normalize` builds a fixed
+  key set and drops the rest. Removed from my builder; a boundary test now
+  asserts every builder's key set is a subset of what `_normalize` keeps.
+  **Neither venue's rows can be traced to the market that quoted them.** The
+  one-line fix is `venue_ticker` in `_normalize`, deliberately not taken (a
+  shared-schema change; diverging would leave one venue traceable, one not).
+- WNBA `us_ex` regions are on live-odds-worker only, not refresh-worker.
+- WNBA cannot exercise any of this until the **2026-09-17** slate.
