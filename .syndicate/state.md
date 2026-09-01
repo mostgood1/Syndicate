@@ -1059,6 +1059,36 @@ demonstrating the bug. Pinned is not fixed.
   'series_out_of_scope': 1334, 'stat_not_in_market_vocabulary': 255,
   'event_not_on_our_board': 239, 'spread_line_orientation_mismatch': 24,
   'team_side_unresolved': 13}`.
+- **THE ABOVE IS SUPERSEDED — CORRECTED 2026-09-01 ~20:0xZ, read from production.
+  THE SOCCER TITLE PARSER IS FIXED AND HAS BEEN SINCE 2026-08-28/30.**
+  `[kalshi_odds] BOARD_JOIN` at 19:51:47Z: `unreadable_title` is **18 of 6,000
+  markets**, and every sampled `unreadable_title` GAP family today is NCAAF
+  SEASON AWARDS (`KXNCAAFACCAWARD` 99, `KXNCAAFBIG12AWARD` 98,
+  `KXNCAAFBIGTENAWARD` 98, `KXNCAAFSECAWARD` 100 — futures with no board market,
+  correctly refused). **ZERO soccer series appear in the gap list.**
+  `kalshi_catalogue` carries `_SOCCER_DRAW` ("Tie is the result"), `_SOCCER_BTTS`,
+  `_SOCCER_TOTAL` ("Will over 5.5 goals be scored?") and the
+  `more than`/`less than` spread wording, all read from production titles.
+  **Anyone told "fix the Kalshi soccer title parser" would ship an inert change.**
+- **THE REAL REASON KALSHI SOCCER NEVER REACHES THE BOARD IS THE DATE, AND IT IS
+  THE SAME DEFECT THE POLYMARKET JOIN ALREADY FIXED.** `kalshi_board_join`
+  compares each market's `game_date_from_ticker` against a SINGLE scalar
+  `wanted_date = selected_date` (lines 599/722/950) and refuses anything else as
+  `market_is_for_another_date` — **3,495 of 6,000, the largest refusal bucket.**
+  Measured from `[kalshi_odds] BY_GAME_DATE` 19:51:44Z: Kalshi's working set
+  holds **~900 full-game soccer markets spanning 2026-09-02..09-15 and NOT ONE
+  dated today** (KXMLSTOTAL, KXLALIGA/LIGUE1/SERIEA/BUNDESLIGA/EREDIVISIE
+  GAME+SPREAD+TOTAL, KXBELGIANPLGAME). Soccer is never same-day, so an
+  exact-date join can only ever match zero of it. The sibling
+  `polymarket_board_join` solved exactly this with a SOCCER-ONLY, FORWARD-ONLY
+  widening at `_FORWARD_HORIZON_DAYS = 14` — the same span Kalshi's soccer set
+  occupies.
+- **NOT FIXED HERE, and it is a USER DECISION because it is the MONEY PATH.**
+  `kalshi_board_join` feeds order pricing, and widening soccer date matching
+  would make soccer markets priceable and orderable for the first time — on a
+  sport whose model is recorded as NOT beating the market (`soccer-model-dispersion`:
+  worse than market in 8 of 9 leagues). Coverage and profitability are different
+  questions and this change couples them.
 - **KALSHI DOES LIST SOCCER; OUR CATALOGUE CANNOT READ ITS TITLES.** ~665
   markets refuse `unreadable_title`: `KXMLSTOTAL` 90, `KXLALIGATOTAL` 66,
   `KXLIGUE1TOTAL` 60, `KXSERIEATOTAL` 60, `KXBUNDESLIGATOTAL` 54,
