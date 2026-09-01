@@ -1,5 +1,29 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#629` — **Orphan-sweep residue: 3 parked worktrees need one human `--force` each; out-of-scope ref families listed for a future pass** — lanes `orphan-*-census`, 2026-09-01 — **OPEN, LOW**
+
+Opened by session fbf1a34b after the day's four censuses (sequencer, stashes,
+worktrees, branches — `findings_2026-09-01_stash_census.md` /
+`_worktree_census.md` / `_branch_census.md`, all landed).
+
+1. **Three worktrees verified safe but PARKED on the permission classifier**
+   (content = untracked `data/live/`-class runtime only, lanes long-archived):
+   `git worktree remove --force C:/tmp/syndicate-sessions/nfl-fantasy-projections`
+   (ditto `wnba-halftime-elapsed`, `wnba-live-props-data`). One command each,
+   then `rm -rf .git/worktrees/<name>` for the OneDrive husk.
+2. **Ref families deliberately out of the branch census's scope**, for a fifth
+   pass if wanted: local `backup/*`, `claude/*`, `dep-*` strays,
+   `fix/soccer-backtest-leakage`, `wnba-only-daily-update`; remote `claude/*`
+   (27), `safety/*`, `hotfix/*`, `fix/*`, `wip`, `staging`. `recover/stash-*`
+   is NOT stale (June-stash content owners — see the stash census).
+3. **Space note:** 450 deleted branch tips are retained on purpose under
+   `refs/archive/branch-census-2026-09-01/` (restore = one `update-ref`).
+   Dropping that namespace someday is a deliberate destruction decision.
+4. **Rider:** a RESOLVED addendum to the 09-01 stash learnings entry sits
+   uncommitted in the primary tree inside its parent entry (two other
+   sessions' unlanded work) — it lands whenever that entry's owner commits
+   `learnings.md`; nothing to do unless it is still unlanded in a week.
+
 ### `#628` — **Polymarket MLB player props admitted to the board join; the quote capture's structural zero is fixed pending its first production reading** — lane `polymarket-prop-quote-capture`, 2026-09-01 — **SHIPPED `9a436fab`, DEPLOYED refresh-worker, FIRST READING OWED**
 
 > Entry id note: this session first took `#618` from the PRIMARY tree's
