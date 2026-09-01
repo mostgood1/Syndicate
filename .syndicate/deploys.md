@@ -17535,3 +17535,16 @@ recorded here so a later reader does not attribute either number to this change.
 - **THEIR COLLISION COUNTER IS ZERO** — `prop_same_name_collision_at_venue` is
   absent from the join's refusals entirely. That is what they predicted, and it
   is recorded as UNEXERCISED, explicitly NOT as the guard firing.
+- CORROBORATION 22:2xZ (lane kalshi-soccer-forward-date, from the book_quotes shard — the stronger vantage, capture records the BOARD's player_name verbatim): 213 polymarket prop rows captured after 21:56:06Z across 121 players (window real, module capturing), ZERO with a parenthetical name — and 0 in 3,543 all day. Read jointly with my two same-instant shortlist scans (0 disambiguated names on 1,730 then 2,000 served rows), the cause is pinned: THE INPUT IS ABSENT from the join's board feed right now, not the fix failing — no derivation can run on a name the shortlist does not carry. The three-way split the capture alone cannot make (shortlist-absent vs venue-not-listing vs upstream-failure) is settled in favour of shortlist-absent by the board scans. Pending read on `#628` unchanged: next pregame board carrying a disambiguated name.
+- **RESOLVED 2026-09-01 ~22:2xZ — the three-way split above is no longer open, and I VERIFIED IT RATHER THAN ADOPTING IT.** Lane `prop-name-disambiguator-derivation` reported the served layer2-shortlist carried ZERO disambiguated names post-deploy (0 of 1,730 at ~22:00Z, 0 of 2,000 at ~22:15Z). That changes MY recorded conclusion, so I re-derived it on a DIFFERENT instrument — the OddsAPI-sourced prop rows in the same shard, a different writer from the shortlist read they used:
+
+      'Max Muncy (2002)' rows in book_quotes ....... 76  (betmgm 32, betonlineag 18,
+                                                        williamhill_us 16, draftkings 8, bovada 2)
+      first captured .............................. 2026-09-01T09:21:44Z
+      last  captured .............................. 2026-09-01T20:18:52Z
+      captured after their fix went live (21:56Z) .. 0
+      latest polymarket prop capture overall ....... 2026-09-01T22:13:46Z
+
+  The capture was still running an hour after the name stopped appearing, so this is the NAME leaving the feed, not the instrument stopping. **Verdict: SHORTLIST-ABSENT, confirmed on an independent instrument.** Their fix is correct and simply had nothing to act on.
+- **AND IT CORRECTS AN IMPRESSION MY OWN ENTRY COULD LEAVE.** I wrote "no board name containing a parenthetical has EVER been captured today" — true, but scoped to POLYMARKET rows, and the reason is precisely the bug their fix repairs: pre-fix the token derived `max200`, so a Muncy-class row could never match and therefore could never be captured. Across all books the name is present 76 times. Both facts are consistent; the scoped one alone reads as "the name never existed", which is false.
+- **The decisive positive read stays owed and is named on `todo #628`:** a fresh PREGAME board carrying a disambiguated name, one capture read, sample token must read `maxmun`-style. Not obtainable tonight — the slate is live.
