@@ -532,6 +532,93 @@ def quote_rows_from_kalshi_matches(
     return out
 
 
+def quote_rows_from_polymarket_matches(
+    matches: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Polymarket board-join matches -> quote rows. The sibling of the Kalshi one.
+
+    Same gap, same shape, same bound -- written next to
+    `quote_rows_from_kalshi_matches` deliberately, because a reader asking "how
+    does a venue match become a quote row" should find both answers in one place.
+    Splitting them across modules is the second-owner drift this repo keeps
+    paying for.
+
+    BUILT FROM THE JOIN, NOT THE RAW FEED, for the reason the Kalshi builder
+    states: a match already carries the identity the join paired on, and
+    deriving a second identity here is what produced a CIN@SF contract priced at
+    BAL@STL's number. `polymarket_american` is the venue's own price already in
+    American odds; a row without one is skipped rather than defaulted, because a
+    quote with no price records nothing.
+
+    ------------------------------------------------------------------
+    PROPS ONLY -- A CORRECTNESS BOUND, NOT A SCOPE CHOICE
+    ------------------------------------------------------------------
+
+    `_KEY_FIELDS` is `(sport, kind, event_id, bookmaker, segment, market,
+    selection, player_name, line)` and **has no source field.** Verified
+    2026-09-01 rather than assumed: `"source" in _KEY_FIELDS` is False. The
+    provenance stamp added for the Layer 1 board travels in `extra`, which puts
+    it on the ROW and not in the KEY -- so it does not separate these rows from
+    OddsAPI's copy of the same market.
+
+    Two sources under one key do not merge, they ALTERNATE, and every
+    alternation reads as a price change by "polymarket" that never happened,
+    corrupting movement, latest-price and dispersion for the one venue this
+    exists to illuminate.
+
+    MEASURED, and that is what bounds it. Existing polymarket rows in
+    `book_quotes`, by `kind`:
+
+        mlb  2026-08-31    2,350 game    0 prop   (lane mlb-accuracy-assessment)
+        soccer 2026-08-31      0 exchange rows of any kind, in 35,672 rows
+        wnba 2026-08-30        0 exchange rows of any kind, in 101,129 rows
+
+    So OddsAPI carries exchange GAME lines where it carries exchanges at all, and
+    exchange PROPS nowhere. Restricting to props removes the collision completely
+    -- there is nothing to collide with -- while keeping the whole value, since
+    props are the gap.
+
+    It also preserves the invariant `book_grid`'s direct-feed refusal protects
+    (`[2026-08-25 user decision]`, one venue must have ONE price source):
+    Polymarket's game prices keep coming from OddsAPI, its prop prices from the
+    direct feed, and no bet has two.
+
+    **Relax this to a source check only when `source` is in `_KEY_FIELDS`** --
+    not when it merely appears on the row, which is today's state. Until then
+    the alternation returns the moment this covers a game market.
+    """
+    out: list[dict[str, Any]] = []
+    for match in matches or ():
+        if not isinstance(match, Mapping):
+            continue
+        price = match.get("polymarket_american")
+        market = str(match.get("market") or "").strip()
+        if price is None or not market:
+            continue
+        player = str(match.get("player_name") or "").strip()
+        if not player:
+            # A game market: OddsAPI already writes polymarket here, and a
+            # second source under the same dedup key alternates. See above.
+            continue
+        out.append(
+            {
+                "bookmaker": "polymarket",
+                "market": market,
+                "price": price,
+                "line": match.get("line"),
+                "selection": match.get("side"),
+                "player_name": player or None,
+                "event_id": match.get("event_id"),
+                "kind": "prop" if player else "game",
+                # The market this price was quoted for -- the only field that
+                # makes a row traceable back to a specific Polymarket market
+                # when one looks wrong. `venue_ticker` for symmetry with Kalshi.
+                "venue_ticker": match.get("polymarket_slug"),
+            }
+        )
+    return out
+
+
 def quote_rows_from_oddsapi_events(
     events: Iterable[Mapping[str, Any]],
     *,

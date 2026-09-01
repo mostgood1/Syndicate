@@ -148,6 +148,98 @@ def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def _capture_polymarket_quotes(
+    report: "Mapping[str, Any] | None",
+    board_rows: "Sequence[Mapping[str, Any]] | None",
+    selected_date: Any,
+) -> None:
+    """Record Polymarket's OWN prop prices into the quote log. The sibling of
+    `kalshi_odds_refresh._capture_kalshi_quotes`.
+
+    WHY IT IS HERE AND NOT BESIDE THE FETCH. The Polymarket JOIN runs inside
+    `run_portfolio_commit`, and that runs from `intelligence_state`'s background
+    loop -- `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is **true only
+    on refresh-worker** (read 2026-09-01; live-odds-worker and web are both
+    `false`). The sibling lane shipped its Kalshi capture to live-odds-worker
+    because that is where the Kalshi FETCH runs, and the join did not run there,
+    so the code never executed. Same trap, named so the next reader does not
+    walk into it: **this capture only runs where the JOIN runs.**
+
+    THE SHARD IS CHOSEN PER MATCH, from the board row's own sport. A quote
+    written to the wrong sport's shard is worse than a missing one, because it
+    is later read as another sport's price.
+
+    NEVER RAISES. The quote log is instrumentation; committing is the product.
+    """
+    try:
+        matches = report.get("matches") if isinstance(report, Mapping) else None
+        if not matches:
+            return
+        from syndicate.features.shared.book_shortlist import (
+            QUOTE_SOURCE_FIELD,
+            QUOTE_SOURCE_VENUE_DIRECT,
+        )
+        from syndicate.features.shared.odds_book_quotes import (
+            append_book_quotes,
+            quote_rows_from_polymarket_matches,
+        )
+
+        sport_by_event: dict[str, str] = {}
+        for row in board_rows or ():
+            if not isinstance(row, Mapping):
+                continue
+            event_id = str(row.get("event_id") or "").strip()
+            sport = str(row.get("sport") or "").strip().lower()
+            if event_id and sport:
+                sport_by_event.setdefault(event_id, sport)
+
+        by_sport: dict[str, list[dict[str, Any]]] = {}
+        no_sport = 0
+        for match in matches:
+            if not isinstance(match, Mapping):
+                continue
+            sport = sport_by_event.get(str(match.get("event_id") or "").strip())
+            if not sport:
+                no_sport += 1
+                continue
+            by_sport.setdefault(sport, []).append(dict(match))
+
+        captured = 0
+        for sport, sport_matches in by_sport.items():
+            rows = quote_rows_from_polymarket_matches(sport_matches)
+            if not rows:
+                continue
+            result = append_book_quotes(
+                sport=sport,
+                date_str=str(selected_date or "").strip(),
+                rows=rows,
+                captured_at=_utc_now_stamp(),
+                # Without this the grid discards these rows: `drop_from_grid`
+                # refuses a direct-feed venue unless the row says it came from
+                # the venue, and absent means dropped.
+                extra={QUOTE_SOURCE_FIELD: QUOTE_SOURCE_VENUE_DIRECT},
+            )
+            captured += int((result or {}).get("appended") or 0)
+        # ONE LINE, ALWAYS, INCLUDING THE ZEROES. `no_sport` and an empty
+        # `by_sport` are different failures -- "the match carries no sport" and
+        # "the join produced nothing" -- and a line printed only on success
+        # cannot tell them apart.
+        print(
+            "[portfolio_commit] POLYMARKET_QUOTE_CAPTURE"
+            f" matches={len(matches)} sports={sorted(by_sport)}"
+            f" appended={captured} no_sport={no_sport}",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 -- instrumentation must not fail the commit
+        print(f"[portfolio_commit] POLYMARKET_QUOTE_CAPTURE_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
+def _utc_now_stamp() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()
+
+
 def _polymarket_price_resolver(selected_date: str | None):
     """`(price_resolver, ticker_resolver)` for Polymarket US, or `(None, None)`.
 
@@ -205,6 +297,7 @@ def _polymarket_price_resolver(selected_date: str | None):
     _join_started = time.monotonic()
     joined = join_polymarket_to_board(markets, board_rows, selected_date=str(selected_date or ""))
     _join_elapsed_s = round(time.monotonic() - _join_started, 2)
+    _capture_polymarket_quotes(joined, board_rows, selected_date)
     age = None if fetched_at is None else round(time.time() - float(fetched_at), 1)
     print(
         f"[portfolio_commit] POLYMARKET_BOARD_JOIN elapsed_s={_join_elapsed_s} "

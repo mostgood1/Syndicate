@@ -138,3 +138,59 @@ def test_the_kalshi_capture_stamps_provenance(tmp_path, monkeypatch):
     assert any(str(r.get("bookmaker") or "").lower() == "kalshi" for r in kept), (
         "a stamped, directly-observed Kalshi price must reach the grid"
     )
+
+
+# ------------------------------------------------------- polymarket, same bound
+def test_polymarket_builder_is_props_only():
+    """A GAME market must be refused: `_KEY_FIELDS` has no source field, so a
+    direct row and OddsAPI's copy share a dedup key and ALTERNATE rather than
+    merge -- every alternation reads as a price change that never happened.
+
+    Measured: mlb 2026-08-31 has 2,350 polymarket GAME rows and 0 prop; soccer
+    2026-08-31 and wnba 2026-08-30 have zero exchange rows of any kind. So props
+    have nothing to collide with, and game markets have plenty.
+    """
+    from syndicate.features.shared.odds_book_quotes import quote_rows_from_polymarket_matches
+
+    game = {"event_id": "e1", "market": "h2h", "side": "home", "line": None,
+            "player_name": None, "polymarket_american": 124, "polymarket_slug": "s"}
+    assert quote_rows_from_polymarket_matches([game]) == []
+
+
+def test_polymarket_builder_emits_a_prop_row():
+    from syndicate.features.shared.odds_book_quotes import quote_rows_from_polymarket_matches
+
+    prop = {"event_id": "e1", "market": "player_points", "side": "over", "line": 18.5,
+            "player_name": "A Player", "polymarket_american": -115, "polymarket_slug": "sl"}
+    rows = quote_rows_from_polymarket_matches([prop])
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["bookmaker"] == "polymarket" and row["kind"] == "prop"
+    assert row["price"] == -115 and row["line"] == 18.5
+    assert row["selection"] == "over" and row["player_name"] == "A Player"
+    assert row["venue_ticker"] == "sl", "traceable back to the market that quoted it"
+
+
+def test_polymarket_builder_skips_rows_with_no_price():
+    """A quote with no price records nothing; defaulting one invents a number."""
+    from syndicate.features.shared.odds_book_quotes import quote_rows_from_polymarket_matches
+
+    assert quote_rows_from_polymarket_matches([
+        {"event_id": "e1", "market": "player_points", "player_name": "P",
+         "polymarket_american": None},
+        {"event_id": "e1", "market": "", "player_name": "P", "polymarket_american": -110},
+        None, "junk",
+    ]) == []
+
+
+def test_the_source_stamp_is_NOT_in_the_dedup_key():
+    """The bound above is load-bearing precisely because of this.
+
+    The provenance stamp travels in `extra`, which puts it on the ROW, not in
+    the KEY. Relaxing the props bound to a source check is only safe once
+    `source` is in `_KEY_FIELDS` -- which it is not.
+    """
+    from syndicate.features.shared.odds_book_quotes import _KEY_FIELDS
+    from syndicate.features.shared.book_shortlist import QUOTE_SOURCE_FIELD
+
+    assert QUOTE_SOURCE_FIELD not in _KEY_FIELDS
