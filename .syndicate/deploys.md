@@ -17273,3 +17273,62 @@ it is met. Polymarket direct props are a SEPARATE, now-correctly-scoped piece of
 work sitting behind the join — chip `task_4889e312`, which will need
 `polymarket_board_join.py` (listed by `open-bet-live-status`, UNOWNED since
 2026-08-31).
+
+
+## 2026-09-01 17:59:56Z — BULLET 2 DISCHARGED, BULLET 1 STILL UNOBSERVABLE — `692214e0` scorer identity stamp — lane `mlb-live-gameline-skill-audit`
+
+Partial discharge of the `verify:` on the 16:55:20Z row. Read at 18:02:55Z.
+
+**Live commit `9a436fab`** (finished 17:59:56Z, deployed by
+`polymarket-prop-quote-capture`, carrying my 17:4xZ push — cumulative again
+because it was on `origin/main`). Both changes confirmed BY CONTENT in that
+tree, not by ancestry: `live_gameline_join.py` has 3 hits for
+`REASON_STALE_QUOTE`; `book_grid_artifact.py:165` has `caps =
+scorer_capabilities()`; `live_gameline_score.py:187` has `SCORER_CONTRACT = 2`.
+
+### BULLET 2 — PASS, and it passed on a board with NOTHING TO SCORE
+
+    MLB     generated_at 18:01:09Z  row states {'pregame': 300}
+            scorer_contract=2  fresh_quote_seconds=120.0  reason=no_final_games_on_this_grid
+    SOCCER  generated_at 18:01:14Z  row states {'pregame': 39}
+            scorer_contract=2  fresh_quote_seconds=120.0  reason=no_final_games_on_this_grid
+
+**This is the whole point of the fix, demonstrated on itself.** Three hours
+earlier the identical branch served exactly `['enabled', 'finals_index',
+'games_with_outcome', 'reason']` and could not distinguish "shipped with nothing
+to do" from "not shipped". The same branch, same pregame state, now answers the
+deploy question outright. The stamp appears on TWO sports, which also confirms
+it rides the shared path rather than an MLB-only one.
+
+### BULLET 1 — STILL UNOBSERVABLE. NOT A PASS, NOT A FAILURE.
+
+    MLB     considered=0 projected=0 priceable=0 index=0  withheld_by_reason={}
+    SOCCER  live_gamelines block ABSENT (None) -- 39 pregame rows
+    WNBA    no board at all (generated_at None)
+
+Every sport that shares this code path is pregame at 18:0xZ. `attach_live_gamelines`
+increments `considered` only after `game.state in {live, in_progress}`, so the
+staleness gate CANNOT have fired, and `withheld_by_reason={}` is a statement
+about the slate, not about the gate. MLB first pitch 22:40Z.
+
+I checked soccer and WNBA specifically to see whether another sport could
+discharge this early — `_LIVE_GAMELINE_SPORTS` is `{mlb, wnba, soccer}` — and
+neither could. That is the honest reason this is still open, rather than the
+MLB clock alone.
+
+Bullet 1 remains owed on the same terms: `withheld_by_reason` carrying
+`quote_older_than_live_pricing_ceiling` with count > 0 against a non-zero
+`considered`, expected near ~39.5% of live rows. Scheduled task
+`verify-live-gameline-staleness-gate` fires 18:45 CT / 23:45Z, about an hour
+into the slate.
+
+## 2026-09-01 18:10Z — refresh-worker `9a436fab` — POLYMARKET PROP CAPTURE: appended 0 -> 374, measured on the first post-deploy commit cycle
+- lane: `polymarket-prop-quote-capture` (session 41d46db0) · deploy dep-dabh3sv10e5c7380l03g, created 17:57:07Z, live 17:59:56Z, trigger=api, claim+preflight (CLEAR pinned to 9a436fab after a ~10-min HOLD for an in-flight odds sweep; deploy killed nothing)
+- carries: `68727f7d` (MLB player-prop admission to the Polymarket board join; props feed the quote capture; resolvers withhold props behind `SYNDICATE_POLYMARKET_PROP_RESOLVERS`) + `9a436fab` (census pair-count correction)
+- verify: **READ 18:10:22Z, one cycle after boot —**
+  `POLYMARKET_QUOTE_CAPTURE matches=436 sports=['mlb','soccer'] appended=374 no_sport=0`
+  (was `matches=60 appended=0`, structural — the join refused ALL PROP, the capture is props-only).
+  `POLYMARKET_PROP_RESOLVERS armed=False prop_matches=374 withheld=374` — the money-path gate is LIVE and withholding every prop match; capture-before-gate ordering confirmed in production.
+  `POLYMARKET_BOARD_JOIN elapsed_s=20.24 markets=17459 indexed=12042 board_rows=1375 matched=436` with the two structural refusals collapsing exactly as designed: `market_type_not_a_game_line` 6,960 (2026-08-27 baseline) -> **3,375**, `board_market_not_a_game_line` 935 -> **138**. None of the new named refusals (`prop_player_token_ambiguous`/`_underivable`/`prop_row_missing_player`) fired on the real slate.
+- NOT yet read, owed on `todo #628`: `kept_direct` polymarket rows beside `near_misses={}` on the next book_grid build (the unrecognised-spelling near-miss is unexercised until a grid build consumes these rows).
+- cost note: join elapsed 20.24s with 12,042 indexed (props added ~2.6k index entries); inside the existing portfolio_commit span, no new stage.
