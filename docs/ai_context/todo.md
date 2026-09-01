@@ -60,8 +60,13 @@ NOWHERE before today (0 rows against 26,710 exchange GAME quotes) — this plus
 Kalshi's `08ecb418` is what makes prop-side price comparison possible at all.
 **Caveat that must travel with it:** capture makes the prop side MEASURABLE
 and says nothing about whether it PAYS — the only option-value number
-(+1.57pp, ~+1.2% ROI, n=13,093) is from GAME markets and must not be carried
+(+1.57pp, ~~~+1.2% ROI~~, n=13,093) is from GAME markets and must not be carried
 into prop expectations; `#624` step 2 is "THEN measure", deliberately.
+`[2026-09-01, lane game-market-entry-roi-curve: the ROI half is RETRACTED and
+re-derived — the game-market answer is **+0.74 ROI points**, and +1.57pp is a
+SINGLE DATE (2026-08-31); pooled over ten it is +1.10pp. See
+`.syndicate/findings_2026-09-01_game_market_entry_roi_curve.md`. The caveat
+above is unchanged and, if anything, stronger.]`
 
 **DISCHARGED 2026-09-01 18:1xZ — both readings landed on the FIRST post-deploy
 cycle:** (1) `POLYMARKET_QUOTE_CAPTURE matches=436 appended=374` at 18:10:22Z
@@ -327,6 +332,24 @@ football instance; a contract-registry walker in `#619` prevents the class).
    the gate's own book. **The same 0.75 also underlies item 05's "+1.57pp ≈
    +1.2% ROI" for GAME markets — and that one has a second problem: it applies
    a PROP book's sensitivity to game-market rows. Do not reuse it; re-derive.**
+   **RE-DERIVED 2026-09-01, lane `game-market-entry-roi-curve` — the game-market
+   answer is `+0.74 ROI points`, and the slope was the SMALLEST of three
+   defects.** `scripts/measure_game_market_option_value.py` +
+   `tests/test_game_market_option_value.py` (30 tests; six deliberate mutations
+   of the script all caught). The game curve's slope is **+1.91** across
+   2.50→4.05pp and **+2.45** across 0→1.00pp, so it is close to the prop
+   table's 1.77 — fixing only the slope would have published **+3.8 points**,
+   *further* from the truth than the +1.2% it replaced. What actually mattered
+   was population, twice over: (a) the game board already enters at a **1.96%
+   two-way hold** and has already banked **62%** of the improvement
+   (+0.977pp of +1.579pp available on its own rows), with 63.7% of the residual
+   held at books we cannot execute on; (b) **+1.57pp is one date** — the
+   superset reproduces exactly on 2026-08-31 (n=13,344 vs 13,093, 52.4% vs
+   52.5%, median +0.232 vs +0.240) and pools to +1.101pp over ten. **The tell,
+   which needed none of the machinery: +1.57pp is larger than the 0.88pp of
+   entry cost the whole book pays.** Full derivation:
+   `.syndicate/findings_2026-09-01_game_market_entry_roi_curve.md`; the 08-31
+   assessment's section 7h carries a RESOLVED block.
 6. **Gate to re-enable staking — EVALUATED 2026-09-01: NOT MET, on both
    conditions. Exclusion `mlb:player_prop` STAYS.** Confirmed still firing in
    production the same day: **982 `market_family_excluded` refusals** on

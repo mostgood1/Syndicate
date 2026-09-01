@@ -3729,3 +3729,65 @@ sufficient.
   Python evaluates the `'w'` open first, so the inner read sees an empty file.
   It silently zeroed a 368-line module. Caught only by `git diff --stat` showing
   368 deletions. Read to a variable first, then write.
+
+## 2026-09-01 — RULE: a claimed GAIN that exceeds the TOTAL COST it is meant to remove is about a different population. One comparison rejects it, with no machinery. `[lane game-market-entry-roi-curve]`
+
+The 08-31 assessment published *"an exchange improves on the best sportsbook by
+**+1.57pp** ... worth about +1.2% ROI"* for MLB game markets. The book that
+stakes that money pays **0.88pp per side in total** — a 1.96% two-way hold,
+because it already routes to exchanges. An improvement of 1.57pp cannot be
+harvested from an entry cost of 0.88pp; there is not that much cost there to
+remove.
+
+**That single sentence is a complete refutation**, and both numbers were
+obtainable the same afternoon. Everything else the re-derivation found — that
+62% of the improvement was already banked, that the residual mostly sits at
+books with no execution path, that `+1.57pp` was a single date pooling to
+`+1.101pp` — is *elaboration* on a conclusion this comparison already forces.
+
+**How to apply.** Before converting any improvement into money, print the total
+size of the thing it improves. `gain <= total cost` is a units check, and it is
+cheaper than the measurement. If it fails, the gain and the cost were measured
+on different populations — which is what happened here: the gain came from a
+superset counting every quoted cell on the board, the cost from the rows
+somebody actually bet.
+
+**The companion trap.** Correcting only the *conversion rate* would have made it
+worse. The published slope (0.75) was wrong and the true game-market slope is
+**+2.45** at this book's operating point — so a diligent fix of just that error
+publishes **+3.8 points**, further from the measured **+0.74** than the +1.2% it
+replaced. **A wrong number can have two errors pointing opposite ways; fixing
+the one you found is not progress until you have looked for the other.** The
+prop-side correction the day before had exactly this shape and said so.
+
+## 2026-09-01 — FORBIDDEN: treating the timestamp on an ORDER as the timestamp of the PRICE it took. Board prices carry a real age, and the error does not surface as an error. `[lane game-market-entry-roi-curve]`
+
+Anchoring a de-vig on `submitted_at` looks obviously right and is wrong here.
+The board hands the executor a price with an age of its own (`book_age_seconds`
+median 202s, p90 1,308s), so an order written at 20:00 is routinely taking a
+quote the book showed at 19:00 and has since moved off. Measured: on **139 of
+584** MLB game-market orders the book's quote at submission differed from
+`fill_price` by more than 1pp — mean **-2.46pp**, worst -77pp.
+
+**What it produced, and why nothing caught it.** The book's mean per-side entry
+cost came out at **-1.43pp** — paying *less* than fair on average, which is not
+a thing that happens — and the sensitivity table then read **-1.05%** at
+"today's" cost. No exception, no refusal, a full table printed. It was caught
+only because the ledger's own stake-weighted return on the same rows was
+**+5.31%**, six points away.
+
+**How to apply.**
+* **Anchor on the last moment the taking book actually SHOWED the price paid**,
+  matched exactly. It is self-verifying and it dates itself: median age 16.5
+  minutes here. Rows where the price never appears are REFUSED, not
+  approximated — 206 of 929 land there, and they are reported as a coverage
+  bound with their own ROI (+15.85% against the priced rows' +6.14%), because a
+  refusal set that returns differently is not a random sample.
+* **Put the ledger in the test.** `roi_at_book_cost(rows, today, today) ==
+  roi_at_quoted_price(rows)` is the invariant that failed, and it is now a unit
+  test. A curve that does not pass through the price actually paid is not a
+  curve, and the assertion costs one line.
+* **`captured_at` is the refresh cycle; `snapshot_ts` is one book's own last
+  update.** Grouping cross-book comparisons on the latter finds almost no cells
+  and raises nothing — it returns a tiny population that still looks like a
+  measurement. Pinned by a test with two books a second apart.
