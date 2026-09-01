@@ -1713,6 +1713,33 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Verification: production read of the Kalshi capture line carrying soccer, soccer rows present in the soccer book_quotes shard, `KALSHI_SOCCER_RESOLVERS armed=False withheld>0`, and MLB match counts UNCHANGED (the control — widening is soccer-only).
 - Blocked by: none.
 
+
+### orphan-sequencer-venue-fee — CLOSED 2026-09-01 — all three picks had already landed as blob-identical twins (`45a4e1d8`/`378d6689`/`b7a8b207`, 22:21:21 the night of the stall); sequencer cleared with `--quit` + `rmdir`, HEAD `66e4ebb4` unchanged; owner was `live-venue-order-placement` (CLOSED 08-30, session gone); landing the picks would have REGRESSED venue_fees.py behind the 08-30 fee-model corrections. Full narrative: `log/2026-09-01.md` — opened 2026-09-01 — session fbf1a34b-cfd3-4248-8194-8d9ce16d8596
+- Goal: the primary tree's stalled 3-pick cherry-pick (`e8b5fdb9`/`4741a642`/`3f38d2e8`, venue-fee-retraction thread, stalled 2026-08-29 22:17:52 CT) is verified against origin/main content and the orphan `.git/sequencer` cleared with `--quit` — never `--abort` — with the disposition logged.
+- Files: NONE tracked — `.git/sequencer` (untracked git state) only; ledger appends to `log/2026-09-01.md` and this block. No code edits.
+- Hypothesis: the three picks' CONTENT already landed on origin/main via twin commits (`45a4e1d8`/`378d6689`/`b7a8b207`, 22:21:21 same evening), so the sequencer is abandoned litter of lane `live-venue-order-placement` (CLOSED 2026-08-30, session 69f9e24f gone), not unlanded work.
+- Falsification test: any touched path whose blob in the unlanded chain differs from the landed twins in a way main did not later supersede — that would mean real unlanded content and the picks must land via a worktree instead.
+- Verification: per-path blob diffs unlanded-vs-twin all empty (RAN: 4 code/test files identical to `45a4e1d8`; findings file identical to `378d6689`'s; learnings+index identical to `b7a8b207`; lanes edit identical) with `git cherry`'s two `+` marks proven false positives per the 08-31 FORBIDDEN rule; then `.git/sequencer` absent and HEAD unchanged after `--quit`.
+- Blocked by: none.
+
+
+### orphan-stash-yes-leg — CLOSED 2026-09-01 — stash@{0} `9a384978` dropped after component-level verification: staged half landed as `a5e16ae6` 71s after stashing (refined comment, same assertions); unstaged ops.py proven a STALE pre-`508a7e79` copy that would have REVERTED the peer's slug-filter feature if applied; owner (session `5611932c`, ARCHIVED) worktree clean; human pass supplied by user this session; 22 older stashes remain UNEXAMINED. Full narrative: `log/2026-09-01.md` — opened 2026-09-01 — session fbf1a34b-cfd3-4248-8194-8d9ce16d8596
+- Goal: `stash@{0}` (`9a384978`, "WIP on session/polymarket-yes-leg-binding", created 2026-08-31 07:59:13 CT by ARCHIVED session `5611932c`) verified component-by-component against origin/main, then dropped `[USER AUTHORIZATION 2026-09-01: "the orphaned stash needs the same treatment — verify then clear" — the human pass the 09-01 learnings entry requires]`.
+- Files: NONE tracked — `refs/stash` git state only; ledger appends + a dated addendum to the existing 09-01 stash learnings entry. No code edits.
+- Hypothesis: the staged components landed as `a5e16ae6` 71 seconds after the stash (07:59:13 → 08:00:24, same stash-then-land-elsewhere pattern as the sequencer); the unstaged ops.py delta is a STALE pre-feature copy whose only effect if applied would be reverting peer commit `508a7e79`.
+- Falsification test: any stash blob carrying content that neither landed nor is a byte-exact older version of a landed file — that would be real unlanded work, and the stash must be landed or surfaced instead of dropped.
+- Verification: RAN, all three components accounted for — ops.py blob byte-identical to `508a7e79^` (stale copy proven, zero novel content); test assertions identical to landed `a5e16ae6` (only the comment differs, landed refined; file evolved twice more on main same day); lanes claim line superseded by the corrected claim at lanes.md:1268 ("MOVED here from polymarket-yes-leg-binding, which had misfiled it"). Owner's worktree checked: CLEAN (0 modified/untracked). Then: stash@{0} re-verified == `9a384978` at drop time, dropped.
+- Blocked by: none.
+
+### orphan-stash-census — CLOSED 2026-09-01 — ALL 22 stashes verified and dropped; stack EMPTY. 349 tracked paths blob-classified, 65k+ untracked classified by policy, ledger files line-checked, six off-main bases proven twinned or recovery-branch-held. FOUR unlanded artifacts recovered first (model-sim-track 08-18 checkpoint — never committed anywhere; two 07-15 fix_notes entries; soccersim phase-1 report fullest copy; SmartSim ensemble eval report) — disposition table + appendices: `findings_2026-09-01_stash_census.md` + two `recovered_*` files. Drops guarded per-SHA, zero aborts — opened 2026-09-01 — session fbf1a34b-cfd3-4248-8194-8d9ce16d8596
+- Goal: all 22 remaining stashes (2026-05-30 `7bb3ea4b` .. 2026-08-21 `c56b6e67`) verified component-by-component (worktree, index, untracked ^3) against origin/main; proven-safe ones dropped by same-instant SHA guard, anything with novel unlanded content KEPT on the stack and surfaced `[USER AUTHORIZATION 2026-09-01: "census the other 22 the same way"]`.
+- Files: NONE tracked — `refs/stash` git state only; ledger appends; census table to `.syndicate/findings_2026-09-01_stash_census.md`. No code edits.
+- Hypothesis: most are landed drafts, stale copies, protective ledger snapshots since superseded, or regenerable output — per the two orphans already resolved this session. Off-main bases (6 of 22) additionally checked for whether the stash is the last reference keeping an unlanded base chain alive.
+- Falsification test: per stash — any stash/untracked blob that is neither in origin/main's history for its path, nor a byte-exact older landed version, nor regenerable mirror/report output; such a stash is NOT dropped.
+- Verification: per-stash disposition table with the evidence class for every differing path, written to the findings doc; drops executed only under a same-instant `rev-parse` identity check; stack length re-read after each drop.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
