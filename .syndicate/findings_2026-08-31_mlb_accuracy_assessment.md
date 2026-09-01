@@ -341,6 +341,165 @@ both sides and is n=51 / n=108. Do not trade it.
 
 ---
 
+## 7c. ITEM 02 EXECUTED — the inversion does NOT pay, and there is NO sign error
+
+**Done 2026-08-31. n = 7,015 joined rows over 23 dates, 2026-04-10..08-30.**
+The join is INSIDE ONE ARTIFACT, not against odds history: the graded
+`season_betting_day_*.json` carries `all_settled_rows` (outcome, odds, side) AND
+`markets.{hitter,extraHitter,pitcher,extraPitcher}Props` (`model_prob_over`,
+`market_prob_over`, `market_prob_under`, `market_no_vig_prob_over`) in the same
+file. Joined on `(player, prop, market_line)`. **Join rate 7,015 / 8,782 =
+79.9%**; 1,765 lost to null probability fields, 2 to an unmatched key.
+
+**A THIRD CORRECTION to my own item 02 framing.** I said first "record both sides
+forward, it answers this retroactively" (wrong — a forward write cannot fill
+graded rows), then "join against odds history" (workable but unnecessary). The
+answer was in the same artifact the graded rows already come from;
+`market_accuracy._normalized_rows` projects 14 keys and drops the rest. That is
+the third time this session the discriminating field was already inside a
+payload I had fetched.
+
+**Note on the source path.** `/mlb/api/season/<yr>/betting-card/day/<date>` serves
+a DIFFERENT artifact (`season_day_*_retuned.json`, `source_kind:
+canonical_daily_fallback`) whose `all_settled_rows` is **0** on the high-volume
+dates while its `all_unresolved_rows` is populated. Use
+`/api/ops/artifacts/export?path=...betting_day_payloads_retuned/season_betting_day_*.json`.
+One endpoint, two code paths — again.
+
+### (a) THERE IS NO COMPARATOR SIGN ERROR. The leading hypothesis is DEAD.
+
+**7,014 of 7,015 rows (100.0%) pick OVER exactly when `model_prob_over >
+market_prob_over`.** Cross-tab: `(under, model<=mkt) 3,762`, `(over, model>mkt)
+3,252`, `(over, model<=mkt) 1`. The selection rule does precisely what it says.
+**Plan item 09's "check the comparator sign first" is WITHDRAWN** — it would
+have been an afternoon spent on a function that is correct.
+
+### (b) INVERTING DOES NOT PAY, at any plausible price
+
+The graded ledger records only the side taken, so the opposite QUOTED price is
+reconstructed as `no_vig(opposite) + measured vig share`. The vig share is
+measured, not assumed: `quoted_implied(selected) - no_vig(selected)` has median
+**+0.0379** (p25 +0.0290, p75 +0.0429) across all 7,015 rows. A symmetric split
+is still an assumption, so this is an ESTIMATE of the flip. It does not matter,
+because it never turns positive:
+
+| vig share on the opposite side | flipped ROI |
+|---|---|
+| +0.0000 (impossible — a free price) | **-2.55%** |
+| +0.0200 | -6.77% |
+| **+0.0379 (measured median)** | **-10.22%** |
+| +0.0500 | -12.39% |
+| +0.0800 | -17.31% |
+
+As-bet the book is **-5.83%**; flipped it is **-10.22%**. Per cell the flip beats
+the original in only 3 of 8 and is positive in none. **The inverted
+discrimination measured in section 3 is real as a statistic and does not convert
+into money** — the two-sided vig is larger than the signal.
+
+### (c) THE REAL DEFECT IS CALIBRATION, AND ITS EXTREME IS A BUG
+
+Model against market on `P(over)`, all 7,015 rows:
+
+| | Brier | LogLoss | AUC | skill vs climatology |
+|---|---|---|---|---|
+| MODEL `prob_over` | 0.26913 | **1.92046** | 0.5835 | **-10.80%** |
+| MARKET (de-vig) | 0.22932 | 0.64989 | 0.6416 | +5.59% |
+| climatology | 0.24289 | 0.67886 | 0.5000 | 0.00% |
+
+A LogLoss of 1.92 against a Brier of 0.269 is the signature of confident, wrong
+extremes. The calibration curve confirms it, and the error is monotone at BOTH
+tails:
+
+| model bucket | n | predicted | actual | error |
+|---|---|---|---|---|
+| 0.00-0.00 | 701 | **0.000** | **0.458** | **-0.458** |
+| 0.00-0.25 | 702 | 0.089 | 0.316 | -0.228 |
+| 0.25-0.30 | 701 | 0.283 | 0.274 | +0.009 |
+| 0.30-0.34 | 702 | 0.324 | 0.288 | +0.036 |
+| 0.34-0.38 | 701 | 0.359 | 0.389 | -0.031 |
+| 0.38-0.43 | 702 | 0.400 | 0.389 | +0.011 |
+| 0.43-0.53 | 701 | 0.470 | 0.432 | +0.037 |
+| 0.53-0.63 | 702 | 0.589 | 0.513 | +0.076 |
+| 0.63-0.68 | 701 | 0.656 | 0.541 | +0.115 |
+| 0.68-1.00 | 702 | 0.753 | 0.557 | **+0.196** |
+
+The middle five buckets are well calibrated (errors +0.009 to +0.036). **The
+engine is only wrong where it is confident** — and "model > market" fires
+hardest exactly there, which is how a well-behaved middle still produces a
+losing book.
+
+**THE BUG AT THE BOTTOM. 993 rows — 14.2% of the joined book — carry a
+`model_prob_over` of exactly `0.000`.** A literal assertion of impossibility.
+**992 of the 993 are `batter_hits_runs_rbis`.** The market priced those at a
+median **48.0%** (p10 0.417, p90 0.554). They actually went over **45.5%** of the
+time. Two rows carry an exact `1.000`; both lost.
+
+That is not a modelling shortfall, it is the unfed-field failure mode
+`docs/ai_context/model_engine_standard.md` exists to prevent — a neutral default
+standing in for a computation that never ran, indistinguishable from a working
+feature at every level except the data. **14.2% of the prop book is staked off a
+null.**
+
+**And the irony that must be stated, because it inverts the obvious fix:**
+removing the zero-probability rows makes the book **WORSE**, -5.83% to -6.35%.
+`prob=0` always forces UNDER, unders are roughly market-neutral, and those rows
+run **-2.17%** against the rest of the book at -6.35%. **The broken market is
+outperforming the working ones.** Fixing the null will not by itself make money —
+it moves 993 bets off an accidental under-bias and onto a model whose extremes
+are measurably worse than that accident. Fix the calibration FIRST, or this
+regresses.
+
+### (d) Within-cell discrimination — the honest version
+
+Pooled AUC is confounded: `P(over)` runs from 12% on HR 0.5 to 55% on hits 0.5,
+so a probability that merely knows which market it is scores well. Within
+`(market, line)`:
+
+| market | line | n | P(over) | MODEL auc | MARKET auc |
+|---|---|---|---|---|---|
+| batter_hits | 0.5 | 1,618 | 0.555 | 0.5254 | 0.5647 |
+| batter_rbis | 0.5 | 1,307 | 0.281 | 0.5554 | 0.5836 |
+| batter_total_bases | 1.5 | 1,145 | 0.388 | 0.5261 | 0.5651 |
+| batter_hits_runs_rbis | 1.5 | 956 | 0.449 | 0.4934 | 0.5617 |
+| batter_runs_scored | 0.5 | 872 | 0.376 | 0.5664 | 0.5964 |
+| batter_total_bases | 0.5 | 284 | 0.496 | 0.5239 | 0.5828 |
+| batter_home_runs | 0.5 | 199 | 0.211 | 0.5237 | 0.6034 |
+| batter_hits | 1.5 | 158 | 0.310 | **0.5902** | 0.5344 |
+
+**n-weighted within-cell AUC: MODEL 0.5338, MARKET 0.5736.** The model has a
+little real discrimination and the market has more, in 7 of 8 cells. The single
+cell the model wins is n=158 — the same cell section 7b already flagged as
+not-tradeable.
+
+### (e) The Tier-0 rule re-derived on this independent join
+
+| book | n | hit | ROI |
+|---|---|---|---|
+| all overs | 3,253 | 44.05% | **-11.32%** |
+| all unders | 3,762 | 60.58% | -0.63% |
+| **unders, minus HR and HRR** | **2,569** | 61.58% | **+0.67%** |
+| unders, minus HR only | 3,569 | 59.60% | -0.18% |
+
+**+0.67% here against +0.65% measured on the full 50-date ledger** — the rule
+survives re-derivation on an overlapping but not identical population. Unders
+positive on their own: `batter_hits` +4.29% (n=515), `strikeouts` +13.95%
+(n=51, do not trade), `batter_runs_scored` +0.19% (n=525).
+
+### What this does to the plan
+
+- **Item 09 "check the comparator sign first" is WITHDRAWN.** No sign error exists.
+- **Replaced by a calibration item**: isotonic or Platt on `model_prob_over`,
+  fitted per `(market, line)`, plus a hard refusal on `prob in {0.0, 1.0}` — a
+  certainty a Monte Carlo sim should never emit for a batter event.
+- **The `batter_hits_runs_rbis` null is its own defect** and belongs in the
+  engine-standard checklist (`scripts/sim_input_checklist.py`), not in the
+  betting plan. It must be fixed AFTER the calibration, per the irony above.
+- **Section 7b's conclusion STRENGTHENS.** The model's own probability is not
+  where the value is; the price is. Nothing here argues for staking more on the
+  model.
+
+---
+
 ## 8. The plan, ranked by measured dollars per unit of work
 
 Each item names the gate that decides whether it worked. Nothing here is
