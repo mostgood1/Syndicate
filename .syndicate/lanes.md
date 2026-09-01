@@ -1310,7 +1310,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - `gameStartTime` is ABSENT on all 10 `bal-col` slate rows, so liveness cannot be
   confirmed from the venue — only from the board's `commence_time`.
 
-### soccer-shot-shrinkage — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED, session 1c88bcca archived 2026-08-31.** Divisor SHIPPED to all three services and published; NEVER OBSERVED working (soccer had `available_today: 0`). Owed reading carried by `todo.md #612` and scheduled task `refit-soccer-shot-shrinkage` (monthly, 1st 09:00).
+### soccer-shot-shrinkage — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED. GOAL MET 2026-09-01 — the divisor IS live in the engine, MEASURED, and `todo.md #612` is CLOSED.** Discharged not on the board but on the PREDICTION ARCHIVE the engine writes: self-normalised over the 3,434 players present both sides of the 2026-08-31 ship date, median post/pre `expected_shots` **0.720** against a predicted 1/1.3979 = **0.715**, with `expected_minutes_share` flat at **1.000** so the step cannot be "future fixtures carry fewer minutes". Tool `scripts/check_soccer_divisor_reached_engine.py`. Monthly re-fit ran the same day: **1.3979 -> 1.3930**, published and read back, no deploy. Residual (small): `players_*.csv` is not in `HOT_ARTIFACT_PATTERNS`, so the board-render form of the reading still cannot run from web. Detail in `.syndicate/deploys.md` 2026-09-01 15:0xZ.
 - Goal: the soccer shots model stops over-predicting by ~1.4x. Ship the
   held-out-validated divisor as a DISK-BACKED, RE-FITTABLE calibration artifact,
   never a hard-coded constant. Testable: the served board's shot-prop
