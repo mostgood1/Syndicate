@@ -40571,3 +40571,63 @@ genuinely broken and cadence is exonerated. **Tonight's slate is already under w
 (first pitch 22:05:00Z), so the first useful PRE-slate reading is tomorrow's pregame window.**
 
 **claim RELEASED** on confirmation of the SHA; all four services free.
+
+## 2026-08-31 23:41Z — `6d024dc7` — the size instrument measures KEYS — lane `layer2-cap-raise`
+
+**User decision, 2026-08-31: _"fix the persist_large instrument"_ then _"deploy it."_**
+**This closes the LAST of the three defects from the 18:25Z incident.**
+
+**I did not deploy this.** Another session deployed `6d024dc7` — my exact commit —
+at 23:41:30Z, `trigger=api`, while my own watcher was still polling a job queue
+that never drained (oscillating 4–10 jobs for 12 minutes). The user had authorised
+deploying through the hold; it never became necessary, and no sim was killed.
+
+### verify: the false alarm STOPPED and nothing replaced it
+
+Baseline, every build before the fix, on a board that was healthy the whole time:
+```
+22:01:58  pct=88.5   rows=1498    22:50:26  pct=116.8  rows=2216
+22:18:58  pct=90.6   rows=1534    23:19:11  pct=122.5  rows=2205
+   ... all four advising "lower SYNDICATE_LAYER2_ROWS_PER_SPORT"
+```
+After:
+```
+BUILD 1  2026-08-31T23:54:28Z  cards_present=2243==rows  PERSIST_LARGE 0  KEY_LARGE 0
+BUILD 2  2026-09-01T00:15:02Z  cards_present=2246==rows  PERSIST_LARGE 0  KEY_LARGE 0
+```
+
+**A ZERO COUNT WAS REFUSED AS EVIDENCE UNTIL THE EMITTER RAN.** At 23:46Z both
+counters read 0 with **0 builds since the deploy** — which says nothing, and is the
+exact null-window trap that produced wrong findings twice earlier in this session.
+The verifier required TWO real builds and would have printed `INCONCLUSIVE` on
+none. Both builds also re-confirm the cards flip: `cards_present == rows`.
+
+### what the fix does
+
+`_warn_if_layer2_keys_near_ceiling` reports **one number per KEY** — combined plus
+each rows/cards shard — and names the lever matching whichever is biggest.
+Proven end-to-end through the real writer, both branches, same board size:
+```
+combined 5,186,940 B (cards inline)      -> "set SYNDICATE_LAYER2_CARDS_INLINE=0"
+soccer shard 4,893,776 B, combined 220 B -> "lower SYNDICATE_LAYER2_ROWS_PER_SPORT"
+```
+Opposite advice for the same row count, because the advice follows the key. It
+costs no extra serialisation: shard sizes come from the `json.dumps` the trim loop
+already did, hoisted out of the `while` header.
+
+### the whole thread, not just the function
+
+`layer2_board.py`'s `persisted_bytes_note` was a DATA FIELD pointing readers at a
+log line that no longer exists; the cards test monkeypatched the removed function.
+Both fixed. Nine tests replace the old file, one asserting the stale instrument is
+gone — two answers to one question is how this guard got it wrong twice.
+
+**Lane hygiene:** the lane guard blocked the test file, claimed by
+`polymarket-yes-leg-binding` — my own lane, which had misfiled it. Claim MOVED to
+`layer2-cap-raise` rather than routing around the guard.
+
+### ALL THREE INCIDENT DEFECTS ARE NOW CLOSED AND VERIFIED IN PRODUCTION
+
+1. refused write left CORRUPTION not staleness — `865c89be`, 19:46Z
+2. the shed could not shrink the combined key — cards split, `8876b823` + flip `7e678674`
+3. the size instrument measured a payload nothing writes — `6d024dc7`, this entry
