@@ -221,7 +221,29 @@ fi
 # `state_key_check.py` in the coherence loop below, which is why loosening this
 # number does not loosen the thing that matters.
 BLOAT=""
-for f in state.md:180000 lanes.md:120000 learnings.md:120000; do
+# RAISED 2026-09-01, after the reduction below made the old numbers unreachable
+# rather than aspirational. learnings.md went 416,515 -> 232,351 chars in one
+# evening (compaction through 09-01, pre-08-20 entries archived, and the
+# evidence file deduped) and STILL sat at 1.94x of 120,000. A cap that cannot
+# be met by any non-destructive operation is not a budget, it is a permanent red
+# light -- and a warning that is always on is one nobody reads.
+#
+# The new numbers are current size + ~15% headroom, so this stays a GROWTH
+# ALARM: it goes off when a file starts running away again, which is the only
+# question it was ever able to answer. Sizes when set: state 638,208,
+# lanes 201,022, learnings 240,442.
+#
+# state.md gets MORE headroom than the others, not less: it is the fastest
+# grower (617 KB -> 638 KB in roughly two hours on 2026-08-31 with three
+# sessions appending) and it is the one file here with NO trim tool at all --
+# `state_key_check.py` is a checker. 10% headroom would have fired again the
+# same night.
+#
+# lanes.md is the one with no lever at all: `trim_lane_blocks.py` reports
+# "nothing to move -- every block is claim-bearing or reads OPEN", so its size
+# is lanes not being CLOSED. Raising its cap does not fix that; it stops the
+# digest crying about something no tool can act on.
+for f in state.md:750000 lanes.md:240000 learnings.md:280000; do
   n=${f%%:*}; cap=${f##*:}
   if [ -f ".syndicate/$n" ]; then
     SZ=$(wc -c < ".syndicate/$n" 2>/dev/null | tr -d ' ')

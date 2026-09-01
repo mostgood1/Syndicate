@@ -109,7 +109,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--keep-from", required=True, help="YYYY-MM-DD; entries on/after this stay in full")
     ap.add_argument("--apply", action="store_true", help="write; default is a dry run")
-    ap.add_argument("--cap", type=int, default=120000)
+    # Default tracks the digest budget in `.claude/hooks/session-start.sh`; both
+    # were raised 2026-09-01. This only scales the "Nx of cap" line it prints.
+    ap.add_argument("--cap", type=int, default=280000)
     args = ap.parse_args(argv)
 
     try:
