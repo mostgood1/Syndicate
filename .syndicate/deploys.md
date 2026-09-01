@@ -5,6 +5,67 @@
 
 ---
 
+
+## 2026-09-01 03:3xZ — mlb-accuracy-assessment — web + live-odds-worker @ `ea06bf81`
+
+**Lane** `mlb-accuracy-assessment`. **Locks:** claims acquired on all three
+services by me; preflight CLEAR on web and live-odds-worker, **HOLD on
+refresh-worker (10 jobs in flight, incl. `run_mlb_daily_sim_job.py` and a
+`daily_update.py` MLB sim with spawn children) — NOT forced, watcher armed.**
+
+**Target `ea06bf81`, deliberately NOT the moving tip.** origin/main advanced
+twice while I worked (`697c41f0` -> `ea06bf81` -> `f5b6220f`); I pinned the SHA
+I claimed and preflighted rather than chase it, because the newer commits are
+another lane's and I had not read them. `ea06bf81` is an ancestor of
+origin/main, so preflight passes OFF_MAIN.
+
+**web** `dep-dab4dhp42hec739qq7ig` live. **live-odds-worker**
+`dep-dab4e2ijobas73bba37g` live. Both from `7e678674` / `8743ee1d`.
+
+### verify: ITEM 03 — DISCHARGED, on the served payload
+
+`/mlb/api/live-lens-accuracy?since=2026-07-01&until=2026-08-31`:
+
+| | before | after |
+|---|---|---|
+| `by_klass` over | **0 wins / 1,578** | *(absent)* |
+| `by_klass` under | **206 / 206** | *(absent)* |
+| days available | 11 of 61 | **0 of 61** |
+| `snapshotActualNotFinal` | *(field did not exist)* | **1,784** |
+| days carrying the named refusal | — | **11** |
+
+**1,578 + 206 = 1,784 exactly.** Every row that was previously being settled
+from a running tally is now refused BY NAME and none is lost. Sample warning,
+2026-07-17: `['feed_live_miss:16', 'snapshot_actual_not_final:16']`.
+The gate allowed either hit rates strictly inside (0%,100%) or
+`available:false` with the named refusal; the second branch is met exactly.
+
+### verify: ITEM 04 — NOT YET DISCHARGED. Do not read the ROI as proof.
+
+`/api/portfolio/live` now shows no `by_venue_family` row below -100%
+(`polymarket/game_line` -45.05% against -159.38% before). **THAT IS NOT
+EVIDENCE AND I ALMOST BANKED IT.** The date rolled to 2026-09-01, the payload
+returned is dated 2026-08-26, and **the offending order `C7AZA3MBEKDD` is not
+in it at all** — so a clean table is consistent with "different orders" as
+easily as with "the fix worked".
+
+The only lines available at check time were **02:22-02:28Z, BEFORE the 03:36Z
+deploy**, and they still print the dead `pnl_unattributed=None`. So the new
+code had not ticked yet. Watcher armed for a `VENUE_SETTLEMENT` line carrying
+`pnl_exceeded_own_fill=`, which is the proof that the new code RAN, plus
+`IMPOSSIBLE_PNL_CORRECTED n>=1` for the repair.
+
+### owed
+
+- **ITEM 04 verification** — as above.
+- **ITEM 01 UNDEPLOYED.** `commit_portfolio` is reached via
+  `run_portfolio_commit` from `pipeline/intelligence_state.py`, and
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is **true only on
+  refresh-worker** (false on web and live-odds-worker — read off the live
+  env-vars, not inferred). So the staking exclusion is inert until
+  refresh-worker deploys, which is on HOLD behind the MLB sim.
+
+
 ## 2026-08-31 — live-odds-worker — the soccer WRONG-SIDE fix (user-reported live-money bug)
 
     dep-daaujkafngtc73afqthg  8876b823  live 20:56:30Z  leg decided by team names
@@ -16033,3 +16094,52 @@ gone — two answers to one question is how this guard got it wrong twice.
 1. refused write left CORRUPTION not staleness — `865c89be`, 19:46Z
 2. the shed could not shrink the combined key — cards split, `8876b823` + flip `7e678674`
 3. the size instrument measured a payload nothing writes — `6d024dc7`, this entry
+
+---
+
+## 2026-09-01 ~03:3xZ — WNBA live-lens directory fix VERIFIED IN PRODUCTION (no deploy of mine; it rode `ea06bf81`)
+
+**lane** `wnba-accuracy-assessment` · **commits** `9dbb870d`, `697c41f0` (both
+ancestors of `ea06bf81`), plus `c0a0c622` which is NOT yet on any service.
+
+**I did not deploy.** Web and live-odds-worker were already live on `ea06bf81`
+(deployed by another session at 03:33:41Z / 03:34:20Z), and `ea06bf81` contains
+both of my code commits. I acquired the web claim, ran preflight (CLEAR, only
+infrastructure processes), read production, found the fix already live, and
+**released the claim without deploying**.
+
+**verify:** `/wnba/api/live-lens-accuracy?start=<d>&end=<d>` on
+`syndicate-an21.onrender.com`, swept over 2026-08-17..2026-08-30:
+
+    signals.exists   false on 14/14 days   ->   TRUE on 14/14 days
+    signals.path     .../data/processed/... ->  .../data/live_lens/...
+    raw records      0 reachable            ->  1,814 reachable
+    graded n         0                      ->  24..94 per day
+
+**1,814 is the number to check this against**: it is exactly the count I read
+independently out of the raw JSONL files during the assessment, before any fix
+existed. Two paths, same number.
+
+`hit_rate` is still `null` and `wins/losses` are 0 — **expected, and it is the
+remaining half.** Settlement joins `recon_games` / `recon_quarters` /
+`recon_props`, which still do not exist on the Render disk. The producer that
+writes them (`c0a0c622`) is not deployed.
+
+**NOT DEPLOYED, and why:** refresh-worker is still on `6d024dc7`. Two blockers,
+neither forced:
+  1. the deploy claim is **held by lane `mlb-accuracy-assessment`** (taken
+     03:31:51Z, target `ea06bf81`) — a live session, so `--force` would be wrong.
+  2. preflight reported **6 in-flight JOB processes**: `run_mlb_daily_sim_job.py`
+     (pid 7049) plus a `vendor/mlb_bettingv2/tools/daily...` tree with
+     multiprocessing children, worker RSS 1747MB. **A deploy now kills that sim
+     mid-run.**
+
+Messaged that session asking it to deploy `origin/main` HEAD rather than pinning
+`ea06bf81`, so one deploy carries both lanes. No urgency on my side: WNBA has no
+games until **2026-09-17**.
+
+**What is still owed on refresh-worker after it deploys `c0a0c622`:**
+`WNBA_POSTGAME_PRODUCER` must appear in the logs with `recon.status: ok`, and
+`/api/ops/wnba/artifact-counts` must flip `games.gradeable` and `props.gradeable`
+to true. Until then WNBA settlement stays 0 and no WNBA accuracy number should be
+quoted as a performance figure.
