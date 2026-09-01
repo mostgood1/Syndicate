@@ -16972,3 +16972,49 @@ wnba 0 exchange rows of any kind), and props are still the gap.
 
 `appended=0` here is a fact about Polymarket's listings, not a defect -- but it
 is a NEGATIVE result against the gate I set, and it is recorded as one.
+
+### 2026-09-01 17:06Z — POLYMARKET capture: EMITTED, gate NOT MET — and it CANNOT be met as deployed
+
+Follow-up session completing the watch the 417e19ed entry left open. The first
+post-deploy `portfolio_commit` ran at 17:06Z (the 16:51:19Z one entered on
+`c2f3efe4` and was killed by the 16:55:23Z deploy, as expected), and the
+capture emitted its first line ever in production:
+
+    17:06:12Z  [portfolio_commit] POLYMARKET_BOARD_JOIN elapsed_s=12.79 markets=17387 indexed=9942 board_rows=1272 matched=60 slate_age_s=17.6
+    17:06:12Z  [portfolio_commit] POLYMARKET_QUOTE_CAPTURE matches=60 sports=['mlb', 'soccer'] appended=0 no_sport=0
+    17:06:46Z  [book_grid]        AGGREGATOR_DUPLICATE_DROPPED rows=483 kept_direct=869 near_misses={}
+
+**VERIFIED — reachability.** The capture runs where the join runs, resolves a
+sport for every match (`no_sport=0`), and prints its always-on line. The
+"never observed to run" outcome is off the table.
+
+**NOT MET — `appended > 0`. And it is STRUCTURAL, not cadence.** Read off the
+deployed SHA `417e19ed`, not the checkout:
+
+- `polymarket_board_join.py:1329` — the join REFUSES `PROP` market types
+  (`refuse("market_type_not_a_game_line")`; its own comment: "PROP is fetched
+  every cycle and thrown away"). Every match it emits is a game line, so
+  `player_name` is empty on all of them (`:2591` "a GAME LINE HAS NO PLAYER").
+- `odds_book_quotes.py:551` `quote_rows_from_polymarket_matches` — PROPS ONLY,
+  deliberately (`_KEY_FIELDS` has no `source`; a second source under OddsAPI's
+  game-line keys ALTERNATES). A match without `player_name` hits `continue`.
+
+The join emits only game lines; the builder consumes only props. The
+intersection is EMPTY BY CONSTRUCTION, so `appended=0` is the permanent
+reading on this code — waiting longer measures nothing. The lanes.md:1508
+gate ("same-day readable") was written without noticing this: same-day
+readable is true of the LINE, false of `appended > 0`.
+
+**Consequently still unexercisable:** the unrecognised-POLYMARKET-spelling
+near-miss (the one real signal the 07cb592a fix preserved) cannot fire until a
+polymarket row reaches `book_quotes`. `near_misses={}` today is evidence about
+Kalshi only.
+
+**What moves it:** map `PROP` types in `MARKET_TYPE_TO_BOARD` — itself gated on
+characterising the PROP bucket first (the join's comment measured it as MIXED:
+a LoL map-winner lives in it, 2026-08-25). That is join-side work, not
+capture-side; the capture needs no change.
+
+verify: the reading is the 17:06:12Z pair above — `matched=60` beside
+`appended=0 no_sport=0` — plus the two file:line refusals on `417e19ed` that
+make the zero permanent.
