@@ -246,9 +246,18 @@ football instance; a contract-registry walker in `#619` prevents the class).
    (55% of the prop bias is opportunity). Mechanism+estimator pair per the
    standard §4.4. Then re-run the de-biased model-skill measurement (prior
    reading: de-biasing flips 5 of 7 markets past a constant baseline).
-4. **Execute `#202`** — the pre-registered conditional-edge scan, rules frozen
-   2026-08-05, NEVER RUN. Run it as written; report survivors vs the chance
-   expectation.
+4. **`#202` EXECUTED 2026-09-01 — 4 tests run, 0 candidates, NO EDGE FOUND**
+   (the pre-registration's own prior). `scripts/run_mlb_edge_scan.py`, 9,479
+   graded rows / 51 dates. **7 of 8 hypotheses are NOT EXECUTABLE:** the per-row
+   mechanism payload they slice on survives on **534 of 9,479 rows — two dates
+   of fifty-one**, date-scoped not root-scoped. H7 has no model probability on
+   `ml` rows at all; H8 (ordered first) has no segment ACTUAL. The one
+   hypothesis that ran, H3, **failed in the OPPOSITE direction** to its
+   prediction — its only adequately-powered cell is ROI −0.142 with both halves
+   negative and a bootstrap CI spanning zero, and monotonicity is spiky.
+   **Precondition to run the other five: graded rows must retain the mechanism
+   payload.** Full result stamped into the pre-registration doc; its rules were
+   NOT edited.
 5. **Exchange prop economics** — as `book_quotes` accumulates kalshi prop rows
    (`08ecb418`), measure prop-side option value the way item 05 measured game
    markets (time-aligned, unconditional); only then change the board's price

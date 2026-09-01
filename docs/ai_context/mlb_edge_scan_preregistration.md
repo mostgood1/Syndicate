@@ -119,3 +119,53 @@ beating 52.3–54.2% just to break even, the model beats the sim but not the
 price everywhere tested, and the most sophisticated competitor observed is
 publicly losing. A null result here is the expected result and should be
 reported as a real finding, not as a failed search.
+
+---
+
+## EXECUTED 2026-09-01 — result below. The rules above are UNCHANGED.
+
+Run on **9,479 graded rows over 51 dates** (2026-04-10..08-31) pulled from
+production. Scan: `scripts/run_mlb_edge_scan.py`.
+
+**TESTS RUN: 4. CANDIDATES SURVIVING ALL SIX RULES: 0. NO EDGE FOUND** — which
+is this document's own stated prior, and is reported as a real finding rather
+than a failed search.
+
+**7 of the 8 hypotheses were NOT EXECUTABLE**, and that is the more useful
+result. The per-row MECHANISM payload they slice on survives on **534 of 9,479
+graded rows — two dates of fifty-one** (05-09, 05-18); it is DATE-scoped, not
+root-scoped (both artifact roots carry it on those two dates, neither on the
+rest).
+
+| # | status | why |
+|---|---|---|
+| H1 | not runnable | `pitcher_k_rate` on 0/197 K rows |
+| H2 | not runnable | `lineup_k_rate` on 6/197 |
+| H3 | **RAN — FAILED** | see below |
+| H4 | not runnable | `park_hr_mult` on 0/1,691 HR rows |
+| H5 | not runnable | `batter_platoon_hr_mult` on 0/1,691 |
+| H6 | not runnable | `pitcher_primary_pitch_type_hr_mult` on 0/1,691 |
+| H7 | not runnable | `ml` rows carry no model probability at all, only odds |
+| H8 | not runnable | no segment bucket exists; 0 settled first-inning rows |
+
+**H8 was ordered FIRST here and is blocked by a different thing** than the
+others: segments publish a distribution and no ACTUAL, which the MLB accuracy
+assessment had already recorded independently.
+
+**H3 failed in the direction OPPOSITE to its prediction.** Only the `<=4.5`
+cell clears the ≥60-bet size rule:
+
+| cell | n | ROI | halves | fragility | bootstrap 95% | direction |
+|---|---|---|---|---|---|---|
+| `<=4.5` | 128 | **−0.142** | −0.109 / −0.181 | −0.200 | [−0.295, +0.015] | **FAIL** |
+| `5.5` | 42 | +0.202 | +0.028 / +0.345 | +0.051 | [−0.124, +0.503] | ok (size FAIL) |
+| `6.5` | 22 | −0.130 | +0.039 / −0.272 | −0.409 | [−0.517, +0.254] | FAIL |
+| `>=7.5` | 5 | +0.367 | +0.689 / −0.115 | — | [−0.321, +0.732] | ok (size FAIL) |
+
+Monotonicity across cells: **SPIKY**. This document is explicit that a result in
+the wrong direction is a failure, not a discovery — and that the ~+0.20 cell at
+n=42 is exactly the kind of number the size rule exists to refuse.
+
+**PRECONDITION for ever running H1/H2/H4/H5/H6:** the graded rows must retain
+the mechanism payload. Until then those five hypotheses are untestable, not
+untested.
