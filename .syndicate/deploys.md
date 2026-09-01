@@ -17381,3 +17381,36 @@ into the slate.
 - **CONFOUNDERS, STATED RATHER THAN GLOSSED.** The two reads are NOT a clean A/B: `board_rows` 1,518 -> 2,409 and `TRIM_BY_SPORT kept_by_sport` shifted (mlb 2,546 -> 3,576), so the working set is a different population. `unreadable_title` 18 -> 413 and `no_matching_board_row` 1,139 -> 2,305 move with that composition, NOT with this change — classification runs BEFORE the date test in the loop, so the date widening cannot touch `unreadable_title` in either direction. **Only the two counters named in the prediction are attributable here**, and they are the two that moved in the predicted direction.
 - `matched=478 -> 716` is therefore NOT claimed as this change's doing either: more board rows and more MLB in the set explain it at least as well, and soccer contributed zero matches.
 - OWED: `bc716cb8` (club code -> name resolution, measured 63% -> 82% on 176 clubs) is on main and UNDEPLOYED. Its reading is `event_not_on_our_board` falling and soccer entering `QUOTE_CAPTURE sports=[...]`. Deploy blocked at 20:3xZ by 25-min spacing (17 min elapsed) AND an in-flight `run_mlb_daily_sim_job.py` — waiting rather than `--allow-rapid`.
+
+## 2026-09-01 21:08Z — refresh-worker `3ee0f382` — CLUB-NAME RESOLUTION DEPLOYED AND IT MOVED NOTHING. Negative result, diagnosed.
+- lane: `kalshi-soccer-forward-date` (session 41d46db0). Deploy dep-dabjohajnfac73bqlq30, created 20:57:41Z, live **21:00:23Z**, trigger=api, claim+preflight CLEAR pinned to the SHA (fired at the first job lull after a 25-min spacing wait; killed nothing). Carries `bc716cb8` (club code -> Kalshi's own names, measured 63% -> 82% on 176 clubs).
+- verify, first post-boot join **21:08:59Z**:
+
+      event_not_on_our_board     883  ->  883    UNCHANGED, to the digit
+      market_is_for_another_date 910  -> 1133    (population; board_rows 2409 -> 1730)
+      unreadable_title           413  ->   18    back to baseline -- CORROBORATES that
+                                                 the 413 was working-set composition and
+                                                 NOT this lane's change, as recorded
+      QUOTE_CAPTURE sports=['mlb']  -- still ZERO Kalshi soccer quotes
+
+- **THE FIX IS UNEXERCISED, NOT DISPROVEN, and the distinction is the whole finding.**
+  `KALSHI_UNMATCHED.unmatched_events` samples are **8 of 8 Belgian Pro League**
+  fixtures dated 2026-09-05/06 (`BEVOHL`, `RSCGEN`, `KORZUL`, `CERKAA`,
+  `STTRAAL`, `STARAFC`, `YRMWES`, `RCHUSG`). `match_event_blob` iterates **OUR**
+  games: with no board row for a fixture, no code -> name map can produce a
+  match. The alias half is sound -- 11 of 12 of those Belgian clubs resolve
+  locally (`Beveren` -> `waasland beveren`, `Genk` -> `racing genk`, `Gent` ->
+  `kaa gent`; only `Standard` is None).
+- **THE BINDING CONSTRAINT MOVED A THIRD TIME**, and each move was real:
+  date (fixed, measured) -> club alias (fixed, unexercised) -> **BOARD SOCCER
+  FIXTURE COVERAGE on forward dates**. Kalshi lists 918 soccer markets spanning
+  09-02..09-15; our board's soccer horizon does not reach them (at 21:00Z the
+  board carried 26 unmatched soccer TOTALS rows and no soccer h2h key at all).
+  Widening the date let Kalshi's forward markets IN; there is nothing on our
+  side for them to pair with yet.
+- **DO NOT "FIX" THE ALIAS PATH AGAIN ON THIS EVIDENCE.** It is deployed, its
+  club names resolve, and it is waiting on a board that does not yet carry the
+  fixtures. The next real lever is the soccer board's forward horizon, which is
+  a different lane and a different decision.
+- Money path untouched throughout: `KALSHI_SOCCER_RESOLVERS` gate shipped
+  default-OFF; zero soccer matches means it has still never had to withhold one.
