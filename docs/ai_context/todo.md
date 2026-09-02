@@ -757,7 +757,40 @@ absorbs that track's intent; `#440`'s Phase-7 CRPS scorer is consumed by
 
 ---
 
-### `#626` — **PHASE 0 — MEASUREMENT RESTORATION (now → 09-17). Nothing downstream is verifiable until these land.** — lane `edge-plan`, 2026-09-01 — **OPEN — PROGRESS 2026-09-01 (same day): (c)+(e) LANDED `417e19ed`, (d) DISCOVERED ALREADY LANDED, (a) owned**
+### `#626` — **PHASE 0 — MEASUREMENT RESTORATION (now → 09-17). Nothing downstream is verifiable until these land.** — lane `edge-plan`, 2026-09-01 — **OPEN — ALL EIGHT ITEMS HAVE LANDED CODE. What is outstanding is VERIFICATION, and two items cannot be verified as written.**
+
+> **STATUS RECONCILED 2026-09-02 against git, lane `phase0-status-reconcile`.**
+> The block below is dated 09-01 MORNING and says "(b)(f)(g)(h) remaining
+> unowned". All four landed that afternoon. Verified by commit, not memory:
+>
+>     (a) 9a768443   (b) e9090bc0   (c)(e) 417e19ed
+>     (f)(g) 714738fe   (h) 258d312f   (d) f7a9e992 (pre-existing)
+>
+> **LANDED, ARMED and VERIFIED are three different states and this item was
+> conflating them.** Two findings that only appear once they are separated:
+>
+> **(h) IS LANDED BUT INERT — it has never run once.**
+> `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN` is **ABSENT from
+> refresh-worker's 100 env keys**, and the autorun is default-OFF by design
+> (`run_refresh_worker.py:2130`). So the evaluation loop that `#626` exists to
+> restore has produced nothing, and its verification — "a published accuracy
+> artifact with a fresh `generated_at` daily" — is unsatisfiable until the key
+> is set AND a deploy injects it. **This is the feedback loop the whole plan
+> rests on; it is one env var away from existing and currently does not.**
+>
+> **(f)'s VERIFICATION NAMES THE WRONG ARTIFACT.** It asks for "ramp/closing
+> phase stamps present per sport in `book_quotes`". Sampled 2026-09-02 across
+> soccer (2 dates) and MLB: **`<none>` on 1,950 / 1,905 / 2,032 rows** — because
+> `book_quotes` rows carry no phase field at all (`captured_at, snapshot_ts,
+> sport, kind, event_id, bookmaker, market, segment, selection, line, price,
+> source`). The phase is written to the refresh loop's own metadata
+> (`live_refresh_loop.py:3488, 5420, 5854`), not to the quote rows. **The clause
+> is unsatisfiable as written and must be repointed before anyone reads a
+> `<none>` as a regression.** Not evidence that (f) failed.
+>
+> **Gated on a future event, not actionable now:** (c) first NBA slate,
+> (d) 09-17 WNBA live game, (e) next live slate, (a) next MLB pregame pass.
+> **Actionable now:** arming (h); repointing (f)'s clause; (b) and (g) counts.
 
 > **STATUS 2026-09-01 evening, lane `phase0-basketball-integrity` (CLOSED, landed `417e19ed`):**
 > - **(c) DONE, production reading dated:** NBA integrity ports all landed —
