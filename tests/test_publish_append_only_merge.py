@@ -32,6 +32,7 @@ from unittest.mock import patch
 
 from syndicate.app import create_app
 from syndicate.blueprints import ops
+from syndicate.features.shared import artifact_merge as am
 
 BOOK_QUOTES = "mlb_source/tracking/book_quotes/2026-09-01.jsonl"
 STATE_SIDECAR = "mlb_source/tracking/book_quotes/2026-09-01.state.json"
@@ -54,7 +55,7 @@ class MergeHelperTests(unittest.TestCase):
         self._tmp.cleanup()
 
     def _merge(self) -> dict:
-        return ops._merge_append_only_publish(self.target, self.incoming)
+        return am.merge_append_only(self.target, self.incoming)
 
     def test_disjoint_writers_both_survive(self) -> None:
         self.target.write_text("a\nb\n", encoding="utf-8")
@@ -334,7 +335,7 @@ class OddsHistoryMergeTests(unittest.TestCase):
         # `_merge_odds_history_publish` takes the SERVICE-WIDE admission lock,
         # which lives at data_root() -- point it at the temp dir so tests never
         # touch the real one and never leak a lock between cases.
-        self._patch = patch.object(ops, "data_root", return_value=self.root)
+        self._patch = patch.object(am, "data_root", return_value=self.root)
         self._patch.start()
 
     def tearDown(self) -> None:
@@ -344,7 +345,7 @@ class OddsHistoryMergeTests(unittest.TestCase):
     def _merge(self, target_doc: dict, incoming_doc: dict) -> dict:
         self.target.write_text(json.dumps(target_doc), encoding="utf-8")
         self.incoming.write_text(json.dumps(incoming_doc), encoding="utf-8")
-        return ops._merge_odds_history_publish(self.target, self.incoming)
+        return am.merge_odds_history(self.target, self.incoming)
 
     def _stored(self) -> dict:
         return json.loads(self.target.read_text(encoding="utf-8"))
@@ -397,14 +398,14 @@ class OddsHistoryMergeTests(unittest.TestCase):
         for bad in ({"schema_version": 2, "markets": {}}, {"markets": "not-a-dict"}, {"nope": 1}, []):
             self.target.write_text(json.dumps(_doc({"k": _entry(EARLY, 2.0, 1.0)}, EARLY)), encoding="utf-8")
             self.incoming.write_text(json.dumps(bad), encoding="utf-8")
-            result = ops._merge_odds_history_publish(self.target, self.incoming)
+            result = am.merge_odds_history(self.target, self.incoming)
             self.assertFalse(result["merged"], bad)
             self.assertIn("shape_gate", result["error"])
 
     def test_unparseable_input_falls_back_rather_than_raising(self) -> None:
         self.target.write_text("{not json", encoding="utf-8")
         self.incoming.write_text(json.dumps(_doc({}, EARLY)), encoding="utf-8")
-        result = ops._merge_odds_history_publish(self.target, self.incoming)
+        result = am.merge_odds_history(self.target, self.incoming)
         self.assertFalse(result["merged"])
         self.assertIn("parse_failed", result["error"])
 
@@ -415,8 +416,8 @@ class OddsHistoryMergeTests(unittest.TestCase):
         clobber it fixes."""
         self.target.write_text(json.dumps(_doc({}, EARLY)), encoding="utf-8")
         self.incoming.write_text(json.dumps(_doc({}, EARLY)), encoding="utf-8")
-        with patch.object(ops, "_ODDS_HISTORY_MERGE_MAX_INPUT_BYTES", 1):
-            result = ops._merge_odds_history_publish(self.target, self.incoming)
+        with patch.object(am, "ODDS_HISTORY_MERGE_MAX_INPUT_BYTES", 1):
+            result = am.merge_odds_history(self.target, self.incoming)
         self.assertFalse(result["merged"])
         self.assertIn("over_size_cap", result["error"])
 
@@ -446,7 +447,7 @@ class OddsHistoryMergeAdmissionTests(unittest.TestCase):
         self.target.write_text(json.dumps(_doc({"a": _entry(EARLY, 1.0, 1.0)}, EARLY)), encoding="utf-8")
         self.incoming.write_text(json.dumps(_doc({"b": _entry(LATE, 2.0, 1.0)}, LATE)), encoding="utf-8")
         # the admission lock is SERVICE-WIDE, so it lives at data_root()
-        self._patch = patch.object(ops, "data_root", return_value=self.root)
+        self._patch = patch.object(am, "data_root", return_value=self.root)
         self._patch.start()
 
     def tearDown(self) -> None:
@@ -456,40 +457,41 @@ class OddsHistoryMergeAdmissionTests(unittest.TestCase):
     def test_the_cap_covers_the_real_mlb_pair(self) -> None:
         """A regression on the CONSTANT. Measured 3.13x peak/input on the MLB
         shard, so this cap implies ~525MB worst case, admitted one at a time."""
-        self.assertGreater(ops._ODDS_HISTORY_MERGE_MAX_INPUT_BYTES,
+        self.assertGreater(am.ODDS_HISTORY_MERGE_MAX_INPUT_BYTES,
                            self.OBSERVED_MLB_COMBINED_BYTES,
                            "the cap must not exclude the shards that clobber worst")
 
     def test_the_lock_admits_one_and_refuses_the_second(self) -> None:
-        first = ops._odds_history_merge_lock(self.target)
+        first = am.odds_history_merge_lock(self.root)
         self.assertIsNotNone(first)
-        self.assertIsNone(ops._odds_history_merge_lock(self.target),
+        self.assertIsNone(am.odds_history_merge_lock(self.root),
                           "a second worker must not merge concurrently")
         first.unlink()
-        self.assertIsNotNone(ops._odds_history_merge_lock(self.target))
+        self.assertIsNotNone(am.odds_history_merge_lock(self.root))
 
     def test_the_lock_is_SERVICE_WIDE_not_per_directory(self) -> None:
         """The tracking shard and its artifacts twin live in DIFFERENT
         directories and were observed publishing 2 SECONDS apart. A
         per-directory lock would have let exactly that pair run concurrently --
-        the one case it exists to bound."""
-        tracking = self.root / "mlb_source/tracking/odds_history/2026-09-01.json"
+        the one case it exists to bound. Asserted through the real entry point,
+        not by comparing lock paths."""
         twin = self.root / "mlb_source/artifacts/mlb/odds_history/2026-09-01.json"
-        for path in (tracking, twin):
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("{}", encoding="utf-8")
-        held = ops._odds_history_merge_lock(tracking)
+        twin.parent.mkdir(parents=True, exist_ok=True)
+        twin.write_text(json.dumps(_doc({"t": _entry(EARLY, 1.0, 1.0)}, EARLY)), encoding="utf-8")
+        held = am.odds_history_merge_lock(self.root)
         self.assertIsNotNone(held)
         try:
-            self.assertIsNone(ops._odds_history_merge_lock(twin),
-                              "the twin must be blocked by the SAME lock")
+            blocked = am.merge_odds_history(twin, self.incoming, root=self.root)
+            self.assertFalse(blocked["merged"])
+            self.assertIn("merge_busy", blocked["error"],
+                          "a merge in a DIFFERENT directory must still be blocked")
         finally:
             held.unlink()
 
     def test_a_busy_lock_falls_back_instead_of_raising(self) -> None:
-        held = ops._odds_history_merge_lock(self.target)
+        held = am.odds_history_merge_lock(self.root)
         try:
-            result = ops._merge_odds_history_publish(self.target, self.incoming)
+            result = am.merge_odds_history(self.target, self.incoming)
         finally:
             held.unlink()
         self.assertFalse(result["merged"])
@@ -498,7 +500,7 @@ class OddsHistoryMergeAdmissionTests(unittest.TestCase):
         self.assertEqual(sorted(json.loads(self.target.read_text(encoding="utf-8"))["markets"]), ["a"])
 
     def test_the_lock_is_released_after_a_successful_merge(self) -> None:
-        result = ops._merge_odds_history_publish(self.target, self.incoming)
+        result = am.merge_odds_history(self.target, self.incoming)
         self.assertTrue(result["merged"])
         self.assertEqual(list(self.root.glob("*.lock")), [], "lock leaked after success")
 
@@ -506,22 +508,22 @@ class OddsHistoryMergeAdmissionTests(unittest.TestCase):
         """A leaked lock would disable merging for everything in this directory
         until the staleness timeout — worse than the bug it guards."""
         self.incoming.write_text("{not json", encoding="utf-8")
-        result = ops._merge_odds_history_publish(self.target, self.incoming)
+        result = am.merge_odds_history(self.target, self.incoming)
         self.assertFalse(result["merged"])
         self.assertEqual(list(self.root.glob("*.lock")), [], "lock leaked after failure")
 
     def test_a_stale_lock_is_broken(self) -> None:
         """A worker killed mid-merge must not disable merging forever."""
-        stale = ops._odds_history_merge_lock(self.target)
-        old = time.time() - ops._ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS - 60
+        stale = am.odds_history_merge_lock(self.root)
+        old = time.time() - am.ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS - 60
         os.utime(stale, (old, old))
-        self.assertIsNotNone(ops._odds_history_merge_lock(self.target),
+        self.assertIsNotNone(am.odds_history_merge_lock(self.root),
                              "a stale lock must be broken, not honoured forever")
 
     def test_a_fresh_lock_is_NOT_broken(self) -> None:
-        held = ops._odds_history_merge_lock(self.target)
+        held = am.odds_history_merge_lock(self.root)
         try:
-            self.assertIsNone(ops._odds_history_merge_lock(self.target))
+            self.assertIsNone(am.odds_history_merge_lock(self.root))
         finally:
             held.unlink()
 
@@ -644,16 +646,132 @@ class MergeDispatcherTests(unittest.TestCase):
         self.assertIsNone(ops._merge_published_artifact(STATE_SIDECAR, self.target, self.incoming))
 
     def test_it_routes_each_family_to_its_own_merge(self) -> None:
-        with patch.object(ops, "_merge_append_only_publish",
+        """And they are handled DIFFERENTLY on purpose: the cheap line union runs
+        INLINE (20 MB peak on 34 MB, 0.59x — it streams), the JSON union is
+        SPAWNED out of process (276 MB on 88 MB, 3.13x — it parses both)."""
+        with patch.object(ops, "merge_append_only",
                           return_value={"merged": True, "which": "lines"}) as lines, \
-             patch.object(ops, "_merge_odds_history_publish",
-                          return_value={"merged": True, "which": "json"}) as js:
+             patch.object(ops, "_spawn_odds_history_merge",
+                          return_value={"spawned": True, "which": "json"}) as js:
             self.assertEqual(ops._merge_published_artifact(
                 BOOK_QUOTES, self.target, self.incoming)["which"], "lines")
             self.assertEqual(ops._merge_published_artifact(
                 "soccer_source/tracking/odds_history/2026-09-05.json",
                 self.target, self.incoming)["which"], "json")
         self.assertEqual((lines.call_count, js.call_count), (1, 1))
+
+
+class DeferredOddsHistoryMergeTests(unittest.TestCase):
+    """`odds_history` merges OUT OF PROCESS. Measured: the JSON union peaks at
+    276 MB on 88 MB (3.13x) and, run inside gunicorn, ratcheted web's floor from
+    717.7 MB at boot to ~1030 MB and did not come back — CPython does not return
+    freed arenas to the OS. **A background thread would not have fixed that**:
+    same process, same arenas. A child process gives the address space back.
+
+    The cheap line union (0.59x, streams) deliberately stays inline.
+    """
+
+    ODDS_HISTORY = "mlb_source/tracking/odds_history/2026-09-01.json"
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self._ops = patch.object(ops, "data_root", return_value=self.root)
+        self._am = patch.object(am, "data_root", return_value=self.root)
+        self._ops.start()
+        self._am.start()
+        self.target = self.root / self.ODDS_HISTORY
+        self.target.parent.mkdir(parents=True, exist_ok=True)
+        self.target.write_text(json.dumps(_doc({"mine": _entry(EARLY, 1.0, 1.0)}, EARLY)),
+                               encoding="utf-8")
+
+    def tearDown(self) -> None:
+        self._ops.stop()
+        self._am.stop()
+        self._tmp.cleanup()
+
+    def _incoming(self) -> Path:
+        path = self.root / "incoming.json"
+        path.write_text(json.dumps(_doc({"theirs": _entry(LATE, 2.0, 1.0)}, LATE)),
+                        encoding="utf-8")
+        return path
+
+    def test_spawning_does_not_touch_the_target(self) -> None:
+        """The request must not do the merge, and must not replace either — the
+        target keeps what it had until the child finishes. Stale by one publish
+        is the pre-merge behaviour; a clobber is not."""
+        before = self.target.read_bytes()
+        with patch("subprocess.Popen") as popen:
+            result = ops._spawn_odds_history_merge(self.ODDS_HISTORY, self.target, self._incoming())
+        self.assertTrue(result["spawned"])
+        self.assertEqual(popen.call_count, 1)
+        self.assertEqual(self.target.read_bytes(), before, "the target must be untouched")
+        self.assertEqual(len(list(self.target.parent.glob("*.staged"))), 1)
+
+    def test_a_failed_spawn_promotes_the_staged_copy_rather_than_dropping_it(self) -> None:
+        """If the child cannot start, fall back to the plain replace — today's
+        behaviour — instead of silently discarding the publish."""
+        with patch("subprocess.Popen", side_effect=OSError("no fork")):
+            result = ops._spawn_odds_history_merge(self.ODDS_HISTORY, self.target, self._incoming())
+        self.assertFalse(result["spawned"])
+        self.assertIn("spawn_failed", result["error"])
+        stored = json.loads(self.target.read_text(encoding="utf-8"))
+        self.assertEqual(sorted(stored["markets"]), ["theirs"], "the publish must land")
+        self.assertEqual(list(self.target.parent.glob("*.staged")), [], "no staging left behind")
+
+    def test_the_endpoint_defers_and_does_not_replace(self) -> None:
+        before = self.target.read_bytes()
+        with patch("subprocess.Popen") as popen, \
+             patch.dict(os.environ, {"ADMIN_TOKEN": TOKEN}, clear=False):
+            response = self.client.post(
+                "/api/ops/artifacts/publish",
+                data=json.dumps(_doc({"theirs": _entry(LATE, 2.0, 1.0)}, LATE)).encode("utf-8"),
+                content_type="application/octet-stream",
+                headers={"Authorization": f"Bearer {TOKEN}",
+                         "X-Artifact-Path": self.ODDS_HISTORY,
+                         "X-Artifact-Publisher": "refresh-worker"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["merge"], "deferred")
+        self.assertEqual(popen.call_count, 1)
+        self.assertEqual(self.target.read_bytes(), before)
+
+    def test_the_subprocess_actually_merges_and_cleans_up(self) -> None:
+        """END TO END, running the real child. Everything above mocks Popen, so
+        without this the script itself is never proven to work."""
+        import subprocess as sp
+        import sys as _sys
+        staged = self.target.parent / "staged.json"
+        staged.write_text(json.dumps(_doc({"theirs": _entry(LATE, 2.0, 1.0)}, LATE)),
+                          encoding="utf-8")
+        script = Path(ops.__file__).resolve().parents[2] / "scripts" / "merge_odds_history_artifact.py"
+        proc = sp.run([_sys.executable, str(script), "--target", str(self.target),
+                       "--incoming", str(staged), "--relative-path", self.ODDS_HISTORY],
+                      capture_output=True, text=True, timeout=120,
+                      env={**os.environ, "SYNDICATE_DATA_ROOT": str(self.root)})
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("ODDS_HISTORY_MERGE", proc.stdout)
+        stored = json.loads(self.target.read_text(encoding="utf-8"))
+        self.assertEqual(sorted(stored["markets"]), ["mine", "theirs"],
+                         "the union must survive — this is the whole point")
+        self.assertFalse(staged.exists(), "the child owns deleting its staging file")
+
+    def test_the_child_cleans_up_even_when_it_refuses(self) -> None:
+        """A staging file left behind is disk nothing will reclaim."""
+        import subprocess as sp
+        import sys as _sys
+        staged = self.target.parent / "bad.json"
+        staged.write_text("{not json", encoding="utf-8")
+        script = Path(ops.__file__).resolve().parents[2] / "scripts" / "merge_odds_history_artifact.py"
+        proc = sp.run([_sys.executable, str(script), "--target", str(self.target),
+                       "--incoming", str(staged)],
+                      capture_output=True, text=True, timeout=120,
+                      env={**os.environ, "SYNDICATE_DATA_ROOT": str(self.root)})
+        self.assertEqual(proc.returncode, 1, "a refusal is a non-zero exit")
+        self.assertFalse(staged.exists(), "staging must be removed on refusal too")
 
 
 if __name__ == "__main__":

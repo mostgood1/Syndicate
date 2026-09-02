@@ -32,6 +32,9 @@ from syndicate.features.shared.artifact_publisher import relative_to_data_root
 # tail pull already assumes. A second copy of this list is a way for one to
 # start merging a family the other still replaces, or vice versa.
 from syndicate.features.shared.artifact_publisher import _is_append_only
+from syndicate.features.shared.artifact_merge import merge_append_only
+from syndicate.features.shared.artifact_merge import is_mergeable_odds_history
+
 from syndicate.features.shared.ops_refresh import build_refresh_plan
 from syndicate.features.shared.ops_refresh import _assert_no_active_refresh_run
 from syndicate.features.shared.ops_refresh import cancel_latest_refresh_run
@@ -1696,285 +1699,47 @@ _PUBLISH_LAST_PUBLISHER: dict[str, str] = {}
 _PUBLISH_CONSECUTIVE_REFUSALS: dict[str, int] = {}
 
 
-def _merge_append_only_publish(target_path: Path, incoming_path: Path) -> dict:
-    """UNION an incoming append-only artifact into the one already on disk.
+def _spawn_odds_history_merge(relative_path: str, target_path: Path, incoming_path: Path) -> dict:
+    """Stage the incoming copy and hand the merge to a SUBPROCESS. `#630`.
 
-    `#630`. Two services each keep their OWN copy of
-    `<sport>_source/tracking/book_quotes/<date>.jsonl`, append only their own
-    rows to it, and then publish the WHOLE FILE. A replace therefore drops
-    whatever the other service had appended since. Measured 2026-09-01: a
-    refetch an hour later had LOST 1,318 exchange rows and gained none, a clean
-    tail truncation, while sportsbook rows gained a whole hour.
+    THE REQUEST DOES NOT WAIT, and the allocation does not happen here. Measured
+    on the real MLB shard, the JSON union peaks at 276 MB on 88 MB of input
+    (3.13x). Run inside gunicorn that RATCHETED web's floor from 717.7 MB at
+    boot to ~1030 MB once merges started, and it did not come back -- CPython
+    does not return freed arenas to the OS. **A background THREAD would not have
+    fixed that**: same process, same arenas. A child process gives the whole
+    address space back when it exits.
 
-    Merging makes publishes COMMUTATIVE: whichever service publishes last, the
-    result holds both services' rows, so the order stops mattering.
+    It also restores `CLAUDE.md`'s rule that the web service does no heavy
+    computation -- a 276 MB parse in a request handler is what that forbids.
 
-    THE LOAD-BEARING INVARIANT IS THAT THE EXISTING FILE STAYS A BYTE PREFIX OF
-    THE RESULT. Existing bytes are copied through untouched and new lines are
-    only ever appended -- never reordered, never rewritten. That is not
-    tidiness: `artifact_publisher.pull_streamed_artifact` fetches these families
-    by HTTP Range from the worker's local size, so any edit before that offset
-    would splice two different files together on the worker. `_is_append_only`
-    is imported rather than restated so the two can never disagree about which
-    families those are. Merging is what finally MAKES that assumption true --
-    until now the file could be replaced wholesale underneath it.
-
-    DEDUP IS ON THE WHOLE LINE, deliberately, not on a parsed semantic key.
-    A semantic key needs a schema, and getting one wrong collapses two genuinely
-    different observations into one -- silent, unrecoverable data loss, the
-    expensive direction. Whole-line identity can only ever collapse rows that
-    are already byte-identical, which is exactly what a re-publish of the same
-    file produces. It also makes this idempotent: republishing an unchanged file
-    adds nothing.
-
-    RACES ARE SELF-HEALING, which is why this needs no cross-process lock.
-    Two simultaneous publishes can interleave read-modify-write and lose one
-    side's additions. That side is not lost for good: every publisher sends its
-    COMPLETE file every time, so the next publish re-offers those rows and they
-    merge then. A lock would narrow a window that already closes by itself.
-
-    Returns a dict of counts. Never raises -- on any failure the caller keeps
-    the plain replace, which is exactly today's behaviour.
+    FAILURE IS BENIGN BY CONSTRUCTION. The target is NOT touched here, so if the
+    child never runs the target keeps the copy it already had: stale by one
+    publish, which is the pre-merge behaviour and not a clobber. The child owns
+    deleting the staging file, including on refusal.
     """
-    digests: set[bytes] = set()
-    existing_lines = 0
-    for line in _iter_lines(target_path):
-        digests.add(hashlib.blake2b(line, digest_size=16).digest())
-        existing_lines += 1
-
-    merged_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.merge"
-    added = 0
-    duplicates = 0
+    staging = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.staged"
     try:
-        with merged_path.open("wb") as out:
-            # Byte-for-byte copy of what is already there. This is the prefix
-            # guarantee, and it is why this is a copy rather than a re-encode.
-            with target_path.open("rb") as current:
-                shutil.copyfileobj(current, out, _PUBLISH_STREAM_CHUNK_BYTES)
-            if existing_lines and not _ends_with_newline(target_path):
-                # Without this, the first appended row would be glued onto the
-                # last existing one and BOTH would stop parsing.
-                out.write(b"\n")
-            for line in _iter_lines(incoming_path):
-                digest = hashlib.blake2b(line, digest_size=16).digest()
-                if digest in digests:
-                    duplicates += 1
-                    continue
-                digests.add(digest)
-                out.write(line + b"\n")
-                added += 1
-        os.replace(merged_path, target_path)
+        os.replace(incoming_path, staging)
     except Exception as exc:
+        return {"spawned": False, "error": f"stage_failed: {type(exc).__name__}: {exc}"}
+    script = Path(__file__).resolve().parents[2] / "scripts" / "merge_odds_history_artifact.py"
+    try:
+        subprocess.Popen(
+            [sys.executable, str(script), "--target", str(target_path),
+             "--incoming", str(staging), "--relative-path", relative_path],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            close_fds=True,
+        )
+    except Exception as exc:
+        # Could not spawn: promote the staged copy so the publish is not simply
+        # dropped. That is the plain replace, i.e. today's behaviour.
         try:
-            merged_path.unlink(missing_ok=True)
+            os.replace(staging, target_path)
         except Exception:
             pass
-        return {"merged": False, "error": f"{type(exc).__name__}: {exc}"}
-    return {
-        "merged": True,
-        "existing_lines": existing_lines,
-        "added": added,
-        "duplicates": duplicates,
-    }
-
-
-# `odds_history` shards are a SINGLE JSON DOCUMENT, so the line-union above
-# would concatenate two documents and destroy both. They get their own merge.
-#
-# MEMORY, MEASURED TWICE -- AND THE FIRST CAP WAS SIZED ON THE WRONG SPORT.
-#
-#   soccer shard  39,581,487 B / 2,745 markets -> peak 189 MB on  72 MB (2.6x)
-#   MLB shard     54,909,482 B / 3,873 markets -> peak 276 MB on  88 MB (3.13x)
-#
-# The first version capped combined input at 100 MiB, sized on soccer. In
-# production MLB's pair is **109,448,725 B combined**, so the very first live
-# publish logged `ARTIFACT_MERGE_FALLBACK ... over_size_cap: 109448725 >
-# 104857600` and the merge was INERT on the largest shards -- a guard disabling
-# the fix precisely where it mattered most. It was visible only because the
-# fallback logs its reason instead of silently replacing.
-#
-# The cap is now derived from a stated memory BUDGET rather than from whichever
-# file happened to be measured: at the observed 3.13x, 160 MiB of input peaks
-# around 525 MB.
-#
-# THE CAP ALONE IS NOT THE BOUND, AND THE CONCURRENCY IS WORSE THAN IT LOOKS.
-#
-# Read from the live process list rather than assumed, 2026-09-02:
-#
-#     gunicorn wsgi:application --workers 2 --threads 4
-#
-# So there are TWO processes, each serving up to FOUR requests at once -- eight
-# concurrent requests, but NOT eight isolated single-request workers. An earlier
-# version of this comment said "8 gunicorn workers, each single-request", copied
-# from the envelope-form note below rather than from the running config, and it
-# was wrong in the direction that matters: `--threads 4` means merges can race
-# INSIDE one process, which a per-process assumption would have declared
-# impossible.
-#
-# Four concurrent merges (two services x tracking + its artifacts twin, observed
-# 2 SECONDS apart in the log) would be ~1.4 GB on a 2Gi box already near
-# 750 MB. So a service-wide `O_CREAT|O_EXCL` lock -- which is correct for both
-# the cross-process and the cross-thread case -- admits ONE merge at a time and
-# everything else falls back to the replace it would have done anyway. Safe for
-# the same reason the append-only race is: every publisher sends its COMPLETE
-# file every cycle, so a skipped merge is re-offered on the next publish.
-_ODDS_HISTORY_MERGE_MAX_INPUT_BYTES = 160 * 1024 * 1024
-_ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS = 300
-
-
-def _odds_history_merge_lock(target_path: Path):
-    """Service-wide single-merge admission, or None if another worker holds it.
-
-    `O_CREAT|O_EXCL` on a lock file -- the same primitive `deploy_claim.py`
-    uses, and for the same reason: it works ACROSS processes, which an
-    in-process lock does not. A stale lock (a worker killed mid-merge) is
-    broken after `_ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS` so one crash cannot
-    disable merging forever.
-    """
-    # ONE lock for the whole service, NOT one per directory. Keying it on
-    # `target_path.parent` was the first version and it did not bound anything
-    # useful: `<sport>_source/tracking/odds_history/` and
-    # `<sport>_source/artifacts/<sport>/odds_history/` are DIFFERENT directories,
-    # and those two twins are exactly the pair observed publishing 2 SECONDS
-    # apart -- so the per-directory lock would have let the one case it was built
-    # for run concurrently anyway.
-    lock_path = data_root() / ".odds_history_merge.lock"
-    try:
-        if lock_path.is_file():
-            age = time.time() - lock_path.stat().st_mtime
-            if age > _ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS:
-                lock_path.unlink(missing_ok=True)
-        handle = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.close(handle)
-        return lock_path
-    except FileExistsError:
-        return None
-    except Exception:
-        # Cannot take the lock for some other reason -- do NOT merge unbounded.
-        return None
-
-
-def _is_mergeable_odds_history(relative_path: str) -> bool:
-    text = str(relative_path or "")
-    return "/odds_history/" in text and text.endswith(".json")
-
-
-def _odds_history_recency(entry: Any) -> str:
-    """How recent an entry is, for picking a winner. Never guesses a shape."""
-    if not isinstance(entry, dict):
-        return ""
-    for field in ("last_updated", "last_snapshot_ts"):
-        value = str(entry.get(field) or "").strip().replace("Z", "+00:00")
-        if value:
-            return value
-    return ""
-
-
-def _merge_odds_history_publish(target_path: Path, incoming_path: Path) -> dict:
-    """UNION two `odds_history` documents by market key. `#630`.
-
-    Shape (measured on the live soccer shard, 2,745 markets):
-
-        {schema_version, sport, shard_key, date, updated_at, history_limit,
-         markets: {<market_key>: {history: [...], last_line, previous_line,
-                                  delta, movement, last_updated, ...}}}
-
-    ENTRIES ARE TAKEN WHOLESALE, NEVER FIELD-MIXED, and that is the safety
-    property. Each entry carries a `history` list AND scalars DERIVED from
-    consecutive history points (`previous_line`, `delta`, `percent_change`).
-    Merging two histories and keeping one side's scalars would publish an entry
-    whose `previous_line` does not correspond to its own history -- an
-    inconsistency nothing downstream could detect. So for a key present in both,
-    the entry with the newer `last_updated` wins ENTIRE. Every entry in the
-    output is one some publisher actually wrote.
-
-    THIS IS STRICTLY BETTER THAN THE REPLACE IT REMOVES, for every key:
-      * key only in the existing copy -> today it is DESTROYED; here it survives.
-      * key only in the incoming copy -> unchanged, it lands either way.
-      * key in both -> today the INCOMING always wins even when it is the
-        STALER of the two; here the newer one wins.
-
-    Never raises. On any refusal the caller keeps the plain replace.
-    """
-    try:
-        existing_bytes = target_path.stat().st_size
-        incoming_bytes = incoming_path.stat().st_size
-    except Exception as exc:
-        return {"merged": False, "error": f"stat_failed: {type(exc).__name__}: {exc}"}
-    combined = existing_bytes + incoming_bytes
-    if combined > _ODDS_HISTORY_MERGE_MAX_INPUT_BYTES:
-        return {"merged": False, "error": f"over_size_cap: {combined} > "
-                                          f"{_ODDS_HISTORY_MERGE_MAX_INPUT_BYTES}"}
-
-    lock_path = _odds_history_merge_lock(target_path)
-    if lock_path is None:
-        # Another worker is merging. Fall back to the replace this publish would
-        # have done anyway; the rows come back on the next publish because every
-        # publisher sends its whole file every cycle.
-        return {"merged": False, "error": "merge_busy: another worker holds the merge lock"}
-    try:
-        return _merge_odds_history_locked(target_path, incoming_path)
-    finally:
-        try:
-            lock_path.unlink(missing_ok=True)
-        except Exception:
-            pass
-
-
-def _merge_odds_history_locked(target_path: Path, incoming_path: Path) -> dict:
-    """The merge proper. Called only while holding the admission lock."""
-    try:
-        existing = json.loads(target_path.read_text(encoding="utf-8-sig"))
-        incoming = json.loads(incoming_path.read_text(encoding="utf-8-sig"))
-    except Exception as exc:
-        return {"merged": False, "error": f"parse_failed: {type(exc).__name__}: {exc}"}
-
-    # SHAPE GATE. An unrecognised document is REPLACED, not merged -- guessing a
-    # shape is how a merge corrupts something it was never meant to touch.
-    for doc in (existing, incoming):
-        if not isinstance(doc, dict) or doc.get("schema_version") != 1:
-            return {"merged": False, "error": "shape_gate: not a schema_version=1 document"}
-        if not isinstance(doc.get("markets"), dict):
-            return {"merged": False, "error": "shape_gate: markets is not a mapping"}
-
-    existing_markets: dict = existing["markets"]
-    incoming_markets: dict = incoming["markets"]
-    kept_existing = 0
-    replaced = 0
-    added = 0
-    for key, entry in incoming_markets.items():
-        current = existing_markets.get(key)
-        if current is None:
-            existing_markets[key] = entry
-            added += 1
-        elif _odds_history_recency(entry) >= _odds_history_recency(current):
-            existing_markets[key] = entry
-            replaced += 1
-        else:
-            kept_existing += 1
-
-    merged_doc = dict(incoming)          # the newer publish owns the metadata ...
-    merged_doc["markets"] = existing_markets
-    merged_doc["updated_at"] = max(      # ... except the clock, which only moves forward
-        str(existing.get("updated_at") or ""), str(incoming.get("updated_at") or "")
-    ) or incoming.get("updated_at")
-    incoming = None
-
-    merged_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.merge"
-    try:
-        # json.dump streams; json.dumps would materialise another ~40MB string.
-        with merged_path.open("w", encoding="utf-8") as out:
-            json.dump(merged_doc, out, separators=(",", ":"))
-        os.replace(merged_path, target_path)
-    except Exception as exc:
-        try:
-            merged_path.unlink(missing_ok=True)
-        except Exception:
-            pass
-        return {"merged": False, "error": f"{type(exc).__name__}: {exc}"}
-    return {"merged": True, "markets": len(existing_markets),
-            "added": added, "replaced_by_newer": replaced,
-            "kept_existing_newer": kept_existing}
+        return {"spawned": False, "error": f"spawn_failed: {type(exc).__name__}: {exc}"}
+    return {"spawned": True, "staged": staging.name}
 
 
 def _merge_published_artifact(relative_path: str, target_path: Path, incoming_path: Path):
@@ -1983,38 +1748,22 @@ def _merge_published_artifact(relative_path: str, target_path: Path, incoming_pa
     ONE dispatcher because there are TWO receive forms, and a family merged by
     one path and replaced by the other would clobber on exactly the transport
     nobody was watching.
+
+    The two families are handled differently for a MEASURED reason:
+
+        book_quotes  (line union)   34 MB in ->  20 MB peak   0.59x  <- inline
+        odds_history (JSON union)   88 MB in -> 276 MB peak   3.13x  <- subprocess
+
+    The line union streams and holds only 16-byte digests, so it is sub-linear
+    and stays here. The JSON union parses both documents and is moved out.
     """
     if not target_path.is_file():
         return None                       # first write is a plain write
     if _is_append_only(relative_path):
-        return _merge_append_only_publish(target_path, incoming_path)
-    if _is_mergeable_odds_history(relative_path):
-        return _merge_odds_history_publish(target_path, incoming_path)
+        return merge_append_only(target_path, incoming_path)
+    if is_mergeable_odds_history(relative_path):
+        return _spawn_odds_history_merge(relative_path, target_path, incoming_path)
     return None
-
-
-def _iter_lines(path: Path):
-    """Yield newline-stripped lines as bytes, skipping blanks. Bounded memory."""
-    try:
-        with path.open("rb") as handle:
-            for raw in handle:
-                line = raw.rstrip(b"\r\n")
-                if line:
-                    yield line
-    except Exception:
-        return
-
-
-def _ends_with_newline(path: Path) -> bool:
-    try:
-        size = path.stat().st_size
-        if size <= 0:
-            return True
-        with path.open("rb") as handle:
-            handle.seek(-1, os.SEEK_END)
-            return handle.read(1) in (b"\n", b"\r")
-    except Exception:
-        return True
 
 
 def _publish_divergence_verdict(relative_path: str, incoming_bytes: int, publisher: str):
@@ -2150,7 +1899,7 @@ def _publish_streamed_body() -> Any:
             )
         publisher = str(request.headers.get("X-Artifact-Publisher") or "").strip()
         will_merge = target_path.is_file() and (
-            _is_append_only(relative_path) or _is_mergeable_odds_history(relative_path)
+            _is_append_only(relative_path) or is_mergeable_odds_history(relative_path)
         )
         refuse, marker = _publish_divergence_verdict(relative_path, written, publisher)
         if marker:
@@ -2181,6 +1930,17 @@ def _publish_streamed_body() -> Any:
             )
         merged = _merge_published_artifact(relative_path, target_path, temp_path)
         if merged is not None:
+            if merged.get("spawned"):
+                # temp_path has been MOVED to staging; the child owns it now and
+                # the target is deliberately untouched. Must not fall through to
+                # the replace below -- that is the clobber.
+                print(f"[ops.publish] ARTIFACT_MERGE_DEFERRED path={relative_path} "
+                      f"publisher={publisher or 'UNKNOWN'} bytes={written} "
+                      f"staged={merged.get('staged')}", flush=True)
+                return jsonify({
+                    "ok": True, "relative_path": relative_path, "bytes": written,
+                    "transport": "stream", "merge": "deferred",
+                }), 200
             if merged.get("merged"):
                 temp_path.unlink(missing_ok=True)
                 print(
@@ -2246,6 +2006,13 @@ def _write_published_artifact(relative_path: str, content: Any) -> Any:
         # that cause it, which is the whole defect.
         merged = _merge_published_artifact(relative_path, target_path, temp_path)
         if merged is not None:
+            if merged.get("spawned"):
+                print(f"[ops.publish] ARTIFACT_MERGE_DEFERRED path={relative_path} "
+                      f"transport=envelope staged={merged.get('staged')}", flush=True)
+                return jsonify({
+                    "ok": True, "relative_path": relative_path,
+                    "merge": "deferred",
+                }), 200
             if merged.get("merged"):
                 temp_path.unlink(missing_ok=True)
                 print(
