@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 698 rules `[generated]`
+## Index — 702 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 229**
+**FORBIDDEN — 232**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -165,6 +165,9 @@
 - [2026-09-02 — FORBIDDEN: arming a periodic job on refresh-worker on the strength of a bo…](#2026-09-02-forbidden-arming-a-periodic-job-on-refresh-worker-on-the-strength-of-a-bound-that-does-not-bound-memory-lane-soccer-anchor-wiring)
 - [2026-09-02 FORBIDDEN: trusting a FILTER, EXCLUSION or ALLOW rule that has never been sh…](#2026-09-02-forbidden-trusting-a-filter-exclusion-or-allow-rule-that-has-never-been-shown-to-match-something-two-inert-rules-in-one-file-both-reading-as-correct-lane-m625-replay-diff-gate)
 - [2026-09-02 FORBIDDEN: reporting a clean result for anything a bounded scan did not reac…](#2026-09-02-forbidden-reporting-a-clean-result-for-anything-a-bounded-scan-did-not-reach-a-cap-on-recording-must-never-become-a-cap-on-traversal-lane-m625-replay-diff-gate)
+- [2026-09-02 FORBIDDEN: sampling a seeded Monte-Carlo estimator at CONSECUTIVE seeds and…](#2026-09-02-forbidden-sampling-a-seeded-monte-carlo-estimator-at-consecutive-seeds-and-calling-the-spread-a-control-overlapping-draws-read-as-sd-00000-which-looks-exactly-like-determinism-lane-soccer-anchor-cost)
+- [2026-09-02 FORBIDDEN: reading an ALLOWLIST-FILTERED inventory as a statement about what…](#2026-09-02-forbidden-reading-an-allowlist-filtered-inventory-as-a-statement-about-what-exists-i-made-the-403-vs-absent-error-inside-the-change-that-fixes-it-lane-m625-export-only-patterns)
+- [2026-09-02 FORBIDDEN: acting on a code comment's account of WHY something is excluded w…](#2026-09-02-forbidden-acting-on-a-code-comments-account-of-why-something-is-excluded-without-checking-the-exclusion-is-real-two-of-four-families-in-a-work-item-were-already-done-lane-m625-export-only-patterns)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -248,7 +251,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 464**
+**Rules and corrections — 465**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -404,6 +407,7 @@
 - [2026-09-02 — REQUIRED: when you correct a number, re-check the CLAIMS AROUND IT. Mine r…](#2026-09-02-required-when-you-correct-a-number-re-check-the-claims-around-it-mine-rode-through-two-corrections-untouched-and-was-wrong-the-whole-time-lane-game-market-entry-roi-curve)
 - [2026-09-02 REQUIRED: a ledger APPEND computed in one tree is not valid in another. Both…](#2026-09-02-required-a-ledger-append-computed-in-one-tree-is-not-valid-in-another-both-the-insertion-point-and-the-base-content-differ-and-neither-difference-announces-itself-lane-maxmun-pregame-read)
 - [2026-09-02 — RULE: a WATCHER carries the assumptions it was armed with, and those expir…](#2026-09-02-rule-a-watcher-carries-the-assumptions-it-was-armed-with-and-those-expire-re-read-the-world-before-acting-on-what-a-watcher-tells-you-lane-soccer-anchor-wiring)
+- [2026-09-02 REQUIRED: when a mechanism is under-reaching, measure whether the CHEAP vers…](#2026-09-02-required-when-a-mechanism-is-under-reaching-measure-whether-the-cheap-version-is-louder-than-the-mechanism-itself-cost-lever-costs-accuracy-is-not-the-finding-cost-lever-exceeds-the-signal-is-lane-soccer-anchor-cost)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

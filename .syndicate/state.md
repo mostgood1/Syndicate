@@ -158,6 +158,43 @@ reading the log.
   auto-merged with no conflict. Re-run `trim_lane_blocks.py --apply` after any
   such merge and check for lanes with two blocks. Rule in `learnings.md`.
 
+## [artifact-allowlist-split] THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT a census of the disk `[verified 2026-09-02 in production, web `e6fa165b`, lane m625-export-only-patterns]`
+
+`is_hot_artifact_relative_path` = WRITE (publish + sweep), unchanged.
+`is_exportable_artifact_relative_path` = READ (export + stream) = hot +
+`EXPORT_ONLY_ARTIFACT_PATTERNS`. Four READ sites in `ops.py` use the wide one;
+the two publish sites keep the narrow one.
+
+- **VERIFIED WITH CONTROLS, one instant:** a `feed_live` `.json.gz` went
+  **403 -> 415** naming `/stream`; `/stream` serves it **200, 111,585 B**,
+  gunzipping to gamePk 822722 Final/Final; a `props_history` CSV went
+  **403 -> 200 count=1**; an UNLISTED path (`render.yaml`) is **still 403**, so
+  the predicate was widened and not disabled. Inventory 33,229 -> 33,567 files.
+- **AN ALLOWLIST-FILTERED INVENTORY IS EVIDENCE ABOUT THE FILTER.**
+  `/api/ops/artifacts/export` — `names_only` and body form alike — globs
+  `HOT_ARTIFACT_PATTERNS` and can only ever report allowlisted paths, so it can
+  NEVER establish that a non-allowlisted family is absent. I read zero
+  `feed_live` from it and published "absent"; there were **146 files /
+  16,721,077 B** on that disk, plus 18 `props_history` / 11,142,087 B, seeded by
+  `bootstrap_data_root` from the git-tracked copies.
+- **`#413` IS NOT ARMED, but the hazard is real and structural.** Every
+  `feed_live` file on web is from **2026-06-14..06-25**, most recent 69 days
+  old; the trap needs a CURRENT-date file. **No allowlist can prevent it** —
+  `_mlb_feed_live_payload` (`home.py:3560`) returns the cached file IF IT EXISTS
+  and only fetches live when it is ABSENT, so the trigger is PRESENCE ON DISK.
+  The family is therefore read-only forever and a test forbids any hot pattern
+  from mentioning it. Making that reader gate on FRESHNESS is the prerequisite
+  for ever publishing it.
+- **`export?path=` CANNOT CARRY BINARY.** It returns a JSON envelope of decoded
+  text; the gzipped family answered HTTP 500 until fixed to 415 naming
+  `/stream`. Use `/stream` for anything not UTF-8.
+- **TWO OF `#625`(2)'s FOUR FAMILIES WERE ALREADY EXPORTABLE.** `eval/batches`
+  (51 files / 199,281,869 B on web) was explicitly allowlisted;
+  `roster_objs` is matched by `snapshots/*/*.json` because **fnmatch `*` crosses
+  `/`**. Production writes rosters directly under `snapshots/<date>/`, so the
+  publisher comment calling them "deliberately NOT allowlisted" is STALE —
+  `todo.md #638`.
+
 ## [replay-diff-gate] A PRODUCTION DAY NOW REPRODUCES OFFLINE, 0 MISMATCHES — and two board blocks provably CANNOT `[verified 2026-09-02, lane m625-replay-diff-gate, commits d8caea14 + 9dad0881, NO DEPLOY]`
 
 `py -3 scripts/replay_diff_gate.py --date 2026-09-01` -> **PASS**, mirror

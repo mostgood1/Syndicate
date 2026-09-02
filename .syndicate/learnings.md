@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 698 rules `[generated]`
+## Index — 702 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4587,3 +4587,62 @@ market, so a better h2h number is arithmetic. And beware the flattering outlier:
 `100x3` scored best on props here (ratio 0.31) while scoring WORSE on shift RMSE
 in the sibling measurement; two measurements disagreeing on n=6 is a reason to
 trust neither, not to pick the one you like.
+
+## 2026-09-02 FORBIDDEN: reading an ALLOWLIST-FILTERED inventory as a statement about what EXISTS. I made the 403-vs-absent error inside the change that fixes it. `[lane m625-export-only-patterns]`
+
+- **What we believed:** `feed_live` and the prop-history CSVs were not on web's
+  disk. The evidence felt solid: a full `names_only=1` inventory of web's
+  artifact tree — 33,229 files, taken that hour — contained zero of either.
+- **What was actually true:** **146 `feed_live` files (16,721,077 B) and 18
+  prop-history CSVs (11,142,087 B) were sitting on web's disk the whole time.**
+  The inventory endpoint globs `HOT_ARTIFACT_PATTERNS` and returns only what
+  matches, so an un-allowlisted family is INVISIBLE to it, not absent. I had
+  used the inventory as a census of the disk when it is a census of *the
+  allowlist's intersection with* the disk. The moment the export-only split
+  deployed, the same call returned 33,567.
+- **How we found out:** the first read after deploying. I had written into the
+  code comment and the commit message that both families were absent and the
+  new patterns were therefore an `#208` allowlist-ahead-of-a-producer. The
+  verification read returned `count=1, 98,935 bytes`. **This file already warns
+  about this twice** — the `locked_cards_retuned` note ("a check that collapses
+  403 onto 404 turns 'I am not permitted to look' into 'it does not exist'") and
+  a `lanes.md` reading that says the same of `market/oddsapi/`. I wrote the
+  third instance while implementing the fix for the first two.
+- **The rule going forward:** **an inventory is evidence about its FILTER as
+  much as about its subject.** Before reading absence out of any listing, state
+  what the listing is filtered by, and ask whether the thing you are looking for
+  could pass that filter. If it could not, the listing says NOTHING about it —
+  and in this repo that specifically means: `/api/ops/artifacts/export` (both
+  `names_only` and body form) can only ever report allowlisted paths, so it can
+  never establish that a non-allowlisted family is absent. Use a channel whose
+  filter does not contain the question — here, deploying the widened predicate
+  and re-reading was the only way.
+- **Cost:** one wrong fact published to a code comment, a commit message and a
+  todo item, corrected within the hour by the verification read. Cheap only
+  because the change was deployed and measured rather than landed and believed.
+
+## 2026-09-02 FORBIDDEN: acting on a code comment's account of WHY something is excluded without checking the exclusion is real. Two of four families in a work item were already done. `[lane m625-export-only-patterns]`
+
+- **What we believed:** `todo.md #625`(2) names four worker-local families
+  needing an export-only allowlist, and `artifact_publisher.py` explains that
+  roster objects are *"deliberately NOT allowlisted — hundreds of large files
+  per date."* Both read as settled scope.
+- **What was actually true:** **half the item was already done.**
+  `eval/batches` was explicitly allowlisted and already on web — 51 files,
+  199,281,869 bytes. `roster_objs` was allowlisted too, by
+  `snapshots/*/*.json`, because **in fnmatch `*` crosses `/`** and the pattern
+  reaches arbitrarily deep. And the comment's premise was stale anyway:
+  production writes rosters DIRECTLY under `snapshots/<date>/`, not into a
+  `roster_objs/` subdirectory, so the "hundreds of large files" it fears are
+  ~16 files of ~85 KB, already being published and mirrored daily.
+- **How we found out:** a test written to assert the four families were NOT
+  publishable failed on two of them, immediately, before anything shipped.
+- **The rule going forward:** **a work item's scope and a comment's rationale
+  are both CLAIMS. Check each against the running system before building for
+  it** — for an allowlist that means evaluating the predicate against a real
+  path, which costs one line. Corollary specific to this repo: `fnmatch`
+  patterns do not stop at `/`, so any `a/*/b` reads much wider than it looks,
+  and a comment describing what a pattern excludes may simply be wrong.
+- **Cost:** none — the tests caught it pre-deploy. It would have been an
+  inert list, silently duplicating two families and claiming to fix a gap that
+  did not exist.

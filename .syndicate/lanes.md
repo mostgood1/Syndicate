@@ -1576,40 +1576,14 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - DOES NOT re-arm `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN` and does not
   deploy. Local only.
 - Blocked by: none
-### m625-export-only-patterns — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
-- Goal: `todo.md #625` build item (2). Split the artifact allowlist in two so a
-  worker-local family can be READ (mirrored) without becoming WRITABLE to web.
-  Today ONE list, `HOT_ARTIFACT_PATTERNS`, gates both directions — its own
-  comment says so ("this allowlist drives publishing as well as reading"), and
-  that conflation is why `roster_objs`, raw `feed_live`, evaluation-ledger
-  chunks and prop-history CSVs are unreadable.
-  Testable outcome: a path in the new EXPORT-ONLY list is accepted by
-  `/api/ops/artifacts/export` and `/stream` (READ) and REFUSED 403 by
-  `/api/ops/artifacts/publish` (WRITE), and the sweep never offers it.
-- Files: `syndicate/features/shared/artifact_publisher.py`,
-  `syndicate/blueprints/ops.py`, `tests/test_export_only_patterns.py` (NEW).
-- Hypothesis: the list is NOT inert, because these families are already ON
-  WEB'S DISK — `SYNDICATE_BOOTSTRAP_ON_START=1` on web and
-  `data/mlb_source/source_artifacts` is a BOOTSTRAP_ROOT, so git-tracked
-  `roster_objs` (689 files), `feed_live` (151) and `eval/batches` (6) are seeded
-  there. The read-side allowlist is the only thing hiding them.
-- Falsification test: PARTLY EXPECTED TO FAIL, and the prediction is made in
-  advance. `props_history` lives under `data/mlb_source/tracking/`, which is NOT
-  a bootstrap root and is not published, so it should be ABSENT on web. After a
-  deploy the three bootstrapped families must return CONTENT and props_history
-  must return `count: 0` (present-but-empty), NOT 403. A 403 anywhere means the
-  predicate is not wired; content for props_history means my model of how web's
-  disk is filled is wrong.
-- Verification: (a) unit tests prove the ASYMMETRY both ways — an export-only
-  path is readable AND refused by publish; (b) after a web deploy, `?path=` on a
-  git-tracked `roster_objs` file returns bytes where it returns 403 today.
-- **`#413` HAZARD, and it is why the split must be READ-ONLY:** raw `feed_live`
-  on web freezes game state — `_mlb_feed_live_payload` returns the cached file
-  if it EXISTS. Adding these patterns to the WRITE side would let the sweep push
-  CURRENT-date feed_live to web and arm that trap for live games. This lane adds
-  them to the READ side only, and a test asserts it.
-- Blocked by: none. **NEEDS A WEB DEPLOY to verify (b)** — the endpoint runs on
-  web. Unlike `#625`(5), this item does contend for the deploy queue.
+### m625-export-only-patterns — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET, DEPLOYED AND VERIFIED (web `8da0eddc` then `e6fa165b`).** The allowlist is two predicates: WRITE (`is_hot_artifact_relative_path`, unchanged, publish + sweep) and READ (`is_exportable_artifact_relative_path`, export + stream). Verified in production with controls at one instant: a `feed_live` `.json.gz` went **403 -> 415 naming `/stream`**, `/stream` serves it **200, 111,585 B, gunzips to gamePk 822722 Final/Final**, a `props_history` CSV went **403 -> 200 count=1**, and an unlisted path is **still 403** — widened, not disabled. Inventory 33,229 -> 33,567 files. **MY HYPOTHESIS WAS RIGHT AND MY FALSIFICATION PREDICTION WAS WRONG IN BOTH DIRECTIONS:** I predicted 3 families present / 1 absent; the truth is 2 were already hot (`eval/batches` 51 files/199 MB; `roster_objs` via `snapshots/*/*.json`, since fnmatch `*` crosses `/`) and the other 2 were PRESENT AND INVISIBLE (`feed_live` 146 files/16.7 MB, `props_history` 18/11.1 MB) — I published "absent" first, on an inventory taken before the split that was blind to them *because* they were unallowlisted. Corrected within the hour. **`#413` NOT ARMED:** all `feed_live` on web is 2026-06-14..06-25, 69+ days old. Follow-ons: `#638` (stale publisher comment), and 15 files mirrored for 2026-06-14 (manifest `47568090177ed76b`, verify 15/15) which unblocks `build_mlb_actuals` as a `#625`(5) target. Commits `8da0eddc`, `e6fa165b`, `d668898a`.
+- Files: released — `syndicate/features/shared/artifact_publisher.py`,
+  `syndicate/blueprints/ops.py`, `tests/test_export_only_patterns.py`,
+  `scripts/mirror_manifest.py`.
+- Claims: NONE held. Web deploy claim acquired, used, and RELEASED.
+- Narrative + evidence: `deploys.md` 2026-09-02 22:07Z/22:14Z,
+  `todo.md #625`(2) + `#638`, `log/2026-09-02.md`.
+
 ### soccer-anchor-audit-artifact — CLOSED 2026-09-02 — opened 2026-09-02 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **GOAL MET, VERIFIED END TO END ON REAL BUILDS (`cddd748c`). `recommendations_{date}.json` now carries an `anchor` block whose `state` takes one of five named values; all three reachable states read back out of the WRITTEN JSON: `odds_absent`; `disabled` with attached=2/2, priced_events=20, by_stage={event_id:0, exact_pair:2, fuzzy:0} (production's actual state); `anchored` with teams_resolved=4, teams_unresolved=0, elapsed_s=126.2. Path confirmed against `HOT_ARTIFACT_PATTERNS`, so unlike the log line this REACHES WEB. 13 tests pass. NOT DEPLOYED — a refresh-worker deploy is owed before any production reading.**
 - Goal: the soccer anchor's audit becomes a FIELD in
   `recommendations_{date}.json`, so its state is readable in production at all.

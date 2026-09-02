@@ -18762,3 +18762,48 @@ service — and an accumulator that starts empty does not lose openings quietly,
 re-dates every one to the migration moment.** Wrong data, permanently, with no
 way back. Letting the 10-day TTL do it costs nothing but time and cannot invent
 anything.
+
+## 2026-09-02 22:07Z + 22:14Z — web `8da0eddc` then `e6fa165b` — `#625`(2), the export-only allowlist split — lane `m625-export-only-patterns`
+
+**Two deploys, both to web, both behind claim + preflight CLEAR. Claim released.**
+Preflight CLEAR on both (only infra processes; no in-flight job). `4577c043`
+(what web was running) confirmed an ANCESTOR of main with nothing unique by
+`git cherry`, so neither deploy could revert it.
+
+**verify:** the READING that proves it worked is a single-instant set of four
+reads against `/api/ops/artifacts/export` and `/stream`, with controls:
+
+| read | before | after |
+|---|---|---|
+| `?path=` a `feed_live` `.json.gz` | 403 not allowlisted | **415** naming `/stream` |
+| `/stream` the same file | 403 | **200, 111,585 B**, gunzips to gamePk 822722, Final/Final |
+| `?path=` a `props_history` CSV | 403 | **200, count=1, 98,935 B** |
+| `?path=` an unlisted path (`render.yaml`) | 403 | **403** — the control: widened, not disabled |
+| `names_only=1` inventory | 33,229 files | **33,567 files**, 8.1s |
+
+**I PUBLISHED A WRONG FACT AND CORRECTED IT IN THE SAME HOUR.** `8da0eddc`'s
+comment and commit message said both export-only families were ABSENT from web,
+so the list was an allowlist-ahead-of-a-producer (`#208`). They were **present
+and invisible**: 146 `feed_live` files / 16,721,077 B and 18 `props_history` /
+11,142,087 B, seeded by `bootstrap_data_root` from the git-tracked copies. My
+evidence was an inventory taken BEFORE the split, which could not see them
+*precisely because they were not allowlisted* — the 403-vs-absent confusion,
+made while writing the fix for it. `e6fa165b` carries the correction.
+
+**`#413` IS NOT ARMED — checked, not hoped.** Every `feed_live` file on web is
+from the git-tracked window **2026-06-14..06-25**, most recent **69 days old**.
+The trap needs a file for a date somebody is watching LIVE, and nothing writes
+current-date `feed_live` to web. It stays a hazard for any future producer,
+which is why the family is read-only and a test forbids it from ever being hot.
+
+**Second defect, found only by reaching the files:** `export?path=` returns a
+JSON envelope of DECODED TEXT, so the gzipped family answered **HTTP 500
+UnicodeDecodeError** — "the server is broken" when the truth is "wrong
+transport". Now 415 naming `stream`. That branch had never been reachable
+before, because the path was refused earlier.
+
+**Follow-on, measured the same session:** 15 `feed_live` files pulled to the
+local mirror for 2026-06-14 (manifest `47568090177ed76b`, `verify` 15/15,
+0 drifted). That unblocks `build_mlb_actuals` as a `#625`(5) replay target —
+`load_final_feed(fetch_if_missing=True)` otherwise falls back to a live
+`statsapi.mlb.com` call.

@@ -1,5 +1,35 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#638` — **THE PUBLISHER'S `roster_objs` COMMENT IS STALE, and the pattern above it is broader than its author thought** — lane `m625-export-only-patterns`, 2026-09-02 — **OPEN, low severity, NOT a live defect**
+
+`artifact_publisher.py` says roster objects are *"deliberately NOT allowlisted --
+hundreds of large files per date, and this allowlist drives publishing as well
+as reading."* Two halves of that are no longer true, measured 2026-09-02:
+
+- **They ARE allowlisted.** `*_source/source_artifacts/data/daily/snapshots/*/*.json`
+  matches them, because in fnmatch `*` **crosses `/`** — the pattern reaches
+  arbitrarily deep, not one level.
+- **The layout it describes is not production's.** Production writes rosters
+  DIRECTLY under `snapshots/<date>/roster_*.json`, not into a `roster_objs/`
+  subdirectory (`ask_the_syndicate_data.py:1290` says so explicitly). A mirror
+  pull fetched **16 of them from web** for 2026-09-01. The `roster_objs/` shape
+  exists only in the git mirror (689 tracked files, June dates) and on laptops.
+
+So the feared cost is not being paid — those files are ~85 KB each, ~16 a day,
+not "hundreds of large files" — and nothing is broken. What is wrong is the
+COMMENT, and it is load-bearing prose: it is the stated reason a family is
+excluded, and `#625`(2) nearly acted on it. **Deliberately not rewritten in
+passing** — the publish path is not this lane's to change, and narrowing that
+glob would be a behaviour change to what web receives.
+
+Fix: correct the comment, and decide separately whether
+`snapshots/*/*.json` should be narrowed to one level. `tests/test_export_only_patterns.py`
+pins the CURRENT behaviour (`test_families_625_calls_worker_local_are_already_exportable`),
+so a narrowing that drops rosters off the mirror fails loudly rather than
+silently.
+
+---
+
 ### `#635` — **FIXED 2026-09-02 (`deploy_claim.py` + `deploy-guard.py`, 10 tests, 5 mutations caught). One hole remains UNEXPLAINED — see the end.** — was: **DEPLOY SERIALISATION IS BROKEN: `web` and `syndicate` are TWO LOCKS FOR ONE SERVICE, and two lanes held them at once** — lane `game-market-entry-roi-curve`, 2026-09-02 — **OPEN, and it has already cost a cancelled build**
 
 **MEASURED, not theorised — it happened at 05:03Z on 2026-09-02.** Lane
@@ -1070,11 +1100,42 @@ the 163MB tape and the gate fails on exactly 8 fields.
 - **(3) was already DONE** by lane `m625-env-snapshots` (`66b66895`,
   `scripts/snapshot_render_env.py`) — that commit is on its session branch and
   **is not on `origin/main`**, so the file does not exist in the primary tree.
-- **(2) NOT DONE, and the survey confirms the gap is real:** `/api/ops/artifacts/export`
-  iterates the SAME `HOT_ARTIFACT_PATTERNS` that gates web-publish
-  (`ops.py:2215`), so today there is no way to make a worker-local family
-  exportable without also making it web-servable — exactly the `#413` collision.
-  Not taken because `artifact_publisher.py` was claimed by another lane.
+- **(2) DONE 2026-09-02 — DEPLOYED AND VERIFIED (web `e6fa165b`), lane
+  `m625-export-only-patterns`.** The allowlist is two predicates now:
+  `is_hot_artifact_relative_path` (WRITE — publish + sweep, unchanged) and
+  `is_exportable_artifact_relative_path` (READ — export + stream, hot plus
+  export-only), wired into the four READ sites in `ops.py` with the two publish
+  sites left narrow. Tests assert the asymmetry THROUGH THE REAL ROUTES both
+  ways, plus a regression test that no hot pattern may ever mention `feed_live`.
+  - **TWO OF THE FOUR FAMILIES `#625` NAMES WERE ALREADY EXPORTABLE**, checked
+    against the live inventory rather than accepted. `eval/batches` was already
+    allowlisted and already on web (**51 files / 199,281,869 B**). `roster_objs`
+    was already matched by `snapshots/*/*.json` because fnmatch `*` crosses `/`
+    — and production writes rosters DIRECTLY under `snapshots/<date>/`, not into
+    a `roster_objs/` subdirectory, so **the publisher comment calling them
+    "deliberately NOT allowlisted" is STALE**. Left for its owner; carried as
+    `#638`.
+  - **THE OTHER TWO WERE PRESENT AND INVISIBLE, AND I PUBLISHED THE OPPOSITE
+    FIRST.** `8da0eddc` claimed both were absent (an `#208` allowlist-ahead-of-
+    a-producer). Measured after deploying: **`feed_live` 146 files /
+    16,721,077 B** and **`props_history` 18 files / 11,142,087 B**, seeded by
+    `bootstrap_data_root`. My evidence was an inventory taken BEFORE the split,
+    blind to them *because* they were not allowlisted — the 403-vs-absent
+    confusion, made while fixing it. Corrected in `e6fa165b`.
+  - **`#413` IS NOT ARMED:** every `feed_live` file on web is from
+    2026-06-14..06-25, most recent 69 days old. The trap needs a CURRENT-date
+    file. It stays a hazard for any future producer — hence read-only forever,
+    and `_mlb_feed_live_payload` gating on PRESENCE rather than freshness
+    (`home.py:3560`) is the prerequisite for ever mirroring it safely.
+  - **A second defect, reachable only once the files were:** `export?path=`
+    returns a JSON envelope of DECODED TEXT and answered **HTTP 500** on the
+    gzipped family. Now **415** naming `/api/ops/artifacts/stream`, which serves
+    it (111,585 B, gunzips to gamePk 822722, Final/Final).
+  - **It closes the loop into (5):** 15 `feed_live` files mirrored for
+    2026-06-14 (manifest `47568090177ed76b`, `verify` 15/15, 0 drifted). That
+    makes `build_mlb_actuals` replayable — `load_final_feed(fetch_if_missing=True)`
+    otherwise falls back to a live `statsapi.mlb.com` call
+    (`box_score_stats.py:132-141`) and its only caller never passes False.
 - **(4) NOT STARTED.** (6) NOT STARTED.
 
 **FOUR FINDINGS THAT CONSTRAIN ANY FUTURE REPLAY TARGET — each measured, none
