@@ -2664,7 +2664,7 @@ on that slate is permanently ungradeable and the bound is hiding it — check
 `SETTLED ... ungraded={}` for that date before widening anything.
 
 
-### `#593` — **NCAAF bets could never be graded, and an NFL-shaped fix would have graded them against the WRONG GAME.** — lane `ncaaf-settlement-resolver`, 2026-08-28 — **SHIPPED (`234c9e81`); PRODUCTION VERIFICATION IS FUTURE-DATED**
+### `#593` — **NCAAF bets could never be graded, and an NFL-shaped fix would have graded them against the WRONG GAME.** — lane `ncaaf-settlement-resolver`, 2026-08-28 — **SHIPPED (`234c9e81`); CLOSED 2026-09-01 AS UNVERIFIABLE, NOT AS DONE `[user decision]`**
 
 `paper_settlement._default_resolver` had no `ncaaf` builder. Unlike `#592`, the
 counter never showed it: NCAAF orders have not reached the ledger, though NCAAF
@@ -2696,9 +2696,31 @@ tests fail — the dispatch test and `#592`'s traded-sports tripwire, correctly
 detecting `ncaaf` back in the missing set. Its first real catch.
 
 **OWED, and it is not a formality.** The JOIN is verified against real ESPN
-names; the GRADING is not — no NCAAF game has finished this season (08-22/08-23
+names; the GRADING is not — no NCAAF game had finished at build time (08-22/08-23
 return 0 games; 08-29 returns 8 with 0 finals), so grading is unit-tested on
 synthetic scores only. The reading needs a finished game AND a real NCAAF order.
+
+**RESOLVED 2026-09-01 — CLOSED AS UNVERIFIABLE, NOT AS DONE `[user decision]`.**
+That reading can never be taken, and the reason is not a defect. **NCAAF places
+ZERO orders** — `/api/portfolio/paper` `by_sport` over 2026-08-26..09-01 returns
+`ncaaf 0 settled / 0 orders` on all seven dates, and **0** ncaaf rows in
+`orphan_orders`, while NCAAF is simultaneously on the board at 373 rows.
+**TWO GATES HOLD, BOTH BY DESIGN:** `football/pick_gate.py` denies the NCAAF
+model claim on a **17-sigma out-of-sample loss**, and `portfolio_commit.py:267`
+refuses all **480 served rows** for `no_model_edge_pct` — 0 of 480 carry a model
+edge, every row is `market_fair` basis. NCAAF is **373 rows, 0 covered, 0.0%, in
+every market**.
+
+So the code SHIPPED and whether it WORKS has never been observed. **A zero
+counter here is still not evidence** — it now reads zero for a SECOND,
+independent reason (no input at all), which is exactly the ambiguity `#592`'s
+traded-sports tripwire exists to prevent. This is blocked on a **PRODUCT
+DECISION** — a model that beats the close, or an explicit choice to size on
+market basis — not on any lane's work. Re-entry is `#627`'s **LIFT_CONDITION**
+tripwire, which fires on that decision. The date-based scheduled task
+`verify-ncaaf-settlement-593` was **DISABLED 2026-09-02**: with both gates
+holding it was guaranteed to report PENDING forever, and a recurring PENDING
+report is not a verification.
 
 ---
 
