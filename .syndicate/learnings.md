@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 702 rules `[generated]`
+## Index — 705 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4704,3 +4704,58 @@ trust neither, not to pick the one you like.
 - **How we found out:** `git log --oneline origin/main..HEAD` after the rebase — the subject was visibly the wrong text. Nothing errored.
 - **The rule going forward:** after ANY cherry-pick, rebase or squash of a commit whose subject starts with `#`, read `git log --oneline` and confirm the subject survived. To keep it: `git -c core.commentChar=';' rebase ...`, or rebuild with `git commit-tree -p <parent> -F <msgfile>` (verbatim, no cleanup) and `git update-ref`. `git commit --amend -C <sha>` does NOT fix it — it re-runs the same cleanup.
 - **Cost:** two mangled subjects in a landing sequence; both rebuilt before the push, with the trees verified byte-identical so only the messages changed.
+## 2026-09-02 FORBIDDEN: installing a guard in `sitecustomize.py` that RAISES. CPython swallows it, prints a warning, and the process runs on — my guard announced its refusal and permitted the thing it refused. `[lane m625-fleet-runner]`
+
+- **What we believed:** a `sitecustomize.py` that raises during interpreter
+  startup stops the process. It is the standard hook for injecting a policy
+  before any application code, and raising from it looked like the strongest
+  possible refusal.
+- **What was actually true:** `site.execsitecustomize` wraps the import in
+  `try/except Exception`, writes `Error in sitecustomize; set PYTHONVERBOSE for
+  traceback:` to stderr, and **returns normally**. Verified with a one-line
+  probe — a `sitecustomize.py` containing only `raise RuntimeError("GUARD
+  REFUSED")` printed that warning and then the program's own output, exiting
+  **rc=0**. The guard was protecting a fleet whose production env carries
+  `SYNDICATE_EXECUTION_MODE=live`, `LIVE_ARMED=1` and real venue private keys,
+  so "prints an error and continues" was the difference between a refusal and a
+  trade.
+- **How we found out:** a NEGATIVE CONTROL in the tool's own `doctor` — re-arm
+  money in a copy of the env, run the interpreter, and require it to fail. It
+  reported `REFUSES a money-armed env: NO (rc=0)` while every positive check
+  said the guard was engaged and money was off. Nothing else would have shown
+  it: the receipt was written, the reasons were printed, the run looked healthy.
+- **The rule going forward:** **a refusal that another frame can catch is not a
+  refusal.** In `sitecustomize`, and anywhere a host frame wraps your code in a
+  broad `except`, terminate with `os._exit(code)` after writing the reason to
+  stderr — it skips atexit handlers and cannot be caught. And more generally:
+  for any guard, write the control that ARMS the condition and requires the
+  refusal. A guard verified only by watching it pass is a guard whose refusal
+  path has never executed.
+- **Cost:** none — the control ran before any role was started. Without it the
+  fleet would have looked correct in every visible respect while offering no
+  protection at all, on a machine holding live trading credentials.
+
+## 2026-09-02 REQUIRED: derive a local run's config from a SNAPSHOT of production's, not by hand — the roles ARE their env, and they differ on 137 of 194 keys. `[lane m625-fleet-runner]`
+
+- **What we believed:** running the three services locally mainly needs the
+  right start commands, plus a handful of local overrides.
+- **What was actually true:** the three roles are the SAME code, and the env is
+  the entire difference — measured across the live services, **137 of 194 keys
+  differ**, and the differences are the product: `SYNDICATE_REFRESH_LANE`,
+  `SYNDICATE_WEB_DYNO`, `SYNDICATE_MLB_REFRESH_TICK_OWNER`,
+  `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP`, and two dozen `*_ENABLE_*_AUTORUN`
+  flags that decide whether a job runs at all. A hand-written local config
+  reproduces a machine nobody runs, which is precisely the failure `#625` exists
+  to end — and it is the same shape as `#626`(h), where one absent key meant a
+  shipped, tested feature had never executed.
+- **How we found out:** starting from a real snapshot and CHANGING AS LITTLE AS
+  POSSIBLE, then counting: 103 / 77 / 37 production keys pass through per role,
+  against 13-15 forced and 1 dropped.
+- **The rule going forward:** **for any local reproduction of a deployed
+  service, start from a snapshot of the deployed env and justify every
+  deviation.** State the forced set and the dropped set in the tool's output, so
+  a reader can see how far the local run is from production without reading the
+  code. Corollary found the same way: a secret-withholding snapshot is also the
+  best credential scrub available, because a value that was never written cannot
+  leak through a deny-list somebody forgot to extend.
+- **Cost:** none directly, but it is what makes a local reading worth anything.

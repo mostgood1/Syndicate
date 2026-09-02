@@ -179,6 +179,42 @@ reading the log.
   auto-merged with no conflict. Re-run `trim_lane_blocks.py --apply` after any
   such merge and check for lanes with two blocks. Rule in `learnings.md`.
 
+## [local-fleet-runner] THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, lane m625-fleet-runner, commit 92020995, NO DEPLOY]`
+
+`py -3 scripts/fleet_local.py doctor` -> READY.
+`... up --bounded --duration-seconds 120` ran all three: web **156.7 MB** of its
+2048 MB cap and still serving, refresh-worker **exit 0, 408.9 MB** of 4096,
+live-odds-worker **exit 0, 620.2 MB** of 2048. Production run-modes preserved —
+**103 / 77 / 37 production keys passed through** per role.
+
+- **RUNNING THE PRODUCTION ENV LOCALLY SPENDS MONEY.** live-odds-worker runs
+  `SYNDICATE_EXECUTION_MODE=live`, `SYNDICATE_EXECUTION_LIVE_ARMED=1`,
+  `SYNDICATE_EXECUTION_ENABLED=1`, `SYNDICATE_EXECUTION_VENUE=kalshi,polymarket`
+  with a real `KALSHI_PRIVATE_KEY` and `POLYMARKET_US_PRIVATE_KEY` — both also on
+  refresh-worker. **Measured, not argued: one bounded 120-second pass made 1,176
+  outbound attempts, all denied, including 27 each to `trading-api.kalshi.com`,
+  `external-api.kalshi.com` and `api.elections.kalshi.com`**, plus
+  `statsapi.mlb.com`, `site.api.espn.com` and `api.weather.gov`.
+- **FOUR INDEPENDENT DEFENCES**, the first three asserted BY THE CHILD (a
+  parent-side scrub can be mis-edited): mode != `live`, the arm switch, no venue
+  credentials — and structurally, `snapshot_render_env.py` withholds secret
+  VALUES, so 49/50/35 keys per service were never in the snapshot to leak.
+- **A `sitecustomize` THAT RAISES DOES NOT STOP THE INTERPRETER.** CPython's
+  `site.execsitecustomize` catches it, prints `Error in sitecustomize; set
+  PYTHONVERBOSE for traceback:` and CARRIES ON — verified with a one-line probe,
+  **rc=0**. Any guard installed that way must `os._exit`, or it announces a
+  refusal and permits the thing it refused.
+- **BOTH WORKERS REFUSE A FILE STATE BACKEND** while
+  `SYNDICATE_REQUIRE_HOSTED_STORAGE` is truthy (`refresh_state_store.py:316`),
+  and production sets it `true` on all three services. Clearing `RENDER` alone
+  is not enough — the predicate is an OR of the two.
+- **GUNICORN CANNOT RUN ON WINDOWS** (`import fcntl`), though
+  `shutil.which("gunicorn")` finds the pip shim. Local web runs the Flask dev
+  server and says so; do not read performance or concurrency from it.
+- **Memory caps are a WATCHDOG, not a container limit.** RSS sampling: a process
+  can exceed the cap between samples and a sudden allocation outruns the
+  sampler. Useful for the slow ratchet, NOT evidence about Render's ceiling.
+
 ## [artifact-allowlist-split] THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT a census of the disk `[verified 2026-09-02 in production, web `e6fa165b`, lane m625-export-only-patterns]`
 
 `is_hot_artifact_relative_path` = WRITE (publish + sweep), unchanged.

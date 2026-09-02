@@ -1458,7 +1458,40 @@ the 163MB tape and the gate fails on exactly 8 fields.
     makes `build_mlb_actuals` replayable — `load_final_feed(fetch_if_missing=True)`
     otherwise falls back to a live `statsapi.mlb.com` call
     (`box_score_stats.py:132-141`) and its only caller never passes False.
-- **(4) NOT STARTED.** (6) NOT STARTED.
+- **(4) DONE 2026-09-02 — lane `m625-fleet-runner`, commit `92020995`. NO DEPLOY
+  (local-only tooling).** `scripts/fleet_local.py` + `scripts/_fleet_guard.py`.
+  `doctor` -> READY; `up --bounded --duration-seconds 120` ran all three roles:
+  web **156.7 MB** of its 2048 cap and still serving, refresh-worker **exit 0,
+  408.9 MB** of 4096, live-odds-worker **exit 0, 620.2 MB** of 2048. Production
+  run-modes preserved — **103 / 77 / 37 production keys passed through** per
+  role, because the roles ARE their env (the live services differ on **137 of
+  194 keys**).
+  - **THE GUARD IS THE DELIVERABLE, and the need is measured not argued.** One
+    bounded 120s pass made **1,176 outbound attempts, all denied and recorded**,
+    including **27 each to `trading-api.kalshi.com`, `external-api.kalshi.com`
+    and `api.elections.kalshi.com`** — with `SYNDICATE_EXECUTION_MODE=live`,
+    `LIVE_ARMED=1` and real venue private keys sitting in the production env
+    those roles run. Four independent defences: mode != `live`, the arm switch,
+    no venue credentials, and — structurally — `snapshot_render_env.py`
+    withholding secret VALUES, so 49/50/35 keys per service were never in the
+    file to leak. The CHILD asserts the first three itself; a parent-side scrub
+    is a thing that can be mis-edited.
+  - **FOUR DEFECTS CAUGHT BY CONTROLS, NOT REVIEW.** (a) **A `sitecustomize`
+    that RAISES does not stop the interpreter** — CPython prints `Error in
+    sitecustomize; ...` and carries on **rc=0**, so the first guard announced
+    its refusal and let the money-armed process run; it now `os._exit(70)`s, and
+    `doctor`'s negative control found it before any role started. (b)
+    `shutil.which("gunicorn")` succeeds on Windows and gunicorn dies on `import
+    fcntl` — presence is not reachability, in the harness for that. (c) **Both
+    workers REFUSE a file state backend** while `SYNDICATE_REQUIRE_HOSTED_STORAGE`
+    is truthy, which production sets on all three; clearing `RENDER` alone is not
+    enough, the predicate is an OR. (d) The run reported `ok=True` while all
+    three roles had exited 1, because the criterion was "a guard receipt exists"
+    and a receipt is written before the role does any work.
+  - **Memory caps are a WATCHDOG, not a container limit**, and are labelled so
+    everywhere: RSS sampling means a process can exceed the cap between samples.
+    Useful for the slow ratchet; NOT evidence about Render's ceiling.
+- **(6) NOT STARTED** — the `model_engine_standard.md` §3b substrate-label edit.
 
 **FOUR FINDINGS THAT CONSTRAIN ANY FUTURE REPLAY TARGET — each measured, none
 of them guesses:**
