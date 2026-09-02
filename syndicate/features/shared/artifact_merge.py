@@ -174,7 +174,7 @@ def odds_history_recency(entry) -> str:
     return ""
 
 
-def odds_history_merge_lock(root: Path | None = None):
+def odds_history_merge_lock(root: Path | None = None, *, wait_seconds: float = 0.0):
     """Service-wide single-merge admission, or None if it is held.
 
     ONE lock for the whole service, NOT one per directory.
@@ -186,22 +186,34 @@ def odds_history_merge_lock(root: Path | None = None):
     """
     base = root if root is not None else data_root()
     lock_path = Path(base) / ".odds_history_merge.lock"
-    try:
-        if lock_path.is_file():
-            age = time.time() - lock_path.stat().st_mtime
-            if age > ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS:
-                lock_path.unlink(missing_ok=True)
-        handle = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.close(handle)
-        return lock_path
-    except FileExistsError:
-        return None
-    except Exception:
-        return None
+    deadline = time.time() + max(0.0, wait_seconds)
+    while True:
+        try:
+            if lock_path.is_file():
+                age = time.time() - lock_path.stat().st_mtime
+                if age > ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS:
+                    lock_path.unlink(missing_ok=True)
+            handle = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(handle)
+            return lock_path
+        except FileExistsError:
+            # WAITING IS THE POINT when the caller is the detached child: nothing
+            # is blocked on it. Measured in production 2026-09-02, TWELVE
+            # odds_history publishes landed inside 2 SECONDS (each shard plus its
+            # artifacts twin, several match dates at once). A non-blocking lock
+            # admitted one and DROPPED eleven -- self-healing on the next cycle,
+            # but a 1-in-12 hit rate is a bottleneck, not a guard. On the request
+            # path waiting was not an option; here it is the correct behaviour.
+            if time.time() >= deadline:
+                return None
+            time.sleep(0.25)
+        except Exception:
+            return None
 
 
 def merge_odds_history(target_path: Path, incoming_path: Path,
-                       *, root: Path | None = None) -> dict:
+                       *, root: Path | None = None,
+                       lock_wait_seconds: float = 0.0) -> dict:
     """UNION two `odds_history` documents by market key.
 
     Shape, read from the live shard rather than assumed (2,745 markets):
@@ -230,7 +242,7 @@ def merge_odds_history(target_path: Path, incoming_path: Path,
         return {"merged": False,
                 "error": f"over_size_cap: {combined} > {ODDS_HISTORY_MERGE_MAX_INPUT_BYTES}"}
 
-    lock_path = odds_history_merge_lock(root)
+    lock_path = odds_history_merge_lock(root, wait_seconds=lock_wait_seconds)
     if lock_path is None:
         return {"merged": False, "error": "merge_busy: another worker holds the merge lock"}
     try:
@@ -243,11 +255,21 @@ def merge_odds_history(target_path: Path, incoming_path: Path,
 
 
 def _merge_odds_history_locked(target_path: Path, incoming_path: Path) -> dict:
+    # PARSED SEPARATELY so the caller can tell WHICH side failed, and that
+    # distinction decides whether the staged copy may be promoted. A refusal
+    # normally falls back to the plain replace -- but promoting an UNPARSEABLE
+    # incoming would overwrite a good artifact with garbage, so that one case
+    # must be distinguishable. One combined try/except could not tell them apart.
     try:
         existing = json.loads(target_path.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return {"merged": False,
+                "error": f"target_unparseable: {type(exc).__name__}: {exc}"}
+    try:
         incoming = json.loads(incoming_path.read_text(encoding="utf-8-sig"))
     except Exception as exc:
-        return {"merged": False, "error": f"parse_failed: {type(exc).__name__}: {exc}"}
+        return {"merged": False, "do_not_promote": True,
+                "error": f"incoming_unparseable: {type(exc).__name__}: {exc}"}
 
     # SHAPE GATE. An unrecognised document is REPLACED, not merged -- guessing a
     # shape is how a merge corrupts something it was never meant to touch.

@@ -402,12 +402,26 @@ class OddsHistoryMergeTests(unittest.TestCase):
             self.assertFalse(result["merged"], bad)
             self.assertIn("shape_gate", result["error"])
 
-    def test_unparseable_input_falls_back_rather_than_raising(self) -> None:
+    def test_an_unparseable_TARGET_is_reported_and_may_be_replaced(self) -> None:
+        """The target is the corrupt side, so the incoming is the good copy and
+        promoting it is the right outcome -- no `do_not_promote`."""
         self.target.write_text("{not json", encoding="utf-8")
         self.incoming.write_text(json.dumps(_doc({}, EARLY)), encoding="utf-8")
         result = am.merge_odds_history(self.target, self.incoming)
         self.assertFalse(result["merged"])
-        self.assertIn("parse_failed", result["error"])
+        self.assertIn("target_unparseable", result["error"])
+        self.assertFalse(result.get("do_not_promote"))
+
+    def test_an_unparseable_INCOMING_is_flagged_do_not_promote(self) -> None:
+        """The distinction that keeps a bad publish from overwriting a good
+        artifact. One combined try/except could not tell the two sides apart."""
+        self.target.write_text(json.dumps(_doc({"k": _entry(EARLY, 1.0, 1.0)}, EARLY)),
+                               encoding="utf-8")
+        self.incoming.write_text("{not json", encoding="utf-8")
+        result = am.merge_odds_history(self.target, self.incoming)
+        self.assertFalse(result["merged"])
+        self.assertIn("incoming_unparseable", result["error"])
+        self.assertTrue(result["do_not_promote"])
 
     def test_the_size_cap_refuses_rather_than_risking_the_receiver(self) -> None:
         """Measured 2.5x parse cost on the real 39.6MB shard (97MB resident).
@@ -759,8 +773,52 @@ class DeferredOddsHistoryMergeTests(unittest.TestCase):
                          "the union must survive — this is the whole point")
         self.assertFalse(staged.exists(), "the child owns deleting its staging file")
 
-    def test_the_child_cleans_up_even_when_it_refuses(self) -> None:
-        """A staging file left behind is disk nothing will reclaim."""
+    def test_a_refused_child_PROMOTES_the_staged_copy_rather_than_dropping_it(self) -> None:
+        """Measured in production: TWELVE odds_history publishes landed inside 2
+        SECONDS, and a non-blocking lock admitted one. The first version of the
+        child unlinked its staging file unconditionally, so every `merge_busy`
+        was SILENT DATA LOSS. A refusal must fall back to the plain replace."""
+        import subprocess as sp
+        import sys as _sys
+        staged = self.target.parent / "busy.json"
+        staged.write_text(json.dumps(_doc({"theirs": _entry(LATE, 2.0, 1.0)}, LATE)),
+                          encoding="utf-8")
+        held = am.odds_history_merge_lock(self.root)          # force merge_busy
+        script = Path(ops.__file__).resolve().parents[2] / "scripts" / "merge_odds_history_artifact.py"
+        try:
+            proc = sp.run([_sys.executable, str(script), "--target", str(self.target),
+                           "--incoming", str(staged), "--lock-wait-seconds", "0"],
+                          capture_output=True, text=True, timeout=120,
+                          env={**os.environ, "SYNDICATE_DATA_ROOT": str(self.root)})
+        finally:
+            held.unlink()
+        self.assertIn("merge_busy", proc.stdout)
+        self.assertFalse(staged.exists(), "staging must not be left behind")
+        stored = json.loads(self.target.read_text(encoding="utf-8"))
+        self.assertEqual(sorted(stored["markets"]), ["theirs"],
+                         "the publish must LAND, not be discarded")
+
+    def test_the_lock_can_wait_instead_of_giving_up(self) -> None:
+        """On the request path a non-blocking lock was the only option. In the
+        detached child nothing is waiting, so waiting is correct."""
+        import threading
+        held = am.odds_history_merge_lock(self.root)
+        threading.Timer(0.4, held.unlink).start()
+        got = am.odds_history_merge_lock(self.root, wait_seconds=5.0)
+        self.assertIsNotNone(got, "it must WAIT for a lock that is about to free")
+        got.unlink()
+
+    def test_zero_wait_still_gives_up_immediately(self) -> None:
+        held = am.odds_history_merge_lock(self.root)
+        try:
+            self.assertIsNone(am.odds_history_merge_lock(self.root, wait_seconds=0.0))
+        finally:
+            held.unlink()
+
+    def test_an_UNPARSEABLE_staged_copy_is_dropped_not_promoted(self) -> None:
+        """The one refusal that must NOT fall back to the plain replace.
+        Promoting garbage would overwrite a good artifact; dropping the publish
+        is safe because the publisher re-sends its whole file next cycle."""
         import subprocess as sp
         import sys as _sys
         staged = self.target.parent / "bad.json"
@@ -771,7 +829,11 @@ class DeferredOddsHistoryMergeTests(unittest.TestCase):
                       capture_output=True, text=True, timeout=120,
                       env={**os.environ, "SYNDICATE_DATA_ROOT": str(self.root)})
         self.assertEqual(proc.returncode, 1, "a refusal is a non-zero exit")
+        self.assertIn("incoming_unparseable", proc.stdout)
         self.assertFalse(staged.exists(), "staging must be removed on refusal too")
+        stored = json.loads(self.target.read_text(encoding="utf-8"))
+        self.assertEqual(sorted(stored["markets"]), ["mine"],
+                         "the good target must survive an unparseable publish")
 
 
 if __name__ == "__main__":

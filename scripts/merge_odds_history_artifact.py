@@ -41,6 +41,7 @@ def main() -> int:
     ap.add_argument("--target", required=True)
     ap.add_argument("--incoming", required=True)
     ap.add_argument("--relative-path", default="")
+    ap.add_argument("--lock-wait-seconds", type=float, default=180.0)
     args = ap.parse_args()
 
     target = Path(args.target)
@@ -58,14 +59,34 @@ def main() -> int:
         elif not incoming.is_file():
             result = {"merged": False, "error": "staging_absent"}
         else:
-            result = merge_odds_history(target, incoming)
+            result = merge_odds_history(target, incoming,
+                                        lock_wait_seconds=args.lock_wait_seconds)
     except Exception as exc:  # never let a crash strand the staging file
         result = {"merged": False, "error": f"{type(exc).__name__}: {exc}"}
     finally:
+        # A REFUSAL IS NOT A REASON TO DISCARD THE PUBLISH. If the merge could
+        # not run, PROMOTE the staged copy -- that is the plain replace, i.e.
+        # the pre-merge behaviour -- rather than dropping the data on the floor.
+        # The first version unlinked unconditionally, which turned every
+        # `merge_busy` into silent data loss.
         try:
-            incoming.unlink(missing_ok=True)
+            if incoming.is_file():
+                if result.get("merged") or result.get("do_not_promote"):
+                    # merged -> staging is spent.
+                    # do_not_promote -> the staged copy is NOT VALID JSON, and
+                    # promoting it would replace a good artifact with garbage.
+                    # Dropping this publish is correct: the publisher sends its
+                    # whole file again next cycle.
+                    incoming.unlink(missing_ok=True)
+                else:
+                    incoming.replace(target)
+                    result = dict(result)
+                    result["promoted_staged_copy"] = True
         except Exception:
-            pass
+            try:
+                incoming.unlink(missing_ok=True)
+            except Exception:
+                pass
 
     payload = dict(result)
     if args.relative_path:

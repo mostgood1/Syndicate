@@ -1728,7 +1728,10 @@ def _spawn_odds_history_merge(relative_path: str, target_path: Path, incoming_pa
         subprocess.Popen(
             [sys.executable, str(script), "--target", str(target_path),
              "--incoming", str(staging), "--relative-path", relative_path],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            # INHERIT stdout/stderr so the child's ODDS_HISTORY_MERGE line reaches
+            # Render's log collector. The parent does not wait, so that line IS
+            # the only record the merge ever happened -- DEVNULL here (the first
+            # version) made the whole deferred path unobservable.
             close_fds=True,
         )
     except Exception as exc:
