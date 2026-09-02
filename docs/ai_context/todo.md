@@ -885,8 +885,14 @@ absorbs that track's intent; `#440`'s Phase-7 CRPS scorer is consumed by
 > conflating them.** Two findings that only appear once they are separated:
 >
 > **(h) IS LANDED BUT INERT — it has never run once.**
-> `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN` is **ABSENT from
-> refresh-worker's 100 env keys**, and the autorun is default-OFF by design
+> `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN` was **ABSENT** — confirmed by
+> `render_env_set.py` reporting `before None`, a DIRECT single-key read, which is
+> the authoritative instrument. **An earlier version of this line said "absent
+> from refresh-worker's 100 env keys"; that was a truncated page, not a total.**
+> `?limit=100` is the PAGE SIZE and the service has **153** keys, so 53 were
+> invisible to that read — CLAUDE.md says to paginate here and I did not. The
+> conclusion held, the evidence cited for it did not.
+> The autorun is default-OFF by design
 > (`run_refresh_worker.py:2130`). So the evaluation loop that `#626` exists to
 > restore has produced nothing, and its verification — "a published accuracy
 > artifact with a fresh `generated_at` daily" — is unsatisfiable until the key
