@@ -1,5 +1,24 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
+
+Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
+the soccer overview cost, 452.97 → 80.50s) was MET and verified. **This is the
+DIFFERENT defect that lane found and deliberately did not build**, and it had no
+`todo.md` id, so it existed only as `state.md` prose — one close away from being
+orphaned.
+
+**The defect, as that lane measured it:** served 18:13:02Z carried
+`computed_at 2026-08-28T23:03:31Z` — **19.2 hours stale**. `2026-08-30` had ONLY
+soccer fixtures, and `_supported_intelligence_dates()` covers five DAILY sports,
+so a soccer-only date never becomes eligible to build and its **42 real Serie A
+rows age on the board forever**.
+
+**NEXT ACTION, and it is a precondition not a step:** verify
+`SLOW_REFRESH_SECONDS` actually BINDS before widening the build window —
+**widening without it halves today's refresh rate.** Scoped in `state.md
+[week-scoped-board-window]`.
+
 ### `#630` — **PUBLISHED ARTIFACTS WERE SILENTLY LOSING ROWS: two services each published a WHOLE-FILE REPLACE of the same path** — lane `book-quotes-publish-clobber`, 2026-09-01 — **FIXED AND LIVE (`e78aee52`, `bfaa5ecc`, `cf569731`, `8db62f85`, `f027fda6`); three follow-ups OPEN below**
 
 **The defect.** `odds_book_quotes.append_book_quotes` appends LOCALLY with

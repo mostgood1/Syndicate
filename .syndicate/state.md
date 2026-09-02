@@ -510,6 +510,24 @@ comparison is UNCHANGED by that capture and the 0-of-103 reading still stands:
 `quote.book_prices` is what the board reads, and changing it is step 3, gated on
 step 2.
 
+## [mlb-live-edge-forbidden] TWO STANDING CONSTRAINTS ON ANY MLB LIVE-EDGE WORK — lifted out of lane `live-prob-producer-reader-gap` when it closed `[2026-09-01]`
+
+**Recorded here because the lane that held them is CLOSED and a constraint that
+dies with its block is not a constraint.** Both are to be surfaced BEFORE any
+live-edge work, not discovered during it.
+
+1. **A live-edge attempt was SHIPPED AND BACKED OUT.** It priced
+   `modelProbOver`, **bit-identical to the PREGAME probability on 24 of 28
+   rows**; three props whose over had ALREADY WON still read 0.659 / 0.655 /
+   0.745, producing +36.5% / +32.3% / +15.8%. Mean |edge| on decided rows
+   **28.2% vs 12.0%** on undecided — **fabricated numbers twice the size of real
+   ones, sorting straight to the top of an edge-ranked board.** Treat as a
+   standing decision.
+2. **The live model TRAILS the market**, measured by `live-game-line-projection`
+   (CLOSED) on **8 of 9 scored dates**. **A live edge computed against a model
+   that trails the market is a false edge.** Even a clean keying fix does not by
+   itself make live opportunities safe to place.
+
 ## [mlb-exchange-shopping-value] EXCHANGE PRICE-SHOPPING IS WORTH `+0.74 ROI POINTS` ON GAME MARKETS AND `+2.43%` ON THE PROP GATE BOOK — both re-derived, both smaller than first published `[verified 2026-09-01, lane game-market-entry-roi-curve]`
 
 **GAME MARKETS.** n=621 settled MLB game-market paper orders, 2026-08-22..08-31.
