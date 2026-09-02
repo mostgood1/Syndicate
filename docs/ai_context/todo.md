@@ -1,5 +1,82 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#630` — **PUBLISHED ARTIFACTS WERE SILENTLY LOSING ROWS: two services each published a WHOLE-FILE REPLACE of the same path** — lane `book-quotes-publish-clobber`, 2026-09-01 — **FIXED AND LIVE (`e78aee52`, `bfaa5ecc`, `cf569731`, `8db62f85`, `f027fda6`); three follow-ups OPEN below**
+
+**The defect.** `odds_book_quotes.append_book_quotes` appends LOCALLY with
+`open("a")` — correct — then `publish_hot_artifact` does `read_text()` and
+pushes **the whole file**. Web and workers have separate disks, so each service
+held only its own rows and each publish overwrote the other's. Web kept whoever
+published last.
+
+**Measured**, `book_quotes/2026-09-01.jsonl` fetched twice ~1h apart with
+identical code: **1,318 exchange rows LOST, 0 gained**, a clean tail truncation
+(0 losses at or before the cutoff), while sportsbook rows gained a whole hour.
+`count:1 truncated:False`, so not an export artifact.
+
+**Why it was worse than lost data: it was invisible.** Every surviving row is
+real and correctly time-aligned, so a clobbered shard still prints a tidy
+number. It had already produced one published wrong conclusion — `#624` step 5/6
+reported 67% of exchange quotes as having no time-aligned sportsbook price and
+called the survivors "plausibly the more liquid subset". **1,365 of 1,795 (76%)
+were the sportsbook feed simply stopping.**
+
+**THE FIX: MERGE-ON-RECEIVE.** `/api/ops/artifacts/publish` unions an incoming
+artifact with what is on disk instead of replacing it, in BOTH receive forms
+(the envelope form matters — live-odds-worker is pinned on `7e76478f`). Publishes
+become commutative. Two families, two shapes:
+- **append-only JSONL** (`book_quotes`, every sport): line union, dedup on the
+  WHOLE LINE, and **the existing file stays a byte PREFIX** — load-bearing,
+  because `pull_streamed_artifact` fetches these by HTTP Range from the worker's
+  local size. Merging is what finally makes that assumption TRUE.
+- **`odds_history` JSON**: union `markets` by key, entries taken **WHOLESALE,
+  never field-mixed** (each carries a history list PLUS scalars derived from it).
+
+**VERIFIED IN PRODUCTION:** the superset test — the exact test that found the
+bug — passes: **0 lines lost / 7,104 gained** across a publish cycle. Both
+writers merge by name. Independently, lane `game-market-entry-roi-curve` reports
+the date now passes `measure_exchange_prop_option_value`'s own feed-overlap
+guard at **100.0% matchable, was 46.1%**.
+
+**Two of my own errors, both caught by instrumentation I had deliberately made
+non-silent, and both recorded because the pattern repeats:**
+1. The `odds_history` size cap was sized on the 39.6MB **soccer** shard; MLB's
+   pair is **109,448,725 B**, so the merge was **INERT on the biggest shards**.
+   Visible only because the fallback LOGS ITS REASON.
+2. The admission lock was keyed on `target_path.parent`, so
+   `tracking/odds_history/` and `artifacts/<sport>/odds_history/` took DIFFERENT
+   locks — and those twins are exactly the pair observed publishing **2 seconds
+   apart**. The bound did not cover the case it was built for.
+
+**Also fixed (`#488`'s guard):** it recorded a publisher whose publish it had
+just REFUSED, so the refused publisher became `last` and its next attempt passed
+as same-publisher — `22:01:15 REFUSED` → `22:05:03 ALLOWED`, 9.2MB replaced by
+5.2MB. **The refusal bought one cycle while logging a line that reads like a
+save.** Now only an allowed publish takes the slot, plus a
+`consecutive_refusals=N` counter so a permanent block is distinguishable from a
+one-off. Proven to discriminate (`off != on`) rather than merely to pass.
+
+**STILL OPEN:**
+
+- **(a) `odds_history` RECOVERY is not demonstrated.** The merge runs on the
+  right files (`markets=3882`), but every observed merge showed `added=0` — that
+  publish carried a superset, so no market has actually been rescued yet.
+  **Reading that would prove it:** `ARTIFACT_MERGE ... odds_history ...
+  "added": N>0` or `kept_existing_newer > 0` from a CROSS-PUBLISHER sequence.
+- **(b) The envelope-form merge is UNEXERCISED** — every observed line is
+  `transport=stream`. Correct by unit test only.
+- **(c) MEMORY.** `json.loads` costs 2.5–3.13x the document; the MLB merge peaked
+  at **276 MB on 88 MB of input**. Capped at 160MiB combined with a service-wide
+  `O_CREAT|O_EXCL` lock admitting ONE merge at a time. **A watch is running for
+  the FLOOR** (`container_memory_unreclaimable_mb`, NOT `container_memory_mb`
+  which includes page cache this merge inflates), boot floor **717.7 MB**, alarm
+  at 900 MB against a 2048 MB cap. If the floor ratchets, lower the cap or move
+  the merge off the request path.
+- **(d) `#488`'s guard is LEAKY BY CONSTRUCTION and that is not fixed.** Both its
+  dicts are PER-PROCESS and web runs `--workers 2 --threads 4`, so `last` is
+  per-worker and an unseen path reads `last=None` → ALLOWED. Merging removes the
+  need for it on the families that actually collide; everything else still rides
+  a leaky guard.
+
 ### `#629` — **Orphan-sweep residue: 3 parked worktrees need one human `--force` each; out-of-scope ref families listed for a future pass** — lanes `orphan-*-census`, 2026-09-01 — **OPEN, LOW**
 
 Opened by session fbf1a34b after the day's four censuses (sequencer, stashes,
