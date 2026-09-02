@@ -3824,3 +3824,48 @@ one writer's rows — and that subset has its own statistics. So:
 * Sibling rules: *measure on the BOOK THE DECISION IS ABOUT* and *absence in a
   window isn't absence*. This is the same family — the population you can see
   was selected by something, and here the selector was a race.
+
+## 2026-09-01 — FORBIDDEN: closing or reassigning a lane because its RECORDED SESSION is gone. The session id is not an ownership key — it is a stamp that outlives the thing it names, in both directions. `[lane game-market-entry-roi-curve, ownership pass]`
+
+**The census.** 34 OPEN lanes, **32 already marked UNOWNED**. Checked every
+recorded owner session against a 200-session roster (`list_sessions
+include_archived=true`) whose oldest entry is **2026-08-13**, i.e. a window
+covering every lane in the file, so absence from it is real absence and not a
+truncated view. Result: **17 of 18 owner sessions DO NOT EXIST.** The 18th
+(`abf487e4`) is archived, last active 2026-08-20. Exactly **one** session in the
+entire store was running.
+
+**Why that licenses nothing.** Lane `book-quotes-publish-clobber` records
+session `3492626c`, which is NOT FOUND — and that lane was worked **today**: it
+landed `51cf8b83`, messaged me about `#630`, and its work is why I re-ran a
+measurement this afternoon. The live worker is `local_ea1e4863`, the one running
+session. **A lane's recorded session dies and is replaced while the lane keeps
+going.** Had the pass closed lanes on "owning session gone", it would have
+closed an actively-worked lane holding four file claims.
+
+**The instrument is dead in both directions.** A present id does not prove
+ownership either — it proves someone once typed it.
+
+**What the pass found instead, and this is the actionable half.** Classify on
+what the lane says about ITS OWN GOAL, which is the thing a lane is for:
+
+    A. header says GOAL MET and nothing owed anywhere ..........  0 lanes
+    B. GOAL MET but the block still names owed work ............  4 lanes
+    C. no goal-met claim in the header ........................ 32 lanes
+
+**ZERO lanes are closeable on the evidence in the ledger.** Every one either
+names owed work or never claimed its goal. So the honest output of an ownership
+pass here is a census and two corrections — not closures.
+
+**How to apply.**
+* **Never close a lane on liveness.** Close it on its own stated verification,
+  and if that verification is missing, the lane's problem is a missing reading,
+  not a missing owner.
+* **`UNOWNED` means "nobody is holding this right now", not "abandoned".** It is
+  an invitation to pick up, and it already appears on 32 of 34 lanes — so it
+  carries almost no information and must never be a closure trigger.
+* **State the roster window whenever you call a session gone.** "Not in the
+  roster" is meaningless without it; here it is 2026-08-13..09-02, ~200 sessions.
+* Sibling rule, same family: *a LIVENESS field that the recorder cannot outlive*
+  should not be recorded at all. The session id in a lane header is exactly that
+  field, and this is the second time it has misled a census.
