@@ -791,10 +791,36 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
             slate_start = epoch
     slate_started = slate_start is not None and now_epoch >= slate_start
     for prefix in ("oddsapi_pitcher_props", "oddsapi_hitter_props"):
-        source_path = market_dir / f"{prefix}_{slug}.json"
-        if not source_path.exists() or not source_path.is_file():
-            continue
         frozen_name = f"{prefix}_{slug}_pregame.json"
+        live_name = f"{prefix}_{slug}.json"
+        # SOURCE FROM THE RICHEST TREE, not from `market_dirs[0]` alone.
+        #
+        # `#611`: the prop seal stopped on 2026-08-16 and produced ZERO files
+        # for sixteen days while GAME LINES sealed normally on the same runs
+        # (2026-09-01: a 15-game game-line freeze, zero prop seals). The
+        # asymmetry was inside this one loop. Two lines below, `best_frozen`
+        # is computed across EVERY `market_dir` -- its own comment says
+        # *"'Already frozen' is asked of EVERY tree, not just this one"* --
+        # while the SOURCE was read from `market_dirs[0]` and a miss was a
+        # bare `continue` that emitted nothing. Game lines cannot fail this
+        # way because `_merge_pregame_game_lines` seeds from every copy, which
+        # is exactly why they survived and props did not.
+        #
+        # `market_dirs[0]` is `source_root/data/market/oddsapi` -- the tree the
+        # fetch writes to LATER in the same pass (`_refresh_source_artifacts`
+        # freezes first, then fetches), and one that git tracks zero files
+        # under. So a pass that finds it empty sealed nothing and said nothing.
+        #
+        # Ties keep `market_dirs[0]`: `max` returns the FIRST maximum, so when
+        # the writer's own tree is as rich as any other the behaviour is
+        # byte-identical to before. Monotonicity is untouched -- the richness
+        # comparison against `best_frozen` below still governs whether this
+        # doc may replace an existing seal.
+        source_candidates = [
+            (directory / live_name, _oddsapi_props_richness(directory / live_name))
+            for directory in market_dirs
+        ]
+        source_path, candidate_richness = max(source_candidates, key=lambda item: item[1])
         # Sealed once the slate starts.
         #
         # THE SEAL IS MONOTONE: a poorer doc never replaces a richer one, and a
@@ -823,14 +849,43 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
         #
         # "Already frozen" is asked of EVERY tree, not just this one: a seal
         # that exists only in the tree the reader uses must still count.
-        candidate_richness = _oddsapi_props_richness(source_path)
         best_frozen = max(
             (_oddsapi_props_richness(directory / frozen_name) for directory in market_dirs),
             default=-1,
         )
+        # EVERY REFUSAL IS NAMED. `#611` spent three sessions unable to say
+        # which branch stopped the seal, because all three were bare
+        # `continue`s -- "a zero is indistinguishable from an inert feature",
+        # and the item's own note records that inference stood in for a
+        # reading three times running. These lines are the reading. `print`
+        # rather than `logger.info` because only `print` reaches Render's log
+        # collector (CLAUDE.md).
+        #
+        # `no_live_doc_in_any_tree` is the one that FALSIFIES this change's own
+        # hypothesis: it means the doc is in no tree at freeze time, so the
+        # cause is upstream (fetch cadence, or the source root the orchestrator
+        # computes but MLB's step does not use) and NOT the single-directory
+        # read fixed above. Reporting that clearly is the point.
+        if candidate_richness < 0:
+            print(
+                f"[refresh_mlb_oddsapi] PROP_FREEZE_SKIPPED prefix={prefix} date={date_str} "
+                f"reason=no_live_doc_in_any_tree trees={len(market_dirs)}",
+                flush=True,
+            )
+            continue
         if slate_started:
+            print(
+                f"[refresh_mlb_oddsapi] PROP_FREEZE_SKIPPED prefix={prefix} date={date_str} "
+                f"reason=slate_started richness={candidate_richness} best_frozen={best_frozen}",
+                flush=True,
+            )
             continue
         if best_frozen >= 0 and candidate_richness <= best_frozen:
+            print(
+                f"[refresh_mlb_oddsapi] PROP_FREEZE_SKIPPED prefix={prefix} date={date_str} "
+                f"reason=not_richer_than_existing richness={candidate_richness} best_frozen={best_frozen}",
+                flush=True,
+            )
             continue
         destinations = [directory / frozen_name for directory in market_dirs]
         destinations.append(snapshot_dir / frozen_name)
@@ -838,6 +893,13 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
             _ensure_dir(destination.parent)
             shutil.copy2(source_path, destination)
             copied[str(destination)] = str(destination)
+        print(
+            f"[refresh_mlb_oddsapi] PROP_FREEZE_WROTE prefix={prefix} date={date_str} "
+            f"richness={candidate_richness} best_frozen={best_frozen} "
+            f"source_tree_index={[str(path) for path, _ in source_candidates].index(str(source_path))} "
+            f"destinations={len(destinations)}",
+            flush=True,
+        )
     return copied
 
 

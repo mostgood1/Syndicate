@@ -157,16 +157,23 @@ def test_a_segment_market_is_refused_not_priced_as_a_full_game():
     assert result["refusals"]["segment_market_not_full_game"] == 1
 
 
-def test_player_props_are_refused_by_name_rather_than_half_matched():
-    """Props are REAL on this venue. Resolving `jakman` to a roster name is a
-    different problem, and a prop priced by a guessed player is a real order on
-    the wrong person."""
+def test_a_player_prop_with_no_board_row_is_a_visible_no_candidate_not_out_of_scope():
+    """This test used to pin the refuse-ALL-props contract, written when
+    resolving `jakman` to a roster name was a guess. The encoding is measured
+    now (2026-09-01, 98 ground-truth pairs -- `jakman` is Jake Mangum), so a
+    measured-shape MLB prop INDEXES; with no board row asking for it, nothing
+    matches and nothing lands in the out-of-scope census. An UNMEASURED prop
+    shape still refuses by name -- that half of the old contract stands (see
+    `test_parse_player_prop_admits_only_the_measured_shape`)."""
     result = mod.join_polymarket_to_board(
         [_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jakman-gte2",
                  kind="SPORTS_MARKET_TYPE_PROP", outcomes=("Yes", "No"))],
         [],
     )
-    assert result["refusals"]["market_type_not_a_game_line"] == 1
+    assert result["matched"] == 0
+    assert result["indexed"] == 1
+    assert "market_type_not_a_game_line" not in result["refusals"]
+    assert result["out_of_scope_counts"] == {}
 
 
 def test_an_unseen_market_type_is_refused_not_mapped_to_a_neighbour():
@@ -2499,3 +2506,590 @@ def test_a_PERMISSIVE_resolver_now_REFUSES_instead_of_picking_positionally(monke
             [_threeway("liv", "0.60"), _threeway("not", "0.15")],
             _threeway_board(side), selected_date="2026-08-29")
         assert out["matched"] == 0, (side, out)
+
+
+# ==========================================================================
+# MLB PLAYER PROPS -- admitted per family from the 2026-09-01 measurement
+# (`.syndicate/findings_2026-09-01_polymarket_prop_census.md`): 99 ground-truth
+# (token, question-name) pairs across 8 fixtures. The join derives the venue's
+# token from OUR player_name and requires exact equality -- a token we cannot
+# derive is a COVERAGE miss, never a wrong-person match.
+# ==========================================================================
+
+
+def _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte2",
+                 yes="0.62", no="0.40", **kw):
+    return _market(slug=slug, kind="SPORTS_MARKET_TYPE_PROP",
+                   outcomes=("Yes", "No"), prices=(yes, no), **kw)
+
+
+def _prop_board(market="batter_hits", player="Jackson Merrill", side="over",
+                line=1.5, **kw):
+    return _board(market=market, side=side, line=line, player_name=player, **kw)
+
+
+def test_a_measured_mlb_player_prop_matches_end_to_end():
+    """`hits-jacmer-gte2` is "Will Jackson Merrill record at least 2 hits" --
+    the board's over 1.5, priced at the venue's own Yes."""
+    out = mod.join_polymarket_to_board([_prop_market()], [_prop_board()])
+    assert out["matched"] == 1, out["refusals"]
+    match = out["matches"][0]
+    assert match["market"] == "batter_hits"
+    assert match["player_name"] == "Jackson Merrill"
+    assert match["line"] == 1.5
+    assert match["side"] == "over"
+    assert match["polymarket_probability"] == pytest.approx(0.62)
+    assert match["polymarket_slug"] == "astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte2"
+
+
+def test_the_under_side_prices_the_No_leg_never_one_minus_yes():
+    out = mod.join_polymarket_to_board([_prop_market()], [_prop_board(side="under")])
+    assert out["matched"] == 1, out["refusals"]
+    assert out["matches"][0]["polymarket_probability"] == pytest.approx(0.40)
+
+
+def test_a_one_sided_prop_quote_refuses_the_missing_leg():
+    """A missing No is a missing price, not 1 - Yes."""
+    market = _market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte2",
+                     kind="SPORTS_MARKET_TYPE_PROP",
+                     outcomes=("Yes",), prices=("0.62",))
+    out = mod.join_polymarket_to_board([market], [_prop_board(side="under")])
+    assert out["matched"] == 0
+    assert out["refusals"].get("side_not_an_outcome_of_this_market") == 1
+
+
+def test_the_gte_threshold_must_equal_the_board_line_exactly():
+    """`gte2` is over 1.5 and NOTHING else -- a 2.5 board row is a different
+    contract, and pricing one as the other is the rung mismatch this join
+    refuses everywhere."""
+    out = mod.join_polymarket_to_board([_prop_market()], [_prop_board(line=2.5)])
+    assert out["matched"] == 0
+    assert out["refusals"].get("no_matching_polymarket_market") == 1
+
+
+def test_the_player_token_must_match_exactly():
+    out = mod.join_polymarket_to_board(
+        [_prop_market()], [_prop_board(player="Manny Machado")])
+    assert out["matched"] == 0
+    assert out["refusals"].get("no_matching_polymarket_market") == 1
+
+
+def test_a_venue_disambiguated_token_is_a_coverage_miss_never_a_wrong_person():
+    """`bretbat` is the venue's OWN collision handling (Brett Bateman at 4+3,
+    because Brett Baty collides at `brebat`). We only derive the plain 3+3
+    form, so the extended form never matches -- the refusal direction, not the
+    wrong player."""
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hr-bretbat-gte1")
+    board = _prop_board(market="batter_home_runs", player="Brett Bateman", line=0.5)
+    out = mod.join_polymarket_to_board([market], [board])
+    assert out["matched"] == 0
+    assert out["refusals"].get("no_matching_polymarket_market") == 1
+
+
+def test_two_board_players_sharing_a_token_BOTH_refuse():
+    """Tyler Stephenson and Tyler Steele both derive `tylste`. Picking either
+    is a wrong-person order half the time, so both refuse by name."""
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-tylste-gte1")
+    rows = [
+        _prop_board(player="Tyler Stephenson", line=0.5),
+        _prop_board(player="Tyler Steele", line=0.5),
+    ]
+    out = mod.join_polymarket_to_board([market], rows)
+    assert out["matched"] == 0
+    assert out["refusals"].get("prop_player_token_ambiguous") == 2
+
+
+def test_duplicate_venue_prop_rows_refuse_ambiguous_not_first_wins():
+    duplicate = [_prop_market(), _prop_market()]
+    out = mod.join_polymarket_to_board(duplicate, [_prop_board()])
+    assert out["matched"] == 0
+    assert out["refusals"].get("ambiguous_polymarket_match") == 1
+    # The ambiguity refusal is the WHOLE story for that row -- the no-match
+    # counter must not stack a second reason on the same row.
+    assert "no_matching_polymarket_market" not in out["refusals"]
+
+
+def test_a_segment_prop_board_row_still_refuses():
+    out = mod.join_polymarket_to_board(
+        [_prop_market()], [_prop_board(segment="first3")])
+    assert out["matched"] == 0
+    assert out["refusals"].get("board_row_is_a_segment_bet") == 1
+
+
+def test_a_prop_row_without_a_player_refuses_by_name():
+    out = mod.join_polymarket_to_board([_prop_market()], [_prop_board(player="")])
+    assert out["matched"] == 0
+    assert out["refusals"].get("prop_row_missing_player") == 1
+
+
+def test_an_underivable_player_name_refuses_by_name():
+    out = mod.join_polymarket_to_board([_prop_market()], [_prop_board(player="Ichiro")])
+    assert out["matched"] == 0
+    assert out["refusals"].get("prop_player_token_underivable") == 1
+
+
+@pytest.mark.parametrize("name,token", [
+    # Measured pairs, `.syndicate/findings_2026-09-01_polymarket_prop_census.md`.
+    ("Fernando Tatis Jr.", "fertat"),      # suffix dropped
+    ("Vladimir Guerrero Jr.", "vlague"),
+    ("Michael Harris II", "michar"),
+    ("Elly De La Cruz", "ellcru"),         # surname = LAST word
+    ("Pete Crow-Armstrong", "petarm"),     # hyphen splits; last segment
+    ("AJ Smith-Shawver", "ajsha"),
+    ("Ty France", "tyfra"),                # short first name keeps its length
+    ("JJ Bleday", "jjble"),
+    ("Jo Adell", "joade"),
+    ("Jung Hoo Lee", "junlee"),            # middle name ignored
+    ("Eugenio Suárez", "eugsua"),     # diacritics folded
+    ("Julio Rodríguez", "julrod"),
+    ("Logan Webb", "logweb"),
+    ("Paul Skenes", "pauske"),
+])
+def test_the_token_encoding_reproduces_the_measured_pairs(name, token):
+    assert mod._polymarket_player_token(name) == token
+
+
+def test_a_single_word_name_is_underivable_not_repeated():
+    assert mod._polymarket_player_token("Ichiro") is None
+    assert mod._polymarket_player_token("") is None
+    assert mod._polymarket_player_token(None) is None
+
+
+def test_parse_player_prop_admits_only_the_measured_shape():
+    def parsed(slug):
+        return mod._parse_player_prop(mod.parse_slug(slug))
+
+    good = parsed("astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte2")
+    assert good == {"market": "batter_hits", "token": "jacmer", "line": 1.5}
+    # The venue's own disambiguated token still indexes (so a miss is a
+    # visible no_match, not out-of-scope noise) -- it just never matches.
+    assert parsed("astatc-mlb-pit-sd-2026-08-24-hr-wilcon2-gte1") == {
+        "market": "batter_home_runs", "token": "wilcon2", "line": 0.5}
+    # Everything below stays in the out-of-scope census.
+    assert parsed("astatc-mlb-pit-sd-2026-08-24-yrfi") is None
+    assert parsed("atc-mlb-pit-sd-2026-08-24-i1-sd") is None
+    assert parsed("atc-mlb-pit-sd-2026-08-24-f5-draw") is None
+    assert parsed("astatc-lg1-tou-lil-2026-09-03-ftts-tou") is None
+    assert parsed("astatc-atp-danswe-cormou-2026-08-30-es-3-0") is None
+    # `gte0` has never been observed and "at least 0" is not a bet.
+    assert parsed("astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte0") is None
+    # MLB only: the family vocabulary was measured on MLB slugs and nowhere
+    # else -- `k-` on another league is not known to mean strikeouts.
+    assert parsed("astatc-cfb-osu-mich-2026-09-05-k-somguy-gte2") is None
+
+
+def test_admitted_props_leave_the_out_of_scope_census():
+    """An admitted prop row is IN SCOPE; an unadmitted one stays counted."""
+    markets = [
+        _prop_market(),
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-yrfi"),
+    ]
+    out = mod.join_polymarket_to_board(markets, [_prop_board()])
+    assert out["matched"] == 1
+    assert out["out_of_scope_counts"] == {"SPORTS_MARKET_TYPE_PROP|mlb": 1}
+
+
+def test_the_kill_switch_restores_the_old_behaviour_exactly(monkeypatch):
+    """off != on, and off == the pre-admission join: venue rows back in the
+    out-of-scope census, board rows back to board_market_not_a_game_line."""
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_PROP_JOIN", "off")
+    out = mod.join_polymarket_to_board([_prop_market()], [_prop_board()])
+    assert out["matched"] == 0
+    assert out["refusals"].get("board_market_not_a_game_line") == 1
+    assert out["refusals"].get("market_type_not_a_game_line") == 1
+    assert out["out_of_scope_counts"] == {"SPORTS_MARKET_TYPE_PROP|mlb": 1}
+
+
+def test_prop_ladders_are_per_player_not_pooled():
+    """Two players' clean ladders interleave into a fake violation when the
+    ladder key omits the player (learnings 2026-08-27: a prop join key that
+    omits the player). Both must survive."""
+    markets = [
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte1",
+                     yes="0.80", no="0.22"),
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte2",
+                     yes="0.50", no="0.52"),
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-manmac-gte1",
+                     yes="0.60", no="0.42"),
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-manmac-gte2",
+                     yes="0.58", no="0.44"),
+    ]
+    rows = [
+        _prop_board(line=0.5),
+        _prop_board(line=1.5),
+        _prop_board(player="Manny Machado", line=0.5),
+        _prop_board(player="Manny Machado", line=1.5),
+    ]
+    out = mod.join_polymarket_to_board(markets, rows)
+    assert out["matched"] == 4, out["refusals"]
+    assert out["refusals"].get("ladder_not_monotonic") is None
+    assert not any("non_monotonic" in k for k in out["ladder_counts"])
+
+
+def test_a_genuinely_non_monotonic_prop_ladder_still_condemns_that_player():
+    markets = [
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte1",
+                     yes="0.50", no="0.52"),
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte2",
+                     yes="0.80", no="0.22"),  # over RISES with the line: wrong
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-manmac-gte1",
+                     yes="0.60", no="0.42"),
+    ]
+    rows = [
+        _prop_board(line=0.5),
+        _prop_board(line=1.5),
+        _prop_board(player="Manny Machado", line=0.5),
+    ]
+    out = mod.join_polymarket_to_board(markets, rows)
+    assert out["matched"] == 1, out["refusals"]
+    assert out["matches"][0]["player_name"] == "Manny Machado"
+    assert out["refusals"].get("ladder_not_monotonic") == 2
+
+
+def test_a_prop_match_flows_to_the_quote_capture_rows():
+    """The whole point of the admission: the props-only capture bound in
+    `quote_rows_from_polymarket_matches` keeps game lines out and now has
+    prop rows to keep."""
+    from syndicate.features.shared.odds_book_quotes import (
+        quote_rows_from_polymarket_matches,
+    )
+
+    out = mod.join_polymarket_to_board(
+        [_prop_market(), _market()],
+        [_prop_board(), _board(side="Padres")],
+    )
+    assert out["matched"] == 2, out["refusals"]
+    rows = quote_rows_from_polymarket_matches(out["matches"])
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["bookmaker"] == "polymarket"
+    assert row["kind"] == "prop"
+    assert row["market"] == "batter_hits"
+    assert row["player_name"] == "Jackson Merrill"
+    assert row["selection"] == "over"
+    assert row["line"] == 1.5
+    assert row["event_id"] == "evt-pit-sd"
+
+
+def test_game_lines_are_untouched_by_the_prop_path():
+    """The control: the existing game-line join behaves identically with prop
+    rows present in the slate."""
+    out = mod.join_polymarket_to_board(
+        [_market(), _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-yrfi")],
+        [_board(side="Padres")],
+    )
+    assert out["matched"] == 1
+    assert out["matches"][0]["market"] == "h2h"
+    assert out["matches"][0]["player_name"] is None
+
+
+# ==========================================================================
+# THE PROP NO-MATCH SAMPLE NAMES THE PLAYER. Measured 2026-09-01T18:20:10Z:
+# ~230 `no_match|mlb|<prop market>` refusals per cycle, and the sample could
+# not say WHICH miss each was -- `want` is market|side|line, `offered` is
+# fixtures drawn unfiltered from the whole bucket, and the census strips the
+# digit that marks a collision-extended token. Token-miss, rung-miss and
+# player-not-listed printed identically; they need opposite responses.
+# ==========================================================================
+
+
+def test_a_prop_no_match_sample_puts_both_spellings_side_by_side():
+    """`wilcon2` is the venue's own collision-extended William Contreras; our
+    derived `wilcon` deliberately never matches it. The sample now shows the
+    venue's spelling beside ours -- a TOKEN-miss, readable from one log line
+    instead of a census."""
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hr-wilcon2-gte1")
+    board = _prop_board(market="batter_home_runs", player="William Contreras",
+                        line=0.5)
+    out = mod.join_polymarket_to_board([market], [board])
+    assert out["matched"] == 0
+    sample = out["unmatched_samples"][0]
+    assert sample["kind"] == "no_match"
+    assert sample["player"] == "William Contreras"
+    assert sample["token"] == "wilcon"
+    assert sample["fixture_tokens"] == ["wilcon2"]
+    assert sample["token_lines"] == []
+
+
+def test_a_rung_miss_shows_the_lines_the_venue_DOES_offer_for_our_token():
+    """The player IS listed and the rung is not: `token_lines` beside `want`'s
+    line is the whole story, with no token or listing question left open."""
+    markets = [
+        _prop_market(),  # hits-jacmer-gte2 -> over 1.5
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte3"),
+    ]
+    out = mod.join_polymarket_to_board(markets, [_prop_board(line=4.5)])
+    assert out["matched"] == 0
+    sample = out["unmatched_samples"][0]
+    assert sample["player"] == "Jackson Merrill"
+    assert sample["token"] == "jacmer"
+    assert sample["fixture_tokens"] == ["jacmer"]
+    assert sorted(sample["token_lines"]) == [1.5, 2.5]
+
+
+def test_a_player_the_venue_never_listed_shows_teammates_not_our_token():
+    """The venue quotes the family for OTHER players in this game only. Our
+    token absent from a populated `fixture_tokens` -- with no near variant --
+    is the player-not-listed read."""
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-manmac-gte2")
+    out = mod.join_polymarket_to_board([market], [_prop_board()])
+    assert out["matched"] == 0
+    sample = out["unmatched_samples"][0]
+    assert sample["token"] == "jacmer"
+    assert sample["fixture_tokens"] == ["manmac"]
+    assert sample["token_lines"] == []
+
+
+def test_a_near_token_survives_the_bound_teammates_would_crowd_it_out_of():
+    """`fixture_tokens` is bounded to 6 and a fixture lists more players than
+    that. A collision-extended variant shares our token's first-name prefix,
+    so it orders FIRST: truncation drops teammates, never the token-miss
+    evidence the field exists to carry."""
+    slugs = [
+        f"astatc-mlb-pit-sd-2026-08-24-hits-{tok}-gte2"
+        for tok in ("aaabbb", "cccddd", "eeefff", "ggghhh", "iiijjj",
+                    "kkklll", "mmmnnn", "wilcon2")
+    ]
+    out = mod.join_polymarket_to_board(
+        [_prop_market(slug=s) for s in slugs],
+        [_prop_board(player="William Contreras", line=1.5)],
+    )
+    assert out["matched"] == 0
+    sample = out["unmatched_samples"][0]
+    assert sample["fixture_tokens"][0] == "wilcon2"
+    assert len(sample["fixture_tokens"]) == 6
+
+
+def test_another_games_players_do_not_leak_into_fixture_tokens():
+    """Same family and date, different fixture: `offered` shows the bucket has
+    rows while `fixture_tokens` stays empty -- OUR game is what the family
+    bucket lacks, which is a fixture question, not a player one."""
+    market = _prop_market(slug="astatc-mlb-min-ath-2026-08-24-hits-othgu1-gte2")
+    out = mod.join_polymarket_to_board([market], [_prop_board()])
+    assert out["matched"] == 0
+    sample = out["unmatched_samples"][0]
+    assert sample["offered"] != []
+    assert sample["fixture_tokens"] == []
+    assert sample["token_lines"] == []
+
+
+def test_a_prop_family_with_no_candidates_at_all_still_names_the_player():
+    """The `no_candidates` kind for a prop row carries the same fields, empty:
+    the family+date bucket is what is missing, and the sample says for whom."""
+    out = mod.join_polymarket_to_board([], [_prop_board()])
+    sample = out["unmatched_samples"][0]
+    assert sample["kind"] == "no_candidates"
+    assert sample["player"] == "Jackson Merrill"
+    assert sample["token"] == "jacmer"
+    assert sample["fixture_tokens"] == []
+    assert sample["token_lines"] == []
+
+
+def test_a_game_line_sample_keeps_its_exact_shape():
+    """The control: the prop fields are prop-only. A game-line sample gains
+    nothing, so the established readers of this log line see what they saw."""
+    report = mod.join_polymarket_to_board(
+        [_total_market("tsc-mlb-min-sac-2026-08-25-10pt5")],
+        [{"sport": "mlb", "market": "totals", "side": "under", "line": 10.5,
+          "away_team": "Minnesota Twins", "home_team": "Athletics",
+          "date": "2026-08-25", "event_id": "e1"}],
+        selected_date="2026-08-25",
+    )
+    sample = report["unmatched_samples"][0]
+    assert sample["kind"] == "no_match"
+    for prop_only in ("player", "token", "fixture_tokens", "token_lines"):
+        assert prop_only not in sample
+
+
+# ==========================================================================
+# THE COMPLETE PROP NO-MATCH CLASSIFICATION. The samples above decompose one
+# row per family; the counter decomposes ALL of them, so class/family is a
+# RATE. Invariant: per family the classes sum to `no_match|mlb|<family>`.
+# ==========================================================================
+
+
+def test_each_prop_no_match_class_is_counted_by_name():
+    markets = [
+        # rung_miss: venue lists jacmer hits at 1.5, board wants 4.5
+        _prop_market(),
+        # near_token: venue lists wilcon2, our William Contreras derives wilcon
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hr-wilcon2-gte1"),
+        # player_not_listed: venue lists tb for Machado only, board asks Merrill
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-tb-manmac-gte2"),
+        # fixture_miss: venue lists k only for ANOTHER game on the date
+        _prop_market(slug="astatc-mlb-min-ath-2026-08-24-k-somepi-gte5"),
+    ]
+    rows = [
+        _prop_board(line=4.5),
+        _prop_board(market="batter_home_runs", player="William Contreras", line=0.5),
+        _prop_board(market="batter_total_bases", player="Jackson Merrill", line=1.5),
+        _prop_board(market="strikeouts", player="Paul Skenes", line=4.5),
+    ]
+    out = mod.join_polymarket_to_board(markets, rows)
+    assert out["matched"] == 0
+    assert out["prop_unmatched_classes"] == {
+        "rung_miss|batter_hits": 1,
+        "near_token|batter_home_runs": 1,
+        "player_not_listed|batter_total_bases": 1,
+        "fixture_miss|strikeouts": 1,
+    }
+    # The invariant that makes class/family a rate: per family, classes sum
+    # exactly to the no_match count on the same report.
+    per_family = {}
+    for key, n in out["prop_unmatched_classes"].items():
+        fam = key.split("|", 1)[1]
+        per_family[fam] = per_family.get(fam, 0) + n
+    for fam, total in per_family.items():
+        assert out["unmatched_counts"][f"no_match|mlb|{fam}"] == total, fam
+
+
+def test_prop_classes_count_completely_while_samples_stay_bounded():
+    """Seven unlisted players are SEVEN in the counter and one in the sample --
+    the same complete-count/bounded-sample split every other instrument in
+    this file keeps."""
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-manmac-gte2")
+    rows = [
+        _prop_board(player=name, line=1.5)
+        for name in ("Luis Arraez", "Xander Bogaerts", "Jake Cronenworth",
+                     "Gavin Sheets", "Tyler Wade", "Elias Diaz", "Mason McCoy")
+    ]
+    out = mod.join_polymarket_to_board([market], rows)
+    assert out["prop_unmatched_classes"] == {"player_not_listed|batter_hits": 7}
+    assert out["unmatched_counts"]["no_match|mlb|batter_hits"] == 7
+    assert sum(1 for s in out["unmatched_samples"] if s.get("player")) == 1
+
+
+def test_mixed_classes_in_one_family_sum_to_its_no_match_count():
+    markets = [
+        _prop_market(),  # jacmer hits 1.5
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-jacmer-gte3"),  # 2.5
+    ]
+    rows = [
+        _prop_board(line=4.5),                       # rung_miss (jacmer listed)
+        _prop_board(line=9.5),                       # rung_miss again
+        _prop_board(player="Manny Machado", line=1.5),  # player_not_listed
+    ]
+    out = mod.join_polymarket_to_board(markets, rows)
+    assert out["prop_unmatched_classes"] == {
+        "rung_miss|batter_hits": 2,
+        "player_not_listed|batter_hits": 1,
+    }
+    assert out["unmatched_counts"]["no_match|mlb|batter_hits"] == 3
+
+
+def test_game_line_misses_never_enter_prop_classes():
+    out = mod.join_polymarket_to_board(
+        [_total_market("tsc-mlb-min-sac-2026-08-25-10pt5")],
+        [{"sport": "mlb", "market": "totals", "side": "under", "line": 10.5,
+          "away_team": "Minnesota Twins", "home_team": "Athletics",
+          "date": "2026-08-25", "event_id": "e1"}],
+        selected_date="2026-08-25",
+    )
+    assert out["unmatched_counts"]  # the game-line miss is counted...
+    assert out["prop_unmatched_classes"] == {}  # ...and never classified
+
+
+def test_a_matched_prop_is_not_classified():
+    out = mod.join_polymarket_to_board([_prop_market()], [_prop_board()])
+    assert out["matched"] == 1
+    assert out["prop_unmatched_classes"] == {}
+
+
+def test_an_ambiguous_prop_is_refused_as_ambiguous_not_classified():
+    """The ambiguity guard's refusal is the whole story for that row; the
+    class counter must not add a second reading of it."""
+    out = mod.join_polymarket_to_board(
+        [_prop_market(), _prop_market()], [_prop_board()])
+    assert out["refusals"].get("ambiguous_polymarket_match") == 1
+    assert out["prop_unmatched_classes"] == {}
+
+
+# ==========================================================================
+# BOARD-NAME DISAMBIGUATORS AND THE SAME-NAME COLLISION GUARD. `Max Muncy
+# (2002)` derived `max200` in production (20:30Z read) -- a token no venue
+# writes, so every such row died as player_not_listed. Stripping the
+# disambiguator is only safe WITH the guard: the venue keys ONE of a
+# same-named pair plain, and the OTHER one's derivation lands on exactly
+# that plain token.
+# ==========================================================================
+
+
+@pytest.mark.parametrize("name,token", [
+    ("Max Muncy (2002)", "maxmun"),   # parenthetical disambiguator dropped
+    ("Max Muncy 2002", "maxmun"),     # bare digit word can never be a name half
+    ("Luis Garcia (WSH)", "luigar"),  # non-numeric disambiguators too
+])
+def test_board_disambiguators_do_not_poison_the_token(name, token):
+    assert mod._polymarket_player_token(name) == token
+
+
+def test_a_disambiguated_board_name_matches_its_venue_row():
+    market = _prop_market(slug="astatc-mlb-ath-tex-2026-08-24-hrr-maxmun-gte2")
+    board = _prop_board(market="batter_hits_runs_rbis", player="Max Muncy (2002)",
+                        line=1.5, home="Texas Rangers", away="Athletics",
+                        event_id="evt-ath-tex")
+    out = mod.join_polymarket_to_board([market], [board])
+    assert out["matched"] == 1, out["refusals"]
+    assert out["matches"][0]["player_name"] == "Max Muncy (2002)"
+
+
+def test_both_token_forms_in_one_fixture_refuse_BOTH_same_named_players():
+    """Whichever Contreras owns the venue's plain `wilcon`, the other one's
+    derivation produces it. With both forms in the fixture the plain rows'
+    identity is undecidable, so William AND Willson refuse by name -- a
+    wrong-person order is the single most expensive mistake available here."""
+    markets = [
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-wilcon-gte2"),
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-wilcon2-gte2"),
+    ]
+    for player in ("William Contreras", "Willson Contreras"):
+        out = mod.join_polymarket_to_board(markets, [_prop_board(player=player, line=1.5)])
+        assert out["matched"] == 0, (player, out["matches"])
+        assert out["refusals"].get("prop_same_name_collision_at_venue") == 1, (player, out["refusals"])
+
+
+def test_a_lone_plain_token_still_matches_its_owner():
+    """The control, and the guard's off-state: no variant in the fixture, no
+    refusal -- the plain form is whoever is in this game."""
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-wilcon-gte2")
+    out = mod.join_polymarket_to_board([market], [_prop_board(player="Willson Contreras", line=1.5)])
+    assert out["matched"] == 1, out["refusals"]
+    assert "prop_same_name_collision_at_venue" not in out["refusals"]
+
+
+def test_an_extended_only_fixture_stays_a_coverage_miss():
+    market = _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-wilcon2-gte2")
+    out = mod.join_polymarket_to_board([market], [_prop_board(player="William Contreras", line=1.5)])
+    assert out["matched"] == 0
+    assert out["refusals"].get("no_matching_polymarket_market") == 1
+    assert "prop_same_name_collision_at_venue" not in out["refusals"]
+
+
+def test_the_4_plus_3_variant_also_trips_the_guard_for_both_players():
+    """`bretbat` is the venue's longer-prefix mechanism -- and it is the 4+3
+    of BOTH Brett Baty and Brett Bateman, so the guard is symmetric from
+    either board row."""
+    markets = [
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hr-brebat-gte1"),
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hr-bretbat-gte1"),
+    ]
+    for player in ("Brett Baty", "Brett Bateman"):
+        out = mod.join_polymarket_to_board(
+            markets,
+            [_prop_board(market="batter_home_runs", player=player, line=0.5)])
+        assert out["matched"] == 0, (player, out["matches"])
+        assert out["refusals"].get("prop_same_name_collision_at_venue") == 1, (player, out["refusals"])
+
+
+def test_a_variant_in_a_DIFFERENT_fixture_does_not_refuse():
+    """Fixture-scoped by design: `wilcon2` in another game proves the pair
+    exists league-wide, not that OUR fixture's plain rows are ambiguous --
+    and a league-wide refusal would cost the plain-owner every day both are
+    listed."""
+    markets = [
+        _prop_market(slug="astatc-mlb-pit-sd-2026-08-24-hits-wilcon-gte2"),
+        _prop_market(slug="astatc-mlb-min-ath-2026-08-24-hits-wilcon2-gte2"),
+    ]
+    out = mod.join_polymarket_to_board(markets, [_prop_board(player="Willson Contreras", line=1.5)])
+    assert out["matched"] == 1, out["refusals"]
+    assert "prop_same_name_collision_at_venue" not in out["refusals"]

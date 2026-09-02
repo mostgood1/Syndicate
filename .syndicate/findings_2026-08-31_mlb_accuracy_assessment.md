@@ -962,7 +962,7 @@ are not captured at all today, which is item 05's actual work.
 
 ---
 
-## 7h. TIER 1 ITEM 05 MEASURED — worth about +1.2% ROI, not the ~+5% the plan implied, and the first step is CAPTURE not the board change
+## 7h. TIER 1 ITEM 05 MEASURED — worth **+0.74 ROI points** (`[re-derived 2026-09-01]`; this section first published +1.2%, retracted), not the ~+5% the plan implied, and the first step is CAPTURE not the board change
 
 **Done 2026-09-01.** Item 05 said *"make the board's price comparison read the
 venue feeds it already has"*. Before building it I measured what it buys. **Two
@@ -1024,15 +1024,102 @@ to be better *sometimes*, and you take it only then. Improvement =
 - mean improvement *when* an exchange wins: +2.99pp
 - median +0.24pp, p75 +1.98pp, p90 +3.81pp, p99 +17.16pp
 
-**Anchored to item 07's sensitivity** (the surviving book pays 4.05pp per side;
-each 1pp of better entry is worth roughly +0.75pp of ROI): **+1.57pp is worth
-about +1.2% ROI.**
+**~~Anchored to item 07's sensitivity~~** (the surviving book pays 4.05pp per
+side; each 1pp of better entry is worth roughly +0.75pp of ROI): **~~+1.57pp is
+worth about +1.2% ROI.~~** `[RETRACTED 2026-09-01 — wrong constant, wrong book,
+and a single-date population. The measured answer is +0.74 ROI points; read the
+two blocks below before quoting anything from this line.]`
 
-**That is real and it is roughly a quarter of what the plan implied.** Section
-7b's "+5.1% payout improvement" framing and item 07's "+5.57% at a 3% hold" row
-both described what a *low-hold venue* would give. This measures what
-*price-shopping across the venues we have* gives, which is a different and much
-smaller thing.
+> **CORRECTION `[2026-09-01, lane mlb-prop-staking-gate-not-met]` — THE 0.75 IS
+> WRONG, AND SO IS APPLYING IT HERE. Do not reuse this +1.2%; re-derive it.**
+>
+> **The constant contradicts the table it cites.** Item 07's sensitivity is
+> printed in this same document (section "WHAT KILLING IT PRODUCED"): 4.05pp
+> per side → +0.98%, and 2.50pp per side → +3.72%. That is **2.74 ROI points
+> across 1.55pp, a slope of ~1.77 — not 0.75.** The conversion understates by
+> ~2.4×. `#624` step 5 took the 0.75 at face value from this line and had to be
+> corrected the same day (`d7928307`).
+>
+> **Second, separate defect:** the numbers above are GAME markets, and item
+> 07's sensitivity prices the ROI of a *prop* book — "unders, minus home runs
+> and HRR, n=2,569". A prop book's ROI curve does not convert a game-market
+> entry improvement. Even at the right slope, this row would need a
+> game-market sensitivity that has not been measured.
+>
+> The corrected machinery lives in
+> `scripts/measure_exchange_prop_option_value.py`, which now interpolates the
+> published table instead of carrying a constant, with a test asserting the
+> slope against 0.75 so it cannot return.
+
+> **RESOLVED `[2026-09-01, lane game-market-entry-roi-curve]` — THE NUMBER IS
+> `+0.74 ROI POINTS`, and the slope was the smallest of THREE defects.** Full
+> derivation: `.syndicate/findings_2026-09-01_game_market_entry_roi_curve.md`.
+> Machinery: `scripts/measure_game_market_option_value.py` +
+> `tests/test_game_market_option_value.py`.
+>
+> The game-market sensitivity the block above asked for now exists, measured on
+> the book that stakes the money — 621 settled MLB game-market paper orders,
+> 2026-08-22..08-31, each re-priced exactly at flat 1u:
+>
+> | 2 × per side | per side | book ROI |
+> |---|---|---|
+> | **0.00%** | 0.00pp | **+8.21%** |
+> | 0.50% | 0.25pp | +7.57% |
+> | 1.00% | 0.50pp | +6.95% |
+> | 1.50% | 0.75pp | +6.34% |
+> | **1.76% — what it actually paid** | **0.88pp** | **+6.04%** |
+> | 2.00% | 1.00pp | +5.76% |
+> | 3.00% | 1.50pp | +4.62% |
+> | 5.00% | 2.50pp | +2.50% |
+> | 7.50% | 3.75pp | +0.09% |
+> | 8.10% — *item 07's prop book sits here* | 4.05pp | −0.46% |
+>
+> The first column is twice the second, item 07's own convention. It is **not**
+> the measured two-way hold, which is **1.957%**: proportional de-vig charges
+> each side in proportion to its price, so `2 × cost = hold` only at even money
+> and this book's mean implied price paid is 0.4516.
+>
+> Its slope is **+1.91** across 2.50→4.05pp and **+2.45** across 0→1.00pp, the
+> range this book operates in. So the slope was never the main error: the prop
+> table's 1.77 is close to it. **The two defects that mattered were both about
+> POPULATION.**
+>
+> **(a) The improvement was already banked.** The board already enters at
+> **0.883pp per side**, into quotes holding **1.957% two-way**. Re-measured on
+> this book's own rows at their own fill instants, exchanges make **+1.579pp**
+> available — but
+> the board had already taken **+0.977pp** of it, leaving **+0.602pp**, and
+> **63.7% of that residual sits at books with no execution path** (betopenly,
+> onexbet, gtbets). Priced per row over the 551 rows carrying both cohorts:
+> best-sportsbook-only **+4.49%**, actually taken **+6.69%**, best execution
+> venue **+7.43%**, best-any-book +8.45%, fair price +8.98%. **Exchange access
+> is worth +2.20 points and is already spent; routing to the best venue adds
+> +0.74.** Stable at +0.72..+0.77 across 15–120 minute windows.
+>
+> **(b) `+1.57pp` is ONE DATE.** The superset reproduces exactly on 2026-08-31
+> (n=13,344 vs 13,093, 52.4% vs 52.5%, median +0.232 vs +0.240 — the same
+> measurement on the day this document was written). Pooled over ten dates it is
+> **+1.101pp**, and per-date it ranges +0.59 to +1.26. The published *mean* does
+> not reproduce (+1.140 here) and the gap is all tail (p99 +7.49 vs +17.16);
+> section 1's own dead-price filter is a plausible but insufficient explanation,
+> and the original scratchpad no longer exists to read — so that is recorded as
+> unreproduced, not as diagnosed.
+>
+> **THE TELL, which needed none of this:** +1.57pp of "improvement" is larger
+> than the **0.88pp** of entry cost this book pays in total. A gain bigger than
+> the whole cost it is meant to remove cannot be about that book.
+>
+> Had only the slope been fixed, +1.57pp × 2.45 would have published **+3.8
+> points** — five times the truth, and further from it than the +1.2% it
+> replaced.
+
+**~~That is real and it is roughly a quarter of what the plan implied.~~**
+`[struck 2026-09-01 — it rests on the retracted +1.2%; the measured figure is
++0.74 ROI points, see RESOLVED above]` Section 7b's "+5.1% payout improvement"
+framing and item 07's "+5.57% at a 3% hold" row both described what a *low-hold
+venue* would give. This measures what *price-shopping across the venues we have*
+gives, which is a different and much smaller thing — **and smaller again than
+this section believed, because most of it was already being collected.**
 
 ### WHAT THIS CHANGES ABOUT THE ORDER OF WORK
 
@@ -1050,7 +1137,10 @@ anywhere** (section 7f: 0 rows). So:
 The plan had step 3 as the item. Doing it first would add a code path with
 nothing flowing through it on props, and would change game-row ranking — which
 already sees exchanges via OddsAPI — for a benefit measured at +1.2% and
-extrapolated from a different market type.
+extrapolated from a different market type. `[2026-09-01: the re-derivation makes
+this argument STRONGER, not weaker. The benefit is +0.74 ROI points, and the
+reason it is small is precisely that the game board already sees the exchanges —
+62% of the available improvement is already being collected.]`
 
 **NOT BUILT THIS SESSION, deliberately.** The measurement is the deliverable;
 it re-prices the item downward by ~4x and reorders it. Building a board-ranking

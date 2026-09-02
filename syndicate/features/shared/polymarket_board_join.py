@@ -38,12 +38,21 @@ anyway.
 WHAT IS REFUSED, BY NAME
 --------------------------------------------------------------------------
 
-Game lines only: `h2h`, `spreads`, `totals`. Player props are REAL on this
-venue (`astatc-mlb-pit-sd-...-hits-jakman-gte2`) and are refused here rather
-than half-matched, because resolving `jakman` to a roster name is a different
-problem with its own failure modes, and a prop priced by a guessed player is a
-real order on the wrong person. `refusals` counts every drop by reason, so
-coverage is diagnosable instead of merely low.
+Game lines (`h2h`, `spreads`, `totals`), plus the individually-admitted
+families: `btts`, corners, and — as of 2026-09-01 — MLB PLAYER PROPS.
+
+Player props were refused wholesale here for as long as resolving a slug token
+like `jakman` to a roster name was a guess, because a prop priced by a guessed
+player is a real order on the wrong person. That token is a guess NO LONGER:
+the encoding was measured against the venue's own `question` text (99 ground
+-truth pairs across 8 fixtures, 2026-09-01,
+`.syndicate/findings_2026-09-01_polymarket_prop_census.md`) — and `jakman` is
+Jake MANGUM, not any of the names a reader might have guessed. See
+`_polymarket_player_token` for the rule and `_parse_player_prop` for the
+admission bound. The join direction stays exact-or-refuse: we derive the token
+from OUR `player_name` and require equality, so a venue token we cannot derive
+is a COVERAGE miss, never a wrong-person match. `refusals` counts every drop
+by reason, so coverage is diagnosable instead of merely low.
 """
 
 from __future__ import annotations
@@ -100,6 +109,61 @@ _JOINABLE_BOARD_MARKETS: frozenset[str] = frozenset(MARKET_TYPE_TO_BOARD.values(
     "btts",
     "alternate_totals_corners",
 }
+
+# ---------------------------------------------------------------------------
+# MLB PLAYER PROPS -- admitted per FAMILY, per LEAGUE, from measurement.
+# ---------------------------------------------------------------------------
+#
+# Slug grammar, measured on 8 of 8 live fixtures 2026-09-01 against the
+# venue's own `question` text (the field `persist_game_slate` drops; fetched
+# from the public web gateway -- full evidence with all 98 (token, name)
+# pairs in `.syndicate/findings_2026-09-01_polymarket_prop_census.md`;
+# the implemented encoder reproduces 97 of 99, and both misses are the
+# venue's own collision-extended forms, which fail SAFE -- underivable):
+#
+#     astatc-mlb-<away>-<home>-<date>-<family>-<playertoken>-gte<N>
+#     e.g.  astatc-mlb-sd-cin-2026-09-01-hits-jacmer-gte2
+#           "Will Jackson Merrill record at least 2 hits in SD vs CIN?"
+#
+# `gte<N>` is "at least N", so YES is the board's OVER at line N-0.5 BY THE
+# MARKET'S OWN CONSTRUCTION -- the polarity is pinned by the slug the same way
+# `_greater_than_line`'s `gt` token pins corners, not by a side constant.
+#
+# Values are the CANONICAL market keys (`market_keys._MLB`), the vocabulary
+# `book_quotes` is keyed on and the board's own rows canonicalise into.
+# MLB ONLY: these family tokens were measured on MLB slugs. Another league
+# reusing a token (`k-` on cfb, say) stays refused until measured -- admission
+# is per (family, league), the same rule BTTS and corners were admitted under.
+_PROP_FAMILY_TO_BOARD: dict[str, str] = {
+    "hits": "batter_hits",
+    "tb": "batter_total_bases",
+    "hr": "batter_home_runs",
+    "hrr": "batter_hits_runs_rbis",
+    "k": "strikeouts",
+    "outs": "outs",
+    "er": "earned_runs",
+    "wa": "walks_allowed",
+    "ha": "hits_allowed",
+}
+
+# The board-side gate for prop rows. DERIVED, NOT RETYPED -- the same rule
+# `_JOINABLE_BOARD_MARKETS` states for game lines: two guards that must agree
+# should not be two literals. Kept SEPARATE from the game-line set because a
+# prop row must ALSO carry a player and a line; membership alone does not
+# admit it (see the board loop).
+_JOINABLE_PROP_BOARD_MARKETS: frozenset[str] = frozenset(_PROP_FAMILY_TO_BOARD.values())
+
+# `gte2` -> 2.0. At-least-N. Distinct from `_GT_TOKEN` (`gt10pt5`, strictly
+# more than): both appear in venue slugs and they differ by half a rung.
+_GTE_TOKEN = re.compile(r"^gte(?P<num>\d+)$")
+
+# The venue's player token: 3+3 prefix encoding, plus the venue's OWN
+# league-wide collision handling (a digit suffix -- `wilcon2` = William
+# Contreras beside Willson -- or a longer prefix -- `bretbat` = Brett
+# Bateman beside Brett Baty). We never derive those extended forms, so they
+# can never match; the pattern still recognises them as player tokens so the
+# row indexes and a miss shows up as `no_match` instead of out-of-scope.
+_PROP_PLAYER_TOKEN = re.compile(r"^[a-z]{2,12}\d{0,2}$")
 
 # `14pt5` -> 14.5. The venue writes decimals this way in slugs; reading it as an
 # integer would price a +14.5 spread at +145.
@@ -825,6 +889,164 @@ def _is_yes_no_market(outcomes: Any) -> bool:
     return {_norm(name) for name, _ in (outcomes or ())} == {"yes", "no"}
 
 
+# Name suffixes the venue's token encoding ignores: `fertat` is Fernando Tatis
+# Jr., `michar` is Michael Harris II. Measured, not assumed -- see the census.
+_PROP_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+
+def _player_name_words(player_name: Any) -> list[str]:
+    """The name words BOTH encoders read. One cleaner, not two that drift.
+
+    Drops, in order: parenthetical groups -- our board disambiguates two real
+    same-named players with them (`Max Muncy (2002)` is the Athletics' Muncy,
+    b. 2002, beside the Dodgers' 1990 one) and the year was surviving cleaning
+    to become the "surname" (`max200`, measured in production 2026-09-01
+    20:30Z, classified player_not_listed with a token no venue will ever
+    write); hyphens to spaces (the venue keys `Crow-Armstrong` off
+    `armstrong`); diacritics and punctuation; generational suffixes; and
+    pure-digit words, which can never be a name half regardless of where the
+    board writes them.
+    """
+    import unicodedata
+
+    text = str(player_name or "").strip().lower()
+    if not text:
+        return []
+    text = re.sub(r"\([^)]*\)", " ", text)
+    text = text.replace("-", " ")
+    folded = unicodedata.normalize("NFKD", text)
+    stripped = "".join(ch for ch in folded if not unicodedata.combining(ch))
+    cleaned = re.sub(r"[^a-z0-9 ]", "", stripped)
+    return [
+        w for w in cleaned.split()
+        if w and w not in _PROP_NAME_SUFFIXES and not w.isdigit()
+    ]
+
+
+def _polymarket_player_token(player_name: Any) -> str | None:
+    """OUR player's name -> the venue's slug token, or None when underivable.
+
+    The rule, validated on 97 of 99 measured (token, question-name) pairs
+    across 8 fixtures on 2026-09-01 (the other 2 are the venue's own
+    collision-extended forms, which this NEVER produces -- see below):
+
+        first 3 of the FIRST NAME + first 3 of the SURNAME, lowercased
+        - a first name shorter than 3 keeps its length: `tyfra` (Ty France),
+          `jjble` (JJ Bleday), `joade` (Jo Adell)
+        - suffixes dropped: `fertat` (Fernando Tatis Jr.)
+        - the surname is the LAST space- or hyphen-separated word:
+          `ellcru` (Elly De La Cruz), `petarm` (Pete Crow-Armstrong),
+          `ajsha` (AJ Smith-Shawver)
+        - diacritics and punctuation folded: `eugsua` (Eugenio Suarez),
+          `julrod` (Julio Rodriguez)
+        - board disambiguators dropped: `maxmun` (Max Muncy (2002))
+
+    WHY DERIVE-AND-COMPARE STILL NEEDS A COLLISION GUARD. The venue
+    disambiguates its token space LEAGUE-WIDE: `wilcon2` (William Contreras,
+    beside Willson) and `bretbat` (Brett Bateman at 4+3, beside Brett Baty).
+    We only produce the plain 3+3 form, so an EXTENDED venue token can never
+    match ours -- a coverage miss, the refusal this module prefers. But the
+    PLAIN form is not safe by construction: whichever of a same-named pair
+    owns it at the venue, the OTHER one's name derives to exactly that plain
+    token, and when the two appear in ONE fixture (Willson's and William's
+    clubs meet repeatedly every season) a plain-token match would price the
+    wrong person. That is what `prop_same_name_collision_at_venue` in the
+    match loop refuses: both forms coexisting in the matched fixture makes
+    the plain form's identity undecidable from our side, so BOTH same-named
+    players refuse there. Board-side, two of OUR rows sharing a token in one
+    game still refuse via `prop_player_token_ambiguous`.
+
+    NAMED RESIDUAL, not closed: both players in one game, the venue listing
+    ONLY the plain-owner, and our board quoting ONLY the extended-owner --
+    no variant token exists anywhere to detect, and deciding it needs lineup
+    knowledge the join does not have. Refusing every league-ambiguous token
+    outright would cost the plain-owner's legitimate matches all season, so
+    the fixture-scoped guard is the deliberate stopping point.
+    """
+    words = _player_name_words(player_name)
+    if len(words) < 2:
+        # One word cannot fill both halves of the encoding; inventing a
+        # repeat would be the guess this function exists to avoid.
+        return None
+    return words[0][:3] + words[-1][:3]
+
+
+def _polymarket_token_alt43(player_name: Any) -> str | None:
+    """The 4+3 encoding of OUR OWN name, or None when it adds nothing.
+
+    `bretbat` is Brett Bateman at 4+3 because Brett Baty collides at
+    `brebat` -- the venue's longer-prefix collision mechanism, beside the
+    digit suffix. This exists ONLY for the collision guard: seeing our own
+    4+3 beside our plain 3+3 in one fixture proves a same-named pair there.
+    It is never used to MATCH -- decoding which player owns which form is
+    the guess this file refuses to make.
+    """
+    words = _player_name_words(player_name)
+    if len(words) < 2 or len(words[0]) <= 3:
+        return None
+    return words[0][:4] + words[-1][:3]
+
+
+def _parse_player_prop(parsed: Mapping[str, Any]) -> dict[str, Any] | None:
+    """`{market, token, line}` for an admitted player-prop slug, or None.
+
+    The shape is exactly `<family>-<playertoken>-gte<N>` -- three modifiers,
+    no more, no fewer. `yrfi` (one token), `ftts-tou` (two), `es-3-0`
+    (numbers), and inning/segment shapes all fail this bound and stay in the
+    out-of-scope census, which is where an unadmitted family must remain
+    visible.
+
+    MLB ONLY, by the raw slug league token: the family vocabulary was
+    measured on MLB slugs and nowhere else. `k-` on some other league is not
+    known to mean strikeouts, and admission-by-analogy is how a segment got
+    priced as a full game twice in August.
+
+    The line is `N - 0.5`: "at least N" is the board's OVER of N-0.5. Integer
+    thresholds only -- a fractional `gte` has never been observed, and a shape
+    we have not seen refuses rather than rounding.
+    """
+    if str(parsed.get("league") or "") != "mlb":
+        return None
+    modifiers = [str(m).strip().lower() for m in (parsed.get("modifiers") or [])]
+    if len(modifiers) != 3:
+        return None
+    family, token, threshold = modifiers
+    board_market = _PROP_FAMILY_TO_BOARD.get(family)
+    if board_market is None:
+        return None
+    if not _PROP_PLAYER_TOKEN.match(token) or _GTE_TOKEN.match(token):
+        return None
+    gte = _GTE_TOKEN.match(threshold)
+    if not gte:
+        return None
+    try:
+        at_least = int(gte.group("num"))
+    except ValueError:
+        return None
+    if at_least < 1:
+        return None
+    return {"market": board_market, "token": token, "line": at_least - 0.5}
+
+
+def _prop_probability_for_side(side: Any, candidate: Mapping[str, Any]) -> float | None:
+    """P(board side) of a `gte` prop from its Yes/No outcomes, or None.
+
+    `over` -> `Yes` and `under` -> `No` is NOT the fixed-constant trap the
+    Kalshi order path fell into: a `gte<N>` market's Yes IS the at-least side
+    by the slug's own grammar, the way `_greater_than_line` reads `gt`. A
+    market whose outcomes are not literally Yes/No refuses -- never a
+    positional pick, and never `1 - p` on a one-sided quote (the venue quotes
+    one-sided for real: a missing No is a missing price, not 1 - Yes).
+    """
+    wanted = {"over": "yes", "under": "no"}.get(_norm(side))
+    if wanted is None:
+        return None
+    for name, probability in candidate.get("outcomes") or ():
+        if _norm(name) == wanted:
+            return probability
+    return None
+
+
 def _subject_token(parsed: Mapping[str, Any]) -> str:
     """The slug's trailing SUBJECT -- who the Yes/No contract is ABOUT.
 
@@ -1078,6 +1300,59 @@ def join_polymarket_to_board(
     unmatched_samples: list[dict[str, Any]] = []
     unmatched_seen: set[str] = set()
 
+    # THE COMPLETE CLASSIFICATION beside the bounded sample. The samples above
+    # decompose ONE row per (kind, league, market); a RATE needs the whole
+    # population, and "2 of 3 samples are rung-misses" is an anecdote wearing a
+    # percentage. `<class>|<family>` -> count, counted for EVERY prop no-match
+    # row, so `rung_miss|batter_hits / no_match|mlb|batter_hits` is readable
+    # from one log line. Invariant, asserted in tests: per family, the class
+    # counts sum exactly to `no_match|mlb|<family>`.
+    prop_unmatched_classes: dict[str, int] = {}
+
+    # token -> sorted venue lines, for ONE fixture+family. Built at most once
+    # per (family, date, fixture) per join and shared by the classifier and
+    # the sample builder -- two scanners over the same candidates would be two
+    # implementations that must agree, which is the two-guards trap. Cache is
+    # naturally bounded by families x dates x fixtures on the slate.
+    prop_fixture_profiles: dict[tuple[str, str, str], dict[str, list[float]]] = {}
+
+    def _prop_fixture_profile(
+        board_row: Mapping[str, Any],
+        board_market: str,
+        league: str,
+        date: str,
+        candidates: Sequence[Mapping[str, Any]],
+    ) -> dict[str, list[float]]:
+        cache_key = (
+            board_market,
+            date,
+            str(board_row.get("event_id") or "")
+            or f"{board_row.get('away_team')}|{board_row.get('home_team')}",
+        )
+        cached = prop_fixture_profiles.get(cache_key)
+        if cached is not None:
+            return cached
+        profile: dict[str, list[float]] = {}
+        for c in candidates:
+            cand_prop = c.get("prop")
+            if not isinstance(cand_prop, Mapping):
+                continue
+            cand_token = str(cand_prop.get("token") or "")
+            if not cand_token:
+                continue
+            if not _teams_match(
+                board_row, c["parsed"], board_row.get("sport") or sport,
+                board_fixtures.get((league, date)),
+            ):
+                continue
+            slot = profile.setdefault(cand_token, [])
+            if c.get("line") is not None and float(c["line"]) not in slot:
+                slot.append(float(c["line"]))
+        for slot in profile.values():
+            slot.sort()
+        prop_fixture_profiles[cache_key] = profile
+        return profile
+
     def _note_unmatched(
         kind: str,
         board_row: Mapping[str, Any],
@@ -1085,13 +1360,15 @@ def join_polymarket_to_board(
         league: str,
         date: str,
         candidates: Sequence[Mapping[str, Any]],
+        prop_token: str | None = None,
+        prop_profile: Mapping[str, Sequence[float]] | None = None,
     ) -> None:
         key = f"{kind}|{league}|{board_market}"
         unmatched_counts[key] = unmatched_counts.get(key, 0) + 1
         if key in unmatched_seen or len(unmatched_samples) >= 10:
             return
         unmatched_seen.add(key)
-        unmatched_samples.append({
+        sample: dict[str, Any] = {
             "kind": kind,
             "board": f"{board_row.get('away_team')} @ {board_row.get('home_team')}"[:52],
             "want": f"{board_market}|{board_row.get('side')}|{board_row.get('line')}",
@@ -1103,7 +1380,51 @@ def join_polymarket_to_board(
                 f"{c['parsed']['away']}-{c['parsed']['home']}@{c.get('line')}"
                 for c in list(candidates)[:5]
             ],
-        })
+        }
+        if prop_token is not None:
+            # WHO THE PROP IS ABOUT, because for a prop the fields above name
+            # everything EXCEPT the player: `want` is market|side|line and
+            # `offered` is fixtures drawn unfiltered from the whole
+            # (league, date, market) bucket. Measured 2026-09-01T18:20:10Z:
+            # ~230 `no_match|mlb|<prop market>` per cycle, and a token-encoding
+            # miss -- `wilcon2` (William Contreras) or `bretbat` (Brett
+            # Bateman), the venue's own collision-extended forms our derived
+            # 3+3 encoding deliberately never produces -- was indistinguishable
+            # in the sample from a rung the venue does not list or a player it
+            # does not list. (`prop_modifier_census` cannot see them either:
+            # it strips digit-bearing tokens, so `wilcon2`-class rows collapse
+            # to bare family shapes there.)
+            #
+            # `fixture_tokens` is the venue's player tokens for the SAME
+            # fixture and family, NEAR tokens first -- collision-extended
+            # forms share the 3-char first-name prefix (`wilcon2`/`wilcon`,
+            # `bretbat`/`brebat`), so ordering on that prefix keeps them
+            # inside the bound instead of truncated behind teammates.
+            # `token_lines` is the venue's rungs for OUR token in this
+            # fixture. One read now decomposes:
+            #   token-miss         near variant in fixture_tokens, ours absent
+            #   rung-miss          token_lines non-empty, our line not in them
+            #   player-not-listed  fixture_tokens filled by other players only
+            #   fixture-miss       offered non-empty, fixture_tokens empty
+            #
+            # Derived from the SHARED fixture profile (see
+            # `_prop_fixture_profile`) when the caller already built one for
+            # the complete classifier; the no_candidates call site passes none
+            # and the empty-bucket scan below produces empties at zero cost.
+            # Profile keys keep candidate insertion order, so near-first here
+            # orders identically to the original per-sample scan.
+            # Diagnostic only: nothing here changes what is matched.
+            if prop_profile is None:
+                prop_profile = _prop_fixture_profile(
+                    board_row, board_market, league, date, candidates
+                )
+            near_tokens = [t for t in prop_profile if t[:3] == prop_token[:3]]
+            far_tokens = [t for t in prop_profile if t[:3] != prop_token[:3]]
+            sample["player"] = str(board_row.get("player_name") or "")[:28]
+            sample["token"] = prop_token
+            sample["fixture_tokens"] = (near_tokens + far_tokens)[:6]
+            sample["token_lines"] = list(prop_profile.get(prop_token) or ())[:6]
+        unmatched_samples.append(sample)
 
     def _note_out_of_scope(venue_type: str, parsed: Mapping[str, Any], row: Mapping[str, Any]) -> None:
         key = f"{venue_type}|{parsed.get('league')}"
@@ -1170,6 +1491,16 @@ def join_polymarket_to_board(
     forward_date_widened: dict[str, int] = {}
     alignment_samples: list[dict[str, Any]] = []
     orientation_flip_samples: list[dict[str, Any]] = []
+
+    # Kill switch for the player-prop admission, ON by default. The prop path
+    # feeds the QUOTE CAPTURE; the money path is gated separately and OFF in
+    # `portfolio_commit._polymarket_price_resolver`, so this switch exists
+    # only to turn the instrumentation off without a code deploy.
+    import os as _os
+
+    prop_join_enabled = str(
+        _os.environ.get("SYNDICATE_POLYMARKET_PROP_JOIN") or ""
+    ).strip().lower() not in {"0", "off", "false", "no"}
 
     for row in markets:
         parsed = parse_slug(row.get("slug"))
@@ -1303,6 +1634,20 @@ def join_polymarket_to_board(
                 # would match any corners line at all, so a slug carrying none
                 # refuses downstream rather than pricing the wrong contract.
                 board_market = "alternate_totals_corners"
+        prop_info: dict[str, Any] | None = None
+        if (
+            board_market is None
+            and prop_join_enabled
+            and venue_type == "SPORTS_MARKET_TYPE_PROP"
+        ):
+            # MLB PLAYER PROPS, admitted per family from the measured census
+            # -- see `_parse_player_prop` and the constants block. A slug that
+            # does not fit the measured three-modifier `gte` shape falls
+            # through to the out-of-scope census below, where an unadmitted
+            # family stays countable.
+            prop_info = _parse_player_prop(parsed)
+            if prop_info is not None:
+                board_market = prop_info["market"]
         if board_market is None:
             # PROP lands here -- a real market, deliberately out of scope (see
             # the module header). DRAWABLE_OUTCOME no longer does; it is in
@@ -1380,7 +1725,15 @@ def join_polymarket_to_board(
         key = (row_league, parsed["date"], board_market)
         index.setdefault(key, []).append(
             {"parsed": parsed, "row": row, "outcomes": outcomes,
-             "line": _resolved_line(parsed, row, board_market, line_source, line_gap_samples),
+             # A prop's line comes from its `gte` token and NOWHERE else --
+             # `_resolved_line` would fall back to the row's `line` field,
+             # which has never been measured for props, and its counters
+             # would drown in per-player noise.
+             "prop": prop_info,
+             "line": (
+                 prop_info["line"] if prop_info is not None
+                 else _resolved_line(parsed, row, board_market, line_source, line_gap_samples)
+             ),
              # THE FIXTURE AS AN UNORDERED PAIR OF CANONICAL CLUB NAMES, or
              # None when either token will not canonicalise. Computed ONCE per
              # market here rather than per unmatched row, which is the
@@ -1421,12 +1774,66 @@ def join_polymarket_to_board(
             if pair not in slot:
                 slot.append(pair)
 
+    # WHICH BOARD PLAYERS SHARE A DERIVED TOKEN, PER GAME. Two of our own
+    # players encoding to one token cannot be told apart at the venue, so BOTH
+    # refuse -- picking either is the wrong-person order this module exists to
+    # prevent. Keyed on the board's own `event_id` (the game IS part of a
+    # prop's identity -- learned the hard way, see `_resolver_key`), owners
+    # deduplicated through `normalize_person` so two spellings of one player
+    # do not read as a collision.
+    from syndicate.features.shared.kalshi_board_join import normalize_person as _norm_person
+    from syndicate.features.shared.market_keys import canonical_market_key as _canon_market
+
+    prop_token_owners: dict[tuple[str, str], set[str]] = {}
+    for board_row in board_rows:
+        _raw_mk = str(board_row.get("market") or "").strip().lower()
+        _canon_mk = _canon_market(board_row.get("sport"), _raw_mk) or _raw_mk
+        if _canon_mk not in _JOINABLE_PROP_BOARD_MARKETS:
+            continue
+        _tok = _polymarket_player_token(board_row.get("player_name"))
+        if not _tok:
+            continue
+        prop_token_owners.setdefault(
+            (str(board_row.get("event_id") or ""), _tok), set()
+        ).add(_norm_person(board_row.get("player_name")))
+
     matches: list[dict[str, Any]] = []
     for board_row in board_rows:
         board_market = str(board_row.get("market") or "").strip().lower()
+        is_prop = False
+        prop_token: str | None = None
         if board_market not in _JOINABLE_BOARD_MARKETS:
-            refuse("board_market_not_a_game_line")
-            continue
+            # THE PROP GATE. Canonicalised first (`pitcher_strikeouts` and
+            # `strikeouts` are one market, `#224`), then bounded exactly the
+            # way the venue side is: MLB only, player present, token
+            # derivable, token unambiguous among OUR OWN players for this
+            # game. Every bound refuses BY NAME -- a prop that stops matching
+            # with no reason emitted is indistinguishable from a venue that
+            # stopped quoting.
+            _canon_mk = _canon_market(board_row.get("sport"), board_market) or board_market
+            if (
+                prop_join_enabled
+                and _canon_mk in _JOINABLE_PROP_BOARD_MARKETS
+                and _norm(board_row.get("sport") or sport) == "mlb"
+            ):
+                if not str(board_row.get("player_name") or "").strip():
+                    refuse("prop_row_missing_player")
+                    continue
+                prop_token = _polymarket_player_token(board_row.get("player_name"))
+                if not prop_token:
+                    refuse("prop_player_token_underivable")
+                    continue
+                owners = prop_token_owners.get(
+                    (str(board_row.get("event_id") or ""), prop_token)
+                ) or set()
+                if len(owners) > 1:
+                    refuse("prop_player_token_ambiguous")
+                    continue
+                board_market = _canon_mk
+                is_prop = True
+            else:
+                refuse("board_market_not_a_game_line")
+                continue
         # THE MIRROR OF THE VENUE-SIDE GUARD ABOVE. That one refuses a segment
         # MARKET; this refuses a segment ROW. Without both, the only markets in
         # the index are full-game and the only thing a `first3` row can match is
@@ -1551,15 +1958,36 @@ def join_polymarket_to_board(
                     # name is the disagreement.
                     "markets_for_our_league_date": same_league_date,
                 })
-            _note_unmatched("no_candidates", board_row, board_market, league, date, [])
+            _note_unmatched(
+                "no_candidates", board_row, board_market, league, date, [],
+                prop_token=prop_token,
+            )
             refuse("no_polymarket_market_for_league_date_market")
             continue
 
         board_line = _as_float(board_row.get("line"))
         side = str(board_row.get("side") or "").strip()
         picked: dict[str, Any] | None = None
+        # Whether THIS row's search ended in ambiguity, read as a delta on the
+        # shared counter -- the prop no-match path below must not stack a
+        # second refusal on a row the ambiguity guard already refused.
+        _ambiguous_before = refusals.get("ambiguous_polymarket_match", 0)
         for candidate in candidates:
-            if board_market in _LINE_BEARING_BOARD_MARKETS:
+            if is_prop:
+                # A prop's identity is (game, market, PLAYER, line) -- the
+                # player and the line are both mandatory, exact, and derived,
+                # never fuzzy. A candidate without prop fields is a game-line
+                # market sharing nothing but the bucket.
+                cand_prop = candidate.get("prop")
+                if not isinstance(cand_prop, Mapping):
+                    continue
+                if str(cand_prop.get("token") or "") != prop_token:
+                    continue
+                if board_line is None or candidate["line"] is None:
+                    continue
+                if abs(float(candidate["line"]) - float(board_line)) > 1e-9:
+                    continue
+            elif board_market in _LINE_BEARING_BOARD_MARKETS:
                 if board_line is None or candidate["line"] is None:
                     continue
                 if abs(float(candidate["line"]) - float(board_line)) > 1e-9:
@@ -1591,6 +2019,50 @@ def join_polymarket_to_board(
                 refuse("ambiguous_polymarket_match")
                 break
             picked = candidate
+        if picked is None and is_prop:
+            # NO ORIENTATION FORENSICS FOR PROPS. The flip counters below are
+            # a calibrated instrument for a soccer GAME-LINE question, read
+            # denominator-first in production; letting ~200 prop rows per
+            # cycle into `tried` would move every rate it reports without
+            # touching the question it answers. A prop that found candidates
+            # and paired none is a token, rung, or listing miss -- and which
+            # one is readable from the sample: `prop_token` makes
+            # `_note_unmatched` print the player, our derived token, and the
+            # venue's tokens for this fixture+family beside the rungs it
+            # offers for ours. See the decomposition table there.
+            #
+            # AND COUNTED COMPLETELY, not just sampled. The first production
+            # read of the samples (2026-09-01T19:18:45Z) showed 2 rung-misses
+            # and 1 player-not-listed -- three rows standing in for ~224, which
+            # is a reading, not a rate. The class counter makes the rate: per
+            # family, these buckets sum exactly to `no_match|mlb|<family>`.
+            # Class order is decisive-first: our token listed at other lines
+            # (rung_miss) beats a shared 3-char prefix (near_token, the
+            # `wilcon2`-class candidate), beats other players only
+            # (player_not_listed), beats a bucket holding no row for OUR
+            # fixture at all (fixture_miss).
+            if refusals.get("ambiguous_polymarket_match", 0) == _ambiguous_before:
+                _profile = _prop_fixture_profile(
+                    board_row, board_market, league, date, candidates
+                )
+                if _profile.get(prop_token):
+                    _cls = "rung_miss"
+                elif any(t[:3] == prop_token[:3] for t in _profile):
+                    _cls = "near_token"
+                elif _profile:
+                    _cls = "player_not_listed"
+                else:
+                    _cls = "fixture_miss"
+                _cls_key = f"{_cls}|{board_market}"
+                prop_unmatched_classes[_cls_key] = (
+                    prop_unmatched_classes.get(_cls_key, 0) + 1
+                )
+                _note_unmatched(
+                    "no_match", board_row, board_market, league, date, candidates,
+                    prop_token=prop_token, prop_profile=_profile,
+                )
+                refuse("no_matching_polymarket_market")
+            continue
         if picked is None:
             # ----------------------------------------------------------
             # WOULD THIS ROW PAIR IF THE FIXTURE'S SIDES WERE SWAPPED?
@@ -1796,7 +2268,51 @@ def join_polymarket_to_board(
                 refuse("no_matching_polymarket_market")
             continue
 
-        probability = _probability_for_side(side, picked, board_row.get("sport") or sport, board_row)
+        if is_prop:
+            # THE SAME-NAME COLLISION GUARD, and it runs ONLY on a row that
+            # just matched -- a refusal path cannot pick a wrong person. The
+            # venue extends a colliding token league-wide (`wilcon2` beside
+            # `wilcon`, `bretbat` beside `brebat`); we derive only the plain
+            # form, so when BOTH forms sit in the fixture we just matched,
+            # the plain rows we picked belong to WHICHEVER of the two the
+            # venue keyed plain -- undecidable from our side, and Willson's
+            # and William's clubs meet repeatedly every season. Both
+            # same-named board rows refuse here; a fixture holding only one
+            # form keeps matching exactly as before (test-pinned both ways).
+            # FIXTURE-SCOPED deliberately: a variant in another game says the
+            # pair exists, not that OUR fixture's plain rows are ambiguous --
+            # and refusing league-wide would cost the plain-owner's
+            # legitimate matches every day both are listed. The residual this
+            # cannot see is named in `_polymarket_player_token`'s docstring.
+            _alt43 = _polymarket_token_alt43(board_row.get("player_name"))
+            _collision_token = None
+            for c in candidates:
+                cand_prop = c.get("prop")
+                if not isinstance(cand_prop, Mapping):
+                    continue
+                _ct = str(cand_prop.get("token") or "")
+                if not _ct or _ct == prop_token:
+                    continue
+                _digit_ext = (
+                    _ct.startswith(prop_token)
+                    and _ct[len(prop_token):].isdigit()
+                    and len(_ct) - len(prop_token) <= 2
+                )
+                if not _digit_ext and _ct != _alt43:
+                    continue
+                if not _teams_match(
+                    board_row, c["parsed"], board_row.get("sport") or sport,
+                    board_fixtures.get((league, date)),
+                ):
+                    continue
+                _collision_token = _ct
+                break
+            if _collision_token is not None:
+                refuse("prop_same_name_collision_at_venue")
+                continue
+            probability = _prop_probability_for_side(side, picked)
+        else:
+            probability = _probability_for_side(side, picked, board_row.get("sport") or sport, board_row)
         if probability is None:
             # The measured failure of the game-line join, kept as its own
             # counter: the market matched but we cannot place the SIDE.
@@ -1861,7 +2377,13 @@ def join_polymarket_to_board(
         # BOARD's own fixture id so two clubs cannot be conflated across dates.
         _lkey = (
             str(board_row.get("event_id") or ""),
-            board_market,
+            # THE PLAYER IS PART OF A PROP LADDER'S IDENTITY. Without the
+            # token, Tatis's hits rungs and Machado's sort into ONE ladder and
+            # the monotonicity check compares prices that share no market --
+            # condemning ladders that are individually clean. The standing
+            # rule (learnings 2026-08-27): a join key for a player prop that
+            # omits the player is a defect that looks like a working join.
+            f"{board_market}|{prop_token}" if is_prop else board_market,
             str(side or "").strip().lower(),
         )
         if _lkey[0] and board_line is not None and _lkey[2] in {"over", "under"}:
@@ -1933,7 +2455,11 @@ def join_polymarket_to_board(
             delta = (p_b - p_a) if side_name == "over" else (p_a - p_b)
             if delta > worst:
                 worst = delta
-        league_key = f"{market_name}|{side_name}"
+        # The COUNT aggregates per market -- a prop ladder key carries its
+        # player token (`batter_hits|jacmer`), and per-player count keys would
+        # turn this summary into a roster. The LADDER key keeps the token; the
+        # counter drops it.
+        league_key = f"{market_name.split('|')[0]}|{side_name}"
         # A tolerance, because two rungs quoted a tick apart are noise rather
         # than a contradiction. Anything above it is an ORDERING error.
         if worst > 0.02:
@@ -1978,6 +2504,12 @@ def join_polymarket_to_board(
             sorted(unmatched_counts.items(), key=lambda kv: -kv[1])
         ),
         "unmatched_samples": unmatched_samples,
+        # The COMPLETE prop no-match classification (`<class>|<family>` ->
+        # count). Per family these sum exactly to `no_match|mlb|<family>`
+        # above, so class/family IS a rate, not a sampled reading.
+        "prop_unmatched_classes": dict(
+            sorted(prop_unmatched_classes.items(), key=lambda kv: -kv[1])
+        ),
         # One per board market that found an empty bucket, with the
         # neighbouring index keys that say WHICH component disagreed.
         "key_miss_samples": key_miss_samples,

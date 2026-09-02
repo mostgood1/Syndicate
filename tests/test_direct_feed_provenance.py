@@ -151,7 +151,11 @@ def test_the_kalshi_capture_stamps_provenance(tmp_path, monkeypatch):
     monkeypatch.setattr(odds_book_quotes, "append_book_quotes", _fake_append)
     monkeypatch.setattr(
         odds_book_quotes, "quote_rows_from_kalshi_matches",
-        lambda matches: [{
+        # `**_kw` so a new keyword on the real function (e.g. the soccer
+        # `allow_game_lines` opt-in) surfaces as a real assertion failure rather
+        # than a TypeError the capture's try/except swallows into
+        # QUOTE_CAPTURE_FAILED -- which is exactly how it failed once.
+        lambda matches, **_kw: [{
             "sport": "wnba", "date": "2026-09-18", "kind": "game", "event_id": "e1",
             "home_team": "Atlanta Dream", "away_team": "Minnesota Lynx",
             "market": "h2h", "segment": "full", "selection": "home",

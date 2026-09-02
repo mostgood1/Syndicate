@@ -4,6 +4,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import shutil
 import sys
 import threading
 import subprocess
@@ -25,6 +26,15 @@ from flask import url_for
 from syndicate.features.shared.artifact_publisher import HOT_ARTIFACT_PATTERNS
 from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
 from syndicate.features.shared.artifact_publisher import relative_to_data_root
+# Private on purpose, and imported rather than re-stated. It is the SAME
+# predicate that decides a Range/tail pull in `pull_streamed_artifact`, and the
+# two must not drift: merging establishes the append-only invariant that the
+# tail pull already assumes. A second copy of this list is a way for one to
+# start merging a family the other still replaces, or vice versa.
+from syndicate.features.shared.artifact_publisher import _is_append_only
+from syndicate.features.shared.artifact_merge import merge_append_only
+from syndicate.features.shared.artifact_merge import is_mergeable_odds_history
+
 from syndicate.features.shared.ops_refresh import build_refresh_plan
 from syndicate.features.shared.ops_refresh import _assert_no_active_refresh_run
 from syndicate.features.shared.ops_refresh import cancel_latest_refresh_run
@@ -1675,6 +1685,120 @@ _PUBLISH_STREAM_CHUNK_BYTES = 1024 * 1024
 
 _PUBLISH_DIVERGENCE_SHRINK_RATIO = 0.80
 _PUBLISH_LAST_PUBLISHER: dict[str, str] = {}
+# How many times in a row this path's publish has been refused. A permanent
+# block and a one-off look identical without it -- see the note in
+# `_publish_divergence_verdict`.
+#
+# BOTH OF THESE ARE PER-PROCESS, and web runs 2 gunicorn workers. So `last` is
+# whoever last published THROUGH THIS WORKER, and a worker that has not yet seen
+# this path reads `last=None` -> `cross=False` -> ALLOWED. The guard is
+# therefore leaky by construction and always has been; this is stated rather
+# than fixed, because a cross-process store is a different change and merging
+# (`_merge_published_artifact`) removes the need for the guard on the families
+# that actually collide.
+_PUBLISH_CONSECUTIVE_REFUSALS: dict[str, int] = {}
+
+
+# `Popen` without a later `wait()` leaves a ZOMBIE for every merge: the child is
+# dead but its exit status is unreaped, so it keeps a PID table entry. Observed
+# in production within an hour of the deferred merge shipping -- deploy_preflight
+# reported `3 defunct child(ren) awaiting reap` under the gunicorn workers. One
+# per odds_history publish, and those come in bursts of twelve.
+#
+# `signal.SIGCHLD = SIG_IGN` would auto-reap but breaks `subprocess.run` exit
+# codes elsewhere in this process, so instead the handles are kept and polled on
+# the next spawn. Reaping is O(pending) and pending is tiny.
+_PENDING_MERGE_CHILDREN: list = []
+
+
+def _reap_finished_merge_children() -> int:
+    """Poll previously spawned merge children so they stop being zombies."""
+    global _PENDING_MERGE_CHILDREN
+    alive = []
+    reaped = 0
+    for proc in _PENDING_MERGE_CHILDREN:
+        try:
+            if proc.poll() is None:
+                alive.append(proc)
+            else:
+                reaped += 1
+        except Exception:
+            reaped += 1
+    _PENDING_MERGE_CHILDREN = alive
+    return reaped
+
+
+def _spawn_odds_history_merge(relative_path: str, target_path: Path, incoming_path: Path) -> dict:
+    """Stage the incoming copy and hand the merge to a SUBPROCESS. `#630`.
+
+    THE REQUEST DOES NOT WAIT, and the allocation does not happen here. Measured
+    on the real MLB shard, the JSON union peaks at 276 MB on 88 MB of input
+    (3.13x). Run inside gunicorn that RATCHETED web's floor from 717.7 MB at
+    boot to ~1030 MB once merges started, and it did not come back -- CPython
+    does not return freed arenas to the OS. **A background THREAD would not have
+    fixed that**: same process, same arenas. A child process gives the whole
+    address space back when it exits.
+
+    It also restores `CLAUDE.md`'s rule that the web service does no heavy
+    computation -- a 276 MB parse in a request handler is what that forbids.
+
+    FAILURE IS BENIGN BY CONSTRUCTION. The target is NOT touched here, so if the
+    child never runs the target keeps the copy it already had: stale by one
+    publish, which is the pre-merge behaviour and not a clobber. The child owns
+    deleting the staging file, including on refusal.
+    """
+    reaped = _reap_finished_merge_children()
+    staging = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.staged"
+    try:
+        os.replace(incoming_path, staging)
+    except Exception as exc:
+        return {"spawned": False, "error": f"stage_failed: {type(exc).__name__}: {exc}"}
+    script = Path(__file__).resolve().parents[2] / "scripts" / "merge_odds_history_artifact.py"
+    try:
+        child = subprocess.Popen(
+            [sys.executable, str(script), "--target", str(target_path),
+             "--incoming", str(staging), "--relative-path", relative_path],
+            # INHERIT stdout/stderr so the child's ODDS_HISTORY_MERGE line reaches
+            # Render's log collector. The parent does not wait, so that line IS
+            # the only record the merge ever happened -- DEVNULL here (the first
+            # version) made the whole deferred path unobservable.
+            close_fds=True,
+        )
+    except Exception as exc:
+        # Could not spawn: promote the staged copy so the publish is not simply
+        # dropped. That is the plain replace, i.e. today's behaviour.
+        try:
+            os.replace(staging, target_path)
+        except Exception:
+            pass
+        return {"spawned": False, "error": f"spawn_failed: {type(exc).__name__}: {exc}"}
+    _PENDING_MERGE_CHILDREN.append(child)
+    return {"spawned": True, "staged": staging.name, "reaped": reaped,
+            "pending_children": len(_PENDING_MERGE_CHILDREN)}
+
+
+def _merge_published_artifact(relative_path: str, target_path: Path, incoming_path: Path):
+    """Dispatch to the right merge for this family, or None to replace.
+
+    ONE dispatcher because there are TWO receive forms, and a family merged by
+    one path and replaced by the other would clobber on exactly the transport
+    nobody was watching.
+
+    The two families are handled differently for a MEASURED reason:
+
+        book_quotes  (line union)   34 MB in ->  20 MB peak   0.59x  <- inline
+        odds_history (JSON union)   88 MB in -> 276 MB peak   3.13x  <- subprocess
+
+    The line union streams and holds only 16-byte digests, so it is sub-linear
+    and stays here. The JSON union parses both documents and is moved out.
+    """
+    if not target_path.is_file():
+        return None                       # first write is a plain write
+    if _is_append_only(relative_path):
+        return merge_append_only(target_path, incoming_path)
+    if is_mergeable_odds_history(relative_path):
+        return _spawn_odds_history_merge(relative_path, target_path, incoming_path)
+    return None
 
 
 def _publish_divergence_verdict(relative_path: str, incoming_bytes: int, publisher: str):
@@ -1713,6 +1837,8 @@ def _publish_divergence_verdict(relative_path: str, incoming_bytes: int, publish
     if ratio >= _PUBLISH_DIVERGENCE_SHRINK_RATIO:
         if publisher:
             _PUBLISH_LAST_PUBLISHER[relative_path] = publisher
+        # This publish proceeds and writes, so any refusal streak is over.
+        _PUBLISH_CONSECUTIVE_REFUSALS.pop(relative_path, None)
         return False, None
     last = _PUBLISH_LAST_PUBLISHER.get(relative_path)
     who = publisher or "UNKNOWN"
@@ -1722,9 +1848,34 @@ def _publish_divergence_verdict(relative_path: str, incoming_bytes: int, publish
         f"existing_bytes={existing} ratio={ratio:.3f}"
     )
     cross = bool(publisher and last and publisher != last)
-    if publisher:
+    # `#630`: DO NOT record a publisher whose publish is about to be REFUSED.
+    #
+    # `_PUBLISH_LAST_PUBLISHER` means "who last WROTE this path". Recording a
+    # refused ATTEMPT made the refusal self-defeating: the refused publisher
+    # became `last`, so its very next attempt read as same-publisher and went
+    # straight through. Measured 2026-09-01 on `ncaaf_source/tracking/
+    # book_quotes/2026-09-05.jsonl`:
+    #
+    #     22:01:15  publisher=live-odds-worker  last=refresh-worker    REFUSED
+    #     22:05:03  publisher=live-odds-worker  last=live-odds-worker  ALLOWED
+    #
+    # and 9.2MB was replaced by 5.2MB four minutes later. The guard did not
+    # prevent the clobber, it DELAYED it by one cycle -- while logging a
+    # REFUSED line that reads like a save.
+    if publisher and not cross:
         _PUBLISH_LAST_PUBLISHER[relative_path] = publisher
-    return cross, marker + (" verdict=REFUSED" if cross else " verdict=ALLOWED_WITH_WARNING")
+    if not cross:
+        _PUBLISH_CONSECUTIVE_REFUSALS.pop(relative_path, None)
+        return False, marker + " verdict=ALLOWED_WITH_WARNING"
+    # A refusal that actually holds means this publisher's data NEVER LANDS for
+    # this path. That is a better failure than silent destruction and it is
+    # still a failure, so it is counted -- a path refused over and over is two
+    # writers fighting, and the answer is a merge (see `_merge_published_artifact`)
+    # or a single owner, not a guard. Without the count a permanent block looks
+    # identical to a one-off.
+    streak = _PUBLISH_CONSECUTIVE_REFUSALS.get(relative_path, 0) + 1
+    _PUBLISH_CONSECUTIVE_REFUSALS[relative_path] = streak
+    return True, marker + f" verdict=REFUSED consecutive_refusals={streak}"
 
 
 def _publish_streamed_body() -> Any:
@@ -1782,10 +1933,25 @@ def _publish_streamed_body() -> Any:
                 400,
             )
         publisher = str(request.headers.get("X-Artifact-Publisher") or "").strip()
+        will_merge = target_path.is_file() and (
+            _is_append_only(relative_path) or is_mergeable_odds_history(relative_path)
+        )
         refuse, marker = _publish_divergence_verdict(relative_path, written, publisher)
         if marker:
             print(marker, flush=True)
-        if refuse:
+        # `#630`: for a MERGED family the shrink guard must not refuse. It was
+        # built for `#488`, where a replace really did destroy rows, and a
+        # refusal was the only protection available. A merge keeps both sides,
+        # so refusing here would reject the very publish that carries the other
+        # service's rows -- turning the fix off. The marker still prints.
+        #
+        # That guard also has a defect of its own, measured 2026-09-01 and NOT
+        # fixed here: it sets `_PUBLISH_LAST_PUBLISHER` on the REFUSED branch
+        # too, so the refused publisher becomes "last" and its next attempt
+        # passes as same-publisher. `22:01:15 REFUSED` -> `22:05:03
+        # ALLOWED_WITH_WARNING`, 9.2MB replaced by 5.2MB. The refusal buys one
+        # cycle. Merging is what actually removes the hazard.
+        if refuse and not will_merge:
             temp_path.unlink(missing_ok=True)
             return (
                 jsonify({
@@ -1796,6 +1962,41 @@ def _publish_streamed_body() -> Any:
                     "publisher": publisher,
                 }),
                 409,
+            )
+        merged = _merge_published_artifact(relative_path, target_path, temp_path)
+        if merged is not None:
+            if merged.get("spawned"):
+                # temp_path has been MOVED to staging; the child owns it now and
+                # the target is deliberately untouched. Must not fall through to
+                # the replace below -- that is the clobber.
+                print(f"[ops.publish] ARTIFACT_MERGE_DEFERRED path={relative_path} "
+                      f"publisher={publisher or 'UNKNOWN'} bytes={written} "
+                      f"staged={merged.get('staged')}", flush=True)
+                return jsonify({
+                    "ok": True, "relative_path": relative_path, "bytes": written,
+                    "transport": "stream", "merge": "deferred",
+                }), 200
+            if merged.get("merged"):
+                temp_path.unlink(missing_ok=True)
+                print(
+                    f"[ops.publish] ARTIFACT_MERGE path={relative_path} "
+                    f"publisher={publisher or 'UNKNOWN'} transport=stream "
+                    f"bytes={target_path.stat().st_size} "
+                    f"{json.dumps({k: v for k, v in merged.items() if k != 'merged'}, sort_keys=True)}",
+                    flush=True,
+                )
+                return jsonify({
+                    "ok": True, "relative_path": relative_path,
+                    "bytes": target_path.stat().st_size, "transport": "stream",
+                    "merged": merged,
+                }), 200
+            # Merge refused or failed: fall through to the plain replace, which
+            # is exactly today's behaviour. NAMED, not swallowed -- a silent
+            # fallback would make the clobber look fixed while it continued.
+            print(
+                f"[ops.publish] ARTIFACT_MERGE_FALLBACK path={relative_path} "
+                f"reason={merged.get('error')} -- replacing instead",
+                flush=True,
             )
         os.replace(temp_path, target_path)
     except Exception as exc:
@@ -1833,6 +2034,37 @@ def _write_published_artifact(relative_path: str, content: Any) -> Any:
         with temp_path.open("wb") as handle:
             for start in range(0, len(content), _PUBLISH_ENCODE_CHUNK_CHARS):
                 handle.write(content[start : start + _PUBLISH_ENCODE_CHUNK_CHARS].encode("utf-8"))
+        # `#630`: the envelope form merges too, through the SAME dispatcher. It
+        # is not the path most publishes take, but live-odds-worker is PINNED to
+        # an older commit and this is the form it sends -- so fixing only the
+        # streamed path would leave the clobber live for one of the two writers
+        # that cause it, which is the whole defect.
+        merged = _merge_published_artifact(relative_path, target_path, temp_path)
+        if merged is not None:
+            if merged.get("spawned"):
+                print(f"[ops.publish] ARTIFACT_MERGE_DEFERRED path={relative_path} "
+                      f"transport=envelope staged={merged.get('staged')}", flush=True)
+                return jsonify({
+                    "ok": True, "relative_path": relative_path,
+                    "merge": "deferred",
+                }), 200
+            if merged.get("merged"):
+                temp_path.unlink(missing_ok=True)
+                print(
+                    f"[ops.publish] ARTIFACT_MERGE path={relative_path} transport=envelope "
+                    f"bytes={target_path.stat().st_size} "
+                    f"{json.dumps({k: v for k, v in merged.items() if k != 'merged'}, sort_keys=True)}",
+                    flush=True,
+                )
+                return jsonify({
+                    "ok": True, "relative_path": relative_path,
+                    "bytes": target_path.stat().st_size, "merged": merged,
+                }), 200
+            print(
+                f"[ops.publish] ARTIFACT_MERGE_FALLBACK path={relative_path} transport=envelope "
+                f"reason={merged.get('error')} -- replacing instead",
+                flush=True,
+            )
         os.replace(temp_path, target_path)
     except Exception as exc:
         # write_text() left the .tmp behind on any failure, on the same disk

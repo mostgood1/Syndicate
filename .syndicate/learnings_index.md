@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 653 rules `[generated]`
+## Index — 665 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 201**
+**FORBIDDEN — 208**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -137,6 +137,13 @@
 - [2026-09-01 FORBIDDEN: naming a MECHANISM from a SYMPTOM. Three times in one session, on…](#2026-09-01-forbidden-naming-a-mechanism-from-a-symptom-three-times-in-one-session-on-three-different-subjects-lane-wnba-accuracy-assessment)
 - [2026-09-01 FORBIDDEN: recording a LIVENESS field that the recorder itself cannot outlive](#2026-09-01-forbidden-recording-a-liveness-field-that-the-recorder-itself-cannot-outlive)
 - [2026-09-01 FORBIDDEN: leaving anything staged in the SHARED index that you are not comm…](#2026-09-01-forbidden-leaving-anything-staged-in-the-shared-index-that-you-are-not-committing-in-the-same-breath)
+- [2026-09-01 FORBIDDEN: running any git working-tree restore (`checkout --`, `restore`, `…](#2026-09-01-forbidden-running-any-git-working-tree-restore-checkout----restore-reset-without-pinning-the-repo-with--c-path-the-cwd-is-not-a-fact-on-this-machine-it-is-a-liability-that-destroys-other-sessions-work-lane-polymarket-prop-quote-capture)
+- [2026-09-01 — FORBIDDEN: comparing a model against a market price without conditioning o…](#2026-09-01-forbidden-comparing-a-model-against-a-market-price-without-conditioning-on-quote-age-a-stale-price-is-a-weak-forecast-so-staleness-flatters-the-model-the-error-runs-in-the-reassuring-direction-lane-mlb-live-gameline-skill-audit)
+- [2026-09-01 — FORBIDDEN: pooling an accuracy history across a SCORER-version boundary, a…](#2026-09-01-forbidden-pooling-an-accuracy-history-across-a-scorer-version-boundary-and-shipping-a-scorer-whose-payload-cannot-say-which-version-produced-it-lane-mlb-live-gameline-skill-audit)
+- [2026-09-01 — FORBIDDEN: `ast.parse` as a syntax check for an edit, and building a `writ…](#2026-09-01-forbidden-astparse-as-a-syntax-check-for-an-edit-and-building-a-write-and-a-read-of-the-same-path-in-one-expression-lane-mlb-live-gameline-skill-audit)
+- [2026-09-01 — FORBIDDEN: treating the timestamp on an ORDER as the timestamp of the PRIC…](#2026-09-01-forbidden-treating-the-timestamp-on-an-order-as-the-timestamp-of-the-price-it-took-board-prices-carry-a-real-age-and-the-error-does-not-surface-as-an-error-lane-game-market-entry-roi-curve)
+- [2026-09-01 — FORBIDDEN: closing or reassigning a lane because its RECORDED SESSION is g…](#2026-09-01-forbidden-closing-or-reassigning-a-lane-because-its-recorded-session-is-gone-the-session-id-is-not-an-ownership-key-it-is-a-stamp-that-outlives-the-thing-it-names-in-both-directions-lane-game-market-entry-roi-curve-ownership-pass)
+- [2026-09-02 FORBIDDEN: measuring a change by REPLAYING IT WITHOUT AN ARGUMENT PRODUCTION…](#2026-09-02-forbidden-measuring-a-change-by-replaying-it-without-an-argument-production-always-passes-the-replay-then-measures-a-different-system-and-its-null-result-is-not-about-your-change-lane-kalshi-soccer-club-aliases)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -220,7 +227,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 447**
+**Rules and corrections — 452**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -359,6 +366,11 @@
 - [2026-09-01 REQUIRED: assert on the VALUE THAT CROSSED THE BOUNDARY, not on the call ret…](#2026-09-01-required-assert-on-the-value-that-crossed-the-boundary-not-on-the-call-returning-it-didnt-raise-and-the-counter-moved-are-different-claims-and-only-the-second-is-evidence-lane-wnba-accuracy-assessment)
 - [2026-09-01 REQUIRED: a PRODUCER fix is not in force on data that already exists. Ask wh…](#2026-09-01-required-a-producer-fix-is-not-in-force-on-data-that-already-exists-ask-when-the-artifact-is-next-written-lane-wnba-accuracy-assessment)
 - [2026-09-01 REQUIRED: on the shared tree, read the DIFF of a ledger file before committi…](#2026-09-01-required-on-the-shared-tree-read-the-diff-of-a-ledger-file-before-committing-it-not-its---stat-lane-wnba-accuracy-assessment)
+- [2026-09-01 — RULE: a claimed GAIN that exceeds the TOTAL COST it is meant to remove is…](#2026-09-01-rule-a-claimed-gain-that-exceeds-the-total-cost-it-is-meant-to-remove-is-about-a-different-population-one-comparison-rejects-it-with-no-machinery-lane-game-market-entry-roi-curve)
+- [2026-09-01 — OVERTURNED: repairing a lossy artifact does not move a derived number in t…](#2026-09-01-overturned-repairing-a-lossy-artifact-does-not-move-a-derived-number-in-the-recovering-direction-a-truncated-file-is-not-a-random-sample-of-itself-lane-game-market-entry-roi-curve)
+- [2026-09-02 REQUIRED: a pre-registered falsification test still needs a CONTROL CYCLE be…](#2026-09-02-required-a-pre-registered-falsification-test-still-needs-a-control-cycle-before-you-act-on-it-one-reading-on-a-cadence-driven-instrument-is-not-evidence-lane-kalshi-soccer-club-aliases)
+- [2026-09-02 REQUIRED: before calling a thin downstream count a COVERAGE DEFECT, find the…](#2026-09-02-required-before-calling-a-thin-downstream-count-a-coverage-defect-find-the-counter-that-accounts-for-the-gap-and-read-the-code-that-increments-it-a-deliberate-quality-filter-and-a-broken-pipeline-look-identical-from-the-downstream-end-lane-kalshi-soccer-club-aliases---finding-soccer-board-coverage)
+- [2026-09-02 REQUIRED: a SIZE warning measured from the working tree is a statement about…](#2026-09-02-required-a-size-warning-measured-from-the-working-tree-is-a-statement-about-your-checkout-not-about-the-ledger-read-the-file-at-originmain-before-trimming-it-ledger-trim-pass)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

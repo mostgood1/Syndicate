@@ -45,6 +45,41 @@
 > wrong, EDIT THE LINE. Do not append a newer section that contradicts it. The
 > reasoning trail belongs in `deploys.md` (append-only measurement log).
 
+## [soccer-board-coverage] — MEASURED 2026-09-02, production, NOT A DEFECT
+
+**Soccer's thin board is a DELIBERATE QUALITY FILTER working correctly.** Full
+evidence: `.syndicate/findings_2026-09-02_soccer_board_coverage.md`.
+
+- Measured on `/api/board/layer2-shortlist`, one read, all sports: soccer
+  **selects 1,547 rows and 129 reach the board (8%)**, against mlb 804/850
+  (95%) and ncaaf 467/467 (100%). The counter accounting for it is
+  `rows_uninformative_ev = 1547` — exactly soccer's selected count.
+- **THE FILTER IS RIGHT.** `_row_ev_is_hold_restatement` drops a row whose
+  `ev_pct` is arithmetically the book's own margin: for a one-sided market the
+  price CANCELS and EV is `-hold` for every such row, so ranking on it ranks on
+  WHICH BOOK QUOTED. It fires only where the row has NO model view. Its own
+  evidence: 2,611 rows with a correct model edge topped out at **-4.73** against
+  a live shortlist whose #50 was **+0.64**. The value floor cannot catch them —
+  it is derived from the same hold, so filter and input move together.
+- **WHY SOCCER SPECIFICALLY:** by recorded decision, not oversight.
+  `soccer-model-dispersion` measured the model WORSE THAN MARKET IN 8 OF 9
+  LEAGUES and declined to publish `model_edge_pct`. Corroborated: only 19% of
+  the served soccer rows carry one.
+- **CHAIN, every link deliberate:** weak model -> no published model edge -> EV
+  degenerates to the book's hold -> filter removes the row -> few soccer
+  fixtures on the board -> Kalshi soccer cannot match (ceiling 28 of 171).
+- **DO NOT "FIX" THIS AS COVERAGE.** The two available moves are publishing a
+  model edge the model has not earned, or exempting soccer from the filter —
+  which puts ~1,400 rows ranked on the book's margin onto a money-adjacent
+  board. If ever done: behind a flag, default off, caveat stated where the rows
+  surface, and never described as a coverage fix.
+- **THE REAL LEVER IS UPSTREAM:** give soccer a model view worth ranking on —
+  `soccer-model-dispersion`'s open per-league discrimination work, not board
+  plumbing.
+- **THIRD REQUESTED FIX IN ONE SESSION THAT WAS ALREADY WORKING**, after the
+  soccer TITLE PARSER and the FORWARD FIXTURE HORIZON. The other two would have
+  shipped inert; this one would have degraded the board.
+
 ## [wnba-live-lens-directory] THE WNBA LIVE-LENS READERS OPENED THE WRONG DIRECTORY — fixed and verified locally, NOT DEPLOYED `[verified 2026-08-31, lane wnba-accuracy-assessment, commit 9dbb870d]`
 
 **Root cause, confirmed against LIVE Render config rather than inferred.**
@@ -596,9 +631,10 @@ game lines only for exchanges. Kalshi's own prices are now captured directly:
 props — a game row would collide with OddsAPI's copy under `_KEY_FIELDS`, which
 has no source term, and the two would ALTERNATE rather than merge). **This makes
 the prop side MEASURABLE; it does not show price shopping on props is worth
-anything** — that is `todo #624` step 2, and the only option-value number
-measured to date (+1.57pp, ~+1.2% ROI, n=13,093) is from GAME markets and must
-not be quoted for props.
+anything** — that is `todo #624` step 2. The game-market option-value number is
+**+1.57pp gross worth `+0.74 ROI points`** `[re-derived 2026-09-01, lane
+game-market-entry-roi-curve; the `~+1.2% ROI` first published is RETRACTED]` and
+still must not be quoted for props.
 
 Kalshi DOES quote MLB props (23 filled orders, `KXMLB*` tickers). **Until
 2026-09-01 those prices reached us ONLY through the direct feed**
@@ -610,6 +646,62 @@ MLB props, which is why step 1 was a CAPTURE and not a join.** The board's
 comparison is UNCHANGED by that capture and the 0-of-103 reading still stands:
 `quote.book_prices` is what the board reads, and changing it is step 3, gated on
 step 2.
+
+## [mlb-live-edge-forbidden] TWO STANDING CONSTRAINTS ON ANY MLB LIVE-EDGE WORK — lifted out of lane `live-prob-producer-reader-gap` when it closed `[2026-09-01]`
+
+**Recorded here because the lane that held them is CLOSED and a constraint that
+dies with its block is not a constraint.** Both are to be surfaced BEFORE any
+live-edge work, not discovered during it.
+
+1. **A live-edge attempt was SHIPPED AND BACKED OUT.** It priced
+   `modelProbOver`, **bit-identical to the PREGAME probability on 24 of 28
+   rows**; three props whose over had ALREADY WON still read 0.659 / 0.655 /
+   0.745, producing +36.5% / +32.3% / +15.8%. Mean |edge| on decided rows
+   **28.2% vs 12.0%** on undecided — **fabricated numbers twice the size of real
+   ones, sorting straight to the top of an edge-ranked board.** Treat as a
+   standing decision.
+2. **The live model TRAILS the market**, measured by `live-game-line-projection`
+   (CLOSED) on **8 of 9 scored dates**. **A live edge computed against a model
+   that trails the market is a false edge.** Even a clean keying fix does not by
+   itself make live opportunities safe to place.
+
+## [mlb-exchange-shopping-value] EXCHANGE PRICE-SHOPPING IS WORTH `+0.74 ROI POINTS` ON GAME MARKETS AND `+2.43%` ON THE PROP GATE BOOK — both re-derived, both smaller than first published `[verified 2026-09-01, lane game-market-entry-roi-curve]`
+
+**GAME MARKETS.** n=621 settled MLB game-market paper orders, 2026-08-22..08-31.
+Three anchors bracket: ledger stake-weighted **+6.14%**, flat-1u at the quoted
+price **+6.03%**, curve at the measured cost **+6.03%**. The book already enters
+at **0.883pp per side**. Curve: `0.00pp → +8.21%`, `0.88 → +6.04`, `2.50 →
++2.50`, `4.05 → −0.46`; slope **+1.91** (2.50→4.05pp), **+2.45** (0→1pp).
+Exchanges make **+1.579pp** available on this book's own rows; **+0.977pp is
+already banked** and of the **+0.602pp** residual **63.7% sits at books with no
+execution path**. Priced per row (n=551): no-exchange +4.49% → actual +6.69% →
+best execution venue **+7.43%** → best any book +8.45% → fair +8.98%. **The
+claimable figure is +0.74 points**, stable at +0.72..+0.77 across 15/30/60/120-min
+windows. Machinery `scripts/measure_game_market_option_value.py` (+38 tests, 11
+mutations each caught).
+
+**The `~+1.2% ROI` in the 08-31 assessment is RETRACTED**, wrong three ways: a
+`0.75` slope constant contradicting the table it cited (~1.77); a PROP book's
+curve priced against a GAME measurement; and `+1.57pp` being **ONE DATE**
+(2026-08-31 reproduces at n=13,344 / 52.4% / median +0.232pp against a published
+13,093 / 52.5% / +0.240pp; pooled over ten dates it is **+1.101pp**). **The tell
+needed no machinery: +1.57pp exceeds the 0.883pp of entry cost the whole book
+pays.**
+
+**PROPS, `#624` step 6 — STILL NOT MET on both conditions.** Re-measured on the
+HEALED 2026-09-01 shard (`e78aee52` live on web; the date passes its own guard at
+**100.0% matchable**, was 46.1%): gate book **n=1,235** (was 653), gain
+**+0.824pp** (was +0.949), two-way hold **6.5%**, **ROI +2.43%** (was +2.65%),
+shortfall **0.57** points (was 0.35). All props n=3,774, gross 70.1%/+1.709pp,
+fee-aware **52.2%/+0.985pp** — which now sits almost exactly on the game-market
+52.5%. **Repairing a file that had LOST rows made the exchange look WORSE**:
+rows before the clobber's cutoff take it 64.5% of the time for +1.021pp, the
+restored rows 40.2% for +0.737pp.
+
+**LEVEL vs SLOPE — do not spend the level.** Settlement is `settled_by =
+inferred`; real money ran **−5.5%** over adjacent days against paper's +9.4%.
+Ten dates is not a rate. 308 of 929 orders are unpriced and returned **+15.85%**
+against the priced rows' +6.14%, which plausibly OVERSTATES the residual.
 
 ## [mlb-live-lens-accuracy-refuses] THE MLB LIVE-LENS GRADER SETTLED FROM A RUNNING TALLY; it now refuses, and reads EMPTY because its feed never reaches web `[verified 2026-09-01, lane mlb-accuracy-assessment, commit 4b8d5436]`
 
@@ -1161,6 +1253,36 @@ demonstrating the bug. Pinned is not fixed.
   'series_out_of_scope': 1334, 'stat_not_in_market_vocabulary': 255,
   'event_not_on_our_board': 239, 'spread_line_orientation_mismatch': 24,
   'team_side_unresolved': 13}`.
+- **THE ABOVE IS SUPERSEDED — CORRECTED 2026-09-01 ~20:0xZ, read from production.
+  THE SOCCER TITLE PARSER IS FIXED AND HAS BEEN SINCE 2026-08-28/30.**
+  `[kalshi_odds] BOARD_JOIN` at 19:51:47Z: `unreadable_title` is **18 of 6,000
+  markets**, and every sampled `unreadable_title` GAP family today is NCAAF
+  SEASON AWARDS (`KXNCAAFACCAWARD` 99, `KXNCAAFBIG12AWARD` 98,
+  `KXNCAAFBIGTENAWARD` 98, `KXNCAAFSECAWARD` 100 — futures with no board market,
+  correctly refused). **ZERO soccer series appear in the gap list.**
+  `kalshi_catalogue` carries `_SOCCER_DRAW` ("Tie is the result"), `_SOCCER_BTTS`,
+  `_SOCCER_TOTAL` ("Will over 5.5 goals be scored?") and the
+  `more than`/`less than` spread wording, all read from production titles.
+  **Anyone told "fix the Kalshi soccer title parser" would ship an inert change.**
+- **THE REAL REASON KALSHI SOCCER NEVER REACHES THE BOARD IS THE DATE, AND IT IS
+  THE SAME DEFECT THE POLYMARKET JOIN ALREADY FIXED.** `kalshi_board_join`
+  compares each market's `game_date_from_ticker` against a SINGLE scalar
+  `wanted_date = selected_date` (lines 599/722/950) and refuses anything else as
+  `market_is_for_another_date` — **3,495 of 6,000, the largest refusal bucket.**
+  Measured from `[kalshi_odds] BY_GAME_DATE` 19:51:44Z: Kalshi's working set
+  holds **~900 full-game soccer markets spanning 2026-09-02..09-15 and NOT ONE
+  dated today** (KXMLSTOTAL, KXLALIGA/LIGUE1/SERIEA/BUNDESLIGA/EREDIVISIE
+  GAME+SPREAD+TOTAL, KXBELGIANPLGAME). Soccer is never same-day, so an
+  exact-date join can only ever match zero of it. The sibling
+  `polymarket_board_join` solved exactly this with a SOCCER-ONLY, FORWARD-ONLY
+  widening at `_FORWARD_HORIZON_DAYS = 14` — the same span Kalshi's soccer set
+  occupies.
+- **NOT FIXED HERE, and it is a USER DECISION because it is the MONEY PATH.**
+  `kalshi_board_join` feeds order pricing, and widening soccer date matching
+  would make soccer markets priceable and orderable for the first time — on a
+  sport whose model is recorded as NOT beating the market (`soccer-model-dispersion`:
+  worse than market in 8 of 9 leagues). Coverage and profitability are different
+  questions and this change couples them.
 - **KALSHI DOES LIST SOCCER; OUR CATALOGUE CANNOT READ ITS TITLES.** ~665
   markets refuse `unreadable_title`: `KXMLSTOTAL` 90, `KXLALIGATOTAL` 66,
   `KXLIGUE1TOTAL` 60, `KXSERIEATOTAL` 60, `KXBUNDESLIGATOTAL` 54,
@@ -1212,6 +1334,9 @@ demonstrating the bug. Pinned is not fixed.
   (2002)` derive token `max200` (parenthetical survives cleaning) — a
   derivation fix CHANGES MATCHING for deliberately-ambiguous names, own lane
   required.
+  rung-miss vs player-not-listed. First read: 2 rung-miss (Soto hits 0.5 vs
+  venue 1.5; Gasser K 4.5 vs {1.5,2.5,6.5}), 1 player-not-listed (Rocchio),
+  0 token-miss; counts unchanged (224 ≈ 230 baseline — instrumentation only).
   **UPDATED 2026-09-01 19:18Z `[lane polymarket-prop-resolver-arming, USER
   DECISION]`: the resolvers are ARMED** (key set by the user, injected by
   dep-dabi38dcqm1c73dmhdjg live 19:06:37Z). Verified first cycle:
@@ -8087,6 +8212,66 @@ Production effect is UNOBSERVED. Lane `board-cycle-overview-throughput`.
   loop cannot make a 71-minute-old quote fresh.
 
 None of the above is fixed. No lane holds them.
+
+## [polymarket-vs-kalshi-prop-prices] — MEASURED 2026-09-01, MLB, production shard
+
+**First cross-venue PROP price comparison the platform has ever been able to
+make** (exchange prop prices were in `book_quotes` nowhere before today). Full
+method + bounds: `.syndicate/findings_2026-09-01_polymarket_vs_kalshi_prop_prices.md`.
+
+- **Both venues quote ASKS, not mids** — settled from the data by summing both
+  sides of one bet at one venue (kalshi median **101.04%**, polymarket
+  **101.93%**, ~0-1% below 100). Without this gate the whole comparison would
+  have been an ask-vs-mid artifact.
+- **The two books agree to about one 1c tick.** 390 bets quoted by both (61.7%
+  of polymarket's 632, 48.2% of kalshi's 809): median difference **+0.00pp**,
+  median |diff| **0.95pp**, p10/p90 -1.09/+1.13.
+- **Staleness control PASSED:** median capture gap 111.8 min, but the
+  within-10-minute subset (n=93) returns the same answer (median +0.00, |diff|
+  0.90pp) — the agreement is real, not an artifact of comparing across time.
+- **KALSHI IS THE TIGHTER BOOK: median spread 1.04pp vs polymarket 1.93pp**
+  (~1.9x, and a much fatter tail: p90 2.07% vs 4.93%). That is where "better
+  price: kalshi 37% / polymarket 26% / tie 37%" comes from.
+- **POLYMARKET WINS ON PITCHER VOLUME MARKETS, and that is the only
+  price-shopping signal here:** `earned_runs` 73% cheaper (median -1.13pp),
+  `hits_allowed` 58% (-1.13pp). Kalshi wins `batter_total_bases` (15% poly),
+  `outs` (12%), `strikeouts` (21%).
+- **CROSS-VENUE ARBITRAGE: EFFECTIVELY NONE.** 502 two-sided cross-venue pairs,
+  median 101.92%; **6 distinct** below 100% (1.2%), only **2 surviving a
+  10-minute same-instant bound**, both ~99%. The other 4 have legs 49-119 min
+  apart — stale legs, not mispricings. ~1pp gross is erased by any plausible
+  fee, and **Polymarket's fee remains an OPEN question** (the "measured zero"
+  was retracted as an instrument artifact; `DEFAULT_FEE_BUFFER = 0.04` is a
+  placeholder). **DO NOT build an arb strategy on this.**
+- **A doubled count was caught and is recorded:** the first pass reported 12
+  sub-100% pairs; each was counted twice (both leg orderings). 6 is the number.
+- **SOCCER: NO COMPARISON EXISTS, and it is not a reader problem.** ZERO
+  exchange rows of ANY kind (kalshi or polymarket, prop or game) in **92,795
+  soccer quote rows across SIX fixture dates** (08-31..09-05) — soccer shards by
+  FIXTURE date, so one date would be the wrong window. Instrument calibrated:
+  the same reader found 2,870 MLB exchange prop rows the same day. **TWO
+  INDEPENDENT CAUSES, each sufficient:** (1) Kalshi soccer never reaches the
+  join — `[kalshi_odds] QUOTE_CAPTURE ... sports=['mlb']`, upstream the known
+  `unreadable_title` PARSER gap on ~665 real Kalshi soccer markets; (2)
+  Polymarket soccer DOES match (~25 rows/cycle: `soccer|h2h` 4, `soccer|totals`
+  21) but every one is GAME/TEAM level with an empty `player_name`, and the
+  capture is props-only by its correctness bound — all 25 discarded per cycle.
+- **THE PROPS-ONLY BOUND'S PREMISE IS EMPIRICALLY FALSE FOR SOCCER**, and this is
+  the actionable half. The bound exists because OddsAPI already writes exchange
+  GAME lines under the same dedup key (measured on MLB: 2,350 polymarket game
+  rows 08-31). In soccer OddsAPI carries **no exchange rows at all**, so there is
+  nothing to collide with. **NOT changed** — the guard also hedges against
+  OddsAPI starting to carry them, and its stated release condition (`source` in
+  `_KEY_FIELDS`, pinned by `tests/test_direct_feed_provenance.py`) is unmet.
+- **CORRECTION, read from production:** `_capture_kalshi_quotes` runs on
+  **refresh-worker**, not live-odds-worker (zero hits there). The docstring in
+  `portfolio_commit._capture_polymarket_quotes` still says otherwise.
+- **INSTRUMENT AMBIGUITY worth carrying:** `POLYMARKET_QUOTE_CAPTURE ...
+  sports=['mlb','soccer']` lists sports with MATCHES, not sports with APPENDED
+  ROWS. Soccer is in that field every cycle and contributes exactly zero quotes.
+- **NOT ESTABLISHED:** anything about MODEL edge. This is venue-vs-venue price
+  quality on one sport, one slate. Spread figures rest on the two-sided subset
+  only (coverage is heavily one-sided at both venues).
 
 ## [polymarket-low-activity] — VERIFIED 2026-08-27, refresh-worker + live-odds-worker
 

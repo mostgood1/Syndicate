@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 653 rules `[generated]`
+## Index — 665 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3248,352 +3248,38 @@ watcher that stalls is the benign outcome; the other one deployed into a race.
 
 ## 2026-09-01 REQUIRED: for every grader, ask what it does when its OUTCOME SOURCE IS ABSENT. A fallback there is a false-result generator. `[lanes wnba-accuracy-assessment + mlb-accuracy-assessment, independently]`
 
-Two lanes hit the same instrument family on the same evening, on different
-sports, and compared notes. The comparison is worth more than either finding.
-
-**MLB** (`mlb-accuracy-assessment`): the live-lens grader settled from
-`lastSeenSnapshot.actual` — **a running tally** — whenever the statsapi feed was
-unavailable, which was 100% of the time (`feedResolved` 0 on all 11 days that
-produced rows, against `feed_live_miss: 1,802`). Published reading:
-**`over 0 wins / 1,578`, `under 206 / 206`.**
-
-**WNBA** (`wnba-accuracy-assessment`): the same shared module,
-`live_lens_local._settle_over_under`, returns **`None`** when the outcome is
-absent. Grep that module for a running-tally fallback — `get("actual")`,
-`lastSeen`, snapshot-actual — and it is **zero hits**. The signal row *carries*
-an in-progress `actual` and the grader never reads it. Published reading:
-**`n_settled: 0`.**
-
-**Same missing input. Opposite blast radius. Zero is a null result; 0-for-1578 is
-a false one, and a number gets acted on.** The discriminating variable is not
-whether the input is published, not which sport, and not the shape of the
-plumbing. It is one question:
-
-> **When the outcome source is missing, does this grader return UNSETTLED, or
-> does it settle from something else?**
-
-That question is cheap, needs no knowledge of a sport's pipeline, and would have
-caught every instance below. **Ask it of every grader.** If there is a fallback,
-that fallback is a false-result generator, and publishing its real input does not
-fix it — it only changes which wrong number you get.
-
-**The family is NOT "unpublished input".** That was the first hypothesis and it
-is too narrow. The family is **"one side of the comparison is not what it claims
-to be"**, and it already has three distinct mechanisms:
-
-| mechanism | side that lies | measured |
-|---|---|---|
-| proxy outcome | outcome | MLB: running tally for a final ⇒ 0/1,578 |
-| stale line | line | WNBA: pregame full-game prop line, `line_live_age_sec` null on 1,777/1,777 ⇒ hit rate walks Q1 55.9% → Q4 88.0% on the clock alone |
-| self-priced line | line | WNBA: 701 of 1,777 signals graded against the engine's OWN model line ⇒ 91.2% |
-
-The unpublished-input hypothesis IS instantiated on the WNBA side and was worth
-chasing — `recon_quarters_*`, the sole settlement source for every half- and
-quarter-total market, was in **no** `HOT_ARTIFACT_PATTERNS` entry while both its
-siblings were (`git show 9dbb870d~1:...artifact_publisher.py | grep -c
-recon_quarters` → **0**). It is fixed. But it was never why WNBA read zero, and
-treating it as the common cause would have left the two line-side mechanisms
-undetected.
-
-**How to apply, in order:** (1) for each grader, name its outcome source and its
-line source; (2) delete or hard-fail any fallback on either; (3) only then
-publish the missing inputs. Doing (3) first turns a visible null into an
-invisible falsehood.
-
----
+- **MLB** (`mlb-accuracy-assessment`): the live-lens grader settled from `lastSeenSnapshot.actual` — **a running tally** — whenever the statsapi feed was unavailable, which was 100% of the time (`feedResolved` 0 on all 11 days that produced rows, against `feed_live_miss: 1,802`). Published reading: **`over 0 wins / 1,578`, `under 206 / 206`.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-01 REQUIRED: assert on the VALUE THAT CROSSED THE BOUNDARY, not on the call returning. "It didn't raise" and "the counter moved" are different claims, and only the second is evidence. `[lane wnba-accuracy-assessment]`
 
-**What happened.** I added a block to publish WNBA recon artifacts from
-refresh-worker to web, because the producer was writing to the worker's disk and
-the web-facing endpoint reads web's. The block ran cleanly, raised nothing,
-returned, and **published zero files.**
-
-The bug: the tick builds a small summary off the producer's result for the log
-line —
-
-    result["recon"] = {key: recon.get(key) for key in ("status", "games", "quarters", "props")}
-
-— and `paths` is not one of those four keys. The publish loop then iterated
-`(result.get("recon") or {}).get("paths", {})`, which was **always empty**. Every
-observable said fine: no exception, `status: ok`, a well-formed log line, and a
-`published` map that was simply `{}` rather than obviously wrong.
-
-**What caught it, and it is the only thing that would have.** The test asserted
-on *what reached the publisher* — it patched `publish_hot_artifact` with a
-recorder and asserted the four expected filenames were in it:
-
-    names = {p.rsplit("/", 1)[-1] for p in sent}
-    assert "recon_quarters_2026-08-30.csv" in names
-
-A test that asserted the tick returned without raising, or that `published` was
-present, or that the producer reported `ok`, would have **passed on the broken
-version**.
-
-**THE GENERALISATION.** This is the same failure as a test asserting *a deploy
-happened* rather than *the code ran*, and the same as an off/on check asserting
-*the call succeeded* rather than *the counter's value changed*. Any time work
-crosses a boundary — a process, a service, a disk, a queue, a network — the
-assertion has to name **the thing on the far side**:
-
-| weak assertion | what it actually proves |
-|---|---|
-| the call did not raise | the caller survived |
-| the function returned a dict | the caller survived, verbosely |
-| status == "ok" | the PRODUCER is happy |
-| **the recipient received X** | **the boundary was crossed** |
-
-**This is distinct from the readability rule** (`before reading a null result,
-find the thing that says the signal could have arrived`) and the two were nearly
-folded together. Readability is about **when a reading is interpretable**; this is
-about **what the assertion is even claiming**. A test can be perfectly readable
-and still assert nothing that matters.
-
-**How to apply.** For any cross-boundary work: patch or observe the RECIPIENT,
-and assert on the value it received. If the recipient cannot be observed in a
-test, that is itself the finding — an unobservable boundary is where silent
-failures live, and it is exactly where this one lived for its whole short life.
-
-### SECOND INSTANCE, SAME DAY, BY THE SESSION THAT CITED THIS RULE APPROVINGLY — `[lane mlb-accuracy-assessment]`
-
-**About an hour after telling the lane above that their `paths` bug deserved its
-own rule, I shipped it in my own file.** `quote_rows_from_kalshi_matches` set
-`venue_ticker`, documented as *"the only field that makes a row traceable back to
-a specific Kalshi market"*. `_normalize` in the same module builds a **fixed key
-set** and silently drops anything outside it. The field reached disk on **0 of
-603 production rows**, through a full deploy, with a GREEN test.
-
-The test's failure is the precise thing this rule names. It asserted:
-
-    row = quote_rows_from_kalshi_matches([_match()])[0]
-    assert row["venue_ticker"] == "KXMLBHR-..."
-
-— which is the **near** side. The builder is not the boundary; `_normalize` is.
-The replacement asserts against the boundary itself, and needs no fixture to know
-what survives:
-
-    kept = _normalize(row, sport=..., date_str=..., captured_at=...)
-    assert set(row) - set(kept) == set()
-
-**WHY THIS INSTANCE ADDS SOMETHING.** The first instance had a plainly weak
-assertion (the call did not raise). Mine had a **specific assertion on a real
-value** — it looked exactly like a good test, and the rule as written above could
-be read as already satisfied by it. It is not. The question is not *"does the
-assertion name a value?"* but *"is that value on the FAR side of the boundary the
-change has to cross?"* A builder that returns the right dict has crossed nothing.
-
-**THE CHEAP GENERAL FORM, when the boundary is a normaliser/serialiser/schema:**
-do not assert the field is present — assert the **set difference** between what
-the producer emits and what the boundary keeps is empty. That catches every
-future field at once, including ones nobody thought to test, and it fails at the
-moment the producer adds one rather than in production weeks later.
-
-**Corollary that decided the fix.** The remedy was to DELETE the field, not to
-teach `_normalize` a new key. A normaliser widened to rescue a field that nothing
-downstream reads is scope taken on the strength of a mistake.
-
----
+- **What happened.** I added a block to publish WNBA recon artifacts from refresh-worker to web, because the producer was writing to the worker's disk and the web-facing endpoint reads web's. The block ran cleanly, raised nothing, returned, and **published zero files.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-01 FORBIDDEN: inferring a MECHANISM from a file's SIZE. Count the composition, or say you haven't. `[lane wnba-accuracy-assessment, caught by lane mlb-accuracy-assessment]`
 
-**What I claimed.** WNBA's board shows zero Kalshi/Polymarket quotes across 787
-book references, while `wnba_source/tracking/book_quotes/2026-08-30.jsonl` is
-**45,776,899 bytes**. I wrote that up — into `todo.md #616`, into a peer message,
-and into a user-facing summary — as:
-
-> *"a JOIN gap, not an ingestion gap. The prices are already captured, on the
-> same service, in a 45MB file."*
-
-**What was actually in the file.** 101,129 rows, 11 bookmakers, and
-**ZERO exchange rows** — no kalshi, no polymarket, no novig, no prophetx, on any
-market. The board showing no exchange price was **correct behaviour over its
-input**, not a defect. There was nothing to join.
-
-**The bytes were real and the mechanism was invented.** 45.8MB is a true fact
-about the file and says nothing whatever about whose prices are in it. I used
-size as a proxy for content and then named a fix ("a join, one function call")
-that would have been a **no-op**.
-
-**How it was caught, which is the part to copy.** The peer lane refused to accept
-the symmetry I offered it and counted ITS OWN file instead — 274,129 lines,
-26,710 exchange quotes on game markets, 0 on props — concluding MLB's was a
-SOURCE gap, not a join. That composition count is what made me count mine. **I
-had told that same lane, twice, to measure rather than assume symmetry, and then
-did not do it myself on the one file my own conclusion rested on.**
-
-**The tell, in hindsight.** I had the file's *name* and *size* from a
-`names_only=1` listing. `names_only` is a listing, not a reading. Every number I
-had was metadata, and I reasoned about contents.
-
-**The rule.** A claim about WHAT IS IN a store must come from counting what is in
-it — by the field that decides the claim (here: `bookmaker`). Size, row count,
-mtime and existence are all metadata and support none of:
-"the data is there", "it's a join problem", "the producer ran", "coverage is
-fine". If counting is too expensive right now, the honest form is *"N bytes
-exist; composition uncounted"* — which is a fact — rather than a mechanism, which
-is a guess wearing a measurement's clothes.
-
-**Related and distinct:** `[read the field you already have]` is about ignoring a
-discriminating field that is already in hand. This is about not HAVING the field
-and proceeding anyway. Both end in a confident wrong mechanism; the fix here is
-to go and get the field.
-
----
+- **What I claimed.** WNBA's board shows zero Kalshi/Polymarket quotes across 787 book references, while `wnba_source/tracking/book_quotes/2026-08-30.jsonl` is **45,776,899 bytes**. I wrote that up — into `todo.md #616`, into a peer message, and into a user-facing summary — as:
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-01 FORBIDDEN: naming a MECHANISM from a SYMPTOM. Three times in one session, on three different subjects. `[lane wnba-accuracy-assessment]`
 
-Same error, three subjects, one day. Recording the set rather than any one of
-them, because the pattern is the finding.
-
-| I measured (true) | I claimed (invented) | what it actually was |
-|---|---|---|
-| `book_quotes` file is **45.8MB** | "captured but not joined — a JOIN gap" | **0 exchange rows in it.** Nothing to join. |
-| `artifacts/export` count **0** for recon | "gate 2 is STRUCTURALLY unreachable" | It crossed on its own. The count predated the producer's first run. |
-| `active_sports: ['ncaaf','soccer']` | "Layer 2 EXCLUDES WNBA upstream" | **No allowlist exists.** The field is derived from whichever sports had rows. |
-
-Each measurement was correct. Each mechanism was fiction, stated with the
-confidence the measurement had earned — and in two of the three I named a FIX,
-which would have been a no-op.
-
-**The shape.** A symptom is a value you read. A mechanism is a claim about *why*
-that value is what it is. Reading one does not give you the other, and the gap is
-invisible from inside because the number is real and right there. The tell is
-grammatical: *"the board can't see it"*, *"it's structurally unreachable"*,
-*"excluded upstream"* — all causal claims, none of which any of those readings
-could support.
-
-**The check that would have caught all three**, and it is one question:
-
-> **What else would produce this same reading?**
-
-- 45.8MB → "a file full of sportsbook rows" would too. → count by `bookmaker`.
-- count 0 → "the producer hasn't run yet" would too. → check the producer ran first.
-- `active_sports` without wnba → "no WNBA rows in the pool" would too. → read the code that builds the field.
-
-In all three the disambiguating evidence was **one command away** and I did not
-run it, because the symptom already felt like an explanation.
-
-**Corollary that cost the most time:** two of the three were *fixes I nearly
-shipped*. A mechanism invented from a symptom generates a plausible, specific,
-wrong repair — and it will pass its own tests, because the tests are written
-against the invented mechanism too.
-
-**How to apply.** Before writing a causal sentence about a system, name the
-reading it rests on and one alternative that would produce the same reading.
-If you cannot rule the alternative out with evidence in hand, the honest form is
-*"symptom X; cause not established"* — which is a finding, and is what `#614`
-and `#616` now say.
-
----
+- **The shape.** A symptom is a value you read. A mechanism is a claim about *why* that value is what it is. Reading one does not give you the other, and the gap is invisible from inside because the number is real and right there. The tell is grammatical: *"the board can't see it"*, *"it's structurally unreachable"*, *"excluded upstream"* — all causal claims, none of which any of those readings could support.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-01 REQUIRED: a PRODUCER fix is not in force on data that already exists. Ask when the artifact is next written. `[lane wnba-accuracy-assessment]`
 
-**What happened.** I fixed three things in the WNBA odds producer — totals
-withheld, impossible EV refused, certainty clamped — deployed them to all three
-services, verified all three deploys reached `live`, and was about to report the
-items done. Then I read the SERVED PAYLOAD:
-
-    card_bucket: candidate      <- live, changed
-    p_win:       1.0            <- unchanged
-    market:      TOTAL present  <- unchanged
-
-Not a failed deploy. `card_bucket` is assigned at READ time, so it changed the
-instant web restarted. `p_win`, `ev_pct` and `market` are **baked into
-`recommendations_slate_*.json`** and copied verbatim by the card builder — the
-producer governs what is *written*, and **WNBA does not rebuild until
-2026-09-17**. The fix was live and in force on nothing anyone could see, for
-sixteen days.
-
-**THE DISTINCTION, which is not the same as the deploy one.** "Deployed" vs
-"running" is already a rule here. This is a third state past it:
-
-| state | question it answers |
-|---|---|
-| landed | is it on `origin/main`? |
-| deployed | is the process running it? |
-| **in force** | **has the artifact it governs been rewritten since?** |
-
-A producer fix reaches production instantly and reaches *the data* only at the
-next write. Between those two moments every reading looks exactly like the fix
-failing.
-
-**How to apply.** For any change to a producer, name the artifact it writes and
-answer *"when is that artifact next written?"* before claiming the item is done.
-If the answer is "not for N days", the change is **deployed, not in force**, and
-that is what to report. Where the gap matters — here, a board serving
-`p_win = 1.0` and `EV 2264.8%` for sixteen days — apply the same rule at READ
-time as well, so the fix governs what a reader sees and not only what a future
-writer produces.
-
-**Seasonal sports make this the normal case, not an edge case.** Any producer
-fixed during an off-season or a mid-season break is in exactly this state, and
-the break is precisely when there is time to fix things.
-
----
+- **What happened.** I fixed three things in the WNBA odds producer — totals withheld, impossible EV refused, certainty clamped — deployed them to all three services, verified all three deploys reached `live`, and was about to report the items done. Then I read the SERVED PAYLOAD:
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-01 REQUIRED: on the shared tree, read the DIFF of a ledger file before committing it, not its --stat. `[lane wnba-accuracy-assessment]`
 
-**What happened, twice in one day, in both directions.**
-
-* A peer's broad `git add` swept MY `log/2026-09-01.md` entry into their commit
-  `7b31a766`. Content durable, attribution theirs.
-* I staged `.syndicate/lanes.md` to record a one-line claim and swept **112
-  lines of a third session's brand-new lane block** (`mlb-live-gameline-skill-audit`,
-  session `250953ef`) into my commit `c544b30c`.
-
-Nothing was lost either time — both were purely additive, and I verified the
-swept block is complete on `origin/main` before moving on. That is luck about the
-shape of the edit, not a property of the process.
-
-**The specific miss, and it is not "I forgot to check".** I DID run
-`git diff --cached --stat`. It printed `.syndicate/lanes.md | 113 +++...` for a
-change I knew was one line, and I read the file list rather than the number. A
-`--stat` answers *which files* am I committing; only the diff answers *what*.
-
-**The rule.** For any file in `.syndicate/` or another shared ledger, `--stat` is
-not sufficient before commit:
-
-    git diff --cached -- .syndicate/lanes.md | grep -E "^\+### |^-"
-
-Two things to look for: a `### ` heading you did not write (someone else's lane
-block rode along) and ANY deletion line (which is the case where content is lost
-rather than merely re-attributed).
-
-**Why the number is the tell.** A one-line edit that stages as 113 lines is
-arithmetic that cannot be right, and it was visible before the commit. The check
-that catches this costs one command; the version where the edit is *not* additive
-costs someone their work.
-
-**This is the same shape as `[shared index can hold a revert]`** — 4,993 staged
-deletions invisible in the worktree — and the same fix applies: the index on a
-shared tree contains whatever anyone put there, so read it, do not assume it
-holds only what you touched.
+- **What happened, twice in one day, in both directions.**
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-01 FORBIDDEN: recording a LIVENESS field that the recorder itself cannot outlive
 
-- **What we believed.** `deploy_claim.py`'s `"pid"` identified the session holding
-  a deploy lock, so the documented `--force` procedure — "verify the holder is
-  gone" — could distinguish a live holder from a dead one.
-- **What was actually true.** It recorded `os.getpid()` **inside the
-  `deploy_claim.py acquire` CLI process**, which exits about a second after
-  writing the claim. **Every claim in the repo read as "held by a dead process"
-  within seconds of being taken.** The field could only ever say "gone", so
-  `--force` was not an escape hatch, it was the default outcome.
-- **How we found out.** A live claim with **15 minutes of TTL left** was
-  force-broken by another session citing "pid 22884, verified DEAD via
-  Get-Process". `Get-Process` was right and the checker was right — **the FIELD
-  lied.** Nothing programmatic ever read it (`deploy_preflight.py` never did), so
-  its only consumer was a human deciding whether to break someone's lock.
-- **The rule going forward.** A liveness field must name something that OUTLIVES
-  the code writing it — a session id, checkable with `list_sessions`
-  (`isRunning`) — never the pid of the short-lived CLI that records it. If no
-  such identity is available, **write nothing and let the TTL be the invariant**:
-  a missing field reads as UNKNOWN, which correctly refuses to authorise a force,
-  whereas a dead-on-arrival pid reads as PERMISSION. Absent identity is not
-  absence of a holder.
-- **Cost.** One force-broken live claim and a deploy handed to another session
-  mid-work. No production damage — the TTL was doing the real work the whole
-  time, which is exactly why the pid was safe to delete rather than repair.
+- **The rule going forward.** A liveness field must name something that OUTLIVES the code writing it — a session id, checkable with `list_sessions` (`isRunning`) — never the pid of the short-lived CLI that records it. If no such identity is available, **write nothing and let the TTL be the invariant**: a missing field reads as UNKNOWN, which correctly refuses to authorise a force, whereas a dead-on-arrival pid reads as PERMISSION. Absent identity is not absence of a holder.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-01 FORBIDDEN: leaving anything staged in the SHARED index that you are not committing in the same breath
 
@@ -4214,6 +3900,47 @@ and this merge reads/writes 50MB+ files, so it inflates for reasons that are not
 a leak. `container_memory_unreclaimable_mb` is the figure to watch, and the
 FLOOR across samples is the ratchet — every deploy reboots the workers and
 resets it, so a post-deploy reading always looks healthy.
+- **The rule going forward.** Stage and commit **atomically** or not at all: `git commit --only -- <paths>` takes the worktree copies of exactly those paths and leaves the rest of the index alone. When the commit needs content that is NOT the worktree copy (rebuilding `origin/main` + only your edits), build it in a **temporary index** — `GIT_INDEX_FILE=<tmp> git read-tree/update-index/ write-tree` then `git commit-tree` — which never touches the shared index at all. **Inspect BEFORE staging, never between staging and committing.** The older "never chain add and commit" is not wrong, but it is not the invariant: the invariant is that no staged state of yours may outlive your own commit.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-01 FORBIDDEN: running any git working-tree restore (`checkout --`, `restore`, `reset`) without pinning the repo with `-C <path>`. The cwd is not a fact; on this machine it is a liability that destroys OTHER SESSIONS' work. `[lane polymarket-prop-quote-capture]`
+
+- **The rule going forward.** THREE layers, because each alone has now failed: (1) every git command that can DISCARD working-tree content must carry an explicit `git -C <absolute-path>` — never rely on the shell's cwd; (2) a file-wide restore is NEVER the tool for undoing a targeted experiment — reverse the specific edit (string-swap back) instead, which cannot exceed its own blast radius (this same session had already wiped its own uncommitted implementation once with `checkout --` in the worktree — same instrument, and the second firing hit ANOTHER session); (3) on the shared tree, `checkout/restore` of a ledger file is forbidden OUTRIGHT — uncommitted peer edits live there by design, and the command cannot distinguish yours from theirs.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-01 — FORBIDDEN: comparing a model against a market price without conditioning on QUOTE AGE. A stale price is a weak forecast, so staleness flatters the model — the error runs in the reassuring direction `[lane mlb-live-gameline-skill-audit]`
+
+- **The model does not improve as the quote ages. The MARKET decays**, because a price that has not moved in half an hour is a bad forecast of an outcome it has not seen. Quote-age distribution in that file: p50 410s, p90 1,848s, **p99 74,997s** — roughly 1 row in 100 was priced against a quote over 20 hours old.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-01 — FORBIDDEN: pooling an accuracy history across a SCORER-version boundary, and shipping a scorer whose payload cannot say which version produced it `[lane mlb-live-gameline-skill-audit]`
+
+- **Nothing in the row said which scorer wrote it**, so the boundary was invisible and had to be rediscovered by matching record counts. The rule has two halves:
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-01 — FORBIDDEN: `ast.parse` as a syntax check for an edit, and building a `write` and a `read` of the same path in one expression `[lane mlb-live-gameline-skill-audit]`
+
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-01 — RULE: a claimed GAIN that exceeds the TOTAL COST it is meant to remove is about a different population. One comparison rejects it, with no machinery. `[lane game-market-entry-roi-curve]`
+
+- **+1.57pp** ... worth about +1.2% ROI"* for MLB game markets. The book that stakes that money pays **0.88pp per side in total** — a 1.96% two-way hold, because it already routes to exchanges. An improvement of 1.57pp cannot be harvested from an entry cost of 0.88pp; there is not that much cost there to remove.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-01 — FORBIDDEN: treating the timestamp on an ORDER as the timestamp of the PRICE it took. Board prices carry a real age, and the error does not surface as an error. `[lane game-market-entry-roi-curve]`
+
+- **What it produced, and why nothing caught it.** The book's mean per-side entry cost came out at **-1.43pp** — paying *less* than fair on average, which is not a thing that happens — and the sensitivity table then read **-1.05%** at "today's" cost. No exception, no refusal, a full table printed. It was caught only because the ledger's own stake-weighted return on the same rows was **+5.31%**, six points away.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-01 — OVERTURNED: repairing a lossy artifact does not move a derived number in the "recovering" direction. A truncated file is not a random sample of itself. `[lane game-market-entry-roi-curve]`
+
+- **What I expected.** Lane `book-quotes-publish-clobber` found that `book_quotes` shards LOSE ROWS to a whole-file publish race, and that their 2026-09-01 measurement had run on a copy missing its sportsbook tail (46.1% matchable). Once `e78aee52` repaired it I told them, in writing, that their +2.65% "can be re-measured on an intact file" — carrying an unstated assumption that recovering lost rows would recover lost value.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-01 — FORBIDDEN: closing or reassigning a lane because its RECORDED SESSION is gone. The session id is not an ownership key — it is a stamp that outlives the thing it names, in both directions. `[lane game-market-entry-roi-curve, ownership pass]`
+
+- **The census.** 34 OPEN lanes, **32 already marked UNOWNED**. Checked every recorded owner session against a 200-session roster (`list_sessions include_archived=true`) whose oldest entry is **2026-08-13**, i.e. a window covering every lane in the file, so absence from it is real absence and not a truncated view. Result: **17 of 18 owner sessions DO NOT EXIST.** The 18th (`abf487e4`) is archived, last active 2026-08-20. Exactly **one** session in the entire store was running.
+- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-02 REQUIRED: a pre-registered falsification test still needs a CONTROL CYCLE before you act on it. One reading on a cadence-driven instrument is not evidence. `[lane kalshi-soccer-club-aliases]`
 
@@ -4245,3 +3972,96 @@ resets it, so a post-deploy reading always looks healthy.
   control is for changes whose mechanism cannot produce the observed damage.
 - **Cost.** None. But the near-miss was a correct change discarded plus a wrong
   cause recorded as fact — on a money-adjacent join, in a ledger read as evidence.
+
+## 2026-09-02 REQUIRED: before calling a thin downstream count a COVERAGE DEFECT, find the counter that ACCOUNTS for the gap and read the code that increments it. A deliberate quality filter and a broken pipeline look identical from the downstream end. `[lane kalshi-soccer-club-aliases -> finding soccer-board-coverage]`
+
+**Measured.** Kalshi lists 171 open soccer fixtures; our board carried 28. That
+reads as a coverage bug and the obvious next lever is "fix the board's soccer
+fixture coverage". It is not a bug. One read of `/api/board/layer2-shortlist`
+showed soccer selecting **1,547** rows with **129** reaching the board (8%),
+against mlb 95% and ncaaf 100%, and the accounting counter in the SAME payload
+was `rows_uninformative_ev = 1547` -- exactly soccer's selected count.
+
+`_row_ev_is_hold_restatement` drops a row whose `ev_pct` is arithmetically the
+book's own margin: a one-sided market is priced `fair = implied x (1 - hold)`,
+`expected_value_pct` is `fair/implied - 1`, so the price CANCELS and EV is
+`-hold` for every such row **regardless of the bet**. Ranking on it ranks on
+WHICH BOOK QUOTED. It fires only where the row has no model view, and soccer has
+none by the recorded `soccer-model-dispersion` decision (model worse than market
+in 8 of 9 leagues; publishing `model_edge_pct` declined). Every link deliberate.
+
+**Why this rule and not just "check first":** the two available "fixes" were
+publishing a model edge the model has not earned, and exempting soccer from the
+filter -- which puts ~1,400 rows ranked on the book's margin onto a
+money-adjacent board, against that filter's own evidence that 2,611 such rows
+topped out at -4.73 while the live shortlist's #50 was +0.64. **A coverage fix
+that removes a correct filter is indistinguishable from success at every level
+except the money.** It would have looked like a win: more rows, more fixtures,
+more Kalshi matches.
+
+**How to apply.** (1) Read the per-stage counters in the response you already
+have before theorising -- one of them usually equals the gap. (2) Then read the
+FUNCTION that increments it, not its name. (3) A filter whose threshold derives
+from the same quantity it filters on cannot be tuned around: soccer's value
+floor was `-8.1425 = -1.25 x 6.514` against rows whose EV IS `-6.514`. (4) If
+the filter is right, the lever is upstream of it -- here, giving soccer a model
+view worth ranking on. THIRD requested fix in one session that was already
+working as designed; the other two would merely have shipped inert.
+
+## 2026-09-02 FORBIDDEN: measuring a change by REPLAYING IT WITHOUT AN ARGUMENT PRODUCTION ALWAYS PASSES. The replay then measures a different system, and its null result is not about your change. `[lane kalshi-soccer-club-aliases]`
+
+**Measured.** To read whether 34 new club aliases helped, I replayed the resolve
+step on a stable slate and got `resolved=9, delta=+0` -- a clean null that would
+have justified reverting a shipped change. The replay omitted `code_names`,
+which production ALWAYS passes to `match_event_blob`; without it the code path
+that the aliases feed is not the path being exercised. Redone with production's
+arguments: **22 attempted/resolved WITH the aliases against 21 WITHOUT, +1.**
+
+Small, but the sign flipped, and the wrong sign here pointed at reverting.
+
+**How to apply.** Before trusting a replay harness, diff its call site against
+the PRODUCTION call site argument by argument -- optional/defaulted parameters
+are exactly where this hides, because the replay still runs and still returns a
+number. Sibling of "confirm the code ran": assert you are on the branch
+production takes, not merely that something executed.
+
+## 2026-09-02 REQUIRED: a SIZE warning measured from the working tree is a statement about YOUR CHECKOUT, not about the ledger. Read the file at `origin/main` before trimming it. `[ledger trim pass]`
+
+**Measured.** The session-start digest said `LEDGER OVER BUDGET: lanes.md
+246KB>234KB, learnings.md 286KB>273KB`, and I relayed those numbers as real
+pressure. At `origin/main` the same files were **144KB/240KB and 270KB/280KB --
+both UNDER cap, and they had been for some time.** `session-start.sh` stats
+`.syndicate/*` in the PRIMARY SHARED TREE, which was **131 commits behind**;
+upstream had already moved ~122KB of lane blocks into `lanes_history.md` and the
+stale checkout still carried every one of them. The warning was true of the
+bytes on that disk and false of the ledger.
+
+**The trap is that trimming "works".** The tools would have run, the file would
+have shrunk, and the warning would have cleared -- while the actual defect (a
+checkout that stale is also serving STALE LANE STATUS to every session that
+starts there) went untouched and unreported. A remedy that silences the symptom
+is indistinguishable from a fix until someone reads the lane they thought was
+open.
+
+**What was really available**, after running every tool against `origin/main`:
+`trim_lane_blocks.py` 4,518 B (one block, a lane I had closed myself),
+`archive_released_lanes.py` the same block, and `compact_learnings.py`
+0 bytes at every cutoff through 2026-09-01.
+
+**CORRECTION, same day, and it is the more useful half.** I reported that last
+figure as "already fully compacted, no lever left". It is literally true and
+materially misleading -- I stopped testing one day short. `compact_learnings.py`
+compacts entries strictly BEFORE `--keep-from`, so a cutoff of `2026-09-01`
+cannot touch 2026-09-01's own 16 entries. `--keep-from 2026-09-02` reclaims
+**27,669 bytes**; `2026-09-03` reclaims 32,624. **The lever LAGS BY A DAY BY
+DESIGN and I read the lag as its absence.** Generalise it: when a tool takes a
+cutoff, a null result at the boundary is a statement about the boundary, not
+about the tool -- step the parameter one unit further before concluding
+anything.
+
+**How to apply.** (1) `git show origin/main:<path> | wc -c` before acting on any
+digest size number, and check `git rev-list --count HEAD..origin/main` while you
+are there. (2) Dry-run every tool and read the RECLAIMED figure before choosing
+one -- three tools here, two of them with nothing to do. (3) Do not shrink
+`lanes.md` by closing lanes whose sessions are gone: that is FORBIDDEN by the
+2026-09-01 rule, and size is not a reason to reassign someone's work.

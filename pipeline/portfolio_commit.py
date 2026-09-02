@@ -205,8 +205,21 @@ def _capture_polymarket_quotes(
             by_sport.setdefault(sport, []).append(dict(match))
 
         captured = 0
+        appended_by_sport: dict[str, int] = {}
+        game_line_rows = 0
         for sport, sport_matches in by_sport.items():
-            rows = quote_rows_from_polymarket_matches(sport_matches)
+            # GAME LINES FOR SOCCER ONLY -- the sibling of the Kalshi capture's
+            # opt-in, reading the SAME predicate so the two cannot drift.
+            # Polymarket's soccer matches are h2h/totals/btts/corners, none of
+            # which carry a player, so the props-only bound discarded every one.
+            from syndicate.features.shared.odds_book_quotes import (
+                sport_allows_game_line_capture,
+            )
+
+            rows = quote_rows_from_polymarket_matches(
+                sport_matches,
+                allow_game_lines=sport_allows_game_line_capture(sport),
+            )
             if not rows:
                 continue
             result = append_book_quotes(
@@ -219,15 +232,24 @@ def _capture_polymarket_quotes(
                 # the venue, and absent means dropped.
                 extra={QUOTE_SOURCE_FIELD: QUOTE_SOURCE_VENUE_DIRECT},
             )
-            captured += int((result or {}).get("appended") or 0)
+            _n = int((result or {}).get("appended") or 0)
+            captured += _n
+            if _n:
+                appended_by_sport[sport] = appended_by_sport.get(sport, 0) + _n
+            game_line_rows += sum(1 for r in rows if not r.get("player_name"))
         # ONE LINE, ALWAYS, INCLUDING THE ZEROES. `no_sport` and an empty
         # `by_sport` are different failures -- "the match carries no sport" and
         # "the join produced nothing" -- and a line printed only on success
         # cannot tell them apart.
         print(
             "[portfolio_commit] POLYMARKET_QUOTE_CAPTURE"
+            # `sports=` lists sports with MATCHES, not sports with ROWS. Soccer
+            # sat in that field contributing nothing for a whole day, which
+            # reads as working capture -- `appended_by_sport` is what
+            # discriminates.
             f" matches={len(matches)} sports={sorted(by_sport)}"
-            f" appended={captured} no_sport={no_sport}",
+            f" appended={captured} appended_by_sport={appended_by_sport}"
+            f" game_lines={game_line_rows} no_sport={no_sport}",
             flush=True,
         )
     except Exception as exc:  # noqa: BLE001 -- instrumentation must not fail the commit
@@ -329,6 +351,11 @@ def _polymarket_price_resolver(selected_date: str | None):
             "[portfolio_commit] POLYMARKET_UNMATCHED"
             f" counts={joined.get('unmatched_counts')}"
             f" samples={joined.get('unmatched_samples')}"
+            # The COMPLETE prop no-match classification -- class/family over
+            # the matching no_match count on this same line IS the rate the
+            # bounded samples cannot give (rung_miss vs near_token vs
+            # player_not_listed vs fixture_miss).
+            f" prop_classes={joined.get('prop_unmatched_classes')}"
             # WHICH COMPONENT of the key disagreed. `no_candidates` alone
             # cannot distinguish a league mismatch from a date or a market one,
             # and BTTS is currently unexplained for exactly that reason.
@@ -434,6 +461,41 @@ def _polymarket_price_resolver(selected_date: str | None):
             flush=True,
         )
     matches = joined.get("matches") or []
+    # ------------------------------------------------------------------
+    # PLAYER-PROP MATCHES FEED THE QUOTE LOG, NOT THE ORDER PATH -- yet.
+    # ------------------------------------------------------------------
+    #
+    # The join admits MLB player props as of 2026-09-01 (lane
+    # `polymarket-prop-quote-capture`) so `_capture_polymarket_quotes` above
+    # can record the venue's own prop prices. The RESOLVERS below are a
+    # different consumer: whatever they index becomes priceable and
+    # ticker-stamped for the paper AND LIVE books, and `execute_portfolio`
+    # places real venue orders off exactly that. Widening the money path was
+    # not this change's decision to make, so prop matches are withheld here
+    # behind an explicit switch, OFF by default.
+    #
+    # Before arming it, check the two standing constraints in
+    # `live-prob-producer-reader-gap`'s lane block (a live prop edge was
+    # shipped and BACKED OUT once already), and the resolver-key asymmetry:
+    # a prop match carries the CANONICAL market name while `_resolver_key`
+    # reads a board row's market RAW -- identical for today's shortlist rows
+    # (`batter_hits` et al.), but verify before trusting a resolve.
+    #
+    # PRINTED ALWAYS, ZEROES INCLUDED: `withheld=0` on a slate with prop
+    # matches means the switch is armed, and a line printed only when
+    # withholding could not say so.
+    prop_matches = [m for m in matches if str(m.get("player_name") or "").strip()]
+    props_armed = str(
+        os.environ.get("SYNDICATE_POLYMARKET_PROP_RESOLVERS") or ""
+    ).strip().lower() in {"1", "on", "true", "yes"}
+    if prop_matches and not props_armed:
+        matches = [m for m in matches if not str(m.get("player_name") or "").strip()]
+    print(
+        "[portfolio_commit] POLYMARKET_PROP_RESOLVERS"
+        f" armed={props_armed} prop_matches={len(prop_matches)}"
+        f" withheld={0 if props_armed else len(prop_matches)}",
+        flush=True,
+    )
     if not matches:
         return (None, None)
     return polymarket_price_resolver(matches), polymarket_ticker_resolver(matches)
@@ -616,6 +678,63 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
             f" unmatched_events={joined.get('unmatched_events')}",
             flush=True,
         )
+    # ------------------------------------------------------------------
+    # SOCCER MATCHES FEED THE QUOTE LOG, NOT THE ORDER PATH -- yet.
+    # ------------------------------------------------------------------
+    #
+    # `kalshi_board_join` gained a SOCCER-ONLY forward-date widening
+    # (2026-09-01, lane `kalshi-soccer-forward-date`) so Kalshi's ~918 soccer
+    # markets stop refusing `market_is_for_another_date` and their prices reach
+    # `book_quotes`. That capture runs off `kalshi_odds_refresh`'s OWN join and
+    # is unaffected by this gate.
+    #
+    # THESE RESOLVERS ARE A DIFFERENT CONSUMER: whatever they index becomes
+    # priceable and ticker-stamped for the paper AND LIVE books, and
+    # `execute_portfolio` places real venue orders off exactly that.
+    #
+    # WHY THE GATE EXISTS, and it is a MEASUREMENT that overturned my own
+    # prediction rather than a precaution. I expected `no_model_edge_pct` to
+    # keep soccer out of positions on its own. **It does not:** `/api/portfolio
+    # /paper` shows **4 soccer positions in the 7 days to 2026-09-01**
+    # (08-26/28/29/30), soccer is NOT in `DEFAULT_EXCLUDED_FAMILIES`
+    # (`mlb:player_prop` only), `SYNDICATE_EXECUTION_ENABLED=1` and soccer is in
+    # `SYNDICATE_ACTIVE_SPORTS`. So widening the join without this would have
+    # added 918 markets of a sport whose model is recorded as NOT beating the
+    # market (`soccer-model-dispersion`: worse than market in 8 of 9 leagues) to
+    # a live order path, as a side effect of a coverage fix.
+    #
+    # Coverage and profitability are different questions. This keeps them apart
+    # until someone decides the second one on evidence.
+    #
+    # PRINTED ALWAYS, ZEROES INCLUDED: `withheld=0` on a slate with soccer
+    # matches means the switch is armed, and a line printed only when
+    # withholding could not say so.
+    # THROUGH `sport_for_series`, THE JOIN'S OWN MAPPER, and off `series` --
+    # the field a match actually carries. **A match has no `sport` key**:
+    # verified against both `matches.append` blocks, which write
+    # ticker/series/market/player_name/line/board_side/kalshi_*/board_event_id
+    # and no sport. A gate keyed on `m.get("sport")` would have read None for
+    # every row, withheld nothing, and printed `withheld=0` -- indistinguishable
+    # from an armed switch. Caught before shipping; recorded because that is the
+    # inert-guard shape this repo keeps paying for.
+    from syndicate.features.shared.kalshi_catalogue import sport_for_series
+
+    soccer_idx = {
+        i for i, m in enumerate(matches)
+        if sport_for_series((m or {}).get("series")) == "soccer"
+    }
+    soccer_armed = str(
+        os.environ.get("SYNDICATE_KALSHI_SOCCER_RESOLVERS") or ""
+    ).strip().lower() in {"1", "on", "true", "yes"}
+    soccer_matches = soccer_idx
+    if soccer_idx and not soccer_armed:
+        matches = [m for i, m in enumerate(matches) if i not in soccer_idx]
+    print(
+        "[portfolio_commit] KALSHI_SOCCER_RESOLVERS"
+        f" armed={soccer_armed} soccer_matches={len(soccer_matches)}"
+        f" withheld={0 if soccer_armed else len(soccer_matches)}",
+        flush=True,
+    )
     if not matches:
         # Named, and `(None, None)` so the venue reverts to the aggregator
         # rather than losing its book -- but the line above says it happened,

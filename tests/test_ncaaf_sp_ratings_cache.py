@@ -4,7 +4,7 @@ WHY THIS IS THE ONE WORTH CACHING. The NCAAF projections generator hits four
 CFBD endpoints, and only one of them cannot be served from an artifact this repo
 already holds:
 
-    /games       -> historical_truth/games_<season>.json.gz  (888 rows, 2026 wk1-6)
+    /games       -> historical_truth/games_<season>.json.gz  (888 rows, 2026 wk1-13+15)
     /ppa/teams   -> FALLBACK rating source only
     /ppa/games   -> the as-of variant of the same fallback
     /ratings/sp  -> PRIMARY rating source, no local equivalent
@@ -182,7 +182,9 @@ def test_a_corrupt_games_cache_falls_through_rather_than_raising(tmp_path, monke
 
 def test_a_week_with_no_cached_games_falls_through(tmp_path, monkeypatch):
     """A week the cache does not cover must reach the API, not report an empty
-    slate — games_2026 holds weeks 1-6, so week 12 is a real case."""
+    slate. (The real games_2026 holds weeks 1-13 and 15 — measured 2026-09-01;
+    this docstring used to say 1-6, and week 12 is inside the real range. The
+    case still holds because the FIXTURE below covers only week 1.)"""
     monkeypatch.setattr(gen, "__file__", str(tmp_path / "scripts" / "x.py"))
     _write_games_cache(tmp_path, 2026, [{"week": 1, "seasonType": "regular", "homeTeam": "A", "awayTeam": "B"}])
     assert gen._cached_games(2026, 12) is None

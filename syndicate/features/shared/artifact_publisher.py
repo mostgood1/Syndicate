@@ -225,6 +225,92 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # and an unallowlisted input is an unauditable one.
     "nfl_source/tracking/nflverse/roster/roster_*.csv",
     "nfl_source/tracking/nflverse/depth_charts/depth_charts_*.csv",
+    # THE SEASON-PROJECTION ARTIFACTS -- THE BOARD'S OWN MODEL OUTPUT FOR BOTH
+    # FOOTBALL SPORTS. `lane ncaaf-cfbd-quota-latch`, measured 2026-09-01.
+    #
+    # Both generators have called `publish_hot_artifact` on their output since
+    # 2026-08-19, and BOTH CALLS HAVE BEEN NO-OPS THE ENTIRE TIME, because
+    # neither path was ever added here. `generate_smartsim2_nfl_projections.py`
+    # says in its own comment "Fixed in both generators together because the
+    # allowlist pattern covers both" -- the pattern it names does not exist.
+    # That sentence is why this went unnoticed for 13 days: the publish side
+    # was written, reviewed, and believed, and the half that PERMITS it was
+    # never written. `#208` in reverse -- the usual failure is allowlisting
+    # something nothing publishes; this is publishing something nothing
+    # allowlists, and it is just as silent.
+    #
+    # MEASURED, refresh-worker, the run that proved it:
+    #   2026-09-01T00:33:24Z  projections_written=51
+    #   2026-09-01T00:33:24Z  artifact_path=/opt/render/project/data/ncaaf_source/data/smartsim2_projections_2026_wk1.csv
+    #   2026-09-01T00:33:24Z  artifact_published=False
+    # No `artifact_publish_error`, so this was the clean "not allowlisted"
+    # return, not a network failure. Meanwhile `/ncaaf/api/cards` was serving
+    # values byte-identical to the git-committed CSV stamped
+    # `generated_at=2026-08-19T22:00:39Z`. NFL is the same
+    # (`2026-08-31T21:28:40Z artifact_published=False`), which is why both go in
+    # together -- fixing only the sport in front of you is how this class of
+    # defect survives in the sibling.
+    #
+    # The board therefore only ever moved when someone COMMITTED a regenerated
+    # CSV and rode a web deploy -- a deploy per model change, which is exactly
+    # what the worker autorun exists to avoid.
+    #
+    # WRITE PATH -> READ PATH, checked rather than assumed, because an entry
+    # that lands where nothing reads is inert and looks identical to this bug:
+    #   ncaaf  worker writes  <SYNDICATE_DATA_ROOT>/ncaaf_source/data/...
+    #          web reads      default_ncaaf_source_root()/"data" ==
+    #                         $SYNDICATE_NCAAF_SOURCE_ROOT/data ==
+    #                         /opt/render/project/data/ncaaf_source/data  [same]
+    #   nfl    worker writes  nfl_artifact_output_root()/... ==
+    #                         $SYNDICATE_NFL_SOURCE_ROOT/...
+    #          web reads      shared/nfl_game_projections._source_roots()  [same]
+    # NFL's shallower layout is `#389`'s doing and is deliberate; the two
+    # patterns differ in depth for that reason and are NOT collapsible into one
+    # `*_source/` wildcard.
+    #
+    # Bounded: ~10 KB per file, one file per sport per week. The wildcard also
+    # covers prior seasons already on disk (17 files in the ncaaf mirror), a
+    # one-time ~170 KB, and `sweep_changed_hot_artifacts` publishes only what
+    # CHANGED, so the steady state is one file a day.
+    #
+    # NOT ADDED: `nfl_source/smartsim2_preseason_projections_*_wk*.csv`. That
+    # generator has no `publish_hot_artifact` call at all, so an entry for it
+    # would be the inert half of this same defect. `preseason_cards.py` and
+    # `game_board_contract.py` both carry comments compensating for its
+    # absence via `projection_provenance`; wire the publisher first.
+    "ncaaf_source/data/smartsim2_projections_*_wk*.csv",
+    "nfl_source/smartsim2_projections_*_wk*.csv",
+    # WHICH NCAAF WEEKS HAVE BEEN PLAYED. `lane ncaaf-games-cache-refresh`,
+    # measured 2026-09-01.
+    #
+    # `ncaaf_target_week` -- "lowest week with an unplayed game" -- read
+    # `historical_truth/games_<season>.json.gz` directly, and
+    # `ensure_games_cached` writes that file ONCE. The 2026 copy was written
+    # 2026-07-21 and still said `completed: False` on 888 of 888 games, so the
+    # answer was 1 for the whole season and `_week_is_within_pregame_window`
+    # trimmed the board to `week <= 1`: `/ncaaf/api/cards?week=2` and `?week=3`
+    # both served "2026 Week 1" while projection artifacts existed for weeks
+    # 1-13 and 15.
+    #
+    # THE CACHE ITSELF CANNOT BE THE TRANSFER. Refreshing it fixes the worker's
+    # disk only, and this publisher cannot carry it: below
+    # `_PUBLISH_STREAM_MIN_BYTES` a file goes up as `read_text(encoding="utf-8")`
+    # and the 39 KB gzip raises `UnicodeDecodeError` -> SKIP_READ_FAILED. So the
+    # worker derives per-week played/unplayed COUNTS -- small, JSON, and the
+    # platform's own statement rather than a mirror of a vendor payload -- and
+    # web reads those instead of calling CFBD from a request handler.
+    #
+    # WRITE PATH -> READ PATH: both sides call
+    # `week_state.week_state_path(season)`, which is `ncaaf/sources.data_path`,
+    # which is `$SYNDICATE_NCAAF_SOURCE_ROOT/data/week_state/...` ==
+    # /opt/render/project/data/ncaaf_source/data/week_state/... on both
+    # services. ONE function, so the two cannot drift -- the sibling entry
+    # above was inert for 13 days because two different expressions were
+    # believed to name one location.
+    #
+    # Bounded: one ~2 KB file per season, rewritten daily by the projection
+    # generator, and `sweep_changed_hot_artifacts` publishes only what changed.
+    "ncaaf_source/data/week_state/ncaaf_week_state_*.json",
     # `#310`, DIAGNOSTIC. The WNBA grader's actual result inputs, and the file
     # both recon builders are built from. Until now `recon_games_*`,
     # `recon_props_*` and dated `boxscores_*` were in no pattern here (only the

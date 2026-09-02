@@ -1545,6 +1545,42 @@ def build_layer2_rows(
                     and isinstance(cell.get(side), Mapping)
                     and cell[side].get("price") is not None
                 },
+                # BOTH SIDES AT SELECTION TIME. `#626`(g).
+                #
+                # MEASURED (lane `mlb-accuracy-assessment`, 2026-08-31): **0 of
+                # 8,778** graded player-date-market-line keys carried both
+                # sides -- only the side we took is ever recorded. Three
+                # questions are therefore unanswerable from our own ledger:
+                # was the side selection right, what did the two-way hold
+                # actually cost, and what was the de-vigged fair at the instant
+                # we chose. That lane had to reconstruct the opposite price
+                # from a separately-captured odds history covering 81.5% of
+                # groups, and price the whole inversion question on an
+                # ESTIMATE of the opposite side's vig.
+                #
+                # PRICE AND BOOK ONLY, deliberately. The per-book fan-out
+                # `book_prices` does for THIS side is what makes it useful and
+                # also what makes it big. Repeating it per other side would
+                # multiply a payload that is already mostly market data and
+                # whose keyvalue ceiling has corrupted production once
+                # (`state.md [layer2-board-keyvalue-ceiling]`). Two scalars per
+                # other side answer all three questions above; the nested form
+                # would answer a fourth nobody has asked and cost the artifact.
+                #
+                # Keyed BY SIDE rather than named "opposite" because three-way
+                # markets exist (soccer `h2h_3_way`) and have two others, not
+                # one. `None` when there is no other side, so absent stays
+                # absent rather than becoming an empty dict on every one-way
+                # row.
+                "other_sides": {
+                    str(other): {
+                        "price": _as_float((best.get(other) or {}).get("price")),
+                        "bookmaker": str((best.get(other) or {}).get("bookmaker") or "") or None,
+                    }
+                    for other in sides
+                    if other != side and isinstance(best.get(other), Mapping)
+                }
+                or None,
             }
 
             candidate: dict[str, Any] = {field: row.get(field) for field in _IDENTITY_FIELDS}

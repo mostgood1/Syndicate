@@ -534,14 +534,46 @@ class GameConfig:
     park_inplay_hit_weight: float = 1.0
     park_xb_share_weight: float = 1.0
     # `#440` P2: in-sim POSITION-PLAYER substitution (pinch hitters, defensive
-    # replacements). Dark-launched OFF, like every other behaviour change here.
+    # replacements). Dark-launched OFF; **ENABLED 2026-09-01** (`#624` step 3)
+    # on the measurements below, taken on current code rather than inherited.
+    #
+    # WHAT IT FIXES. Without it the nine listed starters bat all game, every
+    # game, so opportunity is over-projected and every counting prop inherits
+    # it (props are rate x opportunity). Measured, 24 games x 40 sims against an
+    # actual starter AB of 3.495:
+    #
+    #     OFF  starter AB 3.880   bias +11.0%
+    #     ON   starter AB 3.708   bias  +6.1%     44.7% of the gap closed
+    #
+    # ACCURACY, controlled A/B -- same rosters, same seeds, same odds, same
+    # outcomes, one input differing (30 games x 100 sims, 1,610 scored rows):
+    # hits +0.00288, runs +0.00314, total bases +0.00034, **rbis -0.00086**.
+    # Three of four better. **The market still beats BOTH arms in all four**,
+    # so this is a bias correction and NOT an edge; it must not be reported as
+    # one.
+    #
+    # WHY THIS DOES NOT NEED THE §4.4 RE-FIT FIRST, which is the reason it sat
+    # off. The standard's hazard is that rates fitted with a mechanism ABSENT
+    # already absorb its average effect, so re-adding OVERSHOOTS. Measured here
+    # it UNDER-corrects -- the opportunity bias is still POSITIVE at +6.1%
+    # afterwards -- so it cannot overshoot what was absorbed. And the measured
+    # negative interaction (-0.00331, worse in 4 of 4) was **both mechanisms
+    # together**: batted-ball weight stays 0.0 and pitch-type effectiveness
+    # stays unfed, so that pair is not being created here.
+    #
+    # COST: none. 22.8 -> 21.3 ms per game-sim, measured per-arm rather than
+    # reasoned, because this engine runs on a container with an OOM history.
+    #
+    # STILL OWED, and not fixed by this flag: the residual +6.1% opportunity
+    # bias and the ~12% per-PA RATE bias (`model_skill` measured opportunity as
+    # 55% of the count bias). That is the rate re-fit, a compute-heavy sweep.
     #
     # THIS MUST BE A DECLARED FIELD, not an attribute set on an instance.
     # `dataclasses.replace()` rebuilds a GameConfig from its declared fields
     # only, and the sim calls `replace(cfg, rng_seed=...)` on every run -- so a
     # monkey-patched attribute is silently discarded before the first pitch and
     # the feature reads as permanently disabled. Caught by the reachability test.
-    position_substitutions: bool = False
+    position_substitutions: bool = True
     # Toggle batted-ball-informed baserunning: DP, sac flies, and runner advancement.
     # When False, falls back to a simpler forced-advance baserunning model.
     bip_baserunning: bool = True

@@ -1932,17 +1932,17 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text('{"games": []}\n', encoding="utf-8")
                 return str(out_path)
 
-            def _fake_recommendations_slate_artifact(*, source_root, date_str, processed_root):
+            def _fake_recommendations_slate_artifact(*, source_root, date_str, processed_root, force_refresh=False):
                 out_path = processed_root / f"recommendations_slate_{date_str}.json"
                 out_path.write_text('{"counts": {"games": 1, "picks": 1}, "per_game": []}\n', encoding="utf-8")
                 return str(out_path)
 
-            def _fake_cards_props_snapshot_artifact(*, source_root, date_str, processed_root):
+            def _fake_cards_props_snapshot_artifact(*, source_root, date_str, processed_root, force_refresh=False):
                 out_path = processed_root / f"cards_props_snapshot_{date_str}.json"
                 out_path.write_text('{"games": []}\n', encoding="utf-8")
                 return str(out_path)
 
-            def _fake_top_by_game_artifact(*, source_root, date_str, processed_root):
+            def _fake_top_by_game_artifact(*, source_root, date_str, processed_root, force_refresh=False):
                 out_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
                 out_path.write_text('{"data": []}\n', encoding="utf-8")
                 return str(out_path)

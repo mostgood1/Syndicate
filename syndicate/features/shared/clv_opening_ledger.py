@@ -171,6 +171,14 @@ def _opening_record(row: Mapping[str, Any], key: str, captured_at: str) -> dict[
         # opening recorded, the joiner can pair whichever book the close exists
         # for -- an unbiased comparison instead of a best-of-N one.
         "book_prices": quote.get("book_prices") or None,
+        # THE OTHER SIDE(S) OF THE SAME MARKET, AS PRICED WHEN WE CHOSE.
+        # `#626`(g). The opening ledger records one row per side we PUBLISH,
+        # and we publish the side we took -- so before this the opposite leg
+        # was absent from the ledger by construction, and 0 of 8,778 graded
+        # MLB prop keys carried both sides. Carried through from the board's
+        # quote rather than re-derived here: this module must not grow a second
+        # opinion about what the market looked like.
+        "other_sides": quote.get("other_sides") or None,
         "fair_probability": _as_float(quote.get("fair_probability")),
         "fair_method": quote.get("fair_method"),
         # Carried so CLV can later be split by whether a model had a view at

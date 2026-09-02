@@ -241,6 +241,76 @@ _WNBA_ALIAS_SUPPLEMENT: dict[str, str] = {
 # reports the club names it could not resolve so the next one is legible
 # instead of showing up as a silently unjoined row.
 _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
+    # ------------------------------------------------------------------
+    # KALSHI'S CLUB SPELLINGS. `#631`, lane `kalshi-soccer-club-aliases`.
+    # ------------------------------------------------------------------
+    #
+    # Kalshi names each soccer club in its own market titles ("<Club> wins"),
+    # and 119 of its 153 clubs already resolve here unaided. These 34 are the
+    # ones that did not, and they are what the join's
+    # `event_not_on_our_board: 314` residual was made of (2026-09-02T00:22Z).
+    #
+    # NOT ONE CLUB IS GUESSED, and the method is why. Per LEAGUE -- never a
+    # flattened map -- resolve everything resolvable, then pair the residual
+    # sets only under two exact rules:
+    #
+    #   R1  one side's normalised token set is a SUBSET of the other
+    #       ("Standard" c "Standard Liege"; "Brest" c "Stade Brest 29")
+    #   R2  they share a token occurring in EXACTLY ONE club on each residual
+    #       side ("eagles": "GA Eagles" <-> "Go Ahead Eagles")
+    #
+    # A Kalshi club matching TWO of ours is refused. Nine were refused that
+    # way and are deliberately absent: `Bilbao`/`Athletic Club` (no shared
+    # token at all), `St. Truidense` (shares `st` with `Union St.-Gilloise`,
+    # so uniqueness fails and the pair is not forced), `FC Koln`,
+    # `M gladbach`, `Enschede`, `Inter`, and MLS `Los Angeles G` /
+    # `Los Angeles F` / `DC United`. Those need evidence this method cannot
+    # supply; a wrong club here is a real order on the wrong team.
+    #
+    # THE PER-LEAGUE FETCH IS LOAD-BEARING. A flattened code->name map read
+    # earlier the same night carried `LEV=Leverkusen` and `PAR=Parma Calcio`;
+    # in la_liga and ligue_1 those codes are **Levante** and **Paris FC**.
+    # Pairing off it would have written two wrong-club aliases. The elimination
+    # pass caught it by refusing rather than choosing.
+    #
+    # Every entry checked BOTH WAYS, the standard the `#503` block above sets:
+    # `canonical_team` returns None for the Kalshi spelling and a real club for
+    # the target. The 119 already-resolving names are deliberately NOT written
+    # -- a working pair buys nothing and hides which entries are load-bearing.
+    "la louviere": "raal la louvière",
+    "standard": "standard liege",
+    "union gilloise": "union st.-gilloise",
+    "atletico": "atlético madrid",
+    "deportivo de la coruna": "deportivo la coruña",
+    "stade brest 29": "brest",
+    "strasbourg alsace": "strasbourg",
+    "parma calcio": "parma",
+    "paderborn": "sc paderborn 07",
+    "schalke": "schalke 04",
+    "den haag": "ado den haag",
+    "ga eagles": "go ahead eagles",
+    "sparta": "sparta rotterdam",
+    "newcastle": "newcastle united",
+    "coventry": "coventry city",
+    "brighton": "brighton & hove albion",
+    "tottenham": "tottenham hotspur",
+    "philadelphia": "philadelphia union",
+    "vancouver": "vancouver whitecaps",
+    "new england": "new england revolution",
+    "san jose": "san jose earthquakes",
+    "houston": "houston dynamo fc",
+    "seattle": "seattle sounders fc",
+    "salt lake": "real salt lake",
+    "colorado": "colorado rapids",
+    "saint louis": "st. louis city sc",
+    "minnesota": "minnesota united fc",
+    "kansas city": "sporting kansas city",
+    "portland": "portland timbers",
+    "orlando": "orlando city sc",
+    "miami": "inter miami cf",
+    "atlanta": "atlanta united fc",
+    "new york rb": "red bull new york",
+    "columbus": "columbus crew",
     "sint truiden": "sint-truidense",
     "sporting lisbon": "sporting cp",
     "union saint gilloise": "union st.-gilloise",

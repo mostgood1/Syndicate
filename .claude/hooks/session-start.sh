@@ -243,7 +243,31 @@ BLOAT=""
 # "nothing to move -- every block is claim-bearing or reads OPEN", so its size
 # is lanes not being CLOSED. Raising its cap does not fix that; it stops the
 # digest crying about something no tool can act on.
-for f in state.md:750000 lanes.md:240000 learnings.md:280000; do
+#
+# learnings.md RAISED AGAIN 2026-09-02, 280,000 -> 400,000, and the reason is
+# that "current size + 15% headroom" IS THE WRONG SIZING RULE FOR THIS FILE.
+# That headroom was set on 2026-09-01 at 240,442 bytes and was CONSUMED IN
+# UNDER A DAY -- 278,051 by 21:09 the same evening, +37,609. Measured growth
+# over ten hours of that day, from the file's own commit sizes: 243,973 ->
+# 274,066, about 3 KB/hour with several sessions appending.
+#
+# The structural reason, and it is not "the file grows fast": THE LEVER LAGS BY
+# A DAY BY DESIGN. `compact_learnings.py --keep-from <date>` compacts entries
+# strictly BEFORE that date, so today's rules are never compactable and
+# yesterday's only become so tomorrow. Measured today: cutoffs through
+# 2026-09-01 reclaimed 0 bytes (everything older was already compacted) while
+# `--keep-from 2026-09-02` reclaimed 27,669. So the file always carries an
+# UNCOMPACTABLE WORKING SET of one to two days on top of its compacted floor,
+# and a cap pinned to a percentage of the compacted floor fires on normal work
+# every single day.
+#
+# 400,000 is that floor (~249 KB after compacting through 09-01) plus roughly
+# three days of net growth -- enough that the alarm survives a weekend nobody
+# compacts, and still goes off if the file genuinely runs away. This is NOT the
+# lanes.md case: learnings.md has a WORKING tool with real bytes to reclaim, so
+# raising the cap here buys time for a lever that exists rather than silencing
+# one that does not.
+for f in state.md:750000 lanes.md:240000 learnings.md:400000; do
   n=${f%%:*}; cap=${f##*:}
   if [ -f ".syndicate/$n" ]; then
     SZ=$(wc -c < ".syndicate/$n" 2>/dev/null | tr -d ' ')

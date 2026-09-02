@@ -28,9 +28,12 @@ from __future__ import annotations
 import gzip
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 from typing import Any
 from typing import Iterable
@@ -113,6 +116,77 @@ def _cfbd_get(path: str, params: dict[str, Any], *, api_key: str | None = None, 
         return json.loads(response.read().decode("utf-8"))
 
 
+def _classify_urllib_error(exc: BaseException) -> tuple[int | None, Any] | None:
+    """`(status, Retry-After)` for a urllib HTTP error, or None to re-raise.
+
+    NOT `cfbd.py::_classify_requests_error`. That one reads `exc.response`,
+    which only a `requests` exception has; this module calls urllib, whose
+    `HTTPError` carries `.code` and `.headers` instead. Handing the requests
+    classifier a urllib error returns None for everything -- every 429 would
+    re-raise immediately and the retry ladder would be inert while looking
+    wired.
+
+    `URLError`/timeouts return None deliberately, matching the sibling: a
+    backoff aimed at a throttle must not also delay a real outage.
+    """
+    if not isinstance(exc, urllib.error.HTTPError):
+        return None
+    headers = getattr(exc, "headers", None) or {}
+    try:
+        retry_after = headers.get("Retry-After")
+    except Exception:  # noqa: BLE001 - a header mapping that will not index
+        retry_after = None
+    return getattr(exc, "code", None), retry_after
+
+
+def _cfbd_get_latched(path: str, params: dict[str, Any], *, api_key: str | None = None, timeout: float = 60.0) -> Any:
+    """`_cfbd_get` behind the monthly-quota latch and the retry ladder.
+
+    THIS MODULE HAD NEITHER. `_cfbd_get` is raw urllib, and the only mention of
+    429 in the file is a comment recording that a few full-season pulls
+    exhausted the quota and it was still 429 thirteen hours later. Everything
+    periodic must come through here.
+
+    `raise_if_latched` runs INSIDE the retried operation, not once before it.
+    That placement is the `ncaaf-cfbd-quota-latch` lane's own measured defect,
+    reproduced here rather than rediscovered: with the check outside, "the first
+    429 set the latch and the four retries behind it still went out" -- 5 calls
+    spent against an exhausted monthly quota instead of 1.
+    """
+    from syndicate.features.ncaaf.cfbd_backoff import call_with_retry
+    from syndicate.features.ncaaf.cfbd_quota_latch import (
+        is_monthly_quota_body,
+        note_quota_exhausted,
+        raise_if_latched,
+    )
+
+    describe = f"GET {path}"
+
+    def _operation() -> Any:
+        raise_if_latched(describe)
+        try:
+            return _cfbd_get(path, params, api_key=api_key, timeout=timeout)
+        except urllib.error.HTTPError as exc:
+            if getattr(exc, "code", None) == 429:
+                # The BODY is the discriminator, not the status: a per-minute
+                # throttle and an exhausted monthly quota both arrive as 429 and
+                # need opposite responses. Reading it consumes the stream, so
+                # this happens once and is guarded.
+                try:
+                    body = exc.read().decode("utf-8", "replace")
+                except Exception:  # noqa: BLE001 - an unreadable body is just not a quota answer
+                    body = ""
+                if is_monthly_quota_body(body):
+                    note_quota_exhausted(body)
+                    # Latched now -- convert to QuotaExhausted immediately so the
+                    # retry ladder does not spend four more calls on an answer
+                    # that cannot change for days.
+                    raise_if_latched(describe)
+            raise
+
+    return call_with_retry(_operation, classify=_classify_urllib_error, describe=describe)
+
+
 def _write_json_gz(payload: Any, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(destination.suffix + ".part")
@@ -143,6 +217,17 @@ def _ratings_cache_path(season: int, cache_dir: Path) -> Path:
 
 
 def ensure_games_cached(season: int, *, cache_dir: Path = DEFAULT_CACHE_DIR, api_key: str | None = None) -> Path:
+    """The games cache path, fetching only when the file is ABSENT.
+
+    DELIBERATELY STILL WRITE-ONCE FOR READERS, and that is not the bug below.
+    `ncaaf_target_week` -> `load_games_season` -> here runs inside Flask request
+    handlers (`ncaaf/cards.py`), and CLAUDE.md's load-bearing rule is that the
+    web service does no on-request backfill. A lazy refresh here would put a
+    blocking CFBD call on the cards page.
+
+    `refresh_games_cache` is the producer half: explicit, worker-side, and the
+    thing that actually keeps `completed` current. See its docstring.
+    """
     path = _games_cache_path(season, cache_dir)
     if path.exists():
         return path
@@ -153,6 +238,195 @@ def ensure_games_cached(season: int, *, cache_dir: Path = DEFAULT_CACHE_DIR, api
     )
     _write_json_gz(payload, path)
     return path
+
+
+# A game is over well inside this many hours of kickoff. CFBD flips `completed`
+# when it ingests the final; the window only has to exceed game length plus that
+# ingest lag, and being generous costs one extra day of staleness at most.
+_GAME_COMPLETION_GRACE_SECONDS = 12 * 3600
+
+# A failed refresh must not re-attempt on every call. The generator runs hourly
+# when its artifact is stale, and an unthrottled retry here would restore the
+# exact per-tick CFBD hammering `cfbd_quota_latch` exists to stop -- on a path
+# the latch cannot see, because a non-quota failure (500, DNS) never latches.
+_GAMES_REFRESH_RETRY_SECONDS = 6 * 3600
+
+
+def _games_refresh_marker_path(season: int, cache_dir: Path) -> Path:
+    return cache_dir / f"games_{season}.refresh_attempt"
+
+
+def _kickoff_epoch(game: Any) -> float | None:
+    """Kickoff as a UTC epoch, or None when the row carries no usable date."""
+    if not isinstance(game, dict):
+        return None
+    text = str(game.get("startDate") or "").strip()
+    if not text:
+        return None
+    # CFBD emits `2026-08-29T23:00:00.000Z`; `fromisoformat` rejects the `Z`
+    # on Python < 3.11 and accepts it on 3.11+. Normalise rather than depend
+    # on the interpreter version.
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.timestamp()
+
+
+def games_payload_is_stale(payload: Any, *, now: float) -> bool:
+    """Does this snapshot predate results that already exist?
+
+    THE STALENESS SIGNAL IS THE CONTENT, NOT THE FILE'S MTIME, and that choice
+    is load-bearing. This file is git-tracked and `bootstrap_data_root` copies
+    it onto the mounted disk, so its mtime is the time of the last deploy or
+    bootstrap -- a freshly deployed snapshot from July reads as seconds old. An
+    mtime rule would report "fresh" on exactly the file this function exists to
+    catch.
+
+    A regular-season game that kicked off more than `_GAME_COMPLETION_GRACE_SECONDS`
+    ago and is still `completed: False` is proof the snapshot is behind reality.
+    That is precisely the field `ncaaf_target_week` reads, so this tests the
+    thing that is wrong rather than a proxy for it.
+    """
+    if not isinstance(payload, list):
+        # Unreadable or unexpected shape: not stale, because a refresh cannot
+        # be justified by a payload we could not interpret. `load_games_season`
+        # already raises on a corrupt file.
+        return False
+    cutoff = now - _GAME_COMPLETION_GRACE_SECONDS
+    for game in payload:
+        if not isinstance(game, dict):
+            continue
+        if game.get("completed"):
+            continue
+        kickoff = _kickoff_epoch(game)
+        if kickoff is not None and kickoff < cutoff:
+            return True
+    return False
+
+
+def refresh_games_cache(
+    season: int,
+    *,
+    cache_dir: Path = DEFAULT_CACHE_DIR,
+    api_key: str | None = None,
+    now: float | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Re-fetch `games_{season}.json.gz` when its `completed` flags are behind.
+
+    WHY THIS EXISTS. `ensure_games_cached` returns early on `path.exists()`, so
+    the file was written once and never again. Measured 2026-09-01:
+    `games_2026.json.gz` (written 2026-07-21, six weeks before kickoff) held 888
+    games with `completed: False` on **888 of 888**. `ncaaf_target_week` is
+    `min(week with an unplayed game)`, so it returned 1 -- and would have
+    returned 1 for the whole season. `_week_is_within_pregame_window` then
+    filters the week list to `week <= 1`, so the board served "2026 Week 1" for
+    every requested week (`?week=2` and `?week=3` both did, on production) while
+    projection artifacts existed for weeks 1-13 and 15.
+
+    Never raises for a caller: returns a status dict. A generator must not die
+    because a refresh did, and neither must a board.
+
+    THE FOUR RULES THIS FOLLOWS, each one a failure mode that is worse than the
+    staleness it replaces:
+
+      * ROUTED THROUGH THE QUOTA LATCH. This module's `_cfbd_get` is raw urllib
+        with no `cfbd_backoff` and no `cfbd_quota_latch` -- the only 429 handling
+        in the file is a comment. Adding an unlatched periodic caller here would
+        rebuild the hourly hammer the latch shipped to stop, on a path the latch
+        cannot see.
+      * NEVER CLOBBERS A GOOD FILE. A short or empty payload is refused, not
+        written. `ensure_ratings_cached` already states the rule for its own
+        sibling: "An absent file is honest; an empty one is not." A truncated
+        schedule would silently shrink the board.
+      * FALLS BACK TO THE STALE FILE. Any failure leaves the existing cache in
+        place. A stale board is a real defect; a blank one is a worse one, and
+        CFBD is on a MONTHLY quota, so an outage can last days.
+      * THROTTLED ON FAILURE. See `_GAMES_REFRESH_RETRY_SECONDS`.
+    """
+    now = time.time() if now is None else now
+    path = _games_cache_path(season, cache_dir)
+    marker = _games_refresh_marker_path(season, cache_dir)
+
+    if not path.exists():
+        return {"status": "absent", "refreshed": False, "path": str(path)}
+
+    try:
+        existing = _read_json_gz(path)
+    except Exception as exc:  # noqa: BLE001 - a corrupt cache is not this function's job
+        return {"status": "unreadable", "refreshed": False, "error": f"{type(exc).__name__}: {exc}"}
+
+    existing_rows = len(existing) if isinstance(existing, list) else 0
+
+    if not force and not games_payload_is_stale(existing, now=now):
+        return {"status": "fresh", "refreshed": False, "rows": existing_rows}
+
+    if not force:
+        try:
+            last_attempt = float(marker.read_text(encoding="utf-8").strip())
+        except Exception:  # noqa: BLE001 - absent or unparseable means "never attempted"
+            last_attempt = None
+        if last_attempt is not None and (now - last_attempt) < _GAMES_REFRESH_RETRY_SECONDS:
+            return {
+                "status": "throttled",
+                "refreshed": False,
+                "rows": existing_rows,
+                "retry_in_seconds": int(_GAMES_REFRESH_RETRY_SECONDS - (now - last_attempt)),
+            }
+
+    # Stamped BEFORE the call, not after. A process killed mid-fetch (the
+    # season-projection generator is launched with a timeout and has been seen
+    # to hit it) must still count as an attempt, or the throttle is not one.
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(str(now), encoding="utf-8")
+    except Exception:  # noqa: BLE001 - an unwritable marker must not block the refresh
+        pass
+
+    try:
+        payload = _cfbd_get_latched(
+            "/games",
+            {"year": season, "seasonType": "regular", "classification": "fbs"},
+            api_key=api_key,
+        )
+    except Exception as exc:  # noqa: BLE001 - includes QuotaExhausted; stale beats blank
+        return {
+            "status": "fetch_failed",
+            "refreshed": False,
+            "rows": existing_rows,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+    if not isinstance(payload, list) or not payload:
+        return {"status": "empty_payload_refused", "refreshed": False, "rows": existing_rows}
+
+    if len(payload) < existing_rows:
+        # A schedule does not shrink. Fewer rows than we already hold means a
+        # partial or filtered response, and writing it would drop games off the
+        # board with no error anywhere.
+        return {
+            "status": "short_payload_refused",
+            "refreshed": False,
+            "rows": existing_rows,
+            "incoming_rows": len(payload),
+        }
+
+    _write_json_gz(payload, path)
+    completed_before = sum(1 for g in existing if isinstance(g, dict) and g.get("completed")) if isinstance(existing, list) else 0
+    completed_after = sum(1 for g in payload if isinstance(g, dict) and g.get("completed"))
+    return {
+        "status": "refreshed",
+        "refreshed": True,
+        "rows": len(payload),
+        "completed_before": completed_before,
+        "completed_after": completed_after,
+        "path": str(path),
+    }
 
 
 def ensure_drives_cached(season: int, *, cache_dir: Path = DEFAULT_CACHE_DIR, api_key: str | None = None) -> Path:
@@ -467,8 +741,10 @@ __all__ = [
     "ensure_drives_cached",
     "ensure_games_cached",
     "ensure_plays_cached",
+    "games_payload_is_stale",
     "load_drives_season",
     "load_games_season",
     "load_ncaaf_canonical_frame",
     "load_plays_season",
+    "refresh_games_cache",
 ]

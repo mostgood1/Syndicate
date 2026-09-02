@@ -2278,15 +2278,17 @@ def _build_local_top_by_game_snapshot(*, processed_root: Path, date_str: str) ->
         game_key = f"{away_tri}@{home_tri}"
         if per_game_counts.get(game_key, 0) >= 3:
             continue
-        ev_pct = _float_or_none(top_play.get("ev_pct"))
-        implied_prob = _american_price_to_prob(top_play.get("price"))
-        win_prob = (
-            _clamp_probability(implied_prob + (_float_or_none(top_play.get("ev")) or 0.0))
-            if implied_prob is not None
-            # Routed through the chokepoint rather than a bare `None` so this
-            # branch -- the one the fix exists for -- is COUNTED, not silent.
-            else _clamp_probability(None)
-        )
+        ev_pct = _plausible_ev_pct(_float_or_none(top_play.get("ev_pct")))
+        # A SITE `bef61c33` MISSED: this builder kept `implied + ev` (a return
+        # fraction added to a probability) after the game-market and
+        # prop-recommendation sites were fixed. Same pattern as the prop site:
+        # prefer the play's own model probability (explicit None test so a
+        # genuine 0.0 survives), else the price-implied probability. Routed
+        # through the chokepoint so the no-price branch is COUNTED, not silent.
+        p_win_value = _float_or_none(top_play.get("p_win"))
+        if p_win_value is None:
+            p_win_value = _american_price_to_prob(top_play.get("price"))
+        win_prob = _clamp_probability(p_win_value)
         enriched_top_play = dict(top_play)
         enriched_top_play.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))
         enriched_top_play["p_win"] = win_prob
@@ -2344,15 +2346,17 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
         away_tri = str(meta.get("away_tri") or "").strip().upper()
         if (home_tri, away_tri) not in grouped:
             continue
-        ev_pct = _float_or_none(top_play.get("ev_pct"))
-        implied_prob = _american_price_to_prob(top_play.get("price"))
-        win_prob = (
-            _clamp_probability(implied_prob + (_float_or_none(top_play.get("ev")) or 0.0))
-            if implied_prob is not None
-            # Routed through the chokepoint rather than a bare `None` so this
-            # branch -- the one the fix exists for -- is COUNTED, not silent.
-            else _clamp_probability(None)
-        )
+        ev_pct = _plausible_ev_pct(_float_or_none(top_play.get("ev_pct")))
+        # A SITE `bef61c33` MISSED: this builder kept `implied + ev` (a return
+        # fraction added to a probability) after the game-market and
+        # prop-recommendation sites were fixed. Same pattern as the prop site:
+        # prefer the play's own model probability (explicit None test so a
+        # genuine 0.0 survives), else the price-implied probability. Routed
+        # through the chokepoint so the no-price branch is COUNTED, not silent.
+        p_win_value = _float_or_none(top_play.get("p_win"))
+        if p_win_value is None:
+            p_win_value = _american_price_to_prob(top_play.get("price"))
+        win_prob = _clamp_probability(p_win_value)
         base_pick = dict(top_play)
         base_pick.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))
         base_pick["player"] = str(row.get("player") or "").strip()

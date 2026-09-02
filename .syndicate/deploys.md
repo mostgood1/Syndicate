@@ -16701,6 +16701,215 @@ fire on a STALE clear, which is what preflight exists to prevent.
 
 ---
 
+## 2026-09-01 15:0xZ — **NO DEPLOY. SOCCER SHOT-SHRINKAGE RE-FIT AND PUBLISHED** — artifact `soccer_source/calibration/shot_shrinkage_2026-09-01.json` — lane `soccer-shot-shrinkage`
+
+Scheduled task `refit-soccer-shot-shrinkage` (monthly). **No code changed, no
+service was deployed, no deploy claim was taken** — this publishes an artifact
+the running engine already knows how to read. Recorded here because it changes
+production behaviour.
+
+**New divisor `1.3930`. Previous `1.3979`** (`shot_shrinkage_2026-08-31.json`).
+Move of **0.0049**, far inside the ~0.15 scrutiny band. The point of re-fitting
+is that this value drifts — 1.244 / 1.314 / 1.333 / 1.438 across four splits on
+2026-08-31 — so a small move is a reading, not a no-op.
+
+**Sample.** n=**10,176** pairs over **254** matches, 9 leagues,
+2026-07-22..2026-08-31 (previous fit: n=9,840 / 247 matches). The production
+archive returned **146** recommendation files, 2 more than the 144 of a day
+ago; the growth is one slate, which is why the divisor barely moved.
+
+### INSTRUMENT VALIDATED BEFORE THE NUMBER WAS TRUSTED
+
+Per-league shots-per-match extracted from ESPN, against a ~23.4 benchmark,
+capture floor 0.75:
+
+| league | matches | shots/match | capture |
+|---|---|---|---|
+| mls | 80 | 24.73 | 1.06 |
+| eredivisie | 29 | 29.46 | 1.26 |
+| la_liga | 29 | 24.79 | 1.06 |
+| **belgian_pro_league** | 28 | **3.00** | **0.13 — EXCLUDED** |
+| primeira_liga | 28 | 22.48 | 0.96 |
+| championship | 25 | 26.88 | 1.15 |
+| serie_a | 20 | 27.70 | 1.18 |
+| epl | 19 | 27.32 | 1.17 |
+| ligue_1 | 17 | 26.71 | 1.14 |
+| bundesliga | 9 | 31.44 | 1.34 |
+
+**No league other than Belgium has degraded** — the next-lowest is 0.96.
+Belgium reads 0.13 for the same reason as before: ESPN's `bel.1` commentary
+carries no shot detail, so its outcomes are MISSING, not zero. Left in, it
+prices at ratio **12.13** (pred 0.485 vs realized 0.040 over n=1,225) and
+flips the pooled verdict — the unfiltered production backtest over all 10
+leagues reads "model WORSE than baseline by 1.4%".
+
+### verify: HELD OUT BY DATE, split 2026-08-22, train n=3,435 / test n=6,741
+
+| candidate | test MAE | test bias |
+|---|---|---|
+| RAW | 0.6178 | +0.1687 |
+| **SCALAR** | **0.5491** | **+0.0281** |
+| AFFINE | 0.5698 | +0.0355 |
+| constant-mean baseline | 0.6226 | 0.0000 |
+
+SCALAR **PASSES** the pre-registered criterion — better than RAW on MAE *and*
+on absolute bias — and beats the constant-mean baseline by 11.8%. SCALAR beats
+AFFINE **in all 9 leagues**, again; the affine slope is fitting the bottom
+deciles, which predict 0.00–0.22 shots and carry almost none of the loss.
+
+### verify: PUBLISHED AND READ BACK, not just 200'd
+
+`POST /api/ops/artifacts/publish` → `200 {"bytes":867,"ok":true}`. That is the
+sender's opinion, so it was read back through
+`GET /api/ops/artifacts/export?path=soccer_source/calibration/shot_shrinkage_2026-09-01.json`:
+**`divisor=1.393, n=10176, matches=254, fitted_at=2026-09-01T15:04:23Z`** —
+matches the bytes written, field for field. No 403, so web's
+`HOT_ARTIFACT_PATTERNS` is current.
+
+The filename is date-suffixed because live-odds-worker receives no pushes and
+PULLS via `pull_hot_artifacts` scoped to `?pattern=*<today>*`. An undated name
+can never reach it. The engine resolves the newest dated file; `shot_shrinkage.json`
+and the 08-31 file stay on disk and are ignored.
+
+### STILL OWED — unchanged, and this run does not discharge it
+
+**The divisor has never been OBSERVED working.** The soccer sim runs every 4h
+(`SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS=14400`) and the board must
+be carrying `player_shots` rows at that moment. The closing reading is
+composition-invariant: back the Poisson mean out of each row's
+`model_prob_over` and divide by that player's own season `shots_per90` from
+`data/soccer_source/*/players/players_*.csv`. That ratio was **1.19** before
+the first divisor shipped and must land near **0.85**. Rows present WITH a
+median still near 1.19 means the artifact reached web but not the worker —
+that is the failure mode, not absence of rows. Carried by `todo.md #612`.
+
+---
+
+## 2026-09-01 15:0xZ — ncaaf-cfbd-quota-latch — MEASUREMENT ONLY, no deploy — refresh-worker @ `bf0811bb` / `13afa27f`
+
+**This row discharges the obligation opened by the 2026-08-31 latch + PPA-cache
+deploys.** No deploy, no code change, no latch file touched — read-only
+verification that the monthly CFBD quota latch RELEASED at the month roll.
+Scheduled task `verify-ncaaf-cfbd-quota-latch-roll`.
+
+### verify: the latch expired on time and did NOT become the outage
+
+**`_next_month_roll` fired exactly as designed. The headline failure mode did
+not occur.** Zero `[cfbd_quota]` lines of ANY kind on refresh-worker in
+`2026-09-01T00:00:00Z .. 15:00Z` — no `LATCHED_SKIP`, no `LATCH_SET`. The last
+one ever emitted:
+
+    2026-08-31T23:22:30.450348974Z  [cfbd_quota] LATCHED_SKIP GET /ppa/teams clears_in_hours=0.6
+
+`clears_in_hours` counted down monotonically 17.7 -> 0.6 across 18 hourly
+skips and then stopped. Nothing had to be cleared by hand.
+
+### verify: the PPA cache ARMED — the line that could not previously exist
+
+    2026-08-31T23:22:30.450367574Z  [ppa] season=2025 source=none reason=quota_exhausted_and_cache_empty
+    2026-09-01T00:23:31.042923621Z  [ppa] season=2025 source=api
+
+17 consecutive `source=none reason=quota_exhausted_and_cache_empty` on 08-31,
+then `source=api` 23 minutes after the roll. The cache was empty and could only
+be filled by the call that was failing; this is the first fill. Write is
+DURABLE: `_ppa_cache_path` resolves under `SYNDICATE_DATA_ROOT`, the same root
+that produced `artifact_path=/opt/render/project/data/...` (the MOUNTED disk,
+not `/src`), and no `[ppa] CACHE_WRITE_FAILED` was emitted. SP+ also came back:
+
+    2026-09-01T00:23:34.623841667Z  [sp_ratings] season=2026 source=api teams=138 cached=/opt/render/project/src/data/ncaaf_source/historical_truth/sp_ratings_2026.json
+
+### verify: the relaunch storm collapsed — a RATE, with its denominator
+
+| window | length | ncaaf `SEASON_PROJECTION_LAUNCHING` | rate |
+|---|---|---|---|
+| 2026-08-31T00:00Z .. 09-01T00:00Z | 24.0 h | 23 | **23.0 / day** |
+| 2026-09-01T00:00Z .. 15:00Z | 15.0 h | 1 | **1.6 / day** |
+
+Configured `interval_seconds=86400` = 1/day. The single post-roll launch
+(`00:23:23Z`, `age_seconds=442924`) was itself triggered by the pre-existing
+staleness; it succeeded, and nothing has re-fired in the 14.6 h since.
+
+### verify: the artifact REGENERATED — positive evidence, not a quiet log
+
+    2026-09-01T00:33:24.512294914Z  projections_written=51
+    2026-09-01T00:33:24.512305135Z  artifact_path=/opt/render/project/data/ncaaf_source/data/smartsim2_projections_2026_wk1.csv
+    2026-09-01T00:33:24.512292403Z  rating_source=cfbd_sp_plus_2026[scale=10]+cfbd_ppa_season_2025_fallback_for_2026
+
+That path is **the exact path `_season_projection_artifact_path` stats**, so
+`age_seconds` reset at 00:33:24Z and stays under 86400 until 2026-09-02T00:33Z.
+The direct `age_seconds=<small>` log line cannot exist before then — the guard
+logs `artifact_stale`/`missing` and is DELIBERATELY SILENT on `artifact_fresh`.
+Recorded because silence alone is ambiguous here (autorun disabled, sport not
+active, week None and process-still-running are all silent too); the WRITE is
+the evidence, not the quiet.
+
+### THE ARTIFACT REGENERATED AND THE BOARD DID NOT MOVE — pre-existing, separate
+
+    2026-09-01T00:33:24.512310835Z  artifact_published=False
+
+No `artifact_publish_error`, so `publish_hot_artifact` returned False cleanly.
+**Cause is mechanism-level and confirmed by running the predicate**, not
+inferred:
+
+    is_hot_artifact_relative_path("ncaaf_source/data/smartsim2_projections_2026_wk1.csv") -> False
+
+The path matches ZERO of the 165 `HOT_ARTIFACT_PATTERNS` (`ncaaf_source/api/live_state/live_state_*.json`
+is the only ncaaf entry). The PULL side is gated on the same allowlist, so
+neither push nor pull can move it. `/ncaaf/api/cards` on
+`syndicate-an21.onrender.com` serves 51 games whose values (TCU 30.3 –
+North Carolina 20.037, margin 10.263, total 50.337, stdev 13.291/11.719) are
+byte-identical to the git-committed CSV stamped
+`generated_at=2026-08-19T22:00:39Z`. **Caveat, stated rather than glossed:**
+values alone do not discriminate — the generator is deterministic
+(`seeds_used=300`, identical `rating_source`) and a re-run could reproduce
+them. The allowlist miss is what makes it decisive.
+
+NFL is the same defect (`2026-08-31T21:28:40Z artifact_published=False`), so it
+is not ncaaf-specific and predates this lane. **Not fixed here — read-only task.**
+
+**Also noted, not fixed:** `[sp_ratings]` caches to `/opt/render/project/src/data/...`,
+the EPHEMERAL checkout, while the PPA cache and the latch correctly use
+`SYNDICATE_DATA_ROOT` (mounted disk). The SP+ cache therefore dies on every
+deploy and costs a CFBD call to refill.
+
+**Retry-ladder fix:** no reading, as expected. It only shows on a run that
+DISCOVERS a fresh exhaustion. Its absence proves nothing.
+### verify (SAME RUN, ~15:2xZ): **THE OWED READING IS DISCHARGED — the divisor IS live in the engine, measured**
+
+The obligation above said the reading could not be forced because the served
+board carried no soccer shot rows. **It did not have to be the board.** The
+engine writes `expected_shots` into the recommendation archive on every sim
+run, and that archive IS exportable — so the same question was asked of the
+artifact the engine produces instead of the surface that renders it.
+
+Self-normalised, so slate composition cannot drive it: only the **3,434**
+players appearing BOTH before and on/after the 2026-08-31 ship date, each
+compared to **himself**. Fixtures dated before the ship are frozen at their
+pre-divisor write; fixtures dated on/after have been re-written since.
+
+| median post/pre, same player | value |
+|---|---|
+| `expected_shots` | **0.720** |
+| `expected_minutes_share` | **1.000** |
+| shots **per unit of minutes share** | **0.720** |
+
+**1 / 1.3979 = 0.715.** Measured 0.720.
+
+**The confound is killed, not waved past.** A shots-only drop could equally
+have been "future fixtures carry lower minutes". Minutes share ratios to
+**exactly 1.000**, and the per-minute shots ratio is unchanged at 0.720 — so
+the step is the divisor and nothing else. Had the artifact reached web but not
+live-odds-worker — the failure mode the lane named — this would read ~1.00.
+
+`scripts/check_soccer_divisor_reached_engine.py` is the check, parameterised on
+`SHIP_DATE` / `SHIPPED_DIVISOR` so the 1.3930 published today can be confirmed
+the same way once fixtures re-write past it.
+
+**What this does NOT say:** it confirms the engine applied the divisor, not
+that the board renders it. `players_*.csv` is not in `HOT_ARTIFACT_PATTERNS`
+(export returned 0 files), so the `shots_per90` form of the reading still
+cannot be run from the web service. `todo.md #612` closes on the engine
+evidence; the board-render reading is a smaller separate question.
 ## 2026-09-01 — exchange prices reach a board for the first time (`wnba-accuracy-assessment`)
 
 ### VERIFIED — the gate I named in advance, read by me off Render
@@ -17206,6 +17415,87 @@ into the slate.
 - Money path untouched throughout: `KALSHI_SOCCER_RESOLVERS` gate shipped
   default-OFF; zero soccer matches means it has still never had to withhold one.
 
+## 2026-09-01 21:21Z / 21:56Z — web + refresh-worker `cc1feccc` — NCAAF GAMES-CACHE REFRESH + week_state ARTIFACT. **DEPLOYED AND HALF-VERIFIED. The producer reading is OWED and CANNOT be taken tonight — see `verify:`.**
+
+- lane: `ncaaf-games-cache-refresh` (session b85e895e). Carries `bc2365fc` +
+  `c1c3cf12`. Only other commit in range is a `deploys.md` row, so this deploy
+  is effectively the lane alone. **No `render.yaml` in range — no
+  `blueprint_sync`, no env rewrite.**
+- web    dep-dabk10ajobas73a9tlj0  created 21:15:45Z  LIVE **21:21:43Z**
+- worker dep-dabk62gjo6nc7391gq1g  created 21:26:34Z  LIVE **21:56:06Z**
+  (build 28 min against ~2-3 min for the five deploys before it; `build_ended`
+  and `deploy_ended` both `succeeded` in the events API. Slow, not failed — and
+  a poller that gave up at 27 min would have called it stuck. It was not.)
+- Both preflights CLEAR pinned to the SHA, claims held by this lane. The worker
+  preflight first returned **TOO_SOON** (22 min into a 25 min window) and I
+  WAITED rather than `--allow-rapid`: the worker needs ~21 min from boot to its
+  first board publish, so cutting that short freezes the board (`#563`). The
+  refresh-worker claim was taken only after the previous holder's TTL EXPIRED on
+  its own — not forced.
+
+**THE DEFECT.** `ensure_games_cached` returns early on `path.exists()`, so
+`games_2026.json.gz` (written 2026-07-21) was never re-fetched: **888 games,
+`completed: False` on 888 of 888.** `ncaaf_target_week` is `min(week holding an
+unplayed game)` -> 1, permanently. `_week_is_within_pregame_window` then trimmed
+the board to `week <= 1`: `/ncaaf/api/cards?week=2` and `?week=3` both served
+`"2026 Week 1"`, 51 games, nav `next=prev="1"`, while projection artifacts
+existed for weeks 1-13 and 15.
+
+**MEASURED — the web half, and it is DISCRIMINATING.** Both old and new code
+answer "Week 1" today, so the week number proves nothing. The allowlist does:
+
+    21:16:49Z  PRE   resolved_active_weeks [1]; cards?week=1 and ?week=2 both
+                     "2026 Week 1" / 51 games (byte-identical: the bug)
+    21:27:48Z  POST  GET /api/ops/artifacts/export
+                       ?path=ncaaf_source/data/week_state/ncaaf_week_state_2026.json
+                     -> HTTP 200 {"count":0,"artifacts":{}}
+               CONTROL same endpoint, ...week_state/definitely_not_allowlisted.txt
+                     -> HTTP 403
+
+200-vs-403 is the reading. The path is allowlisted only on this build, so the
+200 proves web is running `cc1feccc`; the control proves the endpoint really
+does refuse, so the 200 is not a blanket-permit artefact. `count:0` is correct —
+the producer has not run yet. `cards?week=2` still returns Week 1 with no error,
+which is the FALLBACK working: no artifact, so it reads the cache, exactly as
+before. No regression.
+
+**NOT MEASURED, AND WHY IT IS NOT AN OVERSIGHT.** The producer runs from
+`generate_smartsim2_ncaaf_projections.main()` on a DAILY staleness gate against
+an artifact generated 2026-09-01T00:26:15Z. That artifact lives on the
+PERSISTENT disk, so the deploy does not reset its age and the gate does not fire
+until ~2026-09-02T00:26Z. There is no ops endpoint to trigger it, and forcing
+one would spend a CFBD call against a MONTHLY quota. So the worker half is LIVE
+BUT UNPROVEN tonight. Recording that rather than banking the deploy as a fix.
+
+**verify:** OWED, in two parts, both ARMED as scheduled tasks so neither depends
+on anyone remembering.
+1. `verify-ncaaf-week-state-producer`, 2026-09-01 21:00 CDT. PASS =
+   `GAMES_CACHE_REFRESH status=refreshed completed_before=0 completed_after>0`
+   and `WEEK_STATE season=2026 ... stale_completion_flags=0 published=True` in
+   refresh-worker logs, plus the export endpoint above returning `count:1` with
+   a `weeks` map — that last is the one that proves the artifact CROSSED to web.
+2. `verify-ncaaf-week-advance`, 2026-09-08 10:00 CDT. PASS =
+   `resolved_active_weeks` contains 2, and `cards?week=1` vs `?week=2` now
+   DIFFER (identical responses is the failure signature).
+
+**`resolved_active_weeks: [1]` IS THE CORRECT ANSWER UNTIL 2026-09-07 and must
+not be read as a failure before then.** 2026 week 1 spans 08-29..09-07, so the
+frozen `1` and the true `1` are the same number today — the defect is real but
+unobservable until week 1 ends. Verified against the real file that an honest
+refresh does NOT advance the week early: 8 games past kickoff, matching the
+board's own `Final: 8` from a different code path. **2026-09-08 is the first
+date on which a frozen 1 is observably wrong.**
+
+**Cross-lane, authorised:** the one additive `HOT_ARTIFACT_PATTERNS` entry is in
+`artifact_publisher.py`, claimed by `football-projection-publish-allowlist`
+(`#618`). USER OVERRIDE 2026-09-01: *"go ahead and land it, the allowlist edit
+is additive."* Their two entries verified intact on origin/main after the
+rebase, and their own test passes against the landed tree.
+
+**Noted, not caused by this deploy:** the pre-reboot worker was running at
+`memory_headroom_mb: 0.055` of 4096 at 21:54:12Z under a kalshi/polymarket
+refresh. Post-boot it reads 3491 MB headroom — the usual boot-confounded floor,
+recorded here so a later reader does not attribute either number to this change.
 ## 2026-09-01 22:14Z — refresh-worker `cc1feccc` — MAXMUN DERIVATION + SAME-NAME COLLISION GUARD LIVE; module proven running, decisive input absent tonight
 - lane: `prop-name-disambiguator-derivation` (session e063e054) · deploy dep-dabk62gjo6nc7391gq1g NOT MINE (fired by `ncaaf-games-cache-refresh` after the kalshi lane's claim TTL lapsed; live 21:56:06Z). My `38dd9f41` rides it — verified by ME, content not ancestry alone: guard string present ×2 at `cc1feccc`, and `_polymarket_player_token` EXECUTED from that SHA's tree returned `maxmun` for 'Max Muncy (2002)', `fertat` unregressed, alt43 `bretbat`.
 - verify: **READ 22:14:37Z, first post-boot cycle:**
@@ -17812,3 +18102,38 @@ verify: production disk read via `/api/ops/artifacts/export` returned HTTP 200
 `count:1` with `week 1 completed=8, stale_completion_flags=0` against the
 write-once file's 0-of-888, allowlist control 403, on live SHAs that contain
 both fix commits.
+## 2026-09-02 01:5xZ — MEASUREMENT (no deploy): Kalshi soccer club resolution, attempted/resolved rate
+- lane: `kalshi-soccer-club-aliases` (closed; this discharges its OWED measurement). **Offline replay of the deployed join against production data — no deploy, no claim, nothing changed.** Kalshi's 171 open soccer events (its own `/events` API, 9 game series) replayed through `match_event_blob` from the deployed tree, against the board's own soccer fixtures read from `/api/board/layer2-shortlist`.
+- **A/B ON IDENTICAL DATA, the only variable being the 34 aliases:**
+
+      attempted (kalshi soccer events)  171
+      ceiling  (board fixtures)          28   <- NO alias can exceed this
+      resolved WITH the 34 aliases       22   78.6% of ceiling
+      resolved WITHOUT them              21   75.0% of ceiling
+      DELTA attributable to the aliases  +1 event  (+3.6pp of ceiling)
+
+  A/B validity checked rather than assumed: `canonical_team('soccer','Standard')`
+  reads `'standard liege'` with the table and `None` without, so the arms
+  genuinely differ (`_soccer_alias_to_name` is `lru_cache`d and was cleared
+  between runs — without that the two arms are identical by construction).
+- **SO THE ALIASES ARE WORTH +1 EVENT HERE — real, positive, and small.** The
+  earlier claim that their benefit was "unmeasured" is now discharged; the claim
+  that they were harmful (falsification signal, 51->4) stays refuted.
+- **THE BINDING CONSTRAINT IS NOT CLUB RESOLUTION AND THE RATE SAYS SO.** Club
+  resolution now converts **78.6% of everything the board makes reachable**. The
+  ceiling itself is **28 of 171 = 16.4%**: Kalshi lists 171 soccer fixtures and
+  our board carries 28 of them. Further alias work can buy at most 6 more events;
+  board fixture coverage can buy 143.
+- **A METHOD ERROR I MADE AND CAUGHT, recorded because the first number was
+  wrong and confidently so.** My first replay called `match_event_blob` WITHOUT
+  `code_names` and returned `resolved=9, delta=+0`. Production always passes it.
+  Without that map the path is code -> canonical, and NAME aliases can never be
+  consulted — so the experiment could only ever return +0, for a reason that has
+  nothing to do with the aliases. **A replay that does not pass what production
+  passes is not a replay.** Caught by noticing that fixtures which obviously
+  should match (`Gent @ Cercle Brugge KSV` vs Kalshi `CERKAA`) were counted as
+  unresolved while both clubs canonicalised fine.
+- **BOUND: this is a THIN board.** 28 fixtures / 38 soccer rows at ~01:50Z,
+  against 76 fixtures / 485 rows earlier the same evening. The ceiling and the
+  alias delta would both read larger on a fuller slate; the 78.6% conversion is
+  the number least sensitive to that.

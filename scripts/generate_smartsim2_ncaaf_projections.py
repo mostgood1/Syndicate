@@ -202,8 +202,17 @@ def _cached_games(season: int, week: int) -> list[dict] | None:
 
     THE SECOND OF TWO CFBD CALLS THIS SCRIPT CANNOT AVOID -- and unlike SP+,
     this one HAS a local equivalent. `historical_truth/games_<season>.json.gz`
-    is written and refreshed by `ncaaf_historical_loader.ensure_games_cached`;
-    for 2026 it holds 888 rows covering weeks 1-6.
+    is CREATED by `ncaaf_historical_loader.ensure_games_cached` and REFRESHED by
+    `ncaaf_historical_loader.refresh_games_cache`, which `main()` calls; for 2026
+    it holds 888 rows covering weeks 1-13 and 15.
+
+    THE PREVIOUS VERSION OF THIS PARAGRAPH SAID `ensure_games_cached` REFRESHED
+    IT. It does not and never did -- it returns early on `path.exists()`. That
+    one word is why nobody went looking: the file was written 2026-07-21 and
+    still read `completed: False` on 888 of 888 games six weeks later, which
+    pinned `ncaaf_target_week` to 1 and the whole board to week 1. The week span
+    was wrong too (1-6, measured as 1-13 and 15), from reading the row count and
+    guessing the range.
 
     Measured 2026-08-27: with the CFBD quota exhausted, BOTH `/games` and
     `/ratings/sp` returned HTTP 429 and projections could not regenerate at all.
@@ -800,6 +809,68 @@ def main() -> None:
 
     start = time.time()
     log(f"START season={args.season} week={args.week} seeds={args.seeds}")
+
+    # KEEP THE SCHEDULE'S `completed` FLAGS HONEST. This is the producer half of
+    # the games cache, and it runs HERE because this script is the NCAAF process
+    # that already runs on refresh-worker on a daily interval, already holds the
+    # CFBD key, and already has the quota latch wired.
+    #
+    # It cannot live in `ensure_games_cached`: that is reached from Flask request
+    # handlers via `ncaaf_target_week`, and the web service does no on-request
+    # backfill.
+    #
+    # Measured 2026-09-01, which is why this exists: `games_2026.json.gz` was
+    # written 2026-07-21 and never re-fetched, so 888 of 888 games still read
+    # `completed: False`. `ncaaf_target_week` is `min(week with an unplayed
+    # game)` -> 1, permanently, and `_week_is_within_pregame_window` then trimmed
+    # the board's week list to `[1]` while artifacts existed for weeks 1-13, 15.
+    #
+    # Best-effort, like the publish below: `refresh_games_cache` never raises,
+    # and a generator must not die because a refresh did.
+    try:
+        from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import (
+            refresh_games_cache,
+        )
+
+        games_refresh = refresh_games_cache(args.season)
+    except Exception as exc:  # noqa: BLE001 - a refresh must never fail generation
+        games_refresh = {"status": "raised", "error": f"{type(exc).__name__}: {exc}"}
+    # Printed every run, including the no-op ones. `status=fresh` and
+    # `status=throttled` are the healthy quiet states; `status=stale` never
+    # appears because a stale cache is acted on rather than reported.
+    log(f"GAMES_CACHE_REFRESH {' '.join(f'{k}={v}' for k, v in games_refresh.items())}")
+
+    # DERIVE AND PUBLISH THE WEEK STATE. The refresh above fixes THIS service's
+    # copy of the games cache; web has its own disk and cannot receive that file
+    # (a sub-4MB publish goes up as UTF-8 text, so a `.gz` returns
+    # SKIP_READ_FAILED). This is the small owned artifact that does cross, and
+    # it is what `ncaaf_target_week` reads on web -- so without it the whole
+    # refresh is worker-only and the cards board stays pinned to week 1.
+    try:
+        from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import (
+            load_games_season,
+        )
+        from syndicate.features.ncaaf.week_state import build_week_state, write_week_state
+
+        state = build_week_state(args.season, games=load_games_season(args.season), now=time.time())
+        state_path = write_week_state(state)
+        try:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+            state_published = publish_hot_artifact(state_path)
+        except Exception as exc:  # noqa: BLE001 - transfer must never fail generation
+            state_published = False
+            log(f"WEEK_STATE_PUBLISH_ERROR {type(exc).__name__}: {exc}")
+        # `stale_completion_flags` is the number this exists to surface: games
+        # whose kickoff is well past that the source still calls unplayed. It
+        # was 8 on the frozen 2026 snapshot and is 0 on a healthy one.
+        log(
+            f"WEEK_STATE season={args.season} games={state['games']} "
+            f"weeks={len(state['weeks'])} stale_completion_flags={state['stale_completion_flags']} "
+            f"published={state_published} path={state_path}"
+        )
+    except Exception as exc:  # noqa: BLE001 - a derived artifact must not fail generation
+        log(f"WEEK_STATE_ERROR {type(exc).__name__}: {exc}")
 
     schedule_rows = load_engine_schedule(args.season, args.week)
     log(f"ENGINE_SCHEDULE rows={len(schedule_rows)}")

@@ -5435,12 +5435,48 @@ def _build_locked_policy_card(
             baseline_selected=baseline_selected,
             final_selected=selected,
         )
+        # RETAIN THE OVERFLOW, exactly as `pitcher_props` and every hitter
+        # market below already do. `#626`(b).
+        #
+        # Until 2026-09-01 the game markets were the ONLY markets on this card
+        # that DISCARDED what the cap excluded. `pitcher_props` and each hitter
+        # market keep theirs as `other_playable_candidates`; `totals` and `ml`
+        # kept nothing, with no comment in either card builder giving a reason.
+        # Copy-drift, not a decision.
+        #
+        # What it cost, measured: `caps.ml = 1` against **12 raw ML candidates**
+        # on a normal slate (`#610`), so 11 playable picks a day were counted in
+        # `raw_candidates_n` and then dropped -- and `caps.totals = 0` discarded
+        # the totals pool entirely. Those rows are exactly the graded supply the
+        # feedback loop is starved of (35 of 19,692 settleable rows ever
+        # settled), and MLB run totals are the market the accuracy assessment
+        # calls "calibration WITHOUT information" -- unmeasurable while every
+        # totals candidate is thrown away before grading.
+        #
+        # THIS IS NOT A CAP CHANGE AND NOT A POLICY CHANGE. `recommendations`
+        # is still `_rank_and_cap(...)` and the official tier is byte-identical.
+        # The overflow lands in the `candidate` tier, which both consumers
+        # already handle generically and by market-agnostic code:
+        # `build_season_betting_cards_manifest.py` grades
+        # `other_playable_candidates` as `tier="candidate"`, and
+        # `settle_locked_policy_cards.py` settles it as `"candidate"`.
+        # Raising `caps.ml` instead would have changed what OFFICIAL means on a
+        # deliberately-fitted profile (`nototals_p1_tbheavy11_r1_nohr` zeroes
+        # HR, HRR and totals to match measured findings) and multiplied a paper
+        # book measured at -7.43% ROI.
+        extra, playable_audit = _filter_playable_candidates_by_support(
+            _subtract_selected_rows(supported_rows, selected),
+            market_name=str(market_name),
+        )
         markets[market_name] = {
             "raw_candidates_n": int(len(rows)),
             "selected_n": int(len(selected)),
+            "other_playable_candidates_n": int(len(extra)),
             "cap": (int(caps[market_name]) if market_name in caps else None),
             "stake_u": float(DEFAULT_STANDARD_STAKE_U),
             "recommendations": selected,
+            "other_playable_candidates": extra,
+            "playable_support_removed_n": int(playable_audit.get("removed_sparse_support_n") or 0),
         }
 
     baseline_selected_pitcher_rows = _rank_and_cap_unique_players(pitcher_rows, caps.get("pitcher_props"))
