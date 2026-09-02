@@ -727,16 +727,50 @@ is pinned False at any coverage, and the "bounded" payload is LARGER than the ra
 one. The 8MB keyvalue ceiling it was written to protect is unprotected. Owner:
 lane `accuracy-autorun-decline-telemetry`, which holds that file.
 
-**STILL DO NOT RE-ARM — the reason has changed, not gone.** The measurement is
-done; the BOUND is not built. Proposed and measured: a CUMULATIVE byte budget
-(newest-chunk-first) of 90,000,000 B -> peak 344-378 MiB, worker worst case
-2,255 MiB = 55.1% of ceiling. Anchored on a real reading (85,766,820 B ->
-365.0 MiB), not on arithmetic. **Do NOT reach for
-`load_recent_evaluation_records(days=14, max_chunk_bytes=64MB)`: at 64MB it
-accepts 0 of the 8 chunks and the summary is computed on an empty set.** And note
-the budget's honest limit — chunks are 95-332 MB/day, so 90 MB is under ONE DAY
-against a 28-day drift window; the budget makes the job safe, not correct. The
-correct fix is streaming accumulators (peak O(segments + dates), not O(ledger)).
+**THE BUDGET IS BUILT AND RE-MEASURED, OFF vs ON, AT PRODUCTION SCALE**
+`[2026-09-02, lane accuracy-summary-ledger-budget, LOCAL, not deployed]`:
+
+    corpus 831,038,410 B / 8 chunks, production-shaped records
+    budget OFF -> accepted 831,038,410 B, peak growth 3,181.1 MiB, 41.2 s
+    budget ON  -> accepted    89,967,617 B, peak growth   344.4 MiB,  7.3 s
+    resident/file byte 4.014 in BOTH -> the budget changes WHICH bytes are
+    read, not what a byte costs.  9.24x reduction, 2,836.7 MiB saved.
+
+**THE PROJECTION IS NOW A MEASUREMENT.** 3,181.1 MiB measured against 3,178 MiB
+extrapolated — 0.1%. So: OFF = 1,833 + 3,181.1 = **5,014.1 MiB vs a 4,096 MiB
+ceiling, OOM by 918 MiB**; ON = 1,877 (cycle peak) + 344.4 = **2,221.4 MiB,
+54.2% of ceiling, 1,874.6 MiB free**.
+
+Built in `intelligence_evaluation.py`: `max_total_bytes`/`stats` on
+`_stream_chunked_ledger_records` (**default None — all 8 existing callers
+unchanged**), newest-first SELECTION with ascending EMISSION so
+`_latest_by_recommendation_id`'s last-wins is not inverted, a **per-RECORD**
+bound so an oversized chunk is read INTO rather than dropped, env
+`SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES` (default 90,000,000, **absent
+means bounded**), and a published `ledger_coverage` block. 10 tests incl.
+off!=on; 66 pass across the ledger/summary suites.
+
+**BOTH PUBLISHING BLOCKERS ARE NOW FIXED** `[same session, cross-lane by user
+decision, logged in lanes.md]`. `_bounded_accuracy_summary` no longer drops
+`ledger_coverage`, and its truncation now bounds the `segments` LIST instead of
+the mapping's three fixed keys. Verified against a real summary AND against the
+pre-fix function extracted from HEAD, which fails all four assertions:
+
+    segments_total       3 -> 7 (the real count)
+    segments_truncated   False-at-any-coverage -> True when it truncates
+    payload/raw ratio    0.996 -> 0.13 at 400 segments capped to 50
+    ledger_coverage      dropped -> published
+
+Segments are now kept LARGEST-SAMPLE-FIRST, so a cap that fires drops the
+thinnest segments rather than an arbitrary set.
+
+**RE-ARMING IS STILL A SEPARATE, UNTAKEN DECISION, and nothing here is
+deployed.** The standing caveat is unchanged and is now VISIBLE in the artifact
+rather than implicit: at 95-332 MB/day the 90MB budget covers **one day against
+a 28-day drift window** (`recent_days=7` + `baseline_days=21`). The budget makes
+the job survivable, not correct. The structural fix — streaming accumulators,
+peak O(segments + dates) instead of O(ledger) — is the next build
+`[user decision 2026-09-02]`.
 
 ## [refresh-worker-headroom-2026-09-02] THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-env-snapshots, measured off 200 MEMORY_WATCHDOG samples 15:30-16:10Z]`
 

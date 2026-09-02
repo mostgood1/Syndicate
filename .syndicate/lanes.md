@@ -2419,7 +2419,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   whose absent case is reported as UNKNOWN, not folded into `ok`.
 - Blocked by: none. Needs NO deploy — it never contends for the deploy queue.
 
-### accuracy-summary-ledger-budget — OPEN — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### accuracy-summary-ledger-budget — OPEN, GOAL MET, **BOTH PUBLISHING BLOCKERS FIXED (cross-lane, user-authorised)** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 — **BUILT AND RE-MEASURED OFF vs ON AT PRODUCTION SCALE.** Corpus 831,038,410 B / 8 chunks: budget OFF peak **3,181.1 MiB** (41.2 s), budget ON (90,000,000) peak **344.4 MiB** (7.3 s), accepted 89,967,617 <= budget, coefficient **4.014 in BOTH** — 9.24x reduction, 2,836.7 MiB saved. **The prior extrapolation (3,178 MiB) is now a direct measurement (3,181.1), 0.1% apart.** OFF = 5,014.1 MiB vs a 4,096 ceiling (OOM by 918); ON = 2,221.4 MiB = 54.2% of ceiling. Falsification test PASSED: off != on. 10 new tests, 66 pass across the ledger/summary suites, all 8 pre-existing callers unchanged (budget defaults to None). **DEFECT CAUGHT BY ITS OWN TEST:** the first cut checked the byte limit AFTER consuming the line and read 5,005,916 against a 5,000,000 budget; the bound is now exact. **BOTH BLOCKERS FIXED IN THE SAME SESSION `[user decision: cross-lane edit authorised]`:** `_bounded_accuracy_summary` now publishes `ledger_coverage` and truncates the `segments` LIST (not the mapping's 3 fixed keys), keeping the largest-sample segments. 10 more tests, and all four key assertions VERIFIED TO FAIL against the pre-fix function extracted from HEAD (segments_total 3, truncated False, payload ratio 0.996, coverage None). **NOT RE-ARMED, NOT DEPLOYED.** Record: `todo.md #626`(h) + `state.md [accuracy-autorun-OOM-2026-09-02]`.
 - Goal: implement the CUMULATIVE byte budget measured by lane
   `accuracy-summary-alloc-profile` and re-measure peak WITH IT ENFORCED, at
   production scale, off vs on. Peak must land in the predicted 344-378 MiB band.
@@ -2442,6 +2442,24 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   deploy. Local only.
 - Blocked by: none
 
+
+
+### ledger-land-2026-09-02 — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `27299be6`. The two FORBIDDEN rules, both state blocks and the session checkpoint are on origin/main, verified by grep. Applied from a worktree cut fresh from origin/main because the primary tree was 48 commits BEHIND and pushing it would have reverted peers' ledger work.**
+- Goal: land this session's ledger content, which is committed LOCALLY only
+  (`adf0d3b9`) in a primary tree 48 commits behind origin/main. Pushing that tree
+  would revert 48 commits of peers' ledger work.
+- Files: .syndicate/{learnings,state,deploys}.md, .syndicate/log/2026-09-02.md
+- Verification: the two new FORBIDDEN rules and the OOM state block are greppable
+  on origin/main.
+- **CROSS-LANE EDIT AUTHORISED `[user decision 2026-09-02]`.** This lane now
+  also edits `scripts/run_refresh_worker.py` (`_bounded_accuracy_summary` ONLY)
+  and `tests/test_accuracy_summary_autorun.py`, both nominally held by OPEN lane
+  `accuracy-autorun-decline-telemetry`. Surfaced as a conflict and the user
+  chose "I take both fixes now". Scope is strictly the two measured defects --
+  `ledger_coverage` dropped by the field whitelist, and the truncation aimed at
+  the wrong container. **NOT touching `_launch_autorun_accuracy_summary`, the
+  decline telemetry, or the enable flag**, which are that lane's actual subject.
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
