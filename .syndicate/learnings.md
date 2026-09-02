@@ -4688,3 +4688,19 @@ trust neither, not to pick the one you like.
   being quoted at arming time, and `#626`(h) — the platform's named #1
   structural failure — blocked a further day. The profile that settles it took
   under an hour and could have been run before arming.
+
+## 2026-09-02 — FORBIDDEN: anchoring an edit on a GENERIC line in a shared append-only file. My lane note landed inside ANOTHER lane's block, and every check passed. `[lane accuracy-summary-ledger-budget]`
+
+- **What we believed:** that inserting a bullet before `"- Blocked by: none\n\n## Archived lanes"` in `lanes.md` would put it at the end of MY lane block, because my block was the last one before `## Archived lanes` when I read the file.
+- **What was actually true:** by the time the edit ran, a parallel session had appended `ledger-land-2026-09-02` after mine. The anchor is not unique and not owned — it matched THEIR `- Blocked by: none`, so my `CROSS-LANE EDIT AUTHORISED [user decision]` note was written into their lane block. It then rode into a commit, and I found it only because a rebase diff made me read the added lines one at a time. `check_lane_invariants.py` passed, `lane-guard` passed, the ledger post-write hook passed: none of them can tell whose bullet a bullet is.
+- **How we found out:** reading `git diff origin/main -- .syndicate/lanes.md` line by line before pushing, and noticing my bullet appeared under a `+### ledger-land-2026-09-02` header rather than under mine.
+- **The rule going forward:** in a file every session appends to, anchor on something that NAMES YOU — your own `### <slug>` header, then scan forward to the next `### ` — never on a boilerplate line like `- Blocked by: none`, `- Files:` or a section terminator. `str.replace(old, new, 1)` with a count of 1 is not protection; it silently picks the first match, and the first match moves when someone else writes. If an anchor must be generic, assert it is UNIQUE (`s.count(old) == 1`) **and** that it sits inside your own block, and re-read the file immediately before the edit rather than trusting a read from earlier in the session.
+- **Cost:** a user decision attributed to the wrong lane in a committed ledger, caught one step before it reached `origin/main`. The same pattern would have mis-assigned a file claim, which is what lane exclusivity rests on.
+
+## 2026-09-02 — RULE: a commit subject starting with `#` is a COMMENT to git, and cherry-pick/rebase silently delete it. This repo's `#<id>:` convention walks into it every time. `[lane accuracy-summary-ledger-budget]`
+
+- **What we believed:** that `git cherry-pick --continue` and `git rebase --continue` preserve the original commit message.
+- **What was actually true:** they run the message through git's cleanup, which strips lines beginning with the comment char (`#` by default). Our subjects look like `#626(h): bound the accuracy-summary ledger load by BYTES` — so the SUBJECT is deleted and the first body paragraph is promoted in its place. It happened twice in one landing, producing a commit whose subject was a 300-character sentence about anon MiB. The original commits were fine only because `git commit-tree -F` does no cleanup at all.
+- **How we found out:** `git log --oneline origin/main..HEAD` after the rebase — the subject was visibly the wrong text. Nothing errored.
+- **The rule going forward:** after ANY cherry-pick, rebase or squash of a commit whose subject starts with `#`, read `git log --oneline` and confirm the subject survived. To keep it: `git -c core.commentChar=';' rebase ...`, or rebuild with `git commit-tree -p <parent> -F <msgfile>` (verbatim, no cleanup) and `git update-ref`. `git commit --amend -C <sha>` does NOT fix it — it re-runs the same cleanup.
+- **Cost:** two mangled subjects in a landing sequence; both rebuilt before the push, with the trees verified byte-identical so only the messages changed.
