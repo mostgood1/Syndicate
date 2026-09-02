@@ -18449,3 +18449,40 @@ matches `soccer_source/epl/extra/players/...`. Every `soccer_source/*/` entry in
 the list has always had this property; it is not introduced here. The assertion
 records the truth rather than the intent, because a test asserting the intuitive
 behaviour would fail today and would be asserting a fiction.
+## 2026-09-02 15:19:44Z — web `dep-dac3rhnavr4c73bc37v0` → `4577c043`: the `#632` STEADY-STATE attribution read. **MEASUREMENT: <pending>** — collector running, restore deploy OWED. `[lane game-market-entry-roi-curve]`
+
+**WEB IS AT ONE WORKER RIGHT NOW AND MUST BE PUT BACK.** If this session ends
+before the restore, the next one should do it: single-key PUT
+`WEB_CONCURRENCY=2`, DELETE `SYNDICATE_REQUEST_MEMORY_PROFILE`, then **deploy**
+— an env change is not injected without one. Verified state to restore TO:
+`WEB_CONCURRENCY=2`, `GUNICORN_THREADS=4`, profile key ABSENT.
+
+    preflight  CLEAR at 15:1xZ (2 defunct children, already dead)
+    live       15:19:44Z, commit 4577c043
+    verified   ONE gunicorn worker (master + 1), against two before
+    claim      web, held by game-market-entry-roi-curve, 45-min TTL — it EXPIRES
+               during this measurement, which is fine; the RESTORE deploy needs
+               a fresh acquire.
+
+**WHY ONE WORKER, AGAIN, AND FOR LONGER.** The guard refuses attribution only
+per PROCESS while the cgroup is per CONTAINER, so at two workers a "solo" request
+is not solo and route totals are inflated by the sibling. Inflation biases
+TOWARD routes explaining the drift — the direction that would make an
+inconclusive result look like a positive one. **Cost accepted: ~2.5h at half
+request capacity.**
+
+**WHY THIS READ IS DIFFERENT FROM THE 05:11/05:19Z ONE.** That pair sat inside
+the post-restart warm-up, and dividing by its inflated denominator is what
+produced the "~2%" now qualified in `#632`. **The accumulator is cumulative from
+boot, so the steady-state number is LATE-minus-LATE:** difference two emissions
+taken well after the ramp, and compare that delta against the anon delta over the
+same interval. **Do not re-read the first emissions.**
+
+**THE QUESTION IT ANSWERS.** `/api/ops/artifacts/publish` runs **1,725/hour** and
+retains **0.0710 MB/call** → 122 MB/h churned against a **32 MB/h** net drift.
+Either the routes account for the drift in steady state or they do not, and the
+warm-up window cannot tell us which.
+
+Collector: `C:/tmp/gm_option_value/steady_state.jsonl`, 5-minute samples for 150
+minutes, capturing `SUM(route total_mb)`, `solo_attributed`,
+`skipped_concurrent` and anon each tick.
