@@ -1709,6 +1709,26 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   CODE'S BOUND — never "Kalshi is slow".
 - Blocked by: none. Does not deploy; the fix is a bound, and a bound is only
   worth shipping once its off != on test exists.
+### m625-standard-substrate-label — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: `todo.md #625` build item (6). Extend `model_engine_standard.md` §3b so
+  a VERIFIED local mirror is an admissible substrate — cited by manifest id —
+  without weakening the rule that a bare local read is not a claim. §3b today
+  says the substrate "must be Render", full stop; `#625`'s law (2) is that the
+  real invariant is CHECKABILITY, and every incident behind §3b was a PARTIAL,
+  UNVERIFIABLE mirror rather than locality as such.
+- Files: `docs/ai_context/model_engine_standard.md`.
+- Hypothesis: the rule can be widened and made STRONGER at the same time,
+  because the new substrate carries a verifiable id and a stated class of
+  questions it may answer, where "local" today carries neither.
+- Falsification test: if the class of questions a verified mirror may answer
+  cannot be stated crisply — if it collapses into "anything" — then the edit
+  weakens §3b and must not be made. The dividing line to test against is §3b's
+  own worked example: NCAAF's local 0-games vs production's 16.
+- Verification: (a) §3b names three admissible substrates, each with what it
+  can and CANNOT answer; (b) it requires a manifest id on any local claim;
+  (c) the §3b allowlist requirement is updated for `#625`(2)'s split, or the
+  standard is stale on the day it is read.
+- Blocked by: none. NO DEPLOY — documentation.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

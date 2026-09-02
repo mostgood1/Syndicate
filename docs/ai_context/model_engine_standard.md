@@ -102,8 +102,10 @@ Requirements for every engine input:
 
 - **Disk-backed**, resolved through `SYNDICATE_DATA_ROOT` (the mounted disk),
   never a path relative to the source tree.
-- **Allowlisted** in `artifact_publisher.HOT_ARTIFACT_PATTERNS`, or it cannot be
-  published or read through `/api/ops/artifacts/*`.
+- **Allowlisted**, or it cannot be read through `/api/ops/artifacts/*` at all —
+  in `HOT_ARTIFACT_PATTERNS` if web must SERVE it, or
+  `EXPORT_ONLY_ARTIFACT_PATTERNS` if it must only be auditable and mirrorable.
+  The two are not interchangeable; see §3b's "Requirements for a gate".
 - **A readable document**, keyed by a real id — not a hash-named cache. A cache
   cannot be diffed, validated, or inspected.
 - **Bounded**: prefer one per-season document over per-date fan-out. The
@@ -117,22 +119,33 @@ just a publish.** Every engine must document its equivalent reuse flag.
 
 ---
 
-## 3b. MANDATORY: RENDER IS THE ARTIFACT SOURCE OF TRUTH. NOTHING MAY RELY ON LOCAL.
+## 3b. MANDATORY: NAME YOUR SUBSTRATE. RENDER IS THE SOURCE OF TRUTH; NOTHING MAY RELY ON AN UNVERIFIED LOCAL READ.
 
 **`[user directive, 2026-08-18]` — this applies to every engine, every audit,
 every backtest, and every gate.**
 
-Model *testing* may run locally. Model *facts* may not come from there. The
-`data/**` trees in git are a **cold-start safety net**, refreshed per-family on
-unrelated schedules — not a snapshot of what production computed. A local read
-answers a question about the checkout and nothing else.
+**The directive is unchanged. `[#625, 2026-09-02]` adds ONE thing to it: a local
+read that cites a VERIFIED MIRROR MANIFEST is admissible for a stated class of
+questions.** The original wording — "nothing may rely on local" — was right
+about every incident behind it, and the reason it was right is worth being
+precise about, because it is what the extension turns on: each of those
+incidents came from a mirror that was PARTIAL and whose partiality was
+INVISIBLE. A mirror that can be re-verified file-by-file against a
+content-addressed manifest is a different object from the one this rule was
+written against. **An unverified local read is still not a claim, and that has
+not moved.**
+
+Model *testing* may run locally. Model *facts* may come from there only under
+substrate 2 below. The `data/**` trees in git are a **cold-start safety net**,
+refreshed per-family on unrelated schedules — not a snapshot of what production
+computed, and never substrate 2. A read from the checkout answers a question
+about the checkout and nothing else.
 
 ### The rule
 
 **Every claim about what an engine has, produces, or is missing must name the
-SUBSTRATE it was read from, and that substrate must be Render** — the served
-payload, the worker disk via `/api/ops/artifacts/*`, or the live env-vars API.
-A claim that does not name its substrate is not yet a claim.
+SUBSTRATE it was read from, and that substrate must be one of the three below.
+A claim that does not name its substrate is not yet a claim.**
 
 | question | read this | NEVER this |
 |---|---|---|
@@ -140,6 +153,76 @@ A claim that does not name its substrate is not yet a claim.
 | does an input artifact exist? | `/api/ops/artifacts/export?path=...` | `ls data/<sport>_source/` |
 | is a config key set? | live `/v1/services/<id>/env-vars`, paginated | `render.yaml` |
 | which code is running? | the **content** of the deployed blob | ancestry from `main` |
+| would this code change the artifact? | a **replay-diff** on a verified mirror, citing its manifest id | a local run on whatever is on disk |
+
+### The three admissible substrates `[#625, 2026-09-02]`
+
+This section used to say the substrate "must be Render", full stop. That was
+right about every incident behind it and slightly wrong about why. **The
+invariant is not REMOTENESS, it is CHECKABILITY** — every failure below came
+from a mirror that was PARTIAL and whose partiality was invisible, not from
+locality as such. So a local substrate is admissible exactly when it can be
+checked, and inadmissible otherwise, which is what it always was.
+
+**1. PRODUCTION (`render`).** The served payload, `/api/ops/artifacts/*`, the
+live env-vars API. The only substrate that can answer *what is true right now*.
+
+**2. A VERIFIED LOCAL MIRROR (`mirror:<manifest_id>`).** Admissible only when
+all three hold, and the claim must carry the id:
+
+- the day was synced by `scripts/mirror_manifest.py`, which records a
+  content-addressed manifest of every file it pulled;
+- `mirror_manifest.py verify --date <D>` passes NOW — it re-hashes every file
+  against the manifest, so drift and truncation are caught rather than assumed;
+- the question is in the reproducible class (below).
+
+Cite it as `mirror:8d5c42ba8cb18c34`. An id nobody can re-verify is decoration;
+`verify` is what makes it a claim.
+
+**3. THE GIT MIRROR (`checkout`).** Still not a substrate for any model fact.
+`data/**` in git is refreshed per family on unrelated schedules — measured, four
+MLB families whose date windows are 46 / 33 / 26 / 11 dates and whose
+intersection is **one usable date**. A reading from here is a statement about a
+checkout. It may be labelled and reported; it may not be a claim.
+
+### What a verified mirror may and may NOT answer
+
+A mirror is a copy of ARTIFACTS. It is not a copy of the running system, and the
+line falls exactly where §3b's own worked example does — NCAAF's local **0
+games** against production's **16** was a question about what production
+PRODUCES, and no mirror can answer that.
+
+| a verified mirror CAN answer | it can NEVER answer |
+|---|---|
+| what an input file contains, for the dates in its manifest | whether production has that file **now** |
+| whether this code, run over those bytes, reproduces production's artifact | whether the model output reaches a user |
+| whether a field is populated **in the mirrored dates** | whether a job is enabled, or ran |
+| how much memory a producer uses on those inputs | which commit is deployed |
+
+**A local run is evidence about the CODE, never about the DEPLOYMENT.** The
+strongest form is a replay-diff (`scripts/replay_diff_gate.py`): run the real
+worker entrypoint over a mirrored day and diff against production's own output.
+Measured 2026-09-01 — 280,840 leaves exact, 0 mismatches — which is what
+licenses substrate 2 at all. It also comes with two preconditions that any local
+claim inherits: **every input must predate the output**, or the diff measures
+elapsed time; and **the checkout must be the commit that produced the output**,
+or it measures code drift (refresh-worker took 465 successful deploys in 21 days,
+and of nine consecutive dates only ONE was built by the then-current HEAD).
+
+### A 403 IS NOT AN ABSENCE, and it has now cost three readings
+
+`/api/ops/artifacts/export` — `names_only` and body form alike — globs the
+artifact allowlist and returns only what matches. **So it can never establish
+that a non-allowlisted family is absent**; it reports the intersection of the
+allowlist with the disk, and a family outside the allowlist is INVISIBLE, not
+missing. Measured 2026-09-02: a full inventory returned zero `feed_live` files
+and the conclusion "absent" was published; there were **146 files, 16,721,077
+bytes** on that disk the whole time. Two earlier readings made the same error on
+`locked_cards_retuned` and `market/oddsapi/`.
+
+Before reading absence out of any listing, state what the listing is FILTERED
+by, and ask whether the thing you are looking for could pass that filter. If it
+could not, the listing says nothing about it.
 
 ### Why this is stated at this length
 
@@ -163,15 +246,37 @@ corroboration instead of as a measurement of a different subject.
   when its substrate is a local checkout, and must say so in the failure text.
   `scripts/football_sim_input_checklist.py` emits *"FROM THIS CHECKOUT ...
   `data/**` is a lossy mirror ... check the served board"*.
-- **Every model input must be in `HOT_ARTIFACT_PATTERNS`**, or it cannot be read
-  or published through `/api/ops/artifacts/*` — which means it cannot be
-  audited on Render at all, and every question about it falls back to the local
-  guess this rule forbids. Measured: NCAAF's `recommendations_summary/week_N.json`
-  — **the artifact its board renders from** — is not allowlisted, so its row
-  count was unanswerable from outside and had to be instrumented in the payload
-  instead.
+  **A VERIFIED MIRROR IS NOT A CHECKOUT** `[#625, 2026-09-02]`: a gate whose
+  substrate is substrate 2 may report a real number, provided it prints the
+  manifest id and the dates that manifest covers alongside it. The number then
+  describes those dates and nothing else — which is the whole point of citing
+  them. A gate that cannot tell the two apart must assume checkout and report
+  UNMEASURED; **unknown does not get the permissive branch.**
+- **Every model input must be in an artifact allowlist**, or it cannot be read
+  through `/api/ops/artifacts/*` — which means it cannot be audited on Render at
+  all, and every question about it falls back to the local guess this rule
+  forbids. Measured: NCAAF's `recommendations_summary/week_N.json` — **the
+  artifact its board renders from** — is not allowlisted, so its row count was
+  unanswerable from outside and had to be instrumented in the payload instead.
+- **THERE ARE TWO ALLOWLISTS NOW, AND PICKING THE WRONG ONE IS A REAL DEFECT**
+  `[#625(2), 2026-09-02]`:
+  - `HOT_ARTIFACT_PATTERNS` — **WRITE**. Publishable to web and swept for
+    publishing. Use this for an input web must SERVE.
+  - `EXPORT_ONLY_ARTIFACT_PATTERNS` — **READ**. Exportable and streamable,
+    never published, never swept. Use this for an input that must be
+    AUDITABLE and MIRRORABLE but must not reach web's serving path.
+
+  The read predicate is `is_exportable_artifact_relative_path`; the write
+  predicate is `is_hot_artifact_relative_path`. **Choosing the write list for a
+  read-only need is not a tidiness question.** `raw/statsapi/feed_live` on web's
+  disk freezes live game state for every reader — `_mlb_feed_live_payload`
+  returns the cached file IF IT EXISTS and only fetches live when it is absent
+  (`blueprints/home.py:3560`), so the trigger is PRESENCE ON DISK and no
+  allowlist setting can undo it once the bytes are there.
 - **Maintaining that allowlist is part of shipping an input**, not follow-up
-  work. An unallowlisted artifact is an unauditable one.
+  work. An unallowlisted artifact is an unauditable one — and a large or binary
+  one needs `/api/ops/artifacts/stream`, because `export?path=` returns a JSON
+  envelope of DECODED TEXT and answers 415 on anything that is not UTF-8.
 
 ---
 
@@ -225,9 +330,17 @@ Before an engine is considered production-ready:
 - [ ] **Gating checklist script**, exits 1, in `/preflight` or the migration gate
 - [ ] **Pipeline trace documented**, file:line at each hop, including what it writes
 - [ ] **Every input disk-backed** via `SYNDICATE_DATA_ROOT`, never the source tree
-- [ ] **Every input allowlisted** in `HOT_ARTIFACT_PATTERNS` — and therefore
-      readable through `/api/ops/artifacts/*`. Unallowlisted = unauditable (§3b)
-- [ ] **Every claim names its substrate**, and the substrate is Render (§3b)
+- [ ] **Every input allowlisted** — `HOT_ARTIFACT_PATTERNS` if web must SERVE it,
+      `EXPORT_ONLY_ARTIFACT_PATTERNS` if it must only be AUDITABLE and
+      MIRRORABLE. Unallowlisted = unauditable; wrong list = a publish that
+      should never have happened (§3b)
+- [ ] **Every claim names its substrate** — `render`, `mirror:<manifest_id>`, or
+      `checkout` — and `checkout` is never a claim (§3b)
+- [ ] **Any local claim cites a manifest id that `verify` passes TODAY**, and
+      states the dates it covers (§3b)
+- [ ] **A replay-diff for the producer**, if its output is an artifact anyone
+      reads — the real entrypoint over a mirrored day, diffed against
+      production's own output (`scripts/replay_diff_gate.py`)
 - [ ] **Reuse/caching flags documented**, with the rebuild procedure for a new input
 - [ ] **Reachability test per flagged feature** (`off != on`)
 - [ ] **Mechanisms distinguished from estimators**, with the re-fit obligation stated
