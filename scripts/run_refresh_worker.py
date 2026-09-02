@@ -2206,13 +2206,38 @@ def _launch_autorun_accuracy_summary(
     worker_status_path: Path,
     refresh_cycle: dict[str, int],
 ) -> bool:
+    # SAY WHY, exactly as `_launch_autorun_reconciliation` does. Both of these
+    # returns used to be SILENT, and that cost a real investigation on
+    # 2026-09-02: the flag was set, the deploy injected it, and the job produced
+    # nothing for 100 minutes. "disabled", "gate refused" and "never reached"
+    # were indistinguishable from outside, because none of them emitted
+    # anything -- so the silence carried no information at all. That is `#341`'s
+    # lesson, which this file already states one function above, and which this
+    # job shipped without.
+    #
+    # `print`, not `logger.info`: logger.info does not reach Render's collector.
     if not _accuracy_summary_auto_refresh_enabled():
+        print(
+            "[refresh_worker] ACCURACY_SUMMARY_AUTORUN_GATED reason=disabled "
+            "env=ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN -- set it and DEPLOY "
+            "(a Render env change is not injected without one)",
+            flush=True,
+        )
         return False
 
     status_path = _accuracy_summary_autorun_status_path()
     last_status = _refresh_state_store()["read_json_file"](status_path) or {}
     last_epoch = float((last_status or {}).get("epoch") or 0.0)
     if not _accuracy_summary_should_run_now(now_epoch=time.time(), last_epoch=last_epoch):
+        now_epoch = time.time()
+        age = now_epoch - last_epoch if last_epoch else -1.0
+        print(
+            "[refresh_worker] ACCURACY_SUMMARY_AUTORUN_GATED reason=daily_gate "
+            f"target_hour_central={_accuracy_summary_target_hour_central()} "
+            f"last_epoch={last_epoch:.0f} age_sec={age:.0f} "
+            f"never_run={'yes' if not last_epoch else 'no'}",
+            flush=True,
+        )
         return False
 
     # `#256`: CLAIM THE RUN BEFORE DOING THE WORK. A status written only at the

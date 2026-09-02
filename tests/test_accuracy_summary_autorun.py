@@ -15,6 +15,7 @@ the same day, and what gets persisted must be bounded.
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 import time
 import unittest
@@ -226,6 +227,43 @@ class WiredIntoTheTickChainTests(unittest.TestCase):
             source.index("elif _launch_autorun_accuracy_summary("),
             "it scores what settlement writes, so it must not run ahead of it",
         )
+
+
+class DeclineTelemetryTests(unittest.TestCase):
+    """A decline that says nothing is indistinguishable from never running.
+
+    Both returns here were SILENT and it cost a real investigation on
+    2026-09-02: flag set, deploy injected, 100 minutes of nothing, and no way
+    to tell "disabled" from "gate refused" from "never reached". The neighbour
+    `_launch_autorun_reconciliation` had emitted `..._AUTORUN_GATED` since
+    `#341` for exactly this reason; this job shipped without it.
+    """
+
+    def _printed(self, env: dict, last_status: dict) -> str:
+        with patch.dict(os.environ, env, clear=False), patch("builtins.print") as printer:
+            with patch.object(WORKER, "_refresh_state_store", return_value={
+                "read_json_file": lambda _p: last_status,
+                "write_json_file": lambda _p, _v: None,
+                "reports_root": lambda: Path("."),
+            }):
+                WORKER._launch_autorun_accuracy_summary(
+                    latest_manifest_path=Path("x"), worker_status_path=Path("y"), refresh_cycle={})
+        return " ".join(str(c.args[0]) for c in printer.call_args_list if c.args)
+
+    def test_the_DISABLED_decline_names_the_env_var_and_the_deploy(self) -> None:
+        env = {"ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN": ""}
+        printed = self._printed(env, {})
+        self.assertIn("ACCURACY_SUMMARY_AUTORUN_GATED", printed)
+        self.assertIn("reason=disabled", printed)
+        self.assertIn("ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN", printed,
+                      "name the key, so the reader can act without reading source")
+        self.assertIn("DEPLOY", printed,
+                      "a Render env change does nothing until a deploy injects it")
+
+    def test_a_silent_decline_is_impossible(self) -> None:
+        """The regression. Either branch must emit SOMETHING."""
+        self.assertTrue(self._printed({"ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN": ""}, {}).strip(),
+                        "the disabled path must not be silent")
 
 
 if __name__ == "__main__":
