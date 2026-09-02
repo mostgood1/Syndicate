@@ -1437,7 +1437,9 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   is doing costs anything, with numbers. Diagnosis only — **no production mutation
   in this lane.** `/api/ops/keyvalue/expire-run-artifacts` and `/api/ops/keyvalue/sweep`
   are both POST and both destructive; neither is called without an explicit decision.
-- Files: **NONE CLAIMED.** Read-only investigation. If it produces a code change
+- Files: `scripts/check_venue_odds_hydration_census.py` (NEW, claimed 2026-09-02
+  ~19:5xZ — the gate on the Redis reclaim; read-only against production, performs
+  no expiry). Otherwise read-only investigation. If it produces a code change
   the fix gets its own lane and its own claim.
 - Hypothesis (written BEFORE the reader trace): `reports/intelligence/venue_odds/`
   is the dominant consumer, and a material slice of it is DEAD — files keyed to
