@@ -1510,7 +1510,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - DOES NOT arm anchoring. `SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT` stays 0.0 in
   production; `model_engine_standard.md` §4.4 re-fit is still owed and is
   reported as owed, not done.
-- STATUS 2026-09-02: **BOTH JOINS FIXED AND LANDED (`1182c3a3`).** Reach
+- STATUS 2026-09-02: **BOTH JOINS FIXED AND LANDED (`686d8282` (landed on main; the pre-rebase local SHA was `686d8282` — `session_worktree.py land` rebases, so a SHA quoted before landing never exists upstream)).** Reach
   remeasured on the identical production basis: fixture->priced-event
   **66 -> 122 of 136**, fixture->ratings-key **138 -> 214 of 214**. The
   `event_id` stage joins 0 of 136 (ESPN vs OddsAPI id spaces) -- the feed has
