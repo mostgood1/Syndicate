@@ -1035,6 +1035,245 @@ Mostly execution of already-measured items; references, not duplicates:
   bounded summary through the state store. Verify: a published accuracy
   artifact with a fresh `generated_at` daily, and drift alerts wired to a
   surface someone reads.
+- **(h) MEASURED 2026-09-02, lane `accuracy-summary-alloc-profile`. LOCAL
+  PROFILE ONLY -- no deploy, no production, and the autorun STAYS DISARMED. The
+  ~2GB is ONE allocator, the scaling is LINEAR, and the fix is a BYTE BUDGET, not
+  a cap. This is the measurement `state.md [accuracy-autorun-OOM-2026-09-02]`
+  demanded before any re-arm; re-arming is a separate decision and is NOT taken
+  here.**
+
+  **WHERE IT ALLOCATES -- one site, 100% of it.** tracemalloc attributes every
+  resident byte to `intelligence_evaluation.py:711`, the `json.loads(line)` inside
+  `_stream_chunked_ledger_records` (55.1 of 55.2 MB traced, 778,578 blocks; the
+  next site is 0.0 MB). `build_accuracy_summary:2657` is where the faulthandler
+  dumps caught execution and it is also the CONSUMER --
+  `_latest_by_recommendation_id` retains every parsed record. **The streaming
+  reduction buys nothing: dedup ratio 0.9979 on the real local chunks, 1.0000 on
+  every synthetic corpus.** `recommendation_id` is a content hash that drifts with
+  price (`#505`), so the reduction is ~the identity function and the "reduced set"
+  IS the raw set. `_stream_chunked_ledger_records`'s docstring reasons that
+  streaming "lets the peak be the REDUCED set instead of the raw one" -- true in
+  general, worth ~0.2% here.
+
+  **EVERYTHING AFTER MATERIALISATION IS FREE.** Stages 2-4 (sport filter,
+  `compute_metrics`, `build_segmented_reliability_profile`) add **0.3-4.4 MiB**
+  against stage 1's **360.6-961.7 MiB** -- materialisation is **98.8-99.9% of
+  peak**. My own hypothesis that the repeated `dict(item)` copies in
+  `_stream_record_payloads` roughly double the peak is **FALSIFIED**: those copies
+  are SHALLOW, so the fat nested payloads (`recommendation` 6.1 KB/rec,
+  `prediction` 2.1 KB/rec, `artifact_metadata` 1.7 KB/rec) are shared, not
+  duplicated.
+
+  **SCALING: PROPORTIONAL, INTERCEPT ZERO.** RSS measured with NO profiler in the
+  process (tracemalloc at nframe=20 inflated RSS 6x on its own traceback storage
+  and I nearly reported that as the result -- the 2026-08-29 profiler-SCOPE rule),
+  peak sampled at 2 ms, over corpora built by replicating REAL local ledger
+  records with fresh ids: real object shape, synthetic count.
+
+  | corpus bytes | B/record | stage-1 peak growth | resident / file byte |
+  |---|---|---|---|
+  | 8,573,026 | 12,682 | 35.7 MiB | 4.367 |
+  | 14,293,545 | 9,777 | 60.8 MiB | 4.461 |
+  | 28,588,200 | 9,777 | 121.0 MiB | 4.438 |
+  | 57,177,510 | 9,777 | 241.0 MiB | 4.419 |
+  | 65,394,456 | 44,729 | 250.3 MiB | 4.013 |
+  | 85,766,820 | 9,777 | 360.6 MiB | 4.409 |
+  | 114,357,826 | 9,777 | 480.1 MiB | 4.402 |
+  | 130,790,022 | 44,730 | 500.3 MiB | 4.011 |
+  | 228,726,762 | 9,777 | 961.7 MiB | 4.409 |
+
+  Least squares: thin records **4.404 resident bytes per file byte** (R2 0.999998,
+  intercept +0.62 MiB); production-shaped records **4.009** (R2 1.000000, intercept
+  +0.30 MiB). The coefficient falls mildly as records get fatter, so record
+  fatness brackets it at **4.01-4.41** and nothing else moves it. **Peak is
+  proportional to ACCEPTED CHUNK BYTES with no fixed term -- which is exactly the
+  signature that says the fix is streaming/chunking rather than a cap.** It also
+  reproduces this repo's own 4.05-4.19x RSS coefficient independently.
+
+  **THE PRODUCTION NUMBER.** The accepted set is `LEDGER_CHUNKS_ACCEPTED count=8
+  bytes=830,832,574 ceiling=256,000,000 records=22,078` (recorded 2026-08-17;
+  37,632 B/record, i.e. records embedding `artifact_metadata.manifest_summary`).
+  `build_accuracy_summary` still reads at the **256MB** ceiling and applies **no
+  date window at all** -- it globs the whole chunk root, so its cost grows with
+  the ledger forever.
+
+      coef 4.011 (prod shape) -> peak growth 3,178 MiB -> worker 5,011 MiB  OOM by   915 MiB
+      coef 4.15  (central)    -> peak growth 3,288 MiB -> worker 5,121 MiB  OOM by 1,025 MiB
+      coef 4.409 (thin)       -> peak growth 3,493 MiB -> worker 5,326 MiB  OOM by 1,230 MiB
+
+  against anon 1,833 MiB at claim time and a 4,096 MiB ceiling. **The kill was
+  certain, not marginal -- the job is ~915 MiB short of fitting even on its most
+  favourable coefficient.** Two independent corroborations that the local
+  measurement reproduces the production allocator: it died at 3,868 MiB having
+  added 2,035 MiB = **64% of the 4.011 projection**, i.e. two-thirds of the way
+  through sport 1 of 8; and the local allocation rate on production-shaped records
+  is **155 MiB/s** against production's measured terminal climb of **146.9 MB/s**
+  (6% apart).
+
+  **8 SPORTS DO NOT STACK -- they multiply DURATION, not peak.** Measured on
+  production-shaped records: 8 sports peak **502.0 MiB** vs 1 sport **501.8 MiB**.
+  But `build_accuracy_summary(sport=...)` filters AFTER loading, so the autorun
+  re-reads the entire ledger once per sport: 61.4 s for 130.8 MB x8 locally ->
+  **~390 s** at 830.8 MB on a machine faster than the container, and ~9 min at
+  production's observed 49 MiB/s ingest rate. One load filtered 8 ways would cut
+  that 8x at identical peak.
+
+  **WHY THE SEGMENT CAP DID NOT BOUND MEMORY -- and it does not bound the OUTPUT
+  either.** Two distinct defects in `_bounded_accuracy_summary`
+  (`run_refresh_worker.py:2169`):
+  1. **Ordering.** It runs on the RETURNED summary, after the 22,078-record
+     working set has been built and released. Since 98.8-99.9% of peak is set
+     before any output exists, no output-side cap can bound it. A segment cap
+     bounds output rows; the working set that produces them is upstream of it.
+  2. **It truncates the wrong container.** `segmented_reliability` is a dict
+     `{global, shrinkage_k, segments}`; `list(segments.items())[:50]` truncates
+     the three TOP-LEVEL KEYS, never the `segments` LIST -- the one field whose
+     stated purpose is to grow with coverage. Measured on a real summary:
+     **`segments_total = 3` while `len(segments) = 7`**, `segments_truncated`
+     pinned `False` at any coverage, and the "bounded" payload came out LARGER
+     than the raw one (3,585 vs 3,535 bytes). **The 8MB keyvalue ceiling it was
+     written to protect is unprotected**, and `segments_total` is not a count of
+     segments. That file is held by lane `accuracy-autorun-decline-telemetry`;
+     reported here, not edited.
+
+  **THE EXISTING BOUNDED READER IS NOT THE ANSWER -- IT RETURNS ZERO.**
+  `load_recent_evaluation_records(days=14, max_chunk_bytes=64_000_000)` was written
+  for exactly this shape of caller. At 64MB it accepts **0 of the 8 chunks** (they
+  average ~104 MB each; this file's own comment at :2417 enumerates the skipped
+  ones at 305/324/367/480MB). It is safe and vacuous, and a summary over an empty
+  set is precisely the failure `#626` exists to end. **Do not propose it as the
+  fix.**
+
+  **PROPOSED BOUND -- a CUMULATIVE byte budget, newest-chunk-first,
+  `90,000,000` bytes.** The existing guard is per-FILE and nothing bounds the SUM
+  (`_stream_chunked_ledger_records` says so itself: "The ceiling is per FILE;
+  nothing bounded the SUM"). A running `accepted_bytes` budget that stops
+  accepting once spent makes peak deterministic, because peak is proportional to
+  accepted bytes with intercept zero.
+  - **Measured anchor, not arithmetic:** 85,766,820 B -> **365.0 MiB** on the
+    worst-case (thin) record shape.
+  - Implied at 90,000,000 B: **344 MiB** (production shape) to **378 MiB** (thin).
+  - Against the worker's real baseline -- cycle peak anon **1,877 MiB**, ceiling
+    **4,096 MiB** (`state.md [refresh-worker-headroom-2026-09-02]`; read
+    `memory_anon_mb`, never `memory_headroom_mb`) -- worst case is
+    **2,255 MiB = 55.1% of ceiling, 1,841 MiB free.** That is a bound with a
+    measurement behind it, which is what the last arming lacked.
+  - It must PUBLISH `ledger_bytes_budget`, `ledger_bytes_accepted`,
+    `chunks_accepted`, `dates_covered` and `truncated`. A budget that silently
+    narrows the sample is the "unknown defaults permissive" trap.
+
+  **THE HONEST LIMIT OF THAT BOUND, stated rather than discovered.** Production
+  chunks are **95-332 MB/day**, so a 90 MB budget does not cover ONE DAY -- while
+  `build_accuracy_summary`'s own drift window is `recent_days=7` +
+  `baseline_days=21` = **28 days**. Any memory bound that fits this container is
+  smaller than a single day of this ledger. So the budget makes the job SAFE and
+  leaves it computing 28-day drift on <1 day of data, which must be reported as
+  such and never presented as a 28-day reading.
+  **The structural fix is that the function does not need the records at all:**
+  every output is a sum/count per (sport, market_family, confidence_tier) and per
+  date. Streaming accumulators make peak O(segments + dates) instead of O(ledger),
+  and only then is the 28-day window affordable at any ledger size. Attacking the
+  same number from the other side, `scripts/compact_evaluation_ledger.py` exists
+  and 37,632 B/record is what `manifest_summary` embedding costs.
+  **Order: budget first (safe, small sample, honest counters), accumulators second
+  (correct sample), re-arm only after one of them is measured in place.**
+
+- **(h) BUILT AND RE-MEASURED WITH THE BUDGET ENFORCED, 2026-09-02, lane
+  `accuracy-summary-ledger-budget`. LOCAL ONLY -- not deployed, NOT re-armed.
+  OFF vs ON at production scale, same corpus, same process shape:**
+
+  | | budget OFF | budget ON (90,000,000) |
+  |---|---|---|
+  | accepted bytes | 831,038,410 | **89,967,617** |
+  | chunks accepted | 8 of 8 | 1 partial, 7 skipped |
+  | **peak RSS growth** | **3,181.1 MiB** | **344.4 MiB** |
+  | resident / file byte | 4.014 | 4.014 |
+  | seconds (1 sport) | 41.2 | 7.3 |
+  | dates covered | 8 | **1** |
+  | `truncated` | false | **true** |
+
+  **9.24x reduction, 2,836.7 MiB saved.** Corpus = 831,038,410 B across 8 chunks
+  of production-shaped records, built to match the real accepted set
+  (`count=8 bytes=830,832,574`).
+
+  **THE PROJECTION IS NOW A MEASUREMENT.** The unbudgeted peak was previously
+  EXTRAPOLATED at 3,178 MiB from corpora up to 228 MB. Measured directly at
+  production scale: **3,181.1 MiB -- 0.1% from the extrapolation.** The
+  coefficient is identical off and on (4.014 both), which is the strongest form
+  of the linearity claim: the budget changes WHICH bytes are read, not what a
+  byte costs.
+
+  **Worker arithmetic, both directions:**
+
+      OFF: 1,833 (anon at claim) + 3,181.1 = 5,014.1 MiB vs 4,096  -> OOM by 918 MiB
+      ON:  1,877 (cycle peak)    +   344.4 = 2,221.4 MiB = 54.2% of ceiling,
+                                                            1,874.6 MiB free
+
+  The 2026-09-02 kill is reproduced and explained to within 1%. It was never
+  marginal.
+
+  **WHAT WAS BUILT** (`intelligence_evaluation.py`):
+  - `_stream_chunked_ledger_records(path, *, max_total_bytes=None, stats=None)`.
+    **Defaults to None everywhere, so all 8 existing callers are unchanged** --
+    verified by enumeration and by 56 passing tests in the ledger/summary suites.
+    `build_accuracy_summary` is the only caller that passes a budget.
+  - `_select_ledger_chunks_within_budget`: **newest-first SELECTION, ascending
+    EMISSION.** The budget must buy the most recent dates, but emitting
+    newest-first would silently invert `_latest_by_recommendation_id`'s
+    last-wins semantics for every consumer. Selecting in one order and yielding
+    in the other keeps the bound without touching record semantics; there is a
+    test that fails if emission order flips.
+  - **The bound is per RECORD, not per FILE.** The oldest selected chunk gets a
+    partial byte limit rather than being dropped. This is the whole difference
+    from `load_recent_evaluation_records(max_chunk_bytes=64MB)`, which drops any
+    FILE over its ceiling and therefore accepts **0 of 8** real production
+    chunks. Safe and vacuous is not safe, and there is a test pinning that a
+    single chunk larger than the entire budget still yields records.
+  - `_accuracy_summary_ledger_budget_bytes()`: env
+    `SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES`, default **90,000,000**.
+    **Absent means BOUNDED, not unlimited** (CLAUDE.md: absent is not off);
+    `0` is the explicit opt-out for offline/CLI full-history runs; garbage falls
+    back to bounded.
+  - `build_accuracy_summary` now returns **`ledger_coverage`**
+    (`budget_bytes`, `bytes_accepted`, `chunks_accepted`, `chunks_partial`,
+    `chunks_skipped_budget`, `dates_covered`, `date_min`, `date_max`,
+    `truncated`, `records`), and `LEDGER_CHUNKS_ACCEPTED` carries the same
+    fields in the log line.
+  - 10 tests, `tests/test_accuracy_summary_ledger_budget.py`, including the
+    off!=on reachability check the model-engine standard requires.
+
+  **DEFECT FOUND AND FIXED DURING THE BUILD:** the first cut checked the byte
+  limit AFTER consuming the line, so it read **5,005,916 B against a 5,000,000 B
+  budget** -- over by exactly one record. Caught by the bound's own test, not by
+  inspection. The check now runs before consumption and the bound is exact.
+
+  **OWED, AND NOT MINE TO FIX -- the coverage does NOT reach the artifact.**
+  `_bounded_accuracy_summary` (`run_refresh_worker.py:2169`) builds its output
+  from a FIELD WHITELIST, so it **drops `ledger_coverage` entirely** -- verified
+  by running it on a real summary. Until one line is added there, the published
+  artifact will show a summary computed on ONE DAY with nothing saying so, which
+  is the precise failure the coverage block exists to prevent. That file is held
+  by OPEN lane `accuracy-autorun-decline-telemetry`, which also owns the
+  `segments_total = 3` defect recorded above. **Both are one-line-class fixes in
+  the same function and should land together.**
+
+  **RE-ARM PRECONDITIONS, unchanged by this work being done:**
+  1. `ledger_coverage` survives `_bounded_accuracy_summary` (above).
+  2. Accept that the daily summary rests on ~1 day, not 28 -- or raise the
+     budget knowingly against the measured 4.014 coefficient (every extra
+     100 MB of budget costs ~383 MiB of peak).
+  3. The 8-sport loop re-reads the whole ledger once per sport; at the budget
+     that is ~58 s rather than ~330 s, but one load filtered 8 ways would make
+     it ~7 s at identical peak.
+  4. Only then arm `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN`, and read
+     the first run's `LEDGER_CHUNKS_ACCEPTED ... budget=... truncated=1` line
+     before believing it.
+
+  **The structural fix is still the accumulators**, not this budget. This makes
+  the job survivable; it does not make its sample right. Streaming accumulators
+  (peak O(segments + dates), not O(ledger)) are what let the 28-day window be
+  affordable at any ledger size.
+
 - DO NOT report (d)/(e) as working from a zero during the break — "a zero is
   indistinguishable from an inert feature" (`verify_wnba_totals_pricing.py`
   exit-3 pattern); the WNBA reads are 09-17+.

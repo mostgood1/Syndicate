@@ -2178,6 +2178,35 @@ def _bounded_accuracy_summary(summary: Mapping[str, Any], *, max_segments: int =
     whole and discovering the ceiling in production, are the two failure modes
     this repo has already paid for (`state.md [layer2-board-keyvalue-ceiling]`,
     where a raised cap corrupted the board for ~29 minutes).
+
+    **TWO DEFECTS FIXED 2026-09-02** `[lane accuracy-summary-ledger-budget,
+    cross-lane by user decision; measured, not reasoned]`:
+
+    1. **It truncated the WRONG CONTAINER, so it never truncated at all.**
+       `build_accuracy_summary` returns `segmented_reliability` as a MAPPING
+       `{global, shrinkage_k, segments}` -- the growing thing is the `segments`
+       LIST inside it, not the mapping. `list(mapping.items())[:50]` therefore
+       sliced three fixed top-level keys and passed the list through whole.
+       Measured on a real summary: `segments_total` reported **3** while
+       `len(segments)` was **7**, `segments_truncated` was pinned **False** at
+       any coverage, and the "bounded" payload came out **LARGER** than the raw
+       one (3,585 vs 3,535 bytes). The 8MB ceiling this function exists to
+       defend was undefended for its whole life, and every test passed because
+       a cap that never fires looks exactly like a cap that is never needed.
+    2. **It dropped `ledger_coverage`.** This dict is built from a FIELD
+       WHITELIST, so a field added upstream is silently discarded. The accuracy
+       summary's ledger load is now BYTE-BUDGETED (`#626`(h)) and publishes what
+       it actually read -- dates covered, bytes accepted, whether it was
+       truncated. At a 90MB budget against 95-332 MB/day chunks that is ONE DAY
+       against a `recent_days=7` + `baseline_days=21` window, so an artifact
+       without the coverage block reads as a 28-day drift measurement when it is
+       a one-day one. Publishing it is the difference between a narrowed sample
+       and a misleading one.
+
+    Segments are truncated LARGEST-SAMPLE-FIRST rather than in dict order. If
+    the cap must drop segments it should drop the thinnest ones; dropping an
+    arbitrary set makes the surviving surface unrepresentative in a way nothing
+    downstream can detect.
     """
     out: dict[str, Any] = {
         "sport": summary.get("sport"),
@@ -2186,16 +2215,45 @@ def _bounded_accuracy_summary(summary: Mapping[str, Any], *, max_segments: int =
         "settled_count": summary.get("settled_count"),
         "metrics": summary.get("metrics"),
         "drift": summary.get("drift"),
+        # WHAT THE NUMBERS ABOVE REST ON. Never drop this: a budgeted load whose
+        # narrowing is invisible is worse than an unbudgeted one.
+        "ledger_coverage": summary.get("ledger_coverage"),
     }
+
+    def _segment_weight(segment: Any) -> float:
+        if not isinstance(segment, Mapping):
+            return 0.0
+        for key in ("decisive_count", "sample_size", "calibration_sample_size"):
+            try:
+                value = segment.get(key)
+                if value is not None:
+                    return float(value)
+            except (TypeError, ValueError):
+                continue
+        return 0.0
+
     segments = summary.get("segmented_reliability")
-    if isinstance(segments, Mapping):
+    if isinstance(segments, Mapping) and isinstance(segments.get("segments"), list):
+        # The real shape. Bound the LIST; keep `global`/`shrinkage_k`, which are
+        # fixed-size and are what make the surviving segments interpretable.
+        inner = segments["segments"]
+        kept = sorted(inner, key=_segment_weight, reverse=True)[:max_segments]
+        bounded = dict(segments)
+        bounded["segments"] = kept
+        out["segmented_reliability"] = bounded
+        out["segments_total"] = len(inner)
+        out["segments_truncated"] = len(inner) > max_segments
+    elif isinstance(segments, Mapping):
+        # Unexpected mapping shape -- bound it the old way rather than passing
+        # an unbounded payload through, but say so in the count.
         items = list(segments.items())
         out["segments_total"] = len(items)
         out["segmented_reliability"] = dict(items[:max_segments])
         out["segments_truncated"] = len(items) > max_segments
     elif isinstance(segments, list):
+        kept = sorted(segments, key=_segment_weight, reverse=True)[:max_segments]
         out["segments_total"] = len(segments)
-        out["segmented_reliability"] = segments[:max_segments]
+        out["segmented_reliability"] = kept
         out["segments_truncated"] = len(segments) > max_segments
     return out
 

@@ -622,7 +622,99 @@ def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
     return list(_stream_chunked_ledger_records(path))
 
 
-def _stream_chunked_ledger_records(path: Path) -> "Iterator[dict[str, Any]]":
+DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = 90_000_000
+
+
+def _accuracy_summary_ledger_budget_bytes() -> int:
+    """Cumulative accepted-BYTES budget for `build_accuracy_summary`'s ledger
+    load. 0 means unlimited.
+
+    90MB is not a guess. Measured 2026-09-02 (lane
+    `accuracy-summary-alloc-profile`, `todo.md #626`(h)): peak RSS for this load
+    is **proportional to accepted chunk bytes with intercept zero** --
+    4.01x for production-shaped records, 4.41x for thin ones, R2 0.999998 over
+    nine corpora. So a byte budget converts directly into a peak:
+
+        85,766,820 B accepted -> 365.0 MiB peak growth   (measured anchor)
+        90,000,000 B accepted -> 344-378 MiB peak growth (this default)
+
+    against a refresh-worker whose baseline cycle already peaks at anon
+    ~1,877 MiB of a 4,096 MiB ceiling -- so the worst case is ~2,255 MiB, about
+    55% of the ceiling. Unbounded, the same load projects to 3,178-3,493 MiB on
+    top of that baseline and OOM-killed the worker on 2026-09-02 by a margin of
+    at least 915 MiB. The kill was arithmetically certain, not marginal.
+
+    Absent means BOUNDED, not unlimited -- the CLAUDE.md rule that absent is not
+    off. Set the env var to 0 to explicitly opt out (offline/CLI full-history
+    runs); no other caller of the ledger streamer is affected, because the
+    budget is passed per-call and defaults to None everywhere else.
+    """
+    import os
+
+    raw_value = str(os.environ.get("SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES") or "").strip()
+    if not raw_value:
+        return DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES
+    try:
+        return max(0, int(raw_value))
+    except ValueError:
+        return DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES
+
+
+def _select_ledger_chunks_within_budget(
+    chunk_paths: "list[Path]",
+    *,
+    max_total_bytes: int,
+) -> "tuple[list[tuple[Path, int]], dict[str, Any]]":
+    """Pick chunks NEWEST-FIRST until ``max_total_bytes`` is spent, then return
+    them in ASCENDING date order with a per-chunk byte limit.
+
+    Two decisions worth stating, because both are load-bearing:
+
+    * **Newest-first SELECTION, ascending YIELD.** The budget should buy the most
+      recent dates -- that is what drift and reliability want -- but yielding
+      newest-first would silently invert `_latest_by_recommendation_id`, which
+      keeps the LAST record seen per id. Selecting in one order and yielding in
+      the other keeps the memory bound without touching record semantics.
+    * **The bound is per RECORD, not per FILE.** The last (oldest) selected chunk
+      gets a partial byte limit rather than being dropped. A whole-file rule has
+      no lower bound on what it returns: production chunks run 95-332 MB/day, so
+      "skip any chunk that does not fit" makes the newest day unreadable and the
+      summary EMPTY -- which is exactly the trap
+      `load_recent_evaluation_records(max_chunk_bytes=64MB)` falls into here,
+      accepting 0 of 8 real chunks. Safe and vacuous is not safe.
+    """
+    ordered = sorted(chunk_paths, key=lambda item: item.name, reverse=True)
+    remaining = int(max_total_bytes)
+    selected: list[tuple[Path, int]] = []
+    skipped_budget = 0
+    partial = 0
+    for chunk_path in ordered:
+        if remaining <= 0:
+            skipped_budget += 1
+            continue
+        try:
+            chunk_bytes = chunk_path.stat().st_size
+        except OSError:
+            continue
+        limit = min(chunk_bytes, remaining)
+        if limit < chunk_bytes:
+            partial += 1
+        selected.append((chunk_path, limit))
+        remaining -= limit
+    selected.reverse()
+    return selected, {
+        "chunks_partial": partial,
+        "chunks_skipped_budget": skipped_budget,
+        "budget_exhausted": remaining <= 0,
+    }
+
+
+def _stream_chunked_ledger_records(
+    path: Path,
+    *,
+    max_total_bytes: int | None = None,
+    stats: "dict[str, Any] | None" = None,
+) -> "Iterator[dict[str, Any]]":
     """Yield ledger records one at a time. NEVER build the full list.
 
     #435 ONE LEVEL UP. `#254` correctly removed the 256MB `read_text()` string
@@ -640,6 +732,29 @@ def _stream_chunked_ledger_records(path: Path) -> "Iterator[dict[str, Any]]":
     `_latest_by_recommendation_id`, which is a single-pass reduction -- exactly
     the shape `read_book_quotes_latest` used to turn 478,782 rows into 36,424
     keys. Streaming lets the peak be the REDUCED set instead of the raw one.
+
+    **THAT LAST SENTENCE IS FALSE FOR THIS LEDGER, and measuring it is what
+    produced `max_total_bytes`** `[2026-09-02, lane
+    accuracy-summary-alloc-profile]`. The dedup ratio is **0.9979** on the real
+    chunks -- `recommendation_id` is a content hash that drifts with price
+    (`#505`), so `_latest_by_recommendation_id` is ~the identity function and the
+    "reduced set" IS the raw set. Streaming bounds the TRANSIENT string, never
+    the retained records, so peak stayed proportional to accepted bytes
+    (4.01-4.41x, R2 0.999998) and this load OOM-killed refresh-worker on
+    2026-09-02.
+
+    ``max_total_bytes`` is the bound the per-file ceiling never was: a cumulative
+    budget across the whole load. **It defaults to None (unlimited) so every
+    existing caller is byte-for-byte unchanged**; only callers that pass it are
+    bounded (today: `build_accuracy_summary`). When it IS set, the per-file
+    ceiling is bypassed as redundant -- the cumulative budget is strictly
+    tighter, and skipping a big chunk outright would only push the reader onto
+    older data while reading no less of it.
+
+    ``stats`` is filled in as the generator runs, so the CALLER can publish what
+    its result actually rests on. A budget that silently narrows the sample is
+    the "unknown must not default permissive" trap; the numbers have to leave
+    this function.
     """
     chunk_root = _ledger_chunk_root(path)
     if not chunk_root.exists():
@@ -661,6 +776,14 @@ def _stream_chunked_ledger_records(path: Path) -> "Iterator[dict[str, Any]]":
     if not chunk_paths:
         chunk_paths = sorted(item for item in chunk_root.glob("*.jsonl") if item.is_file())
     max_chunk_bytes = _ledger_max_chunk_bytes()
+    budgeted = bool(max_total_bytes)
+    selection_stats: dict[str, Any] = {}
+    if budgeted:
+        plan, selection_stats = _select_ledger_chunks_within_budget(
+            chunk_paths, max_total_bytes=int(max_total_bytes or 0)
+        )
+    else:
+        plan = [(chunk_path, -1) for chunk_path in chunk_paths]
     # Counters only -- these must never grow with the data. The guard has always
     # announced what it REFUSED (SKIP_OVERSIZED_LEDGER_CHUNK) and never what it
     # ACCEPTED, which is the wrong half: the refused chunks are free, and the
@@ -669,21 +792,24 @@ def _stream_chunked_ledger_records(path: Path) -> "Iterator[dict[str, Any]]":
     accepted_chunks = 0
     accepted_bytes = 0
     yielded = 0
-    for chunk_path in chunk_paths:
+    dates: list[str] = []
+    for chunk_path, byte_limit in plan:
         # Historical chunks reached 2.0-2.7GB per day (records used to embed
         # full sport manifests -- see _artifact_manifest_summary); reading one
         # of those into memory is an instant OOM on the workers. Skip
         # oversized chunks outright until scripts/compact_evaluation_ledger.py
-        # has rewritten them.
-        try:
-            if chunk_path.stat().st_size > max_chunk_bytes:
-                print(
-                    f"[intelligence_evaluation] SKIP_OVERSIZED_LEDGER_CHUNK path={chunk_path.name} bytes={chunk_path.stat().st_size} ceiling={max_chunk_bytes}",
-                    flush=True,
-                )
+        # has rewritten them. Under a byte budget this is redundant: the budget
+        # already caps what we read from any single file.
+        if not budgeted:
+            try:
+                if chunk_path.stat().st_size > max_chunk_bytes:
+                    print(
+                        f"[intelligence_evaluation] SKIP_OVERSIZED_LEDGER_CHUNK path={chunk_path.name} bytes={chunk_path.stat().st_size} ceiling={max_chunk_bytes}",
+                        flush=True,
+                    )
+                    continue
+            except OSError:
                 continue
-        except OSError:
-            continue
         # #254: stream the chunk. This was read_text() + splitlines(), which is
         # the exact defect #75 fixed in odds_lifecycle._load_jsonl_rows -- the
         # ceiling above bounds which files are SKIPPED, never what reading an
@@ -700,10 +826,26 @@ def _stream_chunked_ledger_records(path: Path) -> "Iterator[dict[str, Any]]":
         except OSError:
             chunk_bytes = -1
         accepted_chunks += 1
-        accepted_bytes += max(0, chunk_bytes)
+        dates.append(chunk_path.stem)
+        consumed = 0
         try:
             with chunk_path.open("r", encoding="utf-8") as handle:
                 for line in handle:
+                    # Byte accounting BEFORE the parse, and the stop is
+                    # mid-file: a whole-file rule cannot bound a 332MB day
+                    # without dropping it entirely. Checked BEFORE consuming so
+                    # the bound is exact -- an after-the-fact check overshoots by
+                    # one record, which is how the first version of this read
+                    # 5,005,916 bytes against a 5,000,000 budget.
+                    if byte_limit >= 0:
+                        # Encoded length only on the BUDGETED path -- every
+                        # existing caller passes no budget and must not start
+                        # paying an encode() per line for a bound it never asked
+                        # for.
+                        line_bytes = len(line.encode("utf-8"))
+                        if consumed + line_bytes > byte_limit:
+                            break
+                        consumed += line_bytes
                     line = line.strip()
                     if not line:
                         continue
@@ -716,14 +858,41 @@ def _stream_chunked_ledger_records(path: Path) -> "Iterator[dict[str, Any]]":
                         yield payload
         except Exception:
             continue
+        accepted_bytes += consumed if byte_limit >= 0 else max(0, chunk_bytes)
+    if stats is not None:
+        stats.update(
+            {
+                "budget_bytes": int(max_total_bytes or 0),
+                "bytes_accepted": accepted_bytes,
+                "chunks_accepted": accepted_chunks,
+                "records": yielded,
+                "dates_covered": len(dates),
+                "date_min": min(dates) if dates else None,
+                "date_max": max(dates) if dates else None,
+                "truncated": bool(
+                    selection_stats.get("chunks_skipped_budget")
+                    or selection_stats.get("chunks_partial")
+                ),
+                **selection_stats,
+            }
+        )
     if accepted_chunks:
         # The number that was missing all night: what the ceiling let THROUGH.
         # print(..., flush=True) -- #37, logger.info never reaches Render's
         # collector.
+        budget_text = ""
+        if budgeted:
+            budget_text = (
+                f" budget={int(max_total_bytes or 0)} "
+                f"partial={selection_stats.get('chunks_partial', 0)} "
+                f"skipped_budget={selection_stats.get('chunks_skipped_budget', 0)} "
+                f"dates={len(dates)} "
+                f"truncated={1 if (selection_stats.get('chunks_skipped_budget') or selection_stats.get('chunks_partial')) else 0}"
+            )
         print(
             f"[intelligence_evaluation] LEDGER_CHUNKS_ACCEPTED count={accepted_chunks} "
             f"bytes={accepted_bytes} ceiling={max_chunk_bytes} records={yielded} "
-            f"streamed=1",
+            f"streamed=1{budget_text}",
             flush=True,
         )
 
@@ -1394,8 +1563,17 @@ def _stream_record_payloads(
     records: Iterable[Mapping[str, Any]] | None = None,
     *,
     ledger_path: Path | str | None = None,
+    max_total_bytes: int | None = None,
+    stats: "dict[str, Any] | None" = None,
 ) -> "Iterator[dict[str, Any]]":
-    """Yield ledger records one at a time, materialising nothing."""
+    """Yield ledger records one at a time, materialising nothing.
+
+    ``max_total_bytes``/``stats`` are pass-throughs to
+    `_stream_chunked_ledger_records`; both default to None so every existing
+    caller is unchanged. They apply only to a CHUNKED ledger read -- an
+    in-memory ``records`` sequence is already bounded by whoever built it, and
+    the unchunked single-file fallback has no chunk to budget across.
+    """
     if records is not None:
         for item in records:
             if isinstance(item, Mapping):
@@ -1403,7 +1581,9 @@ def _stream_record_payloads(
         return
     path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
     if _is_chunked_ledger_path(path):
-        yield from _stream_chunked_ledger_records(path)
+        yield from _stream_chunked_ledger_records(
+            path, max_total_bytes=max_total_bytes, stats=stats
+        )
         return
     if not path.exists():
         return
@@ -2654,7 +2834,22 @@ def build_accuracy_summary(
     from syndicate.features.shared.drift_detection import detect_metric_drift
 
     sport_slug = str(sport or "").strip().lower() or None
-    record_rows = _latest_by_recommendation_id(_stream_record_payloads(records, ledger_path=ledger_path))
+    # `#626`(h): the ledger load is BUDGETED here and nowhere else. Measured
+    # 2026-09-02 -- unbudgeted this materialises 4.01-4.41x accepted chunk bytes
+    # (R2 0.999998, intercept zero), which at production's 830,832,574 accepted
+    # bytes is 3,178-3,493 MiB on top of a worker already peaking at anon
+    # ~1,877 MiB of 4,096 MiB. It OOM-killed refresh-worker on its first armed
+    # run. The budget is the bound the 50-segment output cap could never be:
+    # 98.8-99.9% of peak is set by THIS line, before any output exists.
+    ledger_stats: dict[str, Any] = {}
+    record_rows = _latest_by_recommendation_id(
+        _stream_record_payloads(
+            records,
+            ledger_path=ledger_path,
+            max_total_bytes=_accuracy_summary_ledger_budget_bytes(),
+            stats=ledger_stats,
+        )
+    )
     if sport_slug:
         record_rows = [record for record in record_rows if _record_sport(record) in {sport_slug, None}]
 
@@ -2692,6 +2887,12 @@ def build_accuracy_summary(
         "metrics": compute_metrics(records=record_rows, sport=sport_slug),
         "segmented_reliability": build_segmented_reliability_profile(records=record_rows, sport=sport_slug),
         "drift": drift,
+        # WHAT THIS SUMMARY ACTUALLY RESTS ON. The budget is small relative to
+        # this ledger -- production chunks run 95-332 MB/day, so 90MB is under
+        # ONE DAY against a recent_days=7 + baseline_days=21 window. A reader
+        # who cannot see `truncated`/`dates_covered` would take a one-day drift
+        # reading for a 28-day one. Publishing it is not optional.
+        "ledger_coverage": dict(ledger_stats),
     }
 
 

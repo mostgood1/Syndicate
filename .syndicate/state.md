@@ -405,6 +405,133 @@ period-total reads zero.
 ANYWHERE.** That is the remaining half and it was deliberately not wired:
 periodic work on refresh-worker is what `#241` did when it caused a prod restart
 loop (~1.4GB headroom), so it needs its own decision and its own measurement.
+loop, so it needs its own decision and its own measurement. **The headroom
+figure that rule carried (~1.4GB) is STALE — see
+`[refresh-worker-headroom-2026-09-02]`; it is ~2.26GB of ANON, and the metric
+most people read says 29-99MB.**
+
+## [accuracy-autorun-OOM-2026-09-02] THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lane soccer-anchor-wiring]`
+
+**RESOLVED. No deadline outstanding.** The key was set `false` at ~19:0xZ and a
+peer's refresh-worker deploy (`e4a471c0`, 19:26:44Z) injected it. **VERIFIED
+DIRECTLY rather than inferred from deploy ordering** — the decline reason flipped
+from `daily_gate` to `disabled` at 19:32:27Z and has held since:
+
+    ACCURACY_SUMMARY_AUTORUN_GATED reason=disabled env=ACCURACY_SUMMARY_ENABLE_...
+
+That verification exists only because the decline telemetry was added earlier the
+same day (`24efb82b`); before it, all three decline causes were the same silence.
+
+**MEASURED:** armed 15:29:45Z, fired 15:31:11Z, killed the worker by 15:32:56Z.
+Anon **1,833 → 3,868 MB** against a 4,096 MB ceiling, headroom **0.051 MB**,
+climbing **+146.9 MB/s**. `[accuracy_summary] AUTORUN_DONE` never printed, and
+since the `except` path prints it too, its absence proves a KILL rather than an
+exception. `intelligence_evaluation.py:2657` (`build_accuracy_summary`) was on
+the stack in all three faulthandler dumps.
+
+**`#241` REPEATED.** "Worker periodic work is never free" was quoted at arming
+time and armed over. The job roughly DOUBLES peak anon on a worker whose cycle
+already peaks at 1,877 MB.
+
+**WHAT PREVENTED A RESTART LOOP:** `#256`'s claim-before-work. The epoch advances
+at CLAIM time, so a death mid-pass costs exactly one run per day instead of every
+cycle. That design decision is the only reason this is a scheduled nuisance
+rather than an outage.
+
+**THE ALLOCATOR IS MEASURED** `[2026-09-02, lane accuracy-summary-alloc-profile,
+LOCAL profile, no deploy]`. Full record: `todo.md #626`(h).
+
+    peak growth = 4.01-4.41 x ACCEPTED CHUNK BYTES, intercept ZERO, R2 0.999998
+    100% of resident bytes at intelligence_evaluation.py:711 (json.loads)
+    dedup ratio 0.9979 -> the "streaming reduction" reduces nothing here
+    98.8-99.9% of peak is set by materialisation, BEFORE any output exists
+
+At the production accepted set (`LEDGER_CHUNKS_ACCEPTED bytes=830,832,574
+records=22,078`, ceiling 256MB, and NO date window at all) that is **3,178-3,493
+MiB** on top of anon 1,833 MiB -> **5,011-5,326 MiB against a 4,096 MiB ceiling.
+The kill was CERTAIN, ~915 MiB short on its most favourable coefficient**, not a
+near miss. Corroborated two ways: it died having added 2,035 MiB = 64% of the
+projection, and the local allocation rate (155 MiB/s) matches production's
+terminal climb (146.9 MB/s) within 6%.
+
+**Why the segment cap could not have worked, and a SECOND defect it hides.**
+`_bounded_accuracy_summary` runs on the RETURNED summary, downstream of the whole
+working set — a segment cap bounds output rows, never the set that produces them.
+Separately it truncates the WRONG CONTAINER: `list(segmented_reliability.items())
+[:50]` cuts the three top-level keys, never the `segments` LIST, so
+`segments_total` reads **3** while `len(segments)` is **7**, `segments_truncated`
+is pinned False at any coverage, and the "bounded" payload is LARGER than the raw
+one. The 8MB keyvalue ceiling it was written to protect is unprotected. Owner:
+lane `accuracy-autorun-decline-telemetry`, which holds that file.
+
+**THE BUDGET IS BUILT AND RE-MEASURED, OFF vs ON, AT PRODUCTION SCALE**
+`[2026-09-02, lane accuracy-summary-ledger-budget, LOCAL, not deployed]`:
+
+    corpus 831,038,410 B / 8 chunks, production-shaped records
+    budget OFF -> accepted 831,038,410 B, peak growth 3,181.1 MiB, 41.2 s
+    budget ON  -> accepted    89,967,617 B, peak growth   344.4 MiB,  7.3 s
+    resident/file byte 4.014 in BOTH -> the budget changes WHICH bytes are
+    read, not what a byte costs.  9.24x reduction, 2,836.7 MiB saved.
+
+**THE PROJECTION IS NOW A MEASUREMENT.** 3,181.1 MiB measured against 3,178 MiB
+extrapolated — 0.1%. So: OFF = 1,833 + 3,181.1 = **5,014.1 MiB vs a 4,096 MiB
+ceiling, OOM by 918 MiB**; ON = 1,877 (cycle peak) + 344.4 = **2,221.4 MiB,
+54.2% of ceiling, 1,874.6 MiB free**.
+
+Built in `intelligence_evaluation.py`: `max_total_bytes`/`stats` on
+`_stream_chunked_ledger_records` (**default None — all 8 existing callers
+unchanged**), newest-first SELECTION with ascending EMISSION so
+`_latest_by_recommendation_id`'s last-wins is not inverted, a **per-RECORD**
+bound so an oversized chunk is read INTO rather than dropped, env
+`SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES` (default 90,000,000, **absent
+means bounded**), and a published `ledger_coverage` block. 10 tests incl.
+off!=on; 66 pass across the ledger/summary suites.
+
+**BOTH PUBLISHING BLOCKERS ARE NOW FIXED** `[same session, cross-lane by user
+decision, logged in lanes.md]`. `_bounded_accuracy_summary` no longer drops
+`ledger_coverage`, and its truncation now bounds the `segments` LIST instead of
+the mapping's three fixed keys. Verified against a real summary AND against the
+pre-fix function extracted from HEAD, which fails all four assertions:
+
+    segments_total       3 -> 7 (the real count)
+    segments_truncated   False-at-any-coverage -> True when it truncates
+    payload/raw ratio    0.996 -> 0.13 at 400 segments capped to 50
+    ledger_coverage      dropped -> published
+
+Segments are now kept LARGEST-SAMPLE-FIRST, so a cap that fires drops the
+thinnest segments rather than an arbitrary set.
+
+**RE-ARMING IS STILL A SEPARATE, UNTAKEN DECISION, and nothing here is
+deployed.** The standing caveat is unchanged and is now VISIBLE in the artifact
+rather than implicit: at 95-332 MB/day the 90MB budget covers **one day against
+a 28-day drift window** (`recent_days=7` + `baseline_days=21`). The budget makes
+the job survivable, not correct. The structural fix — streaming accumulators,
+peak O(segments + dates) instead of O(ledger) — is the next build
+`[user decision 2026-09-02]`.
+
+## [refresh-worker-headroom-2026-09-02] THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-env-snapshots, measured off 200 MEMORY_WATCHDOG samples 15:30-16:10Z]`
+
+**Read `memory_anon_mb`, not `memory_headroom_mb`.** `memory_current_mb` includes
+reclaimable page cache and this worker holds **~1.2GB** of it, so the headroom
+field understates by roughly that much.
+
+    memory_headroom_mb   min 29    max 425   last 99     <- ALARMING AND MISLEADING
+    memory_anon_mb       min 1518  max 1877  last 1833   <- the real number
+    -> anon 1833 of 4096 = ~2.26GB REAL headroom
+
+**55% of samples read under 200MB nominal headroom.** Anyone reading that field
+will conclude the worker is minutes from death. It is not. This is the same trap
+as the 2.7GB "plateau" that turned out to be file cache — split anon from
+inactive_file before calling anything pressure.
+
+**What IS true:** anon climbs through a cycle (1518 → 1877) and peaks at
+`last_stage=overview_sport_end`, so the board-overview stage is the high-water
+mark. New periodic work still is not free — `#241` stands — but it is being
+weighed against ~2.26GB, not ~1.4GB, and certainly not against 29MB.
+
+**Owed:** the first armed run of the accuracy autorun (`#626`(h), live since
+2026-09-02T15:29:45Z) should have its OWN cost read against this
+`overview_sport_end` peak, not against an idle baseline.
 
 ## [wnba-consensus-price] BOOK PRICES WERE AVERAGED ON THE AMERICAN SCALE; 43% OF CARD PRICES WERE IMPOSSIBLE `[2026-08-31, lane wnba-accuracy-assessment, commit 697c41f0]`
 
