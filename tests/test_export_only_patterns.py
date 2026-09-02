@@ -45,6 +45,12 @@ EXPORT_ONLY_SAMPLES = (
     "mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/2026-06-14/822722.json.gz",
     "mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/2026-06-14/822722.json",
     "mlb_source/tracking/odds_mlb_hitter_props_history_2026-06-10.csv",
+    # Reconciliation outputs -- the graded "what actually happened" side of the
+    # evaluation chain, and the OUTPUT a `build_mlb_actuals` replay-diff needs
+    # to compare against. They were in neither list, so that output was
+    # unauditable from outside.
+    "mlb_source/reconciliation/props_actuals_2026-06-14.csv",
+    "mlb_source/reconciliation/game_results_2026-06-14.json",
 )
 
 FEED_LIVE_SAMPLE = EXPORT_ONLY_SAMPLES[0]

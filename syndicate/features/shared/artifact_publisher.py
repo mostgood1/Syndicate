@@ -1023,6 +1023,23 @@ EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/source_artifacts/data/raw/statsapi/feed_live/*/*/*.json.gz",
     # Prop-history CSVs, under `tracking/` -- not a bootstrap root, not swept.
     "*_source/tracking/odds_*_props_history_*.csv",
+    # RECONCILIATION OUTPUTS (`props_actuals_<date>.csv`, `game_results_<date>.*`).
+    # The graded "what actually happened" side of the evaluation chain, written
+    # by `build_mlb_actuals.write_mlb_actuals_for_date` under the refresh-worker
+    # autorun (`RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER=true`, hourly) and read
+    # by `prediction_reconciliation.RECONCILIATION_PATTERNS` on the same worker.
+    #
+    # WORKER-LOCAL, SO READ-ONLY IS THE RIGHT LIST: nothing on web serves these.
+    # `blueprints/mlb.py`'s `reconciliation` keys come from an artifact's own
+    # `diagnostics` dict, not from these files.
+    #
+    # WHY THEY ARE HERE: they were in NEITHER list, so the producer's output was
+    # unauditable from outside -- `model_engine_standard.md` §3b's "an
+    # unallowlisted artifact is an unauditable one", on the outputs the
+    # settlement and accuracy chain rests on. The inventory showed zero and that
+    # meant INVISIBLE, not absent; there was nothing to diff a replay against.
+    "*_source/reconciliation/*.csv",
+    "*_source/reconciliation/*.json",
 )
 
 

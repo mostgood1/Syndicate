@@ -1803,6 +1803,36 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Claims: NONE held. No deploy taken or needed.
 - Narrative: `log/2026-09-02.md`, `todo.md #625`(6).
 
+### m626-actuals-replay-target — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: a SECOND replay-diff target — `build_mlb_actuals` — following `#625`(5).
+  Testable outcome: `replay_diff_gate.py --target mlb_actuals --date <D>`
+  reproduces production's `props_actuals_<D>.csv` from a mirrored day, or the
+  reason it cannot is stated with evidence.
+- Files: `syndicate/features/shared/artifact_publisher.py`,
+  `tests/test_export_only_patterns.py`, `scripts/replay_diff_gate.py`,
+  `scripts/mirror_manifest.py`.
+- **BLOCKER FOUND BEFORE ANY CODE, and it is the item's real content:**
+  `mlb_source/reconciliation/*` is in NEITHER allowlist, so the producer's
+  OUTPUT cannot be read from outside — the inventory shows 0 files and, by the
+  rule I wrote into §3b this session, that means **INVISIBLE, not absent**.
+  There is nothing to diff against until it is allowlisted. Production does
+  produce it: `RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER=true` on refresh-worker,
+  hourly.
+- Hypothesis: reconciliation outputs are worker-local and web serves none of
+  them (`prediction_reconciliation.py` runs under the refresh-worker autorun;
+  `blueprints/mlb.py`'s `reconciliation` keys come from an artifact's
+  `diagnostics` dict, not these CSVs), so EXPORT-ONLY is the correct list and
+  adding them to the WRITE list would be wrong.
+- Falsification test: after allowlisting and deploying, if production turns out
+  to hold NO `props_actuals` for any date, the hypothesis that it produces them
+  hourly is wrong and the blocker is upstream of the allowlist. If it holds them
+  only for dates with no mirrorable `feed_live` (web has 11 dates,
+  2026-06-14..06-25), the target is not buildable today and that is the finding.
+- Verification: (a) after the deploy, `?path=` on a `props_actuals` CSV returns
+  content where it returns 403 today; (b) the producer commit for the mirrorable
+  overlap is read from the Render deploy history before any diff is trusted.
+- Blocked by: none. **NEEDS A WEB DEPLOY** for (a).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
