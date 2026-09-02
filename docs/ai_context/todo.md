@@ -1,5 +1,53 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#635` — **DEPLOY SERIALISATION IS BROKEN: `web` and `syndicate` are TWO LOCKS FOR ONE SERVICE, and two lanes held them at once** — lane `game-market-entry-roi-curve`, 2026-09-02 — **OPEN, and it has already cost a cancelled build**
+
+**MEASURED, not theorised — it happened at 05:03Z on 2026-09-02.** Lane
+`book-quotes-publish-clobber` held the `web` claim (acquired 04:37Z, 45-min TTL)
+with a build in flight. I acquired **`syndicate`**, was granted it, and deployed.
+Render cancelled their build **0.6s** later. No `--force`, no
+`SYNDICATE_DEPLOY_GUARD=off`, and the claim step WAS run.
+
+**THE DEFECT.** `scripts/deploy_claim.py:69` keys the lock by NAME STRING:
+
+    _path(service) = CLAIM_DIR / f"{service}.json"
+    SERVICES = ("web", "syndicate", "refresh-worker", "live-odds-worker")
+
+so `web.json` and `syndicate.json` are **independent files for one Render
+service**. Nothing aliases them. **The three tools disagree about which key
+protects `srv-d88ahvrbc2fs73eodu30`:**
+
+    deploy_preflight.py:95   "syndicate" AND "web" -> srv-d88ahvrbc2fs73eodu30   ALIASED
+    deploy-guard.py:104      srv-d88ahvrbc2fs73eodu30 -> "web"                    web only
+    deploy_claim.py:69       one file per NAME                                    NOT aliased
+
+**AND THE STATUS OUTPUT ACTIVELY MISLEADS**, which is the part that caught me:
+
+    web         HELD by book-quotes-publish-clobber 7.9 min
+    syndicate   free
+
+Two lines, one box. I read it as two services. `deploy_preflight.py` even printed
+`web ... <-- deploying` while I held `syndicate`, and **that mismatch is the
+signal that should have stopped me and did not.**
+
+**THE FIX IS SMALL AND SHOULD NOT WAIT:** resolve every service name to its
+Render service ID and key the claim file on the ID, or collapse the alias so
+`syndicate` is not offered at all. Until then **the claim serialises nothing for
+web**, and the coordinator role that used to serialise deploys is retired.
+
+**SECOND HOLE, UNEXPLAINED, DO NOT ASSUME IT IS THE SAME BUG.** The GUARD should
+have refused me independently: it is armed (`SYNDICATE_DEPLOY_GUARD` unset,
+registered in `settings.json`), its `DEPLOYS_ENDPOINT` regex matches the URL
+shape I used, and it maps the id to `web` — which they held. **Reproduced
+2026-09-02: an equivalent command IS blocked and the block names `web`.** So
+matching works and it should have stopped me. **I have no account of its silence
+at 05:03Z and did not invent one.** If the hook keeps a decision log, that is
+where to look.
+
+**No harm this time, verified by them not assumed:** `git merge-base
+--is-ancestor f086691e 5e6c4d75` is true, so my deploy CONTAINED their work.
+Serialisation is not composition — that it held here was luck.
+
 ### `#634` — **`#488`'s publish-divergence guard is LEAKY BY CONSTRUCTION: its state is PER-PROCESS across 2 gunicorn workers, so it is blind exactly when it is most needed** — split out of `#630`(d), lane `book-quotes-publish-clobber`, 2026-09-02 — **OPEN. Known, measured, NOT fixed.**
 
 **What the guard is for.** `_publish_divergence_verdict` in
@@ -299,6 +347,27 @@ description of the MECHANISM. What survives unchanged: **anon never comes down
 except at a restart.** The one apparent counter-example, a 296 MB drop between
 14:00 and 15:00Z, was **two deploys** (`deploy_ended` 14:22:27Z and 14:42:40Z),
 checked rather than assumed.
+
+> **CORRECTION `[2026-09-02, from lane `book-quotes-publish-clobber`'s independent
+> memory watch]`. THE `+488.7 MB` BELOW IS POST-RESTART WARM-UP, NOT LEAK GROWTH.**
+> Both of my readings sit **inside the first 12 minutes after my own deploy's
+> restart** — precisely where the slope is steepest for reasons that are not a
+> leak. Their watch on `477e42c2` shows unreclaimable rising 766.7 → ~895 MB over
+> 40 minutes and then **PLATEAUING**, oscillating **861.8-894.9 for 50 minutes and
+> never crossing 900**. One curve: a ramp to a working set of ~890 MB.
+> **So "anon rose +488.7 MB in 7m23s" is a warm-up rate, and the earlier
+> "~75 MB/h" was already downgraded from a mechanism to an average.**
+>
+> **WHAT SURVIVES:** at both OOM kills anon was **1,390-1,637 MB** with
+> `inactive_file` 14-229 MB — far above that ~890 MB plateau. So something does
+> exceed the working set sometimes, and that excursion, not a steady climb, is
+> what `#632` is about. **WHAT DOES NOT SURVIVE:** the framing of a continuous
+> climb between restarts.
+>
+> **Instrument caveat both ways, unresolved:** they read
+> `container_memory_unreclaimable_mb` (via `/api/ops/memory`), I read
+> `memory_anon_mb`. Related, not identical. **One deliberate same-instant read of
+> both is owed before anyone leans on either.**
 
 **THE LEAK IS NOT IN THE REQUEST PATH. MEASURED 2026-09-02, and this is the
 strongest result on this item so far.** The instrument ran on production at

@@ -4206,3 +4206,37 @@ process list.
   session is not its owner. **This is the same rule about config.**
 * **When concurrency shapes a measurement, get the concurrency from the
   platform**, before the design and not after the code.
+
+## 2026-09-02 — FORBIDDEN: trusting a lock whose KEY is a name you chose, when the thing it protects has more than one name. `[lane game-market-entry-roi-curve]`
+
+**What happened.** I acquired `deploy_claim.py --service syndicate`, was granted
+it, preflighted CLEAR, and deployed web — cancelling a peer's in-flight build
+0.6s later. They held `--service web`, unexpired, the whole time. **Both claims
+were valid. `web.json` and `syndicate.json` are separate files for ONE Render
+service** (`_path = CLAIM_DIR / f"{service}.json"`), and nothing aliases them.
+
+**The tell was on my screen and I read past it.** `status` printed
+
+    web         HELD by book-quotes-publish-clobber 7.9 min
+    syndicate   free
+
+and I took that for two services. Then `deploy_preflight.py --service syndicate`
+printed **`web ... <-- deploying`** — the tool telling me, in its own output, that
+my key and its target had different names. **A tool that answers about a
+different name than you asked about is reporting an alias, and an alias means
+your lock may not be the lock.**
+
+**How to apply.**
+* **Key a lock on the IDENTITY of the resource, never on a label for it.** Here:
+  the Render service ID. `#635` carries the fix.
+* **When two tools name the same thing differently, stop.** Do not proceed on the
+  one that agrees with you. Preflight aliased, the guard mapped to `web` only,
+  the claim aliased nothing — three components, three answers, and I only
+  needed to notice that two of them disagreed.
+* **A granted lock is not evidence the resource is free.** It is evidence that
+  THAT FILE was free. Ask what else could be holding the same box under another
+  name.
+* Companion: the peer verified `git merge-base --is-ancestor` before saying
+  anything, so we know my deploy CONTAINED their work rather than dropping it.
+  **Serialisation is not composition** — and when serialisation silently fails,
+  containment is the only thing between you and a silent revert.

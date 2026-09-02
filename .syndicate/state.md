@@ -690,6 +690,15 @@ week would produce MORE OOMs, not fewer.** `[worker memory is boot-confounded]`
 in reverse: there every deploy made a fix look good for five minutes, here every
 deploy hides the leak.
 
+**CORRECTED `[2026-09-02]`: the `+488.7 MB` below is POST-RESTART WARM-UP.** Both
+readings sit inside the first 12 min after a restart. Lane
+`book-quotes-publish-clobber`'s independent watch shows unreclaimable ramping to
+~895 MB then **plateauing 861.8-894.9 for 50 min**. One curve, a working set of
+~890 MB — not an unbounded climb. **What survives:** at both OOMs anon was
+1,390-1,637 MB, far above that plateau, so something exceeds the working set
+sometimes and THAT excursion is the defect. Instruments differ
+(`unreclaimable` vs `anon`); a same-instant read of both is owed.
+
 **THE LEAK IS NOT IN THE REQUEST PATH `[measured 2026-09-02 at WEB_CONCURRENCY=1]`.**
 Two attribution tables 7m23s apart: anon **270.8 → 759.5 MB (+488.7)** while the
 sum of ALL per-route attributions rose **1.963 → 12.452 MB (+10.5)** — routes
