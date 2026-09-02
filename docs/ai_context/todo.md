@@ -1,5 +1,56 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#633` — **NCAAF SEASON PROJECTIONS CANNOT REFRESH: the CFBD monthly quota is exhausted and the artifact is 5+ days stale** — lane `game-market-entry-roi-curve` (the owed reading from `ncaaf-no-orders`, taken rather than filed), 2026-09-01 — **OPEN**
+
+**THE READING `ncaaf-no-orders` WAS WAITING ON IS TAKEN, and it passes the lane's
+test while revealing a different and larger problem.** Render logs API,
+`srv-d91dpertqb8s73co8ls0` (refresh-worker), window 2026-08-30T20:20Z..09-01T00:21Z.
+
+**First: the two mechanisms that lane shipped DO work.** Its pass condition was
+*"a `[cfbd_backoff] ... status=429 ... sleeping=` line followed by a run that
+COMPLETES, or `SEASON_PROJECTION_RELAUNCH_HELD` with `SEASON_PROJECTION_LAUNCHING`
+falling to ~1/hour"*, and *"a quiet log is not a pass"*. The log is not quiet:
+
+    [cfbd_backoff] GET /ppa/teams status=429 attempt=1/5 sleeping=0.4s slept_total=0.0s
+    [cfbd_backoff] GET /ppa/teams status=429 attempt=2/5 sleeping=1.8s slept_total=0.4s
+    [cfbd_backoff] GET /ppa/teams status=429 attempt=3/5 sleeping=1.5s slept_total=2.2s
+    [cfbd_backoff] GET /ppa/teams status=429 attempt=4/5 sleeping=0.6s slept_total=3.7s
+
+    SEASON_PROJECTION_LAUNCHING sport=ncaaf  07:33 08:33 09:33 10:50 11:51 12:52
+      -> ~1 per hour, which is the second branch MET
+    SEASON_PROJECTION_RELAUNCH_HELD sport=ncaaf artifact_stale_relaunched_recently
+      -> firing continuously; 100 lines across the window
+
+**Second, and this is the finding: the blocker is not the 429 rate limit, it is
+the MONTHLY QUOTA.**
+
+    syndicate.features.ncaaf.cfbd_quota_latch.QuotaExhausted:
+      CFBD monthly quota exhausted; not issuing GET /ppa/teams
+    [cfbd_quota] LATCHED_SKIP GET /ppa/teams clears_in_hours=1.7
+
+The latch that `ncaaf-cfbd-quota-latch` (CLOSED) shipped is working exactly as
+designed — it is refusing to spend a quota that is already gone. **The
+consequence is that the NCAAF projection artifact cannot be rebuilt**, and its
+age climbs monotonically across the window:
+
+    age_seconds 428,209 (4.96 d) at 08-31T20:18Z   ->   443,140 (5.13 d) at 09-01T00:21Z
+
+**WHAT IS NOT ESTABLISHED, and do not skip these.** Whether the quota is
+exhausted by legitimate demand or by a retry storm predating the latch; what the
+monthly allowance is and when it resets (`clears_in_hours=1.7` reads like a
+rolling window, not a calendar month, and the two should not be conflated); and
+whether `SEASON_PROJECTION_COMPLETE` is even the completion marker's name — it
+returns **0 lines**, which is absence of that STRING and not evidence the run
+never completes. The artifact age is the outcome measure; use it, not the marker.
+
+**WHY IT IS NOT URGENT, stated so nobody sizes it wrong.** NCAAF serves **zero
+orders** and will keep doing so regardless: `football/pick_gate.py` denies the
+model claim on a measured 17-sigma out-of-sample loss, and
+`portfolio_commit.py:267` refuses all 480 served rows for `no_model_edge_pct`
+(0 of 480 carry one). **Stale projections are therefore costing DISPLAY accuracy
+on the board, not money.** That is the reason to fix it calmly and the reason
+not to spend CFBD quota fixing it in a hurry.
+
 ### `#632` — **WEB WAS OOM-KILLED TWICE. Real `oomKilled` events at the 2G limit, and nothing owns them** — lane `game-market-entry-roi-curve` (surfaced by `boot-sync-healthcheck-kill`, rehomed on closing it), 2026-09-01 — **OPEN**
 
 **Measured, Render events API, `srv-d88ahvrbc2fs73eodu30` (`syndicate`, the WEB
