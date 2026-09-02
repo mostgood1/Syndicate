@@ -1682,7 +1682,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Narrative + evidence: `log/2026-09-02.md`, `todo.md #625`(4),
   `state.md [local-fleet-runner]`.
 
-### kalshi-discovery-deadline — OPEN — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### kalshi-discovery-deadline — OPEN, **HYPOTHESIS FALSIFIED AND RE-AIMED: the cost is FAN-OUT (243 per-series fetches), not pagination or host retries** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: the candidate-pool build cannot block for minutes on Kalshi. ONE testable
   outcome: `tests/test_intelligence.py` completes in bounded time WITHOUT opening
   an outbound socket, and `kalshi_client.discover` aborts at an AGGREGATE
@@ -1730,6 +1730,68 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Caution carried from `learnings.md` 2026-08-28: a network result is a fact
   about the NETWORK, not the venue. This lane's conclusion must be about the
   CODE'S BOUND — never "Kalshi is slow".
+- **FALSIFICATION TEST RUN 2026-09-02 — MY HYPOTHESIS IS WRONG IN ITS MECHANISM
+  AND RIGHT IN ITS CONCLUSION. The subject survives; the aim moves.**
+
+  Timed with `_get` instrumented per request (leaf patch, so import style cannot
+  bypass it). Two runs of the single test, `SYNDICATE_WEB_DYNO=1` to skip the
+  unrelated WNBA recursion:
+
+      run A   wall 152.1s   calls 290   network 94.1s   (62% of wall)
+      run B   wall 109.7s   calls 266   network 64.4s   (59% of wall)
+      run B breakdown:  market fetches WITHOUT a cursor   243
+                        cursor continuations               21
+                        series-catalogue calls              2
+
+  And a standalone `discover()`:
+
+      40 requests, ALL to _BASE_URLS[0], 0 failures, wall 30.27s
+      per-request  min 0.52s  median 0.63s  max 1.39s
+      pages=40  truncated=True  markets=40,000  singles=201  combinatorial=39,799
+
+  **FALSIFIED — the two multipliers I named are not where the time goes.**
+  - `_BASE_URLS` (3 entries) is NOT a 3x multiplier on the normal path. It
+    `break`s on first success and every observed call went to base 1 with zero
+    failures. The 3x applies only when a host FAILS.
+  - `pages` is declared OUTSIDE the `for base` loop and never reset, so
+    `max_pages` is a GLOBAL budget across hosts, not per-host. My
+    "3 x 20 x 20s = 1,200s" was arithmetic on a loop shape that does not exist.
+  - Pagination depth is not the cost either: only **21 of 266** calls follow a
+    cursor.
+  - The 20s per-request timeout is never approached — median ~0.24s in-test,
+    0.63s standalone.
+
+  **CONFIRMED — there is no aggregate bound, and the real driver is FAN-OUT.**
+  A single intelligence request issues **~250-290 sequential HTTP requests**,
+  dominated by **243 per-series `/markets` fetches**, taking **64-94s** with
+  nothing measuring elapsed time, no concurrency, and no memoisation. That is
+  59-62% of the test's wall clock.
+
+  **SECOND FINDING, worth its own fix:** `discover()` pays 40 pages / 30s to
+  return `truncated=True` every time, and of 40,000 markets only **201 are
+  singles** — 99.5% combinatorial parlay noise the board does not bet. The
+  module's own docstring already says the market listing is the wrong instrument
+  and that `discover_series` exists for this; the catalogue was called **twice**
+  against 243 listing fetches.
+
+  **CORRECTION TO MY OWN REPORT: this test does not HANG on Kalshi.** With the
+  WNBA recursion branch disabled it COMPLETES, in 109-152s. My earlier 90s and
+  240s timeouts were simply shorter than the test. The only infinite hang is the
+  WNBA `_artifact_bundle` <-> `_games_from_live_state_fallback` recursion, which
+  is a different subject and has no lane. "Slow" and "hung" are not the same
+  finding and I reported the wrong one.
+
+- **REVISED GOAL, replacing the original.** A single candidate-pool build must
+  not issue hundreds of sequential venue requests. Testable outcome: the same
+  test completes with **an order of magnitude fewer Kalshi requests** and an
+  AGGREGATE deadline that a unit test can drive, with the truncation reported
+  rather than silent. The original goal (a deadline alone) is necessary and not
+  sufficient — a deadline on 243 fan-out calls just truncates arbitrarily.
+- **REVISED VERIFICATION:** (1) request count for one build drops from ~250-290
+  to a stated target, measured the same way (`_get` leaf patch), not asserted;
+  (2) an aggregate deadline unit test — off != on, generous vs tight, and the
+  tight case must SAY it truncated; (3) the test suite no longer opens a socket
+  to a venue at all, with a guard that FAILS when it does.
 - Blocked by: none. Does not deploy; the fix is a bound, and a bound is only
   worth shipping once its off != on test exists.
 ### m625-standard-substrate-label — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. `#625`(6) done, commit `6211bdf9`, NO DEPLOY (documentation).** `model_engine_standard.md` §3b now names **three** substrates — `render`, `mirror:<manifest_id>`, `checkout` — with a table of what a verified mirror CAN and can NEVER answer. **The 2026-08-18 user directive is preserved verbatim and explicitly marked unchanged**; this ADDS one admissible case rather than relaxing anything, and an unverified local read is still not a claim. **The falsification test did NOT fire:** the reproducible class states crisply, against §3b's own worked example (NCAAF local 0 vs production 16) — a mirror answers questions about the CODE, never about the DEPLOYMENT. **Three stale places fixed in the same pass:** §3 and the gate requirements still said "allowlisted in `HOT_ARTIFACT_PATTERNS`" after `#625`(2) split it; the UNMEASURED rule could not tell a verified mirror from a checkout; and a new subsection states that a 403 is not an absence. **`#625` IS COMPLETE — all six items.**
