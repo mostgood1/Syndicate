@@ -690,6 +690,16 @@ week would produce MORE OOMs, not fewer.** `[worker memory is boot-confounded]`
 in reverse: there every deploy made a fix look good for five minutes, here every
 deploy hides the leak.
 
+**SAME-INSTANT READ TAKEN `[2026-09-02 14:19Z]`: `unreclaimable` = `anon` + ~5 MB
+(0.4-0.5%), every sample.** One `memory.stat` read builds both, so a
+`CONTAINER_MEMORY` line is already same-instant. The two lanes' numbers are
+directly comparable. **Post-warm-up growth is `+32.0 MB/h`** over 8.0h with no
+restart (06:16Z 906.6 → 14:19Z 1163.7 MB), now **57% of 2,048 at 8.9h uptime**.
+The peer's 861.8-894.9 plateau matches 06:00-09:00 exactly — a real WINDOW, not a
+ceiling. **CORRECTION: anon DOES fall without a restart** (—57 MB 12:17→13:16Z);
+"never falls except at a restart" was wrong. At +32 MB/h it reaches OOM #1's
+1,637 MB in ~23h uptime, which deploys normally pre-empt.
+
 **CORRECTED `[2026-09-02]`: the `+488.7 MB` below is POST-RESTART WARM-UP.** Both
 readings sit inside the first 12 min after a restart. Lane
 `book-quotes-publish-clobber`'s independent watch shows unreclaimable ramping to

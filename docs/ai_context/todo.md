@@ -484,6 +484,44 @@ route".** Start with what the web process runs off the request path.
 under master 62), `SYNDICATE_REQUEST_MEMORY_PROFILE` **deleted** (readback 404,
 zero attribution lines since), deploy claim released. `deploys.md` 2026-09-02.
 
+**THE OWED SAME-INSTANT READ IS TAKEN `[2026-09-02 14:19Z]`, and it settles the
+instrument question and corrects two of my own claims.**
+
+**(a) The two metrics are the SAME QUANTITY.** They do not need correlating:
+`container_memory_payload` builds `memory_anon_mb` and `memory_unreclaimable_mb`
+from **one** `memory.stat` read, so any single `CONTAINER_MEMORY` line is already
+a same-instant sample. Over 15 samples:
+
+    anon 1158.0-1163.7 MB   unreclaimable 1162.7-1169.3 MB
+    gap 4.7-5.4 MB = 0.4-0.5% of anon, every sample
+
+That is analytic, not coincidence: `_unreclaimable_bytes` is
+`max(anon + shmem + slab_unreclaimable, current - reclaimable_file)`, so it is
+`anon` plus a few MB of shmem/slab here. **Their `unreclaimable` numbers and my
+`anon` numbers are directly comparable; subtract ~5 MB.**
+
+**(b) POST-WARM-UP GROWTH IS `+32 MB/h`, and the plateau was a WINDOW not a
+ceiling.** Web has been up since **05:24:25Z** (my deploy), so this series is
+8.0h of steady state with no restart in it:
+
+    06:16Z  906.6      09:17Z  899.9      12:17Z 1174.5
+    07:17Z  898.4      10:19Z  980.2      13:16Z 1117.8
+    08:18Z  916.6      11:17Z 1003.7      14:19Z 1163.7   = +32.0 MB/h
+
+The peer's plateau (unreclaimable 861.8-894.9) matches the **06:00-09:00** part
+of this exactly. It was real for their window and it did not hold: the climb
+resumed and anon is now **1,163.7 MB = 57% of 2,048** at 8.9h uptime.
+
+**(c) CORRECTION TO MY OWN CLAIM: anon DOES fall without a restart.** I wrote
+"never falls except at a restart" twice. This series falls **-57 MB** between
+12:17Z and 13:16Z, and -17 MB between 08:18Z and 09:17Z, with no restart. It is a
+noisy upward drift, not a monotonic ratchet.
+
+**WHY THE OOMs STILL FIT.** At +32 MB/h from ~900 MB, anon reaches the 1,637 MB
+seen at OOM #1 in roughly **23 hours of uptime**. Web rarely lives that long
+because deploys keep restarting it — which is the masking effect this item
+already records, now with a rate that makes it arithmetic rather than a story.
+
 **STILL NOT ESTABLISHED, and this is where to start:** WHAT leaks. The shape is
 established, the cause is not, and naming one from the shape would be exactly
 the mistake `learnings.md` forbids. Two candidates the log context suggests and
