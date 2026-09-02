@@ -238,3 +238,25 @@ def test_unpatterned_body_export_still_excludes_export_only_families(client) -> 
     )
     assert response.status_code == 200
     assert EXPORT_ONLY_SAMPLES[0] in response.get_json()["artifacts"]
+
+
+def test_binary_artifact_gets_an_actionable_415_not_a_500(client) -> None:
+    """`export?path=` returns a JSON envelope of DECODED TEXT, so a binary
+    artifact cannot cross it. Making the gzipped `feed_live` family readable
+    reached this branch for the first time and it answered HTTP 500 in
+    production -- which reads as "the server is broken" when the truth is
+    "wrong transport, and there is a right one"."""
+    test_client, root = client
+    target = root / FEED_LIVE_SAMPLE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff")  # gzip magic
+
+    response = test_client.get(f"/api/ops/artifacts/export?path={FEED_LIVE_SAMPLE}", headers=AUTH)
+    assert response.status_code == 415, response.get_data(as_text=True)
+    payload = response.get_json()
+    assert payload["transport"] == "/api/ops/artifacts/stream", "the error must name the right transport"
+
+    # ...and that transport serves it.
+    response = test_client.get(f"/api/ops/artifacts/stream?path={FEED_LIVE_SAMPLE}", headers=AUTH)
+    assert response.status_code == 200
+    assert response.get_data().startswith(b"\x1f\x8b"), "bytes, not decoded text"

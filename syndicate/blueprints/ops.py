@@ -2214,6 +2214,25 @@ def api_ops_artifacts_export() -> Any:
             if since_epoch is not None and target.stat().st_mtime < since_epoch:
                 return jsonify({"ok": True, "count": 0, "artifacts": {}})
             return jsonify({"ok": True, "count": 1, "artifacts": {exact_path: target.read_text(encoding="utf-8")}})
+        except UnicodeDecodeError:
+            # This branch returns a JSON envelope of DECODED TEXT, so a binary
+            # artifact cannot cross it. `#625`(2) made the gzipped `feed_live`
+            # family readable and thereby reachable here for the first time,
+            # and it answered HTTP 500 -- which reads as "the server is broken"
+            # when the truth is "wrong transport, and there is a right one".
+            # `stream` sends bytes via send_file and serves these correctly
+            # (verified 2026-09-02: 111,585 bytes, gunzips to a real payload).
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "artifact is not UTF-8 text; use /api/ops/artifacts/stream for binary artifacts.",
+                        "path": exact_path,
+                        "transport": "/api/ops/artifacts/stream",
+                    }
+                ),
+                415,
+            )
         except Exception as exc:
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 

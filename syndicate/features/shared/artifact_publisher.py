@@ -992,19 +992,30 @@ def is_hot_artifact_relative_path(relative_path: str) -> bool:
 # DISK, which no allowlist can prevent** -- so this family may be read, and must
 # never be published. `tests/test_export_only_patterns.py` asserts both.
 #
-# **BOTH ENTRIES ARE CURRENTLY INERT, AND THAT IS STATED RATHER THAN DISCOVERED
-# LATER.** Web holds ZERO files matching either (measured 2026-09-02). Neither
-# is under a `BOOTSTRAP_ROOT` reachable path that produced anything, and nothing
-# publishes them -- by design. This is the `#208` situation the `live_momentum_*`
-# entry above already documents: **allowlisting PERMITS a transfer, it does not
-# make one happen**, and `export` returning `count: 0` here means "never
-# captured", not "capture is broken". What would make each live:
-#   - prop-history CSVs: a producer that publishes them, which is safe -- they
-#     carry no `#413`-style hazard, they are just not sent today.
-#   - `feed_live`: NOTHING SHOULD, until `_mlb_feed_live_payload` gates on
-#     FRESHNESS instead of presence. That is the deeper fix `board_enrichment`
-#     already names; until it lands, mirroring this family through web is
-#     unsafe at any allowlist setting.
+# **BOTH ENTRIES ARE LIVE, AND I PREDICTED THE OPPOSITE.** Measured on
+# production immediately after this shipped (web `8da0eddc`, 2026-09-02):
+#
+#     feed_live      146 files   16,721,077 bytes   11 dates, 2026-06-14..06-25
+#     props_history   18 files   11,142,087 bytes   MLB + soccer
+#
+# I had written that both were absent from web, on the strength of an inventory
+# taken BEFORE the split -- an inventory that could not see them precisely
+# because they were not allowlisted. **That is the 403-vs-absent confusion this
+# very file warns about twice, made while writing the fix for it.** They were
+# invisible, not absent; `bootstrap_data_root` seeds the git-tracked copies onto
+# web's disk at boot, and `data/mlb_source/source_artifacts` is a BOOTSTRAP_ROOT.
+# So this list is not an allowlist-ahead-of-a-producer (`#208`) after all -- it
+# unlocked ~28 MB of artifacts that were already sitting there unreadable.
+#
+# **`#413` IS NOT ARMED, and that was checked rather than hoped.** Every
+# `feed_live` file on web is from 2026-06-14..06-25 -- the git-tracked window,
+# most recent 69 days old. The trap needs a file for a date somebody is watching
+# LIVE, and nothing writes current-date `feed_live` to web. It stays a live
+# hazard for any future producer, which is why this family is read-only here.
+#
+# Binary note: these are `.json.gz`. `export?path=` returns a JSON envelope of
+# DECODED TEXT and answers 415 pointing at `stream`; `stream` serves them
+# correctly (verified: 111,585 bytes, gunzips to a real StatsAPI payload).
 EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # Raw StatsAPI feed_live. READ-ONLY IS LOAD-BEARING: see `#413` above.
     # Never add this to HOT_ARTIFACT_PATTERNS.
