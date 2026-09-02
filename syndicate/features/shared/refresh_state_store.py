@@ -200,7 +200,33 @@ _KEYVALUE_RUN_SCOPED_TTL_SECONDS = 2 * 24 * 60 * 60  # 2 days
 # which exists precisely so lane discovery works on the keyvalue backend), and
 # refresh_status + live_refresh_loop together were 4.4MB -- they are not the
 # problem and removing them would break a working path.
-_KEYVALUE_EXCLUDED_PATH_MARKERS = ("migration_runs/",)
+_KEYVALUE_EXCLUDED_PATH_MARKERS = (
+    "migration_runs/",
+    # `#637`, 2026-09-02. `reports/intelligence/venue_odds/` was 41 keys holding
+    # 114.9 MB of a 224.3 MB store -- 51% of the whole instance, on a 256 MB plan
+    # that was at 93% and evicting. Measured, with the reader traced: NOTHING
+    # reads these files. The only read is `record_daily_odds`'s own
+    # read-modify-write of the file it is about to write; both external importers
+    # take write paths only. It is a deliberate capture-first archive whose
+    # consumer was never built.
+    #
+    # A write-only archive does not belong in a small shared cache, and it had
+    # grown big enough to break its own writes against the 8 MB ceiling (`#638`,
+    # 3,192 refused writes in 40 hours). Disk has no such ceiling and no
+    # contention with live operational state.
+    #
+    # TWO CONSEQUENCES, BOTH DELIBERATE:
+    #  - Disk is PER-SERVICE, so refresh-worker and live-odds-worker now keep
+    #    separate accumulations instead of one shared key. That is not a
+    #    regression: two services doing read-modify-write on ONE key without a
+    #    lock already lose each other's updates. This turns one raced record into
+    #    two coherent ones.
+    #  - `reports_root()` is `/opt/render/project/data/reports` on Render -- the
+    #    MOUNTED disk, verified against the live `SYNDICATE_REPORTS_ROOT` -- so
+    #    these survive a deploy. This exclusion would be wrong for any path that
+    #    resolves inside the ephemeral checkout.
+    "/intelligence/venue_odds/",
+)
 
 
 def _keyvalue_backed(path: Path) -> bool:
@@ -457,6 +483,44 @@ def read_json_file_result(path: Path) -> tuple[dict[str, Any] | None, bool]:
     except Exception:
         return None, False
     return (payload if isinstance(payload, dict) else None), True
+
+
+def read_json_keyvalue_copy(path: Path) -> dict[str, Any] | None:
+    """Read a path's KEYVALUE copy even when that path now routes to disk.
+
+    `#637`. Exists for exactly one situation: a path has just been moved OUT of
+    the keyvalue store by `_KEYVALUE_EXCLUDED_PATH_MARKERS`, and its accumulated
+    history is still sitting in Redis under the old key. Without this, the first
+    disk write starts from nothing -- and for an accumulator that records
+    "opening on first sight", starting from nothing does not lose data quietly,
+    it INVENTS it: every market's `opened_at` becomes the migration moment and
+    reads forever after as though the book opened then. Wrong data is worse than
+    absent data.
+
+    Deliberately NOT wired into `read_json_file`. That function routes by
+    `_keyvalue_backed` precisely so read and write cannot disagree, and a silent
+    fallback there would reintroduce the split it exists to prevent. A caller
+    that wants the old copy asks for it BY NAME, once, and writes the result to
+    the new home.
+
+    Returns None when the backend is not keyvalue, when the key is absent, or on
+    any error -- a migration aid must never be the reason a write fails.
+    """
+    if _state_backend_kind() != "keyvalue":
+        return None
+    try:
+        payload_text = _execute_keyvalue_operation(
+            lambda client: client.get(_state_key_for_path(path))
+        )
+    except Exception:
+        return None
+    if not payload_text:
+        return None
+    try:
+        payload = json.loads(str(payload_text))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def read_text_file(path: Path) -> str | None:

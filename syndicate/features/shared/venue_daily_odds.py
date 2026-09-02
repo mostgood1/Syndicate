@@ -278,6 +278,34 @@ def record_daily_odds(
         state = read_json_file(path) or {}
     except Exception:
         state = {}
+    # `#637`. ONE-TIME HYDRATION ACROSS THE MOVE OFF KEYVALUE. These files used
+    # to live in Redis; the disk copy starts empty. For an accumulator whose
+    # openings are captured on FIRST SIGHT, an empty start does not lose the
+    # history quietly -- it rewrites every `opened_at` to now and reads forever
+    # after as though the book opened at the migration. So when there is no disk
+    # state, look ONCE for the old keyvalue copy and carry it over.
+    #
+    # Self-limiting: the first successful write creates the disk file, after
+    # which `state` is truthy and this never runs again for that file. For a
+    # genuinely new (venue, sport, date) the old key is simply absent and this
+    # costs one GET.
+    if not state:
+        try:
+            from syndicate.features.shared.refresh_state_store import (
+                read_json_keyvalue_copy,
+            )
+
+            carried = read_json_keyvalue_copy(path)
+        except Exception:
+            carried = None
+        if isinstance(carried, dict) and carried.get("markets"):
+            state = carried
+            print(
+                f"[venue_daily_odds] HYDRATED_FROM_KEYVALUE venue={venue} "
+                f"sport={sport} game_date={str(game_date or '')[:10]} "
+                f"markets={len(carried.get('markets') or {})}",
+                flush=True,
+            )
     markets: dict[str, Any] = state.get("markets") or {}
 
     opened = appended = unchanged = unpriced = skipped = trimmed_points = 0

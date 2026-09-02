@@ -1391,9 +1391,15 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   run this writer and does not need the deploy. **True total 3,192 / ~40h across
   two services**, and the deploy is therefore BOTH workers, not one.
 - Files: `syndicate/features/shared/venue_daily_odds.py`,
-  `tests/test_venue_daily_odds.py`. Checked against every OPEN lane: neither is
-  claimed. `refresh_state_store.py` is deliberately NOT claimed and NOT edited —
-  the ceiling it enforces is correct and stays.
+  `tests/test_venue_daily_odds.py`, and — **CLAIMED 2026-09-02 ~18:4xZ for `#637`,
+  user asked to move `venue_odds` off keyvalue** —
+  `syndicate/features/shared/refresh_state_store.py`,
+  `tests/test_refresh_state_store.py`, `tests/test_ops_live_lens_status.py`
+  (the exclusion-list pin only). Checked against every OPEN lane: none of
+  the five is claimed; the only other mention of `refresh_state_store.py` in this
+  file is this lane's own earlier note saying it was deliberately not taken.
+  **The CEILING it enforces is still correct and is NOT changed** — the move takes
+  `venue_odds` out from under the ceiling rather than raising it.
 - Hypothesis: the caps cannot prevent the rejection because they bound COUNTS
   (`MAX_POINTS_PER_MARKET=48`, `MAX_MARKETS_PER_FILE=8000`) while the guard
   bounds BYTES. A trim that measures the serialized payload and shrinks until it

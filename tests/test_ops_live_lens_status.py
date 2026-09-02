@@ -106,10 +106,39 @@ class TestTheAllowlistFixWouldHaveBeenInert:
         with patch.object(store, "_state_backend_kind", return_value="keyvalue"):
             assert store._keyvalue_backed(path) is True
 
-    def test_only_migration_runs_is_excluded_from_keyvalue(self):
+    def test_no_exclusion_marker_matches_the_tick_path(self):
+        """THE ACTUAL INVARIANT this class protects. Asserted against the tick
+        path itself rather than against the literal contents of the list.
+
+        `#637`, 2026-09-02: this used to read
+        `_KEYVALUE_EXCLUDED_PATH_MARKERS == ("migration_runs/",)` and it failed
+        when `venue_odds` was moved to disk -- an addition that has nothing to do
+        with the tick file. An exact-tuple lock fires on every unrelated change,
+        so it trains the next reader to update the literal without checking
+        whether the guarantee still holds. This asks the question the docstring
+        actually cares about.
+        """
+        from syndicate.features.shared import refresh_state_store as store
+        from syndicate.features.shared.live_lens_loop import _meta_dir
+
+        normalized = store._normalize_state_path(_meta_dir() / "latest_live_lens_tick.json")
+        matched = [m for m in store._KEYVALUE_EXCLUDED_PATH_MARKERS if m in normalized]
+        assert matched == [], f"the tick path is now disk-backed via {matched}"
+
+    def test_the_exclusion_list_is_still_the_known_set(self):
+        """The tripwire is KEPT, not deleted -- every exclusion takes a path out
+        of the shared store and away from cross-service reads, so a silent
+        addition should be noticed. Adding one here is fine; doing it without
+        reading the sibling test above is not.
+        """
         from syndicate.features.shared.refresh_state_store import _KEYVALUE_EXCLUDED_PATH_MARKERS
 
-        assert _KEYVALUE_EXCLUDED_PATH_MARKERS == ("migration_runs/",)
+        assert set(_KEYVALUE_EXCLUDED_PATH_MARKERS) == {
+            "migration_runs/",
+            # `#637`: 41 keys / 114.9MB of a 224.3MB store, no reader, and it had
+            # grown past the 8MB write ceiling. Moved to disk.
+            "/intelligence/venue_odds/",
+        }
 
     def test_stream_endpoint_still_refuses_the_tick_path(self, client):
         """Belt and braces: the artifact route must not start serving it by

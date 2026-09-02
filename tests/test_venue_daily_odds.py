@@ -623,3 +623,97 @@ def test_trimmed_to_fit_is_reported_even_when_FALSE(monkeypatch):
     fits' from 'this build does not have the trim'."""
     report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row("m1")])
     assert report["trimmed_to_fit"] is False
+
+
+# --------------------------------------------------------------------------
+# `#637` -- venue_odds lives on DISK, not in the shared keyvalue store
+# --------------------------------------------------------------------------
+
+
+def test_a_venue_odds_path_is_NOT_keyvalue_backed_even_on_the_keyvalue_backend(monkeypatch):
+    """The whole point of #637: 41 of these keys held 114.9MB of a 224.3MB
+    store, on a 256MB plan at 93%, and nothing reads them."""
+    from syndicate.features.shared import refresh_state_store as store
+
+    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "keyvalue")
+    assert store._keyvalue_backed(mod.daily_odds_path("kalshi", "ncaaf", "2026-09-05")) is False
+
+
+def test_a_SIBLING_intelligence_path_is_still_keyvalue_backed(monkeypatch):
+    """SCOPED. The exclusion must take `venue_odds` out and leave the rest of
+    `reports/intelligence` -- which IS read cross-service -- where it was."""
+    from syndicate.features.shared import refresh_state_store as store
+
+    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "keyvalue")
+    sibling = store.reports_root() / "intelligence" / "kalshi_markets.json"
+    assert store._keyvalue_backed(sibling) is True
+
+
+def test_read_and_write_AGREE_after_the_exclusion(monkeypatch):
+    """`_keyvalue_backed` is documented as the one predicate both sides use so
+    they cannot disagree -- a split sends writes to disk and reads to Redis and
+    reads as 'the artifact vanished'. Pin that they still agree."""
+    from syndicate.features.shared import refresh_state_store as store
+
+    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "keyvalue")
+    path = mod.daily_odds_path("kalshi", "ncaaf", "2026-09-05")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    store.write_json_file(path, {"markets": {"m1": {"opening_yes": 0.4}}})
+    assert path.is_file(), "write did not land on disk"
+    assert store.read_json_file(path) == {"markets": {"m1": {"opening_yes": 0.4}}}
+
+
+def test_the_old_keyvalue_copy_is_CARRIED_OVER_so_openings_are_not_reinvented(monkeypatch):
+    """An accumulator that captures the opening on FIRST SIGHT does not fail
+    quietly when it starts empty -- it rewrites every `opened_at` to the
+    migration moment. Wrong data, not absent data."""
+    carried = {
+        "markets": {
+            "m1": {"market": "h2h", "family": "KXTEST", "opened_at": "2026-08-20T00:00:00Z",
+                   "opening_yes": 0.11, "opening_no": 0.89, "points": []},
+        }
+    }
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.read_json_keyvalue_copy",
+        lambda path: carried,
+    )
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row("m1", yes=0.6, no=0.4)])
+    assert report["status"] == "ok"
+    # NOT re-opened: the market was already known, so this is an append.
+    assert report["opened"] == 0
+    assert report["appended"] == 1
+    from syndicate.features.shared.refresh_state_store import read_json_file
+    state = read_json_file(mod.daily_odds_path("kalshi", "mlb", "2026-08-25"))
+    assert state["markets"]["m1"]["opened_at"] == "2026-08-20T00:00:00Z"
+    assert state["markets"]["m1"]["opening_yes"] == 0.11
+
+
+def test_hydration_runs_ONCE_and_not_on_every_tick(monkeypatch):
+    """Self-limiting by design: once the disk file exists the old copy must
+    never be consulted again, or a stale Redis copy would keep resurrecting."""
+    calls = {"n": 0}
+
+    def _copy(path):
+        calls["n"] += 1
+        return {"markets": {"m1": {"opened_at": "2026-08-20T00:00:00Z",
+                                   "opening_yes": 0.11, "points": []}}}
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.read_json_keyvalue_copy", _copy
+    )
+    mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row("m1", yes=0.6, no=0.4)])
+    assert calls["n"] == 1
+    mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row("m1", yes=0.7, no=0.3)])
+    assert calls["n"] == 1, "the old keyvalue copy was consulted again after the disk file existed"
+
+
+def test_a_brand_new_file_with_no_old_copy_is_unaffected(monkeypatch):
+    """No old key: hydration is a no-op and the opening is recorded now, which
+    for a genuinely new market is CORRECT."""
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.read_json_keyvalue_copy",
+        lambda path: None,
+    )
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row("m9")])
+    assert report["status"] == "ok"
+    assert report["opened"] == 1
