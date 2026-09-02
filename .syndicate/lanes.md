@@ -1610,6 +1610,50 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   them to the READ side only, and a test asserts it.
 - Blocked by: none. **NEEDS A WEB DEPLOY to verify (b)** — the endpoint runs on
   web. Unlike `#625`(5), this item does contend for the deploy queue.
+### soccer-anchor-audit-artifact — CLOSED 2026-09-02 — opened 2026-09-02 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **GOAL MET, VERIFIED END TO END ON REAL BUILDS (`cddd748c`). `recommendations_{date}.json` now carries an `anchor` block whose `state` takes one of five named values; all three reachable states read back out of the WRITTEN JSON: `odds_absent`; `disabled` with attached=2/2, priced_events=20, by_stage={event_id:0, exact_pair:2, fuzzy:0} (production's actual state); `anchored` with teams_resolved=4, teams_unresolved=0, elapsed_s=126.2. Path confirmed against `HOT_ARTIFACT_PATTERNS`, so unlike the log line this REACHES WEB. 13 tests pass. NOT DEPLOYED — a refresh-worker deploy is owed before any production reading.**
+- Goal: the soccer anchor's audit becomes a FIELD in
+  `recommendations_{date}.json`, so its state is readable in production at all.
+  Today `ops_refresh.py:1402` launches every refresh unit with
+  `stdout=DEVNULL`, and a discriminating control (7 units demonstrably ran;
+  every child token 0 log matches incl. `player projections`, parent token 5)
+  shows NO child output reaches Render. Every `[soccer_anchor]` line is
+  discarded, so "no odds", "disabled", "nothing priced" and "worked" are one
+  indistinguishable silence.
+- Files: scripts/build_soccer_artifacts.py, tests/test_soccer_anchor_wiring.py.
+- **CLAIM CONFLICT, SURFACED AND OVERRIDDEN BY THE USER
+  `[user: "publish the anchor audit into the recommendations artifact"]`.**
+  `scripts/build_soccer_artifacts.py` is claimed by lane `soccer-anchor-wiring`
+  (session 3492626c). That claim exists ONLY in **4 commits sitting unpushed in
+  the shared primary tree** (`adf0d3b9` "ledger: sync the shared tree — SIX
+  sessions' blocks"); at `origin/main` the block does not exist and both lanes
+  that name this file mark it `released:`. Verified `block=0` in all 12 recent
+  commits touching lanes.md, INCLUDING ones predating this session — so it was
+  never dropped by me, it was never pushed. Session 3492626c is neither running
+  nor archived in the visible roster. The lane is NOT being closed or
+  reassigned (2026-09-01 rule); only this file is taken, for the direct
+  continuation of what that lane built.
+- Hypothesis: n/a (making a built mechanism observable).
+- Falsification test: if the published block cannot distinguish `odds_absent`
+  from `disabled` from `anchored`, it has reproduced the silence it replaces
+  in a new location and is worthless.
+- Verification: `recommendations_{date}.json` carries an `anchor` block whose
+  `state` takes a named value, plus attach counts, the by-stage split and
+  `teams_resolved`/`teams_unresolved`; asserted by a test that builds the
+  artifact at weight 0 AND weight > 0 and reads different `state` values.
+- DOES NOT arm anchoring. Weight stays 0.0; the block must publish correctly
+  WHILE DISABLED, which is the state production is actually in — and the
+  `disabled` run above is exactly that reading.
+- Verification RAN: three real `build_soccer_artifacts.py` runs, field read back
+  from the written artifact each time; the four states are asserted DISTINCT by
+  test, not merely present. `teams_changed == teams_resolved == 4` on the armed
+  run — pre-fix those diverged, so their agreement is the join working.
+- Also landed: a `simulations` test seam on `_apply_market_anchor` (omitted when
+  None, so the production call is byte-identical). Suite 310s → 140s.
+- CLAIMS RELEASED: `scripts/build_soccer_artifacts.py`,
+  `tests/test_soccer_anchor_wiring.py`.
+- OWED: a refresh-worker deploy, then read `anchor.state` off a production
+  artifact via `/api/ops/artifacts/export`. Until then this is LANDED, not LIVE.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

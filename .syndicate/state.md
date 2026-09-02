@@ -244,7 +244,18 @@ evidence: `.syndicate/findings_2026-09-02_soccer_anchor_cost.md`.
 - **§4.4 is SMALL here, measured:** the anchor shifts the `expected_shots` LEVEL
   by **0.36%** against `shot_calibration`'s divisor whose own cross-window drift
   is ±8%. Re-fit AFTER arming, not before.
-- **NO PRODUCTION READING OF THIS MECHANISM IS POSSIBLE TODAY.**
+- **FIXED, LANDED, NOT DEPLOYED (`cddd748c`): the audit is now a FIELD in
+  `recommendations_{date}.json`.** `anchor.state` takes one of five named values
+  (`odds_absent`, `odds_unreadable`, `disabled`, `no_priced_fixtures`,
+  `anchored`) beside attach counts, the by-stage split and
+  `teams_resolved`/`teams_unresolved`. Verified end to end on three real builds
+  by reading the WRITTEN artifact: `disabled` with attached=2/2 and
+  `by_stage={event_id:0, exact_pair:2, fuzzy:0}` — production's actual state,
+  and a working feed plus a disarmed mechanism reads differently from a missing
+  feed. Path matches `HOT_ARTIFACT_PATTERNS`
+  (`soccer_source/*/api/recommendations/recommendations_*.json`), so it reaches
+  web. **A refresh-worker deploy is owed before any production reading.**
+- **WHY THE LOG LINE COULD NEVER SERVE:**
   `ops_refresh.py:1402` launches units with `stdout=DEVNULL`, so every
   `[soccer_anchor]` line is discarded. Control: every child-process token
   returns 0 log matches (incl. `player projections`, printed on every success)
