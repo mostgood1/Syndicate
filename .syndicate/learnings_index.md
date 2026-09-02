@@ -1,6 +1,7 @@
 <!-- LEARNINGS-INDEX:START -->
 
 ## Index — 729 rules `[generated]`
+## Index — 688 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -9,6 +10,7 @@
 > `[evidence]` have their body in `learnings_evidence.md`.
 
 **FORBIDDEN — 251**
+**FORBIDDEN — 223**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -187,6 +189,10 @@
 - [2026-09-03 FORBIDDEN: choosing the READ-only allowlist because "nothing serves this". T…](#2026-09-03-forbidden-choosing-the-read-only-allowlist-because-nothing-serves-this-the-test-is-whether-there-is-a-serving-hazard-export-only-makes-a-family-readable-if-present-and-if-nothing-publishes-it-the-entry-does-nothing-at-all-lane-worker-artifact-transport)
 - [2026-09-03 — FORBIDDEN: a comparative claim from ONE run per condition. I published a 4…](#2026-09-03-forbidden-a-comparative-claim-from-one-run-per-condition-i-published-a-40-effect-ruled-out-four-mechanisms-for-it-and-three-paired-replications-erased-it-lane-intelligence-suite-runtime)
 - [2026-09-03 — FORBIDDEN: instrumenting a COMPONENT when the contradiction is between two…](#2026-09-03-forbidden-instrumenting-a-component-when-the-contradiction-is-between-two-numbers)
+- [2026-09-02 — FORBIDDEN: calling a job "bounded" because something downstream of it is c…](#2026-09-02-forbidden-calling-a-job-bounded-because-something-downstream-of-it-is-capped-a-cap-on-the-output-cannot-bound-the-working-set-that-produced-it-and-a-cap-that-reports-a-count-is-not-a-bound-until-you-check-which-container-it-counted-lane-accuracy-summary-alloc-profile)
+- [2026-09-02 — FORBIDDEN: arming a periodic job on refresh-worker on the strength of a bo…](#2026-09-02-forbidden-arming-a-periodic-job-on-refresh-worker-on-the-strength-of-a-bound-that-does-not-bound-memory-lane-soccer-anchor-wiring)
+- [2026-09-02 FORBIDDEN: trusting a FILTER, EXCLUSION or ALLOW rule that has never been sh…](#2026-09-02-forbidden-trusting-a-filter-exclusion-or-allow-rule-that-has-never-been-shown-to-match-something-two-inert-rules-in-one-file-both-reading-as-correct-lane-m625-replay-diff-gate)
+- [2026-09-02 FORBIDDEN: reporting a clean result for anything a bounded scan did not reac…](#2026-09-02-forbidden-reporting-a-clean-result-for-anything-a-bounded-scan-did-not-reach-a-cap-on-recording-must-never-become-a-cap-on-traversal-lane-m625-replay-diff-gate)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -271,6 +277,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
 **Rules and corrections — 473**
+**Rules and corrections — 460**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -435,6 +442,8 @@
 - [2026-09-03 REQUIRED: before proposing to ARCHIVE or DATE anything in this repo, check w…](#2026-09-03-required-before-proposing-to-archive-or-date-anything-in-this-repo-check-whether-the-path-is-keyvalue-backed-and-price-it-the-live-lens-snapshot-is-a-4-mb-redis-key-on-a-60s-tick----dating-it-would-have-written-576-gbday-into-a-256-mb-store-lane-mlens-snapshot-dating)
 - [2026-09-02 REQUIRED: when a sign test and a t-statistic DISAGREE, believe neither until…](#2026-09-02-required-when-a-sign-test-and-a-t-statistic-disagree-believe-neither-until-you-have-found-the-clustering-mine-said-p00027-and-t-128-on-the-same-rows-lane-soccer-anchor-cost-6223)
 - [2026-09-03 REQUIRED: when a sign test says p=0.0000 and the t says -1.06, publish BOTH…](#2026-09-03-required-when-a-sign-test-says-p00000-and-the-t-says--106-publish-both-the-direction-and-the-magnitude-are-different-findings-and-only-one-of-them-decides-anything-lane-soccer-anchor-cost-6223)
+- [2026-09-02 — RULE: TWO WRITERS IS A PRECONDITION FOR HARM, NOT HARM. And "fix all N con…](#2026-09-02-rule-two-writers-is-a-precondition-for-harm-not-harm-and-fix-all-n-contested-paths-is-the-wrong-instinct-when-the-paths-are-rebuilt-rather-than-accumulating-lane-book-quotes-publish-clobber)
+- [2026-09-02 — RULE: a WATCHER carries the assumptions it was armed with, and those expir…](#2026-09-02-rule-a-watcher-carries-the-assumptions-it-was-armed-with-and-those-expire-re-read-the-world-before-acting-on-what-a-watcher-tells-you-lane-soccer-anchor-wiring)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

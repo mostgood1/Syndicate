@@ -2418,6 +2418,31 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   proves nothing); (c) `migration_gate.py --json` carries a `replay_diff` block
   whose absent case is reported as UNKNOWN, not folded into `ok`.
 - Blocked by: none. Needs NO deploy — it never contends for the deploy queue.
+- **RESULT 2026-09-02 — GOAL MET. Commit `dcf4d29a` on `session/m625-replay-diff-gate`
+  (landed, needs no deploy). All three verification criteria discharged:**
+  - (a) `py -3 scripts/replay_diff_gate.py --date 2026-09-01` → **PASS**,
+    manifest `8d5c42ba8cb18c34`: **280,840 leaves exact, 58,335 clock-derived
+    fields within 0.1s of one shared 3.6s offset, 0 mismatches** against
+    production's own `book_grid_2026-09-01.json` (12.75 MB), running the REAL
+    `run_refresh_worker:_run_book_grid_artifact_tick`, 0 outbound attempts.
+  - (b) `--perturb` drops ONE line from the 163 MB tape; the gate FAILS on
+    exactly 8 fields (that cell's price/observed_at/age/lag, the consensus, the
+    best-cell edge, both shard counters). **The gate has been observed to fail.**
+  - (c) `migration_gate.py` reports `Replay-diff: UNKNOWN` when there is no
+    fixture and its `ok` uses `is not False`, so NO_FIXTURE can never pass.
+    13 new tests + the 16 existing `test_migration_gate.py` tests pass.
+- **HYPOTHESIS HELD, with one correction.** Every defect class named is
+  observable offline — but the falsification test FIRED on two blocks and they
+  are recorded as UNREPLAYABLE, not fixed: `live/mlb_live_lens.json` is
+  NON-DATED and mutable (no historical value exists; web holds zero `live/*`
+  though it is allowlisted), and `game_state.chips` needs D+1's slate while D's
+  grid is built DURING D+1 (`D+1 settled first` FALSE on 9 of 9 dates).
+- **THE FILE-CLAIM NOTES ABOVE ARE NOW STALE, deliberately not rewritten:**
+  `book-quotes-publish-clobber` and `accuracy-summary-alloc-profile` both CLOSED
+  during this session, so `todo.md` and `artifact_publisher.py` are free.
+  `todo.md` was edited (the `#625` section only). `artifact_publisher.py` was
+  NOT touched — `#625`(2) stays out of scope and is recorded in `todo.md`.
+- Full record: `todo.md #625` PROGRESS block. Claims: NONE held; no deploy taken.
 
 ### accuracy-summary-ledger-budget — OPEN, GOAL MET, **BOTH PUBLISHING BLOCKERS FIXED (cross-lane, user-authorised)** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 — **BUILT AND RE-MEASURED OFF vs ON AT PRODUCTION SCALE.** Corpus 831,038,410 B / 8 chunks: budget OFF peak **3,181.1 MiB** (41.2 s), budget ON (90,000,000) peak **344.4 MiB** (7.3 s), accepted 89,967,617 <= budget, coefficient **4.014 in BOTH** — 9.24x reduction, 2,836.7 MiB saved. **The prior extrapolation (3,178 MiB) is now a direct measurement (3,181.1), 0.1% apart.** OFF = 5,014.1 MiB vs a 4,096 ceiling (OOM by 918); ON = 2,221.4 MiB = 54.2% of ceiling. Falsification test PASSED: off != on. 10 new tests, 66 pass across the ledger/summary suites, all 8 pre-existing callers unchanged (budget defaults to None). **DEFECT CAUGHT BY ITS OWN TEST:** the first cut checked the byte limit AFTER consuming the line and read 5,005,916 against a 5,000,000 budget; the bound is now exact. **BOTH BLOCKERS FIXED IN THE SAME SESSION `[user decision: cross-lane edit authorised]`:** `_bounded_accuracy_summary` now publishes `ledger_coverage` and truncates the `segments` LIST (not the mapping's 3 fixed keys), keeping the largest-sample segments. 10 more tests, and all four key assertions VERIFIED TO FAIL against the pre-fix function extracted from HEAD (segments_total 3, truncated False, payload ratio 0.996, coverage None). **NOT RE-ARMED, NOT DEPLOYED.** Record: `todo.md #626`(h) + `state.md [accuracy-autorun-OOM-2026-09-02]`.
 - Goal: implement the CUMULATIVE byte budget measured by lane
