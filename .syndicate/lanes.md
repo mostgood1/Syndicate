@@ -1647,6 +1647,38 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Verification: the two new FORBIDDEN rules and the OOM state block are greppable
   on origin/main.
 - Blocked by: none
+### m625-fleet-runner — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: `todo.md #625` build item (4). A local 3-role fleet runner that starts
+  web / refresh-worker / live-odds-worker with PRODUCTION run-modes, but
+  paper-only, file-or-redis state, replay fetch by default, and per-role memory
+  caps at 2/2/4 GB. Testable outcome: all three roles start locally from a
+  production env snapshot, and the guards are PROVEN to engage rather than
+  assumed — a `doctor` subcommand that refuses to start if they would not.
+- Files: `scripts/fleet_local.py` (NEW), `scripts/_fleet_guard.py` (NEW),
+  `tests/test_fleet_local.py` (NEW).
+- **THE HAZARD THIS ITEM IS REALLY ABOUT, measured from the live env today:**
+  live-odds-worker runs `SYNDICATE_EXECUTION_MODE=live`,
+  `SYNDICATE_EXECUTION_LIVE_ARMED=1`, `SYNDICATE_EXECUTION_ENABLED=1`,
+  `SYNDICATE_EXECUTION_VENUE=kalshi,polymarket` with real `KALSHI_PRIVATE_KEY`
+  and `POLYMARKET_US_PRIVATE_KEY` (both also on refresh-worker), day caps
+  $40/$150. Both workers also carry `SYNDICATE_WEB_PUBLISH_URL` and can POST
+  artifacts onto production web. **So "run the fleet locally with production
+  env" places REAL MONEY ORDERS and writes to production** unless the runner
+  prevents it. Preventing it IS the deliverable.
+- Hypothesis: the existing switches are already fail-safe, so the runner can
+  enforce paper-only with three INDEPENDENT mechanisms rather than one:
+  `execution_mode()` returns PAPER for anything that is not literally `live`
+  (`execution_ledger.py:233`), `live_execution_armed()` needs an explicit
+  truthy value (`:244`), and dropping the venue keys leaves nothing to sign an
+  order with.
+- Falsification test: if a child process can be shown to reach a venue submit
+  path, or to POST to `SYNDICATE_WEB_PUBLISH_URL`, with the runner's guards in
+  place, the design is wrong and no amount of env scrubbing fixes it.
+- Verification: (a) `doctor` proves the guard module is the one that loads and
+  that it refuses a money-armed env; (b) all three roles actually START and are
+  observed running; (c) an outbound connection attempt from a child in replay
+  mode is DENIED and recorded, shown by a test.
+- Blocked by: none. NO DEPLOY — this is local-only tooling.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
