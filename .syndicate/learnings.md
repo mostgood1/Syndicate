@@ -4091,3 +4091,41 @@ dropped `Files:` line silently un-guards those paths, and `lane-guard` reads
 `lanes.md` and nothing else. (4) Deferring a pull is not free -- this one cost a
 backup, a blocked commit, 9 file collisions, 2 conflicts, 19 resurrections and 2
 duplicated lanes. At zero commits behind it is a no-op.
+## 2026-09-01 — FORBIDDEN: counting Render `server_failed` events without reading `reason`. It is not a failure count — one of its three meanings is a HEALTHY DELIBERATE EXIT. `[lane game-market-entry-roi-curve]`
+
+**Measured today, both classes, on two services within one hour of each other:**
+
+    web (srv-d88ahvrbc2fs73eodu30)          2 x server_failed  reason.oomKilled   <- REAL, now todo #632
+    live-odds-worker (srv-d91dpertqb8s73co8lt0)  3 x server_failed  reason.earlyExit   <- HEALTHY BY DESIGN
+
+**The `earlyExit` three are the worker recycling itself on purpose.** Its own log
+line says so, and the code confirms it rather than the log merely suggesting it:
+
+    LIVE ODDS REFRESH WORKER RECYCLING after 22712s uptime to reset accumulated page cache
+    PROCESS_TREE_MEMORY {... "stage": "before_exit" ...}
+
+    scripts/run_live_odds_refresh_worker.py:670
+      SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS, default "21600"  == 6 hours
+    :2186  if uptime_seconds >= max_uptime_seconds: exit
+
+Observed uptimes **22,712s and 23,606s** — 6h18m and 6h33m — which is 6h plus
+the remainder of the in-flight tick, exactly what a post-tick check produces. The
+three exits sat **6h18m / 6h19m / 6h34m after their deploys**, and that
+regularity is the tell: *a crash does not keep a schedule.*
+
+**Render labels a voluntary process exit `server_failed`.** That is a platform
+naming artifact, not a verdict, and a background worker that exits on purpose
+trips it every time.
+
+**How to apply.**
+* **Always read `details.reason`.** `oomKilled`, `earlyExit` and `evicted` are
+  three different events wearing one name, and only the first two are usually
+  present. A count without the reason is a rate of nothing.
+* **Suspect a schedule before a fault.** Three failures at ~6h20m past deploy is
+  a timer. Compute the gap before reaching for a cause.
+* **This retro-justifies refusing to reinterpret a condition.** Lane
+  `boot-sync-healthcheck-kill` closed on the argument that its 2 `server_failed`
+  were OOM and therefore not its health-check mechanism. That argument is now
+  stronger, not weaker: `server_failed` turns out to span at least three causes,
+  so the raw count was never the right instrument for that lane's gate — which
+  is exactly why it was closed on MECHANISM and said so out loud.

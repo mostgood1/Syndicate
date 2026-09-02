@@ -156,6 +156,13 @@ service, 2G limit):**
     window: 24 `deploy_ended` events, oldest event 2026-08-29T18:21:22Z
     every other event in the last 100: build/deploy started+ended, 2 server_available
 
+**COUNT BY `reason`, NOT BY EVENT `[added 2026-09-01]`.** `server_failed` spans at
+least three causes and only these two are OOM. In the same window
+`live-odds-worker` logged **3 x `server_failed` with `reason.earlyExit`**, which
+is that worker **recycling itself on purpose** every 6 hours
+(`SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS` default 21600). **Anyone sizing
+this item off a raw `server_failed` count will inflate it.**
+
 **THIS IS NOT `#566`, AND THE DISTINCTION IS THE WHOLE POINT.** `#566` concluded
 *"there was no memory issue"* — correctly — for the **4096 MB** service over
 2026-08-24..08-26, where the alarming 93-99% readings were `ALL_PROCESS_MEMORY`
