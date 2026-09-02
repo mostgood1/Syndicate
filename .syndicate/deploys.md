@@ -17958,3 +17958,39 @@ page cache, which this merge inflates by reading and writing 50MB+ files.
   749 more markets reach the club stage). **The 34 aliases are SAFE and their
   BENEFIT IS UNMEASURED.** Reading it needs a stable slate and a per-sport
   attempted/resolved rate, not a total. Not claimed either way.
+
+## 2026-09-02 01:5xZ — MEASUREMENT (no deploy): Kalshi soccer club resolution, attempted/resolved rate
+- lane: `kalshi-soccer-club-aliases` (closed; this discharges its OWED measurement). **Offline replay of the deployed join against production data — no deploy, no claim, nothing changed.** Kalshi's 171 open soccer events (its own `/events` API, 9 game series) replayed through `match_event_blob` from the deployed tree, against the board's own soccer fixtures read from `/api/board/layer2-shortlist`.
+- **A/B ON IDENTICAL DATA, the only variable being the 34 aliases:**
+
+      attempted (kalshi soccer events)  171
+      ceiling  (board fixtures)          28   <- NO alias can exceed this
+      resolved WITH the 34 aliases       22   78.6% of ceiling
+      resolved WITHOUT them              21   75.0% of ceiling
+      DELTA attributable to the aliases  +1 event  (+3.6pp of ceiling)
+
+  A/B validity checked rather than assumed: `canonical_team('soccer','Standard')`
+  reads `'standard liege'` with the table and `None` without, so the arms
+  genuinely differ (`_soccer_alias_to_name` is `lru_cache`d and was cleared
+  between runs — without that the two arms are identical by construction).
+- **SO THE ALIASES ARE WORTH +1 EVENT HERE — real, positive, and small.** The
+  earlier claim that their benefit was "unmeasured" is now discharged; the claim
+  that they were harmful (falsification signal, 51->4) stays refuted.
+- **THE BINDING CONSTRAINT IS NOT CLUB RESOLUTION AND THE RATE SAYS SO.** Club
+  resolution now converts **78.6% of everything the board makes reachable**. The
+  ceiling itself is **28 of 171 = 16.4%**: Kalshi lists 171 soccer fixtures and
+  our board carries 28 of them. Further alias work can buy at most 6 more events;
+  board fixture coverage can buy 143.
+- **A METHOD ERROR I MADE AND CAUGHT, recorded because the first number was
+  wrong and confidently so.** My first replay called `match_event_blob` WITHOUT
+  `code_names` and returned `resolved=9, delta=+0`. Production always passes it.
+  Without that map the path is code -> canonical, and NAME aliases can never be
+  consulted — so the experiment could only ever return +0, for a reason that has
+  nothing to do with the aliases. **A replay that does not pass what production
+  passes is not a replay.** Caught by noticing that fixtures which obviously
+  should match (`Gent @ Cercle Brugge KSV` vs Kalshi `CERKAA`) were counted as
+  unresolved while both clubs canonicalised fine.
+- **BOUND: this is a THIN board.** 28 fixtures / 38 soccer rows at ~01:50Z,
+  against 76 fixtures / 485 rows earlier the same evening. The ceiling and the
+  alias delta would both read larger on a fuller slate; the 78.6% conversion is
+  the number least sensitive to that.
