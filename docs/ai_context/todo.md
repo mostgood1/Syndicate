@@ -522,6 +522,61 @@ seen at OOM #1 in roughly **23 hours of uptime**. Web rarely lives that long
 because deploys keep restarting it — which is the masking effect this item
 already records, now with a rate that makes it arithmetic rather than a story.
 
+**THE HUNT FOR THE OFF-REQUEST-PATH ALLOCATOR `[2026-09-02 14:50Z]`. Result: it
+is probably NOT off the request path, and my own "routes are ~2%" needs the
+qualification below.**
+
+**WHAT WEB ACTUALLY RUNS.** Read from the live env block (73 keys) and from an
+hour of its own log stream, not from `render.yaml`:
+
+    SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP  false
+    SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP              false
+    MLB_ENABLE_LIVE_LENS_LOOP                            false
+    MLB_ENABLE_REFRESH_WORKER_AUTORUN                    true   <- ON, but see below
+
+**So the obvious background loops are OFF.** `MLB_ENABLE_REFRESH_WORKER_AUTORUN`
+is true, and **no autorun/launch log line appears on web in 6 hours** — either it
+never fires or it does not log; **unresolved, and worth its own look.**
+
+**THE `#630` MERGE CHILDREN ARE NOT HOLDING MEMORY.** `PROCESS_TREE_MEMORY`
+reports **`child_count: 0` on every one of 16 samples**; the merge subprocesses
+are transient.
+
+**ANON IS THE GUNICORN WORKERS THEMSELVES.** `self_rss` per worker runs
+**591-686 MB**, and there are two workers, against container anon **~1,285 MB**.
+Anon → 2 x worker RSS. The growth is inside the request-serving processes — not
+in children, not in page cache.
+
+**AND `self_rss` OSCILLATES** (610 → 684 → 591 within four minutes), which is the
+same shape as the anon dips and independently confirms that "never falls except
+at a restart" was wrong.
+
+**THE ARITHMETIC THAT REOPENS THE REQUEST PATH.** `/api/ops/artifacts/publish` is
+web's dominant traffic by a wide margin — **1,725/hour measured** (an undercount;
+one 2-minute slice hit the log API's 100-line cap). The attribution run measured
+**0.0710 MB retained per solo publish**. So:
+
+    0.0710 MB/call x 1,725 calls/h  =  122 MB/h of anon churned by publish alone
+    measured steady-state drift      =   32 MB/h
+
+**Publish churns roughly 4x the net drift**, so most of what it allocates is
+returned and the +32 MB/h is a residual on a much larger churn. **That does not
+name publish as the leak. It does mean the request path is NOT eliminated.**
+
+**QUALIFICATION TO THIS ITEM'S OWN "~2%" RESULT, and it is the third time this
+session a ratio has been measured in a window that flattered it.** The 2% was
+`routes 10.5 MB / anon 488.7 MB` — and that denominator is the **post-restart
+warm-up** already retracted above. Against a steady-state denominator the same
+numerator is a much larger share. **The per-route measurements stand; the RATIO
+does not transfer out of its window.**
+
+**THE NEXT MEASUREMENT IS THE SAME INSTRUMENT AT STEADY STATE.** It is landed and
+inert (`97260296`): one single-key PUT of `SYNDICATE_REQUEST_MEMORY_PROFILE=on`
+plus a deploy, **taken when web has been up for hours rather than minutes**, then
+compare `SUM(route total_mb)` against the anon delta over the same window. Do NOT
+re-read the warm-up window. **tracemalloc is NOT the tool** — ruled out
+2026-08-15 (`state.md:556`), it silenced the sampler at nframe=3 and 2.
+
 **STILL NOT ESTABLISHED, and this is where to start:** WHAT leaks. The shape is
 established, the cause is not, and naming one from the shape would be exactly
 the mistake `learnings.md` forbids. Two candidates the log context suggests and

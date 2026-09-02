@@ -709,6 +709,17 @@ readings sit inside the first 12 min after a restart. Lane
 sometimes and THAT excursion is the defect. Instruments differ
 (`unreclaimable` vs `anon`); a same-instant read of both is owed.
 
+**QUALIFIED `[2026-09-02 14:50Z]`: the request path is NOT eliminated.** The "~2%"
+below divides by the **post-restart warm-up** denominator that is itself
+retracted. Measured since: `/api/ops/artifacts/publish` runs **1,725/hour** and
+retains **0.0710 MB/call** → **122 MB/h churned against a 32 MB/h net drift**, so
+most is returned and the drift is a residual on a much larger churn. Also
+established: web's background loops are OFF (intelligence, live-odds, live-lens
+all false), `#630` merge children hold nothing (`child_count: 0` on 16 samples),
+and **anon → 2 x gunicorn worker `self_rss` (591-686 MB each)** — the growth is
+inside the request-serving processes. The per-route numbers stand; the RATIO does
+not transfer out of its window.
+
 **THE LEAK IS NOT IN THE REQUEST PATH `[measured 2026-09-02 at WEB_CONCURRENCY=1]`.**
 Two attribution tables 7m23s apart: anon **270.8 → 759.5 MB (+488.7)** while the
 sum of ALL per-route attributions rose **1.963 → 12.452 MB (+10.5)** — routes
