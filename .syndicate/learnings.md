@@ -4759,3 +4759,66 @@ trust neither, not to pick the one you like.
   best credential scrub available, because a value that was never written cannot
   leak through a deny-list somebody forgot to extend.
 - **Cost:** none directly, but it is what makes a local reading worth anything.
+
+## 2026-09-02 FORBIDDEN: taking a deploy claim or preflight from a SESSION WORKTREE. `deploy-guard.py` reads `$CLAUDE_PROJECT_DIR` — the PRIMARY tree — so worktree locks are invisible and the deploy is blocked with a message that names the wrong lane. `[lane soccer-anchor-audit-artifact]`
+
+**Measured.** Claim acquired and preflight run from
+`C:\tmp\syndicate-sessions\soccer-anchor-cost`, both reporting success. Same
+command, same repo, same second:
+
+    worktree:      refresh-worker  HELD by soccer-anchor-audit-artifact  8.1 min
+    primary tree:  refresh-worker  free
+
+`deploy_claim.py` and `deploy_preflight.py` resolve `.syndicate/deploy/`
+RELATIVE TO CWD, so a worktree gets its own claim directory, its own
+`preflight/` record, and its own `.current-lane.<session>` marker. The guard
+reads none of them. It blocked the deploy and printed `your lane:
+soccer-anchor-cost` — the PRIMARY tree's stale marker from a lane I had closed
+hours earlier — while the worktree's marker said `soccer-anchor-audit-artifact`.
+
+**Why this is worth a rule and not a note.** Every other instruction in this repo
+pushes work INTO a worktree (`session_worktree.py`, "`git add` here touches no
+other session"), so taking the locks there is the obvious move, and both
+commands SUCCEED. Nothing warns you. The failure only surfaces at the guard,
+after the preflight window has started ticking, and its remedy text hands you a
+lane name that is not yours — which is exactly how a claim gets acquired under
+someone else's holder (the 2026-08-19 misattribution).
+
+**How to apply.** Take both locks with `cd` to the PRIMARY tree, and fix
+`.syndicate/.current-lane.<session id>` THERE, not in the worktree. Commit and
+land from the worktree as normal — only the locks are primary-tree-bound. A
+stranded worktree claim releases with its own token from the acquire output; no
+`--force` needed, and `--force` on the wrong tree's claim achieves nothing.
+
+## 2026-09-02 REQUIRED: `deploy_preflight.py` CLEAR means "no job was running when I looked", NOT "no job dies". The old container keeps launching work for the whole build phase. `[lane soccer-anchor-audit-artifact]`
+
+**Measured on a deploy I ran:**
+
+    preflight CLEAR (0 jobs)  22:48:22Z
+    deploy TRIGGERED          22:49:04Z
+    mls|2026-09-05 LAUNCHED   22:52:43Z   <- 219 s AFTER the trigger
+    deploy LIVE (restart)     22:54:26Z
+    -> SOCCER_UNIT_OUTCOME unit=mls|2026-09-05 wrote_since_launch=False
+
+Preflight samples processes at TRIGGER time. Render then builds for ~5.4 minutes
+during which the OLD container is still serving and still starting jobs. On
+refresh-worker a soccer unit launches every ~335 s, so **a 5-minute build window
+is more likely than not to catch one.** The gate is still worth taking — it held
+this deploy through 10 → 7 → 2 → 0 jobs and kept it off an in-flight MLB sim —
+but its guarantee ends at the trigger, not at the restart.
+
+**And the retry protection is weaker than `#353` reads.** I first recorded "the
+killed unit returns in minutes" and had to correct it: `due.sort` keys on
+`_soccer_unit_last_touched` = **max(success, attempt)**, so a unit killed by a
+deploy still stamps `lastAttempt` and sorts LAST among due units. `#356`'s own
+comment says it — *"a unit that just burned a slot simply goes to the back of the
+queue"*. Measured: spacing 300 s, `due` 6-13, one cycle **~30-65 min**; at 16
+minutes after the restart `mls|2026-09-05` had not relaunched while three other
+units took the intervening slots. Bounded (one cycle, not the 4 h interval), but
+the mechanism that stops a FAILING unit hogging slots is the same one that sends
+an innocent KILLED unit to the back.
+
+**How to apply.** Budget the build window as exposure, not as dead time: state
+"CLEAR at trigger; ~N min of build during which jobs may still start" rather than
+"clear to deploy". When a deploy does kill a job, say which one and expect it
+back in one queue cycle, not in minutes.
