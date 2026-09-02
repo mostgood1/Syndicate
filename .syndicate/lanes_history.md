@@ -20872,3 +20872,69 @@ lost no protection and no open lane left the session-start digest.
   documented route to the same 5s budget.
 - Blocked by: none.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-09-01
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### ncaaf-no-orders — **CLOSED 2026-09-01, GOAL MET** (the first zero stage is NAMED with a production reading: 0 of 480 served rows carry `model_edge_pct`, so `portfolio_commit.py:267` refuses every one; the owed CFBD reading was TAKEN and is `#633`) — was OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-29 — session 7b278ebe-b1fa-4ea4-9648-834fb63961b7
+- Goal: name the FIRST stage in the NCAAF chain that is zero, with a production
+  reading rather than a belief.
+- Files: released: `scripts/generate_smartsim2_ncaaf_projections.py`,
+  **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: `syndicate/features/ncaaf/cfbd.py`,
+  released: `syndicate/features/ncaaf/cfbd_backoff.py`,
+  released: `tests/test_cfbd_backoff.py`,
+  released: `scripts/run_refresh_worker.py`,
+  released: `tests/test_season_projection_staleness.py`
+  (the last two added 2026-08-29 by USER OVERRIDE — `exchange-markets-api-integration`
+  released the worker entrypoint; see its Files line.)
+- **THE ORIGINAL GOAL IS DISCHARGED WITH A PRODUCTION READING `[measured 2026-09-01, lane game-market-entry-roi-curve]`, and it names a SECOND gate this block does not.** The chain is alive far past where "zero orders" suggests: `/api/board/layer2-shortlist?sport=ncaaf` serves **480 rows**, `per_sport.ncaaf.selected=480`. **The first stage that is zero is the SIZING input, not the board:**
+
+      model_edge_pct numeric   0 / 480      <- what the sizing path reads
+      model_ev_pct   numeric   0 / 480
+      ev_pct         numeric   480 / 480
+      ev_basis                 market_fair on 480 / 480
+
+  **TWO INTENTIONAL GATES IN SERIES, and this block names only the first.**
+  (1) `football/pick_gate.py` denies the MODEL claim — measured out-of-sample, 2023 SP+ → 2024, n=2,233 clean: model margin MAE **15.775 vs market 12.212, +3.563 at t=+17.20**, losing to the OPEN line by nearly as much and at every scale 6..24. Default is deny; serving requires a recorded WIN.
+  (2) **`portfolio_commit.py:267` refuses any row with no `model_edge_pct` (`no_model_edge_pct`)** — by design: *"a legitimate way to RANK and not a basis on which to SIZE ... Kelly would be exactly zero anyway."* **This is the gate that actually kills NCAAF**, because every served row is `market_fair` basis.
+  **CONSEQUENCE, and it is the useful part:** `pick_gate`'s 2026-08-29 amendment — re-keying the registry to `(sport, market, BASIS)` so a market-basis claim is no longer denied by sharing a key with the model claim — **does not and cannot produce orders on its own.** It un-blocked RANKING; sizing still requires a model edge the gate denies. A board change without a sizing basis is inert in the order path. Same shape as MLB Layer 2 (0/200 `model_edge_pct`, 100% venue-book refusal) in `findings_2026-08-31_mlb_accuracy_assessment.md` section 5.
+  **SO NOTHING IS "BLOCKING" THIS LANE.** Zero NCAAF orders is two deliberate gates working, and it will not change without either a model that beats the close or an explicit decision to size on market basis. That is a PRODUCT decision, not a defect — the same position `#624` step 6 holds for MLB props.
+  **AND IT RESOLVES `ncaaf-settlement-resolver`'s wait:** that lane is not blocked on a bug, it is waiting for a graded NCAAF bet that **cannot arrive while these gates hold.**
+- **THE CFBD READING IS TAKEN AND REHOMED AS `#633` `[2026-09-01]`.** It passes this lane's stated test — backoff retries visible, `SEASON_PROJECTION_LAUNCHING` down to ~1/hour, log not quiet — but the real blocker is the CFBD **monthly quota**, not the 429 rate limit: `QuotaExhausted ... not issuing GET /ppa/teams`, with the NCAAF projection artifact **5.13 days stale and climbing**. `b59ee603` is NOT on `origin/main` by SHA but its CONTENT is (`git cherry` reports it upstream; all three files present, 5 marker lines in `run_refresh_worker.py`) — so nothing was owed on a deploy. **This lane's remaining item is now `#633`; it is no longer orphaned.**
+- **~~SEPARATELY OWED AND NOW APPARENTLY ORPHANED `[measured 2026-09-01, lane game-market-entry-roi-curve]`:** this block's "STILL OWED — the production reading" is about the CFBD **429/backoff**, a different thread. The lane that reclaimed those files, `ncaaf-cfbd-quota-latch`, is **CLOSED and no longer in `lanes.md`**, and **no `todo.md` item mentions `cfbd_backoff`, `SEASON_PROJECTION_RELAUNCH_HELD` or `b59ee603`.** Whoever closes this lane must give that reading a home first or it dies here.
+- **NOTE FOR WHOEVER CLOSES THIS: the lane's ORIGINAL question is answered and
+  is NOT what these commits fix.** Zero NCAAF orders is `pick_gate` denying
+  ncaaf spread/moneyline/total on a measured out-of-sample loss, **working as
+  designed**. Fixing the 429 will NOT produce NCAAF orders. **Do not let these
+  two commits read as a fix for that.**
+- **STILL OWED — the production reading.** Everything else is BENCH evidence.
+  The reading that closes it: after a deploy carrying `b59ee603`, either a
+  `[cfbd_backoff] ... status=429 ... sleeping=` line followed by a run that
+  COMPLETES, or `SEASON_PROJECTION_RELAUNCH_HELD sport=ncaaf` with
+  `SEASON_PROJECTION_LAUNCHING` falling to ~1/hour. **A quiet log is not a
+  pass** — the same trap `#593`'s verification carried.
+- **The CFBD paths in this block were RECLAIMED 2026-08-31** by lane
+  `ncaaf-cfbd-quota-latch`, which shipped the monthly-quota latch and the PPA
+  cache this lane's own analysis proposed.
+- Blocked by: none.
+- Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
+
+### kalshi-soccer-club-aliases — CLOSED 2026-09-02 — **34 ALIASES SHIPPED AND SAFE; THEIR BENEFIT IS UNMEASURED AND NOT CLAIMED.** Derived per LEAGUE from Kalshi's own `<Club> wins` titles under two exact rules (token-subset; token unique on both residual sides); **9 candidates REFUSED** and left None, including `Bilbao`/`Athletic Club` and `St. Truidense` (shares `st` with `Union St.-Gilloise`). Live on `ad1de331` 00:48:50Z. **THE FIRST POST-DEPLOY CYCLE FIRED MY OWN FALSIFICATION TEST** — `event_not_on_our_board` 314→775, `soccer_matches` 51→**4**, both denominators moving the wrong way for a composition excuse. **THE CONTROL CYCLE, CODE UNTOUCHED, READ 52** (and 380), so the dip was slate-state transience on a ~15-min cadence. Reverting on the first reading would have discarded a correct change AND self-confirmed, since matches were returning to ~52 regardless. New rule in `learnings.md`. **Waiting was defensible only because the change is provably additive** — 0 of 34 keys overrode a dropped-as-ambiguous entry, 0 were already present, `setdefault` only, no new ambiguity refusals. A change that could plausibly cause the harm gets reverted first. **NOT CLAIMED: that the aliases helped.** 51→52 is inside cycle noise and the residual rode a denominator that also moved (749 more markets cleared the date gate). Reading the benefit needs a stable slate and a per-sport attempted/resolved RATE. Measurements: `deploys.md` 01:02Z + 01:34Z. Claims released. — opened 2026-09-02 — session 41d46db0-4017-4d9b-91bf-c9392f13c9de
+- Goal: the `event_not_on_our_board: 314` residual falls — Kalshi's club spellings resolve to our clubs. Testable: `event_not_on_our_board` materially below 314 and Kalshi soccer matches above 51.
+- **NO CLUB IS GUESSED. Two exact rules, applied to per-league residual sets, and 9 candidates were REFUSED for failing both.** For each league: resolve every Kalshi club we already can (119 of 153 resolve unaided), then pair what remains only when (R1) one side's normalised token set is a SUBSET of the other (`Standard` ⊂ `Standard Liege`), or (R2) they share a token occurring in EXACTLY ONE club on each residual side (`eagles`: `GA Eagles` ↔ `Go Ahead Eagles`). A pairing matching two of our clubs is refused.
+- **EVERY ENTRY CHECKED BOTH WAYS**, the standard this table already sets: `canonical_team` returns None for the Kalshi spelling and a real club for the target. 119 already-resolving Kalshi names are deliberately NOT written — a working pair buys nothing and hides which entries are load-bearing.
+- **THE PER-LEAGUE FETCH IS LOAD-BEARING AND A FLATTENED MAP IS UNSAFE HERE.** My earlier scratch artifact was global and had `LEV=Leverkusen`, `PAR=Parma`; in la_liga and ligue_1 those codes are **Levante** and **Paris FC**. Pairing off the flattened map would have written two wrong-club aliases. Re-fetched per series; the elimination pass caught it by refusing.
+- **REFUSED, and left for a decision rather than guessed:** `Bilbao`↔`Athletic Club` (no shared token), `St. Truidense` (shares `st` with `Union St.-Gilloise`), `FC Koln`/`M gladbach`, `Enschede`, `Inter`, and MLS `Los Angeles G`/`Los Angeles F`/`DC United`.
+- Files: `syndicate/features/shared/team_aliases.py`, `tests/test_kalshi_soccer_club_aliases.py` (NEW)
+- Hypothesis: these 34 spellings are what the 314 residual is made of; adding them lifts Kalshi soccer matches above 51.
+- Falsification test: `event_not_on_our_board` does not fall, or `event_matches_two_games` rises for soccer — either means a pairing is wrong and this reverts.
+- Verification: production `[kalshi_odds] BOARD_JOIN` after deploy; MLB unchanged as the control.
+- Files: released at close: `syndicate/features/shared/team_aliases.py`, released: `tests/test_kalshi_soccer_club_aliases.py`, released: `tests/test_kalshi_club_code_names.py`
+- **OWED, and it is a MEASUREMENT not a fix:** a per-sport attempted/resolved rate for club resolution, read on a stable slate, is what would show whether these 34 bought anything. The 9 refused clubs need evidence this method cannot supply and remain None by design.
+- Blocked by: none.

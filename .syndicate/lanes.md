@@ -663,7 +663,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   the carve-out has landed and this lane was never a second owner. Plus the
   pinned-set assertion in
   released: `tests/test_paper_settlement.py` that `nfl-settlement-resolver` added.
-- **THE MISSING READING IS STILL MISSING, AND NOW EXPLAINED `[reading taken 2026-09-01 by the ownership pass, lane game-market-entry-roi-curve]`: there are ZERO NCAAF ORDERS AT ALL**, not merely zero graded ones. `/api/portfolio/paper?date=` over 2026-08-26..09-01: `settlement.by_sport` ncaaf **0 settled / 0 orders** on all seven dates, and **0** ncaaf rows in `orphan_orders`. **This lane cannot be verified until NCAAF places a bet, which is OPEN lane `ncaaf-no-orders`'s subject.** That is a real dependency the block did not record — `Blocked by: none` is wrong; it is blocked by `ncaaf-no-orders`.
+- **THE MISSING READING IS STILL MISSING, AND NOW EXPLAINED `[reading taken 2026-09-01 by the ownership pass, lane game-market-entry-roi-curve]`: there are ZERO NCAAF ORDERS AT ALL**, not merely zero graded ones. `/api/portfolio/paper?date=` over 2026-08-26..09-01: `settlement.by_sport` ncaaf **0 settled / 0 orders** on all seven dates, and **0** ncaaf rows in `orphan_orders`. **This lane cannot be verified until NCAAF places a bet.** `[CORRECTED 2026-09-01 when `ncaaf-no-orders` CLOSED: it is NOT blocked by that lane, and naming a lane was the wrong shape. That lane measured the cause and it is not a defect — NCAAF serves zero orders because TWO GATES hold, both by design: `football/pick_gate.py` denies the model claim on a 17-sigma out-of-sample loss, and `portfolio_commit.py:267` refuses all 480 served rows for `no_model_edge_pct` (0 of 480 carry one, every row `market_fair` basis). **So this lane is blocked on a PRODUCT DECISION — a model that beats the close, or an explicit choice to size on market basis — not on any lane's work.** Same position `#624` step 6 holds for MLB props. Nothing to wait for; if that decision is not coming, this lane should close as UNVERIFIABLE rather than wait forever.]`
 - **Do not describe this as end-to-end verified** — a real graded NCAAF bet was
   not available at the time the work landed.
 - Blocked by: none.
@@ -690,50 +690,6 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - **NOTE for whoever takes `game_chip_scoreboard.py` next:** the guard added
   here changes its behaviour; read the history block before editing.
 - Blocked by: a deploy. Not urgent.
-- Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
-
-### ncaaf-no-orders — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-29 — session 7b278ebe-b1fa-4ea4-9648-834fb63961b7
-- Goal: name the FIRST stage in the NCAAF chain that is zero, with a production
-  reading rather than a belief.
-- Files: released: `scripts/generate_smartsim2_ncaaf_projections.py`,
-  **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
-  released: `syndicate/features/ncaaf/cfbd.py`,
-  released: `syndicate/features/ncaaf/cfbd_backoff.py`,
-  released: `tests/test_cfbd_backoff.py`,
-  released: `scripts/run_refresh_worker.py`,
-  released: `tests/test_season_projection_staleness.py`
-  (the last two added 2026-08-29 by USER OVERRIDE — `exchange-markets-api-integration`
-  released the worker entrypoint; see its Files line.)
-- **THE ORIGINAL GOAL IS DISCHARGED WITH A PRODUCTION READING `[measured 2026-09-01, lane game-market-entry-roi-curve]`, and it names a SECOND gate this block does not.** The chain is alive far past where "zero orders" suggests: `/api/board/layer2-shortlist?sport=ncaaf` serves **480 rows**, `per_sport.ncaaf.selected=480`. **The first stage that is zero is the SIZING input, not the board:**
-
-      model_edge_pct numeric   0 / 480      <- what the sizing path reads
-      model_ev_pct   numeric   0 / 480
-      ev_pct         numeric   480 / 480
-      ev_basis                 market_fair on 480 / 480
-
-  **TWO INTENTIONAL GATES IN SERIES, and this block names only the first.**
-  (1) `football/pick_gate.py` denies the MODEL claim — measured out-of-sample, 2023 SP+ → 2024, n=2,233 clean: model margin MAE **15.775 vs market 12.212, +3.563 at t=+17.20**, losing to the OPEN line by nearly as much and at every scale 6..24. Default is deny; serving requires a recorded WIN.
-  (2) **`portfolio_commit.py:267` refuses any row with no `model_edge_pct` (`no_model_edge_pct`)** — by design: *"a legitimate way to RANK and not a basis on which to SIZE ... Kelly would be exactly zero anyway."* **This is the gate that actually kills NCAAF**, because every served row is `market_fair` basis.
-  **CONSEQUENCE, and it is the useful part:** `pick_gate`'s 2026-08-29 amendment — re-keying the registry to `(sport, market, BASIS)` so a market-basis claim is no longer denied by sharing a key with the model claim — **does not and cannot produce orders on its own.** It un-blocked RANKING; sizing still requires a model edge the gate denies. A board change without a sizing basis is inert in the order path. Same shape as MLB Layer 2 (0/200 `model_edge_pct`, 100% venue-book refusal) in `findings_2026-08-31_mlb_accuracy_assessment.md` section 5.
-  **SO NOTHING IS "BLOCKING" THIS LANE.** Zero NCAAF orders is two deliberate gates working, and it will not change without either a model that beats the close or an explicit decision to size on market basis. That is a PRODUCT decision, not a defect — the same position `#624` step 6 holds for MLB props.
-  **AND IT RESOLVES `ncaaf-settlement-resolver`'s wait:** that lane is not blocked on a bug, it is waiting for a graded NCAAF bet that **cannot arrive while these gates hold.**
-- **THE CFBD READING IS TAKEN AND REHOMED AS `#633` `[2026-09-01]`.** It passes this lane's stated test — backoff retries visible, `SEASON_PROJECTION_LAUNCHING` down to ~1/hour, log not quiet — but the real blocker is the CFBD **monthly quota**, not the 429 rate limit: `QuotaExhausted ... not issuing GET /ppa/teams`, with the NCAAF projection artifact **5.13 days stale and climbing**. `b59ee603` is NOT on `origin/main` by SHA but its CONTENT is (`git cherry` reports it upstream; all three files present, 5 marker lines in `run_refresh_worker.py`) — so nothing was owed on a deploy. **This lane's remaining item is now `#633`; it is no longer orphaned.**
-- **~~SEPARATELY OWED AND NOW APPARENTLY ORPHANED `[measured 2026-09-01, lane game-market-entry-roi-curve]`:** this block's "STILL OWED — the production reading" is about the CFBD **429/backoff**, a different thread. The lane that reclaimed those files, `ncaaf-cfbd-quota-latch`, is **CLOSED and no longer in `lanes.md`**, and **no `todo.md` item mentions `cfbd_backoff`, `SEASON_PROJECTION_RELAUNCH_HELD` or `b59ee603`.** Whoever closes this lane must give that reading a home first or it dies here.
-- **NOTE FOR WHOEVER CLOSES THIS: the lane's ORIGINAL question is answered and
-  is NOT what these commits fix.** Zero NCAAF orders is `pick_gate` denying
-  ncaaf spread/moneyline/total on a measured out-of-sample loss, **working as
-  designed**. Fixing the 429 will NOT produce NCAAF orders. **Do not let these
-  two commits read as a fix for that.**
-- **STILL OWED — the production reading.** Everything else is BENCH evidence.
-  The reading that closes it: after a deploy carrying `b59ee603`, either a
-  `[cfbd_backoff] ... status=429 ... sleeping=` line followed by a run that
-  COMPLETES, or `SEASON_PROJECTION_RELAUNCH_HELD sport=ncaaf` with
-  `SEASON_PROJECTION_LAUNCHING` falling to ~1/hour. **A quiet log is not a
-  pass** — the same trap `#593`'s verification carried.
-- **The CFBD paths in this block were RECLAIMED 2026-08-31** by lane
-  `ncaaf-cfbd-quota-latch`, which shipped the monthly-quota latch and the PPA
-  cache this lane's own analysis proposed.
-- Blocked by: none.
 - Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
 ### mlb-resolver-write-side-effect — OPEN, **NARROWED — NOT A LIVE INCIDENT** — opened 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411 — **UNOWNED, handed off**
