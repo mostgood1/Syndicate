@@ -4169,3 +4169,40 @@ series read as a smooth "~75 MB/h monotonic climb" and I published that. At
 The average was true and the MECHANISM it implied was wrong. **Pick the
 resolution from the mechanism you intend to claim, not from what is convenient
 to fetch.**
+
+## 2026-09-02 — FORBIDDEN: designing against a DEFAULT read out of a config template. `${VAR:-1}` is what runs when nobody set VAR, and somebody set VAR. `[lane web-request-memory-attribution]`
+
+**What happened.** Building the `#632` per-request memory instrument, the one
+design question that mattered was how many requests can overlap. I read
+`render.yaml`:
+
+    startCommand: ... gunicorn wsgi:application --workers ${WEB_CONCURRENCY:-1} --threads ${GUNICORN_THREADS:-1}
+
+and took **1 worker**, then went looking for `GUNICORN_THREADS` and found the
+explicit `value: "4"` a hundred lines further down. So I designed for *one
+process, four threads* and built a per-process in-flight guard, which is exactly
+right for that shape.
+
+**Production runs TWO workers.** `WEB_CONCURRENCY` is also set explicitly, in a
+block I did not scroll to because I had already "read the value". The process
+list from `deploy_preflight.py` shows pids 80 and 81 under master 63.
+
+**Why it is not a cosmetic error.** The cgroup the instrument reads is
+**per-container**, so with two processes a request can be "solo" in worker A
+while worker B allocates, and B's allocation lands on A's row. The guard removes
+intra-process contention and **not** inter-process contention — so its first
+table would name a route with false confidence, which is the precise failure the
+guard exists to prevent. I found it only because a deploy preflight prints the
+process list.
+
+**How to apply.**
+* **A default is what happens when nobody decides. Assume somebody decided.**
+  Read the env block, not the interpolation — and note the tell I ignored: I
+  looked up `GUNICORN_THREADS` and found an explicit value, which was direct
+  evidence that these keys ARE set explicitly, and I did not generalise it.
+* **Prefer the running process to any file.** `deploy_preflight.py` prints the
+  real process tree; `/api/ops/version` prints the real commit. Sibling rules
+  already say the checkout is not the deployed code and that a lane's recorded
+  session is not its owner. **This is the same rule about config.**
+* **When concurrency shapes a measurement, get the concurrency from the
+  platform**, before the design and not after the code.
