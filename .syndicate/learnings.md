@@ -4293,3 +4293,34 @@ the source five ways to check they bit. **Two mutations sailed straight through:
 * **Ask what arrangement makes the OLD code wrong**, and build the fixture from
   that. A fixture drawn from the incident as it happened may sit on the side
   where both versions agree.
+
+## 2026-09-02 — REQUIRED: when you correct a number, re-check the CLAIMS AROUND IT. Mine rode through two corrections untouched and was wrong the whole time. `[lane game-market-entry-roi-curve]`
+
+**What happened.** I published three things about web's memory in one paragraph:
+a rate (`~75 MB/h`), a mechanism (`monotonic climb`), and a property
+(**"anon never falls except at a restart"**). Over the next day I corrected the
+paragraph **twice** — once downgrading the mechanism from a smooth climb to
+steps and plateaus, once retracting the rate as post-restart warm-up. **Both
+times I left the property standing, and both times I restated it as the thing
+that survived.**
+
+It is false. An 8-hour steady-state series with no restart in it falls **-57 MB**
+between 12:17Z and 13:16Z and **-17 MB** between 08:18Z and 09:17Z. The real
+shape is a noisy upward drift at **+32 MB/h**, not a ratchet.
+
+**Why corrections are the dangerous moment.** A correction feels like scrutiny,
+so whatever you carry through it inherits the credibility of the work you just
+did — and I actively promoted the property each time by writing "what survives".
+**The un-corrected neighbour is the least examined sentence in the document, not
+the most.**
+
+**How to apply.**
+* **List every claim in the passage before editing one.** Rate, mechanism,
+  bound, monotonicity, direction — then say which the new evidence touches and
+  which it merely fails to contradict. Those are different, and only the first
+  is corrected.
+* **Beware "what survives".** It reads as a careful concession and is usually
+  the sentence nobody re-derived. If you are about to write it, re-derive the
+  thing it names.
+* **A monotonicity claim needs the resolution that could falsify it.** Hourly
+  samples cannot see a one-hour dip; I had hourly samples and claimed "never".
