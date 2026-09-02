@@ -51,8 +51,11 @@ that does not depend on the endpoint.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -142,6 +145,122 @@ _MARKET_FIELDS = (
 
 class KalshiError(RuntimeError):
     """Raised when the fetch cannot be trusted -- never swallowed into an empty list."""
+
+
+class KalshiBudgetExceeded(KalshiError):
+    """The AGGREGATE request budget ran out mid-fetch.
+
+    A subclass of `KalshiError` on purpose: every existing caller already
+    handles that and names the failure rather than swallowing it into an empty
+    list, so a budget stop inherits the same discipline for free.
+    """
+
+
+# --------------------------------------------------------------------------
+# TWO BOUNDS, BOTH MEASURED BEFORE THEY WERE WRITTEN (lane
+# `kalshi-discovery-deadline`, 2026-09-02). `todo.md #626`(h) has the profile.
+#
+# WHAT THE TIMING ACTUALLY SHOWED, because the obvious answers were all wrong:
+#
+#   one intelligence build  ->  254 requests, 58.3s of network, 103.3s wall
+#   of which                    248 per-series /markets fetches
+#                               150 DISTINCT series, so 98 (40%) were repeats
+#   standalone discover()   ->  40 pages, 30.3s, truncated=True EVERY time,
+#                               201 singles out of 40,000 markets
+#
+# The cost is FAN-OUT ACROSS SERIES, not pagination depth (21 of 266 calls
+# followed a cursor) and not host retries (`fetch_markets` breaks on first
+# success; every observed call hit _BASE_URLS[0] with zero failures). The 20s
+# per-request timeout is never approached -- median ~0.24s.
+#
+# So neither bound here is a timeout. They are:
+#   1. `_MARKETS_CACHE` -- a short-TTL memo, because 40% of the calls in a
+#      single build ask for a series already fetched seconds earlier.
+#   2. `request_budget(...)` -- an AGGREGATE wall-clock budget, because nothing
+#      anywhere measured elapsed time across a fan-out. `max_pages` bounds ONE
+#      call's paging; it has never bounded a caller that makes 248 calls.
+#
+# WHAT THIS DELIBERATELY DOES NOT DO: add concurrency. 150 sequential fetches at
+# ~0.24s is ~36s, and threading them is the large win -- but it is venue-facing,
+# this repo already runs a metered call budget against OddsAPI, and Kalshi's
+# rate limits are not measured. That is a separate decision with its own risk,
+# not a free speedup to slip in behind a caching change.
+# --------------------------------------------------------------------------
+
+_MARKETS_CACHE: "dict[tuple, tuple[float, dict[str, Any]]]" = {}
+_CACHE_STATS = {"calls": 0, "hits": 0, "misses": 0, "evictions": 0}
+_CACHE_LOCK = threading.Lock()
+
+
+def _markets_cache_ttl_seconds() -> float:
+    """Default 60s. Short on purpose: this memoises a LISTING within one build,
+    it is not a price cache. Set 0 to disable (every fetch goes to the venue)."""
+    raw = str(os.environ.get("SYNDICATE_KALSHI_MARKETS_CACHE_TTL_SECONDS") or "").strip()
+    if not raw:
+        return 60.0
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 60.0
+
+
+def markets_cache_stats() -> dict[str, int]:
+    """Hits/misses/evictions, so the saving is a READING rather than a claim."""
+    with _CACHE_LOCK:
+        return dict(_CACHE_STATS)
+
+
+def reset_markets_cache() -> None:
+    with _CACHE_LOCK:
+        _MARKETS_CACHE.clear()
+        for key in _CACHE_STATS:
+            _CACHE_STATS[key] = 0
+
+
+class _Budget:
+    __slots__ = ("deadline", "seconds", "requests", "exceeded")
+
+    def __init__(self, seconds: float):
+        self.seconds = float(seconds)
+        self.deadline = time.monotonic() + float(seconds)
+        self.requests = 0
+        self.exceeded = False
+
+    def remaining(self) -> float:
+        return self.deadline - time.monotonic()
+
+
+_BUDGET_STATE = threading.local()
+
+
+def _current_budget() -> "_Budget | None":
+    return getattr(_BUDGET_STATE, "budget", None)
+
+
+@contextlib.contextmanager
+def request_budget(seconds: float):
+    """Bound the TOTAL wall-clock a block of Kalshi work may spend on requests.
+
+    Thread-local, so a worker thread's budget cannot leak into another's, and
+    re-entrant blocks keep the TIGHTER deadline -- a caller that asks for 5s
+    inside a 30s block gets 5s, never a silent extension.
+
+    On exhaustion `_get` raises `KalshiBudgetExceeded`, which `fetch_markets`
+    turns into a partial result flagged `budget_exceeded=True` rather than a
+    raise, so a truncated listing is VISIBLE instead of being mistaken for the
+    whole one -- the failure mode this module was built to prevent.
+    """
+    previous = _current_budget()
+    budget = _Budget(seconds)
+    if previous is not None and previous.deadline < budget.deadline:
+        budget.deadline = previous.deadline
+    _BUDGET_STATE.budget = budget
+    try:
+        yield budget
+    finally:
+        _BUDGET_STATE.budget = previous
+        if previous is not None and budget.exceeded:
+            previous.exceeded = True
 
 
 def dollars_to_probability(dollars: Any) -> float | None:
@@ -271,6 +390,18 @@ def _signed_headers_or_none(url: str) -> dict[str, str] | None:
 
 
 def _get(url: str, *, timeout: float = 20.0) -> dict[str, Any]:
+    budget = _current_budget()
+    if budget is not None:
+        remaining = budget.remaining()
+        if remaining <= 0.0:
+            budget.exceeded = True
+            raise KalshiBudgetExceeded(
+                "request_budget_exhausted after %d request(s) in %.1fs"
+                % (budget.requests, budget.seconds)
+            )
+        # Never let ONE request outlive the budget it is spending from.
+        timeout = min(timeout, max(0.1, remaining))
+        budget.requests += 1
     headers = {"Accept": "application/json", "User-Agent": "syndicate/1.0"}
     signed = _signed_headers_or_none(url)
     if signed:
@@ -300,6 +431,7 @@ def fetch_markets(
     status: str = "open",
     limit: int = 200,
     max_pages: int = 20,
+    use_cache: bool = True,
 ) -> dict[str, Any]:
     """Every market matching the filter, following the cursor.
 
@@ -310,16 +442,53 @@ def fetch_markets(
     `max_pages` is a hard stop, not a budget -- a cursor that never terminates
     would otherwise page forever, and the page count is reported so a truncated
     result is visible rather than mistaken for the whole listing.
+
+    TWO BOUNDS ADDED 2026-09-02 after timing this (lane
+    `kalshi-discovery-deadline`), because `max_pages` bounds ONE call's paging
+    and one intelligence build makes **248** of them:
+
+    * `use_cache` memoises on (series_ticker, status, limit, max_pages) for
+      `SYNDICATE_KALSHI_MARKETS_CACHE_TTL_SECONDS` (default 60s). Measured: of
+      248 per-series fetches in one build, only **150 were distinct** -- 40%
+      asked again for a listing fetched seconds earlier.
+    * an active `request_budget(...)` stops the paging loop when the AGGREGATE
+      wall-clock runs out, and the result says `budget_exceeded=True`. It
+      returns what it has instead of raising, so a partial listing is visible
+      rather than mistaken for the whole one.
     """
+    _CACHE_STATS["calls"] = _CACHE_STATS.get("calls", 0) + 1
+    cache_key = (series_ticker, status, int(limit), int(max_pages))
+    ttl = _markets_cache_ttl_seconds()
+    if use_cache and ttl > 0:
+        with _CACHE_LOCK:
+            hit = _MARKETS_CACHE.get(cache_key)
+            if hit is not None and (time.monotonic() - hit[0]) <= ttl:
+                _CACHE_STATS["hits"] += 1
+                cached = dict(hit[1])
+                cached["cache_hit"] = True
+                return cached
+            if hit is not None:
+                del _MARKETS_CACHE[cache_key]
+                _CACHE_STATS["evictions"] += 1
+            _CACHE_STATS["misses"] += 1
+
     markets: list[dict[str, Any]] = []
     cursor: str | None = None
     pages = 0
     errors: list[str] = []
     base_used: str | None = None
 
+    budget_exceeded = False
     for base in _BASE_URLS:
         try:
             while pages < max_pages:
+                budget = _current_budget()
+                if budget is not None and budget.remaining() <= 0.0:
+                    # Stop the LOOP, keep what we have. Raising here would throw
+                    # away pages already paid for and read as a total failure.
+                    budget.exceeded = True
+                    budget_exceeded = True
+                    break
                 query = [f"limit={int(limit)}", f"status={status}"]
                 if series_ticker:
                     query.append(f"series_ticker={series_ticker}")
@@ -338,6 +507,13 @@ def fetch_markets(
                     break
             base_used = base
             break
+        except KalshiBudgetExceeded:
+            # The budget ran out on the very first request against this host.
+            # Not a host fault -- do NOT try the next base, that is exactly the
+            # retry storm the budget exists to stop.
+            budget_exceeded = True
+            base_used = base_used or base
+            break
         except KalshiError as exc:
             errors.append(f"{base}: {exc}")
             continue
@@ -353,20 +529,30 @@ def fetch_markets(
         for field in market.get("missing_fields") or ():
             missing_counts[field] = missing_counts.get(field, 0) + 1
 
-    return {
+    report = {
         "base_url": base_used,
         "series_ticker": series_ticker,
         "status": status,
         "markets": markets,
         "count": len(markets),
         "pages": pages,
-        "truncated": pages >= max_pages and bool(cursor),
+        "truncated": (pages >= max_pages and bool(cursor)) or budget_exceeded,
+        # Named separately from `truncated` so "we hit the page cap" and "we ran
+        # out of time" are never the same reading.
+        "budget_exceeded": budget_exceeded,
+        "cache_hit": False,
         # If this is non-empty the schema assumption is wrong, and it says which
         # field rather than leaving a silently-None column.
         "missing_fields": dict(sorted(missing_counts.items())),
         "host_errors": errors,
         "authenticated": _api_key() is not None,
     }
+    if use_cache and ttl > 0 and not budget_exceeded:
+        # A budget-truncated listing is NOT cached: it would serve a partial
+        # result to callers that had plenty of time.
+        with _CACHE_LOCK:
+            _MARKETS_CACHE[cache_key] = (time.monotonic(), dict(report))
+    return report
 
 
 # Multi-leg parlay combinations. MEASURED 2026-08-23: 39,793 of the first

@@ -21,6 +21,88 @@ from pipeline.intelligence_state import _payload_key
 from pipeline.intelligence_state import IntelligenceStateService
 from syndicate.blueprints.home import _finalize_home_prop_rows
 from syndicate.blueprints.home import _load_home_pregame_prop_items
+
+from syndicate.features.shared import kalshi_client as _kalshi_client
+
+# --------------------------------------------------------------------------
+# NO VENUE SOCKETS IN THIS SUITE.
+#
+# MEASURED 2026-09-02 (lane `kalshi-discovery-deadline`): ONE test in this file
+# --- test_intelligence_query_api_resolves_preview_date_and_preserves_contract
+# --- issued **254 real HTTP requests to Kalshi**, 58.3s of network inside a
+# 103.3s run. The request path builds a candidate pool, which fans out one
+# `/markets` fetch per series across 150 distinct series.
+#
+# That is a live dependency on a third party inside a unit suite: it makes the
+# run slow, non-deterministic, and rate-limit-coupled to a venue, and a network
+# result is a fact about the NETWORK rather than the code (`learnings.md`
+# 2026-08-28). `_KALSHI_ATTEMPTS` is kept so the guard is DISCRIMINATING: a test
+# below asserts the stub is installed AND that the code really does try to reach
+# the venue, so silently deleting this guard fails rather than quietly restoring
+# a 100-second suite.
+# --------------------------------------------------------------------------
+_KALSHI_ATTEMPTS: list[str] = []
+_REAL_KALSHI_GET = _kalshi_client._get
+
+
+def _blocked_kalshi_get(url, *, timeout: float = 20.0):
+    _KALSHI_ATTEMPTS.append(url)
+    raise _kalshi_client.KalshiError("network_disabled_in_tests: " + str(url)[:120])
+
+
+def _fake_kalshi_get(url, *, timeout: float = 20.0):
+    """Deterministic SUCCESS, still offline.
+
+    `SYNDICATE_TESTS_KALSHI_FAKE=1` selects this instead of the blocker. It
+    exists because the blocker cannot measure the memo: every fetch fails, so
+    nothing is ever cached and the request count is identical with the cache on
+    or off. Exercising the SUCCESS path offline is also the only way this suite
+    covers what production actually does."""
+    _KALSHI_ATTEMPTS.append(url)
+    return {"markets": [{"ticker": "STUB", "title": "stub", "yes_bid": 50, "no_bid": 50}]}
+
+
+def _kalshi_stub():
+    """`SYNDICATE_TESTS_KALSHI_TRANSPORT`: block (default) | fake | live.
+
+    `live` is the deliberate integration escape -- it restores the real
+    transport so the fan-out can be RE-MEASURED against the venue after a
+    change. It is not a default and never should be: the whole point of this
+    guard is that an ordinary run touches no venue. `fake` cannot substitute
+    for it, because the series list is DERIVED from live results, so a stubbed
+    market produces no fan-out at all (measured: 30 attempts instead of ~254).
+    """
+    raw = str(os.environ.get("SYNDICATE_TESTS_KALSHI_TRANSPORT") or "").strip().lower()
+    if raw == "live":
+        return _REAL_KALSHI_GET
+    if raw == "fake":
+        return _fake_kalshi_get
+    return _blocked_kalshi_get
+
+
+def setUpModule():
+    _kalshi_client._get = _kalshi_stub()
+    _kalshi_client.reset_markets_cache()
+
+
+def tearDownModule():
+    _kalshi_client._get = _REAL_KALSHI_GET
+    _kalshi_client.reset_markets_cache()
+
+
+class KalshiNetworkGuardTests(unittest.TestCase):
+    def test_guard_is_installed(self):
+        self.assertIn(_kalshi_client._get, (_blocked_kalshi_get, _fake_kalshi_get))
+
+    def test_guard_is_load_bearing(self):
+        """Not decorative: the suite DOES drive code that reaches for Kalshi.
+        If this ever reads zero, the fan-out moved and the guard needs
+        re-aiming rather than deleting."""
+        _kalshi_client.reset_markets_cache()
+        with self.assertRaises(_kalshi_client.KalshiError):
+            _kalshi_client.fetch_markets(series_ticker="GUARD_PROBE", use_cache=False)
+        self.assertTrue(_KALSHI_ATTEMPTS)
+
 from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.features.intelligence_board import build_intelligence_board_contract
 from syndicate.features.intelligence import _advanced_signals_from_item

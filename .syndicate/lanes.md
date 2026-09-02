@@ -1682,7 +1682,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Narrative + evidence: `log/2026-09-02.md`, `todo.md #625`(4),
   `state.md [local-fleet-runner]`.
 
-### kalshi-discovery-deadline — OPEN, **HYPOTHESIS FALSIFIED AND RE-AIMED: the cost is FAN-OUT (243 per-series fetches), not pagination or host retries** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### kalshi-discovery-deadline — OPEN, **BOUNDS IMPLEMENTED; GUARD VALIDATED (103-152s -> 22.5s); MEMO+BUDGET LANDED UNVALIDATED because the 248-fetch baseline STOPPED REPRODUCING (fetch_markets calls = 0): the cost is FAN-OUT (243 per-series fetches), not pagination or host retries** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: the candidate-pool build cannot block for minutes on Kalshi. ONE testable
   outcome: `tests/test_intelligence.py` completes in bounded time WITHOUT opening
   an outbound socket, and `kalshi_client.discover` aborts at an AGGREGATE
@@ -1792,6 +1792,65 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   (2) an aggregate deadline unit test — off != on, generous vs tight, and the
   tight case must SAY it truncated; (3) the test suite no longer opens a socket
   to a venue at all, with a guard that FAILS when it does.
+- **IMPLEMENTED 2026-09-02 — ONE PART VALIDATED, TWO PARTS LANDED UNVALIDATED
+  AND LABELLED AS SUCH. The baseline I built this on NO LONGER REPRODUCES.**
+
+  **VALIDATED — the suite network guard.** `tests/test_intelligence.py` now
+  installs a transport stub in `setUpModule`
+  (`SYNDICATE_TESTS_KALSHI_TRANSPORT`: `block` default | `fake` | `live`).
+  Measured on the named test: **103-152s -> 22.5s**. Two guard tests keep it
+  DISCRIMINATING rather than decorative — one asserts the stub is installed, one
+  asserts the code really does reach for the venue, so deleting the guard fails
+  instead of quietly restoring a 100-second suite.
+
+  **LANDED BUT NOT VALIDATED IN SITU — the memo and the aggregate budget.**
+  `fetch_markets(use_cache=...)` memoises on
+  (series_ticker, status, limit, max_pages) for
+  `SYNDICATE_KALSHI_MARKETS_CACHE_TTL_SECONDS` (default 60s, `0` disables), and
+  `request_budget(seconds)` is a thread-local aggregate wall-clock bound that
+  makes `fetch_markets` return a PARTIAL result flagged `budget_exceeded=True`
+  rather than raise. 11 tests, off != on proven for both, plus: distinct series
+  are not conflated, a budget-truncated listing is never cached, an exhausted
+  budget does not retry all three hosts, and no-budget is a no-op for every
+  existing caller.
+
+  **WHY UNVALIDATED, STATED PLAINLY.** The 248-fetch fan-out this lane was aimed
+  at **stopped reproducing**. A counter placed INSIDE `fetch_markets` reads
+  **0 calls** across four separate live runs (~18:0x-18:4x) on the same test
+  that measured 254-290 calls at ~17:0x-17:2x, while the test still takes ~140s.
+  Ruled out by direct test, not by reasoning:
+  - not the on-disk `reports/intelligence/kalshi_markets.json` artifact — moved
+    it aside, re-ran, still 0 calls;
+  - not a module-identity problem — `kc.__file__` and `is` both confirm one
+    module object;
+  - not a subprocess — the original leaf patch on `_get` DID capture the 254
+    calls in-process.
+  Most likely a SLATE/TIME-OF-DAY conditional path, which is ordinary in this
+  repo. **Not identified, so not claimed.**
+
+  **THE CONSEQUENCE, AND IT IS THE POINT:** with `fetch_markets` calls at 0, the
+  memo is currently **INERT on the observed path** — the exact
+  presence-is-not-reachability trap this repo has paid for repeatedly. It is
+  landed because a bound that is unit-proven and off-by-default-harmless is
+  worth having for the COLD build where the fan-out does occur, but nobody
+  should read it as a measured improvement. **The `-40%` figure (98 redundant of
+  248) is a property of the ORIGINAL cold run, not a demonstrated saving.**
+
+- **WHAT THE NEXT SESSION SHOULD DO FIRST — reproduce the baseline before
+  touching anything.** Find the condition that makes `_build_candidate_pool` fan
+  out across ~150 series (suspect: a pregame slate window). Until that is
+  reproducible on demand, no change to this path can be measured, and this lane
+  should not be closed. Run `fetch_markets`' own `markets_cache_stats()["calls"]`
+  as the instrument — it is now the cheapest possible reachability check.
+- **ALSO OPEN, AND NOT THIS LANE'S SUBJECT:** even with the guard installed,
+  `tests/test_intelligence.py` as a whole still does not finish inside 10
+  minutes (stalls ~32%). So the file has expensive tests beyond the Kalshi one,
+  and the WNBA `_artifact_bundle` <-> `_games_from_live_state_fallback`
+  recursion remains unfixed and unlaned.
+- **ORIGINAL GOAL NOT MET, deliberately not restated to fit what was achieved.**
+  "An order of magnitude fewer requests" is not demonstrated; the measured wins
+  are the suite guard (103-152s -> 22.5s) and two bounds that are correct in
+  unit tests and unexercised in production.
 - Blocked by: none. Does not deploy; the fix is a bound, and a bound is only
   worth shipping once its off != on test exists.
 ### m625-standard-substrate-label — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. `#625`(6) done, commit `6211bdf9`, NO DEPLOY (documentation).** `model_engine_standard.md` §3b now names **three** substrates — `render`, `mirror:<manifest_id>`, `checkout` — with a table of what a verified mirror CAN and can NEVER answer. **The 2026-08-18 user directive is preserved verbatim and explicitly marked unchanged**; this ADDS one admissible case rather than relaxing anything, and an unverified local read is still not a claim. **The falsification test did NOT fire:** the reproducible class states crisply, against §3b's own worked example (NCAAF local 0 vs production 16) — a mirror answers questions about the CODE, never about the DEPLOYMENT. **Three stale places fixed in the same pass:** §3 and the gate requirements still said "allowlisted in `HOT_ARTIFACT_PATTERNS`" after `#625`(2) split it; the UNMEASURED rule could not tell a verified mirror from a checkout; and a new subsection states that a 403 is not an absence. **`#625` IS COMPLETE — all six items.**
