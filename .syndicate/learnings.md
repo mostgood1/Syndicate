@@ -3791,3 +3791,36 @@ only because the ledger's own stake-weighted return on the same rows was
   update.** Grouping cross-book comparisons on the latter finds almost no cells
   and raises nothing — it returns a tiny population that still looks like a
   measurement. Pinned by a test with two books a second apart.
+
+## 2026-09-01 — OVERTURNED: repairing a lossy artifact does not move a derived number in the "recovering" direction. A truncated file is not a random sample of itself. `[lane game-market-entry-roi-curve]`
+
+**What I expected.** Lane `book-quotes-publish-clobber` found that
+`book_quotes` shards LOSE ROWS to a whole-file publish race, and that their
+2026-09-01 measurement had run on a copy missing its sportsbook tail (46.1%
+matchable). Once `e78aee52` repaired it I told them, in writing, that their
++2.65% "can be re-measured on an intact file" — carrying an unstated assumption
+that recovering lost rows would recover lost value.
+
+**What happened.** On the healed shard the gate book roughly doubled (n=653 →
+**1,235**) and the number got **WORSE**: gain +0.949pp → **+0.824pp**, ROI
++2.65% → **+2.43%**, shortfall 0.35 → **0.57** points.
+
+**Why, measured rather than assumed.** Split the healed book at the clobbered
+copy's last sportsbook quote (20:18:49Z): rows at or before it take the exchange
+**64.5%** of the time for **+1.021pp**; the rows the repair restored take it
+**40.2%** for **+0.737pp**. The truncation had preserved **exactly the window
+where the exchange looks best** — early, pregame, thin sportsbook coverage —
+and discarded the late in-play window where it looks worst. **The loss was
+biased, in the direction that flattered the conclusion.**
+
+**How to apply.** A lossy artifact loses a STRUCTURED subset — a tail, an hour,
+one writer's rows — and that subset has its own statistics. So:
+* **Never predict the direction of a repair.** "We lost rows, so the number is
+  understated" is a guess with a 50% prior at best. Measure both cohorts.
+* **The split is cheap and it is the whole test:** partition the repaired data
+  at the loss boundary and compare. One query.
+* **A doubled n is not reassurance.** Here n grew 89% and the estimate moved
+  against the conclusion; the extra rows were the unfavourable ones.
+* Sibling rules: *measure on the BOOK THE DECISION IS ABOUT* and *absence in a
+  window isn't absence*. This is the same family — the population you can see
+  was selected by something, and here the selector was a race.

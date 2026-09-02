@@ -494,9 +494,10 @@ game lines only for exchanges. Kalshi's own prices are now captured directly:
 props — a game row would collide with OddsAPI's copy under `_KEY_FIELDS`, which
 has no source term, and the two would ALTERNATE rather than merge). **This makes
 the prop side MEASURABLE; it does not show price shopping on props is worth
-anything** — that is `todo #624` step 2, and the only option-value number
-measured to date (+1.57pp, ~+1.2% ROI, n=13,093) is from GAME markets and must
-not be quoted for props.
+anything** — that is `todo #624` step 2. The game-market option-value number is
+**+1.57pp gross worth `+0.74 ROI points`** `[re-derived 2026-09-01, lane
+game-market-entry-roi-curve; the `~+1.2% ROI` first published is RETRACTED]` and
+still must not be quoted for props.
 
 Kalshi DOES quote MLB props (23 filled orders, `KXMLB*` tickers). **Until
 2026-09-01 those prices reached us ONLY through the direct feed**
@@ -508,6 +509,44 @@ MLB props, which is why step 1 was a CAPTURE and not a join.** The board's
 comparison is UNCHANGED by that capture and the 0-of-103 reading still stands:
 `quote.book_prices` is what the board reads, and changing it is step 3, gated on
 step 2.
+
+## [mlb-exchange-shopping-value] EXCHANGE PRICE-SHOPPING IS WORTH `+0.74 ROI POINTS` ON GAME MARKETS AND `+2.43%` ON THE PROP GATE BOOK — both re-derived, both smaller than first published `[verified 2026-09-01, lane game-market-entry-roi-curve]`
+
+**GAME MARKETS.** n=621 settled MLB game-market paper orders, 2026-08-22..08-31.
+Three anchors bracket: ledger stake-weighted **+6.14%**, flat-1u at the quoted
+price **+6.03%**, curve at the measured cost **+6.03%**. The book already enters
+at **0.883pp per side**. Curve: `0.00pp → +8.21%`, `0.88 → +6.04`, `2.50 →
++2.50`, `4.05 → −0.46`; slope **+1.91** (2.50→4.05pp), **+2.45** (0→1pp).
+Exchanges make **+1.579pp** available on this book's own rows; **+0.977pp is
+already banked** and of the **+0.602pp** residual **63.7% sits at books with no
+execution path**. Priced per row (n=551): no-exchange +4.49% → actual +6.69% →
+best execution venue **+7.43%** → best any book +8.45% → fair +8.98%. **The
+claimable figure is +0.74 points**, stable at +0.72..+0.77 across 15/30/60/120-min
+windows. Machinery `scripts/measure_game_market_option_value.py` (+38 tests, 11
+mutations each caught).
+
+**The `~+1.2% ROI` in the 08-31 assessment is RETRACTED**, wrong three ways: a
+`0.75` slope constant contradicting the table it cited (~1.77); a PROP book's
+curve priced against a GAME measurement; and `+1.57pp` being **ONE DATE**
+(2026-08-31 reproduces at n=13,344 / 52.4% / median +0.232pp against a published
+13,093 / 52.5% / +0.240pp; pooled over ten dates it is **+1.101pp**). **The tell
+needed no machinery: +1.57pp exceeds the 0.883pp of entry cost the whole book
+pays.**
+
+**PROPS, `#624` step 6 — STILL NOT MET on both conditions.** Re-measured on the
+HEALED 2026-09-01 shard (`e78aee52` live on web; the date passes its own guard at
+**100.0% matchable**, was 46.1%): gate book **n=1,235** (was 653), gain
+**+0.824pp** (was +0.949), two-way hold **6.5%**, **ROI +2.43%** (was +2.65%),
+shortfall **0.57** points (was 0.35). All props n=3,774, gross 70.1%/+1.709pp,
+fee-aware **52.2%/+0.985pp** — which now sits almost exactly on the game-market
+52.5%. **Repairing a file that had LOST rows made the exchange look WORSE**:
+rows before the clobber's cutoff take it 64.5% of the time for +1.021pp, the
+restored rows 40.2% for +0.737pp.
+
+**LEVEL vs SLOPE — do not spend the level.** Settlement is `settled_by =
+inferred`; real money ran **−5.5%** over adjacent days against paper's +9.4%.
+Ten dates is not a rate. 308 of 929 orders are unpriced and returned **+15.85%**
+against the priced rows' +6.14%, which plausibly OVERSTATES the residual.
 
 ## [mlb-live-lens-accuracy-refuses] THE MLB LIVE-LENS GRADER SETTLED FROM A RUNNING TALLY; it now refuses, and reads EMPTY because its feed never reaches web `[verified 2026-09-01, lane mlb-accuracy-assessment, commit 4b8d5436]`
 
