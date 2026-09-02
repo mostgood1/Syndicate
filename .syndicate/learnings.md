@@ -3900,3 +3900,55 @@ pass here is a census and two corrections — not closures.
   control is for changes whose mechanism cannot produce the observed damage.
 - **Cost.** None. But the near-miss was a correct change discarded plus a wrong
   cause recorded as fact — on a money-adjacent join, in a ledger read as evidence.
+
+## 2026-09-02 REQUIRED: before calling a thin downstream count a COVERAGE DEFECT, find the counter that ACCOUNTS for the gap and read the code that increments it. A deliberate quality filter and a broken pipeline look identical from the downstream end. `[lane kalshi-soccer-club-aliases -> finding soccer-board-coverage]`
+
+**Measured.** Kalshi lists 171 open soccer fixtures; our board carried 28. That
+reads as a coverage bug and the obvious next lever is "fix the board's soccer
+fixture coverage". It is not a bug. One read of `/api/board/layer2-shortlist`
+showed soccer selecting **1,547** rows with **129** reaching the board (8%),
+against mlb 95% and ncaaf 100%, and the accounting counter in the SAME payload
+was `rows_uninformative_ev = 1547` -- exactly soccer's selected count.
+
+`_row_ev_is_hold_restatement` drops a row whose `ev_pct` is arithmetically the
+book's own margin: a one-sided market is priced `fair = implied x (1 - hold)`,
+`expected_value_pct` is `fair/implied - 1`, so the price CANCELS and EV is
+`-hold` for every such row **regardless of the bet**. Ranking on it ranks on
+WHICH BOOK QUOTED. It fires only where the row has no model view, and soccer has
+none by the recorded `soccer-model-dispersion` decision (model worse than market
+in 8 of 9 leagues; publishing `model_edge_pct` declined). Every link deliberate.
+
+**Why this rule and not just "check first":** the two available "fixes" were
+publishing a model edge the model has not earned, and exempting soccer from the
+filter -- which puts ~1,400 rows ranked on the book's margin onto a
+money-adjacent board, against that filter's own evidence that 2,611 such rows
+topped out at -4.73 while the live shortlist's #50 was +0.64. **A coverage fix
+that removes a correct filter is indistinguishable from success at every level
+except the money.** It would have looked like a win: more rows, more fixtures,
+more Kalshi matches.
+
+**How to apply.** (1) Read the per-stage counters in the response you already
+have before theorising -- one of them usually equals the gap. (2) Then read the
+FUNCTION that increments it, not its name. (3) A filter whose threshold derives
+from the same quantity it filters on cannot be tuned around: soccer's value
+floor was `-8.1425 = -1.25 x 6.514` against rows whose EV IS `-6.514`. (4) If
+the filter is right, the lever is upstream of it -- here, giving soccer a model
+view worth ranking on. THIRD requested fix in one session that was already
+working as designed; the other two would merely have shipped inert.
+
+## 2026-09-02 FORBIDDEN: measuring a change by REPLAYING IT WITHOUT AN ARGUMENT PRODUCTION ALWAYS PASSES. The replay then measures a different system, and its null result is not about your change. `[lane kalshi-soccer-club-aliases]`
+
+**Measured.** To read whether 34 new club aliases helped, I replayed the resolve
+step on a stable slate and got `resolved=9, delta=+0` -- a clean null that would
+have justified reverting a shipped change. The replay omitted `code_names`,
+which production ALWAYS passes to `match_event_blob`; without it the code path
+that the aliases feed is not the path being exercised. Redone with production's
+arguments: **22 attempted/resolved WITH the aliases against 21 WITHOUT, +1.**
+
+Small, but the sign flipped, and the wrong sign here pointed at reverting.
+
+**How to apply.** Before trusting a replay harness, diff its call site against
+the PRODUCTION call site argument by argument -- optional/defaulted parameters
+are exactly where this hides, because the replay still runs and still returns a
+number. Sibling of "confirm the code ran": assert you are on the branch
+production takes, not merely that something executed.
