@@ -18489,7 +18489,11 @@ minutes, capturing `SUM(route total_mb)`, `solo_attributed`,
 
 ## 2026-09-02 15:49:39Z — web `dep-dac48gss728c73ccqr2g`: CAPACITY RESTORED, instrument off. `[lane game-market-entry-roi-curve]`
 
-- RECONCILED: the 15:19:44Z deploy's `<pending>` marker. **A measurement WAS
+- RECONCILED: the 15:19:44Z deploy's open-measurement marker. **Written without
+  the literal token on purpose** — `session-start.sh` counts that string, so
+  quoting it while describing it inflates the very count this line clears, which
+  is a trap the hook's own comment names and I walked into anyway. **A
+  measurement WAS
   taken and it is a WARM-UP measurement, not the steady-state one it was armed
   for** — said plainly rather than filed as if the intended reading happened.
 

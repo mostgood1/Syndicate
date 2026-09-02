@@ -4381,3 +4381,30 @@ append is defined against a base you did not check.
   session shares, use `git show <commit>:<path>` redirected to the file, then
   verify `git diff --cached --stat` is empty.
 - *(full account: `deploys.md` 2026-09-02 ~16:2xZ)*
+
+## 2026-09-02 — FORBIDDEN: a log or metric query whose window straddles a restart. You get the wrong process and it looks like an answer. `[lane web-request-memory-attribution]`
+
+**Twice in one session, on opposite questions.**
+
+* Chasing `live-odds-worker`'s early exits, I pulled logs "around" the failure
+  timestamp. The window ended AFTER the restart, so the API returned the
+  RESTARTED process's lines — entirely normal ones. Stopping there would have
+  reported "nothing unusual before the exit", true of the wrong process.
+* Verifying the memory instrument was OFF after a restore, I queried "the last 4
+  minutes" and got **1** attribution line. It was stamped **15:46:18**, three
+  minutes BEFORE the restore went live at 15:49:39Z. Read naively: "still
+  running". Re-run against the exact boundary: **0**.
+
+**Why it is not obvious in the moment.** Both readings are internally plausible.
+A restart is invisible in a log query's output — the lines do not say which
+process wrote them — so the failure mode is a confident answer about a process
+that no longer exists, or one that did not exist yet.
+
+**How to apply.**
+* **Get the restart timestamp FIRST, then pick the window**, strictly one side of
+  it. `finishedAt` from the deploys API, or the `server_restarted` event.
+* **When asking "did X stop?", query strictly AFTER the boundary.** When asking
+  "what was X doing before it died?", query strictly BEFORE.
+* **A count of 1 near a boundary deserves its timestamp read**, not just its
+  existence. Both of today's errors would have been caught by looking at the
+  stamp on the single line rather than at the fact that there was one.
