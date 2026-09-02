@@ -498,6 +498,98 @@ class OddsHistoryMergeAdmissionTests(unittest.TestCase):
             held.unlink()
 
 
+class DivergenceGuardTests(unittest.TestCase):
+    """`#488`'s shrink guard recorded a publisher whose publish it was about to
+    REFUSE, which made the refusal self-defeating. Measured 2026-09-01 on
+    `ncaaf_source/tracking/book_quotes/2026-09-05.jsonl`:
+
+        22:01:15  publisher=live-odds-worker  last=refresh-worker    REFUSED
+        22:05:03  publisher=live-odds-worker  last=live-odds-worker  ALLOWED
+
+    9.2MB replaced by 5.2MB four minutes later. The guard DELAYED the clobber by
+    one cycle while logging a REFUSED line that reads like a save.
+    """
+
+    PATH = "ncaaf_source/tracking/book_quotes/2026-09-05.jsonl"
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        target = self.root / self.PATH
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"x" * 9_229_230)          # the real existing size
+        self._patch = patch.object(ops, "data_root", return_value=self.root)
+        self._patch.start()
+        ops._PUBLISH_LAST_PUBLISHER.pop(self.PATH, None)
+        ops._PUBLISH_CONSECUTIVE_REFUSALS.pop(self.PATH, None)
+
+    def tearDown(self) -> None:
+        self._patch.stop()
+        self._tmp.cleanup()
+        ops._PUBLISH_LAST_PUBLISHER.pop(self.PATH, None)
+        ops._PUBLISH_CONSECUTIVE_REFUSALS.pop(self.PATH, None)
+
+    SMALL = 5_159_915                                  # the real incoming size
+
+    def test_a_refusal_does_not_become_permission_next_cycle(self) -> None:
+        """THE REGRESSION, replaying the measured two-cycle sequence."""
+        ops._PUBLISH_LAST_PUBLISHER[self.PATH] = "refresh-worker"
+        first, marker = ops._publish_divergence_verdict(self.PATH, self.SMALL, "live-odds-worker")
+        self.assertTrue(first, "a cross-publisher shrink must be refused")
+        self.assertIn("verdict=REFUSED", marker)
+
+        second, marker2 = ops._publish_divergence_verdict(self.PATH, self.SMALL, "live-odds-worker")
+        self.assertTrue(second, "the SECOND attempt must still be refused -- this is the bug")
+        self.assertIn("verdict=REFUSED", marker2)
+
+    def test_a_refused_publisher_never_takes_the_last_publisher_slot(self) -> None:
+        ops._PUBLISH_LAST_PUBLISHER[self.PATH] = "refresh-worker"
+        ops._publish_divergence_verdict(self.PATH, self.SMALL, "live-odds-worker")
+        self.assertEqual(ops._PUBLISH_LAST_PUBLISHER[self.PATH], "refresh-worker",
+                         "a refused attempt did not publish, so it is not the last publisher")
+
+    def test_consecutive_refusals_are_counted_so_a_permanent_block_is_visible(self) -> None:
+        """A path refused over and over is two writers fighting; without the
+        count that looks identical to a one-off."""
+        ops._PUBLISH_LAST_PUBLISHER[self.PATH] = "refresh-worker"
+        for expected in (1, 2, 3):
+            _, marker = ops._publish_divergence_verdict(self.PATH, self.SMALL, "live-odds-worker")
+            self.assertIn(f"consecutive_refusals={expected}", marker)
+
+    def test_an_allowed_publish_clears_the_streak(self) -> None:
+        ops._PUBLISH_LAST_PUBLISHER[self.PATH] = "refresh-worker"
+        ops._publish_divergence_verdict(self.PATH, self.SMALL, "live-odds-worker")
+        self.assertEqual(ops._PUBLISH_CONSECUTIVE_REFUSALS.get(self.PATH), 1)
+        ops._publish_divergence_verdict(self.PATH, self.SMALL, "refresh-worker")
+        self.assertNotIn(self.PATH, ops._PUBLISH_CONSECUTIVE_REFUSALS)
+
+    def test_a_publisher_shrinking_its_OWN_artifact_is_still_allowed(self) -> None:
+        """Retention pruning. `#488` is explicit that refusing this would break
+        real writes -- the signature of divergence is a shrink from a DIFFERENT
+        publisher."""
+        ops._PUBLISH_LAST_PUBLISHER[self.PATH] = "refresh-worker"
+        refuse, marker = ops._publish_divergence_verdict(self.PATH, self.SMALL, "refresh-worker")
+        self.assertFalse(refuse)
+        self.assertIn("verdict=ALLOWED_WITH_WARNING", marker)
+
+    def test_a_non_shrinking_publish_still_records_the_publisher(self) -> None:
+        """The ordinary path must keep working: `last` has to be maintained or
+        the guard can never detect a cross-publisher shrink at all."""
+        refuse, marker = ops._publish_divergence_verdict(self.PATH, 9_229_230, "refresh-worker")
+        self.assertFalse(refuse)
+        self.assertIsNone(marker)
+        self.assertEqual(ops._PUBLISH_LAST_PUBLISHER[self.PATH], "refresh-worker")
+
+    def test_an_unknown_publisher_is_allowed_with_a_marker_not_refused(self) -> None:
+        """`#488`: an older sender omits the header, and mapping absent onto
+        'same publisher' would silence exactly what this exists to catch."""
+        ops._PUBLISH_LAST_PUBLISHER[self.PATH] = "refresh-worker"
+        refuse, marker = ops._publish_divergence_verdict(self.PATH, self.SMALL, "")
+        self.assertFalse(refuse)
+        self.assertIn("publisher=UNKNOWN", marker)
+        self.assertIn("verdict=ALLOWED_WITH_WARNING", marker)
+
+
 class MergeDispatcherTests(unittest.TestCase):
     """ONE dispatcher, because there are TWO receive forms. A family merged by
     one transport and replaced by the other would clobber on exactly the

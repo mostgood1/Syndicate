@@ -1682,6 +1682,18 @@ _PUBLISH_STREAM_CHUNK_BYTES = 1024 * 1024
 
 _PUBLISH_DIVERGENCE_SHRINK_RATIO = 0.80
 _PUBLISH_LAST_PUBLISHER: dict[str, str] = {}
+# How many times in a row this path's publish has been refused. A permanent
+# block and a one-off look identical without it -- see the note in
+# `_publish_divergence_verdict`.
+#
+# BOTH OF THESE ARE PER-PROCESS, and web runs 8 gunicorn workers. So `last` is
+# whoever last published THROUGH THIS WORKER, and a worker that has not yet seen
+# this path reads `last=None` -> `cross=False` -> ALLOWED. The guard is
+# therefore leaky by construction and always has been; this is stated rather
+# than fixed, because a cross-process store is a different change and merging
+# (`_merge_published_artifact`) removes the need for the guard on the families
+# that actually collide.
+_PUBLISH_CONSECUTIVE_REFUSALS: dict[str, int] = {}
 
 
 def _merge_append_only_publish(target_path: Path, incoming_path: Path) -> dict:
@@ -2022,6 +2034,8 @@ def _publish_divergence_verdict(relative_path: str, incoming_bytes: int, publish
     if ratio >= _PUBLISH_DIVERGENCE_SHRINK_RATIO:
         if publisher:
             _PUBLISH_LAST_PUBLISHER[relative_path] = publisher
+        # This publish proceeds and writes, so any refusal streak is over.
+        _PUBLISH_CONSECUTIVE_REFUSALS.pop(relative_path, None)
         return False, None
     last = _PUBLISH_LAST_PUBLISHER.get(relative_path)
     who = publisher or "UNKNOWN"
@@ -2031,9 +2045,34 @@ def _publish_divergence_verdict(relative_path: str, incoming_bytes: int, publish
         f"existing_bytes={existing} ratio={ratio:.3f}"
     )
     cross = bool(publisher and last and publisher != last)
-    if publisher:
+    # `#630`: DO NOT record a publisher whose publish is about to be REFUSED.
+    #
+    # `_PUBLISH_LAST_PUBLISHER` means "who last WROTE this path". Recording a
+    # refused ATTEMPT made the refusal self-defeating: the refused publisher
+    # became `last`, so its very next attempt read as same-publisher and went
+    # straight through. Measured 2026-09-01 on `ncaaf_source/tracking/
+    # book_quotes/2026-09-05.jsonl`:
+    #
+    #     22:01:15  publisher=live-odds-worker  last=refresh-worker    REFUSED
+    #     22:05:03  publisher=live-odds-worker  last=live-odds-worker  ALLOWED
+    #
+    # and 9.2MB was replaced by 5.2MB four minutes later. The guard did not
+    # prevent the clobber, it DELAYED it by one cycle -- while logging a
+    # REFUSED line that reads like a save.
+    if publisher and not cross:
         _PUBLISH_LAST_PUBLISHER[relative_path] = publisher
-    return cross, marker + (" verdict=REFUSED" if cross else " verdict=ALLOWED_WITH_WARNING")
+    if not cross:
+        _PUBLISH_CONSECUTIVE_REFUSALS.pop(relative_path, None)
+        return False, marker + " verdict=ALLOWED_WITH_WARNING"
+    # A refusal that actually holds means this publisher's data NEVER LANDS for
+    # this path. That is a better failure than silent destruction and it is
+    # still a failure, so it is counted -- a path refused over and over is two
+    # writers fighting, and the answer is a merge (see `_merge_published_artifact`)
+    # or a single owner, not a guard. Without the count a permanent block looks
+    # identical to a one-off.
+    streak = _PUBLISH_CONSECUTIVE_REFUSALS.get(relative_path, 0) + 1
+    _PUBLISH_CONSECUTIVE_REFUSALS[relative_path] = streak
+    return True, marker + f" verdict=REFUSED consecutive_refusals={streak}"
 
 
 def _publish_streamed_body() -> Any:
