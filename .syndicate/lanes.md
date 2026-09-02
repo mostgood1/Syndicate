@@ -1345,6 +1345,147 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   is reported. A 200 with no parse is not a pass.
 - Blocked by: none.
 
+### m625-env-snapshots — OPEN — opened 2026-09-02 — session 3492626c — **⚠ STUB. THE REAL BLOCK WAS DESTROYED BY ME, `soccer-players-csv-allowlist` / session 92987093, 2026-09-02 ~16:2xZ. REPLACE THIS WHOLESALE — do not merge into it.**
+- **WHAT HAPPENED.** This lane existed ONLY as an uncommitted modification in the
+  PRIMARY tree's `lanes.md`. I ran `git checkout HEAD -- .syndicate/lanes.md`
+  intending it in MY worktree; a stray `cd` two commands earlier had moved me to
+  the primary tree, so it discarded your working copy instead. The content is
+  **not recoverable**: `git log --all -S'm625-env-snapshots'` finds no commit, and
+  none of the 20+ session worktrees' `lanes.md` carries it — including
+  `C:\tmp\syndicate-sessions\m625-env-snapshots` itself. Uncommitted, so it was
+  never in the object store.
+- **WHY THE STUB EXISTS ANYWAY:** without a block, `lane-guard` stops enforcing
+  your claim and `docs/ai_context/todo.md` becomes takeable by any session. This
+  restores the LOCK. It does not pretend to restore the lane.
+- Files: none re-asserted here, deliberately — see the next bullet.
+- **THE ONE CLAIM I CAN EVIDENCE IS `docs/ai_context/todo.md`**, because
+  `lane-guard` refused my edit at ~16:2xZ naming THIS lane as its holder — which
+  is also how I learned the lane existed. It is written as prose rather than in
+  the `Files:` block on purpose: your sibling lane `book-quotes-publish-clobber`
+  (same session `3492626c`) already claims that exact path, so the LOCK IS
+  INTACT without me restating it, and a second claim would only trip
+  `check_lane_invariants` with a contest between two of your own lanes.
+  **If this lane held any OTHER path, it is UNPROTECTED right now** — I have no
+  record of it. Re-add before doing anything else.
+- Goal: UNKNOWN — lost with the block. The slug suggests `#625` and env
+  snapshots; I did not read the body and will not invent one.
+- Hypothesis / Falsification test / Verification: UNKNOWN, lost.
+- Blocked by: none known.
+- **My fault, recorded in full in `deploys.md` 2026-09-02 and as a standing rule
+  in `learnings.md`.** Session `3492626c` is not in the session roster; the
+  ledger's own ownership pass associates this session id with `local_ea1e4863`,
+  which I have messaged.
+
+### keyvalue-pressure-637 — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
+- Goal: `#637`. Say WHAT holds the shared Redis at 93% and WHETHER the eviction it
+  is doing costs anything, with numbers. Diagnosis only — **no production mutation
+  in this lane.** `/api/ops/keyvalue/expire-run-artifacts` and `/api/ops/keyvalue/sweep`
+  are both POST and both destructive; neither is called without an explicit decision.
+- Files: **NONE CLAIMED.** Read-only investigation. If it produces a code change
+  the fix gets its own lane and its own claim.
+- Hypothesis (written BEFORE the reader trace): `reports/intelligence/venue_odds/`
+  is the dominant consumer, and a material slice of it is DEAD — files keyed to
+  game dates already in the past, kept alive only by the blanket 10-day
+  date-token TTL, long after the CLV comparison they exist for could be made.
+- Falsification test: a reader that legitimately needs past-date venue_odds files
+  for the full 10 days falsifies "dead". Then the pressure is real load, not
+  waste, and the answer is a smaller retained payload or a bigger instance — not
+  expiry.
+- MEASURED SO FAR (web, 2026-09-02, `/api/ops/keyvalue/{usage,diagnostics}`):
+  - store **2,650 keys / 224.3 MB estimated**; Redis `used_memory` **250,937,536**
+    of `maxmemory` **268,435,456** (~93%), policy `volatile-lru`,
+    `evicted_keys` **11,852** over an uptime of 936,662s (~10.8 days, so ~1,100/day
+    against 2,650 resident keys), `keyspace_misses` 13.27M vs `keyspace_hits` 9.85M.
+  - **`reports/intelligence` is 194.92 MB — 87% of the store.** Everything else
+    combined is ~30 MB.
+  - Inside it, **41 `venue_odds` keys hold 114.9 MB — 51% of the whole store.**
+    By sport: ncaaf 48.0, mlb 43.7, soccer 12.3, nfl 8.9, wnba 2.0 MB.
+  - Game dates span **2026-08-29 .. 2026-09-14**. The three dates already in the
+    PAST hold **29.4 MB** (08-29 9.0, 08-30 2.9, 08-31 17.5). A single future
+    date, 09-05, is already at **22.5 MB** three days out.
+  - Mechanism: `venue_daily_odds.record_daily_odds` is an ACCUMULATOR — it reads
+    the existing state, appends a price point per market per tick, and writes
+    back. `MAX_POINTS_PER_MARKET = 48` caps per market, so growth is in the
+    market COUNT, and a lookahead market opens days before its game.
+- Verification: a reader trace for `daily_odds_path`, stating which consumers read
+  a PAST-date file and over what horizon; plus whether these are duplicated to
+  disk via `HOT_ARTIFACT_PATTERNS`.
+- **HYPOTHESIS CONFIRMED, AND THE REAL DEFECT IS BIGGER AND DIFFERENT FROM
+  MEMORY PRESSURE.** Two findings, in order of what matters:
+
+  **(1) `venue_odds` WRITES ARE FAILING IN PRODUCTION RIGHT NOW — 2,203 rejected
+  writes on live-odds-worker between 2026-09-01T00:00Z and 2026-09-02T16:04Z.**
+  Found by predicting it from the sizes rather than by reading logs at random:
+  keys sitting exactly on the 8 MiB allocator bucket should be hitting
+  `_guard_keyvalue_payload_size`, and they are.
+
+  | key | rejections |
+  |---|---|
+  | `kalshi__ncaaf__2026_09_05.json` | **964** |
+  | `polymarket__ncaaf__2026_09_05.json` | **688** |
+  | `kalshi__mlb__2026_09_01.json` | 162 |
+  | `kalshi__mlb__2026_08_31.json` | 137 |
+  | `polymarket__mlb__2026_09_01.json` | 136 |
+  | `polymarket__mlb__2026_08_31.json` | 116 |
+
+  Sample: `size_bytes=8789596 max_bytes=8388608 caller=venue_daily_odds.py:293`.
+  **NOTHING outside `venue_odds` is being rejected** — the whole 2,203 is this
+  one artifact class. Each rejection means that tick's price points were
+  DISCARDED: the file froze at its last sub-ceiling write and every subsequent
+  move is lost. NCAAF 09-05 has been frozen for ~40 hours and counting.
+
+  **Blast radius is contained, checked not assumed:** `record_daily_odds` catches
+  the write and returns `{"status": "error"}`, and `record_venue_book` loops over
+  every `(sport, game_date)` group, so one oversized file does NOT abort the
+  others. It is counted in `errors` and logged — and nothing acts on either.
+
+  **ROOT CAUSE: the trim caps are dimensionally wrong.** `MAX_POINTS_PER_MARKET
+  = 48` and `MAX_MARKETS_PER_FILE = 8000` bound COUNTS, while the constraint
+  that actually fires is BYTES. 8,000 markets cannot fit in 8 MiB at any
+  plausible per-market size, so the cap can never be the thing that keeps the
+  file writable. The module's own docstring says the per-(sport, date) split
+  exists *because* "the keyvalue store refuses at 8MB" — the split is simply not
+  fine enough for an NCAAF slate.
+
+  **(2) THE 114.9 MB HAS NO READER AT ALL — not "no past-date reader".** Full
+  trace: `venue_odds` appears in exactly three modules. `venue_daily_odds.py`
+  (defines the path; the only read is `record_daily_odds`'s own
+  read-modify-write of the file it is about to write), `venue_odds_loop.py`
+  (drives the writes), and `intelligence_state.py` (comments + starting the
+  loop). Both external importers — `kalshi_odds_refresh.py:1190` and
+  `run_live_odds_refresh_worker.py:903` — import only `record_venue_book` and
+  `*_daily_rows`, i.e. WRITE paths. Nothing consumes the record.
+
+  **That is not the same as worthless, and the module says so.** It is a
+  deliberate capture-first investment: the join is meant to become "a CONSUMER
+  of that record rather than its gatekeeper", so tomorrow's grammar can be
+  written from real strings. The consumer was never built. The problem is not
+  that the data is captured, it is that a write-only archive is being kept in a
+  256 MB Redis where it competes with live operational state — and is now large
+  enough to break its own writes.
+
+  **My original framing was too narrow and is corrected:** I hypothesised
+  "past-date files are dead weight kept alive by the 10-day TTL". The 10-day TTL
+  is DELIBERATE and documented, and CLV openings do not depend on these files —
+  they live in the undated `clv_opening_ledger`. So the TTL is not the defect.
+- **NOT CLAIMED:** that any specific eviction harmed anything. `evicted_keys` is
+  cumulative and names no key; the instrument cannot attribute, and I did not
+  find a single named victim. The eviction number is context for the pressure,
+  NOT evidence of damage. The damage I did find is the 2,203 rejected writes,
+  which is a different mechanism entirely — a hard guard, not LRU.
+- **OWED, AND BLOCKED BY A LIVE CLAIM:** the `#637` rewrite and a new `#638` for
+  the rejected writes are NOT in `docs/ai_context/todo.md`. That file is claimed
+  by OPEN lane `m625-env-snapshots` (session `3492626c`, opened 2026-09-02 — TODAY,
+  with no `released:` note), so `lane-guard` correctly blocked the edit and I did
+  not work around it. **Everything is in this block instead; nothing is lost, but
+  a reader of `todo.md` alone will not see it.** Whoever holds that file next
+  should lift the two entries from here verbatim. `#638` is the free id — ids run
+  to `#637`.
+- Blocked by: none for the diagnosis (it is complete). **No production mutation
+  performed and no code changed — the fix is a DECISION (byte-aware trim vs.
+  moving the class off keyvalue) and wants its own lane and claim on
+  `venue_daily_odds.py`.**
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -4356,3 +4356,28 @@ or the next session to commit that file lands a duplicate.
 legitimately sit modified there all day. It is that the primary tree's copy of
 a shared file is a THIRD version — not your edit, not `origin/main` — and an
 append is defined against a base you did not check.
+
+## 2026-09-02 FORBIDDEN: a `git` command that can DISCARD work taking its tree from the working directory. `cd` persists, and the destructive call is not the one that moved you.
+
+- **I deleted another session's OPEN lane from the shared tree.** `m625-env-snapshots`
+  (session `3492626c`) existed only as an uncommitted modification in the PRIMARY
+  `lanes.md`. I ran `git checkout HEAD -- .syndicate/lanes.md` believing I was in
+  my worktree. A `cd` to the primary tree **two commands earlier**, added purely so
+  `render_logs.py` could read `RENDER_API_KEY` from `.env`, had re-homed the shell —
+  and the working directory persists between calls. Not recoverable: no commit
+  contains it (`git log --all -S`), no worktree carries it, it was never staged.
+- **The rule.** Any command that can discard or overwrite states its tree IN THE
+  SAME INVOCATION — `git -C <path> checkout ...`, `git -C <path> reset ...`. Not
+  "remember where you are". The `cd` that re-homes you is usually innocent, serves
+  a different purpose, and is far away from the call that does the damage.
+- **What actually caught it was the existing rule, and it earned its keep:**
+  `git diff --cached --stat` read **81 insertions, 294 deletions** on a change I
+  knew was additive. Committing on the belief instead of the reading would have
+  deleted a second live lane, `book-quotes-publish-clobber`, from `origin/main`.
+  A diff whose SHAPE contradicts what you think you did is the signal — not the
+  file list, the sign.
+- **Corollary on repair:** `git checkout <commit> -- <path>` also writes the
+  SHARED INDEX. To fix a working file without touching the index that every
+  session shares, use `git show <commit>:<path>` redirected to the file, then
+  verify `git diff --cached --stat` is empty.
+- *(full account: `deploys.md` 2026-09-02 ~16:2xZ)*

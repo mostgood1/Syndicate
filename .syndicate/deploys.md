@@ -18522,3 +18522,60 @@ BEFORE the first of the two readings.
 
 Collector stopped. Deploy claim released. **Half-capacity window: 15:19:44Z to
 15:49:39Z, ~30 minutes.**
+---
+
+## 2026-09-02 ~16:2xZ — **NO DEPLOY. I DESTROYED ANOTHER SESSION'S UNCOMMITTED LANE BLOCK.** — lane `keyvalue-pressure-637`
+
+Recorded here because `deploys.md` is the ledger that gets read, and this is a
+loss another session will otherwise discover as a mystery.
+
+**What I destroyed.** Lane `m625-env-snapshots` (OPEN, opened 2026-09-02, session
+`3492626c`), which existed ONLY as an uncommitted modification in the PRIMARY
+tree's `.syndicate/lanes.md`. Gone: goal, hypothesis, falsification test,
+verification, and any claim other than `docs/ai_context/todo.md`.
+
+**How.** I ran `git reset -q HEAD .syndicate/lanes.md && git checkout HEAD --
+.syndicate/lanes.md`, intending it in MY worktree. Two commands earlier a
+`cd /c/Users/tempadmin/OneDrive/Coding/Syndicate` — added only so
+`scripts/render_logs.py` could find `RENDER_API_KEY` in `.env` — had moved the
+shell to the primary tree, **and the working directory persists between calls.**
+So the discard landed on the shared tree.
+
+**NOT RECOVERABLE, checked three ways:** `git log --all -S'm625-env-snapshots' --
+.syndicate/lanes.md` finds no commit; no session worktree's `lanes.md` carries
+it, INCLUDING `C:\tmp\syndicate-sessions\m625-env-snapshots` itself; it was never
+staged. Uncommitted content is not in the object store.
+
+**THE TRIGGER THAT SAVED THE REST — and it is the existing rule, not a new one.**
+`git diff --cached --stat` before committing read **`81 insertions, 294
+deletions`** on a change I knew was purely additive. That number is the only
+reason I looked. Had I committed on the strength of "my edits were additive",
+`book-quotes-publish-clobber` — a live OPEN lane — would have been deleted from
+`origin/main` too.
+
+### what I repaired, and what I did not
+
+- **Primary `lanes.md` restored to `origin/main`'s content**, which is strictly
+  newer than the stale HEAD my discard left behind (primary HEAD `c87a73f0` is 36
+  commits behind and NOT an ancestor of `origin/main`). Done with
+  `git show origin/main:... | Out-File`, **working file only** — deliberately not
+  `git checkout origin/main -- <path>`, which also writes the SHARED index.
+  Verified `git diff --cached --stat` empty afterwards.
+- **A STUB lane block for `m625-env-snapshots`** is now on `origin/main`, marked
+  to be replaced wholesale. It restores no content — it exists so the lane is
+  visible and its loss is discoverable at the place its owner will look.
+- **The stub deliberately does NOT re-claim `docs/ai_context/todo.md`.** The
+  sibling lane `book-quotes-publish-clobber` (same session) already claims that
+  path, so the lock is intact; a second claim would only produce a contest
+  between two of that session's own lanes. Stated in the stub so it does not read
+  as an oversight.
+- **NOT repaired:** the lane's actual content. It is lost and I say so plainly
+  rather than reconstructing a plausible-looking goal I never read.
+
+### the rule
+
+**A `cd` added for one command's benefit silently re-homes every command after
+it, and the destructive one may be twenty calls later.** The fix is not "be
+careful": it is that any command which can DISCARD work states its tree
+explicitly in the same invocation — `git -C <path> checkout ...` — so the
+working directory cannot supply it. Written to `learnings.md`.
