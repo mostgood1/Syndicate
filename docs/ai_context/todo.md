@@ -40,8 +40,59 @@ whose publish it had just REFUSED, making the refusal a one-cycle delay
 `8db62f85`, with a `consecutive_refusals=N` counter. **This item is only the
 remaining PER-PROCESS hole.**
 
-**ENUMERATION RUN 2026-09-02. THE ANSWER IS STRUCTURAL, NOT A LIST: EVERY
-ALLOWLISTED PATTERN HAS TWO POTENTIAL WRITERS.**
+**ENUMERATION RUN AND THEN CORRECTED, 2026-09-02. THE ANSWER: 39 PATH FAMILIES
+ARE PUBLISHED BY BOTH WORKERS, NONE OF THEM MERGED. `#634` IS NOT MOOT.**
+
+**The instrument exists and I first said it did not.** `publish_hot_artifact`
+DOES log success — `[artifact_publisher] PUBLISH_OK path=... transport=...` —
+so each service's published-path set is directly readable. My earlier note
+("no success log, only failures") was wrong and sent the first pass down an
+inference route it did not need.
+
+Measured over 03:20–03:55Z, per service, excluding per-run `migration_runs`
+scratch: **refresh-worker only 31 · live-odds-worker only 20 · BOTH 39.**
+
+    mlb_source/tracking/book_quotes/<date>.state.json      <-- SEE BELOW
+    mlb_source/source_artifacts/data/daily/daily_summary_<date>.json
+    mlb_source/source_artifacts/data/daily/sims/<date>/sim_*.json   (all 6)
+    mlb_source/source_artifacts/data/daily/snapshots/<date>/{lineups,meta,
+        probables,roster_*,roster_events,schedule_raw}.json
+    mlb_source/source_artifacts/data/weather/weather_<date>.json
+    mlb_source/data/live_lens/live_lens_report_<date>.json  (+ render_sync twin)
+    mlb_source/data/daily/snapshots/<date>/oddsapi_{game_lines,hitter,pitcher}*.json
+    nfl_source/data/book_grid/book_grid_<date>.json
+    soccer_source/data/book_grid/book_grid_<date>.json
+    soccer_source/<9 leagues>/api/live_state/live_state_<date>.json
+
+**THE ONE THAT SHOULD WORRY US MOST:**
+`mlb_source/tracking/book_quotes/<date>.state.json` — the sidecar
+`_is_append_only` DELIBERATELY excludes from merging because it is a dict
+rewritten whole every flush. Two writers, no merge, and the guard is the only
+thing standing between them. It is what `read_quote_last_seen` reads, i.e. what
+`seen_age_seconds` is computed from, so a clobber there does not error — it
+makes staleness read wrong on every market on the board.
+
+**A CORRECTION TO THIS ITEM'S OWN FIRST ANSWER.** I wrote "every allowlisted
+pattern has two potential writers, because both workers sweep ALL of them". That
+is wrong for exactly the files that were being clobbered. The sweep SKIPS
+anything over `_PUBLISH_MAX_BYTES` (**12 MiB**), and measured over-ceiling
+artifacts are `book_quotes` (150–157 MB), `odds_history` (18–56 MB), `book_grid`
+(~13 MB) and `daily_ladders` (~14 MB). So:
+
+    over 12 MiB  -> sweep skips  -> DIRECT writers only -> book_quotes/odds_history
+                                    (both already merged by `#630`)
+    under 12 MiB -> sweep publishes from BOTH workers -> the 39 above, NONE merged
+
+The ceiling is doing load-bearing work nobody chose it for, in both directions:
+it exempts the biggest artifacts from the sweep, and it leaves everything
+smaller contested.
+
+**OLD FRAMING, kept because the mechanism is still real for under-ceiling
+files:** `sweep_changed_hot_artifacts` iterates every `HOT_ARTIFACT_PATTERNS`
+entry and publishes anything whose mtime moved — 58 sweeps on live-odds-worker,
+12 on refresh-worker over 02:00–02:30Z. A PULL moves mtime.
+`_publisher_identity()` is `SYNDICATE_REFRESH_LANE`, so the header names the
+SERVICE, not the code that wrote the bytes.
 
 `artifact_publisher.sweep_changed_hot_artifacts` iterates **every**
 `HOT_ARTIFACT_PATTERNS` entry and publishes any file whose mtime moved:
@@ -78,9 +129,10 @@ ceiling can still overwrite them. The ceiling is doing load-bearing work nobody
 chose it for.
 
 **Options, cheapest first:**
-1. ~~Enumerate.~~ **DONE — and it did NOT close this as moot.** The answer is
-   that the guard's per-process state is leaky across the WHOLE allowlist, not a
-   couple of paths.
+1. ~~Enumerate.~~ **DONE — and it did NOT close this as moot.** 39 contested
+   path families, none merged, including the `book_quotes` `.state.json` sidecar
+   that drives `seen_age_seconds`. Whichever option follows, it is protecting
+   real artifacts, not a hypothetical.
 2. **Extend merging** to whichever families the sweep finds, which removes the
    need for the guard there too.
 3. **Move the state cross-process** via `refresh_state_store` (keyvalue), which
