@@ -17539,3 +17539,132 @@ what was owed here, not a score.
 - NOTE for the next reader: web returned **502 twice** on `/api/ops/artifacts/stream`
   before answering on retry. The shard read needs a backoff; a single 502 there
   is not evidence the rows are absent.
+
+## 2026-09-02 00:20:33Z — web ← `8db62f85` — `#488` guard: a refused publish no longer takes the last-publisher slot — lane `book-quotes-publish-clobber`
+
+- **Deploy** `dep-dabmnk7qj5pc738l5ivg`. Live `8db62f85` confirmed via
+  `/api/ops/version` at 00:24:04Z. Claim re-acquired (previous released cleanly
+  **with its token**, not `--force`); preflight CLEAR for the exact SHA.
+- **THE DEFECT.** `_publish_divergence_verdict` wrote
+  `_PUBLISH_LAST_PUBLISHER[path] = publisher` on EVERY branch, including the one
+  where it had just decided to REFUSE. The refused publisher became `last`, so
+  its next attempt read as same-publisher and went through:
+  `22:01:15 REFUSED` → `22:05:03 ALLOWED`, **9.2MB replaced by 5.2MB**. The
+  guard DELAYED the clobber by one cycle while logging a REFUSED line that reads
+  like a save — the worst shape a guard can have.
+- **PROVEN TO DISCRIMINATE (off != on), not merely to pass:**
+
+      FIXED : attempt1 refused=True   attempt2 refused=True
+      OLD   : attempt1 refused=True   attempt2 refused=False
+
+- **Added** `consecutive_refusals=N` to the marker: a refusal that HOLDS means
+  that publisher's data never lands for that path — better than silent
+  destruction, still a failure, and indistinguishable from a one-off without a
+  count.
+- **STATED, NOT FIXED:** both dicts are PER-PROCESS across 8 gunicorn workers,
+  so `last` is per-worker and an unseen path reads `last=None` → ALLOWED. The
+  guard is leaky by construction and always has been; documented at the
+  constant. Merging removes the need for it on the families that actually
+  collide.
+- **verify (owed, and likely rare now):** a `PUBLISH_DIVERGENCE ...
+  verdict=REFUSED consecutive_refusals=2` — i.e. a SECOND consecutive refusal on
+  one path, which the old code could not produce. Expected to be uncommon
+  precisely because `book_quotes` and `odds_history` now merge instead of
+  refusing, so this may sit UNEXERCISED. Not claimed as verified.
+
+### MEMORY — A REAL WATCH ITEM, NOT A CLEAN BILL
+
+Immediately BEFORE this deploy, with `odds_history` merges running under
+`cf569731`, web's gunicorn workers read **591.7 MB and 591.0 MB** — up from
+~300–400 MB earlier in the evening. Consistent with a merge peak of ~276–343 MB
+landing on top of a ~300 MB baseline.
+
+**The post-deploy reading (408 MB / 317 MB) proves nothing** — every deploy
+reboots the workers, so the floor resets and any ratchet looks fixed for a few
+minutes. **The floor IS the ratchet.**
+
+**What to watch:** web worker RSS over the next few hours against the ~750 MB
+historical baseline and the 2Gi limit. The admission lock bounds CONCURRENCY to
+one merge service-wide, but it does not stop RSS ratcheting on each worker that
+runs one. If the floor climbs past ~900 MB/worker, lower
+`_ODDS_HISTORY_MERGE_MAX_INPUT_BYTES` or move the odds_history merge off the
+request path entirely.
+
+## 2026-09-02 00:35:36Z — web ← `f027fda6` — `#630` the merge lock was PER-DIRECTORY; worker count in the comment was wrong — lane `book-quotes-publish-clobber`
+
+- **Deploy** `dep-dabmum2jobas738c1ec0`. Live `f027fda6` confirmed via
+  `/api/ops/version` at 00:41:41Z (4 x 502 during the update, expected). Claim
+  acquired; preflight CLEAR for the exact SHA; released with its token after.
+- **Deployed at the user's explicit direction while a memory watch was armed.**
+  I had held this deploy because a reboot resets the memory floor and destroys
+  the reading. Cost turned out to be **one sample** (only 00:27Z had landed), so
+  the objection was real and cheap. Watch restarted post-deploy on the final
+  code; the earlier log is kept but its floor now spans a reboot and is void.
+- **FIX 1 — the lock did not bound the case it was built for.** Keyed on
+  `target_path.parent`, so `<sport>_source/tracking/odds_history/` and
+  `<sport>_source/artifacts/<sport>/odds_history/` took DIFFERENT locks — and
+  those twins are exactly the pair observed publishing **2 seconds apart**. Now
+  one lock at `data_root()`, with a test asserting the twin is blocked by it.
+- **FIX 2 — the justification was wrong even though the code was right.** I had
+  written "8 gunicorn workers, each single-request", copied from a note further
+  down the same file. The live process list says
+  **`--workers 2 --threads 4`**: two processes, four concurrent requests each,
+  so merges can race INSIDE one process. `O_CREAT|O_EXCL` is correct for both
+  the cross-process and cross-thread case, so nothing shipped wrong — but the
+  next guard built on "single-request" would be an in-process lock that does
+  nothing.
+- Both found by reading `/api/ops/memory`'s process list while setting up the
+  watch. Neither would have been caught by a test.
+- **verify:** no `ARTIFACT_MERGE_FALLBACK ... merge_busy` storm (occasional is
+  by design and self-healing); `ARTIFACT_MERGE ... odds_history` continues; and
+  the memory floor below.
+
+### MEMORY WATCH — RUNNING, NO VERDICT YET
+
+Pre-deploy, one sample on `8db62f85` (per-directory lock, i.e. up to 2
+concurrent merges — the worse case):
+
+    00:27:02   total 1549.2   unreclaimable 890.4   workers 410.7 / 507.3
+
+At 00:35Z, immediately before this deploy: workers **503.5 / 464.9** — one had
+*fallen* from 507.3, so no monotonic climb was visible in that window.
+
+Watch restarted 00:42Z for 180 min at 10-min samples, alarm on an
+**unreclaimable floor > 900 MB** against the 2048 MB cap and a ~750 MB
+historical baseline. **`container_memory_mb` is NOT the figure** — it includes
+page cache, which this merge inflates by reading and writing 50MB+ files.
+**No ratchet is claimed or ruled out yet.**
+
+## 2026-09-02 01:34Z — refresh-worker `ad1de331` — 34 Kalshi soccer club aliases: FALSIFICATION SIGNAL FIRED, THEN THE CONTROL EXONERATED IT
+- lane: `kalshi-soccer-club-aliases` (session 41d46db0). Deploy dep-dabn3gijobas738cgpmg, created 00:45:54Z, live **00:48:50Z**, claim+preflight CLEAR pinned to the SHA, killed nothing.
+- **FIRST POST-DEPLOY CYCLE LOOKED LIKE A REGRESSION AND I REPORTED IT AS ONE:**
+
+      01:02:08Z   event_not_on_our_board  314 -> 775   (UP)
+                  soccer_matches           51 -> 4     (DOWN 92%)
+
+  The lane's own pre-registered falsification test says that reverts.
+- **THE CONTROL CYCLE — SAME CODE, NOTHING CHANGED — RECOVERED ON ITS OWN:**
+
+      01:34:22Z   soccer_matches           4 -> 52
+                  event_not_on_our_board 775 -> 380
+                  kalshi soccer kept       948 both cycles (denominator FLAT)
+
+  So the 4 was a single-cycle slate-state dip, not the aliases.
+- **THE LESSON, AND IT IS THE EXPENSIVE KIND.** Reverting on the first reading
+  would have discarded a safe, correct change — and would then have been
+  "confirmed" by matches returning to ~52, because they were going to do that
+  regardless. A pre-registered falsification test still needs a CONTROL before
+  it is acted on: on this instrument one cycle is not evidence, and the cheap
+  discriminating experiment (wait one cycle, change nothing) costs ~15 minutes
+  against a revert-and-redeploy round trip of ~45.
+- **WHAT MADE WAITING DEFENSIBLE RATHER THAN WISHFUL:** the change is provably
+  additive — 0 of the 34 keys were dropped-as-ambiguous by the derived map (so
+  no deliberate safety refusal was overridden), 0 were already present, the
+  overlay is `setdefault`, and no `event_matches_two_games` refusals appeared.
+  Had any of those failed I would have reverted immediately instead.
+- **STILL NOT DEMONSTRATED: that the aliases HELPED.** soccer_matches 51 -> 52 is
+  inside cycle-to-cycle noise, and `event_not_on_our_board` 314 -> 380 moved with
+  a denominator that also moved (`market_is_for_another_date` 1,919 -> 1,170 let
+  749 more markets reach the club stage). **The 34 aliases are SAFE and their
+  BENEFIT IS UNMEASURED.** Reading it needs a stable slate and a per-sport
+  attempted/resolved rate, not a total. Not claimed either way.
