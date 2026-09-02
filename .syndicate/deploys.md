@@ -18273,3 +18273,101 @@ silently: the resolver still returns a divisor rather than 1.0.
 `SHIPPED_DIVISOR` as comma-separated lists and compares every bucket to the
 pre-divisor BASE, never to its neighbour, precisely so the next re-fit cannot
 be read as confirming a step it has no power to resolve.
+
+## 2026-09-02 13:46:18Z — refresh-worker `ad1de331` — **`todo #628`'s PENDING PRODUCTION READ: PASS.** `Max Muncy (2002)` -> `maxmun` in production, on a pregame board
+
+- lane: `maxmun-pregame-read` (session `ae526656`, scheduled task
+  `todo-628-maxmun-pregame-read`) · **NO DEPLOY — read-only verification** of the
+  2026-09-01 22:14Z `cc1feccc` entry, which recorded the derivation fix
+  (`38dd9f41`, lane `prop-name-disambiguator-derivation`) as LIVE with its
+  decisive input absent. That entry, its 22:05Z follow-up, and
+  `findings_2026-09-01_prop_rung_miss_rate.md` are what this discharges.
+- **OBSERVED WINDOW, not dispatch time.** The scheduled task was dispatched
+  earlier; the reads actually ran 2026-09-02 **14:31Z–14:40Z** (09:31–09:40 CT).
+  The log line quoted below is stamped **13:46:18Z**, the most recent
+  `POLYMARKET_UNMATCHED` emission before the read; the only other emission in
+  the covered window was 13:55:09Z. Two board-build cycles, both pregame.
+
+**THE INPUT WAS PRESENT THIS TIME.** Served
+`/api/board/layer2-shortlist?date=2026-09-02&limit=2000` at 14:31Z: **1
+disambiguated name in 307 distinct `player_name`s**, `Max Muncy (2002)`, on 4
+rows (`batter_home_runs` 0.5 and 1.5, `batter_total_bases` 1.5,
+`batter_runs_scored` 0.5), fixture `ATH @ TEX`, `event_id a5c57f0a71bf...`,
+`game.state = "pregame"`, first pitch `2026-09-02T18:35:00Z` — i.e. ~4h47m
+BEFORE the game, which is exactly the condition 2026-09-01 could not supply
+(three instruments put that row off the feed at ~20:18Z, 97 min pre-deploy).
+
+**THE DECISIVE LINE** — `[portfolio_commit] POLYMARKET_UNMATCHED counts=...`,
+refresh-worker, `2026-09-02T13:46:18.027633152Z`, one entry of `samples=[...]`,
+quoted verbatim:
+
+    {'kind': 'no_match', 'board': 'Athletics @ Texas Rangers',
+     'want': 'batter_home_runs|over|0.5', 'date': '2026-09-02',
+     'offered': ['tor-cle@0.5', 'tor-cle@1.5', 'tor-cle@0.5', 'tor-cle@1.5', 'tor-cle@0.5'],
+     'player': 'Max Muncy (2002)', 'token': 'maxmun',
+     'fixture_tokens': ['jakbur', 'wyalan', 'corsea', 'branim', 'jusfos', 'ezedur'],
+     'token_lines': []}
+
+`token` reads **`maxmun`**. Pre-fix this name derived **`max200`** (measured
+2026-09-01 20:30Z, classified `player_not_listed` with a token no venue will
+ever write). **The strip is effective in production, not merely present.**
+
+- **The expected value was derived by EXECUTING THE DEPLOYED TREE, not from
+  memory and not from the primary checkout.** `git show
+  ad1de331:syndicate/features/shared/polymarket_board_join.py` -> executed:
+  `'Max Muncy (2002)' -> maxmun`, `'Max Muncy' -> maxmun` (the disambiguator
+  changes nothing, which is the point), `'Fernando Tatis Jr.' -> fertat`
+  unregressed, `'Brett Bateman' -> brebat` with alt43 `bretbat`. This is a
+  derivation of the EXPECTED token, NOT the measurement — the measurement is
+  the production line above. (Per the 09-02 replay rule: a local replay is not
+  evidence about production; it is here only to say what PASS would look like.)
+- **Live SHA read, not assumed:** `scripts/pending_deploys.py` -> refresh-worker
+  `live=ad1de331` (later than `cc1feccc`; web `5e6c4d75`, live-odds-worker
+  `7e76478f`). Content-checked, not ancestry alone: `prop_same_name_collision_at_venue`
+  present at line 2311 of that SHA's copy, strip present in `_player_name_words`.
+
+**`prop_same_name_collision_at_venue` COUNT: ZERO — and zero is the expected
+reading, NOT the guard firing.** Stated with its instrument, because a zero on a
+dead instrument proves nothing: the counter lives in the join's `refusals` dict,
+which IS emitted every cycle on `[portfolio_commit] POLYMARKET_BOARD_JOIN`, and
+that dict was POPULATED on both cycles — 13:46:18Z carried 10 distinct reasons
+(`market_type_not_a_game_line` 5092, `segment_market_not_full_game` 4345,
+`no_matching_polymarket_market` 1652, `outcomes_count_mismatch` 974,
+`board_market_not_a_game_line` 566, `no_polymarket_market_for_league_date_market`
+453, `venue_price_inverted_vs_book` 54, `side_not_an_outcome_of_this_market` 32,
+`ladder_not_monotonic` 11, `board_row_is_a_segment_bet` 2), and 13:55:09Z
+similarly. `prop_same_name_collision_at_venue` is absent from both = 0. A live
+dict with the key absent is a real zero. Reachability stays test-pinned.
+
+**ONE LIVE OBSERVATION OF THE COLLISION CONDITION'S OTHER HALF**, worth
+recording because it is the first production sighting and it is NOT a defect.
+Same log family, `2026-09-02T13:55:09.098181275Z`:
+
+    {'kind': 'no_match', 'board': 'Milwaukee Brewers @ Chicago Cubs',
+     'want': 'batter_hits|under|0.5', ..., 'player': 'William Contreras',
+     'token': 'wilcon', 'fixture_tokens': ['wilcon2', 'jaccho', 'britur',
+     'andvau', 'nichoe', 'petarm'], 'token_lines': []}
+
+The venue's collision-extended `wilcon2` is listed for that fixture and the
+plain `wilcon` is NOT, so nothing matched and the guard was never reached — it
+sits after `picked`, on MATCHED rows only. This is the documented coverage miss
+(we only ever produce the plain form), behaving exactly as the docstring says.
+The guard's own condition — both forms coexisting in one matched fixture — did
+not occur today.
+
+- **Why this row is still `no_match` and that is CORRECT:** `fixture_tokens` for
+  ATH @ TEX are `['jakbur','wyalan','corsea','branim','jusfos','ezedur']` —
+  `maxmun` is not among them. The venue does not list this player for this
+  fixture. The token is now RIGHT and the coverage miss is the venue's, which is
+  the refusal this module prefers. A `maxmun`-keyed MATCH was never the pass
+  criterion and must not be read as one.
+- **Population caveat, standing:** the `prop_classes` and refusal rates on these
+  two lines are PREGAME (board_rows 3529 then 1592). Do not compare them against
+  2026-09-01's live-slate readings — measured that night, n went 532 -> 237 in
+  12 minutes at first pitches.
+
+verify: the `token: 'maxmun'` field on the quoted
+`2026-09-02T13:46:18.027633152Z` `POLYMARKET_UNMATCHED` sample for
+`'player': 'Max Muncy (2002)'`, on refresh-worker `ad1de331`, against a served
+board row for that name in `game.state = "pregame"` at 14:31Z. That is the
+reading; nothing here is a thing-I-will-watch.

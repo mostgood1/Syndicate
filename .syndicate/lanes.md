@@ -1262,6 +1262,27 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   in this lane -- it needs its own decision)
 - **LANDED to `origin/main` by lane `game-market-entry-roi-curve` (session 02ec72a5) `[user decision 2026-09-01: "land their lane block too"]`.** This block existed ONLY in the shared primary tree's uncommitted copy, so no one reading the landed ledger could see this lane — its OPEN status, its file claims, or its findings. **Extracted and reapplied onto current `origin/main`, NOT committed from the shared tree's copy of `lanes.md`**, which is many commits behind and carries other sessions' uncommitted blocks; committing that file would have reverted what landed since and swept in work that was not mine to move. Body verbatim apart from the header parenthetical, which said "todo.md entry OWED, blocked" and would have handed the next session a blocker that no longer exists.
 
+
+
+### maxmun-pregame-read — OPEN — opened 2026-09-02 — session ae526656-29ed-4bb4-bee5-e3c9e4e0a583 (scheduled task `todo-628-maxmun-pregame-read`)
+- Goal: discharge `todo #628`'s PENDING PRODUCTION READ — one production log line
+  showing a board name carrying a parenthetical disambiguator deriving its plain
+  3+3 token (`maxmun`-style, never `max200`-style), taken on a PREGAME board.
+- Files: .syndicate/deploys.md, .syndicate/lanes.md
+- Note: the todo item's own file is deliberately NOT claimed here. The `#628`
+  paragraph edit is already LANDED as `51f16af6` via the worktree flow, and
+  `book-quotes-publish-clobber`'s own heading records that it RELEASED that file
+  on 2026-09-01. Claiming it would manufacture a contest over a file this lane
+  no longer writes.
+- Hypothesis: `38dd9f41`'s parenthetical/pure-digit strip in
+  `_player_name_words` is live and effective in production, not merely present.
+- Falsification test: a `POLYMARKET_UNMATCHED` sample naming a disambiguated
+  board player whose `token` is digit-bearing (`max200`-class) FALSIFIES it.
+- Verification: the log line quoted verbatim in `.syndicate/deploys.md`, with
+  the deployed refresh-worker SHA named and the token derived by executing THAT
+  SHA's own tree.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
