@@ -4065,3 +4065,29 @@ are there. (2) Dry-run every tool and read the RECLAIMED figure before choosing
 one -- three tools here, two of them with nothing to do. (3) Do not shrink
 `lanes.md` by closing lanes whose sessions are gone: that is FORBIDDEN by the
 2026-09-01 rule, and size is not a reason to reassign someone's work.
+
+## 2026-09-02 REQUIRED: merging a TRIMMED file from a branch that still holds the untrimmed copy RESURRECTS what was archived. Verify against BOTH pre-merge baselines, not just "nothing was lost". `[primary-tree pull]`
+
+**Measured.** The primary shared tree was 139 commits behind, so its `lanes.md`
+still carried 39 blocks that upstream had moved into `lanes_history.md`. The
+merge auto-resolved with no conflict and **brought 19 of them back**, producing
+blocks that existed in `lanes.md` AND `lanes_history.md` at once, plus two lanes
+holding two blocks each — the exact state the lane system's exclusivity rests on
+not having.
+
+**A one-sided check would have passed.** "Did the merge lose anything?" was
+answered NO for both sides, correctly. Loss was never the risk here; RETURN was.
+The check that caught it asked a second question -- *is anything present that
+upstream had deliberately removed?* -- by classifying every local-only heading
+against upstream's ARCHIVE files first, so the expected count was known before
+the merge ran (28 upstream + 9 genuinely new = 37, actual 56).
+
+**How to apply.** (1) Before merging a stale branch, split local-only items into
+ARCHIVED-UPSTREAM and GENUINELY-NEW; only the second set is allowed to be in the
+result. (2) Re-run the trim tool after the merge -- it is idempotent and moves
+resurrected blocks straight back. (3) Where the merge duplicates a claim-bearing
+block, UNION the claims into the kept block rather than dropping a side: a
+dropped `Files:` line silently un-guards those paths, and `lane-guard` reads
+`lanes.md` and nothing else. (4) Deferring a pull is not free -- this one cost a
+backup, a blocked commit, 9 file collisions, 2 conflicts, 19 resurrections and 2
+duplicated lanes. At zero commits behind it is a no-op.

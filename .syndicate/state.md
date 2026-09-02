@@ -45,6 +45,30 @@
 > wrong, EDIT THE LINE. Do not append a newer section that contradicts it. The
 > reasoning trail belongs in `deploys.md` (append-only measurement log).
 
+## [ledger-and-primary-tree] — MEASURED 2026-09-02, this machine
+
+**The primary shared tree is at `origin/main` (`a44dd4bf`), 0 behind / 0 ahead**
+— first parity in 139 commits. Verified by `merge-base --is-ancestor`, not by
+reading the log.
+
+- **`LEDGER OVER BUDGET` in the session digest can be a STALE CHECKOUT.**
+  `session-start.sh` stats `.syndicate/*` in whatever tree you started in. On
+  2026-09-02 it reported `lanes.md 246KB>234KB, learnings.md 286KB>273KB` while
+  `origin/main` held 148KB and 270KB, both under cap. **Read
+  `git show origin/main:<path> | wc -c` before acting on that warning.**
+- **learnings.md cap RAISED 280,000 -> 400,000** in `.claude/hooks/session-start.sh`.
+  The old "+15% headroom" was consumed in under a day (240,442 -> 278,051,
+  ~3KB/hour). Sizing rule now: the compacted floor plus the UNCOMPACTABLE
+  WORKING SET, because `compact_learnings.py` compacts strictly BEFORE its
+  cutoff, so one to two days of rules are never compactable.
+- **Current, at `origin/main`:** state 89%, lanes 62%, learnings 72% of cap.
+- **The trim tools' printed `cap 120000` is a REPORTING DEFAULT** (`--cap`), not
+  the enforced budget. They will say `*** STILL OVER ***` on a file that is
+  comfortably under the real cap. Do not act on that line.
+- **Merging a stale branch RESURRECTS archived lane blocks** — 19 of them here,
+  auto-merged with no conflict. Re-run `trim_lane_blocks.py --apply` after any
+  such merge and check for lanes with two blocks. Rule in `learnings.md`.
+
 ## [soccer-board-coverage] — MEASURED 2026-09-02, production, NOT A DEFECT
 
 **Soccer's thin board is a DELIBERATE QUALITY FILTER working correctly.** Full
