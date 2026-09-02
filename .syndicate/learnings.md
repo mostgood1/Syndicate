@@ -4129,3 +4129,43 @@ trips it every time.
   stronger, not weaker: `server_failed` turns out to span at least three causes,
   so the raw count was never the right instrument for that lane's gate — which
   is exactly why it was closed on MECHANISM and said so out loud.
+
+## 2026-09-01 — REQUIRED: before spending a correlation, drop the largest point and recompute. One window drove a +0.499 to a +0.139. `[lane game-market-entry-roi-curve]`
+
+**What happened.** `#632` asked for a per-route correlation against the web
+service's anonymous-memory series. A first look at two hand-picked windows was
+compelling: the high-growth one had `/api/ops/artifacts/stream` **24** times
+against **7** in the flat one, while `publish` ran the OTHER way (14 vs 31) — so
+it was not merely "more traffic". It looked like a clean discriminator.
+
+**Across 13 windows it did not survive.**
+
+    corr(anon delta, stream)   +0.499   ->  +0.139   with ONE window removed
+    17:20Z  stream=24  anon +401.9      <- the whole association lives here
+    19:00Z  stream=21  anon  -13.1
+    17:40Z  stream=20  anon   +5.6
+    18:40Z  stream=18  anon  +24.1
+
+**No dose-response.** Three windows with 18-21 `stream` calls moved anon by
+roughly nothing. A relationship that exists only at the maximum and nowhere on
+the way up is not a relationship, it is a coincidence with one loud instance.
+
+**How to apply.**
+* **Recompute without the extreme point. Always.** It is one line, and here it
+  changed the conclusion from "the endpoint that reads whole 60-70 MB artifacts
+  into memory is the leak" to "no route explains this". Someone would have
+  rewritten a working endpoint.
+* **Look for dose-response, not just direction.** Rank the exposure and check the
+  response rises with it. Two-point comparisons — my first pass — cannot see this
+  at all, which is exactly why they persuade.
+* **Say what the instrument censors.** The logs API returned EXACTLY 100 lines
+  for every window, so those counts are SHARES of a truncated sample, not
+  volumes: it cannot separate "more `stream`" from "less of everything else".
+  A correlation computed on censored composition is weaker than its number looks.
+
+**The companion correction, same investigation.** At 2-hour granularity the same
+series read as a smooth "~75 MB/h monotonic climb" and I published that. At
+20-minute granularity it is **steps and plateaus** (+402, then +5.6, then -37.5).
+The average was true and the MECHANISM it implied was wrong. **Pick the
+resolution from the mechanism you intend to claim, not from what is convenient
+to fetch.**

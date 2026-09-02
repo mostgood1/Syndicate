@@ -210,6 +210,44 @@ deploys would produce MORE OOMs, not fewer. This is the boot-confound in
 `state.md [worker memory is boot-confounded]` running in reverse — there, every
 deploy made a fix look good for five minutes; here, every deploy hides the leak.
 
+**THE PER-ROUTE CORRELATION WAS TAKEN AND IT IS NEGATIVE. NO ROUTE EXPLAINS THE
+GROWTH `[2026-09-01]`.** 13 twenty-minute windows, 2026-09-01T15:00..19:40Z, anon
+delta against per-route request counts:
+
+    corr(anon delta, /api/ops/artifacts/stream)   +0.499   ->  +0.139 without one window
+    corr(anon delta, /api/ops/artifacts/export)   +0.362   ->  +0.267 without one window
+    corr(anon delta, /api/ops/artifacts/publish)  -0.140   ->  +0.101
+
+**ONE WINDOW DROVE THE WHOLE APPARENT ASSOCIATION** — 17:20-17:40Z, `stream`=24,
+anon **+401.9 MB**. Remove it and `stream` collapses to +0.139. **There is no
+dose-response:** the next three highest-`stream` windows did essentially nothing.
+
+    17:20Z  stream=24  anon  +401.9      17:00Z  stream=0  anon  -84.2
+    19:00Z  stream=21  anon   -13.1      18:00Z  stream=0  anon  -37.5
+    17:40Z  stream=20  anon    +5.6      19:20Z  stream=0  anon  +15.2
+    18:40Z  stream=18  anon   +24.1
+
+**So do NOT "fix" `/api/ops/artifacts/stream` on this evidence.** The earlier note
+below flagged it as suggestive; it has now been TESTED and it does not hold. The
++402 MB step is a single event to be explained on its own terms, not a rate.
+
+**A LIMIT ON THAT TEST, which must travel with it:** the Render logs API returned
+**exactly 100 lines for every window**, so these are per-route SHARES OF A
+CENSORED SAMPLE, not true request volumes. A busier window has every route's
+count compressed. **This test therefore cannot distinguish "more `stream`" from
+"less of everything else"**, and the weak correlations may be an artifact of that
+censoring rather than of the world. Settling it needs per-request memory
+accounting or an uncensored access log, not more of this.
+
+**CORRECTION TO THIS ITEM'S OWN EARLIER WORDING.** At 2-hour granularity the
+series looked like a smooth "~75 MB/h monotonic climb". At **20-minute**
+granularity it is **steps and plateaus** — +402 MB in one window, then +5.6, then
+-37.5. The 75 MB/h is a true AVERAGE over step-wise behaviour and a false
+description of the MECHANISM. What survives unchanged: **anon never comes down
+except at a restart.** The one apparent counter-example, a 296 MB drop between
+14:00 and 15:00Z, was **two deploys** (`deploy_ended` 14:22:27Z and 14:42:40Z),
+checked rather than assumed.
+
 **STILL NOT ESTABLISHED, and this is where to start:** WHAT leaks. The shape is
 established, the cause is not, and naming one from the shape would be exactly
 the mistake `learnings.md` forbids. Two candidates the log context suggests and

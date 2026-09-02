@@ -690,12 +690,19 @@ week would produce MORE OOMs, not fewer.** `[worker memory is boot-confounded]`
 in reverse: there every deploy made a fix look good for five minutes, here every
 deploy hides the leak.
 
-**WHAT leaks is NOT established** and must not be named from the shape. The one
-suggestive-but-unmeasured association: OOM #2 followed a burst of
-`/api/ops/artifacts/export` / `stream` (one export **1,312,395 B in 7,197 ms**),
-an endpoint that reads whole artifacts into memory and serves 60-70 MB
-`book_quotes` shards. OOM #1 had no export in flight. **A per-route correlation
-against the anon series is the next measurement.**
+**WHAT leaks is NOT established, and the per-route correlation came back
+NEGATIVE `[tested 2026-09-01]`.** 13 twenty-minute windows: `corr(anon delta,
+/api/ops/artifacts/stream)` = **+0.499, which falls to +0.139** when the single
++401.9 MB window is removed. No dose-response — `stream`=21 and 20 produced
+-13.1 and +5.6 MB. **Do not "fix" that endpoint on this evidence.** Caveat that
+travels with the test: the logs API returned exactly 100 lines per window, so
+these are shares of a CENSORED sample, not volumes.
+
+**Mechanism correction:** at 20-minute resolution the growth is **steps and
+plateaus**, not the smooth ~75 MB/h a 2-hour view suggested; 75 MB/h is a true
+average and a false mechanism. What holds: **anon never falls except at a
+restart** — the one apparent exception, -296 MB across 14:00-15:00Z, was two
+deploys, checked.
 
 ## [render-server-failed-is-three-events] `server_failed` IS NOT A FAILURE COUNT — read `details.reason`, one of its meanings is a HEALTHY DELIBERATE EXIT `[verified 2026-09-01, lane game-market-entry-roi-curve]`
 
