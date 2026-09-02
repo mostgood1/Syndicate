@@ -331,8 +331,14 @@ class OddsHistoryMergeTests(unittest.TestCase):
         self.root = Path(self._tmp.name)
         self.target = self.root / "target.json"
         self.incoming = self.root / "incoming.json"
+        # `_merge_odds_history_publish` takes the SERVICE-WIDE admission lock,
+        # which lives at data_root() -- point it at the temp dir so tests never
+        # touch the real one and never leak a lock between cases.
+        self._patch = patch.object(ops, "data_root", return_value=self.root)
+        self._patch.start()
 
     def tearDown(self) -> None:
+        self._patch.stop()
         self._tmp.cleanup()
 
     def _merge(self, target_doc: dict, incoming_doc: dict) -> dict:
@@ -439,8 +445,12 @@ class OddsHistoryMergeAdmissionTests(unittest.TestCase):
         self.incoming = self.root / "i.json"
         self.target.write_text(json.dumps(_doc({"a": _entry(EARLY, 1.0, 1.0)}, EARLY)), encoding="utf-8")
         self.incoming.write_text(json.dumps(_doc({"b": _entry(LATE, 2.0, 1.0)}, LATE)), encoding="utf-8")
+        # the admission lock is SERVICE-WIDE, so it lives at data_root()
+        self._patch = patch.object(ops, "data_root", return_value=self.root)
+        self._patch.start()
 
     def tearDown(self) -> None:
+        self._patch.stop()
         self._tmp.cleanup()
 
     def test_the_cap_covers_the_real_mlb_pair(self) -> None:
@@ -457,6 +467,24 @@ class OddsHistoryMergeAdmissionTests(unittest.TestCase):
                           "a second worker must not merge concurrently")
         first.unlink()
         self.assertIsNotNone(ops._odds_history_merge_lock(self.target))
+
+    def test_the_lock_is_SERVICE_WIDE_not_per_directory(self) -> None:
+        """The tracking shard and its artifacts twin live in DIFFERENT
+        directories and were observed publishing 2 SECONDS apart. A
+        per-directory lock would have let exactly that pair run concurrently --
+        the one case it exists to bound."""
+        tracking = self.root / "mlb_source/tracking/odds_history/2026-09-01.json"
+        twin = self.root / "mlb_source/artifacts/mlb/odds_history/2026-09-01.json"
+        for path in (tracking, twin):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{}", encoding="utf-8")
+        held = ops._odds_history_merge_lock(tracking)
+        self.assertIsNotNone(held)
+        try:
+            self.assertIsNone(ops._odds_history_merge_lock(twin),
+                              "the twin must be blocked by the SAME lock")
+        finally:
+            held.unlink()
 
     def test_a_busy_lock_falls_back_instead_of_raising(self) -> None:
         held = ops._odds_history_merge_lock(self.target)

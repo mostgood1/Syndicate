@@ -1686,7 +1686,7 @@ _PUBLISH_LAST_PUBLISHER: dict[str, str] = {}
 # block and a one-off look identical without it -- see the note in
 # `_publish_divergence_verdict`.
 #
-# BOTH OF THESE ARE PER-PROCESS, and web runs 8 gunicorn workers. So `last` is
+# BOTH OF THESE ARE PER-PROCESS, and web runs 2 gunicorn workers. So `last` is
 # whoever last published THROUGH THIS WORKER, and a worker that has not yet seen
 # this path reads `last=None` -> `cross=False` -> ALLOWED. The guard is
 # therefore leaky by construction and always has been; this is stated rather
@@ -1797,15 +1797,27 @@ def _merge_append_only_publish(target_path: Path, incoming_path: Path) -> dict:
 # file happened to be measured: at the observed 3.13x, 160 MiB of input peaks
 # around 525 MB.
 #
-# THE CAP ALONE IS NOT THE BOUND, THOUGH, AND THAT WAS THE HOLE IN THE FIRST
-# VERSION'S REASONING. Web runs 8 gunicorn workers; each is single-request, so
-# "one at a time" is true per PROCESS and false for the service. Four concurrent
-# merges (two services x tracking + its artifacts twin, observed 2s apart) would
-# be ~1.4 GB on a 2Gi box already sitting near 750 MB. So a service-wide lock
-# admits ONE merge at a time and everything else falls back to the replace it
-# would have done anyway -- which is safe for the same reason the append-only
-# race is: every publisher sends its COMPLETE file every cycle, so a skipped
-# merge is re-offered on the next publish.
+# THE CAP ALONE IS NOT THE BOUND, AND THE CONCURRENCY IS WORSE THAN IT LOOKS.
+#
+# Read from the live process list rather than assumed, 2026-09-02:
+#
+#     gunicorn wsgi:application --workers 2 --threads 4
+#
+# So there are TWO processes, each serving up to FOUR requests at once -- eight
+# concurrent requests, but NOT eight isolated single-request workers. An earlier
+# version of this comment said "8 gunicorn workers, each single-request", copied
+# from the envelope-form note below rather than from the running config, and it
+# was wrong in the direction that matters: `--threads 4` means merges can race
+# INSIDE one process, which a per-process assumption would have declared
+# impossible.
+#
+# Four concurrent merges (two services x tracking + its artifacts twin, observed
+# 2 SECONDS apart in the log) would be ~1.4 GB on a 2Gi box already near
+# 750 MB. So a service-wide `O_CREAT|O_EXCL` lock -- which is correct for both
+# the cross-process and the cross-thread case -- admits ONE merge at a time and
+# everything else falls back to the replace it would have done anyway. Safe for
+# the same reason the append-only race is: every publisher sends its COMPLETE
+# file every cycle, so a skipped merge is re-offered on the next publish.
 _ODDS_HISTORY_MERGE_MAX_INPUT_BYTES = 160 * 1024 * 1024
 _ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS = 300
 
@@ -1819,7 +1831,14 @@ def _odds_history_merge_lock(target_path: Path):
     broken after `_ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS` so one crash cannot
     disable merging forever.
     """
-    lock_path = target_path.parent / ".odds_history_merge.lock"
+    # ONE lock for the whole service, NOT one per directory. Keying it on
+    # `target_path.parent` was the first version and it did not bound anything
+    # useful: `<sport>_source/tracking/odds_history/` and
+    # `<sport>_source/artifacts/<sport>/odds_history/` are DIFFERENT directories,
+    # and those two twins are exactly the pair observed publishing 2 SECONDS
+    # apart -- so the per-directory lock would have let the one case it was built
+    # for run concurrently anyway.
+    lock_path = data_root() / ".odds_history_merge.lock"
     try:
         if lock_path.is_file():
             age = time.time() - lock_path.stat().st_mtime
