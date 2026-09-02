@@ -176,6 +176,40 @@ ONLY by their direct writer, and any service holding a stale copy under the
 ceiling can still overwrite them. The ceiling is doing load-bearing work nobody
 chose it for.
 
+**THE OTHER 38 DO NOT NEED A MERGE, AND MERGING THEM WOULD BE A CORRUPTION.
+MEASURED 2026-09-02.**
+
+The 39 split by SHAPE, and only the first kind is what `#630` fixed:
+
+  * **accumulating / keyed** — `book_quotes`, `odds_history`, and the
+    `.state.json` sidecar. Union is correct. All three now merge.
+  * **REBUILT WHOLESALE** — `sim_*.json`, `daily_summary`, `lineups`,
+    `probables`, `schedule_raw`, `weather`, `book_grid`, `live_state`,
+    `live_lens_report`, the snapshot `oddsapi_*` files. **A union here would
+    resurrect entries a rebuild deliberately dropped and interleave stale rows
+    with fresh ones** — the same trap `_is_append_only` exists to avoid, one
+    level up. For these, last-writer-wins is CORRECT.
+
+**So two writers is a PRECONDITION for harm, not harm.** The only damage a
+rebuilt artifact can take is a STALER rebuild landing on a fresher one, and that
+is a recency guard, not a merge. Both sampled families carry `generated_at`, so
+it is both implementable AND directly observable.
+
+**HARM TEST, 2026-09-02 05:44–06:09Z** (`scratchpad/watch_recency.py`), 5
+contested paths — `live_state` × 3 leagues and `book_grid` × 2 sports:
+
+    samples 33   observed republishes 59   REGRESSIONS 0
+
+**`generated_at` advanced on all 59 changes. Not one staler rebuild overwrote a
+fresher one.** No guard is warranted on this evidence, and 38 merges would have
+been actively harmful.
+
+**WHAT THIS DOES NOT COVER, stated rather than implied:** 5 of 38 paths and 2 of
+the shapes. `sims`, `daily_summary`, rosters, `lineups`, `weather` were NOT
+exercised — they are 09-01-dated or were not rebuilt in the window. And 25
+minutes is the window; absence here is not absence in general. **Re-run the
+watch against those families before closing this item.**
+
 **Options, cheapest first:**
 1. ~~Enumerate.~~ **DONE — and it did NOT close this as moot.** 39 contested
    path families, none merged, including the `book_quotes` `.state.json` sidecar
