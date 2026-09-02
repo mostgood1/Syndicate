@@ -1512,7 +1512,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none. Next: **`#623`** (the 09-17 sprint + pre-registered gates + parked `#614`/`#616` reads) and **`#626`(d)(e)** (reuse-guard/live-capture, klass-hole). **`#622`** owns the ranking-key question — per `#615` T2-1 is ANSWERED (no sim-derived key exists; do NOT keep re-looking at the 656-row sample, ~30 looks are already on record). `scripts/prereg_wnba_favourite_lean.py` is frozen and waiting for the sprint.
 
 
-### mlb-live-gameline-skill-audit — OPEN — opened 2026-09-01 — session 250953ef-3461-4628-b326-415a35a97a74 — **SHIPPED AND LIVE; ONE READING OWED.**
+### mlb-live-gameline-skill-audit — CLOSED 2026-09-02 — opened 2026-09-01 — session 250953ef-3461-4628-b326-415a35a97a74 — **CLOSED ON THE READING: `quote_older_than_live_pricing_ceiling = 27` against `considered = 742` (215 live rows) at 00:01:10Z — 27 of the 130 rows that reach the quote check, 20.8%. The staleness gate fires in production.**
 - Goal: decide whether the MLB live game-line model has skill the market lacks,
   and if not, name the mechanism. **ANSWERED — see `log/2026-09-01.md`.**
 - Files: syndicate/features/shared/live_gameline_score.py,
@@ -1525,12 +1525,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - STATUS: `c01dabb1` live in `417e19ed` (16:55:20Z), `692214e0` live in
   `9a436fab` (17:59:56Z). Both verified BY CONTENT. Neither deployed by me —
   carried by other lanes because they were on `origin/main`.
-- **THE ONE THING OWED: the staleness gate has NEVER FIRED in production.**
-  Every sport on this path was pregame at 18:0xZ, so `considered=0` and
-  `withheld_by_reason={}` describe the SLATE, not the gate. PASSES only on
-  `quote_older_than_live_pricing_ceiling` > 0 against a non-zero `considered`
-  (expect ~39.5% of live rows). Scheduled task
-  `verify-live-gameline-staleness-gate` fires 18:45 CT. A zero is NOT a pass.
+- **THE READING THAT WAS OWED IS TAKEN — DISCHARGED 2026-09-02 00:05Z.** The
+  18:0xZ `considered=0` described the SLATE (all sports pregame), not the gate.
+  On the 00:01:10Z MLB grid: `considered 742` / `projected 103` / `priceable 68`,
+  `withheld_by_reason` = segment 601, stale-quote **27**, prob-interval 35,
+  no-projection 11; 215 live rows. The gate sits THIRD in the join, so its own
+  denominator is 742−601−11 = **130 → 20.8% refused**, and 130−27 = 103 =
+  `projected` closes the arithmetic. Below the ~39.5% ledger expectation (a
+  pooled cross-sport historical rate vs one MLB grid at one instant — not
+  compared here), and far from zero, which is what the bullet turned on.
+  `row_carries_no_quote_age` count **0** — the predicted-defect branch has not
+  fired. Bullet 2 re-confirmed: `scorer_contract 2`, `fresh_quote_seconds 120.0`.
+  Full reading: `.syndicate/deploys.md`, the 2026-09-02 00:05Z entry.
 - Headline for anyone quoting this model: **on fresh quotes (<=120s) the model
   LOSES, +0.01096, CI [+0.00171, +0.02132] over 147 games.** The old
   "+0.07000 / n=98" figure is a FIXED SCORER BUG — do not quote it. History rows

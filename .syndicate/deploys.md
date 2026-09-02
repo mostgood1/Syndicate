@@ -17619,3 +17619,57 @@ recorded here so a later reader does not attribute either number to this change.
   `Sint Truiden` and neither Kalshi form) — the 18% that neither orientation nor
   the code->name map reaches. `unreadable_title` 413 is working-set composition,
   not this change; it has swung 18/413/18/413 across cycles independent of it.
+
+## VERIFIED 2026-09-02 00:05Z (19:05 CT) — `c01dabb1` QUOTE-STALENESS GATE **FIRED IN PRODUCTION**, on a live MLB slate — lane `mlb-live-gameline-skill-audit`
+
+The reading owed since 18:0xZ, when every sport on `_LIVE_GAMELINE_SPORTS` was
+pregame and `considered=0` described the SLATE rather than the gate. Taken by
+scheduled task `verify-live-gameline-staleness-gate`. ONE fetch of
+`/api/board/book-grid?sport=mlb`, every number below from that single payload:
+
+    generated_at 2026-09-02T00:01:10.465483+00:00
+    row states   {'live': 215, 'pregame': 85}
+    considered 742  projected 103  priceable 68
+    withheld_by_reason {"no_live_gameline_projection": 11,
+                        "prob_interval_swamps_edge": 35,
+                        "quote_older_than_live_pricing_ceiling": 27,
+                        "segment_is_not_full_game": 601}
+    scorer_contract 2  fresh_quote_seconds 120.0  reason no_final_games_on_this_grid
+    fresh_quotes_only null
+
+**BULLET 1 — PASS.** `considered = 742` (> 0, 215 live rows on the board) and
+`quote_older_than_live_pricing_ceiling = 27` (> 0). The gate is not merely
+deployed, it is REFUSING ROWS.
+
+**AS A RATE, WITH THE DENOMINATOR THE CODE ACTUALLY GIVES IT.** 27/742 would be
+the wrong fraction — the gate sits third in `attach_live_gamelines`
+(`live_gameline_join.py:1021` segment → `:1029` index-hit → `:1044` quote age),
+so 601 segment rows and 11 index misses are refused ABOVE it and never reach it.
+Rows that reached the quote check: 742 − 601 − 11 = **130**, of which **27
+refused = 20.8%**. The arithmetic closes exactly — 130 − 27 = 103 = `projected`,
+and 103 = 68 `priceable` + 35 `prob_interval_swamps_edge` — so the counters are
+internally consistent and the ordering above is read from the code, not inferred
+from the totals alone.
+
+**20.8% vs the ~39.5% expected from the retained ledger.** Roughly half. Not
+investigated here and NOT claimed as a discrepancy: the ledger figure is a
+pooled historical rate over a different population (all retained live rows,
+across sports and slates), while this is one MLB grid at one instant, one hour
+into the slate. Both are far from zero, which is the thing the bullet turned on.
+Whether the two populations are comparable at all is unmeasured.
+
+**`row_carries_no_quote_age` DID NOT APPEAR — count 0.** The predicted-defect
+branch (`live_gameline_join.py:256`, absent age refused not passed) has not
+fired; consistent with all 72,587 measured production records carrying
+`age_seconds`.
+
+**BULLET 2 — RE-CONFIRMED, NO REGRESSION.** `692214e0`'s capability stamp is
+still on the payload: `scorer_contract = 2`, `fresh_quote_seconds = 120.0`.
+`reason = no_final_games_on_this_grid` and `fresh_quotes_only = null` are
+expected on a grid with no finals yet (00:01Z, games in progress) — the stamp is
+what was owed here, not a score.
+
+**verify:** the reading above IS the verification — `withheld_by_reason` naming
+`quote_older_than_live_pricing_ceiling` with a non-zero count against a non-zero
+`considered`, on a board carrying 215 live rows. Lane
+`mlb-live-gameline-skill-audit` closed on it.
