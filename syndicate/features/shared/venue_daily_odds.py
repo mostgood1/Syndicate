@@ -95,15 +95,106 @@ __all__ = [
 # a day's movement, few enough that one market cannot dominate the document.
 MAX_POINTS_PER_MARKET = 48
 
-# Per (venue, sport, date). Chosen against the 8MB keyvalue ceiling with
-# `layer2_shortlist` already at 5.0MB: a compact row is ~150 bytes plus its
-# points, so 8,000 markets is comfortably inside a per-sport budget while
-# still holding a whole sport's book including every ladder rung.
+# Per (venue, sport, date).
+#
+# `#638`, 2026-09-02 -- THIS NUMBER WAS SIZED BY AN ESTIMATE THAT WAS WRONG, and
+# the note that used to sit here said "a compact row is ~150 bytes plus its
+# points, so 8,000 markets is comfortably inside a per-sport budget". It is not:
+# 8,000 markets each carrying `raw_title` and up to 48 points cannot fit in 8MB
+# at any realistic per-row size, so this cap could NEVER be the thing that kept a
+# file writable. Measured consequence: 2,203 `KEYVALUE_WRITE_REJECTED` on
+# live-odds-worker in 40 hours, 1,652 of them one NCAAF date, each one discarding
+# that tick's prices while the file sat frozen at its last good write.
+#
+# THE REAL BOUND IS NOW BYTES (`_trim_to_budget` below), measured on the actual
+# serialized payload. This stays as a cheap upper bound on pathological market
+# counts -- it is a backstop, not the mechanism, and it must not be read as one.
 MAX_MARKETS_PER_FILE = 8000
+
+# Order in which a too-large document is shrunk. POINTS GO BEFORE MARKETS, and
+# that ordering is the whole design: market COVERAGE is what this module exists
+# to capture (an unparsed family is only discoverable because its `raw_title` is
+# stored), while a point history is a convenience whose one irreplaceable
+# element -- the opening -- lives in `opening_yes`/`opening_no` and is never
+# touched by either trim.
+_TRIM_POINT_CAPS = (24, 12, 6, 3, 1)
 
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _serialized_bytes(payload: Any) -> int:
+    """Size of the payload AS THE STORE WILL SEE IT.
+
+    Must mirror `refresh_state_store.write_json_file` exactly -- same
+    normalisation, same compact separators, same utf-8 encoding with the same
+    error handling. Measuring anything else is measuring a different document,
+    and the whole point is that the number agrees with the guard's.
+    """
+    import json
+
+    from syndicate.features.shared.timezone import normalize_timestamped_payload
+
+    serialized = json.dumps(normalize_timestamped_payload(payload), separators=(",", ":"))
+    return len(serialized.encode("utf-8", errors="replace"))
+
+
+def _trim_to_budget(
+    state: dict[str, Any], budget_bytes: int
+) -> tuple[dict[str, Any], int, int]:
+    """Shrink `state` in place until it serializes under `budget_bytes`.
+
+    Returns `(state, points_dropped, markets_dropped)`.
+
+    POINTS FIRST, NEWEST KEPT; then markets, LEAST-RECENTLY-SEEN dropped -- the
+    same ordering and the same key the count-based trims already use, so a file
+    that crosses the byte bound does not suddenly start being pruned by a
+    different rule than one that crosses the count bound.
+
+    Bounded and terminating by construction: the point caps are a fixed
+    descending tuple, and the market phase halves the survivor count each round
+    and stops at zero. It never loops on a size that will not shrink.
+    """
+    points_dropped = 0
+    markets_dropped = 0
+    if _serialized_bytes(state) <= budget_bytes:
+        return state, 0, 0
+
+    markets: dict[str, Any] = state.get("markets") or {}
+
+    for cap in _TRIM_POINT_CAPS:
+        for entry in markets.values():
+            points = entry.get("points") or []
+            if len(points) > cap:
+                points_dropped += len(points) - cap
+                entry["points"] = points[-cap:]
+        state["markets"] = markets
+        if _serialized_bytes(state) <= budget_bytes:
+            return state, points_dropped, 0
+
+    # Still over with one point each: the market COUNT is the size. Drop the
+    # least-recently-seen, which are the ones whose book has gone quietest.
+    ordered = sorted(
+        markets.items(),
+        key=lambda kv: str(kv[1].get("last_seen") or kv[1].get("opened_at") or ""),
+        reverse=True,
+    )
+    keep = len(ordered)
+    while keep > 0:
+        keep //= 2
+        trimmed = dict(ordered[:keep])
+        state["markets"] = trimmed
+        if _serialized_bytes(state) <= budget_bytes:
+            markets_dropped = len(ordered) - keep
+            return state, points_dropped, markets_dropped
+
+    # Nothing but the envelope left. Returned rather than raised: the caller
+    # reports `status=error` on the retry and the guard's own log line already
+    # names the key -- a file whose non-market fields alone exceed the ceiling
+    # is a different bug and must not be disguised as a trim.
+    state["markets"] = {}
+    return state, points_dropped, len(ordered)
 
 
 def _as_float(value: Any) -> float | None:
@@ -289,8 +380,45 @@ def record_daily_odds(
     state["sport"] = sport
     state["game_date"] = str(game_date or "")[:10]
     state["updated_at"] = stamp
+    # `#638`. TRIM REACTIVELY, NOT PREEMPTIVELY. A pre-write size check would
+    # serialize the whole document on EVERY tick to protect a case that fires
+    # rarely; catching the store's own refusal costs nothing on the happy path
+    # and cannot disagree with the guard about the size, because it IS the
+    # guard's verdict. It also makes this correctly inert on a disk backend,
+    # which has no ceiling and therefore never raises.
+    #
+    # A file already over the bound self-heals on its next tick: the read brings
+    # back the last good state, this trims it, and the write lands.
+    trimmed_to_fit = False
+    try:
+        from syndicate.features.shared.refresh_state_store import KeyValuePayloadTooLarge
+    except Exception:  # pragma: no cover - the store always defines it
+        KeyValuePayloadTooLarge = ()  # type: ignore[assignment]
     try:
         write_json_file(path, state)
+    except KeyValuePayloadTooLarge:
+        from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
+
+        # Under the ceiling, not at it. The document grows again on the very
+        # next tick, and landing exactly on the bound would mean one rejection
+        # for every successful write.
+        budget = int(_keyvalue_max_bytes() * 0.90)
+        state, extra_points, extra_markets = _trim_to_budget(state, budget)
+        trimmed_points += extra_points
+        trimmed_markets += extra_markets
+        trimmed_to_fit = True
+        markets = state.get("markets") or {}
+        print(
+            f"[venue_daily_odds] TRIMMED_TO_FIT venue={venue} sport={sport} "
+            f"game_date={state.get('game_date')} budget_bytes={budget} "
+            f"points_dropped={extra_points} markets_dropped={extra_markets} "
+            f"markets_kept={len(markets)}",
+            flush=True,
+        )
+        try:
+            write_json_file(path, state)
+        except Exception as exc:
+            return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
     except Exception as exc:
         return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
 
@@ -316,6 +444,10 @@ def record_daily_odds(
         ),
         "trimmed_points": trimmed_points,
         "trimmed_markets": trimmed_markets,
+        # `#638`. REPORTED EVEN WHEN FALSE, like every other counter here: a
+        # flag that appears only when it fires cannot distinguish "the document
+        # fits" from "this build does not have the trim".
+        "trimmed_to_fit": bool(trimmed_to_fit),
         # True means the FEED did not advance since the last write, so
         # `unchanged` says nothing about the market.
         "source_unchanged": bool(source_unchanged),

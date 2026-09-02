@@ -485,3 +485,141 @@ def test_the_row_keeps_the_venues_league_beside_the_mapped_sport():
     }])
     assert rows[0]["sport"] == "soccer"
     assert rows[0]["league"] == "lal"
+
+
+# --------------------------------------------------------------------------
+# `#638` -- the bound that actually fires is BYTES
+#
+# 2,203 `KEYVALUE_WRITE_REJECTED` on live-odds-worker in 40 hours, 1,652 of
+# them one NCAAF date, each discarding that tick's prices while the file sat
+# frozen at its last good write. The count caps could never have prevented it:
+# they bound markets and points, the guard bounds bytes.
+# --------------------------------------------------------------------------
+
+
+def _big_state(markets=200, points=48):
+    """A document whose SERIALIZED size is the thing under test."""
+    state = {"venue": "kalshi", "sport": "ncaaf", "game_date": "2026-09-05",
+             "updated_at": "2026-09-02T00:00:00Z", "markets": {}}
+    for i in range(markets):
+        state["markets"][f"m{i:05d}"] = {
+            "market": None,
+            "family": "unreadable_title",
+            # The real payload's bulk: an unparsed market carries its title so
+            # a grammar can be written from it later.
+            "raw_title": f"Some quite long unreadable market title number {i} " * 6,
+            "opened_at": "2026-08-20T00:00:00Z",
+            "opening_yes": 0.11,
+            "opening_no": 0.89,
+            # STRICTLY ascending with i. An earlier draft used `i % 60`, which
+            # wraps -- markets 60+ got the EARLIEST stamps and the recency test
+            # failed against correct code. The fixture has to make the ordering
+            # it asserts on unambiguous.
+            "last_seen": f"2026-09-02T{i // 60:02d}:{i % 60:02d}:00Z",
+            "points": [{"ts": f"2026-09-0{1 + (p % 2)}T00:{p % 60:02d}:00Z",
+                        "yes": 0.5, "no": 0.5} for p in range(points)],
+        }
+    return state
+
+
+def test_a_document_that_already_fits_is_returned_UNTOUCHED():
+    """The trim must be inert on the happy path. A trim that always fires would
+    silently shorten every history in the system."""
+    state = _big_state(markets=3, points=4)
+    before = mod._serialized_bytes(state)
+    out, points_dropped, markets_dropped = mod._trim_to_budget(state, before + 1)
+    assert (points_dropped, markets_dropped) == (0, 0)
+    assert len(out["markets"]) == 3
+    assert len(out["markets"]["m00000"]["points"]) == 4
+
+
+def test_the_trim_is_measured_in_BYTES_not_counts_and_the_result_actually_fits():
+    """ASSERTS THE SERIALIZED SIZE, not that a counter moved. A counter can
+    move while the payload is still over the ceiling -- which is exactly the
+    failure this replaces."""
+    state = _big_state()
+    budget = mod._serialized_bytes(state) // 4
+    out, points_dropped, _ = mod._trim_to_budget(state, budget)
+    assert mod._serialized_bytes(out) <= budget
+    assert points_dropped > 0
+
+
+def test_points_are_shed_BEFORE_markets_because_coverage_is_the_point():
+    """An unparsed family is only discoverable because its `raw_title` is
+    stored, so market coverage outranks price history."""
+    state = _big_state(markets=60, points=48)
+    # Loose enough that dropping points alone gets under it.
+    budget = mod._serialized_bytes(state) // 2
+    out, points_dropped, markets_dropped = mod._trim_to_budget(state, budget)
+    assert markets_dropped == 0, "markets were dropped while points remained to shed"
+    assert points_dropped > 0
+    assert len(out["markets"]) == 60
+
+
+def test_the_opening_SURVIVES_every_level_of_trimming():
+    """CLV is measured against the opening, and it is never in `points[0]`.
+    Trimmed to almost nothing, the opening must still be there."""
+    state = _big_state()
+    out, _, _ = mod._trim_to_budget(state, 4096)
+    assert out["markets"], "trimmed to zero markets before reaching the budget"
+    for entry in out["markets"].values():
+        assert entry["opening_yes"] == 0.11
+        assert entry["opening_no"] == 0.89
+        assert entry["opened_at"] == "2026-08-20T00:00:00Z"
+
+
+def test_when_markets_must_go_the_LEAST_RECENTLY_SEEN_go_first():
+    """Same key the count-based trim already uses, so crossing the byte bound
+    does not prune by a different rule than crossing the count bound."""
+    state = _big_state(markets=64, points=1)
+    out, _, markets_dropped = mod._trim_to_budget(state, 3000)
+    assert markets_dropped > 0
+    survivors = sorted(out["markets"])
+    # last_seen ascends with the index, so the highest indices are newest.
+    assert survivors[-1] == f"m{63:05d}"
+    assert "m00000" not in out["markets"]
+
+
+def test_an_oversized_write_is_RETRIED_and_the_report_says_so(monkeypatch):
+    """End to end through `record_daily_odds`: the store refuses once, the
+    document is trimmed, the retry lands, and `trimmed_to_fit` is reported."""
+    from syndicate.features.shared.refresh_state_store import KeyValuePayloadTooLarge
+
+    seen: list[int] = []
+    real_budget = 20000
+
+    def _fake_write(path, payload):
+        size = mod._serialized_bytes(payload)
+        seen.append(size)
+        if size > real_budget:
+            raise KeyValuePayloadTooLarge(f"{size} bytes")
+
+    monkeypatch.setattr(mod, "MAX_POINTS_PER_MARKET", 48)
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.write_json_file", _fake_write
+    )
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store._keyvalue_max_bytes",
+        lambda: int(real_budget / 0.90),
+    )
+
+    rows = [
+        {"id": f"m{i:04d}", "yes": 0.5, "no": 0.5, "market": None,
+         "sport": "ncaaf", "game_date": "2026-09-05", "family": "unreadable_title",
+         "raw_title": f"A long unreadable market title number {i} " * 8}
+        for i in range(120)
+    ]
+    report = mod.record_daily_odds("kalshi", "ncaaf", "2026-09-05", rows)
+
+    assert report["status"] == "ok"
+    assert report["trimmed_to_fit"] is True
+    assert len(seen) == 2, "expected exactly one refusal and one retry"
+    assert seen[0] > real_budget
+    assert seen[1] <= real_budget, "the retry was still over the ceiling"
+
+
+def test_trimmed_to_fit_is_reported_even_when_FALSE(monkeypatch):
+    """A flag that appears only when it fires cannot distinguish 'the document
+    fits' from 'this build does not have the trim'."""
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row("m1")])
+    assert report["trimmed_to_fit"] is False

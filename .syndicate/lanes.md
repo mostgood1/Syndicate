@@ -1379,6 +1379,43 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   **This block IS the handoff.** If you are reading it and can reach that
   session, tell it; otherwise it finds out here.
 
+### venue-odds-byte-aware-trim — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
+- Goal: `#638`. `venue_odds` writes stop being rejected. Testable on the
+  PRODUCTION log: `KEYVALUE_WRITE_REJECTED ... caller=venue_daily_odds.py` goes
+  to **zero**, and the frozen files resume advancing (`updated_at` moves,
+  `appended` > 0).
+- **COUNT CORRECTED — 2,203 was ONE SERVICE, not the total.** I reported it as
+  the figure; it was `live-odds-worker` only, because that is the only service I
+  queried. **`refresh-worker` carries a further 989** over the same window
+  (2026-09-01T00:00Z..09-02T16:25Z). Web: **nothing matched** — so web does not
+  run this writer and does not need the deploy. **True total 3,192 / ~40h across
+  two services**, and the deploy is therefore BOTH workers, not one.
+- Files: `syndicate/features/shared/venue_daily_odds.py`,
+  `tests/test_venue_daily_odds.py`. Checked against every OPEN lane: neither is
+  claimed. `refresh_state_store.py` is deliberately NOT claimed and NOT edited —
+  the ceiling it enforces is correct and stays.
+- Hypothesis: the caps cannot prevent the rejection because they bound COUNTS
+  (`MAX_POINTS_PER_MARKET=48`, `MAX_MARKETS_PER_FILE=8000`) while the guard
+  bounds BYTES. A trim that measures the serialized payload and shrinks until it
+  fits removes the failure without raising any ceiling.
+- Approach, and why this shape: trim REACTIVELY, by catching
+  `KeyValuePayloadTooLarge` and retrying, rather than pre-measuring every write.
+  A pre-check would serialize an 8 MB document on EVERY tick to protect the rare
+  case; catching the exception costs nothing on the happy path, and — because the
+  guard only fires on the keyvalue backend — it also makes the trim correctly
+  inert on a disk backend, which has no ceiling.
+- Falsification test: if a file is still rejected after the retry, the trim is
+  not reaching the bytes that matter. The unit test asserts the SERIALIZED size
+  of the retried payload is under the budget, not that a counter moved.
+- **What must NOT be lost:** `opening_yes` / `opening_no` / `opened_at`, which is
+  what CLV is measured against and is never in `points[0]`; and market COVERAGE
+  (`raw_title` on unparsed markets) is the module's whole reason for existing, so
+  points are shed before markets are.
+- Verification: unit tests both directions (a payload that fits is untouched; one
+  that does not is trimmed and fits), then the production log reading above after
+  deploy to live-odds-worker.
+- Blocked by: none.
+
 ### keyvalue-pressure-637 — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
 - Goal: `#637`. Say WHAT holds the shared Redis at 93% and WHETHER the eviction it
   is doing costs anything, with numbers. Diagnosis only — **no production mutation
