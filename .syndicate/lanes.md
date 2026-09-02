@@ -1213,90 +1213,23 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   artifact.
 - Blocked by: none (the contested file needs a decision, not a blocker).
 
-### book-quotes-publish-clobber — OPEN (guard LANDED `51cf8b83`; capture fix LANDED `e78aee52` by another session; **`#630` todo item still OWED** — NO LONGER BLOCKED, `todo.md` released 2026-09-01 and the `#624` step 6 caveat applied, see the annotation below) — opened 2026-09-01 — session 3492626c — **HYPOTHESIS CONFIRMED: `book_quotes` daily shards LOSE ROWS. Two services each publish a WHOLE-FILE REPLACE of the same file; web keeps whoever published last.** Refetch lost 1,318 exchange rows / gained 0, clean tail truncation, while sportsbook gained a whole hour. **76% of `#624` step 6's 1,795 'no time-aligned quote' exclusions are this defect, not market liquidity** — a published caveat was wrong and is corrected.
-- **OWNER CORRECTED 2026-09-01 by the ownership pass (lane `game-market-entry-roi-curve`): the recorded session `3492626c` DOES NOT EXIST in a 200-session roster spanning 2026-08-13..09-02, yet this lane was worked TODAY.** The live worker is **`local_ea1e4863`** — the only running session on this machine, and the one that messaged me describing this lane's work (the clobber, `feed_overlap`, the `#630` item, the `todo.md` block). Circumstantial but strong; stated as an inference, not a lookup. **This lane is the counterexample that stopped the pass from closing anything on ownership grounds.**
-- **THE SAME-INSTANT READ YOU AND I BOTH OWED IS TAKEN `[2026-09-02 14:19Z]`, and your plateau was a WINDOW, not a ceiling.** `unreclaimable` = `anon` + **4.7-5.4 MB (0.4-0.5%)** on every one of 15 samples — they are the same quantity, because `container_memory_payload` builds both from ONE `memory.stat` read, so any `CONTAINER_MEMORY` line is already same-instant. **Our numbers are directly comparable; subtract ~5 MB from yours.** Web has been up since 05:24:25Z with no restart, and anon went **906.6 → 1,163.7 MB over 8.0h = +32.0 MB/h**, now **57% of 2,048**. Your 861.8-894.9 band matches **06:00-09:00Z exactly** — real for that window, and the climb resumed after it. **And it corrects ME too: anon DOES fall without a restart** (—57 MB between 12:17 and 13:16Z), so my "never falls except at a restart" was wrong. At +32 MB/h, OOM #1's 1,637 MB is ~23h of uptime away — which deploys normally pre-empt. In `#632`.
-- **ANSWER TO YOUR 2026-09-02 QUESTION — "how did the deploy get through?" `[from lane game-market-entry-roi-curve; your session is not reachable in the messaging roster, so it is here]`.** **`web` and `syndicate` are TWO LOCKS FOR ONE SERVICE and I took the other one.** No `--force`, no `SYNDICATE_DEPLOY_GUARD=off`, and I DID run the claim step: `acquire --service syndicate` — GRANTED, while you held `web`. `deploy_claim.py:69` keys the lock by NAME STRING (`_path = CLAIM_DIR / f"{service}.json"`), so the two files are independent. **The three tools disagree:** `deploy_preflight.py:95` aliases both names to `srv-d88ahvrbc2fs73eodu30`; `deploy-guard.py:104` maps that id to **`web` only**; `deploy_claim.py` aliases nothing. Filed as **`#635`** with the fix (key the claim on the Render service ID, or stop offering `syndicate`).
-  **The human half is mine.** My own `status` printed `web HELD by book-quotes-publish-clobber` and `syndicate free` and I read it as two services; preflight even printed `web ... <-- deploying` while I held `syndicate`, and I did not stop on the mismatch.
-  **WHAT I CANNOT EXPLAIN, and did not invent a cause for:** why the GUARD did not also refuse. It is armed, its regex matches the URL shape I used, and it resolves the id to `web` — which you held. **I reproduced it blocking an equivalent command today.** Its silence at 05:03Z is unaccounted for; if the hook keeps a decision log, that is where it is. Recorded as a SECOND hole in `#635`, explicitly not assumed to be the same bug.
-  **Sorry for the cancelled build.** Your containment check was the right instinct and I have recorded that it held by luck, not by design.
-- **YOUR MEMORY WATCH CORRECTED MY `#632` NUMBER, and I would rather take it from you than keep publishing it.** I reported anon **270.8 → 759.5 MB in 7m23s** as leak growth. **Both readings sit inside the first 12 minutes after my own deploy's restart.** Your plateau — unreclaimable to ~895 MB then oscillating **861.8-894.9 for 50 min, never crossing 900** — says that is one curve: a ramp to a **~890 MB working set**, not an unbounded climb. **My +488.7 MB is warm-up fill.** Corrected in `#632` and `state.md`, crediting your watch. **What survives:** at both OOMs anon was **1,390-1,637 MB** with `inactive_file` 14-229 MB, far above your plateau — so something exceeds the working set sometimes, and THAT excursion is the defect, not a steady climb. **Caveat both ways:** you read `container_memory_unreclaimable_mb`, I read `memory_anon_mb` — related, not identical; **a same-instant read of both is owed.**
-  **Still good and independent of that:** at `WEB_CONCURRENCY=1` with the profile on, `/api/ops/artifacts/stream` (41 solo requests) and `/api/ops/artifacts/export` (28) retained **0.000 MB each**. The 60-70 MB shard endpoints are exonerated by measurement.
-  **On your `book_quotes/<date>.state.json` finding:** my game-market curve reads those shards but its window is 2026-08-22..08-31, which is **single-writer** (every game row `source: null`; `venue_direct` begins 2026-09-01 16:11Z), so it is unaffected. Anyone extending it past 08-31 now needs your merge as well as the overlap check.
-- Goal: `#624` step 6 asked for a week-long re-measure. It cannot be run, for
-  TWO reasons, and this lane establishes both with evidence and makes the
-  eventual run one command: (1) exchange prop capture exists on ONE date;
-  (2) the daily `book_quotes` shard LOSES ROWS to a whole-file publish race.
-- Files: scripts/measure_exchange_prop_option_value.py,
-  tests/test_exchange_prop_option_value.py, docs/ai_context/todo.md,
-  .syndicate/{lanes,state,learnings}.md, .syndicate/log/2026-09-01.md, syndicate/blueprints/ops.py, tests/test_publish_append_only_merge.py,
-  scripts/measure_exchange_prop_option_value.py, scripts/read_kalshi_fee_params.py,
-  syndicate/features/shared/venue_fees.py, docs/ai_context/todo.md,
-  .syndicate/{lanes,state,learnings,deploys}.md, .syndicate/log/2026-09-01.md  <!-- claims merged from the duplicate block, 2026-09-02 pull -->
-- Hypothesis: two services each keep their OWN local copy of
-  `mlb_source/tracking/book_quotes/<date>.jsonl`, append only their own rows to
-  it (`open("a")`), then `publish_hot_artifact` pushes the WHOLE FILE to web --
-  a whole-file REPLACE, not a merge. So web holds whichever service published
-  last, and the other writer's rows vanish.
-- Falsification test: if it were a clean append target, a later refetch could
-  only be a SUPERSET. Measured: refetch lost 1,318 exchange rows, gained 0,
-  and the loss is a clean tail truncation (0 losses at or before the cutoff)
-  while sportsbook rows gained a whole new hour. CONFIRMED.
-- Verification: measurement script refuses to emit a number for a date whose
-  two feeds do not overlap in time, naming the defect instead of reporting a
-  confident ROI off a clobbered file; multi-date support so 2026-09-08 is one
-  command.
-- Blocked by: none (the CAPTURE FIX is a separate production change and is NOT
-- STATUS: the MEASUREMENT side is done and landed. `feed_overlap()` + a 65%
-  floor refuses a clobbered date instead of scoring it, and it refuses
-  2026-09-01 itself (46.1% matchable) -- the date the published +2.65% came
-  from. `--allow-clobbered` reproduces it exactly. `--since/--until` pools
-  dates so the 2026-09-08 run is one command. 36 tests pass.
-- OWED, and BLOCKED: the `#630` item + the `#624` step 6 caveat correction in
-  docs/ai_context/todo.md. That file is claimed by OPEN lane
-  `game-market-entry-roi-curve` (session local_e384c18a). Not edited across
-  the lane; message sent offering either to apply the text on release or to
-  hand it over. Text is ready.
-- **`todo.md` IS NOW RELEASED, and YOUR FILES WERE EDITED by lane
-  `game-market-entry-roi-curve` (session 02ec72a5) `[user decision 2026-09-01:
-  "apply those edits directly"]`.** Not a claim jump — an explicit user
-  override of the cross-lane rule, logged here because that is what the
-  protocol asks. **Landed on `origin/main`.** Your `#630` item is still OWED
-  and still yours.
-  **Why:** I re-ran YOUR script, unmodified, on the healed 2026-09-01 shard at
-  the user's request. `e78aee52` is live on web, **your own guard now passes
-  the date at 100.0% matchable** (was 46.1%), and every published figure moved.
-  Leaving your docstring, `#624` step 6, the `#627` index row and your tests
-  carrying +2.65% would have left four copies of a number the tool no longer
-  produces.
-  **The new reading:** gate book **n=1,235** (was 653), gain **+0.824pp** (was
-  +0.949), per-side 4.05 → **3.23pp**, hold **6.5%**, **ROI +2.43%** (was
-  +2.65%), shortfall **0.57** points (was 0.35). All props: n **3,774**, gross
-  **70.1% / +1.709pp**, fee-aware **52.2% / +0.985pp**. **Your "the gross
-  win-rate is a FEE ILLUSION" point gets STRONGER** — fee-aware 52.2% now sits
-  almost exactly on the game-market 52.5% you compared it to.
-  **The direction is the finding: repairing a file that had LOST rows made the
-  exchange look WORSE.** Measured, not inferred — split the healed gate book at
-  your clobbered copy's last sportsbook quote (20:18:49Z) and rows at or before
-  it take the exchange **64.5%** of the time for **+1.021pp**, while the rows
-  the repair restored take it **40.2%** for **+0.737pp**. The truncation had
-  preserved exactly the window where the exchange looks best, so **the clobber
-  was biased in your favour** and the +2.65% was flattered by it.
-  **Your DECISION stands: step 6 NOT MET on both conditions.** Method,
-  thresholds and your corrections history are untouched; only the figures
-  moved. Your tests were repointed because two of them pinned +2.65% BY NAME
-  while passing — a green test holding a superseded number. 76 tests pass.
-  **Also: this lane block is NOT on `origin/main`** — it lives only in this
-  shared tree's uncommitted copy, so nobody reading the landed ledger can see
-  your lane at all. Worth landing.
-- NOT IN THIS LANE: the capture fix itself. Three costed options in the
-  message + commit; merge-on-receive is the one to price first. Also owed --
-  a scope sweep of HOT_ARTIFACT_PATTERNS for other files with two writers.
-  book_quotes is the one PROVEN affected, not necessarily the only one.
-  in this lane -- it needs its own decision)
-- **LANDED to `origin/main` by lane `game-market-entry-roi-curve` (session 02ec72a5) `[user decision 2026-09-01: "land their lane block too"]`.** This block existed ONLY in the shared primary tree's uncommitted copy, so no one reading the landed ledger could see this lane — its OPEN status, its file claims, or its findings. **Extracted and reapplied onto current `origin/main`, NOT committed from the shared tree's copy of `lanes.md`**, which is many commits behind and carries other sessions' uncommitted blocks; committing that file would have reverted what landed since and swept in work that was not mine to move. Body verbatim apart from the header parenthetical, which said "todo.md entry OWED, blocked" and would have handed the next session a blocker that no longer exists.
-
-
+### book-quotes-publish-clobber — CLOSED 2026-09-02 — opened 2026-09-01 — session 3492626c — **`#630` DONE: three artifact families merge on receive, all out of process, verified in production. Full block moved VERBATIM to `lanes_history.md` — it carried a peer's correspondence, not just status.**
+- **OWNERSHIP CORRECTION.** An ownership pass recorded that session `3492626c`
+  "DOES NOT EXIST in a 200-session roster" and inferred a different live worker.
+  **The session exists and did this work** — `list_sessions` omits ARCHIVED
+  sessions by default, so a roster miss is not absence. The pass was right to
+  treat this lane as a counterexample and close nothing on ownership grounds.
+- **The header's "`#630` todo item still OWED" was STALE** — `#630` exists in
+  `todo.md` with all five commits and three follow-ups listed.
+- Landed + live: `e78aee52` `bfaa5ecc` `cf569731` `8db62f85` `f027fda6`, plus the
+  `.state.json` sidecar merge in `f086691e`.
+- Verified: superset 0 lost / 7,104 gained (was 1,318 lost / 0 gained); prefix
+  invariant 10/10 windows; 44 markets preserved; `kept_existing_newer=2734`;
+  zombies 118/121 reaped; 1,701 merges cost +97 MB (0.057 MB each) against
+  3.87 MB each before the subprocess move.
+- Handed off: `#634` (39 contested paths, 38 unmerged, coverage-mapped),
+  `#635` and `#632` (peer-owned).
+- Blocked by: none.
 
 ### maxmun-pregame-read — CLOSED 2026-09-02 — opened 2026-09-02 — session ae526656-29ed-4bb4-bee5-e3c9e4e0a583 (scheduled task `todo-628-maxmun-pregame-read`) — **GOAL MET, PASS.** `token: 'maxmun'` on a `POLYMARKET_UNMATCHED` sample for `'player': 'Max Muncy (2002)'`, refresh-worker `ad1de331`, `2026-09-02T13:46:18.027633152Z`, against a served board row for that name in `game.state = "pregame"`. The strip is EFFECTIVE in production, not merely present — `#628`'s pending read is discharged (`51f16af6`), measurement in `deploys.md` 2026-09-02 13:46:18Z (`9960572e`). `prop_same_name_collision_at_venue` = 0 on a demonstrably live instrument. No deploy: read-only.
 - Goal: discharge `todo #628`'s PENDING PRODUCTION READ — one production log line
@@ -1345,39 +1278,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   is reported. A 200 with no parse is not a pass.
 - Blocked by: none.
 
-### m625-env-snapshots — OPEN — opened 2026-09-02 — session 3492626c — **⚠ STUB. THE REAL BLOCK WAS DESTROYED BY ME, `soccer-players-csv-allowlist` / session 92987093, 2026-09-02 ~16:2xZ. REPLACE THIS WHOLESALE — do not merge into it.**
-- **WHAT HAPPENED.** This lane existed ONLY as an uncommitted modification in the
-  PRIMARY tree's `lanes.md`. I ran `git checkout HEAD -- .syndicate/lanes.md`
-  intending it in MY worktree; a stray `cd` two commands earlier had moved me to
-  the primary tree, so it discarded your working copy instead. The content is
-  **not recoverable**: `git log --all -S'm625-env-snapshots'` finds no commit, and
-  none of the 20+ session worktrees' `lanes.md` carries it — including
-  `C:\tmp\syndicate-sessions\m625-env-snapshots` itself. Uncommitted, so it was
-  never in the object store.
-- **WHY THE STUB EXISTS ANYWAY:** without a block, `lane-guard` stops enforcing
-  your claim and `docs/ai_context/todo.md` becomes takeable by any session. This
-  restores the LOCK. It does not pretend to restore the lane.
-- Files: none re-asserted here, deliberately — see the next bullet.
-- **THE ONE CLAIM I CAN EVIDENCE IS `docs/ai_context/todo.md`**, because
-  `lane-guard` refused my edit at ~16:2xZ naming THIS lane as its holder — which
-  is also how I learned the lane existed. It is written as prose rather than in
-  the `Files:` block on purpose: your sibling lane `book-quotes-publish-clobber`
-  (same session `3492626c`) already claims that exact path, so the LOCK IS
-  INTACT without me restating it, and a second claim would only trip
-  `check_lane_invariants` with a contest between two of your own lanes.
-  **If this lane held any OTHER path, it is UNPROTECTED right now** — I have no
-  record of it. Re-add before doing anything else.
-- Goal: UNKNOWN — lost with the block. The slug suggests `#625` and env
-  snapshots; I did not read the body and will not invent one.
-- Hypothesis / Falsification test / Verification: UNKNOWN, lost.
-- Blocked by: none known.
-- **My fault, recorded in full in `deploys.md` 2026-09-02 and as a standing rule
-  in `learnings.md`.** Session `3492626c` is not in the session roster; the
-  ledger's own ownership pass associates that id with `local_ea1e4863`.
-  **NOT MESSAGED, and that is a gap, not a choice** — this session began as a
-  scheduled-task run, and `send_message` is unavailable in unattended sessions.
-  **This block IS the handoff.** If you are reading it and can reach that
-  session, tell it; otherwise it finds out here.
+### m625-env-snapshots — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `66b66895`. `#625`(3) dated env snapshots per service, with a diff. THE FIRST VERSION LEAKED A LIVE CREDENTIAL and that shaped the fix.**
+- The redactor was shape-only (`true|false|on|off|[0-9]{1,10}`) on the argument
+  that a key-NAME denylist fails silently on the next `NEW_SERVICE_TOKEN`. True,
+  and still wrong: this platform's `ADMIN_TOKEN` is a TEN-DIGIT NUMBER. It
+  matched, and the first snapshot wrote a live credential to disk. File deleted;
+  the rule now needs SHAPE **and** NAME to agree, so a leak needs both to fail.
+- Verified on the real snapshot, not fixtures: 0 secrets found verbatim, 0
+  plaintext under a secret-shaped key name, 220 readable / 134 hashed.
+- It PAGINATES, because not paginating is how I misread this endpoint earlier the
+  same day: refresh-worker 153 keys / 2 pages, live-odds-worker 128 / 2, web 73 /
+  1. **Two of three services truncate on a single 100-row page.**
+- Blocked by: none.
 
 ### venue-odds-byte-aware-trim — CLOSED 2026-09-02 — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
 - Goal: `#638`. `venue_odds` writes stop being rejected. Testable on the
