@@ -18177,3 +18177,33 @@ under the gunicorn workers, the same shape `#630` fixed on the publish path
 
 **NOTHING IS VERIFIED.** No deploy, so no reading. The gate this is waiting on is
 a human approval of the deploy call, not any technical blocker.
+
+## 2026-09-02 04:34Z — RIDEALONG WITHDRAWN. `SYNDICATE_REQUEST_MEMORY_PROFILE` DELETED from web; claim released. `[lane web-request-memory-attribution, user decision "unset the key"]`
+
+**Supersedes the 04:12Z entry above: there is no longer anything for a peer's
+deploy to pick up.** Deploy web freely.
+
+    DELETE /v1/services/srv-d88ahvrbc2fs73eodu30/env-vars/SYNDICATE_REQUEST_MEMORY_PROFILE
+      -> HTTP 204, and a read-back returns HTTP 404. Single-key DELETE, never the
+         bulk `env-vars` endpoint, which replaces the whole block.
+    web live commit UNCHANGED at 477e42c2 — confirmed on `/api/ops/version` AFTER
+      the delete, so the env change did not itself trigger a deploy.
+    deploy claim on `syndicate` RELEASED (token from the claim file). All four
+      services now read free.
+
+**NET EFFECT ON PRODUCTION: NONE.** The key was set at 04:12Z and never injected,
+because injection needs a deploy and that deploy was refused by a permission
+gate. It has now been removed while still uninjected. **Web has run `477e42c2`
+throughout and no process ever saw the key.**
+
+**The instrumentation code stays on `main` and stays inert.** `97260296` is
+default-OFF: with the key absent, `note_request_start` returns before it touches
+the cgroup, and `tests/test_request_memory_attribution.py` asserts the read
+helper is never called rather than asserting the return is None. Carrying it
+costs nothing; turning it on is one single-key PUT plus a deploy, deliberately.
+
+**What is still owed if anyone resumes this:** the two-worker correction in the
+04:12Z entry stands and must be read first — `WEB_CONCURRENCY` is **2**, the
+guard refuses only INTRA-process contention, and the cgroup is per-container, so
+a first per-route table is an upper bound contaminated by the sibling worker.
+`#632` remains open with its shape established and its cause not.
