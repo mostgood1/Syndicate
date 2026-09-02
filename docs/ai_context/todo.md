@@ -26,7 +26,7 @@ worker is unguarded**, and a cross-publisher shrink in that window is allowed
 silently. Deploys are frequent. With `--workers 2` a path also has a standing
 chance of landing on the worker that has not seen it.
 
-**Scope, and why it is not urgent.** `#630` made `book_quotes` (all sports) and
+**Scope — and the enumeration below REVISED this upward.** `#630` made `book_quotes` (all sports) and
 `odds_history` MERGE, and merged families deliberately skip this refusal — for
 them the guard is moot and the merge is the real protection. **Everything else
 still rides the leaky guard**: board snapshots, `intelligence_state`, the
@@ -40,10 +40,47 @@ whose publish it had just REFUSED, making the refusal a one-cycle delay
 `8db62f85`, with a `consecutive_refusals=N` counter. **This item is only the
 remaining PER-PROCESS hole.**
 
+**ENUMERATION RUN 2026-09-02. THE ANSWER IS STRUCTURAL, NOT A LIST: EVERY
+ALLOWLISTED PATTERN HAS TWO POTENTIAL WRITERS.**
+
+`artifact_publisher.sweep_changed_hot_artifacts` iterates **every**
+`HOT_ARTIFACT_PATTERNS` entry and publishes any file whose mtime moved:
+
+    for pattern in HOT_ARTIFACT_PATTERNS:
+        for candidate in root.glob(pattern):
+            if candidate.stat().st_mtime < since_epoch_seconds: continue
+            if publish_hot_artifact(candidate): published += 1
+
+It runs on **BOTH workers** — measured over ~30 min, 2026-09-02 02:00–02:30Z:
+**58 sweeps on live-odds-worker, 12 on refresh-worker.** So the writer set for a
+path is not "whoever authors it" but **"whoever has a copy whose mtime moved"**,
+and a PULL moves mtime. `_publisher_identity()` is `SYNDICATE_REFRESH_LANE`, an
+env var, so the header names the SERVICE and not the code that wrote the bytes.
+
+**This also completes the `#630` `book_quotes` diagnosis, which was only half
+explained.** live-odds-worker does NOT run `append_book_quotes` at all — zero
+`[odds_book_quotes]` lines while refresh-worker logged 35 in the same window,
+and live-odds-worker was demonstrably logging (2,340 lines). It publishes
+`book_quotes` **via the sweep**, from its own smaller local copy:
+
+    refresh-worker    book_quotes/2026-09-01.jsonl  150,174,688 B  SWEEP_SKIPPED too_large
+    live-odds-worker  (absent from its skip list -- its copy is under the ceiling)
+
+refresh-worker appends and publishes **directly**, bypassing the sweep's size
+ceiling; live-odds-worker sweeps a smaller copy back over it. That is the
+clobber, precisely.
+
+**A SECOND FINDING, worth its own attention:** the sweep SKIPS large files as
+`too_large` — `book_grid` (~13.9 MB), `odds_history/<date>.json` (56.6 MB),
+`book_quotes/<date>.jsonl` (150.2 MB). So the biggest artifacts are published
+ONLY by their direct writer, and any service holding a stale copy under the
+ceiling can still overwrite them. The ceiling is doing load-bearing work nobody
+chose it for.
+
 **Options, cheapest first:**
-1. **Do nothing but enumerate.** Sweep `HOT_ARTIFACT_PATTERNS` for paths with
-   more than one writer. If the only ones are already merged, this item closes as
-   moot rather than fixed — and that is a legitimate outcome worth the sweep.
+1. ~~Enumerate.~~ **DONE — and it did NOT close this as moot.** The answer is
+   that the guard's per-process state is leaky across the WHOLE allowlist, not a
+   couple of paths.
 2. **Extend merging** to whichever families the sweep finds, which removes the
    need for the guard there too.
 3. **Move the state cross-process** via `refresh_state_store` (keyvalue), which
