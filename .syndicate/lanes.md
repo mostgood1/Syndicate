@@ -1897,6 +1897,77 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - **NEXT, and NOT claimed done:** the 314 residual needs Kalshi's club spellings in the alias map (a per-league alias decision, its own lane). The soccer game-line relaxation rests on soccer having no OddsAPI exchange rows — the module names the re-measurement that invalidates it. `source` in `_KEY_FIELDS` remains the real remedy and remains unbuilt.
 - Blocked by: none.
 
+### book-quotes-publish-clobber — OPEN (guard LANDED `51cf8b83`; capture fix LANDED `e78aee52` by another session; **`#630` todo item still OWED** — NO LONGER BLOCKED, `todo.md` released 2026-09-01 and the `#624` step 6 caveat applied, see the annotation below) — opened 2026-09-01 — session 3492626c — **HYPOTHESIS CONFIRMED: `book_quotes` daily shards LOSE ROWS. Two services each publish a WHOLE-FILE REPLACE of the same file; web keeps whoever published last.** Refetch lost 1,318 exchange rows / gained 0, clean tail truncation, while sportsbook gained a whole hour. **76% of `#624` step 6's 1,795 'no time-aligned quote' exclusions are this defect, not market liquidity** — a published caveat was wrong and is corrected.
+- Goal: `#624` step 6 asked for a week-long re-measure. It cannot be run, for
+  TWO reasons, and this lane establishes both with evidence and makes the
+  eventual run one command: (1) exchange prop capture exists on ONE date;
+  (2) the daily `book_quotes` shard LOSES ROWS to a whole-file publish race.
+- Files: scripts/measure_exchange_prop_option_value.py,
+  tests/test_exchange_prop_option_value.py, docs/ai_context/todo.md,
+  .syndicate/{lanes,state,learnings}.md, .syndicate/log/2026-09-01.md
+- Hypothesis: two services each keep their OWN local copy of
+  `mlb_source/tracking/book_quotes/<date>.jsonl`, append only their own rows to
+  it (`open("a")`), then `publish_hot_artifact` pushes the WHOLE FILE to web --
+  a whole-file REPLACE, not a merge. So web holds whichever service published
+  last, and the other writer's rows vanish.
+- Falsification test: if it were a clean append target, a later refetch could
+  only be a SUPERSET. Measured: refetch lost 1,318 exchange rows, gained 0,
+  and the loss is a clean tail truncation (0 losses at or before the cutoff)
+  while sportsbook rows gained a whole new hour. CONFIRMED.
+- Verification: measurement script refuses to emit a number for a date whose
+  two feeds do not overlap in time, naming the defect instead of reporting a
+  confident ROI off a clobbered file; multi-date support so 2026-09-08 is one
+  command.
+- Blocked by: none (the CAPTURE FIX is a separate production change and is NOT
+- STATUS: the MEASUREMENT side is done and landed. `feed_overlap()` + a 65%
+  floor refuses a clobbered date instead of scoring it, and it refuses
+  2026-09-01 itself (46.1% matchable) -- the date the published +2.65% came
+  from. `--allow-clobbered` reproduces it exactly. `--since/--until` pools
+  dates so the 2026-09-08 run is one command. 36 tests pass.
+- OWED, and BLOCKED: the `#630` item + the `#624` step 6 caveat correction in
+  docs/ai_context/todo.md. That file is claimed by OPEN lane
+  `game-market-entry-roi-curve` (session local_e384c18a). Not edited across
+  the lane; message sent offering either to apply the text on release or to
+  hand it over. Text is ready.
+- **`todo.md` IS NOW RELEASED, and YOUR FILES WERE EDITED by lane
+  `game-market-entry-roi-curve` (session 02ec72a5) `[user decision 2026-09-01:
+  "apply those edits directly"]`.** Not a claim jump — an explicit user
+  override of the cross-lane rule, logged here because that is what the
+  protocol asks. **Landed on `origin/main`.** Your `#630` item is still OWED
+  and still yours.
+  **Why:** I re-ran YOUR script, unmodified, on the healed 2026-09-01 shard at
+  the user's request. `e78aee52` is live on web, **your own guard now passes
+  the date at 100.0% matchable** (was 46.1%), and every published figure moved.
+  Leaving your docstring, `#624` step 6, the `#627` index row and your tests
+  carrying +2.65% would have left four copies of a number the tool no longer
+  produces.
+  **The new reading:** gate book **n=1,235** (was 653), gain **+0.824pp** (was
+  +0.949), per-side 4.05 → **3.23pp**, hold **6.5%**, **ROI +2.43%** (was
+  +2.65%), shortfall **0.57** points (was 0.35). All props: n **3,774**, gross
+  **70.1% / +1.709pp**, fee-aware **52.2% / +0.985pp**. **Your "the gross
+  win-rate is a FEE ILLUSION" point gets STRONGER** — fee-aware 52.2% now sits
+  almost exactly on the game-market 52.5% you compared it to.
+  **The direction is the finding: repairing a file that had LOST rows made the
+  exchange look WORSE.** Measured, not inferred — split the healed gate book at
+  your clobbered copy's last sportsbook quote (20:18:49Z) and rows at or before
+  it take the exchange **64.5%** of the time for **+1.021pp**, while the rows
+  the repair restored take it **40.2%** for **+0.737pp**. The truncation had
+  preserved exactly the window where the exchange looks best, so **the clobber
+  was biased in your favour** and the +2.65% was flattered by it.
+  **Your DECISION stands: step 6 NOT MET on both conditions.** Method,
+  thresholds and your corrections history are untouched; only the figures
+  moved. Your tests were repointed because two of them pinned +2.65% BY NAME
+  while passing — a green test holding a superseded number. 76 tests pass.
+  **Also: this lane block is NOT on `origin/main`** — it lives only in this
+  shared tree's uncommitted copy, so nobody reading the landed ledger can see
+  your lane at all. Worth landing.
+- NOT IN THIS LANE: the capture fix itself. Three costed options in the
+  message + commit; merge-on-receive is the one to price first. Also owed --
+  a scope sweep of HOT_ARTIFACT_PATTERNS for other files with two writers.
+  book_quotes is the one PROVEN affected, not necessarily the only one.
+  in this lane -- it needs its own decision)
+- **LANDED to `origin/main` by lane `game-market-entry-roi-curve` (session 02ec72a5) `[user decision 2026-09-01: "land their lane block too"]`.** This block existed ONLY in the shared primary tree's uncommitted copy, so no one reading the landed ledger could see this lane — its OPEN status, its file claims, or its findings. **Extracted and reapplied onto current `origin/main`, NOT committed from the shared tree's copy of `lanes.md`**, which is many commits behind and carries other sessions' uncommitted blocks; committing that file would have reverted what landed since and swept in work that was not mine to move. Body verbatim apart from the header parenthetical, which said "todo.md entry OWED, blocked" and would have handed the next session a blocker that no longer exists.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
