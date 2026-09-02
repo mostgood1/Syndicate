@@ -18207,3 +18207,39 @@ costs nothing; turning it on is one single-key PUT plus a deploy, deliberately.
 guard refuses only INTRA-process contention, and the cgroup is per-container, so
 a first per-route table is an upper bound contaminated by the sibling worker.
 `#632` remains open with its shape established and its cause not.
+
+## 2026-09-02 05:07Z + 05:33Z — web deployed TWICE on purpose: once to take a reading at one worker, once to put capacity back. `[lane web-request-memory-attribution]`
+
+**VERIFY — the reading that decides `#632`, and it is a NEGATIVE result about the
+request path.** Two `REQUEST_MEMORY_ATTRIBUTION` tables 7m23s apart:
+
+    05:11:53Z   anon 270.8 MB   solo 200   skipped 93    SUM(route total_mb)   1.963
+    05:19:16Z   anon 759.5 MB   solo 400   skipped 234   SUM(route total_mb)  12.452
+    anon +488.7 MB;  routes +10.5 MB  =  ~2%.  ~98% arrived with no request solo.
+
+    /api/ops/artifacts/stream   41 solo   0.000 MB      <- exonerated
+    /api/ops/artifacts/export   28 solo   0.000 MB      <- exonerated
+    /api/ops/artifacts/publish 148 solo  10.503 MB      <- ~0.07 MB/call, linear
+
+**DEPLOY 1, `dep-dabqs6vqj5pc739237p0`, live 05:07:34Z, commit `5e6c4d756cd5`.**
+Preflight CLEAR. Set `WEB_CONCURRENCY=1` and `SYNDICATE_REQUEST_MEMORY_PROFILE=on`
+first, single-key PUTs. **The one-worker step was the whole point**: the guard
+refuses concurrency PER PROCESS while the cgroup is PER CONTAINER, so at two
+workers a "solo" request is not solo. Verified after: exactly one gunicorn
+worker (pid 97 under master 64), against two before.
+
+**DEPLOY 2, `dep-dabr4h3tqb8s73dammv0`, live ~05:33Z, same commit.** Preflight
+CLEAR. Restores `WEB_CONCURRENCY=2` and DELETES the profile key. **An env change
+needs a deploy to be injected, so the restore is not real until this ran** —
+leaving it would have left production at half request capacity on a service
+whose own `render.yaml` notes slow requests are routine.
+
+**VERIFIED AFTER THE RESTORE:** two gunicorn workers back (pids 79, 80 under
+master 62); `SYNDICATE_REQUEST_MEMORY_PROFILE` readback **HTTP 404**; **zero**
+`REQUEST_MEMORY_ATTRIBUTION` lines in the following five minutes; deploy claim
+**released**, all four services free.
+
+**COST PAID, stated rather than buried:** ~26 minutes at half web capacity, and
+two extra restarts. **What it bought:** the request path is eliminated as the
+cause, and the two endpoints everyone would have rewritten are cleared by
+measurement instead of by argument.

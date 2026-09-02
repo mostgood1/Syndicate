@@ -690,6 +690,15 @@ week would produce MORE OOMs, not fewer.** `[worker memory is boot-confounded]`
 in reverse: there every deploy made a fix look good for five minutes, here every
 deploy hides the leak.
 
+**THE LEAK IS NOT IN THE REQUEST PATH `[measured 2026-09-02 at WEB_CONCURRENCY=1]`.**
+Two attribution tables 7m23s apart: anon **270.8 → 759.5 MB (+488.7)** while the
+sum of ALL per-route attributions rose **1.963 → 12.452 MB (+10.5)** — routes
+account for **~2%**. `/api/ops/artifacts/stream` (41 solo) and `/export` (28 solo)
+retain **0.000 MB**: the 60-70 MB shard endpoints are exonerated, not merely
+uncorrelated. Largest route is `/api/ops/artifacts/publish`, 10.5 MB over 148
+calls (~0.07 MB each), linear in call count. **So it is background work in the
+web process, or something that only occurs under concurrency — not a route.**
+
 **WHAT leaks is NOT established, and the per-route correlation came back
 NEGATIVE `[tested 2026-09-01]`.** 13 twenty-minute windows: `corr(anon delta,
 /api/ops/artifacts/stream)` = **+0.499, which falls to +0.139** when the single

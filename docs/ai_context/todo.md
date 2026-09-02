@@ -300,6 +300,41 @@ except at a restart.** The one apparent counter-example, a 296 MB drop between
 14:00 and 15:00Z, was **two deploys** (`deploy_ended` 14:22:27Z and 14:42:40Z),
 checked rather than assumed.
 
+**THE LEAK IS NOT IN THE REQUEST PATH. MEASURED 2026-09-02, and this is the
+strongest result on this item so far.** The instrument ran on production at
+`WEB_CONCURRENCY=1` — so its per-process solo guard finally matched the
+per-container cgroup — and emitted two attribution tables 7m23s apart:
+
+    05:11:53Z   anon 270.8 MB   solo 200   skipped 93    SUM(route total_mb)   1.963
+    05:19:16Z   anon 759.5 MB   solo 400   skipped 234   SUM(route total_mb)  12.452
+
+    anon rose  +488.7 MB.   Routes accounted for  +10.5 MB  =  ~2%.
+
+**~98% of the growth appeared while no request was solo.** That is this lane's
+own falsification test firing: *"the growth appears with NO request in flight
+— that would mean it is background work, not a route."*
+
+**THE TWO PRIME SUSPECTS ARE POSITIVELY EXONERATED, not merely uncorrelated:**
+
+    /api/ops/artifacts/stream    41 solo requests   total 0.000 MB   max 0.000
+    /api/ops/artifacts/export    28 solo requests   total 0.000 MB   max 0.000
+
+Those are the endpoints that serve 60-70 MB `book_quotes` shards, and they
+retain **nothing**. The earlier +0.499 correlation is now explained as the
+coincidence it was. The largest route is `/api/ops/artifacts/publish` at
+**10.5 MB over 148 solo calls (~0.07 MB each)** — linear in call count, which is
+a cost and not a leak.
+
+**WHAT THIS NARROWS IT TO, and the wording is deliberate.** The growth is not
+attributable to SOLO requests. It is therefore one of: **background work in the
+web process**, or **something that only happens under CONCURRENCY** (234 requests
+were refused as contended in that window, against 400 solo). **It is NOT "a
+route".** Start with what the web process runs off the request path.
+
+**Production restored and verified:** `WEB_CONCURRENCY` back to **2** (pids 79, 80
+under master 62), `SYNDICATE_REQUEST_MEMORY_PROFILE` **deleted** (readback 404,
+zero attribution lines since), deploy claim released. `deploys.md` 2026-09-02.
+
 **STILL NOT ESTABLISHED, and this is where to start:** WHAT leaks. The shape is
 established, the cause is not, and naming one from the shape would be exactly
 the mistake `learnings.md` forbids. Two candidates the log context suggests and
