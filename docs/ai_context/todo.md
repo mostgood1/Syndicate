@@ -1361,7 +1361,7 @@ path (a) is FALSIFIED, and two name joins were losing most of the mechanism.**
   Anchor cost **45.0 min per 4h interval while broken, 83.2 min once fixed**,
   against a build already costing 98.2 min — 76% of the interval. Memory is
   untouched (`container_memory_unreclaimable_mb` 1710 of 4096).
-- **TWO NAME JOINS WERE SWITCHED OFF, both fixed and landed (`686d8282` (landed on main; the pre-rebase local SHA was `686d8282` — `session_worktree.py land` rebases, so a SHA quoted before landing never exists upstream),
+- **TWO NAME JOINS WERE SWITCHED OFF, both fixed and landed (`686d8282` on main,
   NOT DEPLOYED, NOT ARMED).** Both compared exact strings across feeds that do
   not share a naming convention. Reach, same production basis before/after:
   fixture→priced-event **66 → 122 of 136**; fixture→ratings-key **138 → 214 of

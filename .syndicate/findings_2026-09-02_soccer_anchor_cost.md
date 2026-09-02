@@ -580,7 +580,7 @@ launch slot: 3 of 42 units already overrun it today, 5 would with the anchor.
 
 ### The order that actually unblocks this
 
-1. ~~**Fix both name joins.**~~ **DONE, `686d8282` (landed on main; the pre-rebase local SHA was `686d8282` — `session_worktree.py land` rebases, so a SHA quoted before landing never exists upstream)** — reach 66→122 fixtures,
+1. ~~**Fix both name joins.**~~ **DONE, `686d8282` on main** — reach 66→122 fixtures,
    138→214 team slots. Not deployed, not armed.
 2. **Publish the anchor audit into the recommendations artifact.** Today every
    `[soccer_anchor]` line goes to `/dev/null` (§1a), so no production reading of

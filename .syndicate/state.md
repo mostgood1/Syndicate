@@ -209,6 +209,54 @@ CHECKOUT of `origin/main` after pushing. Full evidence:
   sha256 — `names_only` returns no hash and no endpoint does, so it is NOT a
   claim that production's bytes equal ours.
 
+## [soccer-market-anchor] MARKET-ANCHORING IS REACHABLE AND STILL OFF BY DECISION — MEASURED 2026-09-02 `[lane soccer-anchor-cost, main 686d8282/0844694c]`
+
+**Weight stays 0.0. The blocker was never cost; it was two dead name joins, an
+unreadable instrument, and n=10 of evidence on the wrong market.** Full
+evidence: `.syndicate/findings_2026-09-02_soccer_anchor_cost.md`.
+
+- **The 57/136 min cost figures counted priced EVENTS in a forward book to
+  d+13.** `build_artifacts` is SINGLE-DATE, so the anchor never sees that list.
+  Production-measured (refresh-worker `e4a471c0`, `SOCCER_UNIT_CONFIRMED`):
+  **43 units, 4h interval, ~335 s spacing, unit = 27 s + 35 s/fixture, 136
+  fixtures in the live 7-day horizon.** Live env: `..._SIM_HORIZON_DAYS=7` (code
+  default 1), `..._WEEKLY_REFRESH_INTERVAL_SECONDS=14400`, anchor weight ABSENT.
+- **BOTH NAME JOINS FIXED AND LANDED, NOT DEPLOYED.** Reach on the identical
+  production basis: fixture→priced-event **66 → 122 of 136**;
+  fixture→ratings-key **138 → 214 of 214**. `event_id` joins **0 of 136** — ESPN
+  and OddsAPI ids never collide, so the feed has always run on the exact-name
+  fallback. 11 tests, 8 fail pre-fix.
+- **Fixing it made the anchor MORE expensive: 45.0 → 83.2 min per 4h interval**,
+  against a build already costing 98.2 min (76% of the interval). Memory is not
+  touched. 3 of 42 units already overrun their 335 s slot; 5 would.
+- **CUTTING SOLVER SIMULATIONS IS FALSIFIED, do not propose it again without new
+  evidence.** `D_cheap/D_anchor` on `expected_shots`: 50x5 **1.81**, 25x5 1.39,
+  12x5 2.06 — the solver-budget choice moves the published projection MORE than
+  anchoring does — and the shift REVERSES SIGN on 2 of 6 fixtures. The one safe
+  trim is capping `max_iterations` at 5 (`100x7` costs +40% for RMSE 0.0491 vs
+  0.0497).
+- **The bisection is quantized to 32 lattice points** (0.01875 spacing, set by
+  `shift_bound` and `max_iterations` alone). All 10 shifts in the original
+  validation CSV sit on it, using 7 distinct values — precision below the
+  lattice was never available and cannot be what produced the −40%.
+- **THE EVIDENCE IS n=10, ONE SLATE, h2h ONLY**, and its source report calls it
+  "a sensitivity check, not a tuned production default".
+- **§4.4 is SMALL here, measured:** the anchor shifts the `expected_shots` LEVEL
+  by **0.36%** against `shot_calibration`'s divisor whose own cross-window drift
+  is ±8%. Re-fit AFTER arming, not before.
+- **NO PRODUCTION READING OF THIS MECHANISM IS POSSIBLE TODAY.**
+  `ops_refresh.py:1402` launches units with `stdout=DEVNULL`, so every
+  `[soccer_anchor]` line is discarded. Control: every child-process token
+  returns 0 log matches (incl. `player projections`, printed on every success)
+  while parent tokens return normally. The audit must become a PUBLISHED
+  ARTIFACT FIELD, not a log line.
+- **WHY ARMING IT WOULD CHANGE LITTLE:** the anchor moves h2h **3.58 pp** and
+  props **2.9–5.1% relative**, while the staked soccer surface is **99 board
+  rows / 58 fixtures, 74% h2h, ZERO player props**. Largest effect on the market
+  the audit says not to stake; smallest on markets that do not reach the board.
+  The real lever remains `[soccer-board-coverage]`'s: a model view worth ranking
+  on.
+
 ## [soccer-board-coverage] — MEASURED 2026-09-02, production, NOT A DEFECT
 
 **Soccer's thin board is a DELIBERATE QUALITY FILTER working correctly.** Full

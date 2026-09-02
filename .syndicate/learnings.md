@@ -4530,3 +4530,60 @@ measurement comes back empty, the first hypothesis should be the instrument.
   it covered, or its silence about the rest reads as absence.
 - **Cost:** one confident wrong summary of a diff, corrected only because the
   denominator happened to be printed.
+
+## 2026-09-02 FORBIDDEN: sampling a seeded Monte-Carlo estimator at CONSECUTIVE seeds and calling the spread a control. Overlapping draws read as sd = 0.0000, which looks exactly like determinism. `[lane soccer-anchor-cost]`
+
+**Measured.** To size how much precision soccer's anchor solver buys, I ran
+`solve_market_rating_shift` at 12 "different" seeds and got **sd = 0.0000, all
+twelve answers byte-identical**. The write-up would have been "the default
+solver is deterministic, so cutting its cost is free" — and that is the opposite
+of the truth.
+
+`solve_market_rating_shift(seed=S)` passes `S` down to
+`_simulated_home_win_probability`, which draws `seed + offset for offset in
+range(simulations)` — seeds `S … S+99`. **Seeds 1000 and 1001 therefore share 99
+of their 100 draws.** My twelve seeds were one draw sampled twelve times. Redone
+at spacing 5000 (above every `simulations` value graded), the true seed-to-seed
+sd is **0.0414** — 2.2× the bisection's own 0.01875 quantisation, i.e. the
+estimator is noise-dominated, the exact opposite conclusion.
+
+**Why this is worth a rule rather than a note.** A null variance is the most
+persuasive possible reading: it does not look like a broken measurement, it
+looks like a clean result, and it licenses the cheap option. Nothing downstream
+would have caught it — the harness ran, returned numbers, and agreed with
+itself.
+
+**How to apply.** Before treating seed-to-seed spread as a control, READ THE
+SEED'S CONSUMER and check the draw ranges are disjoint: spacing must exceed
+however many draws one run consumes. Sibling of "confirm the code ran" — here
+the code ran, twelve times, on the same random numbers. And treat an exactly
+zero variance from a stochastic estimator as a bug signal until the draws are
+proven independent.
+
+## 2026-09-02 REQUIRED: when a mechanism is under-reaching, measure whether the CHEAP version is louder than the mechanism itself. "Cost lever costs accuracy" is not the finding; "cost lever exceeds the signal" is. `[lane soccer-anchor-cost]`
+
+**Measured.** The brief asked whether cutting soccer's anchor solver from 500 to
+250/125/60 simulations preserved its validated gain. The obvious framing is a
+trade: cheaper, somewhat worse. Graded on the PROPS the build publishes:
+
+    D_anchor = |prop(anchored, full solver) - prop(UNANCHORED)|
+    D_cheap  = |prop(anchored, cheap solver) - prop(anchored, full solver)|
+
+`D_cheap / D_anchor` on `expected_shots`: **1.81 at half budget**, 1.39 at a
+quarter, 2.06 at an eighth. **Above 1 means the choice of solver budget moves
+the published projection MORE than the mechanism it is economising on**, and the
+solved shift REVERSES SIGN on 2 of 6 fixtures. That is not a trade at a price;
+it is replacing the signal with the instrument's noise.
+
+**The unanchored arm is what makes this readable, and it is the arm that gets
+skipped.** `D_cheap` alone was 0.033 — a small-looking absolute number that
+means "harmless cut" or "nothing here moves at all", and those recommend
+opposite actions. Only the control separates them.
+
+**How to apply.** When grading a cheaper version of a mechanism, always run the
+WITHOUT arm too, and report the RATIO. Do it on the market the mechanism is
+claimed to help, not the one it is fitted to — anchoring shrinks toward the h2h
+market, so a better h2h number is arithmetic. And beware the flattering outlier:
+`100x3` scored best on props here (ratio 0.31) while scoring WORSE on shift RMSE
+in the sibling measurement; two measurements disagreeing on n=6 is a reason to
+trust neither, not to pick the one you like.

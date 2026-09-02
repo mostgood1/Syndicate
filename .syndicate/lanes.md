@@ -1466,7 +1466,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### soccer-anchor-cost — OPEN — opened 2026-09-02 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### soccer-anchor-cost — CLOSED 2026-09-02 — opened 2026-09-02 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **GOAL MET. The cost blocker was a DENOMINATOR ERROR — the 57/136 min figures count priced EVENTS in a forward book to d+13, and the builder is SINGLE-DATE. Path (a) FALSIFIED on props (`D_cheap/D_anchor` = 1.81 at half budget; the shift REVERSES SIGN on 2 of 6 fixtures); (b) and (c) were ALREADY BUILT. Both name joins fixed and landed: reach 66→122 of 136 fixtures, 138→214 of 214 team slots. NOT DEPLOYED, NOT ARMED; weight stays 0.0. Narrative `log/2026-09-02.md`; evidence `findings_2026-09-02_soccer_anchor_cost.md`; recorded on `todo.md #622`.**
 - Goal: a MEASURED cost/accuracy tradeoff for soccer market-anchoring across the
   three candidate paths (cut solver simulations / anchor only staked fixtures /
   move it off the refresh cycle), plus a recommendation with the number behind
@@ -1510,13 +1510,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - DOES NOT arm anchoring. `SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT` stays 0.0 in
   production; `model_engine_standard.md` §4.4 re-fit is still owed and is
   reported as owed, not done.
-- STATUS 2026-09-02: **BOTH JOINS FIXED AND LANDED (`686d8282` (landed on main; the pre-rebase local SHA was `686d8282` — `session_worktree.py land` rebases, so a SHA quoted before landing never exists upstream)).** Reach
-  remeasured on the identical production basis: fixture->priced-event
-  **66 -> 122 of 136**, fixture->ratings-key **138 -> 214 of 214**. The
-  `event_id` stage joins 0 of 136 (ESPN vs OddsAPI id spaces) -- the feed has
-  always run on the exact-name fallback. 11 new tests, 8 fail pre-fix; existing
-  22 unchanged. NOT DEPLOYED and NOT ARMED; weight stays 0.0.
-  Full evidence: `.syndicate/findings_2026-09-02_soccer_anchor_cost.md`.
+- Verification RAN: reach remeasured on the identical production basis
+  (66→122 of 136 fixtures, 138→214 of 214 team slots); 11 new tests, 8 failing
+  against pre-fix code, existing 22 unchanged; cost table delivered against the
+  production-measured 43-unit / 4h baseline.
+- Landed on main: `686d8282` (fix + tests), `0844694c` (findings, `#622`),
+  `501c109e` (SHA correction — `land` rebases, so a pre-land SHA is dead).
+- CLAIMS RELEASED: `market_anchoring.py`, `market_odds.py`,
+  `tests/test_soccer_anchor_name_joins.py`.
+- OWED by whoever arms this, in order: (1) publish the anchor audit as an
+  ARTIFACT FIELD — child stdout is `DEVNULL`, so no production reading of this
+  mechanism is possible today; (2) HELD-OUT surrogate validation (the 0.0221 is
+  IN-SAMPLE); (3) multi-week anchored-vs-base on PROPS against OUTCOMES.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
