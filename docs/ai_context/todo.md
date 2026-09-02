@@ -326,6 +326,19 @@ is out-of-sample with pre-specified subsets AND denominators are bets not rows
 absorbs that track's intent; `#440`'s Phase-7 CRPS scorer is consumed by
 `#626`(h).
 
+> **TRIPWIRE, ATTACHED HERE BECAUSE THIS IS WHERE THE DECISION IS MADE
+> `[2026-09-01, on closing lane `ncaaf-settlement-resolver` as UNVERIFIABLE]`.**
+> **A market clearing LIFT_CONDITION is necessary and NOT sufficient: its
+> SETTLEMENT path must be verified against a real graded bet before it
+> carries money.** For **NCAAF that verification has never been taken.** The
+> resolver shipped 2026-08-28 (`ncaaf_team_registry.py`, `bet_status_ncaaf.py`,
+> the `paper_settlement.py` carve-out, tests) and its own lane recorded *"do
+> not describe this as end-to-end verified"* because no graded NCAAF bet
+> existed then, and none has existed since: **0 orders across 2026-08-26..09-01**.
+> It is live, untested code sitting behind a gate. **Grading the wrong game is
+> silent** — it pays or fails a bet without erroring — so if NCAAF is enabled,
+> settle a bet in PAPER and check the game identity before any real stake.
+
 ---
 
 ### `#626` — **PHASE 0 — MEASUREMENT RESTORATION (now → 09-17). Nothing downstream is verifiable until these land.** — lane `edge-plan`, 2026-09-01 — **OPEN — PROGRESS 2026-09-01 (same day): (c)+(e) LANDED `417e19ed`, (d) DISCOVERED ALREADY LANDED, (a) owned**

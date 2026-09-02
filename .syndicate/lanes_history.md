@@ -20960,3 +20960,32 @@ lost no protection and no open lane left the session-start digest.
 - Files: released at close: `syndicate/features/shared/team_aliases.py`, released: `tests/test_kalshi_soccer_club_aliases.py`, released: `tests/test_kalshi_club_code_names.py`
 - **OWED, and it is a MEASUREMENT not a fix:** a per-sport attempted/resolved rate for club resolution, read on a stable slate, is what would show whether these 34 bought anything. The 9 refused clubs need evidence this method cannot supply and remain None by design.
 - Blocked by: none.
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-09-01
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### ncaaf-settlement-resolver — **CLOSED 2026-09-01 AS UNVERIFIABLE, NOT AS DONE `[user decision: "close it as unverifiable"]`** — the code SHIPPED and was NEVER verified end to end; it cannot be, because NCAAF places no bets and that is two deliberate gates, not a defect. Tripwire at the decision point: `#627`'s LIFT_CONDITION. — was OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-28 — session 764eca35-178c-4c29-afbd-ec621894aaf1
+- Goal: NCAAF bets can be GRADED, and are graded against the RIGHT GAME.
+- Files: released: NEW `syndicate/features/shared/ncaaf_team_registry.py`, NEW
+  **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: `scripts/poll_ncaaf_live_state.py`, NEW
+  released: `syndicate/features/shared/bet_status_ncaaf.py`, NEW
+  released: `tests/test_bet_status_ncaaf.py`, plus the same ONE-LINE carve-out on a file
+  held by `open-bet-live-status`: `syndicate/features/shared/paper_settlement.py`
+  Reordered 2026-08-28 so the parser reads this as the deference it always was:
+  the carve-out has landed and this lane was never a second owner. Plus the
+  pinned-set assertion in
+  released: `tests/test_paper_settlement.py` that `nfl-settlement-resolver` added.
+- **THE MISSING READING IS STILL MISSING, AND NOW EXPLAINED `[reading taken 2026-09-01 by the ownership pass, lane game-market-entry-roi-curve]`: there are ZERO NCAAF ORDERS AT ALL**, not merely zero graded ones. `/api/portfolio/paper?date=` over 2026-08-26..09-01: `settlement.by_sport` ncaaf **0 settled / 0 orders** on all seven dates, and **0** ncaaf rows in `orphan_orders`. **This lane cannot be verified until NCAAF places a bet.** `[CORRECTED 2026-09-01 when `ncaaf-no-orders` CLOSED: it is NOT blocked by that lane, and naming a lane was the wrong shape. That lane measured the cause and it is not a defect — NCAAF serves zero orders because TWO GATES hold, both by design: `football/pick_gate.py` denies the model claim on a 17-sigma out-of-sample loss, and `portfolio_commit.py:267` refuses all 480 served rows for `no_model_edge_pct` (0 of 480 carry one, every row `market_fair` basis). **So this lane is blocked on a PRODUCT DECISION — a model that beats the close, or an explicit choice to size on market basis — not on any lane's work.** Same position `#624` step 6 holds for MLB props. Nothing to wait for; if that decision is not coming, this lane should close as UNVERIFIABLE rather than wait forever.]`
+- **CLOSED AS UNVERIFIABLE `[user decision 2026-09-01]`, and the distinction is the whole record.** This is NOT "goal met". The goal was *"NCAAF bets can be GRADED, and are graded against the RIGHT GAME"*; the code to do it shipped, and **whether it works has never been observed.** It cannot be: NCAAF has placed **0 orders across 2026-08-26..09-01**, because `football/pick_gate.py` denies the model claim on a 17-sigma out-of-sample loss and `portfolio_commit.py:267` refuses all 480 served rows for `no_model_edge_pct`. Both are working as designed, so waiting is not a strategy.
+  **WHAT IS LIVE AND UNTESTED:** `ncaaf_team_registry.py`, `bet_status_ncaaf.py`, the one-line `paper_settlement.py` carve-out, and their tests — bench-verified only.
+  **THE TRIPWIRE IS AT THE DECISION POINT, NOT HERE**, because a note in a closed lane is not a control: `todo #627`'s `pick_gate` LIFT_CONDITION paragraph now says that clearing the condition is necessary and NOT sufficient, and that NCAAF settlement must be proved on a PAPER bet before any real stake. **Grading the wrong game is silent** — it pays or fails without erroring — which is why this cannot be left to be noticed.
+- **Do not describe this as end-to-end verified** — a real graded NCAAF bet was
+  not available at the time the work landed.
+- Blocked by: none.
+- Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
