@@ -1555,41 +1555,6 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   and does not touch production.
 
 
-### m625-replay-diff-gate — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
-- Goal: `todo.md #625` build item (5). ONE mirrored production day is replayed
-  through the REAL producer entrypoints with fetching disabled, and the
-  artifacts it regenerates are diffed against production's OWN recorded outputs
-  for that date, tolerance-aware — then wired into `scripts/migration_gate.py`.
-  Testable outcome: `py -3 scripts/replay_diff_gate.py --date <D>` exits 0 on a
-  day production actually produced, exits non-zero when an input is perturbed,
-  and `migration_gate.py` reports its status rather than silently passing.
-- Files: `scripts/replay_diff_gate.py` (NEW), `scripts/migration_gate.py`,
-  `tests/test_replay_diff_gate.py` (NEW), `scripts/mirror_manifest.py` (NEW).
-- NOT CLAIMED, deliberately — both are held by other OPEN lanes and I will not
-  edit across them:
-  - `syndicate/features/shared/artifact_publisher.py` (`HOT_ARTIFACT_PATTERNS`)
-    is held by `book-quotes-publish-clobber`. That blocks `#625` build item (2),
-    the EXPORT-ONLY pattern list, which is therefore NOT in this lane's scope.
-  - `docs/ai_context/todo.md` is CONTESTED between `accuracy-summary-alloc-profile`
-    and `book-quotes-publish-clobber` (`check_lane_invariants.py` FAILs on it
-    today). I will record `#625` progress there as a single additive edit to the
-    `#625` section only, and say so here rather than claiming the file.
-- Hypothesis: the four defects found on 2026-09-02 (evaluation autorun never
-  ran; `odds_history` merge cap sized on a 39MB shard against a 109MB pair; the
-  autorun's silent False decline; the autorun's OOM) are all
-  DEPLOYED-INERT-class, and every one is observable OFFLINE from a mirrored day
-  plus a production env snapshot — no deploy, no production time.
-- Falsification test: if the first replay target's output cannot be reproduced
-  from mirrored inputs alone — i.e. it depends on a fetch, on wall-clock, or on
-  state that is not in any artifact — then a replay-diff gate cannot be built
-  for it and the target is wrong. Record which, and pick another.
-- Verification: (a) one date replayed, diff PASS, with the tolerance stated and
-  its justification recorded; (b) a deliberate perturbation of one input makes
-  the same command FAIL (off != on — a gate that has never been seen to fail
-  proves nothing); (c) `migration_gate.py --json` carries a `replay_diff` block
-  whose absent case is reported as UNKNOWN, not folded into `ok`.
-- Blocked by: none. Needs NO deploy — it never contends for the deploy queue.
-
 ### accuracy-summary-ledger-budget — OPEN, GOAL MET AND EXCEEDED — **THE PROJECTION SUPERSEDES THE BUDGET: 831,038,410 B / 8 dates at 42.2 MiB (was 3,181.1), 75x better than baseline and 8x better than the 90MB budget on 8x the data, and faster (10.9s vs 41.2s). Resident/file byte 4.014 -> 0.053. Budget default raised 90,000,000 -> 2,000,000,000 and demoted to a backstop; the 28-day drift window is now affordable. PLANNED ACCUMULATORS DELIBERATELY NOT BUILT — they need a second implementation of every formula and buy nothing at 42 MiB; equivalence is asserted instead (byte-identical statistics, all 9 sports, real builders). 136 tests pass. `tests/test_intelligence.py` hangs on TWO PRE-EXISTING blockers proven not mine by faulthandler (WNBA `_artifact_bundle` <-> `_games_from_live_state_fallback` recursion; a live Kalshi HTTPS call on the intelligence request path).** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 — **BUILT AND RE-MEASURED OFF vs ON AT PRODUCTION SCALE.** Corpus 831,038,410 B / 8 chunks: budget OFF peak **3,181.1 MiB** (41.2 s), budget ON (90,000,000) peak **344.4 MiB** (7.3 s), accepted 89,967,617 <= budget, coefficient **4.014 in BOTH** — 9.24x reduction, 2,836.7 MiB saved. **The prior extrapolation (3,178 MiB) is now a direct measurement (3,181.1), 0.1% apart.** OFF = 5,014.1 MiB vs a 4,096 ceiling (OOM by 918); ON = 2,221.4 MiB = 54.2% of ceiling. Falsification test PASSED: off != on. 10 new tests, 66 pass across the ledger/summary suites, all 8 pre-existing callers unchanged (budget defaults to None). **DEFECT CAUGHT BY ITS OWN TEST:** the first cut checked the byte limit AFTER consuming the line and read 5,005,916 against a 5,000,000 budget; the bound is now exact. **BOTH BLOCKERS FIXED IN THE SAME SESSION `[user decision: cross-lane edit authorised]`:** `_bounded_accuracy_summary` now publishes `ledger_coverage` and truncates the `segments` LIST (not the mapping's 3 fixed keys), keeping the largest-sample segments. 10 more tests, and all four key assertions VERIFIED TO FAIL against the pre-fix function extracted from HEAD (segments_total 3, truncated False, payload ratio 0.996, coverage None). **NOT RE-ARMED, NOT DEPLOYED.** Record: `todo.md #626`(h) + `state.md [accuracy-autorun-OOM-2026-09-02]`.
 - Goal: implement the CUMULATIVE byte budget measured by lane
   `accuracy-summary-alloc-profile` and re-measure peak WITH IT ENFORCED, at
@@ -1611,6 +1576,14 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   publishes what it covered, so a narrowed sample cannot be read as a full one.
 - DOES NOT re-arm `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN` and does not
   deploy. Local only.
+- **CROSS-LANE EDIT AUTHORISED `[user decision 2026-09-02]`.** This lane now
+  also edits `scripts/run_refresh_worker.py` (`_bounded_accuracy_summary` ONLY)
+  and `tests/test_accuracy_summary_autorun.py`, both nominally held by OPEN lane
+  `accuracy-autorun-decline-telemetry`. Surfaced as a conflict and the user
+  chose "I take both fixes now". Scope is strictly the two measured defects --
+  `ledger_coverage` dropped by the field whitelist, and the truncation aimed at
+  the wrong container. **NOT touching `_launch_autorun_accuracy_summary`, the
+  decline telemetry, or the enable flag**, which are that lane's actual subject.
 - Blocked by: none
 ### m625-export-only-patterns — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET, DEPLOYED AND VERIFIED (web `8da0eddc` then `e6fa165b`).** The allowlist is two predicates: WRITE (`is_hot_artifact_relative_path`, unchanged, publish + sweep) and READ (`is_exportable_artifact_relative_path`, export + stream). Verified in production with controls at one instant: a `feed_live` `.json.gz` went **403 -> 415 naming `/stream`**, `/stream` serves it **200, 111,585 B, gunzips to gamePk 822722 Final/Final**, a `props_history` CSV went **403 -> 200 count=1**, and an unlisted path is **still 403** — widened, not disabled. Inventory 33,229 -> 33,567 files. **MY HYPOTHESIS WAS RIGHT AND MY FALSIFICATION PREDICTION WAS WRONG IN BOTH DIRECTIONS:** I predicted 3 families present / 1 absent; the truth is 2 were already hot (`eval/batches` 51 files/199 MB; `roster_objs` via `snapshots/*/*.json`, since fnmatch `*` crosses `/`) and the other 2 were PRESENT AND INVISIBLE (`feed_live` 146 files/16.7 MB, `props_history` 18/11.1 MB) — I published "absent" first, on an inventory taken before the split that was blind to them *because* they were unallowlisted. Corrected within the hour. **`#413` NOT ARMED:** all `feed_live` on web is 2026-06-14..06-25, 69+ days old. Follow-ons: `#638` (stale publisher comment), and 15 files mirrored for 2026-06-14 (manifest `47568090177ed76b`, verify 15/15) which unblocks `build_mlb_actuals` as a `#625`(5) target. Commits `8da0eddc`, `e6fa165b`, `d668898a`.
 - Files: released — `syndicate/features/shared/artifact_publisher.py`,
@@ -1673,14 +1646,6 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Files: .syndicate/{learnings,state,deploys}.md, .syndicate/log/2026-09-02.md
 - Verification: the two new FORBIDDEN rules and the OOM state block are greppable
   on origin/main.
-- **CROSS-LANE EDIT AUTHORISED `[user decision 2026-09-02]`.** This lane now
-  also edits `scripts/run_refresh_worker.py` (`_bounded_accuracy_summary` ONLY)
-  and `tests/test_accuracy_summary_autorun.py`, both nominally held by OPEN lane
-  `accuracy-autorun-decline-telemetry`. Surfaced as a conflict and the user
-  chose "I take both fixes now". Scope is strictly the two measured defects --
-  `ledger_coverage` dropped by the field whitelist, and the truncation aimed at
-  the wrong container. **NOT touching `_launch_autorun_accuracy_summary`, the
-  decline telemetry, or the enable flag**, which are that lane's actual subject.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

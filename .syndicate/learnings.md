@@ -4646,3 +4646,45 @@ trust neither, not to pick the one you like.
 - **Cost:** none — the tests caught it pre-deploy. It would have been an
   inert list, silently duplicating two families and claiming to fix a gap that
   did not exist.
+
+## 2026-09-02 — FORBIDDEN: calling a job "bounded" because something downstream of it is capped. A cap on the OUTPUT cannot bound the WORKING SET that produced it — and a cap that reports a count is not a bound until you check WHICH container it counted. `[lane accuracy-summary-alloc-profile]`
+
+- **What we believed:** that the accuracy autorun was safe to arm because
+  `_bounded_accuracy_summary` capped SEGMENTS at 50 and reported
+  `segments_total`/`segments_truncated`, and because `#256`'s claim-before-work
+  guarded the schedule. `state.md` records the author's own words: "Being
+  segment-capped and claim-guarded did not bound its memory, and I asserted it
+  would." It OOM-killed refresh-worker on its first run.
+- **What was actually true:** TWO independent failures of the same cap.
+  (1) **Ordering.** It runs on the summary that has already been RETURNED, i.e.
+  downstream of the 22,078-record working set. Measured: materialisation is
+  **98.8-99.9% of peak** (stages after it add 0.3-4.4 MiB against 360.6-961.7
+  MiB), so no output-side cap can touch the number that kills the container.
+  (2) **Wrong container.** `segmented_reliability` is a dict
+  `{global, shrinkage_k, segments}`, and `list(segments.items())[:50]` truncates
+  the three TOP-LEVEL KEYS, never the `segments` LIST — the one field whose
+  stated purpose is to grow with coverage. On a real summary `segments_total`
+  reads **3** while `len(segments)` is **7**, `segments_truncated` is pinned
+  **False** at any coverage, and the "bounded" payload comes out **LARGER** than
+  the raw one (3,585 vs 3,535 bytes). The 8MB keyvalue ceiling it exists to
+  protect is unprotected, and has been the whole time.
+- **How we found out:** profiling it locally under RSS with no profiler in the
+  process, staged so each step's cost was attributable, then calling
+  `_bounded_accuracy_summary` on a real summary and printing `segments_total`
+  next to `len(segments)`. Both readings are one line each. Neither had been
+  taken before the thing was armed.
+- **The rule going forward:** before calling anything bounded, name the
+  QUANTITY the bound applies to and the MOMENT it applies, and check that both
+  match the failure you are guarding against. A cap on emitted rows bounds the
+  artifact, not the allocation; a cap that fires after the peak bounds nothing
+  at all. And when a guard reports a count, print that count beside the length
+  of the collection it claims to describe — a truncation pointed at the wrong
+  container is invisible in every test, because it never truncates.
+  Related and NOT the same rule: `#435`'s "the ceiling is per FILE; nothing
+  bounded the SUM". That one is about a bound too small in EXTENT; this one is
+  about a bound aimed at the wrong THING.
+- **Cost:** one OOM kill of refresh-worker (anon 1,833 -> 3,868 MiB against a
+  4,096 ceiling), one day of the evaluation loop lost, `#241` repeated after
+  being quoted at arming time, and `#626`(h) — the platform's named #1
+  structural failure — blocked a further day. The profile that settles it took
+  under an hour and could have been run before arming.
