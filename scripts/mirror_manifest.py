@@ -138,6 +138,33 @@ FAMILIES: dict[str, dict[str, Any]] = {
             ("mlb_source/data/live_gameline_ledger/live_gameline_ledger_{date}.jsonl", (0,)),
         ),
     },
+    "mlb_actuals_replay": {
+        "role": "input",
+        # NEWLY REACHABLE VIA `#625`(2). Before the export-only split these were
+        # on web's disk and unreadable -- `/api/ops/artifacts/export` refused
+        # them 403, which is not the same fact as absent and was misread as
+        # absent (including by me, writing the fix).
+        #
+        # WHY THIS FAMILY IS WORTH MIRRORING: `box_score_stats.load_final_feed`
+        # takes `fetch_if_missing=True` and falls back to a LIVE
+        # `statsapi.mlb.com` call when the cached artifact is absent
+        # (`box_score_stats.py:132-141`), and its only caller never passes False.
+        # So `build_mlb_actuals` is network-free ONLY on a date whose feed_live
+        # is present. Mirroring it is what makes that a replayable target.
+        #
+        # BINARY: these are `.json.gz`. `mirror_manifest` pulls via `stream`,
+        # which sends bytes; `export?path=` answers 415 and names `stream`.
+        "note": "raw StatsAPI feed_live for the date -- READ-ONLY, never publishable (`#413`).",
+        "patterns": (
+            "mlb_source/source_artifacts/data/raw/statsapi/feed_live/*/{date}/*.json",
+            "mlb_source/source_artifacts/data/raw/statsapi/feed_live/*/{date}/*.json.gz",
+        ),
+    },
+    "mlb_prop_history": {
+        "role": "input",
+        "note": "prop-history CSVs under tracking/ -- also newly reachable via `#625`(2).",
+        "patterns": ("*_source/tracking/odds_*_props_history_{date}.csv",),
+    },
     "mlb_book_grid_output": {
         "role": "output",
         "note": "production's OWN answer for the date -- the thing the replay is diffed against.",
