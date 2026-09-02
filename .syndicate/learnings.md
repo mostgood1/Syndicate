@@ -3869,3 +3869,34 @@ pass here is a census and two corrections — not closures.
 * Sibling rule, same family: *a LIVENESS field that the recorder cannot outlive*
   should not be recorded at all. The session id in a lane header is exactly that
   field, and this is the second time it has misled a census.
+
+## 2026-09-02 REQUIRED: a pre-registered falsification test still needs a CONTROL CYCLE before you act on it. One reading on a cadence-driven instrument is not evidence. `[lane kalshi-soccer-club-aliases]`
+
+- **What we believed.** A falsification test written in advance is the honest
+  way to hold yourself to a result, so when it fires you act on it. Mine said:
+  "`event_not_on_our_board` does not fall, or soccer matches drop — either
+  means a pairing is wrong and this reverts."
+- **What actually happened.** It fired hard on the first post-deploy cycle:
+  `event_not_on_our_board` **314 -> 775** and `soccer_matches` **51 -> 4**, a
+  92% collapse, with both denominators moving the WRONG way for a composition
+  excuse (kalshi soccer markets 918 -> 948, soccer board rows 1,600 -> 1,565).
+  Every aggregate said regression. **The next cycle, with the code untouched,
+  read `soccer_matches=52` and `event_not_on_our_board=380`.** The dip was
+  slate-state transience on a ~15-minute cadence.
+- **Why reverting would have been self-confirming, which is the trap.** Had I
+  reverted on the first reading, matches would have returned to ~52 anyway and
+  I would have recorded "revert confirmed, the aliases were the cause" —
+  a false finding, durably written, with the real change discarded.
+- **The rule going forward.** Before acting on a falsification signal from a
+  periodic instrument, take ONE more cycle with NOTHING changed. It costs one
+  cadence (~15 min here) against a revert-and-redeploy round trip (~45), and it
+  is the only thing that separates "my change did this" from "this cycle did
+  this". State the control's result beside the signal in `deploys.md`.
+- **What made waiting defensible rather than wishful, and this half is not
+  optional:** the change was provably ADDITIVE before the deploy — 0 of 34 keys
+  were dropped-as-ambiguous by the derived map, 0 were already present, the
+  overlay is `setdefault`, no new ambiguity refusals appeared. **A change that
+  could plausibly cause the harm gets reverted first and diagnosed after.** The
+  control is for changes whose mechanism cannot produce the observed damage.
+- **Cost.** None. But the near-miss was a correct change discarded plus a wrong
+  cause recorded as fact — on a money-adjacent join, in a ledger read as evidence.
