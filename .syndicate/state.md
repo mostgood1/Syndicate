@@ -179,6 +179,37 @@ reading the log.
   auto-merged with no conflict. Re-run `trim_lane_blocks.py --apply` after any
   such merge and check for lanes with two blocks. Rule in `learnings.md`.
 
+## [substrate-rule] A CLAIM MUST NAME ITS SUBSTRATE, AND THERE ARE THREE — the standard's §3b was widened and strengthened at the same time `[2026-09-02, lane m625-standard-substrate-label, commit 6211bdf9, NO DEPLOY]`
+
+`model_engine_standard.md` §3b used to say the substrate "must be Render", full
+stop. It now names three, because the invariant is **CHECKABILITY, not
+remoteness** — every incident behind the old wording came from a mirror that was
+PARTIAL and whose partiality was INVISIBLE.
+
+- **`render`** — the served payload, `/api/ops/artifacts/*`, the live env-vars
+  API. The ONLY substrate that answers *what is true right now*.
+- **`mirror:<manifest_id>`** — admissible only when the day was synced by
+  `mirror_manifest.py`, `verify --date <D>` passes **TODAY**, and the question is
+  in the reproducible class. **Cite the id.**
+- **`checkout`** — `data/**` in git. Still never a claim.
+
+**A LOCAL RUN IS EVIDENCE ABOUT THE CODE, NEVER ABOUT THE DEPLOYMENT.** A
+verified mirror can say what an input contains and whether this code reproduces
+production's artifact from it; it can NEVER say whether production has that file
+now, whether the output reaches a user, whether a job is enabled or ran, or
+which commit is deployed. The dividing line is §3b's own worked example: NCAAF's
+local **0 games** against production's **16** was a question about what
+production PRODUCES.
+
+**The 2026-08-18 user directive is preserved verbatim and marked unchanged.**
+This ADDED one admissible case; an unverified local read is still not a claim.
+
+Also fixed, because `#625`(2) had made them stale the same day: §3 and the gate
+requirements said "allowlisted in `HOT_ARTIFACT_PATTERNS`" when there are now
+two lists; and the "report UNMEASURED for a local checkout" rule now
+distinguishes a verified mirror from a checkout — **and a gate that cannot tell
+the two apart must assume checkout.**
+
 ## [local-fleet-runner] THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, lane m625-fleet-runner, commit 92020995, NO DEPLOY]`
 
 `py -3 scripts/fleet_local.py doctor` -> READY.

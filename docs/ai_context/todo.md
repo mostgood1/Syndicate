@@ -1513,7 +1513,42 @@ the 163MB tape and the gate fails on exactly 8 fields.
   - **Memory caps are a WATCHDOG, not a container limit**, and are labelled so
     everywhere: RSS sampling means a process can exceed the cap between samples.
     Useful for the slow ratchet; NOT evidence about Render's ceiling.
-- **(6) NOT STARTED** — the `model_engine_standard.md` §3b substrate-label edit.
+- **(6) DONE 2026-09-02 — lane `m625-standard-substrate-label`, commit
+  `6211bdf9`. NO DEPLOY (documentation).** §3b now names **three** substrates
+  instead of one — `render`, `mirror:<manifest_id>`, `checkout` — with a table
+  of what a verified mirror CAN and can NEVER answer. The 2026-08-18 user
+  directive is preserved verbatim and explicitly marked unchanged: this ADDS one
+  admissible case (a local read that cites a manifest `verify` passes TODAY, for
+  a question in the reproducible class) rather than relaxing anything. An
+  unverified local read is still not a claim, and `checkout` never is.
+  - The dividing line uses §3b's own worked example: NCAAF's local **0 games**
+    against production's **16** was a question about what production PRODUCES,
+    and no mirror can answer that. **A local run is evidence about the CODE,
+    never about the DEPLOYMENT**, and it inherits the replay gate's two
+    preconditions.
+  - **THREE PLACES THE STANDARD HAD GONE STALE, fixed in the same pass:** §3 and
+    the gate requirements both said "allowlisted in `HOT_ARTIFACT_PATTERNS`",
+    which `#625`(2) split into a WRITE list and a READ list; the UNMEASURED rule
+    did not distinguish a verified mirror from a checkout (it now does, and a
+    gate that cannot tell must assume checkout — unknown does not get the
+    permissive branch); and a new subsection states that **a 403 is not an
+    absence**, which has now cost three readings, the most recent mine.
+  - The new-engine checklist gains three items: name your substrate, cite a
+    manifest id that verifies today, and build a replay-diff for any producer
+    whose output someone reads.
+
+**`#625` IS NOW COMPLETE — all six build items done, across four lanes on
+2026-09-02.** (1) `mirror_manifest.py`; (2) the allowlist split, deployed and
+verified; (3) `snapshot_render_env.py` (lane `m625-env-snapshots`);
+(4) `fleet_local.py` + `_fleet_guard.py`; (5) `replay_diff_gate.py`, PASS on
+2026-09-01 with 0 mismatches; (6) this. **The item's own verification criterion
+— "first 'deployed-inert'-class defect caught locally" — was met four times
+over, and every one was caught by a NEGATIVE CONTROL rather than by review:**
+a mismatch cap that stopped the traversal and reported a clean bill on 12 MB it
+never read; two fnmatch rules that were inert while reading as correct; a
+`sitecustomize` guard that announced a refusal and let the money-armed process
+run; and `shutil.which("gunicorn")` succeeding where gunicorn cannot import.
+None of them cost a deploy or a minute of production time.
 
 **FOUR FINDINGS THAT CONSTRAIN ANY FUTURE REPLAY TARGET — each measured, none
 of them guesses:**

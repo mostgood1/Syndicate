@@ -1709,26 +1709,14 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   CODE'S BOUND — never "Kalshi is slow".
 - Blocked by: none. Does not deploy; the fix is a bound, and a bound is only
   worth shipping once its off != on test exists.
-### m625-standard-substrate-label — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
-- Goal: `todo.md #625` build item (6). Extend `model_engine_standard.md` §3b so
-  a VERIFIED local mirror is an admissible substrate — cited by manifest id —
-  without weakening the rule that a bare local read is not a claim. §3b today
-  says the substrate "must be Render", full stop; `#625`'s law (2) is that the
-  real invariant is CHECKABILITY, and every incident behind §3b was a PARTIAL,
-  UNVERIFIABLE mirror rather than locality as such.
-- Files: `docs/ai_context/model_engine_standard.md`.
-- Hypothesis: the rule can be widened and made STRONGER at the same time,
-  because the new substrate carries a verifiable id and a stated class of
-  questions it may answer, where "local" today carries neither.
-- Falsification test: if the class of questions a verified mirror may answer
-  cannot be stated crisply — if it collapses into "anything" — then the edit
-  weakens §3b and must not be made. The dividing line to test against is §3b's
-  own worked example: NCAAF's local 0-games vs production's 16.
-- Verification: (a) §3b names three admissible substrates, each with what it
-  can and CANNOT answer; (b) it requires a manifest id on any local claim;
-  (c) the §3b allowlist requirement is updated for `#625`(2)'s split, or the
-  standard is stale on the day it is read.
-- Blocked by: none. NO DEPLOY — documentation.
+### m625-standard-substrate-label — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. `#625`(6) done, commit `6211bdf9`, NO DEPLOY (documentation).** `model_engine_standard.md` §3b now names **three** substrates — `render`, `mirror:<manifest_id>`, `checkout` — with a table of what a verified mirror CAN and can NEVER answer. **The 2026-08-18 user directive is preserved verbatim and explicitly marked unchanged**; this ADDS one admissible case rather than relaxing anything, and an unverified local read is still not a claim. **The falsification test did NOT fire:** the reproducible class states crisply, against §3b's own worked example (NCAAF local 0 vs production 16) — a mirror answers questions about the CODE, never about the DEPLOYMENT. **Three stale places fixed in the same pass:** §3 and the gate requirements still said "allowlisted in `HOT_ARTIFACT_PATTERNS`" after `#625`(2) split it; the UNMEASURED rule could not tell a verified mirror from a checkout; and a new subsection states that a 403 is not an absence. **`#625` IS COMPLETE — all six items.**
+- Files: released — `docs/ai_context/model_engine_standard.md`.
+- Verification: all three criteria met — (a) three substrates each with what
+  they cannot answer; (b) a manifest id required on any local claim, and
+  `verify` must pass TODAY; (c) the allowlist requirement updated for the
+  `#625`(2) split, in all three places it appeared.
+- Claims: NONE held. No deploy taken or needed.
+- Narrative: `log/2026-09-02.md`, `todo.md #625`(6).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
