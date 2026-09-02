@@ -1,5 +1,62 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#634` — **`#488`'s publish-divergence guard is LEAKY BY CONSTRUCTION: its state is PER-PROCESS across 2 gunicorn workers, so it is blind exactly when it is most needed** — split out of `#630`(d), lane `book-quotes-publish-clobber`, 2026-09-02 — **OPEN. Known, measured, NOT fixed.**
+
+**What the guard is for.** `_publish_divergence_verdict` in
+`syndicate/blueprints/ops.py` refuses a publish that is substantially SMALLER
+than what is on disk **from a different publisher** — the `#488` signature of
+two services overwriting one path (the WNBA `boxscores_history.csv` incident,
+which published a NEGATIVE home-court advantage into the sim).
+
+**The defect.** Both `_PUBLISH_LAST_PUBLISHER` and `_PUBLISH_CONSECUTIVE_REFUSALS`
+are plain module-level dicts, and the live config — read from `/api/ops/memory`'s
+process list, 2026-09-02 — is:
+
+    gunicorn wsgi:application --workers 2 --threads 4
+
+So `last_publisher` means *"who last published through THIS worker"*. A worker
+that has not yet seen a path reads `last=None`, which makes `cross=False`, which
+**ALLOWS** the publish. The guard's own docstring is careful that "unknown must
+not be treated as same-publisher" for the *header* case, and then the process
+model reintroduces exactly that hole by another route.
+
+**WHEN IT BITES, concretely — this is not theoretical.** Both workers start with
+empty dicts, so **after every deploy the FIRST publish of each path in each
+worker is unguarded**, and a cross-publisher shrink in that window is allowed
+silently. Deploys are frequent. With `--workers 2` a path also has a standing
+chance of landing on the worker that has not seen it.
+
+**Scope, and why it is not urgent.** `#630` made `book_quotes` (all sports) and
+`odds_history` MERGE, and merged families deliberately skip this refusal — for
+them the guard is moot and the merge is the real protection. **Everything else
+still rides the leaky guard**: board snapshots, `intelligence_state`, the
+`book_quotes/<date>.state.json` sidecar, and any other allowlisted path with
+more than one writer. Whether any of those actually has two writers is the
+enumeration `#630`'s sweep did NOT complete — it found the two it could prove.
+
+**Already fixed, so do not re-report it:** the guard used to record a publisher
+whose publish it had just REFUSED, making the refusal a one-cycle delay
+(`22:01:15 REFUSED` → `22:05:03 ALLOWED`, 9.2MB replaced by 5.2MB). Fixed in
+`8db62f85`, with a `consecutive_refusals=N` counter. **This item is only the
+remaining PER-PROCESS hole.**
+
+**Options, cheapest first:**
+1. **Do nothing but enumerate.** Sweep `HOT_ARTIFACT_PATTERNS` for paths with
+   more than one writer. If the only ones are already merged, this item closes as
+   moot rather than fixed — and that is a legitimate outcome worth the sweep.
+2. **Extend merging** to whichever families the sweep finds, which removes the
+   need for the guard there too.
+3. **Move the state cross-process** via `refresh_state_store` (keyvalue), which
+   is what the repo already uses for state that must be shared. Costs a
+   round-trip on the publish path — the same request path `#630` just finished
+   taking heavy work OFF, so weigh it against option 1.
+
+**Reading that would show it biting:** a `PUBLISH_DIVERGENCE` line with
+`last_publisher=UNKNOWN` on a path that demonstrably had a prior publisher, or
+a shrink `ALLOWED_WITH_WARNING` on a non-merged path followed by a smaller file
+on disk. **DO NOT close this on the absence of such a line without stating the
+window** — absence in a short window is not absence.
+
 ### `#633` — **NCAAF SEASON PROJECTIONS CANNOT REFRESH: the CFBD monthly quota is exhausted and the artifact is 5+ days stale** — lane `game-market-entry-roi-curve` (the owed reading from `ncaaf-no-orders`, taken rather than filed), 2026-09-01 — **OPEN**
 
 **THE READING `ncaaf-no-orders` WAS WAITING ON IS TAKEN, and it passes the lane's
@@ -173,11 +230,9 @@ one-off. Proven to discriminate (`off != on`) rather than merely to pass.
   which includes page cache this merge inflates), boot floor **717.7 MB**, alarm
   at 900 MB against a 2048 MB cap. If the floor ratchets, lower the cap or move
   the merge off the request path.
-- **(d) `#488`'s guard is LEAKY BY CONSTRUCTION and that is not fixed.** Both its
-  dicts are PER-PROCESS and web runs `--workers 2 --threads 4`, so `last` is
-  per-worker and an unseen path reads `last=None` → ALLOWED. Merging removes the
-  need for it on the families that actually collide; everything else still rides
-  a leaky guard.
+- **(d) SPLIT OUT AS `#634`** — `#488`'s guard is leaky by construction. Moved to
+  its own item so closing this one cannot bury it; it is a live defect on every
+  family this thread does NOT merge.
 
 ### `#629` — **Orphan-sweep residue: 3 parked worktrees need one human `--force` each; out-of-scope ref families listed for a future pass** — lanes `orphan-*-census`, 2026-09-01 — **OPEN, LOW**
 
