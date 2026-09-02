@@ -65,8 +65,9 @@ class AnchorWiringTests(unittest.TestCase):
         fixtures = self._fixtures()
         with patch.dict(os.environ, {"SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT": weight}, clear=False):
             with patch("builtins.print") as printer:
-                out = MOD._apply_market_anchor("epl", self.root, fixtures, _RATINGS)
+                out, audit = MOD._apply_market_anchor("epl", self.root, fixtures, _RATINGS)
         printed = " ".join(str(c.args[0]) for c in printer.call_args_list if c.args)
+        self._audit = audit
         return out, fixtures, printed
 
     # ---- the reachability test, before any correctness claim ----
@@ -104,19 +105,21 @@ class AnchorWiringTests(unittest.TestCase):
         empty = Path(self._tmp.name) / "nowhere"
         with patch.dict(os.environ, {"SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT": "0.35"}, clear=False):
             with patch("builtins.print") as printer:
-                out = MOD._apply_market_anchor("epl", empty, self._fixtures(), _RATINGS)
+                out, audit = MOD._apply_market_anchor("epl", empty, self._fixtures(), _RATINGS)
         printed = " ".join(str(c.args[0]) for c in printer.call_args_list if c.args)
         self.assertEqual(out, _RATINGS)
         self.assertIn("ODDS_ABSENT", printed)
+        self.assertEqual(audit["state"], "odds_absent")
 
     def test_an_unpriced_slate_names_the_reason_rather_than_anchoring_nothing(self) -> None:
         fixtures = [{"match_id": "zzz", "home_team": "Ghost", "away_team": "Phantom"}]
         with patch.dict(os.environ, {"SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT": "0.35"}, clear=False):
             with patch("builtins.print") as printer:
-                out = MOD._apply_market_anchor("epl", self.root, fixtures, _RATINGS)
+                out, audit = MOD._apply_market_anchor("epl", self.root, fixtures, _RATINGS)
         printed = " ".join(str(c.args[0]) for c in printer.call_args_list if c.args)
         self.assertEqual(out, _RATINGS)
         self.assertIn("no_priced_fixtures", printed)
+        self.assertEqual(audit["state"], "no_priced_fixtures")
 
     # ---- the knob ----
 
@@ -135,3 +138,100 @@ class AnchorWiringTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MarketAnchorAuditIsPublishedTests(unittest.TestCase):
+    """The audit must be READABLE WHERE THE LOGS ARE NOT.
+
+    `ops_refresh.py:1402` launches every refresh unit with
+    `stdout=subprocess.DEVNULL`, so nothing `build_soccer_artifacts.py` prints
+    reaches Render. Measured 2026-09-02 over a window where seven soccer units
+    demonstrably ran: every token printed by that file returned 0 log matches,
+    including `player projections` which prints on every success, while the
+    parent's own token returned 5. The `[soccer_anchor]` lines are therefore not
+    an instrument in production -- the published field is.
+
+    The point of `state` is that the five outcomes must not collapse into one
+    another. A test that only checks "a dict came back" would pass against
+    exactly the ambiguity this replaces.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name)
+        odds = self.root / "epl" / "api" / "odds"
+        odds.mkdir(parents=True, exist_ok=True)
+        (odds / "game_odds_current.csv").write_text(_ODDS_CSV, encoding="utf-8")
+
+    def _audit_at(self, weight: str, *, source_root=None, fixtures=None):
+        fixtures = fixtures if fixtures is not None else [
+            {"match_id": "e1", "home_team": "Home FC", "away_team": "Away FC"}
+        ]
+        with patch.dict(os.environ, {"SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT": weight}, clear=False):
+            with patch("builtins.print"):
+                # simulations=2 keeps these fast. It is a COST knob, not a
+                # correctness one: the assertions below are about which STATE
+                # is reported and whether resolution was counted, and neither
+                # depends on the solved shift's precision. The pre-existing
+                # tests above deliberately keep the default -- they assert the
+                # ratings MOVE, which is a claim about the solve itself.
+                _out, audit = MOD._apply_market_anchor(
+                    "epl", source_root if source_root is not None else self.root, fixtures, _RATINGS,
+                    simulations=2,
+                )
+        return audit
+
+    def test_the_five_states_are_DISTINCT_values(self) -> None:
+        """If any two of these collapse, the field has rebuilt the silence."""
+        disabled = self._audit_at("0")["state"]
+        anchored = self._audit_at("0.35")["state"]
+        absent = self._audit_at("0.35", source_root=Path(self._tmp.name) / "nowhere")["state"]
+        unpriced = self._audit_at(
+            "0.35", fixtures=[{"match_id": "zzz", "home_team": "Ghost", "away_team": "Phantom"}]
+        )["state"]
+
+        self.assertEqual(disabled, "disabled")
+        self.assertEqual(anchored, "anchored")
+        self.assertEqual(absent, "odds_absent")
+        self.assertEqual(unpriced, "no_priced_fixtures")
+        self.assertEqual(len({disabled, anchored, absent, unpriced}), 4)
+
+    def test_DISABLED_still_reports_a_live_feed(self) -> None:
+        """This is the state production is actually in. `disabled` with
+        attached=1 is a WORKING FEED plus a DISARMED mechanism, and must not
+        read like `odds_absent`."""
+        audit = self._audit_at("0")
+        self.assertEqual(audit["state"], "disabled")
+        self.assertEqual(audit["attached"], 1)
+        self.assertEqual(audit["weight"], 0.0)
+        self.assertEqual(audit["by_stage"]["event_id"], 1)
+
+    def test_ANCHORED_reports_REACHABILITY_not_just_that_a_dict_changed(self) -> None:
+        """`teams_changed` counted spurious keys as successes before the
+        2026-09-02 name-join fix -- it read `2 of 25` while 0 teams changed for
+        the simulation. `teams_resolved`/`teams_unresolved` come from the
+        resolver and are the honest pair."""
+        audit = self._audit_at("0.35")
+        self.assertEqual(audit["state"], "anchored")
+        self.assertEqual(audit["teams_resolved"], 2)
+        self.assertEqual(audit["teams_unresolved"], 0)
+        self.assertEqual(audit["fixtures_priced"], 1)
+        self.assertIsInstance(audit["elapsed_s"], float)
+
+    def test_an_unresolvable_team_is_COUNTED_not_hidden(self) -> None:
+        audit = self._audit_at(
+            "0.35", fixtures=[{"match_id": "e1", "home_team": "Home FC", "away_team": "Away FC"},
+                              {"match_id": "e1", "home_team": "Nobody United", "away_team": "Away FC"}]
+        )
+        self.assertEqual(audit["state"], "anchored")
+        self.assertEqual(audit["teams_unresolved"], 1)
+        self.assertIn("Nobody United", audit["unresolved_examples"])
+
+    def test_every_state_carries_the_weight_so_a_reader_never_has_to_guess(self) -> None:
+        for weight in ("0", "0.35"):
+            with self.subTest(weight=weight):
+                self.assertEqual(self._audit_at(weight)["weight"], float(weight))
+        self.assertEqual(
+            self._audit_at("0.35", source_root=Path(self._tmp.name) / "nowhere")["weight"], 0.35
+        )

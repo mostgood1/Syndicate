@@ -376,59 +376,131 @@ def _apply_market_anchor(
     source_root: Path,
     fixtures: list[dict[str, Any]],
     ratings: dict[str, dict[str, float]],
-) -> dict[str, dict[str, float]]:
+    *,
+    simulations: int | None = None,
+) -> tuple[dict[str, dict[str, float]], dict[str, Any]]:
     """Attach market odds to fixtures and, if the weight is > 0, anchor ratings.
 
-    THE ODDS ARE ATTACHED AND COUNTED EVEN WHEN ANCHORING IS OFF. The feed's
-    health and the mechanism's arming are separate questions, and collapsing
-    them is how `#626`(h) hid: with one silent switch, "no odds" and "anchoring
-    disabled" produce the same nothing. Printed for the same reason the
-    `#170` roster comment above gives -- a silent degrade is indistinguishable
-    from a league that has no data source.
+    Returns `(ratings, audit)`. **THE AUDIT IS PUBLISHED INTO THE ARTIFACT, and
+    that is the only reason this mechanism is observable at all.**
+
+    WHY A RETURNED AUDIT AND NOT THE PRINTS BELOW. The prints are unreadable in
+    production and always have been. `ops_refresh.py:1402` launches every
+    refresh unit detached with `stdout=subprocess.DEVNULL`, and this module runs
+    as that child. Measured 2026-09-02 over a window in which seven soccer units
+    demonstrably ran and wrote artifacts: every token printed by THIS FILE
+    returned 0 matches from the Render logs API -- including `player projections`,
+    which prints on every success -- while the parent's `SOCCER_UNIT_LAUNCHED`
+    returned 5. The search works; the child's output simply never arrives.
+
+    So the `[soccer_anchor]` lines are kept (they are readable when the script is
+    run by hand, which is how it is developed) but they are NOT the instrument.
+    The artifact field is.
+
+    THE ODDS ARE ATTACHED AND COUNTED EVEN WHEN ANCHORING IS OFF, and `state`
+    carries WHICH of the five outcomes happened. The feed's health and the
+    mechanism's arming are separate questions, and collapsing them is how
+    `#626`(h) hid: with one silent switch, "no odds" and "anchoring disabled"
+    produce the same nothing. A single boolean, or a bare count, would rebuild
+    that ambiguity in a new place -- so `state` is a named value and every
+    branch below sets exactly one.
     """
     odds_path = source_root / league / "api" / "odds" / "game_odds_current.csv"
     weight = _soccer_anchor_weight()
+    audit: dict[str, Any] = {
+        "state": None,
+        "weight": weight,
+        "odds_path": str(odds_path),
+        "fixtures": len(fixtures),
+    }
+
     if not odds_path.is_file():
         print(
             f"[soccer_anchor] ODDS_ABSENT league={league} path={odds_path} "
             f"weight={weight} -- fixtures carry no market_odds, anchoring cannot run",
             flush=True,
         )
-        return ratings
+        audit["state"] = "odds_absent"
+        return ratings, audit
 
     try:
         with odds_path.open("r", encoding="utf-8-sig", newline="") as handle:
             rows = list(csv.DictReader(handle))
     except Exception as exc:
         print(f"[soccer_anchor] ODDS_UNREADABLE league={league} error={type(exc).__name__}: {exc}", flush=True)
-        return ratings
+        audit["state"] = "odds_unreadable"
+        audit["error"] = f"{type(exc).__name__}: {exc}"
+        return ratings, audit
 
     priced = home_win_probability_by_event(rows)
-    audit = attach_market_odds(fixtures, priced)
+    attach = attach_market_odds(fixtures, priced)
+    audit.update(
+        {
+            "attached": attach["attached"],
+            "skipped": attach["skipped"],
+            "priced_events": attach["priced_events"],
+            "by_stage": attach.get("by_stage"),
+            "skipped_reasons": attach.get("skipped_reasons"),
+            "skipped_examples": attach.get("skipped_examples"),
+        }
+    )
     print(
         f"[soccer_anchor] ODDS_ATTACHED league={league} weight={weight} "
-        f"fixtures={audit['fixtures']} attached={audit['attached']} "
-        f"skipped={audit['skipped']} priced_events={audit['priced_events']} "
-        f"examples={audit['skipped_examples']}",
+        f"fixtures={attach['fixtures']} attached={attach['attached']} "
+        f"skipped={attach['skipped']} priced_events={attach['priced_events']} "
+        f"examples={attach['skipped_examples']}",
         flush=True,
     )
     if weight <= 0.0:
-        # Reachable and instrumented, deliberately not armed.
-        return ratings
-    if audit["attached"] == 0:
+        # Reachable and instrumented, deliberately not armed. This is the state
+        # production is actually in, so it is the one the field must report
+        # correctly -- `disabled` with a live attach count is a WORKING FEED
+        # plus a DISARMED mechanism, and reads differently from `odds_absent`.
+        audit["state"] = "disabled"
+        return ratings, audit
+    if attach["attached"] == 0:
         print(f"[soccer_anchor] ANCHOR_SKIPPED league={league} reason=no_priced_fixtures", flush=True)
-        return ratings
+        audit["state"] = "no_priced_fixtures"
+        return ratings, audit
 
     started = time.perf_counter()
-    anchored = anchor_ratings_to_market(ratings, fixtures, weight=weight)
+    reach: dict[str, Any] = {}
+    # `simulations` is a TEST SEAM and is omitted entirely when None, so the
+    # production call is byte-identical to what it was -- passing the library
+    # default explicitly would silently pin a number that belongs to the
+    # library, and the two would drift apart the first time it changed there.
+    # A solve costs 5 x simulations full match sims; at the default that is
+    # ~100 s per fixture, which is not a unit-test budget.
+    solver_kwargs: dict[str, Any] = {} if simulations is None else {"simulations": simulations}
+    anchored = anchor_ratings_to_market(ratings, fixtures, weight=weight, audit=reach, **solver_kwargs)
     changed = sum(1 for team, rating in anchored.items() if ratings.get(team) != rating)
+    elapsed = time.perf_counter() - started
+    # `teams_changed` CANNOT answer whether the anchor reached the sim: before the
+    # 2026-09-02 name-join fix it counted spurious keys -- written under the ESPN
+    # fixture name, which `loaders._rating_for` never reads -- as successes, and
+    # read `2 of 25` while 0 teams changed for the simulation. `teams_resolved` /
+    # `teams_unresolved` come from the resolver itself and are the honest pair.
+    audit.update(
+        {
+            "state": "anchored",
+            "teams_changed": changed,
+            "teams_total": len(anchored),
+            "teams_resolved": reach.get("teams_resolved"),
+            "teams_unresolved": reach.get("teams_unresolved"),
+            "unresolved_examples": reach.get("unresolved_examples"),
+            "fixtures_priced": reach.get("fixtures_priced"),
+            "elapsed_s": round(elapsed, 2),
+        }
+    )
     print(
         f"[soccer_anchor] ANCHORED league={league} weight={weight} "
         f"teams_changed={changed} of {len(anchored)} "
-        f"elapsed_s={time.perf_counter() - started:.1f}",
+        f"teams_resolved={reach.get('teams_resolved')} "
+        f"teams_unresolved={reach.get('teams_unresolved')} "
+        f"elapsed_s={elapsed:.1f}",
         flush=True,
     )
-    return anchored
+    return anchored, audit
 
 
 def _attach_confirmed_starters(league: str, iso_date: str, fixtures: list[dict[str, Any]], player_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -509,7 +581,11 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
     rec_path = api_root / "recommendations" / f"recommendations_{iso_date}.json"
 
     if not fixtures_raw:
-        payload = {"league": league, "date": iso_date, "generated_at": pd.Timestamp.now("UTC").isoformat(), "matches": [], "player_props": []}
+        # `anchor` is present on EVERY payload, including this one. A reader that
+        # has to distinguish "key absent" from "state absent" has been handed the
+        # same ambiguity the field exists to remove.
+        payload = {"league": league, "date": iso_date, "generated_at": pd.Timestamp.now("UTC").isoformat(), "matches": [], "player_props": [],
+                   "anchor": {"state": "no_fixtures", "weight": _soccer_anchor_weight(), "fixtures": 0}}
         rec_path.parent.mkdir(parents=True, exist_ok=True)
         rec_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         _update_date_index(api_root, iso_date)
@@ -530,7 +606,7 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
         for fixture in fixtures_raw
     ]
     fixtures = _attach_confirmed_starters(league, iso_date, fixtures, player_rows)
-    ratings = _apply_market_anchor(league, source_root, fixtures, ratings)
+    ratings, anchor_audit = _apply_market_anchor(league, source_root, fixtures, ratings)
     simulation_input = build_soccer_simulation_input(
         league=league,
         date=iso_date,
@@ -568,6 +644,8 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
         "generated_at": pd.Timestamp.now("UTC").isoformat(),
         "simulations": simulations,
         "promoted_prior_teams": promoted,
+        # PUBLISHED BECAUSE THE LOGS CANNOT BE READ. See `_apply_market_anchor`.
+        "anchor": anchor_audit,
         "matches": matches,
         "player_props": [
             {
