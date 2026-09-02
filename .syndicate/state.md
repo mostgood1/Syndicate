@@ -45,6 +45,41 @@
 > wrong, EDIT THE LINE. Do not append a newer section that contradicts it. The
 > reasoning trail belongs in `deploys.md` (append-only measurement log).
 
+## [soccer-board-coverage] — MEASURED 2026-09-02, production, NOT A DEFECT
+
+**Soccer's thin board is a DELIBERATE QUALITY FILTER working correctly.** Full
+evidence: `.syndicate/findings_2026-09-02_soccer_board_coverage.md`.
+
+- Measured on `/api/board/layer2-shortlist`, one read, all sports: soccer
+  **selects 1,547 rows and 129 reach the board (8%)**, against mlb 804/850
+  (95%) and ncaaf 467/467 (100%). The counter accounting for it is
+  `rows_uninformative_ev = 1547` — exactly soccer's selected count.
+- **THE FILTER IS RIGHT.** `_row_ev_is_hold_restatement` drops a row whose
+  `ev_pct` is arithmetically the book's own margin: for a one-sided market the
+  price CANCELS and EV is `-hold` for every such row, so ranking on it ranks on
+  WHICH BOOK QUOTED. It fires only where the row has NO model view. Its own
+  evidence: 2,611 rows with a correct model edge topped out at **-4.73** against
+  a live shortlist whose #50 was **+0.64**. The value floor cannot catch them —
+  it is derived from the same hold, so filter and input move together.
+- **WHY SOCCER SPECIFICALLY:** by recorded decision, not oversight.
+  `soccer-model-dispersion` measured the model WORSE THAN MARKET IN 8 OF 9
+  LEAGUES and declined to publish `model_edge_pct`. Corroborated: only 19% of
+  the served soccer rows carry one.
+- **CHAIN, every link deliberate:** weak model -> no published model edge -> EV
+  degenerates to the book's hold -> filter removes the row -> few soccer
+  fixtures on the board -> Kalshi soccer cannot match (ceiling 28 of 171).
+- **DO NOT "FIX" THIS AS COVERAGE.** The two available moves are publishing a
+  model edge the model has not earned, or exempting soccer from the filter —
+  which puts ~1,400 rows ranked on the book's margin onto a money-adjacent
+  board. If ever done: behind a flag, default off, caveat stated where the rows
+  surface, and never described as a coverage fix.
+- **THE REAL LEVER IS UPSTREAM:** give soccer a model view worth ranking on —
+  `soccer-model-dispersion`'s open per-league discrimination work, not board
+  plumbing.
+- **THIRD REQUESTED FIX IN ONE SESSION THAT WAS ALREADY WORKING**, after the
+  soccer TITLE PARSER and the FORWARD FIXTURE HORIZON. The other two would have
+  shipped inert; this one would have degraded the board.
+
 ## [wnba-live-lens-directory] THE WNBA LIVE-LENS READERS OPENED THE WRONG DIRECTORY — fixed and verified locally, NOT DEPLOYED `[verified 2026-08-31, lane wnba-accuracy-assessment, commit 9dbb870d]`
 
 **Root cause, confirmed against LIVE Render config rather than inferred.**
