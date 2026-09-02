@@ -353,7 +353,107 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         default=900,
         help="Timeout for browser smoke command in seconds.",
     )
+    parser.add_argument(
+        "--replay-date",
+        help=(
+            "Mirrored production date to run the replay-diff gate against "
+            "(`scripts/replay_diff_gate.py`, `#625`). Defaults to SYNDICATE_REPLAY_DATE."
+        ),
+    )
+    parser.add_argument(
+        "--skip-replay",
+        action="store_true",
+        help="Skip the replay-diff step entirely (it is then reported as SKIPPED, not as a pass).",
+    )
+    parser.add_argument(
+        "--require-replay",
+        action="store_true",
+        help=(
+            "Fail the gate when the replay-diff cannot run (no mirror, no manifest, or the day "
+            "is not comparable). Off by default because most checkouts have no mirror; ON is "
+            "the right setting anywhere a fixture is expected."
+        ),
+    )
+    parser.add_argument(
+        "--replay-timeout-sec",
+        type=int,
+        default=1800,
+        help="Timeout for the replay-diff command in seconds (a 163MB tape pivots in ~60s).",
+    )
     return parser.parse_args(argv)
+
+
+def evaluate_replay_diff(args: argparse.Namespace, *, timeout_sec: int) -> dict[str, object]:
+    """Run the replay-diff gate and classify its three outcomes.
+
+    THE ONE THING THIS MUST NOT DO is fold "could not run" into `ok`. The replay
+    needs a local mirror that most checkouts do not have, so NO_FIXTURE is the
+    common case -- and a guard whose common case is its permissive branch is the
+    failure mode this repo has recorded more often than any other. So:
+
+        PASS        -> ok True
+        FAIL        -> ok False, always
+        NO_FIXTURE  -> ok False ONLY under --require-replay; otherwise `ok` is
+                       None and the caller reports UNKNOWN. It is never True.
+
+    `ok is None` is deliberately not falsy-equivalent to failure and not truthy
+    -- the report says UNKNOWN in words, so a reader cannot mistake a gate run
+    with no fixture for a gate run that proved something.
+    """
+    if args.skip_replay:
+        return {"status": "SKIPPED", "ok": None, "reason": "--skip-replay was passed; nothing was replayed."}
+    replay_date = (args.replay_date or os.environ.get("SYNDICATE_REPLAY_DATE") or "").strip()
+    if not replay_date:
+        return {
+            "status": "NO_FIXTURE",
+            "ok": False if args.require_replay else None,
+            "reason": "no --replay-date and no SYNDICATE_REPLAY_DATE. Nothing was replayed.",
+        }
+    command = [sys.executable, "scripts/replay_diff_gate.py", "--date", replay_date, "--json"]
+    result = run_command("replay_diff", command, timeout_sec=timeout_sec)
+    payload: dict[str, object] = {}
+    try:
+        payload = json.loads(result.stdout) if result.stdout.strip() else {}
+    except json.JSONDecodeError as error:
+        payload = {"parse_error": str(error)}
+    status = str(payload.get("status") or ("FAIL" if result.timed_out else "NO_FIXTURE"))
+    if result.timed_out:
+        status = "FAIL"
+    ok: bool | None
+    if status == "PASS":
+        ok = True
+    elif status == "FAIL":
+        ok = False
+    else:
+        ok = False if args.require_replay else None
+    diffs = payload.get("diffs") if isinstance(payload.get("diffs"), list) else []
+    return {
+        "status": status,
+        "ok": ok,
+        "date": replay_date,
+        "returncode": result.returncode,
+        "timed_out": bool(result.timed_out),
+        "manifest_id": payload.get("manifest_id"),
+        "entrypoint": payload.get("entrypoint"),
+        "clock": payload.get("clock"),
+        "network_attempts": len(payload.get("network_attempts") or []),
+        "reason": payload.get("reason"),
+        "diffs": [
+            {
+                "path": entry.get("path"),
+                "ok": entry.get("ok"),
+                "leaves_compared": entry.get("leaves_compared"),
+                "leaves_excluded": entry.get("leaves_excluded"),
+                "clock_relative_checked": entry.get("clock_relative_checked"),
+                "clock_offset_sec": entry.get("clock_offset_sec"),
+                "mismatch_count": entry.get("mismatch_count"),
+                "mismatch_by_key": dict(list((entry.get("mismatch_by_key") or {}).items())[:20]),
+            }
+            for entry in diffs
+            if isinstance(entry, dict)
+        ],
+        "stderr_excerpt": summarize_command_output(result.stderr),
+    }
 
 
 def write_reports(report: dict[str, object], output_dir: Path) -> dict[str, str]:
@@ -1283,6 +1383,33 @@ def render_text_report(report: dict[str, object]) -> str:
     lines.append(f"Migration gate: {overall}")
     lines.append("")
 
+    # FIRST, and in words. `#625`: a replay-diff that could not run must be
+    # visibly UNKNOWN rather than absent -- an omitted section reads as "nothing
+    # to report", which is exactly the permissive reading it must not get.
+    replay = report.get("replay_diff") or {}
+    if replay:
+        verdict = {True: "PASS", False: "FAIL", None: "UNKNOWN"}[replay.get("ok")]
+        lines.append(f"Replay-diff: {verdict}  ({replay.get('status')})")
+        if replay.get("date"):
+            lines.append(f"  Date: {replay.get('date')}   manifest_id: {replay.get('manifest_id') or '-'}")
+        if replay.get("entrypoint"):
+            lines.append(f"  Entrypoint: {replay.get('entrypoint')}")
+            lines.append(f"  Outbound network attempts (all denied): {replay.get('network_attempts')}")
+        for entry in replay.get("diffs") or []:
+            lines.append(
+                f"  [{'PASS' if entry.get('ok') else 'FAIL'}] {entry.get('path')}  "
+                f"exact leaves {entry.get('leaves_compared')}, clock-relative "
+                f"{entry.get('clock_relative_checked')} @ offset {entry.get('clock_offset_sec')}s, "
+                f"excluded {entry.get('leaves_excluded')}, mismatches {entry.get('mismatch_count')}"
+            )
+            for key, count in (entry.get("mismatch_by_key") or {}).items():
+                lines.append(f"      {count:>8} {key}")
+        if replay.get("reason"):
+            lines.append(f"  Reason: {replay.get('reason')}")
+        if replay.get("ok") is None:
+            lines.append("  THIS RUN PROVES NOTHING ABOUT WORKER BEHAVIOUR. Pass --require-replay to make it fail.")
+        lines.append("")
+
     audit = report.get("audit") or {}
     audit_status = "PASS" if audit.get("ok") else "FAIL"
     lines.append(f"Audit: {audit_status}")
@@ -1502,8 +1629,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             smoke_command.extend(["--base-url", args.base_url])
         command_results.append(run_command("browser_smoke", smoke_command, timeout_sec=smoke_timeout))
 
+    replay_diff = evaluate_replay_diff(args, timeout_sec=max(1, int(args.replay_timeout_sec)))
+
     report = {
-        "ok": audit_ok and runtime_dependency_ok and all(result.ok for result in command_results if result.name not in {"audit", "module_tracker"}),
+        # `replay_diff["ok"] is not False` -- NOT `bool(...)`. A None (UNKNOWN)
+        # must not sink the gate on a checkout with no mirror, and must not be
+        # silently counted as a pass either; it is reported in words below.
+        "ok": audit_ok
+        and runtime_dependency_ok
+        and replay_diff.get("ok") is not False
+        and all(result.ok for result in command_results if result.name not in {"audit", "module_tracker", "replay_diff"}),
+        "replay_diff": replay_diff,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "audit": {
             "ok": audit_ok,
