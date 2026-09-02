@@ -286,14 +286,16 @@ class NonAppendOnlyStillReplacesTests(unittest.TestCase):
                 headers={"Authorization": f"Bearer {TOKEN}"},
             )
 
-    def test_the_state_sidecar_is_replaced_not_merged(self) -> None:
+    def test_the_state_sidecar_is_never_LINE_merged(self) -> None:
         """It is a dict of quote-key -> [line, price, last_seen], rewritten on
-        every flush. Concatenating two of them yields a file
-        `read_quote_last_seen` silently returns {} for."""
+        every flush, so a LINE union would glue two JSON documents together and
+        `read_quote_last_seen` would silently return {}.
+
+        It IS merged now -- but by `merge_quote_state`, a union by KEY. The
+        distinction is the whole point, so this asserts the line predicate
+        refuses it while the sidecar predicate claims it."""
         self.assertFalse(ops._is_append_only(STATE_SIDECAR))
-        self._publish('{"k":1}', STATE_SIDECAR)
-        self._publish('{"k":2}', STATE_SIDECAR)
-        self.assertEqual((self.root / STATE_SIDECAR).read_text(encoding="utf-8"), '{"k":2}')
+        self.assertTrue(ops.is_mergeable_quote_state(STATE_SIDECAR))
 
     def test_another_jsonl_family_still_replaces(self) -> None:
         """The sharpest version of the discrimination: `clv_openings` is
@@ -677,9 +679,18 @@ class MergeDispatcherTests(unittest.TestCase):
         self.assertIsNone(ops._merge_published_artifact(BOOK_QUOTES, self.target, self.incoming))
 
     def test_an_unmergeable_family_returns_None(self) -> None:
+        """`clv_openings` is allowlisted AND ends in `.jsonl` AND is rebuilt
+        whole, so it is the sharpest check that the rule has not degraded into
+        "ends with .jsonl".
+
+        The `.state.json` sidecar USED to be listed here as unmergeable. It is
+        now merged by KEY (`merge_quote_state`) -- it was published by both
+        workers and left last-writer-wins, which is what `#634`'s enumeration
+        surfaced. It is still refused by the LINE merge, which is what its
+        exclusion always meant."""
         self.assertIsNone(ops._merge_published_artifact(
             "reports/intelligence/clv_openings/2026-09-01.jsonl", self.target, self.incoming))
-        self.assertIsNone(ops._merge_published_artifact(STATE_SIDECAR, self.target, self.incoming))
+        self.assertFalse(ops._is_append_only(STATE_SIDECAR))
 
     def test_it_routes_each_family_to_its_own_merge(self) -> None:
         """BOTH families run out of process now, tagged by family so the child
@@ -898,6 +909,99 @@ class DeferredOddsHistoryMergeTests(unittest.TestCase):
         stored = json.loads(self.target.read_text(encoding="utf-8"))
         self.assertEqual(sorted(stored["markets"]), ["mine"],
                          "the good target must survive an unparseable publish")
+
+
+def _state(key: str, line, price, last_seen: str) -> dict:
+    """The live shape, read from production rather than assumed:
+    {quote_key: [line, price, last_seen]}."""
+    return {key: [line, price, last_seen]}
+
+
+class QuoteStateSidecarMergeTests(unittest.TestCase):
+    """`book_quotes/<date>.state.json` — published by BOTH workers (measured,
+    `#634`'s 39-family contested set) and NOT merged until now, so it was
+    last-writer-wins on the file `seen_age_seconds` is computed from. A clobber
+    there does not error; it makes staleness read wrong for every market."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.target = self.root / "t.state.json"
+        self.incoming = self.root / "i.state.json"
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _merge(self, target_doc: dict, incoming_doc: dict) -> dict:
+        self.target.write_text(json.dumps(target_doc), encoding="utf-8")
+        self.incoming.write_text(json.dumps(incoming_doc), encoding="utf-8")
+        return am.merge_quote_state(self.target, self.incoming)
+
+    def _stored(self) -> dict:
+        return json.loads(self.target.read_text(encoding="utf-8"))
+
+    def test_a_key_only_the_existing_copy_has_SURVIVES(self) -> None:
+        """THE REGRESSION. Today that key is destroyed, and a vanished key turns
+        `seen_age_seconds` into 'unknown' for that market."""
+        result = self._merge(_state("mlb|a", None, -110, EARLY),
+                             _state("mlb|b", 1.5, -120, LATE))
+        self.assertTrue(result["merged"])
+        self.assertEqual(sorted(self._stored()), ["mlb|a", "mlb|b"])
+        self.assertEqual(result["added"], 1)
+
+    def test_the_newer_last_seen_wins(self) -> None:
+        result = self._merge(_state("k", None, -110, EARLY),
+                             _state("k", 2.5, -200, LATE))
+        self.assertEqual(result["replaced_by_newer"], 1)
+        self.assertEqual(self._stored()["k"], [2.5, -200, LATE])
+
+    def test_a_STALER_incoming_does_not_overwrite_a_newer_existing(self) -> None:
+        result = self._merge(_state("k", 9.5, -900, LATEST),
+                             _state("k", None, -110, EARLY))
+        self.assertEqual(result["kept_existing_newer"], 1)
+        self.assertEqual(self._stored()["k"], [9.5, -900, LATEST])
+
+    def test_entries_are_never_FIELD_MIXED(self) -> None:
+        """`[line, price, last_seen]` is ONE observation. Splicing a price from
+        one onto a timestamp from another invents a quote nobody saw."""
+        winner = [2.5, -200, LATE]
+        self._merge(_state("k", None, -110, EARLY), {"k": winner})
+        self.assertEqual(self._stored()["k"], winner)
+
+    def test_an_unreadable_last_seen_still_keeps_the_key(self) -> None:
+        """Union is what fixes the defect, so no malformed row may cost a key."""
+        result = self._merge({"k": "not-a-row", "only_mine": [None, -110, EARLY]},
+                             {"k": [1.0, -105, LATE]})
+        self.assertTrue(result["merged"])
+        self.assertEqual(sorted(self._stored()), ["k", "only_mine"])
+
+    def test_a_non_mapping_is_refused_not_merged(self) -> None:
+        for bad in ([1, 2, 3], "nope", 7):
+            self.target.write_text(json.dumps(_state("k", None, -110, EARLY)), encoding="utf-8")
+            self.incoming.write_text(json.dumps(bad), encoding="utf-8")
+            result = am.merge_quote_state(self.target, self.incoming)
+            self.assertFalse(result["merged"], bad)
+            self.assertIn("shape_gate", result["error"])
+
+    def test_an_unparseable_incoming_is_flagged_do_not_promote(self) -> None:
+        self.target.write_text(json.dumps(_state("k", None, -110, EARLY)), encoding="utf-8")
+        self.incoming.write_text("{not json", encoding="utf-8")
+        result = am.merge_quote_state(self.target, self.incoming)
+        self.assertTrue(result["do_not_promote"])
+
+    def test_no_merge_temp_files_are_left_behind(self) -> None:
+        self._merge(_state("a", None, -110, EARLY), _state("b", None, -120, LATE))
+        self.assertEqual([p.name for p in self.root.glob("*.merge")], [])
+
+    def test_the_dispatcher_routes_the_sidecar_to_quote_state(self) -> None:
+        target = self.root / STATE_SIDECAR
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("{}", encoding="utf-8")
+        seen = []
+        with patch.object(ops, "_spawn_artifact_merge",
+                          side_effect=lambda rp, fam, t, i: seen.append(fam)):
+            ops._merge_published_artifact(STATE_SIDECAR, target, self.incoming)
+        self.assertEqual(seen, ["quote_state"])
 
 
 if __name__ == "__main__":

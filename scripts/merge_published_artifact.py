@@ -51,6 +51,7 @@ if str(REPO_ROOT) not in sys.path:
 from syndicate.features.shared.artifact_merge import (  # noqa: E402
     merge_append_only,
     merge_odds_history,
+    merge_quote_state,
 )
 
 
@@ -59,7 +60,7 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--target", required=True)
     ap.add_argument("--incoming", required=True)
-    ap.add_argument("--family", required=True, choices=("append_only", "odds_history"))
+    ap.add_argument("--family", required=True, choices=("append_only", "odds_history", "quote_state"))
     ap.add_argument("--relative-path", default="")
     ap.add_argument("--lock-wait-seconds", type=float, default=180.0)
     args = ap.parse_args()
@@ -82,6 +83,11 @@ def main() -> int:
         elif args.family == "append_only":
             result = merge_append_only(target, incoming,
                                        lock_wait_seconds=args.lock_wait_seconds)
+        elif args.family == "quote_state":
+            # No lock: the sidecar is ~5 MB, so it does not need the memory
+            # bound the other two do, and a race here self-heals like any other
+            # -- every publisher sends its whole file each cycle.
+            result = merge_quote_state(target, incoming)
         else:
             result = merge_odds_history(target, incoming,
                                         lock_wait_seconds=args.lock_wait_seconds)

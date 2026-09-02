@@ -34,6 +34,7 @@ from syndicate.features.shared.artifact_publisher import relative_to_data_root
 from syndicate.features.shared.artifact_publisher import _is_append_only
 from syndicate.features.shared.artifact_merge import merge_append_only
 from syndicate.features.shared.artifact_merge import is_mergeable_odds_history
+from syndicate.features.shared.artifact_merge import is_mergeable_quote_state
 
 from syndicate.features.shared.ops_refresh import build_refresh_plan
 from syndicate.features.shared.ops_refresh import _assert_no_active_refresh_run
@@ -1807,6 +1808,12 @@ def _merge_published_artifact(relative_path: str, target_path: Path, incoming_pa
         return _spawn_artifact_merge(relative_path, "append_only", target_path, incoming_path)
     if is_mergeable_odds_history(relative_path):
         return _spawn_artifact_merge(relative_path, "odds_history", target_path, incoming_path)
+    # The `.state.json` sidecar: `_is_append_only` refuses it (rewritten whole,
+    # a line union would glue two documents), and it is published by BOTH
+    # workers, so without this it is last-writer-wins on the file that
+    # `seen_age_seconds` is computed from.
+    if is_mergeable_quote_state(relative_path):
+        return _spawn_artifact_merge(relative_path, "quote_state", target_path, incoming_path)
     return None
 
 
@@ -1944,6 +1951,7 @@ def _publish_streamed_body() -> Any:
         publisher = str(request.headers.get("X-Artifact-Publisher") or "").strip()
         will_merge = target_path.is_file() and (
             _is_append_only(relative_path) or is_mergeable_odds_history(relative_path)
+            or is_mergeable_quote_state(relative_path)
         )
         refuse, marker = _publish_divergence_verdict(relative_path, written, publisher)
         if marker:

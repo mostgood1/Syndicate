@@ -366,3 +366,93 @@ def _merge_odds_history_locked(target_path: Path, incoming_path: Path) -> dict:
     return {"merged": True, "markets": len(existing_markets),
             "added": added, "replaced_by_newer": replaced,
             "kept_existing_newer": kept_existing}
+
+# ---------------------------------------------------------------------------
+# book_quotes `.state.json` sidecar: a keyed dict, and the one `_is_append_only`
+# EXCLUDES from the line merge on purpose
+# ---------------------------------------------------------------------------
+# Shape read from the live file (5,245,428 B), not assumed:
+#
+#     {"mlb|game|<event>|fanduel|full|h2h|home||": [null, -4500,
+#                                        "2026-09-02T01:43:12.002315+00:00"]}
+#
+# i.e. {quote_key: [line, price, last_seen]}. It is REWRITTEN WHOLE on every
+# flush, so a line union would glue two JSON documents together -- which is
+# exactly why `_is_append_only` refuses it, and why it needs its own merge
+# rather than being folded into the existing one.
+#
+# WHY IT MATTERS MORE THAN ITS SIZE SUGGESTS. Measured 2026-09-02, BOTH workers
+# publish this path (39-family contested set, `#634`), and it is not merged, so
+# last-writer-wins applies. `read_quote_last_seen` reads it and
+# `seen_age_seconds` is computed from it -- so a clobber does not error. It
+# makes staleness read wrong for every market on the board, which is the
+# "looks fixed, reads wrong" failure the 11.9h-stale investigation ended on.
+
+
+def is_mergeable_quote_state(relative_path: str) -> bool:
+    text = str(relative_path or "")
+    return "/book_quotes/" in text and text.endswith(".state.json")
+
+
+def quote_state_last_seen(entry) -> str:
+    """`last_seen` off a `[line, price, last_seen]` row, or "" if unreadable.
+
+    Never raises and never guesses a different position: this is the only
+    ordering signal the sidecar carries."""
+    if isinstance(entry, (list, tuple)) and len(entry) >= 3:
+        return str(entry[2] or "").strip().replace("Z", "+00:00")
+    return ""
+
+
+def merge_quote_state(target_path: Path, incoming_path: Path) -> dict:
+    """UNION two sidecars by quote key, newest `last_seen` winning WHOLESALE.
+
+    Union is what fixes the defect: no key can be lost, which is the harm --
+    a key that disappears turns `seen_age_seconds` into "unknown" for that
+    market. Entries are taken whole, never field-mixed, for the same reason as
+    `odds_history`: `[line, price, last_seen]` is one observation and splicing
+    a price from one onto a timestamp from another invents a quote nobody saw.
+
+    An entry whose `last_seen` cannot be read prefers the INCOMING copy -- the
+    status quo, since the incoming is the newer publish -- and is still kept
+    rather than dropped.
+    """
+    try:
+        existing = json.loads(target_path.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return {"merged": False, "error": f"target_unparseable: {type(exc).__name__}: {exc}"}
+    try:
+        incoming = json.loads(incoming_path.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return {"merged": False, "do_not_promote": True,
+                "error": f"incoming_unparseable: {type(exc).__name__}: {exc}"}
+    for doc in (existing, incoming):
+        if not isinstance(doc, dict):
+            return {"merged": False, "error": "shape_gate: sidecar is not a mapping"}
+
+    added = replaced = kept = 0
+    for key, entry in incoming.items():
+        current = existing.get(key)
+        if current is None:
+            existing[key] = entry
+            added += 1
+        elif quote_state_last_seen(entry) >= quote_state_last_seen(current):
+            existing[key] = entry
+            replaced += 1
+        else:
+            kept += 1
+    incoming = None
+
+    merged_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.merge"
+    try:
+        with merged_path.open("w", encoding="utf-8") as out:
+            json.dump(existing, out, separators=(",", ":"))
+        os.replace(merged_path, target_path)
+    except Exception as exc:
+        try:
+            merged_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return {"merged": False, "error": f"{type(exc).__name__}: {exc}"}
+    return {"merged": True, "keys": len(existing), "added": added,
+            "replaced_by_newer": replaced, "kept_existing_newer": kept}
