@@ -222,11 +222,39 @@ contested paths — `live_state` × 3 leagues and `book_grid` × 2 sports:
 fresher one.** No guard is warranted on this evidence, and 38 merges would have
 been actively harmful.
 
-**WHAT THIS DOES NOT COVER, stated rather than implied:** 5 of 38 paths and 2 of
-the shapes. `sims`, `daily_summary`, rosters, `lineups`, `weather` were NOT
-exercised — they are 09-01-dated or were not rebuilt in the window. And 25
-minutes is the window; absence here is not absence in general. **Re-run the
-watch against those families before closing this item.**
+**COVERAGE MAP, 2026-09-02 — and the second watch came back INCONCLUSIVE, which
+is a result about the INSTRUMENT, not about the artifacts.**
+
+Per family, whether a staler-rebuild regression is even DETECTABLE this way:
+
+| family | recency field | watched | result |
+|---|---|---|---|
+| `live_state` (9 leagues) | `generated_at` | yes | **59 republishes, 0 regressions** |
+| `book_grid` (nfl, soccer) | `generated_at` | yes | included in the above |
+| `lineups`, `probables` | `generated_at` | yes | **0 republishes — INCONCLUSIVE** |
+| `weather`, `schedule_raw` | **NONE** | n/a | **UNTESTABLE by this method** |
+| `daily_summary`, `live_lens_report`, `oddsapi_game_lines` | ? | no | **404 on the stream endpoint** |
+| `sim_*`, rosters, `meta`, `roster_events` | ? | no | not probed |
+
+**Three things this makes explicit that the first pass did not:**
+
+1. **A 26-minute window at 08:00Z cannot catch `lineups`/`probables`.** They
+   rebuilt at 07:57:09 and not again — they are SLATE-CONSTRUCTION artifacts,
+   rebuilt during the pregame build. **The fix is the right time of day, not a
+   longer watch.** 34 samples with 0 republishes is zero statistical power, and
+   recording it as "no regression seen" would have been a false clear.
+2. **`weather` and `schedule_raw` carry NO recency field**, so a staler rebuild
+   overwriting a fresher one is undetectable by timestamp AND a recency guard is
+   not implementable for them without adding one. They need a different test —
+   content hash going backwards, or a writer-side check.
+3. **`daily_summary`, `live_lens_report` and `oddsapi_game_lines` 404 on
+   `/api/ops/artifacts/stream` while appearing in `PUBLISH_OK`.** A path that
+   publishes but cannot be read back is its own small defect and should be
+   understood before it is used as evidence either way.
+
+**SO `#634` DOES NOT CLOSE.** What is established: two families, well powered,
+no harm. What is not: everything else, for three different reasons, none of
+which is "we did not look long enough".
 
 **Options, cheapest first:**
 1. ~~Enumerate.~~ **DONE — and it did NOT close this as moot.** 39 contested
