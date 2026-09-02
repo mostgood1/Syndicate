@@ -171,9 +171,34 @@ class SensitivityTests(unittest.TestCase):
         self.assertEqual(MOD.roi_at_side_cost(-3.0), 8.48)
         self.assertEqual(MOD.roi_at_side_cost(99.0), 0.98)
 
-    def test_the_measured_gate_readings_fail_both_conditions(self) -> None:
-        """2026-09-01, gate book, n=653: +0.955pp (m=0.5) and +0.703pp (m=1.0).
-        Neither reaches +3% ROI, and neither brings the two-way hold to <=5%."""
+    def test_the_healed_shard_reading_fails_both_conditions(self) -> None:
+        """THE CURRENT READING. 2026-09-01 re-measured after `e78aee52` repaired
+        the shard: gate book n=1,235, gain +0.824pp, per-side 4.05 -> 3.23,
+        two-way hold 6.5%, ROI +2.43%. Shortfall 0.57 points, wider than the
+        clobbered copy's 0.35."""
+        side_cost = MOD.GATE_PER_SIDE_TODAY - 0.824
+        roi = MOD.roi_at_side_cost(side_cost)
+        self.assertAlmostEqual(roi, 2.43, places=1)
+        self.assertLess(roi, MOD.GATE_ROI_TARGET_PCT)
+        self.assertGreater(2 * side_cost, MOD.GATE_HOLD_TARGET_PCT)
+
+    def test_the_healed_reading_is_WORSE_than_the_clobbered_one(self) -> None:
+        """The counterintuitive direction, pinned so nobody 'restores' the older
+        and friendlier number. Repairing a file that had LOST rows made the
+        exchange look WORSE: the truncation had preserved exactly the window
+        where it looks best (64.5% taken / +1.021pp before the old cutoff
+        against 40.2% / +0.737pp after), so the clobber was biased in the
+        exchange's favour."""
+        healed = MOD.roi_at_side_cost(MOD.GATE_PER_SIDE_TODAY - 0.824)
+        clobbered = MOD.roi_at_side_cost(MOD.GATE_PER_SIDE_TODAY - 0.949)
+        self.assertLess(healed, clobbered)
+        self.assertAlmostEqual(clobbered - healed, 0.22, places=1)
+
+    def test_the_superseded_bound_readings_still_fail_both_conditions(self) -> None:
+        """HISTORICAL, from the CLOBBERED copy: +0.955pp (m=0.5) and +0.703pp
+        (m=1.0), before the multiplier was resolved and before the shard was
+        repaired. Kept because they exercise the interpolator across a wide
+        span, and because the decision has survived every restatement."""
         for gain, expected_roi in ((0.955, 2.66), (0.703, 2.22)):
             side_cost = MOD.GATE_PER_SIDE_TODAY - gain
             self.assertAlmostEqual(MOD.roi_at_side_cost(side_cost), expected_roi, places=1)
@@ -234,10 +259,12 @@ class KalshiMultiplierTests(unittest.TestCase):
             self.assertFalse(resolved)
             self.assertEqual(multiplier, MOD.KALSHI_UNKNOWN_MULTIPLIER)
 
-    def test_the_resolved_gate_reading_still_fails_both_conditions(self) -> None:
-        """2026-09-01, gate book, per-series multipliers: +0.949pp. Resolving the
-        multiplier COLLAPSED the bound to its optimistic end — it did not close
-        the gate, and saying it was 'worth 0.44 points' overstated it."""
+    def test_the_superseded_resolved_reading_still_fails_both_conditions(self) -> None:
+        """HISTORICAL, and superseded by the healed-shard reading in
+        `SensitivityTests`. 2026-09-01 on the CLOBBERED copy, per-series
+        multipliers: +0.949pp -> +2.65%. Resolving the multiplier COLLAPSED the
+        bound to its optimistic end — it did not close the gate, and saying it
+        was 'worth 0.44 points' overstated it. The current number is +2.43%."""
         side_cost = MOD.GATE_PER_SIDE_TODAY - 0.949
         roi = MOD.roi_at_side_cost(side_cost)
         self.assertAlmostEqual(roi, 2.65, places=1)

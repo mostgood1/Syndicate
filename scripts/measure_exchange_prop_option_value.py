@@ -4,27 +4,48 @@ Item 05 answered this for GAME markets (+1.57pp, ~+1.2% ROI, n=13,093) and
 could not answer it for props: until 2026-09-01 no exchange prop price was
 captured anywhere. The capture landed, and this is the measurement it unblocked.
 
-RESULT, 2026-09-01. Run `--book gate` for the number that decides step 6.
+RESULT, 2026-09-01, RE-MEASURED ON THE HEALED SHARD. Run `--book gate` for the
+number that decides step 6.
 
-ALL PROPS, n=2,062 time-aligned comparisons:
+**The first version of every figure below came off a CLOBBERED copy of this
+date** (`#630`: two publishers, one whole-file publish each; 46.1% matchable).
+`e78aee52` fixed it, the shard now passes this script's own guard at **100.0%
+matchable**, and the numbers moved. Superseded figures are kept in the
+corrections section at the bottom, because the DIRECTION they moved is the
+lesson.
+
+ALL PROPS, n=3,774 time-aligned comparisons (was 2,062):
 
                           gross      fee-aware
-    exchange is cheaper   82.3%      55.8% - 62.9%
-    mean gain            +1.939pp    +0.859 / +1.121 pp
+    exchange is cheaper   70.1%         52.2%
+    mean gain            +1.709pp     +0.985pp
 
-**The 82.3% gross win-rate is a FEE ILLUSION.** Net of measured fees the
-exchange wins ~56-63% of the time, which sits right next to the game-market
-52.5% instead of looking anomalous.
+**The gross win-rate is a FEE ILLUSION.** Net of measured fees the exchange
+wins 52.2% of the time, which now sits almost exactly on the game-market 52.5%
+instead of looking anomalous -- an observation the repair made STRONGER.
 
-THE GATE BOOK (`--book gate`: unders, minus HR and HRR), n=653 -- and this is
-the one step 6 is written about. **The Kalshi multiplier is now RESOLVED per
-series, so this is a point estimate rather than the bound first reported:**
+THE GATE BOOK (`--book gate`: unders, minus HR and HRR), n=1,235 (was 653) --
+and this is the one step 6 is written about. Kalshi multipliers are RESOLVED
+per series, so this is a point estimate rather than a bound:
 
     mean gain   per-side cost   two-way hold   book ROI
-     +0.949pp    4.05 -> 3.10    8.1% -> 6.2%   +2.65%
+     +0.824pp    4.05 -> 3.23    8.1% -> 6.5%   +2.43%
 
 STEP 6 IS NOT MET, on BOTH of its conditions: it needs >= +3% ROI at a <= 5%
-effective two-way hold. The shortfall is **0.35 ROI points**.
+effective two-way hold. The shortfall is **0.57 ROI points**, and the hold sits
+further from its condition than the clobbered copy suggested.
+
+**REPAIRING A FILE THAT HAD LOST ROWS MADE THE EXCHANGE LOOK WORSE.** That is
+the opposite of the intuitive direction, and it is measured rather than
+inferred: split the healed gate book at the clobbered copy's last sportsbook
+quote (20:18:49Z) and the rows at or before it take the exchange **64.5%** of
+the time for **+1.021pp**, while the rows the repair restored take it **40.2%**
+for **+0.737pp**. The truncation had preserved exactly the window where the
+exchange looks best, so **the clobber was biased in the exchange's favour** and
+the published +2.65% was flattered by it. (That split is a directional test on
+one consistent file, not a reproduction of the original run: the pre-cutoff
+cohort is n=380 against the original n=653, because that fetch's exchange tail
+differed too.)
 
 **RESOLVING THE MULTIPLIER DID NOT CLOSE THE GATE, and the claim that it was
 "worth 0.44 ROI points" was wrong about what that width meant.** It was the
@@ -33,9 +54,9 @@ to be half rate, so the range collapsed onto its own optimistic end (+2.66% ->
 +2.65%, the tiny move being the 13 full-rate pitcher rows). What was bought is
 CERTAINTY, which is worth having and is not ROI.
 
-TWO CORRECTIONS TO THE FIRST VERSION OF THIS NUMBER, which offset each other
-and are recorded because either alone would have produced a confident wrong
-answer:
+THREE CORRECTIONS TO THIS NUMBER, recorded because the first two offset each
+other and either alone would have produced a confident wrong answer, and
+because the third moved the margin after the decision looked settled:
 
   * WRONG ANCHOR. It converted entry improvement to ROI with "1pp of entry ~
     +0.75pp of ROI", taken from the 08-31 assessment, which attributes it to
@@ -47,8 +68,18 @@ answer:
     gate's own book the gain is SMALLER (+0.955 vs +1.121), so the broad
     measurement flattered the answer.
 
-Net of both: the honest reading moved from "+1.6-1.8%, well short" to
-"+2.2-2.7%, narrowly short". The DECISION is unchanged; the MARGIN is not.
+  * CLOBBERED INPUT `[2026-09-01, applied by lane game-market-entry-roi-curve
+    at the user's direction]`. Every figure above was first measured on a copy
+    of the shard that had lost its sportsbook tail to the `#630` publish race.
+    On the healed file the gate book is n=1,235 not 653, the gain +0.824pp not
+    +0.949, and the ROI **+2.43% not +2.65%**. Superseded readings, kept so the
+    direction stays visible: all props 82.3% gross / +1.939pp / 55.8-62.9%
+    fee-aware / +1.121pp; gate 4.05 -> 3.10pp at a 6.2% hold.
+
+Net of all three: the honest reading moved from "+1.6-1.8%, well short" to
+"+2.2-2.7%, narrowly short" to **"+2.43%, short by 0.57 points"**. The DECISION
+has never changed; the MARGIN has moved three times, and it is the margin a
+reader uses to decide whether to keep pulling the thread.
 
 --------------------------------------------------------------------------
 THREE THINGS THIS GETS RIGHT THAT AN OBVIOUS VERSION GETS WRONG

@@ -125,7 +125,7 @@ weight allowed to hit 0), on a feedback loop that actually settles (today:
 |---|---|---|---|
 | 0 · Measurement restoration | `#626` | now → 09-17 | graded supply restored; instruments non-zero |
 | M · Local mirror + replay gate | `#625` | parallel with 0 | replay-diff reproduces a prod day |
-| 1 · MLB prop program | `#624` | Sept | surviving under book ≥ +3% at ≤5% hold — **evaluated 09-01: NOT MET (+2.65% at 6.2% hold, Kalshi multiplier resolved); staking stays off** |
+| 1 · MLB prop program | `#624` | Sept | surviving under book ≥ +3% at ≤5% hold — **evaluated 09-01: NOT MET (+2.43% at a 6.5% hold, n=1,235, re-measured on the HEALED shard; the clobbered copy read +2.65% at 6.2%); staking stays off** |
 | 2 · WNBA sprint | `#623` | 09-17 → 09-25 | its 8 pre-registered gates |
 | 3 · Probability plane + fitted blend | `#622` | late Sept → Oct | held-out Brier(blend) ≤ market-alone per market |
 | 4 · Joint distributions + derivatives | `#621` | Oct | SGP/ladder paper surface vs Kalshi rungs |
@@ -360,19 +360,46 @@ football instance; a contract-registry walker in `#619` prevents the class).
    +0.98% @ 8.1%, +3.72% @ 5%, +6.52% @ 2%).
 
    Measured on the gate's own book via
-   `scripts/measure_exchange_prop_option_value.py --book gate` (n=653
-   time-aligned comparisons, 2026-09-01), with the **Kalshi multiplier
-   RESOLVED per series** — so this is a point estimate, not a bound:
+   `scripts/measure_exchange_prop_option_value.py --book gate`
+   (**n=1,235** time-aligned comparisons, 2026-09-01, **re-measured on the
+   HEALED shard**), with the **Kalshi multiplier RESOLVED per series** — so
+   this is a point estimate, not a bound:
 
    | entry gain | per-side | two-way hold | book ROI | gate |
    |---|---|---|---|---|
-   | **+0.949pp** | 4.05 → 3.10pp | 8.1% → **6.2%** | **+2.65%** | **FAIL** |
+   | **+0.824pp** | 4.05 → 3.23pp | 8.1% → **6.5%** | **+2.43%** | **FAIL** |
 
    **Both conditions fail, and the hold is the binding one** — at ≤5% the
    table already pays +3.72%, so reaching the hold reaches the target. Note
-   the gain on the gate book is **smaller** than on all props (+0.949 vs
-   +1.121), so the broad measurement flattered it. **Shortfall: 0.35 ROI
+   the gain on the gate book is **smaller** than on all props (+0.824 vs
+   +0.985), so the broad measurement flatters it. **Shortfall: 0.57 ROI
    points.**
+
+   **RE-MEASURED 2026-09-01 ON THE HEALED SHARD `[applied by lane
+   game-market-entry-roi-curve at the user's direction; the numbers are that
+   lane's, the file and the item are `book-quotes-publish-clobber`'s]`.** The
+   first reading came off a copy of the shard that had lost its sportsbook
+   tail to the `#630` publish race. `e78aee52` is live on web, the date now
+   passes the script's own guard at **100.0% matchable** (was 46.1%), and:
+
+   | | clobbered copy | HEALED |
+   |---|---|---|
+   | gate n | 653 | **1,235** |
+   | gate gain | +0.949pp | **+0.824pp** |
+   | gate hold | 6.2% | **6.5%** |
+   | **gate ROI** | +2.65% | **+2.43%** |
+   | all props n | 2,062 | **3,774** |
+   | all props gain | +1.121pp | **+0.985pp** |
+
+   **REPAIRING A FILE THAT HAD LOST ROWS MADE THE EXCHANGE LOOK WORSE** — the
+   opposite of the intuitive direction, and measured rather than inferred.
+   Splitting the healed gate book at the clobbered copy's last sportsbook quote
+   (20:18:49Z): rows at or before it take the exchange **64.5%** of the time
+   for **+1.021pp**; the rows the repair restored take it **40.2%** for
+   **+0.737pp**. The truncation had preserved exactly the window where the
+   exchange looks best, so **the clobber was biased in the exchange's favour**.
+   The DECISION is unchanged; the margin widened from 0.35 to 0.57 points and
+   the hold moved further from its condition.
 
    **THE KALSHI MULTIPLIER IS RESOLVED — and it did NOT close the gate.**
    Read live from `GET /trade-api/v2/series/<ticker>` across all 14 registered
@@ -390,8 +417,10 @@ football instance; a contract-registry walker in `#619` prevents the class).
    at once. Resolve per series; the map is in the measurement script with
    tests, and an unmapped market rounds **against** us.
 
-   **What is left, and it is now a genuinely thinner list.** n=653 on ONE day,
-   and 1,795 exchange quotes had no time-aligned sportsbook price. **Do not
+   **What is left, and it is now a genuinely thinner list.** n=1,235 on ONE
+   day, and 1,960 exchange quotes had no time-aligned sportsbook price — and
+   that exclusion count is now a CLEAN reading rather than a confounded one:
+   at 100.0% matchable it is genuine coverage, not the shard losing a tail. **Do not
    re-run and stake on a single passing date** — that is the same sample-size
    mistake in the other direction. In cost order: (a) re-measure over a full
    week — cheapest, now just a re-run; (b) exchange **maker** rather than taker
