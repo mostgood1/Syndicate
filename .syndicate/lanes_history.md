@@ -21699,3 +21699,21 @@ lost no protection and no open lane left the session-start digest.
   per-process.
 - Blocked by: none. todo.md unblocked when `game-market-entry-roi-curve` closed;
   the owed `#630` item landed `7eaca475`.
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-09-02
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### web-request-memory-attribution — **CLOSED 2026-09-02, GOAL MET.** The instrument was built, the precondition met, and the reading taken: **routes account for ~2% of the growth — the leak is NOT in the request path.** — opened 2026-09-01 — session 02ec72a5-aed0-41b6-bc3b-6a6c1abeca72
+- Goal: name WHAT leaks web's anonymous memory by attributing anon delta to the route that caused it. **MET as a NEGATIVE result, which is the answer the instrument existed to be able to give.**
+- **THE READING**, two `REQUEST_MEMORY_ATTRIBUTION` tables 7m23s apart at `WEB_CONCURRENCY=1`: anon **270.8 → 759.5 MB (+488.7)** while the sum of ALL per-route attributions rose **1.963 → 12.452 MB (+10.5)** — **~2%**. `/api/ops/artifacts/stream` (41 solo) and `/api/ops/artifacts/export` (28 solo) retained **0.000 MB each**, so the 60-70 MB shard endpoints are exonerated by measurement rather than by argument. Largest route `/api/ops/artifacts/publish`, 10.5 MB over 148 calls (~0.07 MB each), linear.
+- **Both halves of the gate are now proven.** OFF: 13 tests, five mutations each caught, the load-bearing one asserting the cgroup helper is **never called**. ON: the tables above, carrying their own denominators (`solo_attributed` 200→400, `skipped_concurrent` 93→234, `unreadable` 0).
+- **The precondition was met and then undone.** `WEB_CONCURRENCY` 2 → 1 (verified: one gunicorn worker, pid 97), reading taken, then restored to 2 (verified: pids 79/80) and the profile key DELETED (readback 404, zero attribution lines after). Two deploys, both preflight CLEAR, both in `deploys.md` 2026-09-02 with the measurement.
+- **CAVEAT THAT OUTLIVES THIS LANE `[from lane book-quotes-publish-clobber's independent watch]`:** the `+488.7 MB` is **post-restart WARM-UP**, not leak growth — both readings sit inside the first 12 min after a restart, and their watch shows a plateau at 861.8-894.9 MB. **That does not touch the ~2% result**, which is a ratio measured over the same window, but it does mean the absolute rate was wrong and `#632` says so.
+- Files (all landed): `syndicate/features/shared/memory_observability.py`, `syndicate/app.py`, `tests/test_request_memory_attribution.py`. **Nothing held; production carries the code INERT** (key absent, default OFF).
+- **RESIDUAL IS NOT THIS LANE'S:** what actually leaks is `#632` — narrowed to background work in the web process or something that only occurs under concurrency, plus a same-instant `unreclaimable` vs `anon` read that is still owed. Naming a lane as that item's blocker would be the wrong shape.
+- Blocked by: none.

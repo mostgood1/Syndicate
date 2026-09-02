@@ -4240,3 +4240,56 @@ your lock may not be the lock.**
   anything, so we know my deploy CONTAINED their work rather than dropping it.
   **Serialisation is not composition** — and when serialisation silently fails,
   containment is the only thing between you and a silent revert.
+
+## 2026-09-02 — FORBIDDEN: measuring a steady-state rate in the minutes after a restart. You are measuring the RAMP. `[lane web-request-memory-attribution]`
+
+**What happened.** I deployed to enable an instrument, then took my `#632`
+readings **inside the first 12 minutes after that deploy's restart**: anon
+270.8 → 759.5 MB in 7m23s, published as leak growth. A peer's independent
+150-minute watch showed the same service ramping and then **PLATEAUING**,
+oscillating 861.8-894.9 MB for 50 minutes and never crossing 900. One curve: a
+process filling to a **~890 MB working set**. My "+488.7 MB in 7m23s" was
+warm-up.
+
+**Why the instrument could not tell me.** Enabling it REQUIRED a deploy, and a
+deploy restarts the process, so the act of switching the measurement on
+guaranteed I would start measuring at the steepest part of the curve. **The
+measurement window was chosen by the mechanism, not by me** — and nothing in the
+output says "this is minute three".
+
+**How to apply.**
+* **Record uptime beside every memory reading**, and refuse to quote a RATE from
+  a window that starts near a restart. A ratio measured within the window can
+  still be fine — my "routes account for ~2%" survives, because both terms come
+  from the same minutes.
+* **When enabling an instrument requires a restart, plan the wait into the
+  measurement.** Take a first reading to prove it works, then a later one to
+  read the level.
+* Sibling: `state.md [worker memory is boot-confounded]` says every deploy makes
+  a FIX look good for five minutes. **This is the same confound in the opposite
+  direction: it made a PROBLEM look worse.** The rule generalises — a restart
+  distorts the reading whichever way you are hoping it goes.
+
+## 2026-09-02 — REQUIRED: mutate the code before believing a green test. Two of mine asserted on a CONSTANT and on a fixture that could not fail. `[lane game-market-entry-roi-curve]`
+
+**What happened.** Fixing `#635` I wrote six tests, all green, and then mutated
+the source five ways to check they bit. **Two mutations sailed straight through:**
+
+* **A test that asserted on a CONSTANT, not on BEHAVIOUR.** It checked
+  `CANONICAL_SERVICES` did not contain `syndicate`. Reverting the actual listing
+  to iterate `SERVICES` left the constant untouched, so the test passed while the
+  misleading two-row output — the *proximate cause of the incident* — came
+  straight back. Fixed by capturing what `status` PRINTS.
+* **A fixture whose arrangement could not distinguish the bug.** The guard used
+  to return the FIRST claim across `("web", "syndicate")`. My fixture put the
+  peer in `web` — the first alias — so first-match blocked too and the test
+  passed either way. Only the peer in the SECOND alias discriminates.
+
+**How to apply.**
+* **A test is not evidence until you have seen it fail.** Break the line it
+  guards and watch it go red; it costs one edit.
+* **Assert on the OUTPUT a human reads**, not on the constant that feeds it. The
+  constant is an implementation detail the bug can route around.
+* **Ask what arrangement makes the OLD code wrong**, and build the fixture from
+  that. A fixture drawn from the incident as it happened may sit on the side
+  where both versions agree.
