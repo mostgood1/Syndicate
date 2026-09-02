@@ -577,6 +577,31 @@ compare `SUM(route total_mb)` against the anon delta over the same window. Do NO
 re-read the warm-up window. **tracemalloc is NOT the tool** — ruled out
 2026-08-15 (`state.md:556`), it silenced the sampler at nframe=3 and 2.
 
+**WARM-UP ATTRIBUTION, MEASURED 2026-09-02 at ONE worker `[dep-dac3rhnavr4c73bc37v0]`.
+Routes are 76-83% of anon growth here — the opposite of the retracted "~2%", and
+still NOT the steady-state answer.**
+
+    15:25 → 15:30Z    routes +43.4 MB    anon +57.1 MB    76%
+    15:30 → 15:35Z    routes +41.1 MB    anon +49.6 MB    83%
+
+Two independent intervals agreeing closely, and consistent with the publish
+arithmetic (1,725/h x 0.0710 MB/call). **But both sit 6-16 minutes after a
+restart, inside the ramp**, and the run was cut at 24 minutes of uptime when web
+was restored to two workers. **Do not quote 76-83% as the steady-state share** —
+that is the same window error this item has already made twice.
+
+**WHAT IT DOES ESTABLISH:** the instrument works end to end at one worker, it can
+record net RELEASE (the first emission read **-0.512 MB**, so it is not a
+one-way accumulator), and during warm-up the request path — dominated by
+`/api/ops/artifacts/publish` — is where the growth is. The "leak is not in the
+request path" headline is now positively contradicted for the warm-up regime and
+UNTESTED for steady state.
+
+**THE READ THAT IS STILL OWED, and exactly how:** arm the instrument (one
+single-key PUT + a deploy), then **wait a couple of hours**, THEN difference two
+emissions. The accumulator is cumulative from boot, so late-minus-late is the
+steady-state number. `deploys.md` 2026-09-02 15:19Z and 15:49Z carry both runs.
+
 **STILL NOT ESTABLISHED, and this is where to start:** WHAT leaks. The shape is
 established, the cause is not, and naming one from the shape would be exactly
 the mistake `learnings.md` forbids. Two candidates the log context suggests and

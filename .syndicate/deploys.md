@@ -18486,3 +18486,39 @@ warm-up window cannot tell us which.
 Collector: `C:/tmp/gm_option_value/steady_state.jsonl`, 5-minute samples for 150
 minutes, capturing `SUM(route total_mb)`, `solo_attributed`,
 `skipped_concurrent` and anon each tick.
+
+## 2026-09-02 15:49:39Z — web `dep-dac48gss728c73ccqr2g`: CAPACITY RESTORED, instrument off. `[lane game-market-entry-roi-curve]`
+
+- RECONCILED: the 15:19:44Z deploy's `<pending>` marker. **A measurement WAS
+  taken and it is a WARM-UP measurement, not the steady-state one it was armed
+  for** — said plainly rather than filed as if the intended reading happened.
+
+**WHAT WAS MEASURED**, two independent 5-minute intervals, `SUM(route total_mb)`
+against anon over the same interval:
+
+    15:25 -> 15:30Z    routes +43.4 MB    anon +57.1 MB    76%
+    15:30 -> 15:35Z    routes +41.1 MB    anon +49.6 MB    83%
+
+**Routes account for the large majority of anon growth here**, which is the
+direction the publish arithmetic predicted (1,725 publishes/h x 0.0710 MB) and
+the opposite of the retracted "~2%". **It does NOT settle steady state**: both
+intervals sit 6-16 minutes after a restart, inside the ramp. The reading was cut
+short at 24 minutes of uptime because capacity was restored on request.
+
+**STILL OWED, and unchanged:** the same two intervals taken **late** — two
+emissions well past the ramp, differenced. The instrument is landed and inert;
+this needs one single-key PUT plus a deploy, then a wait of a couple of hours
+BEFORE the first of the two readings.
+
+**RESTORE VERIFIED, not assumed:**
+
+    two gunicorn workers back      pids 97, 98 under master 64 (one before)
+    WEB_CONCURRENCY                '2'
+    GUNICORN_THREADS               '4'
+    SYNDICATE_REQUEST_MEMORY_PROFILE   HTTP 404, absent
+    attribution lines strictly AFTER 15:49:40Z      0
+      (a single line at 15:46:18 PREDATES the restore -- the first window I
+       checked straddled the restart and would have read as "still running")
+
+Collector stopped. Deploy claim released. **Half-capacity window: 15:19:44Z to
+15:49:39Z, ~30 minutes.**
