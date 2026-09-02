@@ -3974,8 +3974,18 @@ open.
 **What was really available**, after running every tool against `origin/main`:
 `trim_lane_blocks.py` 4,518 B (one block, a lane I had closed myself),
 `archive_released_lanes.py` the same block, and `compact_learnings.py`
-**0 bytes at every cutoff through 2026-09-01** -- already fully compacted, the
-270KB that remains IS the rules. Total lever: 2% of one file.
+0 bytes at every cutoff through 2026-09-01.
+
+**CORRECTION, same day, and it is the more useful half.** I reported that last
+figure as "already fully compacted, no lever left". It is literally true and
+materially misleading -- I stopped testing one day short. `compact_learnings.py`
+compacts entries strictly BEFORE `--keep-from`, so a cutoff of `2026-09-01`
+cannot touch 2026-09-01's own 16 entries. `--keep-from 2026-09-02` reclaims
+**27,669 bytes**; `2026-09-03` reclaims 32,624. **The lever LAGS BY A DAY BY
+DESIGN and I read the lag as its absence.** Generalise it: when a tool takes a
+cutoff, a null result at the boundary is a statement about the boundary, not
+about the tool -- step the parameter one unit further before concluding
+anything.
 
 **How to apply.** (1) `git show origin/main:<path> | wc -c` before acting on any
 digest size number, and check `git rev-list --count HEAD..origin/main` while you
