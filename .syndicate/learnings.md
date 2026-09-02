@@ -4324,3 +4324,35 @@ the most.**
   thing it names.
 * **A monotonicity claim needs the resolution that could falsify it.** Hourly
   samples cannot see a one-hour dip; I had hourly samples and claimed "never".
+
+## 2026-09-02 REQUIRED: a ledger APPEND computed in one tree is not valid in another. Both the insertion POINT and the base CONTENT differ, and neither difference announces itself. `[lane maxmun-pregame-read]`
+
+Two distinct failures, same root, both hit in one 10-minute ledger write:
+
+1. **Base content.** The primary tree's HEAD was `c87a73f0`; `origin/main`'s
+   `deploys.md` held **106 lines it did not have**. Committing the primary
+   tree's copy — a pure append, `git diff --numstat` reading `N 0`, zero
+   deletions — would have REVERTED another session's landed measurements.
+   `DELETIONS==0` is a statement about your working copy against YOUR HEAD; it
+   says nothing about a stale HEAD. Check `git diff HEAD origin/main -- <file>`
+   before committing any shared ledger file from the primary tree.
+
+2. **Insertion point.** `lanes.md` in the primary tree had ONE `## ` heading
+   (`## OPEN`), so EOF was inside the OPEN section. `origin/main`'s copy had a
+   `## Archived lanes` heading at 1265 — another session's archive pass, landed
+   but not pulled into the primary tree. The same `>> lanes.md` that was
+   correct in one tree put an OPEN lane below `## Archived lanes` in the other,
+   which is exactly the silent claim-loss `#466` documents. The postwrite hook
+   caught it; nothing else would have.
+
+**How to apply.** Write ledger appends from a worktree at `origin/main`, not
+from the primary tree, and RE-DERIVE the insertion point in the tree you are
+actually writing to — never carry a line number or an "append at EOF" decision
+across trees. Then `py -3 scripts/check_lane_invariants.py` before committing.
+If a block already stands in the primary tree, remove it there after landing,
+or the next session to commit that file lands a duplicate.
+
+**Anti-lesson to avoid:** this is not "the primary tree is bad". Ledger files
+legitimately sit modified there all day. It is that the primary tree's copy of
+a shared file is a THIRD version — not your edit, not `origin/main` — and an
+append is defined against a base you did not check.
