@@ -37,6 +37,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any, Iterable, Mapping
 
+from syndicate.features.soccer.features.team_names import match_team_name
+
 _H2H_MARKETS = {"h2h", "moneyline", "ml"}
 _DRAW_LABELS = {"draw", "tie", "x"}
 
@@ -121,6 +123,50 @@ def home_win_probability_by_event(rows: Iterable[Mapping[str, Any]]) -> dict[str
     return out
 
 
+def _fuzzy_event_for(fixture: Mapping[str, Any], probabilities: Mapping[str, Mapping[str, Any]]) -> tuple[Mapping[str, Any] | None, str]:
+    """The priced event this fixture names, resolved through the repo's own
+    team matcher. Returns (entry, reason) where reason names the refusal.
+
+    WHY THIS STAGE EXISTS. The two id spaces never collide -- `match_id` is an
+    ESPN event id, `event_id` in the odds CSV is an OddsAPI one -- so the join
+    always fell through to an EXACT string compare on both team names, and the
+    two feeds do not share a naming convention. Measured 2026-09-02 against
+    production, 10 leagues over the live 7-day horizon: **56 of the 70 skipped
+    fixtures named a priced event that `match_team_name` resolves**, against 14
+    genuinely unpriced. `Sint-Truidense` vs `Sint Truiden`, `KAA Gent` vs
+    `Gent`, `Royal Charleroi SC` vs `Charleroi`.
+
+    BEST-OF-ALL-CANDIDATES, NOT PAIRWISE THRESHOLD, AND THAT DISTINCTION IS THE
+    WHOLE SAFETY ARGUMENT. `match_team_name` is called ONCE against the full
+    candidate list per side, so it returns the best match rather than the first
+    name to clear 0.72. Both sides must resolve, and the resolved pair must
+    identify EXACTLY ONE event -- two candidates is a refusal, not a coin flip.
+    A wrong join here feeds a wrong market price into a ratings anchor, which is
+    worse than no join at all, so ambiguity is counted and dropped.
+    """
+    home = str(fixture.get("home_team") or "")
+    away = str(fixture.get("away_team") or "")
+    if not home or not away:
+        return None, "fixture_missing_team_name"
+
+    home_names = sorted({str(row.get("home_team") or "") for row in probabilities.values() if row.get("home_team")})
+    away_names = sorted({str(row.get("away_team") or "") for row in probabilities.values() if row.get("away_team")})
+    matched_home = match_team_name(home, home_names)
+    matched_away = match_team_name(away, away_names)
+    if matched_home is None or matched_away is None:
+        return None, "no_name_match"
+
+    hits = [row for row in probabilities.values()
+            if row.get("home_team") == matched_home and row.get("away_team") == matched_away]
+    if len(hits) > 1:
+        return None, "ambiguous_name_match"
+    if not hits:
+        # Each side matched something, but not the same fixture -- e.g. both
+        # clubs are in the feed on different match-ups. Not a join.
+        return None, "name_match_pair_disagreed"
+    return hits[0], "fuzzy"
+
+
 def attach_market_odds(fixtures: list[dict], probabilities: Mapping[str, Mapping[str, Any]]) -> dict:
     """Attach `market_odds` to fixtures that have a price, and COUNT the rest.
 
@@ -128,12 +174,20 @@ def attach_market_odds(fixtures: list[dict], probabilities: Mapping[str, Mapping
     a fixture with no `market_odds`, so without a published attached/skipped
     split the anchor can be entirely inert while everything downstream looks
     healthy. Mutates `fixtures` in place and returns the audit.
+
+    Three join stages, tried in order and COUNTED SEPARATELY (`by_stage`) so a
+    later regression in any one of them is attributable rather than showing up
+    as a single number drifting down: the event id, an exact team-pair compare,
+    then `_fuzzy_event_for`.
     """
     attached = 0
     skipped: list[str] = []
+    by_stage: dict[str, int] = {"event_id": 0, "exact_pair": 0, "fuzzy": 0}
+    refusals: dict[str, int] = {}
     for fixture in fixtures:
         event_id = str(fixture.get("match_id") or "").strip()
         entry = probabilities.get(event_id)
+        stage = "event_id"
         if not entry:
             # match_id is synthesised when event_id is absent, so fall back to
             # the team pair rather than dropping a fixture the feed does cover.
@@ -143,10 +197,17 @@ def attach_market_odds(fixtures: list[dict], probabilities: Mapping[str, Mapping
                  and row.get("away_team") == fixture.get("away_team")),
                 None,
             )
+            stage = "exact_pair"
+        if not entry:
+            entry, reason = _fuzzy_event_for(fixture, probabilities)
+            stage = "fuzzy"
+            if entry is None:
+                refusals[reason] = refusals.get(reason, 0) + 1
         if not entry:
             skipped.append(f"{fixture.get('home_team')} v {fixture.get('away_team')}")
             continue
         fixture["market_odds"] = {"home_win_probability": entry["home_win_probability"]}
+        by_stage[stage] += 1
         attached += 1
     return {
         "fixtures": len(fixtures),
@@ -154,4 +215,6 @@ def attach_market_odds(fixtures: list[dict], probabilities: Mapping[str, Mapping
         "skipped": len(skipped),
         "skipped_examples": skipped[:5],
         "priced_events": len(probabilities),
+        "by_stage": by_stage,
+        "skipped_reasons": refusals,
     }

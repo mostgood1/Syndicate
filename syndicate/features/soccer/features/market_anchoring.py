@@ -16,6 +16,9 @@ fixtures where you have market odds, and leave it alone otherwise.
 
 from __future__ import annotations
 
+from typing import Mapping
+
+from syndicate.features.soccer.features.team_names import match_team_name
 from syndicate.features.soccer.sim_engine.soccersim.calibration_profile import CalibrationProfile
 from syndicate.features.soccer.sim_engine.soccersim.calibration_profile import SOCCER_CALIBRATION_PROFILE
 from syndicate.features.soccer.sim_engine.soccersim.contracts import SoccerSimSimulationInput
@@ -167,6 +170,30 @@ def anchor_team_ratings(
     return anchored_home, anchored_away
 
 
+def _ratings_key_for(team: str, ratings: Mapping[str, dict[str, float]]) -> str | None:
+    """The key under which ``ratings`` holds this team, or None.
+
+    WHY THIS IS NOT A PLAIN ``dict.get``. Fixture names come from ESPN; rating
+    keys come from Understat / football-data. `_fill_promoted`, right beside the
+    call site in `build_soccer_artifacts`, already resolves them with
+    `match_team_name`, and so does `loaders._rating_for`, which is what the SIM
+    reads -- this was the only hop in the chain doing an exact-key lookup.
+
+    Measured 2026-09-02 against the real production fixture list, 9 leagues, 90
+    team slots: **36 (40%) missed**, took a `0.0/0.0` default, and wrote the
+    anchored value back under the ESPN name -- a key the sim never reads,
+    because `match_team_name` finds the real entry first. `belgian_pro_league`
+    was 7 of 8. The anchor was silently inert for those, and the call site's
+    `teams_changed` counted them as SUCCESSES, because a spurious new key does
+    differ from the input dict.
+    """
+    if not team:
+        return None
+    if team in ratings:
+        return team
+    return match_team_name(team, list(ratings))
+
+
 def anchor_ratings_to_market(
     ratings: dict[str, dict[str, float]],
     fixtures: list[dict],
@@ -174,6 +201,7 @@ def anchor_ratings_to_market(
     weight: float = 0.35,
     profile: CalibrationProfile = SOCCER_CALIBRATION_PROFILE,
     simulations: int = 100,
+    audit: dict | None = None,
 ) -> dict[str, dict[str, float]]:
     """Anchor a ratings table's home/away pair for each fixture that carries
     market odds.
@@ -183,8 +211,18 @@ def anchor_ratings_to_market(
     directly, or ``{"moneyline": {"home": decimal, "draw": decimal, "away":
     decimal}}`` to devig first. Fixtures without ``market_odds`` are left
     untouched. Returns a new ratings dict; the input is not mutated.
+
+    Pass ``audit`` to receive the reachability counts. It is an OUT-PARAMETER
+    rather than a changed return type deliberately: the caller
+    (`build_soccer_artifacts._apply_market_anchor`) is held by another lane and
+    needs no edit to keep working. `teams_resolved` vs `teams_unresolved` is the
+    number that says whether the anchor reached the ratings the sim actually
+    reads -- `teams_changed` at the call site cannot, because an unreachable
+    write still changes the dict.
     """
     anchored = {team: dict(rating) for team, rating in ratings.items()}
+    counts: dict = {"fixtures_priced": 0, "teams_resolved": 0, "teams_unresolved": 0,
+                    "unresolved_examples": []}
     for index, fixture in enumerate(fixtures):
         market = fixture.get("market_odds") or {}
         home_win_probability = market.get("home_win_probability")
@@ -196,10 +234,21 @@ def anchor_ratings_to_market(
             home_win_probability = devigged.get("home")
         if home_win_probability is None:
             continue
+        counts["fixtures_priced"] += 1
         home_team = str(fixture.get("home_team") or "")
         away_team = str(fixture.get("away_team") or "")
-        home_rating = anchored.get(home_team, {"attack_rating": 0.0, "defense_rating": 0.0})
-        away_rating = anchored.get(away_team, {"attack_rating": 0.0, "defense_rating": 0.0})
+        home_key = _ratings_key_for(home_team, anchored)
+        away_key = _ratings_key_for(away_team, anchored)
+        for raw, key in ((home_team, home_key), (away_team, away_key)):
+            if key is None:
+                counts["teams_unresolved"] += 1
+                if len(counts["unresolved_examples"]) < 5:
+                    counts["unresolved_examples"].append(raw)
+            else:
+                counts["teams_resolved"] += 1
+        blank = {"attack_rating": 0.0, "defense_rating": 0.0}
+        home_rating = anchored.get(home_key, blank) if home_key else dict(blank)
+        away_rating = anchored.get(away_key, blank) if away_key else dict(blank)
         new_home, new_away = anchor_team_ratings(
             home_rating,
             away_rating,
@@ -209,14 +258,23 @@ def anchor_ratings_to_market(
             simulations=simulations,
             seed=1000 + index,
         )
-        if home_team:
-            anchored[home_team] = {**home_rating, **new_home}
-        if away_team:
-            anchored[away_team] = {**away_rating, **new_away}
+        # WRITE BACK UNDER THE RESOLVED KEY. Writing under the fixture's own name
+        # is what made this inert: it created a SECOND entry that the sim never
+        # reads, since `match_team_name` finds the real one first. A team that
+        # resolves to nothing keeps the old behaviour -- a new key at its fixture
+        # name -- so nothing regresses, but it is now counted above instead of
+        # being indistinguishable from a working anchor.
+        if home_key or home_team:
+            anchored[home_key or home_team] = {**home_rating, **new_home}
+        if away_key or away_team:
+            anchored[away_key or away_team] = {**away_rating, **new_away}
+    if audit is not None:
+        audit.update(counts)
     return anchored
 
 
 __all__ = [
+    "_ratings_key_for",
     "anchor_ratings_to_market",
     "anchor_team_ratings",
     "devig_decimal_odds",
