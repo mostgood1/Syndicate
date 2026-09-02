@@ -18642,3 +18642,62 @@ ceiling and it stops competing with live operational state.
 **refresh-worker (989 rejections over the same window) is NOT yet deployed** —
 its preflight has held on an in-flight `run_mlb_daily_sim_job.py` throughout.
 Claim still held, waiter armed. This entry covers ONE of the two services.
+
+---
+
+## 2026-09-02 17:56:08Z — **refresh-worker `21de4a9e` — DEPLOYED, TRIM PATH NOT YET EXERCISED. The rejections there stopped BEFORE this deploy and it does not get the credit.**
+
+**Locks:** claim EXPIRED at 47.1 min while waiting on jobs and was re-acquired
+(new token) rather than assumed still held; preflight re-verified CLEAR seconds
+before firing — only infra plus two already-dead defunct children, so no MLB sim
+was killed. Deploy `dep-dac63nv10e5c73bdb45g`, live 17:56:08Z. Third attempt;
+`run_mlb_daily_sim_job.py` respawns on this service about every 19 minutes
+(pids 2886 / 3358 / 3892 at 16:41 / 17:00 / 17:19) so the idle windows are
+shorter than the two calls the guard requires.
+
+### the reading, and why it is NOT a pass
+
+Since go-live: `TRIMMED_TO_FIT` **nothing matched**, `KEYVALUE_WRITE_REJECTED`
+**nothing matched**, `DAILY_BOOK` **nothing matched**. All three silent is
+exactly the ambiguous state the paired criterion exists to catch — the worker
+had restarted and the writer had not ticked. **Reported as NOT MEASURED, not as
+zero rejections.**
+
+### and then the attribution turned out to be wrong anyway
+
+| time | event |
+|---|---|
+| **17:06:10Z** | LAST refresh-worker rejection, `kalshi__ncaaf__2026_09_05.json` |
+| 17:10:25Z | live-odds-worker goes live on `21de4a9e` |
+| 17:11:43Z | live-odds-worker trims **polymarket**\_\_ncaaf\_\_2026_09_05 |
+| **17:13:47Z** | live-odds-worker trims **kalshi**\_\_ncaaf\_\_2026_09_05 — `points_dropped=56910 markets_dropped=0 markets_kept=5747` |
+| 17:16–17:48Z | refresh-worker `DAILY_BOOK status=ok files=39 **errors=0**` every ~5 min, **zero rejections** |
+| 17:56:08Z | refresh-worker goes live on `21de4a9e` |
+
+**refresh-worker's rejections were fixed by the OTHER service's deploy.** The
+keyvalue store is SHARED, so a trim by whichever service writes first shrinks
+the key for both; refresh-worker's next read-modify-write of that key then fit.
+Its 989 rejections had already stopped 50 minutes before its own deploy landed.
+
+**So refresh-worker's own trim path has never executed in production.** It is
+deployed and content-verified by SHA, unit-tested both directions, and identical
+code to the path proven on live-odds-worker — but this repo's rule is that
+deployed is not working, and I am not going to claim a measurement I do not
+have. **OWED:** a `TRIMMED_TO_FIT` line on refresh-worker, which will come the
+next time that service is the first to push a file past the budget.
+
+**HOW CLOSE THIS CAME TO A FALSE PASS.** "Zero `KEYVALUE_WRITE_REJECTED` on
+refresh-worker since go-live" is TRUE and would have read as a verified fix. It
+is true because the defect was already gone. The discriminator was checking the
+pre-deploy window at all — the last rejection at 17:06:10Z against a go-live of
+17:56:08Z. A criterion that only looks forward from go-live cannot tell a fix
+from a defect that stopped on its own.
+
+### the standing correction
+
+**Where two services share a keyvalue key, a repair deployed to ONE of them
+repairs the key for BOTH, and the second service's logs will look fixed before
+its own deploy lands.** Attribution needs the pre-deploy window, not just the
+post. Both deploys were still worth doing: either service can be the one that
+first pushes a file past the ceiling, so both need the trim — but only
+live-odds-worker's is measured.

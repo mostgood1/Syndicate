@@ -4408,3 +4408,25 @@ that no longer exists, or one that did not exist yet.
 * **A count of 1 near a boundary deserves its timestamp read**, not just its
   existence. Both of today's errors would have been caught by looking at the
   stamp on the single line rather than at the fact that there was one.
+
+## 2026-09-02 FORBIDDEN: verifying a fix only in the window AFTER go-live, where a defect that stopped on its own is indistinguishable from one you fixed.
+
+- **Nearly banked, as a pass:** "zero `KEYVALUE_WRITE_REJECTED` on refresh-worker
+  since go-live 17:56:08Z". Perfectly true. It was true because the LAST rejection
+  was at **17:06:10Z** — fifty minutes BEFORE that deploy. The defect was already
+  gone, fixed by the OTHER service's deploy at 17:10:25Z.
+- **The mechanism, and it generalises:** the two workers share one keyvalue store.
+  `venue_odds` files are read-modify-write, so when live-odds-worker trimmed
+  `kalshi__ncaaf__2026_09_05` at 17:13:47Z the SHARED key shrank, and
+  refresh-worker's next write of that same key fit without carrying the fix at
+  all. **A repair deployed to one of two services sharing a key repairs it for
+  both, and the second service's logs read as fixed before its own deploy lands.**
+- **The rule.** Attribution requires the PRE-deploy window. Read back far enough
+  to see the defect still firing, and state the last occurrence's timestamp
+  against go-live. A criterion that only looks forward cannot separate "I fixed
+  it" from "it stopped".
+- **Corollary:** `deployed + zero symptom` is not `working`. refresh-worker's trim
+  path is unit-tested, content-verified by SHA and identical to the path proven on
+  live-odds-worker, and it has still never executed in production — recorded as
+  OWED rather than passed.
+- *(full account: `deploys.md` 2026-09-02 17:56:08Z)*
