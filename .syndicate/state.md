@@ -671,6 +671,49 @@ comparison is UNCHANGED by that capture and the 0-of-103 reading still stands:
 `quote.book_prices` is what the board reads, and changing it is step 3, gated on
 step 2.
 
+## [render-server-failed-is-three-events] `server_failed` IS NOT A FAILURE COUNT — read `details.reason`, one of its meanings is a HEALTHY DELIBERATE EXIT `[verified 2026-09-01, lane game-market-entry-roi-curve]`
+
+Two services demonstrated two different meanings within an hour, both off
+Render's events API:
+
+    web              srv-d88ahvrbc2fs73eodu30   2 x server_failed  reason.oomKilled   REAL → `todo #632`
+    live-odds-worker srv-d91dpertqb8s73co8lt0   3 x server_failed  reason.earlyExit   HEALTHY BY DESIGN
+
+**The `earlyExit` three are a designed 6-hour self-recycle**, confirmed in code
+and not inferred from the log line: `run_live_odds_refresh_worker.py:670`
+`SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS` default **21600**, checked at
+`:2186` after each tick. Observed uptimes **22,712s / 23,606s** = 6h18m / 6h33m,
+i.e. 6h plus the remainder of the in-flight tick, with the worker's own
+`RECYCLING ... to reset accumulated page cache` line and `stage: before_exit`.
+The three sat 6h18m / 6h19m / 6h34m after their deploys — **a crash does not keep
+a schedule.**
+
+**Render labels a voluntary process exit `server_failed`.** That is a platform
+naming artifact. Any audit that counts the events without the reason inflates.
+
+## [ncaaf-zero-orders-is-two-gates] NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry-roi-curve]`
+
+The board is alive: `/api/board/layer2-shortlist?sport=ncaaf` serves **480 rows**,
+`per_sport.ncaaf.selected=480`. The first zero is the SIZING input.
+
+    model_edge_pct numeric     0 / 480      <- what the sizing path reads
+    ev_pct         numeric   480 / 480
+    ev_basis       market_fair on 480 / 480
+
+1. `football/pick_gate.py` denies the MODEL claim on a measured out-of-sample
+   loss: 2023 SP+ → 2024, n=2,233 clean, model margin MAE **15.775 vs market
+   12.212, +3.563 at t=+17.20**, losing to the OPEN line by nearly as much and at
+   every scale 6..24. Default deny; serving requires a recorded WIN.
+2. `portfolio_commit.py:267` refuses any row with no `model_edge_pct`, by design
+   ("a legitimate way to RANK and not a basis on which to SIZE"). **This is the
+   gate that actually kills NCAAF**, since every served row is `market_fair`.
+
+**`pick_gate`'s 2026-08-29 `(sport, market, BASIS)` re-key cannot produce orders
+on its own** — it un-blocked RANKING; sizing still needs a model edge the gate
+denies. Changing this is a PRODUCT DECISION, the position `#624` step 6 holds for
+MLB props. **NCAAF settlement is shipped and NEVER verified end-to-end**; tripwire
+at `#627`'s LIFT_CONDITION.
+
 ## [mlb-live-edge-forbidden] TWO STANDING CONSTRAINTS ON ANY MLB LIVE-EDGE WORK — lifted out of lane `live-prob-producer-reader-gap` when it closed `[2026-09-01]`
 
 **Recorded here because the lane that held them is CLOSED and a constraint that
