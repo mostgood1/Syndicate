@@ -1699,6 +1699,35 @@ _PUBLISH_LAST_PUBLISHER: dict[str, str] = {}
 _PUBLISH_CONSECUTIVE_REFUSALS: dict[str, int] = {}
 
 
+# `Popen` without a later `wait()` leaves a ZOMBIE for every merge: the child is
+# dead but its exit status is unreaped, so it keeps a PID table entry. Observed
+# in production within an hour of the deferred merge shipping -- deploy_preflight
+# reported `3 defunct child(ren) awaiting reap` under the gunicorn workers. One
+# per odds_history publish, and those come in bursts of twelve.
+#
+# `signal.SIGCHLD = SIG_IGN` would auto-reap but breaks `subprocess.run` exit
+# codes elsewhere in this process, so instead the handles are kept and polled on
+# the next spawn. Reaping is O(pending) and pending is tiny.
+_PENDING_MERGE_CHILDREN: list = []
+
+
+def _reap_finished_merge_children() -> int:
+    """Poll previously spawned merge children so they stop being zombies."""
+    global _PENDING_MERGE_CHILDREN
+    alive = []
+    reaped = 0
+    for proc in _PENDING_MERGE_CHILDREN:
+        try:
+            if proc.poll() is None:
+                alive.append(proc)
+            else:
+                reaped += 1
+        except Exception:
+            reaped += 1
+    _PENDING_MERGE_CHILDREN = alive
+    return reaped
+
+
 def _spawn_odds_history_merge(relative_path: str, target_path: Path, incoming_path: Path) -> dict:
     """Stage the incoming copy and hand the merge to a SUBPROCESS. `#630`.
 
@@ -1718,6 +1747,7 @@ def _spawn_odds_history_merge(relative_path: str, target_path: Path, incoming_pa
     publish, which is the pre-merge behaviour and not a clobber. The child owns
     deleting the staging file, including on refusal.
     """
+    reaped = _reap_finished_merge_children()
     staging = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.staged"
     try:
         os.replace(incoming_path, staging)
@@ -1725,7 +1755,7 @@ def _spawn_odds_history_merge(relative_path: str, target_path: Path, incoming_pa
         return {"spawned": False, "error": f"stage_failed: {type(exc).__name__}: {exc}"}
     script = Path(__file__).resolve().parents[2] / "scripts" / "merge_odds_history_artifact.py"
     try:
-        subprocess.Popen(
+        child = subprocess.Popen(
             [sys.executable, str(script), "--target", str(target_path),
              "--incoming", str(staging), "--relative-path", relative_path],
             # INHERIT stdout/stderr so the child's ODDS_HISTORY_MERGE line reaches
@@ -1742,7 +1772,9 @@ def _spawn_odds_history_merge(relative_path: str, target_path: Path, incoming_pa
         except Exception:
             pass
         return {"spawned": False, "error": f"spawn_failed: {type(exc).__name__}: {exc}"}
-    return {"spawned": True, "staged": staging.name}
+    _PENDING_MERGE_CHILDREN.append(child)
+    return {"spawned": True, "staged": staging.name, "reaped": reaped,
+            "pending_children": len(_PENDING_MERGE_CHILDREN)}
 
 
 def _merge_published_artifact(relative_path: str, target_path: Path, incoming_path: Path):

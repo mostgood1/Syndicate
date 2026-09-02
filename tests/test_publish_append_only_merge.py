@@ -713,6 +713,44 @@ class DeferredOddsHistoryMergeTests(unittest.TestCase):
                         encoding="utf-8")
         return path
 
+    def test_spawned_children_are_REAPED_so_they_do_not_become_zombies(self) -> None:
+        """`Popen` without a later `wait()` leaves a zombie per merge, each
+        holding a PID slot. Observed in production within an hour of shipping:
+        deploy_preflight reported `3 defunct child(ren) awaiting reap` under the
+        gunicorn workers -- one per odds_history publish, and those arrive in
+        bursts of twelve."""
+        ops._PENDING_MERGE_CHILDREN.clear()
+
+        class _Done:
+            def poll(self):
+                return 0
+
+        class _Running:
+            def poll(self):
+                return None
+
+        done, running = _Done(), _Running()
+        ops._PENDING_MERGE_CHILDREN.extend([done, running])
+        with patch("subprocess.Popen", return_value=_Running()):
+            result = ops._spawn_odds_history_merge(self.ODDS_HISTORY, self.target, self._incoming())
+        self.assertEqual(result["reaped"], 1, "the finished child must be reaped")
+        self.assertNotIn(done, ops._PENDING_MERGE_CHILDREN)
+        self.assertIn(running, ops._PENDING_MERGE_CHILDREN, "a live child must be kept")
+        self.assertEqual(result["pending_children"], 2)
+        ops._PENDING_MERGE_CHILDREN.clear()
+
+    def test_a_child_that_raises_on_poll_is_still_dropped(self) -> None:
+        """A handle we cannot poll must not accumulate forever."""
+        ops._PENDING_MERGE_CHILDREN.clear()
+
+        class _Broken:
+            def poll(self):
+                raise OSError("gone")
+
+        ops._PENDING_MERGE_CHILDREN.append(_Broken())
+        self.assertEqual(ops._reap_finished_merge_children(), 1)
+        self.assertEqual(ops._PENDING_MERGE_CHILDREN, [])
+
     def test_spawning_does_not_touch_the_target(self) -> None:
         """The request must not do the merge, and must not replace either — the
         target keeps what it had until the child finishes. Stale by one publish
