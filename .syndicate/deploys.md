@@ -18137,3 +18137,43 @@ both fix commits.
   against 76 fixtures / 485 rows earlier the same evening. The ceiling and the
   alias delta would both read larger on a fuller slate; the 78.6% conversion is
   the number least sensitive to that.
+
+## 2026-09-02 04:12Z — web `SYNDICATE_REQUEST_MEMORY_PROFILE=on` SET, DEPLOY **NOT** DONE (blocked by a permission gate). `[lane web-request-memory-attribution]`
+
+**READ THIS IF YOU ARE ABOUT TO DEPLOY WEB.** The env key is set on the live
+service but has NOT been injected, because env changes need a deploy and mine
+was refused by the harness's permission classifier. **The consequence is a
+RIDEALONG: the next deploy of web by ANYONE — deploying any commit at or after
+`97260296` — switches per-request memory instrumentation ON without them asking
+for it.** That is my doing and it is recorded here so it is a known consequence
+rather than a surprise. It is cheap and default-safe (two cgroup reads per SOLO
+request, zero per contended one) and it prints `REQUEST_MEMORY_ATTRIBUTION`
+roughly once per 200 solo requests. **If you would rather not carry it, unset the
+key** — single-key PUT, never the bulk `env-vars` endpoint, which rewrites the
+whole block.
+
+    what:      SYNDICATE_REQUEST_MEMORY_PROFILE = "on"  (single-key PUT, 200, read back "on")
+    service:   syndicate / srv-d88ahvrbc2fs73eodu30 (web, 2G)
+    intended:  deploy d8b7dfbf3209 (origin/main tip, contains 97260296)
+    live now:  477e42c2  — i.e. NEITHER the code NOR the key is in force yet
+    claim:     held by lane `web-request-memory-attribution`, acquired 04:08:29Z, TTL 45 min
+    preflight: **CLEAR** at 04:12:20Z — only infrastructure processes, no sim at risk
+
+**PREFLIGHT SURFACED SOMETHING THAT CHANGES HOW THE INSTRUMENT MUST BE READ,
+and it is a correction to my own design note.** The process list shows **TWO
+gunicorn workers** (pids 80 and 81 under master 63), not one — `WEB_CONCURRENCY`
+is 2. My concurrency guard refuses attribution when another request is in flight
+**IN THE SAME PROCESS**, but the cgroup it reads is **per-CONTAINER**. So a
+request can be "solo" in worker A while worker B allocates, and that allocation
+lands on A's row. **The guard removes intra-process contention and NOT
+inter-process contention.** It is still directionally useful — it was built to
+avoid blaming the most frequent route, and it still does — but a per-route total
+from it is an UPPER bound contaminated by the sibling worker, not a clean
+attribution. Anyone reading the first table must know that before believing it.
+
+**Also visible and not mine:** web carries **5 defunct children** awaiting reap
+under the gunicorn workers, the same shape `#630` fixed on the publish path
+(`dd049490`).
+
+**NOTHING IS VERIFIED.** No deploy, so no reading. The gate this is waiting on is
+a human approval of the deploy call, not any technical blocker.
