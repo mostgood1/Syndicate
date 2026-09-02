@@ -17620,6 +17620,88 @@ recorded here so a later reader does not attribute either number to this change.
   the code->name map reaches. `unreadable_title` 413 is working-set composition,
   not this change; it has swung 18/413/18/413 across cycles independent of it.
 
+### VERIFIED 2026-09-01 23:49Z — `e78aee52` merge-on-receive WORKS. Three independent readings.
+
+1. **THE SUPERSET TEST — the exact test that found the bug — PASSES.**
+
+       snapshot A  bytes 63,546,681  lines 139,747  exchange 9,640  sportsbook 71,281
+       (300s, several publish cycles)
+       snapshot B  bytes 66,771,715  lines 146,851  exchange 9,640  sportsbook 74,223
+
+       lines in A MISSING from B ... 0
+       lines new in B ............... 7,104
+
+   **Zero lost, 7,104 gained.** Before the fix the same read gave 1,318 LOST /
+   0 gained. Exchange held flat at 9,640 (late slate, no new exchange quotes in
+   the window) — and flat is the point: exchange rows were precisely what used
+   to be destroyed.
+
+2. **THE BRANCH IS CONFIRMED RUNNING, and caught the clobber in the act:**
+
+       23:42:28  publisher=refresh-worker    existing=129832  added=3803  duplicates=127106
+       23:43:17  publisher=live-odds-worker  existing=133635  added=6112  duplicates=129832
+
+   live-odds-worker contributed **6,112 rows refresh-worker's copy did not
+   have**. Under the old replace, one of those publishes destroys the other's
+   work. `duplicates=129832` shows idempotence holding at production scale.
+
+3. **Live commit read independently** off `/api/ops/version`:
+   `e78aee525fde4367ee63cd8f311371c0a284f4e9` — not taken from the deploy record.
+
+**UNEXERCISED, stated rather than implied:** both log lines carry `publisher=`,
+which is the STREAMED format. The **envelope-form merge has not run in
+production** — it is defensive coverage for the pinned live-odds-worker, correct
+by unit test only.
+
+**SCOPE SWEEP (owed, now done) — `book_quotes` was NOT the only victim.**
+From 34 `PUBLISH_DIVERGENCE` markers, 2026-08-30 → now:
+- **NCAAF `book_quotes` — same defect, now COVERED** (the predicate is
+  sport-agnostic): live-odds-worker vs refresh-worker, 9.2MB vs 5.2MB.
+- **`#488`'s guard DELAYS the clobber by one cycle rather than preventing it.**
+  It sets `_PUBLISH_LAST_PUBLISHER` **on the refused branch too**, so the
+  refused publisher becomes "last" and its next attempt passes as
+  same-publisher: `22:01:15 REFUSED` → `22:05:03 ALLOWED_WITH_WARNING`,
+  replacing 9.2MB with 5.2MB. Moot for merged families; still live elsewhere.
+- **Soccer `odds_history/*.json` STILL CLOBBERED, not covered by this fix.**
+  `ALLOWED_WITH_WARNING` at ratio ~0.79 — **43.9MB → 34.8MB, several times an
+  hour.** `.json`, a single document, so a line-union would corrupt it.
+  Being handled separately.
+
+## 2026-09-02 00:00:06Z — web ← `bfaa5ecc` — `#630` part 2: `odds_history` JSON merge — lane `book-quotes-publish-clobber`
+
+- **Deploy** `dep-dabme1jtqb8s73csabl0`, trigger=api. Previous live `e78aee52`
+  (the part-1 append-only merge, verified above). Both locks: claim held by this
+  lane continuously since 23:38:07Z — **`status` re-read, never re-`acquire`**,
+  which rotates the token and strands the claim; preflight **CLEAR** for
+  `--target-commit bfaa5ecc`, sample age 0s, only gunicorn infra on web.
+- **WHY:** the part-1 sweep found a SECOND clobbered family.
+  `soccer_source/tracking/odds_history/<date>.json` + its `artifacts/` twin,
+  refresh-worker vs live-odds-worker, `ALLOWED_WITH_WARNING` at ratio ~0.79 —
+  **43.9MB → 34.8MB, several times an hour.** A single JSON document, so the
+  line-union would have concatenated two documents and destroyed both.
+- **PRE-DEPLOY EVIDENCE, on the real 39,581,487-byte / 2,745-market shard**
+  (two realistic divergent copies of 2,196 markets each, built from live data):
+  union preserved **2,745**, **549 markets recovered** that a replace destroys,
+  no market lost from either side, **0 entries not verbatim from one side** (the
+  field-mixing safety property), `updated_at` moved forward, and **peak resident
+  189 MB on 72 MB of inputs (2.6x)**.
+- **MEMORY IS BOUNDED, NOT HOPED.** Web is 2Gi / 8 gunicorn slots with a
+  documented request-path OOM history (`#318`/`#319`). The merge is capped on
+  combined input at 100MiB and falls back to today's replace over the cap,
+  saying so. Observed shards (39.6MB, 43.9MB) sit well under it.
+- **verify:** two reads of
+  `soccer_source/tracking/odds_history/<date>.json` across a publish cycle —
+  the market-key set must not SHRINK, and `updated_at` must advance.
+  Corroborating: `ARTIFACT_MERGE path=...odds_history...` in web logs with
+  `added`/`replaced_by_newer` counters. A `PUBLISH_DIVERGENCE ... ratio=0.79`
+  line for these paths should stop being followed by a shrink.
+- **STATUS: DEPLOY TRIGGERED, VERIFICATION PENDING.**
+- **NOT FIXED, recorded at the guard rather than silently:** `#488`'s shrink
+  guard sets `_PUBLISH_LAST_PUBLISHER` on its REFUSED branch, so a refused
+  publisher becomes "last" and its next attempt passes as same-publisher
+  (measured `22:01:15 REFUSED` → `22:05:03 ALLOWED`, 9.2MB → 5.2MB). Merging
+  removes the hazard for merged families; it is still live for everything else.
+
 ## VERIFIED 2026-09-02 00:05Z (19:05 CT) — `c01dabb1` QUOTE-STALENESS GATE **FIRED IN PRODUCTION**, on a live MLB slate — lane `mlb-live-gameline-skill-audit`
 
 The reading owed since 18:0xZ, when every sport on `_LIVE_GAMELINE_SPORTS` was
@@ -17673,3 +17755,77 @@ what was owed here, not a score.
 `quote_older_than_live_pricing_ceiling` with a non-zero count against a non-zero
 `considered`, on a board carrying 215 live rows. Lane
 `mlb-live-gameline-skill-audit` closed on it.
+
+## 2026-09-02 00:08:30Z — web ← `cf569731` — `#630` part 3: the cap was sized on the wrong sport — lane `book-quotes-publish-clobber`
+
+- **Deploy** `dep-dabmhvgjo6nc7387cnmg`. Live commit `cf569731` confirmed via
+  `/api/ops/version` at 00:12:01Z (4 x 502 during the update window, expected).
+  Claim held continuously; preflight CLEAR for the exact SHA.
+- **WHY — MY OWN PART-2 FIX WAS INERT ON THE BIGGEST SHARDS.** The first live
+  publish after `bfaa5ecc` logged
+  `over_size_cap: 109448725 > 104857600 -- replacing instead` for BOTH MLB
+  `odds_history` paths. I had sized the 100MiB cap on the 39.6MB **soccer**
+  shard and never checked MLB, whose pair is 109,448,725 B. A guard disabling
+  the fix exactly where a clobber costs most.
+- **It was visible only because the fallback logs its reason.** A silent
+  fallback would have left the clobber running under a fix believed shipped.
+  That decision paid for itself inside one publish cycle.
+- **Re-measured on the sport that matters:** MLB 54,909,482 B / 3,873 markets →
+  **peak 276 MB on 88 MB (3.13x)**, vs soccer's 2.6x. Merge itself correct at
+  that size: union 3,873, added 775, none lost from either side.
+- **Two changes:** cap 100→160MiB, derived from a stated budget and pinned by a
+  test above the observed 109,448,725 B; plus a **service-wide `O_CREAT|O_EXCL`
+  admission lock**, because part 2's reasoning ("publishes are minutes apart")
+  was wrong — the tracking shard and its artifacts twin published **2 seconds
+  apart**, and web's 8 gunicorn workers are single-request each, so "one at a
+  time" was true per process and false for the service.
+
+### VERIFIED 2026-09-02 00:13Z — and stated at the limit of what it shows
+
+- **`book_quotes` merge still healthy:** `added=5991 duplicates=178964
+  existing_lines=182767`.
+- **`odds_history` NOW MERGES instead of falling back** — the defect this deploy
+  fixed: `markets=3882 added=0 replaced_by_newer=3882 kept_existing_newer=0` on
+  both MLB paths.
+- **NOT YET DEMONSTRATED, and not claimed: RECOVERY.** `added=0` means that
+  publish carried a superset, so no market was rescued in this instance. The
+  mechanism is confirmed to RUN on the right files; that it *recovers* markets
+  in production is still owed.
+  **verify (owed):** an `ARTIFACT_MERGE ... odds_history ... "added": N>0`, or
+  `kept_existing_newer > 0`, from a CROSS-PUBLISHER sequence (refresh-worker
+  after live-odds-worker or the reverse). Second reading: two reads of the shard
+  across a publish cycle with no shrink in the market-key set.
+
+## 2026-09-02 00:22Z — refresh-worker `bfaa5ecc` — SOCCER EXCHANGE QUOTES EXIST FOR THE FIRST TIME: 0 -> 51
+- lane: `kalshi-soccer-blob-orientation` (session 41d46db0). Deploy dep-dabmebijnfac73djhm90, created 00:00:46Z, live **00:04:22Z**. Claim had lapsed during a 40-min job HOLD and was re-acquired ONCE before firing (never inside the poll loop — that is how a claim gets stranded). Preflight CLEAR re-pinned to the exact head; killed nothing.
+- verify, first post-boot cycle **00:22:19Z**:
+
+      [kalshi_odds] QUOTE_CAPTURE matches=480 sports=['mlb','soccer']
+        appended=365 appended_by_sport={'mlb': 314, 'soccer': 51} game_lines=51
+
+  **AND CONFIRMED ON DISK, not from the log line**: `soccer_source/tracking/
+  book_quotes/2026-09-01.jsonl` now holds `{'kalshi': 51}` exchange rows,
+  captured_at 00:22:19Z, carrying real two-sided prices (`totals over 144`,
+  `totals under -156`). Baseline was **0 exchange rows of any kind in 92,795
+  soccer rows across six dates**, re-confirmed at 0 of 6,205 hours earlier.
+- **`appended_by_sport` EARNED ITS KEEP ON ITS FIRST READING.** The old line
+  would have said `sports=['mlb','soccer'] appended=365` — which is exactly what
+  it said for hours while soccer contributed ZERO, and is what misled me earlier
+  today. The new field separates matched-from-written, and `game_lines=51`
+  names precisely the rows the props-only bound had been discarding.
+- **THE FULL CHAIN, all four constraints measured and each real:**
+  1. exact-date matching (soccer is never same-day) -> forward widening, `3,495 -> 910`
+  2. club codes unresolvable -> Kalshi's own `<Club> wins` titles, 63% -> 82%
+  3. blob ORIENTATION (Kalshi soccer is HOME-first) -> `883 -> 314`, 51 matches
+  4. props-only capture bound -> soccer opt-in, **51 quotes on disk**
+  Two things I was asked to "fix" along the way were NOT defects and would have
+  shipped inert: the soccer TITLE PARSER (18/6,000 unreadable, all NCAAF awards)
+  and the FORWARD FIXTURE HORIZON (already 7 days, schedule-driven path already
+  crossing matchweeks). Both are recorded as exonerated.
+- **MONEY PATH STILL CLOSED.** `KALSHI_SOCCER_RESOLVERS armed=False` withheld all
+  51 on the previous cycle; soccer reaches the QUOTE LOG only.
+- residual `event_not_on_our_board: 314` unchanged — the measured NAME gap
+  (Kalshi's `St. Truidense`/`La Louviere` vs our `Sint Truiden`), not orientation.
+- NOTE for the next reader: web returned **502 twice** on `/api/ops/artifacts/stream`
+  before answering on retry. The shard read needs a backoff; a single 502 there
+  is not evidence the rows are absent.
