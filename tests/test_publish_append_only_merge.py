@@ -149,6 +149,19 @@ class PublishEndpointMergeTests(unittest.TestCase):
         self._patch.stop()
         self._tmp.cleanup()
 
+    def _await_merges(self, timeout: float = 60.0) -> None:
+        """The merge is ASYNCHRONOUS now -- both families run in a child. A test
+        that publishes and immediately reads the target is asserting synchronous
+        behaviour that no longer exists. Wait for the staging files to clear."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            staged = list(self.root.rglob("*.staged"))
+            if not staged:
+                time.sleep(0.35)          # let the final rename land
+                return
+            time.sleep(0.2)
+        self.fail(f"merge children did not finish: {[p.name for p in self.root.rglob('*.staged')]}")
+
     def _target(self, relative_path: str = BOOK_QUOTES) -> Path:
         return self.root / relative_path
 
@@ -187,10 +200,14 @@ class PublishEndpointMergeTests(unittest.TestCase):
         response = self._publish_streamed(sportsbook, "refresh-worker")
         self.assertEqual(response.status_code, 200)
 
+        self._await_merges()
         stored = self._target().read_text(encoding="utf-8")
         self.assertEqual(stored.count("kalshi"), 5, "the exchange rows were clobbered")
         self.assertEqual(stored.count("fanduel"), 5)
-        self.assertTrue(response.get_json()["merged"]["merged"])
+        # The merge is DEFERRED now, so the response reports that rather than a
+        # completed merge -- the union above is what actually matters, and it is
+        # asserted on the file after waiting for the child.
+        self.assertEqual(response.get_json()["merge"], "deferred")
 
     def test_publishing_is_commutative(self) -> None:
         """Order stops mattering — which is the whole point. Whoever publishes
@@ -198,17 +215,20 @@ class PublishEndpointMergeTests(unittest.TestCase):
         a, b = "a\nb\n", "c\nd\n"
         self._publish_streamed(a, "worker-a")
         self._publish_streamed(b, "worker-b")
+        self._await_merges()
         one = sorted(self._target().read_text(encoding="utf-8").split())
 
         self._target().unlink()
         self._publish_streamed(b, "worker-b")
         self._publish_streamed(a, "worker-a")
+        self._await_merges()
         two = sorted(self._target().read_text(encoding="utf-8").split())
         self.assertEqual(one, two)
 
     def test_the_envelope_form_merges_too(self) -> None:
         self._publish_envelope("a\nb\n")
         self._publish_envelope("c\n")
+        self._await_merges()
         self.assertEqual(self._target().read_text(encoding="utf-8"), "a\nb\nc\n")
 
     def test_the_two_forms_interoperate(self) -> None:
@@ -216,6 +236,7 @@ class PublishEndpointMergeTests(unittest.TestCase):
         which is the actual production arrangement."""
         self._publish_envelope("envelope-row\n")
         self._publish_streamed("streamed-row\n", "refresh-worker")
+        self._await_merges()
         stored = self._target().read_text(encoding="utf-8")
         self.assertIn("envelope-row", stored)
         self.assertIn("streamed-row", stored)
@@ -233,6 +254,7 @@ class PublishEndpointMergeTests(unittest.TestCase):
         self._publish_streamed("\n".join(f"row{i}" for i in range(400)) + "\n", "worker-a")
         response = self._publish_streamed("tiny\n", "worker-b")
         self.assertEqual(response.status_code, 200)
+        self._await_merges()
         stored = self._target().read_text(encoding="utf-8")
         self.assertIn("tiny", stored)
         self.assertIn("row399", stored, "the larger writer's rows must survive")
@@ -660,19 +682,22 @@ class MergeDispatcherTests(unittest.TestCase):
         self.assertIsNone(ops._merge_published_artifact(STATE_SIDECAR, self.target, self.incoming))
 
     def test_it_routes_each_family_to_its_own_merge(self) -> None:
-        """And they are handled DIFFERENTLY on purpose: the cheap line union runs
-        INLINE (20 MB peak on 34 MB, 0.59x — it streams), the JSON union is
-        SPAWNED out of process (276 MB on 88 MB, 3.13x — it parses both)."""
-        with patch.object(ops, "merge_append_only",
-                          return_value={"merged": True, "which": "lines"}) as lines, \
-             patch.object(ops, "_spawn_odds_history_merge",
-                          return_value={"spawned": True, "which": "json"}) as js:
-            self.assertEqual(ops._merge_published_artifact(
-                BOOK_QUOTES, self.target, self.incoming)["which"], "lines")
-            self.assertEqual(ops._merge_published_artifact(
+        """BOTH families run out of process now, tagged by family so the child
+        picks the right merge. `book_quotes` was inline until the 81 MB
+        real-scale measurement; the 20 MB figure that justified keeping it there
+        came off a 34 MB synthetic against a 150 MB production shard."""
+        seen = []
+
+        def _spy(relative_path, family, target, incoming):
+            seen.append(family)
+            return {"spawned": True, "family": family}
+
+        with patch.object(ops, "_spawn_artifact_merge", side_effect=_spy):
+            ops._merge_published_artifact(BOOK_QUOTES, self.target, self.incoming)
+            ops._merge_published_artifact(
                 "soccer_source/tracking/odds_history/2026-09-05.json",
-                self.target, self.incoming)["which"], "json")
-        self.assertEqual((lines.call_count, js.call_count), (1, 1))
+                self.target, self.incoming)
+        self.assertEqual(seen, ["append_only", "odds_history"])
 
 
 class DeferredOddsHistoryMergeTests(unittest.TestCase):
@@ -732,7 +757,7 @@ class DeferredOddsHistoryMergeTests(unittest.TestCase):
         done, running = _Done(), _Running()
         ops._PENDING_MERGE_CHILDREN.extend([done, running])
         with patch("subprocess.Popen", return_value=_Running()):
-            result = ops._spawn_odds_history_merge(self.ODDS_HISTORY, self.target, self._incoming())
+            result = ops._spawn_artifact_merge(self.ODDS_HISTORY, "odds_history", self.target, self._incoming())
         self.assertEqual(result["reaped"], 1, "the finished child must be reaped")
         self.assertNotIn(done, ops._PENDING_MERGE_CHILDREN)
         self.assertIn(running, ops._PENDING_MERGE_CHILDREN, "a live child must be kept")
@@ -757,7 +782,7 @@ class DeferredOddsHistoryMergeTests(unittest.TestCase):
         is the pre-merge behaviour; a clobber is not."""
         before = self.target.read_bytes()
         with patch("subprocess.Popen") as popen:
-            result = ops._spawn_odds_history_merge(self.ODDS_HISTORY, self.target, self._incoming())
+            result = ops._spawn_artifact_merge(self.ODDS_HISTORY, "odds_history", self.target, self._incoming())
         self.assertTrue(result["spawned"])
         self.assertEqual(popen.call_count, 1)
         self.assertEqual(self.target.read_bytes(), before, "the target must be untouched")
@@ -767,7 +792,7 @@ class DeferredOddsHistoryMergeTests(unittest.TestCase):
         """If the child cannot start, fall back to the plain replace — today's
         behaviour — instead of silently discarding the publish."""
         with patch("subprocess.Popen", side_effect=OSError("no fork")):
-            result = ops._spawn_odds_history_merge(self.ODDS_HISTORY, self.target, self._incoming())
+            result = ops._spawn_artifact_merge(self.ODDS_HISTORY, "odds_history", self.target, self._incoming())
         self.assertFalse(result["spawned"])
         self.assertIn("spawn_failed", result["error"])
         stored = json.loads(self.target.read_text(encoding="utf-8"))
@@ -799,13 +824,14 @@ class DeferredOddsHistoryMergeTests(unittest.TestCase):
         staged = self.target.parent / "staged.json"
         staged.write_text(json.dumps(_doc({"theirs": _entry(LATE, 2.0, 1.0)}, LATE)),
                           encoding="utf-8")
-        script = Path(ops.__file__).resolve().parents[2] / "scripts" / "merge_odds_history_artifact.py"
+        script = Path(ops.__file__).resolve().parents[2] / "scripts" / "merge_published_artifact.py"
         proc = sp.run([_sys.executable, str(script), "--target", str(self.target),
-                       "--incoming", str(staged), "--relative-path", self.ODDS_HISTORY],
+                       "--incoming", str(staged), "--family", "odds_history",
+                       "--relative-path", self.ODDS_HISTORY],
                       capture_output=True, text=True, timeout=120,
                       env={**os.environ, "SYNDICATE_DATA_ROOT": str(self.root)})
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
-        self.assertIn("ODDS_HISTORY_MERGE", proc.stdout)
+        self.assertIn("ARTIFACT_MERGE_CHILD", proc.stdout)
         stored = json.loads(self.target.read_text(encoding="utf-8"))
         self.assertEqual(sorted(stored["markets"]), ["mine", "theirs"],
                          "the union must survive — this is the whole point")
@@ -822,10 +848,10 @@ class DeferredOddsHistoryMergeTests(unittest.TestCase):
         staged.write_text(json.dumps(_doc({"theirs": _entry(LATE, 2.0, 1.0)}, LATE)),
                           encoding="utf-8")
         held = am.odds_history_merge_lock(self.root)          # force merge_busy
-        script = Path(ops.__file__).resolve().parents[2] / "scripts" / "merge_odds_history_artifact.py"
+        script = Path(ops.__file__).resolve().parents[2] / "scripts" / "merge_published_artifact.py"
         try:
             proc = sp.run([_sys.executable, str(script), "--target", str(self.target),
-                           "--incoming", str(staged), "--lock-wait-seconds", "0"],
+                           "--incoming", str(staged), "--family", "odds_history", "--lock-wait-seconds", "0"],
                           capture_output=True, text=True, timeout=120,
                           env={**os.environ, "SYNDICATE_DATA_ROOT": str(self.root)})
         finally:
@@ -861,9 +887,9 @@ class DeferredOddsHistoryMergeTests(unittest.TestCase):
         import sys as _sys
         staged = self.target.parent / "bad.json"
         staged.write_text("{not json", encoding="utf-8")
-        script = Path(ops.__file__).resolve().parents[2] / "scripts" / "merge_odds_history_artifact.py"
+        script = Path(ops.__file__).resolve().parents[2] / "scripts" / "merge_published_artifact.py"
         proc = sp.run([_sys.executable, str(script), "--target", str(self.target),
-                       "--incoming", str(staged)],
+                       "--incoming", str(staged), "--family", "odds_history"],
                       capture_output=True, text=True, timeout=120,
                       env={**os.environ, "SYNDICATE_DATA_ROOT": str(self.root)})
         self.assertEqual(proc.returncode, 1, "a refusal is a non-zero exit")

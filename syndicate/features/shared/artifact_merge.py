@@ -21,8 +21,17 @@ WHY `odds_history` RUNS OUT OF PROCESS AND `book_quotes` DOES NOT
 
 MEASURED, and the two are not close:
 
-    book_quotes  (line union)   34 MB in ->  20 MB peak   0.59x   <- streams
-    odds_history (JSON union)   88 MB in -> 276 MB peak   3.13x   <- parses both
+    book_quotes  (line union)   34 MB in ->  20 MB peak   0.59x   <- SYNTHETIC
+    book_quotes  (line union)  154 MB target -> 81 MB peak 0.53x   <- REAL SCALE
+    odds_history (JSON union)   88 MB in -> 276 MB peak   3.13x
+
+**BOTH RUN OUT OF PROCESS NOW.** The line union looked cheap at 20 MB and I kept
+it on the request path on that basis -- but production's `book_quotes` shard is
+**150 MB**, not the 34 MB I had measured, and at real scale it peaks at **81 MB
+per merge** on the most frequent publish on the platform. The RATIO held; the
+absolute number, which is what ratchets a worker, was 4x larger. Measuring small
+and generalising the DECISION rather than the ratio is the same error that sized
+the odds_history cap on a 39 MB soccer shard when MLB's pair was 109 MB.
 
 The line union streams and holds only 16-byte digests, so it is sub-linear and
 stays on the request path. The JSON union must hold two parsed documents, and on
@@ -104,7 +113,34 @@ def ends_with_newline(path: Path) -> bool:
         return True
 
 
-def merge_append_only(target_path: Path, incoming_path: Path) -> dict:
+def append_only_merge_lock(target_path: Path, *, wait_seconds: float = 0.0):
+    """PER-PATH admission for the line merge, unlike odds_history's ONE global
+    lock. The global lock exists to bound MEMORY (276 MB a merge); the line
+    merge peaks at 81 MB on a 154 MB target, so two of them on DIFFERENT files
+    are affordable and serialising them would queue the most frequent publish on
+    the platform behind everything else. Two children on the SAME target must
+    still not race, hence per-path."""
+    lock_path = target_path.parent / f".{target_path.name}.merge.lock"
+    deadline = time.time() + max(0.0, wait_seconds)
+    while True:
+        try:
+            if lock_path.is_file():
+                age = time.time() - lock_path.stat().st_mtime
+                if age > ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS:
+                    lock_path.unlink(missing_ok=True)
+            handle = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(handle)
+            return lock_path
+        except FileExistsError:
+            if time.time() >= deadline:
+                return None
+            time.sleep(0.25)
+        except Exception:
+            return None
+
+
+def merge_append_only(target_path: Path, incoming_path: Path,
+                      *, lock_wait_seconds: float = 0.0) -> dict:
     """UNION an incoming append-only artifact into the one already on disk.
 
     THE LOAD-BEARING INVARIANT IS THAT THE EXISTING FILE STAYS A BYTE PREFIX OF
@@ -125,6 +161,19 @@ def merge_append_only(target_path: Path, incoming_path: Path) -> dict:
     its COMPLETE file every cycle, so rows lost to an interleaved
     read-modify-write are re-offered on the next publish.
     """
+    lock_path = append_only_merge_lock(target_path, wait_seconds=lock_wait_seconds)
+    if lock_path is None:
+        return {"merged": False, "error": "merge_busy: another child holds this path"}
+    try:
+        return _merge_append_only_locked(target_path, incoming_path)
+    finally:
+        try:
+            lock_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+def _merge_append_only_locked(target_path: Path, incoming_path: Path) -> dict:
     digests: set[bytes] = set()
     existing_lines = 0
     for line in iter_lines(target_path):

@@ -1728,7 +1728,7 @@ def _reap_finished_merge_children() -> int:
     return reaped
 
 
-def _spawn_odds_history_merge(relative_path: str, target_path: Path, incoming_path: Path) -> dict:
+def _spawn_artifact_merge(relative_path: str, family: str, target_path: Path, incoming_path: Path) -> dict:
     """Stage the incoming copy and hand the merge to a SUBPROCESS. `#630`.
 
     THE REQUEST DOES NOT WAIT, and the allocation does not happen here. Measured
@@ -1752,12 +1752,16 @@ def _spawn_odds_history_merge(relative_path: str, target_path: Path, incoming_pa
     try:
         os.replace(incoming_path, staging)
     except Exception as exc:
-        return {"spawned": False, "error": f"stage_failed: {type(exc).__name__}: {exc}"}
-    script = Path(__file__).resolve().parents[2] / "scripts" / "merge_odds_history_artifact.py"
+        # Staging failed, so the temp file is untouched and the caller's plain
+        # replace is still the right fallback -- `handled` stays False.
+        return {"spawned": False, "handled": False,
+                "error": f"stage_failed: {type(exc).__name__}: {exc}"}
+    script = Path(__file__).resolve().parents[2] / "scripts" / "merge_published_artifact.py"
     try:
         child = subprocess.Popen(
             [sys.executable, str(script), "--target", str(target_path),
-             "--incoming", str(staging), "--relative-path", relative_path],
+             "--incoming", str(staging), "--family", family,
+             "--relative-path", relative_path],
             # INHERIT stdout/stderr so the child's ODDS_HISTORY_MERGE line reaches
             # Render's log collector. The parent does not wait, so that line IS
             # the only record the merge ever happened -- DEVNULL here (the first
@@ -1767,11 +1771,19 @@ def _spawn_odds_history_merge(relative_path: str, target_path: Path, incoming_pa
     except Exception as exc:
         # Could not spawn: promote the staged copy so the publish is not simply
         # dropped. That is the plain replace, i.e. today's behaviour.
+        # Promote the staged copy so the publish is not dropped: that is the
+        # plain replace, i.e. today's behaviour. `handled` tells the caller the
+        # temp file is ALREADY CONSUMED -- without it the caller falls through to
+        # `os.replace(temp_path, ...)` on a path that no longer exists and turns
+        # a correctly-handled publish into a 500.
+        promoted = False
         try:
             os.replace(staging, target_path)
+            promoted = True
         except Exception:
             pass
-        return {"spawned": False, "error": f"spawn_failed: {type(exc).__name__}: {exc}"}
+        return {"spawned": False, "handled": promoted,
+                "error": f"spawn_failed: {type(exc).__name__}: {exc}"}
     _PENDING_MERGE_CHILDREN.append(child)
     return {"spawned": True, "staged": staging.name, "reaped": reaped,
             "pending_children": len(_PENDING_MERGE_CHILDREN)}
@@ -1784,20 +1796,17 @@ def _merge_published_artifact(relative_path: str, target_path: Path, incoming_pa
     one path and replaced by the other would clobber on exactly the transport
     nobody was watching.
 
-    The two families are handled differently for a MEASURED reason:
-
-        book_quotes  (line union)   34 MB in ->  20 MB peak   0.59x  <- inline
-        odds_history (JSON union)   88 MB in -> 276 MB peak   3.13x  <- subprocess
-
-    The line union streams and holds only 16-byte digests, so it is sub-linear
-    and stays here. The JSON union parses both documents and is moved out.
+    BOTH families now run OUT OF PROCESS. `book_quotes` was kept inline on a
+    measured 20 MB peak -- taken on a 34 MB SYNTHETIC file. Production's shard is
+    150 MB and it peaks at 81 MB per merge, ~10 merges a minute, all of it
+    landing in a gunicorn worker that never gives the arenas back.
     """
     if not target_path.is_file():
         return None                       # first write is a plain write
     if _is_append_only(relative_path):
-        return merge_append_only(target_path, incoming_path)
+        return _spawn_artifact_merge(relative_path, "append_only", target_path, incoming_path)
     if is_mergeable_odds_history(relative_path):
-        return _spawn_odds_history_merge(relative_path, target_path, incoming_path)
+        return _spawn_artifact_merge(relative_path, "odds_history", target_path, incoming_path)
     return None
 
 
@@ -1995,9 +2004,14 @@ def _publish_streamed_body() -> Any:
             # fallback would make the clobber look fixed while it continued.
             print(
                 f"[ops.publish] ARTIFACT_MERGE_FALLBACK path={relative_path} "
-                f"reason={merged.get('error')} -- replacing instead",
+                f"reason={merged.get('error')} handled={merged.get('handled')}",
                 flush=True,
             )
+            if merged.get("handled"):
+                # The staged copy was already promoted; temp_path is gone.
+                return jsonify({"ok": True, "relative_path": relative_path,
+                                "bytes": target_path.stat().st_size,
+                                "merge": "fallback_replace"}), 200
         os.replace(temp_path, target_path)
     except Exception as exc:
         try:
@@ -2062,9 +2076,12 @@ def _write_published_artifact(relative_path: str, content: Any) -> Any:
                 }), 200
             print(
                 f"[ops.publish] ARTIFACT_MERGE_FALLBACK path={relative_path} transport=envelope "
-                f"reason={merged.get('error')} -- replacing instead",
+                f"reason={merged.get('error')} handled={merged.get('handled')}",
                 flush=True,
             )
+            if merged.get("handled"):
+                return jsonify({"ok": True, "relative_path": relative_path,
+                                "merge": "fallback_replace"}), 200
         os.replace(temp_path, target_path)
     except Exception as exc:
         # write_text() left the .tmp behind on any failure, on the same disk
