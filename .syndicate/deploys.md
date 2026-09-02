@@ -18701,3 +18701,64 @@ its own deploy lands.** Attribution needs the pre-deploy window, not just the
 post. Both deploys were still worth doing: either service can be the one that
 first pushes a file past the ceiling, so both need the trim — but only
 live-odds-worker's is measured.
+
+---
+
+## 2026-09-02 18:53:00Z / 19:26:44Z — **`#637` DONE AND MEASURED ON BOTH WORKERS: `venue_odds` now writes to disk** — `e4a471c0` — lane `venue-odds-byte-aware-trim`
+
+**Locks:** claims held on both; preflight re-verified CLEAR seconds before each
+fire; `e4a471c0` re-confirmed an ancestor of `origin/main` at deploy time.
+live-odds-worker `dep-dac6vjgu01pc739kl14g` live **18:53:00Z**; refresh-worker
+`dep-dac7fjojo6nc73cu36s0` live **19:26:44Z**.
+
+### verify: hydration, per service, EXACTLY ONCE PER FILE
+
+| service | distinct files | total lines | book write | rejections |
+|---|---|---|---|---|
+| live-odds-worker | **50** | **50** | `POLYMARKET_DAILY_BOOK status=ok files=11 errors=0 appended=4832/3815/2562` over 3 ticks | **0** |
+| refresh-worker | **37** | **37** | `kalshi_odds DAILY_BOOK status=ok files=37 errors=0 appended=1549` | **0** |
+
+Largest carried: `polymarket ncaaf 2026-09-05` **6,844 markets** (live-odds) and
+`kalshi ncaaf 2026-09-05` **6,185 markets** (refresh-worker) — the files that
+were frozen for 40 hours under `#638`.
+
+**distinct == total on both services is the assertion that matters.** Hydration
+must run once per file; a repeat would keep overwriting newer DISK state with the
+stale REDIS copy every tick.
+
+**The hydration is also the proof the routing flipped**, and it is stronger than
+any log line asserting it: on the same tick, `read_json_file` returned EMPTY
+(that is what triggers hydration) while `read_json_keyvalue_copy` returned 6,844
+markets. Those are simultaneously true only if reads and writes now go to disk
+while the old copy still sits in Redis.
+
+### a false alarm I nearly filed, and the discriminator
+
+The live-odds-worker hydration count went **11 → 50** across three ticks and my
+first reading was "hydration is repeating every tick" — which would have been a
+serious defect. It is not. The 11 at 18:59 were **polymarket**; the jump at
+19:01 was **kalshi** hydrating its own 39 files. **The COUNT pointed the wrong
+way and the DISTRIBUTION settled it** — grouping by `(venue, sport, game_date)`
+showed every file exactly once.
+
+**And it corrected a belief I had been stating all session:** live-odds-worker is
+not "the polymarket writer" and refresh-worker is not "the kalshi writer".
+**Both services write BOTH venues.** live-odds-worker writes polymarket via
+`run_live_odds_refresh_worker.py:918` AND kalshi via the board build's
+`kalshi_odds_refresh`.
+
+### THE REDIS MEMORY HAS NOT BEEN RECLAIMED, AND THAT IS THE CORRECT STATE
+
+`reports/intelligence` still holds ~115 MB. The move stops NEW writes reaching
+Redis; the existing keys live out their 10-day TTL. **The signal that this
+worked is that those keys stop CHANGING, not that they disappear.** Reading the
+unchanged total as "the move failed" is the available mistake here.
+
+**Expiry is NOT run, and this is a decision, not an oversight.** Hydration reads
+the old key on a service's FIRST write of that file. refresh-worker has hydrated
+its 37 kalshi files and has NOT yet written polymarket, so its polymarket copies
+are still un-hydrated. **Expiring now would make those files start empty on that
+service — and an accumulator that starts empty does not lose openings quietly, it
+re-dates every one to the migration moment.** Wrong data, permanently, with no
+way back. Letting the 10-day TTL do it costs nothing but time and cannot invent
+anything.

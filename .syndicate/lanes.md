@@ -1379,7 +1379,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   **This block IS the handoff.** If you are reading it and can reach that
   session, tell it; otherwise it finds out here.
 
-### venue-odds-byte-aware-trim — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
+### venue-odds-byte-aware-trim — CLOSED 2026-09-02 — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
 - Goal: `#638`. `venue_odds` writes stop being rejected. Testable on the
   PRODUCTION log: `KEYVALUE_WRITE_REJECTED ... caller=venue_daily_odds.py` goes
   to **zero**, and the frozen files resume advancing (`updated_at` moves,
@@ -1420,6 +1420,16 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Verification: unit tests both directions (a payload that fits is untouched; one
   that does not is trimmed and fits), then the production log reading above after
   deploy to live-odds-worker.
+- **CLOSED 2026-09-02. BOTH GOALS MET AND MEASURED ON BOTH WORKERS.**
+  `#638` byte-aware trim: live-odds-worker `21de4a9e` 17:10:25Z — TRIMMED_TO_FIT
+  on both venues, `errors=0 appended=8749` against a file frozen ~40h.
+  `#637` move to disk: `e4a471c0`, live-odds-worker 18:53:00Z / refresh-worker
+  19:26:44Z — **50 and 37 files hydrated, distinct == total on both**, book
+  writes `errors=0`, **zero** rejections. Detail: `deploys.md` 2026-09-02.
+  **`#637`'s memory reclaim is deliberately NOT done** — expiry would make
+  un-hydrated files start empty and re-date every opening; the 10-day TTL
+  reclaims it safely. See `keyvalue-pressure-637` below, which stays OPEN for
+  that.
 - Blocked by: none.
 
 ### keyvalue-pressure-637 — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
