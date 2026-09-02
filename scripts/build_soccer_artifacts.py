@@ -21,8 +21,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
+import os
 import sys
+import time
 from datetime import date as date_cls
 from pathlib import Path
 from typing import Any
@@ -36,6 +39,9 @@ from syndicate.features.soccer.adapters import build_soccer_simulation_adapter
 from syndicate.features.soccer.features.lineups import attach_confirmed_starters
 from syndicate.features.soccer.features.loaders import build_soccer_simulation_input
 from syndicate.features.soccer.features.loaders import compute_team_ratings
+from syndicate.features.soccer.features.market_anchoring import anchor_ratings_to_market
+from syndicate.features.soccer.features.market_odds import attach_market_odds
+from syndicate.features.soccer.features.market_odds import home_win_probability_by_event
 from syndicate.features.soccer.features.lineups import _norm_player_name
 from syndicate.features.soccer.sources import default_season
 from syndicate.features.soccer.sources import roster_rows
@@ -342,6 +348,89 @@ def _fetch_fixtures(league: str, iso_date: str) -> list[dict[str, Any]]:
     return fixtures
 
 
+def _soccer_anchor_weight() -> float:
+    """Blend weight toward the market-implied rating shift. 0.0 = OFF.
+
+    A WEIGHT rather than a boolean because that is the tunable the plan asks
+    for ("choose `market_anchoring`'s weight"), and because 0.0 is a real
+    setting rather than a special case -- `anchor_team_ratings` at weight 0
+    returns the history ratings unchanged, so OFF and ON differ only in this
+    number and the off!=on test is meaningful.
+
+    DEFAULT IS 0.0 AND STAYS THERE. Anchoring is a MECHANISM added to a
+    calibrated engine, and `model_engine_standard.md` §4.4 requires re-fitting
+    the rates that were absorbing its absence -- this repo has a MEASURED
+    negative interaction in 4 of 4 markets from skipping that step. Wiring it
+    reachable and turning it on are two different decisions.
+    """
+    raw_value = str(os.environ.get("SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT") or "").strip()
+    try:
+        value = float(raw_value or 0.0)
+    except ValueError:
+        value = 0.0
+    return max(0.0, min(1.0, value))
+
+
+def _apply_market_anchor(
+    league: str,
+    source_root: Path,
+    fixtures: list[dict[str, Any]],
+    ratings: dict[str, dict[str, float]],
+) -> dict[str, dict[str, float]]:
+    """Attach market odds to fixtures and, if the weight is > 0, anchor ratings.
+
+    THE ODDS ARE ATTACHED AND COUNTED EVEN WHEN ANCHORING IS OFF. The feed's
+    health and the mechanism's arming are separate questions, and collapsing
+    them is how `#626`(h) hid: with one silent switch, "no odds" and "anchoring
+    disabled" produce the same nothing. Printed for the same reason the
+    `#170` roster comment above gives -- a silent degrade is indistinguishable
+    from a league that has no data source.
+    """
+    odds_path = source_root / league / "api" / "odds" / "game_odds_current.csv"
+    weight = _soccer_anchor_weight()
+    if not odds_path.is_file():
+        print(
+            f"[soccer_anchor] ODDS_ABSENT league={league} path={odds_path} "
+            f"weight={weight} -- fixtures carry no market_odds, anchoring cannot run",
+            flush=True,
+        )
+        return ratings
+
+    try:
+        with odds_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+    except Exception as exc:
+        print(f"[soccer_anchor] ODDS_UNREADABLE league={league} error={type(exc).__name__}: {exc}", flush=True)
+        return ratings
+
+    priced = home_win_probability_by_event(rows)
+    audit = attach_market_odds(fixtures, priced)
+    print(
+        f"[soccer_anchor] ODDS_ATTACHED league={league} weight={weight} "
+        f"fixtures={audit['fixtures']} attached={audit['attached']} "
+        f"skipped={audit['skipped']} priced_events={audit['priced_events']} "
+        f"examples={audit['skipped_examples']}",
+        flush=True,
+    )
+    if weight <= 0.0:
+        # Reachable and instrumented, deliberately not armed.
+        return ratings
+    if audit["attached"] == 0:
+        print(f"[soccer_anchor] ANCHOR_SKIPPED league={league} reason=no_priced_fixtures", flush=True)
+        return ratings
+
+    started = time.perf_counter()
+    anchored = anchor_ratings_to_market(ratings, fixtures, weight=weight)
+    changed = sum(1 for team, rating in anchored.items() if ratings.get(team) != rating)
+    print(
+        f"[soccer_anchor] ANCHORED league={league} weight={weight} "
+        f"teams_changed={changed} of {len(anchored)} "
+        f"elapsed_s={time.perf_counter() - started:.1f}",
+        flush=True,
+    )
+    return anchored
+
+
 def _attach_confirmed_starters(league: str, iso_date: str, fixtures: list[dict[str, Any]], player_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Opt-in preprocessing step, same pattern as market anchoring: if ESPN
     has a confirmed lineup posted for a fixture (typically within ~an hour
@@ -441,6 +530,7 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
         for fixture in fixtures_raw
     ]
     fixtures = _attach_confirmed_starters(league, iso_date, fixtures, player_rows)
+    ratings = _apply_market_anchor(league, source_root, fixtures, ratings)
     simulation_input = build_soccer_simulation_input(
         league=league,
         date=iso_date,
