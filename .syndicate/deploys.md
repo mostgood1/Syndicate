@@ -18371,3 +18371,81 @@ verify: the `token: 'maxmun'` field on the quoted
 `'player': 'Max Muncy (2002)'`, on refresh-worker `ad1de331`, against a served
 board row for that name in `game.state = "pregame"` at 14:31Z. That is the
 reading; nothing here is a thing-I-will-watch.
+
+---
+
+## 2026-09-02 15:0x-15:1xZ — **`#636` DISCHARGED: soccer players CSVs are readable from web, and the reading they gate now RUNS** — web `2114d5c6` — lane `soccer-players-csv-allowlist`
+
+**Locks:** claim acquired on web by this lane; preflight **CLEAR** for the exact
+target `2114d5c6` (only infrastructure processes, 13 already-dead defunct
+children). Target is an ancestor of `origin/main`. Deploy
+`dep-dac3k5jtqb8s73e2vb60`, api trigger, live 15:1xZ. Claim released after.
+
+One allowlist entry: `soccer_source/*/players/players_*.csv`.
+
+### the fix was discriminated BEFORE it was written, not after
+
+The 2026-08-27 standing rule is that allowlisting a keyvalue-backed path turns
+a 403 into an EMPTY RESULT and looks exactly like a fix. So the probe ran first,
+on a control that isolates the guard from the disk:
+
+| probe | result |
+|---|---|
+| `soccer_source/epl/api/schedule/schedule_2026.json` (season-suffixed, git-tracked, same tree, ALREADY allowlisted) | **200, count=1, 113,410 bytes** |
+| `soccer_source/epl/players/players_2026.csv` | **403 "path is not an allowed hot artifact"** |
+
+A 403 is the ALLOWLIST branch; `count=0` would have been the disk branch. So the
+file was on web's disk and the guard was the only block — which is what made a
+one-line allowlist entry the right fix rather than a hopeful one.
+
+### verify: BYTES, not a status code
+
+`?pattern=soccer_source/*/players/players_*.csv&names_only=1` → **count=15**,
+totalling **879,401 bytes** — matching the local tree's 15 files / 879,401
+bytes exactly, file for file. Bodies pulled: 871,227 chars over 15 files.
+Largest 68,768 (`mls/players_2026.csv`). Only MLS has a 2026 file; the other
+nine leagues' newest is 2025.
+
+### verify: THE READING `#636` EXISTS FOR NOW RUNS — and it does NOT say what the lane predicted
+
+`scripts/check_soccer_shot_divisor_vs_season_rate.py`, new. Every player is his
+own denominator: `expected_shots / (shots_per90 * expected_minutes_share)`.
+87.5% of prop rows join to a season rate.
+
+| window | n | median |
+|---|---|---|
+| fixtures **< 2026-08-31** (pre-divisor) | 9,731 | **0.925** |
+| fixtures **>= 2026-09-02** (post) | 4,546 | **0.631** |
+
+Ratio **0.682**, against **1/1.393 = 0.718** predicted. Second independent
+confirmation that the divisor is applied — the first was yesterday's
+self-normalised archive comparison at 0.720 vs 0.715, which shares no
+denominator with this one.
+
+**THE LANE'S OWN TARGET IS NOT MET, AND THE TARGET IS WHAT IS WRONG.** The lane
+recorded the pre-divisor ratio as **1.19** and predicted **~0.85** after. This
+instrument reads the pre-divisor window at **0.925**, not 1.19 — so the 1.19
+baseline was built some other way (different denominator, different season
+file, or a top-N) and I could not reproduce it from anything in the ledger. The
+absolute levels are therefore NOT comparable and 0.85 was never a number this
+construction could hit. What is valid is the **before/after on ONE instrument**,
+which is the comparison that was always doing the work.
+
+**A control error worth recording.** The first control run came back **0.793**
+and looked plausible. It had no upper bound, so "before" silently included
+"after" — the average of the thing and its own baseline, which is not a control.
+`--until` now exists and the docstring says why.
+
+**Spread is wide and a pooled median hides it:** post-divisor by league runs
+0.454 (serie_a) to 0.782 (mls). MLS is also the only league whose denominator is
+a CURRENT-season file. Not chased here; noted so nobody reads the pooled 0.631
+as uniform.
+
+### a finding from the test, not the fix
+
+The new test pinned a property I expected to be false: `fnmatch`'s `*`
+translates to `.*` and **spans `/`**, so `soccer_source/*/players/...` also
+matches `soccer_source/epl/extra/players/...`. Every `soccer_source/*/` entry in
+the list has always had this property; it is not introduced here. The assertion
+records the truth rather than the intent, because a test asserting the intuitive
+behaviour would fail today and would be asserting a fiction.

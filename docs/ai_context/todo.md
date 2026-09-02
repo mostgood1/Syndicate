@@ -3163,6 +3163,23 @@ the ROI report's 64,007-bet denominator does not move.
 
   </details>
 
+- **#636 CLOSED 2026-09-02 — the allowlist entry shipped on web `2114d5c6` and the
+  reading it gates RUNS.** `?pattern=soccer_source/*/players/players_*.csv` returns
+  **15 files / 879,401 bytes**, matching the local tree file for file. New tool
+  `scripts/check_soccer_shot_divisor_vs_season_rate.py` reads
+  `expected_shots / (shots_per90 * expected_minutes_share)`, each player his own
+  denominator: pre-divisor window **0.925** (n=9,731) → post **0.631** (n=4,546),
+  ratio **0.682** against **1/1.393 = 0.718** predicted. Second independent
+  confirmation of the divisor, sharing no denominator with the archive check that
+  closed `#612`.
+  **BUT the lane's `1.19 → 0.85` target is NOT reproducible and should not be
+  quoted again:** this instrument reads the PRE-divisor window at 0.925, not 1.19,
+  so the 1.19 came from a construction not recorded anywhere I could find. Only the
+  before/after on a single instrument is valid. Detail: `.syndicate/deploys.md`
+  2026-09-02 15:0xZ.
+
+  <details><summary>original item</summary>
+
 - **#636 SOCCER: `players_*.csv` is not in `HOT_ARTIFACT_PATTERNS`, so the
   board-render form of the shot-divisor reading cannot run from web.**
   `GET /api/ops/artifacts/export?pattern=soccer_source/*/players/players_*.csv`
@@ -3176,6 +3193,8 @@ the ROI report's 64,007-bet denominator does not move.
   worker's date-scoped pull means an undated CSV name may still never reach it —
   check the filename shape before assuming an allowlist entry is sufficient.
   Small, and nothing is blocked on it.
+
+  </details>
 
 - **#613 `lane-guard` unenforced every claim under a dot-directory — FIXED, and
   the audit tool that found it is now the standing check.** `_paths_in` stripped

@@ -1283,7 +1283,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   SHA's own tree.
 - Blocked by: none
 
-### soccer-players-csv-allowlist — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
+### soccer-players-csv-allowlist — CLOSED 2026-09-02 — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc — **GOAL MET, VERIFIED ON BYTES.** web `2114d5c6` live; `?pattern=soccer_source/*/players/players_*.csv` returns **15 files / 879,401 bytes**, matching the local tree file for file. The reading it gates RUNS: pre-divisor **0.925** (n=9,731) → post **0.631** (n=4,546), ratio **0.682** vs **1/1.393 = 0.718** predicted — a second confirmation of the divisor sharing no denominator with the archive check that closed `#612`. **The lane-inherited `1.19 → 0.85` target is NOT reproducible by this construction (it reads the pre-divisor window at 0.925) and must not be quoted again; only the before/after on ONE instrument is valid.** Claim on web released. Detail: `deploys.md` 2026-09-02 15:0xZ.
 - Goal: `#636`. `GET /api/ops/artifacts/export?path=soccer_source/<lg>/players/players_2026.csv`
   returns the CSV body instead of 403, so the board-render form of the soccer
   shot-divisor reading can run from web. One allowlist entry; deploy web.
