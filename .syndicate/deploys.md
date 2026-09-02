@@ -18836,6 +18836,7 @@ have FALSIFIED it.
     passes 1-5 (22:54:52 - 23:02:09):  150 stale / 0 carrying / 0 missing
                                        -> too early, NOT a failure
     pass 6    (23:04:20):              149 stale / 1 carrying / 0 missing
+    re-check  (23:10:47):              147 stale / 3 carrying / 0 missing
 
     soccer_source/eredivisie/api/recommendations/recommendations_2026-09-05.json
     generated_at 2026-09-02T22:59:52.073594Z   (> cutoff 22:54:26Z)
@@ -18859,6 +18860,24 @@ exactly `exact_pair: 2, fuzzy: 2` unprompted.** The prediction and the productio
 reading share no code path — one was a local replay, the other is the deployed
 builder writing its own artifact. `event_id: 0` for a fourth time.
 
+### THREE units now, and each one reproduces the pre-fix prediction EXACTLY
+
+Re-checked 23:10:47Z. Still **0 new-code artifacts missing `anchor`**. Each
+production reading was replayed against the PRE-FIX join (event_id, then exact
+pair only) on this morning's snapshot:
+
+| unit | pre-fix attached | production now | recovered |
+|---|---|---|---|
+| `eredivisie\|2026-09-05` | 2 of 4 | 4 of 4 (`fuzzy 2`) | +2 |
+| `primeira_liga\|2026-09-05` | 1 of 4 | 3 of 4 (`fuzzy 2`) | +2 |
+| `eredivisie\|2026-09-04` | 0 of 1 | 1 of 1 (`fuzzy 1`) | +1 |
+
+**The refusal is working too, which is the half that matters.**
+`primeira_liga|2026-09-05` still skips one: `skipped_reasons {"no_name_match": 1}`,
+`skipped_examples ["Sporting CP v C.D. Nacional"]` -- one of the 14 fixtures
+independently classified as genuinely unpriced. The fuzzy stage is recovering
+real joins, not matching everything.
+
 ### COST OF THIS DEPLOY, and a LIMITATION OF THE PREFLIGHT GATE
 
 **It killed a soccer unit, and preflight was not wrong to say CLEAR.**
@@ -18878,8 +18897,24 @@ looked". The gate is still worth taking — it stopped this deploy landing on an
 MLB sim, holding through 10 → 7 → 2 → 0 jobs — but its guarantee is narrower
 than it reads.
 
-Bounded, not lost: `#353`'s 600 s retry backoff exists for exactly this, so the
-killed unit returns in minutes rather than sleeping the 4 h interval.
+Bounded, not lost -- **but CORRECTED 2026-09-02 23:1xZ, my first number here was
+wrong.** I wrote "returns in minutes"; it does not. `due.sort` keys on
+`_soccer_unit_last_touched` = **max(success, attempt)** (`#356`, and its own
+comment says it plainly: *"a unit that just burned a slot simply goes to the back
+of the queue"*). A unit KILLED BY A DEPLOY still stamps `lastAttempt`, so it
+sorts LAST among due units -- the retry backoff releases it, then the ordering
+puts it behind everything else.
+
+Measured on this deploy: `spacing_seconds=300`, `due` 6-13, so one full
+due-queue cycle is **~30-65 min**. At 23:10Z, 16 minutes after the restart,
+`mls|2026-09-05` had NOT relaunched: three `SOCCER_UNIT_OUTCOME` lines
+(`wrote_since_launch=False`) and no `SOCCER_UNIT_LAUNCHED`, while
+eredivisie/primeira_liga/eredivisie took the 22:58, 23:03 and 23:08 slots.
+
+**BOUNDED still holds** -- one cycle, not the 4 h interval -- but the protection
+is WEAKER for a deploy-killed unit than `#353`'s comment reads, because the
+mechanism that protects against a *failing* unit hogging slots is the same
+mechanism that sends an *innocent killed* unit to the back.
 
 **Owed to the gate, not to this lane:** either re-check processes immediately
 before the restart, or state the build-window exposure in the CLEAR line so the
