@@ -18807,3 +18807,98 @@ local mirror for 2026-06-14 (manifest `47568090177ed76b`, `verify` 15/15,
 0 drifted). That unblocks `build_mlb_actuals` as a `#625`(5) replay target —
 `load_final_feed(fetch_if_missing=True)` otherwise falls back to a live
 `statsapi.mlb.com` call.
+
+---
+
+## 2026-09-02 22:54:26Z — refresh-worker `99c3731f` — the soccer anchor audit is READABLE IN PRODUCTION
+
+Lane `soccer-anchor-audit-artifact`, session `b2b5b45b`. Deploy
+`dep-dacafo2jnfac73bqt07g`, trigger=api, `build_in_progress` → `update_in_progress`
+→ **live 2026-09-02T22:54:26.137808Z**. Live commit re-read per service after:
+refresh-worker **`99c3731f`**, web `e6fa165b`, live-odds-worker `e4a471c0` — only
+the intended service moved.
+
+**WHY:** every `[soccer_anchor]` line was written to `/dev/null`.
+`ops_refresh.py:1402` launches refresh units with `stdout=subprocess.DEVNULL`,
+so `build_soccer_artifacts.py`'s output never reached Render. Control taken over
+a window where 7 units demonstrably ran: every child-printed token returned **0**
+log matches (including `player projections`, printed on every success) while the
+parent's `SOCCER_UNIT_LAUNCHED` returned 5.
+
+### verify: `anchor.state` on a production artifact whose `generated_at` POSTDATES the deploy
+
+The timestamp is the whole test, not the field's presence: all 150 artifacts on
+disk were written by the old code and carry no `anchor` key, so a naive grep
+would have read 150 misses as a failed deploy. Each artifact was classified
+against the deploy's `finishedAt`; a NEW-code artifact missing `anchor` would
+have FALSIFIED it.
+
+    passes 1-5 (22:54:52 - 23:02:09):  150 stale / 0 carrying / 0 missing
+                                       -> too early, NOT a failure
+    pass 6    (23:04:20):              149 stale / 1 carrying / 0 missing
+
+    soccer_source/eredivisie/api/recommendations/recommendations_2026-09-05.json
+    generated_at 2026-09-02T22:59:52.073594Z   (> cutoff 22:54:26Z)
+    {
+      "state": "disabled",  "weight": 0.0,
+      "fixtures": 4, "attached": 4, "skipped": 0, "priced_events": 21,
+      "by_stage": {"event_id": 0, "exact_pair": 2, "fuzzy": 2},
+      "skipped_reasons": {}, "skipped_examples": []
+    }
+
+**`state: disabled` with `attached: 4/4` is the reading that matters** — a
+working feed plus a disarmed mechanism, which is a different fact from
+`odds_absent`, and it is the state production is actually in.
+
+### The same payload independently confirms THIS MORNING'S name-join fix, live
+
+`by_stage.fuzzy = 2`. Predicted locally before the deploy, from the production
+artifacts: `eredivisie|2026-09-05` was **4 fixtures / 2 attached** pre-fix and
+**4 attached** post-fix, the 2 recovered by the new stage. **Production wrote
+exactly `exact_pair: 2, fuzzy: 2` unprompted.** The prediction and the production
+reading share no code path — one was a local replay, the other is the deployed
+builder writing its own artifact. `event_id: 0` for a fourth time.
+
+### COST OF THIS DEPLOY, and a LIMITATION OF THE PREFLIGHT GATE
+
+**It killed a soccer unit, and preflight was not wrong to say CLEAR.**
+
+    preflight CLEAR (0 jobs)  22:48:22Z
+    deploy TRIGGERED          22:49:04Z
+    mls|2026-09-05 LAUNCHED   22:52:43Z   <- 219 s AFTER the trigger
+    deploy LIVE (restart)     22:54:26Z
+    -> SOCCER_UNIT_OUTCOME unit=mls|2026-09-05 wrote_since_launch=False
+
+**`deploy_preflight.py` samples running processes AT TRIGGER TIME, but the old
+container keeps serving — and keeps LAUNCHING NEW JOBS — for the whole build
+phase, ~5.4 minutes here.** On a worker that starts a soccer unit roughly every
+335 s, a 5-minute build window is *more likely than not* to catch one. "CLEAR at
+trigger" is therefore not "no job dies"; it is only "no job was running when I
+looked". The gate is still worth taking — it stopped this deploy landing on an
+MLB sim, holding through 10 → 7 → 2 → 0 jobs — but its guarantee is narrower
+than it reads.
+
+Bounded, not lost: `#353`'s 600 s retry backoff exists for exactly this, so the
+killed unit returns in minutes rather than sleeping the 4 h interval.
+
+**Owed to the gate, not to this lane:** either re-check processes immediately
+before the restart, or state the build-window exposure in the CLEAR line so the
+deployer sees it.
+
+### Locks — and a trap worth naming
+
+Both locks were taken TWICE, because the first pair were invisible.
+`deploy-guard.py` runs with `$CLAUDE_PROJECT_DIR` = the PRIMARY tree, while the
+claim and preflight had been taken from a **session worktree**, writing a
+different `.syndicate/deploy/` entirely:
+
+    worktree:      refresh-worker  HELD by soccer-anchor-audit-artifact  8.1 min
+    primary tree:  refresh-worker  free
+
+Same command, same repo, opposite answers; the guard blocked the deploy and
+reported `your lane: soccer-anchor-cost` from the primary tree's stale marker.
+**LOCKS MUST BE TAKEN IN THE TREE THE GUARD READS.** The stranded worktree claim
+was released with its own token (no `--force` needed — the token was still in
+hand from the acquire).
+
+Claim released after this entry.

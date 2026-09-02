@@ -1637,6 +1637,29 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `tests/test_soccer_anchor_wiring.py`.
 - OWED: a refresh-worker deploy, then read `anchor.state` off a production
   artifact via `/api/ops/artifacts/export`. Until then this is LANDED, not LIVE.
+- **DEPLOYED AND VERIFIED IN PRODUCTION 2026-09-02.** refresh-worker
+  `99c3731f`, deploy `dep-dacafo2jnfac73bqt07g`, live **22:54:26.137808Z**; live
+  commit re-read per service, only refresh-worker moved. **verify:**
+  `soccer_source/eredivisie/api/recommendations/recommendations_2026-09-05.json`,
+  `generated_at 22:59:52Z` (POSTDATES the deploy), carries
+  `state=disabled weight=0.0 fixtures=4 attached=4 priced_events=21
+  by_stage={event_id:0, exact_pair:2, fuzzy:2}`. Passes 1-5 read 150 stale / 0
+  carrying — correctly reported as TOO EARLY, not failure; a new-code artifact
+  missing `anchor` would have falsified it.
+- **The same payload confirms the morning's name-join fix LIVE:** `fuzzy=2` is
+  exactly the 2 fixtures predicted to be recovered for that league-date
+  (pre-fix 2 attached of 4, post-fix 4). Prediction and production share no code
+  path. `event_id=0` for a fourth time.
+- **This deploy KILLED `mls|2026-09-05`** (`wrote_since_launch=False`), launched
+  219 s AFTER the trigger, during the build phase. Preflight was honestly CLEAR
+  at trigger; it samples processes then, while the old container keeps launching
+  jobs for the whole ~5.4 min build. Bounded by `#353`'s 600 s retry. Gate
+  limitation recorded in `deploys.md`, owed to the gate not to this lane.
+- **Locks had to be taken TWICE:** `deploy-guard.py` reads `$CLAUDE_PROJECT_DIR`
+  (the PRIMARY tree) while the claim/preflight were taken in a session worktree
+  — worktree said HELD, primary said free. Locks must be taken where the guard
+  reads. Stranded worktree claim released with its own token.
+- Claim RELEASED; all four services free.
 - Blocked by: none.
 
 

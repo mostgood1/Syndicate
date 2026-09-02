@@ -369,8 +369,15 @@ evidence: `.syndicate/findings_2026-09-02_soccer_anchor_cost.md`.
 - **§4.4 is SMALL here, measured:** the anchor shifts the `expected_shots` LEVEL
   by **0.36%** against `shot_calibration`'s divisor whose own cross-window drift
   is ±8%. Re-fit AFTER arming, not before.
-- **FIXED, LANDED, NOT DEPLOYED (`cddd748c`): the audit is now a FIELD in
-  `recommendations_{date}.json`.** `anchor.state` takes one of five named values
+- **DEPLOYED AND VERIFIED IN PRODUCTION 2026-09-02 22:54:26Z (refresh-worker
+  `99c3731f`): the audit is a FIELD in `recommendations_{date}.json`.** Read off
+  a production artifact whose `generated_at` (22:59:52Z) POSTDATES the deploy:
+  `state=disabled weight=0.0 fixtures=4 attached=4 priced_events=21
+  by_stage={event_id:0, exact_pair:2, fuzzy:2}` on
+  `eredivisie/.../recommendations_2026-09-05.json`. `fuzzy=2` independently
+  confirms the same day's name-join fix live — exactly the 2 fixtures predicted
+  recovered for that league-date, from a code path the prediction never touched.
+  Detail: `anchor.state` takes one of five named values
   (`odds_absent`, `odds_unreadable`, `disabled`, `no_priced_fixtures`,
   `anchored`) beside attach counts, the by-stage split and
   `teams_resolved`/`teams_unresolved`. Verified end to end on three real builds
