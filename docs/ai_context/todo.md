@@ -1,5 +1,37 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#632` — **WEB WAS OOM-KILLED TWICE. Real `oomKilled` events at the 2G limit, and nothing owns them** — lane `game-market-entry-roi-curve` (surfaced by `boot-sync-healthcheck-kill`, rehomed on closing it), 2026-09-01 — **OPEN**
+
+**Measured, Render events API, `srv-d88ahvrbc2fs73eodu30` (`syndicate`, the WEB
+service, 2G limit):**
+
+    2026-08-29T18:21:22Z   server_failed   reason.oomKilled, memoryLimit 2G
+    2026-09-01T02:35:51Z   server_failed   reason.oomKilled, memoryLimit 2G
+
+    window: 24 `deploy_ended` events, oldest event 2026-08-29T18:21:22Z
+    every other event in the last 100: build/deploy started+ended, 2 server_available
+
+**THIS IS NOT `#566`, AND THE DISTINCTION IS THE WHOLE POINT.** `#566` concluded
+*"there was no memory issue"* — correctly — for the **4096 MB** service over
+2026-08-24..08-26, where the alarming 93-99% readings were `ALL_PROCESS_MEMORY`
+counting clean page cache. **These two are different in every term: a different
+service, a 2G limit, a later window, and `reason.oomKilled` from Render's own
+events API rather than from our telemetry.** `#566`'s own lesson is to trust the
+events API over the percentage; this is what the events API says.
+
+**WHY IT HAS NO OWNER.** It was surfaced while taking the rate reading that
+`boot-sync-healthcheck-kill` had been waiting on. That lane fixed a boot sync
+that starved `/healthz`, which is a **different mechanism** — the user ruled
+`[2026-09-01]` that OOM kills do not count against its condition, and it closed.
+The kills are real and stayed behind.
+
+**NOT YET ESTABLISHED, and do not skip to a fix:** whether 2 kills in 24 deploys
+is a rate worth acting on, what the web service's anon (not page-cache) high-water
+mark actually is, and whether these correlate with a deploy, a slate size, or a
+route. **Read anon vs inactive_file before calling anything a leak** —
+`state.md [memory.current is page cache]` and `#566` both exist because that step
+was skipped.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
@@ -3858,6 +3890,12 @@ target is named. **If it comes back SMALL, this instrumentation was aimed wrong
 
 **THE ASK WAS "fix the memory issue". THE ANSWER IS THERE ISN'T ONE**, and that
 is the finding rather than a deflection.
+
+> **SCOPE NOTE `[2026-09-01, lane game-market-entry-roi-curve]`: this item is
+> about the 4096 MB service over 2026-08-24..08-26. It is NOT a clean bill for
+> WEB.** The 2G web service was **oomKilled twice** — 2026-08-29T18:21:22Z and
+> 2026-09-01T02:35:51Z, per Render's events API, the very instrument this item
+> says to trust over the percentage. Tracked as **`#632`**.
 
     oomKilled events, 2026-08-24 -> 2026-08-26        ZERO
     anonymous memory across the same window           1135-1760 MB of 4096 = 28-43%

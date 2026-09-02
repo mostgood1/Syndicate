@@ -20842,3 +20842,33 @@ lost no protection and no open lane left the session-start digest.
   That generator has no `publish_hot_artifact` call, so the entry would be the
   inert half of this same defect. Wire the publisher in the same change.
 - Blocked by: none.
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-09-01
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### boot-sync-healthcheck-kill — **CLOSED 2026-09-01 `[user decision: "the OOM kills don't count, close it"]`** — was OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-27 — session 64625b4d
+- Goal: a web boot must not cost the container a long blocking file walk, so
+  sync I/O cannot starve `/healthz` inside Render's 5s budget.
+- Status: **both fixes LIVE.** Boot sync **72.20s -> 0.65s**, reproduced at
+  0.59s on an unrelated lane's next deploy. `present=33316` + `unchanged=76` =
+  33,392 = `git ls-files` over the roots, so nothing was skipped.
+- Files: released: `scripts/bootstrap_data_root.py`, `syndicate/app.py`
+  **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+- **CLOSED ON THE MECHANISM ARGUMENT, NOT ON THE CONDITION `[user decision 2026-09-01]`.** Stating it plainly because the bullet below says not to reinterpret the condition silently, and this is the un-silent version: **the stated condition — 0 `server_failed` over ≥5 deploys — was NOT met.** 24 deploys, 2 `server_failed`. The user ruled that OOM kills do not count against a condition written for health-check starvation, which is a judgement about MECHANISM, and on mechanism this lane is exonerated: boot sync 72.20s → 0.65s, reproduced at 0.59s, and neither kill carries a health-check cause. **The two OOM kills are real, are NOT this lane's, and are rehomed to `todo #632` so they do not close with it.**
+- **THE RATE IS NOW MEASURED, AND THE STATED CONDITION IS NOT MET `[reading taken 2026-09-01 by the ownership pass, lane game-market-entry-roi-curve]`.** Render events API for `srv-d88ahvrbc2fs73eodu30`, window opening 2026-08-29T18:21:22Z: **24 `deploy_ended` events** — well past the ≥5 this lane asked for — and **2 `server_failed`**, not 0, at 2026-08-29T18:21:22Z and 2026-09-01T02:35:51Z. **BOTH carry `reason.oomKilled` at a 2G limit**, which is memory exhaustion and NOT the boot-sync health-check starvation this lane fixed. So on its OWN terms the condition fails; on MECHANISM the lane is exonerated. **Do not silently reinterpret the condition to pass** — either accept the mechanism argument explicitly and close, or keep counting. **Either way the two OOM kills on web are a live operational fact this lane surfaced and does not own.**
+- **Open ONLY on the rate.** 2 deploys since the fix, 0 `server_failed`.
+  Against a ~1-in-5 base rate that is **not yet evidence**. Close when >=5
+  deploys have accumulated with no kill — **they will arrive from other lanes'
+  work; do not manufacture deploys for this.**
+- **Verification is NOT a per-boot `/healthz` trace** — that does not
+  discriminate, since two PRE-fix boots that survived were equally clean (5.13s,
+  5.59s). Count `server_failed` per deploy over >=5 deploys.
+- Not this lane: `GET /` at 8.1s (`home.py`, claimed elsewhere) is the other
+  documented route to the same 5s budget.
+- Blocked by: none.
+- Full working record moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
