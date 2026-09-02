@@ -25,6 +25,8 @@ from flask import url_for
 
 from syndicate.features.shared.artifact_publisher import HOT_ARTIFACT_PATTERNS
 from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
+from syndicate.features.shared.artifact_publisher import EXPORT_ONLY_ARTIFACT_PATTERNS
+from syndicate.features.shared.artifact_publisher import is_exportable_artifact_relative_path
 from syndicate.features.shared.artifact_publisher import relative_to_data_root
 # Private on purpose, and imported rather than re-stated. It is the SAME
 # predicate that decides a Range/tail pull in `pull_streamed_artifact`, and the
@@ -2199,8 +2201,12 @@ def api_ops_artifacts_export() -> Any:
     if exact_path:
         if exact_path.startswith("/") or ".." in exact_path.split("/"):
             return jsonify({"ok": False, "error": "invalid path."}), 400
-        if not is_hot_artifact_relative_path(exact_path):
-            return jsonify({"ok": False, "error": "path is not an allowed hot artifact."}), 403
+        # READ predicate (`#625`(2)): the hot set PLUS the export-only set. The
+        # publish handlers above deliberately keep the narrower one -- widening
+        # them would let the sweep push current-date `feed_live` to web and
+        # freeze live game state (`#413`).
+        if not is_exportable_artifact_relative_path(exact_path):
+            return jsonify({"ok": False, "error": "path is not an allowed hot or export-only artifact."}), 403
         target = root / Path(exact_path)
         if not target.is_file():
             return jsonify({"ok": True, "count": 0, "artifacts": {}})
@@ -2237,12 +2243,17 @@ def api_ops_artifacts_export() -> Any:
     artifacts: dict[str, str] = {}
     if names_only:
         listing: dict[str, dict[str, Any]] = {}
-        for pattern in HOT_ARTIFACT_PATTERNS:
+        # The inventory walk carries the export-only set too. It reads no file
+        # bodies (there is no budget to exceed on this path), and it is the ONLY
+        # way a mirror can discover these artifacts exist -- a 403 and an
+        # absence are indistinguishable to a caller, and that confusion has
+        # already produced two wrong readings in this repo.
+        for pattern in HOT_ARTIFACT_PATTERNS + EXPORT_ONLY_ARTIFACT_PATTERNS:
             for path in root.glob(pattern):
                 if not path.is_file():
                     continue
                 relative_path = relative_to_data_root(path)
-                if not relative_path or not is_hot_artifact_relative_path(relative_path):
+                if not relative_path or not is_exportable_artifact_relative_path(relative_path):
                     continue
                 if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
                     continue
@@ -2279,14 +2290,25 @@ def api_ops_artifacts_export() -> Any:
     budget_bytes = _artifact_export_budget_bytes()
     total_bytes = 0
     truncated = False
-    for pattern in HOT_ARTIFACT_PATTERNS:
+    # THE BODY-CARRYING LOOP WIDENS ONLY FOR AN EXPLICIT `pattern=`.
+    #
+    # With no pattern this walk is what the backup workflow calls, and it stops
+    # at a 24MB budget. Adding thousands of roster_objs and feed_live files to
+    # its CANDIDATE set would change which artifacts fit under that budget --
+    # silently reducing what the backup pulls, in a caller that never asked for
+    # the new families. So the default set stays byte-for-byte what it was, and
+    # a caller that names a pattern opts in to the wider one.
+    _body_patterns = (
+        HOT_ARTIFACT_PATTERNS + EXPORT_ONLY_ARTIFACT_PATTERNS if subset_pattern else HOT_ARTIFACT_PATTERNS
+    )
+    for pattern in _body_patterns:
         if truncated:
             break
         for path in root.glob(pattern):
             if not path.is_file():
                 continue
             relative_path = relative_to_data_root(path)
-            if not relative_path or not is_hot_artifact_relative_path(relative_path):
+            if not relative_path or not is_exportable_artifact_relative_path(relative_path):
                 continue
             if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
                 continue
@@ -2341,8 +2363,11 @@ def api_ops_artifacts_stream() -> Any:
         return jsonify({"ok": False, "error": "path parameter required."}), 400
     if relative_path.startswith("/") or ".." in relative_path.split("/"):
         return jsonify({"ok": False, "error": "invalid path."}), 400
-    if not is_hot_artifact_relative_path(relative_path):
-        return jsonify({"ok": False, "error": "path is not an allowed hot artifact."}), 403
+    # READ predicate, same as export (`#625`(2)). This is the transport the
+    # mirror uses for anything large, so an export-only family that `stream`
+    # refused would be discoverable and un-pullable.
+    if not is_exportable_artifact_relative_path(relative_path):
+        return jsonify({"ok": False, "error": "path is not an allowed hot or export-only artifact."}), 403
 
     target = data_root() / Path(relative_path)
     if not target.is_file():

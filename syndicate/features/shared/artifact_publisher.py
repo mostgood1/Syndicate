@@ -930,11 +930,110 @@ def relative_to_data_root(path: Path) -> str | None:
     return str(relative).replace("\\", "/")
 
 
-def is_hot_artifact_relative_path(relative_path: str) -> bool:
+def _is_safe_relative_path(relative_path: str) -> str | None:
+    """Normalise, or reject. Returns the normalised path or None."""
     normalized = str(relative_path or "").strip().replace("\\", "/")
     if not normalized or normalized.startswith("/") or ".." in normalized.split("/"):
+        return None
+    return normalized
+
+
+def is_hot_artifact_relative_path(relative_path: str) -> bool:
+    """May this path be WRITTEN to web, and swept for publishing?
+
+    Unchanged in meaning. `#625`(2) deliberately did NOT widen this predicate --
+    see `EXPORT_ONLY_ARTIFACT_PATTERNS` for why widening it would arm `#413`.
+    """
+    normalized = _is_safe_relative_path(relative_path)
+    if normalized is None:
         return False
     return any(fnmatch.fnmatch(normalized, pattern) for pattern in HOT_ARTIFACT_PATTERNS)
+
+
+# `#625`(2) -- READ-ONLY. Never swept, never publishable.
+#
+# THE CONFLATION THIS SPLITS. One list gated both directions, and this file said
+# so itself in the `roster_objs` note above: *"hundreds of large files per date,
+# and this allowlist drives publishing as well as reading."* That sentence names
+# a real coupling -- a family that merely needs to be READABLE could only be
+# made readable by also making it WRITABLE and SWEPT.
+#
+# **THE LIST IS TWO FAMILIES, NOT THE FOUR `#625` NAMES, AND THE OTHER TWO WERE
+# CHECKED RATHER THAN ACCEPTED** (measured 2026-09-02 against the live hot-set
+# inventory, 33,229 files):
+#
+#   - `eval/batches` was ALREADY allowlisted
+#     (`mlb_source/.../eval/batches/*/sim_vs_actual_*.json`) and is ALREADY on
+#     web: **51 files, 199,281,869 bytes**. There was never a gap.
+#   - `roster_objs` was ALREADY matched, by `*_source/source_artifacts/data/
+#     daily/snapshots/*/*.json` -- fnmatch `*` crosses `/`, so that pattern
+#     reaches arbitrarily deep. **The note above claiming roster objects are
+#     "deliberately NOT allowlisted" is STALE**: production writes its rosters
+#     DIRECTLY under `snapshots/<date>/roster_*.json`, not into a `roster_objs/`
+#     subdirectory (`ask_the_syndicate_data.py:1290` says so, and a mirror pull
+#     on 2026-09-02 fetched 16 of them from web). The `roster_objs/` layout
+#     exists only in the git mirror and on laptops. Nothing here is broken; the
+#     COMMENT is wrong, and it is left for its owner rather than rewritten in
+#     passing. Carried as a todo.
+#
+# **`#413`, and why `feed_live` is READ-ONLY FOREVER.** `_mlb_feed_live_payload`
+# (`blueprints/home.py:3560`) is:
+#
+#     payload = load_json_or_gz_file(raw_feed_live_path(selected_date, game_pk))
+#     if isinstance(payload, dict):
+#         return payload                      # <- PRESENCE, not freshness
+#     if selected_date == central_today_iso():
+#         return _fetch_mlb_feed_live(game_pk)
+#
+# The live fetch is reached ONLY when the file is absent. So a `feed_live` file
+# on web's disk for a current date freezes that game's state for every reader --
+# measured 2026-08-13 against a board artifact FIVE MINUTES OLD: MIL @ SD read
+# `live / TOP 9` while the live lens read `Final`. **The hazard is PRESENCE ON
+# DISK, which no allowlist can prevent** -- so this family may be read, and must
+# never be published. `tests/test_export_only_patterns.py` asserts both.
+#
+# **BOTH ENTRIES ARE CURRENTLY INERT, AND THAT IS STATED RATHER THAN DISCOVERED
+# LATER.** Web holds ZERO files matching either (measured 2026-09-02). Neither
+# is under a `BOOTSTRAP_ROOT` reachable path that produced anything, and nothing
+# publishes them -- by design. This is the `#208` situation the `live_momentum_*`
+# entry above already documents: **allowlisting PERMITS a transfer, it does not
+# make one happen**, and `export` returning `count: 0` here means "never
+# captured", not "capture is broken". What would make each live:
+#   - prop-history CSVs: a producer that publishes them, which is safe -- they
+#     carry no `#413`-style hazard, they are just not sent today.
+#   - `feed_live`: NOTHING SHOULD, until `_mlb_feed_live_payload` gates on
+#     FRESHNESS instead of presence. That is the deeper fix `board_enrichment`
+#     already names; until it lands, mirroring this family through web is
+#     unsafe at any allowlist setting.
+EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
+    # Raw StatsAPI feed_live. READ-ONLY IS LOAD-BEARING: see `#413` above.
+    # Never add this to HOT_ARTIFACT_PATTERNS.
+    "*_source/source_artifacts/data/raw/statsapi/feed_live/*/*/*.json",
+    "*_source/source_artifacts/data/raw/statsapi/feed_live/*/*/*.json.gz",
+    # Prop-history CSVs, under `tracking/` -- not a bootstrap root, not swept.
+    "*_source/tracking/odds_*_props_history_*.csv",
+)
+
+
+def is_export_only_artifact_relative_path(relative_path: str) -> bool:
+    """Is this path in the READ-ONLY set? True does NOT imply publishable."""
+    normalized = _is_safe_relative_path(relative_path)
+    if normalized is None:
+        return False
+    return any(fnmatch.fnmatch(normalized, pattern) for pattern in EXPORT_ONLY_ARTIFACT_PATTERNS)
+
+
+def is_exportable_artifact_relative_path(relative_path: str) -> bool:
+    """May this path be READ back out of web -- exported, streamed, mirrored?
+
+    The READ predicate. Union of the hot set and the export-only set. Use this
+    at `/api/ops/artifacts/export` and `/stream`; use
+    `is_hot_artifact_relative_path` at `/publish` and in the sweep. Wiring the
+    read predicate into a write path would silently undo `#413`.
+    """
+    return is_hot_artifact_relative_path(relative_path) or is_export_only_artifact_relative_path(
+        relative_path
+    )
 
 
 # `#394`. relative_path -> sha256 of the content last successfully published

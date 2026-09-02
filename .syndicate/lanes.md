@@ -1576,6 +1576,40 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - DOES NOT re-arm `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN` and does not
   deploy. Local only.
 - Blocked by: none
+### m625-export-only-patterns — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: `todo.md #625` build item (2). Split the artifact allowlist in two so a
+  worker-local family can be READ (mirrored) without becoming WRITABLE to web.
+  Today ONE list, `HOT_ARTIFACT_PATTERNS`, gates both directions — its own
+  comment says so ("this allowlist drives publishing as well as reading"), and
+  that conflation is why `roster_objs`, raw `feed_live`, evaluation-ledger
+  chunks and prop-history CSVs are unreadable.
+  Testable outcome: a path in the new EXPORT-ONLY list is accepted by
+  `/api/ops/artifacts/export` and `/stream` (READ) and REFUSED 403 by
+  `/api/ops/artifacts/publish` (WRITE), and the sweep never offers it.
+- Files: `syndicate/features/shared/artifact_publisher.py`,
+  `syndicate/blueprints/ops.py`, `tests/test_export_only_patterns.py` (NEW).
+- Hypothesis: the list is NOT inert, because these families are already ON
+  WEB'S DISK — `SYNDICATE_BOOTSTRAP_ON_START=1` on web and
+  `data/mlb_source/source_artifacts` is a BOOTSTRAP_ROOT, so git-tracked
+  `roster_objs` (689 files), `feed_live` (151) and `eval/batches` (6) are seeded
+  there. The read-side allowlist is the only thing hiding them.
+- Falsification test: PARTLY EXPECTED TO FAIL, and the prediction is made in
+  advance. `props_history` lives under `data/mlb_source/tracking/`, which is NOT
+  a bootstrap root and is not published, so it should be ABSENT on web. After a
+  deploy the three bootstrapped families must return CONTENT and props_history
+  must return `count: 0` (present-but-empty), NOT 403. A 403 anywhere means the
+  predicate is not wired; content for props_history means my model of how web's
+  disk is filled is wrong.
+- Verification: (a) unit tests prove the ASYMMETRY both ways — an export-only
+  path is readable AND refused by publish; (b) after a web deploy, `?path=` on a
+  git-tracked `roster_objs` file returns bytes where it returns 403 today.
+- **`#413` HAZARD, and it is why the split must be READ-ONLY:** raw `feed_live`
+  on web freezes game state — `_mlb_feed_live_payload` returns the cached file
+  if it EXISTS. Adding these patterns to the WRITE side would let the sweep push
+  CURRENT-date feed_live to web and arm that trap for live games. This lane adds
+  them to the READ side only, and a test asserts it.
+- Blocked by: none. **NEEDS A WEB DEPLOY to verify (b)** — the endpoint runs on
+  web. Unlike `#625`(5), this item does contend for the deploy queue.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
