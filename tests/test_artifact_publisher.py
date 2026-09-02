@@ -223,6 +223,37 @@ class HotArtifactAllowlistTests(unittest.TestCase):
         self.assertTrue(is_hot_artifact_relative_path("mlb_source/source_artifacts/data/statcast/features/player_features_latest.json"))
         self.assertTrue(is_hot_artifact_relative_path("mlb_source/data/statcast/features/player_features_latest.json"))
 
+    def test_accepts_soccer_season_player_files(self) -> None:
+        # `#636`. These carry `shots_per90` -- the denominator of the only
+        # composition-invariant reading of the soccer shot-shrinkage divisor.
+        # Measured 2026-09-02 BEFORE the entry landed: web returned 403 "path
+        # is not an allowed hot artifact" for the CSV while serving the
+        # season-suffixed, git-tracked `schedule_2026.json` in the same tree at
+        # 200/113,410 bytes -- so the allowlist was the only block.
+        for league in ("epl", "mls", "la_liga", "belgian_pro_league"):
+            self.assertTrue(
+                is_hot_artifact_relative_path(f"soccer_source/{league}/players/players_2026.csv")
+            )
+        # Season-suffixed, so every archived season resolves, not just this one.
+        self.assertTrue(is_hot_artifact_relative_path("soccer_source/epl/players/players_2024.csv"))
+        # SCOPED. The entry must not become a general "any csv under soccer"
+        # rule: a wildcard that also swept bulk history would put megabytes
+        # through the sweep's per-pattern glob on every export call.
+        self.assertFalse(is_hot_artifact_relative_path("soccer_source/epl/players/history_2026.csv"))
+        self.assertFalse(is_hot_artifact_relative_path("soccer_source/epl/players/players_2026.parquet"))
+        self.assertFalse(is_hot_artifact_relative_path("mlb_source/epl/players/players_2026.csv"))
+        # DEPTH IS *NOT* CONSTRAINED, and this asserts the truth rather than
+        # the intent. `is_hot_artifact_relative_path` uses `fnmatch`, whose `*`
+        # translates to `.*` and therefore SPANS `/` -- so a single `*` is not
+        # "one path segment", it is "any number of them". Written as a passing
+        # assertion because it is a property of the matcher shared by EVERY
+        # `soccer_source/*/...` entry above (and the mlb/nba/wnba ones), not
+        # something this entry introduced; a test asserting the intuitive
+        # behaviour would fail today and would be asserting a fiction.
+        self.assertTrue(
+            is_hot_artifact_relative_path("soccer_source/epl/extra/players/players_2026.csv")
+        )
+
     def test_accepts_soccer_raw_odds_props_and_picks(self) -> None:
         # 2026-07-24 fix: the fetch/picks scripts have been scheduled in
         # refresh_odds_sources.py for a while and run successfully (confirmed

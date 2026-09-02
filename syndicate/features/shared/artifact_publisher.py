@@ -730,6 +730,31 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # is invisible to web exactly as the CSV version was.
     "soccer_source/*/props/game_markets_*.json",
     "soccer_source/*/api/picks/picks_*.csv",
+    # `#636`. Per-league SEASON player files -- `players_2026.csv` and friends,
+    # 15 files / ~880KB total, largest 69KB. These carry `shots_per90`, which is
+    # the DENOMINATOR of the only composition-invariant reading of the soccer
+    # shot-shrinkage divisor: back the Poisson mean out of a served row's
+    # `model_prob_over` and divide by that player's own season rate. Without
+    # this entry that reading cannot be run from web at all.
+    #
+    # NOT a keyvalue path, and that distinction is the whole reason this note
+    # exists -- the 2026-08-27 standing rule is that allowlisting a
+    # keyvalue-backed path turns a 403 into an EMPTY RESULT and looks like a
+    # fix. Checked BEFORE the edit rather than after:
+    # `soccer_source/epl/api/schedule/schedule_2026.json` is the exact analog
+    # (season-suffixed, git-tracked, same tree, already allowlisted) and served
+    # 200 / count=1 / 113,410 bytes off web's disk, while
+    # `soccer_source/epl/players/players_2026.csv` returned 403 "path is not an
+    # allowed hot artifact" -- the ALLOWLIST branch, not `count=0`. So the file
+    # is on disk and the guard was the only block.
+    #
+    # The season suffix means the worker's date-scoped `pull_hot_artifacts`
+    # (`?pattern=*<today>*`) can never match these, and that is FINE HERE while
+    # NOT being fine for a new model input: the engine that needs `shots_per90`
+    # already reads them out of the git-tracked checkout. This entry buys the
+    # WEB READ and nothing else. Do not cite it as precedent for shipping a
+    # season-named file to a worker.
+    "soccer_source/*/players/players_*.csv",
     # CORRECTED 2026-08-08. This note used to read: "reports/intelligence/
     # board_snapshot.json and intelligence_state.json are intentionally excluded
     # here. They're written through refresh_state_store's write_json_file, which

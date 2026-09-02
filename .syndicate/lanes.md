@@ -1094,7 +1094,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   scripts/generate_smartsim2_ncaaf_projections.py,
   syndicate/features/ncaaf/week_state.py (NEW),
   syndicate/features/ncaaf/sources.py,
-  syndicate/features/shared/artifact_publisher.py (CONTESTED — see below),
+  released: syndicate/features/shared/artifact_publisher.py (CONTESTED — see below) **[RELEASED 2026-09-02 by lane `soccer-players-csv-allowlist`. This lane's OWN body, three bullets down, already records the edit as "finished and landed" and the file as "claimed by NOBODY and is FREE TO TAKE" under a user override — it only ever registered as a claim because the path sits inside a `Files:` block, which the parser reads as a claim regardless of the prose beside it. Owning session `b85e895e` is absent from the session roster. Nothing else in this lane is touched; its other claims stand.]**,
   tests/test_ncaaf_games_cache_refresh.py (NEW),
   tests/test_ncaaf_week_state.py (NEW),
   tests/test_ncaaf_sp_ratings_cache.py (docstring only: it carried the same
@@ -1282,6 +1282,34 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   the deployed refresh-worker SHA named and the token derived by executing THAT
   SHA's own tree.
 - Blocked by: none
+
+### soccer-players-csv-allowlist — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
+- Goal: `#636`. `GET /api/ops/artifacts/export?path=soccer_source/<lg>/players/players_2026.csv`
+  returns the CSV body instead of 403, so the board-render form of the soccer
+  shot-divisor reading can run from web. One allowlist entry; deploy web.
+- Files: `syndicate/features/shared/artifact_publisher.py` (HOT_ARTIFACT_PATTERNS
+  entry + its note ONLY), `tests/test_artifact_publisher.py`.
+  **CLAIM CHECKED against every OPEN lane.** `artifact_publisher.py` is recorded
+  in `ncaaf-week-state` as "claimed by NOBODY and is FREE TO TAKE" after
+  `football-projection-publish-allowlist` (`#618`) closed on 2026-09-01. Taken here.
+- Hypothesis: the allowlist is the ONLY thing blocking the read — the file is
+  already on web's disk.
+- **ALREADY TESTED, BEFORE ANY EDIT (this is not an assumption).**
+  `soccer_source/epl/api/schedule/schedule_2026.json` is the exact analog —
+  season-suffixed, git-tracked, same tree, already allowlisted — and returns
+  **200, count=1, 113,410 bytes**. The target returns **403 "path is not an
+  allowed hot artifact"**, which is the allowlist branch, NOT `count=0`. So web
+  has the tree and the guard is the block.
+- Falsification test: after deploy the path returns `count=0` instead of a body.
+  That would mean the file is NOT on web's disk and an allowlist entry was the
+  wrong fix — the exact shape of the 2026-08-27 FORBIDDEN rule (allowlisting a
+  KEYVALUE-backed path and calling it readable turns a 403 into an empty result).
+  Which is why the verification below reads BYTES, never a status code.
+- Verification: (1) deployed SHA carries the pattern; (2) `?path=` returns a body
+  with a `shots_per90` column; (3) the reading `#636` exists for actually RUNS —
+  implied Poisson mean over that player's own season shots_per90 — and its value
+  is reported. A 200 with no parse is not a pass.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
