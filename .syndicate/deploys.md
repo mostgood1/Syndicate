@@ -18243,3 +18243,33 @@ master 62); `SYNDICATE_REQUEST_MEMORY_PROFILE` readback **HTTP 404**; **zero**
 two extra restarts. **What it bought:** the request path is eliminated as the
 cause, and the two endpoints everyone would have rewritten are cleared by
 measurement instead of by argument.
+
+### verify (2026-09-02 ~14:2xZ, one day on): **the new dated file did NOT break resolution**
+
+The failure mode a re-publish introduces is not a wrong divisor — it is the
+resolver choking on the newly published dated file and falling back to 1.0,
+which would silently restore the 1.4x over-prediction. Re-pulled the archive
+(**150** recommendation files, 4 more than yesterday) and bucketed by fixture
+date against the same pre-divisor baseline:
+
+| bucket | shared players | shots | minutes | shots/minute |
+|---|---|---|---|---|
+| `>= 08-31 < 09-02` (1.3979) | 496 | 0.669 | 1.000 | 0.669 |
+| **`>= 09-02` (after 1.3930 published)** | **3,428** | **0.726** | **1.000** | **0.726** |
+
+Target 1/1.3930 = 0.718; absent would be 1.00. **A divisor of the shipped size
+is still being applied** after the new file landed. Minutes flat at 1.000 in
+both buckets, so the confound stays killed.
+
+**WHAT THIS DOES NOT SAY, stated because the numbers invite the stronger
+reading.** It does NOT show which dated artifact the worker resolved. The two
+divisors differ by **0.35%**, and this measure's own noise is far larger — the
+496-player bucket scattered to 0.669 against the 3,428-player bucket's 0.726,
+both drawn from the same regime. So `1.3930 is live` is UNPROVEN and would
+need the worker's own disk. What is proven is the thing that actually fails
+silently: the resolver still returns a divisor rather than 1.0.
+
+`scripts/check_soccer_divisor_reached_engine.py` now takes `SHIP_DATES` /
+`SHIPPED_DIVISOR` as comma-separated lists and compares every bucket to the
+pre-divisor BASE, never to its neighbour, precisely so the next re-fit cannot
+be read as confirming a step it has no power to resolve.

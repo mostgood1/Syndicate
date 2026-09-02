@@ -3102,6 +3102,20 @@ the ROI report's 64,007-bet denominator does not move.
 
   </details>
 
+- **#636 SOCCER: `players_*.csv` is not in `HOT_ARTIFACT_PATTERNS`, so the
+  board-render form of the shot-divisor reading cannot run from web.**
+  `GET /api/ops/artifacts/export?pattern=soccer_source/*/players/players_*.csv`
+  returns **0 files** (measured 2026-09-01). The engine-side reading is closed
+  (`#612`) — the divisor demonstrably reaches the code that writes
+  `expected_shots`. What is still unreadable is the composition-invariant check
+  the lane originally specified: back the Poisson mean out of a served row's
+  `model_prob_over` and divide by that player's own season `shots_per90`, which
+  needs the players CSV. Fix is one allowlist entry, but note the standing rule:
+  a `HOT_ARTIFACT_PATTERNS` change is CODE and needs a web deploy, and the
+  worker's date-scoped pull means an undated CSV name may still never reach it —
+  check the filename shape before assuming an allowlist entry is sufficient.
+  Small, and nothing is blocked on it.
+
 - **#613 `lane-guard` unenforced every claim under a dot-directory — FIXED, and
   the audit tool that found it is now the standing check.** `_paths_in` stripped
   punctuation symmetrically, so `.syndicate/x.md` parsed to `syndicate/x.md`
