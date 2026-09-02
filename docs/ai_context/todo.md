@@ -177,6 +177,49 @@ that starved `/healthz`, which is a **different mechanism** — the user ruled
 `[2026-09-01]` that OOM kills do not count against its condition, and it closed.
 The kills are real and stayed behind.
 
+**ANSWERED 2026-09-01: IT IS AN ANONYMOUS-MEMORY LEAK, ~75 MB/h, AND THE DEPLOY
+CADENCE IS HIDING IT.** The reading this item demanded — anon vs `inactive_file`
+— is taken, off `CONTAINER_MEMORY` on web, 108 samples over 2026-09-01T01:27Z..
+09-02T03:18Z.
+
+**It is NOT page cache, which is the trap `#566` exists to warn about.** At both
+kills `memory_anon_mb` alone is most of the limit, and the reclaimable file cache
+is too small to save it:
+
+    OOM #1 18:21:22Z   anon 1516 → 1604 → 1637 MB   inactive_file 47 → 14 → 229 MB
+    OOM #2 02:35:51Z   anon 1398 → 1346 → 1390 MB   inactive_file 378 → 459 → 281 MB
+                       limit 2048 MB; headroom at #2 was 76-106 MB
+
+**The shape is a SAWTOOTH: monotonic climb, reset by restart.** From a ~322 MB
+floor at 05:21Z it climbs without interruption to **1,530.8 MB at 21:19Z** —
+**+1,209 MB over 15h58m, ~75 MB/h average** — then drops to 489.9 MB three
+minutes later when the process restarts. The pattern repeats: 1,374.5 MB at
+01:18Z → 546.8 MB at 01:21Z. **Peak observed 1,823.8 MB = 89% of the limit.**
+Series min 322 / mean 958 / max 1,824.
+
+    05:21Z  322   07:2xZ  592   09:2xZ  766   11:2xZ  798   13:2xZ  870
+    15:2xZ  835   17:2xZ 1301   19:2xZ 1322   21:19Z 1531  -> restart -> 490
+
+The climb is not perfectly linear — there is a step between 15:3xZ and 17:25Z
+(835 → 1,222) worth isolating — but it never comes back down without a restart.
+
+**WHY "2 KILLS IN 24 DEPLOYS" WAS THE WRONG RATE.** The denominator is what
+suppresses the numerator: **the deploys are what keep resetting anon**, so the
+process usually dies of a deploy before it dies of memory. A quiet week of
+deploys would produce MORE OOMs, not fewer. This is the boot-confound in
+`state.md [worker memory is boot-confounded]` running in reverse — there, every
+deploy made a fix look good for five minutes; here, every deploy hides the leak.
+
+**STILL NOT ESTABLISHED, and this is where to start:** WHAT leaks. The shape is
+established, the cause is not, and naming one from the shape would be exactly
+the mistake `learnings.md` forbids. Two candidates the log context suggests and
+NEITHER is measured: OOM #2 was preceded by a burst of
+`/api/ops/artifacts/export` and `/api/ops/artifacts/stream` (one export returned
+**1,312,395 bytes in 7,197 ms**), and that endpoint reads whole artifacts into
+memory — the MLB `book_quotes` shards it serves are **60-70 MB each**. OOM #1
+had no export in flight, just a `/portfolio` render. **A per-route correlation
+against the anon series is the next measurement**, not a fix.
+
 **NOT YET ESTABLISHED, and do not skip to a fix:** whether 2 kills in 24 deploys
 is a rate worth acting on, what the web service's anon (not page-cache) high-water
 mark actually is, and whether these correlate with a deploy, a slate size, or a

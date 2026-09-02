@@ -671,6 +671,32 @@ comparison is UNCHANGED by that capture and the 0-of-103 reading still stands:
 `quote.book_prices` is what the board reads, and changing it is step 3, gated on
 step 2.
 
+## [web-anon-leak] THE WEB SERVICE LEAKS ANONYMOUS MEMORY, ~75 MB/h, AND THE DEPLOY CADENCE HIDES IT `[verified 2026-09-01, lane game-market-entry-roi-curve, `todo #632`]`
+
+**This is a real memory problem and it is NOT the page-cache misreading `#566`
+warns about.** 108 `CONTAINER_MEMORY` samples on web (2G limit), 2026-09-01T01:27Z
+..09-02T03:18Z. `memory_anon_mb` climbs monotonically from a **~322 MB** floor to
+**1,530.8 MB in 15h58m** (→ **+1,209 MB, ~75 MB/h**), then drops to 489.9 MB
+three minutes later on restart. Repeats: 1,374.5 → 546.8 MB. **Peak 1,823.8 MB
+= 89% of limit.** min 322 / mean 958 / max 1,824.
+
+At both OOM kills anon alone is most of the limit and the reclaimable cache is
+too small to help: **#1 anon 1,637 MB with `inactive_file` 14-229 MB; #2 anon
+1,390 MB, headroom 76-106 MB.**
+
+**"2 kills in 24 deploys" is the wrong rate.** The deploys are what reset anon,
+so the process normally dies of a deploy before it dies of memory — **a quiet
+week would produce MORE OOMs, not fewer.** `[worker memory is boot-confounded]`
+in reverse: there every deploy made a fix look good for five minutes, here every
+deploy hides the leak.
+
+**WHAT leaks is NOT established** and must not be named from the shape. The one
+suggestive-but-unmeasured association: OOM #2 followed a burst of
+`/api/ops/artifacts/export` / `stream` (one export **1,312,395 B in 7,197 ms**),
+an endpoint that reads whole artifacts into memory and serves 60-70 MB
+`book_quotes` shards. OOM #1 had no export in flight. **A per-route correlation
+against the anon series is the next measurement.**
+
 ## [render-server-failed-is-three-events] `server_failed` IS NOT A FAILURE COUNT — read `details.reason`, one of its meanings is a HEALTHY DELIBERATE EXIT `[verified 2026-09-01, lane game-market-entry-roi-curve]`
 
 Two services demonstrated two different meanings within an hour, both off
