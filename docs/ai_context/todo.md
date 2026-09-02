@@ -3163,6 +3163,28 @@ the ROI report's 64,007-bet denominator does not move.
 
   </details>
 
+- **#637 THE SHARED REDIS IS AT 93% AND EVICTING, AND KEYVALUE-BACKED ARTIFACTS
+  ARE THE THINGS THAT DISAPPEAR.** Measured on web 2026-09-02 via
+  `/api/ops/keyvalue/diagnostics`: `used_memory` **250,937,536** against a
+  `maxmemory` of **268,435,456** (239.31M / 256.00M, ~93%), policy
+  **`volatile-lru`**, **`evicted_keys` 11,852**, `keyspace_misses` 13.27M vs
+  9.85M hits. Every artifact routed through `refresh_state_store` — which is
+  everything except paths containing `migration_runs/` — is a TTL'd Redis key and
+  therefore evictable under this pressure, including
+  `wnba_source/data/live/live_player_box_<date>.json` (10-day TTL) and the whole
+  `reports/intelligence` bucket (**209 MB across 188 keys**, i.e. most of the
+  instance on its own).
+  **Why this matters more than it looks:** an evicted key is indistinguishable at
+  every reader from "the producer never ran". `read_json_file` returns None and
+  the consumer correctly reports a zero. Several lanes are currently holding
+  "chain built, never observed working" verdicts against exactly this shape.
+  **Not diagnosed here, and deliberately not acted on** — it was found while
+  retiring a stale allowlist blocker on the WNBA live box (see lane
+  `wnba-live-props-data`), and sizing/eviction on a shared instance is its own
+  piece of work. First question for whoever takes it: is `reports/intelligence`
+  at 209MB supposed to be in Redis at all, given `intelligence_state` is ALSO
+  pushed over HTTP as a hot artifact.
+
 - **#636 CLOSED 2026-09-02 — the allowlist entry shipped on web `2114d5c6` and the
   reading it gates RUNS.** `?pattern=soccer_source/*/players/players_*.csv` returns
   **15 files / 879,401 bytes**, matching the local tree file for file. New tool

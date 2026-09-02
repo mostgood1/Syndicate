@@ -325,13 +325,13 @@ death, never life — do not invert it.
 - Files:
   **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
   released: - `scripts/capture_wnba_live_player_box.py` — the capture (new).
-  - **BLOCKED, NOT CLAIMED:** the `HOT_ARTIFACT_PATTERNS` entry for
-    released: `wnba_source/data/live/live_player_box_*.json` lives in a file held by the
-    OPEN lane `nfl-props-odds-allowlist` (actively editing that same list). Not
-    edited across lanes. **Until it lands the capture writes an artifact the
-    board build cannot see** — written, not yet reachable, which is exactly the
-    half of `#488` that reads as working. Owed with it: the
-    `is_hot_artifact_relative_path` test.
+  - ~~**BLOCKED, NOT CLAIMED:** the `HOT_ARTIFACT_PATTERNS` entry for
+    `wnba_source/data/live/live_player_box_*.json` lives in a file held by the
+    OPEN lane `nfl-props-odds-allowlist`.~~
+    **RETIRED 2026-09-02 — THIS BLOCKER IS NOT REAL, AND THE FIX IT ASKS FOR IS
+    FORBIDDEN.** See the RETIRED note at the bottom of this lane for the
+    evidence. Short version: the artifact is KEYVALUE-backed, so it already
+    crosses services and an allowlist entry would be inert.
 - **TWO READINGS OWED, BOTH BLOCKED ON A LIVE SLATE. DO NOT report either as
   working.**
   (a) `#499` totals PASSES only if rows refuse as `prob_interval_swamps_edge`
@@ -345,10 +345,44 @@ death, never life — do not invert it.
   reason — treat exit 3 as "not measured", never as a pass.
 - **STILL NEVER RUN END TO END.** Every hop is wired and unit-tested; the chain
   has never executed against a live slate.
-- **BLOCKED, NOT CLAIMED:** the `HOT_ARTIFACT_PATTERNS` entry for
+- ~~**BLOCKED, NOT CLAIMED:** the `HOT_ARTIFACT_PATTERNS` entry for
   `wnba_source/data/live/live_player_box_*.json`. Until it lands the capture
-  writes an artifact the board build CANNOT SEE — written, not reachable, which
-  is exactly the half of `#488` that reads as working.
+  writes an artifact the board build CANNOT SEE.~~
+- **RETIRED 2026-09-02 `[lane soccer-players-csv-allowlist, asked to "fix the
+  wnba one too" after the soccer allowlist entry shipped]`. THE BLOCKER IS NOT
+  REAL AND THE FIX IT NAMES IS THE ONE THIS REPO FORBIDS.** No entry was added
+  and no deploy was run. Traced end to end, in code:
+  - **WRITER** is not the standalone script any more. `live_lens_loop.py:625`
+    writes the capture through `refresh_state_store.write_json_file`. That
+    function returns **before ever touching disk** when the path is
+    keyvalue-backed — an exclusive branch, not a dual write.
+  - **BOTH READERS** use `refresh_state_store.read_json_file`:
+    `bet_status_wnba.py:666` and `wnba/live_lens.py:370`. Neither consults disk.
+  - **THE PATH IS KEYVALUE-BACKED.** `_keyvalue_backed()` excludes exactly one
+    marker, `migration_runs/`, and all three services carry
+    `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` in `render.yaml`. Its docstring
+    says read and write route through one predicate specifically so they cannot
+    disagree.
+  - **KEYVALUE IS THE SHARED REDIS**, so the artifact ALREADY crosses services.
+    Measured on web 2026-09-02: `/api/ops/keyvalue/diagnostics` returns real
+    Redis stats (not the "not keyvalue on this service" refusal), and
+    `/api/ops/keyvalue/usage` shows a **`wnba_source/data` bucket, 55 keys,
+    322,752 bytes**. TTL is 10 days for a date-tokened path.
+  - So an allowlist entry would let `publish` accept the path while
+    `sweep_changed_hot_artifacts` globs a DISK that never holds the file, and
+    `/api/ops/artifacts/export` (also a disk read) would return `count=0`. That
+    is the **2026-08-27 FORBIDDEN** rule verbatim: *allowlisting a keyvalue-backed
+    path turns a 403 into an empty result and looks like a fix.*
+  - `artifact_publisher.py` already says so in its own `board_snapshot` note:
+    **"Allowlisting PERMITS a transfer; it does not make a reader. Add the entry
+    with a disk-consulting read, not before."**
+  - The deferral target is also gone: lane `nfl-props-odds-allowlist` no longer
+    exists in `lanes.md`.
+  **What was never in question:** this does NOT show the props chain works. The
+  "STILL NEVER RUN END TO END" bullet above stands untouched — the transport was
+  never the missing piece, so removing a non-blocker discharges nothing.
+  **The real risk to this artifact is eviction, not reachability** — see
+  `todo.md #637`.
 - Blocked by: none.
 - Full working record (measurements, phase log, hypothesis/falsification detail) moved VERBATIM to `.syndicate/lanes_history.md` at the 2026-08-31 compaction. Nothing was summarised away.
 
