@@ -1659,6 +1659,57 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Narrative + evidence: `log/2026-09-02.md`, `todo.md #625`(4),
   `state.md [local-fleet-runner]`.
 
+### kalshi-discovery-deadline — OPEN — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+- Goal: the candidate-pool build cannot block for minutes on Kalshi. ONE testable
+  outcome: `tests/test_intelligence.py` completes in bounded time WITHOUT opening
+  an outbound socket, and `kalshi_client.discover` aborts at an AGGREGATE
+  deadline that a unit test can drive.
+- Files: `syndicate/features/shared/kalshi_client.py`,
+  `pipeline/kalshi_discovery.py`, `tests/test_intelligence.py` (the network
+  guard + the one hanging test only), `tests/test_kalshi_discovery_deadline.py`
+  (NEW). Checked against every OPEN lane: none claims these.
+  **DELIBERATELY NOT CLAIMED: `pipeline/intelligence_state.py`** — held by OPEN
+  lanes `polymarket-yes-leg-binding` and `layer2-cap-raise`. The bound belongs in
+  the client, which is also where it fixes every other caller.
+  `syndicate/blueprints/intelligence.py` is RELEASED by two lanes but is not
+  needed: the request-path gate there is already correct (see below).
+- Hypothesis: **the per-request timeout is real and the AGGREGATE is unbounded.**
+  `_get` passes `timeout=20.0` to `urlopen`, but `fetch_markets` walks a cursor
+  with `max_pages=20` — its own docstring says "`max_pages` is a hard stop, not a
+  budget" — inside `for base in _BASE_URLS`, and `_BASE_URLS` has THREE entries.
+  Worst case ≈ 3 x 20 x 20s = **1,200s**, with nothing measuring elapsed time.
+  Located by faulthandler on 2026-09-02: `_build_candidate_pool` ->
+  `run_kalshi_discovery` -> `fetch_markets` -> `_get` -> blocking `ssl.read`.
+- Falsification test: if `fetch_markets` breaks out of `_BASE_URLS` on first
+  success AND real page counts are small, the ~1,200s ceiling is theoretical and
+  the hang has another cause — in which case this lane is wrong and the real
+  subject is whatever else blocks. Settle it by TIMING a single
+  `run_kalshi_discovery` with per-request and per-page instrumentation before
+  changing anything.
+- Verification: (1) `tests/test_intelligence.py` runs to completion, with a test
+  that FAILS if the suite opens a socket to a venue (the guard must be
+  discriminating, not merely present); (2) a unit test drives
+  `discover`/`fetch_markets` past the deadline against a stubbed slow transport
+  and proves it aborts, reporting what it got rather than raising; (3) an
+  off != on check — with the deadline generous the call completes, with it tight
+  it truncates and SAYS SO, so a truncated discovery can never read as a
+  complete one (`#435`-class: a partial result presented as whole).
+- **PRODUCTION SCOPE, SETTLED IN ADVANCE SO NOBODY RE-DERIVES IT.** This is
+  **NOT** a production web incident. `intelligence.py:1799` gates on
+  `_render_hosted_request()`: on Render a cache miss returns the queued/empty
+  placeholder, and the synchronous `_compute_intelligence_response` lives only in
+  the `else` (non-Render) branch. That gate was added deliberately — its comment
+  records that a synchronous candidate-pool build "drove web to 100% memory /
+  0MB headroom" (`#109` follow-up, 2026-07-27). **I overstated this as a live
+  request-path defect when I first reported it; corrected here.** The CONFIRMED
+  harm is: the regression suite hangs for everyone, and any non-Render caller
+  (local dev, CLI, a script) can block for minutes.
+- Caution carried from `learnings.md` 2026-08-28: a network result is a fact
+  about the NETWORK, not the venue. This lane's conclusion must be about the
+  CODE'S BOUND — never "Kalshi is slow".
+- Blocked by: none. Does not deploy; the fix is a bound, and a bound is only
+  worth shipping once its off != on test exists.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
