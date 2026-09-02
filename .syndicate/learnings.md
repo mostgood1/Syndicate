@@ -4430,3 +4430,54 @@ that no longer exists, or one that did not exist yet.
   live-odds-worker, and it has still never executed in production — recorded as
   OWED rather than passed.
 - *(full account: `deploys.md` 2026-09-02 17:56:08Z)*
+
+## 2026-09-02 — FORBIDDEN: arming a periodic job on refresh-worker on the strength of a bound that does not bound MEMORY. `[lane soccer-anchor-wiring]`
+
+I armed `#626`(h) and it **OOM-killed the worker on its first run**: anon
+**1,833 → 3,868 MB** against a 4,096 MB ceiling, headroom down to **0.051 MB**,
+climbing **+146.9 MB/s**, instance restarted 105 seconds after the job claimed.
+
+**The rule was in front of me and I quoted it while breaking it.** CLAUDE.md
+says *"Worker periodic work is never free — `#241` caused a prod restart loop"*.
+I repeated that back when asked to arm it, and then argued the job was safe
+because it was **segment-capped and claim-guarded**. Neither of those bounds
+memory: a segment cap bounds OUTPUT ROWS, not the working set that produces
+them, and a claim bounds RETRY, not allocation. **I substituted two real bounds
+on other quantities for the bound that mattered and never measured the one that
+mattered.**
+
+**How to apply.** Before arming anything periodic on a worker, state the peak it
+will add and how you measured it. "It is capped" is not an answer until you say
+capped ON WHAT. If the only available answer is a cap on something other than
+memory, the job is unmeasured and must not be armed.
+
+**What kept it to a nuisance:** `#256`'s claim-before-work. The epoch advances at
+CLAIM time, so a death mid-pass costs exactly ONE run per day instead of every
+cycle. Without it this was a permanent crashloop. That design decision did more
+than my reasoning did.
+
+## 2026-09-02 — RULE: a WATCHER carries the assumptions it was armed with, and those expire. Re-read the world before acting on what a watcher tells you. `[lane soccer-anchor-wiring]`
+
+Two watchers misled me in one hour:
+
+- One polled the deploy claim for the literal string `free`. An expired claim
+  reads **`EXPIRED (does not block)`** — so it sat through an OPEN window from
+  19:26 onward reporting "blocked". I caught it only by reading the status by
+  hand.
+- The other fired at 20:06 with **"take it, the disarm is pending"**. The disarm
+  had been resolved at 19:32 by a peer's deploy. The instruction was true when
+  armed and false when delivered.
+
+**Neither was wrong about its predicate; both were wrong about the world.** A
+watcher is a snapshot of intent, and intent goes stale while it waits.
+
+**How to apply.** A watcher's job is to WAKE you, never to tell you what to do.
+On waking, re-read the live state before acting — and prefer matching on the
+condition (`not blocking`) rather than one spelling of it (`free`).
+
+**The wider pattern this session — SIX false readings, every one mine, not the
+system's:** a heredoc eating a pipe's stdin; truncated JSON parsed as zero rows;
+a grep matching the log tool's own echoed query; `?limit=100` read as a total
+when the service has 153 keys; and the two above. **In each case an instrument
+reported on itself and I read it as a fact about production.** When a
+measurement comes back empty, the first hypothesis should be the instrument.

@@ -1,3 +1,92 @@
+## [refresh-worker-headroom-2026-09-02] THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-env-snapshots, measured off 200 MEMORY_WATCHDOG samples 15:30-16:10Z]`
+
+**Read `memory_anon_mb`, not `memory_headroom_mb`.** `memory_current_mb` includes
+reclaimable page cache and this worker holds **~1.2GB** of it, so the headroom
+field understates by roughly that much.
+
+    memory_headroom_mb   min 29    max 425   last 99     <- ALARMING AND MISLEADING
+    memory_anon_mb       min 1518  max 1877  last 1833   <- the real number
+    -> anon 1833 of 4096 = ~2.26GB REAL headroom
+
+**55% of samples read under 200MB nominal headroom.** Anyone reading that field
+will conclude the worker is minutes from death. It is not. This is the same trap
+as the 2.7GB "plateau" that turned out to be file cache — split anon from
+inactive_file before calling anything pressure.
+
+**What IS true:** anon climbs through a cycle (1518 → 1877) and peaks at
+`last_stage=overview_sport_end`, so the board-overview stage is the high-water
+mark. New periodic work still is not free — `#241` stands — but it is being
+weighed against ~2.26GB, not ~1.4GB, and certainly not against 29MB.
+
+**Owed:** the first armed run of the accuracy autorun (`#626`(h), live since
+2026-09-02T15:29:45Z) should have its OWN cost read against this
+`overview_sport_end` peak, not against an idle baseline.
+
+## [accuracy-autorun-OOM-2026-09-02] THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lane soccer-anchor-wiring]`
+
+**RESOLVED. No deadline outstanding.** The key was set `false` at ~19:0xZ and a
+peer's refresh-worker deploy (`e4a471c0`, 19:26:44Z) injected it. **VERIFIED
+DIRECTLY rather than inferred from deploy ordering** — the decline reason flipped
+from `daily_gate` to `disabled` at 19:32:27Z and has held since:
+
+    ACCURACY_SUMMARY_AUTORUN_GATED reason=disabled env=ACCURACY_SUMMARY_ENABLE_...
+
+That verification exists only because the decline telemetry was added earlier the
+same day (`24efb82b`); before it, all three decline causes were the same silence.
+
+**MEASURED:** armed 15:29:45Z, fired 15:31:11Z, killed the worker by 15:32:56Z.
+Anon **1,833 → 3,868 MB** against a 4,096 MB ceiling, headroom **0.051 MB**,
+climbing **+146.9 MB/s**. `[accuracy_summary] AUTORUN_DONE` never printed, and
+since the `except` path prints it too, its absence proves a KILL rather than an
+exception. `intelligence_evaluation.py:2657` (`build_accuracy_summary`) was on
+the stack in all three faulthandler dumps.
+
+**`#241` REPEATED.** "Worker periodic work is never free" was quoted at arming
+time and armed over. The job roughly DOUBLES peak anon on a worker whose cycle
+already peaks at 1,877 MB.
+
+**WHAT PREVENTED A RESTART LOOP:** `#256`'s claim-before-work. The epoch advances
+at CLAIM time, so a death mid-pass costs exactly one run per day instead of every
+cycle. That design decision is the only reason this is a scheduled nuisance
+rather than an outage.
+
+**THE ALLOCATOR IS MEASURED** `[2026-09-02, lane accuracy-summary-alloc-profile,
+LOCAL profile, no deploy]`. Full record: `todo.md #626`(h).
+
+    peak growth = 4.01-4.41 x ACCEPTED CHUNK BYTES, intercept ZERO, R2 0.999998
+    100% of resident bytes at intelligence_evaluation.py:711 (json.loads)
+    dedup ratio 0.9979 -> the "streaming reduction" reduces nothing here
+    98.8-99.9% of peak is set by materialisation, BEFORE any output exists
+
+At the production accepted set (`LEDGER_CHUNKS_ACCEPTED bytes=830,832,574
+records=22,078`, ceiling 256MB, and NO date window at all) that is **3,178-3,493
+MiB** on top of anon 1,833 MiB -> **5,011-5,326 MiB against a 4,096 MiB ceiling.
+The kill was CERTAIN, ~915 MiB short on its most favourable coefficient**, not a
+near miss. Corroborated two ways: it died having added 2,035 MiB = 64% of the
+projection, and the local allocation rate (155 MiB/s) matches production's
+terminal climb (146.9 MB/s) within 6%.
+
+**Why the segment cap could not have worked, and a SECOND defect it hides.**
+`_bounded_accuracy_summary` runs on the RETURNED summary, downstream of the whole
+working set — a segment cap bounds output rows, never the set that produces them.
+Separately it truncates the WRONG CONTAINER: `list(segmented_reliability.items())
+[:50]` cuts the three top-level keys, never the `segments` LIST, so
+`segments_total` reads **3** while `len(segments)` is **7**, `segments_truncated`
+is pinned False at any coverage, and the "bounded" payload is LARGER than the raw
+one. The 8MB keyvalue ceiling it was written to protect is unprotected. Owner:
+lane `accuracy-autorun-decline-telemetry`, which holds that file.
+
+**STILL DO NOT RE-ARM — the reason has changed, not gone.** The measurement is
+done; the BOUND is not built. Proposed and measured: a CUMULATIVE byte budget
+(newest-chunk-first) of 90,000,000 B -> peak 344-378 MiB, worker worst case
+2,255 MiB = 55.1% of ceiling. Anchored on a real reading (85,766,820 B ->
+365.0 MiB), not on arithmetic. **Do NOT reach for
+`load_recent_evaluation_records(days=14, max_chunk_bytes=64MB)`: at 64MB it
+accepts 0 of the 8 chunks and the summary is computed on an empty set.** And note
+the budget's honest limit — chunks are 95-332 MB/day, so 90 MB is under ONE DAY
+against a 28-day drift window; the budget makes the job safe, not correct. The
+correct fix is streaming accumulators (peak O(segments + dates), not O(ledger)).
+
 # Syndicate — Verified System State
 
 > **Overwrite lines here as facts change. Do not stack contradictions.**
