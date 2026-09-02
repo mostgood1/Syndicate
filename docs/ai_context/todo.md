@@ -663,10 +663,32 @@ soccer fixtures, and `_supported_intelligence_dates()` covers five DAILY sports,
 so a soccer-only date never becomes eligible to build and its **42 real Serie A
 rows age on the board forever**.
 
-**NEXT ACTION, and it is a precondition not a step:** verify
-`SLOW_REFRESH_SECONDS` actually BINDS before widening the build window —
-**widening without it halves today's refresh rate.** Scoped in `state.md
-[week-scoped-board-window]`.
+**PRECONDITION DISCHARGED 2026-09-02 — THE THROTTLE BINDS, measured.** Per-date
+`BUILD_SPAN_ENTER` intervals over a 744-minute production window on
+refresh-worker:
+
+| date | builds | span (min) | median gap |
+|---|---|---|---|
+| 2026-09-02 (today, unthrottled) | 39 | 744 | **15.8 min** |
+| 2026-09-03 (tomorrow, throttled) | 7 | 708 | **38.8 min** |
+
+Tomorrow's median gap sits **above the 30-min floor**
+(`SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS`, default 1800s,
+applied only to `window_date != today`). Today runs free. **This is what three
+tuning changes never established** — the knob was never shown to bind, so nobody
+could tell a tuned knob from an inert one.
+
+**AND IT CORRECTS THE COST MODEL THAT BLOCKED THIS ITEM.** The scoping note
+predicted *"add tomorrow and they alternate: ~42 min each"*, i.e. that widening
+HALVES today. Measured, today is **15.8 min, not 42** — because the throttle
+SHEDS the extra date's turns rather than alternating with it. **Widening does not
+halve today's refresh rate**, provided each added date is likewise non-today and
+therefore throttled.
+
+**WHAT IS STILL NOT ESTABLISHED, and the widening should not skip it:** every
+added date here is soccer-only, and `display_prediction_dates.json` staleness
+(risk 2 in the scoping note) remains UNVERIFIED — who writes it and how often. A
+throttle that binds does not help if the date list feeding it is stale.
 
 ### `#630` — **PUBLISHED ARTIFACTS WERE SILENTLY LOSING ROWS: two services each published a WHOLE-FILE REPLACE of the same path** — lane `book-quotes-publish-clobber`, 2026-09-01 — **FIXED AND LIVE (`e78aee52`, `bfaa5ecc`, `cf569731`, `8db62f85`, `f027fda6`); three follow-ups OPEN below**
 

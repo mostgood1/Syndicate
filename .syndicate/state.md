@@ -9168,6 +9168,23 @@ exists precisely for this and already applies to non-today dates -- **verify it
 BINDS before widening**, because this lane has already shipped three tuning changes
 to that knob that did nothing (see `[board-window-staleness]`).
 
+> **VERIFIED 2026-09-02 — IT BINDS, AND THIS COST MODEL IS WRONG.**
+> `[lane board-window-throttle-binds]` Measured per-date `BUILD_SPAN_ENTER`
+> intervals, 744-minute window on refresh-worker:
+>
+>     2026-09-02  today, unthrottled   39 builds   median gap 15.8 min
+>     2026-09-03  tomorrow, throttled   7 builds   median gap 38.8 min
+>
+> Tomorrow sits ABOVE the 30-min floor; today runs free. **"They alternate at
+> ~42 min each" did NOT happen — today is 15.8 min, not 42.** The throttle SHEDS
+> the extra date's turns instead of alternating, so **widening does not halve
+> today's refresh rate.** The paragraph above is kept because its CAUTION was
+> right and produced this measurement; only its arithmetic is superseded.
+>
+> Method note: a first pass read a 12-line log tail and concluded tomorrow
+> out-built today 3:1. Over the full span it is 39 to 7 the other way — a tail
+> read as a population, which is the standing "a rate, not a count" rule.
+
 ### Risks
 
 1. **Today regresses** if the throttle does not bind. Measured earlier today with 2
