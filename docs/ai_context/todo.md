@@ -710,16 +710,38 @@ and empty. Refusals collapsed as designed: `market_type_not_a_game_line`
 6,960→3,375, `board_market_not_a_game_line` 935→138. Recorded in `deploys.md`;
 state.md corrected; lane CLOSED.
 
-**STILL OPEN (follow-ups, unowned):** ONE PENDING PRODUCTION READ, due next
+**STILL OPEN (follow-ups, unowned):** ~~ONE PENDING PRODUCTION READ, due next
 pregame board (added 2026-09-01 22:1xZ, lane `prop-name-disambiguator-derivation`):
 the `Max Muncy (2002)`→`maxmun` derivation fix + `prop_same_name_collision_at_venue`
 guard are LIVE on `cc1feccc` (module proven running: 5 sample pairs encode per the
 measured rule, `prop_classes` invariant 162=162), but the board carried ZERO
 disambiguated names after first pitches — the decisive read is one
 `POLYMARKET_UNMATCHED`/capture line on a pregame board carrying such a name
-(sample token must read `maxmun`-style, never `max200`); the collision counter's
-zero is expected and is NOT the guard firing (reachability is test-pinned). See
-`findings_2026-09-01_prop_rung_miss_rate.md` + `deploys.md` 22:14Z. NFL PROP admission (448/cycle, vocabulary
+(sample token must read `maxmun`-style, never `max200`)~~ — **DISCHARGED,
+PASS, 2026-09-02** (lane `maxmun-pregame-read`, scheduled task
+`todo-628-maxmun-pregame-read`; read taken 14:31–14:40Z / 09:31–09:40 CT, on
+refresh-worker `ad1de331`). The served pregame board carried the input this
+time: `Max Muncy (2002)` on 4 rows, `ATH @ TEX`, `game.state = "pregame"`, first
+pitch 18:35Z. The decisive line, `[portfolio_commit] POLYMARKET_UNMATCHED` at
+`2026-09-02T13:46:18.027633152Z`, sample verbatim: `{'kind': 'no_match',
+'board': 'Athletics @ Texas Rangers', 'want': 'batter_home_runs|over|0.5',
+'player': 'Max Muncy (2002)', 'token': 'maxmun', 'fixture_tokens': ['jakbur',
+'wyalan', 'corsea', 'branim', 'jusfos', 'ezedur'], 'token_lines': []}`.
+**`token` reads `maxmun`, not `max200` — the strip is effective in production,
+not merely present.** The row is still `no_match` and that is CORRECT: `maxmun`
+is not in the venue's `fixture_tokens`, so this is the venue's coverage miss,
+which is the refusal this module prefers; a `maxmun`-keyed MATCH was never the
+pass criterion. Expected token derived by EXECUTING `ad1de331`'s own tree, not
+from memory or the primary checkout. **`prop_same_name_collision_at_venue` = 0,
+on a LIVE instrument** — the join's `refusals` dict is emitted every cycle on
+`POLYMARKET_BOARD_JOIN` and carried 10 populated reasons that cycle, so the
+absent key is a real zero, not a dead counter; reachability stays test-pinned.
+**First production sighting of the collision condition's other half, not a
+defect:** 13:55:09Z, `'player': 'William Contreras', 'token': 'wilcon',
+'fixture_tokens': ['wilcon2', ...]` — the venue lists the extended form and not
+the plain one, so nothing matched and the guard (which runs only on MATCHED
+rows) was never reached. Full measurement: `deploys.md` 2026-09-02 13:46:18Z,
+referencing the 2026-09-01 22:14Z `cc1feccc` entry it discharges. NFL PROP admission (448/cycle, vocabulary
 unmeasured — same mechanism once week-1 fixtures are resolvable);
 `/api/ops/polymarket/slate` still skips PROP before sampling (the reader now
 disagrees with the decider about props); `venue_ticker` untraceable on captured
