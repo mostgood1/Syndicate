@@ -1524,6 +1524,59 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   IN-SAMPLE); (3) multi-week anchored-vs-base on PROPS against OUTCOMES.
 - Blocked by: none.
 
+
+### accuracy-summary-alloc-profile — CLOSED 2026-09-02 — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 — **GOAL MET. The allocator is ONE SITE and the scaling is PROPORTIONAL.** 100% of resident bytes at `intelligence_evaluation.py:711` (`json.loads` in `_stream_chunked_ledger_records`); peak = **4.01-4.41 x accepted chunk bytes, intercept ZERO, R2 0.999998** over 9 corpora of real records; materialisation is 98.8-99.9% of peak, so no output-side cap can bound it. Production projection **3,178-3,493 MiB** on top of anon 1,833 -> the kill was CERTAIN, ~915 MiB short at best. Two independent corroborations (64% of the projection consumed at death; 155 MiB/s local vs 146.9 MB/s production climb). **HYPOTHESIS PARTLY FALSIFIED:** the repeated `dict(item)` copies are SHALLOW and cost ~nothing — the peak is one materialisation, not three. **SECOND DEFECT FOUND, NOT MINE TO FIX:** `_bounded_accuracy_summary` truncates the wrong container (`segments_total`=3 vs `len(segments)`=7, `segments_truncated` pinned False, bounded payload LARGER than raw) so the 8MB keyvalue ceiling is unprotected — owner is lane `accuracy-autorun-decline-telemetry`. Bound proposed and measured: cumulative 90,000,000 B budget -> peak 344-378 MiB, worker worst case 55.1% of ceiling. **NOT RE-ARMED; no deploy; no production touched.** Record: `todo.md #626`(h) + `state.md [accuracy-autorun-OOM-2026-09-02]`.
+- Goal: a MEASURED allocation profile of `build_accuracy_summary` (peak + top
+  allocating sites), a scaling relationship against ledger chunk bytes, and a
+  proposed bound stated as an implied peak against the 4,096 MB container whose
+  baseline cycle already peaks at anon ~1,877 MB. Recorded on `#626`(h).
+- Files: docs/ai_context/todo.md, .syndicate/lanes.md, .syndicate/state.md,
+  .syndicate/deploys.md (measurement record only).
+  READ-ONLY on `syndicate/features/shared/intelligence_evaluation.py` and
+  `scripts/run_refresh_worker.py` — the latter is held by OPEN lane
+  `accuracy-autorun-decline-telemetry`; this lane proposes, it does not edit.
+  Profiling harness lives in the session scratchpad, not the repo.
+- Hypothesis: peak is driven by FULL MATERIALISATION of the deduped record set
+  plus REPEATED SHALLOW COPIES of it — `_stream_record_payloads` does
+  `yield dict(item)` for an in-memory sequence, and `build_accuracy_summary`
+  passes its own `record_rows` back through it TWICE (`compute_metrics` and
+  `build_segmented_reliability_profile`). Peak should therefore be ~linear in
+  accepted-chunk bytes with a multiplier >1x the single reduced set, and the
+  50-segment cap cannot touch it because it truncates OUTPUT after the working
+  set has already been built.
+- Falsification test: if peak is FLAT in input bytes, or if the top allocating
+  sites are not the record materialisation, the hypothesis is wrong and the fix
+  is not streaming/chunking.
+- Verification: tracemalloc peak AND process RSS delta reported together for
+  the same run (the OOM metric is anon RSS, not Python-object bytes — the
+  2026-08-29 profiler-scope rule), across >=3 input sizes, with the fitted
+  slope stated in MB resident per MB of chunk file.
+- Blocked by: none. DOES NOT re-arm `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN`
+  and does not touch production.
+
+### accuracy-summary-ledger-budget — OPEN, GOAL MET, **BOTH PUBLISHING BLOCKERS FIXED (cross-lane, user-authorised)** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 — **BUILT AND RE-MEASURED OFF vs ON AT PRODUCTION SCALE.** Corpus 831,038,410 B / 8 chunks: budget OFF peak **3,181.1 MiB** (41.2 s), budget ON (90,000,000) peak **344.4 MiB** (7.3 s), accepted 89,967,617 <= budget, coefficient **4.014 in BOTH** — 9.24x reduction, 2,836.7 MiB saved. **The prior extrapolation (3,178 MiB) is now a direct measurement (3,181.1), 0.1% apart.** OFF = 5,014.1 MiB vs a 4,096 ceiling (OOM by 918); ON = 2,221.4 MiB = 54.2% of ceiling. Falsification test PASSED: off != on. 10 new tests, 66 pass across the ledger/summary suites, all 8 pre-existing callers unchanged (budget defaults to None). **DEFECT CAUGHT BY ITS OWN TEST:** the first cut checked the byte limit AFTER consuming the line and read 5,005,916 against a 5,000,000 budget; the bound is now exact. **BOTH BLOCKERS FIXED IN THE SAME SESSION `[user decision: cross-lane edit authorised]`:** `_bounded_accuracy_summary` now publishes `ledger_coverage` and truncates the `segments` LIST (not the mapping's 3 fixed keys), keeping the largest-sample segments. 10 more tests, and all four key assertions VERIFIED TO FAIL against the pre-fix function extracted from HEAD (segments_total 3, truncated False, payload ratio 0.996, coverage None). **NOT RE-ARMED, NOT DEPLOYED.** Record: `todo.md #626`(h) + `state.md [accuracy-autorun-OOM-2026-09-02]`.
+- Goal: implement the CUMULATIVE byte budget measured by lane
+  `accuracy-summary-alloc-profile` and re-measure peak WITH IT ENFORCED, at
+  production scale, off vs on. Peak must land in the predicted 344-378 MiB band.
+- Files: syndicate/features/shared/intelligence_evaluation.py,
+  tests/test_accuracy_summary_ledger_budget.py (NEW), docs/ai_context/todo.md,
+  .syndicate/lanes.md, .syndicate/state.md, .syndicate/log/2026-09-02.md.
+  NOT `scripts/run_refresh_worker.py` -- held by OPEN lane
+  `accuracy-autorun-decline-telemetry`. Checked: no OPEN lane claims
+  `intelligence_evaluation.py`.
+- Hypothesis: n/a (building a bound that was measured before it was designed).
+- Falsification test: OFF != ON. With the budget unlimited the load must accept
+  the whole corpus and peak at ~4.0x its bytes; with the budget set it must
+  accept <= budget and peak in the predicted band. If peak is the same either
+  way the budget is INERT and this fails.
+- Verification: (1) `LEDGER_CHUNKS_ACCEPTED` carries budget/accepted/truncated
+  and the accepted sum is <= budget; (2) measured peak at production-scale
+  corpus, budget off vs on, both reported; (3) the summary payload itself
+  publishes what it covered, so a narrowed sample cannot be read as a full one.
+- DOES NOT re-arm `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN` and does not
+  deploy. Local only.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
