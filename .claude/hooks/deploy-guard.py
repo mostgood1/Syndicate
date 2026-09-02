@@ -155,8 +155,17 @@ def _lane(root, session_id):
     return ""
 
 
-def _claim(root, service):
-    """Unexpired claim on a canonical service, or None. Corrupt != absent."""
+def _claim(root, service, lane=""):
+    """Unexpired claim on a canonical service, or None. Corrupt != absent.
+
+    `#635`. WHEN TWO ALIAS FILES BOTH HOLD A CLAIM, THE BLOCKING ONE WINS.
+    This used to return the FIRST alias found, which makes the verdict depend on
+    dict order: with `web.json` held by a peer and `syndicate.json` held by you,
+    the wrong iteration order reads as "your own claim, proceed" and lets you
+    cancel their build. `deploy_claim.py` no longer writes two files, but old
+    ones exist and a guard must not be correct only because of tidy inputs.
+    """
+    found = []
     for alias in ALIASES.get(service, (service,)):
         path = os.path.join(root, ".syndicate", "deploy_claims", alias + ".json")
         if not os.path.exists(path):
@@ -175,8 +184,14 @@ def _claim(root, service):
         if age <= ttl:
             claim["_alias"] = alias
             claim["_age_min"] = age / 60.0
+            found.append(claim)
+    if not found:
+        return None
+    # Prefer a claim held by SOMEONE ELSE: that is the one that must block.
+    for claim in found:
+        if not lane or str(claim.get("holder") or "") != lane:
             return claim
-    return None
+    return found[0]
 
 
 def _commits_agree(receipt_sha, deploy_sha):
@@ -413,7 +428,7 @@ def main():
 
     state, blocked = [], False
     for service in services:
-        claim = _claim(root, service)
+        claim = _claim(root, service, lane)
         if claim is None:
             claim_problem = "NOT HELD by anyone -- take it"
         elif claim.get("corrupt"):

@@ -64,13 +64,61 @@ CLAIM_DIR = REPO_ROOT / ".syndicate" / "deploy_claims"
 SERVICES = ("web", "syndicate", "refresh-worker", "live-odds-worker")
 DEFAULT_TTL_SECONDS = 45 * 60
 
+# `#635`. ONE LOCK PER SERVICE, NOT PER NAME.
+#
+# `web` and `syndicate` are two names for `srv-d88ahvrbc2fs73eodu30`, and this
+# file used to key the claim on whichever string you typed -- so `web.json` and
+# `syndicate.json` were independent locks on one box. MEASURED 2026-09-02: one
+# lane held `web` with a build in flight, another was GRANTED `syndicate`,
+# deployed, and Render cancelled the first build 0.6s later. Both claims were
+# valid. No --force, no guard override; the claim step was run by both.
+#
+# The alias was already known elsewhere and only here was it missed:
+# `deploy_preflight.py` maps both names to the same service id, and
+# `deploy-guard.py` maps that id to `web`. Three components, three answers.
+#
+# The canonical name is the one the guard uses, so a claim written here is the
+# claim the guard reads. LEGACY_ALIASES is read on lookup so a `syndicate.json`
+# written by an older copy of this script still blocks -- absent that, upgrading
+# would silently free a held lock, which is the failure this fix exists to stop.
+CANONICAL = {
+    "web": "web",
+    "syndicate": "web",
+    "refresh-worker": "refresh-worker",
+    "live-odds-worker": "live-odds-worker",
+}
+LEGACY_ALIASES = {"web": ("web", "syndicate")}
+#: `status` iterates this, so one box prints one line. The old listing showed
+#: `web HELD` and `syndicate free` on consecutive lines for the same service,
+#: which is how the 2026-09-02 collision was read as "a different service".
+CANONICAL_SERVICES = ("web", "refresh-worker", "live-odds-worker")
+
+
+def canonical(service: str) -> str:
+    """The service a name refers to. Unknown names map to themselves rather than
+    raising: a new service must not silently share another's lock."""
+    return CANONICAL.get(str(service or "").strip(), str(service or "").strip())
+
 
 def _path(service: str) -> Path:
-    return CLAIM_DIR / f"{service}.json"
+    return CLAIM_DIR / f"{canonical(service)}.json"
+
+
+def _existing_paths(service: str) -> list[Path]:
+    """Every file that could hold a live claim on this service, canonical first."""
+    name = canonical(service)
+    return [CLAIM_DIR / f"{alias}.json" for alias in LEGACY_ALIASES.get(name, (name,))]
 
 
 def _read(service: str) -> dict | None:
-    p = _path(service)
+    # `#635`: canonical file first, then any legacy alias. A claim written by an
+    # older copy of this script under `syndicate.json` must still be seen, or
+    # this fix would itself free a lock somebody is holding.
+    for p in _existing_paths(service):
+        if p.exists():
+            break
+    else:
+        p = _path(service)
     try:
         return json.loads(p.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -209,7 +257,11 @@ def cmd_release(args: argparse.Namespace) -> int:
 
 
 def cmd_status(args: argparse.Namespace) -> int:
-    services = [args.service] if args.service else list(SERVICES)
+    # `#635`: one line per BOX. Listing `web` and `syndicate` as separate rows
+    # is what made a collision read as "a different service is busy" on
+    # 2026-09-02 -- the status output was the proximate cause, not just the
+    # split file. An explicit --service is canonicalised for the same reason.
+    services = [canonical(args.service)] if args.service else list(CANONICAL_SERVICES)
     held = 0
     for svc in services:
         claim = _read(svc)

@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#635` — **DEPLOY SERIALISATION IS BROKEN: `web` and `syndicate` are TWO LOCKS FOR ONE SERVICE, and two lanes held them at once** — lane `game-market-entry-roi-curve`, 2026-09-02 — **OPEN, and it has already cost a cancelled build**
+### `#635` — **FIXED 2026-09-02 (`deploy_claim.py` + `deploy-guard.py`, 10 tests, 5 mutations caught). One hole remains UNEXPLAINED — see the end.** — was: **DEPLOY SERIALISATION IS BROKEN: `web` and `syndicate` are TWO LOCKS FOR ONE SERVICE, and two lanes held them at once** — lane `game-market-entry-roi-curve`, 2026-09-02 — **OPEN, and it has already cost a cancelled build**
 
 **MEASURED, not theorised — it happened at 05:03Z on 2026-09-02.** Lane
 `book-quotes-publish-clobber` held the `web` claim (acquired 04:37Z, 45-min TTL)
@@ -30,7 +30,25 @@ Two lines, one box. I read it as two services. `deploy_preflight.py` even printe
 `web ... <-- deploying` while I held `syndicate`, and **that mismatch is the
 signal that should have stopped me and did not.**
 
-**THE FIX IS SMALL AND SHOULD NOT WAIT:** resolve every service name to its
+**FIXED, and the collision is reproduced as closed.** `deploy_claim.py` now
+canonicalises every name to one lock (`CANONICAL`: `syndicate` — `web`), so
+`acquire --service syndicate` while `web` is held now REFUSES instead of being
+granted. `LEGACY_ALIASES` is still read on lookup so a `syndicate.json` written
+by an older copy keeps blocking — without that, deploying the fix would itself
+have freed a held lock. `status` lists **one row per box** (the double listing
+was the proximate cause, not just the split file), and an explicit
+`--service syndicate` resolves to `web`.
+**`deploy-guard.py` hardened too:** `_claim` used to return the FIRST alias
+found, so with `web` held by a peer and `syndicate` held by you the verdict
+depended on dict order. It now prefers a claim held by SOMEONE ELSE — the one
+that must block — regardless of order.
+**Tests:** `tests/test_deploy_claim_service_aliases.py`, 10 cases, guard exercised
+as a SUBPROCESS the way the harness runs it. **Five deliberate mutations each
+caught** — including two that initially slipped through, because the first
+version of those tests asserted on a CONSTANT rather than on printed output, and
+used a fixture whose alias order made first-match look correct.
+
+**~~THE FIX IS SMALL AND SHOULD NOT WAIT:~~** resolve every service name to its
 Render service ID and key the claim file on the ID, or collapse the alias so
 `syndicate` is not offered at all. Until then **the claim serialises nothing for
 web**, and the coordinator role that used to serialise deploys is retired.
