@@ -3952,3 +3952,34 @@ the PRODUCTION call site argument by argument -- optional/defaulted parameters
 are exactly where this hides, because the replay still runs and still returns a
 number. Sibling of "confirm the code ran": assert you are on the branch
 production takes, not merely that something executed.
+
+## 2026-09-02 REQUIRED: a SIZE warning measured from the working tree is a statement about YOUR CHECKOUT, not about the ledger. Read the file at `origin/main` before trimming it. `[ledger trim pass]`
+
+**Measured.** The session-start digest said `LEDGER OVER BUDGET: lanes.md
+246KB>234KB, learnings.md 286KB>273KB`, and I relayed those numbers as real
+pressure. At `origin/main` the same files were **144KB/240KB and 270KB/280KB --
+both UNDER cap, and they had been for some time.** `session-start.sh` stats
+`.syndicate/*` in the PRIMARY SHARED TREE, which was **131 commits behind**;
+upstream had already moved ~122KB of lane blocks into `lanes_history.md` and the
+stale checkout still carried every one of them. The warning was true of the
+bytes on that disk and false of the ledger.
+
+**The trap is that trimming "works".** The tools would have run, the file would
+have shrunk, and the warning would have cleared -- while the actual defect (a
+checkout that stale is also serving STALE LANE STATUS to every session that
+starts there) went untouched and unreported. A remedy that silences the symptom
+is indistinguishable from a fix until someone reads the lane they thought was
+open.
+
+**What was really available**, after running every tool against `origin/main`:
+`trim_lane_blocks.py` 4,518 B (one block, a lane I had closed myself),
+`archive_released_lanes.py` the same block, and `compact_learnings.py`
+**0 bytes at every cutoff through 2026-09-01** -- already fully compacted, the
+270KB that remains IS the rules. Total lever: 2% of one file.
+
+**How to apply.** (1) `git show origin/main:<path> | wc -c` before acting on any
+digest size number, and check `git rev-list --count HEAD..origin/main` while you
+are there. (2) Dry-run every tool and read the RECLAIMED figure before choosing
+one -- three tools here, two of them with nothing to do. (3) Do not shrink
+`lanes.md` by closing lanes whose sessions are gone: that is FORBIDDEN by the
+2026-09-01 rule, and size is not a reason to reassign someone's work.
