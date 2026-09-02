@@ -18583,3 +18583,62 @@ it, and the destructive one may be twenty calls later.** The fix is not "be
 careful": it is that any command which can DISCARD work states its tree
 explicitly in the same invocation — `git -C <path> checkout ...` — so the
 working directory cannot supply it. Written to `learnings.md`.
+
+---
+
+## 2026-09-02 17:10:25Z — **`#638` FIXED AND MEASURED ON live-odds-worker** — `21de4a9e` — lane `venue-odds-byte-aware-trim`
+
+**Locks:** claim held by this lane on both workers; preflight CLEAR for exactly
+`21de4a9e`, which was re-confirmed an ancestor of `origin/main` at deploy time.
+Deploy `dep-dac59frtqb8s73e7le1g`, api trigger, live **17:10:25Z**.
+
+### verify: THE PAIRED READING, from the service's own go-live time
+
+Two log lines 1.37 seconds apart, and BOTH are needed — zero rejections alone
+would be satisfied by the writer simply not running.
+
+```
+17:11:41.973  KEYVALUE_WRITE_REJECTED  polymarket__ncaaf__2026_09_05.json
+                                       size_bytes=9091340 max_bytes=8388608
+17:11:43.343  TRIMMED_TO_FIT venue=polymarket sport=ncaaf game_date=2026-09-05
+                budget_bytes=7549747 points_dropped=45319
+                markets_dropped=0 markets_kept=6812
+17:11:44.421  POLYMARKET_DAILY_BOOK status=ok files=11 ERRORS=0
+                listed=17609 parsed=8742 opened=1695 APPENDED=8749
+```
+
+**`errors=0` and `appended=8749`.** Before this, that file returned
+`status=error` on every tick and appended nothing — frozen ~40 hours.
+**8,749 price points landed that were being discarded.** `budget_bytes=7549747`
+is 0.90 × 8,388,608, confirming the intended margin, and `markets_dropped=0`
+confirms the ordering: points were shed, coverage was not.
+
+### I MUST CORRECT MY OWN STATED CRITERION
+
+I said the reading would be **"rejections → zero"**. That is NOT what this
+design produces and I should not have promised it. The trim is REACTIVE — the
+store's refusal is the trigger — so each file that grows past the ceiling emits
+**exactly one** rejection and is then repaired in the same tick. One rejection
+since go-live, not zero. The correct criterion, and the one to use from now on,
+is the PAIR: a rejection **followed within seconds by `TRIMMED_TO_FIT` and a
+`status=ok` book with `appended` > 0**. A rejection with no trim line after it is
+the failure; a rejection alone is not.
+
+### WHAT THIS DOES NOT FIX, and it is the important part
+
+`points_dropped=45319` across `markets_kept=6812` means the price history for
+that date was cut to almost nothing to make it fit. That is the intended
+priority — openings and market coverage are preserved, both by design and
+verified in tests — but **the movement history for NCAAF 2026-09-05 is
+effectively gone, and will be again each time the file regrows.** The file is
+simply too big for an 8 MB ceiling: 6,812 markets cannot carry a day's points
+inside it at any trim setting.
+
+So `#638` stops the DATA LOSS at the write (no tick is discarded any more) and
+does not, and cannot, give that date a usable price history. That needs `#637` —
+moving this write-only archive off keyvalue onto disk, where there is no 8 MB
+ceiling and it stops competing with live operational state.
+
+**refresh-worker (989 rejections over the same window) is NOT yet deployed** —
+its preflight has held on an in-flight `run_mlb_daily_sim_job.py` throughout.
+Claim still held, waiter armed. This entry covers ONE of the two services.
