@@ -704,6 +704,20 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   released: `tests/test_season_projection_staleness.py`
   (the last two added 2026-08-29 by USER OVERRIDE — `exchange-markets-api-integration`
   released the worker entrypoint; see its Files line.)
+- **THE ORIGINAL GOAL IS DISCHARGED WITH A PRODUCTION READING `[measured 2026-09-01, lane game-market-entry-roi-curve]`, and it names a SECOND gate this block does not.** The chain is alive far past where "zero orders" suggests: `/api/board/layer2-shortlist?sport=ncaaf` serves **480 rows**, `per_sport.ncaaf.selected=480`. **The first stage that is zero is the SIZING input, not the board:**
+
+      model_edge_pct numeric   0 / 480      <- what the sizing path reads
+      model_ev_pct   numeric   0 / 480
+      ev_pct         numeric   480 / 480
+      ev_basis                 market_fair on 480 / 480
+
+  **TWO INTENTIONAL GATES IN SERIES, and this block names only the first.**
+  (1) `football/pick_gate.py` denies the MODEL claim — measured out-of-sample, 2023 SP+ → 2024, n=2,233 clean: model margin MAE **15.775 vs market 12.212, +3.563 at t=+17.20**, losing to the OPEN line by nearly as much and at every scale 6..24. Default is deny; serving requires a recorded WIN.
+  (2) **`portfolio_commit.py:267` refuses any row with no `model_edge_pct` (`no_model_edge_pct`)** — by design: *"a legitimate way to RANK and not a basis on which to SIZE ... Kelly would be exactly zero anyway."* **This is the gate that actually kills NCAAF**, because every served row is `market_fair` basis.
+  **CONSEQUENCE, and it is the useful part:** `pick_gate`'s 2026-08-29 amendment — re-keying the registry to `(sport, market, BASIS)` so a market-basis claim is no longer denied by sharing a key with the model claim — **does not and cannot produce orders on its own.** It un-blocked RANKING; sizing still requires a model edge the gate denies. A board change without a sizing basis is inert in the order path. Same shape as MLB Layer 2 (0/200 `model_edge_pct`, 100% venue-book refusal) in `findings_2026-08-31_mlb_accuracy_assessment.md` section 5.
+  **SO NOTHING IS "BLOCKING" THIS LANE.** Zero NCAAF orders is two deliberate gates working, and it will not change without either a model that beats the close or an explicit decision to size on market basis. That is a PRODUCT decision, not a defect — the same position `#624` step 6 holds for MLB props.
+  **AND IT RESOLVES `ncaaf-settlement-resolver`'s wait:** that lane is not blocked on a bug, it is waiting for a graded NCAAF bet that **cannot arrive while these gates hold.**
+- **SEPARATELY OWED AND NOW APPARENTLY ORPHANED `[measured 2026-09-01, lane game-market-entry-roi-curve]`:** this block's "STILL OWED — the production reading" is about the CFBD **429/backoff**, a different thread. The lane that reclaimed those files, `ncaaf-cfbd-quota-latch`, is **CLOSED and no longer in `lanes.md`**, and **no `todo.md` item mentions `cfbd_backoff`, `SEASON_PROJECTION_RELAUNCH_HELD` or `b59ee603`.** Whoever closes this lane must give that reading a home first or it dies here.
 - **NOTE FOR WHOEVER CLOSES THIS: the lane's ORIGINAL question is answered and
   is NOT what these commits fix.** Zero NCAAF orders is `pick_gate` denying
   ncaaf spread/moneyline/total on a measured out-of-sample loss, **working as
