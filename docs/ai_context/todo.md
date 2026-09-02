@@ -1348,6 +1348,66 @@ the measurement to repeat on this sprint.
   pricing for that market and the row says so. DO NOT ship any blend or
   calibration validated only in-sample (standing rule, 2 failures on record).
 
+**SOCCER'S WEIGHT IS CHOSEN: LEAVE IT AT 0.0. The cost blocker was mis-sized,
+path (a) is FALSIFIED, and two name joins were losing most of the mechanism.**
+`[lane soccer-anchor-cost, 2026-09-02 — full evidence
+.syndicate/findings_2026-09-02_soccer_anchor_cost.md]`
+
+- **The 57/136 min figures counted the wrong denominator.** They count priced
+  EVENTS in a forward book running to d+13. `build_artifacts` is SINGLE-DATE, so
+  the anchor never sees that list. Production-measured instead (refresh-worker
+  `e4a471c0`, `SOCCER_UNIT_*` telemetry): **43 units, 4h interval, ~335 s apart,
+  unit runtime = 27 s + 35 s/fixture, 136 fixtures in the live 7-day horizon.**
+  Anchor cost **45.0 min per 4h interval while broken, 83.2 min once fixed**,
+  against a build already costing 98.2 min — 76% of the interval. Memory is
+  untouched (`container_memory_unreclaimable_mb` 1710 of 4096).
+- **TWO NAME JOINS WERE SWITCHED OFF, both fixed and landed (`1182c3a3`,
+  NOT DEPLOYED, NOT ARMED).** Both compared exact strings across feeds that do
+  not share a naming convention. Reach, same production basis before/after:
+  fixture→priced-event **66 → 122 of 136**; fixture→ratings-key **138 → 214 of
+  214**. The ratings miss was INVISIBLE — the value was written under the ESPN
+  name, a key `loaders._rating_for` never reads, while `teams_changed` counted it
+  a success. `event_id` joins **0 of 136** (ESPN vs OddsAPI id spaces); the feed
+  has always run on the exact-name fallback. 11 tests, 8 fail pre-fix.
+- **(a) CUT SOLVER SIMULATIONS — FALSIFIED on props.** At half budget
+  `D_cheap/D_anchor` on `expected_shots` is **1.81** (25x5: 1.39, 12x5: 2.06) —
+  the solver-budget choice moves the published projection MORE than anchoring
+  does — and the shift REVERSES SIGN on 2 of 6 fixtures. The only safe trim is
+  capping `max_iterations` at 5: `100x7` costs +40% for RMSE 0.0491 vs 0.0497.
+- **(b) ANCHOR ONLY WHAT MATTERS — already implemented** (single-date builder).
+  Further scoping to board fixtures is 117→58 (50%) and CIRCULAR: anchoring
+  changes which rows clear the board's filters.
+- **(c) MOVE IT OFF THE CYCLE — already built.** Units are detached subprocesses,
+  one at a time, memory-isolated. The real constraint is the per-unit launch
+  slot: 3 of 42 units already overrun it, 5 would with the anchor.
+- **THE FREE LEVER, and it is NOT one of the three.** `p_base` is already
+  published per fixture at `simulations: 400` (`win_probability.home`), so
+  `shift = (logit(target) − logit(p_base)) / b_pooled` needs ZERO extra
+  simulations. In-sample it scores **0.0221 mean shift error vs the 500-sim
+  default's 0.0497** (slope cv 0.094 across 8 fixtures). **IN-SAMPLE — this is a
+  reason to run the held-out test, not a result**, per the rule three lines up.
+- **The evidence base is n=10, ONE slate, h2h only**, and the source report calls
+  it "a sensitivity check, not a tuned production default". All 10 shifts land on
+  the bisection's **32-point lattice** (spacing 0.01875), using 7 distinct
+  values — precision below the lattice was never available, so it cannot be what
+  produced the −40%.
+- **§4.4 quantified, not asserted:** `shot_calibration`'s divisor (1.3930) was
+  fitted on UNANCHORED `expected_shots`. The anchor's level shift is **1.0036 —
+  0.36%**, an order of magnitude below the divisor's own cross-window drift
+  (1.244–1.438). Re-fit AFTER arming; this interaction is small.
+- **THE STRATEGIC POINT THAT OUTRANKS THE COST QUESTION.** The anchor moves h2h
+  **3.58 pp** and props **2.9–5.1% relative**; the staked soccer surface is
+  **99 board rows / 58 fixtures, 74% h2h, ZERO player props**. Its largest effect
+  lands on the market the audit says not to stake, its smallest on markets that
+  do not reach the board. **Arming this changes almost nothing about what soccer
+  stakes.** The lever that would is `soccer-board-coverage`'s: give soccer a
+  model view worth ranking on.
+- **OWED, in order:** (1) publish the anchor audit into the recommendations
+  artifact — every `[soccer_anchor]` line currently goes to `/dev/null` because
+  `ops_refresh.py:1402` launches units with `stdout=DEVNULL`, so NO production
+  reading of this mechanism is possible today; (2) held-out surrogate validation;
+  (3) multi-week anchored-vs-base on PROPS against OUTCOMES, not h2h vs market.
+
 ---
 
 ### `#621` — **PHASE 4 — JOINT DISTRIBUTIONS + DERIVATIVES (Oct). Stop discarding the one thing no price-taker can copy.** — lane `edge-plan`, 2026-09-01 — **OPEN**

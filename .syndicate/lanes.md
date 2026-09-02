@@ -1465,6 +1465,60 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   pointed at a real `data/` (508 aliases loaded). Both run.
 - Blocked by: none.
 
+
+### soccer-anchor-cost — OPEN — opened 2026-09-02 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: a MEASURED cost/accuracy tradeoff for soccer market-anchoring across the
+  three candidate paths (cut solver simulations / anchor only staked fixtures /
+  move it off the refresh cycle), plus a recommendation with the number behind
+  it. Anchoring is validated (-40..-51% MAE, non-circular, held-out) and OFF
+  because ONE fixture costs 40.9s of solver time; 84 fixtures = 57 min/cycle,
+  200 = 136 min, on a refresh-worker that already OOM-killed once today.
+- Files: scripts/measure_soccer_anchor_cost.py (NEW),
+  scripts/validate_soccer_vs_market.py (released by `soccer-model-dispersion`),
+  .syndicate/{lanes,state,deploys}.md.
+- Note: `docs/ai_context/todo.md` is deliberately NOT claimed, same convention
+  and same file as `maxmun-pregame-read`: `book-quotes-publish-clobber`'s own
+  heading records that it RELEASED that file on 2026-09-01, and its `- Files:`
+  line is a stale duplicate-merge artifact. `#622`'s paragraph is written via
+  the worktree flow. Claiming it would manufacture a contest over a file the
+  holder no longer writes.
+- Files (cont.): syndicate/features/soccer/features/market_anchoring.py,
+  syndicate/features/soccer/features/market_odds.py,
+  tests/test_soccer_anchor_name_joins.py (NEW).
+  READ-ONLY on scripts/build_soccer_artifacts.py — held by OPEN lane
+  `soccer-anchor-wiring`; the fixes below are additive and need no caller change.
+- SCOPE ADDED 2026-09-02 (user: "fix both name joins and remeasure anchors
+  reach"). Both joins resolve teams by EXACT string and miss the ESPN-vs-ratings
+  and ESPN-vs-OddsAPI name conventions: measured 36 of 90 team slots inert and
+  56 of 70 skipped fixtures recoverable. Safe to land at the current weight:
+  `_apply_market_anchor` returns BEFORE `anchor_ratings_to_market` when
+  weight <= 0, and the only consumer of a fixture's `market_odds` key in the
+  repo is the anchor itself (grepped), so at weight 0.0 the change moves
+  counters and nothing else.
+- Hypothesis: the bisection's MC noise, not its iteration count, dominates the
+  solved shift's error — so solver `simulations` can be cut a long way before
+  the anchored rating moves outside the noise the DEFAULT setting already has.
+  Corollary: the default is not a precision baseline, it is one draw.
+- Falsification test: if the shift error at reduced `simulations` is LARGE
+  relative to the default's own seed-to-seed spread, the cost is buying real
+  precision and path (a) is dead. Run the default at several seeds FIRST —
+  without that control the reduced-sim spread is unattributable.
+- Verification: a table of solver cost vs. shift error vs. a PROP-market
+  accuracy delta (not h2h — anchoring shrinks toward the h2h market, so a
+  better h2h MAE is tautological), and a per-path minutes/cycle figure against
+  the measured 57 min baseline. Recorded on `todo.md #622`.
+- DOES NOT arm anchoring. `SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT` stays 0.0 in
+  production; `model_engine_standard.md` §4.4 re-fit is still owed and is
+  reported as owed, not done.
+- STATUS 2026-09-02: **BOTH JOINS FIXED AND LANDED (`1182c3a3`).** Reach
+  remeasured on the identical production basis: fixture->priced-event
+  **66 -> 122 of 136**, fixture->ratings-key **138 -> 214 of 214**. The
+  `event_id` stage joins 0 of 136 (ESPN vs OddsAPI id spaces) -- the feed has
+  always run on the exact-name fallback. 11 new tests, 8 fail pre-fix; existing
+  22 unchanged. NOT DEPLOYED and NOT ARMED; weight stays 0.0.
+  Full evidence: `.syndicate/findings_2026-09-02_soccer_anchor_cost.md`.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
