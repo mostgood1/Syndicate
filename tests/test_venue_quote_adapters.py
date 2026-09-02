@@ -46,6 +46,58 @@ def _market(slug, kind="SPORTS_MARKET_TYPE_MONEYLINE",
     return row
 
 
+# Club tokens these tests need to resolve. Deliberately TINY and explicit.
+_SOCCER_CLUBS = {
+    "ars": "arsenal",
+    "arsenal": "arsenal",
+    "che": "chelsea",
+    "chelsea": "chelsea",
+}
+
+
+@pytest.fixture
+def _soccer_aliases(monkeypatch):
+    """Make soccer club resolution DETERMINISTIC instead of reading `data/`.
+
+    WHY THIS EXISTS. `canonical_team("soccer", ...)` resolves through
+    `_soccer_alias_to_name`, which is DERIVED AT RUNTIME from the team
+    artifacts under `data/soccer_source/**`. Session worktrees exclude `data/`
+    by design (`scripts/session_worktree.py`: 34,690 files, and a lossy mirror
+    that is never evidence about production), so in the tree every session
+    actually works in, that map is EMPTY -- 0 aliases against 508 in a checkout
+    that has `data/`.
+
+    The three tests below then failed with `no_rows` and read exactly like the
+    production defect they were written to guard
+    (`no_polymarket_row_for_league_soccer`). They are not that. They were
+    passing or failing on whether a data mirror happened to be checked out.
+
+    WORSE, AND THE REASON THIS IS A FIXTURE RATHER THAN A SKIP:
+    `test_an_unresolvable_pair_is_not_relabelled_as_soccer` PASSED without
+    `data/` -- vacuously. With an empty map every pair is unresolvable, so the
+    assertion could not fail and the test could not detect the thing it exists
+    to detect. A green test that cannot go red is worse than a red one.
+
+    What is stubbed is a DEPENDENCY, not the subject. These tests are about the
+    adapter: that `DRAWABLE_OUTCOME` maps to `h2h`, that `_effective_league`
+    relabels a competition token when both clubs resolve, and that "Draw" is
+    dropped. Whether the local mirror happens to contain Arsenal is not the
+    claim. Non-soccer sports fall through to the real resolver untouched, so
+    the MLB/NFL isolation tests still exercise the real map.
+    """
+    from syndicate.features.shared import team_aliases
+
+    real = team_aliases.canonical_team
+
+    def _stub(sport, value):
+        if str(sport or "").strip().lower() == "soccer":
+            return _SOCCER_CLUBS.get(team_aliases.normalize(value))
+        return real(sport, value)
+
+    monkeypatch.setattr(team_aliases, "canonical_team", _stub)
+    return _SOCCER_CLUBS
+
+
 @pytest.fixture
 def _artifact(monkeypatch):
     holder = {}
@@ -59,7 +111,7 @@ def _artifact(monkeypatch):
     return holder
 
 
-def test_drawable_outcome_prices_a_soccer_h2h_row(_artifact):
+def test_drawable_outcome_prices_a_soccer_h2h_row(_artifact, _soccer_aliases):
     """Was refused entirely before 2026-08-25 -- `market_type_not_a_game_line`
     had no entry for DRAWABLE_OUTCOME. Slug is `<away>-<home>`: `ars` away,
     `che` home."""
@@ -73,7 +125,7 @@ def test_drawable_outcome_prices_a_soccer_h2h_row(_artifact):
     assert "soccer|h2h|chelsea" in keys
 
 
-def test_a_draw_outcome_prices_alongside_the_two_clubs(_artifact):
+def test_a_draw_outcome_prices_alongside_the_two_clubs(_artifact, _soccer_aliases):
     """A third "Draw" outcome is a real, priceable quote in its own right --
     it must not be dropped just because it does not name a club the board
     already asks a moneyline side for."""
@@ -92,7 +144,7 @@ def test_a_draw_outcome_prices_alongside_the_two_clubs(_artifact):
     assert "soccer|h2h|arsenal" in keys and "soccer|h2h|chelsea" in keys
 
 
-def test_a_soccer_row_is_found_across_a_non_soccer_league_token(_artifact):
+def test_a_soccer_row_is_found_across_a_non_soccer_league_token(_artifact, _soccer_aliases):
     """The regression this fix guards: before it, `wanted_league="soccer"`
     could never equal a literal slug token like `eflc`, so this returned
     `no_rows` for every soccer market regardless of catalogue coverage --
@@ -118,7 +170,7 @@ def test_a_non_soccer_league_still_requires_a_literal_match(_artifact):
     assert result.reason == "no_polymarket_row_for_league_nfl"
 
 
-def test_an_unresolvable_pair_is_not_relabelled_as_soccer(_artifact):
+def test_an_unresolvable_pair_is_not_relabelled_as_soccer(_artifact, _soccer_aliases):
     """Both clubs must resolve as known soccer clubs before a row is
     relabelled -- an unresolvable pair keeps its literal (wrong, but not
     guessed) league token and correctly misses a soccer call."""

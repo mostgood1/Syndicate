@@ -1544,6 +1544,36 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   moving the class off keyvalue) and wants its own lane and claim on
   `venue_daily_odds.py`.**
 
+### venue-quote-tests-data-dependent — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
+- Goal: `tests/test_venue_quote_adapters.py` passes in a SESSION WORKTREE, which
+  excludes `data/`. It currently fails 3 of 6 there and passes 6 of 6 in a
+  checkout that has `data/` — so every session sees red tests by default in the
+  tree the protocol tells it to work in.
+- Files: `tests/test_venue_quote_adapters.py`. Checked against every OPEN lane:
+  not claimed. **No production code changed** — this was never a code defect.
+- Hypothesis: the failures are ENVIRONMENTAL, not a regression.
+  `canonical_team("soccer", ...)` resolves through `_soccer_alias_to_name`, which
+  is derived at runtime from `data/soccer_source/**` team artifacts.
+- **MEASURED, both directions:** alias map is **0** entries in the worktree and
+  **508** in the primary tree; `canonical_team("soccer","ars")` -> `None` vs
+  `'arsenal'`. Tests: **3 failed / 3 passed** without `data/`, **6 passed** with.
+- **NEARLY MISREPORTED AS A PRODUCTION DEFECT.** The failures surface as
+  `status='no_rows'`, and the tests' own docstrings name the live symptom
+  `no_polymarket_row_for_league_soccer`. Both fixes those tests guard ARE
+  present in the code (`SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME -> h2h`, and the
+  `_effective_league` indirection). Checked before concluding.
+- **THE WORSE HALF, and why the fix is a fixture rather than a skip:**
+  `test_an_unresolvable_pair_is_not_relabelled_as_soccer` PASSED without `data/`
+  — vacuously. With an empty alias map every pair is unresolvable, so it could
+  not fail and could not detect what it exists to detect.
+- Falsification test: if the stub made the tests vacuous, poisoning its map so
+  the bogus clubs resolve would NOT flip the result. **Ran it: the mutation
+  turned the unresolvable-pair result to `ok` and the test FAILED**, so it is
+  discriminating where it previously was not.
+- Verification: 6/6 pass with `data/` absent AND with `SYNDICATE_DATA_ROOT`
+  pointed at a real `data/` (508 aliases loaded). Both run.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
