@@ -235,14 +235,33 @@ class TestResolutionAgainstTheRealAliasMap:
         assert got["event_id"] == "evt-tfc"
         assert got["away_team"] == "Toulouse" and got["home_team"] == "Lille"
 
-    def test_the_sides_are_not_swapped_by_the_substitution(self):
-        """A resolver that matched the fixture but inverted home/away would be
-        a confidently-priced bet on the wrong team."""
+    def test_BOTH_orderings_match_for_soccer_and_that_is_deliberate(self):
+        """SUPERSEDED ASSERTION, REWRITTEN RATHER THAN DELETED.
+
+        This test previously required a home/away-swapped fixture to REFUSE,
+        written when the blob was assumed away-first. The orientation work that
+        followed MEASURED Kalshi's soccer tickers as HOME-first (`RSCKOR` =
+        "Anderlecht vs Kortrijk", 4 of 4 against our board's own home/away), so
+        soccer now matches BOTH orderings by design and the old expectation is
+        simply false.
+
+        It is also not the risk it was written to guard. Both orderings name
+        the SAME fixture, so identity is unharmed; and blob matching does not
+        decide sides -- `_probability_for_side` resolves home/away from the
+        BOARD ROW's own teams, independently of how the venue ordered its
+        ticker. The real protection against pairing two different games is the
+        ambiguity refusal, pinned in `TestSoccerBlobOrientation`."""
         names = build_club_code_names(self._LIGUE1)["KXLIGUE1"]
-        reversed_game = {"away_team": "Lille", "home_team": "Toulouse", "event_id": "evt-rev"}
-        assert match_event_blob(
-            "TFCLIL", [reversed_game], sport="soccer", code_names=names
-        )["status"] == "no_match"
+        as_written = {"away_team": "Toulouse", "home_team": "Lille", "event_id": "evt-a"}
+        reversed_game = {"away_team": "Lille", "home_team": "Toulouse", "event_id": "evt-b"}
+        for game in (as_written, reversed_game):
+            got = match_event_blob("TFCLIL", [game], sport="soccer", code_names=names)
+            assert got["status"] == "ok", game["event_id"]
+        # ...and when BOTH legs are present it must refuse rather than pick.
+        both = match_event_blob(
+            "TFCLIL", [as_written, reversed_game], sport="soccer", code_names=names
+        )
+        assert both["status"] == "ambiguous"
 
 
 class TestSoccerBlobOrientation:
