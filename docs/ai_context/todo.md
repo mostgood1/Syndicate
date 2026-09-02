@@ -1043,6 +1043,90 @@ timestamp (Modern Standby's 9h dispatch/run gap is on record); long-arc
 AFTER git-delivered families move to the publish path (`#618` fixed the
 football instance; a contract-registry walker in `#619` prevents the class).
 
+**PROGRESS 2026-09-02 — lane `m625-replay-diff-gate`, commit `dcf4d29a` (landed,
+NOT deployed and needs no deploy). Items (5) and (1) DONE; the verify criterion
+"one full replay-diff day reproducing prod within tolerance" is MET.**
+
+`py -3 scripts/replay_diff_gate.py --date 2026-09-01` → **PASS**, manifest_id
+`8d5c42ba8cb18c34`: **280,840 leaves exact, 58,335 clock-derived fields inside
+0.1s of one shared offset, 0 mismatches**, against production's own
+`book_grid_2026-09-01.json`. It runs the REAL entrypoint
+`scripts.run_refresh_worker:_run_book_grid_artifact_tick`. Wired into
+`scripts/migration_gate.py` (`--replay-date`, `--require-replay`); `NO_FIXTURE`
+is exit 3 and renders as **UNKNOWN**, and the gate's `ok` uses `is not False`
+so it can never become a pass. Negative control: `--perturb` drops ONE line from
+the 163MB tape and the gate fails on exactly 8 fields.
+
+- **(1) DONE — `scripts/mirror_manifest.py`.** Content-addressed manifest per
+  date (`sync` / `verify --cite` / `list` / `inventory`), mirror OUTSIDE the git
+  tree and OUTSIDE OneDrive (both refused, not merely documented), no `push`
+  subcommand by construction. **Two facts that make this cheap:** one
+  `names_only=1` call inventories the WHOLE hot set — **33,221 files / 13.97 GB
+  in 13.0s** — and a narrow `pattern=` costs EXACTLY the same as none, because
+  the handler globs all 168 patterns first and filters after (`ops.py:2240-2248`).
+  So take one inventory and filter locally. It claims only what it can prove:
+  transfer integrity plus a local sha256. `names_only` returns no hash and no
+  endpoint does, so this is NOT a claim that production's bytes equal ours.
+- **(3) was already DONE** by lane `m625-env-snapshots` (`66b66895`,
+  `scripts/snapshot_render_env.py`) — that commit is on its session branch and
+  **is not on `origin/main`**, so the file does not exist in the primary tree.
+- **(2) NOT DONE, and the survey confirms the gap is real:** `/api/ops/artifacts/export`
+  iterates the SAME `HOT_ARTIFACT_PATTERNS` that gates web-publish
+  (`ops.py:2215`), so today there is no way to make a worker-local family
+  exportable without also making it web-servable — exactly the `#413` collision.
+  Not taken because `artifact_publisher.py` was claimed by another lane.
+- **(4) NOT STARTED.** (6) NOT STARTED.
+
+**FOUR FINDINGS THAT CONSTRAIN ANY FUTURE REPLAY TARGET — each measured, none
+of them guesses:**
+
+1. **A replay of the real tick can WRITE TO PRODUCTION.** `_run_book_grid_artifact_tick`
+   calls `publish_hot_artifact` (`run_refresh_worker.py:4753`) — an HTTP POST
+   onto web's disk — and `pull_streamed_artifact` before it. Running a worker
+   entrypoint locally with a live `ADMIN_TOKEN` therefore pushes a
+   locally-built board into production. Law (1) needs ENFORCING: the gate uses
+   a deny-all socket guard AND a stripped environment. Observed: the publish
+   stopped at `SKIP_NOT_CONFIGURED url_set=False token_set=False`, i.e. the
+   credential strip caught it before the socket guard had to.
+2. **THE FIXTURE MUST PREDATE THE OUTPUT.** Production answers from the input as
+   it was at T. Checked per file, offenders named, `NO_FIXTURE` otherwise. True
+   on **10 of 10** MLB dates, because the tick rebuilds yesterday once its shard
+   settles (`run_refresh_worker.py:4617-4625`).
+3. **THE PRODUCER COMMIT IS THE GATE'S REAL PRECONDITION.** refresh-worker took
+   **465 successful deploys in 21 days**; of nine consecutive MLB dates only
+   **2026-09-01** was produced by this HEAD (`e4a471c0`). An older day's artifact
+   is a fossil of older code, and the 2026-08-29 run proved it — the replay
+   emitted `by_quote_age` / `fresh_quotes_only`, fields production's artifact
+   does not have. **Pick the day by its producer commit, not by convenience.**
+4. **THE CLOCK IS AN INPUT, and two board blocks are NOT REPLAYABLE AT ALL.**
+   Frozen to production's own `generated_at`, that field then matches to the
+   microsecond (and is left CHECKED, as the assertion the freeze took). The
+   residual is ONE constant **3.6s** — production stamps its clock after the
+   pivot — estimated once and held against 58,335 constraints.
+   **`live/mlb_live_lens.json` is a NON-DATED MUTABLE FILE**: no historical
+   value exists to mirror, and web's disk holds **zero** files matching `live/*`
+   (two reads 45 min apart) though the pattern IS allowlisted
+   (`artifact_publisher.py:885`). It is the single cause of every remaining
+   difference — **167 of 167** rows whose `projection` differs read
+   `game.state = live` where production reads `pregame`, matching production's
+   own `transitions: {"live->pregame": 229}`. Likewise `game_state.chips` needs
+   D+1's slate while D's grid is built DURING D+1, so `D+1 settled before D's
+   output` is FALSE on **9 of 9** dates. Both are declared UNREPLAYABLE with the
+   named input rather than quietly excluded.
+
+**FOLLOW-UPS THIS OPENS (not taken here):** make the live-lens snapshot DATED
+(or archive it per tick) — until then the board's live-state correction cannot
+be verified offline by anything; and give `mirror_manifest.py` a family for the
+worker-local export-only set once (2) unblocks.
+
+**REPRODUCE:**
+
+    setx SYNDICATE_MIRROR_ROOT C:\syndicate-mirror
+    py -3 scripts/mirror_manifest.py sync --date 2026-09-01
+    py -3 scripts/replay_diff_gate.py --date 2026-09-01
+    py -3 scripts/replay_diff_gate.py --date 2026-09-01 --perturb
+    py -3 scripts/migration_gate.py --replay-date 2026-09-01 --require-replay
+
 ---
 
 ### `#624` — **PHASE 1 — MLB PROP PROGRAM (Sept). The +8.5pp-gross under book, converted from vig into ROI.** — lane `edge-plan`, 2026-09-01 — **OPEN; order is load-bearing**

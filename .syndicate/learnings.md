@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 665 rules `[generated]`
+## Index — 698 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4481,3 +4481,52 @@ a grep matching the log tool's own echoed query; `?limit=100` read as a total
 when the service has 153 keys; and the two above. **In each case an instrument
 reported on itself and I read it as a fact about production.** When a
 measurement comes back empty, the first hypothesis should be the instrument.
+
+## 2026-09-02 FORBIDDEN: trusting a FILTER, EXCLUSION or ALLOW rule that has never been shown to MATCH something. Two inert rules in one file, both reading as correct. `[lane m625-replay-diff-gate]`
+
+- **What we believed:** `rows[*].game*` excludes the per-row game block, and
+  `rows[].cells.*.reason` excludes the cell's refusal string. Both are ordinary
+  glob rules and both looked obviously right on the page.
+- **What was actually true:** in `fnmatch`, `[...]` is a **character class**, so
+  `rows[*]` means "rows followed by one literal `*`" and matches **nothing** —
+  the rule was inert while reading as correct, in a tolerance table whose entire
+  purpose is to be reviewable. The second was the opposite failure: `*` **spans
+  dots**, so `rows[].cells.*.reason` also swallowed
+  `rows[].cells.<book>.<side>.market_basis.reason` — a different field, checked
+  for real, silently excluded by a rule written for its neighbour.
+- **How we found out:** only by reading a COUNT. The first showed up as 3,076
+  mismatches that an exclusion was supposed to have removed; the second as an
+  excluded-path listing naming fields nobody meant to exclude. Neither produced
+  an error, and both directions are invisible in the rule itself.
+- **The rule going forward:** **every filter rule needs a POSITIVE and a
+  NEGATIVE probe before it is trusted** — one path it must match, one adjacent
+  path it must not. Assert both. This is the `presence is not reachability`
+  rule applied to configuration: a rule that is PRESENT is not a rule that
+  FIRES, and an over-broad rule is not distinguishable from a correct one
+  except by the neighbour it eats. Cheapest form: write the probes as a test
+  next to the table (`tests/test_replay_diff_gate.py`).
+- **Cost:** ~30 minutes and two wrong readings of a diff, inside the very tool
+  built to catch exactly this class of defect elsewhere.
+
+## 2026-09-02 FORBIDDEN: reporting a clean result for anything a bounded scan did not reach. A cap on RECORDING must never become a cap on TRAVERSAL. `[lane m625-replay-diff-gate]`
+
+- **What we believed:** capping the diff at 40 recorded mismatches keeps the
+  report readable. The check returned early once the cap was hit.
+- **What was actually true:** the early return stopped the **traversal**, not
+  the reporting. The run printed `leaves compared 34` and a tidy list of 40
+  differences; the real figure was **69,472 mismatches over 410,213 leaves**,
+  and the 12 MB of `rows` — the thing the artifact exists for — was never
+  compared at all. The output did not say it had stopped looking.
+- **How we found out:** `leaves compared 34` for a 12.7 MB JSON file is
+  absurd on its face, and only because a DENOMINATOR was printed next to the
+  count. With just the mismatch list, the run reads as a small, tractable
+  problem.
+- **The rule going forward:** **count everything, record a sample.** Keep the
+  uncapped total AND an uncapped per-field histogram (indices collapsed, so
+  3,000 row-level differences aggregate to one line), and cap only the verbose
+  sample. Same shape as `/api/ops/artifacts/export`'s `truncated` flag, which
+  exists because "the puller only advances its watermark on a complete
+  response". Sibling of `a rate, not a count`: a bounded scan must publish what
+  it covered, or its silence about the rest reads as absence.
+- **Cost:** one confident wrong summary of a diff, corrected only because the
+  denominator happened to be printed.
