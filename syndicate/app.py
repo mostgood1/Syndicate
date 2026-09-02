@@ -19,6 +19,7 @@ from typing import Callable
 
 from flask import Flask
 from flask.json.provider import DefaultJSONProvider
+from syndicate.features.shared import memory_observability
 from syndicate.blueprints.ask_the_syndicate import ask_the_syndicate_bp
 from syndicate.blueprints.home import home_bp
 from syndicate.blueprints.intelligence import intelligence_bp
@@ -474,6 +475,42 @@ def create_app() -> Flask:
             name="syndicate-background-loop-bootstrap",
             daemon=True,
         ).start()
+
+    # `#632`. PER-REQUEST ANON ATTRIBUTION, DEFAULT OFF.
+    #
+    # Web's anonymous memory climbs to 89% of a 2GB limit and never falls except
+    # at a restart, and the cheap per-route explanation is already dead: the
+    # correlation collapsed from +0.499 to +0.139 once one outlier window was
+    # dropped. This is the instrument that can answer it, and it is registered
+    # UNCONDITIONALLY but does nothing until `SYNDICATE_REQUEST_MEMORY_PROFILE`
+    # is set -- `note_request_start` checks the key before it touches the cgroup.
+    #
+    # Registering it unconditionally is deliberate: a hook added only when the
+    # key is set at IMPORT time cannot be switched on by an env change alone,
+    # and someone would set the key, see nothing, and conclude the leak had
+    # stopped. `#241` is why the WORK is gated rather than the registration.
+    @app.before_request
+    def _note_request_memory_start() -> None:
+        from flask import g
+
+        try:
+            g._syndicate_memory_token = memory_observability.note_request_start()
+        except Exception:
+            g._syndicate_memory_token = None
+
+    @app.teardown_request
+    def _note_request_memory_end(_exc: BaseException | None = None) -> None:
+        from flask import g, request
+
+        token = getattr(g, "_syndicate_memory_token", None)
+        try:
+            # The RULE, not the raw path: `/mlb/api/cards?date=` must not become
+            # one route per date, or the table is a histogram of traffic and
+            # attributes nothing.
+            rule = getattr(request.url_rule, "rule", None) or "<unmatched>"
+            memory_observability.note_request_end(token, rule)
+        except Exception:
+            pass
 
     if _is_render_web_dyno():
         if _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):

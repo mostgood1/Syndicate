@@ -2707,3 +2707,170 @@ def allocation_snapshot(top_n: int = 8) -> dict[str, Any] | None:
     except Exception as exc:
         print(f"[memory_observability] TRACEMALLOC_SNAPSHOT_FAILED {type(exc).__name__}: {exc}", flush=True)
         return None
+
+# ---------------------------------------------------------------------------
+# `#632`. PER-REQUEST ANONYMOUS-MEMORY ATTRIBUTION, AND WHY IT REFUSES MOST ROWS
+# ---------------------------------------------------------------------------
+#
+# What is established (`state.md [web-anon-leak]`): web's `memory_anon_mb` climbs
+# to a peak of 1,823.8 MB of a 2,048 MB limit and NEVER falls except at a
+# restart. It is real anonymous memory, not the page cache `#566` warns about.
+# What is NOT established is WHAT allocates it -- and the cheap answer is already
+# dead: a per-route correlation over 13 windows read +0.499 for
+# `/api/ops/artifacts/stream` and collapsed to **+0.139** when one outlier window
+# was removed, with no dose-response.
+#
+# THE CONSTRAINT THAT SHAPES THIS. Web runs ONE gunicorn worker with
+# `GUNICORN_THREADS=4` (`render.yaml`), so up to four requests are in flight at
+# once and a before/after delta around any one of them includes whatever the
+# other three allocated. **A number attributed under concurrency is not a weak
+# measurement, it is a wrong one**, and it would be wrong in the direction that
+# blames whichever route is most frequent.
+#
+# So this attributes a delta ONLY when the request was provably ALONE for its
+# entire life, and counts the rest as `skipped_concurrent`. On a busy service
+# that refuses most rows. That is the design, not a shortfall: a smaller honest
+# sample beats a larger one that launders concurrency into a route name.
+#
+# COST, AND WHY IT IS SAFE TO CARRY DISABLED. The whole recorder is behind
+# `SYNDICATE_REQUEST_MEMORY_PROFILE`, DEFAULT OFF, because this service is
+# already being OOM-killed and `#241` is the precedent for periodic work that
+# was assumed free. When off, `note_request_start` returns `None` before
+# touching the cgroup. When on, a SOLO request costs two `container_memory_stat`
+# reads and a CONTENDED one costs zero -- the contention check happens first.
+
+_REQUEST_MEMORY_LOCK: Any = None
+_REQUEST_MEMORY_STATE: dict[str, Any] = {
+    "inflight": 0,
+    "seq": 0,
+    "since_emit": 0,
+    "routes": {},
+    "skipped_concurrent": 0,
+    "unreadable": 0,
+}
+
+
+def _request_memory_lock() -> Any:
+    global _REQUEST_MEMORY_LOCK
+    if _REQUEST_MEMORY_LOCK is None:
+        import threading
+
+        _REQUEST_MEMORY_LOCK = threading.Lock()
+    return _REQUEST_MEMORY_LOCK
+
+
+def request_memory_profile_enabled() -> bool:
+    """Default OFF. Absent means off, and so does any value that is not a
+    recognised truthy token -- an unreadable setting must not switch on new
+    per-request work on a 2GB service that is already dying."""
+    raw = str(os.environ.get("SYNDICATE_REQUEST_MEMORY_PROFILE") or "").strip().lower()
+    return raw in {"on", "1", "true", "yes"}
+
+
+def _anon_mb() -> float | None:
+    """Anonymous MB only. `memory_current_mb` includes page cache and reading it
+    here would rebuild `#566`'s mistake one layer down."""
+    stat = _read_container_memory_stat()
+    if not stat or "anon" not in stat:
+        return None
+    return _bytes_to_mb(stat.get("anon"))
+
+
+def note_request_start() -> dict[str, Any] | None:
+    """Call at request entry. Returns a token to hand back, or None.
+
+    None means "do not attribute this request" -- either the profile is off, or
+    another request was already in flight, or the cgroup could not be read."""
+    if not request_memory_profile_enabled():
+        return None
+    with _request_memory_lock():
+        state = _REQUEST_MEMORY_STATE
+        solo = state["inflight"] == 0
+        state["inflight"] += 1
+        state["seq"] += 1
+        seq = state["seq"]
+        if not solo:
+            state["skipped_concurrent"] += 1
+            return None
+    before = _anon_mb()
+    if before is None:
+        with _request_memory_lock():
+            _REQUEST_MEMORY_STATE["unreadable"] += 1
+        return {"attribute": False, "seq": seq}
+    return {"attribute": True, "seq": seq, "anon_before_mb": before}
+
+
+def note_request_end(token: dict[str, Any] | None, route: str,
+                     emit_every: int = 200) -> dict[str, Any] | None:
+    """Call at request teardown. Returns the summary payload when it emits one.
+
+    The in-flight count is decremented even when the token says not to
+    attribute, because a leaked counter would make every later request look
+    contended and the instrument would go quietly blind."""
+    if not request_memory_profile_enabled():
+        return None
+    with _request_memory_lock():
+        state = _REQUEST_MEMORY_STATE
+        state["inflight"] = max(0, state["inflight"] - 1)
+        alone_throughout = (
+            token is not None
+            and bool(token.get("attribute"))
+            and state["inflight"] == 0
+            and state["seq"] == token.get("seq")
+        )
+    if token is None:
+        return None
+    if not alone_throughout:
+        with _request_memory_lock():
+            _REQUEST_MEMORY_STATE["skipped_concurrent"] += 1
+        return None
+    after = _anon_mb()
+    if after is None:
+        with _request_memory_lock():
+            _REQUEST_MEMORY_STATE["unreadable"] += 1
+        return None
+    delta = after - float(token.get("anon_before_mb") or 0.0)
+    key = str(route or "unknown")
+    with _request_memory_lock():
+        state = _REQUEST_MEMORY_STATE
+        row = state["routes"].setdefault(key, {"solo_n": 0, "total_mb": 0.0, "max_mb": 0.0})
+        row["solo_n"] += 1
+        row["total_mb"] = round(row["total_mb"] + delta, 3)
+        row["max_mb"] = round(max(row["max_mb"], delta), 3)
+        state["since_emit"] += 1
+        if state["since_emit"] < max(1, int(emit_every)):
+            return None
+        state["since_emit"] = 0
+        payload = request_memory_attribution_payload()
+    print(f"REQUEST_MEMORY_ATTRIBUTION {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
+    return payload
+
+
+def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
+    """The accumulated attribution, ranked by TOTAL retained MB.
+
+    Ranked on the total rather than the mean because the question is which route
+    accounts for the most unreturned memory over a shift, not which single call
+    is fattest -- a rare huge allocation that is freed is not this defect."""
+    state = _REQUEST_MEMORY_STATE
+    rows = sorted(state["routes"].items(), key=lambda kv: -kv[1]["total_mb"])[: max(1, int(top))]
+    return {
+        "anon_mb_now": _anon_mb(),
+        "routes": [dict(route=r, **vals) for r, vals in rows],
+        "distinct_routes": len(state["routes"]),
+        "skipped_concurrent": state["skipped_concurrent"],
+        "unreadable": state["unreadable"],
+        # A reader must be able to see how much of the traffic this DECLINED to
+        # attribute. A top-routes table with no denominator invites treating the
+        # solo sample as the whole service.
+        "solo_attributed": sum(v["solo_n"] for v in state["routes"].values()),
+    }
+
+
+def reset_request_memory_attribution() -> None:
+    """Tests only. Module-level accumulators otherwise leak across cases and the
+    second test reads the first one's numbers."""
+    _REQUEST_MEMORY_STATE.update(
+        {"inflight": 0, "seq": 0, "since_emit": 0, "routes": {},
+         "skipped_concurrent": 0, "unreadable": 0}
+    )
