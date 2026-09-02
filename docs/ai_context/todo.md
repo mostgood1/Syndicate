@@ -1274,6 +1274,89 @@ Mostly execution of already-measured items; references, not duplicates:
   (peak O(segments + dates), not O(ledger)) are what let the 28-day window be
   affordable at any ledger size.
 
+- **(h) THE PROJECTION REPLACES THE BUDGET AS THE PRIMARY BOUND — 2026-09-02,
+  lane `accuracy-summary-ledger-budget`. LOCAL, not deployed, NOT re-armed.
+  Accumulators were the plan and are NOT needed; here is why, measured.**
+
+  | config | accepted | dates | peak growth | sec |
+  |---|---|---|---|---|
+  | materialise, no budget | 831,038,410 | 8 | **3,181.1 MiB** | 41.2 |
+  | materialise, 90MB budget | 89,967,617 | **1** | 344.4 MiB | 7.3 |
+  | **projected, no budget** | 831,038,410 | **8** | **42.2 MiB** | 10.9 |
+
+  **75x better than the baseline AND 8x better than the byte budget while
+  carrying EIGHT TIMES the data — and faster.** Resident per file byte falls
+  **4.014 -> 0.053**, because the retained set stops tracking record fatness:
+  ~**2.32 KiB per record** regardless of how big `manifest_summary` grows.
+
+  **WHAT IT IS.** `_project_evaluation_record` reduces each record, AS IT
+  STREAMS, to the ~20 scalars the statistics actually read (identity/dedup keys,
+  result, stake, pnl, implied_probability, the two CLV price/line pairs, and
+  slimmed `recommendation`/`artifact_metadata`/`query`/`response`). The fat
+  original is transient; only the slim row is retained.
+
+  **WHY NOT THE ACCUMULATORS THAT WERE PLANNED.** Fold-as-you-go would be
+  O(segments + dates) rather than O(records) — asymptotically better, and it
+  requires a SECOND implementation of `_win_rate`, `_roi`, `_price_clv`, `_clv`,
+  `_calibration` and `binary_calibration_metrics` as running sums. `_roi`'s
+  stake rule alone (absent counts as 1.0, non-numeric excluded, none-at-all
+  falls back to one-per-record) is exactly the kind of detail a re-derivation
+  gets subtly wrong with every test still green. The projection keeps ONE
+  implementation: every downstream function is untouched and simply receives
+  smaller dicts. **At 42.2 MiB for the whole ledger the asymptotic win buys
+  nothing that matters, so the extra risk was not taken.** Revisit only if the
+  per-record figure above stops holding.
+
+  **THE EQUIVALENCE IS THE SAFETY ARGUMENT, and it is asserted, not assumed.**
+  `tests/test_accuracy_summary_projection.py` (14 tests) compares raw vs
+  projected through the REAL builders over REAL records and requires
+  **byte-identical** `compute_metrics` + `build_segmented_reliability_profile`
+  output **across all 9 sports**, plus `build_accuracy_summary` end to end. A
+  field the projection drops is a test failure, not a wrong number on a board.
+  It also pins off!=on (a projection that copied everything would pass
+  equivalence perfectly and be worthless) and the
+  `_recommendation_source` truthiness branch.
+
+  **THE BUDGET DEFAULT WAS RAISED 90,000,000 -> 2,000,000,000.** At 90MB it now
+  costs coverage and saves nothing worth having — it bought ONE date of eight.
+  Its job changed: it is no longer what keeps the job alive (the projection is),
+  it is a backstop against an unbounded RECORD COUNT reconstituting the same
+  failure later. `SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES` still
+  overrides; `0` still disables; absent still means bounded.
+
+  **THE 28-DAY WINDOW IS NOW AFFORDABLE.** That was the entire reason
+  accumulators were queued: `recent_days=7` + `baseline_days=21` against
+  95-332 MB/day chunks. Full history, 8 of 8 dates, `truncated=false`, 42.2 MiB.
+
+  **REGRESSION RESULT, reported rather than assumed:**
+  - **136 passed** across the suites that exercise this change — 90 (projection,
+    budget, bounding, autorun, build_accuracy_summary, ledger streaming, bundle
+    window, single-scan, slimming) + 46 (intelligence board contract, analysis
+    views, evaluation settlement, daily gate, autorun ordering, board-state
+    ledger).
+  - **`tests/test_intelligence.py` HANGS, and it is NOT this change.** Located
+    by faulthandler, not inferred. TWO independent pre-existing blockers on the
+    same test
+    (`test_intelligence_query_api_resolves_preview_date_and_preserves_contract`):
+    1. **Infinite mutual recursion in WNBA cards** — `cards.py:1686
+       _artifact_bundle` <-> `cards.py:3078 _games_from_live_state_fallback`.
+       Guarded by `selected_date == central_today_iso() and not
+       _render_web_dyno()`, so it only bites when the resolved date is TODAY and
+       the process is not a web dyno. That date dependence is why it is not a
+       standing red.
+    2. Under it (revealed by setting `SYNDICATE_WEB_DYNO=1` to skip #1), a
+       **live unbounded HTTPS call to the Kalshi API from the intelligence query
+       request path** — `intelligence_query_api` -> `_compute_intelligence_response`
+       -> `_compute_response` -> `_timed_candidate_pool` -> `_build_candidate_pool`
+       -> `run_kalshi_discovery` -> `kalshi_client.fetch_markets` -> `_get`,
+       blocking in `ssl.read`.
+    **Neither `intelligence_evaluation.py` nor `run_refresh_worker.py` appears
+    on either stack** — that absence, on a dumped stack, is the exoneration.
+    `cards.py` is unmodified in the working tree and last touched by `ad33df21`.
+    Both belong to whoever owns those surfaces; NOT fixed here, and #2 is worth
+    its own item — a test suite that opens a real socket to a venue is a
+    flake and a rate-limit risk, and on the request path it is worse than that.
+
 - DO NOT report (d)/(e) as working from a zero during the break — "a zero is
   indistinguishable from an inert feature" (`verify_wnba_totals_pricing.py`
   exit-3 pattern); the WNBA reads are 09-17+.

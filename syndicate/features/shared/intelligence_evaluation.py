@@ -622,27 +622,41 @@ def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
     return list(_stream_chunked_ledger_records(path))
 
 
-DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = 90_000_000
+DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = 2_000_000_000
 
 
 def _accuracy_summary_ledger_budget_bytes() -> int:
     """Cumulative accepted-BYTES budget for `build_accuracy_summary`'s ledger
     load. 0 means unlimited.
 
-    90MB is not a guess. Measured 2026-09-02 (lane
-    `accuracy-summary-alloc-profile`, `todo.md #626`(h)): peak RSS for this load
-    is **proportional to accepted chunk bytes with intercept zero** --
-    4.01x for production-shaped records, 4.41x for thin ones, R2 0.999998 over
-    nine corpora. So a byte budget converts directly into a peak:
+    **THIS IS NOW A BACKSTOP, NOT THE PRIMARY BOUND, and the default was RAISED
+    from 90,000,000 to 2,000,000,000 for a measured reason.** Both numbers came
+    from the same day; the second replaced the first once
+    `_project_evaluation_record` existed.
 
-        85,766,820 B accepted -> 365.0 MiB peak growth   (measured anchor)
-        90,000,000 B accepted -> 344-378 MiB peak growth (this default)
+    Measured 2026-09-02 on an 831,038,410 B / 8-chunk production-shaped corpus:
 
-    against a refresh-worker whose baseline cycle already peaks at anon
-    ~1,877 MiB of a 4,096 MiB ceiling -- so the worst case is ~2,255 MiB, about
-    55% of the ceiling. Unbounded, the same load projects to 3,178-3,493 MiB on
-    top of that baseline and OOM-killed the worker on 2026-09-02 by a margin of
-    at least 915 MiB. The kill was arithmetically certain, not marginal.
+        materialising, no budget   831,038,410 B, 8 dates -> 3,181.1 MiB, 41.2 s
+        materialising, 90MB budget  89,967,617 B, 1 date  ->   344.4 MiB,  7.3 s
+        PROJECTED, no budget       831,038,410 B, 8 dates ->    42.2 MiB, 10.9 s
+
+    The projection is 75x better than the baseline AND 8x better than the
+    90MB-budgeted run while carrying EIGHT TIMES the data, because it decouples
+    the retained set from record fatness: 4.014 resident bytes per file byte
+    becomes 0.053, i.e. ~2.32 KiB retained per record regardless of how big
+    `manifest_summary` grows. At that rate a 90MB budget only costs coverage --
+    it bought ONE date of eight and saved nothing worth having.
+
+    So the budget's job changed. It no longer keeps the job alive; the
+    projection does. It exists to stop an unbounded RECORD COUNT from
+    reconstituting the same failure years from now: at ~2.32 KiB/record,
+    2,000,000,000 accepted bytes implies roughly 100-200 MiB of peak and covers
+    several times the current ledger. Raise or disable it deliberately, with the
+    per-record figure re-measured, not by assuming this line is still true.
+
+    For the history: unbudgeted and unprojected, this load reached 3,181.1 MiB
+    on top of a worker already peaking at anon ~1,877 MiB of a 4,096 MiB
+    ceiling. The 2026-09-02 kill was arithmetically certain, not marginal.
 
     Absent means BOUNDED, not unlimited -- the CLAUDE.md rule that absent is not
     off. Set the env var to 0 to explicitly opt out (offline/CLI full-history
@@ -2806,6 +2820,98 @@ def build_segmented_reliability_profile(
     return {"global": global_stats, "shrinkage_k": shrinkage_k, "segments": segments}
 
 
+# `#626`(h) -- the projection that makes the accuracy summary's working set
+# independent of how fat a ledger record is.
+#
+# THE MEASUREMENT THIS COMES FROM. Peak for this load is ~4.01x ACCEPTED CHUNK
+# BYTES (R2 0.999998, intercept zero), and production records average 37,632 B
+# because they embed `artifact_metadata.manifest_summary`. So 830,832,574 B of
+# ledger materialises 3,181 MiB -- measured, not extrapolated -- and OOM-killed
+# a 4,096 MiB worker.
+#
+# But the STATISTICS read about twenty scalars per record. The manifest blob,
+# the evidence, the full recommendation payload -- none of it reaches a mean.
+# Projecting each record to just those scalars AS IT STREAMS means the fat
+# original is transient and only the slim row is retained.
+#
+# WHY A PROJECTION AND NOT FOLD-AS-YOU-GO ACCUMULATORS. Accumulators would be
+# O(segments + dates) instead of O(records), which is asymptotically better --
+# and they would require re-deriving `_win_rate`, `_roi`, `_price_clv`, `_clv`,
+# `_calibration` and `binary_calibration_metrics` as running sums, i.e. a SECOND
+# implementation of every formula in this file, silently drifting from the
+# first. `_roi`'s stake rule alone (absent stake counts as 1.0, non-numeric
+# stake is excluded, no stakes at all falls back to one-per-record) is the kind
+# of detail a re-derivation gets subtly wrong and no test notices.
+#
+# The projection keeps ONE implementation: every downstream function is
+# unchanged and simply receives smaller dicts. `test_accuracy_summary_projection`
+# asserts the two paths produce byte-identical summaries, so a field this misses
+# is a test failure rather than a wrong number on a board.
+_PROJECTED_TOP_LEVEL = (
+    # identity + dedup (`_latest_by_recommendation_id`)
+    "record_type", "recommendation_id", "prediction_id",
+    # outcome + economics (`_result_label`, `_roi`, `_win_rate`)
+    "result", "stake", "pnl",
+    # calibration (`_calibration`, `binary_calibration_metrics`)
+    "implied_probability",
+    # CLV, both kinds (`_price_clv` needs prices, `_clv` needs lines)
+    "closing_price", "closing_line", "line", "odds", "price",
+    # `_recommendation_source` falls back to the WHOLE record when
+    # `recommendation` is absent, so its fields must survive at top level too
+    "sport", "sport_slug", "market", "market_family", "market_label",
+    "confidence", "model_probability", "pick", "name", "selection_direction",
+    "projected",
+)
+
+_PROJECTED_RECOMMENDATION = (
+    "sport", "sport_slug", "market", "market_family", "market_label",
+    "confidence", "model_probability", "odds", "price", "line", "projected",
+    "pick", "name", "selection_direction",
+)
+
+# `_recommendation_publish_date` and `_record_sport` read these.
+_PROJECTED_METADATA = ("sport", "selected_date", "date")
+_PROJECTED_RESPONSE = ("sport", "selected_date", "date", "market")
+
+
+def _project_mapping(value: Any, keys: "tuple[str, ...]") -> dict[str, Any] | None:
+    if not isinstance(value, Mapping) or not value:
+        return None
+    slim = {key: value[key] for key in keys if key in value}
+    if not slim:
+        # The SOURCE was truthy, so the projection must be truthy too:
+        # `_recommendation_source` branches on `if recommendation:` and would
+        # otherwise fall back to the whole record for a record that HAS one.
+        slim["_projected"] = True
+    return slim
+
+
+def _project_evaluation_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Reduce a ledger record to the scalars the accuracy statistics read.
+
+    Applied INSIDE the stream, so the full record is transient. Everything
+    downstream (`compute_metrics`, `build_segmented_reliability_profile`,
+    `_segment_stats`, `_latest_by_recommendation_id`) is unchanged and simply
+    receives a smaller dict.
+    """
+    if not isinstance(record, Mapping):
+        return {}
+    slim: dict[str, Any] = {key: record[key] for key in _PROJECTED_TOP_LEVEL if key in record}
+    recommendation = _project_mapping(record.get("recommendation"), _PROJECTED_RECOMMENDATION)
+    if recommendation is not None:
+        slim["recommendation"] = recommendation
+    metadata = _project_mapping(record.get("artifact_metadata"), _PROJECTED_METADATA)
+    if metadata is not None:
+        slim["artifact_metadata"] = metadata
+    query = _project_mapping(record.get("query"), _PROJECTED_METADATA)
+    if query is not None:
+        slim["query"] = query
+    response = _project_mapping(record.get("response"), _PROJECTED_RESPONSE)
+    if response is not None:
+        slim["response"] = response
+    return slim
+
+
 def build_accuracy_summary(
     *,
     records: Iterable[Mapping[str, Any]] | None = None,
@@ -2842,8 +2948,12 @@ def build_accuracy_summary(
     # run. The budget is the bound the 50-segment output cap could never be:
     # 98.8-99.9% of peak is set by THIS line, before any output exists.
     ledger_stats: dict[str, Any] = {}
+    # PROJECT INSIDE THE STREAM. The fat record is transient; only the ~20
+    # scalars the statistics read are retained. This is what decouples peak from
+    # `manifest_summary` bloat -- see `_project_evaluation_record`.
     record_rows = _latest_by_recommendation_id(
-        _stream_record_payloads(
+        _project_evaluation_record(record)
+        for record in _stream_record_payloads(
             records,
             ledger_path=ledger_path,
             max_total_bytes=_accuracy_summary_ledger_budget_bytes(),

@@ -501,6 +501,40 @@ pre-fix function extracted from HEAD, which fails all four assertions:
 Segments are now kept LARGEST-SAMPLE-FIRST, so a cap that fires drops the
 thinnest segments rather than an arbitrary set.
 
+**THE PROJECTION SUPERSEDES THE BUDGET AS THE PRIMARY BOUND** `[same session,
+measured]`. `_project_evaluation_record` reduces each record IN THE STREAM to the
+~20 scalars the statistics read, so the retained set stops tracking record
+fatness:
+
+    materialise, no budget   831,038,410 B, 8 dates -> 3,181.1 MiB, 41.2 s
+    materialise, 90MB budget  89,967,617 B, 1 date  ->   344.4 MiB,  7.3 s
+    PROJECTED, no budget     831,038,410 B, 8 dates ->    42.2 MiB, 10.9 s
+
+**75x better than baseline, 8x better than the budget on 8x the data, and
+faster.** Resident/file byte 4.014 -> **0.053**, i.e. ~2.32 KiB retained per
+record. **The 28-day drift window is therefore affordable and the budget default
+was raised 90,000,000 -> 2,000,000,000** — at 90MB it cost seven of eight dates
+and saved nothing. The budget is now a backstop against unbounded RECORD COUNT,
+not what keeps the job alive.
+
+Fold-as-you-go accumulators were the plan and were **deliberately not built**:
+they need a second implementation of every formula in this file, and at 42.2 MiB
+the asymptotic win buys nothing. `tests/test_accuracy_summary_projection.py`
+requires raw and projected to produce **byte-identical** statistics across all 9
+sports through the real builders, so a dropped field is a test failure.
+
+**REGRESSION: 136 pass. `tests/test_intelligence.py` HANGS and it is NOT this
+change** — located by faulthandler stack dump, my files absent from both stacks.
+TWO pre-existing blockers on
+`test_intelligence_query_api_resolves_preview_date_and_preserves_contract`:
+(1) infinite mutual recursion `wnba/cards.py:1686 _artifact_bundle` <->
+`:3078 _games_from_live_state_fallback`, gated on `selected_date ==
+central_today_iso() and not _render_web_dyno()` — a DATE-TRIGGERED hang, which is
+why it is not a standing red; (2) beneath it, a **live unbounded HTTPS call to
+Kalshi from the intelligence REQUEST PATH** (`_build_candidate_pool` ->
+`run_kalshi_discovery` -> `fetch_markets` -> `ssl.read`). Both are committed code
+owned elsewhere; `cards.py` is unmodified in the tree, last touched `ad33df21`.
+
 **RE-ARMING IS STILL A SEPARATE, UNTAKEN DECISION, and nothing here is
 deployed.** The standing caveat is unchanged and is now VISIBLE in the artifact
 rather than implicit: at 95-332 MB/day the 90MB budget covers **one day against
