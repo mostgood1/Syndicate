@@ -158,6 +158,57 @@ reading the log.
   auto-merged with no conflict. Re-run `trim_lane_blocks.py --apply` after any
   such merge and check for lanes with two blocks. Rule in `learnings.md`.
 
+## [replay-diff-gate] A PRODUCTION DAY NOW REPRODUCES OFFLINE, 0 MISMATCHES — and two board blocks provably CANNOT `[verified 2026-09-02, lane m625-replay-diff-gate, commits d8caea14 + 9dad0881, NO DEPLOY]`
+
+`py -3 scripts/replay_diff_gate.py --date 2026-09-01` -> **PASS**, mirror
+manifest `8d5c42ba8cb18c34`, against production's own `book_grid_2026-09-01.json`:
+**280,840 leaves exact, 58,335 clock-derived fields within 0.1s of one shared
+3.6s offset, 0 mismatches**, 0 outbound attempts. Runs the REAL
+`run_refresh_worker:_run_book_grid_artifact_tick`. Re-verified from a CLEAN
+CHECKOUT of `origin/main` after pushing. Full evidence:
+`.syndicate/findings_2026-09-02_m625_replay_diff_gate.md`.
+
+- **THE GATE HAS BEEN OBSERVED TO FAIL.** `--perturb` drops ONE line from the
+  163 MB tick tape; it fails on exactly 8 fields.
+- **NO_FIXTURE IS NOT A PASS.** `migration_gate.py --replay-date <D>` prints
+  `Replay-diff: UNKNOWN`; its `ok` uses `is not False`. `--require-replay` makes
+  the unknown case fail.
+- **RUNNING A WORKER TICK LOCALLY CAN WRITE TO PRODUCTION.** The tick calls
+  `publish_hot_artifact` (`run_refresh_worker.py:4753`), an HTTP POST onto web's
+  disk. Anyone replaying a worker entrypoint with a live `ADMIN_TOKEN` pushes a
+  locally-built artifact into production. The gate strips credentials AND denies
+  every socket; the credential strip is what actually fired
+  (`SKIP_NOT_CONFIGURED url_set=False token_set=False`).
+- **PICK THE REPLAY DAY BY ITS PRODUCER COMMIT.** refresh-worker took **465
+  successful deploys in 21 days**; of nine consecutive MLB dates only
+  **2026-09-01** was built by `e4a471c0`. Replaying 2026-08-29 emitted
+  `by_quote_age`/`fresh_quotes_only`, fields production's artifact does not have
+  — the diff was measuring code drift, not correctness.
+- **THE CLOCK IS AN INPUT.** Frozen to production's own `generated_at`, which
+  then matches to the microsecond and is left CHECKED as the assertion the
+  freeze took. One constant 3.6s residual, production stamping after the pivot.
+- **TWO BOARD BLOCKS ARE NOT VERIFIABLE OFFLINE BY ANY TOOL, and this is an
+  artifact-design gap, not a harness limit.** `data_root()/live/mlb_live_lens.json`
+  is **NON-DATED and mutable** — no historical value exists — and web's disk
+  holds **zero** files matching `live/*` (two reads 45 min apart) though the
+  pattern IS allowlisted (`artifact_publisher.py:885`). It is the single cause
+  of every remaining difference: **167 of 167** rows whose `projection` differs
+  read `game.state = live` where production reads `pregame`, matching
+  production's own `transitions: {"live->pregame": 229}`. Likewise
+  `game_state.chips` needs D+1's slate while D's grid is built DURING D+1
+  (`D+1 settled first` FALSE on **9 of 9** dates). **Until the live-lens
+  snapshot is DATED or archived per tick, the board's live-state correction —
+  229 rows on that day — cannot be checked after the fact.**
+- **ONE `names_only=1` CALL INVENTORIES THE WHOLE HOT SET: 33,221 files /
+  13.97 GB in 13.0s**, 2.8 MB of JSON, no file opened (`ops.py:2239-2260`). And
+  a narrow `pattern=` costs EXACTLY the same as none — the handler globs all 168
+  patterns first and filters after (`ops.py:2240-2248`). Take one inventory and
+  filter locally; ten per-family queries are ten full walks.
+- Mirror root: `SYNDICATE_MIRROR_ROOT`, refused inside the git tree or under
+  OneDrive. `mirror_manifest.py` claims only transfer integrity plus a local
+  sha256 — `names_only` returns no hash and no endpoint does, so it is NOT a
+  claim that production's bytes equal ours.
+
 ## [soccer-board-coverage] — MEASURED 2026-09-02, production, NOT A DEFECT
 
 **Soccer's thin board is a DELIBERATE QUALITY FILTER working correctly.** Full

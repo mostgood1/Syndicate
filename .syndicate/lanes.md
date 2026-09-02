@@ -1425,95 +1425,15 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   loop). Both external importers — `kalshi_odds_refresh.py:1190` and
   `run_live_odds_refresh_worker.py:903` — import only `record_venue_book` and
   `*_daily_rows`, i.e. WRITE paths. Nothing consumes the record.
-### m625-replay-diff-gate — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
-- Goal: `todo.md #625` build item (5). ONE mirrored production day is replayed
-  through the REAL producer entrypoints with fetching disabled, and the
-  artifacts it regenerates are diffed against production's OWN recorded outputs
-  for that date, tolerance-aware — then wired into `scripts/migration_gate.py`.
-  Testable outcome: `py -3 scripts/replay_diff_gate.py --date <D>` exits 0 on a
-  day production actually produced, exits non-zero when an input is perturbed,
-  and `migration_gate.py` reports its status rather than silently passing.
-- Files: `scripts/replay_diff_gate.py` (NEW), `scripts/migration_gate.py`,
-  `tests/test_replay_diff_gate.py` (NEW), `scripts/mirror_manifest.py` (NEW).
-- NOT CLAIMED, deliberately — both are held by other OPEN lanes and I will not
-  edit across them:
-  - `syndicate/features/shared/artifact_publisher.py` (`HOT_ARTIFACT_PATTERNS`)
-    is held by `book-quotes-publish-clobber`. That blocks `#625` build item (2),
-    the EXPORT-ONLY pattern list, which is therefore NOT in this lane's scope.
-  - `docs/ai_context/todo.md` is CONTESTED between `accuracy-summary-alloc-profile`
-    and `book-quotes-publish-clobber` (`check_lane_invariants.py` FAILs on it
-    today). I will record `#625` progress there as a single additive edit to the
-    `#625` section only, and say so here rather than claiming the file.
-- Hypothesis: the four defects found on 2026-09-02 (evaluation autorun never
-  ran; `odds_history` merge cap sized on a 39MB shard against a 109MB pair; the
-  autorun's silent False decline; the autorun's OOM) are all
-  DEPLOYED-INERT-class, and every one is observable OFFLINE from a mirrored day
-  plus a production env snapshot — no deploy, no production time.
-- Falsification test: if the first replay target's output cannot be reproduced
-  from mirrored inputs alone — i.e. it depends on a fetch, on wall-clock, or on
-  state that is not in any artifact — then a replay-diff gate cannot be built
-  for it and the target is wrong. Record which, and pick another.
-- Verification: (a) one date replayed, diff PASS, with the tolerance stated and
-  its justification recorded; (b) a deliberate perturbation of one input makes
-  the same command FAIL (off != on — a gate that has never been seen to fail
-  proves nothing); (c) `migration_gate.py --json` carries a `replay_diff` block
-  whose absent case is reported as UNKNOWN, not folded into `ok`.
-- Blocked by: none. Needs NO deploy — it never contends for the deploy queue.
-- **RESULT 2026-09-02 — GOAL MET. Commit `dcf4d29a` on `session/m625-replay-diff-gate`
-  (landed, needs no deploy). All three verification criteria discharged:**
-  - (a) `py -3 scripts/replay_diff_gate.py --date 2026-09-01` → **PASS**,
-    manifest `8d5c42ba8cb18c34`: **280,840 leaves exact, 58,335 clock-derived
-    fields within 0.1s of one shared 3.6s offset, 0 mismatches** against
-    production's own `book_grid_2026-09-01.json` (12.75 MB), running the REAL
-    `run_refresh_worker:_run_book_grid_artifact_tick`, 0 outbound attempts.
-  - (b) `--perturb` drops ONE line from the 163 MB tape; the gate FAILS on
-    exactly 8 fields (that cell's price/observed_at/age/lag, the consensus, the
-    best-cell edge, both shard counters). **The gate has been observed to fail.**
-  - (c) `migration_gate.py` reports `Replay-diff: UNKNOWN` when there is no
-    fixture and its `ok` uses `is not False`, so NO_FIXTURE can never pass.
-    13 new tests + the 16 existing `test_migration_gate.py` tests pass.
-- **HYPOTHESIS HELD, with one correction.** Every defect class named is
-  observable offline — but the falsification test FIRED on two blocks and they
-  are recorded as UNREPLAYABLE, not fixed: `live/mlb_live_lens.json` is
-  NON-DATED and mutable (no historical value exists; web holds zero `live/*`
-  though it is allowlisted), and `game_state.chips` needs D+1's slate while D's
-  grid is built DURING D+1 (`D+1 settled first` FALSE on 9 of 9 dates).
-- **THE FILE-CLAIM NOTES ABOVE ARE NOW STALE, deliberately not rewritten:**
-  `book-quotes-publish-clobber` and `accuracy-summary-alloc-profile` both CLOSED
-  during this session, so `todo.md` and `artifact_publisher.py` are free.
-  `todo.md` was edited (the `#625` section only). `artifact_publisher.py` was
-  NOT touched — `#625`(2) stays out of scope and is recorded in `todo.md`.
-- Full record: `todo.md #625` PROGRESS block. Claims: NONE held; no deploy taken.
-
-  **That is not the same as worthless, and the module says so.** It is a
-  deliberate capture-first investment: the join is meant to become "a CONSUMER
-  of that record rather than its gatekeeper", so tomorrow's grammar can be
-  written from real strings. The consumer was never built. The problem is not
-  that the data is captured, it is that a write-only archive is being kept in a
-  256 MB Redis where it competes with live operational state — and is now large
-  enough to break its own writes.
-
-  **My original framing was too narrow and is corrected:** I hypothesised
-  "past-date files are dead weight kept alive by the 10-day TTL". The 10-day TTL
-  is DELIBERATE and documented, and CLV openings do not depend on these files —
-  they live in the undated `clv_opening_ledger`. So the TTL is not the defect.
-- **NOT CLAIMED:** that any specific eviction harmed anything. `evicted_keys` is
-  cumulative and names no key; the instrument cannot attribute, and I did not
-  find a single named victim. The eviction number is context for the pressure,
-  NOT evidence of damage. The damage I did find is the 2,203 rejected writes,
-  which is a different mechanism entirely — a hard guard, not LRU.
-- **OWED, AND BLOCKED BY A LIVE CLAIM:** the `#637` rewrite and a new `#638` for
-  the rejected writes are NOT in `docs/ai_context/todo.md`. That file is claimed
-  by OPEN lane `m625-env-snapshots` (session `3492626c`, opened 2026-09-02 — TODAY,
-  with no `released:` note), so `lane-guard` correctly blocked the edit and I did
-  not work around it. **Everything is in this block instead; nothing is lost, but
-  a reader of `todo.md` alone will not see it.** Whoever holds that file next
-  should lift the two entries from here verbatim. `#638` is the free id — ids run
-  to `#637`.
-- Blocked by: none for the diagnosis (it is complete). **No production mutation
-  performed and no code changed — the fix is a DECISION (byte-aware trim vs.
-  moving the class off keyvalue) and wants its own lane and claim on
-  `venue_daily_odds.py`.**
+### m625-replay-diff-gate — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. `#625`(5) and (1) DONE; no deploy taken or needed.** `replay_diff_gate.py --date 2026-09-01` PASSES against production's own `book_grid`: **280,840 leaves exact, 58,335 clock-derived fields inside one shared 3.6s offset, 0 mismatches**, running the REAL `run_refresh_worker:_run_book_grid_artifact_tick` behind a deny-all socket guard — re-verified from a clean checkout of `origin/main`. Negative control fires on ONE dropped line from a 163MB tape (8 fields). NO_FIXTURE renders as UNKNOWN in `migration_gate.py` and can never become a pass. **THE FINDING WORTH CARRYING: `live/mlb_live_lens.json` is NON-DATED and mutable, so the board's live-state correction (229 rows) cannot be verified offline by any tool until it is dated — 167 of 167 differing rows trace to it.** Commits `d8caea14` + `9dad0881`, both on `origin/main`.
+- Files: released — `scripts/replay_diff_gate.py`, `scripts/mirror_manifest.py`,
+  `scripts/migration_gate.py`, `tests/test_replay_diff_gate.py`. NOT touched:
+  `syndicate/features/shared/artifact_publisher.py`, so `#625`(2) stays open.
+- Verification: all three criteria discharged — see `log/2026-09-02.md`.
+- Narrative + evidence: `log/2026-09-02.md`,
+  `findings_2026-09-02_m625_replay_diff_gate.md`, `state.md [replay-diff-gate]`,
+  `todo.md #625` PROGRESS block.
+- Claims: NONE held. Blocked by: none.
 
 ### venue-quote-tests-data-dependent — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
 - Goal: `tests/test_venue_quote_adapters.py` passes in a SESSION WORKTREE, which
