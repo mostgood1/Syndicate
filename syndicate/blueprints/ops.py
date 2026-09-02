@@ -1769,18 +1769,58 @@ def _merge_append_only_publish(target_path: Path, incoming_path: Path) -> dict:
 # `odds_history` shards are a SINGLE JSON DOCUMENT, so the line-union above
 # would concatenate two documents and destroy both. They get their own merge.
 #
-# MEASURED 2026-09-01 on the real 39,581,487-byte / 2,745-market soccer shard:
-# `json.loads` costs 2.5x the document (97 MB one copy), and END-TO-END THIS
-# FUNCTION PEAKED AT 189 MB against 72 MB of inputs -- 2.6x combined input.
+# MEMORY, MEASURED TWICE -- AND THE FIRST CAP WAS SIZED ON THE WRONG SPORT.
 #
-# Web is a 2Gi service with 8 gunicorn slots and a documented history of
-# request-path OOMs (see the envelope-form note below, `#318`/`#319`), so this
-# is CAPPED on combined input rather than trusted to stay small. At the cap the
-# peak is ~275 MB, and the publishes are minutes apart rather than concurrent.
-# Over the cap it falls back to today's replace and SAYS SO -- a merge that
-# OOMs the receiver would be worse than the clobber it fixes, and the two
-# observed shard sizes (39.6 MB and 43.9 MB) leave real headroom under it.
-_ODDS_HISTORY_MERGE_MAX_INPUT_BYTES = 100 * 1024 * 1024
+#   soccer shard  39,581,487 B / 2,745 markets -> peak 189 MB on  72 MB (2.6x)
+#   MLB shard     54,909,482 B / 3,873 markets -> peak 276 MB on  88 MB (3.13x)
+#
+# The first version capped combined input at 100 MiB, sized on soccer. In
+# production MLB's pair is **109,448,725 B combined**, so the very first live
+# publish logged `ARTIFACT_MERGE_FALLBACK ... over_size_cap: 109448725 >
+# 104857600` and the merge was INERT on the largest shards -- a guard disabling
+# the fix precisely where it mattered most. It was visible only because the
+# fallback logs its reason instead of silently replacing.
+#
+# The cap is now derived from a stated memory BUDGET rather than from whichever
+# file happened to be measured: at the observed 3.13x, 160 MiB of input peaks
+# around 525 MB.
+#
+# THE CAP ALONE IS NOT THE BOUND, THOUGH, AND THAT WAS THE HOLE IN THE FIRST
+# VERSION'S REASONING. Web runs 8 gunicorn workers; each is single-request, so
+# "one at a time" is true per PROCESS and false for the service. Four concurrent
+# merges (two services x tracking + its artifacts twin, observed 2s apart) would
+# be ~1.4 GB on a 2Gi box already sitting near 750 MB. So a service-wide lock
+# admits ONE merge at a time and everything else falls back to the replace it
+# would have done anyway -- which is safe for the same reason the append-only
+# race is: every publisher sends its COMPLETE file every cycle, so a skipped
+# merge is re-offered on the next publish.
+_ODDS_HISTORY_MERGE_MAX_INPUT_BYTES = 160 * 1024 * 1024
+_ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS = 300
+
+
+def _odds_history_merge_lock(target_path: Path):
+    """Service-wide single-merge admission, or None if another worker holds it.
+
+    `O_CREAT|O_EXCL` on a lock file -- the same primitive `deploy_claim.py`
+    uses, and for the same reason: it works ACROSS processes, which an
+    in-process lock does not. A stale lock (a worker killed mid-merge) is
+    broken after `_ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS` so one crash cannot
+    disable merging forever.
+    """
+    lock_path = target_path.parent / ".odds_history_merge.lock"
+    try:
+        if lock_path.is_file():
+            age = time.time() - lock_path.stat().st_mtime
+            if age > _ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS:
+                lock_path.unlink(missing_ok=True)
+        handle = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(handle)
+        return lock_path
+    except FileExistsError:
+        return None
+    except Exception:
+        # Cannot take the lock for some other reason -- do NOT merge unbounded.
+        return None
 
 
 def _is_mergeable_odds_history(relative_path: str) -> bool:
@@ -1835,6 +1875,23 @@ def _merge_odds_history_publish(target_path: Path, incoming_path: Path) -> dict:
         return {"merged": False, "error": f"over_size_cap: {combined} > "
                                           f"{_ODDS_HISTORY_MERGE_MAX_INPUT_BYTES}"}
 
+    lock_path = _odds_history_merge_lock(target_path)
+    if lock_path is None:
+        # Another worker is merging. Fall back to the replace this publish would
+        # have done anyway; the rows come back on the next publish because every
+        # publisher sends its whole file every cycle.
+        return {"merged": False, "error": "merge_busy: another worker holds the merge lock"}
+    try:
+        return _merge_odds_history_locked(target_path, incoming_path)
+    finally:
+        try:
+            lock_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+def _merge_odds_history_locked(target_path: Path, incoming_path: Path) -> dict:
+    """The merge proper. Called only while holding the admission lock."""
     try:
         existing = json.loads(target_path.read_text(encoding="utf-8-sig"))
         incoming = json.loads(incoming_path.read_text(encoding="utf-8-sig"))

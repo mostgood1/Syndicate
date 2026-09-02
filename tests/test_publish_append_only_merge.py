@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -417,6 +418,84 @@ class OddsHistoryMergeTests(unittest.TestCase):
         self._merge(_doc({"a": _entry(EARLY, 1.0, 1.0)}, EARLY),
                     _doc({"b": _entry(LATE, 2.0, 1.0)}, LATE))
         self.assertEqual([p.name for p in self.root.glob("*.merge")], [])
+
+
+class OddsHistoryMergeAdmissionTests(unittest.TestCase):
+    """The cap and the lock, both of which exist because of MEASURED memory and
+    both of which got their first version wrong.
+
+    The cap was sized on the 39.6MB soccer shard, and MLB's real pair is
+    109,448,725 B combined — so the first live publish logged
+    `over_size_cap: 109448725 > 104857600` and the merge was INERT on the
+    biggest shards. `test_the_cap_covers_the_real_mlb_pair` pins that.
+    """
+
+    OBSERVED_MLB_COMBINED_BYTES = 109_448_725
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.target = self.root / "t.json"
+        self.incoming = self.root / "i.json"
+        self.target.write_text(json.dumps(_doc({"a": _entry(EARLY, 1.0, 1.0)}, EARLY)), encoding="utf-8")
+        self.incoming.write_text(json.dumps(_doc({"b": _entry(LATE, 2.0, 1.0)}, LATE)), encoding="utf-8")
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_the_cap_covers_the_real_mlb_pair(self) -> None:
+        """A regression on the CONSTANT. Measured 3.13x peak/input on the MLB
+        shard, so this cap implies ~525MB worst case, admitted one at a time."""
+        self.assertGreater(ops._ODDS_HISTORY_MERGE_MAX_INPUT_BYTES,
+                           self.OBSERVED_MLB_COMBINED_BYTES,
+                           "the cap must not exclude the shards that clobber worst")
+
+    def test_the_lock_admits_one_and_refuses_the_second(self) -> None:
+        first = ops._odds_history_merge_lock(self.target)
+        self.assertIsNotNone(first)
+        self.assertIsNone(ops._odds_history_merge_lock(self.target),
+                          "a second worker must not merge concurrently")
+        first.unlink()
+        self.assertIsNotNone(ops._odds_history_merge_lock(self.target))
+
+    def test_a_busy_lock_falls_back_instead_of_raising(self) -> None:
+        held = ops._odds_history_merge_lock(self.target)
+        try:
+            result = ops._merge_odds_history_publish(self.target, self.incoming)
+        finally:
+            held.unlink()
+        self.assertFalse(result["merged"])
+        self.assertIn("merge_busy", result["error"])
+        # and the target is untouched -- the caller does the plain replace
+        self.assertEqual(sorted(json.loads(self.target.read_text(encoding="utf-8"))["markets"]), ["a"])
+
+    def test_the_lock_is_released_after_a_successful_merge(self) -> None:
+        result = ops._merge_odds_history_publish(self.target, self.incoming)
+        self.assertTrue(result["merged"])
+        self.assertEqual(list(self.root.glob("*.lock")), [], "lock leaked after success")
+
+    def test_the_lock_is_released_after_a_FAILED_merge(self) -> None:
+        """A leaked lock would disable merging for everything in this directory
+        until the staleness timeout — worse than the bug it guards."""
+        self.incoming.write_text("{not json", encoding="utf-8")
+        result = ops._merge_odds_history_publish(self.target, self.incoming)
+        self.assertFalse(result["merged"])
+        self.assertEqual(list(self.root.glob("*.lock")), [], "lock leaked after failure")
+
+    def test_a_stale_lock_is_broken(self) -> None:
+        """A worker killed mid-merge must not disable merging forever."""
+        stale = ops._odds_history_merge_lock(self.target)
+        old = time.time() - ops._ODDS_HISTORY_MERGE_LOCK_STALE_SECONDS - 60
+        os.utime(stale, (old, old))
+        self.assertIsNotNone(ops._odds_history_merge_lock(self.target),
+                             "a stale lock must be broken, not honoured forever")
+
+    def test_a_fresh_lock_is_NOT_broken(self) -> None:
+        held = ops._odds_history_merge_lock(self.target)
+        try:
+            self.assertIsNone(ops._odds_history_merge_lock(self.target))
+        finally:
+            held.unlink()
 
 
 class MergeDispatcherTests(unittest.TestCase):
