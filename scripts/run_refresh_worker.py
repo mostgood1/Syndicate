@@ -2220,10 +2220,21 @@ def _launch_autorun_accuracy_summary(
     # -- a death mid-pass leaves the epoch unadvanced, so the next boot runs it
     # again, forever. Claiming first makes a crash cost ONE run.
     if str((last_status or {}).get("state") or "") == "started":
+        # SAY WHAT ACTUALLY HAPPENS NEXT. This line used to read "Not retrying
+        # today", and then the very next statement claimed the run and retried
+        # -- a log line that reports the OPPOSITE of the code beneath it, which
+        # is worse than no line at all: a crash would be read as a halt.
+        #
+        # Retrying IS the intended behaviour. `#256`'s claim-before-work
+        # advances the epoch at claim time, so a death mid-pass costs exactly
+        # ONE run and the daily gate holds everything else back. What the
+        # operator needs to know is that a previous pass DIED, not that this one
+        # is being skipped.
         print(
             "[accuracy_summary] PREVIOUS_RUN_NEVER_COMPLETED "
             f"claimed_epoch={last_epoch} -- the worker died inside the summary. "
-            "Not retrying today (see #256); investigate before re-enabling.",
+            "PROCEEDING with today's run (the claim already cost that day); "
+            "investigate if this repeats, because a repeat means it dies every pass.",
             flush=True,
         )
     _refresh_state_store()["write_json_file"](

@@ -134,11 +134,23 @@ class ClaimBeforeWorkTests(unittest.TestCase):
         self.assertEqual(writes[0].get("state"), "started", "the CLAIM must be written first")
         self.assertIn(writes[-1].get("state"), {"ok", "error"})
 
-    def test_a_previous_run_that_died_is_reported(self) -> None:
+    def test_a_previous_run_that_died_is_reported_AND_the_message_matches_the_code(self) -> None:
+        """This test used to assert only that the string was PRINTED, and it
+        passed while the line said "Not retrying today" and the code retried on
+        the very next statement. A log line that reports the opposite of the
+        behaviour beneath it is worse than no line: a crash reads as a halt.
+
+        So this pins the BEHAVIOUR too — the run proceeds and re-claims — and
+        forbids the message that contradicts it."""
         with patch("builtins.print") as printer:
-            self._run(last_status={"epoch": 1.0, "state": "started"})
+            fired, writes = self._run(last_status={"epoch": 1.0, "state": "started"})
         printed = " ".join(str(call.args[0]) for call in printer.call_args_list if call.args)
         self.assertIn("PREVIOUS_RUN_NEVER_COMPLETED", printed)
+
+        self.assertTrue(fired, "a died-mid-pass previous run must NOT stop today's run")
+        self.assertEqual(writes[0].get("state"), "started", "it must re-CLAIM before working")
+        self.assertNotIn("not retrying", printed.lower(),
+                         "the message must not claim a skip the code does not perform")
 
     def test_one_sport_failing_does_not_lose_the_others(self) -> None:
         calls = {"n": 0}
