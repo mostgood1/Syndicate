@@ -2486,6 +2486,29 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   decline telemetry, or the enable flag**, which are that lane's actual subject.
 - Blocked by: none
 
+
+### board-window-throttle-binds — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `965823d4`. `#631`'s PRECONDITION IS DISCHARGED: the throttle BINDS** — tomorrow's median build gap 38.8 min against a 30-min floor, today free at 15.8, over a 744-minute production window. **And it corrects the cost model that blocked the item:** "they alternate at ~42 min each" did not happen — the throttle SHEDS the extra date's turns rather than alternating, so widening does NOT halve today's refresh rate.
+- Goal: discharge `#631`'s stated PRECONDITION — verify
+  `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` actually BINDS
+  before anyone widens the board window. Three tuning changes to that knob had
+  reportedly done nothing, so whether it binds at all was unestablished.
+- Files: docs/ai_context/todo.md, .syndicate/state.md
+- Hypothesis (REFUTED): the throttle branch is dead code because the window only
+  ever contains today, so tuning it could not do anything.
+- Falsification test: if non-today dates build at gaps >= the 30-min floor while
+  today runs free, the throttle binds and the hypothesis is wrong.
+- Verification: measured per-date build intervals from BUILD_SPAN_ENTER over a
+  744-minute production window.
+- Hypothesis REFUTED, recorded: I predicted the throttle branch was dead code
+  (window only contains today). The window contains tomorrow; the branch fires.
+- Second error, same session: I read a 12-line log TAIL and concluded tomorrow
+  out-built today 3:1. Over the full span it is 39 to 7 the other way — a tail
+  read as a population, the standing 'a rate, not a count' rule.
+- STILL OWED before widening: `display_prediction_dates.json` staleness (risk 2
+  in the scoping note) is unverified — a binding throttle does not help if the
+  date list feeding it is stale.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
