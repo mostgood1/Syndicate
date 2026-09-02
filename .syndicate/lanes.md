@@ -1264,7 +1264,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 
 
 
-### maxmun-pregame-read — OPEN — opened 2026-09-02 — session ae526656-29ed-4bb4-bee5-e3c9e4e0a583 (scheduled task `todo-628-maxmun-pregame-read`)
+### maxmun-pregame-read — CLOSED 2026-09-02 — opened 2026-09-02 — session ae526656-29ed-4bb4-bee5-e3c9e4e0a583 (scheduled task `todo-628-maxmun-pregame-read`) — **GOAL MET, PASS.** `token: 'maxmun'` on a `POLYMARKET_UNMATCHED` sample for `'player': 'Max Muncy (2002)'`, refresh-worker `ad1de331`, `2026-09-02T13:46:18.027633152Z`, against a served board row for that name in `game.state = "pregame"`. The strip is EFFECTIVE in production, not merely present — `#628`'s pending read is discharged (`51f16af6`), measurement in `deploys.md` 2026-09-02 13:46:18Z (`9960572e`). `prop_same_name_collision_at_venue` = 0 on a demonstrably live instrument. No deploy: read-only.
 - Goal: discharge `todo #628`'s PENDING PRODUCTION READ — one production log line
   showing a board name carrying a parenthetical disambiguator deriving its plain
   3+3 token (`maxmun`-style, never `max200`-style), taken on a PREGAME board.
