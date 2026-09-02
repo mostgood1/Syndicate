@@ -475,13 +475,115 @@ home runs and HRR, n=2,569) priced exactly per row: **+8.48% at zero hold,
 stake-weighted +0.67%, flat-1u reconstruction at the quoted price +1.29%. So
 venue economics is the whole lever; market selection is not.
 
+**THE ROI-PER-ENTRY ANCHOR IN THE 08-31 ASSESSMENT IS WRONG.** It says 1pp of
+better entry is worth ~**+0.75pp** of ROI, "anchored to item 07's sensitivity";
+that table (above) gives **~1.77** — 2.74 points across 4.05pp→2.50pp per side.
+**Do not reuse the 0.75, and do not reuse item 05's game-market "+1.57pp ≈
++1.2% ROI" that rests on it** (which has a second defect: it applies a *prop*
+book's sensitivity to game-market rows). Corrected at the line in
+`findings_2026-08-31_mlb_accuracy_assessment.md` (`17088500`);
+`scripts/measure_exchange_prop_option_value.py` now interpolates the published
+table with a test on the slope.
+
 **MLB PLAYER PROPS ARE EXCLUDED FROM STAKING** — `commit_portfolio`, env
 `SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES`, default `mlb:player_prop`, refusal
 `market_family_excluded`. **VERIFIED IN PRODUCTION 2026-09-01T12:46Z: 1,860
-refused against 1,876 MLB prop rows (99.1%), top market `batter_rbis:379`.**
+refused against 1,876 MLB prop rows (99.1%), top market `batter_rbis:379`**;
+re-confirmed later the same day, **982 `market_family_excluded` refusals** on
+`/api/portfolio/paper`.
+**`#624` STEP 6 — THE RE-ENABLE GATE — EVALUATED 2026-09-01: NOT MET, ON BOTH
+CONDITIONS. The exclusion stays.** The gate needs the surviving book at **≤5%
+effective two-way hold** and **≥ +3% ROI**. Exchange price-shopping, measured on
+that book (`--book gate`, n=653, one date), with the Kalshi multiplier
+**RESOLVED per series** so it is a point estimate and not a bound:
+**+0.949pp entry → 6.2% hold → +2.65% ROI. Shortfall 0.35 ROI points.**
+**The hold is the binding condition** (at ≤5% the table already pays +3.72%).
+One date — re-measure over a week before anything is sized on it.
+
+**KALSHI `fee_multiplier` IS PER SERIES AND GENERALISES TO NOTHING.** Read live
+2026-09-01, **19 MLB series, 0 failures** —
+`scripts/read_kalshi_fee_params.py`, re-runnable, because this is venue CONFIG
+and can change:
+**x0.5** KXMLBGAME KXMLBSPREAD KXMLBTOTAL KXMLBKS KXMLBOUTS KXMLBHIT KXMLBHR
+KXMLBHRR KXMLBRBI KXMLBTB KXMLBSB KXMLBF5TOTAL KXMLBF5SPREAD KXMLBTEAMTOTAL ·
+**x1.0** KXMLBERA KXMLBHA KXMLBWA KXMLBASGAME KXMLBINNINGTOTAL.
+**Every batter-prop series is half rate**, so step 6's m=0.5..1.0 bound is
+retired. **Every broader rule is FALSIFIED by this table:** not per sport (five
+MLB series are full rate); not props-vs-games (`KXMLBASGAME` is a GAME at x1.0
+while `KXMLBGAME` is x0.5); **not per market family** — `KXMLBTOTAL` and
+`KXMLBF5TOTAL` are x0.5 while `KXMLBINNINGTOTAL` is **x1.0**, three totals
+series at two rates. Three full-rate series sit inside the gate book (*unders
+minus HR/HRR*, not *batter unders*).
+**REGISTERED != FETCHED:** the first read covered the 14 in
+`kalshi_catalogue.SERIES_SPORT` and was called complete; five more are fetched
+without being registered there and **two are full rate**. `KXMLBF5GAME` 404s. **Resolving it did NOT close the gate** (+2.66% → +2.65%);
+the 0.44-point width was an UNCERTAINTY, not a recoverable gain, and the earlier
+note here calling it "worth 0.44 ROI points" was wrong about that.
 Justified on the portfolio's own -19.27% ROI / 145 settled, NOT on the
 over-side defect — that defect lives in the vendor season betting card, which
 grep confirms is **not a staking input anywhere**.
+
+**WEB RUNS `gunicorn --workers 2 --threads 4`** (read from `/api/ops/memory`'s
+process list, 2026-09-02) — **two processes, four concurrent requests each**,
+NOT eight single-request workers. `ops.py` carried the older "8 gunicorn slots"
+figure and I reasoned from it once; `--threads 4` means request handlers can
+race inside ONE process, so any in-process lock is not a bound.
+**Memory instrument:** `/api/ops/memory` gives `container_memory_mb` (INCLUDES
+page cache — inflated by any big-file work and not a leak),
+`container_memory_unreclaimable_mb` (**the figure that matters**),
+`container_memory_max_mb` 2048, and per-process `rss_mb`. Reading 2026-09-02
+00:27Z, 3 min after a deploy: total 1549.2, **unreclaimable 890.4**, workers
+410.7 / 507.3. Historical baseline ~750 MB. **A post-deploy reading proves
+nothing — every deploy reboots the workers and resets the floor, and the FLOOR
+is the ratchet.**
+
+**`book_quotes` DAILY SHARDS ARE NOT APPEND-ONLY — THEY LOSE ROWS. Measured
+2026-09-01, mechanism confirmed in code (`#630`, lane
+`book-quotes-publish-clobber`).** Two services each append LOCALLY to their own
+copy (`odds_book_quotes.append_book_quotes`, `open("a")` — correct), then
+`artifact_publisher.publish_hot_artifact` does `read_text()` and pushes **the
+whole file**. Separate disks, so **each publish overwrites the other's rows and
+web keeps whoever published last.** Two reads of `2026-09-01.jsonl` an hour
+apart: **1,318 exchange rows LOST, 0 gained**, clean tail truncation, while
+sportsbook rows gained a whole hour. `count:1 truncated:False` — not an export
+artifact. Sportsbook scars already present: **no hour 10, no hour 21, hour 15 has
+8 rows.**
+**THE DAMAGE IS INVISIBLE — every surviving row is real and correctly aligned,
+so a clobbered shard still prints a tidy number.** It already produced one wrong
+published conclusion: `#624` step 5/6's "67% of exchange quotes had no
+time-aligned sportsbook price, plausibly the more liquid subset" was **76% this
+defect** (1,365 of 1,795), not market liquidity.
+**Before inferring anything from a coverage gap in a shard, compare the two
+feeds' time spans, and read the artifact TWICE — if the second read is not a
+superset, stop.** `measure_exchange_prop_option_value.py` refuses a date below
+65% feed overlap (`51cf8b83`); it refuses 2026-09-01 itself at 46.1%.
+
+**FIX: MERGE-ON-RECEIVE, `e78aee52`, DEPLOYED TO WEB 2026-09-01 23:38:56Z —
+VERIFICATION PENDING, do not yet call it fixed.** `/api/ops/artifacts/publish`
+now UNIONS an append-only artifact with what is on disk instead of replacing it,
+in BOTH receive forms (the envelope form matters: live-odds-worker is pinned on
+`7e76478f`). Publishes become commutative. Two invariants carry it: the existing
+file stays a **byte prefix** (so `pull_streamed_artifact`'s HTTP-Range tail
+fetch stays valid — merging is what finally MAKES that assumption true), and
+dedup is on the **whole line**, never a parsed key. `_is_append_only` is
+imported, not restated, so the merge set and the Range-pull set cannot drift.
+Non-append-only families still REPLACE — merging the `.state.json` sidecar would
+concatenate two dicts.
+Replayed on the two real snapshots pre-deploy: recovered **exactly 1,318** rows,
+byte-prefix True, 54,866 duplicates collapsed.
+**verify (owed):** read the shard twice across a publish cycle from each writer;
+the second read must be a strict SUPERSET. That property was FALSE on
+2026-09-01 and is the test that found the bug.
+**Also note `#488`'s shrink guard did NOT catch this** — the clobbering publish
+was LARGER (25MB→37MB), so `ratio >= threshold` returned "allowed" silently. It
+is now skipped for merged families, because refusing would reject the publish
+carrying the other service's rows.
+**Scope sweep still owed:** `book_quotes` is the one PROVEN two-writer artifact,
+not established as the only one in `HOT_ARTIFACT_PATTERNS`.
+
+**A WEEK-LONG EXCHANGE-PROP MEASUREMENT IS NOT AVAILABLE UNTIL 2026-09-08.**
+Capture began 2026-09-01; 08-26..08-31 carry **exactly zero** exchange prop rows.
+`--since/--until` pools dates when they exist.
 
 **EXCHANGE PROP PRICES WERE NOT CAPTURED — a SOURCE gap, not a join. FIXED AND
 VERIFIED IN PRODUCTION 2026-09-01 16:11Z.** `mlb_source/tracking/book_quotes/2026-08-31.jsonl`
@@ -1096,9 +1198,20 @@ demonstrating the bug. Pinned is not fixed.
   `unmatched_sample` names `player`/`token`/`fixture_tokens` (same
   fixture+family, near-tokens first, bounded 6)/`token_lines`, so one
   `POLYMARKET_UNMATCHED` read separates token-miss (`wilcon2`-class) vs
-  rung-miss vs player-not-listed. First read: 2 rung-miss (Soto hits 0.5 vs
-  venue 1.5; Gasser K 4.5 vs {1.5,2.5,6.5}), 1 player-not-listed (Rocchio),
-  0 token-miss; counts unchanged (224 ≈ 230 baseline — instrumentation only).
+  rung-miss vs player-not-listed — **and COUNTED COMPLETELY as of `356d65b9`
+  (`prop_classes=`, per-family sums == `no_match|mlb|*`, invariant held 532=532
+  on first read) `[measured 2026-09-01 ~20:30Z on `839bfa06`, lane
+  prop-rung-miss-rate]`: player_not_listed 65.2%, rung_miss 27.4%, near_token
+  4.9%, fixture_miss 2.4% (532 rows, one cycle — quote a FRESH line, the
+  population moves). Pitcher props are the inverse of the headline: 85.7%
+  rung_miss (strikeouts 100%); batter props 71.8% player_not_listed — the venue
+  lists ~6–10 batters/game vs our full-lineup board.** The earlier 3-sample
+  read (2 of 3 rung-miss) had suggested rung-miss plurality; the complete count
+  falsified it. Named follow-up in
+  `findings_2026-09-01_prop_rung_miss_rate.md`: board names like `Max Muncy
+  (2002)` derive token `max200` (parenthetical survives cleaning) — a
+  derivation fix CHANGES MATCHING for deliberately-ambiguous names, own lane
+  required.
   **UPDATED 2026-09-01 19:18Z `[lane polymarket-prop-resolver-arming, USER
   DECISION]`: the resolvers are ARMED** (key set by the user, injected by
   dep-dabi38dcqm1c73dmhdjg live 19:06:37Z). Verified first cycle:

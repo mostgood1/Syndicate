@@ -17668,3 +17668,147 @@ page cache, which this merge inflates by reading and writing 50MB+ files.
   749 more markets reach the club stage). **The 34 aliases are SAFE and their
   BENEFIT IS UNMEASURED.** Reading it needs a stable slate and a per-sport
   attempted/resolved rate, not a total. Not claimed either way.
+
+## 2026-09-02 01:17Z + 01:44Z — web ← `088a8109` then `dd049490` — `#630` the odds_history merge moved OFF the request path and OUT of the process
+
+- Both live, confirmed via `/api/ops/version` (`088a8109` 01:20:59Z,
+  `dd049490` 01:48:37Z). Claim held throughout; preflight CLEAR for each SHA.
+- **WHY.** The merge ratcheted web's memory: unreclaimable 717.7 MB at boot →
+  ~1030 MB once merges started, and it kept climbing (workers 790.0/630.7 MB by
+  01:16Z). CPython does not return freed arenas, so each gunicorn worker keeps
+  its peak. **A background THREAD would not have fixed this** — same process,
+  same arenas. A subprocess returns the whole address space on exit. It also
+  restores `CLAUDE.md`'s rule that the web service does no heavy computation.
+- **Scope is MEASURED:** `book_quotes` line union 20 MB peak on 34 MB (0.59x,
+  streams) — stays inline; `odds_history` JSON union 276 MB on 88 MB (3.13x) —
+  moved out. Moving the cheap one too would have added spawn latency to the most
+  frequent publish on the platform for nothing.
+
+### THREE DEFECTS I SHIPPED IN `088a8109`, ALL FOUND BY READING PRODUCTION
+
+1. **I blinded myself** — child spawned with `stdout=DEVNULL`, so the
+   `ODDS_HISTORY_MERGE` line the script's own docstring calls "the only record"
+   went nowhere. The deferred path was unobservable.
+2. **The lock dropped 11 of every 12 publishes.** TWELVE odds_history publishes
+   landed inside 2 SECONDS; the service-wide lock is non-blocking, admitted one,
+   and the child then deleted its staging file regardless — those were
+   **discarded, not clobbered**. The lock was non-blocking because it sat on the
+   REQUEST path; it no longer does, so the child now waits up to 180s.
+3. **A refusal discarded the publish.** Now it PROMOTES the staged copy (the
+   plain replace, i.e. pre-merge behaviour) — **except an unparseable incoming**,
+   which must never overwrite a good artifact. That needed the two parses split
+   so `target_unparseable` and `incoming_unparseable` are distinguishable.
+
+Plus a fourth found in preflight output: **`Popen` without `wait()` left one
+ZOMBIE per publish** (`3 defunct child(ren) awaiting reap`). Handles are now
+polled and reaped on the next spawn.
+
+### VERIFIED 2026-09-02 01:50–01:55Z
+
+- **MEMORY, the reason for the change: unreclaimable 444.0 MB**, workers
+  183.1 / 289.4 MB — **below the 717.7 MB boot floor and less than half the
+  ~1030 MB plateau**, with **38 merges already run in the window**. Previously
+  68 merges took it 717 → 980. Discriminating, not just a boot reset.
+- **Observability restored:** 38 `ODDS_HISTORY_MERGE` child records, all
+  `merged: true`, no `merge_busy` storm — the lock wait works.
+- **`#630`(a) RECOVERY IS NOW DEMONSTRATED**, which was the owed reading:
+  **10 of 38 merges preserved markets the incoming did not carry — 44 markets a
+  plain REPLACE would have destroyed** in a ~2-minute window (09-05: 4 of 2,745;
+  09-04: 6 of 489; 09-12: 3 of 621). Small in proportion, recurring every cycle.
+- **STILL OPEN:** 4 zombies persist between bursts — reaping happens on the NEXT
+  spawn, so a bounded number (≈ burst size) sits idle in between. Bounded, not a
+  leak; **confirm the count does not grow across bursts.** New memory watch
+  running on `dd049490`.
+
+## 2026-09-02 — refresh-worker/web cc1feccc — NCAAF week_state producer
+
+Scheduled verification of the 2026-09-01 deploy that shipped UNPROVEN because the
+producer's daily staleness gate would not fire until after that session ended.
+Readings taken 2026-09-01 21:05–21:15 CDT (02:05–02:15Z). READ-ONLY run.
+
+**VERDICT: PROVEN. The producer ran, the games cache really was re-fetched, and
+the artifact crossed to web.** One real defect found in the VERIFICATION
+INSTRUMENT, not in the fix — see the last section.
+
+### The fix is present on what is actually running
+
+Both services have moved PAST `cc1feccc` since the deploy, so the fix had to be
+re-confirmed by content rather than assumed:
+
+- refresh-worker live `ad1de331`, finished 2026-09-01 19:48:41 CDT
+- web live `dd049490`, finished 2026-09-01 20:48:07 CDT
+- `bc2365fc`, `c1c3cf12` and `cc1feccc` are all ancestors of BOTH live SHAs
+  (`git merge-base --is-ancestor`, 6 of 6). Both emitters exist at `ad1de331`
+  (`generate_smartsim2_ncaaf_projections.py:841` and `:868`).
+
+### 1. The producer ran
+
+`SEASON_PROJECTION_LAUNCHING sport=ncaaf season=2026 week=1 reason=artifact_stale
+age_seconds=86537 interval_seconds=86400` at **2026-09-01 19:35:41 CDT**
+(00:35:41Z). The daily gate fired as predicted (86537 > 86400).
+
+### 2. THE DECISIVE READING — the cache was re-fetched, 0 -> 8
+
+`/api/ops/artifacts/export?path=ncaaf_source/data/week_state/ncaaf_week_state_2026.json`
+returned **HTTP 200, `count: 1`**, body `generated_at 2026-09-02T00:35:50.184787+00:00`:
+
+    games 888   season 2026   source ncaaf_games_cache   stale_completion_flags 0
+    week 1: games 99  completed 8  unplayed 91
+    weeks 2-13,15: completed 0
+
+- **CONTROL RUN AND PASSED:** the same endpoint with
+  `path=.../definitely_not_allowlisted.txt` returned **HTTP 403**
+  `"path is not an allowed hot artifact."` The 200 is therefore load-bearing.
+- **`completed: 8` IS the proof of the re-fetch.** The write-once file this lane
+  was opened against has `completed: False` on 888 of 888 — re-verified today
+  against the on-disk 2026-07-21 copy, which still reads **0 completed for week 1**.
+  Production now reads 8. `stale_completion_flags` moved the other way, **8 -> 0**,
+  which is the diagnostic `week_state.py` was written to expose.
+- **8 IS THE RIGHT NUMBER, not a partial refresh.** Week 1's kickoffs are
+  7 on 08-29, 1 on 08-30, then NOTHING until 09-03 (6), 09-04 (8), 09-05 (60),
+  09-06 (16), 09-07 (1) = 99. Exactly 8 games had kicked off before the 12h
+  grace cutoff, so `completed 8` and `stale_flags 0` are the only mutually
+  consistent pair. A low count here looked wrong and was checked rather than
+  waved through.
+- Publish path, worker logs: `PUBLISH_OK ... bytes=1671` at 19:35:50 CDT;
+  a later republish hit `PUBLISH_FAILED ... Name or service not known` at
+  19:40:49; `SWEEP_REPAIRING reason=direct_publish_failed` then `PUBLISH_OK` at
+  19:43:39. **The self-heal worked** — transient DNS, recovered without help.
+
+### 3. The week number
+
+`/api/ops/ncaaf/season-weeks`: `resolved_active_season 2026`,
+**`resolved_active_weeks [1]`** — CORRECT and NOT a regression: week 1 runs
+08-29..09-07 and genuinely still holds 91 unplayed games. Week advance is the
+separate 2026-09-08 check. `smartsim2_standalone_seasons_and_weeks` 2026 =
+[1-13, 15], matching the artifact's 14 weeks. **Week 14 is absent UPSTREAM** —
+CFBD's own payload has no regular-season week 14 (888 regular games, weeks
+[1-13,15]) — not an artifact of this fix.
+
+### DEFECT FOUND (instrument, not fix — NOT fixed, unattended run)
+
+**The two log readings this check was specified around CANNOT EVER APPEAR.**
+`GAMES_CACHE_REFRESH` matched nothing over 2026-09-01 20:00Z..now, and the only
+`WEEK_STATE` hits were `[artifact_publisher]` lines, never the producer's own.
+Cause: `log()` at `scripts/generate_smartsim2_ncaaf_projections.py:796` writes
+**only** to the `--progress-log` FILE and never to stdout —
+
+    def log(message: str) -> None:
+        if args.progress_log:
+            with args.progress_log.open("a", ...) as handle: ...
+
+so every `log(...)` in that script, including both prescribed needles, is
+invisible to Render's collector by construction. This is the CLAUDE.md
+`print(..., flush=True)` rule in a new place. **The absence proves nothing about
+the fix** — which is why the artifact read above was treated as decisive.
+
+- **CONTROL, run before claiming any absence:** `BOARD_HEALTH sport=ncaaf` over
+  the SAME window returned **24 matches spanning 20:06:59Z..02:03:36Z**. The
+  logs API was healthy; the absence is real and is the emitter's fault.
+- Suggested (NOT applied): have `log()` also `print(message, flush=True)`.
+  Nothing else in the fix depends on it.
+
+verify: production disk read via `/api/ops/artifacts/export` returned HTTP 200
+`count:1` with `week 1 completed=8, stale_completion_flags=0` against the
+write-once file's 0-of-888, allowlist control 403, on live SHAs that contain
+both fix commits.

@@ -1418,7 +1418,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none. Next: **`#623`** (the 09-17 sprint + pre-registered gates + parked `#614`/`#616` reads) and **`#626`(d)(e)** (reuse-guard/live-capture, klass-hole). **`#622`** owns the ranking-key question — per `#615` T2-1 is ANSWERED (no sim-derived key exists; do NOT keep re-looking at the 656-row sample, ~30 looks are already on record). `scripts/prereg_wnba_favourite_lean.py` is frozen and waiting for the sprint.
 
 
-### mlb-live-gameline-skill-audit — OPEN — opened 2026-09-01 — session 250953ef-3461-4628-b326-415a35a97a74 — **SHIPPED AND LIVE; ONE READING OWED.**
+### mlb-live-gameline-skill-audit — CLOSED 2026-09-02 — opened 2026-09-01 — session 250953ef-3461-4628-b326-415a35a97a74 — **CLOSED ON THE READING: `quote_older_than_live_pricing_ceiling = 27` against `considered = 742` (215 live rows) at 00:01:10Z — 27 of the 130 rows that reach the quote check, 20.8%. The staleness gate fires in production.**
 - Goal: decide whether the MLB live game-line model has skill the market lacks,
   and if not, name the mechanism. **ANSWERED — see `log/2026-09-01.md`.**
 - Files: syndicate/features/shared/live_gameline_score.py,
@@ -1431,12 +1431,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - STATUS: `c01dabb1` live in `417e19ed` (16:55:20Z), `692214e0` live in
   `9a436fab` (17:59:56Z). Both verified BY CONTENT. Neither deployed by me —
   carried by other lanes because they were on `origin/main`.
-- **THE ONE THING OWED: the staleness gate has NEVER FIRED in production.**
-  Every sport on this path was pregame at 18:0xZ, so `considered=0` and
-  `withheld_by_reason={}` describe the SLATE, not the gate. PASSES only on
-  `quote_older_than_live_pricing_ceiling` > 0 against a non-zero `considered`
-  (expect ~39.5% of live rows). Scheduled task
-  `verify-live-gameline-staleness-gate` fires 18:45 CT. A zero is NOT a pass.
+- **THE READING THAT WAS OWED IS TAKEN — DISCHARGED 2026-09-02 00:05Z.** The
+  18:0xZ `considered=0` described the SLATE (all sports pregame), not the gate.
+  On the 00:01:10Z MLB grid: `considered 742` / `projected 103` / `priceable 68`,
+  `withheld_by_reason` = segment 601, stale-quote **27**, prob-interval 35,
+  no-projection 11; 215 live rows. The gate sits THIRD in the join, so its own
+  denominator is 742−601−11 = **130 → 20.8% refused**, and 130−27 = 103 =
+  `projected` closes the arithmetic. Below the ~39.5% ledger expectation (a
+  pooled cross-sport historical rate vs one MLB grid at one instant — not
+  compared here), and far from zero, which is what the bullet turned on.
+  `row_carries_no_quote_age` count **0** — the predicted-defect branch has not
+  fired. Bullet 2 re-confirmed: `scorer_contract 2`, `fresh_quote_seconds 120.0`.
+  Full reading: `.syndicate/deploys.md`, the 2026-09-02 00:05Z entry.
 - Headline for anyone quoting this model: **on fresh quotes (<=120s) the model
   LOSES, +0.01096, CI [+0.00171, +0.02132] over 147 games.** The old
   "+0.07000 / n=98" figure is a FIXED SCORER BUG — do not quote it. History rows
@@ -1514,7 +1520,190 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Verification: ran — capture line 18:10:22Z (`appended=374`), grid line 18:11:28Z (`books=['kalshi','polymarket'] near_misses={}`), resolver gate withholding (`withheld=374`). Recorded in `deploys.md`.
 - Blocked by: none.
 
-> **HOLE MARKER `[2026-09-01 ~18:3xZ, session 41d46db0 / lane polymarket-prop-quote-capture]` — TWO CLOSED-LANE BLOCKS BELONGING TO SESSION syndicate-8d (3492626c) WERE DESTROYED HERE BY MY ERROR AND AWAIT THEIR RESTORATION:** `phase0-graded-supply — CLOSED 2026-09-01` (landed `e9090bc0`) and `phase0-accuracy-autorun — CLOSED 2026-09-01` (landed `258d312f`, including the note narrowing its todo.md claim to the `#626` block). A `git checkout -- .syndicate/lanes.md` I intended for my session worktree ran in THIS shared tree after a cwd slip and restored the file from HEAD, discarding every uncommitted edit in it. Their CODE is safe on origin/main; only these ledger blocks were lost. syndicate-8d was notified immediately with what partial text I hold; deliberately NOT reconstructed from my fragments — a partial restore that reads as whole is worse than this visible gap. Remove this marker when the blocks are rewritten.
+### phase0-graded-supply — CLOSED 2026-09-01 — **LANDED `e9090bc0`: game markets (`ml`, `totals`) now retain their cap overflow as `other_playable_candidates`, exactly as `pitcher_props` and every hitter market already did — so capped-out game picks are graded as tier `candidate` instead of discarded.** — session syndicate-8d (3492626c)
+- **NOT a cap raise, and the premise correction IS the result.** `#626`(b) said
+  "re-fit the cap profile". The code says otherwise: prop markets keep their
+  overflow, game markets dropped it, in BOTH card builders, with no comment
+  anywhere giving a reason — copy-drift. Retaining it leaves `recommendations`
+  capped, so the OFFICIAL tier is byte-identical and NO betting policy changes;
+  raising `caps.ml` would instead redefine OFFICIAL on a deliberately-fitted
+  profile and multiply a paper book measured at -7.43%.
+- Verification RAN: 11 new tests (overflow arithmetic on `#610`'s measured
+  12-vs-1 slate, zero-cap and uncapped edges, `_rank_and_cap`'s added `rank`
+  key not breaking identity subtraction; reachability on both builders and both
+  consumers), 71 existing card-builder/MLB-job tests pass. Reachability checked
+  BEFORE writing: the manifest grades extras `tier="candidate"` and the settler
+  settles them `"candidate"`, both market-agnostic — no grader/settler change.
+- **Production gate, deliberately narrower than `#626`(b) claims:**
+  `candidate`-tier `ml`/`totals` rows > 0 on the first card built after this
+  ships. NOT "graded rows/week 14 -> 100+" — that also depends on `#611` and on
+  a join whose health two ledger entries disagree about.
+- Files: released. `vendor/mlb_bettingv2/tools/daily_update_multi_profile.py`,
+  `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py`,
+  `tests/test_game_market_overflow_retained.py`.
+
+### phase0-accuracy-autorun — CLOSED 2026-09-01 — **LANDED `258d312f`: `build_accuracy_summary` finally has a scheduled caller — a refresh-worker autorun, default OFF, claim-before-work, daily at Central hour 7, per-sport isolation, bounded persistence, and its own cost telemetry.** — session syndicate-8d (3492626c)
+- **The memory check is the load-bearing part, and I nearly got it wrong.** I
+  read the call site `_latest_by_recommendation_id(_stream_record_payloads(...))`,
+  concluded it materialises the whole ledger — the exact shape `#256` diagnosed
+  as 110 OOM kills over 11h — and was about to block the job. Reading the
+  REDUCER corrected it: it is "single pass, iterate-only -- so it consumes a
+  GENERATOR without materialising it. That is what lets the peak be the reduced
+  set" (`#254`). Peak is the deduped record set (~20k), the same order as the
+  settlement pass already running daily (~40MB / 71s). **A call site is not an
+  allocation; the function is.**
+- Safety, each item from a logged incident: OFF by default (this file's own
+  convention for a new periodic job); claim-before-work per `#256`, with a
+  still-`started` status reported loudly and not retried that day; hour 7 sits
+  one BEHIND settlement's 6 because it scores what settlement writes; per-sport
+  try/except so one sport cannot cost the other seven; bounded persistence with
+  `segments_total`/`segments_truncated` because the keyvalue key has an 8MB
+  ceiling and the segmented surface grows with coverage.
+- Verification RAN: 16 new tests incl. off!=on both directions, that a disabled
+  gate does NO work at all (the cost guarded is the read), claim-ordering
+  asserted on write SEQUENCE, and reachability that the `elif` sits behind
+  settlement. 74 refresh-worker/ordering tests pass; 3 soccer-seed failures are
+  PRE-EXISTING (baselined via stash — they need `data/`, excluded from worktrees).
+- **Production reading deferred BY DESIGN, not inert:** arming is a one-key
+  config change and should be taken with the first run's cost telemetry in hand.
+- **todo.md claim NARROWED to the `#626` block and released for additive
+  top-inserts** (peer request, lane `polymarket-prop-quote-capture`).
+- Files: released. `scripts/run_refresh_worker.py`,
+  `tests/test_accuracy_summary_autorun.py`.
+
+### mlb-prop-freeze-source-trees — CLOSED 2026-09-01 — **LANDED `9a768443`: `#626`(a) / `#611`. The MLB prop pregame seal now sources the richest doc across EVERY `market_dir` instead of `market_dirs[0]` alone, and every refusal is NAMED.** — session syndicate-8d (3492626c)
+- **The asymmetry was inside one loop body.** `best_frozen` was already computed
+  across every tree — its own comment says *"'Already frozen' is asked of EVERY
+  tree, not just this one"* — while the SOURCE was `market_dirs[0]` and a miss
+  was a bare skip that emitted nothing. Game lines cannot fail that way
+  (`_merge_pregame_game_lines` seeds from every copy), which is exactly why
+  2026-09-01 had a 15-game game-line freeze and ZERO prop seals on the same runs.
+  `market_dirs[0]` is the tree the fetch writes to LATER in the same pass, and
+  git tracks zero files under it.
+- **NOT claimed as proven to be THE cause.** Nobody has read
+  `.../data/market/oddsapi/` on a live worker; `#611` says do not ship on the
+  asymmetry alone. What shipped is narrower and defensible on its own terms: an
+  internal inconsistency in one function, plus the instrumentation `#611` has
+  asked for three sessions running.
+- **THE FALSIFIER IS BUILT IN:** if the next MLB pregame pass reports
+  `reason=no_live_doc_in_any_tree`, this change's own hypothesis is WRONG — the
+  doc is in no tree at freeze time and the cause is upstream (fetch cadence, or
+  the source root `_build_mlb_steps` hardcodes). The counter says so rather than
+  hiding it.
+- **Deliberately NOT fixed:** `refresh_odds_sources._build_mlb_steps` hardcodes
+  `source_root = REPO_ROOT / "data" / "mlb_source"`, making MLB the only sport
+  that ignores the resolution the orchestrator computes and logs. Real, but it
+  moves where every MLB read and write lands on the platform's most mature
+  sport, on an unproven mechanism. **Own lane, behind a production read.**
+- Verification RAN: 10 new tests; **off-is-not-on proven by running them against
+  HEAD's copy of the module — 7 of 10 FAIL pre-fix, and the 3 that pass in both
+  states are exactly the ones asserting UNCHANGED behaviour** (first-tree seal,
+  monotonic replacement, game lines). 71 existing freeze/odds tests pass.
+- **Production gate:** on the next MLB pregame pass, either a
+  `*_props_*_pregame.json` appears for the date, or the emitted reason names
+  which branch refused. Both are progress; the second is the read `#611` has
+  been unable to take for three sessions.
+- Files: released. `scripts/refresh_mlb_oddsapi.py`,
+  `tests/test_mlb_prop_freeze_source_trees.py`.
+
+### polymarket-prop-resolver-arming — CLOSED 2026-09-01 — **ARMED AND VERIFIED WORKING, first post-boot cycle 19:18:21Z on `bde67379`:** `POLYMARKET_PROP_RESOLVERS armed=True prop_matches=386 withheld=0`; `PAPER2_PLAN_WRITTEN date=2026-09-01 venue=polymarket venue_priced=462` of 485 rows_in (pre-arm baseline 62, game lines only) — the `#628` raw-vs-canonical asymmetry is NOT binding, the falsification test did not fire. Env key set BY THE USER (my own env-set attempt was permission-blocked and surfaced, not worked around); injected by `prop-unmatched-decomposition`'s deploy dep-dabi38dcqm1c73dmhdjg (live 19:06:37Z, one deploy carrying both lanes by agreement, killed nothing). **Blast radius measured: positions 4/$14.71 (unchanged) — `market_family_excluded: 402` still closes prop POSITIONS; arming opened pricing + tickers only. Opening the family policy is a separate, unrequested decision.** Measurement in `deploys.md` 19:18Z. — opened 2026-09-01 — session 41d46db0-4017-4d9b-91bf-c9392f13c9de
+- Goal: `SYNDICATE_POLYMARKET_PROP_RESOLVERS` armed on refresh-worker `[USER AUTHORIZATION 2026-09-01: "arm the prop resolvers once a book_grid cycle confirms clean prices" — condition MET: three consecutive clean grid cycles 18:11/18:21/18:31Z (books incl. polymarket, near_misses={}), prop ladders all monotonic, ladder_bad=[], capture converged 374→53→0]`. Testable outcome: `POLYMARKET_PROP_RESOLVERS armed=True ... withheld=0` AND the date-scoped polymarket `PAPER2_PLAN_WRITTEN venue_priced` rises decisively from its game-line-only baseline (62 of 444 rows_in, read 18:20:10Z).
+- Files: NONE — Render ENV on refresh-worker via the single-key API, never `render.yaml`; the arming deploy carries origin/main (rides: `9a768443` #611 prop seal, `258d312f` #626(h) autorun default-OFF — both landed by phase0 lanes, deploy-ready by the deploy-main rule).
+- Hypothesis: prop matches carry CANONICAL market names and shortlist rows carry the same, so `_resolver_key` symmetry holds and props resolve.
+- Falsification test: `armed=True` with `venue_priced` NOT rising above ~62 — the raw-vs-canonical market-name asymmetry named in `todo #628` is real and the armed resolvers are INERT on props; report as such, never as armed-and-working.
+- Verification: post-deploy log read of both lines above for date=2026-09-01; then first prop-order behavior (ORDER_PATH/LIVE_ORDER) reported, execution caps unchanged ($100/day polymarket, $10/order, 15/day).
+- Blocked by: none (closed).
+
+### prop-unmatched-decomposition — CLOSED 2026-09-01 — **GOAL MET AND VERIFIED IN PRODUCTION ON THE FIRST POST-BOOT CYCLE.** `bde67379` live 19:06:37Z (dep-dabi38dcqm1c73dmhdjg); `POLYMARKET_UNMATCHED` read 19:18:45Z carries three prop samples that each DECOMPOSE: Soto batter_hits RUNG-MISS (`token_lines=[1.5]` vs want 0.5), Gasser strikeouts RUNG-MISS (`[2.5,6.5,1.5]` vs 4.5), Rocchio hrr PLAYER-NOT-LISTED (six teammates incl. collision-extended `bretbat` visible in-sample, `token_lines=[]`). Game-line samples byte-shape-unchanged; prop no_match counts unchanged in magnitude (224 vs ~230). Deploy also injected the peer lane's user-staged `SYNDICATE_POLYMARKET_PROP_RESOLVERS='1'` (read back PRESENT pre-deploy; their verification is theirs; coordinated by message both directions). Measurement in `deploys.md` 19:18Z. Claims released at close. — opened 2026-09-01 — session e063e054-b962-43f7-856c-d7da354dd85a
+- Goal: a prop `no_match`/`no_candidates` sample in `POLYMARKET_UNMATCHED` names the board `player_name`, the derived token, and the venue tokens present for the SAME fixture+family (near-tokens first, bounded), plus the venue's lines for OUR token — so one log read decomposes token-miss (`wilcon2`-class, invisible today) vs rung-miss vs player-not-listed. Diagnostic only: counts complete, samples bounded, ZERO behaviour change to matching.
+- Files: released at close 2026-09-01: `syndicate/features/shared/polymarket_board_join.py`, released: `tests/test_polymarket_board_join.py`.
+- Verification: ran — production log read 19:18:45Z on deployed `bde67379`, prop samples name players with `player`/`token`/`fixture_tokens`/`token_lines`; recorded in `deploys.md`.
+- Method note kept small: my first log probe "found" the line 40s after boot because the grep matched `render_logs.py`'s own header echoing the search text — caught by reading the probe body before concluding (the file said `nothing matched`). Grep for `POLYMARKET_UNMATCHED counts=`, never for the bare tag.
+
+### orphan-sequencer-venue-fee — CLOSED 2026-09-01 — all three picks had already landed as blob-identical twins (`45a4e1d8`/`378d6689`/`b7a8b207`, 22:21:21 the night of the stall); sequencer cleared with `--quit` + `rmdir`, HEAD `66e4ebb4` unchanged; owner was `live-venue-order-placement` (CLOSED 08-30, session gone); landing the picks would have REGRESSED venue_fees.py behind the 08-30 fee-model corrections. Full narrative: `log/2026-09-01.md` — opened 2026-09-01 — session fbf1a34b-cfd3-4248-8194-8d9ce16d8596
+- Goal: the primary tree's stalled 3-pick cherry-pick (`e8b5fdb9`/`4741a642`/`3f38d2e8`, venue-fee-retraction thread, stalled 2026-08-29 22:17:52 CT) is verified against origin/main content and the orphan `.git/sequencer` cleared with `--quit` — never `--abort` — with the disposition logged.
+- Files: NONE tracked — `.git/sequencer` (untracked git state) only; ledger appends to `log/2026-09-01.md` and this block. No code edits.
+- Hypothesis: the three picks' CONTENT already landed on origin/main via twin commits (`45a4e1d8`/`378d6689`/`b7a8b207`, 22:21:21 same evening), so the sequencer is abandoned litter of lane `live-venue-order-placement` (CLOSED 2026-08-30, session 69f9e24f gone), not unlanded work.
+- Falsification test: any touched path whose blob in the unlanded chain differs from the landed twins in a way main did not later supersede — that would mean real unlanded content and the picks must land via a worktree instead.
+- Verification: per-path blob diffs unlanded-vs-twin all empty (RAN: 4 code/test files identical to `45a4e1d8`; findings file identical to `378d6689`'s; learnings+index identical to `b7a8b207`; lanes edit identical) with `git cherry`'s two `+` marks proven false positives per the 08-31 FORBIDDEN rule; then `.git/sequencer` absent and HEAD unchanged after `--quit`.
+- Blocked by: none.
+
+### prop-rung-miss-rate — CLOSED 2026-09-01 — **RATE MEASURED, HYPOTHESIS FALSIFIED.** `839bfa06` live 20:18:42Z; first cycle (~20:30Z): `prop_classes=` sums exactly to `no_match|mlb|*` on all 7 families (532=532 — the instrument's license). **player_not_listed 347 (65.2%) > rung_miss 146 (27.4%) > near_token 26 (4.9%) > fixture_miss 13 (2.4%).** My written hypothesis (rung-miss plurality, off the 2-of-3 sample read) reversed by the complete count. Real structure: PITCHER props 85.7% rung_miss (strikeouts 35/35 = 100%), BATTER props 71.8% player_not_listed. Join cost unregressed (11.92s). Named follow-ups in findings: `Max Muncy (2002)`→`max200` derivation poisoning (do-not-hotfix — changes matching for exactly the deliberately-ambiguous names), hr refusals 65→0 across cycles undecomposable without matched-by-family. Deploy carried peer `4c092387` (kalshi soccer widening) by arrangement. Measurements: `deploys.md` 20:30Z; table: `findings_2026-09-01_prop_rung_miss_rate.md`. Claims released at close. — opened 2026-09-01 — session e063e054-b962-43f7-856c-d7da354dd85a
+- Goal: the rung-miss share of MLB prop no-match refusals stated AS A RATE with its denominator — full-population classification (rung-miss / near-token / player-not-listed / fixture-miss) of every prop `no_match` row.
+- **METHOD AMENDED ~20:0xZ, and the amendment is itself a finding: the rate CANNOT be computed off-worker.** Attempted analysis-only route died three ways, each verified: (1) `fetch_game_markets` → `status=skipped reason=credentials_absent` — Polymarket US creds exist only on the workers, zero POLYMARKET keys in local `.env`; (2) the slate artifact is KEYVALUE-only (`persist_game_slate` → `write_json_file`), so `/api/ops/artifacts/export` (disk scan) is structurally blind to it — the known keyvalue/artifact split; (3) `/api/ops/polymarket/slate` `continue`s past PROP rows BEFORE its league/market/slug filters (`board_market None` cut at ops.py:~597), so PROP is countable but never sampleable — the `todo #628` "ops slate PROP sampling" gap, confirmed in code. Board side DID work: 1,531 shortlist rows fetched with all join fields, and my classifier reconciled EXACTLY with the real join on the empty-slate payload (`no_candidates` 792=792 per family).
+- New method: make the join COUNT the classification completely in production — `prop_unmatched_classes` (`<class>|<family>` → count, complete) beside the existing bounded samples, emitted on the `POLYMARKET_UNMATCHED` line; deploy; read the rate off one line. Invariant test: per family, sum(classes) == `no_match|mlb|<family>`.
+- Files: released at close 2026-09-01: `syndicate/features/shared/polymarket_board_join.py`, released: `tests/test_polymarket_board_join.py`, released: `pipeline/portfolio_commit.py`. Findings: `.syndicate/findings_2026-09-01_prop_rung_miss_rate.md`.
+- Hypothesis (written before testing, unchanged): rung-miss — player listed for the fixture+family at OTHER lines — is the PLURALITY class of MLB prop no_match refusals, consistent with the 3-sample 19:18Z read (2 of 3).
+- Falsification test: the complete production counters show any other class ≥ rung-miss.
+- Verification: a production `POLYMARKET_UNMATCHED` line carrying `prop_classes=` with per-family counts that sum to the `no_match|mlb|*` counts on the SAME line; rates with denominators recorded in the findings doc and `deploys.md`.
+- Blocked by: none.
+
+### orphan-stash-yes-leg — CLOSED 2026-09-01 — stash@{0} `9a384978` dropped after component-level verification: staged half landed as `a5e16ae6` 71s after stashing (refined comment, same assertions); unstaged ops.py proven a STALE pre-`508a7e79` copy that would have REVERTED the peer's slug-filter feature if applied; owner (session `5611932c`, ARCHIVED) worktree clean; human pass supplied by user this session; 22 older stashes remain UNEXAMINED. Full narrative: `log/2026-09-01.md` — opened 2026-09-01 — session fbf1a34b-cfd3-4248-8194-8d9ce16d8596
+- Goal: `stash@{0}` (`9a384978`, "WIP on session/polymarket-yes-leg-binding", created 2026-08-31 07:59:13 CT by ARCHIVED session `5611932c`) verified component-by-component against origin/main, then dropped `[USER AUTHORIZATION 2026-09-01: "the orphaned stash needs the same treatment — verify then clear" — the human pass the 09-01 learnings entry requires]`.
+- Files: NONE tracked — `refs/stash` git state only; ledger appends + a dated addendum to the existing 09-01 stash learnings entry. No code edits.
+- Hypothesis: the staged components landed as `a5e16ae6` 71 seconds after the stash (07:59:13 → 08:00:24, same stash-then-land-elsewhere pattern as the sequencer); the unstaged ops.py delta is a STALE pre-feature copy whose only effect if applied would be reverting peer commit `508a7e79`.
+- Falsification test: any stash blob carrying content that neither landed nor is a byte-exact older version of a landed file — that would be real unlanded work, and the stash must be landed or surfaced instead of dropped.
+- Verification: RAN, all three components accounted for — ops.py blob byte-identical to `508a7e79^` (stale copy proven, zero novel content); test assertions identical to landed `a5e16ae6` (only the comment differs, landed refined; file evolved twice more on main same day); lanes claim line superseded by the corrected claim at lanes.md:1268 ("MOVED here from polymarket-yes-leg-binding, which had misfiled it"). Owner's worktree checked: CLEAN (0 modified/untracked). Then: stash@{0} re-verified == `9a384978` at drop time, dropped.
+- Blocked by: none.
+
+### orphan-stash-census — CLOSED 2026-09-01 — ALL 22 stashes verified and dropped; stack EMPTY. 349 tracked paths blob-classified, 65k+ untracked classified by policy, ledger files line-checked, six off-main bases proven twinned or recovery-branch-held. FOUR unlanded artifacts recovered first (model-sim-track 08-18 checkpoint — never committed anywhere; two 07-15 fix_notes entries; soccersim phase-1 report fullest copy; SmartSim ensemble eval report) — disposition table + appendices: `findings_2026-09-01_stash_census.md` + two `recovered_*` files. Drops guarded per-SHA, zero aborts — opened 2026-09-01 — session fbf1a34b-cfd3-4248-8194-8d9ce16d8596
+- Goal: all 22 remaining stashes (2026-05-30 `7bb3ea4b` .. 2026-08-21 `c56b6e67`) verified component-by-component (worktree, index, untracked ^3) against origin/main; proven-safe ones dropped by same-instant SHA guard, anything with novel unlanded content KEPT on the stack and surfaced `[USER AUTHORIZATION 2026-09-01: "census the other 22 the same way"]`.
+- Files: NONE tracked — `refs/stash` git state only; ledger appends; census table to `.syndicate/findings_2026-09-01_stash_census.md`. No code edits.
+- Hypothesis: most are landed drafts, stale copies, protective ledger snapshots since superseded, or regenerable output — per the two orphans already resolved this session. Off-main bases (6 of 22) additionally checked for whether the stash is the last reference keeping an unlanded base chain alive.
+- Falsification test: per stash — any stash/untracked blob that is neither in origin/main's history for its path, nor a byte-exact older landed version, nor regenerable mirror/report output; such a stash is NOT dropped.
+- Verification: per-stash disposition table with the evidence class for every differing path, written to the findings doc; drops executed only under a same-instant `rev-parse` identity check; stack length re-read after each drop.
+- Blocked by: none.
+
+### kalshi-soccer-forward-date — CLOSED 2026-09-01 — **BOTH CHANGES SHIPPED AND READ IN PRODUCTION; ONE VERIFIED, ONE UNEXERCISED, GOAL NOT MET AND SAID SO.** (1) DATE WIDENING VERIFIED, prediction pre-stated and confirmed: `market_is_for_another_date` **3,495 -> 910** and `event_not_on_our_board` **0 -> 883** on `839bfa06` (20:30:26Z). (2) CLUB CODE -> NAME resolution deployed on `3ee0f382` (live 21:00:23Z) and **moved nothing** — `event_not_on_our_board` 883 -> 883 to the digit. **Unexercised, not disproven:** the failing blobs are 8/8 Belgian Pro League fixtures dated 09-05/06 and `match_event_blob` iterates OUR games, so with no board row nothing can pair; 11 of 12 of those clubs resolve locally by name. **Kalshi soccer quotes remain ZERO** (`QUOTE_CAPTURE sports=['mlb']`) — the original goal is NOT met. The binding constraint moved three times, each move real: date -> club alias -> **board soccer fixture horizon on forward dates**, which is a different lane. Money path untouched: `KALSHI_SOCCER_RESOLVERS` shipped default-OFF and has never had a soccer match to withhold. **The requested 'fix the title parser' was a NO-OP** (18/6,000 unreadable, all NCAAF awards); state.md corrected in `39f00736`. Measurements: `deploys.md` 20:30Z + 21:08Z. — opened 2026-09-01 — session 41d46db0-4017-4d9b-91bf-c9392f13c9de
+- Goal: Kalshi soccer PRICES reach `book_quotes` (so soccer is cross-venue comparable) **without opening Kalshi soccer to live orders**. `[USER DECISION 2026-09-01: "do it that way" — widen, but gate the position side]`. Testable: `[kalshi_odds] QUOTE_CAPTURE ... sports=['mlb','soccer']` with soccer rows landing in `soccer_source/tracking/book_quotes/`, AND `KALSHI_SOCCER_RESOLVERS armed=False withheld>0`.
+- **THE REQUESTED FIX WAS A NO-OP AND IS NOT WHAT SHIPPED.** "Fix the Kalshi soccer title parser" — the parser has been FIXED since 2026-08-28/30 (`unreadable_title` 18 of 6,000 at 19:51:47Z, every sampled family NCAAF awards, zero soccer). state.md corrected in `39f00736`.
+- **THE REAL BLOCKER, MEASURED:** `kalshi_board_join` matches on ONE scalar `wanted_date` (slate date) at lines 599/722/950; Kalshi's working set holds **918 soccer markets dated 2026-09-02..09-15 and ZERO today** (`BY_GAME_DATE` + `TRIM_BY_SPORT demand={'soccer': 1541}`), so an exact-date join matches zero soccer by construction. `market_is_for_another_date` is the largest refusal at **3,495 of 6,000**. Same defect `polymarket_board_join` fixed with a SOCCER-ONLY FORWARD-ONLY widening at `_FORWARD_HORIZON_DAYS = 14`.
+- **THE POSITION-GATE PRECONDITION FAILED, WHICH IS WHY THE RESOLVER GATE EXISTS.** I predicted `no_model_edge_pct` would hold soccer out. **It does not: 4 soccer positions in the last 7 days** (08-26/28/29/30, `/api/portfolio/paper`), soccer is NOT in `DEFAULT_EXCLUDED_FAMILIES` (`mlb:player_prop` only), `SYNDICATE_EXECUTION_ENABLED=1` and soccer is in `SYNDICATE_ACTIVE_SPORTS`. Verified rather than assumed — the same class of stale-belief error the parser premise already was.
+- Files: `syndicate/features/shared/kalshi_board_join.py`, `pipeline/portfolio_commit.py`, `tests/test_kalshi_board_join.py`, `tests/test_kalshi_soccer_forward_date.py` (NEW)
+- Hypothesis: soccer club pairs do not repeat inside a 14-day horizon, so widening cannot pair a board row to the wrong fixture; the existing `event_matches_two_games` ambiguity refusal is the backstop, and nothing about fixture identity is relaxed.
+- Falsification test: `event_matches_two_games` rising for soccer after the change, or a soccer match whose paired board row names a different fixture — either means the horizon is too wide and this reverts.
+- Verification: production read of the Kalshi capture line carrying soccer, soccer rows present in the soccer book_quotes shard, `KALSHI_SOCCER_RESOLVERS armed=False withheld>0`, and MLB match counts UNCHANGED (the control — widening is soccer-only).
+- Files: released at close 2026-09-01: `syndicate/features/shared/kalshi_board_join.py`, released: `syndicate/features/shared/kalshi_catalogue.py`, released: `pipeline/portfolio_commit.py`, released: `tests/test_kalshi_soccer_forward_date.py`, released: `tests/test_kalshi_club_code_names.py`
+- **NEXT LEVER, for whoever picks it up:** the soccer board's forward fixture horizon. Kalshi lists 918 soccer markets over 09-02..09-15; our board does not carry them, so the alias path sits ready and idle. **Do NOT re-fix the alias path on the 883 reading** — it is deployed and its names resolve.
+- Blocked by: none.
+
+### mlb-prop-calibration-refit — CLOSED 2026-09-01 — **LANDED `f03ef38a`. `#624` step 1 done, and the headline is the INCUMBENT: the calibration deployed since 2026-07-17 was measurably WORSE THAN NO CALIBRATION on a held-out window (LogLoss 0.37889 / Brier 0.11860 vs raw 0.37859 / 0.11842). The shipped refit beats it on both (0.37535 / 0.11856).** Verification ran: three-way chronological split from PRODUCTION (FIT 30d, VAL 10d for L2 + per-prop selection, TEST 10d 08-22..08-31 read once), n=48,708; 11 new tests; 50 adjacent MLB tests pass. **HRR hypothesis FALSIFIED and pinned by test** — adding it regresses all four rungs held-out and the fit pins the slope at the clamp floor, so calibration cannot rescue HRR and `#624` step 2 (producer) owns it. Reproducible via NEW `scripts/fit_mlb_prop_calibration.py`, which REFUSES to write unless it beats the incumbent held-out. RIDEALONG deploy. — session syndicate-8d (3492626c)
+- Goal: `#624` step 1. The MLB hitter-prop calibration is refit against
+  PRODUCTION data and beats the deployed config on a held-out window, and the
+  refit is REPRODUCIBLE rather than a one-off.
+- Files: `vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json`
+  (the config), NEW `scripts/fit_mlb_prop_calibration.py` (the reproducible
+  entrypoint), NEW test. NOT touching
+  `vendor/mlb_bettingv2/tools/tune/fit_hitter_prob_calibration.py` (the fitter's
+  math is reused, not rewritten) and NOT the HR calibration (unevaluated here).
+- **THE HEADLINE IS THAT THE DEPLOYED CONFIG IS NET-NEGATIVE TODAY.** On a
+  10-day window neither fitted on nor selected on (2026-08-22..08-31, n=48,708
+  scored observations): incumbent LogLoss **0.37889** / Brier **0.11860**
+  against RAW-no-calibration **0.37859** / **0.11842**. It was fitted
+  2026-07-17 and has gone stale. This config: **0.37535 / 0.11856** — beats the
+  incumbent on BOTH metrics.
+- **Protocol, because a calibration validated in-sample must not ship** (two
+  refits this month looked better in-sample and were worse held-out): FIT 30
+  days 06-14..08-11; VAL 10 days 08-12..08-21 used for L2 AND per-prop
+  selection, therefore NOT held out; TEST 10 days 08-22..08-31 touched by
+  neither and read once.
+- **HRR: hypothesis FALSIFIED, and the negative result is the deliverable.**
+  The fitter's `prop_keys` hardcodes 18 props and omits all four
+  `hits_runs_rbis_*` rungs, so HRR has never been fitted — that looked like the
+  obvious `#624` step-1 fix. Tested: the fit pins the slope at the CLAMP FLOOR
+  (a=0.05, i.e. it wants to discard the model probability outright) and
+  REGRESSES all four rungs held-out. Per-prop selection on VAL independently
+  chose "no entry" for all four without seeing TEST. **Calibration cannot
+  rescue HRR — it is the PRODUCER defect (`#624` step 2), confirmed from a
+  second direction.**
+- Verification: the held-out table above, reproducible via the new script;
+  plus a test pinning that the shipped config carries no HRR entry and that its
+  `_meta` records the falsification, so nobody "fixes" the gap later.
+- **Production reading owed:** this is a data file inside the repo, so it
+  reaches production by git + deploy. It changes the vendor CARD (Book A),
+  which grep confirms is NOT a staking input — so the effect is on graded-row
+  quality and the loop, not on money. RIDEALONG: no dedicated deploy.
+- Blocked by: none.
 
 ### ncaaf-games-cache-refresh — OPEN — opened 2026-09-01 — session b85e895e-dde2-4066-8336-dc6c1d4c3c61
 - Goal: `ncaaf_target_week` returns the real current week instead of a permanent
@@ -1569,12 +1758,342 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `ncaaf_target_week` never reaching CFBD, and the written path being one
   `HOT_ARTIFACT_PATTERNS` actually matches — that last is the half that was
   inert for 13 days on the sibling entry.
-- **OWED: no production reading. NOT DEPLOYED, NOT PUSHED.** The reading that
-  would prove it: `WEEK_STATE season=2026 ... published=True` on refresh-worker,
-  then `resolved_active_weeks` moving past [1] after 09-07.
-- Commits (session branch `session/ncaaf-games-cache-refresh`, not pushed):
-  `cf41d1a9` refresh producer, `5a88f20b` week-state artifact.
+- ~~**OWED: no production reading. NOT DEPLOYED, NOT PUSHED.**~~ **PAID
+  2026-09-01 21:05-21:15 CDT (scheduled verification run). THE FIX IS PROVEN
+  IN PRODUCTION.** Full measurement: `deploys.md` -> `## 2026-09-02 --
+  refresh-worker/web cc1feccc -- NCAAF week_state producer`.
+  - Shipped as `bc2365fc` + `c1c3cf12` -> `cc1feccc` (this block's `cf41d1a9` /
+    `5a88f20b` are the PRE-REBASE session-branch SHAs; the landed pair differs).
+    Both services have since moved on -- refresh-worker `ad1de331`, web
+    `dd049490` -- and all three SHAs are ancestors of BOTH, so the fix is on
+    what is actually running (checked by ancestry, not assumed).
+  - Producer ran: `SEASON_PROJECTION_LAUNCHING sport=ncaaf ... reason=artifact_stale
+    age_seconds=86537` at 19:35:41 CDT. Daily gate fired as predicted.
+  - **DECISIVE: the artifact crossed to web.** `/api/ops/artifacts/export` ->
+    HTTP 200 `count:1`, `stale_completion_flags 0`, **week 1 completed 8 /
+    unplayed 91** against the write-once file's **0 of 888** (re-verified on the
+    2026-07-21 copy today). Allowlist CONTROL returned 403, so the 200 counts.
+    8 is corroborated by the kickoff distribution -- only 8 week-1 games had
+    kicked off (7 on 08-29, 1 on 08-30, none until 09-03).
+  - `resolved_active_weeks [1]` -- CORRECT today, not a regression; week 1 runs
+    08-29..09-07. The advance remains the 2026-09-08 check.
+- **INSTRUMENT DEFECT FOUND, NOT FIXED (read-only run):** the prescribed log
+  readings `GAMES_CACHE_REFRESH` / `WEEK_STATE` CANNOT EVER REACH Render.
+  `log()` at `scripts/generate_smartsim2_ncaaf_projections.py:796` writes only to
+  the `--progress-log` FILE, never stdout -- so every `log(...)` in that script is
+  invisible to the collector. A `BOARD_HEALTH sport=ncaaf` control over the same
+  window returned 24 hits, so the logs API was healthy and the absence is the
+  emitter's. Fix would be one `print(message, flush=True)`; nothing else in the
+  lane depends on it. **The lane's own stated proof was unattainable by
+  construction** -- the artifact read replaced it.
+- Commits (session branch `session/ncaaf-games-cache-refresh`, LANDED as
+  `bc2365fc` + `c1c3cf12`): `cf41d1a9` refresh producer, `5a88f20b` week-state
+  artifact.
 - Blocked by: none (the contested file needs a decision, not a blocker).
+### orphan-worktree-census — CLOSED 2026-09-01 — 166 of 186 C:/tmp worktrees removed after per-worktree verification (155 clean + 11 verified-dirty, all dirty content proven runtime exhaust / landed drafts / superset-elsewhere docs); every HEAD proven ref-reachable BEFORE removal so zero commits orphaned; 17 PROTECTED (10 OPEN lanes, 6 active-session/task incl. the ENABLED nightly gameline snapshot, + today's refit closure), 3 PARKED on the permission classifier (`nfl-fantasy-projections`, `wnba-halftime-elapsed`, `wnba-live-props-data` — verified data/live-runtime only; one human `git worktree remove --force` each finishes it); 39 headless admin husks deleted, prune clean. Zero recoveries needed. Table: `findings_2026-09-01_worktree_census.md` — opened 2026-09-01 — session fbf1a34b-cfd3-4248-8194-8d9ce16d8596
+- Goal: every worktree under `C:/tmp` censused with the stash-census discipline `[USER AUTHORIZATION 2026-09-01: "same treatment for the stale worktrees in C:/tmp"]`: live-session and OPEN-lane worktrees PROTECTED and untouched; clean stale ones removed (branch/commits survive removal — only uncommitted+untracked content is ever at risk); dirty ones content-verified against origin/main first and recovered where unlanded. No `--force` past unverified content, ever.
+- Files: NONE tracked — worktree registrations (git state) only; ledger appends + census findings doc `.syndicate/findings_2026-09-01_worktree_census.md`. No code edits.
+- Hypothesis: the ~110 detached `C:/tmp` scratch worktrees (deploy/push/checkpoint era) are clean husks on landed or ref-reachable commits; the risk concentrates in dirty session worktrees whose lanes are closed.
+- Falsification test: per worktree — any uncommitted/untracked file whose content is neither on origin/main, in a landed twin, regenerable by policy (data mirror/reports/caches), nor recovered to the ledger; such a worktree is NOT removed.
+- Verification: sweep TSV (dirty counts, HEAD ancestry, ref-reachability) driving a per-worktree disposition table in the findings doc; removals only via `git worktree remove` (which itself refuses dirty trees unless forced — force only after per-file verification, recorded); final `git worktree list` retains exactly primary + protected.
+- Blocked by: none.
+
+### mlb-hrr-null-closed — CLOSED 2026-09-01 — **LANDED `3ee0f382`. `#624` step 2 CLOSED AS ALREADY FIXED: all 993 zero-probability HRR rows are historical (2026-06-04..07-08); the batch surface is 100% zeros on six dates (06-14..06-25) and 0% on all 43 dates from 07-20. The producer healed between them.** **AND I WITHDREW MY OWN CLAIM FROM ONE COMMIT EARLIER** — `f03ef38a`'s "HRR carries no usable signal" was an artifact of a fit window that was 20.1% literal zeros; on clean dates HRR fits healthy slopes (0.77-1.14). The DECISION (no HRR entry) survives because the clean fit still regresses held-out. Coefficients unchanged; only the recorded reasoning. **Deliverable: a degenerate-date guard in `fit_mlb_prop_calibration.py`** — it would have repeated the same mistake silently. 13 new guard tests + config test rewritten to fail if the withdrawn reasoning returns; 21 pass. — session syndicate-8d (3492626c)
+- Goal: `#624` step 2. Establish whether the HRR producer null is still live,
+  act on the answer, and guard the trap it leaves behind.
+- **ANSWER: THE NULL IS ALREADY FIXED, AND `#624` STEP 2 IS NOT ACTIONABLE.**
+  Measured on production today: all 993 zero-probability HRR rows fall in
+  **2026-06-04..07-08**; from 08-07 every graded HRR row carries a non-zero
+  probability. On the batch surface the boundary is exact — HRR is **100%**
+  zeros on six dates (06-14..06-25) and **0%** on all 43 dates from 07-20
+  onward. It healed between 06-25 and 07-20.
+- **I AM WITHDRAWING MY OWN CLAIM FROM AN HOUR AGO.** `#624` step 1 (landed
+  `f03ef38a`) said HRR's probability "carries no usable signal", inferred from
+  the fitter pinning the slope at the clamp floor (a=0.05). **That was an
+  artifact of a contaminated fit window** — 1,422 of 7,074 HRR observations in
+  it (20.1%) were literal zeros, while VAL and TEST had none and the
+  `hits_1plus` control had none anywhere. Refitted on clean dates only, HRR
+  produces HEALTHY slopes (0.77, 0.79, 0.93, 1.14). The probability is not
+  signal-free.
+- **THE DECISION SURVIVES ON A BETTER BASIS.** Even the clean-data fit
+  REGRESSES HRR held-out (2plus .6690->.6740, 3plus .5570->.5603, 4plus
+  .4102->.4149), so HRR stays uncalibrated — not because it is signal-free,
+  but because the fitted affine-logit correction does not generalise.
+- Files: `vendor/mlb_bettingv2/data/tuning/hitter_props_calibration/default.json`
+  (`_meta` HRR note only — no coefficient changes), `scripts/fit_mlb_prop_calibration.py`
+  (a degenerate-date guard), `tests/test_mlb_prop_calibration_config.py`
+  (assertions follow the corrected reasoning), `docs/ai_context/todo.md`
+  (`#624` step 2 -> closed).
+- **The guard is the real deliverable.** The script I landed an hour ago fits
+  on whatever production returns, which today still includes six 100%-degenerate
+  HRR dates. It would have made the same mistake again, silently. It now
+  detects per-prop dates that are wholly degenerate, EXCLUDES them, and says so.
+- Verification: the guard is tested both ways (a degenerate date is dropped and
+  reported; a clean run drops nothing), and the config test asserts the
+  corrected reasoning rather than the withdrawn one.
+- Blocked by: none.
+
+### prop-name-disambiguator-derivation — CLOSED 2026-09-01 — **SHIPPED, DEPLOYED (on a third lane's deploy), MODULE PROVEN LIVE; the single decisive read is PENDING an input and parked on `todo #628`.** `38dd9f41` rides `cc1feccc` (dep-dabk62gjo6nc7391gq1g, live 21:56:06Z, fired by `ncaaf-games-cache-refresh` after the kalshi lane's claim TTL lapsed — content-verified by me: guard ×2 at that SHA, `_polymarket_player_token` EXECUTED from that tree → `maxmun`/`fertat` unregressed). First cycle 22:14:37Z: refactored encoder live-correct (5 sample pairs incl. diacritics), `prop_classes` invariant 162=162, collision refusal zero (EXPECTED — reachability test-pinned, zero ≠ firing). Same-instant board scan: ZERO disambiguated names (Muncy rotated off at first pitches), so the `maxmun` production exercise is due the next pregame board — one log read, recorded on `#628`. Severity of the closed hazard corrected in-lane (pricing/quote-capture, not orders — `market_family_excluded` 402/485, reversible policy). Measurements: `deploys.md` 22:14Z. Claims released at close. — opened 2026-09-01 — session e063e054-b962-43f7-856c-d7da354dd85a
+- Goal: board names carrying disambiguators (`Max Muncy (2002)` → today's garbage token `max200`) derive their REAL token — WITHOUT opening the wrong-person door the do-not-hotfix note existed for. Two changes, one lane: (1) `_polymarket_player_token` drops parenthetical groups and pure-digit words before encoding; (2) a same-name collision REFUSAL at match time — when the matched fixture's candidates carry, besides our plain token, a collision-variant of OUR OWN name (plain+digit like `wilcon2`, or our 4+3 like `bretbat`), the plain form's identity is undecidable from our side and the row refuses by name instead of matching.
+- WHY (2) IS THE LOAD-BEARING HALF, found by tracing the enclosing control flow before fixing: the deployed match loop (token equality → line → `_teams_match`) will pair our derived PLAIN token with the venue's plain rows in the SAME fixture. The venue disambiguates league-wide, so whichever same-named player owns the plain form, the OTHER one's derivation produces it — Willson/William Contreras meet ~13×/season (MIL@STL), and with resolvers ARMED (19:06Z) that was a live wrong-person PRICING/quote-capture path, no parenthetical involved. **SEVERITY CORRECTED 2026-09-01 ~21:1xZ (flagged by lane kalshi-soccer-forward-date, then verified by me in code + their production reading): NOT an order path today — `DEFAULT_EXCLUDED_FAMILIES="mlb:player_prop"` closes prop position-taking (`market_family_excluded` fired 402/485 on today's cycle). That exclusion is a reversible policy default behind one env var, so the guard removes the hazard rather than leaning on the policy staying set.** The docstring's safety argument ("a venue token that carries a disambiguator cannot match ours") covers extended-can't-match and misses plain-belongs-to-the-other. The guard needs NO venue-assignment decoding: both same-name players refuse whenever both forms coexist in the fixture; coverage misses stay misses; singleton fixtures keep matching.
+- Files: released at close 2026-09-01: `syndicate/features/shared/polymarket_board_join.py`, released: `tests/test_polymarket_board_join.py`.
+- Hypothesis: n/a (defect fix; the Muncy sample and the census's `wilcon2`/`bretbat` pairs are the evidence).
+- Falsification test: for the guard — a test where the fixture carries `wilcon`+`wilcon2` and board William Contreras MATCHES the plain form would prove the guard unreachable/ineffective; for the strip — measured derivation pairs regressing.
+- Verification: tests prove strip pairs + both-refuse-when-both-listed + singleton-still-matches (reachability off≠on inherent); production read after deploy shows a `Max Muncy (2002)`-class row deriving `maxmun` (matched, or refused with token=maxmun in its sample/class line) instead of `max200`→player_not_listed. The collision refusal will likely read ZERO tonight (no same-name pair shares a fixture on this slate) — reachability rests on the tests, and the zero must NOT be read as the guard working.
+- Blocked by: none (deploy waits on the refresh-worker claim currently held by kalshi-soccer lane; coordinated by message).
+
+### mlb-position-substitution-on — CLOSED 2026-09-01 — **LANDED `e3bdbc8b`. `#624` step 3 done: in-sim position-player substitution is ON by default.** Opportunity bias +11.0% → +6.1% (44.7% of the gap closed, actual AB 3.495); accuracy 3 of 4 markets better on a controlled A/B (n=1,610) with rbis −0.00086 worse; runtime 22.8 → 21.3 ms/game-sim, measured per-arm. **NOT AN EDGE — the market beats both arms in all four markets.** §4.4's re-fit hazard measured NOT BINDING (the correction UNDER-corrects, so it cannot overshoot what the rates absorbed); the measured negative interaction was BOTH mechanisms together, and batted-ball stays 0.0 with a test pinning it. Reachability to production checked before flipping (`cfg_kwargs` never contains the key). 6 new tests incl. `replace()` preservation. **OWED: residual +6.1% opportunity bias and the ~12% per-PA rate bias — the rate re-fit, its own lane.** RIDEALONG deploy. — session syndicate-8d (3492626c)
+- Goal: `#624` step 3. In-sim position-player substitution is ENABLED by
+  default, on evidence, with the `#440`/§4.4 refit question answered rather
+  than deferred.
+- Files: `vendor/mlb_bettingv2/sim_engine/models.py` (the
+  `position_substitutions` default + its comment ONLY), new test. NOT touching
+  `simulate.py`'s hazard table, NOT enabling batted-ball or pitch-split
+  mechanisms (see the interaction note below).
+- **MEASURED THIS SESSION, on current code, not inherited:**
+  - Reachability: OFF vs ON differ. Starter AB **3.880 → 3.708** against an
+    actual 3.495 — bias **+11.0% → +6.1%**, 44.7% of the opportunity gap
+    closed, 2,183 bench appearances (24 games x 40 sims).
+  - Accuracy, controlled A/B (same rosters, seeds, odds, outcomes; one input
+    differs), n=1,610 scored rows over 30 games x 100 sims: **3 of 4 markets
+    better** — hits +0.00288, runs +0.00314, total bases +0.00034; **rbis
+    −0.00086 worse**. The market still beats BOTH arms in all four.
+  - Runtime: **22.8 → 21.3 ms/game-sim**, i.e. no cost. Measured per-arm, not
+    reasoned — this host has an OOM history and "reasoned, not measured" is
+    what the ledger keeps flagging.
+  - Reachability TO PRODUCTION: `daily_update.py` builds
+    `GameConfig(**cfg_kwargs)` and `cfg_kwargs` never contains this key, so the
+    dataclass default governs the daily sim.
+- **WHY §4.4's DOUBLE-COUNT HAZARD DOES NOT BITE HERE, which is the part that
+  unblocks this item.** The standard says a mechanism needs a re-fit of the
+  rates that absorbed it, because re-adding OVERSHOOTS. Measured: this
+  correction **under-corrects** — opportunity bias stays POSITIVE at +6.1%
+  after substitution — so it cannot overshoot the absorbed effect. And the
+  measured negative interaction (−0.00331, 4 of 4 markets) was **both
+  mechanisms together**; batted-ball weight stays 0.0 and pitch-type
+  effectiveness stays unfed, so the interacting pair is not being created.
+- **NOT AN EDGE, and must not be reported as one.** The market wins all four
+  markets in both arms. This is a bias correction, not alpha.
+- **STILL OWED, explicitly:** the residual +6.1% opportunity bias and the
+  ~12% per-PA rate bias (`model_skill`: opportunity explains 55% of the count
+  bias). Those are the rate re-fit, which is a compute-heavy sweep and its own
+  lane.
+- Verification: tests that the default is ON, that OFF != ON both directions,
+  and that `dataclasses.replace()` PRESERVES it — the original defect was a
+  `setattr` silently dropped by `replace`, which is why it must stay a declared
+  field.
+- **Production reading owed:** first MLB sim after deploy shows starter
+  `pa_mean`/`ab_mean` falling; this is a RIDEALONG, no dedicated deploy (and a
+  deploy kills an in-flight sim).
+- Blocked by: none.
+
+### orphan-branch-census — CLOSED 2026-09-01 — 193 of 215 local session/deploy branches + ALL 257 `origin/deploy/*` deleted; origin deploy/* now ZERO (`ls-remote` verified) and remote-tracking refs pruned; the 22 kept are exactly the checked-out/OPEN-lane protected set (+1 branch born mid-census). Deletion made LOSSLESS BY CONSTRUCTION: every deleted tip under `refs/archive/branch-census-2026-09-01/{local,remote}/<name>` with name-by-name coverage verified (comm=0, twice) BEFORE deletion — restore is one `update-ref`; chosen over 248 per-tip blob proofs whose "not blob-landed" reading is EXPECTED for divergent deploy tips main evolved past. Out-of-scope families noted (backup/claude/dep-*/fix; remote claude/safety/hotfix/wip/staging); `recover/stash-*` explicitly NOT stale. Table + recipe: `findings_2026-09-01_branch_census.md` — opened 2026-09-01 — session fbf1a34b-cfd3-4248-8194-8d9ce16d8596
+- Goal: stale `session/*` and `deploy/*` branches (215 local + 257 `origin/deploy/*`) censused with the day's discipline `[USER AUTHORIZATION 2026-09-01: "same treatment for the stale session and deploy branches"]`: a branch is deletable ONLY when tier-verified — tip ancestor of origin/main, or every `git cherry +` commit content-verified landed (blob/twin level, never cherry alone per the 08-31 rule); anything unverified or protected stays and is reported.
+- Files: NONE tracked — branch refs (git state) only; ledger appends + findings doc `.syndicate/findings_2026-09-01_branch_census.md`. No code edits.
+- Hypothesis: deploy branches are compositions cut from live SHAs whose fix content landed on main via twins (the 08-15 lesson: two deploy branches do not contain each other); session branches of closed lanes landed via worktree pushes. Tier-1 ancestry will clear most; the tier-3 remainder concentrates the risk.
+- Falsification test: per branch — a unique commit whose changed-path blobs are neither in origin/main's history nor superseded by main's evolution of those paths; such a branch is KEPT and surfaced.
+- Verification: tiered TSV (ancestor / patch-equivalent / content-verified / KEPT) in the findings doc; protected set = OPEN-lane + active-session + checked-out-in-worktree branches + `recover/*` (out of scope, content owners); deletions batched with per-batch disposition echo; final ref counts.
+- Blocked by: none.
+
+### mlb-202-edge-scan — CLOSED 2026-09-01 — **LANDED `b2060de2`. `#624` step 4 / `#202` EXECUTED: 4 tests run, 0 candidates, NO EDGE FOUND — the pre-registration's own prior.** The larger result: **7 of 8 hypotheses are UNEXECUTABLE** — the mechanism payload they slice on survives on 534 of 9,479 graded rows, TWO DATES OF FIFTY-ONE, date-scoped not root-scoped; `ml` rows carry no model probability at all; H8 has no segment ACTUAL. H3, the one that ran, FAILED in the direction opposite its prediction (only powered cell ROI −0.142, both halves negative, bootstrap spanning zero, monotonicity spiky). Pre-registration rules NOT edited — only an EXECUTED-ON stamp appended. 15 tests, each asserting one rule REJECTS (an inert rule reads exactly like a satisfied one). **Precondition for the other five: graded rows must retain the mechanism payload.** — session syndicate-8d (3492626c)
+- Goal: `#624` step 4 / `#202`. EXECUTE the conditional-edge scan whose rules
+  were pre-registered 2026-08-05 and never run, and report it to its own
+  reporting requirement.
+- **RESULT: 4 tests run, 0 candidates. NO EDGE FOUND — which is the
+  pre-registration's own stated prior.** But the larger result is that
+  **7 of the 8 hypotheses are NOT EXECUTABLE against the production graded
+  surface**, and that is why this item sat for a month.
+- **THE BLOCKER, measured:** the per-row MECHANISM payload the hypotheses slice
+  on (`park_hr_mult`, `batter_platoon_hr_mult`,
+  `pitcher_primary_pitch_type_hr_mult`, `pitcher_k_rate`) exists on **534 of
+  9,442 graded rows — two dates of thirty-six** (2026-05-09, 05-18). It is
+  DATE-scoped, not root-scoped: both artifact roots carry it for those two
+  dates and neither carries it for the other thirty-four.
+  - H1/H2 (K quartiles): `pitcher_k_rate` 0/192 K rows, `lineup_k_rate` 6/192.
+  - H4/H5/H6 (HR slices): all three fields 0/1,670 HR rows.
+  - H7 (sim favourite): `ml` rows carry NO model probability at all — only
+    odds, selection, result. Slicing on the MARKET's favourite instead would be
+    a different hypothesis and the pre-registration forbids that substitution.
+  - H8 (NRFI/first1), which the pre-registration ordered FIRST: no segment
+    bucket exists and 0 settled first-inning rows — corroborating the MLB
+    assessment's "segments publish distributions and no ACTUAL".
+- **H3 is the only hypothesis that ran, and it FAILS in the predicted
+  direction's opposite.** Cells `<=4.5 / 5.5 / 6.5 / >=7.5`: only `<=4.5` meets
+  the >=60-bet size rule (n=125) and it is **ROI -0.141, both halves negative,
+  fragility -0.197, bootstrap [-0.300,+0.018] spanning zero, direction FAIL**
+  (predicted positive). Monotonicity across cells: SPIKY. A result in the wrong
+  direction is a failure, not a discovery — the pre-registration says so.
+- Files: NEW `scripts/run_mlb_edge_scan.py` (the scan, rules transcribed not
+  invented), NEW test, `docs/ai_context/mlb_edge_scan_preregistration.md`
+  (an EXECUTED-ON stamp; the rules themselves are NOT touched), `docs/ai_context/todo.md`
+  (`#202` result).
+- **The rules are transcribed, not re-derived**, and the script refuses to
+  reinterpret them: size >=60, both chronological halves positive, fragility
+  after dropping the top 5 winners, 2,000-resample bootstrap CI excluding zero,
+  direction matching the prediction, and monotonicity where the mechanism
+  implies ordering.
+- Verification: tests that each of the six rules REJECTS a synthetic slice that
+  violates only that rule (so a rule cannot silently become a no-op), and that
+  the fragility rule drops WINNERS rather than losers.
+- Blocked by: nothing for the null result. Re-running H1/H2/H4/H5/H6 is blocked
+  on the graded rows retaining the mechanism payload.
+
+### mlb-exchange-prop-option-value — CLOSED 2026-09-01 — **LANDED `7d8b3ae9`. `#624` step 5 measured: exchange prop price-shopping is worth ~+0.64% to +0.84% ROI NET OF FEES, not the +1.45% gross implies.** Capture confirmed working (6,523 exchange prop rows day one, both venues, vs zero before). **The 82.3% gross win-rate is a FEE ILLUSION** — net it is 55.8–62.9%, next to the game-market 52.5%. **CONSEQUENCE: the surviving under book reaches only ~+1.6–1.8% against step 6's +3% gate — price-shopping alone does NOT clear it, and the board change is still not justified.** Two self-corrections before publishing: fee-aware selection (I had subtracted fees on rows where you'd never pay them) and verifying Kalshi stores the ASK not a midpoint. 11 tests; one caught me misreading the fee docstring (the documented 7x tail gap holds at HALF rate, ~3.8x at full). — session syndicate-8d (3492626c)
+- Goal: `#624` step 5. Measure what exchange price-shopping is worth on MLB
+  PROPS, now that the capture exists — the step the assessment's item 05 could
+  not do because no exchange prop price was captured anywhere.
+- **THE CAPTURE WORKS.** 2026-09-01 `book_quotes`: **6,523 exchange prop rows**
+  (polymarket 3,330, kalshi 3,193) against 37,391 sportsbook prop rows, across
+  batter hits / total bases / HRR / RBIs / home runs. Before today this was
+  zero.
+- **THE ANSWER: +0.86 to +1.12 pp of entry, i.e. ~+0.64% to +0.84% ROI — NOT
+  the +1.45% the gross number implies.** n=2,062 time-aligned comparisons.
+  | | gross | fee-aware |
+  |---|---|---|
+  | exchange is cheaper | 82.3% | **55.8%–62.9%** |
+  | mean gain | +1.939 pp | **+0.859 / +1.121 pp** |
+  - **The 82.3% gross win-rate was a FEE ILLUSION.** Net of measured fees the
+    exchange wins ~56–63% of the time, which lands right next to the game-market
+    52.5% and makes the whole picture coherent instead of anomalous.
+- **Two corrections I made to my OWN numbers before believing them:**
+  1. I first subtracted the fee on EVERY row, including ones where you would
+     take the sportsbook and never pay it. Corrected to fee-aware selection —
+     take whichever is cheaper AFTER fees, so the gain floors at zero.
+  2. I checked which price the capture stores before trusting the comparison.
+     Kalshi writes **that side's ASK** (`kalshi_board_join`'s own docstring:
+     deriving one side from the other "would erase the spread and invent an edge
+     that is not there"), so this is apples-to-apples, not a midpoint artifact.
+- **Fees are MEASURED, not assumed:** Polymarket **150 bps of notional, flat and
+  price-independent** (1.50pp at any price); Kalshi `0.07 x multiplier x P(1-P)`.
+  **Kalshi's multiplier for BATTER-PROP series is UNRESOLVED** — the repo's own
+  `kalshi_fee_params` refuses without a series payload, and the half-rate finding
+  is documented for "MLB game/total/spread/K" series, which does not name batter
+  props. Both bounds are therefore reported rather than one guessed.
+- **CONSEQUENCE FOR STEP 6, and it is the decision-relevant part:** the surviving
+  under book is +0.98% at today's ~8.1% hold. Adding ~+0.64–0.84% of entry
+  improvement reaches **~+1.6–1.8%**, well short of step 6's **+3%** re-enable
+  gate. **Exchange price-shopping alone does not clear it.**
+- Caveats stated, not buried: ONE DAY of capture; **67% of exchange quotes had
+  no time-aligned sportsbook price and were excluded**, so this measures the
+  overlap, which is plausibly the more liquid subset; and item 05's game-market
+  +1.57pp is a GROSS number by the same method, so props-vs-games must be
+  compared gross-to-gross.
+- Files: NEW `scripts/measure_exchange_prop_option_value.py`, NEW test,
+  `docs/ai_context/todo.md` (`#624` step 5 result).
+- Blocked by: none. Re-run after a full week of capture before sizing anything
+  on it.
+
+
+### mlb-prop-staking-gate-not-met — CLOSED 2026-09-01 — **`#624` STEP 6 RECORDED AS NOT MET, on both conditions; `mlb:player_prop` staking stays off. Landed `d7928307` (gate + corrected machinery) and `17088500` (the 08-31 anchor marked wrong at the line).** Measured on the GATE'S OWN book (`--book gate`, unders minus HR/HRR, n=653): +0.955pp entry → 6.2% hold → **+2.66%** ROI (Kalshi m=0.5); +0.703pp → 6.7% → **+2.22%** (m=1.0). Gate needs ≥ +3% at ≤5% hold — **the hold is the binding condition**. Exclusion re-verified live: **982 `market_family_excluded` refusals** on `/api/portfolio/paper`.
+- Goal: record `#624` step 6 (the MLB prop staking re-enable gate) as NOT MET,
+  with the arithmetic that decides it, and correct the ROI-per-entry anchor that
+  step 5 propagated from the 08-31 assessment.
+- Files: docs/ai_context/todo.md, scripts/measure_exchange_prop_option_value.py,
+  tests/test_exchange_prop_option_value.py, .syndicate/lanes.md,
+  .syndicate/state.md, .syndicate/learnings.md, .syndicate/log/2026-09-01.md
+- Hypothesis: the 08-31 assessment's "each 1pp of better entry is worth roughly
+  +0.75pp of ROI" is inconsistent with item 07's OWN sensitivity table, which
+  gives ~1.77 ROI points per pp of PER-SIDE entry (2.74 pts over 1.55pp,
+  4.05pp->2.50pp per side). If so, step 5's "+1.6-1.8% total" understates.
+- Falsification test: recompute the slope from the published table. If it comes
+  out near 0.75, the anchor is right and my correction is wrong.
+- Verification: gate recorded NOT MET on the binding condition, with the
+  entry improvement re-measured on the GATE'S OWN BOOK (unders minus HR/HRR)
+  rather than on all props; exclusion confirmed still firing in production.
+- Blocked by: none
+- Outcome: gate NOT MET. **Hypothesis CONFIRMED** — the 0.75 ROI-per-entry-pp
+  anchor contradicts the table it cites (~1.77). Falsification test ran: the
+  slope recomputed from item 07's published rows is 1.7677, not ~0.75.
+- Second finding, unplanned: step 5 had also measured the wrong POPULATION
+  (all props, not unders-minus-HR/HRR). The two errors OFFSET — fixing either
+  alone lands further from the truth. Net: "+1.6-1.8%, well short" ->
+  "+2.2-2.7%, narrowly short". Decision unchanged, margin materially changed.
+- Verification: 19 tests pass; production exclusion re-read the same day.
+
+
+### kalshi-batter-prop-fee-multiplier — CLOSED 2026-09-01 — **RESOLVED FROM THE VENUE, LANDED `e2709245`. Every MLB batter-prop series is HALF RATE** (KXMLBHIT/HR/HRR/RBI/TB/SB x0.5), so `#624` step 6's m=0.5..1.0 bound is retired and becomes a point estimate: **+0.949pp entry → 6.2% hold → +2.65% ROI, still NOT MET** (needs ≥+3% at ≤5%). **Hypothesis FALSIFIED in the favourable direction**, and resolving it did NOT close the gate.
+- Goal: resolve the Kalshi `fee_multiplier` for the MLB BATTER-PROP series
+  (KXMLBHIT/HR/HRR/RBI/TB/SB) by reading it from the venue, not inferring it.
+  Worth 0.44 ROI points on `#624` step 6's shortfall.
+- Files: syndicate/features/shared/venue_fees.py,
+  scripts/measure_exchange_prop_option_value.py, tests/test_venue_fees.py,
+  tests/test_exchange_prop_option_value.py, docs/ai_context/todo.md,
+  .syndicate/{lanes,state,learnings}.md, .syndicate/log/2026-09-01.md
+- Hypothesis: batter-prop series are NOT uniformly half-rate. `KXMLBERA` is
+  already known to be multiplier 1 while KXMLBKS/TOTAL/SPREAD/GAME are 0.5, so
+  "MLB is half rate" is false as a blanket rule and the batter series must be
+  read individually.
+- Falsification test: if all six batter series return fee_multiplier 0.5, the
+  m=1.0 bound was pure caution and step 6's range collapses to the m=0.5 row.
+- Verification: `fee_type` + `fee_multiplier` read live from
+  GET /trade-api/v2/series/<ticker> for all 14 MLB series, recorded per series;
+  step 6's range re-stated on the resolved multiplier.
+- Blocked by: none
+- Outcome: read live from GET /trade-api/v2/series/<ticker>, all 14 registered
+  MLB series, 0 failures. x1.0 is KXMLBERA/KXMLBHA/KXMLBWA -- PITCHER RATE STATS,
+  all three INSIDE the gate book (unders-minus-HR/HRR, not batter-unders). So
+  "MLB is half rate" is false and a per-sport multiplier is wrong BOTH ways.
+- Correction to my own earlier note: I had called this "worth 0.44 ROI points,
+  more than half the shortfall". Wrong category -- that was the width of an
+  UNCERTAINTY, not a recoverable gain. The bound collapsed onto its optimistic
+  end (+2.66% -> +2.65%) and the gate is no closer. Checkable in advance: the
+  optimistic end was ALREADY below +3%.
+- Verification: 47 tests pass; scripts/read_kalshi_fee_params.py re-runs the read.
+
+### kalshi-soccer-blob-orientation — CLOSED 2026-09-02 — **GOAL MET AND EXCEEDED: SOCCER EXCHANGE QUOTES EXIST FOR THE FIRST TIME, 0 -> 51.** Orientation fix (`8dbcb64d`, live 23:22:47Z): `event_not_on_our_board` **883 -> 314** and the first 51 soccer matches ever — 883 had been frozen to the digit across three cycles whose board_rows were 2,409/1,730/3,225, so a 569 move on an orientation change is a clean attribution. Then the props-only capture bound relaxed for soccer (`bdc72dbc`, live 00:04:22Z): `appended_by_sport={'mlb':314,'soccer':51} game_lines=51`, **CONFIRMED ON DISK** — 51 kalshi rows in `soccer_source/tracking/book_quotes/2026-09-01.jsonl` with real two-sided prices, against a baseline of 0 in 92,795 rows over six dates. **MONEY PATH NEVER OPENED:** `KALSHI_SOCCER_RESOLVERS armed=False` withheld all 51; quotes only. **TWO REQUESTED FIXES WERE EXONERATED, NOT SHIPPED:** the soccer TITLE PARSER (18/6,000 unreadable, all NCAAF awards) and the FORWARD FIXTURE HORIZON (already 7 days; schedule-driven path already crossing matchweeks). Both would have been inert. **MY OWN EARLIER DIAGNOSIS WAS ALSO WRONG AND IS CORRECTED:** 'the board does not carry those fixtures' — it carries 485 soccer rows over 76 fixtures; I had mistaken the shortlist endpoint's 200-row display cap for the board. Residual `event_not_on_our_board: 314` is the measured NAME gap (Kalshi `St. Truidense`/`La Louviere` vs our `Sint Truiden`), not orientation. Measurements: `deploys.md` 23:41Z + 00:22Z. Claims released. — opened 2026-09-01 — session 41d46db0-4017-4d9b-91bf-c9392f13c9de
+- Goal: Kalshi soccer markets pair with the soccer fixtures our board ALREADY carries. Testable: `event_not_on_our_board` falls materially from **883** and `[kalshi_odds] QUOTE_CAPTURE sports=[...]` gains `soccer`.
+- **THIS SUPERSEDES MY OWN DIAGNOSIS IN `kalshi-soccer-forward-date`, WHICH WAS WRONG.** I recorded "the board does not carry those fixtures". It does. Measured on `/api/board/layer2-shortlist?sport=soccer&limit=2000`: **485 soccer rows, 76 distinct fixtures, spanning 09-02..09-07**, `per_sport.soccer.selected=1600`. The earlier read that suggested otherwise was the endpoint's 200-row DISPLAY CAP, which I mistook for the board. `deploys.md` corrected.
+- **THE FORWARD HORIZON IS NOT THE CONSTRAINT EITHER, and "fix the horizon" would have been a no-op:** `SYNDICATE_SOCCER_SIM_HORIZON_DAYS` is already **7** in production (code default 1), and `_soccer_schedule_dates_in_horizon` already crosses matchweeks — it returns belgian `['09-02','09-04','09-05','09-06']`, exactly the dates Kalshi lists.
+- **THE REAL DEFECT: ORIENTATION.** `kalshi_catalogue._blob_for(away, home)` builds AWAY+HOME. Kalshi's soccer event tickers are **HOME+AWAY**. Evidence, 4 of 4 plus the venue's own labelling: Kalshi `sub_title` names the code order (`RSCKOR` = "RSC vs KOR" = "Anderlecht vs Kortrijk"), and its FIRST code is our board's HOME club in every case — `RSCKOR`/Kortrijk@Anderlecht, `CERKAA`/Gent@Cercle Brugge, `KORZUL`/Zulte-Waregem@Kortrijk, `STTRAAL`/La Louviere@Sint Truiden. MLB is AWAY+HOME and stays untouched (`MINATH` = MIN at ATH, per the module's own comment). Same sport-dependent split `polymarket_board_join` measured for soccer slugs.
+- Files: `syndicate/features/shared/kalshi_catalogue.py`, `tests/test_kalshi_club_code_names.py`
+- Hypothesis: adding the HOME+AWAY construction FOR SOCCER ONLY pairs these fixtures; being wrong fails SAFE (a reversed reading matches the return leg, which is a different fixture almost never on a 6-day board, and the existing `event_matches_two_games` ambiguity refusal catches it if both are).
+- Falsification test: `event_not_on_our_board` does NOT fall after deploy, or `event_matches_two_games` rises for soccer — either means the orientation reading is wrong and this reverts.
+- Verification: production `[kalshi_odds] BOARD_JOIN` showing `event_not_on_our_board` well below 883, MLB match counts UNCHANGED (the control), and soccer entering `QUOTE_CAPTURE sports`.
+- **Money path stays closed:** `SYNDICATE_KALSHI_SOCCER_RESOLVERS` is default-OFF, so newly-matched soccer reaches the QUOTE LOG and not the order path.
+- Files: released at close: `syndicate/features/shared/kalshi_catalogue.py`, released: `syndicate/features/shared/odds_book_quotes.py`, released: `pipeline/kalshi_odds_refresh.py`, released: `pipeline/portfolio_commit.py`, released: `tests/test_kalshi_club_code_names.py`, released: `tests/test_soccer_game_line_capture.py`, released: `tests/test_direct_feed_provenance.py`
+- **NEXT, and NOT claimed done:** the 314 residual needs Kalshi's club spellings in the alias map (a per-league alias decision, its own lane). The soccer game-line relaxation rests on soccer having no OddsAPI exchange rows — the module names the re-measurement that invalidates it. `source` in `_KEY_FIELDS` remains the real remedy and remains unbuilt.
+- Blocked by: none.
+
+### book-quotes-publish-clobber — OPEN (all code LANDED + LIVE; one watch running, three readings owed) — opened 2026-09-01 — session 3492626c — **THE PUBLISH CLOBBER IS FIXED AND VERIFIED IN PRODUCTION.** Two services each published a WHOLE-FILE replace of one path; web kept whoever published last. Merge-on-receive makes publishes commutative.
+- Goal: MET and exceeded. Started as "why can't `#624` step 6 be re-measured over
+  a week"; the answer was a data-integrity defect, and the lane fixed it.
+- Files: syndicate/blueprints/ops.py, tests/test_publish_append_only_merge.py,
+  scripts/measure_exchange_prop_option_value.py, scripts/read_kalshi_fee_params.py,
+  syndicate/features/shared/venue_fees.py, docs/ai_context/todo.md,
+  .syndicate/{lanes,state,learnings,deploys}.md, .syndicate/log/2026-09-01.md
+- LANDED + LIVE ON WEB: `e78aee52` append-only merge · `bfaa5ecc` odds_history
+  JSON merge · `cf569731` cap + admission lock · `8db62f85` `#488` guard ·
+  `f027fda6` lock scope + worker-count correction · `7eaca475` the `#630` item.
+- VERIFIED: superset test **0 lost / 7,104 gained** (was 1,318 lost / 0 gained);
+  both writers merging by name; `odds_history` merges instead of falling back;
+  live commit read off `/api/ops/version` on every deploy. Independent
+  corroboration from lane `game-market-entry-roi-curve`: the date now passes the
+  feed-overlap guard at **100.0% matchable, was 46.1%**.
+- TWO OF MY OWN ERRORS SHIPPED AND WERE CAUGHT BY NON-SILENT INSTRUMENTATION:
+  the cap sized on the 39.6MB soccer shard made the merge INERT on MLB's 109MB
+  pair; the admission lock was keyed per-DIRECTORY while the colliding twins
+  span two. Both are in learnings.
+- OWED, all tracked on `#630` (a)-(d): odds_history RECOVERY undemonstrated
+  (every observed merge `added=0`), envelope form UNEXERCISED, memory floor
+  watch RUNNING (boot floor 717.7 MB, alarm 900), `#488` guard still leaky
+  per-process.
+- Blocked by: none. todo.md unblocked when `game-market-entry-roi-curve` closed;
+  the owed `#630` item landed `7eaca475`.
+
+### kalshi-soccer-club-aliases — CLOSED 2026-09-02 — **34 ALIASES SHIPPED AND SAFE; THEIR BENEFIT IS UNMEASURED AND NOT CLAIMED.** Derived per LEAGUE from Kalshi's own `<Club> wins` titles under two exact rules (token-subset; token unique on both residual sides); **9 candidates REFUSED** and left None, including `Bilbao`/`Athletic Club` and `St. Truidense` (shares `st` with `Union St.-Gilloise`). Live on `ad1de331` 00:48:50Z. **THE FIRST POST-DEPLOY CYCLE FIRED MY OWN FALSIFICATION TEST** — `event_not_on_our_board` 314→775, `soccer_matches` 51→**4**, both denominators moving the wrong way for a composition excuse. **THE CONTROL CYCLE, CODE UNTOUCHED, READ 52** (and 380), so the dip was slate-state transience on a ~15-min cadence. Reverting on the first reading would have discarded a correct change AND self-confirmed, since matches were returning to ~52 regardless. New rule in `learnings.md`. **Waiting was defensible only because the change is provably additive** — 0 of 34 keys overrode a dropped-as-ambiguous entry, 0 were already present, `setdefault` only, no new ambiguity refusals. A change that could plausibly cause the harm gets reverted first. **NOT CLAIMED: that the aliases helped.** 51→52 is inside cycle noise and the residual rode a denominator that also moved (749 more markets cleared the date gate). Reading the benefit needs a stable slate and a per-sport attempted/resolved RATE. Measurements: `deploys.md` 01:02Z + 01:34Z. Claims released. — opened 2026-09-02 — session 41d46db0-4017-4d9b-91bf-c9392f13c9de
+- Goal: the `event_not_on_our_board: 314` residual falls — Kalshi's club spellings resolve to our clubs. Testable: `event_not_on_our_board` materially below 314 and Kalshi soccer matches above 51.
+- **NO CLUB IS GUESSED. Two exact rules, applied to per-league residual sets, and 9 candidates were REFUSED for failing both.** For each league: resolve every Kalshi club we already can (119 of 153 resolve unaided), then pair what remains only when (R1) one side's normalised token set is a SUBSET of the other (`Standard` ⊂ `Standard Liege`), or (R2) they share a token occurring in EXACTLY ONE club on each residual side (`eagles`: `GA Eagles` ↔ `Go Ahead Eagles`). A pairing matching two of our clubs is refused.
+- **EVERY ENTRY CHECKED BOTH WAYS**, the standard this table already sets: `canonical_team` returns None for the Kalshi spelling and a real club for the target. 119 already-resolving Kalshi names are deliberately NOT written — a working pair buys nothing and hides which entries are load-bearing.
+- **THE PER-LEAGUE FETCH IS LOAD-BEARING AND A FLATTENED MAP IS UNSAFE HERE.** My earlier scratch artifact was global and had `LEV=Leverkusen`, `PAR=Parma`; in la_liga and ligue_1 those codes are **Levante** and **Paris FC**. Pairing off the flattened map would have written two wrong-club aliases. Re-fetched per series; the elimination pass caught it by refusing.
+- **REFUSED, and left for a decision rather than guessed:** `Bilbao`↔`Athletic Club` (no shared token), `St. Truidense` (shares `st` with `Union St.-Gilloise`), `FC Koln`/`M gladbach`, `Enschede`, `Inter`, and MLS `Los Angeles G`/`Los Angeles F`/`DC United`.
+- Files: `syndicate/features/shared/team_aliases.py`, `tests/test_kalshi_soccer_club_aliases.py` (NEW)
+- Hypothesis: these 34 spellings are what the 314 residual is made of; adding them lifts Kalshi soccer matches above 51.
+- Falsification test: `event_not_on_our_board` does not fall, or `event_matches_two_games` rises for soccer — either means a pairing is wrong and this reverts.
+- Verification: production `[kalshi_odds] BOARD_JOIN` after deploy; MLB unchanged as the control.
+- Files: released at close: `syndicate/features/shared/team_aliases.py`, released: `tests/test_kalshi_soccer_club_aliases.py`, released: `tests/test_kalshi_club_code_names.py`
+- **OWED, and it is a MEASUREMENT not a fix:** a per-sport attempted/resolved rate for club resolution, read on a stable slate, is what would show whether these 34 bought anything. The 9 refused clubs need evidence this method cannot supply and remain None by design.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

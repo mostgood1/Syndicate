@@ -3775,3 +3775,473 @@ sufficient.
   Python evaluates the `'w'` open first, so the inner read sees an empty file.
   It silently zeroed a 368-line module. Caught only by `git diff --stat` showing
   368 deletions. Read to a variable first, then write.
+
+## 2026-09-01 — FORBIDDEN: `git stash` in a worktree. The stash is SHARED with every other worktree, so a failed `stash push` followed by `stash pop` pops a PEER'S work into your tree. `[lane mlb-prop-freeze-source-trees]`
+
+**What I did.** To prove an off-is-not-on (does my test fail on the pre-fix
+code?), I ran:
+
+    git stash push -- scripts/refresh_mlb_oddsapi.py -q     # FAILED
+    ... test run ...
+    git stash pop -q                                        # POPPED SOMEONE ELSE'S
+
+The push failed on flag ORDER — `-q` after the pathspec is parsed as a pathspec,
+so git rejected it and stashed **nothing**. The command chain continued, and the
+`pop` at the end took `stash@{0}`, which belonged to a different session
+(`session/polymarket-yes-leg-binding`). It landed three of their files in my
+worktree, one as an unmerged `UU` conflict.
+
+**The fact that makes this a rule, not a slip: `git stash` is per-REPOSITORY,
+not per-worktree.** This repo's whole isolation protocol rests on each session
+having its own index and its own tree — `session_worktree.py`'s output says
+exactly that: *"index — its own; `git add` here touches no other session"*. The
+stash is the documented exception nobody had written down. Every worktree shares
+one stash stack, so `stash pop` with no argument is a blind `pop` of whatever a
+peer pushed most recently.
+
+**What saved it, and it was luck, not design.** The pop hit a conflict, so git
+KEPT the entry ("The stash entry is kept in case you need it again"). A clean
+pop would have DROPPED the only copy of that work and I would have had nothing
+to give back.
+
+**ATTRIBUTION CORRECTED `[2026-09-01, by lane polymarket-prop-quote-capture]`,
+and it makes the entry MORE dangerous to touch, not less.** I wrote this up as
+having popped "a peer's work". It is not a live peer's: `stash@{0}`'s branch
+(`session/polymarket-yes-leg-binding`) belongs to session `5611932c`, which
+`lanes.md` records as ARCHIVED. So it is **orphaned uncommitted content with no
+live owner** — nobody is coming back for it, and nobody can say what it is worth.
+That changes its disposition from "leave it, it is theirs" to **"needs a human
+pass before anyone drops it"**, because an orphan is exactly the thing a future
+session will feel entitled to clear. It is still on the stack, unclaimed by me.
+The rule below is unchanged either way: the hazard is that a bare `pop` takes
+whatever is on top, and WHOSE it is only decides how bad the outcome is. Recovery was: confirm my own edit was untouched
+(the failed push meant it was never stashed), `git restore --staged --worktree`
+the three files the pop introduced, and verify `stash@{0}` still listed.
+
+**RESOLVED `[2026-09-01, lane orphan-stash-yes-leg, session fbf1a34b]`: the
+orphan stash is DROPPED, and the human pass happened — the user ordered "verify
+then clear".** Verified before dropping, component by component: the STAGED
+half (ceiling-guard test widening + a lanes claim line) landed as `a5e16ae6`
+**71 seconds after the stash was created** (07:59:13 → 08:00:24 CT, the session
+stashed and immediately landed the same content elsewhere); the UNSTAGED half —
+a 46-line "deletion" in `syndicate/blueprints/ops.py` — was proven a STALE COPY,
+byte-identical to `508a7e79^`, i.e. the file as it stood before a peer's
+day-old slug-filter feature, so applying the stash would have silently REVERTED
+that landed feature. Nothing of value was unlanded; the only unlanded delta was
+harmful to apply. Dropped with a same-instant identity guard (`stash@{0}`
+re-verified == `9a384978` in the drop command itself, against concurrent stack
+shifts); the commit object `9a384978` stays recoverable by SHA until gc. The
+owner's worktree was checked CLEAN first. **The remaining 22 stashes
+(2026-05-30..08-21) were then censused the same way later the same day (user
+authorization, lane `orphan-stash-census`) and ALL dropped after per-path
+blob/line verification — the stack is now EMPTY. Four genuinely-unlanded
+artifacts were recovered first: the `model-sim-track` 08-18 session-end
+checkpoint (never committed anywhere), two 07-15 fix_notes entries, the
+soccersim phase-1 build report (fullest copy), and the SmartSim ensemble
+evaluation report — see `findings_2026-09-01_stash_census.md` and the two
+`recovered_*` files beside it.** Full narrative: `log/2026-09-01.md`.
+
+**The rule.** In a worktree, do not use `git stash` at all. To test against a
+different version of a file, COPY it:
+
+    cp path/file /some/tmp/mine        # your version
+    git show HEAD:path/file > path/file
+    ... run ...
+    cp /some/tmp/mine path/file        # restore, then VERIFY by grepping your own marker
+
+That is what I did on the retry and it is strictly better: it touches no shared
+state, it cannot pop a peer's work, and it fails loudly rather than silently.
+If a stash is genuinely unavoidable, address the entry explicitly
+(`git stash push -m "<lane>"` then `git stash pop stash@{n}` after reading
+`git stash list`) — never the bare form.
+
+**Second, smaller rule from the same command: a failed step in a `&&`-less chain
+does not stop the chain.** The push failed and the pop still ran. Chain
+destructive git operations with `&&`, or check the exit status before the
+inverse operation — an "undo" that runs after its "do" failed is not an undo.
+
+## 2026-09-01 — a log SEARCH tool echoes your query; grepping its output for the bare tag matches the ECHO. Grep for content the tool cannot have written itself `[lane prop-unmatched-decomposition]`
+
+My deploy-verification poll declared `FOUND POLYMARKET_UNMATCHED` 40 seconds
+after the service went live — impossibly early for a ~10-min commit cycle. The
+"match" was `render_logs.py`'s own header (`# refresh-worker
+text='POLYMARKET_UNMATCHED'`), which restates the search text on every run; the
+body beneath it said `nothing matched`. The instrument reads positive on its
+own reflection, on every empty result, forever — the same class as
+instrument-blindness (a reading is evidence only once you know what makes it
+read the OTHER way) wearing a new coat: here the false positive is structural,
+not situational.
+
+**Rule:** a watcher grepping a search tool's output must anchor on content the
+tool cannot emit about itself — the payload shape (`POLYMARKET_UNMATCHED
+counts=`), never the bare tag you typed into the tool. Cheap check before
+arming any such watcher: run it once where the answer is known-absent and
+confirm it stays silent.
+
+Caught in one poll cycle by reading the probe BODY before acting on the exit
+status; no wrong conclusion recorded, no cost beyond one redundant poll.
+
+## 2026-09-01 — CONFIRMED INSTANCE, with the falsifying numbers: a bounded sample majority is not a plurality claim. I wrote the hypothesis down first, and the complete count reversed it `[lane prop-rung-miss-rate]`
+
+The first production read of the prop no-match samples showed 2 rung-misses in
+3 samples, and I hypothesised (in the lane block, before measuring) that
+rung-miss was the plurality class. The complete counter (`prop_classes=`,
+deployed the same evening) read: player_not_listed 65.2%, rung_miss 27.4% —
+reversed, by 2.4×. The samples were not wrong; they are bounded to ONE row per
+family, and the two biggest families' dominant class simply wasn't the one the
+sampled rows happened to show.
+
+This is the standing "a rate, not a count" rule doing its job — kept because
+the falsification was CHEAP ONLY BECAUSE the hypothesis was written down before
+the instrument ran, and the instrument carried its own license (per-family
+class sums equal the refusal counts on the same log line, 532=532). Write the
+hypothesis first; make the counter self-checking; then a wrong guess costs one
+sentence to retract instead of a shipped decision. (Also demonstrated: the
+class SPLIT is where the value was — pitcher props 85.7% rung-miss, batter
+props 71.8% player-not-listed. A single pooled rate would have hidden the only
+actionable structure.)
+
+## 2026-09-01 — FORBIDDEN: reading a DEGENERATE FIT as a fact about the model. A slope pinned at its clamp floor describes the training window, not the signal. `[lane mlb-hrr-null-closed, correcting lane mlb-prop-calibration-refit one commit earlier]`
+
+**What I did.** Fitting the MLB prop calibration, `hits_runs_rbis_*` came back
+with `a = 0.05` on all four rungs — exactly the fitter's clamp floor. I read
+that as the fitter asking to discard the model probability, concluded **"HRR's
+probability carries no usable signal"**, and shipped that sentence into a config
+`_meta`, a commit message, a test and the ledger.
+
+**It was wrong, and the check that would have caught it took one query.** The
+fit window contained **1,422 of 7,074 HRR observations (20.1%) that were
+literal `0.0`** — a producer null that had been fixed months earlier but whose
+broken dates were still inside a 60/20/20 chronological split. The fitter did
+the only sane thing with a mass of zeros: it flattened the slope. Refitted on
+clean dates only, the same prop yields **healthy slopes (0.77, 0.79, 0.93,
+1.14)**. The clamp floor was a fact about June, not about HRR.
+
+**The tell I had and did not read.** The zeros were not scattered — they were
+**100% of six dates and 0% of the other forty-three**, with a control prop
+(`hits_1plus`) showing zero zeros on every date. That shape is a producer
+outage, and it is visible in one pass over the input. I went from a fitted
+parameter straight to a claim about the world without ever looking at the
+distribution the parameter was fitted to.
+
+**The rule.** A fitted parameter at a BOUND is not a result — it is the
+optimiser reporting that it wanted to leave the feasible region, and the first
+question is always *what in the training data pushed it there*. Before
+interpreting any coefficient at a clamp, floor, ceiling or zero:
+
+1. **Look at the input distribution for that cell**, not just the output.
+2. **Check for degenerate mass** — all-zeros, all-identical, all-missing — and
+   check it PER DATE and PER CELL, because a producer outage is concentrated in
+   time while a real property is not.
+3. **Carry a control** that shares the pipeline but not the suspicion. Here
+   `hits_1plus` was clean on every date, which is what turned "this data is odd"
+   into "this prop was broken on these six days".
+
+**Second-order, and the reason this is written as a rule rather than a note:**
+the conclusion was *directionally* right — HRR still should not be calibrated,
+because the clean fit also regresses held-out. **A wrong reason that reaches the
+right decision is more dangerous than a wrong decision**, because nothing
+downstream disagrees with it and it gets cited. It went into a config, a test
+and a commit message before anything contradicted it, and the only thing that
+surfaced it was checking whether the defect it described was still live.
+
+**And the fix is a guard, not a memory.** `fit_mlb_prop_calibration.py` now
+detects wholly-degenerate dates per prop, excludes them, and prints what it
+dropped — because the script I had written an hour earlier would have walked
+into the identical trap on its next scheduled run.
+
+## 2026-09-01 — FORBIDDEN: reusing a DERIVED CONSTANT without re-deriving it from the source it cites — especially when that source is printed in the same document. `[lane mlb-prop-staking-gate-not-met]`
+
+**What happened.** The 08-31 MLB assessment converts price improvement into ROI
+with *"each 1pp of better entry is worth roughly +0.75pp of ROI"*, explicitly
+**"anchored to item 07's sensitivity"**. Item 07's sensitivity table is printed
+**in the same file, ~100 lines earlier**, and says:
+
+| two-way hold | per side | book ROI |
+|---|---|---|
+| 8.1% | 4.05pp | +0.98% |
+| 5.0% | 2.50pp | +3.72% |
+
+That is **2.74 ROI points across 1.55pp of per-side entry — a slope of ~1.77.**
+The cited constant was wrong by **2.4×**, and I carried it into `#624` step 5,
+published "+1.6–1.8%, well short of the +3% gate", and put it in `todo.md` and a
+commit message. Nobody caught it; I found it only because step 6 forced me to
+check the gate's *second* condition (the ≤5% hold), which is stated in the units
+of the table rather than in ROI — and the two readings disagreed.
+
+**Why the citation made it worse, not better.** "Anchored to item 07's
+sensitivity" reads as provenance and therefore as *having been checked*. An
+uncited number invites scrutiny; a cited one deflects it. The citation was the
+reason I didn't verify it.
+
+**How to apply.** A derived constant is a claim, not a datum. Before spending
+one, recompute it from two rows of the source — this took under a minute and the
+source was already open. If the recomputation disagrees, the constant loses.
+Where the code needs the relationship, **interpolate the published table rather
+than storing the constant**, and put a test on the slope so the wrong value
+cannot come back. `scripts/measure_exchange_prop_option_value.py` now does both.
+
+**The near-miss that makes this worth a rule.** Two errors were offsetting: the
+anchor understated by 2.4×, and I had measured entry improvement over ALL props
+while spending it against the ROI curve of a book that is *unders minus HR and
+HRR* — which flattered the gain by ~20%. Correcting **either one alone** would
+have produced a number further from the truth than the original. The published
+conclusion moved from "+1.6–1.8%, well short" to "+2.2–2.7%, narrowly short";
+the decision held, the margin did not — and the margin is what a reader uses to
+decide whether to keep pulling the thread.
+
+## 2026-09-01 — RULE: measure on the BOOK THE DECISION IS ABOUT, not on the convenient superset. `[lane mlb-prop-staking-gate-not-met]`
+
+`#624` step 6 gates on "the surviving book (unders minus HR/HRR)". Step 5
+measured exchange price improvement across **all** MLB props — every market,
+both sides — because that is what the shard makes easy, and then spent the
+result against the surviving book's ROI curve. On the gate's own book the same
+measurement gives **+0.955pp, not +1.121pp** (n=653, not 2,062).
+
+The superset is not a conservative proxy: it was **biased in the favourable
+direction** here, and there was no way to know the sign in advance. HR and HRR
+carry the longest prices on the board, and both fee schedules are
+price-dependent, so excluded markets move the mean by construction.
+
+**How to apply.** When a gate names a population, encode that population in the
+measurement script as a named predicate (`in_gate_book`) with tests, so the
+number and the gate cannot drift apart — and so the next person does not have to
+re-derive which markets "HRR" meant. Report `n` for the *gated* population; a
+sample that shrinks 2,062 → 653 is itself a finding about how much the answer
+rests on.
+
+## 2026-09-01 — RULE: the WIDTH OF AN UNCERTAINTY IS NOT A RECOVERABLE GAIN. Resolving it buys certainty, which is worth having and is not ROI. `[lane kalshi-batter-prop-fee-multiplier]`
+
+**What I claimed.** Closing `#624` step 6 I wrote that resolving the Kalshi
+batter-prop fee multiplier was *"worth 0.44 ROI points, more than half the
+shortfall"*, and ranked it as the second-cheapest way to close a gate that
+missed by 0.35 points. That reads as: do this lookup and you might pass.
+
+**What actually happened.** Read live from `GET /trade-api/v2/series/<ticker>`:
+every batter-prop series is half rate. The bound **collapsed onto its own
+optimistic end** — +2.66% → **+2.65%** — because the optimistic end was already
+the m=0.5 row I had reported. The gate is no closer than before.
+
+**The error is a category one.** A bound `[a, b]` has width `b − a`, and the
+width measures *what I do not know*, not *what I can win*. Resolving it moves
+the estimate to a point **somewhere inside the interval** — and if the true
+value sits at the favourable end, resolution changes nothing about the decision.
+Only the endpoints could ever have been "gained", and only if the truth were at
+the other one. Quoting a width as an expected gain silently assumes the
+pessimistic end is the truth.
+
+**How to apply.** When ranking work by what it is "worth", separate two things:
+work that moves the ESTIMATE (a better price, a real mechanism) and work that
+narrows the INTERVAL. Only the first has an expected ROI. For the second, say
+what it rules out. The right sentence was: *"resolving this replaces a bound
+with a number; it cannot by itself clear the gate, because even the optimistic
+end of the bound does not clear it."* That was checkable before I ran anything —
+**+2.66% was already below +3%.**
+
+## 2026-09-01 — RULE: a venue parameter that varies per SERIES must never be generalised AT ALL — not to the sport, not to props-vs-games, not to the market family. `[lanes kalshi-batter-prop-fee-multiplier, book-quotes-publish-clobber]`
+
+Kalshi's `fee_multiplier` is a property of the series. The ledger had carried
+**"Every MLB game/total/spread/K series is HALF RATE"**, which is true and reads
+as "MLB is half rate". Reading 19 MLB series:
+
+    x0.5  KXMLBGAME KXMLBSPREAD KXMLBTOTAL KXMLBKS KXMLBOUTS
+          KXMLBHIT KXMLBHR KXMLBHRR KXMLBRBI KXMLBTB KXMLBSB
+          KXMLBF5TOTAL KXMLBF5SPREAD KXMLBTEAMTOTAL
+    x1.0  KXMLBERA KXMLBHA KXMLBWA KXMLBASGAME KXMLBINNINGTOTAL
+
+**I FIXED THIS RULE ONCE AND STILL PITCHED IT TOO BROAD.** My first version said
+the split was "per STAT, not per sport" -- a better rule than "per sport", and
+still wrong. Five more series (fetched but absent from `SERIES_SPORT`) falsify
+every level above the series:
+
+  * **not per sport** -- five MLB series are full rate;
+  * **not props-vs-games** -- `KXMLBASGAME` is a GAME at x1.0 while `KXMLBGAME`
+    is x0.5, and both are `quadratic_with_maker_fees`;
+  * **not per market family**, the one that kills "per stat" -- `KXMLBTOTAL`
+    and `KXMLBF5TOTAL` are x0.5 while `KXMLBINNINGTOTAL` is **x1.0**. Three
+    totals series, two rates.
+
+**The generalising reflex survived being corrected once.** Each time I had real
+evidence and drew the smallest rule that covered it, rather than none.
+
+**The evidence was already on the page and I did not read it that way.** The
+08-29 table in `venue_fees.py` shows `KXMLBERA` at x1.0 sitting directly under
+four MLB series at x0.5. The counter-example to the per-sport rule was printed
+inside the table the rule was drawn from; what was missing was the inference.
+
+**Why it bites here rather than being cosmetic:** all three full-rate series are
+*pitcher* markets that sit INSIDE `#624`'s gate book — which is "unders minus
+HR/HRR", not "batter unders". A single per-sport multiplier would be wrong in
+**both directions at once** depending on the row it was pointed at.
+
+**REGISTERED != FETCHED, and it was luck that caught it.** The complete-looking
+read covered `kalshi_catalogue.SERIES_SPORT` (14 series). Five more are fetched
+without being registered there, two of them full rate, and they surfaced ONLY
+because a stale background grep finished after I had declared the read complete.
+When enumerating "all X", name the LIST you enumerated and ask what else feeds
+the same consumer -- the fee question follows what is FETCHED, not what is
+registered.
+
+**How to apply.** Resolve per series, from the venue, with a re-runnable command
+(`scripts/read_kalshi_fee_params.py`) rather than a hand reading — it is venue
+CONFIG and can change under you. An unmapped market takes the **expensive**
+branch, not the modal one: `venue_fees` exists on the principle that a fee model
+which is too LOW manufactures fake arbs and loses money on every fill.
+
+## 2026-09-01 — FORBIDDEN: treating a `data/**` daily shard as APPEND-ONLY. Two services publish WHOLE-FILE REPLACES of the same file, so a later read can be a SUBSET. `[lane book-quotes-publish-clobber]`
+
+**Measured.** `mlb_source/tracking/book_quotes/2026-09-01.jsonl` fetched twice,
+~1h apart, counted with identical code:
+
+    first read   25,662,174 B   56,184 lines   7,158 exchange   16:11:30..22:22:27
+    refetch      37,045,354 B   81,039 lines   5,840 exchange   16:11:30..21:09:40
+
+**1,318 exchange rows lost, 0 gained**, a clean tail truncation (0 losses at or
+before the cutoff), while sportsbook rows gained a whole new hour. Export said
+`count: 1`, `truncated: False` — not an export artifact.
+
+**Mechanism, in code.** `odds_book_quotes.append_book_quotes` appends LOCALLY
+with `path.open("a")` — which is correct and is exactly what makes this hard to
+see — then `artifact_publisher.publish_hot_artifact(path)` does
+`file_path.read_text()` and pushes **the whole file**. Separate disks per
+service, so each holds only its own rows and each publish overwrites the other.
+Web = whoever published last.
+
+**Why it is dangerous rather than merely lossy: the damage is invisible.** Every
+surviving row is real, correctly typed, correctly time-aligned. A clobbered
+shard produces a tidy number with a plausible `n`. There is no error, no gap in
+the rows you can see, and no log line. **It cost me a published conclusion:**
+I reported that 67% of exchange quotes lacked a time-aligned sportsbook price
+and called the survivors "plausibly the more liquid subset" — a statement about
+the MARKET. Measured afterwards: **1,365 of 1,795 (76%) were the sportsbook feed
+simply stopping in that copy of the file.**
+
+**How to apply.**
+- **Never infer market behaviour from a coverage gap in a shard** until the two
+  feeds' time spans have been compared. A gap is a claim about the FILE first.
+- Guard on the OUTPUT — *do the two series actually coexist?* — not on an
+  assumption about how the file gets damaged. `feed_overlap()` +
+  `FEED_OVERLAP_FLOOR` refuses a date rather than scoring it, and it refuses the
+  very date whose number was already published.
+- **Two reads of the same artifact is a cheap, high-yield check** and it was the
+  entire diagnosis here. If a second read is not a superset, stop.
+- The `"a"` mode in the writer is a red herring: local append-correctness says
+  nothing about a cross-service publish that replaces wholesale.
+
+## 2026-09-01 — FORBIDDEN: recording an actor as having DONE the thing you just refused to let it do. A guard that books a refused attempt as success makes its own refusal a one-cycle delay. `[lane book-quotes-publish-clobber]`
+
+**Measured**, `ncaaf_source/tracking/book_quotes/2026-09-05.jsonl`:
+
+    22:01:15  publisher=live-odds-worker  last=refresh-worker    REFUSED
+    22:05:03  publisher=live-odds-worker  last=live-odds-worker  ALLOWED_WITH_WARNING
+
+and 9.2MB was replaced by 5.2MB four minutes later.
+
+`_publish_divergence_verdict` (`#488`) updated `_PUBLISH_LAST_PUBLISHER[path]`
+on **every** branch, including the one where it had just decided to refuse. The
+refused publisher therefore became `last`, its next attempt read as
+same-publisher, and sailed through. **The guard did not prevent the clobber; it
+delayed it by one cycle — while emitting a `REFUSED` line that reads like a
+save.**
+
+**That is the worst shape a guard can have.** It produces evidence of working at
+the exact moment it fails. Anyone auditing the logs sees refusals and concludes
+the protection is live. The `#488` write-up, the marker, and the 409 response
+were all accurate about the FIRST attempt and silent about the second.
+
+**How to apply.**
+- **State-updating side effects belong on the branch where the action actually
+  happened**, never before the decision. If a field means "who last DID X",
+  writing it for an actor that was stopped from doing X is a lie the code tells
+  itself. Read the mutation's position against the control flow, not its intent.
+- **A refusal is not a fix, and a working refusal is still a failure.** Once it
+  holds, that publisher's data never lands. Better than silent destruction,
+  still broken — so COUNT it (`consecutive_refusals=N`), because a permanent
+  block and a one-off look identical otherwise. The real answer is a merge or a
+  single owner.
+- **Prove a regression test discriminates (`off != on`).** Here: attempt 2 is
+  refused on the fix and ALLOWED on the old code. A regression that also passes
+  on the unfixed code proves nothing, and this one was checked rather than
+  assumed.
+- **Related, same session:** the cap I added to bound this merge's memory was
+  sized on the 39.6MB soccer shard and made the merge INERT on MLB's 109MB pair.
+  It surfaced only because the fallback LOGS ITS REASON. Guard-shaped code needs
+  its degraded path named, or the fix is believed to be running when it is not.
+
+## 2026-09-02 — FORBIDDEN: scoping a lock (or any bound) to a key that does not cover the case it was built for. Check the bound against the SPECIFIC incident, not against the abstraction. `[lane book-quotes-publish-clobber]`
+
+I added an admission lock to stop concurrent `odds_history` merges exhausting
+web's memory, and keyed it on `target_path.parent`. The two paths that actually
+collide are:
+
+    <sport>_source/tracking/odds_history/<date>.json
+    <sport>_source/artifacts/<sport>/odds_history/<date>.json
+
+**Different directories, therefore different locks.** Those two twins are
+precisely the pair observed publishing **2 SECONDS apart** in the production
+log — the concrete case I cited in the commit message as the reason the lock was
+needed. The lock would have permitted it. It read as a bound and bounded
+nothing that mattered.
+
+**How to apply.** After writing a guard, replay the ORIGINAL INCIDENT through it
+by hand — the actual paths, the actual timestamps — and check the guard fires.
+"Would this have stopped the thing I just watched happen?" is a different and
+much sharper question than "is this a reasonable lock". The abstraction (one
+merge at a time per artifact) sounded right; the instance (two artifacts, one
+memory budget) was what mattered. The fix is one lock at `data_root()`, with a
+test that asserts the TWIN is blocked by the same lock.
+
+## 2026-09-02 — RULE: read the RUNNING config, not a docstring in the same file that describes it. `[lane book-quotes-publish-clobber]`
+
+I justified the lock with *"web runs 8 gunicorn workers; each is
+single-request"*, copied from a note further down `ops.py`. The live process
+list says:
+
+    gunicorn wsgi:application --workers 2 --threads 4
+
+**Two processes, four concurrent requests each.** Wrong in the direction that
+matters: `--threads 4` means merges can race INSIDE one process, which the
+per-process claim declares impossible. The `O_CREAT|O_EXCL` file lock happens
+to be correct for both cases, so the CODE survived — but a wrong justification
+is what the next person reasons from, and the next guard built on "each worker
+is single-request" would be an in-process lock that silently does nothing.
+
+Both errors surfaced only because I read `/api/ops/memory`'s process list while
+setting up an unrelated memory watch. Neither would have been caught by a test.
+
+**Corollary already in force here:** `container_memory_mb` includes page cache
+and this merge reads/writes 50MB+ files, so it inflates for reasons that are not
+a leak. `container_memory_unreclaimable_mb` is the figure to watch, and the
+FLOOR across samples is the ratchet — every deploy reboots the workers and
+resets it, so a post-deploy reading always looks healthy.
+
+## 2026-09-02 REQUIRED: a pre-registered falsification test still needs a CONTROL CYCLE before you act on it. One reading on a cadence-driven instrument is not evidence. `[lane kalshi-soccer-club-aliases]`
+
+- **What we believed.** A falsification test written in advance is the honest
+  way to hold yourself to a result, so when it fires you act on it. Mine said:
+  "`event_not_on_our_board` does not fall, or soccer matches drop — either
+  means a pairing is wrong and this reverts."
+- **What actually happened.** It fired hard on the first post-deploy cycle:
+  `event_not_on_our_board` **314 -> 775** and `soccer_matches` **51 -> 4**, a
+  92% collapse, with both denominators moving the WRONG way for a composition
+  excuse (kalshi soccer markets 918 -> 948, soccer board rows 1,600 -> 1,565).
+  Every aggregate said regression. **The next cycle, with the code untouched,
+  read `soccer_matches=52` and `event_not_on_our_board=380`.** The dip was
+  slate-state transience on a ~15-minute cadence.
+- **Why reverting would have been self-confirming, which is the trap.** Had I
+  reverted on the first reading, matches would have returned to ~52 anyway and
+  I would have recorded "revert confirmed, the aliases were the cause" —
+  a false finding, durably written, with the real change discarded.
+- **The rule going forward.** Before acting on a falsification signal from a
+  periodic instrument, take ONE more cycle with NOTHING changed. It costs one
+  cadence (~15 min here) against a revert-and-redeploy round trip (~45), and it
+  is the only thing that separates "my change did this" from "this cycle did
+  this". State the control's result beside the signal in `deploys.md`.
+- **What made waiting defensible rather than wishful, and this half is not
+  optional:** the change was provably ADDITIVE before the deploy — 0 of 34 keys
+  were dropped-as-ambiguous by the derived map, 0 were already present, the
+  overlay is `setdefault`, no new ambiguity refusals appeared. **A change that
+  could plausibly cause the harm gets reverted first and diagnosed after.** The
+  control is for changes whose mechanism cannot produce the observed damage.
+- **Cost.** None. But the near-miss was a correct change discarded plus a wrong
+  cause recorded as fact — on a money-adjacent join, in a ledger read as evidence.
