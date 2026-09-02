@@ -1373,8 +1373,11 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none known.
 - **My fault, recorded in full in `deploys.md` 2026-09-02 and as a standing rule
   in `learnings.md`.** Session `3492626c` is not in the session roster; the
-  ledger's own ownership pass associates this session id with `local_ea1e4863`,
-  which I have messaged.
+  ledger's own ownership pass associates that id with `local_ea1e4863`.
+  **NOT MESSAGED, and that is a gap, not a choice** — this session began as a
+  scheduled-task run, and `send_message` is unavailable in unattended sessions.
+  **This block IS the handoff.** If you are reading it and can reach that
+  session, tell it; otherwise it finds out here.
 
 ### keyvalue-pressure-637 — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
 - Goal: `#637`. Say WHAT holds the shared Redis at 93% and WHETHER the eviction it
