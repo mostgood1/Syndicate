@@ -19268,3 +19268,282 @@ because in both of them silence was still consistent with an unlabelled exit.
 
 Instrumentation from deploys 1–3 is KEPT: `_read_payload` had five returns and
 zero labels, and three of them can still produce a misleading answer.
+### ZOMBIE VERDICT 2026-09-02 20:56–21:35 (local) — BOUNDED, SELF-CLEARING. A LAG, NOT A LEAK.
+
+40 samples at 60s, tracking defunct PIDs individually rather than just counting
+them — **the count alone cannot tell reaping from coincidence.** The
+discriminator is whether specific pids disappear.
+
+    defunct count: min 2  max 19  last 3
+    distinct pids ever seen defunct 121
+    of those, later REAPED          118
+    defunct since the FIRST sample    0
+
+Clean sawtooth: spikes to 12–19 during a merge burst, back to 2–3 within a
+minute or two. The 3 outstanding at the close are the ones still dead at that
+instant; they go on the next spawn. **Zero pids stuck from the first sample**,
+which is the reading that would have proven a leak. Reap-on-next-spawn is
+confirmed adequate; no move to a timer or SIGCHLD is needed.
+
+### `#634` ENUMERATION RUN — AND IT DID NOT CLOSE THE ITEM AS MOOT
+
+Expected two or three contested paths, already merged by `#630`. Found the
+opposite: **every allowlisted pattern has two potential writers.**
+`sweep_changed_hot_artifacts` iterates EVERY `HOT_ARTIFACT_PATTERNS` entry and
+publishes anything whose mtime moved, and it runs on BOTH workers — **58 sweeps
+on live-odds-worker, 12 on refresh-worker** over 02:00–02:30Z. A PULL moves
+mtime, so holding a copy is enough to make a service a writer.
+
+**It also corrected `#630`'s own mechanism, which I had half wrong.** I wrote
+"two services each append their own rows". live-odds-worker does **not** run
+`append_book_quotes` at all — 0 `[odds_book_quotes]` lines against
+refresh-worker's 35, while live-odds-worker was demonstrably logging (2,340
+lines), so the silence is real and not a dead instrument. It publishes
+`book_quotes` **via the sweep**, from a smaller local copy:
+
+    refresh-worker    book_quotes/2026-09-01.jsonl  150,174,688 B  SWEEP_SKIPPED too_large
+    live-odds-worker  absent from its skip list -- its copy is under the ceiling
+
+refresh-worker appends and publishes DIRECTLY, bypassing the sweep's size
+ceiling; live-odds-worker sweeps a smaller copy over it. Merge was still the
+right fix; now the mechanism is right too.
+
+**Unchosen load-bearing behaviour, recorded:** the sweep skips large files
+(`book_grid` ~13.9MB, `odds_history` 56.6MB, `book_quotes` 150.2MB), so the
+biggest artifacts are published only by their direct writer — while any service
+holding a stale copy UNDER the ceiling can still overwrite them.
+
+Landed `e7d786fb`/`5044d367`. Memory watch still running.
+
+## 2026-09-02 02:58:45Z — web ← `477e42c2` — `#630` `book_quotes` merge moved off process too
+
+- Live, confirmed via `/api/ops/version` at 03:02:59Z. Claim acquired, preflight
+  CLEAR, released with its token.
+- **WHY — MY OWN MEASUREMENT WAS THE DEFECT.** I kept the line union on the
+  request path on a measured 20 MB peak. That was a **34 MB SYNTHETIC**;
+  production's shard is **150 MB**, and at real scale it peaks at **81 MB per
+  merge** — on the platform's most frequent publish (106 merges in one 10-minute
+  sample). The RATIO held (0.59x → 0.53x); the absolute number, which is what
+  ratchets a worker, was 4x larger.
+  **This is the same error as the odds_history cap sized on a 39 MB soccer shard
+  when MLB's pair was 109 MB — twice in one session, two hours apart.**
+- **Locking differs by family, deliberately:** odds_history keeps ONE
+  service-wide lock (276 MB a merge is what needed bounding); append_only takes
+  a PER-PATH lock, because 81 MB children on different files are affordable and
+  serialising them would queue the most frequent publish behind twelve-deep
+  odds_history bursts.
+- **Latent 500 fixed en route:** on a failed spawn the parent PROMOTES the staged
+  copy (correct), then the caller fell through to `os.replace(temp_path, ...)` on
+  a path already renamed away → 500 on a correctly-handled publish. The result
+  now carries `handled` so the caller returns 200.
+
+### VERIFIED 03:03–03:06Z
+
+- **Both families run in the child**, including the big one:
+  `family=append_only bytes=154,767,749 existing_lines=340,011 added=1,192
+  merged=true` — the 154 MB merge now happens in a process that exits.
+- **`kept_existing_newer` is doing heavy work**, which is the "strictly better
+  than replace" property earning its keep: **2,734 markets on
+  `odds_history/2026-09-05.json` kept their NEWER data** instead of being
+  overwritten by a staler publish (also 615, 410, 211, 203, 73 on other shards).
+  Under the old replace every one of those would have been overwritten with
+  older data. **This is a larger effect than the `added` counts.**
+- Memory 5 min in, with the 154 MB merge already done: **612.1 MB
+  unreclaimable**, workers 274.2 / 362.3.
+
+### MEMORY: STILL NO VERDICT, AND THE PREVIOUS RUN DID NOT HOLD
+
+The `dd049490` watch climbed **532.7 → 1111.5 MB over 50 min**, past the 900 MB
+alarm — then fell back to 956.9. Fluctuating, not a clean ratchet, and the
+sample minimum never rose above the boot value.
+**One sample jumped 876 → 1111 with ZERO merges in the interval**, so web's other
+loops (intelligence-state, live-refresh) contribute and this change must NOT be
+expected to flatten the curve on its own. Historical baseline ~750 MB with
+documented 1.6–1.8 GB spikes.
+New watch running on `477e42c2` (150 min). **`#630`(c) stays OPEN.**
+
+### PREFIX-INVARIANT CHECK on `477e42c2` — PASS (2026-09-02 ~03:45–03:52Z)
+
+`mlb_source/tracking/book_quotes/2026-09-01.jsonl`, the shard actually being
+written at that hour (picked by comparing `X-Artifact-Mtime` against 09-02's,
+not by assuming "today"):
+
+    T1 size 159,610,169 B
+    T2 size 160,385,221 B   delta +775,052 B
+    windows compared 10   windows CHANGED 0
+
+**The file GREW and every sampled prefix window is byte-identical** — the
+append-only invariant holding with BOTH families now merging in child processes.
+A replace would have rewritten those bytes or shrunk the file.
+
+**Deliberately the LIGHT instrument.** The full superset check downloads the
+shard twice through `/api/ops/artifacts/export`, which reads it into memory ON
+WEB — ~320 MB of allocation on the service whose memory ratchet is being
+measured right now. This used HTTP Range over 10 × 64 KB windows: **0.7 MB
+instead of 320 MB**, so the verification does not contaminate the measurement it
+informs.
+
+**What it cannot do, stated:** sampled windows cannot prove every byte is
+unchanged. It catches a rewrite, truncation or replacement — which is what the
+clobber does — and would miss a surgical edit falling entirely between windows.
+Weaker than the line diff, chosen because the strong one perturbs the reading.
+
+Incidental: `HEAD` on `/api/ops/artifacts/stream` returns no `Content-Length`
+(measured 0, no `Accept-Ranges`); total size comes from `Content-Range` on a
+1-byte GET, which confirms Range support in the same request.
+
+## 2026-09-02 04:40Z — web ← `f086691e` (sidecar merge) — **MY DEPLOY WAS CANCELLED BY A PEER'S; THE FIX SHIPPED ANYWAY INSIDE THEIRS**
+
+    04:37Z          claim acquired, holder book-quotes-publish-clobber, 45-min TTL
+    04:40:43.955Z   my dep-dabqhion74is7384bc5g -> f086691e   build_in_progress
+    05:03:23.176Z   peer dep-dabqs6vqj5pc739237p0 -> 5e6c4d75 created
+    05:03:23.758Z   MY DEPLOY CANCELED, 0.6s later
+    05:07:49Z       5e6c4d75 live
+
+**The claim was HELD AND UNEXPIRED throughout** — `deploy_claim.py status`
+showed `HELD by book-quotes-publish-clobber` for the whole window, and I
+released it myself only after their deploy went live. Render cancels an
+in-flight build when a new deploy starts, so their trigger killed mine.
+
+**NO HARM, AND I VERIFIED IT RATHER THAN ASSUMING IT.**
+`git merge-base --is-ancestor f086691e 5e6c4d75` → **true**: their deploy
+CONTAINS my sidecar merge. Had `5e6c4d75` been cut from an older base, my work
+would have silently gone missing and both sessions would have believed it
+shipped — which is the `#284` "serialisation is not composition" failure exactly.
+Containment is the check; ordering is not.
+
+**THE OPEN QUESTION IS THE MECHANISM, NOT THE OUTCOME.** The guard should refuse
+a deploy while another lane holds an unexpired claim, and it did not. Candidates:
+`--force`, `SYNDICATE_DEPLOY_GUARD=off`, `render_deploy.py` called without the
+claim step, or the guard reading a stale/per-session marker. **The claim is the
+only thing serialising deploys now that the coordinator role is retired, and it
+silently failed to.** Raised with the peer (session `local_e384c18a`, lane
+`web-request-memory-attribution`); answer owed.
+
+### VERIFIED 05:08Z — the sidecar merge is LIVE and working
+
+    [artifact_merge] ARTIFACT_MERGE_CHILD {"family": "quote_state", "keys": 256,
+      "added": 0, "replaced_by_newer": 256, "merged": true,
+      "path": "soccer_source/tracking/book_quotes/2026-09-02.state.json"}
+
+### MEMORY WATCH — VOID FROM 05:03Z, and what it had established first
+
+Their deploy reboots the workers and resets the floor, so the run ends there.
+On `477e42c2`, 9 samples over 80 min:
+
+    22:18  unrecl 766.7   workers 385.9 / 404.5   merges   0
+    22:58         894.9           445.0 / 467.5          88   <- peak
+    23:38         865.9           395.2 / 485.7          55
+
+**Rose for 40 min, then PLATEAUED** — last five samples oscillate 861.8–894.9
+over 50 min with no trend, and it **never crossed the 900 MB alarm**. Floor
+766.7 MB (first sample); worker floors 384.2 / 404.5.
+**775 merges cost +99 MB net, against +263 MB from 68 merges before the
+subprocess move.** So the residual climb is NOT the artifact merges — it looks
+like `#632`'s shape, which a peer has open with "shape established, cause not".
+**`#630`(c) therefore closes on the merge question and hands the residual to
+`#632`.**
+
+### RESOLVED 2026-09-02 — the claim bypass was a SYSTEMIC DEFECT, not a slip (`#635`, peer `bed726d6`)
+
+I asked the peer how their deploy got through my unexpired `web` claim. Answer,
+proven rather than guessed: **`web` and `syndicate` are TWO LOCKS FOR ONE
+SERVICE.**
+
+    deploy_claim.py:69   _path = CLAIM_DIR / f"{service}.json"   keyed by NAME
+    SERVICES = ("web", "syndicate", ...)                          both offered
+    deploy_preflight.py:95  BOTH -> srv-d88ahvrbc2fs73eodu30      aliased
+    deploy-guard.py:104     that id -> "web" only                 NOT aliased
+
+They acquired `syndicate`, were granted it while I held `web`, preflighted
+CLEAR, and deployed. **No `--force`, no `SYNDICATE_DEPLOY_GUARD=off`, and the
+claim step WAS run.** So the claim serialises nothing for web — and it is the
+only thing left, the coordinator role having been retired.
+
+**A SECOND HOLE THEY LEFT OPEN RATHER THAN ABSORBING INTO THE FIRST:** the guard
+should have refused independently. It is armed, its regex matches the URL shape
+used, and it maps the id to `web`; they reproduced it blocking an equivalent
+command the same day. **Its silence at 05:03Z is unaccounted for and they
+declined to invent a cause.** Correct discipline — one explained failure does not
+retire a second, unexplained one.
+
+**Both sides verified rather than assumed.** They confirmed
+`merge-base --is-ancestor f086691e 5e6c4d75` → true (their deploy contained my
+work) — the same check I ran independently.
+
+**AND MY WATCH CORRECTED THEIR `#632` NUMBER.** They had reported anon
+270.8 → 759.5 MB in 7m23s as leak growth; both readings sit inside the first 12
+minutes after a boot, i.e. warm-up, not leak. Their `fe651e9c` now records the
+leak is NOT in the request path (routes ≈ 2%). Together with my 74.4 MB/h
+matching their ~75 MB/h, `#632` has a rate and a ruled-out cause.
+
+**PRACTICAL RULE UNTIL `#635` LANDS: holding `web` does NOT stop a deploy. Claim
+BOTH `web` and `syndicate`, and treat a preflight that prints `web <-- deploying`
+while you hold `syndicate` as a STOP, not a formality.**
+
+## 2026-09-02 — refresh-worker OOM-killed by the accuracy autorun — **RESOLVED 19:32Z, verified `reason=disabled`**
+
+**WHAT HAPPENED.** I armed `#626`(h) (`ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN=true`,
+deployed 15:29:45Z). It fired at **15:31:11Z** and **OOM-killed the worker**:
+
+    15:31:11  autorun CLAIMS the run (epoch written)
+    15:31:49  faulthandler dumps -- build_accuracy_summary on the stack
+    15:31:51  anon 3700.6 MB  headroom 0.152 MB  climb +146.9 MB/s
+    15:31:54  anon 3868.1 MB  headroom 0.051 MB
+    15:32:28  MEMORY_WATCHDOG_STARTED   <- fresh process
+    15:32:56  ==> Instance srv-d91dpertqb8s73co8ls0-zbvw6 restarted
+
+**Anon 1,833 -> 3,868 MB against a 4,096 MB ceiling.** The job roughly DOUBLED
+peak anon. `[accuracy_summary] AUTORUN_DONE` never printed — and because the
+code's `except` path still prints it with `error=`, its absence proves the
+process was **KILLED, not raised**.
+
+**THIS IS `#241` REPEATING.** CLAUDE.md states the rule verbatim: *"Worker
+periodic work is never free — `#241` caused a prod restart loop."* I quoted that
+rule when arming and armed anyway.
+
+**WHAT SAVED IT FROM A LOOP:** `#256`'s claim-before-work. The epoch advanced at
+claim time, so the daily gate holds everything back and a crash costs exactly
+ONE run per day rather than every cycle. One restart, then quiet for 3 hours.
+
+### THE RISK IS NOT CLOSED. THE KEY IS `false`; THE RUNNING PROCESS STILL READS `true`.
+
+`render_env_set.py` set it to `false` at ~19:0xZ and said so plainly: **a Render
+env change is not injected without a DEPLOY, and a restart does not re-inject.**
+The 15:32 OOM restart reused the old environment. The live process (`3cdbcf4c`,
+deployed 18:41:28Z) still has `true`.
+
+**SO WITHOUT A DEPLOY IT FIRES AGAIN AT OR AFTER 07:00 CENTRAL AND OOMS THE
+WORKER AGAIN** — one restart per day, indefinitely. It will print
+`PREVIOUS_RUN_NEVER_COMPLETED ... PROCEEDING` first (that message was corrected
+today in `24efb82b`, so it now reports the retry honestly).
+
+### RESOLVED 19:32Z — no deploy of mine was needed
+
+A peer deployed refresh-worker to `e4a471c0` at **19:26:44Z**, after the key was
+already `false`, so their deploy injected the disarm. My own attempt was refused
+by `render_deploy.py` as **`ALREADY LIVE -- redundant` (exit 5)** — a guard doing
+real work, since a redundant deploy would have restarted the worker and killed
+the MLB sim then running (pid 351).
+
+**VERIFIED DIRECTLY, not inferred from deploy ordering.** The decline reason
+flipped and has held:
+
+    19:32:27Z  ACCURACY_SUMMARY_AUTORUN_GATED reason=disabled
+    19:33:00Z  ACCURACY_SUMMARY_AUTORUN_GATED reason=disabled
+    19:33:34Z  ACCURACY_SUMMARY_AUTORUN_GATED reason=disabled
+
+`daily_gate` -> `disabled` is the process reading `false`. **That check is only
+possible because the decline telemetry was added hours earlier (`24efb82b`);
+before it, "disabled", "gate refused" and "never reached" were one silence.**
+
+**MY WATCHER WOULD HAVE MISSED THE WINDOW.** It greps the claim status for the
+literal `free`, and an expired claim reads `EXPIRED (does not block)` — so it
+polled past an open window from 19:26 onward. Caught only by reading the status
+by hand. Fifth false-negative instrument of the session, all mine: a heredoc
+eating stdin, truncated JSON parsed as zero rows, a grep matching the log tool's
+own query echo, a paginated list read as a total, and now this.
+
+**NEXT REAL WORK, and do NOT re-arm before it:** measure what inside
+`build_accuracy_summary` allocates ~2 GB. `intelligence_evaluation.py:2657` is
+the frame that was on the stack in all three dumps.

@@ -995,6 +995,53 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - `gameStartTime` is ABSENT on all 10 `bal-col` slate rows, so liveness cannot be
   confirmed from the venue — only from the board's `commence_time`.
 
+### soccer-shot-shrinkage — CLOSED 2026-09-02 — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57 — **UNOWNED. GOAL MET 2026-09-01 — the divisor IS live in the engine, MEASURED, and `todo.md #612` is CLOSED.** Discharged not on the board but on the PREDICTION ARCHIVE the engine writes: self-normalised over the 3,434 players present both sides of the 2026-08-31 ship date, median post/pre `expected_shots` **0.720** against a predicted 1/1.3979 = **0.715**, with `expected_minutes_share` flat at **1.000** so the step cannot be "future fixtures carry fewer minutes". Tool `scripts/check_soccer_divisor_reached_engine.py`. Monthly re-fit ran the same day: **1.3979 -> 1.3930**, published and read back, no deploy. Residual (small): `players_*.csv` is not in `HOT_ARTIFACT_PATTERNS`, so the board-render form of the reading still cannot run from web. Detail in `.syndicate/deploys.md` 2026-09-01 15:0xZ. **CLOSED 2026-09-02:** goal met and measured; monthly re-fit automated as scheduled task `refit-soccer-shot-shrinkage`; re-checked one day on — the new dated file did not break resolution (shots/minute 0.726 vs 1.00-if-absent, n=3,428). The ONE residual is carried as `todo.md #636`, not by this lane.
+- Goal: the soccer shots model stops over-predicting by ~1.4x. Ship the
+  held-out-validated divisor as a DISK-BACKED, RE-FITTABLE calibration artifact,
+  never a hard-coded constant. Testable: the served board's shot-prop
+  probabilities fall, and `expected_shots` bias on the next backtest run moves
+  toward 0 from +0.166.
+- Files: released: syndicate/features/soccer/sim_engine/soccersim/player_props.py
+  **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: syndicate/features/soccer/sim_engine/soccersim/shot_calibration.py
+  released: syndicate/features/shared/artifact_publisher.py
+  released: scripts/fit_soccer_shot_shrinkage.py
+  released: tests/test_soccer_shot_shrinkage.py
+- Evidence this rests on (all in `state.md [soccer-shots-prop-skill]`): n=9,840
+  pairs / 247 matches / 9 leagues from production; ratio 1.398; held-out SCALAR
+  MAE 0.5551 vs raw 0.6251 vs baseline 0.6278; SCALAR beats AFFINE in all 9
+  leagues and all 4 splits. On-target RATE is already correct (model 0.345 vs
+  actual 0.342, ratio 1.007), so one divisor at the `expected_shots` choke point
+  fixes shots AND shots-on-target without a second constant.
+- Hypothesis: correcting the MEAN is sufficient; the Poisson FORM needs no change
+  (dispersion 1.07, P(>=2) bias -0.0001 over 597 players / 759 matches).
+- Falsification test: if the served shot-prop probabilities do not fall after
+  deploy, the artifact is not reaching the engine and the change is INERT --
+  which is this repo's most common failure and the reason for the reachability
+  test below.
+- Verification: reachability FIRST (divisor 1.0 vs 1.4 produce different
+  probabilities, driving the real shipped function), then a PRODUCTION read of
+  the served board, then a re-run of
+  `scripts/backtest_soccer_shot_props_production.py` on dates AFTER the deploy.
+- SAFETY: absent/unreadable/out-of-range artifact -> divisor 1.0, i.e. exactly
+  today's behaviour. Clamped to [1.0, 2.0] so a corrupt fit cannot zero the board.
+- STATUS: **SHIPPED TO ALL THREE SERVICES, NOT YET OBSERVED WORKING.** web
+  `132559e1` (allowlist), both workers `a35591dc` (wiring + dated resolver), all
+  content-verified on the deployed blob. Artifact published 200 and READ BACK:
+  `divisor=1.3979, n=9840, matches=247`. Divisor measured at 1.398x
+  over-prediction; a SCALAR beat an AFFINE fit held out in all 9 leagues and all
+  4 date splits.
+- **THE VERIFICATION IS OWED AND CANNOT BE FORCED.** At publish time the board
+  carried ZERO soccer shot-prop rows, and the soccer sim runs every FOUR HOURS
+  (`SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS=14400`). **Nothing is
+  confirmed to have reached live-odds-worker.** The closing reading is
+  composition-invariant: implied Poisson mean divided by that player's own
+  season `shots_per90`, which was **1.19** before and must land near **0.85**.
+  A median still near 1.19 WITH rows present means the artifact reached web but
+  not the worker — that is the failure mode, not absence of rows.
+- Blocked by: none. The soccer engine was unclaimed at open (verified with
+  `lane_claim_audit.py`).
+
 ### layer2-accuracy-audit — OPEN, UNOWNED, SESSION ARCHIVED 2026-08-31 ~23:5xZ — **CLAIMS: NONE HELD, all four services free.** Handoff armed: scheduled task `check-mlb-pregame-freeze-611` fires 2026-09-01 08:30 CT (needs a manual Run-now for tool approval). **`#611`'s deployed log line is UNREADABLE — do not plan around it; read the artifact + run history instead.** 7-day board accuracy DELIVERED; MLB game-line join FIXED, DEPLOYED and VERIFIED (`13 -> 0` misses, `(pregame-freeze, 14 games)`, 20:33:17Z) — but it did NOT raise graded rows, which falsified my own causal claim. Two follow-ups opened as `todo #610` (caps: ml 12 candidates -> cap 1) and `todo #611` (prop seal dead since 08-16; cadence is the lead). **ONE THING OWED: `5be4381d` is on main and NOT DEPLOYED** — preflight HOLD, 3 jobs in flight on live-odds-worker. **AT RISK: 18 local commits incl. all ledger writes are NOT on origin/main.** — opened 2026-08-31 — session ef7e22fc-d592-43f7-b326-31ddea9258ef
 - Goal: a per-sport x per-bet-type accuracy read on the Layer 2 board for the last 7 days, with an explicit statement of how many days and rows it actually rests on, plus ranked optimizations.
 - Files: released: **CLAIMED 2026-08-31 ~18:3xZ, user asked for the MLB join fix:** `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py` (`_odds_paths` + helpers only), `tests/test_season_betting_cards_odds_paths.py`. **EXTENDED ~18:4xZ, user asked for the backlog regrade:** `scripts/run_refresh_worker.py` (`_mlb_betting_day_backfill_*` only — NOT `_season_projection_should_launch`, which lanes.md flags as contended), `tests/test_refresh_worker.py`. Every OPEN-lane reference to `run_refresh_worker.py` is RELEASED; checked. Checked against every OPEN lane: no lane holds either. Still NOT editing `graded_outcomes.py`, `evaluation_settlement.py`, `layer2_shortlist.py`, `layer2_board.py`, `refresh_mlb_oddsapi.py`.
@@ -2186,6 +2233,215 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   "the run was skipped".
 - Blocked by: none once `check_deploy_safety` is CLEAR. Polling; an MLB sim and
   a board build were in flight at 10:20 CT.
+### book-quotes-publish-clobber — CLOSED 2026-09-02 — opened 2026-09-01 — session 3492626c — **`#630` DONE: three artifact families merge on receive, all out of process, verified in production. Full block (incl. a peer's `#635` answer and `#632` corrections) moved VERBATIM to `lanes_history.md`.**
+- **OWNERSHIP CORRECTION.** An ownership pass recorded that session `3492626c`
+  "DOES NOT EXIST in a 200-session roster" and inferred the live worker was
+  `local_ea1e4863`. **The session exists and did this work** — `list_sessions`
+  omits ARCHIVED sessions by default, so a roster miss is not absence (standing
+  rule: *session roster hides archived*). The pass was right to treat this lane
+  as a counterexample and close nothing on ownership grounds.
+- **`#630` todo item is NOT owed** — the header said so and it is stale. `#630`
+  exists in `todo.md` with all five commits and three follow-ups listed.
+- Landed + live: `e78aee52` `bfaa5ecc` `cf569731` `8db62f85` `f027fda6`, plus the
+  `.state.json` sidecar merge in `f086691e`.
+- Verified: superset 0 lost / 7,104 gained (was 1,318 lost / 0 gained); prefix
+  invariant 10/10 windows; 44 markets preserved; `kept_existing_newer=2734`;
+  zombies bounded 118/121 reaped; 1,701 merges cost +97 MB (0.057 MB each) vs
+  3.87 MB each before the subprocess move.
+- Handed off: `#634` (39 contested paths, 38 unmerged, coverage map recorded),
+  `#635` (peer-owned), `#632` (peer-owned, rate agreed at ~32-75 MB/h).
+- Blocked by: none.
+
+### maxmun-pregame-read — CLOSED 2026-09-02 — opened 2026-09-02 — session ae526656-29ed-4bb4-bee5-e3c9e4e0a583 (scheduled task `todo-628-maxmun-pregame-read`) — **GOAL MET, PASS.** `token: 'maxmun'` on a `POLYMARKET_UNMATCHED` sample for `'player': 'Max Muncy (2002)'`, refresh-worker `ad1de331`, `2026-09-02T13:46:18.027633152Z`, against a served board row for that name in `game.state = "pregame"`. The strip is EFFECTIVE in production, not merely present — `#628`'s pending read is discharged (`51f16af6`), measurement in `deploys.md` 2026-09-02 13:46:18Z (`9960572e`). `prop_same_name_collision_at_venue` = 0 on a demonstrably live instrument. No deploy: read-only.
+- Goal: discharge `todo #628`'s PENDING PRODUCTION READ — one production log line
+  showing a board name carrying a parenthetical disambiguator deriving its plain
+  3+3 token (`maxmun`-style, never `max200`-style), taken on a PREGAME board.
+- Files: .syndicate/deploys.md, .syndicate/lanes.md
+- Note: the todo item's own file is deliberately NOT claimed here. The `#628`
+  paragraph edit is already LANDED as `51f16af6` via the worktree flow, and
+  `book-quotes-publish-clobber`'s own heading records that it RELEASED that file
+  on 2026-09-01. Claiming it would manufacture a contest over a file this lane
+  no longer writes.
+- Hypothesis: `38dd9f41`'s parenthetical/pure-digit strip in
+  `_player_name_words` is live and effective in production, not merely present.
+- Falsification test: a `POLYMARKET_UNMATCHED` sample naming a disambiguated
+  board player whose `token` is digit-bearing (`max200`-class) FALSIFIES it.
+- Verification: the log line quoted verbatim in `.syndicate/deploys.md`, with
+  the deployed refresh-worker SHA named and the token derived by executing THAT
+  SHA's own tree.
+- Blocked by: none
+
+### soccer-players-csv-allowlist — CLOSED 2026-09-02 — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc — **GOAL MET, VERIFIED ON BYTES.** web `2114d5c6` live; `?pattern=soccer_source/*/players/players_*.csv` returns **15 files / 879,401 bytes**, matching the local tree file for file. The reading it gates RUNS: pre-divisor **0.925** (n=9,731) → post **0.631** (n=4,546), ratio **0.682** vs **1/1.393 = 0.718** predicted — a second confirmation of the divisor sharing no denominator with the archive check that closed `#612`. **The lane-inherited `1.19 → 0.85` target is NOT reproducible by this construction (it reads the pre-divisor window at 0.925) and must not be quoted again; only the before/after on ONE instrument is valid.** Claim on web released. Detail: `deploys.md` 2026-09-02 15:0xZ.
+- Goal: `#636`. `GET /api/ops/artifacts/export?path=soccer_source/<lg>/players/players_2026.csv`
+  returns the CSV body instead of 403, so the board-render form of the soccer
+  shot-divisor reading can run from web. One allowlist entry; deploy web.
+- Files: `syndicate/features/shared/artifact_publisher.py` (HOT_ARTIFACT_PATTERNS
+  entry + its note ONLY), `tests/test_artifact_publisher.py`.
+  **CLAIM CHECKED against every OPEN lane.** `artifact_publisher.py` is recorded
+  in `ncaaf-week-state` as "claimed by NOBODY and is FREE TO TAKE" after
+  `football-projection-publish-allowlist` (`#618`) closed on 2026-09-01. Taken here.
+- Hypothesis: the allowlist is the ONLY thing blocking the read — the file is
+  already on web's disk.
+- **ALREADY TESTED, BEFORE ANY EDIT (this is not an assumption).**
+  `soccer_source/epl/api/schedule/schedule_2026.json` is the exact analog —
+  season-suffixed, git-tracked, same tree, already allowlisted — and returns
+  **200, count=1, 113,410 bytes**. The target returns **403 "path is not an
+  allowed hot artifact"**, which is the allowlist branch, NOT `count=0`. So web
+  has the tree and the guard is the block.
+- Falsification test: after deploy the path returns `count=0` instead of a body.
+  That would mean the file is NOT on web's disk and an allowlist entry was the
+  wrong fix — the exact shape of the 2026-08-27 FORBIDDEN rule (allowlisting a
+  KEYVALUE-backed path and calling it readable turns a 403 into an empty result).
+  Which is why the verification below reads BYTES, never a status code.
+- Verification: (1) deployed SHA carries the pattern; (2) `?path=` returns a body
+  with a `shots_per90` column; (3) the reading `#636` exists for actually RUNS —
+  implied Poisson mean over that player's own season shots_per90 — and its value
+  is reported. A 200 with no parse is not a pass.
+- Blocked by: none.
+
+
+### soccer-anchor-odds-feed — CLOSED 2026-09-02 (step 1 of 2 done) — opened 2026-09-02 — session 3492626c — **LANDED `5c99c153`. The de-vigged odds feed exists and is VERIFIED ON REAL PRODUCTION DATA: 84 priced events from 2,939 rows across 4 leagues, overround 1.048-1.105 (a real 5-10% three-way vig), P(home) 0.069-0.827, 0 refused. Anchoring is still OFF and still unwired into the builder -- that is step 2 and needs a weight knob, an off!=on test, and the mechanism-vs-estimator re-fit.**
+- Goal: make soccer market-anchoring REACHABLE. Production fixtures carry only
+  {match_id, home_team, away_team}, so `anchor_ratings_to_market` would skip every
+  fixture and be a silent no-op. Feed de-vigged home-win probabilities from
+  `<league>/api/odds/game_odds_current.csv` and publish anchored/skipped counts.
+- Files: syndicate/features/soccer/features/market_odds.py (NEW),
+  tests/test_soccer_market_odds.py (NEW), scripts/build_soccer_artifacts.py
+- Hypothesis: n/a (making a validated-but-dead mechanism reachable)
+- Falsification test: if the anchored count is 0 on a real matchday, the feed
+  does not work and the mechanism is still inert.
+- Verification: anchored/skipped counts published per league-date; a fixture's
+  home_win_probability matches a hand-computed de-vig of its book rows.
+- Blocked by: none. NOTE the mechanism itself stays OFF until (2) — wiring the
+  feed does not turn anchoring on.
+
+
+### accuracy-autorun-decline-telemetry — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `24efb82b`, DEPLOYED, AND IT VERIFIED ITS OWN FIX.** The autorun declined silently on both paths, so "disabled", "gate refused" and "never reached" were one indistinguishable silence — which cost a 100-minute watch that taught nothing. Now emits `ACCURACY_SUMMARY_AUTORUN_GATED reason=...` with `never_run=yes|no`.
+- Goal: `_launch_autorun_accuracy_summary` returns False SILENTLY on both decline
+  paths, so "flag off", "gate refused" and "never reached" are indistinguishable.
+  100 minutes of silence taught nothing. Mirror `RECONCILIATION_AUTORUN_GATED`.
+- Files: scripts/run_refresh_worker.py, tests/test_accuracy_summary_autorun.py
+- Hypothesis: n/a (fixing an instrument I built blind)
+- Verification: an `ACCURACY_SUMMARY_AUTORUN_GATED reason=...` line in
+  refresh-worker logs that names WHY it declined.
+- Verification RAN, and the line proved a SECOND thing hours later: when the
+  autorun was disarmed after OOM-killing the worker, `reason` flipped
+  `daily_gate` -> `disabled` at 19:32:27Z. That is direct proof the process read
+  the new env value, rather than inferring it from deploy ordering.
+- The pattern was already one function above (`RECONCILIATION_AUTORUN_GATED`,
+  `#341`), with a comment stating this exact lesson. It shipped without it.
+- Blocked by: none (needs a refresh-worker deploy, preflight for in-flight sims)
+
+
+### soccer-anchor-wiring — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `3cdbcf4c` and DEPLOYED. Anchoring is reachable, instrumented, and OFF (weight 0.0). THE FINDING IS THE COST: 40.9s per fixture — 57 min/cycle at today's 84 priced events, ~136 min at ten leagues — so it cannot run on the refresh cycle as written. That supersedes the mechanism-vs-estimator re-fit as the blocker.** This lane also carried the accuracy-autorun OOM to resolution (disarmed, verified `reason=disabled` 19:32Z).
+- Goal: wire `anchor_ratings_to_market` into `build_soccer_artifacts.py` behind a
+  WEIGHT knob defaulting to 0.0 (off), publishing attached/skipped/anchored counts
+  so an inert anchor is visible. Step 2 of 2; step 1 (`ed48c2e7`) built the feed.
+- Files: scripts/build_soccer_artifacts.py, tests/test_soccer_anchor_wiring.py (NEW)
+- Hypothesis: n/a (making a validated mechanism reachable)
+- Falsification test: off != on -- with weight 0 the ratings must be UNCHANGED;
+  with weight > 0 they must differ. If they match either way, the wiring is inert.
+- Verification: anchored count > 0 on a real matchday with weight > 0, and the
+  counts published even when weight is 0.
+- DOES NOT turn anchoring on. Default stays 0.0 pending the mechanism-vs-estimator
+  re-fit the standard requires (measured negative interaction 4/4 markets).
+- Verification RAN: off!=on asserted before any correctness claim (weight 0
+  leaves ratings identical; weight 0.35 moves them). Odds counts publish even
+  when off, so the feed's health and the mechanism's arming stay separable.
+- Handed to a delegated session: the three cost paths (cut solver sims / anchor
+  only board-relevant fixtures / move off the refresh cycle), with the caution
+  that better h2h MAE from anchoring is EXPECTED and is not evidence of edge —
+  measure anchored-vs-base on PROP markets.
+- Blocked by: none
+
+### accuracy-summary-alloc-profile — CLOSED 2026-09-02 — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 — **GOAL MET. The allocator is ONE SITE and the scaling is PROPORTIONAL.** 100% of resident bytes at `intelligence_evaluation.py:711` (`json.loads` in `_stream_chunked_ledger_records`); peak = **4.01-4.41 x accepted chunk bytes, intercept ZERO, R2 0.999998** over 9 corpora of real records; materialisation is 98.8-99.9% of peak, so no output-side cap can bound it. Production projection **3,178-3,493 MiB** on top of anon 1,833 -> the kill was CERTAIN, ~915 MiB short at best. Two independent corroborations (64% of the projection consumed at death; 155 MiB/s local vs 146.9 MB/s production climb). **HYPOTHESIS PARTLY FALSIFIED:** the repeated `dict(item)` copies are SHALLOW and cost ~nothing — the peak is one materialisation, not three. **SECOND DEFECT FOUND, NOT MINE TO FIX:** `_bounded_accuracy_summary` truncates the wrong container (`segments_total`=3 vs `len(segments)`=7, `segments_truncated` pinned False, bounded payload LARGER than raw) so the 8MB keyvalue ceiling is unprotected — owner is lane `accuracy-autorun-decline-telemetry`. Bound proposed and measured: cumulative 90,000,000 B budget -> peak 344-378 MiB, worker worst case 55.1% of ceiling. **NOT RE-ARMED; no deploy; no production touched.** Record: `todo.md #626`(h) + `state.md [accuracy-autorun-OOM-2026-09-02]`.
+- Goal: a MEASURED allocation profile of `build_accuracy_summary` (peak + top
+  allocating sites), a scaling relationship against ledger chunk bytes, and a
+  proposed bound stated as an implied peak against the 4,096 MB container whose
+  baseline cycle already peaks at anon ~1,877 MB. Recorded on `#626`(h).
+- Files: docs/ai_context/todo.md, .syndicate/lanes.md, .syndicate/state.md,
+  .syndicate/deploys.md (measurement record only).
+  READ-ONLY on `syndicate/features/shared/intelligence_evaluation.py` and
+  `scripts/run_refresh_worker.py` — the latter is held by OPEN lane
+  `accuracy-autorun-decline-telemetry`; this lane proposes, it does not edit.
+  Profiling harness lives in the session scratchpad, not the repo.
+- Hypothesis: peak is driven by FULL MATERIALISATION of the deduped record set
+  plus REPEATED SHALLOW COPIES of it — `_stream_record_payloads` does
+  `yield dict(item)` for an in-memory sequence, and `build_accuracy_summary`
+  passes its own `record_rows` back through it TWICE (`compute_metrics` and
+  `build_segmented_reliability_profile`). Peak should therefore be ~linear in
+  accepted-chunk bytes with a multiplier >1x the single reduced set, and the
+  50-segment cap cannot touch it because it truncates OUTPUT after the working
+  set has already been built.
+- Falsification test: if peak is FLAT in input bytes, or if the top allocating
+  sites are not the record materialisation, the hypothesis is wrong and the fix
+  is not streaming/chunking.
+- Verification: tracemalloc peak AND process RSS delta reported together for
+  the same run (the OOM metric is anon RSS, not Python-object bytes — the
+  2026-08-29 profiler-scope rule), across >=3 input sizes, with the fitted
+  slope stated in MB resident per MB of chunk file.
+- Blocked by: none. DOES NOT re-arm `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN`
+  and does not touch production.
+
+
+### m625-replay-diff-gate — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: `todo.md #625` build item (5). ONE mirrored production day is replayed
+  through the REAL producer entrypoints with fetching disabled, and the
+  artifacts it regenerates are diffed against production's OWN recorded outputs
+  for that date, tolerance-aware — then wired into `scripts/migration_gate.py`.
+  Testable outcome: `py -3 scripts/replay_diff_gate.py --date <D>` exits 0 on a
+  day production actually produced, exits non-zero when an input is perturbed,
+  and `migration_gate.py` reports its status rather than silently passing.
+- Files: `scripts/replay_diff_gate.py` (NEW), `scripts/migration_gate.py`,
+  `tests/test_replay_diff_gate.py` (NEW), `scripts/mirror_manifest.py` (NEW).
+- NOT CLAIMED, deliberately — both are held by other OPEN lanes and I will not
+  edit across them:
+  - `syndicate/features/shared/artifact_publisher.py` (`HOT_ARTIFACT_PATTERNS`)
+    is held by `book-quotes-publish-clobber`. That blocks `#625` build item (2),
+    the EXPORT-ONLY pattern list, which is therefore NOT in this lane's scope.
+  - `docs/ai_context/todo.md` is CONTESTED between `accuracy-summary-alloc-profile`
+    and `book-quotes-publish-clobber` (`check_lane_invariants.py` FAILs on it
+    today). I will record `#625` progress there as a single additive edit to the
+    `#625` section only, and say so here rather than claiming the file.
+- Hypothesis: the four defects found on 2026-09-02 (evaluation autorun never
+  ran; `odds_history` merge cap sized on a 39MB shard against a 109MB pair; the
+  autorun's silent False decline; the autorun's OOM) are all
+  DEPLOYED-INERT-class, and every one is observable OFFLINE from a mirrored day
+  plus a production env snapshot — no deploy, no production time.
+- Falsification test: if the first replay target's output cannot be reproduced
+  from mirrored inputs alone — i.e. it depends on a fetch, on wall-clock, or on
+  state that is not in any artifact — then a replay-diff gate cannot be built
+  for it and the target is wrong. Record which, and pick another.
+- Verification: (a) one date replayed, diff PASS, with the tolerance stated and
+  its justification recorded; (b) a deliberate perturbation of one input makes
+  the same command FAIL (off != on — a gate that has never been seen to fail
+  proves nothing); (c) `migration_gate.py --json` carries a `replay_diff` block
+  whose absent case is reported as UNKNOWN, not folded into `ok`.
+- Blocked by: none. Needs NO deploy — it never contends for the deploy queue.
+
+### accuracy-summary-ledger-budget — OPEN — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+- Goal: implement the CUMULATIVE byte budget measured by lane
+  `accuracy-summary-alloc-profile` and re-measure peak WITH IT ENFORCED, at
+  production scale, off vs on. Peak must land in the predicted 344-378 MiB band.
+- Files: syndicate/features/shared/intelligence_evaluation.py,
+  tests/test_accuracy_summary_ledger_budget.py (NEW), docs/ai_context/todo.md,
+  .syndicate/lanes.md, .syndicate/state.md, .syndicate/log/2026-09-02.md.
+  NOT `scripts/run_refresh_worker.py` -- held by OPEN lane
+  `accuracy-autorun-decline-telemetry`. Checked: no OPEN lane claims
+  `intelligence_evaluation.py`.
+- Hypothesis: n/a (building a bound that was measured before it was designed).
+- Falsification test: OFF != ON. With the budget unlimited the load must accept
+  the whole corpus and peak at ~4.0x its bytes; with the budget set it must
+  accept <= budget and peak in the predicted band. If peak is the same either
+  way the budget is INERT and this fails.
+- Verification: (1) `LEDGER_CHUNKS_ACCEPTED` carries budget/accepted/truncated
+  and the accepted sum is <= budget; (2) measured peak at production-scale
+  corpus, budget off vs on, both reported; (3) the summary payload itself
+  publishes what it covered, so a narrowed sample cannot be read as a full one.
+- DOES NOT re-arm `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN` and does not
+  deploy. Local only.
+- Blocked by: none
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

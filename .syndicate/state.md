@@ -673,6 +673,95 @@ figure that rule carried (~1.4GB) is STALE — see
 `[refresh-worker-headroom-2026-09-02]`; it is ~2.26GB of ANON, and the metric
 most people read says 29-99MB.**
 
+## [accuracy-autorun-OOM-2026-09-02] THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lane soccer-anchor-wiring]`
+
+**RESOLVED. No deadline outstanding.** The key was set `false` at ~19:0xZ and a
+peer's refresh-worker deploy (`e4a471c0`, 19:26:44Z) injected it. **VERIFIED
+DIRECTLY rather than inferred from deploy ordering** — the decline reason flipped
+from `daily_gate` to `disabled` at 19:32:27Z and has held since:
+
+    ACCURACY_SUMMARY_AUTORUN_GATED reason=disabled env=ACCURACY_SUMMARY_ENABLE_...
+
+That verification exists only because the decline telemetry was added earlier the
+same day (`24efb82b`); before it, all three decline causes were the same silence.
+
+**MEASURED:** armed 15:29:45Z, fired 15:31:11Z, killed the worker by 15:32:56Z.
+Anon **1,833 → 3,868 MB** against a 4,096 MB ceiling, headroom **0.051 MB**,
+climbing **+146.9 MB/s**. `[accuracy_summary] AUTORUN_DONE` never printed, and
+since the `except` path prints it too, its absence proves a KILL rather than an
+exception. `intelligence_evaluation.py:2657` (`build_accuracy_summary`) was on
+the stack in all three faulthandler dumps.
+
+**`#241` REPEATED.** "Worker periodic work is never free" was quoted at arming
+time and armed over. The job roughly DOUBLES peak anon on a worker whose cycle
+already peaks at 1,877 MB.
+
+**WHAT PREVENTED A RESTART LOOP:** `#256`'s claim-before-work. The epoch advances
+at CLAIM time, so a death mid-pass costs exactly one run per day instead of every
+cycle. That design decision is the only reason this is a scheduled nuisance
+rather than an outage.
+
+**THE ALLOCATOR IS MEASURED** `[2026-09-02, lane accuracy-summary-alloc-profile,
+LOCAL profile, no deploy]`. Full record: `todo.md #626`(h).
+
+    peak growth = 4.01-4.41 x ACCEPTED CHUNK BYTES, intercept ZERO, R2 0.999998
+    100% of resident bytes at intelligence_evaluation.py:711 (json.loads)
+    dedup ratio 0.9979 -> the "streaming reduction" reduces nothing here
+    98.8-99.9% of peak is set by materialisation, BEFORE any output exists
+
+At the production accepted set (`LEDGER_CHUNKS_ACCEPTED bytes=830,832,574
+records=22,078`, ceiling 256MB, and NO date window at all) that is **3,178-3,493
+MiB** on top of anon 1,833 MiB -> **5,011-5,326 MiB against a 4,096 MiB ceiling.
+The kill was CERTAIN, ~915 MiB short on its most favourable coefficient**, not a
+near miss. Corroborated two ways: it died having added 2,035 MiB = 64% of the
+projection, and the local allocation rate (155 MiB/s) matches production's
+terminal climb (146.9 MB/s) within 6%.
+
+**Why the segment cap could not have worked, and a SECOND defect it hides.**
+`_bounded_accuracy_summary` runs on the RETURNED summary, downstream of the whole
+working set — a segment cap bounds output rows, never the set that produces them.
+Separately it truncates the WRONG CONTAINER: `list(segmented_reliability.items())
+[:50]` cuts the three top-level keys, never the `segments` LIST, so
+`segments_total` reads **3** while `len(segments)` is **7**, `segments_truncated`
+is pinned False at any coverage, and the "bounded" payload is LARGER than the raw
+one. The 8MB keyvalue ceiling it was written to protect is unprotected. Owner:
+lane `accuracy-autorun-decline-telemetry`, which holds that file.
+
+**STILL DO NOT RE-ARM — the reason has changed, not gone.** The measurement is
+done; the BOUND is not built. Proposed and measured: a CUMULATIVE byte budget
+(newest-chunk-first) of 90,000,000 B -> peak 344-378 MiB, worker worst case
+2,255 MiB = 55.1% of ceiling. Anchored on a real reading (85,766,820 B ->
+365.0 MiB), not on arithmetic. **Do NOT reach for
+`load_recent_evaluation_records(days=14, max_chunk_bytes=64MB)`: at 64MB it
+accepts 0 of the 8 chunks and the summary is computed on an empty set.** And note
+the budget's honest limit — chunks are 95-332 MB/day, so 90 MB is under ONE DAY
+against a 28-day drift window; the budget makes the job safe, not correct. The
+correct fix is streaming accumulators (peak O(segments + dates), not O(ledger)).
+
+## [refresh-worker-headroom-2026-09-02] THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-env-snapshots, measured off 200 MEMORY_WATCHDOG samples 15:30-16:10Z]`
+
+**Read `memory_anon_mb`, not `memory_headroom_mb`.** `memory_current_mb` includes
+reclaimable page cache and this worker holds **~1.2GB** of it, so the headroom
+field understates by roughly that much.
+
+    memory_headroom_mb   min 29    max 425   last 99     <- ALARMING AND MISLEADING
+    memory_anon_mb       min 1518  max 1877  last 1833   <- the real number
+    -> anon 1833 of 4096 = ~2.26GB REAL headroom
+
+**55% of samples read under 200MB nominal headroom.** Anyone reading that field
+will conclude the worker is minutes from death. It is not. This is the same trap
+as the 2.7GB "plateau" that turned out to be file cache — split anon from
+inactive_file before calling anything pressure.
+
+**What IS true:** anon climbs through a cycle (1518 → 1877) and peaks at
+`last_stage=overview_sport_end`, so the board-overview stage is the high-water
+mark. New periodic work still is not free — `#241` stands — but it is being
+weighed against ~2.26GB, not ~1.4GB, and certainly not against 29MB.
+
+**Owed:** the first armed run of the accuracy autorun (`#626`(h), live since
+2026-09-02T15:29:45Z) should have its OWN cost read against this
+`overview_sport_end` peak, not against an idle baseline.
+
 ## [wnba-consensus-price] BOOK PRICES WERE AVERAGED ON THE AMERICAN SCALE; 43% OF CARD PRICES WERE IMPOSSIBLE `[2026-08-31, lane wnba-accuracy-assessment, commit 697c41f0]`
 
 `_aggregate_game_odds_from_market_rows` took an **arithmetic mean of American
@@ -1047,6 +1136,20 @@ book's sensitivity to game-market rows). Corrected at the line in
 `scripts/measure_exchange_prop_option_value.py` now interpolates the published
 table with a test on the slope.
 
+**THE EVALUATION AUTORUN IS ARMED (`#626`(h)) — `8e189d1a` LIVE on refresh-worker
+2026-09-02T15:29:45Z.** `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN=true` set
+via the SINGLE-KEY endpoint and read back; a Render env change needs a DEPLOY to
+be injected. **It had never run once before this** — the flag was absent, the job
+is default-OFF, so the loop `#626` exists to restore produced nothing.
+**FIRST FIRE NOT YET VERIFIED.** The gate is 07:00 Central once/day and
+`last_epoch` was 0, so it should fire on the first cycle after boot rather than
+tomorrow — silence is therefore a signal, not a wait. Read
+`reports/refresh_status/latest/accuracy_summary_autorun_status.json`; its
+claim-before-work record distinguishes a refused gate from a death mid-pass.
+**Env reads on Render MUST paginate** — `?limit=100` is the PAGE SIZE, and
+refresh-worker has **153** keys; a single page read as a total is how I briefly
+cited 100.
+
 **MLB PLAYER PROPS ARE EXCLUDED FROM STAKING** — `commit_portfolio`, env
 `SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES`, default `mlb:player_prop`, refusal
 `market_family_excluded`. **VERIFIED IN PRODUCTION 2026-09-01T12:46Z: 1,860
@@ -1120,28 +1223,28 @@ feeds' time spans, and read the artifact TWICE — if the second read is not a
 superset, stop.** `measure_exchange_prop_option_value.py` refuses a date below
 65% feed overlap (`51cf8b83`); it refuses 2026-09-01 itself at 46.1%.
 
-**FIX: MERGE-ON-RECEIVE, `e78aee52`, DEPLOYED TO WEB 2026-09-01 23:38:56Z —
-VERIFICATION PENDING, do not yet call it fixed.** `/api/ops/artifacts/publish`
-now UNIONS an append-only artifact with what is on disk instead of replacing it,
-in BOTH receive forms (the envelope form matters: live-odds-worker is pinned on
-`7e76478f`). Publishes become commutative. Two invariants carry it: the existing
-file stays a **byte prefix** (so `pull_streamed_artifact`'s HTTP-Range tail
-fetch stays valid — merging is what finally MAKES that assumption true), and
-dedup is on the **whole line**, never a parsed key. `_is_append_only` is
-imported, not restated, so the merge set and the Range-pull set cannot drift.
-Non-append-only families still REPLACE — merging the `.state.json` sidecar would
-concatenate two dicts.
-Replayed on the two real snapshots pre-deploy: recovered **exactly 1,318** rows,
-byte-prefix True, 54,866 duplicates collapsed.
-**verify (owed):** read the shard twice across a publish cycle from each writer;
-the second read must be a strict SUPERSET. That property was FALSE on
-2026-09-01 and is the test that found the bug.
-**Also note `#488`'s shrink guard did NOT catch this** — the clobbering publish
-was LARGER (25MB→37MB), so `ratio >= threshold` returned "allowed" silently. It
-is now skipped for merged families, because refusing would reject the publish
-carrying the other service's rows.
-**Scope sweep still owed:** `book_quotes` is the one PROVEN two-writer artifact,
-not established as the only one in `HOT_ARTIFACT_PATTERNS`.
+**FIXED: MERGE-ON-RECEIVE, and VERIFIED IN PRODUCTION.** `/api/ops/artifacts/publish`
+UNIONS an incoming artifact with what is on disk instead of replacing it, in BOTH
+receive forms, for THREE families — `book_quotes` (line union, whole-line dedup,
+existing file stays a byte PREFIX so the Range/tail pull stays valid),
+`odds_history` (union by market key, entries WHOLESALE, never field-mixed), and
+the `book_quotes/<date>.state.json` sidecar (union by quote key, newest
+`last_seen` wins). **All three run in a SUBPROCESS**, because CPython does not
+return freed arenas and a background thread would not have helped.
+**READINGS:** superset test 0 lost / 7,104 gained (was 1,318 lost / 0 gained);
+prefix invariant 10/10 windows byte-identical while the shard grew; 44 markets
+preserved that a replace would have destroyed; `kept_existing_newer=2734` on one
+shard — data that would have been overwritten by a STALER publish.
+**MEMORY, and it is not our problem:** 775 merges cost +99 MB against +263 MB
+from 68 merges pre-change. The residual climb is **`#632`'s ~75 MB/h anonymous
+leak** — my 74.4 MB/h and a peer's independently-measured ~75 MB/h agree, and
+`9494b9bd` records that the deploy cadence hides it.
+**`#488`'s guard also fixed:** it recorded a publisher whose publish it had just
+REFUSED, making the refusal a one-cycle delay. Its remaining PER-PROCESS hole is
+`#634`.
+**`#634` IS NOT MOOT:** 39 path families are published by BOTH workers, none
+merged apart from the sidecar. The sweep skips >12 MiB, so big artifacts are
+direct-publish only and small ones are contested.
 
 **A WEEK-LONG EXCHANGE-PROP MEASUREMENT IS NOT AVAILABLE UNTIL 2026-09-08.**
 Capture began 2026-09-01; 08-26..08-31 carry **exactly zero** exchange prop rows.
@@ -6447,7 +6550,8 @@ also better matched to the real risk — a web deploy has no long job to land on
 
 **Rejected alternative: give web its own periodic emitter.** That is request-path
 periodic work, which the worker-split rule exists to prevent and which `#241`
-already turned into a production restart loop (~1.4GB headroom).
+already turned into a production restart loop (headroom figure STALE — see
+`[refresh-worker-headroom-2026-09-02]`).
 
 **DO NOT ACT ON A CAUSE FROM THIS SECTION.** Act on the fix, which is
 cause-independent.

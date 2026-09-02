@@ -4430,6 +4430,86 @@ that no longer exists, or one that did not exist yet.
   live-odds-worker, and it has still never executed in production — recorded as
   OWED rather than passed.
 - *(full account: `deploys.md` 2026-09-02 17:56:08Z)*
+## 2026-09-02 — RULE: TWO WRITERS IS A PRECONDITION FOR HARM, NOT HARM. And "fix all N contested paths" is the wrong instinct when the paths are REBUILT rather than accumulating. `[lane book-quotes-publish-clobber]`
+
+`#634` measured 39 artifact paths published by both workers. The obvious next
+move — merge them all, the way `#630` merged `book_quotes` — would have been a
+**corruption**, and it took a shape check to see it.
+
+**The split that matters:**
+
+  * **accumulating / keyed** (`book_quotes`, `odds_history`, the `.state.json`
+    sidecar): rows only ever get added, so a replace DESTROYS data and a union
+    is the fix. `#630` measured the destruction: 1,318 rows lost, 0 gained.
+  * **REBUILT WHOLESALE** (`sim_*`, `daily_summary`, `lineups`, `probables`,
+    `weather`, `book_grid`, `live_state`, `live_lens_report`): the document is
+    recomputed each cycle. **Last-writer-wins is CORRECT.** A union would
+    RESURRECT entries the rebuild deliberately dropped and interleave stale rows
+    with fresh — the same failure `_is_append_only` refuses the `.state.json`
+    sidecar to avoid, one level up.
+
+**So the harm question is not "are there two writers" — that is a precondition.
+It is "does the newer copy ever lose to an older one".** For a rebuilt artifact
+that is a RECENCY question, and it is directly observable: both sampled families
+carry `generated_at`.
+
+**Measured before building anything:** 5 contested paths, 25 minutes, **59
+observed republishes, 0 regressions** — `generated_at` advanced every time. No
+guard warranted. 38 merges would have been written for a defect that was not
+happening.
+
+**How to apply.**
+- Before generalising a fix across N instances, CLASSIFY them. The fix that is
+  right for one shape can be the bug for another, and "same symptom" is not
+  "same defect" — here, "two writers" was the symptom for both.
+- Prefer measuring the HARM over inferring it from the mechanism. `#630` had a
+  measured loss (1,318 rows); `#634` had only a mechanism, and the measurement
+  came back null.
+- **A null result is a legitimate deliverable.** Recording "59 republishes, 0
+  regressions, window stated, 5 of 38 paths covered" is worth more than code
+  nobody needed — and it names exactly what would overturn it.
+
+## 2026-09-02 — FORBIDDEN: calling a job "bounded" because something downstream of it is capped. A cap on the OUTPUT cannot bound the WORKING SET that produced it — and a cap that reports a count is not a bound until you check WHICH container it counted. `[lane accuracy-summary-alloc-profile]`
+
+- **What we believed:** that the accuracy autorun was safe to arm because
+  `_bounded_accuracy_summary` capped SEGMENTS at 50 and reported
+  `segments_total`/`segments_truncated`, and because `#256`'s claim-before-work
+  guarded the schedule. `state.md` records the author's own words: "Being
+  segment-capped and claim-guarded did not bound its memory, and I asserted it
+  would." It OOM-killed refresh-worker on its first run.
+- **What was actually true:** TWO independent failures of the same cap.
+  (1) **Ordering.** It runs on the summary that has already been RETURNED, i.e.
+  downstream of the 22,078-record working set. Measured: materialisation is
+  **98.8-99.9% of peak** (stages after it add 0.3-4.4 MiB against 360.6-961.7
+  MiB), so no output-side cap can touch the number that kills the container.
+  (2) **Wrong container.** `segmented_reliability` is a dict
+  `{global, shrinkage_k, segments}`, and `list(segments.items())[:50]` truncates
+  the three TOP-LEVEL KEYS, never the `segments` LIST — the one field whose
+  stated purpose is to grow with coverage. On a real summary `segments_total`
+  reads **3** while `len(segments)` is **7**, `segments_truncated` is pinned
+  **False** at any coverage, and the "bounded" payload comes out **LARGER** than
+  the raw one (3,585 vs 3,535 bytes). The 8MB keyvalue ceiling it exists to
+  protect is unprotected, and has been the whole time.
+- **How we found out:** profiling it locally under RSS with no profiler in the
+  process, staged so each step's cost was attributable, then calling
+  `_bounded_accuracy_summary` on a real summary and printing `segments_total`
+  next to `len(segments)`. Both readings are one line each. Neither had been
+  taken before the thing was armed.
+- **The rule going forward:** before calling anything bounded, name the
+  QUANTITY the bound applies to and the MOMENT it applies, and check that both
+  match the failure you are guarding against. A cap on emitted rows bounds the
+  artifact, not the allocation; a cap that fires after the peak bounds nothing
+  at all. And when a guard reports a count, print that count beside the length
+  of the collection it claims to describe — a truncation pointed at the wrong
+  container is invisible in every test, because it never truncates.
+  Related and NOT the same rule: `#435`'s "the ceiling is per FILE; nothing
+  bounded the SUM". That one is about a bound too small in EXTENT; this one is
+  about a bound aimed at the wrong THING.
+- **Cost:** one OOM kill of refresh-worker (anon 1,833 -> 3,868 MiB against a
+  4,096 ceiling), one day of the evaluation loop lost, `#241` repeated after
+  being quoted at arming time, and `#626`(h) — the platform's named #1
+  structural failure — blocked a further day. The profile that settles it took
+  under an hour and could have been run before arming.
 
 ## 2026-09-02 — FORBIDDEN: arming a periodic job on refresh-worker on the strength of a bound that does not bound MEMORY. `[lane soccer-anchor-wiring]`
 

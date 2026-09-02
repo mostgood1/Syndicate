@@ -21726,6 +21726,13 @@ CHANNEL (my session was unreachable in the messaging roster). It holds their `#6
 answer, their correction to my `#632` numbers, the same-instant unreclaimable-vs-anon
 read, and an apology for a cancelled build. None of that is lane status and a status
 trim would have destroyed it.
+---
+
+## book-quotes-publish-clobber — moved from lanes.md 2026-09-02 on closing
+Kept VERBATIM because a peer (lane `game-market-entry-roi-curve`) used this block as a
+MESSAGE CHANNEL — it holds their `#635` answer, their correction to my `#632` numbers,
+the same-instant unreclaimable-vs-anon read, and an apology for a cancelled build.
+None of that is lane status and none of it should be lost to a status trim.
 
 ### book-quotes-publish-clobber — OPEN (guard LANDED `51cf8b83`; capture fix LANDED `e78aee52` by another session; **`#630` todo item still OWED** — NO LONGER BLOCKED, `todo.md` released 2026-09-01 and the `#624` step 6 caveat applied, see the annotation below) — opened 2026-09-01 — session 3492626c — **HYPOTHESIS CONFIRMED: `book_quotes` daily shards LOSE ROWS. Two services each publish a WHOLE-FILE REPLACE of the same file; web keeps whoever published last.** Refetch lost 1,318 exchange rows / gained 0, clean tail truncation, while sportsbook gained a whole hour. **76% of `#624` step 6's 1,795 'no time-aligned quote' exclusions are this defect, not market liquidity** — a published caveat was wrong and is corrected.
 - **OWNER CORRECTED 2026-09-01 by the ownership pass (lane `game-market-entry-roi-curve`): the recorded session `3492626c` DOES NOT EXIST in a 200-session roster spanning 2026-08-13..09-02, yet this lane was worked TODAY.** The live worker is **`local_ea1e4863`** — the only running session on this machine, and the one that messaged me describing this lane's work (the clobber, `feed_overlap`, the `#630` item, the `todo.md` block). Circumstantial but strong; stated as an inference, not a lookup. **This lane is the counterexample that stopped the pass from closing anything on ownership grounds.**
