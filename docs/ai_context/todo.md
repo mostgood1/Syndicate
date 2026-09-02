@@ -1,5 +1,50 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#639` — **THE MLB ACTUALS WRITER RUNS HOURLY AND PRODUCES ZERO ROWS FOR EVERY DATE, while its input exists at 1.8 MB** — lane `m626-actuals-replay-target`, 2026-09-02 — **OPEN, not root-caused, evidence below**
+
+`_run_mlb_actuals_writer_tick` is enabled on refresh-worker
+(`RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER=true`, hourly) and it IS running —
+6 ticks in 6 hours, read from the Render logs API. Every tick, for all 12 dates
+it processes, reports:
+
+    "resolved": 0, "skipped_no_feed": 0, "skipped_no_game_pk_or_stat": 0,
+    "skipped_no_stat_value": 0, "top_props_rows": 0
+
+**`top_props_rows: 0` is the alarm, and the other zeros rule out the innocent
+readings.** It is not "no feed" (`skipped_no_feed` is 0 too) and not a grading
+failure — the input row list was EMPTY. So `props_actuals_<date>.csv` has been
+written with nothing in it, hourly.
+
+**The input is not missing in general.** `daily_top_props_<slug>.json` is on WEB
+for **123 dates, 2026-04-10..2026-09-03**, and the specific dates the writer
+reports zero for are present and substantial — 2026-06-15 is **1,808,469 bytes**,
+06-16 is 2,640,286, 09-01 is 199,036.
+
+**THE NEXT THING TO ESTABLISH, and it cannot be read from outside:** whether
+refresh-worker's own disk holds `daily/top_props/`. The writer reads its own
+`data_root()`, and web's copy proves nothing about the worker's — Render gives
+each service its own disk. The family IS hot-allowlisted (so it CAN cross), and
+`run_refresh_worker.py` contains **zero** references to `top_props`, so it can
+only arrive via the generic artifact-refresh pull
+(`SYNDICATE_ARTIFACT_REFRESH_INTERVAL_SECONDS=120`). Confirm by instrumenting
+the tick to log the resolved path and `path.exists()`, or by publishing a
+bounded diagnostic — do NOT infer it from web.
+
+**Why this matters beyond one file:** these are the graded "what actually
+happened" rows the reconciliation and accuracy chain consume
+(`prediction_reconciliation.RECONCILIATION_PATTERNS`). It is consistent with
+`state.md [layer2-realized-accuracy]`'s "the measurement chain is broken in four
+places" and with settlement's 19,692 settleable / 35 settled.
+
+Found while trying to build `build_mlb_actuals` as a second `#625`(5) replay
+target. That target is separately **BLOCKED ON TRANSPORT**: its output
+`mlb_source/reconciliation/*` is now export-only allowlisted (`5885c339`,
+deployed) but is git-tracked 0 files and under no `BOOTSTRAP_ROOT`, so nothing
+puts it on web — there is no production copy to diff a replay against. **An
+export-only entry makes a family readable IF PRESENT; it is not a transport.**
+
+---
+
 ### `#638` — **THE PUBLISHER'S `roster_objs` COMMENT IS STALE, and the pattern above it is broader than its author thought** — lane `m625-export-only-patterns`, 2026-09-02 — **OPEN, low severity, NOT a live defect**
 
 `artifact_publisher.py` says roster objects are *"deliberately NOT allowlisted --

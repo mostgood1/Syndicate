@@ -1036,8 +1036,22 @@ EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # WHY THEY ARE HERE: they were in NEITHER list, so the producer's output was
     # unauditable from outside -- `model_engine_standard.md` §3b's "an
     # unallowlisted artifact is an unauditable one", on the outputs the
-    # settlement and accuracy chain rests on. The inventory showed zero and that
-    # meant INVISIBLE, not absent; there was nothing to diff a replay against.
+    # settlement and accuracy chain rests on.
+    #
+    # **STILL ZERO ON WEB AFTER DEPLOYING THIS, AND THAT IS THE POINT.** Measured
+    # on web `5885c339`: `/api/ops/artifacts/export?names_only=1` returns 0
+    # reconciliation files. Unlike `feed_live` and the prop-history CSVs -- which
+    # were present and merely invisible, because `bootstrap_data_root` seeds the
+    # git-tracked copies -- this family is **git-tracked 0 files and under NO
+    # `BOOTSTRAP_ROOT`**, so nothing puts it on web's disk at all.
+    #
+    # THE LESSON, which corrects how `#625`(2) was framed: an export-only entry
+    # makes a family READABLE IF PRESENT. It is not a transport. It unlocks a
+    # family that already reaches web by some other route; for a genuinely
+    # worker-only family the worker publishes to web or nothing does, and there
+    # is no third path. Kept anyway: the entry is correct, costs three globs that
+    # match nothing, and works the moment a transport exists -- `#208`,
+    # allowlisting PERMITS a transfer and does not make one happen.
     "*_source/reconciliation/*.csv",
     "*_source/reconciliation/*.json",
 )
