@@ -19,3 +19,44 @@ and spreads `P(home covers)` against "did the home team win". Kept only so the
 retraction is auditable.
 
 **SUPERSEDED READING FOLLOWS, KEPT FOR THE RECORD:** **SCORED AT n = 98 GAMES — the model TRAILS the market, and THIS one is powered `[2026-08-28, 08-27 added via `--date` recovery]`.** Pooled over 8 nights 08-20..08-27, `priceable_only` (the population-matched cut, n 26,520 BOTH sides): **model Brier 0.32251 vs market 0.25251, diff +0.07000** record-weighted. **Game-weighted the diff is +0.06104** — state the basis, the two are not interchangeable. Trails on **7 of 8 nights**; sole exception 08-24 (-0.08120), also the thinnest night (10 games, 1,718 records). Per-night: +0.088 / +0.079 / +0.082 / +0.091 / **-0.081** / +0.058 / +0.071 / +0.075. **08-27 contributes only 4 games of ~15** — see the 0-0 placeholder row below; the rest of that night is not recoverable on this path. **DO NOT quote the pooled `last_per_game` diff** — n is 94 model vs 90 market, so like `all_records` it spans different row sets; only `priceable_only` is like-for-like. Independent unit is `games_with_outcome` = 94; the 25,504 are repeated snapshots of those 94. Supersedes the n=3 reading (which was itself a correction of an unsupported "LOSES on every population"). Recovered from the RETAINED ledger after the collector sat disabled 08-21..08-27; `history.jsonl` rows carry `recovered_from_ledger: true`. **Pooled is now 98 `[2026-08-28]`** — 08-27 added at a FLOOR of 4 games (retro board build joined finals for only 4; `no_final_outcome_for_game: 1304`), because that night's 23:25 CT capture never ran.
+
+
+# SUPERSEDED BODIES MOVED OUT OF `state.md` — 2026-09-03
+
+Moved verbatim by `scripts/compact_state.py`. Nothing summarised or
+deleted. The CORRECTION that supersedes each body stays in `state.md`
+with a pointer to here.
+
+## [mlb-sim-log-unreachable] superseded body, moved 2026-09-03
+
+**The mechanism already exists and is purpose-built.**
+`live_refresh_loop.py:2516-2536` copies the child's log into the shared
+Redis-backed state store the moment the process exits, with a comment saying
+exactly why: *"so `/api/ops/live-refresh/state?sim_date=&sim_run=` can surface it
+remotely."*
+
+**Verified by using it:**
+
+    GET /api/ops/live-refresh/state?sim_date=2026-08-19&sim_run=20260819_134839
+      state.sim_run_status      -> the full command line
+      state.sim_run_resolution  -> date, run_stamp, source
+      state.sim_run_log_tail    -> 8000 chars, ending:
+        MLB_DAILY_SIM_END date=2026-08-19 return_code=0 ok=True published_artifacts=93
+
+**The sim SUCCEEDED.** Everything the retracted finding said was invisible is one
+authenticated GET away.
+
+**HOW I GOT IT WRONG — the fourth instance of one habit in this sequence.** I
+checked ONE channel (Render's log API), found nothing, and reported *the system*
+as having nothing. I never asked whether a purpose-built path existed — and the
+answer was in a comment beside the code I had already read to establish the
+redirect. **"My instrument sees nothing" is not "there is nothing."** The
+companion rule [[verify-the-channel-not-just-the-query]] covers the query-vs-
+channel half; this adds: **also ask whether a DIFFERENT channel was built for
+exactly this.**
+
+**I was one step from building a duplicate of an existing mechanism.**
+
+---
+
+### (retracted body follows, for the record only)
