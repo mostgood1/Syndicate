@@ -166,3 +166,65 @@ def test_a_populated_ledger_still_logs_nothing(
     prediction_ledger._read_payload(keyvalue_ledger)
 
     assert "PREDICTION_LEDGER" not in capsys.readouterr().out
+
+
+def test_an_unparseable_shared_value_says_so_instead_of_falling_through_silently(
+    keyvalue_ledger: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """`#642` third pass, and the exit two deploys of instrumentation missed.
+
+    A shared value that will not parse used to fall straight through to the
+    local disk with NO signal. That is the shape a truncated write leaves, and
+    it presents as "the ledger is empty" -- the very symptom the module docstring
+    says was already fixed. The head/tail are logged because they are what
+    distinguish a truncated document from a wrong-shaped one.
+    """
+    keyvalue_ledger.write_text('{"schema_version": 1, "predictions": [], "results": []}', encoding="utf-8")
+    truncated = '{"predictions": [{"id": "p1"'   # a half-written document
+    monkeypatch.setattr(prediction_ledger, "read_text_file_result", lambda path: (truncated, True))
+
+    payload = prediction_ledger._read_payload(keyvalue_ledger)
+
+    assert payload["predictions"] == [], "it still falls back, but no longer silently"
+    out = capsys.readouterr().out
+    assert "PREDICTION_LEDGER_SHARED_PARSE_FAILED" in out
+    assert "unreadable, not empty" in out
+    assert f"shared_bytes={len(truncated)}" in out
+    assert "tail=" in out, "the tail is what shows a truncation"
+
+
+def test_serving_from_local_disk_is_itself_reported(
+    keyvalue_ledger: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """On a ledger shared by three services, answering from the LOCAL disk means
+    this service is serving a file the others never write. That is the notable
+    event, not the quiet default."""
+    keyvalue_ledger.write_text(
+        '{"schema_version": 1, "predictions": [{"id": "d1"}], "results": []}', encoding="utf-8"
+    )
+    monkeypatch.setattr(prediction_ledger, "read_text_file_result", lambda path: (None, True))
+
+    payload = prediction_ledger._read_payload(keyvalue_ledger)
+
+    assert [p["id"] for p in payload["predictions"]] == ["d1"]
+    out = capsys.readouterr().out
+    assert "PREDICTION_LEDGER_SERVED_FROM_DISK" in out
+    assert "disk_predictions=1" in out
+
+
+def test_every_return_in_read_payload_is_labelled() -> None:
+    """THE RULE THIS LANE EARNED. Two deploys were spent instrumenting the branch
+    I believed was at fault while the live path exited elsewhere. Every exit that
+    can produce a misleading answer must carry a token, so the next diagnosis
+    costs one deploy instead of three."""
+    import inspect
+
+    source = inspect.getsource(prediction_ledger._read_payload)
+    for token in (
+        "PREDICTION_LEDGER_SHARED_PARSE_FAILED",
+        "PREDICTION_LEDGER_PARSED_NO_PREDICTIONS",
+        "PREDICTION_LEDGER_READ_FAILED",
+        "PREDICTION_LEDGER_CONFIRMED_EMPTY",
+        "PREDICTION_LEDGER_SERVED_FROM_DISK",
+    ):
+        assert token in source, f"{token} missing -- an exit lost its label"

@@ -160,8 +160,28 @@ def _read_payload(path: Path) -> dict[str, Any]:
     if shared_text:
         try:
             shared_payload = _coerce_payload(json.loads(str(shared_text)))
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
+            # `#642`, THIRD PASS -- and this is the exit two deploys of
+            # instrumentation missed, because I kept instrumenting where I
+            # believed the fault was instead of enumerating every RETURN.
+            #
+            # A shared value that will not PARSE falls straight through to disk
+            # with no signal. That is the shape a TRUNCATED write leaves, and
+            # the size is suspicious in exactly that way: the usage endpoint
+            # reports this key at ~2 MiB, sitting 96 bytes above an allocator
+            # boundary. A half-written 2 MiB JSON document raises here, and web
+            # then silently serves its own empty disk copy -- which is precisely
+            # the "reconciliation ran against a ledger with no bets in it"
+            # symptom the note above says was already fixed.
             shared_payload = None
+            text = str(shared_text)
+            print(
+                "[prediction_ledger] PREDICTION_LEDGER_SHARED_PARSE_FAILED "
+                f"path={path.name} shared_bytes={len(text)} "
+                f"error={type(exc).__name__} head={text[:60]!r} tail={text[-60:]!r} "
+                "-- falling back to LOCAL DISK; the shared ledger is unreadable, not empty",
+                flush=True,
+            )
         if shared_payload is not None:
             # `#642`, SECOND PASS. The first pass instrumented the FAILED-read
             # branch below, deployed it, and **neither token fired** -- so the
@@ -229,6 +249,16 @@ def _read_payload(path: Path) -> dict[str, Any]:
     # one would overwrite a good key with a stale disk copy.
     if read_ok and not shared_text and disk_payload.get("predictions"):
         _publish_shared_payload(path, disk_payload)
+    # `#642`. The last unlabelled exit. Returning the LOCAL disk copy on a
+    # multi-service ledger is itself the notable event -- it means this service
+    # is answering from a file the other services never write.
+    print(
+        "[prediction_ledger] PREDICTION_LEDGER_SERVED_FROM_DISK "
+        f"path={path.name} shared_read_ok={read_ok} shared_text={'yes' if shared_text else 'no'} "
+        f"disk_predictions={len(disk_payload.get('predictions') or [])} "
+        f"disk_results={len(disk_payload.get('results') or [])}",
+        flush=True,
+    )
     return disk_payload
 
 
