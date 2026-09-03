@@ -2331,7 +2331,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### gameline-trend-pooling — OPEN — opened 2026-09-03 — session 89f908c7-df9d-4279-9764-35dd6ebd550b
+### gameline-trend-pooling — CLOSED 2026-09-03 — **GOAL MET. 08-30 and 08-31 are pooled; the post-fix trend is 4 dates / 53 games / -0.00218 (was 2 / 28 / -0.00897), and the era rule now lives in `scripts/pool_live_gameline_trend.py` where `pool()` RAISES on a mixed-era set, so a cross-boundary number is unreachable rather than merely discouraged. Reachability checked BEFORE correctness: the boundary assertion FAILS under the old stamp-only rule. 11 new tests; 249 existing `-k live_gameline` pass; `history.jsonl` byte-unchanged. Landed `92c3d0d2`. NOT DEPLOYED and needs no deploy — offline analysis tooling only.** — opened 2026-09-03 — session 89f908c7-df9d-4279-9764-35dd6ebd550b
 - Goal: 08-30 and 08-31 (proven POST-FIX in `d9fb0b43`) are pooled into the
   accumulated live-gameline trend, and the trend stops being an ad-hoc one-liner
   living in a scheduled-task brief.
