@@ -4901,3 +4901,35 @@ back in one queue cycle, not in minutes.
   recorded as un-runnable for a day, and two real defects in the same feed — name
   joins losing 66 of 136 fixtures and 76 of 214 team slots — went unnoticed
   behind the cost story. The false blocker HID the true ones.
+
+## 2026-09-02 — FORBIDDEN: deriving a worst case from the NAMES of the limits instead of the loop's actual control flow. My "3 x 20 x 20 = 1,200s" described a nesting that does not exist. `[lane kalshi-discovery-deadline]`
+
+- **What we believed:** that `fetch_markets` could spend `len(_BASE_URLS) x max_pages x timeout` = 3 x 20 x 20s, because it has three base URLs, a 20-page cap and a 20s per-request timeout. I opened a lane on that number.
+- **What was actually true:** `pages` is declared OUTSIDE the `for base in _BASE_URLS` loop and never reset, so `max_pages` is a GLOBAL budget across hosts, not per-host; and the loop `break`s on first success, so the 3x applies only to FAILURES. Measured: 40 requests, all to `_BASE_URLS[0]`, zero failures, 30.3s. The per-request timeout was never approached (median 0.63s standalone, ~0.24s in situ), and pagination was not the cost either -- 21 of 266 calls followed a cursor. The real driver was fan-out across series, which none of the three names I multiplied describes.
+- **How we found out:** instrumenting `_get` and printing per-request elapsed time, then reading the loop line by line when the numbers did not match.
+- **The rule going forward:** before multiplying limits together, read where each counter is DECLARED and where the loop BREAKS. A limit's name tells you what it was for, not what it bounds. Cheapest check: instrument the leaf call and count, because the count settles nesting questions that reading alone gets wrong -- and do it BEFORE opening a lane on the arithmetic.
+- **Cost:** a lane opened, named and scoped on a mechanism that was not the mechanism; re-aimed twice before it was right.
+
+## 2026-09-02 — FORBIDDEN: calling a repeated-cost measurement a PER-REQUEST cost without finding the state that decides whether it recurs. Measured once it was 254 calls; measured an hour later, 0. `[lane kalshi-discovery-deadline]`
+
+- **What we believed:** that one intelligence build issues ~250-290 Kalshi requests, so every board build pays 60-94s of venue time. Reported it that way and built a memo to cut it.
+- **What was actually true:** it is a COLD-START BURST, not a per-request cost. `run_kalshi_odds_refresh` gates on a PERSISTED per-series clock (`_due_series`, `refresh_interval` 120s, `dormant_interval` 3600s) capped at `series_per_tick()` = 150 -- exactly the 150 distinct series measured. My first runs found empty state, fetched 150, stamped them all, and everything that read empty went dormant for an hour. Later runs correctly did nothing: a counter INSIDE `fetch_markets` read **0 calls** across four runs while the test still took ~140s.
+- **How we found out:** the fix stopped being measurable. Chasing that -- ruling out the on-disk artifact by moving it aside, module identity by `__file__`/`is`, and subprocesses by the original in-process capture -- led to the per-series clock. Deleting the state file reproduces 150 calls / 50.1s on demand.
+- **The rule going forward:** when a cost looks repeated, find the STATE that decides whether it repeats before naming it per-request: a TTL, a due-clock, an on-disk stamp. Then reproduce it deliberately (clear that state) rather than hoping to catch it again. And put the counter INSIDE the function you are bounding -- an external instrument cannot tell "my bound works" from "my bound is never reached".
+- **Cost:** a memo built on the burst's 40%-repeat figure, shipped, measured at ZERO hits, and deleted the same day. Several 2.5-minute probe runs spent after the signal had already vanished.
+
+## 2026-09-02 — FORBIDDEN: adding a bound that returns a PARTIAL result without checking how the caller reads emptiness. This one would have blanked 150 series off the board for an hour. `[lane kalshi-discovery-deadline]`
+
+- **What we believed:** that wiring an aggregate request budget into `run_kalshi_odds_refresh` was a matter of wrapping the call.
+- **What was actually true:** `fetch_markets` returns a PARTIAL result on exhaustion rather than raising, and the refresh computes `read_succeeded = strategy == "series_filter"` -- an empty successful read means "this series has no open markets", stamps `fetched_at`, and the series goes DORMANT for `dormant_interval_seconds` (3600s). A budget stopping mid-fetch would therefore have recorded up to `series_per_tick()` = 150 series as legitimately empty and removed them from the board for an hour. Separately, the budget wrapped `ensure_series_discovered()` too, and one slow catalogue call spent the whole tick: observed `BUDGET_STOP fetched=0 unattempted=25`.
+- **How we found out:** reading the loop's state-writing before wiring anything, then confirming the discovery starvation in a real run.
+- **The rule going forward:** a bound that DEGRADES rather than raises must be traced into every consumer of its result, because "partial" and "empty" are the same value to a caller that only checks length. Prefer stopping the caller's loop BEFORE spending, so unfinished work stays visibly unfinished; and give any pre-loop step its own sub-budget so it cannot starve the work the budget exists to protect.
+- **Cost:** none shipped -- caught by reading rather than by an incident. Recorded because the next person wiring a deadline into a fan-out will meet the same shape.
+
+## 2026-09-02 — RULE: run `lane_identity_check` AFTER landing, not only before. A rebase duplicates a lane block wholesale, and the write-side rule does not cover it. `[lane kalshi-discovery-deadline]`
+
+- **What we believed:** that anchoring ledger edits on my own `### <slug>` header (the rule written earlier the same day) was enough to keep one lane to one block.
+- **What was actually true:** that rule protects the WRITE. `session_worktree.py land` rebases onto a moved `origin/main`, and an additive ledger merge duplicated the block anyway -- leaving a bare orphaned header 200 lines above the real one. `lane_identity_check` reported DUPLICATE OPEN: the state where two sessions can each read themselves as the holder of the same lane. Twice in one session an additive merge produced a duplicate.
+- **How we found out:** `land` itself printed `ledger/lanes PROBLEMS`, after a successful push.
+- **The rule going forward:** `land` runs its checkers BEFORE the push, so a rebase-introduced duplicate reaches `main` and is only reported afterwards. Re-run `scripts/lane_identity_check.py` after every land and fix immediately -- lane exclusivity is what the claim system rests on.
+- **Cost:** one duplicate OPEN block on `main`, fixed in the following commit.

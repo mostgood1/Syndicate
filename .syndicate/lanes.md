@@ -1499,7 +1499,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Narrative + evidence: `log/2026-09-02.md`, `todo.md #625`(4),
   `state.md [local-fleet-runner]`.
 
-### kalshi-discovery-deadline — OPEN, **BOUNDS IMPLEMENTED; GUARD VALIDATED (103-152s -> 22.5s); FAN-OUT REPRODUCED (cold state -> 150 = DEFAULT_SERIES_PER_TICK); BUDGET VALIDATED IN SITU (50.1s -> 10.7s); MY MEMO DELETED on 0 measured hits; BUDGET NOW WIRED INTO THE BOARD BUILD and measured draining a cold queue over 3 ticks: the cost is FAN-OUT (243 per-series fetches), not pagination or host retries** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### kalshi-discovery-deadline — CLOSED 2026-09-02 — GOAL PARTLY MET, ONE ITEM FALSIFIED RATHER THAN ACHIEVED — **BOUNDS IMPLEMENTED; GUARD VALIDATED (103-152s -> 22.5s); FAN-OUT REPRODUCED (cold state -> 150 = DEFAULT_SERIES_PER_TICK); BUDGET VALIDATED IN SITU (50.1s -> 10.7s); MY MEMO DELETED on 0 measured hits; BUDGET NOW WIRED INTO THE BOARD BUILD and measured draining a cold queue over 3 ticks: the cost is FAN-OUT (243 per-series fetches), not pagination or host retries** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: the candidate-pool build cannot block for minutes on Kalshi. ONE testable
   outcome: `tests/test_intelligence.py` completes in bounded time WITHOUT opening
   an outbound socket, and `kalshi_client.discover` aborts at an AGGREGATE
@@ -1792,6 +1792,33 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   still does not finish inside 10 minutes even with the guard (stalls ~32%), and
   the WNBA `_artifact_bundle` <-> `_games_from_live_state_fallback` recursion
   remains unfixed and unlaned.
+- **CLOSED 2026-09-02. Verification RAN; stating the negative result rather than closing over it.**
+  (1) *Request count drops ~250-290 to a target* — **NOT MET, and FALSIFIED rather
+  than unachieved.** 150/tick is `DEFAULT_SERIES_PER_TICK`, the design's deliberate
+  allocation, and the memo that would have cut it was structurally incapable of
+  hitting (0 cache hits over two ticks) — so there is no order-of-magnitude drop to
+  have. The original concern ("one build issues ~250-290 sequential requests") is
+  RESOLVED BY UNDERSTANDING, not by cutting: it is a cold-start burst under a
+  persisted per-series clock, now time-bounded and draining progressively.
+  (2) *Aggregate deadline, off != on, tight case must SAY it truncated* — **MET**
+  (11 tests; `budget_exceeded` + `BUDGET_STOP`).
+  (3) *Suite opens no venue socket, guard fails if it does* — **MET** (103-152s ->
+  22.5s, two discriminating guard tests).
+  DELIVERED AND MEASURED: fan-out reproducible on demand (delete the state file ->
+  150 calls / 50.1s); budget wired into `run_kalshi_odds_refresh` so all three
+  callers inherit it; cold queue drains 25/31/53 over three real ticks with
+  fetched and stamped tracking each other, so no unattempted series is recorded as
+  read. 251 tests pass across the Kalshi suites.
+  FOUR LEARNINGS RULES RECORDED, this lane having produced four wrong beliefs:
+  limits multiplied by NAME rather than control flow; a cold-start burst reported
+  as a per-request cost; a partial-result bound wired without checking how the
+  caller reads emptiness (would have blanked 150 series for an hour — caught by
+  reading, not by an incident); and `lane_identity_check` belonging AFTER a land,
+  because a rebase duplicates a block wholesale.
+  NOT DEPLOYED. Landed `0cbb1695`, `376bfa94`, `d8bd4e9d` on origin/main.
+  NOT THIS LANE, still open: `tests/test_intelligence.py` as a whole does not
+  finish inside 10 minutes even with the guard, and the WNBA `_artifact_bundle`
+  <-> `_games_from_live_state_fallback` recursion remains unfixed and unlaned.
 - Blocked by: none. Does not deploy; the fix is a bound, and a bound is only
   worth shipping once its off != on test exists.
 ### m625-standard-substrate-label — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. `#625`(6) done, commit `6211bdf9`, NO DEPLOY (documentation).** `model_engine_standard.md` §3b now names **three** substrates — `render`, `mirror:<manifest_id>`, `checkout` — with a table of what a verified mirror CAN and can NEVER answer. **The 2026-08-18 user directive is preserved verbatim and explicitly marked unchanged**; this ADDS one admissible case rather than relaxing anything, and an unverified local read is still not a claim. **The falsification test did NOT fire:** the reproducible class states crisply, against §3b's own worked example (NCAAF local 0 vs production 16) — a mirror answers questions about the CODE, never about the DEPLOYMENT. **Three stale places fixed in the same pass:** §3 and the gate requirements still said "allowlisted in `HOT_ARTIFACT_PATTERNS`" after `#625`(2) split it; the UNMEASURED rule could not tell a verified mirror from a checkout; and a new subsection states that a 403 is not an absence. **`#625` IS COMPLETE — all six items.**
