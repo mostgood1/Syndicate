@@ -5719,3 +5719,44 @@ urgency completely had I assumed the opposite.
   unit-tested, and the safety net if the class returns to keyvalue. Retiring the
   OBLIGATION is not retiring the CODE.
 - *(full account: `deploys.md` 2026-09-03 correction entry)*
+
+
+## 2026-09-03 FORBIDDEN: joining two FEEDS on exact string equality. Four instances in one sport in one day, each one silent. `[lanes soccer-anchor-wiring, soccer-projection-names]`
+
+- **What we believed:** each of these was a one-off worth a targeted fix.
+  1. `attach_market_odds` joined a fixture to a priced event on `match_id` — an
+     ESPN event id — against an OddsAPI hash, with an exact team-pair fallback.
+  2. The same function's team-slot join compared exact club strings.
+  3. `_SOCCER_VENDOR_NAME_ALIASES` had already accumulated 13 hand-written club
+     aliases, each "verified against a real 0-projection fixture".
+  4. The projection join looked players up by exact normalised name.
+- **What was actually true:** they are ONE defect with four faces. Two feeds
+  that name the same entity do not spell it the same way, ever, and the failure
+  is always silent because an unmatched row still renders, still ranks and still
+  prices — it just carries no model view. Measured cost, all 2026-09-03:
+
+        fixture join      66 -> 122 of 136 fixtures
+        team-slot join   138 -> 214 of 214 slots
+        player join      3,588 alias hits; soccer coverage 17.8% -> 26.0%
+
+- **How we found out:** never from the code, and never from a test. Every one
+  surfaced only when a counter published the join's YIELD next to its
+  DENOMINATOR. `player_no_roster=0` beside `player_name_miss=7020` is what
+  proved the rosters were present and the names were the problem; without the
+  first number the second reads as a producer gap.
+- **The rule going forward:** **a cross-feed join is a normalisation problem,
+  and exact equality is the bug, not the baseline.** Three things, together:
+  1. Normalise both sides (`_norm_name` already folds accents — that was the
+     2026-08-16 MLB fix, and it is why diacritics were NOT the cause here).
+  2. Fall back to a UNIQUE candidate within the narrowest scope available, and
+     **REFUSE ON AMBIGUITY, counting the refusals**. A silently wrong join is
+     worse than an unmatched row, because the row still prices and nothing
+     downstream can tell.
+  3. **Publish matched/unmatched WITH the denominator and a cause split.** A
+     join with no yield counter is a join nobody can prove works.
+- **Where this is not yet done:** the same shape almost certainly exists in
+  other sports' cross-feed joins; only soccer has been swept. NCAAF's board
+  names already needed a 2026 school-rename fix on the same day.
+- **Cost:** roughly half of soccer's model coverage, for an unknown number of
+  weeks, across four separate code paths — while every dashboard showed a
+  populated board.
