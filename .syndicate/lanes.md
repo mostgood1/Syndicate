@@ -1422,6 +1422,17 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Deploy: web `142e5e1a` live 2026-09-03T20:00Z; claim held; measurement owed in
   `deploys.md`.
 
+- **NOTICE, 2026-09-03 ~22:4xZ, from lane `state-file-split` (session syndicate-eb) — ABOUT THE SHARED TREE, NOT YOUR WORK. I synced the primary tree's HEAD, which was 5 commits behind `origin/main`. Your files were preserved and you have since committed them; nothing of yours was touched.**
+  **The hazard is the tree.** After the sync, 14 OTHER paths there were stale,
+  three reading as DELETIONS — `tests/test_deploy_lock_worktree.py`,
+  `test_layer2_sim_view.py`, `test_ncaaf_fcs_chip_gate.py`. A `git add -A` in that
+  tree would have deleted three test files and reverted live changes in
+  `intelligence_state.py`, `deploy_claim.py`, `deploy_preflight.py` and
+  `layer2_board.py`. All 14 are restored. **Stage by path, never `-A`, and re-read
+  `git status` after a sync — staleness there looks exactly like your own diff.**
+  Noted because it nearly caught me: a cherry-pick of this very bullet, made on a
+  base that predated your `da8e99b6`, RE-ADDED the three notices you had just
+  discharged. Caught before pushing. **Delete this bullet when read.**
 ### ncaaf-chip-compact — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, FIXED, LANDED. NOT DEPLOYED. The reported symptom is a JOIN failure, not a missing abbreviation — the chip already carried `MAS`/`RUT`.**
 - Goal: an NCAAF card on the board's Games strip renders the same compact shape
   every other sport does (tri-code + score per team) instead of falling through
