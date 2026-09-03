@@ -87,6 +87,14 @@ _DISCLAIMER_MARKERS = (
     "ownership checked",
     "zero mentions",
     "no lane",
+    # 2026-09-03: `render.yaml` was reported CONTESTED by the two lanes most
+    # carefully avoiding it -- both wrote "**never `render.yaml`**", a
+    # PROHIBITION, and every marker above spells the same idea a different way
+    # ("not touch", "not taken", "released") while `never` was missing. On the
+    # repo's highest-blast-radius file, that is the worst place to cry wolf.
+    # Safe as a PREFIX cut: a path BEFORE the word is still claimed, so
+    # "`a.py` (never deployed)" keeps claiming `a.py`.
+    "never",
 )
 
 PATH_RE = re.compile(r"[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+")

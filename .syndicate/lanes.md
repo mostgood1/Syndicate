@@ -1964,6 +1964,9 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   and spelling it even to forbid it made this lane contest it with
   `accuracy-autorun-rearm` (caught by `check_lane_invariants.py`). See the ENV
   bullet below for why that file must not be pushed for this change.
+  Render ENV on **live-odds-worker** via the single-key API — **never `render.yaml`**
+  (pushing it fires `blueprint_sync`, which rewrites every key on all three
+  services).
   Collision-checked 2026-09-03 against every OPEN lane: no OPEN lane claims any
   of these. `run_live_odds_refresh_worker.py` is `released:` in
   `open-bet-live-status` and explicitly "Not claimed, read-only reference" in
@@ -2209,6 +2212,37 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   set, so the extraction provably changes no enforcement;
   (3) `.claude/hooks/test_lane_guard_hyphen.py` green after the refactor.
 - Blocked by: none.
+
+### lane-guard-never-marker — CLOSED 2026-09-03 — **FALSE POSITIVE, FIXED.** `render.yaml` was never claimed: both lanes wrote "**never `render.yaml`**", a PROHIBITION, and `never` was missing from `_DISCLAIMER_MARKERS`. Added to script AND hook (+8/-0 each). Claim-set diff MEASURED before/after: the only change is the 3 `render.yaml` false positives disappearing. Two alternatives rejected after measurement (cross-line carry-over; word-boundary matching, which moved 129 claims). 5 tests, 492 in the lane/guard suites, CI OK. — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: `check_lane_invariants.py` reports `render.yaml` CONTESTED by
+  `accuracy-autorun-rearm` and `ncaaf-live-cadence`. **Neither claims it** —
+  both write "**never `render.yaml`**", a PROHIBITION, and `never` is missing
+  from `_DISCLAIMER_MARKERS` (which has `not touch`, `not taken`, `released`).
+  So the two lanes most carefully avoiding the repo's highest-blast-radius file
+  are reported as fighting over it.
+- Files: `scripts/check_lane_invariants.py`, `.claude/hooks/lane-guard.py`,
+  `tests/test_lane_guard_prohibition_marker.py` (NEW). Collision check with the
+  module's own `claims()`: no OPEN lane claims any of them, and the one
+  contested entry is the false positive this lane removes. **Not claimed here:**
+  the blueprint file, named in the Goal above.
+  (Two self-inflicted bugs worth keeping: I first wrote "Collision-checked",
+  which is not the marker `collision check`, and so claimed that file inside the
+  lane fixing that exact bug. And the test was first named `..._never_marker.py`
+  — the marker cut INSIDE its own path and silently dropped a real claim, the
+  dangerous direction. Renamed; do not put a marker word in a claimed path.)
+- Hypothesis: adding `never` to both marker tuples plus a one-line REFLOW of the
+  ncaaf block (its `never` and its `render.yaml` sit on either side of a line
+  break, and the cut is line-scoped) clears it with no parser cleverness.
+- **DELIBERATELY NOT IMPLEMENTING CROSS-LINE CARRY-OVER.** The failure modes are
+  asymmetric: a false claim is noisy but SAFE, a missed claim lets two lanes edit
+  one file silently. Carry-over buys tidiness in the dangerous direction.
+- Falsification test: if `INVARIANTS HOLD` does not follow, or if any previously
+  claimed path stops being claimed, the change is wrong.
+- Verification: `check_lane_invariants.py` returns INVARIANTS HOLD; the claim set
+  is otherwise UNCHANGED (compared before/after, not eyeballed); marker tuples
+  still identical between script and hook.
+- Blocked by: none.
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
