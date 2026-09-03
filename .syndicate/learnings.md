@@ -4967,3 +4967,55 @@ back in one queue cycle, not in minutes.
   before believing it. When an instrument returns "nothing", establish what it
   would have to see to return something, and check that it can.
 - *(full account: lane `venue-quote-tests-data-dependent`)*
+
+## 2026-09-02 FORBIDDEN: acting on a tool's OUTPUT without checking the tool's actual THRESHOLD or PREDICATE. Its output is a claim about the tool, not about the system. `[lane ledger-stale-tree-guard]`
+
+- **What we believed:** two separate readings, both taken at face value in one
+  session. (1) `trim_lane_blocks.py` printed `cap 120000 ... *** STILL OVER ***`,
+  so `lanes.md` was 173% over budget and needed trimming. (2)
+  `check_lane_invariants.py` printed that a path-naming prose line *"becomes a
+  CLAIM"*, so `artifact_publisher.py` was falsely claimed.
+- **What was actually true:** (1) `--cap 120000` is a REPORTING DEFAULT. The
+  enforced budget is `session-start.sh:270`, `lanes.md:240000` — the file was at
+  **76%** and no digest ever said `LEDGER OVER BUDGET`. (2) the hint's message
+  predates `claims()` learning the hook's disclaimer stripping; `released` IS a
+  marker, `_claimable_prefix` cuts there, and `lane-guard._claims()` on the live
+  ledger does not contain that path. **Both tools were reporting honestly about
+  themselves and misleadingly about the system.**
+- **How we found out:** only at checkpoint, reading
+  `state.md [ledger-and-primary-tree]` — which warns about the `cap 120000` line
+  in those exact words. The second was found by running `_claims()` directly
+  instead of believing the sentence printed above it.
+- **The rule going forward:** **a threshold comes from the ENFORCER, a claim
+  comes from the PREDICATE.** Before acting on any tool line that asserts a
+  system fact, run the predicate or read the constant in the code that enforces
+  it. A number printed next to the word "cap" is not a budget, and a sentence
+  printed next to a flagged line is not that line's behaviour. Sibling of
+  `read the field you already have` and `instrument blindness`.
+- **Cost:** two trim passes justified with a wrong number, and a false defect
+  reported to the user on a ledger that was correct.
+
+## 2026-09-02 FORBIDDEN: a blanket `except` in a guard. It converts VERSION SKEW into silence, and a silent guard is indistinguishable from a clean result. `[lane ledger-precommit-hook]`
+
+- **What we believed:** the new git pre-commit hook, freshly installed with
+  `core.hooksPath=.githooks` and verified end-to-end in a throwaway clone, was
+  protecting this repo.
+- **What was actually true:** it was **INERT in the primary tree from the moment
+  it was installed.** Worktrees here sit at many different commits, so the
+  checker met an OLD `ledger_invariants.py` whose `violations()` takes
+  `(rel, text)`. The new 3-arg call raised `TypeError`, and
+  `except Exception: continue` — written to make the hook fail open — swallowed
+  it. Failing open is right; failing open on YOUR OWN version skew, for every
+  file, silently, is not.
+- **How we found out:** by asking "does it have an opinion HERE", not by a test.
+  Every test passed: they ran against a tree carrying the matching module.
+- **The rule going forward:** **a guard's fail-open path must distinguish "no
+  opinion" from "could not run".** Catch the skew signal (`TypeError`) separately
+  and DEGRADE to the predicates the older version does have, rather than letting
+  it fall into the blanket handler. And after installing any guard, exercise it
+  where it now lives — in a repo with 48 worktrees at 48 commits, "it works"
+  is a statement about one tree. Instance of `presence is not reachability`,
+  with version skew as the mechanism.
+- **Cost:** a guard reported as installed and working while enforcing nothing;
+  caught the same session only because reachability was checked explicitly.
+  Measured after the fix, same injected duplicate: 0 violations before, 2 after.

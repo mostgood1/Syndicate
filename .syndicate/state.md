@@ -178,6 +178,53 @@ reading the log.
 - **Merging a stale branch RESURRECTS archived lane blocks** — 19 of them here,
   auto-merged with no conflict. Re-run `trim_lane_blocks.py --apply` after any
   such merge and check for lanes with two blocks. Rule in `learnings.md`.
+- **THE `cap 120000` TRAP FIRED AGAIN, on the session that wrote the line above
+  `[2026-09-02]`.** A session quoted `lanes.md` as "173% of cap" and then "1.26x
+  over", and used that to justify two trim passes. The enforced budget is
+  `session-start.sh:270` — **`lanes.md:240000`, `state.md:750000`,
+  `learnings.md:400000`**. At its worst that day the file was **183,062 B = 76%
+  of its real cap**, and no digest ever emitted `LEDGER OVER BUDGET`. The trim
+  was still worth running — 14 blocks were genuinely duplicated across
+  `lanes.md` and `lanes_history.md` — but the STATED reason was wrong twice.
+  **Read the threshold from the ENFORCER (`session-start.sh`), never from the
+  reporter.**
+
+## [ledger-precommit-guard] LEDGER COMMITS ARE GUARDED AT TWO LEVELS — VERIFIED 2026-09-02
+
+**A stale-tree ledger commit is now refused by git itself**, not only by the
+PreToolUse hook. `376bfa94` — a kalshi CODE commit carrying a ~90-commit-stale
+`lanes.md` — reverted a trim pass eight minutes after it landed. Both existing
+predicates passed, correctly: the commit ADDED blocks, and **a deletion is
+invisible to any predicate that looks only at what is present.**
+
+- **The predicate:** a block VERBATIM in upstream `lanes_history.md` and absent
+  from upstream `lanes.md` is being un-archived — which only happens when the
+  committing tree is behind. `resurrected_blocks()` in
+  `.claude/hooks/ledger_invariants.py`; BOTH guards import it, never restate it.
+- **What it deliberately does NOT use**, both measured against the live ledger
+  first and both would have blocked honest work: **SAME SLUG** (36 slugs live in
+  both files — history holds SUPERSEDED blocks of lanes still alive, 18 of them
+  OPEN) and **SAME HEADER** (24 match where only 14 bodies do).
+- **`core.hooksPath = .githooks`**, set on this clone — one setting, all 48
+  worktrees. `.githooks/pre-commit` + `.githooks/ledger_precommit.py`;
+  `scripts/install_git_hooks.py --apply` installs it and REFUSES if `.git/hooks`
+  holds real hooks, which `core.hooksPath` would silently disable.
+- **It reads `git show :<path>`**, which resolves against `GIT_INDEX_FILE` — the
+  TEMPORARY index of a `git commit -- <pathspec>`, the exact shape that clobbered.
+- **FAILS OPEN in every direction.** No python, no checker, a crash, an
+  unreadable index — all exit 0. Only an explicit exit 1 blocks.
+- **IT INSTALLED INERT.** Worktrees sit at many commits, so the checker meets OLD
+  `ledger_invariants.py` whose `violations()` takes `(rel, text)`; the 3-arg call
+  raised `TypeError` and the blanket `except` swallowed it. Now degrades to the
+  2-arg call — measured in the primary tree, **0 violations before, 2 after.**
+- **COVERAGE IS PARTIAL and fills in as trees update.** A worktree without
+  `.githooks/` runs no hook at all; one with an old `ledger_invariants.py` gets
+  only the two original predicates. `--no-verify` and
+  `SYNDICATE_ALLOW_LEDGER_COMMIT=1` bypass by design — this is a guardrail, not
+  an enforcement boundary.
+- **Prior art:** `[ledger-and-primary-tree]` already recorded that merging a
+  stale branch resurrects archived blocks (19 of them). Its remedy was MANUAL;
+  this makes refusal automatic.
 
 ## [substrate-rule] A CLAIM MUST NAME ITS SUBSTRATE, AND THERE ARE THREE — the standard's §3b was widened and strengthened at the same time `[2026-09-02, lane m625-standard-substrate-label, commit 6211bdf9, NO DEPLOY]`
 
