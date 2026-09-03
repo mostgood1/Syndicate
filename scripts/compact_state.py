@@ -19,6 +19,33 @@ the tool:
     FINDING IS WRONG AND IS RETRACTED.** The body is kept below only so the
     mistake is legible"), worth ~1,500 chars.
 
+ALL 8 "NEEDS A HUMAN" CANDIDATES WERE THEN AUDITED BY HAND, 2026-09-03. NONE
+IS ARCHIVABLE. Do not re-run that audit expecting a different answer; re-run it
+only against markers ADDED since. Two distinct reasons, and both are structural:
+
+  * SIX have no dead body at all. The superseded claim was DELETED when the
+    correction was written, and survives only as a one-sentence quotation
+    inside the correction itself -- "the entry that stood here said the fee was
+    ZERO", "**RETRACTED: 'soccer box sections render 0 rows'**". The paragraph
+    the audit flags IS the entire record. Moving it removes the correction and
+    restores nothing. (`venue-fee-economics`, `football-smartsim2`,
+    `kalshi-in-play-and-real-fees`, `soccer-live-tier`,
+    `mlb-exchange-shopping-value`, `test-intelligence-runtime`.)
+  * TWO keep a superseded block ON PURPOSE and say so in the correction:
+    "the readings below are the 08-25 state, kept because the diagnosis chain
+    in them is still the right one" (`ncaaf-readiness-2026`) and "the paragraph
+    above is kept because its CAUTION was right and produced this measurement;
+    only its arithmetic is superseded" (`week-scoped-board-window`). Both also
+    carry content added AFTER their correction -- ncaaf runs to 2026-08-30, and
+    week-scoped holds a "STILL LIVE 2026-09-03" risk plus forward dates through
+    09-06 -- so the block is not even uniformly old.
+
+THE CONCLUSION THAT MATTERS FOR ANYONE TRYING TO SHRINK THIS FILE: state.md is
+not carrying superseded bloat. Of ~746,500 chars, the marked-superseded
+material that could be moved came to 1,460 -- 0.2%, and it has now been moved.
+The rest is live current truth. Size here is not a defect to be compacted away,
+which is why the cap was raised rather than the file cut.
+
 So a fully automatic compactor for this file would be a lie, and the honest
 tool is two things instead:
 

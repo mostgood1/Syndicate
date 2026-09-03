@@ -288,12 +288,21 @@ BLOAT=""
 # reclaimed 3,086 B. At the measured growth rate that is ONE HOUR AND TWENTY
 # MINUTES of headroom. Hand archival is real but it does not scale to the rate.
 #
-# This also updates the 2026-08-18 measurement above ("only 923 B of 163,412
-# was self-declared archival, nothing mechanical to reclaim"). At 748,000 B
-# there IS reclaimable prose -- superseded readings and closed operational
-# narrative -- but it is buried inside live cells, so extracting it needs a
-# reader who can tell a retracted number from a current one. That is a tool
-# nobody has written, not a sweep anyone can run.
+# This CONFIRMS the 2026-08-18 measurement above ("only 923 B of 163,412 was
+# self-declared archival, nothing mechanical to reclaim") at 5x the file size,
+# and an earlier draft of this comment guessed the opposite. scripts/
+# compact_state.py was written, and every superseded marker in the file was
+# then audited BY HAND: 9 candidates, of which ONE was archivable (1,460 B,
+# moved) and EIGHT were not. Six had no dead body -- the superseded claim was
+# deleted when its correction was written and survives only as a quotation
+# inside that correction, so the flagged paragraph IS the record. Two keep
+# their old block deliberately and say so ("kept because the diagnosis chain in
+# them is still the right one"), and both carry post-correction content.
+#
+# So: 0.2% of state.md was reclaimable superseded prose, and it is now gone.
+# THE FILE IS NOT BLOATED, IT IS BIG -- it is live current truth, and it grows
+# because the system does. Raise the cap or split the file; do not send anyone
+# looking for fat that has already been measured and is not there.
 #
 # Where 920,000 comes from -- MEASURED, not chosen. Over 133 first-parent
 # commits touching state.md since 08-28: +292,472 B in 143.5 h = 2,038 B/h.
