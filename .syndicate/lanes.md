@@ -1407,6 +1407,70 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `deploys.md`.
 
 - **NOTICE TO THIS LANE'S OWNER — YOUR BLOCK WAS WIPED AND RESTORED BY `accuracy-autorun-rearm` (session 82fe0160), 2026-09-03 ~20:2xZ. PLEASE VERIFY, THEN DELETE THIS BULLET.** Your block was UNCOMMITTED in the primary shared tree. My path-scoped `git add .syndicate/lanes.md` swept it into my index; the ledger-commit-guard then blocked that commit (my copy was behind `origin/main` and would have un-archived 6 blocks from the upstream trim), and my recovery step `git restore --staged --worktree .syndicate/lanes.md` **deleted your block outright — it existed in no commit anywhere, so that was the only copy.** Restored verbatim (29 lines) from a scratch backup taken a minute earlier, re-inserted immediately before `## Archived lanes` where you had it, and pushed in `affbe1e5`; `check_lane_invariants.py` reports INVARIANTS HOLD. **Three things I cannot verify for you:** (1) blank lines INSIDE your block were stripped on re-insertion — content is otherwise verbatim; (2) anything you added to `lanes.md` after ~20:20Z is not in my backup and may be lost; (3) I did NOT touch `deploys.md` — your local modification there is still uncommitted in the primary tree. Also: the primary tree's HEAD is behind `origin/main` and a `merge --ff-only` there will refuse until that `deploys.md` change is dealt with. **Root cause was mine — I edited a ledger file in the shared tree instead of my worktree.** I could not reach you directly: `b2b5b45b-...` is a `CLAUDE_CODE_SESSION_ID` and no CCD session matches it, so `send_message` returned "not found".
+### ncaaf-chip-compact — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, FIXED, LANDED. NOT DEPLOYED. The reported symptom is a JOIN failure, not a missing abbreviation — the chip already carried `MAS`/`RUT`.**
+- Goal: an NCAAF card on the board's Games strip renders the same compact shape
+  every other sport does (tri-code + score per team) instead of falling through
+  to "UMass Minutemen @ Rutgers Scarlet Knights" + an opportunity count.
+- Files: `syndicate/features/shared/team_aliases.py`,
+  `syndicate/features/shared/game_chip_scoreboard.py`,
+  `syndicate/features/shared/layer2_board.py`,
+  `tests/test_ncaaf_chip_join_key.py` (NEW).
+- **NEITHER HYPOTHESIS AS FRAMED. The payload HAS the abbreviations and the
+  renderer DOES read them — the card never receives the chip.** Measured on the
+  served payloads 2026-09-03T19:53Z / 19:22Z:
+
+      chip  game_key "1_Massachusetts_Rutgers"  matchup "MAS @ RUT"
+            away {abbr "MAS", name "Massachusetts", key null}
+      row   event_id "fc7e0d9b83e3da0d637ba983b9eed9d5"
+            matchup "UMass Minutemen @ Rutgers Scarlet Knights"
+            away_key null, home_key null
+
+  `chipForGame` (intelligence.html) has four indexes and NCAAF missed all four:
+  the ids are from different feeds; both exact-matchup indexes hold the CHIP's
+  spelling while the row asks for the ODDS FEED's; and the CANONICAL index — the
+  one that exists precisely for two feeds spelling one club differently — was
+  empty on both sides because `canonical_team("ncaaf", ...)` is None for
+  everything (`_alias_map("ncaaf")` has 0 entries). MLB joins on the exact
+  full-name index and never needed the canonical one, which is why only NCAAF
+  showed it.
+- **THE FIX IS NOT "populate `_alias_map('ncaaf')`" AND MUST NOT BECOME THAT.**
+  That was built, measured and REVERTED 2026-08-29
+  (`handoff_2026-08-29_ncaaf_umass_alias_gap.md`): it makes `teams_match`
+  map-authoritative, and `venue_quote_adapters.event_game_token` (`#603`)
+  depends on NCAAF NOT canonicalising — filling the map silently returns NCAAF
+  quotes to club-pair tokens and re-opens the cross-game collisions that fixed.
+  Shipped instead: `team_aliases.chip_join_key()`, an additive display-join
+  resolver that defers to `ncaaf.oddsapi_lines.resolve_team` (which already
+  carries `umass minutemen -> Massachusetts` in its hand-verified supplement).
+  `teams_match`, `unambiguous_club_tokens` and `event_game_token` all still read
+  `_alias_map` and all still see NCAAF as a sport with no map.
+  `test_ncaaf_alias_map_stays_empty` is the control.
+- **MEASURED BY REPLAYING THE REAL SERVED PAYLOADS THROUGH THE CHANGED CODE:**
+  NCAAF chip-to-card joins go **0 of 4 -> 4 of 4**, all via the canonical index.
+  Board-side coverage **176 of 176 team slots (88 matchups) resolve, 100%**.
+  MLB: 8 of 8 still join, and 0 of 18 MLB chip sides change their key.
+- **WHAT THIS DOES NOT FIX, AND IT IS THE LARGER HALF OF THE SCREENSHOT.**
+  Of the 11 NCAAF board games on 2026-09-03, **4 are FBS-vs-FBS and 7 are
+  FBS-vs-FCS**. `cards.build_ncaaf_chip_games` gates on
+  `homeClassification == awayClassification == "fbs"` (cards.py:849), so the 7
+  have **no chip at all** and keep rendering full names no matter what the join
+  does. The screenshot's `UMass Minutemen @ Rutgers` is fixed; its
+  `Arkansas Pine Bluff Golden Lions @ Missouri Tigers` is one of the 7 and is
+  NOT. That gate mirrors the CARD builder's own gate on purpose, so widening it
+  is a product decision in another lane's file (the NCAAF sources module is held
+  by `ncaaf-games-cache-refresh`) — surfaced, not taken.
+- **NOT VERIFIED IN PRODUCTION — needs a deploy of BOTH web AND refresh-worker,
+  and neither half alone is enough.** `layer2_board` stamps `away_key` on the
+  worker-built board snapshot; `game_chip_scoreboard` runs on BOTH (the endpoint
+  serves the worker artifact when it is <120 s old and rebuilds inline otherwise
+  — today's read was `source: inline_artifact_stale`). Web alone leaves the row
+  side null whenever the artifact is fresh; the worker alone leaves the chip
+  side null. Verify on `/api/board/game-chips?sports=ncaaf` (`away.key`
+  non-null) AND an NCAAF row in `/api/intelligence/query` (`away_key` non-null)
+  READ AT THE SAME INSTANT.
+- Blocked by: nothing. **Deploy deliberately NOT taken** — handed to the
+  coordinating lane `order-model-view`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -890,13 +890,19 @@ def _canonical_team_key(sport: str, name: str) -> str | None:
     Deliberately swallowing: this feeds a DISPLAY join. A club the alias map
     has never heard of must degrade to the existing name-based lookups, not
     take out the row it is stamped on.
+
+    `chip_join_key`, NOT `canonical_team` -- the SAME function
+    `game_chip_scoreboard._side_key` stamps the chip half with, so the two ends
+    of this join cannot resolve on different vocabularies. It adds NCAAF, whose
+    `_alias_map` is empty on purpose; see its docstring for why filling that map
+    instead would be a regression.
     """
     if not sport or not name:
         return None
     try:
-        from syndicate.features.shared.team_aliases import canonical_team
+        from syndicate.features.shared.team_aliases import chip_join_key
 
-        return canonical_team(sport, name)
+        return chip_join_key(sport, name)
     except Exception:
         return None
 

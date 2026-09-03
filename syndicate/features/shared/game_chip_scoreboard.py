@@ -147,14 +147,22 @@ def _side_key(sport: str, game: dict[str, Any], side: str) -> str | None:
 
     None when the sport has no alias map or the club is unresolvable; the
     existing indexes still apply, so this only ever ADDS a join.
+
+    `chip_join_key`, NOT `canonical_team`. They are the same answer for every
+    sport with an alias map; they differ for NCAAF, whose map is empty ON
+    PURPOSE and must stay that way (`chip_join_key`'s docstring carries the
+    measurement and the reverted attempt it comes from). Asking for the display
+    join's key by name is also what keeps the two halves of this join --
+    `layer2_board._canonical_team_key` stamps the other one -- reading the same
+    function rather than two that can drift.
     """
     name = _side_name(game, side) or _side_label(game, side)
     if not name:
         return None
     try:
-        from syndicate.features.shared.team_aliases import canonical_team
+        from syndicate.features.shared.team_aliases import chip_join_key
 
-        return canonical_team(sport, name)
+        return chip_join_key(sport, name)
     except Exception:
         # A chip that cannot resolve an alias is still a usable chip. This is a
         # display join, not a correctness gate -- raising here would take out

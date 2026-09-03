@@ -692,6 +692,88 @@ def canonical_team(sport: Any, value: Any) -> str | None:
     return None
 
 
+def _ncaaf_registry_name(value: Any) -> str | None:
+    """NCAAF club -> the CFBD canonical name, via `ncaaf.oddsapi_lines`.
+
+    NOT `_alias_map`, and that is the entire point of this function existing
+    separately. See `chip_join_key` below for why.
+
+    Lazy and defensive: this is on the board's read path, the NCAAF module
+    reads a CSV off disk, and a sport that cannot resolve must degrade the
+    join rather than take the board down.
+    """
+    try:
+        from syndicate.features.ncaaf.oddsapi_lines import resolve_team
+
+        return normalize(resolve_team(value)) or None
+    except Exception:
+        return None
+
+
+def chip_join_key(sport: Any, value: Any) -> str | None:
+    """The canonical club name a compact game CARD joins its scoreboard CHIP on.
+
+    -------------------------------------------------------------------------
+    WHY THIS IS NOT JUST `canonical_team`
+    -------------------------------------------------------------------------
+
+    `canonical_team` answers off `_alias_map`, and `_alias_map("ncaaf")` has
+    **0 entries** -- deliberately, and it must stay that way. Populating it was
+    built, measured and REVERTED on 2026-08-29
+    (`.syndicate/handoff_2026-08-29_ncaaf_umass_alias_gap.md`) because it makes
+    `teams_match` MAP-AUTHORITATIVE (`teams_match` returns the map's equality
+    verdict and deliberately does not fall through to its heuristics), turning a
+    harmless miss into a confident wrong answer. `venue_quote_adapters.
+    event_game_token` then built a whole second token shape on the same fact --
+    "any sport whose clubs canonicalise keeps the club-pair token" -- to stop
+    NCAAF quotes colliding across games (`#603`). Filling `_alias_map("ncaaf")`
+    would silently undo that.
+
+    So this is a SEPARATE, ADDITIVE resolver used by the display join only.
+    `teams_match`, `unambiguous_club_tokens` and `event_game_token` all still
+    read `_alias_map` and all still see NCAAF as a sport with no map.
+
+    -------------------------------------------------------------------------
+    WHAT IT FIXES, MEASURED ON THE SERVED PAYLOAD 2026-09-03
+    -------------------------------------------------------------------------
+
+    NCAAF cards on the board's Games strip rendered "UMass Minutemen @ Rutgers
+    Scarlet Knights" and an opportunity count, where every other sport rendered
+    two tri-code-plus-score rows. The chip was NOT missing and its abbreviations
+    were NOT missing:
+
+        chip  {"matchup": "MAS @ RUT",
+               "away": {"abbr": "MAS", "name": "Massachusetts", "key": null},
+               "home": {"abbr": "RUT", "name": "Rutgers",       "key": null}}
+        row   {"matchup": "UMass Minutemen @ Rutgers Scarlet Knights",
+               "away_key": null, "home_key": null,
+               "event_id": "fc7e0d9b83e3da0d637ba983b9eed9d5"}
+
+    `chipForGame` (intelligence.html) has four indexes and NCAAF missed all
+    four: the chip's game_key is `1_Massachusetts_Rutgers` while the row's id is
+    an OddsAPI hash; both exact matchup indexes hold the chip's spelling
+    ("mas @ rut", "massachusetts @ rutgers") and the row asks for the odds
+    feed's; and the CANONICAL index -- the one that exists precisely because two
+    feeds spell one club differently -- was empty on both sides, because
+    `canonical_team("ncaaf", ...)` is None for everything. So the card fell
+    through to the chip-less branch, which prints `game.matchup` verbatim.
+
+    The NCAAF registry resolver already bridges exactly this gap, including
+    `umass minutemen -> Massachusetts` in its hand-verified supplement. Measured
+    over the whole served NCAAF board (88 matchups, 176 team slots):
+    **176 of 176 resolve**, and both sides of all 4 published chips resolve.
+
+    None for any sport with no resolver, exactly as before -- this only ever
+    ADDS a join.
+    """
+    resolved = canonical_team(sport, value)
+    if resolved:
+        return resolved
+    if normalize(sport) == "ncaaf":
+        return _ncaaf_registry_name(value)
+    return None
+
+
 def teams_match(sport: Any, token: Any, row_team: Any) -> bool:
     """Does a caller's team token name the same club as a row's team field?
 
