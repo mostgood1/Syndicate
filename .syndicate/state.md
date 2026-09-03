@@ -11384,6 +11384,10 @@ by CONTENT on the deployed tree (`c4ce0502`), not by ancestry:
 - **Windows are scarce during a live slate:** preflight polled continuously
   ~11:24-12:05 CT was CLEAR **once, for under 25 seconds**.
 
+**THE CLAIM HAS THREE STATES, not two:** `free`, `HELD by <lane> N min`, and
+**`EXPIRED (does not block)`** — the last is acquirable and a waiter polling for
+the literal `free` will sit on it forever. Cost ~25 minutes on 2026-09-03.
+
 **`--drain` CANNOT BE RUN FROM A DEV MACHINE.** It refuses without the keyvalue
 backend (correctly — otherwise the flag goes to a local file the worker never
 sees), and `SYNDICATE_REFRESH_STATE_URL` is an internal Render hostname that only
@@ -11397,6 +11401,10 @@ the hour on a quiet worker instead.
 **NEVER LEAVE THE KEY `true` WITHOUT A COMPLETED DEPLOY.** It is inert to the
 running process but any other session's unrelated refresh-worker deploy will
 inject it and arm the autorun unobserved.
+
+**TWO ARM ATTEMPTS ON 2026-09-03 BOTH STOOD DOWN, nothing deployed** — first
+blocked by a zombie poller clobbering the preflight record at the one clear
+window, second by a peer's 45-min claim then a busy worker. Detail: `deploys.md`.
 
 **ARMED AS SCHEDULED TASKS:** `arm-accuracy-autorun-626h` (2026-09-04 03:00 CT)
 and `verify-accuracy-autorun-626h` (07:45 CT, disarms on OOM). Full runbook and

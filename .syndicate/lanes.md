@@ -2171,7 +2171,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### accuracy-autorun-rearm — OPEN, **BLOCKED: stood down 2026-09-03, no deploy taken, key still `false`. Retry OVERNIGHT before 07:00 CT** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### accuracy-autorun-rearm — OPEN, **BLOCKED. TWO attempts 2026-09-03 both stood down; NO DEPLOY TAKEN either time, key still `false`, claim free. Handed to the 03:00 CT scheduled task.** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `#626`(h) runs in production for the first time WITHOUT killing the
   worker. ONE testable outcome: `[accuracy_summary] AUTORUN_DONE ... error=none`
   in refresh-worker logs, with the peak `memory_anon_mb` during that window
