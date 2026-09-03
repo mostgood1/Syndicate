@@ -5760,3 +5760,33 @@ urgency completely had I assumed the opposite.
 - **Cost:** roughly half of soccer's model coverage, for an unknown number of
   weeks, across four separate code paths — while every dashboard showed a
   populated board.
+## 2026-09-03 — FORBIDDEN: correcting a false claim in ONE copy and calling it fixed. Fix the OPERATOR-VISIBLE copy first.
+
+- **What was believed:** that disproving "a row lacking `scored_markets` is
+  pre-fix by construction" and correcting the source comment that stated it had
+  removed the claim from the system.
+- **What is actually true:** the claim existed in at least THREE places, and I
+  fixed the least-read one first. The code COMMENT is read once, by whoever next
+  edits that file. The `print()` two lines below it —
+  `"(absent => PRE-2026-08-30 SCORER, not poolable with later rows)"` — is read
+  **on every single run** by whoever reads the output, and is the copy that
+  actually propagates a belief into the next session. A third copy sat inside
+  `state.md`'s own cell, where my RESOLVED correction and the original
+  unqualified assertion ended up in the SAME subject, contradicting each other.
+- **How we found out:** running the scheduled task end to end to confirm an
+  unrelated change. The false line printed itself in the output. Nothing else in
+  the session would have surfaced it — the comment fix looked complete, and the
+  tests passed.
+- **The rule going forward:** when a claim is disproved, **grep the whole repo
+  for it before declaring it fixed, and rank the copies by how often each is
+  READ, not by how close each is to the code you changed.** Operator-visible
+  strings, `--help` text, log lines and ledger prose outrank comments every time;
+  a comment misleads one editor, a printed line misleads every reader of every
+  run. And check the correction's OWN container: appending "RESOLVED" to a cell
+  that still asserts the original leaves one subject holding both halves of a
+  contradiction, which is the exact failure `state.md`'s one-subject-one-section
+  rule exists to prevent.
+- **Cost:** none realised, caught the same day by an unrelated end-to-end run —
+  but the exposure was total, because the surviving copy was the one a future
+  session would actually have read, and it would have re-excluded 08-30/08-31 and
+  re-halved the sample the same day it was recovered.
