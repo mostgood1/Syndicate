@@ -11223,3 +11223,60 @@ sizing. NEW from-code facts this session `[from-code, agent surveys]`:
 - **OddsAPI: 4,959,329 of 5,000,000 remaining (99.2% unused)** per
   `odds_regions.py:63-66` — the [sharp-reference-price] 92.8%-burn line above
   is overwritten as stale. Historical endpoints: 10 credits/market-region.
+
+## [kalshi-odds-refresh-bound] THE VENUE FAN-OUT IS A COLD-START BURST ON A PERSISTED CLOCK, AND IT IS NOW TIME-BOUNDED `[2026-09-03, lane kalshi-discovery-deadline, LOCAL measurements, NOT deployed]`
+
+`run_kalshi_odds_refresh` — NOT discovery, which is capped at 10 series and paced
+0.5s. The loop is `_due_series(state, ...)` -> `cold[:series_per_tick()]` ->
+`fetch_series` -> `fetch_markets`, gated by a per-series clock persisted in
+`reports/intelligence/kalshi_markets.json` (`markets_artifact_path()`).
+
+    DEFAULT_SERIES_PER_TICK   150    <- exactly the 150 distinct series measured
+    DEFAULT_REFRESH_INTERVAL  120s   per series
+    DEFAULT_DORMANT_INTERVAL 3600s   for a series that read empty
+
+**REPRODUCE ON DEMAND:** delete the state file -> every series due ->
+`fetch_markets` **150 calls / 50.1s**. Do NOT read a quiet tick as "the venue is
+quiet": within the dormant hour the correct behaviour is zero calls.
+
+`request_budget(seconds)` now wraps the whole refresh (env
+`SYNDICATE_KALSHI_REFRESH_BUDGET_SECONDS`, default 30, `0` disables), so all
+three callers inherit it. Measured on the real cold tick: **50.1s -> 10.7s**, and
+a cold queue drains 25/31/53 across three ticks with nothing lost.
+**The bound covers VENUE REQUESTS, not the function** — wall clock exceeds it
+(32-47s vs 30s) because merge and state-write follow the loop.
+
+**THE TRAP IT AVOIDS, and why the wiring is not a one-liner:** `fetch_markets`
+returns a PARTIAL result on exhaustion rather than raising, and the refresh reads
+an empty successful read as "no open markets" -> dormant for an hour. Stopping
+mid-fetch would have marked up to 150 series empty and blanked them off the
+board. The loop therefore checks `budget_remaining()` BEFORE spending.
+
+## [test-intelligence-runtime] `tests/test_intelligence.py` IS SLOW, NOT STALLED — and the "warm state" finding is RETRACTED `[2026-09-03, lane intelligence-suite-runtime]`
+
+**221 pass in 586.00s (9:46).** An armed faulthandler never fired. No single test
+exceeds **4.9%** of the run; the 25 slowest are all
+`test_intelligence_query*` at 12.5-28.9s, each driving a real candidate-pool
+build. Collection alone is 43-75s. The earlier ">10 minutes, stalled at 32%" was
+a 10-minute timeout landing mid-run; the frozen percentage is pytest printing
+per output line.
+
+**RETRACTED, do not cite:** a "warm state" effect (216.4s cold vs 131.4s warm),
+a 1.7x isolation penalty, four mechanism exonerations, and "do not split the slow
+tests into their own job". All rested on ONE unreplicated comparison with an
+outlier cold reading. Three paired replications erased it: **cold 31.32s vs warm
+31.45s**. The rule is in `learnings.md` 2026-09-03.
+
+## [wnba-cards-fallback-recursion] `_artifact_bundle` RE-ENTERED ITSELF 247 FRAMES DEEP AND REPORTED NOTHING — FIXED `[2026-09-03, lane wnba-cards-fallback-recursion, no deploy needed]`
+
+`_artifact_bundle` called `_games_from_live_state_fallback`, which called it
+straight back; neither is memoised. **Trigger is an EMPTY artifact, not a date:**
+no `game_cards_<today>.csv` -> 247 calls / depth 247 / 2 RecursionErrors; ONE row
+-> depth 1 and the fallback never runs (back-control confirmed). Disabled on
+Render by `_render_web_dyno()`, so it was always a cold/dev path.
+
+Fixed with `_artifact_bundle(..., allow_fallback: bool = True)`; the fallback's
+call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
+(`LIVE_STATE_FALLBACK_FAILED`) instead of swallowed by `except Exception`.
+**The cost was never the point (~5.7s); the SILENCE was** — "no cards today" and
+"the stack blew" were the same observable, which is how it survived unnoticed.
