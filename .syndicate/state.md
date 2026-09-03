@@ -4397,6 +4397,36 @@ what would make the shed unreachable rather than merely rare.
   came from a construction I could not reproduce (this instrument reads the
   pre-divisor window at 0.925). Only before/after on ONE instrument is valid.
 
+## [ncaaf-team-registry-two-files] THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]`
+
+Two registries live in
+`data/ncaaf_source/source_artifacts/data/processed/team_registry/`:
+
+| | `..._snapshot.csv` **(READ)** | `ncaaf_team_registry.csv` (not read) |
+|---|---|---|
+| `St. Anselm` | 0 | 1 |
+| `Albany State GA` | 0 | 1 |
+| St./Saint schools | 12 | 11 |
+
+Same row count, different contents. **`resolve_team` / `_alias_map` read the
+SNAPSHOT** (`oddsapi_lines.py:190` via `team_registry_snapshot_path()`), and
+`feature_payload.py:136` reads snapshot first with the plain registry only as a
+fallback. The snapshot is newer and authoritative: written by `d195be63`
+(2026-08-26, "build the 2026 team data") from a live CFBD
+`fetch_team_catalog(season=...)`; the other was last touched `4c5583fa`
+(2026-08-01).
+
+**The 2026 catalog RENAMED schools rather than dropping them:**
+`St. Anselm` -> `Saint Anselm`, `St. Francis (PA)` -> `Saint Francis`,
+`Albany State GA` -> `Albany State`. Three tests asserting the pre-2026
+spellings failed while the resolver was correct throughout — `fold()` produced
+the right keys and `_alias_map` was not dropping them as ambiguous; nothing
+claimed those keys because the rows are not in the file that is read.
+
+**How to avoid re-deriving this:** before concluding `resolve_team` is broken,
+print `team_registry_snapshot_path()` and grep THAT file. Grepping the
+sibling `ncaaf_team_registry.csv` will show the team and prove nothing.
+
 ## [venue-odds-storage] `venue_odds` LIVES ON DISK, NOT IN THE SHARED KEYVALUE `[measured + deployed 2026-09-02, lane venue-odds-byte-aware-trim]`
 
 `reports/intelligence/venue_odds/` held **41 keys / 114.9 MB of a 224.3 MB

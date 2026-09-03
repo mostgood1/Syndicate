@@ -5571,3 +5571,29 @@ inflated counter), so the cost was entirely session time, not board harm.
   the un-archiving that the pre-commit ledger guard had blocked an hour earlier.
   **The false alarm's proposed fix was itself the regression.**
 
+
+## 2026-09-03 FORBIDDEN: concluding a RESOLVER is broken without printing the path it actually reads. Two files with the same row count can differ, and the one you grep is not always the one it loads.
+
+- **Three tests "failed" and the resolver was correct the whole time.**
+  `resolve_team("St. Anselm")` returned None. The team is right there in
+  `ncaaf_team_registry.csv` — which `resolve_team` **does not read**. It reads
+  `ncaaf_team_registry_snapshot.csv`, same directory, **same 685 rows**,
+  different contents: the snapshot has 12 St./Saint schools and no
+  `St. Anselm`; the sibling has 11 and does.
+- **Row count is not identity.** The two files matched on the one cheap signal
+  and disagreed on the rows that mattered. `wc -l` would have said "same file".
+- **The schools were RENAMED, not dropped** — `St. Anselm` -> `Saint Anselm`,
+  `Albany State GA` -> `Albany State` — by `d195be63`, which rebuilt the
+  snapshot from a live 2026 CFBD catalog. A rename reads exactly like a
+  deletion from the consumer side, and exactly like a resolver bug from the
+  test side.
+- **The rule.** Before blaming a resolver: print the resolved path
+  (`team_registry_snapshot_path()`), grep THAT file, and check its git log
+  against the sibling's. Three commands, and they replace an hour of reasoning
+  about alias folding and ambiguity-dropping that was never wrong.
+- **Corollary, same session:** a standalone REPL probe of the same function
+  returned False and looked like it contradicted a PASSING test. It did not —
+  the probe ran without the fixture's patched alias data. **A probe outside the
+  test's fixture is inconclusive, not contradictory**; run the mutation INSIDE
+  the fixture or it is measuring a different function.
+- *(full account: `log/2026-09-03.md`, session 92987093)*
