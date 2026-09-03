@@ -2317,6 +2317,20 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
+### worker-catchup-round2 — CLOSED 2026-09-03 — **live-odds-worker `d4f0b8a3`→`ff6c1220` (live 18:20:02Z, 0 pending, 0 errors). refresh-worker DELIBERATELY NOT DEPLOYED** — its only pending commit is `session_worktree.py`, a dev tool with zero references in any runtime path, so a deploy would cost a ~21 min board-publish gap and change nothing; a peer lane also deployed that service twice while I waited. Raised `todo #643` (execution ledger 2.5 MB against an 8 MB hard refusal, on the trading service). — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: both workers back to current after main moved during round 1.
+  live-odds-worker `d4f0b8a3` and refresh-worker `c1c4211a`, 3 pending each
+  (`layer2_shortlist.py`, `portfolio_commit.py`, +1). Target `ff6c1220`.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: per service, its OWN Render log stream shows role work resuming
+  after boot (`PUBLISH_OK` / `artifact_publisher` / `live_props`) with 0
+  tracebacks, and `pending_deploys.py` reads 0 code commits for it at that
+  instant. Round-1 baselines: live-odds 16 PUBLISH_OK in 3 min; refresh-worker
+  25 publisher lines, peak anon 1,119.95 MB of 4,096.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

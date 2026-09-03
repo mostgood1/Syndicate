@@ -19678,3 +19678,40 @@ nobody later reads it as a regression introduced here.
 
 **Fleet state after this deploy — all three current:**
 web `552c942b` · refresh-worker `c1c4211a` · live-odds-worker `d4f0b8a3`.
+
+## 2026-09-03 — round 2 — live-odds-worker `d4f0b8a3` → `ff6c1220`; **refresh-worker DELIBERATELY NOT DEPLOYED** — lane `worker-catchup-round2`
+
+live-odds-worker: preflight HOLD **13 times over 18 minutes** — this service
+cycles odds jobs almost continuously, so the CLEAR windows are short. Caught one
+at 18:13Z, deployed, live 18:20:02Z.
+
+verify: its own log stream 18:20:02Z→18:28:13Z — 100 lines, `[kalshi_orders]
+ORDERS_READ n=241`, `COUNT_FIELDS`, `[execution_ledger] RECONCILE_ORPHANS
+venue=kalshi n=26`; **0 tracebacks / OOM / CRITICAL**. `pending_deploys.py` then
+read `live-odds-worker live=ff6c1220 0 pending`. (Role work in this window was
+the Kalshi execution phase rather than publishing — a different phase of the
+same loop, not an absence of work.)
+
+**refresh-worker was NOT deployed, on purpose.** Its only remaining pending
+commit is `ad7395fc`, which touches `scripts/session_worktree.py` — a local
+git-worktree developer tool. Verified inert for the running service: grep of
+`syndicate/`, `pipeline/`, `run_refresh_worker.py` and
+`run_live_odds_refresh_worker.py` returns **zero references** to it. Deploying
+would cost a worker reboot (~21 min to first board publish, `#563`) and change
+NO behaviour. A deploy whose only content the service does not execute is pure
+cost.
+
+Two further reasons it would have been wrong: the peer lane
+`soccer-projection-names` held the claim and deployed that service TWICE while I
+waited (`c1c4211a` → `552c942b` → `da179b75`), so it is actively owned; and its
+claim, though expired, belongs to a lane with **no block in the shared
+`lanes.md`**, so its verification criterion could not be read. `--force` was
+never used.
+
+**Fleet:** live-odds-worker `ff6c1220` (0 pending) · refresh-worker `da179b75`
+(1 pending, inert) · web `552c942b` (1 pending).
+
+**Finding raised, not chased:** `[execution_ledger] SIZE_WARNING bytes=2509900
+warn_at=2097152 orders=2294 -- the store refuses at 8MB`, on the trading service.
+Filed as `todo #643`; the growth RATE is unmeasured and is the load-bearing
+unknown, so one reading cannot size the risk.

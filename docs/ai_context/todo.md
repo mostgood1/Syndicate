@@ -84,6 +84,34 @@ production copy. See the transport note in `#625`(2).
 
 ---
 
+### `#643` — **THE EXECUTION LEDGER IS 20% INTO A HARD REFUSAL CEILING, ON THE SERVICE THAT TRADES** — surfaced by lane `worker-catchup-round2`, 2026-09-03 — OPEN, not investigated
+
+live-odds-worker, 2026-09-03T18:27:51Z, its own log stream:
+
+```
+[execution_ledger] SIZE_WARNING bytes=2509900 warn_at=2097152 orders=2294 -- the store refuses at 8MB
+```
+
+The ledger is **2,509,900 bytes over a 2,097,152 warn threshold, with a hard
+refusal at 8,388,608**. It is already 20% past the warning and holds 2,294
+orders. This is the ledger the TRADING role writes; the failure mode at the
+ceiling is the store REFUSING the write, i.e. orders that executed and were not
+recorded.
+
+**What is NOT known and must be measured before anything is changed:**
+- **The growth RATE.** 2,294 orders is a level, not a trend. One reading cannot
+  say whether 8 MB is a week away or a year. Sample `bytes` across days before
+  proposing anything — a fix sized off a single reading is a guess.
+- Whether anything PRUNES it, and whether settled orders are ever dropped.
+- What the writer does when the store refuses — raises, or silently drops.
+  That determines whether the ceiling is an outage or a silent data loss.
+
+Found while verifying an unrelated worker catch-up deploy; the deploy did not
+cause it and the line predates `ff6c1220`. Recorded rather than chased because
+the growth rate is the load-bearing unknown and this lane had no baseline for it.
+
+---
+
 ### `#642` — **CLOSED 2026-09-03 — NOT A DEFECT IN THE DATA OR THE READER. The reader sees all 1,457 rows; the documented stake filter excludes all 1,457, so `total_tracked: 0` is CORRECT. The real defect was that the payload could not SAY that, and is fixed.** — was: a ~2 MiB prediction ledger and a reader that sees nothing in it — lane `m642-ledger-read-silence`
 
 **The contradiction was not one.** `/api/portfolio/summary` on web `b7c2b220`,
