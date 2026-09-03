@@ -4397,6 +4397,39 @@ what would make the shed unreachable rather than merely rare.
   came from a construction I could not reproduce (this instrument reads the
   pre-divisor window at 0.925). Only before/after on ONE instrument is valid.
 
+## [worktree-test-data] THE 92 RED TESTS IN A SESSION WORKTREE ARE THE ENVIRONMENT, NOT DEFECTS `[measured + shipped 2026-09-03]`
+
+A default session worktree excludes `data/`, and **92 tests fail for that alone**
+— established by holding the code constant and varying only the mirror's
+presence, then re-checking each candidate IN ISOLATION (2 of the original 103
+were test-pollution, not data-dependence).
+
+**They must not be stubbed or skipped.** Their SUBJECT is the data;
+`test_ncaaf_team_registry_reachability` states it — *"a value assertion over a
+fixture cannot catch either; the fixture is the thing that lied"*. Skipping their
+modules would drop **601 PASSING tests**, 353 in `test_archives.py`, the file CI
+runs.
+
+**`SYNDICATE_DATA_ROOT` does NOT reach them.** Nine read `REPO_ROOT/data`
+directly and ignore the variable — which is why a differential built on that env
+var could not see them. Only a real checkout does.
+
+    python scripts/session_worktree.py open --lane <slug> --with-test-data
+
+|  | files | MB |
+|---|---|---|
+| `--with-data` (full mirror) | 34,690 | 3,547.5 |
+| `--with-test-data` | 6,013 | 2,071.2 |
+
+Verified in a FRESH worktree: the 24 files carrying all 118 sweep failures run
+**1,031 passed / 0 failed**. Opt-in, because 2 GB across 20+ worktrees is real
+disk.
+
+**A METHOD TRAP:** with `data/` present the TEST IDS THEMSELVES CHANGE — several
+parametrized tests derive params from the alias map, so an id list captured
+without `data/` returns `no tests ran` with it. **Compare by FILE, never by node
+id.**
+
 ## [ncaaf-team-registry-two-files] THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]`
 
 Two registries live in
