@@ -20373,3 +20373,39 @@ from `list_sessions`" is not evidence a holder is gone — which is what
 `deploy_claim.py`'s own refusal text says in those words ("An unrecorded session
 is UNKNOWN, not gone"). The file take was narrow, disjoint by function, already
 landed and marked reversible in `lanes.md`; the BASIS was weaker than I wrote it.
+
+---
+
+## 2026-09-03 — web `b48a9480` then `1d6b2f13` — SINGLE-WORKER WINDOW: ATTEMPTED, EVICTED, RESTORED (`#632`)
+
+**verify: `WEB_CONCURRENCY` is back to `2` — SATISFIED.** `1d6b2f13` live
+23:49:48Z; gunicorn tree reads master 61 with **workers 78 and 79**, `--workers`
+flag `2`; `/api/ops/memory` serving, container 790 MB, headroom 1,258 MB. The
+restore obligation recorded in this file BEFORE the change (`26c38fa7`) is
+discharged.
+
+**What happened.** `WEB_CONCURRENCY=1` was set to give `#632`'s attribution a
+real solo guarantee, deployed as `b48a9480` and verified reachable (1 worker,
+`--workers 1`). At **23:37:08Z** the container logged `server_failed`,
+reason **`['evicted', 'unhealthy']`** — a health-check failure, NOT an OOM. Four
+concurrent slots instead of eight; `/healthz` queued behind slow artifact
+requests; `skipped_concurrent` reached 729. Web was 502 when checked, and the
+experiment was aborted rather than continued.
+
+**The reading was not obtained** — every emission fell inside the ~20 min
+warm-up (max 16.7 min uptime), so there is no plateau to difference. Nothing is
+reported from it.
+
+**The standing conclusion: `WEB_CONCURRENCY=1` cannot be borrowed for a
+measurement on this service.** A future apportionment must change the INSTRUMENT
+— attribute against the process's own anon rather than the container cgroup — not
+the worker count.
+
+**A NEAR-MISS EARLIER IN THE SAME SEQUENCE, recorded because it was luck that
+saved it.** `deploy_claim.py acquire` was chained with `render_env_set.py` in one
+command. The acquire correctly REFUSED (another lane held the claim) but **the
+env set ran anyway** — a refused claim does not stop the next command in a chain.
+`WEB_CONCURRENCY=1` was briefly live while another session's deploy was building.
+It came up with 2 workers because Render injects env at CONTAINER start, after
+the build, and the revert landed first. **`acquire` must never be chained with
+the action it gates.**

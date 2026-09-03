@@ -1406,6 +1406,45 @@ only inside it. The rate is measured AFTER today's cap and cheaper merge, so it
 is the CURRENT state, not the state that produced this morning's kills. And the
 attributed share is a range, never the 150%.
 
+**`[2026-09-03]` THE SINGLE-WORKER APPORTIONMENT WAS ATTEMPTED AND ABANDONED —
+`WEB_CONCURRENCY=1` EVICTED THE CONTAINER IN 22 MINUTES. The reading was NOT
+obtained, and the failure is the more useful result.**
+
+The 61-150% attributed range above has one structural cause: `inflight` is
+per-WORKER module state while `_anon_mb()` reads the per-CONTAINER cgroup, so at
+`WEB_CONCURRENCY=2` both workers difference the same cgroup. One worker makes the
+solo guarantee real. So: claim taken, `WEB_CONCURRENCY=1` set, deployed
+`b48a9480`, **verified reachable** (1 worker, pid 78, gunicorn `--workers 1`).
+
+    23:14:37Z   single-worker container up
+    23:17-23:30 emissions at 3.2, 5.2, 9.7, 10.7, 12.3, 16.7 min uptime
+    23:37:08Z   server_failed   reason = ['evicted', 'unhealthy']
+    23:37:27Z   server_available (restarted); web 502 by the time it was checked
+
+**NOT an OOM.** A health-check failure: 1 worker x 4 threads is 4 concurrent
+slots instead of 8, so `/healthz` queued behind slow artifact requests until the
+platform evicted the container. `skipped_concurrent` had reached **729** on that
+worker, which is what saturation looks like.
+
+**Every emission landed inside the ~20 min warm-up (max 16.7 min).** There is no
+plateau data, and a number built from ramp samples is exactly the contamination
+this item has already retracted twice. **No apportionment is reported.**
+
+**WHAT THIS ESTABLISHES, which is worth more than the marginal number:**
+`WEB_CONCURRENCY=1` is **not a measurement setting that can be borrowed** on this
+service under real traffic — it evicts in ~22 min. **The obvious route to a clean
+apportionment is closed.** Anything further has to change the INSTRUMENT, not the
+worker count: attribute against THIS PROCESS's own anon (`/proc/self/smaps`,
+readers already in `memory_observability.py`) so the measurement scope matches
+the per-worker guarantee, and leave `WEB_CONCURRENCY` alone.
+
+**THE MISS WAS PREDICTABLE FROM DATA ALREADY IN HAND.** `skipped_concurrent` was
+already **475 on a TWO-worker container**, i.e. a large fraction of requests were
+overlapping before the pool was halved. That number was read, the capacity risk
+was called "moderate but real", and it was not modelled against it. Restored to
+`2` (`1d6b2f13`, live 23:49:48Z, verified 2 workers / `--workers 2`, web serving
+at 790 MB with 1,258 MB headroom).
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
