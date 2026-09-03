@@ -1247,7 +1247,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   loop). Both external importers — `kalshi_odds_refresh.py:1190` and
   `run_live_odds_refresh_worker.py:903` — import only `record_venue_book` and
   `*_daily_rows`, i.e. WRITE paths. Nothing consumes the record.
-### venue-quote-tests-data-dependent — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
+### venue-quote-tests-data-dependent — CLOSED 2026-09-02 — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
 - Goal: `tests/test_venue_quote_adapters.py` passes in a SESSION WORKTREE, which
   excludes `data/`. It currently fails 3 of 6 there and passes 6 of 6 in a
   checkout that has `data/` — so every session sees red tests by default in the
@@ -1275,6 +1275,40 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   discriminating where it previously was not.
 - Verification: 6/6 pass with `data/` absent AND with `SYNDICATE_DATA_ROOT`
   pointed at a real `data/` (508 aliases loaded). Both run.
+- **CLOSED 2026-09-02. The named file is FIXED AND LANDED (`30baa584`, 6/6 green with
+  and without `data/`, mutation-tested). The SUITE-WIDE SWEEP that followed is a
+  MEASUREMENT recorded here, not work delivered — nothing else was changed.**
+- **THE SWEEP.** Differential over 87 files / 2,672 tests. PASS 1 without `data/`:
+  **118 failed / 2,482 passed / 72 skipped** (1:14:41). Buckets: A data-dependent,
+  **B fails-in-both 15**, **C passes-without-fails-WITH 5** — all
+  `test_ops.py::...build_refresh_plan_uses_*_syndicate_runner_in_source_mode`,
+  which pass only when the mirror is ABSENT. That is its own defect and is NOT fixed here.
+- **BUCKET A, AFTER A CONFOUND WAS FOUND AND REMOVED:**
+  | | count |
+  |---|---|
+  | genuinely data-dependent (fail ISOLATED, no `data/`) | **92** |
+  | NOT data-dependent — pass isolated, failed only at 2,672-test scope | **2** (`test_kalshi_catalogue`) |
+  | unmeasured — batch returned `rc=4` | **9** (`test_team_aliases`) |
+  **The first reading was wrong: PASS 2 changed SCOPE as well as data** (24 files,
+  not 87), and pollution at the larger scope is indistinguishable from
+  data-dependence in that comparison. Standing rule written to `learnings.md`.
+- **WORKING SET: 252 files / ~33 MB** against `--with-data`'s **34,690 files /
+  3.55 GB** — ~**0.9%**. `test_archives.py`, the only module reaching
+  `mlb_source`, needs **26 of its 31,857** files. A targeted sparse-include is viable.
+  **A FLOOR, NOT A BOUND:** 4 modules / 40 tests fail without `data/` while opening
+  NOTHING — they check EXISTENCE (`TEAM_REGISTRY_RELATIVE_PATH`), and
+  `Path.exists()` raises no `open` audit event. Date-stamped paths also force any
+  pattern to be directory-level, so the 26 drifts with the mirror.
+- **NO FIXTURE WAS ADDED FOR THE 92, deliberately.** Both readings make it worse and
+  the tests say so: `test_ncaaf_team_registry_reachability` — *"A value assertion
+  over a fixture cannot catch either — the fixture is the thing that lied"*; and
+  module-level skips would drop **601 passing tests**, 353 in `test_archives.py`,
+  the file CI runs. The tests are right; the ENVIRONMENT is wrong.
+- **ALSO OBSERVED, not chased:** the suite MUTATES tracked files —
+  `data/mlb_source/.../live_lens_2026_06_02.jsonl`,
+  `reports/intelligence/kalshi_markets.json`, and
+  `vendor/wnba_betting_repo/data/processed/schedule_2026.{csv,json}` were dirty
+  after these runs and had to be restored before committing.
 - Blocked by: none.
 
 

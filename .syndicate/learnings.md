@@ -4933,3 +4933,37 @@ back in one queue cycle, not in minutes.
 - **How we found out:** `land` itself printed `ledger/lanes PROBLEMS`, after a successful push.
 - **The rule going forward:** `land` runs its checkers BEFORE the push, so a rebase-introduced duplicate reaches `main` and is only reported afterwards. Re-run `scripts/lane_identity_check.py` after every land and fix immediately -- lane exclusivity is what the claim system rests on.
 - **Cost:** one duplicate OPEN block on `main`, fixed in the following commit.
+
+## 2026-09-02 FORBIDDEN: reading a DIFFERENTIAL in which more than one variable moved. And an absent trace is not an absent dependency.
+
+- **What I reported, and had to retract.** A "data-dependent tests" sweep compared
+  PASS 1 (87 files, 2,672 tests, no `data/`) against PASS 2 (24 files, 1,031
+  tests, with `data/`) and called the difference bucket A. **Scope moved with the
+  data.** A test that fails only when 2,672 tests share a process — leaked global
+  state, a cache, a monkeypatch outliving its test — and passes in a 1,031-test
+  run lands in that bucket having nothing to do with `data/`.
+  `test_kalshi_catalogue` did exactly that: it passes with **no `data/` at all**
+  when run in isolation.
+- **The check that settles it, and it is cheap:** re-run each candidate ISOLATED,
+  holding the variable of interest at its FAILING value. 92 of 103 still failed
+  without `data/` (real), 2 passed (artefact), 9 could not be run. One command
+  per module; it cost minutes against a differential that cost hours.
+- **AN OPEN-TRACER CANNOT SEE AN EXISTENCE CHECK.** Four modules / 40 tests fail
+  without `data/` and open **nothing** — they assert a path EXISTS
+  (`TEAM_REGISTRY_RELATIVE_PATH`), and `Path.exists()` emits no `open` audit
+  event. I first read that silence as "these do not need data", which was the
+  opposite of true. **A traced working set is a FLOOR, never a bound.**
+- **The instrument was less reliable than the code it measured.** Seven harness
+  bugs in one sweep, each producing plausible output: a `--timeout` flag that
+  aborted the run and whose usage error was counted as a test failure; a
+  `__pycache__` glob that collected zero tests; `awk '{print $1}'` truncating
+  parametrized ids at the space inside `[Appalachian State Mountaineers-App
+  State]`, which would have inflated the finding bucket by 32 phantom entries; a
+  `pytest.main()` wrapper that lost rootdir; CRLF in a Python-written id file that
+  made every id unmatchable; a trace filtered to `data_root()` that hid non-data
+  reads; and the scope confound above. **Two of the seven would have put false
+  findings in front of the user; one did.**
+- **The rule.** Vary ONE thing. Verify every differential finding in ISOLATION
+  before believing it. When an instrument returns "nothing", establish what it
+  would have to see to return something, and check that it can.
+- *(full account: lane `venue-quote-tests-data-dependent`)*
