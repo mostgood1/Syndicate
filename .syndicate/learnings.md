@@ -5445,3 +5445,129 @@ inflated counter), so the cost was entirely session time, not board harm.
 - **Cost:** a published artifact whose headline finding ("both halves of the
   feedback loop are disabled") was false, and a recommendation to arm something
   already armed. Caught before any production change was made.
+## 2026-09-03 — FORBIDDEN: reading a provenance stamp emitted by the OBSERVER as evidence about the SUBJECT
+
+- **What was believed:** `state.md` recorded, as true *by construction*, that rows
+  in `reports/live_gameline_accuracy/history.jsonl` lacking a `scored_markets`
+  field are pre-`75cf9aec` — i.e. produced by the buggy scorer that compared
+  totals/spreads probabilities against "did the home team win". That framing made
+  the field a **scorer**-version marker, and licensed partitioning 29 rows of
+  accuracy history on it.
+- **What is actually true:** `scored_markets` is written by
+  `scripts/snapshot_live_gameline_score.py` — the OBSERVER — and that script
+  gained the stamp some days AFTER the scorer fix landed. The 2026-08-30 and
+  2026-08-31 rows carry no stamp even though the scorer fix shipped on 08-30. So
+  absence marks an old *snapshot script*, and says nothing certain about which
+  scorer built the board being snapshotted.
+- **How we found out:** listing every row with `scored_markets` OR `date >=
+  '2026-08-30'` — instead of trusting the stated partition — put an unstamped
+  08-30 row directly beside the fix date.
+- **The rule going forward:** **a provenance field tells you the version of the
+  thing that WROTE it, not the version of the thing it describes.** Before
+  partitioning a history on any stamp, name which process emits it and when that
+  process gained the field; if emitter and subject are different components with
+  different release dates, the stamp is a lower bound on the emitter and NOT a
+  classifier for the subject. Where they diverge, "unstamped" collapses two
+  distinct populations — genuinely old rows, and new rows from an old writer —
+  into one bucket, and the partition silently discards good data.
+- **Cost:** bounded, because the conservative reading was the one in force. Two
+  candidate dates (08-30, 08-31) sit excluded from a like-for-like pool that is
+  only 2 dates / 28 games — so the exclusion may be roughly doubling the time to
+  a powered read on the single question this whole ledger exists to answer.
+  Sibling of `presence is not reachability` and `absent signal is about the
+  emitter`: same failure, one layer up — the emitter's silence was read as the
+  subject's property.
+
+### 2026-09-03 — A per-date join counter is not safe to SUM across a multi-day window unless it is scoped to that date first. Second confirmed instance of the same shape as `#513`.
+
+**What we believed:** refresh-worker's `[layer2_shortlist] PREGAME_PROJECTION_JOIN
+sport=ncaaf considered=3625 projected=336 reason="no NCAAF SmartSim2
+projections for this date"` (9.3%) described a real, near-total NCAAF
+projection outage the night of the 2026-09-03 opener slate.
+
+**What was actually true.** `pipeline/layer2_shortlist.py::_attach_projections_over_window`
+calls the per-sport join once per date in a multi-day slate window
+(`_SLATE_WINDOW_DAYS["ncaaf"]=7`), passing the SAME shared, unfiltered board
+grid every time. `attach_ncaaf_game_projections` resets `considered = 0` at
+the top of every call and increments it for every qualifying row in the WHOLE
+grid, not just the rows whose own kickoff date matches that call's `date_key`.
+The wrapper then SUMS `rows_considered` across all non-empty window dates
+(summable-field union), which multiplies it by roughly the count of non-empty
+dates iterated (5 here: `considered=3625` / 5 = 725, the true shared-grid
+size). `rows_with_projection` is not similarly inflated — a given row can only
+match the ONE date_key equal to its own kickoff date — so the printed ratio
+collapses even though coverage is fine. Re-derived per-date from
+`/api/board/book-grid?sport=ncaaf&date=<D>` (which IS scoped per date) and
+summed over the same 5 real game-dates: `considered=692, projected=327`
+(~47%), matching the model's own documented FBS-vs-FCS rating boundary
+(51/99=51.5%) almost exactly. A second, independent bug in the SAME wrapper:
+the merged `reason` string is set from the first non-falsy value encountered
+in date order and never overwritten unless the WHOLE window sums to zero
+projected rows, so a TRAILING empty date (a future week whose CSV does not
+exist yet — legitimate, not a bug) can leave a "no projections for this date"
+reason attached to a window that mostly succeeded.
+
+**How we found out.** Re-derived the same window's coverage from a
+correctly-single-date-scoped endpoint (`/api/board/book-grid`) and compared;
+the two disagreed by almost exactly the number of non-empty dates in the
+window, which is not a coincidence a real data gap would produce. Confirmed
+by code trace that row-level `row["projection"]` mutation is untouched by the
+bug (a non-matching date iteration only increments local counters and
+`continue`s).
+
+**The rule.** Before trusting a coverage RATIO printed by any join that is
+invoked once per date inside a multi-day window, check whether its numerator
+and denominator are counted over the SAME population. A counter that is reset
+to 0 inside a per-sport/per-market join function and computed over "the grid"
+rather than "the grid filtered to this call's date" will be summed by an outer
+window-wrapper into a number with no denominator that means what it looks
+like it means. `todo.md #513` (WNBA, 2026-08-22) is the first instance of this
+exact shape (`considered` sourced from one join, `rows_with_projection` summed
+across two) and was correctly left unfixed as "reporting only" because no
+served price/edge/stake depended on it; this is the second, independent
+instance, in a different sport and a different mechanism (window-multiplication
+rather than population-mismatch), and it produced the same category of false
+alarm. **Any time a `PREGAME_PROJECTION_JOIN`-style log line reports a ratio
+that looks catastrophically low for one sport against healthy sports on the
+same pass, re-derive the SAME window from a single-date-scoped endpoint before
+concluding the pipeline is broken** — the per-sport branches that need this
+check are the ones whose slate spans multiple days (nfl, ncaaf, soccer); MLB's
+1-day window cannot exhibit it.
+
+**Cost:** a full diagnostic session driven by this single log line, before the
+counting bug was found; zero production impact (no price/edge/stake reads the
+inflated counter), so the cost was entirely session time, not board harm.
+
+## 2026-09-03 — FORBIDDEN: concluding content is LOST from a line-level diff of a REWORDED ledger
+
+- **What was believed:** that a set comparison of non-blank LINES between two
+  versions of `.syndicate/*.md` measures whether information is present. Run
+  against all 180 ledger files on `origin/main` (153,082 distinct lines), it
+  reported **110 lines existing only on a backup ref** and I warned the user that
+  deleting that ref would lose the `m625-replay-diff-gate` lane's verification
+  record.
+- **What is actually true:** every one of those facts was already on `main`.
+  `lanes_history.md` held a **CLOSED and richer** version of the same block —
+  `280,840` leaves exact, `58,335` clock-derived inside one 3.6s offset, 0
+  mismatches, the negative control, the commits. A token-level check on the other
+  blocks found `1,701`, `0.057 MB`, `local_ea1e4863`, `#632`/`#634`/`#635` all
+  present. The "unique" 110 were superseded **OPEN**-status planning prose and
+  differently-WRAPPED restatements of facts main already carried.
+- **How we found out:** reading the archived block instead of trusting the line
+  set — the archived header said CLOSED where the "missing" one said OPEN.
+- **The rule going forward:** **line identity in these files tracks FORMATTING,
+  not information.** Ledger files are rewritten, re-wrapped, collapsed and
+  archived as a matter of routine, so a reworded restatement and a genuinely
+  absent fact are indistinguishable at line level. Before calling anything lost:
+  (a) compare distinctive TOKENS — numbers, SHAs, identifiers, ids — across the
+  WHOLE ledger including `lanes_history.md` and the `state_archive_*` files;
+  (b) check whether an ARCHIVED block supersedes the one you are missing; (c)
+  treat a status word in a heading (OPEN vs CLOSED) as the signal that one side
+  is stale. Sibling of `remote-absent is not content-absent`, one layer down: not
+  "is this commit upstream" but "is this SENTENCE upstream".
+- **Cost:** bounded but real — it produced a wrong warning to the user, and the
+  remedy they chose on the strength of it (land the 71 lines first) would have
+  RE-INJECTED an OPEN header for a lane `main` records as CLOSED, i.e. exactly
+  the un-archiving that the pre-commit ledger guard had blocked an hour earlier.
+  **The false alarm's proposed fix was itself the regression.**
+
