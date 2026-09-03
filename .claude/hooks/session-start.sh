@@ -239,10 +239,17 @@ BLOAT=""
 # `state_key_check.py` is a checker. 10% headroom would have fired again the
 # same night.
 #
-# lanes.md is the one with no lever at all: `trim_lane_blocks.py` reports
+# lanes.md HAD no lever when this was written -- `trim_lane_blocks.py` reported
 # "nothing to move -- every block is claim-bearing or reads OPEN", so its size
-# is lanes not being CLOSED. Raising its cap does not fix that; it stops the
-# digest crying about something no tool can act on.
+# was lanes not being CLOSED. THAT IS NO LONGER TRUE, and the reason is worth
+# keeping: the lever was not broken, it was WAITING ON LANES TO CLOSE. By
+# 2026-09-03 nineteen had, and one --apply moved 235,998 -> 150,869 B (86,823 B
+# off the working file), 48 blocks -> 29, claims unchanged at 17, every moved
+# block verified present in lanes_history.md and absent from lanes.md.
+#
+# So do not read "no lever" here as permanent. Re-run the dry run before
+# concluding this file cannot be trimmed -- its trimmability is a function of
+# how many lanes are closed today, not of the tool.
 #
 # learnings.md RAISED AGAIN 2026-09-02, 280,000 -> 400,000, and the reason is
 # that "current size + 15% headroom" IS THE WRONG SIZING RULE FOR THIS FILE.
@@ -267,7 +274,45 @@ BLOAT=""
 # lanes.md case: learnings.md has a WORKING tool with real bytes to reclaim, so
 # raising the cap here buys time for a lever that exists rather than silencing
 # one that does not.
-for f in state.md:750000 lanes.md:240000 learnings.md:400000; do
+# state.md RAISED 2026-09-03, 750,000 -> 920,000, AND THIS IS AN EXPLICIT
+# OVERRIDE OF THE PARAGRAPH ABOVE THAT SAYS "THE RIGHT RESPONSE TO EXCEEDING
+# THIS IS NOT ANOTHER RAISE." User ordered the raise after the archival pass
+# below came up short. Logged here rather than applied silently, because the
+# standing position it overrides is still the correct default.
+#
+# What was tried first, and what it actually yielded. A hand archival pass on
+# 2026-09-03 moved two dead regions out of the MLB gameline cell -- a completed
+# landing narrative and the retracted n=98 / +0.06104 reading -- into
+# state_archive_2026-09-03.md. That cell was 11,108 chars, NINE TIMES the next
+# largest line in the file, so it was the best single target available. It
+# reclaimed 3,086 B. At the measured growth rate that is ONE HOUR AND TWENTY
+# MINUTES of headroom. Hand archival is real but it does not scale to the rate.
+#
+# This also updates the 2026-08-18 measurement above ("only 923 B of 163,412
+# was self-declared archival, nothing mechanical to reclaim"). At 748,000 B
+# there IS reclaimable prose -- superseded readings and closed operational
+# narrative -- but it is buried inside live cells, so extracting it needs a
+# reader who can tell a retracted number from a current one. That is a tool
+# nobody has written, not a sweep anyone can run.
+#
+# Where 920,000 comes from -- MEASURED, not chosen. Over 133 first-parent
+# commits touching state.md since 08-28: +292,472 B in 143.5 h = 2,038 B/h.
+# Last 24 h alone: 683,018 -> 736,532, i.e. 2,253 B/h across 40 commits.
+# Busiest window: +62,250 B in 4.7 h = 13,244 B/h. Those are git blob (LF)
+# bytes; the check below reads the CRLF working file, ~1.55% larger, so call
+# it 2,290 B/h sustained. 920,000 - 747,959 = 172,041 B = ~3.1 days sustained,
+# or one full day of burst. Three days is the same survives-a-weekend rule
+# used for learnings.md above.
+#
+# WHAT THIS DOES NOT FIX, stated plainly so the next raise is not a surprise:
+# state.md has NO trim tool and only grows, so any cap is consumed on a
+# schedule. 920,000 buys ~3 days. It is a RUNAWAY DETECTOR and nothing more --
+# it can tell you the file doubled overnight, it can never tell you the file
+# is healthy. The thing that catches the failure size was always a proxy for
+# is state_key_check.py in the coherence loop below, which this raise does not
+# touch. The real fix is a compact_state.py that does for cells what
+# compact_learnings.py does for entries: rule stays, superseded reading moves.
+for f in state.md:920000 lanes.md:240000 learnings.md:400000; do
   n=${f%%:*}; cap=${f##*:}
   if [ -f ".syndicate/$n" ]; then
     SZ=$(wc -c < ".syndicate/$n" 2>/dev/null | tr -d ' ')
