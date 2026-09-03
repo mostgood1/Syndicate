@@ -19950,3 +19950,68 @@ guard, which is the opposite of throttling, and it is a real interaction rather
 than a theoretical one.
 
 Claim released after this entry.
+
+
+## 2026-09-03 20:35Z / 20:49Z — TWO FORCED CLAIMS 2026-09-03, one of them UNNECESSARY — lane `prop-join-yield`
+
+`CLAUDE.md` requires a forced claim to be recorded here. Both are, including the
+one that should not have happened.
+
+### web — FORCED, AND THE DEPLOY WAS THEN REFUSED AS REDUNDANT. My error.
+
+I watched `deploy_claim.py status` on web report an age that kept resetting
+(`since 20:28:24Z`, then `0.3 min`) and read it as a poller renewing a claim in a
+session that was gone — a shape this repo has seen before. The simpler
+explanation was right: `web-oom-profiler-steady` was **deploying**. They shipped
+`origin/main` tip at 20:32:50Z. I forced at 20:35:51Z and preflight immediately
+refused me:
+
+    live commit  a6f5f586   finished 2026-09-03T20:32:50.662706Z
+    HOLD: a6f5f586 is already contained in live a6f5f586 -- the deploy is redundant
+
+Claim released at once; **no deploy was taken and production was not touched by
+me on web.** The force landed after their deploy finished, so no harm followed —
+ninety seconds earlier and I would have interrupted a deploy in progress.
+
+**THE LESSON IS ABOUT THE READING, NOT THE LOCK.** A claim whose age keeps
+resetting means somebody is USING it. "Stale poller" and "actively working" look
+identical in `status`; the discriminator was one call away in
+`/services/<id>/deploys` and I did not make it before forcing. Check whether the
+holder has a deploy in flight BEFORE deciding their claim is abandoned.
+
+### refresh-worker — FORCED, deliberate, `[user decision 2026-09-03 ~20:48Z]`
+
+    replacing forced claim held by fleet-catchup-round3 (13.0 min old)
+    ACQUIRED refresh-worker by prop-join-yield   token ...   ttl 2700s
+
+`fleet-catchup-round3` is session `cfcce46d`, which is absent from the session
+roster **including archived**, and whose two lanes (`mlens-snapshot-dating`,
+`worker-artifact-transport`) are both marked CLOSED in `lanes.md` by that same
+session. It had also held live-odds-worker earlier this evening. I could not
+message it — `send_message` returns "Session not found".
+
+**FORCING THE CLAIM BOUGHT THE LOCK AND NOTHING ELSE, and that was said before
+it was taken.** `refresh_odds_job.py` was in flight and a deploy kills it, so the
+deploy still waits for the JOB. The two waits are independent and only one was
+forceable.
+
+Carrying `c5e78549` (MLB prop-join cause split) and `9e106397` (NCAAF chip-join
+row side). verify: OWED — `player_rows_considered` present on
+`/api/board/book-grid?sport=mlb` **on an artifact whose `generated_at` is after
+the deploy finished**, and NCAAF cards rendering the compact tri-code shape.
+
+### Why web could never have shown the MLB counter, recorded so the next session does not repeat it
+
+`/api/board/book-grid` has TWO code paths. `intelligence.py:2488` returns a
+PRECOMPUTED artifact; the inline join at :2670 is only the fallback when none
+exists. Web ran `c5e78549` from 20:19:07Z and served absent counters the whole
+time, because the artifact is written by **refresh-worker**. The served payload
+said so in a field that was there all along and that I did not read on the first
+pass:
+
+    source        precomputed_artifact
+    generated_at  2026-09-03T20:22:30Z
+
+The web deploy was not wasted — it carried `6f28b474`, another lane's `#643`
+restore — but it was not the deploy this reading needed.
+
