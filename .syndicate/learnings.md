@@ -5790,3 +5790,13 @@ urgency completely had I assumed the opposite.
   but the exposure was total, because the surviving copy was the one a future
   session would actually have read, and it would have re-excluded 08-30/08-31 and
   re-halved the sample the same day it was recovered.
+
+## 2026-09-03 — FORBIDDEN: editing a ledger file with Python TEXT-mode I/O. It rewrites every line ending in the file, and `git diff` will not show you. `[scheduled task live-gameline-accuracy-snapshot, checkpoint]`
+
+A one-line surgical fix to `state.md` (+178 chars) left the file **11,249 bytes SMALLER**. `io.open(...).read()` converted 11,427 CRLF to LF on read; writing back with `newline=''` made that permanent across all 750KB.
+
+**Why nothing caught it.** `git diff --numstat` read `1	1` — correct, because `core.autocrlf` normalises on the way in, so the COMMIT would have been exactly the intended line. The mutation lived only in the working file, which is the copy every concurrent session reads directly. Git's warning (*"LF will be replaced by CRLF the next time Git touches it"*) is printed on every such diff and reads as boilerplate.
+
+It was caught by `wc -c` — a size that moved the wrong DIRECTION for an edit that only added text. The arithmetic then closed exactly: 750877 - 739628 + 178 = 11427 CRs.
+
+**How to apply:** for any `.syndicate/**` edit, use binary I/O (`open(p,'rb')` / `'wb'`) or `Edit`, and check `wc -c` against the expected delta before moving on. A byte count that moves the wrong way is the only cheap detector; the diff is blind to this by design.
