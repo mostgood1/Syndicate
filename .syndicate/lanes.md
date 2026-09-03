@@ -1413,7 +1413,13 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   to "UMass Minutemen @ Rutgers Scarlet Knights" + an opportunity count.
 - Files: `syndicate/features/shared/team_aliases.py`,
   `syndicate/features/shared/game_chip_scoreboard.py`,
-  `syndicate/features/shared/layer2_board.py`,
+  RELEASED `[2026-09-03, lane layer2-sim-disagrees, SAME session 3492626c]`: the
+  layer2 board module. Narrow and disjoint by function: that lane edits
+  `_projection_side_in_row_frame` / `_model_edge_for` / `_model_prob_for_side` /
+  `_publication_columns`; YOUR chip-join work (`away_key`/`home_key` stamping)
+  is untouched and is already LANDED per this block's own header. Checked
+  line-by-line before taking it. Take it back by striking this note and
+  restoring the path on its own line.
   `tests/test_ncaaf_chip_join_key.py` (NEW).
 - **NEITHER HYPOTHESIS AS FRAMED. The payload HAS the abbreviations and the
   renderer DOES read them — the card never receives the chip.** Measured on the
@@ -1470,6 +1476,92 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   READ AT THE SAME INSTANT.
 - Blocked by: nothing. **Deploy deliberately NOT taken** — handed to the
   coordinating lane `order-model-view`.
+
+### layer2-sim-disagrees — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **ANSWERED, FIXED, LANDED, NOT DEPLOYED. The tag's RULE is fine; its INPUT is null on 100% of NCAAF rows. Two further defects found on the same served payload, both of which make the board state a number it does not have.**
+- Goal: the board must never recommend a side its own sim contradicts without
+  saying so, and a row with no sim view must not read like a row the sim
+  approved. `[user report 2026-09-03, production screenshot]`
+- Files: `syndicate/features/shared/layer2_board.py`
+  (**`_projection_side_in_row_frame` / `_model_edge_for` / `_model_prob_for_side`
+  / `_publication_columns` ONLY** — the OPEN lane `ncaaf-chip-compact` lists this
+  file for the CHIP JOIN (`away_key`/`home_key` stamping) and is the SAME session
+  id, `3492626c`; the two edits are disjoint by function and were checked
+  line-by-line before taking this),
+  `pipeline/intelligence_state.py` (**the `confidence` backfill at ~1888 ONLY**;
+  `layer2-cap-raise` marks the file `released:`),
+  `syndicate/templates/intelligence.html` (unclaimed; `chipForGame` is the other
+  lane's area and is untouched),
+  `tests/test_layer2_sim_view.py` (NEW).
+- **A. THE INPUT IS MISSING, NOT THE RULE.** `sim_view` is a function of exactly
+  one field (`layer2_board.py`, `model_edge = row["model_edge_pct"]`; null ->
+  `"none"` -> no badge). Measured on the served `/api/intelligence/query`,
+  2026-09-03, 1,344 ranked rows: **`model_edge_pct` is non-null on 0 of 514
+  NCAAF rows** (mlb 10/631, soccer 87/181 — and soccer DOES render 28
+  `disagrees`, so the rule fires where it is fed). NCAAF's null is DELIBERATE:
+  `ncaaf/game_projections.py` sets `edge_vs_market_pct = None` on all three
+  markets, because the margin model loses to the close by 3.563 MAE at t=17.20
+  (n=2233, clean out-of-sample) and totals were **never scored against the close
+  at all** and run 1.67x over-dispersed. So the tag is UNREACHABLE on NCAAF by
+  construction. Do not "fix the badge" — there was nothing wrong with it.
+- **B. THE TAG IS ALSO THE WRONG CONCEPT FOR THIS REPORT.** `sim disagrees` is a
+  claim about RATING (`model_edge_pct < 0`: worse than the price implies). The
+  user's rows are a claim about DIRECTION (`projected 67.8` against `Under 53.5`).
+  Those are different states and the second had no name. Added as
+  `sim_view = "contradicts"`, computed from `projected` / `line` / `side`, all
+  three of which were ALREADY on the served row.
+- **MEASURED, and it is not a corner case: 71 of 141 NCAAF totals rows (50%)
+  point the opposite way to the sim; 21 of those carry a POSITIVE score.** Gap
+  distribution `projected - line`, 43 games: mean +4.80, median +5.48, per-event
+  SD **9.81**, 46% of rows past 10 points. The board's own #2 row was Under 53.5
+  against a 67.8 projection.
+- **C. `WIN%` IS THE BOOK-COUNT LADDER AGAIN.** `layer2_board.py` blanks
+  `confidence` where there is no model, on purpose, and documents at length why
+  (`Win% 100%` meaning "5+ books quote this" was confirmed on a user screenshot
+  2026-08-21). `pipeline/intelligence_state.py` then ran
+  `card.setdefault("confidence", score["book_confidence"])` — a `setdefault`, so
+  it fired on EXACTLY the rows the blanking had just protected. Served evidence:
+  Akron@Wake `Over 50.5`, `confidence 1.0 == book_confidence 1.0`, no model.
+  **A backfill downstream of a deliberate blank re-creates the defect the blank
+  removed.**
+- **D. `model_probability` IS THE SAME NUMBER ON BOTH SIDES OF EVERY NCAAF
+  MONEYLINE, AND INVERTED ON THE HOME SIDE.** `_model_prob_for_side` (and
+  `_model_edge_for`) compare `projection["side"]` to `row["side"]` as strings.
+  NCAAF, **NFL and WNBA** all set `projection["side"]` to the home TEAM NAME
+  while the row's side is `home`/`away`, so the tokens NEVER match and both
+  sides take the `1 - p` branch. Measured: **17 of 17** NCAAF h2h pairs identical
+  on both sides (Georgia Tech -223 and Colorado +217 both 0.35; Colorado State
+  -148 and Wyoming +147 both 0.56). Illinois at -2532 served **0.67%** — the sim
+  says 99.33%. The user's "WIN% 0%" rows are this, not a disagreement.
+- **NOT A MONEY DEFECT TODAY, and that bounds the urgency correctly.**
+  `portfolio_commit` refuses on `no_model_edge_pct`, so a row with a null
+  `model_edge_pct` can never become a position — which is also why NCAAF has 0
+  orders ever. Everything above is what the board SAYS, not what it BETS.
+- **THE SCORE IS DELIBERATELY UNCHANGED, and that is the recommendation, not an
+  omission.** `sim_component` is null on every contradicted row, so there is no
+  sim support to remove; and the measurement that would SIZE a penalty does not
+  exist (NCAAF totals accuracy never measured; 0 graded NCAAF rows; per-order
+  `model_edge_pct`/`ev_pct` only began persisting 2026-09-03T19:54Z, `04187cdf`,
+  so nothing is recoverable retrospectively). Sizing a penalty today is a guess,
+  and `layer1-model-edge-join` records what happened the last time model
+  information was routed into the ranking through an uncapped channel (top-25
+  became 24 `batter_home_runs`, top model EV 85 points against a best market EV
+  of ~5). **When it is sized, it belongs in `blended_score`'s MULTIPLICATIVE
+  reliability group, not the additive value group** — a contradiction is lower
+  confidence in the row, not a claim the sim is right, and `min(value,
+  discounted)` already guarantees a discount can never promote a negative row.
+- **PRE-REGISTERED MEASUREMENT THAT WOULD LIFT THAT:** with `sim_view` persisted
+  onto orders, compare settled ROI of `contradicts` rows against `agrees` and
+  `none` rows within the same sport and market family, with denominators. The
+  book's own split (`game_line` +13.28% n=296 vs `game_total` -1.78% n=351)
+  cannot answer it — it is not decomposed by the sim's view.
+- **DO NOT ADD A GATE.** `[user decision 2026-09-03, verbatim]` *"I also dont
+  want an all or nothing gate, we should still be seeing EV opps and potentially
+  our sim should be giving us some level of correctness based on scoring model.
+  We cant rule out our work as ALWAYS WRONG with a generalized statement"*
+- **NOT DEPLOYED, DELIBERATELY** — deploys are being coordinated by
+  `prop-join-yield`. `sim_view` is computed on the WORKER and read by the
+  template, so this needs refresh-worker AND web to be visible.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
