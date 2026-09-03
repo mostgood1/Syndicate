@@ -161,8 +161,28 @@ reports/intelligence/evaluation_ledger.jsonl
 # 2026-08-24 after a test run swept both into two commits via `git add -A`.
 reports/intelligence/execution_ledger.json
 reports/intelligence/execution_state.json
-reports/intelligence/kalshi_markets.json
 reports/intelligence/kalshi_market_history.json
+# `kalshi_markets.json` WAS LISTED HERE AND IS NOT RUNTIME STATE. Removed
+# 2026-09-02: it is TRACKED, and a `.gitignore` line has no effect on a tracked
+# file, so this entry never did anything except assert something false. It sat
+# beside the two ledgers above and read as "runtime output, do not commit",
+# which is the opposite of the truth.
+#
+# WHAT IT ACTUALLY IS: the committed copy is 1,912 bytes carrying ONLY a
+# `series` key -- the curated Kalshi series catalogue, a SOURCE input.
+# `default_sports_series()` reads it, and
+# `test_kalshi_odds_cadence.py::test_the_series_list_comes_from_the_catalogue`
+# asserts that list agrees with `SERIES_SPORT` in code. Measured before
+# touching it: hide the file and that test FAILS (1 failed / 261 passed across
+# every kalshi-touching module), so untracking it would have deleted a source
+# input to satisfy a line that was itself wrong.
+#
+# The RUNTIME payload of the same name is a different thing -- ~5.4MB with a
+# `markets` key, written per process and living in the keyvalue store, never
+# on disk in production. The two share a path, which is why this looked like
+# runtime state. `tests/conftest.py::_isolate_kalshi_markets_artifact` exists
+# to stop a full test run rewriting the tracked copy with the runtime one; that
+# isolation stays and is the right guard.
 # `#637`, 2026-09-02. RUNTIME OUTPUT THAT ONLY STARTED LANDING ON DISK TODAY.
 # These were keyvalue-backed until `venue_odds` was moved out of the shared
 # Redis store, so nothing was ever written here and no ignore was needed. Now
