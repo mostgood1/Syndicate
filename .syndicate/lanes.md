@@ -1919,6 +1919,37 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   unanswerable**, and the only fix (a full-sweep republish) is not justified
   against services at 91-97%.
 - Claims: NONE held.
+
+### soccer-anchor-harness-land — OPEN — opened 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: land the measurement harness that answered `todo.md #622`(1)(2)(3) into
+  `scripts/`, so the next mechanism-vs-outcome question does not pay for it
+  again. It exists ONLY in a session scratchpad and dies with the session.
+  `[user instruction 2026-09-03: "land the harness to scripts/"]`
+- Files: scripts/backtest_soccer_anchor_vs_outcomes.py (NEW),
+  scripts/validate_soccer_anchor_shift.py (NEW),
+  scripts/fetch_prod_artifacts_paced.py (NEW),
+  tests/test_soccer_anchor_backtest.py (NEW).
+- Hypothesis: n/a (preserving a proven tool).
+- Falsification test: if the landed scripts cannot reproduce the recorded
+  numbers — base MAE 0.52126 / anchored 0.52163 over 6,486 rows, and the
+  held-out surrogate 0.0144 vs 0.0225 — then what landed is not what ran, and
+  the ledger's evidence has no reproducible source.
+- Verification: each script imports and `--help`s from a clean checkout with NO
+  machine-specific path; the backtest reproduces its recorded population and
+  clustering behaviour under test.
+- **THE TWO DEFECTS THAT MUST BE LOCKED IN BY TEST, because both produced a
+  plausible wrong answer before being caught:** (a) the grading population must
+  include every predicted player with `realized = 0` when absent — filtering
+  zero-outcome rows kept 42 of 197 and selected on the dependent variable;
+  (b) statistics must be MATCH-CLUSTERED — player rows in a match share one
+  anchor shift, and the player-level sign test read p=0.0027 against its own
+  t of -1.28.
+- Scratchpad scripts carry absolute paths (`C:	mp\syndicate-sessions\...`,
+  a hardcoded `.env`) and `m2/m6/m7` names; they must be made
+  `REPO_ROOT`-relative and renamed to the `backtest_/validate_/fetch_` convention
+  before landing. A copy-paste would be unrunnable for anyone else.
+- Blocked by: none. No OPEN lane claims these paths.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
