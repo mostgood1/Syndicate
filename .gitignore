@@ -163,6 +163,18 @@ reports/intelligence/execution_ledger.json
 reports/intelligence/execution_state.json
 reports/intelligence/kalshi_markets.json
 reports/intelligence/kalshi_market_history.json
+# `#637`, 2026-09-02. RUNTIME OUTPUT THAT ONLY STARTED LANDING ON DISK TODAY.
+# These were keyvalue-backed until `venue_odds` was moved out of the shared
+# Redis store, so nothing was ever written here and no ignore was needed. Now
+# every service -- and every dev tree that runs the suite -- accumulates one
+# file per (venue, sport, game date): 36 appeared in a session worktree from
+# ordinary test runs, and the `land` step correctly refused the dirty tree.
+#
+# Ignored rather than committed for the same reason as the two ledgers above:
+# it is a per-process accumulator of venue prices, so a copy from a laptop
+# landing here would masquerade as a cold-start artifact. Nothing under this
+# path is tracked (verified with `git ls-files`), so this shadows no history.
+reports/intelligence/venue_odds/
 # THE BANKROLL, and the worst of this list to commit by accident. It is the
 # STORED tier of `resolve_settings`, which outranks env AND default -- so a
 # copy from a laptop landing here would set production's stake sizing to
