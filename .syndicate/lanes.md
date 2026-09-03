@@ -2480,6 +2480,22 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
+### fleet-catchup-round3 — OPEN — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: all three services on `48c68546`. Unlike round 2, every service has REAL
+  runtime content pending: `04187cdf` (order provenance —
+  `execution_ledger.py` + `pipeline/execute_portfolio.py`, the trading path),
+  `8add1bbe` (`#643` BOUNDED/UNBOUNDED warning), and for web `a81bf816`
+  (`ncaaf/game_projections.py` + `board_enrichment.py`).
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: per service, its OWN log stream shows role work after boot with
+  0 tracebacks, and `pending_deploys.py` reads 0 code commits for it. On
+  live-odds-worker additionally: the `#643` warning must print the NEW shape
+  (`bytes_per_order=` / `BOUNDED`) — the first LIVE confirmation that fix is
+  real rather than merely merged.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
