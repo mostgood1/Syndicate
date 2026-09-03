@@ -1679,6 +1679,28 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Fails OPEN with no root, no git or no `origin/main` ref — it never guesses.
 - Blocked by: none
 
+### ledger-precommit-hook — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **The ledger invariants now run on EVERY commit, not only those made through a Claude session. `.claude/hooks/ledger-commit-guard.py` is a PreToolUse hook and cannot see a commit made outside one — which is the exact shape of `376bfa94`, the kalshi code commit that reverted the trim pass. `core.hooksPath` points git at the tracked `.githooks/`, so one setting covers all 47 worktrees of this clone and the hook everyone runs is the hook in the commit.**
+- Goal: a stale-tree ledger commit is refused by git itself.
+- Files: .githooks/pre-commit (NEW), .githooks/ledger_precommit.py (NEW),
+  scripts/install_git_hooks.py (NEW)
+- Predicates are NOT restated: both guards call `.claude/hooks/ledger_invariants.py`.
+  Two guards disagreeing about what "broken" means is worse than one guard.
+- Reads `git show :<path>`, which resolves against `GIT_INDEX_FILE` — so it sees
+  the TEMPORARY index of a `git commit -- <pathspec>`, the very shape that clobbered.
+- FAILS OPEN in every direction: no python, no checker, a crash, an unreadable
+  index. ONLY an explicit exit 1 blocks. A pre-commit hook that blocks on its own
+  bug is worse than the defect it guards.
+- Verification RAN — real `git commit` in a throwaway clone, not a simulated call:
+  stale commit BLOCKED (exit 1, `BLOCKED by pre-commit`); honest new lane block
+  COMMITTED; `SYNDICATE_ALLOW_LEDGER_COMMIT=1` and `--no-verify` both bypass.
+- The first run of that test reported a false failure — the "honest" case wrote
+  content identical to HEAD, so git's own "nothing to commit" exit 1 read as a
+  block. Asserting on the hook's own stderr, not the exit code, is what separated
+  them.
+- Installer REFUSES if `.git/hooks` holds real hooks, because `core.hooksPath`
+  would disable them silently. `*.sample` files never run and are ignored.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

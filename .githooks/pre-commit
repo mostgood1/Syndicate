@@ -1,0 +1,37 @@
+#!/bin/sh
+# Syndicate pre-commit hook -- ledger invariants for EVERY commit, not just the
+# ones a Claude Code session makes.
+#
+# WHY THIS EXISTS ALONGSIDE `.claude/hooks/ledger-commit-guard.py`. That guard is
+# a PreToolUse hook: it only sees commits made through a session's Bash tool. The
+# commit that actually did the damage on 2026-09-02 (`376bfa94`, a kalshi code
+# change carrying a ~90-commit-stale lanes.md, reverting a trim pass and leaving
+# 14 duplicated blocks) is exactly the shape that a hook outside the session
+# cannot catch. git is the choke point every commit passes through.
+#
+# THE PREDICATES ARE NOT RESTATED HERE. Both guards call
+# `.claude/hooks/ledger_invariants.py` -- two guards disagreeing about what
+# "broken" means is worse than one guard.
+#
+# FAILS OPEN, DELIBERATELY AND IN EVERY DIRECTION: no python, no checker, a
+# crash, an unreadable index -- all exit 0. A pre-commit hook that blocks on its
+# own bug is worse than the defect it guards, so ONLY an explicit exit 1 (a real
+# violation) stops a commit.
+#
+# Bypass:  SYNDICATE_ALLOW_LEDGER_COMMIT=1 git commit ...
+#     or:  git commit --no-verify
+[ "${SYNDICATE_ALLOW_LEDGER_COMMIT:-}" = "1" ] && exit 0
+
+DIR=$(dirname "$0")
+CHECK="$DIR/ledger_precommit.py"
+[ -f "$CHECK" ] || exit 0
+
+for PY in python3 python py; do
+    command -v "$PY" >/dev/null 2>&1 || continue
+    "$PY" "$CHECK"
+    rc=$?
+    # ONLY 1 blocks. 0 = clean; anything else = the checker itself failed.
+    [ "$rc" -eq 1 ] && exit 1
+    exit 0
+done
+exit 0
