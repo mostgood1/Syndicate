@@ -2158,6 +2158,46 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   reports 0 is the falsifying reading, not a pass.
 - Blocked by: none. Needs a WEB deploy to observe.
 
+### accuracy-autorun-rearm — OPEN — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+- Goal: `#626`(h) runs in production for the first time WITHOUT killing the
+  worker. ONE testable outcome: `[accuracy_summary] AUTORUN_DONE ... error=none`
+  in refresh-worker logs, with the peak `memory_anon_mb` during that window
+  recorded against the 4,096 MiB ceiling.
+- Files: `.syndicate/deploys.md`, `.syndicate/lanes.md`, `.syndicate/state.md`.
+  Render ENV on refresh-worker via the single-key API — **never `render.yaml`**,
+  which fires `blueprint_sync` and rewrites every key on all three services.
+  **No code file is touched: the fixes are ALREADY LIVE.**
+- **THE CODE IS ALREADY DEPLOYED — this is an ENV-ONLY change.** refresh-worker
+  runs `c4ce0502`, verified BY CONTENT (not ancestry): that tree carries
+  `_project_evaluation_record` x4, `_accuracy_summary_ledger_budget_bytes` x6,
+  and `ledger_coverage` in `run_refresh_worker.py` x2. The deploy exists solely
+  to inject the env key, since a Render restart does not re-inject one.
+  Deploying `c4ce0502` again therefore changes NO code and deliberately does not
+  pick up the 4 pending commits from other lanes.
+- Hypothesis: n/a (arming a bound that was measured before it was built).
+- Falsification test: if the first armed run OOM-kills the worker, or
+  `AUTORUN_DONE` is absent while the process restarts, the bound did not hold in
+  production and the key goes back to `false` immediately. `#256`'s
+  claim-before-work means a death costs exactly one run per day, not a loop.
+- Verification: (1) `AUTORUN_DONE sports=8 ... error=none`; (2)
+  `LEDGER_CHUNKS_ACCEPTED ... budget=2000000000 ...` naming bytes and dates, so
+  the sample the summary rests on is a READING not an assumption; (3) peak
+  `memory_anon_mb` in the run window, stated against 4,096 and against the
+  1,877 MiB baseline cycle peak; (4) the published artifact carries
+  `ledger_coverage` — if it does not, `_bounded_accuracy_summary` is dropping it
+  and the sample size is invisible again.
+- **IT WILL FIRE ALMOST IMMEDIATELY, not tomorrow.** Gate read, not assumed:
+  `hour >= 7 CT` (it is 10:2x) and `last_run_date (2026-09-02) < today`, so the
+  first tick after the deploy runs it. That is the point — it is observed today
+  — but it is why the sim/board-build wait matters.
+- **EXPECT A MISLEADING LINE ON THE FIRST RUN.**
+  `PREVIOUS_RUN_NEVER_COMPLETED ... Not retrying today (see #256)` will print,
+  because 09-02's death left `state: "started"`. **The code does NOT return
+  after printing it** — it proceeds to claim and run. Do not read that line as
+  "the run was skipped".
+- Blocked by: none once `check_deploy_safety` is CLEAR. Polling; an MLB sim and
+  a board build were in flight at 10:20 CT.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
