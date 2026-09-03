@@ -16,16 +16,21 @@ Measured through the real `commit_portfolio`, that measurement is only PARTLY
 reachable, and the unreachable part is not a coverage problem that time fixes:**
 
     agrees       PLACED        contradicts  REFUSED  no_model_edge_pct
-    neutral      PLACED        none         REFUSED  no_model_edge_pct
-    disagrees    PLACED, but only when a large EV carries it
+    neutral      PLACED        unpriced     REFUSED  no_model_edge_pct
+    disagrees    PLACED*       none         REFUSED  no_model_edge_pct
+      * only when a large EV carries it -- see below
 
-`contradicts` and `none` are computed in exactly the branch where
-`model_edge_pct is None`, which `sizing_inputs_from_row` refuses BY NAME before
+`36161e83` landed mid-lane and split `none` into `none` / `unpriced` at the
+source, expressly because this field was about to be persisted. Nine verdicts
+now, and the finding WIDENS rather than changes: `contradicts`, `unpriced` and
+`none` are all computed in exactly the branch where `model_edge_pct is None`,
+which `sizing_inputs_from_row` refuses BY NAME before
 anything is sized. So the `contradicts` arm's denominator is zero and stays
 zero however long the ledger runs — consistent with NCAAF having 0 orders ever,
 and with production on 2026-09-03 (41 orders on `/api/portfolio/paper`: mlb 29,
 soccer 12, no NCAAF). **A sim CONTRADICTION still cannot be priced from the
-order book, and any penalty for one is still a guess.** Pinned by
+order book, and any penalty for one is still a guess. A stored `sim_view` can
+only ever read `agrees`, `disagrees`, `neutral` or a `live_` form.** Pinned by
 `test_a_contradicted_row_still_cannot_become_an_order` so moving that gate turns
 the suite red instead of silently redefining the measurement.
 

@@ -15,10 +15,11 @@ The suite is in four parts:
   2. it survives the position -> OrderRequest -> ledger record chain
   3. absence survives as absence, and `"none"` never collapses into `None`
   4. WHAT IS STILL UNREACHABLE -- the commit gate refuses the exact rows a
-     contradiction lives on, so two of the three arms of the pre-registered
-     measurement have a structurally empty denominator. Pinned here so that a
-     change to that gate turns this file red rather than silently changing what
-     the measurement means.
+     contradiction lives on, so three of the nine verdicts can never appear on
+     a stored order and the `contradicts` arm of the pre-registered measurement
+     has a structurally empty denominator. Pinned here so that a change to that
+     gate turns this file red rather than silently changing what the
+     measurement means.
 """
 
 from __future__ import annotations
@@ -32,6 +33,23 @@ from syndicate.features.shared.portfolio_commit import (
     _sim_view_of,
     sizing_inputs_from_row,
 )
+
+
+# EVERY VERDICT THE BOARD CAN PUBLISH, read off `_layer2_board_columns` and
+# pinned below. An order carries one of these strings and a settled-ROI split
+# groups on them, so the SET is a contract rather than an implementation detail.
+KNOWN_VERDICTS = {
+    "agrees", "live_agrees",
+    "disagrees", "live_disagrees",
+    "neutral",
+    "contradicts", "live_contradicts",
+    # `36161e83`: "the sim has a view it could not PRICE" (typically a
+    # one-sided market, so there is no two-sided fair) split away from "the sim
+    # has no view at all". Both reach the unreachability test below, because
+    # both live in the branch the commit gate refuses.
+    "unpriced",
+    "none",
+}
 
 
 def _row(**overrides):
@@ -93,6 +111,27 @@ def test_the_verdict_comes_from_the_boards_own_function():
         "`portfolio_commit._sim_view_of` reads exactly this key"
     )
 
+    # AND THE VOCABULARY, not only the key. `36161e83` split `none` into
+    # `none` / `unpriced` hours after this lane opened, expressly because the
+    # field was about to be persisted -- and the rename surfaced as a failure
+    # in a downstream value assertion rather than at the coupling it actually
+    # broke. A new verdict is fine and expected; it just has to be a DECISION,
+    # because every stored order is stamped with one of these and a settled-ROI
+    # cut groups on them.
+    assert KNOWN_VERDICTS == {
+        "agrees", "live_agrees",
+        "disagrees", "live_disagrees",
+        "neutral",
+        "contradicts", "live_contradicts",
+        "unpriced",
+        "none",
+    }, (
+        "the board's `sim_view` vocabulary changed. Orders are stamped with "
+        "these values and grouped on them: update KNOWN_VERDICTS, then check "
+        "whether the new verdict can reach an order at all -- see "
+        "test_a_contradicted_row_still_cannot_become_an_order"
+    )
+
 
 @pytest.mark.parametrize(
     "expected, row",
@@ -104,8 +143,15 @@ def test_the_verdict_comes_from_the_boards_own_function():
         ("neutral", _row(model_edge_pct=0.0)),
         # A DIRECTION claim: projection points the other way from the side.
         ("contradicts", _row(model_edge_pct=None, side="under", projection={"projected": 67.8})),
-        # No priced edge and no direction conflict -- the sim really is silent.
-        ("none", _row(model_edge_pct=None, projection={"projected": None})),
+        # NO PRICED EDGE, BUT THE SIM DID HAVE A VIEW -- typically a one-sided
+        # market, so there is no two-sided fair to price against. `36161e83`
+        # split this away from `none` precisely so this field could be
+        # persisted without conflating the two.
+        ("unpriced", _row(model_edge_pct=None, projection={"projected": None})),
+        # NO MODEL AT ALL. Every model number has to be gone, not just the
+        # edge -- a `projected` or a `model_prob_over` is enough to make it
+        # `unpriced`.
+        ("none", _row(model_edge_pct=None, projection={"projected": None, "model_prob_over": None})),
         # Same verdicts, from the LIVE re-sim, and they must say so.
         ("live_agrees", _row(model_edge_pct=3.0, projection={"basis": "live_resim"})),
         ("live_disagrees", _row(model_edge_pct=-1.0, projection={"basis": "live_resim"})),
@@ -320,13 +366,15 @@ def test_the_verdict_is_not_part_of_a_bets_identity():
 
 
 def test_a_contradicted_row_still_cannot_become_an_order():
-    """TWO ARMS OF THE PRE-REGISTERED MEASUREMENT HAVE AN EMPTY DENOMINATOR.
+    """THREE OF THE NINE VERDICTS HAVE A STRUCTURALLY EMPTY DENOMINATOR.
 
-    `contradicts` and `none` are computed in exactly the branch where
-    `model_edge_pct` is None, and `sizing_inputs_from_row` refuses that row by
-    name before anything is sized. So persisting the verdict is NECESSARY and
-    NOT SUFFICIENT: `contradicts`-vs-`agrees` settled ROI cannot accumulate at
-    all while this gate stands, no matter how long the ledger runs.
+    `contradicts`, `unpriced` and `none` are computed in exactly the branch
+    where `model_edge_pct` is None, and `sizing_inputs_from_row` refuses that
+    row BY NAME (`no_model_edge_pct`) before anything is sized. So persisting
+    the verdict is NECESSARY and NOT SUFFICIENT: `contradicts`-vs-`agrees`
+    settled ROI cannot accumulate at all while this gate stands, no matter how
+    long the ledger runs. Only `agrees`, `disagrees` and `neutral` (and their
+    `live_` forms) can ever appear on a stored order.
 
     Asserted rather than written down, so that changing the gate turns this red
     and whoever changes it reads the note instead of quietly redefining what the
@@ -334,7 +382,8 @@ def test_a_contradicted_row_still_cannot_become_an_order():
     """
     for verdict, row in (
         ("contradicts", _row(model_edge_pct=None, side="under", projection={"projected": 67.8})),
-        ("none", _row(model_edge_pct=None, projection={"projected": None})),
+        ("unpriced", _row(model_edge_pct=None, projection={"projected": None})),
+        ("none", _row(model_edge_pct=None, projection={"projected": None, "model_prob_over": None})),
     ):
         assert _sim_view_of(row)["sim_view"] == verdict
         inputs, reason = sizing_inputs_from_row(row)

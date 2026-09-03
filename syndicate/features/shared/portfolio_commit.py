@@ -503,11 +503,15 @@ def _sim_view_of(row: Mapping[str, Any]) -> dict[str, Any]:
         # `model_edge_pct` is None, and `sizing_inputs_from_row` refuses that
         # row by name (`no_model_edge_pct`) before anything is sized -- so this
         # column is expected to be null on 100% of orders, and that null is the
-        # CONTRACT rather than a bug. Carried anyway because the gate is a
-        # POLICY the `layer2-sim-disagrees` lane has open, and a field added
-        # after the gate changes records nothing about the bets placed before
-        # it. Its nullness is also the cheapest available proof the gate is
-        # still there.
+        # CONTRACT rather than a bug. The same gate makes `unpriced` and
+        # `none` unreachable too, which is why a STORED `sim_view` only ever
+        # reads `agrees`, `disagrees`, `neutral` or a `live_` form.
+        #
+        # Carried anyway because the gate is a POLICY the
+        # `layer2-sim-disagrees` lane has open, and a field added after the
+        # gate changes records nothing about the bets placed before it. Its
+        # nullness is also the cheapest available proof the gate is still
+        # standing.
         "sim_line_gap": _as_float(columns.get("sim_line_gap")),
         "sim_probability_railed": bool(columns.get("sim_probability_railed")),
     }

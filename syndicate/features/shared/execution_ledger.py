@@ -311,6 +311,11 @@ class OrderRequest:
     #                           from the side being taken  (a claim about
     #                           DIRECTION -- `projected 67.8` under `Under 53.5`)
     #   neutral                 the sim landed exactly on the de-vigged price
+    #   unpriced                the sim HAD a view and it could not be priced
+    #                           into an edge -- typically a one-sided market,
+    #                           so there is no two-sided fair (`36161e83` split
+    #                           this out of `none` expressly so that persisting
+    #                           the field here would not conflate the two)
     #   none                    the sim has no view on this row at all
     #   live_*                  the same verdict, from the LIVE re-sim
     #
@@ -331,6 +336,15 @@ class OrderRequest:
     # these fields are here to make -- the same argument
     # `_as_optional_float` makes for keeping a real `0.0` apart from an
     # absent edge.
+    #
+    # ONLY SIX OF THE NINE CAN EVER LAND HERE. `contradicts`, `unpriced` and
+    # `none` are all computed in the branch where `model_edge_pct` is None,
+    # and `sizing_inputs_from_row` refuses that row by name before it is
+    # sized -- so a stored order carries `agrees`, `disagrees`, `neutral` or
+    # a `live_` form, and nothing else. That is a property of the COMMIT
+    # GATE, not of this field, and it is what stops the `contradicts`-vs-
+    # `agrees` ROI split from being answerable however long this runs.
+    # `test_a_contradicted_row_still_cannot_become_an_order` pins it.
     #
     # NOT IN `idempotency_key`, and must never be, for the reason the two
     # fields above are not: that key is an explicit list precisely so a

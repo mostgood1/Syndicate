@@ -1742,9 +1742,15 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
       neutral       PLACED
       disagrees     PLACED **only when a large EV carries it** (below)
       contradicts   REFUSED  no_model_edge_pct
+      unpriced      REFUSED  no_model_edge_pct
       none          REFUSED  no_model_edge_pct
 
-  `contradicts` and `none` are computed in EXACTLY the branch where
+  **RE-MEASURED after `36161e83` landed mid-lane**, which split `none` into
+  `none` / `unpriced` at the source expressly because this field was about to
+  be persisted. That is nine verdicts now, and it does not change the finding
+  — it widens it: THREE are unreachable, not two.
+
+  `contradicts`, `unpriced` and `none` are computed in EXACTLY the branch where
   `model_edge_pct is None`, and `sizing_inputs_from_row` refuses that row by
   name before anything is sized. **So the `contradicts` arm of the
   pre-registered measurement has a denominator that is structurally zero and
