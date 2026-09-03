@@ -1507,30 +1507,6 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   remains unfixed and unlaned.
 - Blocked by: none. Does not deploy; the fix is a bound, and a bound is only
   worth shipping once its off != on test exists.
-### m639-actuals-no-truncate — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
-- Goal: fix `todo.md #639`. `write_mlb_actuals_for_date` opens its output `"w"`
-  before it knows whether there are rows, so a zero-row result truncates
-  `props_actuals_<date>.csv` to a bare header — hourly, for every date whose
-  input has aged off refresh-worker's disk. Testable outcome: with the input
-  ABSENT the function writes nothing and leaves any existing file untouched;
-  with the input PRESENT it behaves exactly as before.
-- Files: `scripts/build_mlb_actuals.py`, `tests/test_build_mlb_actuals.py` (NEW).
-  **NOT `scripts/run_refresh_worker.py`** — the tick already logs
-  `result["summary"]` verbatim, so new fields surface in production with no edit
-  to that file.
-- Hypothesis: the three cases the current code collapses can be separated
-  cheaply, because `load_json_file` returning None is the ONLY signal today and
-  `path.is_file()` is one extra call.
-- Falsification test: if "input present but legitimately zero rows" cannot be
-  told from "input absent", the fix would just move the 403-vs-404 collapse into
-  a new place and must not ship in that form.
-- Verification: (a) BOTH branches exercised offline against the real mirror —
-  an absent-input date must leave a pre-existing file byte-identical, and
-  2026-06-15 (mirrored, manifest `c6d52e5db907f9ac`) must still produce 1,123
-  rows; (b) the new fields must be COMPACT — the tick's log line is already
-  truncated by the Render API at ~1,200 chars, which is how `#639` was first
-  mis-read, so no per-date paths.
-- Blocked by: none for the fix. Shipping it needs a refresh-worker deploy.
 ### m625-standard-substrate-label — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. `#625`(6) done, commit `6211bdf9`, NO DEPLOY (documentation).** `model_engine_standard.md` §3b now names **three** substrates — `render`, `mirror:<manifest_id>`, `checkout` — with a table of what a verified mirror CAN and can NEVER answer. **The 2026-08-18 user directive is preserved verbatim and explicitly marked unchanged**; this ADDS one admissible case rather than relaxing anything, and an unverified local read is still not a claim. **The falsification test did NOT fire:** the reproducible class states crisply, against §3b's own worked example (NCAAF local 0 vs production 16) — a mirror answers questions about the CODE, never about the DEPLOYMENT. **Three stale places fixed in the same pass:** §3 and the gate requirements still said "allowlisted in `HOT_ARTIFACT_PATTERNS`" after `#625`(2) split it; the UNMEASURED rule could not tell a verified mirror from a checkout; and a new subsection states that a 403 is not an absence. **`#625` IS COMPLETE — all six items.**
 - Files: released — `docs/ai_context/model_engine_standard.md`.
 - Verification: all three criteria met — (a) three substrates each with what
@@ -1687,6 +1663,13 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - CLAIMS: none held. Measurement only; no repo code was touched.
 - Blocked by: none.
 
+- Goal: fix `todo.md #639` — `write_mlb_actuals_for_date` opened its output `"w"`
+  before knowing whether there were rows, truncating `props_actuals_<date>.csv`
+  to a bare header hourly for every date whose input had aged off the worker.
+- Falsification test (RAN, did not falsify): if "input present but legitimately
+  zero rows" could not be told from "input absent", the fix would only move the
+  403-vs-404 collapse somewhere new and must not ship in that form. Both cases
+  now carry distinct tokens and both are exercised on real mirrored data.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
