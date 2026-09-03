@@ -19616,3 +19616,40 @@ run. The code does NOT return after printing it; the run proceeds.
 `memory_anon_mb` against 4,096 with the 1,877 MiB baseline cycle peak. **If it
 OOMs, set the key back to `false`** — `#256`'s claim-before-work caps the damage
 at one run per day, not a loop.
+
+## 2026-09-03 — BOTH WORKERS CAUGHT UP — lane `worker-catchup-deploy`
+
+live-odds-worker had drifted **31 code commits / 26 hours** behind (live
+`e4a471c0`, 2026-09-02 13:38) and refresh-worker 6 behind (`c4ce0502`).
+
+| service | from | to | live at | preflight |
+|---|---|---|---|---|
+| live-odds-worker | `e4a471c0` | `d4f0b8a3` | 17:04:06Z | HOLD ×5 (soccer artifact build + odds refresh), CLEAR 16:57:47Z |
+| refresh-worker | `c4ce0502` | `c1c4211a` | 17:19:03Z | HOLD ×2 (`run_mlb_daily_sim_job.py` in flight), CLEAR 17:13:07Z |
+
+verify (live-odds-worker): its OWN Render log stream, 17:04:06Z→17:07:19Z —
+**16 `PUBLISH_OK`**, 7 `PUBLISH_SKIPPED_UNCHANGED`, MLB `LIVE_MC_DIAG` sims and
+`FEED_LIVE_PRUNE` running; **0 tracebacks / OOM / CRITICAL**. Baseline taken
+BEFORE the deploy for comparison: 25 lines in the preceding 25 min, publishing
+soccer `live_state` + `odds_history` at 16:48:04Z. The 13 lines matching "Error"
+are all the `POLYMARKET_US_V1` route probe, which self-documents as
+`sports_routes_404_on_this_host_measured_2026-08-24T20:18:37` — pre-existing,
+not introduced by this deploy.
+
+verify (refresh-worker): 100 lines in 17:19:03Z→17:23:39Z — `artifact_publisher`
+×25, `book_grid` ×6, `live_props` `LIVE_MC_PRICED rows=20`, `live_lens_loop`;
+**0 tracebacks / OOM / CRITICAL**. `MEMORY_WATCHDOG` peaked
+`memory_anon_mb=1119.95` at `cards_context_end` with `game_count=16`, then fell
+to 1017.68 — against a 4,096 MiB ceiling, so no memory regression from the jump.
+
+**Two hazards checked BEFORE deploying refresh-worker, both cleared.**
+(1) Lane `accuracy-autorun-rearm` was waiting on an `[accuracy_summary]
+AUTORUN_DONE` measurement, and a reboot would have destroyed it. It had not
+started: the worker logged `ACCURACY_SUMMARY_AUTORUN_GATED reason=disabled` on
+every tick through 17:01:35Z. (2) **A deploy injects staged env vars**, so if
+that lane had already set its key via the API and was waiting to deploy it, MY
+deploy would have armed a ~1.4 GB job unsupervised. Read the live env block
+first: `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN = 'false'`, not staged.
+Their key is still theirs to set.
+
+Residual: web is 2 commits behind (`b7c2b220`); not in this lane's scope.

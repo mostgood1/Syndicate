@@ -2148,6 +2148,31 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 ### accuracy-autorun-rearm — OPEN, **BLOCKED: stood down 2026-09-03, no deploy taken, key still `false`. Retry OVERNIGHT before 07:00 CT** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### worker-catchup-deploy — CLOSED 2026-09-03 — **BOTH WORKERS CAUGHT UP AND VERIFIED.** live-odds-worker `e4a471c0`→`d4f0b8a3` (live 17:04:06Z, 16 PUBLISH_OK, 0 errors); refresh-worker `c4ce0502`→`c1c4211a` (live 17:19:03Z, 25 publisher lines, peak anon 1,119 MB of 4,096, 0 errors) — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: the two background workers run current code. live-odds-worker is 31
+  commits / 26h behind (live `e4a471c0`, 2026-09-02 13:38); refresh-worker is 6
+  behind (live `c4ce0502`). Target `d4f0b8a3`.
+- Files: NONE. This lane deploys already-merged code and changes no file. It
+  appends to the shared deploy ledger like every lane, but deliberately does not
+  CLAIM it — `accuracy-autorun-rearm` holds that claim and an append-only ledger
+  is not an exclusive resource.
+- Hypothesis: n/a (not diagnostic).
+- Verification: per service, `PUBLISH_OK` (or role-equivalent) lines RESUME in
+  that service's own Render log stream after boot, and the live SHA reads the
+  target. Baseline BEFORE: live-odds-worker emitted 25 lines in 25 min,
+  publishing soccer live_state + odds_history at 16:48:04Z.
+- refresh-worker was blocked by `accuracy-autorun-rearm`'s claim; it lapsed, and
+  **both hazards were then checked rather than assumed**: their autorun had never
+  started (`ACCURACY_SUMMARY_AUTORUN_GATED reason=disabled` on every tick to
+  17:01:35Z), and their env key reads `'false'` in the live block — so my deploy
+  could not arm their ~1.4 GB job. No `--force` was used on either service.
+- Preflight did its job twice: HOLD ×5 on live-odds-worker (soccer artifact
+  build) and HOLD ×2 on refresh-worker (`run_mlb_daily_sim_job.py` in flight).
+- Measurements in `.syndicate/deploys.md`. Residual: web is 2 commits behind.
+- Blocked by: none.
+
+
+### accuracy-autorun-rearm — OPEN — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `#626`(h) runs in production for the first time WITHOUT killing the
   worker. ONE testable outcome: `[accuracy_summary] AUTORUN_DONE ... error=none`
   in refresh-worker logs, with the peak `memory_anon_mb` during that window
