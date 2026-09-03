@@ -246,6 +246,19 @@ def test_every_per_date_COUNT_is_summed_across_the_window(monkeypatch) -> None:
     Measured 2026-09-03: `unprojected_by_market` shipped outside `summable` and
     read `{}`; `player_alias_hits` read a single pass's 1,211. Same defect the
     merged `reason` field has.
+
+    **THE SPORT HERE IS NOW `ncaaf`, AND THAT IS THE POINT OF THE CHANGE THIS
+    NOTE ACCOMPANIES.** This test was written with `soccer` because soccer is
+    where the dropped counters were measured. Soccer no longer reaches this
+    merge at all: its own join already resolves the seven-day slate window
+    internally (`board_enrichment.py:1113`), so looping it per date re-scanned
+    one grid against seven near-identical indexes and summed the result. The
+    merge is still exactly right for `ncaaf` and `nfl`, whose joins read
+    `selected_date` alone and genuinely need every date -- so the assertions
+    below are unchanged and only the vehicle moved.
+
+    Read together with `test_soccer_is_joined_ONCE_because_its_own_join_spans_the_window`
+    in `test_layer2_projection_window.py`, which is the other half.
     """
     from pipeline import layer2_shortlist as mod
 
@@ -267,7 +280,7 @@ def test_every_per_date_COUNT_is_summed_across_the_window(monkeypatch) -> None:
     )
 
     merged = mod._attach_projections_over_window(
-        [], sport="soccer", selected_date="2026-09-04",
+        [], sport="ncaaf", selected_date="2026-09-04",
         window_dates=["2026-09-04", "2026-09-05", "2026-09-06"],
     )
 

@@ -241,3 +241,71 @@ def test_a_single_date_window_keeps_its_rate_unchanged(monkeypatch):
         [], sport="mlb", selected_date="2026-09-03", window_dates=["2026-09-03"],
     )
     assert out["pct_projected"] == 25.9
+
+
+# ---------------------------------------------------------------------------
+# A SPORT WHOSE OWN JOIN SPANS THE WINDOW MUST BE JOINED ONCE.
+#
+# `board_enrichment` resolves a seven-day slate window INSIDE each soccer call
+# (board_enrichment.py:1113) and passes it to `load_soccer_projections`. So the
+# pass for D1 indexes D1..D1+6 and the pass for D2 indexes D2..D2+6 -- two
+# indexes claiming the same rows, which is exactly what the call site's guard
+# comment says "cannot occur in practice". Its premise is about ROWS and holds;
+# its conclusion is about INDEXES and does not.
+#
+# The attach is idempotent so nothing is corrupted. The COUNTS are not: they are
+# summed across passes.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def counting_attach(monkeypatch):
+    """Every call returns the SAME whole-grid coverage -- a window-aware join."""
+    calls: list[str] = []
+
+    import syndicate.features.shared.board_enrichment as be
+
+    def _fake(grid, *, sport, selected_date):
+        calls.append(selected_date)
+        return {"supported": True, "rows_considered": 1036,
+                "rows_with_projection": 511, "unmatched_match_rows": 104}
+
+    monkeypatch.setattr(be, "attach_projections", _fake)
+    return calls
+
+
+def test_soccer_is_joined_ONCE_because_its_own_join_spans_the_window(counting_attach):
+    out = l2._attach_projections_over_window(
+        [], sport="soccer", selected_date="2026-09-03",
+        window_dates=["2026-09-03", "2026-09-04", "2026-09-05", "2026-09-06",
+                      "2026-09-07", "2026-09-08", "2026-09-09"],
+    )
+    assert counting_attach == ["2026-09-03"], "seven passes over one grid, not one"
+    # The numbers the join actually produced, not seven times them.
+    assert out["rows_considered"] == 1036
+    assert out["rows_with_projection"] == 511
+    assert out["unmatched_match_rows"] == 104
+    # A single-date window must not advertise itself as a multi-date one.
+    assert "window_dates" not in out and "per_date" not in out
+
+
+def test_a_sport_whose_join_does_NOT_self_widen_still_gets_every_date(counting_attach):
+    """THE CONTROL, and the reason this is an explicit set rather than a rule
+    about window length. ncaaf's window also spans days, but
+    `load_ncaaf_game_projections(selected_date)` reads ONE date -- so narrowing
+    it here would re-create `#379` backwards, and its zero would look like a
+    producer gap rather than a scope bug."""
+    out = l2._attach_projections_over_window(
+        [], sport="ncaaf", selected_date="2026-09-03",
+        window_dates=["2026-09-03", "2026-09-04", "2026-09-05"],
+    )
+    assert counting_attach == ["2026-09-03", "2026-09-04", "2026-09-05"]
+    assert out["rows_considered"] == 3 * 1036, "ncaaf genuinely needs the sum"
+
+
+def test_single_date_soccer_is_untouched(counting_attach):
+    out = l2._attach_projections_over_window(
+        [], sport="soccer", selected_date="2026-09-03", window_dates=["2026-09-03"],
+    )
+    assert counting_attach == ["2026-09-03"]
+    assert out["rows_considered"] == 1036

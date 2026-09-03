@@ -1967,6 +1967,12 @@ def build_layer2_shortlist(
 # the definition down here keeps the guard measuring what it means to measure
 # instead of being weakened to accommodate a helper.
 # ---------------------------------------------------------------------------
+# Sports whose per-date projection join ALREADY reads the whole slate window
+# internally, so looping it per date re-scans the same grid against
+# near-identical indexes. See `_attach_projections_over_window`.
+_SELF_WINDOWING_PROJECTION_SPORTS = frozenset({"soccer"})
+
+
 def _attach_projections_over_window(
     grid: list,
     *,
@@ -1992,6 +1998,42 @@ def _attach_projections_over_window(
         dates.insert(0, selected_date[:10])
     if not dates:
         dates = [selected_date]
+
+    # A SPORT WHOSE OWN JOIN ALREADY SPANS THE WINDOW MUST BE JOINED ONCE.
+    #
+    # The guard above this call site says: "LAST DATE WINS ON A COLLISION, which
+    # cannot occur in practice: a row belongs to exactly one kickoff date, so two
+    # dates' indexes never claim the same row." The premise is about ROWS and it
+    # is true. The conclusion is about INDEXES and it is false for soccer.
+    #
+    # `board_enrichment` resolves `resolve_window_dates("soccer", d, window="slate")`
+    # -- seven days -- and passes it to `load_soccer_projections` INSIDE each
+    # call (board_enrichment.py:1113). So the pass for D1 builds an index over
+    # D1..D1+6 and the pass for D2 builds one over D2..D2+6, and those two
+    # indexes claim overwhelmingly the SAME rows. Seven passes, seven near-identical
+    # indexes, one grid.
+    #
+    # The attach itself is idempotent -- it overwrites `row["projection"]` -- so
+    # nothing is corrupted. What breaks is every COUNT, because the counts are
+    # summed across passes: `rows_considered` becomes 7x the grid, and
+    # `rows_with_projection` counts a single row up to seven times and can
+    # exceed the true row count. The rate survives roughly (both terms inflate),
+    # the absolute numbers do not, and `unmatched_match_rows` inflates worst
+    # because a pass whose index misses a fixture contributes every one of that
+    # fixture's rows again.
+    #
+    # MEASURED 2026-09-03, same day, soccer:
+    #     windowed telemetry   pct_projected 26.0%   unmatched_match 56.4%
+    #     single pass          pct_projected 49.3%   unmatched_match 10.0%
+    #
+    # EXPLICIT SET, NOT A HEURISTIC. Whether a join self-widens is a fact about
+    # that join's code, not something to infer from the sport's window length --
+    # ncaaf and nfl also span days and their joins take `selected_date` alone,
+    # so they genuinely need this loop. Adding a sport here without widening its
+    # join would silently narrow its coverage to one date, which is `#379`'s
+    # defect running backwards.
+    if sport in _SELF_WINDOWING_PROJECTION_SPORTS and len(dates) > 1:
+        dates = [selected_date[:10] if selected_date else dates[0]]
 
     merged: dict[str, Any] = {}
     per_date: dict[str, Any] = {}
