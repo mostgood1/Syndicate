@@ -1171,6 +1171,17 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   workers (`#638` `21de4a9e`, `#637` `e4a471c0`) — see `state.md
   [venue-odds-storage]` and `log/2026-09-02.md`. **This lane stays OPEN for ONE
   thing only: the ~115 MB is NOT reclaimed.**
+- **CENSUS RE-RUN TWICE 2026-09-02 (22:19 and ~23:0x CDT) — IDENTICAL, exit 2.**
+  42 keys / 100.3 MB, SAFE 27 / PENDING 15. `refresh-worker` still shows
+  `wrote venues: kalshi` only. Nothing expired. **A third reading is ARMED:**
+  scheduled task `check-venue-odds-hydration-census`, one-shot
+  2026-09-03T04:19:00Z, report-only, expiry forbidden in its prompt.
+  **That task lives OUTSIDE the repo** (`~/.claude/scheduled-tasks/...`) and is
+  captured by no commit. **Its first fallback was wrong and is fixed** — it had
+  pointed at the primary tree, which does NOT contain the script.
+  **The script exists only in this session's worktree and on `origin/main`;
+  worktrees are session-scoped**, so if it is closed before the fire time the
+  task stops and the reading is owed to a human.
 - **THE ONLY REMAINING ACTION, and it is gated, not free.** Run
   `py -3 scripts/check_venue_odds_hydration_census.py`. It exits 0 only when every
   censused key is SAFE and the key listing was not truncated. First run:
