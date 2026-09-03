@@ -18937,3 +18937,36 @@ was released with its own token (no `--force` needed — the token was still in
 hand from the acquire).
 
 Claim released after this entry.
+
+## 2026-09-03 01:07-01:1xZ — refresh-worker `f84eb21b` — `#639` fix: the actuals writer no longer truncates — lane `m639-actuals-no-truncate`
+
+Claim acquired + preflight CLEAR (only infra processes; refresh-worker was at
+1,907 MB RSS, no job in flight). Live SHA `99c3731f` confirmed an ANCESTOR of
+the target, so the deploy is cumulative. Claim RELEASED after the deploy.
+
+**verify: OWED, and ARMED.** The reading that settles it is the first
+`MLB_ACTUALS_TICK` after 01:15Z — the tick is hourly and the deploy reset its
+timer, so the next one is ~02:1xZ. Scheduled task
+`verify-639-actuals-no-truncate` fires 21:35 CDT carrying the criterion.
+
+**THE CRITERION, decided before the reading exists:**
+
+- PASS — June dates (06-15/16/18/19/22/23/27) `written: false` with a
+  `skipped_reason`, AND 07-05 / 07-06 / 07-24 / 09-01 / 09-02 `written: true`.
+- **INERT — every date `written: true`, or the `written` / `skipped_reason`
+  fields ABSENT from the summaries.** That would mean the deployed code is not
+  the fixed code.
+- The payload must be **PARSED**, not eyeballed: the logs API truncates that
+  message at ~1,200 chars for ~12 dates, which is exactly how `#639` was first
+  mis-diagnosed as "zero for every date" when it was 7 of 12.
+
+**Already established offline, before the deploy** (mirror manifest
+`c6d52e5db907f9ac`, network denied, all three branches):
+
+    2026-06-15  input present, 1212 rows -> resolved 1123, written=true
+    2026-06-30  input present, 986 rows, all skipped_no_feed -> written=false,
+                refused_empty_overwrite, prior file BYTE-IDENTICAL
+    2026-05-01  input absent -> written=false, input_absent
+
+So this deploy is not the first evidence the fix works — it is the evidence that
+the fix is REACHED in production.
