@@ -18970,3 +18970,43 @@ timer, so the next one is ~02:1xZ. Scheduled task
 
 So this deploy is not the first evidence the fix works — it is the evidence that
 the fix is REACHED in production.
+
+### 2026-09-03 01:58:19Z — `#639` VERIFIED IN PRODUCTION. PASS, 12 of 12 dates discriminating.
+
+First `MLB_ACTUALS_TICK` after the deploy (live 01:10:00Z). **Payload PARSED, not
+eyeballed** — the criterion required it, because a truncated read of this exact
+line is how `#639` was misdiagnosed the first time.
+
+| date | present | rows | resolved | written | reason |
+|---|---|---|---|---|---|
+| 2026-06-15 | False | 0 | 0 | **False** | `input_absent` |
+| 2026-06-16 | False | 0 | 0 | **False** | `input_absent` |
+| 2026-06-18 | False | 0 | 0 | **False** | `input_absent` |
+| 2026-06-19 | False | 0 | 0 | **False** | `input_absent` |
+| 2026-06-22 | False | 0 | 0 | **False** | `input_absent` |
+| 2026-06-23 | False | 0 | 0 | **False** | `input_absent` |
+| 2026-06-27 | False | 0 | 0 | **False** | `input_absent` |
+| 2026-07-05 | True | 987 | 906 | True | — |
+| 2026-07-06 | True | 705 | 651 | True | — |
+| 2026-07-24 | True | 1235 | 1231 | True | — |
+| 2026-09-01 | True | 126 | 126 | True | — |
+| 2026-09-02 | True | 651 | 640 | True | — |
+
+**June refusing with a reason: 7/7. Later dates written: 5/5.** Neither INERT
+branch was taken — the `written` / `skipped_reason` fields are present (so the
+deployed code IS the fixed code) and not every date reads `written: true`.
+
+**IT ALSO CONFIRMS THE ROOT CAUSE FROM PRODUCTION'S OWN SIDE.**
+`top_props_present: False` on exactly the seven June dates is the direct reading
+of what the offline replay could only infer: refresh-worker does not hold those
+inputs, while web holds `daily_top_props` for 123 dates. The diagnosis was made
+on a mirror and is now confirmed on the machine.
+
+**What this stops:** seven `props_actuals_<date>.csv` files were being truncated
+to a bare header every hour. They no longer are.
+
+**Still unknown, and stated rather than assumed:** whether those seven files had
+ever held rows — i.e. whether anything was actually destroyed before the fix, or
+they had been empty all along. `mlb_source/reconciliation/*` is export-only
+allowlisted but nothing publishes it, so there is no production copy to read.
+That is the transport gap in `#625`(2), not a loose end of this fix.

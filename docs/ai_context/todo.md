@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#639` — **THE MLB ACTUALS WRITER TRUNCATES `props_actuals_<date>.csv` TO A HEADER, HOURLY, FOR EVERY DATE WHOSE INPUT HAS AGED OFF THE WORKER'S DISK** — lane `m639-actuals-zero-rows`, 2026-09-02 — **OPEN, ROOT-CAUSED, code exonerated**
+### `#639` — **FIXED, DEPLOYED AND VERIFIED 2026-09-03 01:58:19Z — PASS, 12 of 12 dates discriminating.** Was: the MLB actuals writer truncated `props_actuals_<date>.csv` to a header hourly for every date whose input had aged off the worker's disk — lane `m639-actuals-no-truncate` — **CLOSED**
 
 **CORRECTION TO THIS ITEM'S FIRST VERSION, which I published an hour earlier.**
 It said the writer "produces ZERO rows for every date". **That is false.** I read
@@ -66,10 +66,15 @@ diagnosis visible **with no edit to `run_refresh_worker.py`**. Kept compact and
 path-free deliberately — the log line is truncated at ~1,200 chars for ~12
 dates, which is how this item was first mis-read.
 
-**DEPLOY VERIFICATION, when it ships:** the next `MLB_ACTUALS_TICK` must show
-`written: false` with a `skipped_reason` for the June dates and `written: true`
-for 07-05 / 07-06 / 07-24 / 09-01 / 09-02. A tick where every date reads
-`written: true` would mean the guard is inert.
+**VERIFIED IN PRODUCTION 2026-09-03 01:58:19Z (refresh-worker `f84eb21b`, live
+01:10:00Z). PASS.** The seven June dates read `top_props_present: False,
+written: False, skipped_reason: input_absent`; 07-05 / 07-06 / 07-24 / 09-01 /
+09-02 read `written: True` with 987/906, 705/651, 1235/1231, 126/126, 651/640.
+**7/7 and 5/5 — neither INERT branch was taken.** Seven files were being
+truncated to a bare header every hour; they no longer are. The payload was
+PARSED, not eyeballed. The reading also confirms the root cause from
+production's own side: `top_props_present: False` on exactly those seven dates,
+which the offline replay could only infer. Full table: `deploys.md`.
 
 **STILL OPEN:** whether the June `props_actuals` files were ever non-empty (i.e.
 whether anything has actually been destroyed, or they were always empty). That

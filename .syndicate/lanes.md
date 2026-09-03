@@ -1600,15 +1600,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   <-> `_games_from_live_state_fallback` recursion remains unfixed and unlaned.
 - Blocked by: none. Does not deploy; the fix is a bound, and a bound is only
   worth shipping once its off != on test exists.
-### m639-actuals-no-truncate — OPEN (fix LANDED `558e4ffc`, NOT DEPLOYED) — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **THE FIX IS IN AND VERIFIED OFFLINE; ONE THING OWED: a refresh-worker deploy and the tick that proves it.** `write_mlb_actuals_for_date` no longer opens its output `"w"` before knowing whether there are rows. Four cases kept separate: `input_absent` (refuse, and do not even mkdir), `input_unreadable` (its own token), present-but-empty over an existing non-empty file (`refused_empty_overwrite`, with `allow_empty_overwrite` as the override), and rows present (unchanged). **Verified on the real mirror, all three branches** (manifest `c6d52e5db907f9ac`): 06-15 writes 1,123 rows; 06-30 refuses with the prior file BYTE-IDENTICAL; 05-01 refuses `input_absent`. New fields ride in the summary the worker already logs, so the diagnosis becomes visible with **no edit to `run_refresh_worker.py`**. **I ALSO NEARLY DESTROYED THREE PRE-EXISTING TESTS** by overwriting `tests/test_build_mlb_actuals.py`; the diff's 128 deletions is the only reason I noticed. Restored, and one of them then correctly FAILED the fix (it patches the loader, not the filesystem) — so the loader is now the primary presence signal.
+### m639-actuals-no-truncate — CLOSED 2026-09-03 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. DEPLOYED (refresh-worker `f84eb21b`, live 01:10:00Z) AND VERIFIED IN PRODUCTION 01:58:19Z — PASS, 12 of 12 dates discriminating.** The seven June dates now read `top_props_present: False, written: False, skipped_reason: input_absent`; the five later dates read `written: True` with real counts (987/906, 705/651, 1235/1231, 126/126, 651/640). Neither INERT branch was taken. **Seven `props_actuals_<date>.csv` files were being truncated to a bare header every hour; they no longer are.** The production reading also CONFIRMS the root cause independently — `top_props_present: False` on exactly those seven dates is the direct measurement of what the offline replay could only infer. Full table: `deploys.md` 2026-09-03 01:58:19Z.
 - Files: released — `scripts/build_mlb_actuals.py`, `tests/test_build_mlb_actuals.py`.
-- **OWED:** deploy `558e4ffc` (or later) to **refresh-worker**, then read the next
-  `MLB_ACTUALS_TICK`: the June dates must show `written: false` with a
-  `skipped_reason`, and 07-05 / 07-06 / 07-24 / 09-01 / 09-02 `written: true`.
-  **A tick where every date reads `written: true` means the guard is INERT.**
-- Claims: NONE held.
-- Narrative: `log/2026-09-02.md`, `todo.md #639`.
-
+- Verification: DONE. The criterion was written down BEFORE the reading existed
+  (including what INERT looks like) and the payload was PARSED, not eyeballed —
+  a truncated read of this exact line is how `#639` was first misdiagnosed.
+- Falsification test: RAN, did not falsify. "Input absent" and "input present,
+  graded to zero" carry distinct tokens and both are exercised on real data.
+- Claims: NONE held; refresh-worker claim acquired, used and released.
+- **Residual, not a loose end of this fix:** whether those seven files had ever
+  held rows is unknown — `mlb_source/reconciliation/*` is export-only
+  allowlisted but nothing publishes it, so there is no production copy to read.
+  That is `#625`(2)'s transport gap.
 ### soccer-anchor-surrogate-heldout — CLOSED 2026-09-02 — opened 2026-09-02 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **GOAL MET. The surrogate PASSES held-out: neither pre-registered kill condition fired. `b_train=3.6955` frozen on 4 leagues, scored on 8 fixtures from 4 OTHERS (3 goals-rated; targets 0.364-0.838 vs a training range of 0.14-0.65). Surrogate **0.0144** vs the 500-sim solver's **0.0225**; slope bias only +2.9%. **BUT the in-sample '2x better' does NOT replicate** — 1.3x once a CLAMP ARTIFACT is removed, sign test p=0.289/0.453 NOT significant, and the reference's own uncertainty (0.0187) EXCEEDS the surrogate error being claimed. **Defensible claim: EQUAL ACCURACY AT ZERO COST**, which is enough to adopt it as the cost lever (500 sims/fixture → 0) and nothing more. Does not change arming, which was declined on edge and evidence, not cost.**
 - Goal: `todo.md #622` OWED item (2). Decide whether the pooled-slope surrogate
   (`shift = (logit(target) - logit(p_base)) / b`, ZERO extra simulations)
