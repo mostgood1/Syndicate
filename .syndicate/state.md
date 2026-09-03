@@ -419,10 +419,21 @@ CHECKOUT of `origin/main` after pushing. Full evidence:
   `server_failed / unhealthy: HTTP health check failed (timed out after 5s)` at
   `02:15:54Z`, `server_restarted` + `server_available` `02:16:30Z`. No deploy was
   in flight — the live SHA had landed at 23:20:01Z.
-- **THE SYMPTOM THE OOM EVENTS DO NOT SHOW: it stays degraded between restarts.**
-  After recovery, a *one-file* `names_only` artifact request took **26.9 s**, and
-  a paced prefetch made **0 progress in 8 minutes**. "server_available" is not
-  "serving".
+- **THE SYMPTOM THE OOM EVENTS DO NOT SHOW: latency is ERRATIC between
+  restarts, not merely high.** A *one-file* `names_only` request took **26.9 s**
+  at 02:27Z; a paced prefetch made **0 progress in 8 minutes**.
+  **CORRECTED 02:35Z — and the correction is the useful part.** Re-sampled, the
+  SAME one-file request read **7.2 / 7.1 / 7.2 s** and I recorded that as a
+  "stable degraded state". Widening the sample immediately falsified it: the
+  same pattern then took **43.2 s**, while a 150-file pattern took **7.2 s** in
+  the same minute. **A narrow request slower than a broad one rules out both
+  tree-walk cost and payload cost** — the service is UNSTABLE, not uniformly
+  slow. Three samples five seconds apart are not a sample of a service's
+  behaviour, and "server_available" is not "serving".
+- Memory had meanwhile RECOVERED and does not explain it: anon **1,046.9 MB of
+  2,048 (51%)**, headroom 439 MB (up from 322), `inactive_file` 354 MB
+  reclaimable, no failure events for 16 min. Read `anon`, not
+  `memory_current_mb` — the latter carries page cache.
 - **refresh-worker: 3,724-3,986 / 4,096 MB (91-97%)**, unreclaimable
   2,071-2,229 MB, 10 processes; `oomKilled` at 4Gi `2026-09-02T15:32:56Z`.
 
