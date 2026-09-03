@@ -123,7 +123,36 @@ def test_a_disclaimer_under_files_becomes_a_phantom_claim():
         "  `beta` names `other/thing.py` as a candidate — a DIFFERENT file.\n"
     )
     assert ("alpha", "other/thing.py") in mod.claims(text), "phantom no longer reproduces"
-    assert mod.prose_paths_in_files_blocks(text), "the hint must flag it"
+    hits = mod.prose_paths_in_files_blocks(text)
+    assert hits, "the hint must flag it"
+    assert all(c for _line, c in hits), (
+        "no disclaimer marker here, so the phantom really is a claim")
+
+
+def test_a_RELEASED_line_is_flagged_but_reported_as_NOT_claiming():
+    """The hint's MESSAGE was wrong, not the ledger.
+
+    `_claimable_prefix` cuts at the first disclaimer marker, so a `released:`
+    line claims nothing. The hint still surfaces it -- a human should confirm
+    the marker is deliberate -- but it must not say the path becomes a claim.
+    Measured 2026-09-02 on `artifact_publisher.py`: the old wording ("each
+    becomes a CLAIM") was read at face value and reported as a live false claim
+    on a ledger that was correct.
+    """
+    text = """## OPEN
+
+### alpha — OPEN — opened 2026-09-02
+- Files: `a/one.py`,
+  released: `syndicate/features/shared/artifact_publisher.py` (claimed by nobody).
+"""
+    held = mod.claims(text)
+    assert ("alpha", "a/one.py") in held, "the real claim survives"
+    assert not [p for _s, p in held if "artifact_publisher" in p], (
+        "a released: path must not be claimed")
+    hits = mod.prose_paths_in_files_blocks(text)
+    assert hits, "the line is still surfaced for a human to eyeball"
+    assert not any(c for _line, c in hits), (
+        "and it must be reported as NOT claiming")
 
 
 def test_a_new_top_level_bullet_ends_the_files_block():

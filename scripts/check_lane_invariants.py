@@ -215,8 +215,28 @@ def open_lanes_under_archived(text: str) -> list[str]:
             if OPEN_RE.search(m.group(2))]
 
 
-def prose_paths_in_files_blocks(text: str) -> list[str]:
-    """Indented lines that look like prose AND name a path. HINT ONLY."""
+def prose_paths_in_files_blocks(text, claim_set=None):
+    """Indented lines that look like prose AND name a path. HINT ONLY.
+
+    Each hit is `(line, claims_it)`. THE SECOND HALF IS THE POINT: this hint used
+    to announce that every line it found "becomes a CLAIM", which stopped being
+    true when `claims()` learned the hook's disclaimer stripping (see
+    `_claimable_prefix`). A line reading "released: `x.py`" is flagged here --
+    correctly, a human should confirm the marker is deliberate -- but it claims
+    NOTHING, and saying otherwise sends the reader to fix a ledger that is right.
+
+    Measured 2026-09-02: that exact wording was read off this tool for
+    `artifact_publisher.py` and reported as a live false claim. The path was
+    never in the claim set; the MESSAGE was the defect. Sibling of the standing
+    rule that a healthy reading is evidence only once you know what makes it read
+    unhealthy -- here an UNhealthy reading was emitted for a healthy ledger.
+
+    Membership is tested against the REAL claim set rather than re-deriving it,
+    so this can never drift from what the guard actually enforces.
+    """
+    if claim_set is None:
+        claim_set = claims(text)
+    claimed_paths = {path for _slug, path in claim_set}
     hits, in_files = [], False
     for line in text.splitlines():
         if HEADER_RE.match(line):
@@ -231,7 +251,8 @@ def prose_paths_in_files_blocks(text: str) -> list[str]:
                 in_files = False
                 continue
             if PROSE_HINT_RE.search(line) and PATH_RE.search(line):
-                hits.append(stripped[:100])
+                claims_it = any(p in claimed_paths for p in PATH_RE.findall(line))
+                hits.append((stripped[:100], claims_it))
     return hits
 
 
@@ -263,7 +284,7 @@ def main(argv=None) -> int:
     claim_set = claims(text)
     contested = contested_files(claim_set)
     stray = open_lanes_under_archived(text)
-    prose = prose_paths_in_files_blocks(text)
+    prose = prose_paths_in_files_blocks(text, claim_set)
 
     if not args.quiet:
         print(f"{args.path}: {len(re.findall(r'(?m)^### ', text))} headings, "
@@ -279,10 +300,14 @@ def main(argv=None) -> int:
     for slug in stray:
         print(f"        {slug}  (its claims survive, but archiving it would drop them)")
 
-    print(f"[hint] {len(prose)} prose line(s) inside a '- Files:' block name a path; "
-          f"each becomes a CLAIM")
-    for line in prose[:5]:
-        print(f"        {line}")
+    really = [line for line, claims_it in prose if claims_it]
+    disclaimed = [line for line, claims_it in prose if not claims_it]
+    print(f"[hint] {len(prose)} prose line(s) inside a '- Files:' block name a path: "
+          f"{len(really)} DO claim it, {len(disclaimed)} disclaimed by a marker")
+    for line in really[:5]:
+        print(f"        CLAIMS      {line}")
+    for line in disclaimed[:5]:
+        print(f"        disclaimed  {line}  <- verify the marker is intended")
 
     failures = []
     if contested:

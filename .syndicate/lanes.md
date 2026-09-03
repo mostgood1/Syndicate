@@ -1984,6 +1984,16 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   zero rows" could not be told from "input absent", the fix would only move the
   403-vs-404 collapse somewhere new and must not ship in that form. Both cases
   now carry distinct tokens and both are exercised on real mirrored data.
+### lane-hint-claims-truthfully — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **The `[hint]` in `check_lane_invariants.py` announced that every path-naming prose line "becomes a CLAIM". That stopped being true when `claims()` learned the hook's disclaimer stripping, and the stale wording was read off this tool and reported as a live false claim on `artifact_publisher.py` — which is NOT claimed and never was. THE MESSAGE WAS THE DEFECT, the ledger was right. The hint now tests membership in the REAL claim set and prints `0 DO claim it, 1 disclaimed by a marker`.**
+- Goal: the hint must not report a false claim against a correct ledger.
+- Files: scripts/check_lane_invariants.py, tests/test_check_lane_invariants.py
+- Falsification test: a `released:` line must still be SURFACED but reported as NOT
+  claiming, while the marker-free phantom line in the existing test must still report
+  as claiming. Both asserted.
+- Verification RAN: 21/21 pass, and the checker against the live `lanes.md` prints
+  `0 DO claim it, 1 disclaimed by a marker` where it used to assert a claim.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
