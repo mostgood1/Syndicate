@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 753 rules `[generated]`
+## Index — 756 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4484,3 +4484,37 @@ denominator is not the same as an unbiased one.**
 This is `presence != reachability` applied to a POPULATION rather than to code:
 the fix is present, the path is live, and the rows that would exercise it are
 filtered out upstream.
+
+## 2026-09-03 — CONFIRMED BY DEMONSTRATION: a lane id absent from the roster can be a LIVE session
+
+The namespace rule above was inferred from four lookups all returning zero. It
+now has a positive demonstration. At 22:2x-22:4xZ, `web-oom-profiler-steady`
+(session `b2b5b45b-...`) **held a live deploy claim on web for 27 minutes** and
+was actively deploying that service — while appearing in **no row of a 200-entry
+`list_sessions` including archived**.
+
+So the pairing is proven in both directions: absent from the roster, provably
+alive. Anything that reads "not in the roster" as "gone" is wrong, and the one
+place that matters is `deploy_claim.py --force`, whose own prompt says an
+unrecorded session is UNKNOWN, not gone. **Do not force a claim on roster
+evidence. Wait for the TTL, or leave the service to its owner.**
+
+Applied here: web went un-deployed for a whole round and that was the right
+outcome. Forcing would have risked cancelling their build — which is exactly
+what was done to me at 20:44Z the same day.
+
+## 2026-09-03 — FORBIDDEN: taking an exit code through a pipe
+
+`RC=$(cmd 2>&1 | tail -1); if [ $? -eq 0 ]` reads **`tail`'s** status, not the
+command's. Twice in one session a preflight poll printed `CLEAR` directly above
+a line reading `HOLD: 3 job(s) in flight`, and the second time I had already
+fixed the first. A deploy nearly went out on it.
+
+The shape is dangerous because the wrong answer is always the PERMISSIVE one:
+`tail` essentially always succeeds, so a piped check degrades to "proceed",
+silently, for every guard written this way. Capture first, then test:
+
+    OUT=$(cmd 2>&1); RC=$?      # then echo "$OUT" | tail -1 for display
+
+Same family as *unknown must not default permissive* — here the unknown is the
+exit code itself, and the plumbing chooses the permissive branch for you.

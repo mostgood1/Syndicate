@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 753 rules `[generated]`
+## Index — 756 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 267**
+**FORBIDDEN — 269**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -203,6 +203,8 @@
 - [2026-09-03 — FORBIDDEN: judging what a reworded ledger would lose by a LINE-level diff.…](#2026-09-03-forbidden-judging-what-a-reworded-ledger-would-lose-by-a-line-level-diff-it-reports-as-unique-the-prose-that-was-superseded-which-is-exactly-the-prose-you-must-not-land-statemd-archival-pass)
 - [2026-09-03 — FORBIDDEN: forcing a deploy claim whose age keeps RESETTING without first…](#2026-09-03-forbidden-forcing-a-deploy-claim-whose-age-keeps-resetting-without-first-checking-the-holders-deploys-a-resetting-age-means-the-holder-is-working-not-that-a-dead-poller-is-renewing-it-lane-prop-join-yield)
 - [2026-09-03 — FORBIDDEN: verifying a deploy by ANCESTRY. Check the deployed file's CONTE…](#2026-09-03-forbidden-verifying-a-deploy-by-ancestry-check-the-deployed-files-content)
+- [2026-09-03 — FORBIDDEN: calling a field's persistence "the measurement is now possible"…](#2026-09-03-forbidden-calling-a-fields-persistence-the-measurement-is-now-possible-without-checking-the-population-can-reach-the-table)
+- [2026-09-03 — FORBIDDEN: taking an exit code through a pipe](#2026-09-03-forbidden-taking-an-exit-code-through-a-pipe)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -286,7 +288,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 481**
+**Rules and corrections — 482**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -459,6 +461,7 @@
 - [2026-09-03 — RULE: before you compact a file, measure whether it is BLOATED or merely B…](#2026-09-03-rule-before-you-compact-a-file-measure-whether-it-is-bloated-or-merely-big-they-look-identical-from-the-size-alone-and-take-opposite-fixes-lane-none-ledger-structure-pass)
 - [2026-09-03 — FIXED: a file lock is only a lock if every holder computes the SAME path](#2026-09-03-fixed-a-file-lock-is-only-a-lock-if-every-holder-computes-the-same-path)
 - [2026-09-03 — lane session ids are NOT CCD session ids, so a roster miss proves nothing](#2026-09-03-lane-session-ids-are-not-ccd-session-ids-so-a-roster-miss-proves-nothing)
+- [2026-09-03 — CONFIRMED BY DEMONSTRATION: a lane id absent from the roster can be a LIVE…](#2026-09-03-confirmed-by-demonstration-a-lane-id-absent-from-the-roster-can-be-a-live-session)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
