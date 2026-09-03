@@ -48,6 +48,18 @@ def main():
             continue
         try:
             bad = violations(rel, text, root)
+        except TypeError:
+            # AN OLDER `ledger_invariants.py` TAKES ONLY (rel, text). Worktrees in
+            # this repo sit at many different commits, so the hook WILL meet the
+            # 2-arg version -- and letting the TypeError fall into the blanket
+            # `except` below turned the whole check into a silent no-op. Measured
+            # 2026-09-02: freshly installed in the primary tree, the hook ran,
+            # raised, failed open, and reported nothing. DEGRADE to the predicates
+            # that version does have rather than going quiet.
+            try:
+                bad = violations(rel, text)
+            except Exception:
+                continue
         except Exception:
             continue
         if bad:

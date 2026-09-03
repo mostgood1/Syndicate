@@ -1697,6 +1697,13 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   content identical to HEAD, so git's own "nothing to commit" exit 1 read as a
   block. Asserting on the hook's own stderr, not the exit code, is what separated
   them.
+- **IT INSTALLED INERT, and only a reachability check caught it `[2026-09-02]`.**
+  Worktrees here sit at many different commits, so the hook meets OLD copies of
+  `ledger_invariants.py` whose `violations()` takes only `(rel, text)`. The 3-arg
+  call raised `TypeError`, the blanket `except` swallowed it, and the freshly
+  installed hook reported nothing at all. It now DEGRADES to the predicates that
+  version does have. Verified in the primary tree: 0 violations before the
+  fallback, 2 after, on the same injected duplicate block.
 - Installer REFUSES if `.git/hooks` holds real hooks, because `core.hooksPath`
   would disable them silently. `*.sample` files never run and are ignored.
 - Blocked by: none
