@@ -1727,6 +1727,20 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   lane `prop-join-yield` per user instruction. Needs BOTH order-placing
   services, same as `04187cdf`.
 
+### fleet-catchup-round6 — CLOSED 2026-09-03 — **BOTH WORKERS to `6a41098f`** (22:52:49Z / 22:54:23Z), verified by content (`_edge_unavailable_reason` 0→1, absent from the prior SHA) with both earlier fixes re-checked for survival; 200 log lines, 0 errors. **Web NOT taken — `web-oom-profiler-steady` held the claim all round and was not forced.** — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: all three services on `6a41098f`. ONE substantive commit, `36161e83`
+  (layer2 board splits `sim_view: none` into "no model" vs "model, unpriced" at
+  the source; web also gets `templates/intelligence.html`). `742724bd` is
+  `scripts/split_state.py`, ledger tooling no service executes.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: BY CONTENT on the deployed SHA using
+  `_edge_unavailable_reason`, checked to be ABSENT from the currently-live
+  `498a4320` (live=0, target=1) so a pass discriminates; plus each service's own
+  log stream with 0 tracebacks; plus `pending_deploys.py` reading 0.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

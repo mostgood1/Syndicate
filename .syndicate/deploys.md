@@ -20185,3 +20185,39 @@ the earlier note is not left dangling, not as a result.
 
 **Fleet:** web `9987c545` (0 pending — a peer deployed it after me) ·
 refresh-worker `498a4320` (1 pending) · live-odds-worker `498a4320` (1 pending).
+
+## 2026-09-03 — round 6 — BOTH WORKERS to `6a41098f`; **web deliberately NOT taken** — lane `fleet-catchup-round6`
+
+| service | to | live | notes |
+|---|---|---|---|
+| live-odds-worker | `6a41098f` | 22:52:49Z | preflight HOLD x7 over ~23 min |
+| refresh-worker | `6a41098f` | 22:54:23Z | TOO_SOON x4 (my OWN round-5 deploy, 25-min spacing), then HOLD x6 through a full MLB sim slate that ramped to 10 jobs |
+| web | — | — | **claim HELD by `web-oom-profiler-steady` throughout (2.8 → 27.1 min). Not forced.** |
+
+Substantive content: `36161e83` — layer2 splits `sim_view: none` at the SOURCE
+into "no model" vs "model, unpriced". `742724bd` is `scripts/split_state.py`,
+ledger tooling no service executes.
+
+verify — BY CONTENT on `6a41098f`, token checked ABSENT from the previously-live
+`498a4320` first so a pass discriminates: **`_edge_unavailable_reason` 0 → 1**.
+Both earlier fixes re-checked for SURVIVAL: `#643`'s `bytes_per_order` x1 and the
+deploy-lock `_main_worktree_root` x2 still present.
+
+Runtime: 200 lines across the two workers, **0 tracebacks**. live-odds-worker
+`[kalshi_odds] DAILY_BOOK status=ok files=37 errors=0 listed=16007 parsed=14460`
+and `TICK series_wanted=206 due=176 fetched=155 cap=150`; refresh-worker
+processing Kalshi titles across MLB/WNBA.
+
+**Web left alone on purpose.** `b2b5b45b` held the claim for the whole round and
+is actively profiling web memory (`#632`). Forcing would have risked cancelling
+their build — which is exactly what was done TO me at 20:44Z today. Web is 3
+commits behind; the lane that owns it can carry them.
+
+**Incidentally settles a question from earlier today:** `b2b5b45b` holding a live
+claim proves that session IS alive, while it appears in NO row of a 200-entry
+`list_sessions` including archived. Confirms the namespace rule in
+`learnings.md` — a lane id missing from the roster says nothing about liveness,
+so it must never justify `--force`.
+
+**Fleet:** live-odds-worker `6a41098f` · refresh-worker `6a41098f` · web
+`9987c545` (3 pending, owner-held).
