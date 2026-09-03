@@ -84,7 +84,7 @@ production copy. See the transport note in `#625`(2).
 
 ---
 
-### `#638` — **THE PUBLISHER'S `roster_objs` COMMENT IS STALE, and the pattern above it is broader than its author thought** — lane `m625-export-only-patterns`, 2026-09-02 — **OPEN, low severity, NOT a live defect**
+### `#638` — **CLOSED 2026-09-03 — comment corrected, decision recorded, tripwire in place. NO DEPLOY.** Was: the publisher's `roster_objs` comment is stale and the pattern above it is broader than its author thought — lane `m638-roster-objs-comment`
 
 `artifact_publisher.py` says roster objects are *"deliberately NOT allowlisted --
 hundreds of large files per date, and this allowlist drives publishing as well
@@ -106,11 +106,14 @@ excluded, and `#625`(2) nearly acted on it. **Deliberately not rewritten in
 passing** — the publish path is not this lane's to change, and narrowing that
 glob would be a behaviour change to what web receives.
 
-Fix: correct the comment, and decide separately whether
-`snapshots/*/*.json` should be narrowed to one level. `tests/test_export_only_patterns.py`
-pins the CURRENT behaviour (`test_families_625_calls_worker_local_are_already_exportable`),
-so a narrowing that drops rosters off the mirror fails loudly rather than
-silently.
+**DONE.** The comment now carries all three measurements. **The narrowing
+question is DECIDED: no.** Not as a preference — fnmatch CANNOT express "one
+level". The obvious `snapshots/*/[!/]*.json` still matches the deep path
+(verified), because the trailing `*` crosses `/` regardless of the character
+class. Narrowing means leaving fnmatch for a load-bearing predicate, to remove
+a risk that has never materialised (0 of 2,552). `tests/test_export_only_patterns.py`
+pins both halves instead, and the stale-phrase tripwire was shown to fire
+against the pre-fix blob rather than merely passing after it.
 
 ---
 

@@ -106,6 +106,48 @@ def test_the_two_lists_do_not_overlap() -> None:
         )
 
 
+def test_snapshot_glob_reaches_deeper_than_one_level_and_that_is_known() -> None:
+    """`#638`. In fnmatch `*` CROSSES `/`, so
+    `.../daily/snapshots/*/*.json` matches arbitrarily deep paths -- including a
+    `roster_objs/` subdirectory. That is currently harmless (0 of 2,552 snapshot
+    files on web are deeper than `snapshots/<date>/<file>`, measured 2026-09-03)
+    and it is left broad DELIBERATELY, because narrowing it means abandoning
+    fnmatch for a load-bearing predicate to remove a risk that has never
+    materialised.
+
+    This test exists so neither half can change silently:
+
+    - if the flat case stops being hot, the mirror loses 1,348 roster files
+      (99.4 MB) it has been pulling and nothing else would say so;
+    - if someone "tidies" the glob to one level, this fails and points at the
+      decision instead of letting a mirror family quietly disappear.
+    """
+    flat = "mlb_source/source_artifacts/data/daily/snapshots/2026-09-01/roster_9_ATH_at_TEX_pk822854_g1.json"
+    deep = "mlb_source/source_artifacts/data/daily/snapshots/2026-06-15/roster_objs/roster_obj_0_MIA_at_PHI_pk823452_g1.json"
+
+    assert is_hot_artifact_relative_path(flat), (
+        "production's REAL roster layout is flat under snapshots/<date>/ and must stay publishable"
+    )
+    assert is_hot_artifact_relative_path(deep), (
+        "the glob reaches deeper because fnmatch `*` crosses `/`. If this ever fails, the "
+        "pattern was narrowed -- check `#638` before assuming that is safe: nothing writes "
+        "this layout in production today, but the breadth is what the note above documents."
+    )
+
+
+def test_the_roster_note_is_not_the_old_wrong_one() -> None:
+    """The corrected note is load-bearing prose: it is the stated reason a family
+    is or is not excluded, and the wrong version nearly redirected `#625`(2)."""
+    import inspect
+
+    from syndicate.features.shared import artifact_publisher
+
+    source = inspect.getsource(artifact_publisher)
+    assert "hundreds of large files per date, and this allowlist drives" not in source, (
+        "the stale roster_objs note has been reintroduced -- see `#638`"
+    )
+
+
 def test_every_export_only_pattern_matches_something_real() -> None:
     """A pattern that matches nothing is inert while reading as correct — the
     defect class `#625` exists to catch. Every pattern must claim a sample."""

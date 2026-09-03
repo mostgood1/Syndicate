@@ -67,10 +67,42 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # Conditional pitch mix: pitcher x count-bucket x batter hand, 0.48 MB for
     # 728 pitchers. Same per-season single-document shape as the two above.
     "*_source/source_artifacts/data/conditional_mix/conditional_mix_*.json",
-    # The checklist's own REPORT. Roster objects are deliberately NOT
-    # allowlisted -- hundreds of large files per date, and this allowlist drives
-    # publishing as well as reading. The worker runs the audit and publishes the
-    # bounded result instead, the same shape as book_grid above.
+    # The checklist's own REPORT: the worker runs the audit and publishes the
+    # bounded result, the same shape as book_grid above.
+    #
+    # **CORRECTED `[#638`, measured 2026-09-03]`.** This note used to say roster
+    # objects were *"deliberately NOT allowlisted -- hundreds of large files per
+    # date, and this allowlist drives publishing as well as reading."* All three
+    # limbs were wrong, and it is worth being exact because the sentence is the
+    # stated REASON a family is excluded -- `#625`(2) nearly acted on it:
+    #
+    #   1. THEY ARE ALLOWLISTED. `*_source/source_artifacts/data/daily/
+    #      snapshots/*/*.json` (below) matches them, because in fnmatch `*`
+    #      CROSSES `/` -- that pattern reaches arbitrarily deep, not one level.
+    #   2. THE LAYOUT IT DESCRIBES IS NOT PRODUCTION'S. Production writes rosters
+    #      FLAT as `snapshots/<date>/roster_*.json`, never into a `roster_objs/`
+    #      subdirectory (`ask_the_syndicate_data.py:1290` says so). The
+    #      `roster_objs/` shape exists only in the git mirror and on laptops:
+    #      **0 of 2,552 snapshot files on web are deeper than
+    #      `snapshots/<date>/<file>`.**
+    #   3. THE FEARED COST IS AN ORDER OF MAGNITUDE OFF. Those flat roster files
+    #      ARE published and mirrored: **1,348 files / 99.4 MB over 89 dates =
+    #      15 files and 1.12 MB per date, mean 72 KB.** Not "hundreds of large
+    #      files per date". `#625`'s mirror pull fetches them routinely.
+    #
+    # **THE GLOB IS DELIBERATELY LEFT BROAD, and it is a CONSTRAINT rather than
+    # a preference: fnmatch cannot express "one level".** There is no glob that
+    # fixes this -- the obvious attempt, `snapshots/*/[!/]*.json`, still matches
+    # the deep path, because the trailing `*` crosses `/` regardless of what the
+    # character class says (verified 2026-09-03). Narrowing therefore means
+    # abandoning fnmatch for this pattern -- a change to a load-bearing
+    # predicate -- to remove a risk that has never materialised in production
+    # (0 of 2,552). What the breadth DOES leave is
+    # a latent surprise: if any producer ever writes
+    # `snapshots/<date>/roster_objs/*.json`, the sweep would start publishing
+    # hundreds of files with nobody deciding to, which is the real version of
+    # what the old note feared. `tests/test_export_only_patterns.py` pins both
+    # halves so a future tidy-up cannot hit either one silently.
     "*_source/source_artifacts/data/sim_input_report/sim_input_report_*.json",
     "*_source/data/book_grid/book_grid_*.json",
     "settlement_inputs/closing_lines_*.csv",

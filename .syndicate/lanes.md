@@ -1388,6 +1388,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   which of {works, inert, regresses} the widening falls into.
 - Blocked by: none
 
+### m638-roster-objs-comment — CLOSED 2026-09-03 — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. NO DEPLOY (comment + tests; the predicate is deliberately unchanged).** The `roster_objs` note was wrong on THREE counts, each now measured in place: (1) they ARE allowlisted, because fnmatch `*` crosses `/`; (2) production writes rosters FLAT as `snapshots/<date>/roster_*.json`, never into `roster_objs/` — **0 of 2,552 snapshot files on web are deeper than one level**; (3) the feared cost is **1,348 files / 99.4 MB over 89 dates = 15 files and 1.12 MB per date, mean 72 KB**, not "hundreds of large files per date". **THE GLOB IS LEFT BROAD, and that is a CONSTRAINT not a preference: fnmatch cannot express "one level"** — the obvious `snapshots/*/[!/]*.json` still matches the deep path, verified, because the trailing `*` crosses `/` regardless. Narrowing means abandoning fnmatch for a load-bearing predicate to remove a risk that has never materialised.
+- Files: released — `syndicate/features/shared/artifact_publisher.py`,
+  `tests/test_export_only_patterns.py`.
+- Verification: the tripwire was SHOWN TO FIRE, not assumed — the stale phrase is
+  present in the pre-fix blob and absent after, and the two glob assertions pin
+  both halves (flat rosters must stay hot or the mirror silently loses 1,348
+  files; the deep match is pinned with its reason so a tidy-up cannot hit it
+  quietly). 121 publisher-suite tests pass.
+- Falsification test: RAN, did not falsify — 0 of 2,552 production snapshot
+  paths are deeper than `snapshots/<date>/<file>`, so the breadth is incidental
+  rather than load-bearing.
+- Claims: NONE held. No deploy.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
