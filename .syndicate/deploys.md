@@ -19010,3 +19010,68 @@ ever held rows — i.e. whether anything was actually destroyed before the fix, 
 they had been empty all along. `mlb_source/reconciliation/*` is export-only
 allowlisted but nothing publishes it, so there is no production copy to read.
 That is the transport gap in `#625`(2), not a loose end of this fix.
+
+
+## 2026-09-03 03:03–03:09Z — refresh-worker `f84eb21b` — ENV-ONLY: the board-window floor can finally BIND — lane `board-window-floor-raise`
+
+**`SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` `600` -> `1800`.**
+Single-key endpoint, not `render.yaml` (the key is ABSENT there, so no
+`blueprint_sync` will revert it). **No code shipped.**
+
+### Why the SAME SHA, and why `--allow-rollback` on a deploy that rolls nothing back
+
+`render_deploy.py` refuses a same-SHA deploy: *"ALREADY live on f84eb21b —
+nothing to deploy."* That short-circuit sits inside `if live and not
+args.allow_rollback:`, so the flag is the only way past it. **Target == live, so
+production moved NOWHERE** — the flag bypassed an EQUALITY check, not a rollback
+guard. The tool's assumption that same-SHA means "nothing to deploy" is simply
+wrong for an env change, and is worth fixing in the tool.
+
+**`origin/main` was deliberately NOT deployed.** It was 30 commits ahead and
+carried five other sessions' runtime changes — `pipeline/kalshi_odds_refresh.py`
+(+97), `syndicate/features/shared/board_enrichment.py` (+74, NEW),
+`artifact_publisher.py`, `kalshi_client.py`, `wnba/cards.py`. Shipping those
+would release work that is not mine and would destroy the attribution this
+measurement depends on. One change per deploy.
+
+### Nothing was killed
+
+    03:00:23Z  jobs=3  mlb_sim=gone   HOLD
+    03:01:41Z  jobs=2  mlb_sim=gone   HOLD
+    03:02:58Z  jobs=0  mlb_sim=gone   CLEAR   <- deployed here
+    03:03:02Z  dep-dace6pmq1p3s73frlbo0 build_in_progress
+    03:08:48Z  status=live
+
+Windows on this worker last about ONE poll: an earlier waiter at a 150 s
+interval saw `CLEAR` once and the window was gone before a human turn could act,
+twice. At 75 s it caught one. An MLB daily sim was in flight for ~25 minutes
+before this and was allowed to finish — a deploy would have killed it.
+
+### verify: PART (a) DISCHARGED, PART (b) OWED
+
+**(a) THE INJECTION IS REAL, not merely configured.** The reading that proves it
+is not "the API says 1800" — an env change reaches a process only if that process
+STARTED AFTER IT:
+
+    configured  SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS = 1800
+    env set     ~2026-09-03T02:31Z
+    deploy live  2026-09-03T03:08:48.871144Z   <- NEWER than the set
+
+**(b) OWED — does it actually CLIP? THE PREDICATE IS ENQUEUES, NOT BUILDS.**
+`_board_window_last_queued_at` is stamped at QUEUE time
+(`intelligence_state.py:6886`), so this floor gates how often a non-today date is
+ENQUEUED. The prior lane measured BUILD spans, which cannot see enqueue clipping
+under a saturated queue — do not repeat that error. Baseline to beat, from the
+pre-change window `2026-09-02T12:42:56Z -> 2026-09-03T02:16:34Z` (13.6 h, 341
+lines, `BUILD_SPAN_ENTER stage=pull_hot_artifacts`):
+
+    today       n=46  med=940.8 s
+    non-today   n=5   med=3,854.1 s   min=1,331.2 s
+
+The floor is now above BOTH the ~1005 s serialisation period and that 1,331.2 s
+minimum, so it is capable of clipping for the first time — `600` was below both,
+which is the likely reason three prior tunings of this knob "did nothing".
+
+**A NULL RESULT IS AN ALLOWED OUTCOME AND MUST BE REPORTED AS ONE.** If
+non-today's build share does not fall, that means the queue coalesces and the
+floor is the wrong lever — say so rather than hunting for a reading that agrees.
