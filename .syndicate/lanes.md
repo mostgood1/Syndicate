@@ -1737,7 +1737,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
       so — that would mean the queue coalesces and the floor is the wrong lever.
 - Blocked by: none
 
-### intelligence-suite-runtime — OPEN, **NOT A STALL: 221 pass in 586s (9:46). Top 25 = 66%, all `test_intelligence_query*`. AND ISOLATING THEM MAKES THEM SLOWER — the durations do not decompose** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### intelligence-suite-runtime — OPEN, **NOT A STALL: 221 pass in 586s (9:46). Top 25 = 66%, all `test_intelligence_query*`. AND ISOLATING THEM MAKES THEM SLOWER — the durations do not decompose. WARM EFFECT QUANTIFIED (216.4s cold -> 131.4s after 20 tests costing 8s); MECHANISM NOT FOUND, four candidates ruled out** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `tests/test_intelligence.py` (221 tests) completes in a STATED, bounded
   time. One testable outcome: a full run finishes and its total is recorded, and
   whatever dominates it is either fixed or documented as irreducible with the
@@ -1843,6 +1843,57 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   default. The first is measured to backfire; the second is a 49-test rewrite;
   the third trades runtime for coverage on the only tests that exercise the
   candidate-pool build end to end.
+- **WARM-STATE DIAGNOSTIC RUN 2026-09-03. The effect is REAL, QUANTIFIED and
+  REPRODUCIBLE. Its MECHANISM is NOT FOUND, and four candidates are ruled out
+  with evidence.**
+
+  Within-subject, same six tests, only their position changing:
+
+      test                                      cold(6 alone)  after 20  full run
+      query_api_respects_explicit_filters        52.74s        32.76s    28.94s
+      query_supports_round_robin_parlays         50.83s        23.31s    21.32s
+      query_supports_cross_sport_parlays         33.87s        22.12s    19.74s
+      query_api_resolves_preview_date            29.96s        21.91s    20.02s
+      query_builds_generic_multi_sport_board     25.78s        16.91s    17.62s
+      query_api_reflects_model_reliability       23.19s        14.39s    18.41s
+      SUM                                       216.4s        131.4s    126.1s
+
+  **~8s of earlier tests buys ~85s.** The 20 warming tests cost only 6.3-9.7s
+  themselves, and 20 of them recover ~94% of the benefit the full 215-test
+  prefix gives. Cold is repeatable: three consecutive 6-test runs at 221.7 /
+  208.7 / 211.1s.
+
+  **RULED OUT, each by measurement rather than reasoning:**
+  1. **`lru_cache`.** Miss counts are IDENTICAL cold vs warm across all 19 active
+     cached functions (`_normalized_market_text_cached` 170 vs 173 misses;
+     `_preferred_source_roots_cached` 28 vs 26 — warm is LOWER, not pre-paid).
+  2. **Module-level dict/set caches.** Every non-dunder module container is a
+     STATIC constant — alias tables, stopwords, `market_keys`. Nothing grows.
+  3. **OS filesystem page cache.** Three consecutive cold runs in separate
+     processes are within noise of each other (221.7/208.7/211.1s). A page-cache
+     effect would have made run 2 and 3 fast.
+  4. **The `_INTELLIGENCE_STATE_SERVICE` singleton.** Its `_candidate_pools` and
+     `_source_fingerprints` are **0 and 0** both after zero tests AND after the
+     20 warming tests. It is not caching anything here.
+
+  **THE MEASUREMENT THAT FAILED, recorded so it is not repeated.** A cProfile
+  cold-vs-warm diff was attempted and is INCONCLUSIVE BY CONSTRUCTION, not
+  negative: the "warm" profile necessarily contains the 20 extra tests, so it
+  compared a 1-test profile against a 21-test profile. It showed 0.7s of
+  difference, which means nothing. cProfile around `pytest.main` cannot isolate
+  one test's cold-vs-warm cost; the next attempt needs per-test profiling
+  (a `pytest_runtest_call` hook profiling ONLY the test under study) or the
+  profile must be taken on identical test sets.
+
+- **WHAT THIS ALREADY SETTLES, regardless of the unfound mechanism:** the suite
+  is NOT stalled (221 pass in 586s), the durations do NOT decompose, and
+  **splitting the slow tests into their own job makes them ~1.7x slower** —
+  measured twice now. That guidance stands on the numbers alone.
+- **NEXT PROBE, precisely specified:** profile ONE test under a
+  `pytest_runtest_call` hook so the profile covers that test and nothing else,
+  run it cold and warm, and diff cumulative time by function. That is the
+  instrument that names the dependency; everything cheaper has now been tried
+  and eliminated.
 - Blocked by: none. No deploy — this is test-suite runtime, not production
   behaviour.
 
