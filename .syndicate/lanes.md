@@ -1223,9 +1223,27 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   in refresh-worker logs, with the peak `memory_anon_mb` during that window
   recorded against the 4,096 MiB ceiling.
 - Files: `.syndicate/deploys.md`, `.syndicate/lanes.md`, `.syndicate/state.md`.
-  Render ENV on refresh-worker via the single-key API — **never `render.yaml`**,
-  which fires `blueprint_sync` and rewrites every key on all three services.
+  Render ENV on refresh-worker via the single-key API.
   **No code file is touched: the fixes are ALREADY LIVE.**
+- **The Render blueprint file is NOT claimed by this lane, and must never be
+  pushed for this change** — pushing it fires `blueprint_sync`, which rewrites
+  every key on all three services regardless of `autoDeploy = no`.
+  The intent here is unchanged; only the PLACE it is written has moved, and the
+  move is the fix `[2026-09-03, session c38d3e5c, at the user's direction —
+  substance reviewed, not reworded]`. It previously read "**never
+  `render.yaml`**" INSIDE the `- Files:` block above, which made this lane
+  CLAIM the file it was forbidding. `_claims()` — shared verbatim with
+  `lane-guard.py`, the real `Edit` hook — turns every backticked path under
+  `- Files:` into a claim, and its disclaimer handling is a PREFIX CUT: a marker
+  governs only what FOLLOWS it on the SAME line, and "never" is not in
+  `_DISCLAIMER_MARKERS` at all. So the guard was blocking every OTHER lane from
+  editing a file THIS lane does not want.
+  It read as harmless because `check_lane_invariants.py` said `INVARIANTS HOLD`
+  once the second holder went away — "exactly one holder" is satisfied BY the
+  phantom. A green checker is not evidence the claim is real; ask the parser who
+  holds a path, do not infer it from the absence of a contest.
+  `ncaaf-live-cadence` (session 3492626c) hit and fixed this same defect in its
+  own block the same day, independently.
 - **THE CODE IS ALREADY DEPLOYED — this is an ENV-ONLY change.** refresh-worker
   runs `c4ce0502`, verified BY CONTENT (not ancestry): that tree carries
   `_project_evaluation_record` x4, `_accuracy_summary_ledger_budget_bytes` x6,
@@ -1377,7 +1395,21 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   tests, disabling the rate recompute fails 3 of 5.
 
 ### web-oom-profiler-steady — OPEN — opened 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
-- **NOTICE TO `web-catchup-round7` (session cfcce46d) — I MAY HAVE PUT A CHANGE INTO YOUR 23:02:32Z WEB DEPLOY. MY FAULT, AND HERE IS EXACTLY WHAT. `[web-oom-profiler-steady, 2026-09-03 ~23:0xZ]`**
+- **FLEET WARNING — `web` IS RUNNING ON ONE GUNICORN WORKER RIGHT NOW, AND THE ENV KEY IS SET, SO ANY WEB DEPLOY BEFORE ~23:55Z SHIPS IT. `[web-oom-profiler-steady, 2026-09-03 23:1xZ]`**
+  `WEB_CONCURRENCY=1` is live and deliberate (`b48a9480`, up 23:15:12Z, verified
+  1 worker / gunicorn `--workers 1`) for `#632`'s apportionment reading, which
+  needs the profiler's per-WORKER counter and its per-CONTAINER cgroup read to
+  cover the same scope. **Capacity is halved: 4 concurrent slots, not 8.**
+  **I hold the web claim until ~23:55Z and will restore `2` and redeploy before
+  then.** If you deploy web in this window your container comes up with ONE
+  worker — nothing is corrupted, but capacity stays halved until someone runs:
+      python scripts/render_env_set.py --service web --key WEB_CONCURRENCY --value 2
+      (then deploy — an env change does not reach a running process)
+  The full pre-change env baseline is committed in `deploys.md` under
+  *"`WEB_CONCURRENCY=1` IS TEMPORARY"* (`26c38fa7`), written BEFORE the change so
+  the restore is actionable by anyone if my session ends first. **Delete this
+  bullet once `WEB_CONCURRENCY` reads 2 and a deploy has carried it.**
+- **NOTICE TO `web-catchup-round7` (session cfcce46d) — RESOLVED, NO ACTION NEEDED. Your 23:02:32Z deploy came up CLEAN: 2 workers (pids 77/78 under master 60), gunicorn `--workers` flag reads `2`. Render injects env at CONTAINER start, after the build, so my revert landed first and nothing of mine shipped. Leaving this recorded because it was a real near-miss, not because anything is owed. `[web-oom-profiler-steady, 2026-09-03 ~23:1xZ]`**
   I ran `deploy_claim.py acquire` and `render_env_set.py` in ONE command. The
   acquire correctly REFUSED (you had taken the claim 0.3 min earlier) — but the
   env set ran anyway, because a refused claim does not stop the next command in
@@ -1926,9 +1958,12 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `scripts/refresh_odds_sources.py` (mode-scoped step filter only),
   `tests/test_ncaaf_live_autorun.py` (NEW),
   `tests/test_refresh_step_modes.py` (NEW).
-  Render ENV on **live-odds-worker** via the single-key API — **never
-  `render.yaml`** (a `render.yaml` push fires `blueprint_sync`, which rewrites
-  every key on all three services).
+  Render ENV on **live-odds-worker** via the single-key API only. The Render
+  blueprint file is deliberately NOT named as a path here and is NOT claimed —
+  `lane-guard` reads any backticked path inside a `- Files:` block as a CLAIM,
+  and spelling it even to forbid it made this lane contest it with
+  `accuracy-autorun-rearm` (caught by `check_lane_invariants.py`). See the ENV
+  bullet below for why that file must not be pushed for this change.
   Collision-checked 2026-09-03 against every OPEN lane: no OPEN lane claims any
   of these. `run_live_odds_refresh_worker.py` is `released:` in
   `open-bet-live-status` and explicitly "Not claimed, read-only reference" in
@@ -2132,6 +2167,48 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `39ed4ef5`.** Plus web serving MLB cards with 0 tracebacks.
 - Blocked by: none (claim released).
 
+
+### lane-guard-bash-bypass — OPEN — opened 2026-09-03 — session f97ad5ab
+- Goal: close the measured hole where a file edit made through Bash/PowerShell
+  is invisible to `lane-guard.py`, WITHOUT weakening the Edit-path enforcement
+  and WITHOUT adding a guard that can false-block a shell command.
+- Files (exclusive to this lane, all NEW except three): `.claude/hooks/lane_claims.py` (new),
+  `.claude/hooks/lane-postwrite-check.py` (new),
+  `.claude/hooks/test_lane_postwrite_check.py` (new),
+  `scripts/check_lane_claims.py` (new),
+  `.claude/hooks/lane-guard.py`,
+  `.claude/hooks/session-start.sh`,
+  `.claude/settings.json`.
+  Collision check RUN 2026-09-03 against all OPEN lanes via `lane-guard._claims()`:
+  no OPEN lane names any `.claude/` path or any of the new scripts. CLEAR.
+- **NOT claimed, deliberately:** `scripts/check_lane_invariants.py` — held by OPEN
+  lane `ncaaf-live-cadence` (as the bare token `check_lane_invariants.py`, which
+  `lane-guard` suffix-matches onto it). The claim-validity check therefore lands
+  in a NEW script rather than being added to that one.
+- Hypothesis (diagnostic half, TESTED BEFORE BUILDING): the Bash bypass is
+  routine, not exotic. **Result: CONFIRMED.** Census over all 292 session
+  transcripts for this repo, counting writes whose target resolves to a
+  `git ls-files` path: writes to tracked SOURCE files run 9,023 via the
+  Edit family against **1,045 via Bash/PowerShell — 10.4% unguarded**.
+  In `.syndicate/` the shell is the MAJORITY path (2,618 vs 1,069), which is
+  why the ledger already has a PostToolUse backstop and lane ownership does not.
+- Second finding, same probe: `lane-guard` is the ONLY guard here with one layer.
+  `ledger-append-guard.py` shares the Edit-only matcher but is backstopped twice
+  (`ledger-postwrite-check.py` on Bash|PowerShell, `ledger-commit-guard.py` at
+  commit). `commit-guard.py` does no lane-ownership work at all.
+- Falsification test for the DESIGN: `git status --porcelain` per Bash call costs
+  **200 ms** measured, against **1.3 ms** to `os.stat()` the 43 currently-claimed
+  paths. `ledger-postwrite-check.py` already rejected a **41 ms** git subprocess
+  as too expensive for this hook path, so the tree-diff shape is ruled out by a
+  standard this repo already set. Stat-the-claims is what gets built.
+- Verification: (1) a red-then-green drive of the new hook against a THROWAWAY
+  repo (never the live ledger — `learnings.md` forbids that), asserting exit 2 +
+  the lane name on an out-of-lane shell write and exit 0 on an in-lane one;
+  (2) a differential run of the extracted parser against the pre-refactor
+  `lane-guard._claims()` over the live `lanes.md`, asserting an IDENTICAL claim
+  set, so the extraction provably changes no enforcement;
+  (3) `.claude/hooks/test_lane_guard_hyphen.py` green after the refactor.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
