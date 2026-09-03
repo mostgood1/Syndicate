@@ -1,5 +1,58 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#644` — **THE SIM'S VERDICT IS NOW ON THE ORDER — and that is NECESSARY, NOT SUFFICIENT: two of the three arms of the measurement it was built for have a STRUCTURALLY ZERO denominator** — lane `order-sim-view`, 2026-09-03 — **LANDED, NOT DEPLOYED**
+
+`sim_view` / `sim_line_gap` / `sim_probability_railed` are stamped on the
+position by `portfolio_commit._sim_view_of`, copied across the `OrderRequest`
+boundary by `execute_portfolio`, and persisted by `execution_ledger`
+(`_LEAN_FIELDS`). The rule is IMPORTED from the board's own
+`_layer2_board_columns`, never recopied — the board attaches the verdict to
+`shortlist["cards"]` while the commit path prices `shortlist["rows"]`, so there
+is nothing to read it off and a local recompute would be a second contract.
+
+**Built for the `layer2-sim-disagrees` pre-registered measurement: settled ROI
+of `contradicts` rows vs `agrees` vs `none`, within sport and market family.
+Measured through the real `commit_portfolio`, that measurement is only PARTLY
+reachable, and the unreachable part is not a coverage problem that time fixes:**
+
+    agrees       PLACED        contradicts  REFUSED  no_model_edge_pct
+    neutral      PLACED        none         REFUSED  no_model_edge_pct
+    disagrees    PLACED, but only when a large EV carries it
+
+`contradicts` and `none` are computed in exactly the branch where
+`model_edge_pct is None`, which `sizing_inputs_from_row` refuses BY NAME before
+anything is sized. So the `contradicts` arm's denominator is zero and stays
+zero however long the ledger runs — consistent with NCAAF having 0 orders ever,
+and with production on 2026-09-03 (41 orders on `/api/portfolio/paper`: mlb 29,
+soccer 12, no NCAAF). **A sim CONTRADICTION still cannot be priced from the
+order book, and any penalty for one is still a guess.** Pinned by
+`test_a_contradicted_row_still_cannot_become_an_order` so moving that gate turns
+the suite red instead of silently redefining the measurement.
+
+**The arm that IS reachable carries a selection effect that must travel with
+it.** The stake gates admit a disagreement only when the EV outruns it — at
+-110: `ev_pct` 5.0 admits `model_edge_pct` -0.5, 10.0 admits -2.0, 20.0 admits
+-5.0 — so `disagrees` orders are systematically HIGH-EV against `agrees` orders.
+Control for `ev_pct` (on the order since `04187cdf`) or the comparison measures
+the EV gap and reports it as a sim effect.
+
+**OPEN, and it is the next step for whoever takes the measurement: nothing
+SERVES the field per order.** `/api/portfolio/paper` returns `ledger.orders` as
+an integer COUNT; `bet_status.rows` and `live_marks.marks` carry no model
+fields; `/api/ops/execution/ledger-summary` is aggregates-only BY DESIGN and
+carries no outcome or P&L, so it cannot express ROI at all. An ROI-by-`sim_view`
+aggregate has to be added there, respecting that endpoint's stated safety
+property (it increments counters and never places an order dict in the response).
+
+**OWED: the deploy, and the reading.** Verification is a NON-NULL `sim_view` on
+an order whose `submitted_at` is after the deploy, from `/api/portfolio/paper`
+or `/api/portfolio/live`. A null does not count in either direction. Deploy
+deliberately not taken — held by lane `prop-join-yield`.
+
+Also fixed in passing: `04187cdf` landed its own change TWICE (both field
+declarations and both record-dict keys duplicated). Legal Python, no
+misbehaviour, collapsed to one copy.
+
 ### `#639` — **FIXED, DEPLOYED AND VERIFIED 2026-09-03 01:58:19Z — PASS, 12 of 12 dates discriminating.** Was: the MLB actuals writer truncated `props_actuals_<date>.csv` to a header hourly for every date whose input had aged off the worker's disk — lane `m639-actuals-no-truncate` — **CLOSED**
 
 **CORRECTION TO THIS ITEM'S FIRST VERSION, which I published an hour earlier.**
