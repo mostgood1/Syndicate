@@ -5470,8 +5470,15 @@ inflated counter), so the cost was entirely session time, not board harm.
   classifier for the subject. Where they diverge, "unstamped" collapses two
   distinct populations — genuinely old rows, and new rows from an old writer —
   into one bucket, and the partition silently discards good data.
+- **RESOLVED 2026-09-03:** both dates WERE post-fix and are now pooled. Settled
+  by ratio against a same-ledger control — production-scored rows / h2h-only rows
+  is 7.5-14.7x on pre-fix dates but **1.17x and 1.01x** on 08-30/08-31, with
+  `records_considered` matching production EXACTLY on all five dates tested. The
+  pool went 2 dates / 28 games to **4 dates / 53 games**, and the estimate moved
+  toward zero (-0.00897 to -0.00218). **The exclusion had been costing half the
+  sample on the strength of a stamp that never meant what it was read to mean.**
 - **Cost:** bounded, because the conservative reading was the one in force. Two
-  candidate dates (08-30, 08-31) sit excluded from a like-for-like pool that is
+  candidate dates (08-30, 08-31) sat excluded from a like-for-like pool that was
   only 2 dates / 28 games — so the exclusion may be roughly doubling the time to
   a powered read on the single question this whole ledger exists to answer.
   Sibling of `presence is not reachability` and `absent signal is about the
