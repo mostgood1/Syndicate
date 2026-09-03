@@ -20100,3 +20100,48 @@ schedule reconcile running, `memory_anon_mb=553` against the 2,048 MiB cap,
 **Fleet:** web `ac32034b` (0 pending) · refresh-worker `150cc95b` (2 pending) ·
 live-odds-worker `44903fbf` (1 pending) — the residuals are main churn from the
 ~6 minutes this deploy took.
+
+---
+
+## 2026-09-03 — web `f3bb47d0` — MAKE THE odds_history MERGE CHEAPER (`#632`, lane `web-oom-profiler-steady`)
+
+Shares equal string VALUES within and across the two documents a merge parses,
+via one `object_pairs_hook` pool. CPython's decoder memoizes object KEYS within a
+parse but never values, and these documents repeat a small set of timestamps and
+labels across thousands of markets x 20 history points — the whole 4,021-market
+shard holds **279 distinct strings**.
+
+**verify: the merge is cheaper IN PRODUCTION — SATISFIED.** Sampled at 1.0 s over
+21:20:46-21:43:33Z, 37 distinct merge children, each attributed to its artifact
+by the `--relative-path` in its own argv (the logs API kept returning a stale
+02:52Z window for this filter, so argv is the join):
+
+| reading | before | after | |
+|---|---|---|---|
+| largest single merge child | 281.8 MB | **128.1 MB** | **-55%** |
+| peak summed child RSS | 400.6 MB (19 kids, pre-cap) | **163.3 MB** (3 kids) | **-59%** |
+| peak summed, `cap=4` era | 338.5 MB | — | |
+| peak concurrent children | 19 | 4 | = cap 2 x 2 workers |
+
+The largest post-change child is
+`soccer_source/tracking/odds_history/2026-09-05.json` at **128.1 MB on a
+45.69 MB / 2,786-market artifact**.
+
+**WHAT THIS DOES TO THE KILL ARITHMETIC.** This item records anon peaking at
+**1,823.8 MB** against a **2,048 MB** limit:
+
+    before:  1,823.8 + 284 excursion = 2,108 MB   -> OVER, and that is the kill
+    after:   1,823.8 + 163 excursion = 1,987 MB   -> UNDER, by 61 MB
+
+**HONEST LIMIT ON THE COMPARISON.** The 281.8 -> 128.1 MB figure is **not
+artifact-matched**: the pre-change sampler recorded pids, not paths, so part of
+that delta could be input mix rather than the change. The MATCHED evidence is
+the local benchmark, built from real production entries at the scale of the
+largest shard actually merged (56.7 MB / 4,021 markets): **472.0 -> 268.5 MB,
+-43%, with BYTE-IDENTICAL output** (sha256 `df613f0a...` on both arms). Bench and
+production agree in direction and rough magnitude; neither alone is the whole
+claim.
+
+Cost: 5.38s -> 5.77s per merge, +7%.
+
+Claim released after this entry.

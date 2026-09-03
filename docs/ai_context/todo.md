@@ -1161,6 +1161,86 @@ exempts that path from `_PUBLISH_MAX_BYTES` for one sweep
 (`artifact_publisher.py:1676-1682`). Logged as `SWEEP_REPAIRING`, bounded, but a
 refusal does let a path return exempt from a size guard.
 
+**`[2026-09-03]` CAP VERIFIED AT `cap=2` (web `ac32034b`, live 20:43:34Z). IT
+ENFORCES EXACTLY, AND IT DOES NOT SOLVE THE PROBLEM. Both halves are measured.**
+
+*The ceiling does what it says.* 36 `ARTIFACT_MERGE_AT_CAPACITY` lines after
+go-live, **every one `cap=2 mb_cap=32.0`** — so the retuned env values reached
+the running process — and across 84 post-deploy samples at 1.2 s the maximum in
+any single worker was **2, never 3**.
+
+    peak concurrent children   pre-cap 19  ->  cap=4: 8  ->  cap=2: 3
+    peak summed child RSS        334.6 MB  ->    338.5  ->     281.6 MB
+
+**An 84% cut in child COUNT bought a 16% cut in child MEMORY, because the
+excursion is set by the LARGEST SINGLE MERGE, not by how many run.** At
+`20:44:33Z` **one** child held **281.6 MB** — within 2% of the 276 MB peak
+`#630` measured for this union — and the container's unreclaimable stepped
+**+283.7 MB in the same instant** (389.8 -> 673.5), falling back to 401.1 one
+sample later.
+
+That attribution is not a coincidence of one sample. Over every `0 -> N`
+transition in the window:
+
+    childRSS 281.6 -> unreclaimable +283.7      childRSS  35.1 -> +16.0
+    childRSS  28.9 -> unreclaimable  +18.3      childRSS 102.4 -> +78.3
+    childRSS  26.2 -> unreclaimable  +22.7
+
+    n=5   corr(child RSS, unreclaimable step) = +0.997
+
+**The merge children ARE the excursion, ~1:1 — and a concurrency cap cannot
+bound it.** The byte ceiling cannot catch this either, BY DESIGN: the first
+child is never refused on size alone, because refusing it would mean the biggest
+shard could never merge at all. So one large merge always gets to run, and one
+large merge is the whole excursion.
+
+**RESIDUAL RISK, STATED PLAINLY: the kill mechanism is REDUCED, NOT REMOVED.**
+This item records anon peaking at 1,823.8 MB; 1,823.8 + 284 = **2,108 MB against
+a 2,048 MB limit**. A single large merge at a high baseline still exceeds it.
+
+**WHAT WOULD ACTUALLY BOUND IT** — none of it a concurrency cap:
+  * make the merge itself cheaper. `scripts/merge_published_artifact.py` does a
+    WHOLE-DOCUMENT JSON union, which `#630` measured at 3.13x input. odds_history
+    is a single JSON document, so a streaming union is real work, not a flag.
+  * or reduce the baseline the excursion rides on — still unattributed, still
+    the profiler's question, still owed.
+
+**`[2026-09-03]` THE MERGE IS CHEAPER, VERIFIED IN PRODUCTION (web `f3bb47d0`).**
+The excursion was one large merge, so the fix had to be the merge, not the
+ceiling. Sharing equal string values across a merge's two parses:
+
+    largest single merge child   281.8 MB  ->  128.1 MB   (-55%)
+    peak summed child RSS        400.6 MB  ->  163.3 MB   (-59%)
+    peak concurrent children           19  ->        4    (= cap 2 x 2 workers)
+
+Sampled at 1.0 s over `21:20:46-21:43:33Z`, 37 distinct children, each attributed
+to its artifact by the `--relative-path` in its own argv — the logs API kept
+serving a stale `02:52Z` window for this filter, so argv is the join. The largest
+post-change child is `soccer .../odds_history/2026-09-05.json`, **128.1 MB on a
+45.69 MB / 2,786-market artifact**.
+
+**THE KILL ARITHMETIC NOW CLOSES.** Against the 1,823.8 MB anon peak this item
+records and a 2,048 MB limit:
+
+    before:  1,823.8 + 284 = 2,108 MB   OVER   <- the kill
+    after:   1,823.8 + 163 = 1,987 MB   UNDER  <- by 61 MB
+
+**61 MB is not a comfortable margin, and the baseline is still climbing.** This
+buys headroom; it does not fix the growth, which remains unattributed and is
+still the profiler's question.
+
+**WHAT MADE IT WORK, since two cheaper-looking ideas were measured and
+discarded.** Reading bytes instead of str saves NOTHING (they are the same size),
+and the peak is the PARSED form at 2.76x the file. CPython memoizes object KEYS
+per parse but never VALUES, and the whole 4,021-market document holds only **279
+distinct strings** — so sharing them took the parsed form 187.7 -> 85.8 MB.
+
+**HONEST LIMIT.** The production before/after is **not artifact-matched** — the
+pre-change sampler recorded pids, not paths — so some of that delta may be input
+mix. The matched evidence is the bench: **472.0 -> 268.5 MB (-43%) with
+BYTE-IDENTICAL output**, sha256 equal on both arms over a 67.8 MB result. Bench
+and production agree in direction and magnitude; neither alone is the claim.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
