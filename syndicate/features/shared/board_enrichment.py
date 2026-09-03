@@ -1181,7 +1181,7 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
                     "rows_with_projection": 0,
                     "reason": "no NCAAF SmartSim2 projections for this date",
                 }
-            return attach_ncaaf_game_projections(grid, index)
+            return attach_ncaaf_game_projections(grid, index, selected_date=selected_date)
         except Exception:
             _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=ncaaf date=%s", selected_date)
             return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}

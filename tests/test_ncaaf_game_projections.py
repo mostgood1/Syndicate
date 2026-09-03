@@ -298,3 +298,44 @@ def test_spread_candidates_need_a_key_this_card_deliberately_does_not_set():
     assert "home_puck_line" not in card["betting"]
     rows = _game_bet_candidates_from_game({"slug": "ncaaf"}, card, fallback_epoch=0.0)
     assert "Spread" not in {r.get("market") for r in rows}
+
+
+def _grid_on(date_iso: str):
+    """`_grid()` shifted to another kickoff date, same fixture."""
+    return [{**row, "commence_time": date_iso + "T16:00:00Z"} for row in _grid()]
+
+
+def test_rows_from_ANOTHER_DATE_do_not_inflate_considered() -> None:
+    """The counting bug that made a 47% join read as 9.3%.
+
+    `_attach_projections_over_window` calls this once per date in NCAAF's 7-day
+    window with the SAME unfiltered grid, and the wrapper SUMS `rows_considered`.
+    A row from another date can never match this date's index, so counting it
+    here inflates the denominator on every pass while `rows_with_projection`
+    stays honest. Measured 2026-09-03: `considered=3625`, and 3625 / 5 non-empty
+    dates = 725 -- exactly the shared grid's size.
+    """
+    grid = _grid() + _grid_on("2026-09-05")
+    coverage = gp.attach_ncaaf_game_projections(
+        grid, _index(), selected_date="2026-08-29"
+    )
+    assert coverage["rows_considered"] == 3, "only this date's rows are in scope"
+    assert coverage["rows_with_projection"] == 3
+
+
+def test_without_selected_date_the_old_behaviour_is_UNCHANGED() -> None:
+    """The scoping is opt-in, so no existing caller silently changes meaning.
+    `board_enrichment`'s NCAAF branch -- the one production caller -- passes it."""
+    grid = _grid() + _grid_on("2026-09-05")
+    coverage = gp.attach_ncaaf_game_projections(grid, _index())
+    assert coverage["rows_considered"] == 6
+
+
+def test_scoping_moves_the_COUNTERS_and_not_the_ATTACHMENT() -> None:
+    """A skipped row would have failed `index.lookup` on this date anyway, so no
+    row gains or loses a projection because of this change."""
+    unscoped = _grid() + _grid_on("2026-09-05")
+    scoped = _grid() + _grid_on("2026-09-05")
+    gp.attach_ncaaf_game_projections(unscoped, _index())
+    gp.attach_ncaaf_game_projections(scoped, _index(), selected_date="2026-08-29")
+    assert [("projection" in r) for r in unscoped] == [("projection" in r) for r in scoped]

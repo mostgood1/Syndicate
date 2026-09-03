@@ -320,7 +320,10 @@ def load_ncaaf_game_projections(selected_date: str) -> NcaafGameProjectionIndex:
 
 
 def attach_ncaaf_game_projections(
-    grid: Iterable[Mapping[str, Any]], index: NcaafGameProjectionIndex
+    grid: Iterable[Mapping[str, Any]],
+    index: NcaafGameProjectionIndex,
+    *,
+    selected_date: str | None = None,
 ) -> dict[str, Any]:
     """Stamp `projection` onto NCAAF full-game h2h/spreads/totals rows.
 
@@ -329,6 +332,24 @@ def attach_ncaaf_game_projections(
     caveat, so where the model has no measured skill the honest value is none.**
     Every projection here travels with `model_skill`, because no NCAAF market has
     a recorded win.
+
+    `selected_date` SCOPES THE COUNTERS, and without it they are not
+    interpretable. `load_ncaaf_game_projections` builds a DATE-SCOPED index, but
+    `_attach_projections_over_window` calls this once per date in NCAAF's 7-day
+    slate window passing the SAME unfiltered grid every time -- so a row is
+    counted in `considered` on all seven passes while it can only ever match the
+    one date equal to its own kickoff. The window wrapper then SUMS
+    `rows_considered`, inflating the denominator while `rows_with_projection`
+    stays honest.
+
+    Measured 2026-09-03: the log read `considered=3625 projected=336` (9.3%) and
+    `3625 / 5 non-empty dates = 725`, exactly the shared grid's size. Re-derived
+    per date from the served board it is **327 of 692 (~47%)**, matching the
+    model's documented FBS-vs-FBS boundary. That 9.3% was reported up the chain
+    as a production outage and it was a counting artefact.
+
+    ATTACHMENT IS UNCHANGED by this: a skipped row would have failed
+    `index.lookup` on that date anyway. Only the counters move.
     """
     from syndicate.features.shared.prop_projections import _no_vig_over_probability
 
@@ -341,6 +362,13 @@ def attach_ncaaf_game_projections(
         market = str(row.get("market") or "").strip().lower()
         if market not in {"h2h", "spreads", "totals"}:
             continue
+        # BEFORE `considered`, deliberately: a row belonging to another date is
+        # not a miss on THIS date, and counting it as one is what made a healthy
+        # join read as a near-total failure.
+        if selected_date:
+            row_date = str(row.get("commence_time") or "")[:10]
+            if row_date and row_date != str(selected_date)[:10]:
+                continue
         considered += 1
         if str(row.get("segment") or "full").strip().lower() not in {"", "full"}:
             # margin/total means are full-game; a quarter market is a different bet.
