@@ -55,11 +55,14 @@ STATE = ".syndicate/state.md"
 # state.md was SPLIT 2026-09-03. The dated-sub-heading predicate has to
 # follow the content into the parts, or the guard silently stops covering
 # the files people now actually edit.
-STATE_PARTS = tuple(
-    f".syndicate/state_{d}.md"
-    for d in ("mlb", "soccer", "football", "basketball", "venues",
-              "board", "worker", "model", "ledger")
-)
+# MATCHED BY PATTERN, not by a list and not by a glob. A hard-coded list makes
+# every future split a hook edit, and forgetting it leaves the new part
+# unguarded and silent. A GLOB fixes that but introduces a worse bug here: this
+# guard is handed ABSOLUTE paths and often runs against a session worktree
+# (`.../syndicate-sessions/<lane>/.syndicate/state_mlb.md`), so a glob rooted at
+# the process CWD would return nothing and the guard would go quiet exactly
+# where it matters. The pattern is CWD-independent.
+STATE_PART_RE = re.compile(r"(?:^|/)\.syndicate/state_(?!archive)[A-Za-z0-9_-]+\.md$")
 OFF_ENV = "SYNDICATE_LEDGER_GUARD"
 
 HEADER_RE = re.compile(r"(?m)^###\s+(\S+)\s")
@@ -140,8 +143,11 @@ def main():
     # the edited file itself. Both trees mirror the same internal layout, so a
     # trailing-segment match is correct in either.
     norm = path.replace("\\", "/").rstrip("/")
-    rel = next((c for c in (LANES, STATE, *STATE_PARTS)
+    rel = next((c for c in (LANES, STATE)
                 if norm == c or norm.endswith("/" + c)), None)
+    # A state PART is governed by exactly the same predicate as state.md.
+    if rel is None and STATE_PART_RE.search(norm):
+        rel = STATE
     if rel is None:
         return 0
 
@@ -154,7 +160,7 @@ def main():
     except Exception:
         return 0
 
-    if rel == STATE or rel in STATE_PARTS:
+    if rel == STATE:
         try:
             gained = len(STATE_DATED_SUB.findall(after)) - len(STATE_DATED_SUB.findall(current))
         except Exception:

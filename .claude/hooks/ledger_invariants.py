@@ -45,11 +45,35 @@ STATE = ".syndicate/state.md"
 # slug duplicated ACROSS two parts is invisible here and is caught instead by
 # `scripts/state_key_check.py`, which pools slugs over every part and runs in
 # session-start's coherence loop.
-STATE_PARTS = tuple(
-    f".syndicate/state_{d}.md"
-    for d in ("mlb", "soccer", "football", "basketball", "venues",
-              "board", "worker", "model", "ledger")
-)
+# DISCOVERED, NOT LISTED. A hard-coded tuple made every future split a
+# two-file edit in the hooks, and a split that forgot it would leave the new
+# part checked by NOTHING -- silent, and in the direction of less enforcement.
+# Globbing means a part is covered the moment it exists. Archives are excluded:
+# they legitimately hold a superseded body under a slug that is still live.
+def _discover_state_parts():
+    """Rooted at the REPO, not the process CWD.
+
+    A CWD-rooted glob returns nothing when a hook runs from anywhere else --
+    which is the normal case for a session worktree -- and the failure is
+    silent and permissive. `violations()` also pattern-matches, so a part this
+    misses is still routed; this list only has to be good enough for TRACKED.
+    """
+    import pathlib
+    for base in (pathlib.Path(__file__).resolve().parents[2],  # repo root
+                 pathlib.Path(".")):
+        try:
+            found = sorted(p.name for p in (base / ".syndicate").glob("state_*.md")
+                           if not p.name.startswith("state_archive"))
+            if found:
+                return tuple(f".syndicate/{n}" for n in found)
+        except Exception:
+            continue
+    return ()
+
+
+# Resolved at import for the common case; `violations()` also falls back to a
+# suffix match so a part that appeared after import is still routed.
+STATE_PARTS = _discover_state_parts()
 LEARNINGS = ".syndicate/learnings.md"
 TRACKED = (LANES, STATE, *STATE_PARTS, LEARNINGS)
 
@@ -216,6 +240,13 @@ def violations(rel_path, text, root=None):
     a tree lose nothing they had before.
     """
     fn = CHECKS.get(rel_path)
+    if fn is None and re.match(r"(?:.*/)?\.syndicate/state_(?!archive)[a-z0-9_-]+\.md$",
+                               (rel_path or "").replace("\\", "/")):
+        # A part that did not exist when this module was imported, or a caller
+        # that resolved the path differently. Route it rather than fall through
+        # to "unknown file, no opinion" -- that silence is the failure mode the
+        # glob above exists to prevent, and it fails PERMISSIVE.
+        fn = _state
     if fn is None or not text:
         return []
     try:

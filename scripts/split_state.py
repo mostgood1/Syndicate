@@ -96,7 +96,15 @@ RULES = [
     ("soccer", r"^soccer|fotmob"),
     ("football", r"^nfl|^ncaaf|football|fantasy"),
     ("basketball", r"^nba|^wnba|^ncaab|basketball"),
-    ("venues", r"polymarket|kalshi|venue|exchange|odds|book|arb|fee|price|quote|market|clv|shopping"),
+    # The two venue INTEGRATIONS come out first, before the generic venue
+    # bucket. state_venues.md reached 151,168 B / 42 sections -- the largest
+    # part of the first split -- and it partitions cleanly by venue because
+    # that is how the work itself is divided: Polymarket 24 sections,
+    # Kalshi 6, and 12 that are about venues in general (fees, cadence,
+    # storage, join keys) and belong to neither.
+    ("polymarket", r"^polymarket"),
+    ("kalshi", r"^kalshi"),
+    ("venues", r"venue|exchange|odds|book|arb|fee|price|quote|market|clv|shopping"),
     ("board", r"board|card|surface|lens|display|chip|layer2|^ui|games-rail|portfolio"),
     ("worker", r"worker|memory|oom|deploy|render|keyvalue|artifact|publish|cache|runtime|budget|refresh|subprocess|disk|env"),
     ("model", r"sim|model|eval|accuracy|calibrat|intelligence|shortlist|projection|prop|ladder|scorer|edge|rank"),
@@ -279,9 +287,80 @@ def reindex(lines, crlf, raw, apply_):
     return 0
 
 
+def resplit(src, apply_):
+    """Re-partition ONE existing part with the current RULES.
+
+    The initial split is a one-shot on the monolith; this is what you run when
+    a part outgrows itself (state_venues.md hit 151,168 B). Sections whose slug
+    now classifies elsewhere move out; the rest stay. Targets are APPENDED to,
+    so an existing part is never clobbered.
+    """
+    if not src.exists():
+        print(f"REFUSED: {src} does not exist.")
+        return 1
+    data = src.read_bytes()
+    crlf = b"\r\n" in data
+    text = data.decode("utf-8-sig").replace("\r\n", "\n")
+    lines = text.split("\n")
+    preamble, secs = parse(lines)
+    own = src.name[len("state_"):-len(".md")]
+
+    stay, move = [], collections.defaultdict(list)
+    for slug, title, body in secs:
+        dom = classify(slug)
+        (stay if dom in (own, "root") else move[dom]).append((slug, title, body))
+    if not move:
+        print(f"{src.name}: nothing re-classifies out of it; unchanged.")
+        return 0
+
+    files = {src: preamble.rstrip("\n") + "\n\n"
+                  + "\n\n".join(b for _s, _t, b in stay) + "\n"}
+    for dom, items in move.items():
+        p = part_path(dom)
+        if p.exists():
+            base = p.read_bytes().decode("utf-8-sig").replace("\r\n", "\n").rstrip("\n")
+        else:
+            base = (f"# state — {dom}\n\n"
+                    f"Split out of `state.md` by `scripts/split_state.py`. Bodies are verbatim.\n"
+                    f"The INDEX of every subject, across every part, is in `state.md`; the\n"
+                    f"one-subject-one-section rule is global and spans these files.\n"
+                    f"Same rules as state.md: when a fact changes, EDIT THE LINE.")
+        files[p] = base + "\n\n" + "\n\n".join(b for _s, _t, b in items) + "\n"
+
+    print(f"{src.name}: {len(secs)} sections -> {len(stay)} stay, "
+          f"{sum(len(v) for v in move.values())} move")
+    for dom, items in sorted(move.items(), key=lambda kv: -sum(len(b) for _s, _t, b in kv[1])):
+        print(f"  {sum(len(b) for _s, _t, b in items):>7} ch  {len(items):>2} sections  -> {part_path(dom).name}")
+    print(f"  {sum(len(b) for _s,_t,b in stay):>7} ch  {len(stay):>2} sections  stay in {src.name}")
+
+    bad = verify(lines, secs, files)
+    # verify() only sees the files this call writes; a body that moved to an
+    # EXISTING part is counted there because that part's full text is in files.
+    if bad:
+        print("\nREFUSED. Nothing written:")
+        for b in bad:
+            print(f"  * {b}")
+        return 1
+    print("\nverification: every body verbatim exactly once, headings conserved, "
+          "slugs globally unique, every non-blank line conserved")
+    if not apply_:
+        print("\nDRY RUN. Re-run with --apply, then --reindex --apply.")
+        return 0
+    if src.read_bytes() != data:
+        print(f"REFUSED: {src.name} changed while this ran. Nothing written; re-run.")
+        return 1
+    for p, t in files.items():
+        p.write_bytes((t.replace("\n", "\r\n") if crlf else t).encode("utf-8"))
+    print(f"\nWROTE {len(files)} file(s).")
+    print("NEXT: py -3 scripts/split_state.py --reindex --apply")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--apply", action="store_true", help="write; default is a dry run")
+    ap.add_argument("--resplit", help="re-partition ONE existing part with the "
+                                      "current RULES (e.g. .syndicate/state_venues.md)")
     ap.add_argument("--reindex", action="store_true",
                     help="rebuild state.md's index over state.md + every part "
                          "(use after adding a subject to a part)")
@@ -292,6 +371,9 @@ def main(argv=None):
     except OSError as exc:
         print(f"cannot read {STATE}: {exc}")
         return 2
+
+    if args.resplit:
+        return resplit(pathlib.Path(args.resplit), args.apply)
 
     # ALREADY-SPLIT GUARD. Running this twice is not idempotent and is not
     # harmless: the second pass would read a state.md that holds only the index

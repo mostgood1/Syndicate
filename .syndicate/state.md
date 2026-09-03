@@ -56,7 +56,7 @@ opposite: it is trivially true when sections are titled by their DATE.
 cross-cutting material plus the **`[subject-index]`** table at the bottom:
 every subject, and which file holds it. The bodies live in
 `state_<domain>.md` — mlb, soccer, football, basketball, venues, board,
-worker, model, ledger.
+worker, model, ledger, and the two venue integrations polymarket and kalshi.
 
 **Read state.md first, then open only the part you need.** Adding a subject to
 a part means adding its index row: `py -3 scripts/split_state.py --reindex
@@ -413,6 +413,12 @@ once this index exists: re-splitting would orphan the parts.
 | [nfl-player-props] | NFL player props: capture fixed, model priced and BEATEN by the market | `state_football.md` |
 | [nfl-game-context] | Game context is built and measured, and INERT in production | `state_football.md` |
 | [cfbd-monthly-quota-exhausted] | 2026-08-30 — LIVE: NCAAF projections are FAILING in production, on opener weekend | `state_football.md` |
+| [kalshi-in-play-and-real-fees] | KALSHI TRADES IN-PLAY AND PUBLISHES ITS OWN FEE PARAMETERS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE  | `state_kalshi.md` |
+| [kalshi-segment-on-full-game] | KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS: the join key had no `segment` `[verified 2026-08-28, lane p | `state_kalshi.md` |
+| [kalshi-venue-execution] | KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lan | `state_kalshi.md` |
+| [kalshi-coverage-vs-oddsapi] | KALSHI COVERAGE: capture is healthy, the JOIN is the bottleneck, and two prop vocabularies do not exist `[veri | `state_kalshi.md` |
+| [kalshi-execution] | Kalshi execution — session close 2026-08-26 (lane `kalshi-exchange-index`) | `state_kalshi.md` |
+| [kalshi-odds-refresh-bound] | THE VENUE FAN-OUT IS A COLD-START BURST ON A PERSISTED CLOCK, AND IT IS NOW TIME-BOUNDED `[2026-09-03, lane ka | `state_kalshi.md` |
 | [state-file-split] | state.md IS AN INDEX PLUS NINE PARTS `[2026-09-03, scripts/split_state.py, commit 23bf6bc7]` | `state_ledger.md` |
 | [session-harness] | SESSION HARNESS — what the hooks actually enforce | `state_ledger.md` |
 | [worktree-test-data] | THE 92 RED TESTS IN A SESSION WORKTREE ARE THE ENVIRONMENT, NOT DEFECTS `[measured + shipped 2026-09-03]` | `state_ledger.md` |
@@ -444,6 +450,30 @@ once this index exists: re-splitting would orphan the parts.
 | [sim-scheduling-blocker] | 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker — **ARCHIVED 2026-08-19 to `st | `state_model.md` |
 | [sim-edge-analysis-2026-09-01] | FULL-PLATFORM SIM-ENGINE EDGE ANALYSIS — strategy synthesis + new from-code facts `[2026-09-01, session syndic | `state_model.md` |
 | [accuracy-autorun-rearm-state] | `#626`(h) IS ONE ENV KEY AWAY — THE CODE IS ALREADY LIVE `[2026-09-03, lane accuracy-autorun-rearm, no deploy  | `state_model.md` |
+| [polymarket-live-totals-quote-names-no-game] | 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game iden | `state_polymarket.md` |
+| [polymarket-fill-price-is-reported] | THE VENUE REPORTS `avgPx`. "This path has no fill price" was FALSE and cost a 12h live halt `[verified 2026-08 | `state_polymarket.md` |
+| [polymarket-h2h-buys-the-wrong-side] | POLYMARKET MONEYLINES BUY THE WRONG TEAM: `outcomes[0]` is not reliably the YES leg `[verified 2026-08-28, lan | `state_polymarket.md` |
+| [polymarket-vs-kalshi-prop-prices] | — MEASURED 2026-09-01, MLB, production shard | `state_polymarket.md` |
+| [polymarket-low-activity] | — VERIFIED 2026-08-27, refresh-worker + live-odds-worker | `state_polymarket.md` |
+| [polymarket-venue-join] | VERIFIED 2026-08-29, all three services on `95c4fb12` | `state_polymarket.md` |
+| [polymarket-orders-are-cancelled] | 2026-08-30 — the venue cancels them, we re-place them, and nobody knows why | `state_polymarket.md` |
+| [polymarket-resting-orders-do-not-encumber-cash] | 2026-08-31T15:45Z — CONFIRMED by a before/after pair, after I doubted it | `state_polymarket.md` |
+| [polymarket-price-gate-leaks-by-crossing] | 2026-08-31T16:05Z — FIXED AND DEPLOYED. The ceiling used to be checked against a price the venue never receive | `state_polymarket.md` |
+| [polymarket-soccer-h2h-bought-the-OPPOSITE-team] | 2026-08-31T21:25Z — FIXED AND DEPLOYED on both services; the positive case is UNVERIFIED | `state_polymarket.md` |
+| [polymarket-two-dimensional-rule-PARTLY-CONFIRMED] | 2026-09-01T01:20Z — the PREGAME half is solid on two probes; the LIVE half rests on ONE and is NOT replicating | `state_polymarket.md` |
+| [polymarket-held-population-is-6-of-6-POSITIVE-EV] | 2026-08-31T17:33Z — the gate suppresses positive-EV bets; its whole defence is that they cannot fill | `state_polymarket.md` |
+| [polymarket-explore-arm-FIRING] | 2026-08-31T16:05Z — the arm fired, STALLED on a float edge, and fires again; the falsifier is live | `state_polymarket.md` |
+| [polymarket-explore-arm-too-slow] | 2026-08-31T15:11Z — the arm is LIVE and CORRECT, and its sample rate is close to zero | `state_polymarket.md` |
+| [polymarket-gate-is-self-confirming] | 2026-08-31T13:42Z — THE GATE DESTROYED ITS OWN FALSIFIER | `state_polymarket.md` |
+| [polymarket-cheap-side-selection-risk] | 2026-08-31 — HIGHER FILL VOLUME IS NOT SUCCESS. The gate changes the BET MIX. | `state_polymarket.md` |
+| [polymarket-price-gate-LIVE] | 2026-08-31T05:58Z — the price gate is live and holding the right population | `state_polymarket.md` |
+| [polymarket-TIME-IS-NOT-THE-VARIABLE] | 2026-08-31T05:29Z — TIME-TO-EVENT IS REFUTED. The gate's premise is false. | `state_polymarket.md` |
+| [polymarket-placement-hold] | 2026-08-31 — LIVE, and it holds 13 of 17 positions | `state_polymarket.md` |
+| [polymarket-crossing-RESULT] | 2026-08-31 — CROSSING DOES NOT HELP. Price is not the constraint pregame. | `state_polymarket.md` |
+| [polymarket-crossing-experiment] | 2026-08-31 — LIVE and CORRECT, but it has no test case yet | `state_polymarket.md` |
+| [polymarket-pregame-orders-rest] | 2026-08-31 — THREE pending orders, ALL pregame, ALL bid AT the quote | `state_polymarket.md` |
+| [polymarket-fill-time-to-event] | 2026-08-30 — the leading hypothesis is TIME TO EVENT, not liquidity at our size | `state_polymarket.md` |
+| [polymarket-order-fills] | 2026-08-30 — four causes REFUTED; fills are mostly fine | `state_polymarket.md` |
 | [soccer-market-anchor] | MARKET-ANCHORING IS REACHABLE AND STILL OFF BY DECISION — MEASURED 2026-09-02 `[lane soccer-anchor-cost, main  | `state_soccer.md` |
 | [soccer-board-coverage] | — MEASURED 2026-09-02, production, NOT A DEFECT | `state_soccer.md` |
 | [soccer-live-match-state] | Soccer's live tier is WIRED AND VERIFIED ON LIVE MATCHES (2026-08-21) | `state_soccer.md` |
@@ -454,46 +484,16 @@ once this index exists: re-splitting would orphan the parts.
 | [soccer-shots-prop-skill] | SOCCER SHOTS PROPS â€” THE POISSON SHAPE IS RIGHT AND THE MEAN IS INFLATED `[measured 2026-08-31, lane layer1- | `state_soccer.md` |
 | [603-cross-game-quote-keys] | VENUE QUOTES NAMED NO GAME; FIXED ON EVERY PATH, DEPLOYED, AND STILL UNPROVEN AFTER THREE READINGS `[2026-08-3 | `state_venues.md` |
 | [venue-fee-economics] | FEES ARE READ FROM THE VENUE AND VERIFIED AGAINST 18/18 REAL FILLS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVE | `state_venues.md` |
-| [polymarket-live-totals-quote-names-no-game] | 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game iden | `state_venues.md` |
-| [kalshi-in-play-and-real-fees] | KALSHI TRADES IN-PLAY AND PUBLISHES ITS OWN FEE PARAMETERS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE  | `state_venues.md` |
 | [venue-join-refusal-visibility] | WHY THE EXCHANGES DO NOT EXECUTE SOCCER OR PROPS, and the two instruments that were lying about it `[verified  | `state_venues.md` |
-| [kalshi-segment-on-full-game] | KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS: the join key had no `segment` `[verified 2026-08-28, lane p | `state_venues.md` |
-| [polymarket-fill-price-is-reported] | THE VENUE REPORTS `avgPx`. "This path has no fill price" was FALSE and cost a 12h live halt `[verified 2026-08 | `state_venues.md` |
 | [live-odds-worker-deploy-gate] | THE DEPLOY GATE IS UNREACHABLE ON live-odds-worker, and the documented override CANNOT WORK AS WRITTEN `[measu | `state_venues.md` |
-| [polymarket-h2h-buys-the-wrong-side] | POLYMARKET MONEYLINES BUY THE WRONG TEAM: `outcomes[0]` is not reliably the YES leg `[verified 2026-08-28, lan | `state_venues.md` |
 | [venue-candidate-key-ambiguity] | BOARD JOIN KEYS: a bare token could name another fixture's team, and the guard's own counter cannot see it fir | `state_venues.md` |
-| [kalshi-venue-execution] | KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lan | `state_venues.md` |
-| [kalshi-coverage-vs-oddsapi] | KALSHI COVERAGE: capture is healthy, the JOIN is the bottleneck, and two prop vocabularies do not exist `[veri | `state_venues.md` |
 | [odds-cadence] | ODDS CADENCE AND CAPTURE | `state_venues.md` |
 | [venue-odds-storage] | `venue_odds` LIVES ON DISK, NOT IN THE SHARED KEYVALUE `[measured + deployed 2026-09-02, lane venue-odds-byte- | `state_venues.md` |
 | [sharp-reference-price] | SHARP REFERENCE PRICE — WE HAVE ONE. The audit's caveat is STALE. | `state_venues.md` |
-| [kalshi-execution] | Kalshi execution — session close 2026-08-26 (lane `kalshi-exchange-index`) | `state_venues.md` |
 | [board-quote-staleness] | Board freshness vs QUOTE staleness — verified 2026-08-26 (lane `board-staleness-visibility`) | `state_venues.md` |
 | [exchange-refresh-cadence] | — VERIFIED 2026-08-27, live-odds-worker `34b4d4b4` | `state_venues.md` |
-| [polymarket-vs-kalshi-prop-prices] | — MEASURED 2026-09-01, MLB, production shard | `state_venues.md` |
-| [polymarket-low-activity] | — VERIFIED 2026-08-27, refresh-worker + live-odds-worker | `state_venues.md` |
 | [exchange-venues] | Crypto.com is NOT a third venue — VERIFIED 2026-08-28, local full-egress session | `state_venues.md` |
-| [polymarket-venue-join] | VERIFIED 2026-08-29, all three services on `95c4fb12` | `state_venues.md` |
 | [venue-market-universe] | The venues list ~25,000 markets and the board acts on 277 — VERIFIED 2026-08-30 | `state_venues.md` |
-| [polymarket-orders-are-cancelled] | 2026-08-30 — the venue cancels them, we re-place them, and nobody knows why | `state_venues.md` |
-| [polymarket-resting-orders-do-not-encumber-cash] | 2026-08-31T15:45Z — CONFIRMED by a before/after pair, after I doubted it | `state_venues.md` |
-| [polymarket-price-gate-leaks-by-crossing] | 2026-08-31T16:05Z — FIXED AND DEPLOYED. The ceiling used to be checked against a price the venue never receive | `state_venues.md` |
-| [polymarket-soccer-h2h-bought-the-OPPOSITE-team] | 2026-08-31T21:25Z — FIXED AND DEPLOYED on both services; the positive case is UNVERIFIED | `state_venues.md` |
-| [polymarket-two-dimensional-rule-PARTLY-CONFIRMED] | 2026-09-01T01:20Z — the PREGAME half is solid on two probes; the LIVE half rests on ONE and is NOT replicating | `state_venues.md` |
-| [polymarket-held-population-is-6-of-6-POSITIVE-EV] | 2026-08-31T17:33Z — the gate suppresses positive-EV bets; its whole defence is that they cannot fill | `state_venues.md` |
-| [polymarket-explore-arm-FIRING] | 2026-08-31T16:05Z — the arm fired, STALLED on a float edge, and fires again; the falsifier is live | `state_venues.md` |
-| [polymarket-explore-arm-too-slow] | 2026-08-31T15:11Z — the arm is LIVE and CORRECT, and its sample rate is close to zero | `state_venues.md` |
-| [polymarket-gate-is-self-confirming] | 2026-08-31T13:42Z — THE GATE DESTROYED ITS OWN FALSIFIER | `state_venues.md` |
-| [polymarket-cheap-side-selection-risk] | 2026-08-31 — HIGHER FILL VOLUME IS NOT SUCCESS. The gate changes the BET MIX. | `state_venues.md` |
-| [polymarket-price-gate-LIVE] | 2026-08-31T05:58Z — the price gate is live and holding the right population | `state_venues.md` |
-| [polymarket-TIME-IS-NOT-THE-VARIABLE] | 2026-08-31T05:29Z — TIME-TO-EVENT IS REFUTED. The gate's premise is false. | `state_venues.md` |
-| [polymarket-placement-hold] | 2026-08-31 — LIVE, and it holds 13 of 17 positions | `state_venues.md` |
-| [polymarket-crossing-RESULT] | 2026-08-31 — CROSSING DOES NOT HELP. Price is not the constraint pregame. | `state_venues.md` |
-| [polymarket-crossing-experiment] | 2026-08-31 — LIVE and CORRECT, but it has no test case yet | `state_venues.md` |
-| [polymarket-pregame-orders-rest] | 2026-08-31 — THREE pending orders, ALL pregame, ALL bid AT the quote | `state_venues.md` |
-| [polymarket-fill-time-to-event] | 2026-08-30 — the leading hypothesis is TIME TO EVENT, not liquidity at our size | `state_venues.md` |
-| [polymarket-order-fills] | 2026-08-30 — four causes REFUTED; fills are mostly fine | `state_venues.md` |
-| [kalshi-odds-refresh-bound] | THE VENUE FAN-OUT IS A COLD-START BURST ON A PERSISTED CLOCK, AND IT IS NOW TIME-BOUNDED `[2026-09-03, lane ka | `state_venues.md` |
 | [refresh-worker-headroom-2026-09-02] | THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-en | `state_worker.md` |
 | [accuracy-autorun-OOM-2026-09-02] | THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lan | `state_worker.md` |
 | [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, | `state_worker.md` |

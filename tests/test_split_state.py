@@ -106,7 +106,7 @@ def test_verify_FIRES_when_a_body_is_duplicated(tmp_path, monkeypatch):
     pre, secs = ss.parse(lines)
     files, _b = ss.build(pre, secs)
     a = next(p for p in files if p.name == "state_mlb.md")
-    b = next(p for p in files if p.name == "state_venues.md")
+    b = next(p for p in files if p.name == "state_polymarket.md")
     files[b] = files[b] + files[a]
     bad = ss.verify(lines, secs, files)
     assert any("appears 2x" in x or "not globally unique" in x for x in bad), bad
@@ -164,6 +164,81 @@ def test_reindex_recovers_a_subject_added_to_a_part(tmp_path, monkeypatch):
     assert "[mlb-new]" not in p.read_text(encoding="utf-8")
     assert ss.main(["--reindex", "--apply"]) == 0
     assert "[mlb-new]" in p.read_text(encoding="utf-8")
+
+
+# --- resplit ------------------------------------------------------------
+
+RESPLIT_DOC = """# state — venues
+
+header prose.
+
+## [polymarket-thing] PM SUBJECT
+
+PM body.
+
+## [kalshi-thing] K SUBJECT
+
+K body.
+
+## [venue-fee-economics] GENERIC VENUE SUBJECT
+
+Generic body.
+"""
+
+
+def test_resplit_moves_by_the_current_rules(tmp_path, monkeypatch):
+    syn = tmp_path / ".syndicate"
+    syn.mkdir()
+    monkeypatch.setattr(ss, "SYN", syn)
+    monkeypatch.setattr(ss, "STATE", syn / "state.md")
+    monkeypatch.chdir(tmp_path)
+    src = syn / "state_venues.md"
+    src.write_text(RESPLIT_DOC, encoding="utf-8")
+
+    assert ss.resplit(src, True) == 0
+    left = src.read_text(encoding="utf-8")
+    assert "Generic body." in left          # still belongs to venues
+    assert "PM body." not in left           # moved out
+    assert "PM body." in (syn / "state_polymarket.md").read_text(encoding="utf-8")
+    assert "K body." in (syn / "state_kalshi.md").read_text(encoding="utf-8")
+    assert "header prose." in left          # preamble preserved
+
+
+def test_resplit_appends_to_an_existing_target(tmp_path, monkeypatch):
+    """A target that already exists must be APPENDED to, never clobbered."""
+    syn = tmp_path / ".syndicate"
+    syn.mkdir()
+    monkeypatch.setattr(ss, "SYN", syn)
+    monkeypatch.setattr(ss, "STATE", syn / "state.md")
+    monkeypatch.chdir(tmp_path)
+    src = syn / "state_venues.md"
+    src.write_text(RESPLIT_DOC, encoding="utf-8")
+    (syn / "state_polymarket.md").write_text(
+        "# state — polymarket\n\n## [polymarket-existing] ALREADY HERE\n\nkeep me.\n",
+        encoding="utf-8")
+
+    assert ss.resplit(src, True) == 0
+    pm = (syn / "state_polymarket.md").read_text(encoding="utf-8")
+    assert "keep me." in pm, "existing target content was clobbered"
+    assert "PM body." in pm
+
+
+def test_resplit_is_a_noop_when_nothing_reclassifies(tmp_path, monkeypatch):
+    syn = tmp_path / ".syndicate"
+    syn.mkdir()
+    monkeypatch.setattr(ss, "SYN", syn)
+    monkeypatch.setattr(ss, "STATE", syn / "state.md")
+    monkeypatch.chdir(tmp_path)
+    src = syn / "state_mlb.md"
+    src.write_text("# state — mlb\n\n## [mlb-thing] X\n\nbody.\n", encoding="utf-8")
+    before = src.read_bytes()
+    assert ss.resplit(src, True) == 0
+    assert src.read_bytes() == before
+
+
+def test_resplit_refuses_a_missing_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert ss.resplit(tmp_path / "nope.md", True) == 1
 
 
 # --- line endings -------------------------------------------------------
