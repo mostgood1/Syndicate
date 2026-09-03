@@ -1279,6 +1279,228 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 
 
 ### kalshi-discovery-deadline — OPEN, **BOUNDS IMPLEMENTED; GUARD VALIDATED (103-152s -> 22.5s); FAN-OUT REPRODUCED (cold state -> 150 = DEFAULT_SERIES_PER_TICK); BUDGET VALIDATED IN SITU (50.1s -> 10.7s); MY MEMO DELETED on 0 measured hits: the cost is FAN-OUT (243 per-series fetches), not pagination or host retries** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### soccer-anchor-cost — CLOSED 2026-09-02 — opened 2026-09-02 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **GOAL MET. The cost blocker was a DENOMINATOR ERROR — the 57/136 min figures count priced EVENTS in a forward book to d+13, and the builder is SINGLE-DATE. Path (a) FALSIFIED on props (`D_cheap/D_anchor` = 1.81 at half budget; the shift REVERSES SIGN on 2 of 6 fixtures); (b) and (c) were ALREADY BUILT. Both name joins fixed and landed: reach 66→122 of 136 fixtures, 138→214 of 214 team slots. NOT DEPLOYED, NOT ARMED; weight stays 0.0. Narrative `log/2026-09-02.md`; evidence `findings_2026-09-02_soccer_anchor_cost.md`; recorded on `todo.md #622`.**
+- Goal: a MEASURED cost/accuracy tradeoff for soccer market-anchoring across the
+  three candidate paths (cut solver simulations / anchor only staked fixtures /
+  move it off the refresh cycle), plus a recommendation with the number behind
+  it. Anchoring is validated (-40..-51% MAE, non-circular, held-out) and OFF
+  because ONE fixture costs 40.9s of solver time; 84 fixtures = 57 min/cycle,
+  200 = 136 min, on a refresh-worker that already OOM-killed once today.
+  **PREMISE SUPERSEDED — by this lane's own finding (see header): the 84/200 are
+  priced EVENTS in a forward book to d+13, not a single-date fixture list, and
+  `build_artifacts` is SINGLE-DATE. Measured cost is 83.2 min per 4h interval
+  with the joins working — 76% of the interval, memory untouched. IT FITS; the
+  weight stays 0.0 on the re-fit and on path (a) being falsified, not on cost.**
+- Files: scripts/measure_soccer_anchor_cost.py (NEW),
+  scripts/validate_soccer_vs_market.py (released by `soccer-model-dispersion`),
+  .syndicate/{lanes,state,deploys}.md.
+- Note: `docs/ai_context/todo.md` is deliberately NOT claimed, same convention
+  and same file as `maxmun-pregame-read`: `book-quotes-publish-clobber`'s own
+  heading records that it RELEASED that file on 2026-09-01, and its `- Files:`
+  line is a stale duplicate-merge artifact. `#622`'s paragraph is written via
+  the worktree flow. Claiming it would manufacture a contest over a file the
+  holder no longer writes.
+- Files (cont.): syndicate/features/soccer/features/market_anchoring.py,
+  syndicate/features/soccer/features/market_odds.py,
+  tests/test_soccer_anchor_name_joins.py (NEW).
+  READ-ONLY on scripts/build_soccer_artifacts.py — held by OPEN lane
+  `soccer-anchor-wiring`; the fixes below are additive and need no caller change.
+- SCOPE ADDED 2026-09-02 (user: "fix both name joins and remeasure anchors
+  reach"). Both joins resolve teams by EXACT string and miss the ESPN-vs-ratings
+  and ESPN-vs-OddsAPI name conventions: measured 36 of 90 team slots inert and
+  56 of 70 skipped fixtures recoverable. Safe to land at the current weight:
+  `_apply_market_anchor` returns BEFORE `anchor_ratings_to_market` when
+  weight <= 0, and the only consumer of a fixture's `market_odds` key in the
+  repo is the anchor itself (grepped), so at weight 0.0 the change moves
+  counters and nothing else.
+- Hypothesis: the bisection's MC noise, not its iteration count, dominates the
+  solved shift's error — so solver `simulations` can be cut a long way before
+  the anchored rating moves outside the noise the DEFAULT setting already has.
+  Corollary: the default is not a precision baseline, it is one draw.
+- Falsification test: if the shift error at reduced `simulations` is LARGE
+  relative to the default's own seed-to-seed spread, the cost is buying real
+  precision and path (a) is dead. Run the default at several seeds FIRST —
+  without that control the reduced-sim spread is unattributable.
+- Verification: a table of solver cost vs. shift error vs. a PROP-market
+  accuracy delta (not h2h — anchoring shrinks toward the h2h market, so a
+  better h2h MAE is tautological), and a per-path minutes/cycle figure against
+  the measured 57 min baseline. Recorded on `todo.md #622`.
+- DOES NOT arm anchoring. `SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT` stays 0.0 in
+  production; `model_engine_standard.md` §4.4 re-fit is still owed and is
+  reported as owed, not done.
+- Verification RAN: reach remeasured on the identical production basis
+  (66→122 of 136 fixtures, 138→214 of 214 team slots); 11 new tests, 8 failing
+  against pre-fix code, existing 22 unchanged; cost table delivered against the
+  production-measured 43-unit / 4h baseline.
+- Landed on main: `686d8282` (fix + tests), `0844694c` (findings, `#622`),
+  `501c109e` (SHA correction — `land` rebases, so a pre-land SHA is dead).
+- CLAIMS RELEASED: `market_anchoring.py`, `market_odds.py`,
+  `tests/test_soccer_anchor_name_joins.py`.
+- OWED by whoever arms this, in order: (1) publish the anchor audit as an
+  ARTIFACT FIELD — child stdout is `DEVNULL`, so no production reading of this
+  mechanism is possible today; (2) HELD-OUT surrogate validation (the 0.0221 is
+  IN-SAMPLE); (3) multi-week anchored-vs-base on PROPS against OUTCOMES.
+- Blocked by: none.
+
+
+### accuracy-summary-alloc-profile — CLOSED 2026-09-02 — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 — **GOAL MET. The allocator is ONE SITE and the scaling is PROPORTIONAL.** 100% of resident bytes at `intelligence_evaluation.py:711` (`json.loads` in `_stream_chunked_ledger_records`); peak = **4.01-4.41 x accepted chunk bytes, intercept ZERO, R2 0.999998** over 9 corpora of real records; materialisation is 98.8-99.9% of peak, so no output-side cap can bound it. Production projection **3,178-3,493 MiB** on top of anon 1,833 -> the kill was CERTAIN, ~915 MiB short at best. Two independent corroborations (64% of the projection consumed at death; 155 MiB/s local vs 146.9 MB/s production climb). **HYPOTHESIS PARTLY FALSIFIED:** the repeated `dict(item)` copies are SHALLOW and cost ~nothing — the peak is one materialisation, not three. **SECOND DEFECT FOUND, NOT MINE TO FIX:** `_bounded_accuracy_summary` truncates the wrong container (`segments_total`=3 vs `len(segments)`=7, `segments_truncated` pinned False, bounded payload LARGER than raw) so the 8MB keyvalue ceiling is unprotected — owner is lane `accuracy-autorun-decline-telemetry`. Bound proposed and measured: cumulative 90,000,000 B budget -> peak 344-378 MiB, worker worst case 55.1% of ceiling. **NOT RE-ARMED; no deploy; no production touched.** Record: `todo.md #626`(h) + `state.md [accuracy-autorun-OOM-2026-09-02]`.
+- Goal: a MEASURED allocation profile of `build_accuracy_summary` (peak + top
+  allocating sites), a scaling relationship against ledger chunk bytes, and a
+  proposed bound stated as an implied peak against the 4,096 MB container whose
+  baseline cycle already peaks at anon ~1,877 MB. Recorded on `#626`(h).
+- Files: docs/ai_context/todo.md, .syndicate/lanes.md, .syndicate/state.md,
+  .syndicate/deploys.md (measurement record only).
+  READ-ONLY on `syndicate/features/shared/intelligence_evaluation.py` and
+  `scripts/run_refresh_worker.py` — the latter is held by OPEN lane
+  `accuracy-autorun-decline-telemetry`; this lane proposes, it does not edit.
+  Profiling harness lives in the session scratchpad, not the repo.
+- Hypothesis: peak is driven by FULL MATERIALISATION of the deduped record set
+  plus REPEATED SHALLOW COPIES of it — `_stream_record_payloads` does
+  `yield dict(item)` for an in-memory sequence, and `build_accuracy_summary`
+  passes its own `record_rows` back through it TWICE (`compute_metrics` and
+  `build_segmented_reliability_profile`). Peak should therefore be ~linear in
+  accepted-chunk bytes with a multiplier >1x the single reduced set, and the
+  50-segment cap cannot touch it because it truncates OUTPUT after the working
+  set has already been built.
+- Falsification test: if peak is FLAT in input bytes, or if the top allocating
+  sites are not the record materialisation, the hypothesis is wrong and the fix
+  is not streaming/chunking.
+- Verification: tracemalloc peak AND process RSS delta reported together for
+  the same run (the OOM metric is anon RSS, not Python-object bytes — the
+  2026-08-29 profiler-scope rule), across >=3 input sizes, with the fitted
+  slope stated in MB resident per MB of chunk file.
+- Blocked by: none. DOES NOT re-arm `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN`
+  and does not touch production.
+
+
+### accuracy-summary-ledger-budget — CLOSED 2026-09-02 — GOAL MET AND EXCEEDED; LANDED `3c78bf0b` + `2b927b2e` + `77856f4a` on origin/main, content-verified — **THE PROJECTION SUPERSEDES THE BUDGET: 831,038,410 B / 8 dates at 42.2 MiB (was 3,181.1), 75x better than baseline and 8x better than the 90MB budget on 8x the data, and faster (10.9s vs 41.2s). Resident/file byte 4.014 -> 0.053. Budget default raised 90,000,000 -> 2,000,000,000 and demoted to a backstop; the 28-day drift window is now affordable. PLANNED ACCUMULATORS DELIBERATELY NOT BUILT — they need a second implementation of every formula and buy nothing at 42 MiB; equivalence is asserted instead (byte-identical statistics, all 9 sports, real builders). 136 tests pass. `tests/test_intelligence.py` hangs on TWO PRE-EXISTING blockers proven not mine by faulthandler (WNBA `_artifact_bundle` <-> `_games_from_live_state_fallback` recursion; a live Kalshi HTTPS call on the intelligence request path).** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885 — **BUILT AND RE-MEASURED OFF vs ON AT PRODUCTION SCALE.** Corpus 831,038,410 B / 8 chunks: budget OFF peak **3,181.1 MiB** (41.2 s), budget ON (90,000,000) peak **344.4 MiB** (7.3 s), accepted 89,967,617 <= budget, coefficient **4.014 in BOTH** — 9.24x reduction, 2,836.7 MiB saved. **The prior extrapolation (3,178 MiB) is now a direct measurement (3,181.1), 0.1% apart.** OFF = 5,014.1 MiB vs a 4,096 ceiling (OOM by 918); ON = 2,221.4 MiB = 54.2% of ceiling. Falsification test PASSED: off != on. 10 new tests, 66 pass across the ledger/summary suites, all 8 pre-existing callers unchanged (budget defaults to None). **DEFECT CAUGHT BY ITS OWN TEST:** the first cut checked the byte limit AFTER consuming the line and read 5,005,916 against a 5,000,000 budget; the bound is now exact. **BOTH BLOCKERS FIXED IN THE SAME SESSION `[user decision: cross-lane edit authorised]`:** `_bounded_accuracy_summary` now publishes `ledger_coverage` and truncates the `segments` LIST (not the mapping's 3 fixed keys), keeping the largest-sample segments. 10 more tests, and all four key assertions VERIFIED TO FAIL against the pre-fix function extracted from HEAD (segments_total 3, truncated False, payload ratio 0.996, coverage None). **NOT RE-ARMED, NOT DEPLOYED.** Record: `todo.md #626`(h) + `state.md [accuracy-autorun-OOM-2026-09-02]`.
+- Goal: implement the CUMULATIVE byte budget measured by lane
+  `accuracy-summary-alloc-profile` and re-measure peak WITH IT ENFORCED, at
+  production scale, off vs on. Peak must land in the predicted 344-378 MiB band.
+- Files: syndicate/features/shared/intelligence_evaluation.py,
+  tests/test_accuracy_summary_ledger_budget.py (NEW), docs/ai_context/todo.md,
+  .syndicate/lanes.md, .syndicate/state.md, .syndicate/log/2026-09-02.md.
+  NOT `scripts/run_refresh_worker.py` -- held by OPEN lane
+  `accuracy-autorun-decline-telemetry`. Checked: no OPEN lane claims
+  `intelligence_evaluation.py`.
+- Hypothesis: n/a (building a bound that was measured before it was designed).
+- Falsification test: OFF != ON. With the budget unlimited the load must accept
+  the whole corpus and peak at ~4.0x its bytes; with the budget set it must
+  accept <= budget and peak in the predicted band. If peak is the same either
+  way the budget is INERT and this fails.
+- Verification: (1) `LEDGER_CHUNKS_ACCEPTED` carries budget/accepted/truncated
+  and the accepted sum is <= budget; (2) measured peak at production-scale
+  corpus, budget off vs on, both reported; (3) the summary payload itself
+  publishes what it covered, so a narrowed sample cannot be read as a full one.
+- DOES NOT re-arm `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN` and does not
+  deploy. Local only.
+- **CROSS-LANE EDIT AUTHORISED `[user decision 2026-09-02]`.** This lane now
+  also edits `scripts/run_refresh_worker.py` (`_bounded_accuracy_summary` ONLY)
+  and `tests/test_accuracy_summary_autorun.py`, both nominally held by OPEN lane
+  `accuracy-autorun-decline-telemetry`. Surfaced as a conflict and the user
+  chose "I take both fixes now". Scope is strictly the two measured defects --
+  `ledger_coverage` dropped by the field whitelist, and the truncation aimed at
+  the wrong container. **NOT touching `_launch_autorun_accuracy_summary`, the
+  decline telemetry, or the enable flag**, which are that lane's actual subject.
+- Blocked by: none
+- **CLOSED 2026-09-02.** Verification RAN, all three parts: (1) `LEDGER_CHUNKS_ACCEPTED ... budget=90000000 partial=1 skipped_budget=7 dates=1 truncated=1` with accepted **89,967,617 <= 90,000,000**; (2) production-scale peak OFF **3,181.1 MiB** / ON **344.4 MiB** (predicted band 344-378, measured 344.4); (3) `ledger_coverage` published -- and the last-hop gap found and fixed, `_bounded_accuracy_summary` was dropping it. Falsification test PASSED: off != on (8 dates vs 1). **Then EXCEEDED by the projection** (`_project_evaluation_record`): full history at **42.2 MiB**, 75x better than baseline and 8x better than the budget on 8x the data, so the budget was demoted to a backstop (default 90,000,000 -> 2,000,000,000) and the 28-day drift window is affordable. Planned accumulators deliberately NOT built -- equivalence asserted instead (byte-identical statistics, all 9 sports). 92 tests green in the landing worktree. **NOT re-armed, NOT deployed.** Two learnings rules recorded (generic-anchor mis-attribution; `#`-prefixed commit subjects stripped by cherry-pick/rebase).
+### m625-export-only-patterns — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET, DEPLOYED AND VERIFIED (web `8da0eddc` then `e6fa165b`).** The allowlist is two predicates: WRITE (`is_hot_artifact_relative_path`, unchanged, publish + sweep) and READ (`is_exportable_artifact_relative_path`, export + stream). Verified in production with controls at one instant: a `feed_live` `.json.gz` went **403 -> 415 naming `/stream`**, `/stream` serves it **200, 111,585 B, gunzips to gamePk 822722 Final/Final**, a `props_history` CSV went **403 -> 200 count=1**, and an unlisted path is **still 403** — widened, not disabled. Inventory 33,229 -> 33,567 files. **MY HYPOTHESIS WAS RIGHT AND MY FALSIFICATION PREDICTION WAS WRONG IN BOTH DIRECTIONS:** I predicted 3 families present / 1 absent; the truth is 2 were already hot (`eval/batches` 51 files/199 MB; `roster_objs` via `snapshots/*/*.json`, since fnmatch `*` crosses `/`) and the other 2 were PRESENT AND INVISIBLE (`feed_live` 146 files/16.7 MB, `props_history` 18/11.1 MB) — I published "absent" first, on an inventory taken before the split that was blind to them *because* they were unallowlisted. Corrected within the hour. **`#413` NOT ARMED:** all `feed_live` on web is 2026-06-14..06-25, 69+ days old. Follow-ons: `#638` (stale publisher comment), and 15 files mirrored for 2026-06-14 (manifest `47568090177ed76b`, verify 15/15) which unblocks `build_mlb_actuals` as a `#625`(5) target. Commits `8da0eddc`, `e6fa165b`, `d668898a`.
+- Files: released — `syndicate/features/shared/artifact_publisher.py`,
+  `syndicate/blueprints/ops.py`, `tests/test_export_only_patterns.py`,
+  `scripts/mirror_manifest.py`.
+- Claims: NONE held. Web deploy claim acquired, used, and RELEASED.
+- Narrative + evidence: `deploys.md` 2026-09-02 22:07Z/22:14Z,
+  `todo.md #625`(2) + `#638`, `log/2026-09-02.md`.
+
+### soccer-anchor-audit-artifact — CLOSED 2026-09-02 — opened 2026-09-02 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **GOAL MET, DEPLOYED AND VERIFIED IN PRODUCTION (`bf099485` code, refresh-worker `99c3731f` live 22:54:26Z). `recommendations_{date}.json` carries an `anchor` block whose `state` takes one of five named values. Verified on THREE production artifacts whose `generated_at` postdates the deploy, 0 missing the field: `state=disabled` with `attached` 4/4, 3/4, 1/1 and `by_stage.fuzzy` 2, 2, 1 — each reproducing the pre-fix prediction exactly (2→4, 1→3, 0→1), and the refusal still firing (`no_name_match` on 'Sporting CP v C.D. Nacional', one of the 14 genuinely unpriced). 13 tests pass. Claim released; all services free. Measurement + two corrections in `deploys.md`.**
+- Goal: the soccer anchor's audit becomes a FIELD in
+  `recommendations_{date}.json`, so its state is readable in production at all.
+  Today `ops_refresh.py:1402` launches every refresh unit with
+  `stdout=DEVNULL`, and a discriminating control (7 units demonstrably ran;
+  every child token 0 log matches incl. `player projections`, parent token 5)
+  shows NO child output reaches Render. Every `[soccer_anchor]` line is
+  discarded, so "no odds", "disabled", "nothing priced" and "worked" are one
+  indistinguishable silence.
+- Files: scripts/build_soccer_artifacts.py, tests/test_soccer_anchor_wiring.py.
+- **CLAIM CONFLICT, SURFACED AND OVERRIDDEN BY THE USER
+  `[user: "publish the anchor audit into the recommendations artifact"]`.**
+  `scripts/build_soccer_artifacts.py` is claimed by lane `soccer-anchor-wiring`
+  (session 3492626c). That claim exists ONLY in **4 commits sitting unpushed in
+  the shared primary tree** (`adf0d3b9` "ledger: sync the shared tree — SIX
+  sessions' blocks"); at `origin/main` the block does not exist and both lanes
+  that name this file mark it `released:`. Verified `block=0` in all 12 recent
+  commits touching lanes.md, INCLUDING ones predating this session — so it was
+  never dropped by me, it was never pushed. Session 3492626c is neither running
+  nor archived in the visible roster. The lane is NOT being closed or
+  reassigned (2026-09-01 rule); only this file is taken, for the direct
+  continuation of what that lane built.
+- Hypothesis: n/a (making a built mechanism observable).
+- Falsification test: if the published block cannot distinguish `odds_absent`
+  from `disabled` from `anchored`, it has reproduced the silence it replaces
+  in a new location and is worthless.
+- Verification: `recommendations_{date}.json` carries an `anchor` block whose
+  `state` takes a named value, plus attach counts, the by-stage split and
+  `teams_resolved`/`teams_unresolved`; asserted by a test that builds the
+  artifact at weight 0 AND weight > 0 and reads different `state` values.
+- DOES NOT arm anchoring. Weight stays 0.0; the block must publish correctly
+  WHILE DISABLED, which is the state production is actually in — and the
+  `disabled` run above is exactly that reading.
+- Verification RAN: three real `build_soccer_artifacts.py` runs, field read back
+  from the written artifact each time; the four states are asserted DISTINCT by
+  test, not merely present. `teams_changed == teams_resolved == 4` on the armed
+  run — pre-fix those diverged, so their agreement is the join working.
+- Also landed: a `simulations` test seam on `_apply_market_anchor` (omitted when
+  None, so the production call is byte-identical). Suite 310s → 140s.
+- CLAIMS RELEASED: `scripts/build_soccer_artifacts.py`,
+  `tests/test_soccer_anchor_wiring.py`.
+- OWED: a refresh-worker deploy, then read `anchor.state` off a production
+  artifact via `/api/ops/artifacts/export`. Until then this is LANDED, not LIVE.
+- **DEPLOYED AND VERIFIED IN PRODUCTION 2026-09-02.** refresh-worker
+  `99c3731f`, deploy `dep-dacafo2jnfac73bqt07g`, live **22:54:26.137808Z**; live
+  commit re-read per service, only refresh-worker moved. **verify:**
+  `soccer_source/eredivisie/api/recommendations/recommendations_2026-09-05.json`,
+  `generated_at 22:59:52Z` (POSTDATES the deploy), carries
+  `state=disabled weight=0.0 fixtures=4 attached=4 priced_events=21
+  by_stage={event_id:0, exact_pair:2, fuzzy:2}`. Passes 1-5 read 150 stale / 0
+  carrying — correctly reported as TOO EARLY, not failure; a new-code artifact
+  missing `anchor` would have falsified it.
+- **The same payload confirms the morning's name-join fix LIVE:** `fuzzy=2` is
+  exactly the 2 fixtures predicted to be recovered for that league-date
+  (pre-fix 2 attached of 4, post-fix 4). Prediction and production share no code
+  path. `event_id=0` for a fourth time.
+- **This deploy KILLED `mls|2026-09-05`** (`wrote_since_launch=False`), launched
+  219 s AFTER the trigger, during the build phase. Preflight was honestly CLEAR
+  at trigger; it samples processes then, while the old container keeps launching
+  jobs for the whole ~5.4 min build. Bounded by `#353`'s 600 s retry. Gate
+  limitation recorded in `deploys.md`, owed to the gate not to this lane.
+- **Locks had to be taken TWICE:** `deploy-guard.py` reads `$CLAUDE_PROJECT_DIR`
+  (the PRIMARY tree) while the claim/preflight were taken in a session worktree
+  — worktree said HELD, primary said free. Locks must be taken where the guard
+  reads. Stranded worktree claim released with its own token.
+- Claim RELEASED; all four services free.
+- Blocked by: none.
+
+
+### ledger-land-2026-09-02 — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `27299be6`. The two FORBIDDEN rules, both state blocks and the session checkpoint are on origin/main, verified by grep. Applied from a worktree cut fresh from origin/main because the primary tree was 48 commits BEHIND and pushing it would have reverted peers' ledger work.**
+- Goal: land this session's ledger content, which is committed LOCALLY only
+  (`adf0d3b9`) in a primary tree 48 commits behind origin/main. Pushing that tree
+  would revert 48 commits of peers' ledger work.
+- Files: .syndicate/{learnings,state,deploys}.md, .syndicate/log/2026-09-02.md
+- Verification: the two new FORBIDDEN rules and the OOM state block are greppable
+  on origin/main.
+- Blocked by: none
+### m625-fleet-runner — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. `#625`(4) done, commit `92020995`, NO DEPLOY (local-only).** `doctor` -> READY; `up --bounded --duration-seconds 120` ran all three roles with production run-modes (103/77/37 production keys passed through): web **156.7 MB** of 2048 and serving, refresh-worker **exit 0, 408.9 MB** of 4096, live-odds-worker **exit 0, 620.2 MB** of 2048. **THE HAZARD WAS REAL AND IS NOW MEASURED: one 120s pass made 1,176 outbound attempts, all DENIED, including 27 each to `trading-api.kalshi.com`, `external-api.kalshi.com` and `api.elections.kalshi.com`** — against production env carrying `EXECUTION_MODE=live`, `LIVE_ARMED=1` and real venue keys. Four independent defences; the child asserts three itself. **FOUR DEFECTS CAUGHT BY CONTROLS: a raising `sitecustomize` does NOT stop the interpreter (CPython swallows it, rc=0) so the guard now `os._exit(70)`s; `shutil.which("gunicorn")` succeeds on Windows where gunicorn cannot import `fcntl`; both workers refuse a file state backend while `SYNDICATE_REQUIRE_HOSTED_STORAGE` is truthy; and the report said `ok=True` while all three roles had exited 1.** Memory caps are a watchdog, not a container limit, and say so.
+- Files: released — `scripts/fleet_local.py`, `scripts/_fleet_guard.py`,
+  `tests/test_fleet_local.py`.
+- Verification: all three criteria met — (a) `doctor` proves the guard loads and
+  REFUSES a money-armed env (rc=70); (b) all three roles started and were
+  observed running; (c) outbound denials recorded per role, 1,176 in one pass.
+  22 new tests; the 383-test archive suite passes.
+- Claims: NONE held. No deploy taken or needed.
+- Narrative + evidence: `log/2026-09-02.md`, `todo.md #625`(4),
+  `state.md [local-fleet-runner]`.
+
+### kalshi-discovery-deadline — OPEN, **BOUNDS IMPLEMENTED; GUARD VALIDATED (103-152s -> 22.5s); FAN-OUT REPRODUCED (cold state -> 150 = DEFAULT_SERIES_PER_TICK); BUDGET VALIDATED IN SITU (50.1s -> 10.7s); MY MEMO DELETED on 0 measured hits; BUDGET NOW WIRED INTO THE BOARD BUILD and measured draining a cold queue over 3 ticks: the cost is FAN-OUT (243 per-series fetches), not pagination or host retries** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: the candidate-pool build cannot block for minutes on Kalshi. ONE testable
   outcome: `tests/test_intelligence.py` completes in bounded time WITHOUT opening
   an outbound socket, and `kalshi_client.discover` aborts at an AGGREGATE
@@ -1501,6 +1723,72 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   exists and is unused, which is the same reachability trap one level up. Wiring
   it needs a caller decision (what budget does a board build get?) and belongs
   with whoever owns `kalshi_odds_refresh`'s cadence.
+- **STILL NOT THIS LANE'S SUBJECT:** `tests/test_intelligence.py` as a whole
+  still does not finish inside 10 minutes even with the guard (stalls ~32%), and
+  the WNBA `_artifact_bundle` <-> `_games_from_live_state_fallback` recursion
+  remains unfixed and unlaned.
+- **BUDGET WIRED INTO THE BOARD BUILD AND MEASURED ON IT `[2026-09-02]`. The
+  owed item is discharged; the bound is no longer unused.**
+
+  **WHERE, and why not at the call site.** `run_kalshi_odds_refresh` has THREE
+  callers — `intelligence_state.py:6380` (the board build),
+  `run_live_odds_refresh_worker.py:2255`, and `venue_odds_loop`. The budget went
+  INSIDE the refresh, not at any call site, so every caller inherits it and a
+  new one cannot forget it. It also avoids editing
+  `pipeline/intelligence_state.py`, which OPEN lanes `polymarket-yes-leg-binding`
+  and `layer2-cap-raise` hold. `pipeline/kalshi_odds_refresh.py` is claimed by no
+  OPEN lane — checked against `- Files:` lines, not prose mentions.
+
+  **THE HAZARD THAT MADE NAIVE WIRING DANGEROUS, found by reading the loop
+  before writing anything.** `fetch_markets` returns a PARTIAL result on budget
+  exhaustion rather than raising, and the refresh computes
+  `read_succeeded = strategy == "series_filter"`, treating an empty successful
+  read as "this series has no open markets" -> `fetched_at` stamped -> DORMANT
+  for `dormant_interval_seconds` (3600s). **A budget that stopped mid-fetch
+  would have marked up to 150 series as empty and blanked them off the board for
+  an hour.** Three guards, in order of preference:
+  1. the loop checks `budget_remaining()` BEFORE spending a request and breaks,
+     so an unattempted series keeps its old stamp and stays DUE;
+  2. `fetch_series_markets` maps a budget-truncated report to
+     `strategy="budget"`, so `read_succeeded` can never be True for one;
+  3. the loop breaks on that strategy without writing ANY state for the series.
+
+  **DISCOVERY GETS A SHARE, NOT THE TICK.** `ensure_series_discovered()` runs
+  before the price loop. Wrapping the whole run without this starved it —
+  observed directly while testing: a discovery timeout left
+  `BUDGET_STOP fetched=0 unattempted=25`. It now nests inside
+  `min(DISCOVERY_BUDGET_SECONDS=5, tick*0.2)`; `request_budget` nests by keeping
+  the TIGHTER deadline, so a sub-budget can only shrink the outer bound.
+
+  **THE NUMBER, sized from measurement not preference.**
+  `DEFAULT_REFRESH_BUDGET_SECONDS = 30`, env
+  `SYNDICATE_KALSHI_REFRESH_BUDGET_SECONDS`, `0` disables. A cold tick (all 150
+  series due) cost **50.1s** at zero spacing and ~72s at the default 150ms. 30s
+  admits ~30/(0.24+0.15) ~= 77 series, so a cold start drains over ~2 ticks
+  instead of blocking one board build for over a minute, and a warm tick never
+  approaches it.
+
+  **MEASURED END TO END, cold state, three consecutive real ticks:**
+
+      TICK1  wall 32.1s  fetched 25  cumulative  25  stamped  25
+      TICK2  wall 39.9s  fetched 31  cumulative  56  stamped  55
+      TICK3  wall 46.7s  fetched 53  cumulative 109  stamped 108
+
+  The queue DRAINS and nothing is lost: fetched and stamped track each other, so
+  no un-attempted series was recorded as read. 11 tests including off != on for
+  the wiring itself, the unattempted-not-stamped safety property, and
+  budget-truncated != empty book. 251 pass across the Kalshi suites.
+
+  **TWO HONEST LIMITS.**
+  - **The budget bounds VENUE REQUESTS, not the function.** Wall clock exceeds
+    it (32-47s against 30s) because the merge and state write run after the
+    loop. Anyone reading `wall > budget` as a broken bound will be wrong.
+  - **Cold-catalogue discovery can exhaust its 5s share and return nothing** —
+    seen on TICK1 (`request_budget_exhausted after 0 request(s)`, a 13,771-entry
+    catalogue). It self-heals: TICK2 ran warm, succeeded, and added 181 series.
+    If a cold start ever needs discovery to complete on the first tick, that
+    share is the knob, not the tick budget.
+
 - **STILL NOT THIS LANE'S SUBJECT:** `tests/test_intelligence.py` as a whole
   still does not finish inside 10 minutes even with the guard (stalls ~32%), and
   the WNBA `_artifact_bundle` <-> `_games_from_live_state_fallback` recursion

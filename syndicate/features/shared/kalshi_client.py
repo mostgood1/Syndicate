@@ -242,6 +242,21 @@ def _current_budget() -> "_Budget | None":
     return getattr(_BUDGET_STATE, "budget", None)
 
 
+def budget_remaining() -> "float | None":
+    """Seconds left in the active budget, or None when there is none.
+
+    Public so a CALLER can stop its own loop BEFORE spending a request. That
+    ordering matters more than it looks: `fetch_markets` returns a PARTIAL
+    result on exhaustion rather than raising, and `kalshi_odds_refresh` treats
+    an empty-but-successful read as "this series has no open markets" and marks
+    it dormant for an hour. A budget that stopped mid-fetch would therefore
+    blank up to 150 series off the board. Callers check this first and leave
+    untouched series untouched, so they stay due.
+    """
+    budget = _current_budget()
+    return None if budget is None else budget.remaining()
+
+
 @contextlib.contextmanager
 def request_budget(seconds: float):
     """Bound the TOTAL wall-clock a block of Kalshi work may spend on requests.

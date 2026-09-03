@@ -177,6 +177,14 @@ def fetch_series_markets(series: str) -> dict[str, Any]:
     except KalshiError as exc:
         return {"markets": [], "strategy": "failed", "reason": str(exc)}
 
+    # A BUDGET STOP IS NOT AN EMPTY BOOK. `fetch_markets` returns a PARTIAL
+    # result rather than raising, and the caller below treats an empty
+    # successful read as "no open markets" and lets the series go dormant for an
+    # hour. Naming it here keeps `read_succeeded` False so a truncated fetch can
+    # never blank a series off the board.
+    if report.get("budget_exceeded"):
+        return {"markets": [], "strategy": "budget", "reason": "request_budget_exhausted"}
+
     markets = report.get("markets") or []
     # DID THE FILTER ACTUALLY APPLY? Checked against the data, not the status
     # code. If the API ignored `series_ticker` we get the unfiltered firehose,
@@ -319,6 +327,38 @@ def dormant_interval_seconds() -> int:
     except (TypeError, ValueError):
         return DEFAULT_DORMANT_INTERVAL_SECONDS
     return parsed if parsed >= 0 else DEFAULT_DORMANT_INTERVAL_SECONDS
+
+
+DEFAULT_REFRESH_BUDGET_SECONDS = 30
+# Discovery's slice of a tick. Small on purpose: it is a catalogue refresh, and
+# the prices are what the board reads.
+DISCOVERY_BUDGET_SECONDS = 5.0
+
+
+def refresh_budget_seconds() -> float:
+    """AGGREGATE wall-clock this refresh may spend on venue requests. 0 = off.
+
+    SIZED FROM MEASUREMENT, not picked (2026-09-02, lane
+    `kalshi-discovery-deadline`). A COLD tick -- every series due, so
+    `series_per_tick()` = 150 of them -- cost **50.1s** with spacing forced to
+    0, and ~72s at the default 150ms spacing. Nothing measured that, and
+    `max_pages` cannot: it bounds ONE call's paging, and this loop makes 150
+    calls.
+
+    30s admits roughly 30 / (0.24s request + 0.15s spacing) ~= 77 series, so a
+    cold start DRAINS OVER ~2 TICKS instead of blocking one board build for a
+    minute-plus, and a warm tick (a handful of series due) never approaches it.
+    Raise it deliberately against those numbers; do not raise it because a tick
+    got truncated once -- truncation here is the design working.
+    """
+    raw = os.environ.get("SYNDICATE_KALSHI_REFRESH_BUDGET_SECONDS")
+    if raw is None or not str(raw).strip():
+        return float(DEFAULT_REFRESH_BUDGET_SECONDS)
+    try:
+        parsed = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return float(DEFAULT_REFRESH_BUDGET_SECONDS)
+    return parsed if parsed >= 0 else float(DEFAULT_REFRESH_BUDGET_SECONDS)
 
 
 def series_per_tick() -> int:
@@ -747,6 +787,24 @@ def _trim_to_storage_bounds(
 
 
 def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
+    """Bounded wrapper. The AGGREGATE budget lives here, at the only place that
+    knows a whole tick is one unit of work -- `max_pages` bounds one call's
+    paging and this loop makes up to `series_per_tick()` (150) of them.
+
+    Applied for EVERY caller (`intelligence_state`'s board build,
+    `run_live_odds_refresh_worker`, `venue_odds_loop`) rather than at each call
+    site, so a new caller inherits the bound instead of having to remember it.
+    """
+    from syndicate.features.shared.kalshi_client import request_budget
+
+    budget = refresh_budget_seconds()
+    if budget <= 0:
+        return _run_kalshi_odds_refresh_unbounded(force=force)
+    with request_budget(budget):
+        return _run_kalshi_odds_refresh_unbounded(force=force)
+
+
+def _run_kalshi_odds_refresh_unbounded(*, force: bool = False) -> dict[str, Any]:
     """Refresh whichever series are due, merge, record, write.
 
     Returns EVERY series' markets, not just the ones fetched this call. With a
@@ -757,11 +815,23 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     `force=True` bypasses the enable flag, the per-series clock and the
     per-tick cap: that is what a manual probe wants.
     """
+    from syndicate.features.shared.kalshi_client import budget_remaining, request_budget
     if not (force or kalshi_odds_enabled()):
         return {"status": "skipped", "reason": "disabled"}
 
     # BEFORE `sports_series()` is read, because it decides what that returns.
-    discovery = ensure_series_discovered()
+    # DISCOVERY GETS A SHARE, NOT THE WHOLE TICK. It runs before the price
+    # loop, so without its own sub-budget one slow catalogue call spends
+    # everything and the series fetches -- the actual work -- get nothing.
+    # Observed exactly that while testing this wiring: a discovery timeout left
+    # `BUDGET_STOP fetched=0 unattempted=25`. `request_budget` nests by keeping
+    # the TIGHTER deadline, so this can only ever shrink the outer bound.
+    _tick_budget = refresh_budget_seconds()
+    if _tick_budget > 0:
+        with request_budget(min(DISCOVERY_BUDGET_SECONDS, _tick_budget * 0.2)):
+            discovery = ensure_series_discovered()
+    else:
+        discovery = ensure_series_discovered()
     if discovery.get("status") == "ok":
         print(
             f"[kalshi_odds] SERIES_DISCOVERY catalogue={discovery.get('catalogue')}"
@@ -830,13 +900,28 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
 
     fetched: dict[str, Any] = {}
     spacing = request_spacing_seconds()
+    budget_stopped = 0
     for index, series in enumerate(fetching):
+        # BEFORE the request, not after. A series we never attempt keeps its old
+        # `attempted_at`, so it stays DUE and the next tick picks it up -- the
+        # queue drains rather than skipping. Stamping it here, or letting a
+        # partial fetch through, would mark it a successful empty read and take
+        # it off the board for `dormant_interval_seconds`.
+        remaining = budget_remaining()
+        if remaining is not None and remaining <= 0.0:
+            budget_stopped = len(fetching) - index
+            break
         # SPACING, NOT A SMALLER CAP. The cap bounds how many; only this bounds
         # how FAST, and the 2026-08-23 http_429s came from rate, not count.
         # Skipped before the first call so a one-series tick pays nothing.
         if index and spacing:
             time.sleep(spacing)
         result = fetch_series_markets(series)
+        if result.get("strategy") == "budget":
+            # Belt and braces: the pre-check above should mean we never get
+            # here. Write NO state for this series and stop.
+            budget_stopped = len(fetching) - index
+            break
         markets = result.get("markets") or []
         entry = dict(per_series.get(series) or {})
         entry["attempted_at"] = _now_stamp()
@@ -891,6 +976,16 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
             entry["fetched_at"] = entry["attempted_at"]
         per_series[series] = entry
         fetched[series] = {"count": len(markets), "strategy": result.get("strategy")}
+
+    if budget_stopped:
+        # VISIBLE, or a shrinking tick looks like a shrinking venue. The
+        # un-attempted series keep their old stamps and are still due next tick.
+        print(
+            f"[kalshi_odds] BUDGET_STOP budget_s={refresh_budget_seconds()}"
+            f" fetched={len(fetched)} unattempted={budget_stopped}"
+            f" of={len(fetching)}",
+            flush=True,
+        )
 
     # MERGE. Every series' last good markets, whether or not it was fetched now.
     #
