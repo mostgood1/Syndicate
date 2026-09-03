@@ -1342,7 +1342,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### wnba-cards-fallback-recursion — OPEN, **PREMISE FALSIFIED: recursion is REAL (depth 234, 700 calls) but costs +5.7s, not minutes; the stall was KALSHI. CONTROL DONE: the cycle fires ONLY on an empty artifact (one CSV row -> depth 1), so it is COLD/DEV-ONLY and LOW severity; the real defect is the SWALLOWED RecursionError. **FIXED: depth 247 -> 1, bundle calls 701 -> 2, and the failure is now NAMED**** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### wnba-cards-fallback-recursion — CLOSED 2026-09-02 — GOAL MET, ON A PREMISE THAT WAS WRONG — **PREMISE FALSIFIED: recursion is REAL (depth 234, 700 calls) but costs +5.7s, not minutes; the stall was KALSHI. CONTROL DONE: the cycle fires ONLY on an empty artifact (one CSV row -> depth 1), so it is COLD/DEV-ONLY and LOW severity; the real defect is the SWALLOWED RecursionError. **FIXED: depth 247 -> 1, bundle calls 701 -> 2, and the failure is now NAMED**** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `syndicate/features/wnba/cards.py` cannot re-enter itself. ONE testable
   outcome: with the recursion path ENABLED (no `SYNDICATE_WEB_DYNO`, date ==
   today), `tests/test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_query_api_resolves_preview_date_and_preserves_contract`
@@ -1525,6 +1525,31 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   real hang was Kalshi. What was fixed is what the evidence supported: a 247-deep
   mutual recursion that reported nothing. No deploy — this path is disabled on
   Render by `_render_web_dyno()`.
+- **CLOSED 2026-09-02. Verification RAN, all three items.**
+  (1) *Time it before changing anything* — RAN: 33.6s with the path live vs
+  27.9s control, which is what FALSIFIED the lane's own premise.
+  (2) *A test that fails if the fallback re-enters, asserting on DEPTH not wall
+  clock* — MET: `test_fallback_cannot_reenter_artifact_bundle`, `<= 2` against a
+  pre-fix 247.
+  (3) *off != on, the fallback must still work when legitimately reached* — MET:
+  0 calls with `allow_fallback=False`, >=1 by default, 3 end-to-end. Fixed, not
+  disabled.
+  OUTCOME: depth 247 -> 1, bundle calls 701 -> 2, RecursionError 3 -> 0, and the
+  failure is now NAMED (`LIVE_STATE_FALLBACK_FAILED`). The enabled path matches
+  the disabled control (26.6s vs 27.9s). 6 tests, 4 failing pre-fix; 809 WNBA
+  tests pass, the 2 that fail are pre-existing and proven so by swapping the
+  pre-fix file back in. No deploy — disabled on Render by `_render_web_dyno()`.
+  **THE PREMISE WAS WRONG AND THE LANE STILL PAID OFF.** It opened believing
+  this was a multi-minute hang; it was ~5.7s and the hang was Kalshi, fixed in
+  `kalshi-discovery-deadline`. The falsification test written at open called
+  that outcome in advance, which is the part of the process that worked. What
+  shipped is what the evidence supported: a 247-deep recursion that reported
+  nothing.
+  ONE RULE RECORDED: FORBIDDEN to pay for an expensive control without first
+  checking its inputs can produce the signal — the planned `--with-data`
+  re-run (34,690 files) could not have answered, the mirror's newest WNBA
+  live-state being 2026-07-15 against a today-only trigger. Manufacturing the
+  trigger instead (one CSV row) cost 0.01s and answered it exactly.
 - Blocked by: none. No deploy: `cards.py` runs on web, and this path is disabled
   on Render by `_render_web_dyno()`, so the fix is not urgent in production.
 
