@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 705 rules `[generated]`
+## Index — 710 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4822,3 +4822,31 @@ an innocent KILLED unit to the back.
 "CLEAR at trigger; ~N min of build during which jobs may still start" rather than
 "clear to deploy". When a deploy does kill a job, say which one and expect it
 back in one queue cycle, not in minutes.
+
+## 2026-09-02 FORBIDDEN: drawing a conclusion from a log line the API TRUNCATED. Render's logs API cut a JSON payload at ~1,200 chars; the visible part was all zeros and I published "zero for every date" when it was 7 of 12. `[lane m639-actuals-zero-rows]`
+
+- **What we believed:** the MLB actuals writer produced zero rows for every date
+  it processes. The evidence looked overwhelming — six consecutive hourly ticks,
+  every visible date reporting `top_props_rows: 0`, with the sibling counters
+  also zero so the innocent readings were ruled out.
+- **What was actually true:** **7 of 12 dates, not 12.** The Render logs API
+  returns a `message` field it truncates; the payload is a JSON object whose
+  `summaries` are ordered by date, so the ~1,200 characters I could see covered
+  exactly the June dates — which ARE all zero — and cut off before 07-05
+  (987 rows), 07-06 (705), 07-24 (1,235), 09-01 (126) and 09-02 (1,233). The
+  defect was real but narrower and differently shaped than I published.
+- **How we found out:** re-fetching the same ticks and PARSING the payload
+  instead of eyeballing the message, which surfaced the non-zero dates
+  immediately. Nothing about the first reading looked partial — the string
+  simply ended, mid-object, with no ellipsis and no `truncated` flag.
+- **The rule going forward:** **when a log line carries structured data, PARSE
+  it and assert the parse succeeded — never conclude from the rendered string.**
+  If `json.loads` fails on the tail, the line is cut and you know it. And state
+  the denominator: "zero on N of M dates" is checkable, "zero for every date" is
+  the claim truncation makes easy. Third instance today of the same family (see
+  the inventory-filter rule and the traversal-cap rule): **a view that omits
+  does not announce what it omitted.**
+- **Cost:** one wrong item published to `todo.md` and corrected in place within
+  the hour. The underlying defect stood up — an unconditional `open("w")`
+  truncating a real artifact — so the correction narrowed a finding rather than
+  withdrawing one.

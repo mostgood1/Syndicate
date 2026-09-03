@@ -1871,6 +1871,14 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Claims: NONE held. Web deploy claim acquired, used, RELEASED.
 - Narrative: `log/2026-09-02.md`, `todo.md #639`.
 
+### m639-actuals-zero-rows — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET: ROOT-CAUSED, no deploy, and the code is EXONERATED.** Replayed `build_mlb_actuals` locally on production's own mirrored bytes for 2026-06-15 (manifest `c6d52e5db907f9ac`, network denied): **LOCAL `top_props_rows 1212, resolved 1123` against PROD `0, 0`.** Same code, same date, same 1,808,469 B input — so refresh-worker does not hold that input; web does, for 123 dates, and web's disk is not the worker's. **THE DEFECT IS THE UNCONDITIONAL WRITE:** `write_mlb_actuals_for_date` (`build_mlb_actuals.py:135`) opens the output `"w"` BEFORE knowing whether there are rows, so a zero-row result truncates `props_actuals_<date>.csv` to a bare header — hourly — destroying any previously-computed actuals and handing the reconciliation chain an EMPTY file where it should see a MISSING one. **MY FIRST WRITE-UP OF `#639` WAS WRONG AND IS CORRECTED IN PLACE:** I said "zero rows for every date" from a log line the API had TRUNCATED at ~1,200 chars, which covered only the June dates; it is **7 of 12** (the June ones), with 07-05/07-06/07-24/09-01/09-02 all non-zero. Fix not applied — it is a producer change and wants its own lane.
+- Files: released — `scripts/mirror_manifest.py` (an `mlb_actuals_inputs` family).
+  No production code edited: the cause was established without changing any.
+- Falsification test: RAN, and did NOT falsify — the local replay produced rows,
+  so the hypothesis (worker starved, code fine) holds.
+- Claims: NONE held. No deploy.
+- Narrative: `log/2026-09-02.md`, `todo.md #639`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

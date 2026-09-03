@@ -165,6 +165,18 @@ FAMILIES: dict[str, dict[str, Any]] = {
         "note": "prop-history CSVs under tracking/ -- also newly reachable via `#625`(2).",
         "patterns": ("*_source/tracking/odds_*_props_history_{date}.csv",),
     },
+    "mlb_actuals_inputs": {
+        "role": "input",
+        # Everything `build_mlb_actuals.build_mlb_actuals_for_date` reads:
+        # `daily_top_props` (the row list) and the `feed_live` payloads
+        # `final_stat_value` grades against. `#639`.
+        "note": "daily_top_props + feed_live -- the two inputs the actuals writer consumes.",
+        "patterns": (
+            "mlb_source/source_artifacts/data/daily/top_props/daily_top_props_{slug}.json",
+            "mlb_source/source_artifacts/data/raw/statsapi/feed_live/*/{date}/*.json",
+            "mlb_source/source_artifacts/data/raw/statsapi/feed_live/*/{date}/*.json.gz",
+        ),
+    },
     "mlb_book_grid_output": {
         "role": "output",
         "note": "production's OWN answer for the date -- the thing the replay is diffed against.",

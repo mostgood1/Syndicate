@@ -1,47 +1,60 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#639` — **THE MLB ACTUALS WRITER RUNS HOURLY AND PRODUCES ZERO ROWS FOR EVERY DATE, while its input exists at 1.8 MB** — lane `m626-actuals-replay-target`, 2026-09-02 — **OPEN, not root-caused, evidence below**
+### `#639` — **THE MLB ACTUALS WRITER TRUNCATES `props_actuals_<date>.csv` TO A HEADER, HOURLY, FOR EVERY DATE WHOSE INPUT HAS AGED OFF THE WORKER'S DISK** — lane `m639-actuals-zero-rows`, 2026-09-02 — **OPEN, ROOT-CAUSED, code exonerated**
 
-`_run_mlb_actuals_writer_tick` is enabled on refresh-worker
-(`RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER=true`, hourly) and it IS running —
-6 ticks in 6 hours, read from the Render logs API. Every tick, for all 12 dates
-it processes, reports:
+**CORRECTION TO THIS ITEM'S FIRST VERSION, which I published an hour earlier.**
+It said the writer "produces ZERO rows for every date". **That is false.** I read
+it off a log line the API had TRUNCATED at ~1,200 characters — which happened to
+cover only the June dates, all of which are zero — and generalised from the part
+I could see. The full payload, read properly:
 
-    "resolved": 0, "skipped_no_feed": 0, "skipped_no_game_pk_or_stat": 0,
-    "skipped_no_stat_value": 0, "top_props_rows": 0
+| dates | `top_props_rows` |
+|---|---|
+| 2026-06-15, 06-16, 06-18, 06-19, 06-22, 06-23, 06-27 | **0** (7 dates) |
+| 2026-07-05 / 07-06 / 07-24 | 987 / 705 / 1235 |
+| 2026-09-01 / 09-02 | 126 / 1,233 |
 
-**`top_props_rows: 0` is the alarm, and the other zeros rule out the innocent
-readings.** It is not "no feed" (`skipped_no_feed` is 0 too) and not a grading
-failure — the input row list was EMPTY. So `props_actuals_<date>.csv` has been
-written with nothing in it, hourly.
+So it is **7 of 12 dates**, not all of them. The defect below is narrower than I
+first claimed and more specific.
 
-**The input is not missing in general.** `daily_top_props_<slug>.json` is on WEB
-for **123 dates, 2026-04-10..2026-09-03**, and the specific dates the writer
-reports zero for are present and substantial — 2026-06-15 is **1,808,469 bytes**,
-06-16 is 2,640,286, 09-01 is 199,036.
+**THE CODE IS EXONERATED — proven offline, no deploy.** `build_mlb_actuals` was
+replayed locally on production's OWN mirrored bytes for 2026-06-15, network
+denied, citing mirror manifest **`c6d52e5db907f9ac`**:
 
-**THE NEXT THING TO ESTABLISH, and it cannot be read from outside:** whether
-refresh-worker's own disk holds `daily/top_props/`. The writer reads its own
-`data_root()`, and web's copy proves nothing about the worker's — Render gives
-each service its own disk. The family IS hot-allowlisted (so it CAN cross), and
-`run_refresh_worker.py` contains **zero** references to `top_props`, so it can
-only arrive via the generic artifact-refresh pull
-(`SYNDICATE_ARTIFACT_REFRESH_INTERVAL_SECONDS=120`). Confirm by instrumenting
-the tick to log the resolved path and `path.exists()`, or by publishing a
-bounded diagnostic — do NOT infer it from web.
+    LOCAL : top_props_rows 1212, resolved 1123, skipped_no_stat_value 89
+    PROD  : top_props_rows    0, resolved    0
 
-**Why this matters beyond one file:** these are the graded "what actually
-happened" rows the reconciliation and accuracy chain consume
-(`prediction_reconciliation.RECONCILIATION_PATTERNS`). It is consistent with
-`state.md [layer2-realized-accuracy]`'s "the measurement chain is broken in four
-places" and with settlement's 19,692 settleable / 35 settled.
+Same code, same date, same input file (`daily_top_props_2026_06_15.json`,
+1,808,469 B). The reader resolves and parses it correctly under
+`SYNDICATE_DATA_ROOT`. **So refresh-worker does not hold that input** — web
+does, for 123 dates, but web's disk is not the worker's.
 
-Found while trying to build `build_mlb_actuals` as a second `#625`(5) replay
-target. That target is separately **BLOCKED ON TRANSPORT**: its output
-`mlb_source/reconciliation/*` is now export-only allowlisted (`5885c339`,
-deployed) but is git-tracked 0 files and under no `BOOTSTRAP_ROOT`, so nothing
-puts it on web — there is no production copy to diff a replay against. **An
-export-only entry makes a family readable IF PRESENT; it is not a transport.**
+**THE ACTUAL DEFECT IS THE UNCONDITIONAL WRITE.**
+`write_mlb_actuals_for_date` (`scripts/build_mlb_actuals.py:135`) opens the
+output `"w"` **before it knows whether there are rows**, so a zero-row result
+truncates the file to a bare header:
+
+    with output_path.open("w", encoding="utf-8", newline="") as handle:
+        writer.writeheader()
+        for row in result["rows"]:      # <- may be empty
+
+Running hourly, this **destroys any previously-computed actuals** for a date
+whose input has aged off the worker, and leaves the reconciliation chain an
+EMPTY actuals file where it should see a MISSING one — different facts to
+`prediction_reconciliation.RECONCILIATION_PATTERNS`, and the empty one reads as
+"nothing to grade" rather than "input gone".
+
+**THE FIX (not applied — it is a producer change and wants its own lane):**
+refuse to write when `rows` is empty AND the input was absent, and log the
+distinction. Do not silently skip when the input was present and genuinely
+graded to zero — those are different, and collapsing them is the same error as
+collapsing 403 onto 404.
+
+**STILL OPEN:** whether the June `props_actuals` files were ever non-empty (i.e.
+whether anything has actually been destroyed, or they were always empty). That
+cannot be read from web — `mlb_source/reconciliation/*` is now export-only
+allowlisted (`5885c339`, deployed) but nothing publishes it, so there is no
+production copy. See the transport note in `#625`(2).
 
 ---
 
