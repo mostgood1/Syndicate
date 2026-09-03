@@ -1374,10 +1374,26 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   because every existing emission sits within ~25 min of a boot and the
   accumulator is cumulative from boot.
 - Files: `.syndicate/{lanes,state,log,deploys}.md`, `docs/ai_context/todo.md`
-  (`#632`), **`syndicate/blueprints/ops.py`** and
-  **`tests/test_artifact_merge_child_cap.py`** [claimed 2026-09-03T20:1xZ, user
-  directive "cap the merge children"]. Production CONFIG change: the env key on
-  web plus the deploy that makes it reach the process.
+  (`#632`), `syndicate/blueprints/ops.py`,
+  `syndicate/features/shared/artifact_merge.py`,
+  `tests/test_artifact_merge_child_cap.py` and
+  `tests/test_artifact_merge_string_pool.py` [claimed 2026-09-03T20:1xZ and
+  21:0xZ, user directives "cap the merge children" then "make the merge
+  cheaper"]. All LANDED on main and live on web.
+- **SHIPPED AND VERIFIED IN PRODUCTION, three changes, each measured.**
+  (1) profiler armed `142e5e1a`; (2) merge ceiling `a6f5f586`, retuned to
+  `cap=2`/`32 MB` in `ac32034b`; (3) the string pool `f3bb47d0`.
+      largest single merge child   281.8 MB -> 128.1 MB   (-55%)
+      peak summed child RSS        400.6 MB -> 163.3 MB   (-59%)
+      peak concurrent children           19 ->       4
+  Kill arithmetic vs the 1,823.8 MB anon peak and a 2,048 MB limit:
+  1,823.8+284 = 2,108 OVER  ->  1,823.8+163 = 1,987 UNDER, by 61 MB.
+  **THE CAP ALONE BOUGHT NOTHING** (338.5 MB) -- the excursion was ONE large
+  merge, so the fix had to be the merge. The cap only became useful once the
+  per-merge cost fell: 2 x 128 MB is a bound in a way 2 x 282 MB was not.
+- **STILL OPEN:** the steady-state profiler difference. Its clock was reset by
+  four web deploys today, and the instrument cannot deliver its solo guarantee
+  at `WEB_CONCURRENCY=2` (per-worker counter, per-container cgroup read).
 - **CAP SCOPE.** `_spawn_artifact_merge` has no ceiling; measured peak 19
   concurrent children / 334.6 MB. Refusal is safe to send: 503 is NOT in
   `_PUBLISH_STREAM_UNSUPPORTED_STATUSES` `{400,404,405,415}`, so it does not
