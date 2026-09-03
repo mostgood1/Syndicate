@@ -5354,3 +5354,63 @@ exhaustively labelled; until then "no line" and "no such branch" are the same
 reading. (Same family as 08-2x *absent signal ≠ absent path* and *instrument
 blindness*, and this is the third lane to pay for it.) `_read_payload` keeps its
 five tokens for that reason.
+
+## 2026-09-03 — A per-date join counter is not safe to SUM across a multi-day window unless it is scoped to that date first. Second confirmed instance of the same shape as `#513`.
+
+**What we believed:** refresh-worker's `[layer2_shortlist] PREGAME_PROJECTION_JOIN
+sport=ncaaf considered=3625 projected=336 reason="no NCAAF SmartSim2
+projections for this date"` (9.3%) described a real, near-total NCAAF
+projection outage the night of the 2026-09-03 opener slate.
+
+**What was actually true.** `pipeline/layer2_shortlist.py::_attach_projections_over_window`
+calls the per-sport join once per date in a multi-day slate window
+(`_SLATE_WINDOW_DAYS["ncaaf"]=7`), passing the SAME shared, unfiltered board
+grid every time. `attach_ncaaf_game_projections` resets `considered = 0` at
+the top of every call and increments it for every qualifying row in the WHOLE
+grid, not just the rows whose own kickoff date matches that call's `date_key`.
+The wrapper then SUMS `rows_considered` across all non-empty window dates
+(summable-field union), which multiplies it by roughly the count of non-empty
+dates iterated (5 here: `considered=3625` / 5 = 725, the true shared-grid
+size). `rows_with_projection` is not similarly inflated — a given row can only
+match the ONE date_key equal to its own kickoff date — so the printed ratio
+collapses even though coverage is fine. Re-derived per-date from
+`/api/board/book-grid?sport=ncaaf&date=<D>` (which IS scoped per date) and
+summed over the same 5 real game-dates: `considered=692, projected=327`
+(~47%), matching the model's own documented FBS-vs-FCS rating boundary
+(51/99=51.5%) almost exactly. A second, independent bug in the SAME wrapper:
+the merged `reason` string is set from the first non-falsy value encountered
+in date order and never overwritten unless the WHOLE window sums to zero
+projected rows, so a TRAILING empty date (a future week whose CSV does not
+exist yet — legitimate, not a bug) can leave a "no projections for this date"
+reason attached to a window that mostly succeeded.
+
+**How we found out.** Re-derived the same window's coverage from a
+correctly-single-date-scoped endpoint (`/api/board/book-grid`) and compared;
+the two disagreed by almost exactly the number of non-empty dates in the
+window, which is not a coincidence a real data gap would produce. Confirmed
+by code trace that row-level `row["projection"]` mutation is untouched by the
+bug (a non-matching date iteration only increments local counters and
+`continue`s).
+
+**The rule.** Before trusting a coverage RATIO printed by any join that is
+invoked once per date inside a multi-day window, check whether its numerator
+and denominator are counted over the SAME population. A counter that is reset
+to 0 inside a per-sport/per-market join function and computed over "the grid"
+rather than "the grid filtered to this call's date" will be summed by an outer
+window-wrapper into a number with no denominator that means what it looks
+like it means. `todo.md #513` (WNBA, 2026-08-22) is the first instance of this
+exact shape (`considered` sourced from one join, `rows_with_projection` summed
+across two) and was correctly left unfixed as "reporting only" because no
+served price/edge/stake depended on it; this is the second, independent
+instance, in a different sport and a different mechanism (window-multiplication
+rather than population-mismatch), and it produced the same category of false
+alarm. **Any time a `PREGAME_PROJECTION_JOIN`-style log line reports a ratio
+that looks catastrophically low for one sport against healthy sports on the
+same pass, re-derive the SAME window from a single-date-scoped endpoint before
+concluding the pipeline is broken** — the per-sport branches that need this
+check are the ones whose slate spans multiple days (nfl, ncaaf, soccer); MLB's
+1-day window cannot exhibit it.
+
+**Cost:** a full diagnostic session driven by this single log line, before the
+counting bug was found; zero production impact (no price/edge/stake reads the
+inflated counter), so the cost was entirely session time, not board harm.

@@ -510,6 +510,61 @@ window** — absence in a short window is not absence.
 
 ### `#633` — **NCAAF SEASON PROJECTIONS CANNOT REFRESH: the CFBD monthly quota is exhausted and the artifact is 5+ days stale** — lane `game-market-entry-roi-curve` (the owed reading from `ncaaf-no-orders`, taken rather than filed), 2026-09-01 — **OPEN**
 
+
+> **BOTH HALVES OF THIS HEADLINE ARE FALSE AS OF 2026-09-03, and the item is
+> kept with the correction beside it rather than deleted.**
+> `[systems-engineer subagent, read-only; parent session 3492626c]`
+>
+> **THE QUOTA IS NOT EXHAUSTED.** `cfbd_quota_latch` expires at the MONTH ROLL
+> (00:00 UTC on the 1st), so it cleared 2026-09-01. Production, independently
+> corroborated: `[ppa] season=2025 source=api` on 09-01, 09-02 and 09-03, and
+> **zero `cfbd_quota` log lines since the roll**.
+>
+> **THE PROJECTIONS ARE NOT STALE.** The generator ran three times since 09-02
+> (`projections_written=51`, `=16`, `=51`), each with `artifact_published=True`,
+> and `ncaaf_source/data/smartsim2_projections_2026_wk1.csv` carries
+> `generated_at` timestamps from hours before kickoff.
+>
+> **WHAT THE 9.3% ACTUALLY WAS: A COUNTING BUG, NOT A PRODUCER FAILURE.**
+> `_attach_projections_over_window` calls
+> `attach_projections(grid, sport="ncaaf", selected_date=date_key)` on the SAME
+> unfiltered shared grid once per date in a 7-day window, and
+> `attach_ncaaf_game_projections` resets `considered = 0` and counts EVERY
+> qualifying row in the whole grid rather than only rows whose own kickoff date
+> matches that call. Summed across the 5 non-empty dates that inflates the
+> denominator ~5x: **3,625 / 5 = 725, exactly the shared grid's size.**
+> `rows_with_projection` is NOT similarly inflated -- a row can only match the
+> one date equal to its own kickoff -- so the ratio collapses.
+>
+> Re-derived from a per-date-scoped source (`/api/board/book-grid`):
+> **327 of 692 rows (~47%) carry a projection**, matching the model's own
+> documented FBS-vs-FBS boundary (51/99 = 51.5%) almost exactly.
+>
+> **SECOND BUG, same function:** the merged `reason` is set from the first
+> non-falsy value in date order and never overwritten unless the WHOLE window
+> sums to zero. A trailing empty week-2 date (no CSV yet -- legitimate) leaves
+> *"no NCAAF SmartSim2 projections for this date"* stamped on a window that
+> mostly succeeded. That string is what made this item read as a producer gap.
+>
+> **Row-level attachment was never affected.** Verified on the served board for
+> 2026-09-03: Rutgers/UMass, Wake Forest/Akron, Georgia Tech/Colorado and
+> Illinois/UAB each carry a full SmartSim2 projection; the seven FBS-vs-FCS
+> money games correctly carry none, with a stated reason. `model_edge_pct` stays
+> `None` regardless, by separate already-shipped policy -- not this item.
+>
+> **PRESCRIBED FIX, NOT IMPLEMENTED:** thread `selected_date` into
+> `attach_ncaaf_game_projections` and `continue` BEFORE any counter increment
+> for rows whose own `commence_time` date != that call's date. Scope it to
+> `syndicate/features/ncaaf/game_projections.py` and the `ncaaf` branch of
+> `board_enrichment.py`, NOT the shared window wrapper, so NFL and soccer are
+> untouched. Same class as `#513`. Land it as a ridealong on a routine deploy;
+> nothing about tonight requires it.
+>
+> **THE SAME BUG INFLATES SOCCER**, whose window is 7 dates: `considered`
+> 140,924 / 7 = 20,132 exactly, the merged `rows_by_league` sum. Ratios survive,
+> absolute counts do not. See `log/2026-09-03.md`.
+
+
 **THE READING `ncaaf-no-orders` WAS WAITING ON IS TAKEN, and it passes the lane's
 test while revealing a different and larger problem.** Render logs API,
 `srv-d91dpertqb8s73co8ls0` (refresh-worker), window 2026-08-30T20:20Z..09-01T00:21Z.
