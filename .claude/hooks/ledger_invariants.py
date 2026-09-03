@@ -33,8 +33,25 @@ import re
 
 LANES = ".syndicate/lanes.md"
 STATE = ".syndicate/state.md"
+# state.md was SPLIT 2026-09-03 (`scripts/split_state.py`): the index and the
+# cross-cutting subjects stay in state.md, the bodies live in these parts.
+# Every one has to be TRACKED and routed to `_state`, or a commit touching
+# `state_mlb.md` is checked by nothing at all -- the guard would go quiet
+# exactly where the content moved.
+#
+# WHAT THIS CANNOT SEE, stated so nobody assumes otherwise: `_state` runs
+# per-file, so it catches a subject stacked WITHIN one part -- the common case,
+# someone appending a second section to the file they are already editing. A
+# slug duplicated ACROSS two parts is invisible here and is caught instead by
+# `scripts/state_key_check.py`, which pools slugs over every part and runs in
+# session-start's coherence loop.
+STATE_PARTS = tuple(
+    f".syndicate/state_{d}.md"
+    for d in ("mlb", "soccer", "football", "basketball", "venues",
+              "board", "worker", "model", "ledger")
+)
 LEARNINGS = ".syndicate/learnings.md"
-TRACKED = (LANES, STATE, LEARNINGS)
+TRACKED = (LANES, STATE, *STATE_PARTS, LEARNINGS)
 
 _LANE_HDR = re.compile(r"(?m)^###\s+(\S+)\s")
 _ARCHIVE = re.compile(r"(?m)^## Archived lanes")
@@ -187,7 +204,8 @@ def _learnings(text, root=None):
     return []
 
 
-CHECKS = {LANES: _lanes, STATE: _state, LEARNINGS: _learnings}
+CHECKS = {LANES: _lanes, STATE: _state, LEARNINGS: _learnings,
+          **{p: _state for p in STATE_PARTS}}
 
 
 def violations(rel_path, text, root=None):

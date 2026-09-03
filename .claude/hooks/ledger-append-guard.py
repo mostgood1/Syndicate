@@ -52,6 +52,14 @@ import sys
 TOOLS = ("Edit", "Write", "MultiEdit")
 LANES = ".syndicate/lanes.md"
 STATE = ".syndicate/state.md"
+# state.md was SPLIT 2026-09-03. The dated-sub-heading predicate has to
+# follow the content into the parts, or the guard silently stops covering
+# the files people now actually edit.
+STATE_PARTS = tuple(
+    f".syndicate/state_{d}.md"
+    for d in ("mlb", "soccer", "football", "basketball", "venues",
+              "board", "worker", "model", "ledger")
+)
 OFF_ENV = "SYNDICATE_LEDGER_GUARD"
 
 HEADER_RE = re.compile(r"(?m)^###\s+(\S+)\s")
@@ -132,7 +140,7 @@ def main():
     # the edited file itself. Both trees mirror the same internal layout, so a
     # trailing-segment match is correct in either.
     norm = path.replace("\\", "/").rstrip("/")
-    rel = next((c for c in (LANES, STATE)
+    rel = next((c for c in (LANES, STATE, *STATE_PARTS)
                 if norm == c or norm.endswith("/" + c)), None)
     if rel is None:
         return 0
@@ -146,7 +154,7 @@ def main():
     except Exception:
         return 0
 
-    if rel == STATE:
+    if rel == STATE or rel in STATE_PARTS:
         try:
             gained = len(STATE_DATED_SUB.findall(after)) - len(STATE_DATED_SUB.findall(current))
         except Exception:

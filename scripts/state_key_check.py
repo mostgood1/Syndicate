@@ -45,7 +45,30 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-STATE = REPO_ROOT / ".syndicate" / "state.md"
+SYN = REPO_ROOT / ".syndicate"
+STATE = SYN / "state.md"
+
+
+def state_files():
+    """state.md plus every `state_<domain>.md` part -- NOT the archives.
+
+    THE INVARIANT IS GLOBAL AND MUST STAY GLOBAL. After the 2026-09-03 split
+    (`scripts/split_state.py`) the subjects live across ten files, and one
+    subject appearing in two of them is the same stacking failure this checker
+    was built for -- worse, actually, because two files are less likely to be
+    read together than two sections of one file. Checking each part in
+    isolation would pass on exactly that. So every part is read and the slugs
+    are pooled.
+
+    `state_archive_*.md` is excluded on purpose: archives HOLD superseded
+    bodies, and one of them legitimately repeats a slug from the live file
+    (that is what `compact_state.py` writes). Including them would make the
+    checker fail on correct work.
+    """
+    out = [STATE] if STATE.exists() else []
+    out += sorted(p for p in SYN.glob("state_*.md")
+                  if not p.name.startswith("state_archive"))
+    return out
 
 SECTION = re.compile(r"^## (?!\[)(.*)$", re.M)          # a header with no key
 # PERMISSIVE, and it must stay that way. This was `[a-z0-9][a-z0-9-]*`, which
@@ -73,16 +96,27 @@ def main() -> int:
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
-    try:
-        text = STATE.read_text(encoding="utf-8-sig")
-    except OSError as exc:
-        print(f"FATAL: cannot read {STATE}: {exc}", file=sys.stderr)
+    files = state_files()
+    if not files:
+        print(f"FATAL: no state file found under {SYN}", file=sys.stderr)
         return 2
+    texts = {}
+    for p in files:
+        try:
+            texts[p] = p.read_text(encoding="utf-8-sig")
+        except OSError as exc:
+            print(f"FATAL: cannot read {p}: {exc}", file=sys.stderr)
+            return 2
 
+    # Slugs are pooled ACROSS files, and each records which file it came from,
+    # so a stacked subject reports where both halves live rather than just
+    # naming the slug twice.
     keyed: dict[str, list[str]] = {}
-    for slug, title in KEYED.findall(text):
-        keyed.setdefault(slug, []).append(title.strip()[:70])
-    unkeyed = [t.strip()[:70] for t in SECTION.findall(text)]
+    unkeyed: list[str] = []
+    for p, text in texts.items():
+        for slug, title in KEYED.findall(text):
+            keyed.setdefault(slug, []).append(f"{title.strip()[:56]}  ({p.name})")
+        unkeyed += [f"{t.strip()[:56]}  ({p.name})" for t in SECTION.findall(text)]
 
     stacked = sorted((s, t) for s, t in keyed.items() if len(t) > 1)
     offconvention = sorted(s for s in keyed if not CONFORMING.match(s))
@@ -99,7 +133,7 @@ def main() -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
         return 1 if failed else 0
 
-    print(f"{report['sections']} sections / {report['subjects']} subjects")
+    print(f"{report['sections']} sections / {report['subjects']} subjects  (across {len(files)} file(s))")
 
     if unkeyed:
         print(f"\nUNKEYED -- {len(unkeyed)} section(s) with no subject slug.")

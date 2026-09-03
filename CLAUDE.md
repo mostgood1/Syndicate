@@ -246,7 +246,13 @@ it does not exist.
 
 ## Start of every session
 
-1. Read `.syndicate/state.md` — current, verified system state.
+1. Read `.syndicate/state.md` — current, verified system state. **It is now an
+   INDEX plus the cross-cutting subjects** `[split 2026-09-03]`: the
+   `[subject-index]` table at the bottom lists every subject and which
+   `state_<domain>.md` part holds its body (mlb, soccer, football, basketball,
+   venues, board, worker, model, ledger). Read this file, then open only the
+   part your work touches. One subject, one section is GLOBAL across those
+   files — `scripts/state_key_check.py` is what enforces it across all of them.
 2. Read `.syndicate/lanes.md` — what other sessions are holding.
 3. Read `.syndicate/learnings.md` — the rules that came from past mistakes.
 

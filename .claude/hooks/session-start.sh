@@ -321,7 +321,34 @@ BLOAT=""
 # is state_key_check.py in the coherence loop below, which this raise does not
 # touch. The real fix is a compact_state.py that does for cells what
 # compact_learnings.py does for entries: rule stays, superseded reading moves.
-for f in state.md:920000 lanes.md:240000 learnings.md:400000; do
+# SPLIT 2026-09-03. state.md is now an INDEX plus cross-cutting subjects
+# (61,985 B); the bodies live in nine `state_<domain>.md` parts. So the single
+# 920,000 cap above no longer describes anything -- state.md would sit at 7% of
+# it forever while a part grew without limit, which is a cap that cannot fire.
+#
+# Three alarms now, each answering a different question:
+#   state.md:120000   the index must stay CHEAP -- it is what every session
+#                     reads first, and it grows one row per new subject.
+#   part:250000       one domain running away. Largest today is venues at
+#                     154,682, so this is ~1.6x the current worst.
+#   total:1100000     aggregate growth, the question the old 920,000 asked.
+#                     Today's total is 774,933 across ten files -- the split
+#                     ADDED ~28 KB in part headers and the index, which is the
+#                     price of the structure and is counted here honestly.
+STATE_TOTAL=0
+for sf in .syndicate/state.md .syndicate/state_*.md; do
+  case "$sf" in *state_archive*) continue;; esac
+  [ -f "$sf" ] || continue
+  SZ=$(wc -c < "$sf" 2>/dev/null | tr -d ' ')
+  STATE_TOTAL=$((STATE_TOTAL + ${SZ:-0}))
+  case "$sf" in
+    .syndicate/state.md) [ "${SZ:-0}" -gt 120000 ] && BLOAT="${BLOAT}state.md index $((SZ/1024))KB>117KB, ";;
+    *) [ "${SZ:-0}" -gt 250000 ] && BLOAT="${BLOAT}$(basename "$sf") $((SZ/1024))KB>244KB, ";;
+  esac
+done
+[ "$STATE_TOTAL" -gt 1100000 ] && BLOAT="${BLOAT}state total $((STATE_TOTAL/1024))KB>1074KB, "
+
+for f in lanes.md:240000 learnings.md:400000; do
   n=${f%%:*}; cap=${f##*:}
   if [ -f ".syndicate/$n" ]; then
     SZ=$(wc -c < ".syndicate/$n" 2>/dev/null | tr -d ' ')

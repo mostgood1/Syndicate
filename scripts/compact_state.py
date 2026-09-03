@@ -104,6 +104,11 @@ import re
 import sys
 
 STATE = pathlib.Path(".syndicate/state.md")
+# SPLIT 2026-09-03: the bodies this tool operates on moved into
+# `.syndicate/state_<domain>.md`. state.md keeps the index and the
+# cross-cutting subjects, so pointing this at the default now finds almost
+# nothing -- pass --file to work on a part. Kept as the default anyway
+# because the cross-cutting sections are still real sections.
 
 HEAD = re.compile(r"^## ")
 # PERMISSIVE on purpose -- see the note in the module docstring.
@@ -202,7 +207,7 @@ def candidates(lines):
 def audit(lines):
     secs = sections(lines)
     total = len("\n".join(lines))
-    print(f"state.md: {len(lines)} lines, {total} chars, {len(secs)} sections\n")
+    print(f"{STATE.name}: {len(lines)} lines, {total} chars, {len(secs)} sections\n")
 
     auto, manual = candidates(lines)
 
@@ -347,7 +352,11 @@ def main(argv=None):
                     help="substring of the marker line; moves from after its "
                          "paragraph to the end of that section")
     ap.add_argument("--apply", action="store_true", help="write; default is a dry run")
+    ap.add_argument("--file", help="state file to operate on "
+                                   "(default .syndicate/state.md; use a state_<domain>.md part)")
     args = ap.parse_args(argv)
+    if args.file:
+        globals()["STATE"] = pathlib.Path(args.file)
 
     try:
         lines, crlf, raw = load()

@@ -29,7 +29,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SYN = ROOT / ".syndicate"
-LEDGER = ["state.md", "lanes.md", "deploys.md", "learnings.md"]
+# state.md was SPLIT 2026-09-03 (`scripts/split_state.py`) into an index plus
+# `state_<domain>.md` parts. Globbed rather than listed so a new part is picked
+# up automatically; archives are excluded because they hold superseded bodies.
+LEDGER = (["state.md"]
+          + sorted(p.name for p in SYN.glob("state_*.md")
+                   if not p.name.startswith("state_archive"))
+          + ["lanes.md", "deploys.md", "learnings.md"])
 
 
 def git(*args: str) -> str:
