@@ -4289,3 +4289,38 @@ Deleting backup ref `backup/unpushed-main-2026-09-03` was gated on "is anything 
 **Why a line diff fails here specifically.** A ledger gets REWORDED as it is corrected: the same fact is restated shorter, or moved under a new heading. Line identity tracks the wording, which is the part designed to change; the fact is the part that persists. So the residue a line diff reports is biased TOWARD superseded text.
 
 **How to apply:** before deleting any ledger branch, archive, or duplicate, extract distinctive tokens (SHAs, comma-numbers, decimals, backticked identifiers, issue ids) from the candidate and assert each one appears in the copy you are keeping. Do not reason from line counts. This same check is what verified the 2026-09-03 `state.md` archival: 27 distinctive tokens across both moved regions, 0 lost.
+
+
+## 2026-09-03 — FORBIDDEN: forcing a deploy claim whose age keeps RESETTING without first checking the holder's deploys. A resetting age means the holder is WORKING, not that a dead poller is renewing it. `[lane prop-join-yield]`
+
+`deploy_claim.py status` on web read `HELD by web-oom-profiler-steady since
+20:28:24Z`, then nine minutes later `HELD ... 0.3 min`. I read the reset as a
+watch loop re-acquiring inside a session that had ended — a shape this repo has
+genuinely seen (`project_deploy_claim_poller_rotates_token`) — and told the user
+the claim might be a stale livelock. It was not. `web-oom-profiler-steady` was
+DEPLOYING, and had shipped `origin/main` tip at 20:32:50Z. I forced at 20:35:51Z
+and preflight refused me on the spot:
+
+    HOLD: a6f5f586 is already contained in live a6f5f586 -- the deploy is redundant
+
+No harm followed only because their deploy had already finished. Ninety seconds
+earlier and the force would have landed mid-deploy.
+
+**WHY THE INSTRUMENT CANNOT ANSWER THIS.** "A dead session's poller is renewing"
+and "a live session is actively deploying" produce the SAME reading in
+`status` — a holder name and an age that keeps resetting. The field that
+separates them is not in that tool at all. It is one call away:
+
+    GET /v1/services/<id>/deploys   ->  status=build_in_progress|update_in_progress
+
+**How to apply:** before `acquire --force`, fetch the holder service's deploys
+and confirm none is in flight. Absence of the holder from `list_sessions`
+(including archived) is NOT sufficient on its own — it was true here too, and the
+holder was still mid-deploy. A resetting age is evidence AGAINST forcing, not
+for it: an abandoned claim goes STALE, it does not renew.
+
+**The corollary that did hold.** Forcing a claim buys the LOCK and nothing else.
+On refresh-worker the same evening, forcing `fleet-catchup-round3` off left
+`refresh_odds_job.py` still running, and a deploy kills in-flight jobs — so the
+deploy waited anyway. Say which of the two waits a force actually shortens
+before taking one.
