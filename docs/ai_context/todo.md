@@ -1299,6 +1299,54 @@ mix. The matched evidence is the bench: **472.0 -> 268.5 MB (-43%) with
 BYTE-IDENTICAL output**, sha256 equal on both arms over a 67.8 MB result. Bench
 and production agree in direction and magnitude; neither alone is the claim.
 
+**`[2026-09-03]` THE STEADY-STATE READING IS TAKEN. TWO RESULTS, AND THE SECOND
+IS THE BIGGER ONE: THIS ITEM'S RATE IS WRONG BY AN ORDER OF MAGNITUDE.**
+
+Taken under a deliberately held `web` deploy claim, because the reading needs ONE
+uninterrupted process life and web had booted four times in 62 minutes
+(21:14:17, 22:02:31, 22:11:51, 22:16:04 — all clean deploys, **zero
+`server_failed` and zero `oomKilled` since 21:00Z**; cadence, not instability).
+Boot `22:16:04Z`, 12 emissions to 39 min uptime, both workers recovered by their
+`solo_attributed` steps of 200.
+
+**WARM-UP IS ~20 MIN ON THIS SERVICE, NOT THE ~75 THIS ITEM ASSUMED.** Re-derived
+from the anon series rather than inherited: anon ramps 680 -> ~1,100 MB by minute
+13 and the steep phase is over by ~19. Every reading below is from the plateau.
+
+**RESULT 1 — THE SOLO REQUEST PATH IS NOT INNOCENT. Lane hypothesis FALSIFIED.**
+Three framings, because the workers emit at different times and the honest answer
+is a range:
+
+    endpoint delta, each worker over its own span       101%
+    common 3.7-min window both workers straddle          61%
+    RATE-based (rates add; deltas over unequal spans     150%
+      do not) -- attributed 16.8 MB/min vs anon 11.2
+
+**A share above 100% is not an error to explain away — it is the DOUBLE COUNT
+made visible.** Both workers difference the SAME container cgroup, so each
+absorbs the other's allocation. **The instrument cannot apportion at
+`WEB_CONCURRENCY=2`; it can only rule innocence OUT, and it does.** The request
+path accounts for growth of the same order as the total.
+
+**RESULT 2 — THE GROWTH RATE IS ~500-670 MB/h, NOT 32-75 MB/h.** Fitted, not read
+off two endpoints, and on MERGE-CHILD-FREE samples only (a child was measured at
+281.8 MB with unreclaimable stepping +283.7 in the same instant, so any sample
+with one alive is the excursion, not the baseline):
+
+    unreclaimable   n=32, 19.4-39.1 min   +8.4 MB/min = +503 MB/h   R^2=0.75
+    anon            n=6                  +11.2 MB/min = +671 MB/h   R^2=0.93
+
+**This resolves the kill timing that never fitted.** At ~500 MB/h from the
+1,248 MB reading, 2,048 MB is **~1.6 h away** — and the escalation lane recorded
+OOM kills at **2.45, 3.09 and 3.13 h of uptime**. A 32-75 MB/h rate cannot
+produce a kill at 2.5 h from any plausible floor; ~500 MB/h can, and does.
+
+**LIMITS, STATED RATHER THAN BURIED.** The window is 20 minutes of one process
+life at one traffic level; linearity beyond it is an assumption, and R^2 speaks
+only inside it. The rate is measured AFTER today's cap and cheaper merge, so it
+is the CURRENT state, not the state that produced this morning's kills. And the
+attributed share is a range, never the 150%.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
