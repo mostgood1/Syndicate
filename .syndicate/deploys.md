@@ -19075,3 +19075,30 @@ which is the likely reason three prior tunings of this knob "did nothing".
 **A NULL RESULT IS AN ALLOWED OUTCOME AND MUST BE REPORTED AS ONE.** If
 non-today's build share does not fall, that means the queue coalesces and the
 floor is the wrong lever — say so rather than hunting for a reading that agrees.
+
+## 2026-09-03 02:2x—03:5xZ — refresh-worker `eb11b956` (`lens_fingerprint`, `#640`) — **NOT DEPLOYED. Three attempts, three DIFFERENT legitimate refusals, claim released each time.** — lane `mlens-snapshot-dating`
+
+The change is landed on `origin/main` and is **inert until refresh-worker next
+deploys from main — at which point ANY such deploy carries it**, because it is
+an ancestor of the tip. That is the reason this was abandoned rather than
+forced: it costs nothing to wait and it will ship on someone else's deploy.
+
+| attempt | blocker | exit |
+|---|---|---|
+| 02:2xZ | `HOLD` — MLB daily sim in flight (`daily_update.py --workflow ui-daily`) | 1 |
+| 02:4xZ | `CLAIMED` — `board-window-floor-raise` held the claim, live and unexpired | 3 |
+| 03:13Z | `TOO_SOON` — that lane deployed 4 min earlier; 25 min minimum spacing (`#563`) | 5 |
+| 03:37—03:5xZ | `HOLD` again — spacing cleared straight into 2—10 jobs in flight | 1 |
+
+**NOTHING WAS FORCED, and each escape hatch was declined for its stated reason:**
+`--force` on the claim (the holder was live — and the claim's `pid` is never
+evidence of the opposite), `--allow-rapid` past the spacing window (reserved for
+a revert or an already-broken board; using it discards the build in flight), and
+deploying past a job `HOLD` (kills work in progress). **The change is a 98-byte
+additive field.** None of those trades is worth it, and the deploy queue was
+wanted by another lane throughout.
+
+**verify, WHEN it ships:** the next book-grid tick (~10 min after boot) must
+write a non-empty `live_game_state.lens_fingerprint.sha256_12`. **Its ABSENCE on
+a fresh `generated_at` means the field is inert, NOT that the lens was empty**
+— the fingerprint is emitted for an empty lens too, by test.

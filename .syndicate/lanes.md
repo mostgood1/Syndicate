@@ -1666,13 +1666,12 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   score or state, does NOT change on age alone (so "the lens stopped moving"
   stays distinguishable from "the board changed"), and stays under 400 bytes on
   a 30-game slate. 6 new tests; 27 board-grid tests pass.
-- **OWED: a refresh-worker deploy** — `eb11b956` is landed and NOT deployed, so
-  `lens_fingerprint` is inert until it ships. **Attempted 2026-09-03 02:2xZ and
-  correctly HELD:** preflight found 2 jobs in flight (`daily_update.py
-  --workflow ui-daily` under `run_mlb_daily_sim_job.py`) and a deploy kills
-  them. Claim acquired and RELEASED rather than held or forced — a 98-byte
-  additive field does not justify killing an MLB sim. Retry preflight when the
-  sim is done; refresh-worker is on `f84eb21b`.
+- **OWED: a refresh-worker deploy, and DELIBERATELY ABANDONED after three tries.**
+  `eb11b956` is on `origin/main`, so **any** future refresh-worker deploy from
+  main carries it. Attempts blocked by, in order: an MLB sim in flight (`HOLD`),
+  another lane's live claim (`CLAIMED`), the 25-min spacing after that lane's
+  own deploy (`TOO_SOON`, `#563`), and then jobs again. Claim acquired and
+  RELEASED each time; nothing forced. Full table: `deploys.md` 2026-09-03.
 - Verification when it ships: the next book-grid tick (~10 min) must write a
   `live_game_state.lens_fingerprint` with a non-empty `sha256_12`. **Its ABSENCE
   on a fresh `generated_at` means the field is inert**, not that the lens was
