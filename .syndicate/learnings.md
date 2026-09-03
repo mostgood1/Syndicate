@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 757 rules `[generated]`
+## Index — 758 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4546,3 +4546,38 @@ answer is the same either way.
 The trigger is mechanical and worth automating eventually: `pending_deploys.py`
 already prints the files each commit touches, so "does any pending commit touch a
 file I changed today" is answerable without judgement.
+
+## 2026-09-03 — a guard whose failure modes are ASYMMETRIC must be fixed in the safe direction only
+
+`check_lane_invariants.py` reported `render.yaml` CONTESTED by two lanes that
+had each written "**never `render.yaml`**" — a PROHIBITION. `_DISCLAIMER_MARKERS`
+carried `not touch`, `not taken`, `released`; `never` was missing. The two lanes
+most carefully avoiding the repo's highest-blast-radius file read as fighting
+over it.
+
+**The rule is not "add the marker".** It is that this guard's two failure modes
+are not equal:
+
+  false claim  -> noisy, cries wolf, SAFE
+  missed claim -> two lanes edit one file with no warning, THE INCIDENT
+
+So every candidate fix gets judged on which direction it can fail in, and
+"tidier" loses to "cannot lose claims". Two were measured and rejected:
+
+- **word-boundary marker matching**: changed **129 claims** across the real
+  `lanes.md`. The markers are deliberately substrings so `not touch` also covers
+  `not touched`/`not touching`; anchoring the end broke 15 disclaimers, anchoring
+  the start silently un-suppressed 129 more. Reverted to plain `str.find`.
+- **cross-line carry-over** (a disclaimer governing its wrapped continuation):
+  buys tidiness in the dangerous direction. Not implemented; the two lane blocks
+  were reflowed instead so marker and path share a line.
+
+**BASELINE THE WHOLE OUTPUT BEFORE EDITING A CLASSIFIER.** I snapshotted all 40
+claims first and diffed after every attempt. That is the only reason the 129-claim
+regression and my own dropped claim were seen at all — both were invisible in the
+pass/fail line, which read `INVARIANTS HOLD` while the claim set was wrong.
+
+**And do not put a marker word in a path you intend to claim.** My test was first
+named `test_lane_guard_never_marker.py`; the new marker cut inside its own path
+and dropped the claim. Substring matching is what makes the other markers work,
+so the constraint belongs on the naming side, not the parser.
