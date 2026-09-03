@@ -1359,6 +1359,35 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none. No deploy: `cards.py` runs on web, and this path is disabled
   on Render by `_render_web_dyno()`, so the fix is not urgent in production.
 
+### soccer-date-index-staleness — OPEN — opened 2026-09-02 — session 3492626c
+- Goal: discharge `#631` risk 2 — *"`display_prediction_dates.json` staleness;
+  WHO WRITES IT AND HOW OFTEN IS UNVERIFIED"* (`state.md [week-scoped-board-window]`).
+  Answer both halves with a production measurement, and say whether the proposed
+  `_week_scoped_supported_dates()` widening would work, be inert, or regress.
+- Files: none claimed — READ-ONLY diagnosis. Ledger files follow the convention
+  used by `soccer-anchor-cost` and are deliberately not claimed.
+- WHO WRITES IT, read from the deployed code before testing:
+  `scripts/build_soccer_artifacts.py:696` calls `_update_date_index(api_root,
+  iso_date)` at the END of a league+date build, immediately after the
+  recommendations file is written. It is ACCUMULATE-ONLY: read existing `dates`,
+  `dates.add(iso_date)`, write sorted + `latest`. Nothing ever removes a date.
+- **HYPOTHESIS (written before testing): the index records dates that were BUILT,
+  not dates that are AVAILABLE.** A date can only appear once a build for that
+  date has COMPLETED. So if production builds only today, `available_dates()`
+  can never contain tomorrow, and `#631`'s union
+  `_week_scoped_supported_dates()` would contribute NOTHING to the board window.
+  The widening would then be INERT for soccer rather than harmful — a different
+  failure from the one risk 2 anticipated ("if that artifact lags, the same class
+  of bug recurs one level down").
+- Falsification test: read the LIVE per-league `display_prediction_dates.json`
+  from production. If `max(dates) > today` for any league, the index does carry
+  future dates, the hypothesis is WRONG, and the widening has real input.
+  Also compare each league's `latest` against today to size any lag.
+- Verification: a per-league table of `max(dates)` vs today, read from production
+  (not the local mirror — `data/` in git is a lossy mirror), plus a statement of
+  which of {works, inert, regresses} the widening falls into.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
