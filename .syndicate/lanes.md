@@ -2025,6 +2025,30 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   in the scoping note) is unverified — a binding throttle does not help if the
   date list feeding it is stale.
 - Blocked by: none
+### m639-actuals-no-truncate — OPEN — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: fix `todo.md #639`. `write_mlb_actuals_for_date` opens its output `"w"`
+  before it knows whether there are rows, so a zero-row result truncates
+  `props_actuals_<date>.csv` to a bare header — hourly, for every date whose
+  input has aged off refresh-worker's disk. Testable outcome: with the input
+  ABSENT the function writes nothing and leaves any existing file untouched;
+  with the input PRESENT it behaves exactly as before.
+- Files: `scripts/build_mlb_actuals.py`, `tests/test_build_mlb_actuals.py` (NEW).
+  **NOT `scripts/run_refresh_worker.py`** — the tick already logs
+  `result["summary"]` verbatim, so new fields surface in production with no edit
+  to that file.
+- Hypothesis: the three cases the current code collapses can be separated
+  cheaply, because `load_json_file` returning None is the ONLY signal today and
+  `path.is_file()` is one extra call.
+- Falsification test: if "input present but legitimately zero rows" cannot be
+  told from "input absent", the fix would just move the 403-vs-404 collapse into
+  a new place and must not ship in that form.
+- Verification: (a) BOTH branches exercised offline against the real mirror —
+  an absent-input date must leave a pre-existing file byte-identical, and
+  2026-06-15 (mirrored, manifest `c6d52e5db907f9ac`) must still produce 1,123
+  rows; (b) the new fields must be COMPACT — the tick's log line is already
+  truncated by the Render API at ~1,200 chars, which is how `#639` was first
+  mis-read, so no per-date paths.
+- Blocked by: none for the fix. Shipping it needs a refresh-worker deploy.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
