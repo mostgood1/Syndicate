@@ -1732,7 +1732,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   on a fresh `generated_at` means the field is inert**, not that the lens was
   empty — the fingerprint is emitted even for an empty lens, by test.
 - Claims: NONE held.
-### board-window-floor-raise — OPEN, **GOAL MET AND INJECTED; ONLY THE RATE IS OWED** — opened 2026-09-03 — session 3492626c — **Env `600`->`1800` injected by a SAME-SHA redeploy (`f84eb21b`, live 03:08:48Z, no code shipped), then `33b181ee` (live 04:20:45Z) made the floor OBSERVABLE — the queue path had emitted NOTHING, so the verification originally written here was not satisfiable. `floor_s=1800` in the served line proves the injection reached the process. MECHANISM shown: an enqueue GATED at `elapsed_s=725` that the old 600 floor would have ADMITTED. n=2 is NOT a rate — measurement scheduled 08:00 local, and a clip rate of 0 is a legitimate result.**
+### board-window-floor-raise — OPEN, **FLOOR NOW `1200`, NOT `1800`; RATE MEASURED AT 1800 AND OWED AT 1200.** 1800 clipped 87% of enqueues — correct by the mechanism and too blunt — so it was tuned to `1200`, predicted ~59% and measured 55% on the served line. Scheduled re-read `board-window-clip-rate-1200` at 01:00 local. **GOAL MET AND INJECTED** — opened 2026-09-03 — session 3492626c — **Env `600`->`1800` injected by a SAME-SHA redeploy (`f84eb21b`, live 03:08:48Z, no code shipped), then `33b181ee` (live 04:20:45Z) made the floor OBSERVABLE — the queue path had emitted NOTHING, so the verification originally written here was not satisfiable. `floor_s=1800` in the served line proves the injection reached the process. MECHANISM shown: an enqueue GATED at `elapsed_s=725` that the old 600 floor would have ADMITTED. n=2 is NOT a rate — measurement scheduled 08:00 local, and a clip rate of 0 is a legitimate result.**
 - Goal: make the board-window throttle capable of binding. ENV-ONLY change,
   `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` `600` -> `1800` on
   refresh-worker (SET 2026-09-03, single-key endpoint; the key is ABSENT from
@@ -2171,7 +2171,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### accuracy-autorun-rearm — OPEN, **BLOCKED. TWO attempts 2026-09-03 both stood down; NO DEPLOY TAKEN either time, key still `false`, claim free. Handed to the 03:00 CT scheduled task, which is now DISABLED (stood down 2026-09-03 pm) -- nothing is armed.** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### accuracy-autorun-rearm — OPEN, **UNOWNED — session 82fe0160 CLOSED ITSELF 2026-09-03 ~19:3xZ, saying so in commit `48c68546`: "checkpoint 82fe0160 part 3 (final): session closing with one lane armed, not finished". Absent from the session roster including archived. LEDGER CLAIMS RELEASED by lane `order-model-view` 2026-09-03 20:0xZ — `deploys.md`/`lanes.md`/`state.md` are a RECORD in this block, not a claim; the ENV work itself is untouched and still owed. A lane resuming it reclaims them by striking this note.** BLOCKED. TWO attempts 2026-09-03 both stood down; NO DEPLOY TAKEN either time, key still `false`, claim free. Handed to the 03:00 CT scheduled task, which is now DISABLED (stood down 2026-09-03 pm) -- nothing is armed.** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `#626`(h) runs in production for the first time WITHOUT killing the
   worker. ONE testable outcome: `[accuracy_summary] AUTORUN_DONE ... error=none`
   in refresh-worker logs, with the peak `memory_anon_mb` during that window
@@ -2495,6 +2495,39 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   real rather than merely merged.
 - Blocked by: none.
 
+
+### order-model-view — OPEN — opened 2026-09-03 — session 3492626c — **SHIPPED AND LIVE ON BOTH ORDER-PLACING SERVICES (`04187cdf`); the discharging READING is owed, and the obvious one does not count.**
+- Goal: an order records WHY it was made, not only what and at what price, so the
+  settled book can be split by whether a model view was involved.
+- Files: `syndicate/features/shared/execution_ledger.py`,
+  `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`.
+- Verification: a NON-NULL `model_edge_pct` on an order whose `submitted_at` is
+  after 2026-09-03T19:54:36Z, from `/api/portfolio/live` or `/api/portfolio/paper`.
+  **A null does not count in either direction** — the two positions read at 19:5xZ
+  were both submitted 15:27:33Z, hours before either service ran the code, and a
+  null on a POST-deploy order is the contract for a row with no model view
+  (`no_model_edge_pct` was 72% on NCAAF), not a failure. Watcher armed.
+- Measurement + the 8.9-minute ambiguous window: `.syndicate/deploys.md`
+  2026-09-03 19:45:44Z/19:54:36Z.
+
+### prop-join-yield — OPEN — opened 2026-09-03 — session 3492626c — **COMMITTED `c5e78549`, NOT YET DEPLOYED. Telemetry only.**
+- Goal: MLB prop rows that carry no projection must say WHY — the name did not
+  match, versus the sim genuinely has no view. `prop_projections` had no
+  `unmatched` counter of any kind, so the two were one number.
+- Files: `syndicate/features/shared/prop_projections.py`,
+  `pipeline/layer2_shortlist.py`, `tests/test_prop_join_yield.py`,
+  `tests/test_layer2_projection_window.py`.
+- Second defect found on the way, older and not MLB-only: a RATE is not a count.
+  `pct_projected` / `pct_with_edge` fell to the window merge's "first non-falsy
+  wins" branch, so a multi-date window served the FIRST date's percentage beside
+  a summed numerator and denominator. `rows_with_edge` was not in `summable`
+  either. Rates are now re-derived from the merged counts.
+- Verification: `player_rows_considered` and `player_unmatched_name` present on
+  `/api/board/book-grid?sport=mlb` once web runs `c5e78549` — the endpoint
+  computes the join inline, so no worker cycle is needed. Piggybacking on the
+  next web deploy rather than taking a claim to read telemetry.
+- Both changes mutation-checked: disabling `knows_player` fails 3 of 7 new
+  tests, disabling the rate recompute fails 3 of 5.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
