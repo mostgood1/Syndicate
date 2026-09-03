@@ -1563,6 +1563,22 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   template, so this needs refresh-worker AND web to be visible.
 - Blocked by: none.
 
+### live-odds-catchup-round4 — CLOSED 2026-09-03 — **DONE, verified BY CONTENT.** live-odds-worker `6f28b474`→`44903fbf`, live 21:03:41Z; `chip_join_key` present in all three changed files of the deployed SHA (2/3/4), `#643`'s `bytes_per_order` confirmed still present, 15 PUBLISH_OK, anon 553 MB of 2,048, 0 errors. — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: live-odds-worker off `6f28b474` onto `44903fbf`. Substantive content is
+  `9e106397` (NCAAF chip join — `game_chip_scoreboard.py`, `layer2_board.py`,
+  `team_aliases.py`); the other two touch `scripts/compact_state.py` /
+  `state_key_check.py`, ledger tooling the worker does not execute.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: **BY CONTENT, not ancestry** — the rule this session just paid
+  for. `git show <deployed-sha>:syndicate/features/shared/team_aliases.py |
+  grep -c chip_join_key` must be >= 1, AND `pending_deploys.py` must read 0 for
+  the service, AND its own log stream must show publisher work with 0 tracebacks.
+  Ancestry alone is not evidence: `#643` was an ancestor of the deployed SHA and
+  absent from the deployed FILE for two deploys today.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

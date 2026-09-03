@@ -20071,3 +20071,32 @@ working.
 
 **Fleet:** web `ac32034b` (0 pending) · refresh-worker `150cc95b` (0 pending) ·
 live-odds-worker `6f28b474` (3 pending, churn since 20:20Z).
+
+## 2026-09-03 — live-odds-worker `6f28b474` → `44903fbf` — lane `live-odds-catchup-round4`
+
+Preflight HOLD x5 over ~7 min (this service cycles odds jobs almost
+continuously), CLEAR 20:58:04Z, live 21:03:41Z.
+
+Substantive content was `9e106397` (NCAAF chip join — `game_chip_scoreboard.py`,
+`layer2_board.py`, `team_aliases.py`). The other two commits touch
+`scripts/compact_state.py` / `state_key_check.py`, ledger tooling the worker does
+not execute.
+
+verify — **BY CONTENT, applying today's rule rather than trusting ancestry:**
+```
+git show 44903fbf:...team_aliases.py        | grep -c chip_join_key  -> 2
+git show 44903fbf:...layer2_board.py        | grep -c chip_join_key  -> 3
+git show 44903fbf:...game_chip_scoreboard.py| grep -c chip_join_key  -> 4
+```
+Also re-checked that `#643` SURVIVED into this SHA (`bytes_per_order` x1) — it
+had already been silently reverted once today by an unrelated commit to the same
+file, so its presence is not assumable from one restore.
+
+Runtime: 100 log lines since boot, **15 `PUBLISH_OK`**, MLB card prune and
+schedule reconcile running, `memory_anon_mb=553` against the 2,048 MiB cap,
+**0 tracebacks / CRITICAL / OOM**. `pending_deploys.py` then read
+`live-odds-worker live=44903fbf`.
+
+**Fleet:** web `ac32034b` (0 pending) · refresh-worker `150cc95b` (2 pending) ·
+live-odds-worker `44903fbf` (1 pending) — the residuals are main churn from the
+~6 minutes this deploy took.
