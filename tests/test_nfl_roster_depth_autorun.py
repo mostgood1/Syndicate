@@ -72,6 +72,37 @@ class DispatchOrder(unittest.TestCase):
         self.assertEqual(depth_index, roster_index + 1, f"order={order}")
 
     def test_both_sit_high_in_the_chain(self):
+        """`#341`: not starved -- asserted against the branches that starve.
+
+        THIS ASSERTED `roster_index <= 4` / `depth_index <= 5` AND WENT RED ON
+        `main` `[fixed 2026-09-03]`. Nothing about the NFL block moved. The
+        chain grew ahead of it: `_launch_autorun_accuracy_summary` was inserted
+        at index 2 (`258d312f`, phase0 `#626(h)`), pushing roster 4 -> 5 and
+        depth 5 -> 6.
+
+        The literals were stale, not violated. `accuracy_summary` is daily-gated
+        (`ACCURACY_SUMMARY_AUTORUN_GATED reason=daily_gate`, one tick per 24h),
+        which is the same reason every branch above the NFL block is documented
+        in `run_refresh_worker.py` as "safe this high". Starvation is about what
+        wins ticks DURING A SLATE, and one tick a day is not it.
+
+        So the bound is expressed against the branches that actually starve
+        things, which is what `#341` measured and what the index was only ever a
+        proxy for. `test_nfl_pbp_fetch_autorun.py` already had this loop and
+        called it "strictly stronger" while keeping a literal alongside it that
+        had been raised twice and was red on `main` for the same insertion;
+        `test_nfl_injuries_fetch_autorun.py` and
+        `test_nfl_fantasy_artifact_autorun.py` had already deleted theirs. The
+        relative form does not go stale when the chain legitimately grows, and
+        it is tighter: a literal permits these branches to sit behind
+        `mlb_refresh` as long as the chain is long enough, this forbids it at
+        any index.
+
+        The TIER placement -- roster directly behind injuries, depth directly
+        behind roster -- is not asserted here; it is
+        `test_roster_and_depth_chart_sit_directly_behind_injuries` above, which
+        is relative already and passed throughout.
+        """
         source = open(worker.__file__, encoding="utf-8").read()
         order = [
             line.strip().removeprefix("elif ").removeprefix("if ").split("(")[0]
@@ -80,8 +111,22 @@ class DispatchOrder(unittest.TestCase):
         ]
         roster_index = order.index("_launch_autorun_nfl_roster_snapshot")
         depth_index = order.index("_launch_autorun_nfl_depth_chart_snapshot")
-        self.assertLessEqual(roster_index, 4, f"order={order}")
-        self.assertLessEqual(depth_index, 5, f"order={order}")
+        for name, index in (
+            ("_launch_autorun_nfl_roster_snapshot", roster_index),
+            ("_launch_autorun_nfl_depth_chart_snapshot", depth_index),
+        ):
+            for high_frequency in (
+                "_launch_autorun_mlb_refresh",
+                "_launch_autorun_weekly_sports_refresh",
+                "_launch_autorun_soccer_weekly_refresh",
+            ):
+                self.assertIn(high_frequency, order)
+                self.assertLess(
+                    index, order.index(high_frequency),
+                    f"{high_frequency} precedes {name}; an elif chain means "
+                    f"{name} only runs on a tick where it declines, which is "
+                    f"the starvation #341 measured. order={order}",
+                )
 
 
 class SilentDeclines(unittest.TestCase):

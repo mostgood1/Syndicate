@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from syndicate.features.shared import layer2_board
 from syndicate.features.shared.clv_opening_ledger import _opening_key
 from syndicate.features.shared.layer2_board import movement_join_key
 from syndicate.features.shared.layer2_board import (
@@ -23,6 +24,59 @@ from syndicate.features.shared.layer2_board import (
 from syndicate.features.shared.opportunity_signals import blended_score
 
 NOW = datetime.now(timezone.utc)
+
+
+# ---------------------------------------------------------------------------
+# THE CLOCK IS FROZEN, AND THAT IS THE ONLY REASON `minutes=` MEANS ANYTHING.
+#
+# Every fixture below back-dates `captured_at` from the module-level `NOW`,
+# which is bound ONCE at import. `_movement_from_opening` measures age against
+# the LIVE clock (`layer2_board.py:2572`) and renders the result into
+# `steam_reason`, so the elapsed time the code sees is not `minutes=` -- it is
+# `minutes=` PLUS however long this process ran between importing this module
+# and executing the test:
+#
+#     imported   0s before the test -> "... in 25 min ..."   passed
+#     imported  60s before the test -> "... in 26 min ..."   failed
+#     imported 200s before the test -> "... in 28 min ..."   failed
+#
+# So `test_steam_requires_a_sharp_move_in_a_short_window` passed alone and
+# failed in any sweep, which is the worst shape a test can have: it reads as a
+# real regression exactly when the most code is under test. It was diagnosed on
+# 2026-08-29 ("in 49 min since we published it ... a wall-clock drift against a
+# fixed fixture"), correctly ruled pre-existing, and then carried in the
+# baseline as one of five known failures -- padding the failure count of every
+# regression sweep since.
+#
+# The fix is to freeze what the CODE reads, not to widen what the test asserts.
+# `learnings.md:2464` is the rule being obeyed: a fixture that cannot violate
+# the property it asserts is zero coverage that reads as strong. A relaxed
+# regex over the minutes would have gone green permanently and stopped testing
+# the clock half of steam -- which is the half the old implementation lacked
+# and the whole reason `_STEAM_WINDOW_SECONDS` exists.
+#
+# Pinning `now` rather than re-deriving `captured_at` per call is deliberate:
+# it makes EVERY `NOW`-derived fixture in this file exact, including ones added
+# later, instead of fixing the one that happened to be caught.
+# ---------------------------------------------------------------------------
+
+
+class _FrozenDatetime(datetime):
+    """`datetime` with `now()` pinned to `NOW`. Everything else is inherited.
+
+    A subclass rather than a stub because `layer2_board` also calls
+    `datetime.fromisoformat` on the very record under test; a bare fake would
+    have to re-implement it, and a wrong re-implementation would be invisible.
+    """
+
+    @classmethod
+    def now(cls, tz=None):
+        return NOW.astimezone(tz) if tz is not None else NOW.replace(tzinfo=None)
+
+
+@pytest.fixture(autouse=True)
+def _freeze_layer2_board_clock(monkeypatch):
+    monkeypatch.setattr(layer2_board, "datetime", _FrozenDatetime)
 
 
 def _row(**over):
@@ -433,9 +487,12 @@ def test_the_old_full_key_would_have_missed_all_of_the_above():
 
 
 def _recent_iso():
-    from datetime import datetime, timedelta, timezone
-
-    return (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat().replace("+00:00", "Z")
+    # `NOW`, not a fresh `datetime.now()`. With the clock frozen at import time,
+    # a live read here would run AHEAD of the code's own "now" by the suite's
+    # elapsed runtime -- reintroducing the same drift in the opposite
+    # direction, and eventually producing a NEGATIVE age once a sweep ran
+    # longer than the 20 minutes being subtracted.
+    return (NOW - timedelta(minutes=20)).isoformat().replace("+00:00", "Z")
 
 
 # ---------------------------------------------------------------------------

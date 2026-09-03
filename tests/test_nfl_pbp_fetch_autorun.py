@@ -70,23 +70,35 @@ class NotStarvedByTheElifChain(unittest.TestCase):
         ]
         self.assertIn("_launch_autorun_nfl_pbp_fetch", order)
         index = order.index("_launch_autorun_nfl_pbp_fetch")
-        # Bound raised 1 -> 2 by `#504`, which inserted
-        # `_launch_autorun_evaluation_settlement` directly behind
-        # reconciliation. That is the ONE permitted insertion and it does not
-        # starve this branch: settlement is daily gated
-        # (`_evaluation_settlement_should_run_now`, once per Central day), so it
-        # takes at most ONE tick per 24h. Losing one tick a day is not the
-        # hazard this test exists for -- being behind `mlb_refresh`, which wins
-        # nearly every tick during a slate, is.
-        self.assertLessEqual(
-            index, 2,
-            f"pbp fetch must stay near the front of the chain; found at {index} in {order}",
-        )
-        # The invariant the index is a proxy FOR, asserted directly so this test
-        # keeps its teeth if the chain is reshuffled again. Strictly stronger
-        # than the bound above: a positional number drifts every time anything
-        # is inserted, whereas "ahead of the branches that win most ticks" is
-        # the actual property.
+        # THE ABSOLUTE BOUND IS GONE, NOT RAISED A THIRD TIME `[2026-09-03]`.
+        #
+        # It was `index <= 1`, then `#504` raised it to 2 for
+        # `_launch_autorun_evaluation_settlement`, and then
+        # `_launch_autorun_accuracy_summary` (`258d312f`, phase0 `#626(h)`) put
+        # pbp at 3 and it went red on `main` -- for the third insertion in a
+        # row that was legitimate and starved nothing. Every one of those
+        # insertions is daily-gated, so each costs this branch at most ONE tick
+        # per 24h, which the deleted comment itself said "is not the hazard this
+        # test exists for".
+        #
+        # A bound that must be edited every time an unrelated branch is added
+        # reports the CHAIN'S LENGTH, not this branch's starvation. Its two red
+        # appearances were both false, and a test whose failures are routinely
+        # false is one people learn to raise without reading -- which is exactly
+        # how it survived two raises without anyone noticing it had stopped
+        # measuring anything the loop below does not measure better.
+        #
+        # Nothing is lost by deleting it: the loop is STRICTLY STRONGER, as the
+        # old comment said in as many words. `index <= 2` permits pbp to sit
+        # behind two high-frequency branches; the loop forbids it behind ANY of
+        # them, at any index. The sibling files reached this same conclusion
+        # first -- `test_nfl_injuries_fetch_autorun.py` deleted its literal for
+        # contradicting a relative assertion in the same file ("two assertions
+        # that cannot both pass are not an alarm, they are noise"), and
+        # `test_nfl_fantasy_artifact_autorun.py` replaced `position <= 3` with a
+        # producer-relative bound. This file is the last one holding a literal.
+        #
+        # The invariant the index was a proxy FOR, asserted directly.
         for high_frequency in (
             "_launch_autorun_mlb_refresh",
             "_launch_autorun_weekly_sports_refresh",
