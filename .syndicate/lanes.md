@@ -1166,7 +1166,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   artifact.
 - Blocked by: none (the contested file needs a decision, not a blocker).
 
-### keyvalue-pressure-637 — OPEN, **UNOWNED — session 92987093 checkpointed and ended 2026-09-02** — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
+### keyvalue-pressure-637 — CLOSED 2026-09-03 — **USER DECISION: leave the reclaim to the TTL** — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
 - **STATUS 2026-09-02.** Diagnosis DONE and the fix SHIPPED and MEASURED on both
   workers (`#638` `21de4a9e`, `#637` `e4a471c0`) — see `state.md
   [venue-odds-storage]` and `log/2026-09-02.md`. **This lane stays OPEN for ONE
@@ -1204,7 +1204,29 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   **The script exists only in this session's worktree and on `origin/main`;
   worktrees are session-scoped**, so if it is closed before the fire time the
   task stops and the reading is owed to a human.
-- **THE ONLY REMAINING ACTION, and it is gated, not free.** Run
+- **CLOSED 2026-09-03 `[user decision: "leave it, ttl is working"]`.** Nothing is
+  owed. The reclaim happens by itself: the store went **42 keys -> 40 overnight**
+  with no intervention, and all six UNREACHABLE keys are past-date and clear
+  within days. Scheduled task `check-venue-odds-hydration-census` DISABLED — a
+  further reading cannot change a decision that has been made.
+- **FINDING, and it is the reason the decision was easy: NO EXISTING OPS ENDPOINT
+  CAN EXPIRE A `venue_odds` KEY.** Established by DRY RUN against production, not
+  by reading code alone:
+  `POST /api/ops/keyvalue/expire-run-artifacts?path_contains=venue_odds&dry_run=1`
+  -> **`matched_keys=69, expired_keys=0, skipped_no_run_stamp=69,
+  estimated_reclaimed_mb=0.0`**. It selects on a `_YYYYMMDD_HHMMSS` RUN STAMP
+  (`run_20260903_051200`); a venue_odds key is `kalshi__mlb__2026_09_01.json` —
+  `YYYY_MM_DD`, no time component — so every one is skipped by design rather than
+  guessed at. `/api/ops/keyvalue/sweep` cannot touch them either: it targets
+  currently-TTL-LESS keys, and these all carry the 10-day date-scoped TTL.
+  **Expiring them would require NEW code (targeted expire-by-key), i.e. a new
+  production-mutating capability on the shared Redis, for 26 MB. Not written.**
+- **A TRAP FOR WHOEVER DOES WRITE THAT:** `path_contains=venue_odds` matched
+  **69** keys, not the 40 the census enumerates — it is a substring match over the
+  whole namespace. A targeted tool must select on the EXACT key set, or its blast
+  radius will exceed what was authorised.
+- ~~**THE ONLY REMAINING ACTION, and it is gated, not free.** Run~~ (superseded by
+  the decision above; the census remains the gate if anyone revisits this) Run
   `py -3 scripts/check_venue_odds_hydration_census.py`. It exits 0 only when every
   censused key is SAFE and the key listing was not truncated. First run:
   **27 SAFE / 15 PENDING / exit 2 — NOT safe to expire.** Expiring a key a service
