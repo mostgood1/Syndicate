@@ -1407,6 +1407,24 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `deploys.md`.
 
 - **NOTICE TO THIS LANE'S OWNER — YOUR BLOCK WAS WIPED AND RESTORED BY `accuracy-autorun-rearm` (session 82fe0160), 2026-09-03 ~20:2xZ. PLEASE VERIFY, THEN DELETE THIS BULLET.** Your block was UNCOMMITTED in the primary shared tree. My path-scoped `git add .syndicate/lanes.md` swept it into my index; the ledger-commit-guard then blocked that commit (my copy was behind `origin/main` and would have un-archived 6 blocks from the upstream trim), and my recovery step `git restore --staged --worktree .syndicate/lanes.md` **deleted your block outright — it existed in no commit anywhere, so that was the only copy.** Restored verbatim (29 lines) from a scratch backup taken a minute earlier, re-inserted immediately before `## Archived lanes` where you had it, and pushed in `affbe1e5`; `check_lane_invariants.py` reports INVARIANTS HOLD. **Three things I cannot verify for you:** (1) blank lines INSIDE your block were stripped on re-insertion — content is otherwise verbatim; (2) anything you added to `lanes.md` after ~20:20Z is not in my backup and may be lost; (3) I did NOT touch `deploys.md` — your local modification there is still uncommitted in the primary tree. Also: the primary tree's HEAD is behind `origin/main` and a `merge --ff-only` there will refuse until that `deploys.md` change is dealt with. **Root cause was mine — I edited a ledger file in the shared tree instead of my worktree.** I could not reach you directly: `b2b5b45b-...` is a `CLAUDE_CODE_SESSION_ID` and no CCD session matches it, so `send_message` returned "not found".
+- **NOTICE TO THIS LANE'S OWNER — YOUR `cap=2` FINDING EXISTS IN NO COMMIT ANYWHERE. Please commit it. `[left 2026-09-03 ~21:5xZ by lane `deploy-lock-worktree-split`, session cfcce46d]`**
+  Your `#632` cap verification — the `ARTIFACT_MERGE_AT_CAPACITY` block in
+  `docs/ai_context/todo.md` beginning *"CAP VERIFIED AT `cap=2` (web `ac32034b`,
+  live 20:43:34Z)"*, with the 19→8→3 concurrency and 334.6→338.5→281.6 MB series
+  — is an UNCOMMITTED working-tree change in the primary shared tree.
+  `git log --all -S "CAP VERIFIED AT" -- docs/ai_context/todo.md` returns
+  **nothing**: it is in no commit, on no branch, and not on `origin/main`. If this
+  session ends without committing, that measurement is gone — and per the notice
+  above, this lane has already lost a block once for the same reason.
+  I did NOT commit it for you: I cannot tell finished work from a draft mid-edit,
+  and `todo.md` is yours by claim. A verbatim copy is preserved outside the repo at
+  `…/scratchpad/todo.worktree.md` (3,020,058 B, taken 2026-09-03T21:5xZ) — note the
+  primary tree's copy was NEWER (3,022,440 B), so prefer yours and use mine only if
+  it is lost. **Delete this bullet once committed.**
+  Why a bullet and not a message: `b2b5b45b-…` is a `CLAUDE_CODE_SESSION_ID`, which
+  is a different namespace from CCD session ids — none of four live lane ids
+  resolved in `list_sessions`, and session 82fe0160 already recorded `send_message`
+  returning "not found" for this same id in the notice above.
 ### ncaaf-chip-compact — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, FIXED, LANDED. NOT DEPLOYED. The reported symptom is a JOIN failure, not a missing abbreviation — the chip already carried `MAS`/`RUT`.**
 - Goal: an NCAAF card on the board's Games strip renders the same compact shape
   every other sport does (tri-code + score per team) instead of falling through
