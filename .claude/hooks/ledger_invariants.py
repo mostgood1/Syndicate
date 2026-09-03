@@ -46,7 +46,77 @@ _EVIDENCE = "- *(evidence in `learnings_evidence.md`)*"
 _COMPLETE = re.compile(r'[.!?)*`":]\s*$')
 
 
-def _lanes(text):
+
+def _blocks(text):
+    """[(slug, body)] for every `### ` block. A block ends at the next `### `
+    OR at any `## ` section heading -- without the second boundary the LAST
+    block of a section swallows every heading after it."""
+    out, slug, buf = [], None, []
+    for line in text.splitlines():
+        m = _LANE_HDR.match(line)
+        if m:
+            if slug:
+                out.append((slug, "\n".join(buf).rstrip()))
+            slug, buf = m.group(1), [line]
+        elif re.match(r"^#{1,2} ", line):
+            if slug:
+                out.append((slug, "\n".join(buf).rstrip()))
+            slug, buf = None, []
+        elif slug is not None:
+            buf.append(line)
+    if slug:
+        out.append((slug, "\n".join(buf).rstrip()))
+    return out
+
+
+def resurrected_blocks(text, upstream_lanes, upstream_history):
+    """Slugs whose block is VERBATIM in upstream's history and gone from
+    upstream's lanes.md -- i.e. this content was archived and is coming back.
+
+    THIS IS THE STALE-TREE SIGNATURE, and it is the only one that fires on the
+    real failure. Measured 2026-09-02: a kalshi CODE commit carried a lanes.md
+    from a tree ~90 commits behind and reverted a trim pass, taking the file
+    from 180,974 B back to 209,141 B and leaving 14 blocks duplicated across
+    lanes.md and lanes_history.md. Nothing was lost, so no "dropped block" check
+    would have seen it -- the commit ADDED blocks. What it actually reverted was
+    a DELETION, and a deletion is invisible to every predicate that looks only
+    at what is present.
+
+    Same-slug is NOT the test: 36 slugs legitimately appear in both files,
+    because history holds SUPERSEDED blocks of lanes that are still alive, and
+    18 of those lanes are OPEN. Byte-identity of the BODY is what separates
+    "this lane has an older block on record" from "this exact block is being
+    un-archived". Header identity alone is not enough either -- 24 headers match
+    where only 14 bodies do.
+    """
+    archived = {body for _slug, body in _blocks(upstream_history)}
+    live = {body for _slug, body in _blocks(upstream_lanes)}
+    return sorted({slug for slug, body in _blocks(text)
+                   if body in archived and body not in live})
+
+
+def _git_show(root, rev_path):
+    import subprocess
+    try:
+        r = subprocess.run(["git", "-C", root, "show", rev_path],
+                           capture_output=True, timeout=20)
+        return r.stdout.decode("utf-8", "replace") if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def _resurrected(text, root):
+    """Fails OPEN: no root, no git, no ref -> no opinion."""
+    if not root:
+        return []
+    up_lanes = _git_show(root, "origin/main:.syndicate/lanes.md")
+    up_hist = _git_show(root, "origin/main:.syndicate/lanes_history.md")
+    if up_lanes is None or up_hist is None:
+        return []
+    return resurrected_blocks(text, up_lanes, up_hist)
+
+
+def _lanes(text, root=None):
     out = []
     counts = collections.Counter(m.group(1) for m in _LANE_HDR.finditer(text))
     dupes = sorted(s for s, n in counts.items() if n > 1)
@@ -63,10 +133,21 @@ def _lanes(text):
                         "lane-guard reads lanes.md and NOTHING else, so the next archive pass\n"
                         "moves these out and their file claims stop being enforced SILENTLY.\n"
                         "  py -3 scripts/hoist_open_lanes.py --apply"))
+    back = _resurrected(text, root)
+    if back:
+        out.append(("block(s) already ARCHIVED upstream, coming BACK: " + ", ".join(back[:6]),
+                    "Your lanes.md is BEHIND origin/main. These blocks were moved to\n"
+                    "lanes_history.md upstream and this commit would un-archive them,\n"
+                    "duplicating them across both files and reverting whoever moved them.\n"
+                    "This is how a trim pass gets clobbered by an unrelated code commit.\n"
+                    "  git fetch origin main\n"
+                    "  git checkout origin/main -- .syndicate/lanes.md   # take upstream's\n"
+                    "then re-apply YOUR block to that copy. Do not commit a ledger file\n"
+                    "from a stale tree alongside unrelated changes."))
     return out
 
 
-def _state(text):
+def _state(text, root=None):
     out = []
     heads = _STATE_HDR.findall(text)
     unkeyed = [h.strip() for h in heads if not h.strip().startswith("[")]
@@ -85,7 +166,7 @@ def _state(text):
     return out
 
 
-def _learnings(text):
+def _learnings(text, root=None):
     lines = text.split("\n")
     bad = 0
     for i, l in enumerate(lines):
@@ -109,12 +190,17 @@ def _learnings(text):
 CHECKS = {LANES: _lanes, STATE: _state, LEARNINGS: _learnings}
 
 
-def violations(rel_path, text):
-    """[(what, how_to_fix)] for a ledger file, or [] if clean/unknown."""
+def violations(rel_path, text, root=None):
+    """[(what, how_to_fix)] for a ledger file, or [] if clean/unknown.
+
+    `root` is the repo the commit runs in. Predicates that need UPSTREAM state
+    (see `_resurrected`) are skipped without it, so callers that cannot resolve
+    a tree lose nothing they had before.
+    """
     fn = CHECKS.get(rel_path)
     if fn is None or not text:
         return []
     try:
-        return fn(text)
+        return fn(text, root)
     except Exception:
         return []

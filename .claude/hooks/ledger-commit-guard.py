@@ -162,7 +162,7 @@ def main():
             continue
         if not text:
             continue
-        bad = violations(rel, text)
+        bad = violations(rel, text, root)
         if bad:
             report.append((rel, bad))
     if not report:
