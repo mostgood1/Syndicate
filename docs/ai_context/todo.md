@@ -44,11 +44,32 @@ EMPTY actuals file where it should see a MISSING one — different facts to
 `prediction_reconciliation.RECONCILIATION_PATTERNS`, and the empty one reads as
 "nothing to grade" rather than "input gone".
 
-**THE FIX (not applied — it is a producer change and wants its own lane):**
-refuse to write when `rows` is empty AND the input was absent, and log the
-distinction. Do not silently skip when the input was present and genuinely
-graded to zero — those are different, and collapsing them is the same error as
-collapsing 403 onto 404.
+**THE FIX IS APPLIED AND LANDED — `558e4ffc`, lane `m639-actuals-no-truncate`.
+NOT YET DEPLOYED (needs refresh-worker).** `write_mlb_actuals_for_date` now
+refuses rather than truncating, and keeps the cases separate:
+
+| case | behaviour |
+|---|---|
+| input ABSENT | REFUSE, `skipped_reason=input_absent`. Does not mkdir, does not open the file. |
+| input UNREADABLE | REFUSE, its own token — not folded into "absent". |
+| input PRESENT, rows empty | a real result, written — EXCEPT over an existing non-empty file (`refused_empty_overwrite`), with `allow_empty_overwrite` as the deliberate override. |
+| rows present | written, exactly as before. |
+
+**Verified offline on the real mirror, all three branches** (manifest
+`c6d52e5db907f9ac`): 2026-06-15 writes **1,123** rows; 2026-06-30 (input
+present, all 986 rows `skipped_no_feed`) refuses and the pre-existing file comes
+back **byte-identical**; 2026-05-01 refuses with `input_absent`.
+
+`top_props_present` / `top_props_readable` / `written` / `skipped_reason` ride in
+the summary the worker ALREADY logs verbatim, so the next tick makes the
+diagnosis visible **with no edit to `run_refresh_worker.py`**. Kept compact and
+path-free deliberately — the log line is truncated at ~1,200 chars for ~12
+dates, which is how this item was first mis-read.
+
+**DEPLOY VERIFICATION, when it ships:** the next `MLB_ACTUALS_TICK` must show
+`written: false` with a `skipped_reason` for the June dates and `written: true`
+for 07-05 / 07-06 / 07-24 / 09-01 / 09-02. A tick where every date reads
+`written: true` would mean the guard is inert.
 
 **STILL OPEN:** whether the June `props_actuals` files were ever non-empty (i.e.
 whether anything has actually been destroyed, or they were always empty). That

@@ -1531,6 +1531,123 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   truncated by the Render API at ~1,200 chars, which is how `#639` was first
   mis-read, so no per-date paths.
 - Blocked by: none for the fix. Shipping it needs a refresh-worker deploy.
+### m625-standard-substrate-label — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. `#625`(6) done, commit `6211bdf9`, NO DEPLOY (documentation).** `model_engine_standard.md` §3b now names **three** substrates — `render`, `mirror:<manifest_id>`, `checkout` — with a table of what a verified mirror CAN and can NEVER answer. **The 2026-08-18 user directive is preserved verbatim and explicitly marked unchanged**; this ADDS one admissible case rather than relaxing anything, and an unverified local read is still not a claim. **The falsification test did NOT fire:** the reproducible class states crisply, against §3b's own worked example (NCAAF local 0 vs production 16) — a mirror answers questions about the CODE, never about the DEPLOYMENT. **Three stale places fixed in the same pass:** §3 and the gate requirements still said "allowlisted in `HOT_ARTIFACT_PATTERNS`" after `#625`(2) split it; the UNMEASURED rule could not tell a verified mirror from a checkout; and a new subsection states that a 403 is not an absence. **`#625` IS COMPLETE — all six items.**
+- Files: released — `docs/ai_context/model_engine_standard.md`.
+- Verification: all three criteria met — (a) three substrates each with what
+  they cannot answer; (b) a manifest id required on any local claim, and
+  `verify` must pass TODAY; (c) the allowlist requirement updated for the
+  `#625`(2) split, in all three places it appeared.
+- Claims: NONE held. No deploy taken or needed.
+- Narrative: `log/2026-09-02.md`, `todo.md #625`(6).
+
+### m626-actuals-replay-target — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL NOT MET, AND THE FALSIFICATION TEST IS WHY. The second replay target is BLOCKED ON TRANSPORT, and the investigation found a bigger defect (`#639`).** Reconciliation outputs are now export-only allowlisted and DEPLOYED (web `5885c339`) — correct, and the right list (worker-local, nothing on web serves them). But after deploying, web still holds **0** reconciliation files: unlike `feed_live`, this family is **git-tracked 0 files and under NO `BOOTSTRAP_ROOT`**, so nothing puts it on web at all. **An export-only entry makes a family readable IF PRESENT; it is not a transport** — which corrects how `#625`(2) was framed. With no production copy there is nothing to diff a replay against. **`#639` OPENED, and it is the real find: the MLB actuals writer runs hourly and produces ZERO rows for all 12 dates (`top_props_rows: 0`, and `skipped_no_feed: 0` rules out the innocent reading) while its input `daily_top_props` is on web for 123 dates — 1,808,469 B for 2026-06-15 alone.** Not root-caused: whether refresh-worker's own disk holds that input cannot be read from outside.
+- Files: released — `syndicate/features/shared/artifact_publisher.py`,
+  `tests/test_export_only_patterns.py`.
+- Verification: (a) MET — a `props_actuals` path returns `read=True` and an
+  unlisted path is still refused; (b) MET — the producer commit question was
+  never reached, because the falsification test fired first.
+- Claims: NONE held. Web deploy claim acquired, used, RELEASED.
+- Narrative: `log/2026-09-02.md`, `todo.md #639`.
+
+### m639-actuals-zero-rows — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET: ROOT-CAUSED, no deploy, and the code is EXONERATED.** Replayed `build_mlb_actuals` locally on production's own mirrored bytes for 2026-06-15 (manifest `c6d52e5db907f9ac`, network denied): **LOCAL `top_props_rows 1212, resolved 1123` against PROD `0, 0`.** Same code, same date, same 1,808,469 B input — so refresh-worker does not hold that input; web does, for 123 dates, and web's disk is not the worker's. **THE DEFECT IS THE UNCONDITIONAL WRITE:** `write_mlb_actuals_for_date` (`build_mlb_actuals.py:135`) opens the output `"w"` BEFORE knowing whether there are rows, so a zero-row result truncates `props_actuals_<date>.csv` to a bare header — hourly — destroying any previously-computed actuals and handing the reconciliation chain an EMPTY file where it should see a MISSING one. **MY FIRST WRITE-UP OF `#639` WAS WRONG AND IS CORRECTED IN PLACE:** I said "zero rows for every date" from a log line the API had TRUNCATED at ~1,200 chars, which covered only the June dates; it is **7 of 12** (the June ones), with 07-05/07-06/07-24/09-01/09-02 all non-zero. Fix not applied — it is a producer change and wants its own lane.
+- Files: released — `scripts/mirror_manifest.py` (an `mlb_actuals_inputs` family).
+  No production code edited: the cause was established without changing any.
+- Falsification test: RAN, and did NOT falsify — the local replay produced rows,
+  so the hypothesis (worker starved, code fine) holds.
+- Claims: NONE held. No deploy.
+- Narrative: `log/2026-09-02.md`, `todo.md #639`.
+
+### soccer-anchor-odds-feed — CLOSED 2026-09-02 (step 1 of 2 done) — opened 2026-09-02 — session 3492626c — **LANDED `5c99c153`. The de-vigged odds feed exists and is VERIFIED ON REAL PRODUCTION DATA: 84 priced events from 2,939 rows across 4 leagues, overround 1.048-1.105 (a real 5-10% three-way vig), P(home) 0.069-0.827, 0 refused. Anchoring is still OFF and still unwired into the builder -- that is step 2 and needs a weight knob, an off!=on test, and the mechanism-vs-estimator re-fit.**
+- Goal: make soccer market-anchoring REACHABLE. Production fixtures carry only
+  {match_id, home_team, away_team}, so `anchor_ratings_to_market` would skip every
+  fixture and be a silent no-op. Feed de-vigged home-win probabilities from
+  `<league>/api/odds/game_odds_current.csv` and publish anchored/skipped counts.
+- Files: syndicate/features/soccer/features/market_odds.py (NEW),
+  tests/test_soccer_market_odds.py (NEW), scripts/build_soccer_artifacts.py
+- Hypothesis: n/a (making a validated-but-dead mechanism reachable)
+- Falsification test: if the anchored count is 0 on a real matchday, the feed
+  does not work and the mechanism is still inert.
+- Verification: anchored/skipped counts published per league-date; a fixture's
+  home_win_probability matches a hand-computed de-vig of its book rows.
+- Blocked by: none. NOTE the mechanism itself stays OFF until (2) — wiring the
+  feed does not turn anchoring on.
+
+### accuracy-autorun-decline-telemetry — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `24efb82b`, DEPLOYED, AND IT VERIFIED ITS OWN FIX.** The autorun declined silently on both paths, so "disabled", "gate refused" and "never reached" were one indistinguishable silence — which cost a 100-minute watch that taught nothing. Now emits `ACCURACY_SUMMARY_AUTORUN_GATED reason=...` with `never_run=yes|no`.
+- Goal: `_launch_autorun_accuracy_summary` returns False SILENTLY on both decline
+  paths, so "flag off", "gate refused" and "never reached" are indistinguishable.
+  100 minutes of silence taught nothing. Mirror `RECONCILIATION_AUTORUN_GATED`.
+- Files: scripts/run_refresh_worker.py, tests/test_accuracy_summary_autorun.py
+- Hypothesis: n/a (fixing an instrument I built blind)
+- Verification: an `ACCURACY_SUMMARY_AUTORUN_GATED reason=...` line in
+  refresh-worker logs that names WHY it declined.
+- Verification RAN, and the line proved a SECOND thing hours later: when the
+  autorun was disarmed after OOM-killing the worker, `reason` flipped
+  `daily_gate` -> `disabled` at 19:32:27Z. That is direct proof the process read
+  the new env value, rather than inferring it from deploy ordering.
+- The pattern was already one function above (`RECONCILIATION_AUTORUN_GATED`,
+  `#341`), with a comment stating this exact lesson. It shipped without it.
+- Blocked by: none (needs a refresh-worker deploy, preflight for in-flight sims)
+
+### soccer-anchor-wiring — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `3cdbcf4c` and DEPLOYED. Anchoring is reachable, instrumented, and OFF (weight 0.0). COST FINDING CORRECTED 2026-09-02 by lane `soccer-anchor-cost`: my *"57 min/cycle at 84 priced events, ~136 min at ten leagues — cannot run on the refresh cycle as written"* was a DENOMINATOR ERROR (84 counts priced EVENTS in a forward book to d+13; the builder is SINGLE-DATE). Production-measured cost is **83.2 min per 4h interval** with the joins working — 76% of the interval, and it FITS. Weight stays 0.0 on the mechanism-vs-estimator re-fit and on path (a) being FALSIFIED, NOT on cost.** This lane also carried the accuracy-autorun OOM to resolution (disarmed, verified `reason=disabled` 19:32Z).
+- Goal: wire `anchor_ratings_to_market` into `build_soccer_artifacts.py` behind a
+  WEIGHT knob defaulting to 0.0 (off), publishing attached/skipped/anchored counts
+  so an inert anchor is visible. Step 2 of 2; step 1 (`ed48c2e7`) built the feed.
+- Files: scripts/build_soccer_artifacts.py, tests/test_soccer_anchor_wiring.py (NEW)
+- Hypothesis: n/a (making a validated mechanism reachable)
+- Falsification test: off != on -- with weight 0 the ratings must be UNCHANGED;
+  with weight > 0 they must differ. If they match either way, the wiring is inert.
+- Verification: anchored count > 0 on a real matchday with weight > 0, and the
+  counts published even when weight is 0.
+- DOES NOT turn anchoring on. Default stays 0.0 pending the mechanism-vs-estimator
+  re-fit the standard requires (measured negative interaction 4/4 markets).
+- Verification RAN: off!=on asserted before any correctness claim (weight 0
+  leaves ratings identical; weight 0.35 moves them). Odds counts publish even
+  when off, so the feed's health and the mechanism's arming stay separable.
+- **CORRECTION 2026-09-02 — the PRODUCTION half of "Verification" above was NOT
+  SATISFIABLE AS WRITTEN.** `ODDS_ATTACHED`/`ANCHOR_SKIPPED`/`ANCHORED` are `print`
+  lines, and a delegated session found them unreadable in production — so this lane
+  closed on its unit-test half (`off != on`) only. The counts need a PUBLISHED
+  ARTIFACT FIELD beside `promoted_prior_teams`, not a log line.
+- **CORRECTION 2026-09-02 — two name joins in my feed were switched off.** Both
+  compared exact strings across feeds with different naming conventions
+  (fixture `match_id` is an ESPN id, the odds file keys on an OddsAPI hash; the
+  team-pair fallback then needed exact team names). Cost: 66 of 136 fixtures and
+  76 of 214 team slots. Fixed by `686d8282` on main — NOT deployed, NOT armed.
+- Handed to a delegated session: the three cost paths (cut solver sims / anchor
+  only board-relevant fixtures / move off the refresh cycle), with the caution
+  that better h2h MAE from anchoring is EXPECTED and is not evidence of edge —
+  measure anchored-vs-base on PROP markets.
+- Blocked by: none
+
+### board-window-throttle-binds — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `965823d4`. `#631`'s PRECONDITION IS DISCHARGED: the throttle BINDS** — tomorrow's median build gap 38.8 min against a 30-min floor, today free at 15.8, over a 744-minute production window. **And it corrects the cost model that blocked the item:** "they alternate at ~42 min each" did not happen — the throttle SHEDS the extra date's turns rather than alternating, so widening does NOT halve today's refresh rate.
+- Goal: discharge `#631`'s stated PRECONDITION — verify
+  `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` actually BINDS
+  before anyone widens the board window. Three tuning changes to that knob had
+  reportedly done nothing, so whether it binds at all was unestablished.
+- Files: docs/ai_context/todo.md, .syndicate/state.md
+- Hypothesis (REFUTED): the throttle branch is dead code because the window only
+  ever contains today, so tuning it could not do anything.
+- Falsification test: if non-today dates build at gaps >= the 30-min floor while
+  today runs free, the throttle binds and the hypothesis is wrong.
+- Verification: measured per-date build intervals from BUILD_SPAN_ENTER over a
+  744-minute production window.
+- Hypothesis REFUTED, recorded: I predicted the throttle branch was dead code
+  (window only contains today). The window contains tomorrow; the branch fires.
+- Second error, same session: I read a 12-line log TAIL and concluded tomorrow
+  out-built today 3:1. Over the full span it is 39 to 7 the other way — a tail
+  read as a population, the standing 'a rate, not a count' rule.
+- STILL OWED before widening: `display_prediction_dates.json` staleness (risk 2
+  in the scoping note) is unverified — a binding throttle does not help if the
+  date list feeding it is stale.
+- Blocked by: none
+### m639-actuals-no-truncate — OPEN (fix LANDED `558e4ffc`, NOT DEPLOYED) — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **THE FIX IS IN AND VERIFIED OFFLINE; ONE THING OWED: a refresh-worker deploy and the tick that proves it.** `write_mlb_actuals_for_date` no longer opens its output `"w"` before knowing whether there are rows. Four cases kept separate: `input_absent` (refuse, and do not even mkdir), `input_unreadable` (its own token), present-but-empty over an existing non-empty file (`refused_empty_overwrite`, with `allow_empty_overwrite` as the override), and rows present (unchanged). **Verified on the real mirror, all three branches** (manifest `c6d52e5db907f9ac`): 06-15 writes 1,123 rows; 06-30 refuses with the prior file BYTE-IDENTICAL; 05-01 refuses `input_absent`. New fields ride in the summary the worker already logs, so the diagnosis becomes visible with **no edit to `run_refresh_worker.py`**. **I ALSO NEARLY DESTROYED THREE PRE-EXISTING TESTS** by overwriting `tests/test_build_mlb_actuals.py`; the diff's 128 deletions is the only reason I noticed. Restored, and one of them then correctly FAILED the fix (it patches the loader, not the filesystem) — so the loader is now the primary presence signal.
+- Files: released — `scripts/build_mlb_actuals.py`, `tests/test_build_mlb_actuals.py`.
+- **OWED:** deploy `558e4ffc` (or later) to **refresh-worker**, then read the next
+  `MLB_ACTUALS_TICK`: the June dates must show `written: false` with a
+  `skipped_reason`, and 07-05 / 07-06 / 07-24 / 09-01 / 09-02 `written: true`.
+  **A tick where every date reads `written: true` means the guard is INERT.**
+- Claims: NONE held.
+- Narrative: `log/2026-09-02.md`, `todo.md #639`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
