@@ -1682,7 +1682,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Narrative + evidence: `log/2026-09-02.md`, `todo.md #625`(4),
   `state.md [local-fleet-runner]`.
 
-### kalshi-discovery-deadline — OPEN, **BOUNDS IMPLEMENTED; GUARD VALIDATED (103-152s -> 22.5s); MEMO+BUDGET LANDED UNVALIDATED because the 248-fetch baseline STOPPED REPRODUCING (fetch_markets calls = 0): the cost is FAN-OUT (243 per-series fetches), not pagination or host retries** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### kalshi-discovery-deadline — OPEN, **BOUNDS IMPLEMENTED; GUARD VALIDATED (103-152s -> 22.5s); FAN-OUT REPRODUCED (cold state -> 150 = DEFAULT_SERIES_PER_TICK); BUDGET VALIDATED IN SITU (50.1s -> 10.7s); MY MEMO DELETED on 0 measured hits: the cost is FAN-OUT (243 per-series fetches), not pagination or host retries** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: the candidate-pool build cannot block for minutes on Kalshi. ONE testable
   outcome: `tests/test_intelligence.py` completes in bounded time WITHOUT opening
   an outbound socket, and `kalshi_client.discover` aborts at an AGGREGATE
@@ -1851,6 +1851,64 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   "An order of magnitude fewer requests" is not demonstrated; the measured wins
   are the suite guard (103-152s -> 22.5s) and two bounds that are correct in
   unit tests and unexercised in production.
+- **FAN-OUT REPRODUCED, AND MY OWN MEMO DELETED ON THE MEASUREMENT
+  `[2026-09-02]`. The gate is a PERSISTED PER-SERIES CLOCK, not time of day.**
+
+  `run_kalshi_odds_refresh` (`pipeline/kalshi_odds_refresh.py:749`), NOT
+  discovery: `run_kalshi_discovery` is capped at **10** series and paced 0.5s,
+  so it was never the source. The real loop is `_due_series(state, ...)` ->
+  `cold[:series_per_tick()]` -> `fetch_series` -> `fetch_markets`.
+
+      DEFAULT_SERIES_PER_TICK        150   <- exactly the 150 distinct measured
+      DEFAULT_REFRESH_INTERVAL       120s  (per series)
+      DEFAULT_DORMANT_INTERVAL      3600s  (a series that read empty)
+      state file  reports/intelligence/kalshi_markets.json (markets_artifact_path)
+
+  **REPRODUCTION, on demand:** delete the state file -> every series is due ->
+  `fetch_markets` **= 150 calls, 50.1s** (spacing forced to 0). Confirmed twice.
+  The disappearance is fully explained: my first runs (~17:0x) ran cold, wrote
+  `attempted_at` for all 150, and everything that read empty went DORMANT for an
+  hour -- so the ~18:0x-18:4x runs correctly found nothing due and made 0 calls.
+  Nothing was broken; I had been measuring a cold-start burst and calling it a
+  per-request cost.
+
+  **THE MEMO IS DELETED, not documented.** Two back-to-back forced ticks:
+
+      TICK1  fetch_markets=206  hits=0  misses=206   67.7s
+      TICK2  fetch_markets=412  hits=0  misses=412   70.2s   (cumulative)
+
+  **Zero hits, and it is structural, not a tuning error.** WITHIN a tick each
+  series is fetched exactly once, so there is no redundancy to memoise; ACROSS
+  ticks the 120s refresh interval outlives any TTL short enough to be safe (a
+  full tick alone is 50-70s). And the version that WOULD hit is the one that
+  must not ship: serving a 120-second-old listing to an odds refresh puts stale
+  prices on a money-adjacent board. The "40% repeats" that motivated it was a
+  property of ONE cold intelligence run making ~3 passes, not of this loop.
+  Removed with its tests -- a passing test for a mechanism that cannot fire is
+  worse than no test -- leaving a comment so it is not rebuilt.
+
+  **THE BUDGET IS VALIDATED IN SITU, on the real 150-series tick:**
+
+      unbudgeted, cold state          50.1s
+      inside request_budget(10.0)     10.7s
+
+  That is off != on against production code, not a stub. `fetch_markets_stats()`
+  survives as the cheapest reachability instrument on this path -- a counter
+  INSIDE the function is the only thing that distinguishes "the bound works"
+  from "the bound is never reached", and it is what caught my memo shipping
+  inert.
+
+- **STATUS: goal substantially met, one item owed.** Delivered and measured: the
+  fan-out is reproducible on demand, the aggregate budget bounds it 5x on the
+  real path, and the suite no longer calls the venue (103-152s -> 22.5s). NOT
+  delivered: nothing yet CALLS `request_budget` in production -- the bound
+  exists and is unused, which is the same reachability trap one level up. Wiring
+  it needs a caller decision (what budget does a board build get?) and belongs
+  with whoever owns `kalshi_odds_refresh`'s cadence.
+- **STILL NOT THIS LANE'S SUBJECT:** `tests/test_intelligence.py` as a whole
+  still does not finish inside 10 minutes even with the guard (stalls ~32%), and
+  the WNBA `_artifact_bundle` <-> `_games_from_live_state_fallback` recursion
+  remains unfixed and unlaned.
 - Blocked by: none. Does not deploy; the fix is a bound, and a bound is only
   worth shipping once its off != on test exists.
 ### m625-standard-substrate-label — CLOSED 2026-09-02 — opened 2026-09-02 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. `#625`(6) done, commit `6211bdf9`, NO DEPLOY (documentation).** `model_engine_standard.md` §3b now names **three** substrates — `render`, `mirror:<manifest_id>`, `checkout` — with a table of what a verified mirror CAN and can NEVER answer. **The 2026-08-18 user directive is preserved verbatim and explicitly marked unchanged**; this ADDS one admissible case rather than relaxing anything, and an unverified local read is still not a claim. **The falsification test did NOT fire:** the reproducible class states crisply, against §3b's own worked example (NCAAF local 0 vs production 16) — a mirror answers questions about the CODE, never about the DEPLOYMENT. **Three stale places fixed in the same pass:** §3 and the gate requirements still said "allowlisted in `HOT_ARTIFACT_PATTERNS`" after `#625`(2) split it; the UNMEASURED rule could not tell a verified mirror from a checkout; and a new subsection states that a 403 is not an absence. **`#625` IS COMPLETE — all six items.**

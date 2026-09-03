@@ -174,8 +174,8 @@ class KalshiBudgetExceeded(KalshiError):
 # per-request timeout is never approached -- median ~0.24s.
 #
 # So neither bound here is a timeout. They are:
-#   1. `_MARKETS_CACHE` -- a short-TTL memo, because 40% of the calls in a
-#      single build ask for a series already fetched seconds earlier.
+#   1. a short-TTL memo -- BUILT AND DELETED THE SAME DAY, measured at 0 hits.
+#      See the note above `_Budget`; do not rebuild it.
 #   2. `request_budget(...)` -- an AGGREGATE wall-clock budget, because nothing
 #      anywhere measured elapsed time across a fan-out. `max_pages` bounds ONE
 #      call's paging; it has never bounded a caller that makes 248 calls.
@@ -187,34 +187,39 @@ class KalshiBudgetExceeded(KalshiError):
 # not a free speedup to slip in behind a caching change.
 # --------------------------------------------------------------------------
 
-_MARKETS_CACHE: "dict[tuple, tuple[float, dict[str, Any]]]" = {}
-_CACHE_STATS = {"calls": 0, "hits": 0, "misses": 0, "evictions": 0}
-_CACHE_LOCK = threading.Lock()
+_FETCH_STATS = {"calls": 0}
 
 
-def _markets_cache_ttl_seconds() -> float:
-    """Default 60s. Short on purpose: this memoises a LISTING within one build,
-    it is not a price cache. Set 0 to disable (every fetch goes to the venue)."""
-    raw = str(os.environ.get("SYNDICATE_KALSHI_MARKETS_CACHE_TTL_SECONDS") or "").strip()
-    if not raw:
-        return 60.0
-    try:
-        return max(0.0, float(raw))
-    except ValueError:
-        return 60.0
+def fetch_markets_stats() -> dict[str, int]:
+    """How many times `fetch_markets` ran. The cheapest reachability check on
+    this path, and the instrument that caught a change of mine shipping inert:
+    a counter INSIDE the function reading 0 is the only thing that distinguishes
+    "my bound works" from "my bound is never reached"."""
+    return dict(_FETCH_STATS)
 
 
-def markets_cache_stats() -> dict[str, int]:
-    """Hits/misses/evictions, so the saving is a READING rather than a claim."""
-    with _CACHE_LOCK:
-        return dict(_CACHE_STATS)
+def reset_fetch_markets_stats() -> None:
+    _FETCH_STATS["calls"] = 0
 
 
-def reset_markets_cache() -> None:
-    with _CACHE_LOCK:
-        _MARKETS_CACHE.clear()
-        for key in _CACHE_STATS:
-            _CACHE_STATS[key] = 0
+# A MEMO WAS BUILT HERE AND DELETED THE SAME DAY, MEASURED (2026-09-02, lane
+# `kalshi-discovery-deadline`). Keeping the finding so nobody rebuilds it:
+#
+#   two back-to-back forced ticks -> 206 then 412 cumulative fetch_markets
+#   calls and **0 cache hits**, because
+#     * WITHIN a tick each series is fetched exactly once, so there is no
+#       intra-tick redundancy to memoise at all; and
+#     * ACROSS ticks the refresh interval is 120s while any TTL short enough to
+#       be safe is shorter than that, so the entry is always already expired.
+#
+# And the version that WOULD hit is the one you must not ship: serving a
+# 120-second-old listing to an odds refresh puts stale prices on a
+# money-adjacent board. The 40%-repeat figure that motivated it was a property
+# of one cold intelligence run making ~3 passes, not of this loop.
+#
+# The bound that DOES apply here is `request_budget` below: 150 series per tick
+# (`DEFAULT_SERIES_PER_TICK`) at ~0.24s each is a real 50-70s of wall clock with
+# nothing measuring it.
 
 
 class _Budget:
@@ -431,7 +436,6 @@ def fetch_markets(
     status: str = "open",
     limit: int = 200,
     max_pages: int = 20,
-    use_cache: bool = True,
 ) -> dict[str, Any]:
     """Every market matching the filter, following the cursor.
 
@@ -447,30 +451,12 @@ def fetch_markets(
     `kalshi-discovery-deadline`), because `max_pages` bounds ONE call's paging
     and one intelligence build makes **248** of them:
 
-    * `use_cache` memoises on (series_ticker, status, limit, max_pages) for
-      `SYNDICATE_KALSHI_MARKETS_CACHE_TTL_SECONDS` (default 60s). Measured: of
-      248 per-series fetches in one build, only **150 were distinct** -- 40%
-      asked again for a listing fetched seconds earlier.
     * an active `request_budget(...)` stops the paging loop when the AGGREGATE
       wall-clock runs out, and the result says `budget_exceeded=True`. It
       returns what it has instead of raising, so a partial listing is visible
       rather than mistaken for the whole one.
     """
-    _CACHE_STATS["calls"] = _CACHE_STATS.get("calls", 0) + 1
-    cache_key = (series_ticker, status, int(limit), int(max_pages))
-    ttl = _markets_cache_ttl_seconds()
-    if use_cache and ttl > 0:
-        with _CACHE_LOCK:
-            hit = _MARKETS_CACHE.get(cache_key)
-            if hit is not None and (time.monotonic() - hit[0]) <= ttl:
-                _CACHE_STATS["hits"] += 1
-                cached = dict(hit[1])
-                cached["cache_hit"] = True
-                return cached
-            if hit is not None:
-                del _MARKETS_CACHE[cache_key]
-                _CACHE_STATS["evictions"] += 1
-            _CACHE_STATS["misses"] += 1
+    _FETCH_STATS["calls"] += 1
 
     markets: list[dict[str, Any]] = []
     cursor: str | None = None
@@ -540,18 +526,12 @@ def fetch_markets(
         # Named separately from `truncated` so "we hit the page cap" and "we ran
         # out of time" are never the same reading.
         "budget_exceeded": budget_exceeded,
-        "cache_hit": False,
         # If this is non-empty the schema assumption is wrong, and it says which
         # field rather than leaving a silently-None column.
         "missing_fields": dict(sorted(missing_counts.items())),
         "host_errors": errors,
         "authenticated": _api_key() is not None,
     }
-    if use_cache and ttl > 0 and not budget_exceeded:
-        # A budget-truncated listing is NOT cached: it would serve a partial
-        # result to callers that had plenty of time.
-        with _CACHE_LOCK:
-            _MARKETS_CACHE[cache_key] = (time.monotonic(), dict(report))
     return report
 
 

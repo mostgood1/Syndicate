@@ -82,12 +82,12 @@ def _kalshi_stub():
 
 def setUpModule():
     _kalshi_client._get = _kalshi_stub()
-    _kalshi_client.reset_markets_cache()
+    _kalshi_client.reset_fetch_markets_stats()
 
 
 def tearDownModule():
     _kalshi_client._get = _REAL_KALSHI_GET
-    _kalshi_client.reset_markets_cache()
+    _kalshi_client.reset_fetch_markets_stats()
 
 
 class KalshiNetworkGuardTests(unittest.TestCase):
@@ -98,9 +98,9 @@ class KalshiNetworkGuardTests(unittest.TestCase):
         """Not decorative: the suite DOES drive code that reaches for Kalshi.
         If this ever reads zero, the fan-out moved and the guard needs
         re-aiming rather than deleting."""
-        _kalshi_client.reset_markets_cache()
+        _kalshi_client.reset_fetch_markets_stats()
         with self.assertRaises(_kalshi_client.KalshiError):
-            _kalshi_client.fetch_markets(series_ticker="GUARD_PROBE", use_cache=False)
+            _kalshi_client.fetch_markets(series_ticker="GUARD_PROBE")
         self.assertTrue(_KALSHI_ATTEMPTS)
 
 from syndicate.blueprints.home import _game_bet_candidates_from_game
