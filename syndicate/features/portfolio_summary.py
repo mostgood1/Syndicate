@@ -144,7 +144,15 @@ def build_portfolio_summary(*, limit: int = 60) -> dict[str, Any]:
     # Scoped to user-placed bets only (see _is_user_placed_bet) -- the
     # underlying store also holds every auto-tracked board candidate used
     # for model calibration, which this page must not blend in.
-    predictions = [item for item in load_all_predictions() if _is_user_placed_bet(item)]
+    # `#642`: keep the UNFILTERED count. `total_tracked: 0` was reported
+    # against a ~2 MiB ledger and it took three deploys of reader
+    # instrumentation to establish that the read was fine and the stake
+    # filter had simply excluded every row -- because this payload cannot
+    # tell "the ledger read returned nothing" from "it returned rows and
+    # none of them are user-placed". Those are an incident and a normal
+    # empty portfolio respectively, and they rendered identically.
+    all_predictions = load_all_predictions()
+    predictions = [item for item in all_predictions if _is_user_placed_bet(item)]
     performance = _performance_summary_for(predictions)
 
     today = central_today_iso()
@@ -169,6 +177,12 @@ def build_portfolio_summary(*, limit: int = 60) -> dict[str, Any]:
         "schema": "portfolio_summary_v1",
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "total_tracked": performance.get("total_bets", 0),
+        # Provenance for `total_tracked`, per above. ledger_rows_total is what
+        # the reader returned; excluded_auto_tracked is what the stake filter
+        # dropped. total_tracked == 0 with ledger_rows_total > 0 is a normal
+        # empty portfolio; both 0 means the read itself came back empty.
+        "ledger_rows_total": len(all_predictions),
+        "excluded_auto_tracked": len(all_predictions) - len(predictions),
         "pending_count": pending_count,
         "today_count": today_count,
         "settled_count": performance.get("settled_count", 0),

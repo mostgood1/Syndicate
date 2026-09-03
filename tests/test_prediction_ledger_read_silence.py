@@ -228,3 +228,41 @@ def test_every_return_in_read_payload_is_labelled() -> None:
         "PREDICTION_LEDGER_SERVED_FROM_DISK",
     ):
         assert token in source, f"{token} missing -- an exit lost its label"
+
+
+def test_the_summary_payload_distinguishes_an_empty_read_from_an_all_stakeless_ledger() -> None:
+    """`#642`'s ACTUAL defect, found after three deploys of reader instrumentation.
+
+    The reader was fine the whole time. `total_tracked: 0` against a ~2 MiB
+    ledger was the documented stake filter (`_is_user_placed_bet`) excluding
+    every legacy auto-tracked row. What cost three deploys is that the PAYLOAD
+    renders that -- a normal empty portfolio -- identically to a ledger read
+    that returned nothing, which is an incident. Provenance at the endpoint
+    answers it from one HTTP read instead.
+    """
+    from syndicate.features import portfolio_summary
+
+    rows = [
+        {"id": "auto1", "timestamp": "2026-09-01T00:00:00Z"},          # legacy, stakeless
+        {"id": "auto2", "timestamp": "2026-09-01T00:00:00Z"},
+        {"id": "bet1", "stake": 50.0, "timestamp": "2026-09-01T00:00:00Z"},
+    ]
+
+    import unittest.mock as mock
+
+    with mock.patch.object(portfolio_summary, "load_all_predictions", lambda: list(rows)):
+        payload = portfolio_summary.build_portfolio_summary()
+
+    assert payload["ledger_rows_total"] == 3, "what the reader actually returned"
+    assert payload["excluded_auto_tracked"] == 2, "what the stake filter dropped"
+    assert payload["total_tracked"] == 1
+
+    with mock.patch.object(portfolio_summary, "load_all_predictions", lambda: []):
+        empty = portfolio_summary.build_portfolio_summary()
+
+    assert empty["ledger_rows_total"] == 0
+    assert empty["excluded_auto_tracked"] == 0
+    assert empty["total_tracked"] == 0
+    # THE DISCRIMINATION. Both payloads report total_tracked as a small number;
+    # only ledger_rows_total separates "nothing came back" from "nothing qualified".
+    assert payload["ledger_rows_total"] != empty["ledger_rows_total"]
