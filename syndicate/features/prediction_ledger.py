@@ -167,6 +167,36 @@ def _read_payload(path: Path) -> dict[str, Any]:
 
     disk_payload = _read_disk_payload(path)
     if disk_payload is None:
+        # `#642`. A FAILED shared read and a genuinely empty ledger both arrive
+        # here, and both used to leave silently as `_blank_payload()` -- so
+        # `/api/portfolio/summary` reported `total_tracked: 0` with no way for
+        # anyone to tell which had happened. That is the exact ambiguity
+        # `read_text_file_result`'s own docstring exists to remove; the fix that
+        # introduced `read_ok` applied it to the PROMOTION decision below and
+        # not to this return.
+        #
+        # Measured 2026-09-03: the summary read 0 across the board while the
+        # `prediction_ledger.json` key occupied ~2 MiB, on a web service
+        # documented UNSTABLE against a Redis at 86.8% with 12,203 evictions.
+        # Which of the two it is was not decidable from outside, so this says so
+        # out loud rather than returning a confident zero.
+        #
+        # `print`, not `logger.info` -- `logger.info` never reaches Render's log
+        # collector (CLAUDE.md).
+        if not read_ok:
+            print(
+                "[prediction_ledger] PREDICTION_LEDGER_READ_FAILED "
+                f"path={path.name} shared_read_ok=False disk=absent "
+                "-- returning a BLANK ledger; this is NOT evidence the ledger is empty",
+                flush=True,
+            )
+        else:
+            print(
+                "[prediction_ledger] PREDICTION_LEDGER_CONFIRMED_EMPTY "
+                f"path={path.name} shared_read_ok=True disk=absent "
+                "-- the shared read SUCCEEDED and found nothing",
+                flush=True,
+            )
         return _blank_payload()
 
     # PROMOTE, BUT ONLY UPWARD. On first run after this ships, the real ledger

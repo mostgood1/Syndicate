@@ -2072,6 +2072,36 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   ledger and a reader that sees nothing in it is the same class as the
   documented cross-disk defect in `prediction_ledger.py:80-95`.
 - Claims: NONE held. NO DEPLOY — read-only throughout.
+### m642-ledger-read-silence — OPEN — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: `todo.md #642`. `/api/portfolio/summary` reads `total_tracked: 0` while
+  `prediction_ledger.json` occupies ~2 MiB across 1 key. Make the two
+  possibilities DISTINGUISHABLE, and thereby answer which it is.
+- Files: `syndicate/features/prediction_ledger.py`,
+  `tests/test_prediction_ledger_read_silence.py` (NEW).
+- **TWO LEADS CHECKED AND KILLED FIRST, both recorded so nobody re-runs them:**
+  (1) a namespace split — `SYNDICATE_REFRESH_STATE_NAMESPACE` is set on web
+  ONLY, but its value is `syndicate` which is exactly `_state_namespace()`'s
+  default, so all three services build the SAME key; (2) `read_ok` fetched and
+  ignored — it IS used, at `prediction_ledger.py:180`, to gate the
+  promote-upward path on a CONFIRMED absence. I nearly published both.
+- THE ACTUAL GAP, read from the code: when the shared read FAILS
+  (`read_ok=False`) and web's disk copy is absent, `_read_payload` returns
+  `_blank_payload()` **with no signal to its caller**. So `load_all_predictions`
+  returns `[]` and the summary reports 0, indistinguishable from a genuinely
+  empty ledger. That is the exact ambiguity `read_text_file_result`'s own
+  docstring exists to remove — applied to PROMOTION but not to the RETURN.
+- Hypothesis: the observed 0 is a failed 2 MiB read on a web service that is
+  documented UNSTABLE, against a Redis at 86.8% with 12,203 evictions — not an
+  empty ledger.
+- Falsification test: **the fix IS the instrument.** If, after it ships, the
+  read is confirmed to SUCCEED and still yields 0 predictions, the hypothesis
+  is wrong and the ledger really is empty — which is a different and larger
+  problem (nothing is recording bets), and would need its own lane.
+- Verification: a `PREDICTION_LEDGER_READ_FAILED` line on web at the moment
+  `/api/portfolio/summary` reports 0. Absence of that line while it still
+  reports 0 is the falsifying reading, not a pass.
+- Blocked by: none. Needs a WEB deploy to observe.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
