@@ -6876,10 +6876,37 @@ class IntelligenceStateService:
         slow_refresh_seconds = max(30, _env_int("SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS", 1800))
         now = time.time()
         for window_date in _default_board_window_dates(today):
-            if window_date != today:
-                last_queued_at = self._board_window_last_queued_at.get(window_date)
-                if last_queued_at is not None and (now - last_queued_at) < slow_refresh_seconds:
-                    continue
+            throttled = window_date != today
+            last_queued_at = self._board_window_last_queued_at.get(window_date)
+            elapsed = None if last_queued_at is None else now - last_queued_at
+            if throttled and elapsed is not None and elapsed < slow_refresh_seconds:
+                # DECLINE TELEMETRY `#631`. NOTHING on this path emitted anything,
+                # which made the one question anyone asks of this knob --
+                # "does the floor actually CLIP?" -- unobservable in production.
+                # The only downstream signal is BUILD_SPAN_ENTER, and a build span
+                # cannot separate a CLIPPED ENQUEUE from a capacity-limited build:
+                # a lane read build gaps on 2026-09-02, concluded "the throttle
+                # BINDS", and was wrong on both the floor value and the inference.
+                #
+                # BOTH branches log on purpose. A GATED count without the ADMITTED
+                # count is a count, not a rate, and this repo has a standing rule
+                # about exactly that. The pair gives the clip rate directly.
+                #
+                # Bounded: one line per window date per loop pass (~214s cheap
+                # cadence), so <= ~34 lines/hour at a 2-date window.
+                print(
+                    f"[intelligence_state] BOARD_WINDOW_QUEUE_GATED date={window_date} "
+                    f"elapsed_s={elapsed:.1f} floor_s={slow_refresh_seconds}",
+                    flush=True,
+                )
+                continue
+            print(
+                f"[intelligence_state] BOARD_WINDOW_QUEUED date={window_date} "
+                f"throttled={'yes' if throttled else 'no'} "
+                f"elapsed_s={'none' if elapsed is None else format(elapsed, '.1f')} "
+                f"floor_s={slow_refresh_seconds}",
+                flush=True,
+            )
             payload = self._default_payload()
             payload["date"] = window_date
             self.queue_refresh(payload)

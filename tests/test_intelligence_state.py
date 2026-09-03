@@ -5224,6 +5224,52 @@ class EnsureDefaultBoardWindowWatchedTests(unittest.TestCase):
         queued_dates = [call.args[0]["date"] for call in service.queue_refresh.call_args_list]
         self.assertEqual(queued_dates, ["2026-07-27", "2026-07-28"])
 
+    def test_a_GATED_future_date_says_so_with_the_numbers(self) -> None:
+        """The floor must be OBSERVABLE, not merely applied.
+
+        Before `#631` nothing on this path emitted anything, so "does the floor
+        clip?" could only be inferred from BUILD_SPAN_ENTER -- and a build span
+        cannot separate a clipped ENQUEUE from a capacity-limited build. A lane
+        made exactly that inference on 2026-09-02 and got it wrong.
+        """
+        service = self._service_with_window(["2026-07-27", "2026-07-28"])
+        os.environ["SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS"] = "600"
+        self.addCleanup(
+            lambda: os.environ.pop("SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS", None))
+        with patch.object(intelligence_state_module.time, "time", return_value=1000.0):
+            service._ensure_default_board_window_watched()
+        with patch("builtins.print") as printer:
+            with patch.object(intelligence_state_module.time, "time", return_value=1010.0):
+                service._ensure_default_board_window_watched()
+        printed = " ".join(str(c.args[0]) for c in printer.call_args_list if c.args)
+        self.assertIn("BOARD_WINDOW_QUEUE_GATED date=2026-07-28", printed)
+        self.assertIn("elapsed_s=10.0", printed)
+        self.assertIn("floor_s=600", printed)
+
+    def test_the_ADMITTED_side_logs_too_so_the_gate_has_a_DENOMINATOR(self) -> None:
+        """A GATED count with no ADMITTED count is a count, not a rate."""
+        service = self._service_with_window(["2026-07-27", "2026-07-28"])
+        with patch("builtins.print") as printer:
+            with patch.object(intelligence_state_module.time, "time", return_value=1000.0):
+                service._ensure_default_board_window_watched()
+        printed = " ".join(str(c.args[0]) for c in printer.call_args_list if c.args)
+        self.assertIn("BOARD_WINDOW_QUEUED date=2026-07-27", printed)
+        self.assertIn("throttled=no", printed)
+        self.assertIn("BOARD_WINDOW_QUEUED date=2026-07-28", printed)
+        self.assertIn("throttled=yes", printed)
+        self.assertNotIn("BOARD_WINDOW_QUEUE_GATED", printed)
+
+    def test_today_is_never_gated_however_short_the_gap(self) -> None:
+        """Behaviour must be UNCHANGED by the telemetry: today has no floor."""
+        service = self._service_with_window(["2026-07-27", "2026-07-28"])
+        with patch.object(intelligence_state_module.time, "time", return_value=1000.0):
+            service._ensure_default_board_window_watched()
+        service.queue_refresh.reset_mock()
+        with patch.object(intelligence_state_module.time, "time", return_value=1000.5):
+            service._ensure_default_board_window_watched()
+        queued = [call.args[0]["date"] for call in service.queue_refresh.call_args_list]
+        self.assertEqual(queued, ["2026-07-27"])
+
     def test_slow_refresh_default_outlasts_the_background_loop_period(self) -> None:
         """The default must be LONGER than one loop iteration, or it gates nothing.
 
