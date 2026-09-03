@@ -17,293 +17,40 @@ is written with forward slashes.
 import json, os, re, sys
 
 TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
-HEADER_RE = re.compile(r"^###\s")
-# Status is the field between the 1st and 2nd em-dash, and it is FREE TEXT.
-# Reading it as one word (the old `(\w+)`) silently unprotected a live lane:
-# `memory-guard-reclaimable` was relabelled "— DEPLOYED, MEASUREMENT OPEN —",
-# whose first word is DEPLOYED, so its four claimed files stopped being
-# guarded with nothing reporting it. Match the WORD anywhere in the field:
-# accepts "DEPLOYED, MEASUREMENT OPEN", rejects "OPENED"/"REOPENED"/"CLOSED".
-LANE_RE = re.compile(r"^###\s+(\S+)\s+—\s*([^—]*)")
-OPEN_RE = re.compile(r"\bOPEN\b")
-# THE SAME HEADER WRITTEN WITH ASCII HYPHENS. LANE_RE requires U+2014, so a
-# header written `### slug - OPEN - ...` did not parse AT ALL -- and an unparsed
-# header is an UNGUARDED lane, silently. Measured 2026-08-17: one live lane sat
-# in that state with three claimed files unprotected, one of them contended with
-# a lane closed minutes earlier; by day's end the digest reported FIVE of them.
+# THE PARSER LIVES IN `lane_claims.py` AS OF 2026-09-03, and every incident
+# comment moved with it verbatim. It is shared because a SECOND copy of this
+# logic is not hypothetical here -- f57a02f2, landed the same day, had to add
+# the `never` marker to TWO files by hand and says so in its own message
+# ("kept verbatim-identical"). `learnings.md` 2026-08-20 is the standing rule:
+# a defect in what all the guards share must be fixed in a shared module, or
+# the next guard re-makes it. Two new callers arrived the day this moved.
 #
-# The fix is deliberately two-sided, because rejecting alone leaves the gap open:
-# these headers are PARSED, so their claims are enforced like any other lane, AND
-# reported loudly, and the owning session is blocked from editing until it fixes
-# the separator. Protection first, pressure second.
-ASCII_LANE_RE = re.compile(r"^###\s+(\S+)\s+-\s*([^-]*)")
-# `- Files:` and `- **Files (...):**` are the same field. Measured 2026-08-18:
-# 32 of 37 Files declarations used the bare form and 5 used the bold one, and
-# those 5 matched NOTHING -- they declared files that no hook could see, which is
-# the worst state available: the ledger says a file is held and the guard lets
-# anyone edit it.
+# The extraction was verified to change no decision: the claim set parsed from
+# the live `lanes.md` is identical before and after, and
+# `test_lane_guard_hyphen.py` is green either side.
 #
-# THE COLON IS OPTIONAL, because two of the five wrap the header across lines and
-# the colon lands on the second ("- **Files (all NEW -- collision-checked ...").
-# `[^:]*` cannot span a newline, so requiring it would still miss those two.
-# Continuation lines are picked up by the `in_files` loop either way.
-FILES_RE = re.compile(r"^\s*-\s*\*{0,2}Files\b[^:]*:?(.*)$")
-# FIELD_RE MUST learn the bold form at the same time, and this is the dangerous
-# half. It is what ENDS a claim block. Teaching FILES_RE about `- **Files` while
-# leaving this bare would start the block and never stop it: the fields in these
-# blocks run `- **Goal:**`, `- **Files:**`, `- **DELIBERATELY OUT OF SCOPE**`
-# with no blank line between them, so the parser would read every later bullet as
-# a claim. Over-claiming blocks sessions from files nobody holds, which is a
-# different failure and not a smaller one.
-FIELD_RE = re.compile(r"^-\s*\*{0,2}\w")
-PATHISH_RE = re.compile(r"^[\w.\-]+\.\w{1,5}$")
-
-
-# A bullet inside a `- Files:` block that DISCLAIMS a path rather than claiming
-# it. Measured 2026-08-15: `ask-sport-coverage` wrote
-# "**NOT claimed, deliberately:** `ask_the_syndicate_adapter.py` -- held by OPEN
-# lane `ask-headline-from-board`" and this parser turned that sentence into a
-# CLAIM of that file, blocking the lane that actually owned it from editing it.
-# The reverse fired at the same time between the same two lanes. `state.md`
-# already recorded the defect ("a regex over a hand-written ledger read 'NOT
-# claimed, deliberately' as a claim. Read the block, not a pattern match over
-# it.") -- this is that fix.
-#
-# Deliberately matched on INTENT WORDS rather than on formatting: the ledger is
-# hand-written and the same disclaimer appears as `**NOT claimed:**`,
-# `NOT claimed, deliberately:`, `Collision check: CLEAR`, and
-# `Read-only dependency:`. Erring toward skipping is the safe direction here --
-# a missed claim leaves an edit unguarded, while a phantom claim blocks the
-# lane's own owner and has no override short of editing someone else's ledger.
-#
-# "not touch" (present tense) was MISSING. Measured 2026-08-19:
-# basketball-model-owner wrote "Does NOT touch board_enrichment.py,
-# run_live_odds_refresh_worker.py, or wnba_fixture_identity.py (held by
-# wnba-live-tier / wnba-phase2-migration)." -- the recognized marker "held by"
-# sits AFTER the three filenames, so `_claimable_prefix` had nothing earlier to
-# cut at and included all three as claims. That blocked `wnba-edge-263` from
-# editing `board_enrichment.py`, a file the sentence explicitly disclaims and
-# whose named would-be claimants were both already closed. "not touch" is a
-# substring of the existing "not touched", so it subsumes that entry (covers
-# both tenses) without changing where either function looks for it.
-#
-# "read-only reference" was ALSO MISSING. Measured 2026-08-19:
-# `nfl-player-props-calibration-fix` wrote "Read-only reference:
-# `docs/ai_context/todo.md`" -- an explicit disclaimer, phrased differently
-# from the already-recognized "Read-only dependency:" -- and neither
-# `_is_disclaimer` nor `_claimable_prefix` recognized it, so the path read as
-# a genuine claim. That blocked `nhl-model-owner` from editing `todo.md`, a
-# file every lane in this repo edits constantly as a shared append-only
-# ledger.
-#
-# "not taken" was ALSO MISSING -- the third instance of the same class in one
-# day. Measured 2026-08-19: `wnba-edge-263` wrote "**BLOCKED, not taken:**
-# `scripts/refresh_wnba_oddsapi_props.py`. `lane-guard` caught this live --
-# `basketball-model-owner`'s Files block ... explicitly holds WRITE on this
-# exact file ... **Not editing it.**" -- a disclaimer stating the OPPOSITE of a
-# claim, written specifically BECAUSE this hook had just enforced the real
-# owner's claim correctly. Neither `_is_disclaimer` nor `_claimable_prefix`
-# recognized "not taken", so the path re-read as `wnba-edge-263`'s OWN claim --
-# and blocked `basketball-model-owner`, the file's actual, stated, correctly-
-# enforced owner, from editing their own file. A correct block followed by a
-# stale record of that block turning into a phantom counter-claim is a new
-# failure shape, not a repeat of the first two: those were disclaimers about a
-# file the writer never touched; this one is a disclaimer ABOUT THIS HOOK'S
-# OWN PRIOR ENFORCEMENT, and it still needs the same fix.
-#
-# "released"/"claim released" was ALSO MISSING -- the fourth instance,
-# measured 2026-08-19 while FIXING the third. `soccer-odds-capture-cadence-
-# gap` released `basketball-model-owner`'s completed-but-unclosed claim on
-# `artifact_publisher.py` (their own header already said "no further action
-# identified as ready") and wrote "**`syndicate/features/shared/
-# artifact_publisher.py` claim RELEASED 2026-08-19 by `soccer-odds-capture-
-# cadence-gap`**..." into THEIR Files block as the release note. "released"
-# was not a recognized marker, so that sentence's own path mention re-read as
-# a claim under the still-OPEN `basketball-model-owner` header -- and blocked
-# the very session that had just released it, in its own worktree, on the
-# very next edit. Same shape as "not taken": a disclaimer about this hook's
-# own prior state (here, a claim transfer) needs the same fix as a
-# disclaimer about a file never touched.
-_DISCLAIMER_MARKERS = (
-    "not claimed",
-    "collision check",
-    "read-only dependency",
-    "read-only reference",
-    "not touched",
-    "not touch",
-    "not taken",
-    "released",
-    "held by",
-    "claimed by",
-    "ownership checked",
-    "zero mentions",
-    "no lane",
-    # 2026-09-03: `render.yaml` was reported CONTESTED by the two lanes most
-    # carefully avoiding it -- both wrote "**never `render.yaml`**", a
-    # PROHIBITION, and every marker above spells the same idea a different way
-    # ("not touch", "not taken", "released") while `never` was missing. On the
-    # repo's highest-blast-radius file, that is the worst place to cry wolf.
-    # Safe as a PREFIX cut: a path BEFORE the word is still claimed, so
-    # "`a.py` (never deployed)" keeps claiming `a.py`.
-    "never",
-)
-
-
-def _is_disclaimer(line):
-    """True when this Files-block bullet talks ABOUT a path instead of claiming it."""
-    text = line.lstrip("- ").strip().strip("*_").lower()
-    return any(marker in text for marker in _DISCLAIMER_MARKERS)
-
-
-def _claimable_prefix(line):
-    """The part of a Files line that still claims, i.e. everything BEFORE any
-    disclaimer marker.
-
-    A DISCLAIMER GOVERNS WHAT FOLLOWS IT, and treating it as a veto over the
-    whole line loses real claims. The ledger writes them in one breath:
-
-        - **Files (exclusive to this lane):** `live_refresh_loop.py`,
-          `tests/test_pregame_cadence_fixture_aware.py` (new). Collision check
-          RUN 2026-08-15 against all OPEN lanes: both CLEAR.
-
-    "Collision check ... CLEAR" is a marker, so a whole-line veto silently
-    dropped the test file sitting in front of it -- a file the lane plainly
-    claims. Cutting at the marker keeps that path and still discards everything
-    the sentence goes on to mention.
-
-    The 2026-08-15 incident is preserved exactly: "**NOT claimed, deliberately:**
-    `ask_the_syndicate_adapter.py`" puts the marker at the front, so the
-    claimable prefix is empty and the file stays unclaimed -- which is the whole
-    reason this machinery exists.
-    """
-    low = line.lower()
-    positions = [low.find(m) for m in _DISCLAIMER_MARKERS]
-    positions = [p for p in positions if p != -1]
-    return line[:min(positions)] if positions else line
-
-
-def _norm(p):
-    return p.replace("\\", "/").strip("/")
-
-
-def _paths_in(text):
-    """Pull path-looking tokens out of a claim line."""
-    out = []
-    for tok in re.split(r"[,\s]+", text or ""):
-        # STRIP ASYMMETRICALLY. The right side keeps the original set; the
-        # left side is the same set MINUS the dot, because a LEADING dot is
-        # part of the path, not punctuation.
-        #
-        # Measured 2026-08-31: the symmetric strip turned `.syndicate/x.md`
-        # into `syndicate/x.md`, and since matching is `rel.endswith("/" + f)`,
-        # `.syndicate/x.md`.endswith("/syndicate/x.md") is FALSE -- so EVERY
-        # claim under a dot-directory (`.syndicate/`, `.claude/`) named a file
-        # it could never match and guarded nothing, silently. One live instance:
-        # `exchange-join-refusals` on a findings doc.
-        #
-        # The right side must keep the dot so a trailing sentence period still
-        # goes; dropping it there leaves a token like ``x.py`.`` ending in a
-        # backtick, which is how the first cut of this fix broke a DIFFERENT
-        # claim while repairing this one.
-        tok = tok.strip().rstrip("`<>*_()[].,;").lstrip("`<>*_()[],;")
-        if not tok or tok.lower() in ("n/a", "none", "fill", "in", "tbd"):
-            continue
-        if "/" in tok or "\\" in tok or PATHISH_RE.match(tok):
-            norm = _norm(tok)
-            if norm:
-                out.append(norm)
-    return out
-
-
-def _claims(text):
-    """Yield (slug, claimed_path) for every OPEN lane."""
-    slug = None
-    open_lane = False
-    in_files = False
-    for line in text.splitlines():
-        # Every "### " line ends the previous lane, parseable or not. Without
-        # this branch a header that fails LANE_RE (e.g. "### (superseded lane
-        # detail...)") fell through and INHERITED the previous lane's open
-        # state, attributing its Files block to the wrong slug.
-        if HEADER_RE.match(line):
-            m = LANE_RE.match(line)
-            if not m:
-                # Malformed separator: still a lane, still claims its files.
-                m = ASCII_LANE_RE.match(line)
-            if m:
-                slug = m.group(1)
-                open_lane = bool(OPEN_RE.search(m.group(2)))
-            else:
-                slug, open_lane = None, False
-            in_files = False
-            continue
-
-        m = FILES_RE.match(line)
-        if m:
-            in_files = True
-            if open_lane:
-                # THE SAME DISCLAIMER-STRIPPING CONTINUATION LINES ALREADY GET.
-                # Measured 2026-08-18: `basketball-model-owner`'s Files line ran
-                # "- Files: <real paths>. ... Collision check: no other OPEN lane
-                # claims any `data/wnba_source/**` path (grepped `lanes.md`,
-                # clean)." all on ONE physical line (no colon before "Files:",
-                # so [^:]* stops at the FIRST colon and (.*) swallows the whole
-                # rest of the line, disclaimer included). `lanes.md` -- mentioned
-                # only as the file that WAS grepped, not a claim -- got read as
-                # this lane's own path and blocked an unrelated worktree session
-                # from writing `.syndicate/lanes.md` at all. Continuation lines
-                # already run through `_claimable_prefix` for exactly this
-                # reason; the initial line never did, which is the gap.
-                for f in _paths_in(_claimable_prefix(m.group(1))):
-                    yield slug, f
-            continue
-
-        if in_files:
-            stripped = line.strip()
-            # A new top-level field ("- Goal:", "- Hypothesis:") or a blank
-            # run ends the claim block; nested bullets continue it.
-            if not stripped or (FIELD_RE.match(line) and not line[:1].isspace()):
-                in_files = False
-                continue
-            # WRAPPED CONTINUATION LINES COUNT, not just nested `-` bullets.
-            # Requiring a leading "-" missed the commonest shape in this file --
-            # a Files declaration wrapped across lines:
-            #
-            #   - Files (claimed 2026-08-15, collision check CLEAR via ...
-            #     own `_claims()`): `syndicate/features/shared/clv_join.py`,
-            #     `tests/test_clv_close_timing.py` (new).
-            #
-            # Both paths live on lines that begin with a word, so both were
-            # invisible. `clv_join.py` looked guarded only because the SAME name
-            # appears in prose further down under a `-`, which the block used to
-            # run into; the real declaration never parsed. An accidental claim
-            # from prose is not protection -- it moves the moment the prose does.
-            #
-            # Safe because the block is bounded: FIELD_RE ends it at the next
-            # top-level field, so only the declaration's own lines are read, and
-            # `_is_disclaimer` still skips "NOT claimed, deliberately" bullets.
-            if open_lane:
-                for f in _paths_in(_claimable_prefix(stripped).lstrip("- ")):
-                    yield slug, f
-
-
-def _malformed_headers(text):
-    """Lane headers needing U+2014 that were written with ASCII hyphens.
-
-    Returns [(slug, header_line)]. These DO parse for claim purposes (see
-    `_claims`) so no lane goes unguarded -- but every other reader keyed on the
-    em-dash, including the session-start digest, still disagrees about them.
-    """
-    out = []
-    for line in text.splitlines():
-        if not HEADER_RE.match(line):
-            continue
-        if LANE_RE.match(line):
-            continue
-        m = ASCII_LANE_RE.match(line)
-        if m and OPEN_RE.search(m.group(2)):
-            out.append((m.group(1), line.strip()))
-    return out
+# IT FAILS OPEN ON AN IMPORT ERROR, BUT NEVER SILENTLY. This file's contract is
+# fail-open -- a broken guard that blocks every edit is worse than no guard --
+# and that is kept. What is NOT kept is the silence: "an inert guard and a
+# satisfied guard are indistinguishable from outside" is this repo's own phrase
+# for how `ledger-append-guard` read as passing for its entire existence. A
+# missing shared module now says so on stderr every time.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from lane_claims import (
+        _claims,
+        _malformed_headers,
+        _norm,
+        is_exempt,
+        matches,
+    )
+    from lane_marker import current_lane, safe_session_id as safe_session_id_of
+except Exception as exc:  # pragma: no cover - only when the module is missing
+    sys.stderr.write((
+        "lane-guard: CANNOT IMPORT lane_claims (%s). NO LANE CLAIM IS BEING "
+        "ENFORCED on this edit. Restore .claude/hooks/lane_claims.py"
+    ) % exc + chr(10))
+    sys.exit(0)
 
 
 def main():
@@ -344,11 +91,7 @@ def main():
     # Check the PATH ITSELF for a `.syndicate`/`.claude` segment, not its
     # position relative to `root` -- true in both the primary tree and any
     # worktree, since both mirror the same internal layout.
-    norm_path = _norm(path)
-    if any(
-        norm_path == marker or norm_path.startswith(marker + "/") or ("/" + marker + "/") in ("/" + norm_path)
-        for marker in (".syndicate", ".claude")
-    ):
+    if is_exempt(path):
         return 0
 
     # PER-SESSION MARKER, falling back to the global one.
@@ -367,28 +110,22 @@ def main():
     # marker stops being a contended lock. The global file is still read when
     # no per-session file exists, so a session that never writes one behaves
     # EXACTLY as before -- this cannot break a session that has not opted in.
-    current = ""
-    session_marker_used = False
-    session_id = str(payload.get("session_id") or "").strip()
-    # Defensive: the id goes into a filename, and it arrives from outside.
-    safe_session_id = re.sub(r"[^A-Za-z0-9._-]", "", session_id)[:128]
-    if safe_session_id:
-        session_marker = os.path.join(root, ".syndicate", f".current-lane.{safe_session_id}")
-        if os.path.exists(session_marker):
-            try:
-                with open(session_marker, encoding="utf-8") as fh:
-                    current = fh.read().strip()
-                session_marker_used = bool(current)
-            except Exception:
-                current = ""
+    #
+    # THE READ ITSELF MOVED TO `lane_marker.py` 2026-09-03, and it fixed a live
+    # defect on the way. There were two copies of this: the one that used to sit
+    # here read plain UTF-8 and `.strip()`, while `deploy-guard.py` read
+    # `utf-8-sig` and took `splitlines()[0]`. A marker file written with a BOM
+    # therefore resolved to the lane slug for DEPLOYS and to the literal string
+    # U+FEFF for EDITS -- and U+FEFF matches no lane, so that session was locked
+    # out of editing its OWN claimed files, by a guard telling it to write the
+    # marker it had already written. One such marker was sitting in
+    # `.syndicate/` when this was found (`.current-lane.92987093...`, three
+    # bytes: ef bb bf). The tolerant read is now the only read.
+    current, session_marker_used = current_lane(root, payload.get("session_id"))
+    safe_session_id = safe_session_id_of(payload.get("session_id"))
 
-    marker = os.path.join(root, ".syndicate", ".current-lane")
-    if not current and os.path.exists(marker):
-        try:
-            with open(marker, encoding="utf-8") as fh:
-                current = fh.read().strip()
-        except Exception:
-            current = ""
+    # The fallback to the bare `.syndicate/.current-lane` moved into
+    # `current_lane()` with the rest of the read -- same order, same precedence.
 
     try:
         with open(lanes_file, encoding="utf-8") as fh:
@@ -440,7 +177,7 @@ def main():
         for slug, f in _claims(text):
             if slug == current:
                 continue
-            if rel == f or rel.endswith("/" + f) or f.endswith("/" + rel):
+            if matches(rel, f):
                 conflict = slug
     except Exception:
         return 0

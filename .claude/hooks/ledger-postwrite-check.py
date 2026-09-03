@@ -82,61 +82,17 @@ def _state_path(root):
     return os.path.join(tempfile.gettempdir(), f"syndicate-ledger-check-{key}.json")
 
 
-def _ledger_root(start):
-    """Nearest ancestor of `start` that HOLDS a ledger, or None.
-
-    Deliberately a filesystem walk and NOT `git rev-parse --show-toplevel`,
-    which is what the sibling guards use. This hook runs after EVERY Bash
-    command, and its docstring promises to be ~free; measured on Windows, the
-    git subprocess costs 41ms per call against 0.0ms for the walk, for the
-    identical answer. It also asks the question this hook actually has -- "which
-    tree holds the files I am about to stat" -- rather than a git question it
-    does not care about, so it still works in a tree that is not a repo.
-    """
-    try:
-        d = os.path.abspath(start)
-    except Exception:
-        return None
-    marker = os.path.join(".syndicate", "lanes.md")
-    while True:
-        if os.path.exists(os.path.join(d, marker)):
-            return d
-        parent = os.path.dirname(d)
-        if parent == d:
-            return None
-        d = parent
-
-
-def _roots(payload):
-    """Every tree this session could plausibly have just written, deduped.
-
-    The worktree the command ran in comes FIRST -- it is the one this session
-    actually writes -- with the primary checkout second because it is the shared
-    copy every other session reads at start. Order matters only for reporting.
-    """
-    cwd = ((payload.get("cwd") or "").strip()
-           or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
-    out, seen = [], set()
-    for cand in (_ledger_root(cwd) if os.path.isdir(cwd) else None,
-                 os.environ.get("CLAUDE_PROJECT_DIR"),
-                 cwd):
-        if not cand or not os.path.isdir(cand):
-            continue
-        # `realpath`, not `abspath`: `git rev-parse --show-toplevel` returns the
-        # LONG Windows path with forward slashes, while `CLAUDE_PROJECT_DIR` may
-        # carry an 8.3 short component (`C:\Users\TEMPAD~1\...`). `abspath`
-        # normalises separators but does NOT expand short names, so the same
-        # directory compared unequal and the tree was scanned -- and reported --
-        # twice. `realpath` resolves both to one spelling.
-        try:
-            key = os.path.normcase(os.path.realpath(cand))
-        except Exception:
-            key = os.path.normcase(os.path.abspath(cand))
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(cand)
-    return out
+# `_ledger_root` / `_roots` MOVED TO `hook_trees.py` 2026-09-03, verbatim, when
+# `lane-postwrite-check.py` needed the identical answer. The docstring above
+# still describes their behaviour because it is unchanged -- including the two
+# measurements that shaped them (the 41 ms git subprocess this walk replaces,
+# and `realpath` over `abspath` for the 8.3-short-name dedupe). They are shared
+# rather than copied because `learnings.md` 2026-08-20 says a defect in what all
+# the guards share must be fixed in a shared module or the next guard re-makes
+# it, and WHICH TREE is the defect every hook in this directory has had.
+#
+# Aliased back to the private names so nothing else in this file changed.
+from hook_trees import ledger_root as _ledger_root, roots as _roots
 
 
 def _scan(root):

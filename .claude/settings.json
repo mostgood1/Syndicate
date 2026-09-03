@@ -55,6 +55,11 @@
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deploy-guard.py",
             "timeout": 15,
             "statusMessage": "Checking deploy ownership..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-postwrite-check.py --pre",
+            "timeout": 10
           }
         ]
       }
@@ -79,6 +84,12 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-postwrite-check.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-postwrite-check.py",
+            "timeout": 10,
+            "statusMessage": "Reconciling shell writes against lane claims..."
           }
         ]
       }

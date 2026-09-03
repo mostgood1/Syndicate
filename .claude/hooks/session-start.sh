@@ -388,8 +388,16 @@ if command -v python >/dev/null 2>&1; then
   # under `## OPEN` instead of appending at EOF -- but that is PROSE in a slash
   # command, and prose is what failed here in the first place. A checker in this
   # loop is what makes the regression surface next session instead of next week.
+  # check_lane_claims.py added 2026-09-03. The other three all ask whether the
+  # ledger's STRUCTURE is intact -- one block per slug, blocks under the right
+  # heading, one holder per claim. None of them asks whether a claim NAMES A
+  # FILE, and a claim that names nothing satisfies every one of them while
+  # guarding nothing. `learnings.md` 2026-08-31 prescribed this exact check
+  # ("reject claims whose path is absent from git ls-files") and it was never
+  # built; 8 of 44 live claims were in that state when it finally was.
   for c in "lane_identity_check.py:lanes.md" \
            "check_lane_invariants.py:lanes.md" \
+           "check_lane_claims.py:lanes.md (claims name no file)" \
            "state_key_check.py:state.md" \
            "todo_id_reconcile.py --no-history:todo.md"; do
     script=${c%%:*}; label=${c##*:}

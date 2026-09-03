@@ -24166,3 +24166,147 @@ lost no protection and no open lane left the session-start digest.
   data. `learnings.md:2409` is the standing rule this instance confirms again.
 
 
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-09-03
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### fleet-catchup-round3 — CLOSED 2026-09-03 — **web + refresh-worker at 0 pending; live-odds-worker on `6f28b474`.** The round's real finding: `#643` was an ANCESTOR of the deployed SHA and ABSENT from the deployed FILE — `04187cdf` reverted it with no conflict and no signal, and it shipped inert through two deploys. Restored in `6f28b474` and verified live (`bytes_per_order=1095 ... BOUNDED ... 65%`). Also: a peer force-broke my live claim and canceled my build. Both in `learnings.md`. — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: all three services on `48c68546`. Unlike round 2, every service has REAL
+  runtime content pending: `04187cdf` (order provenance —
+  `execution_ledger.py` + `pipeline/execute_portfolio.py`, the trading path),
+  `8add1bbe` (`#643` BOUNDED/UNBOUNDED warning), and for web `a81bf816`
+  (`ncaaf/game_projections.py` + `board_enrichment.py`).
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: per service, its OWN log stream shows role work after boot with
+  0 tracebacks, and `pending_deploys.py` reads 0 code commits for it. On
+  live-odds-worker additionally: the `#643` warning must print the NEW shape
+  (`bytes_per_order=` / `BOUNDED`) — the first LIVE confirmation that fix is
+  real rather than merely merged.
+- Blocked by: none.
+
+### live-odds-catchup-round4 — CLOSED 2026-09-03 — **DONE, verified BY CONTENT.** live-odds-worker `6f28b474`→`44903fbf`, live 21:03:41Z; `chip_join_key` present in all three changed files of the deployed SHA (2/3/4), `#643`'s `bytes_per_order` confirmed still present, 15 PUBLISH_OK, anon 553 MB of 2,048, 0 errors. — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: live-odds-worker off `6f28b474` onto `44903fbf`. Substantive content is
+  `9e106397` (NCAAF chip join — `game_chip_scoreboard.py`, `layer2_board.py`,
+  `team_aliases.py`); the other two touch `scripts/compact_state.py` /
+  `state_key_check.py`, ledger tooling the worker does not execute.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: **BY CONTENT, not ancestry** — the rule this session just paid
+  for. `git show <deployed-sha>:syndicate/features/shared/team_aliases.py |
+  grep -c chip_join_key` must be >= 1, AND `pending_deploys.py` must read 0 for
+  the service, AND its own log stream must show publisher work with 0 tracebacks.
+  Ancestry alone is not evidence: `#643` was an ancestor of the deployed SHA and
+  absent from the deployed FILE for two deploys today.
+- Blocked by: none.
+
+### deploy-lock-worktree-split — CLOSED 2026-09-03 — **FIXED AND PROVEN END-TO-END.** Both deploy locks now resolve to the tree `deploy-guard.py` reads, via `--git-common-dir`. Acquired from a worktree, the claim file landed in the PRIMARY tree and nothing was written locally. 8 new tests + 54 in the existing deploy suites. — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: a claim taken from a session worktree must be the same lock every other
+  session sees. Opened retroactively — the edit was made before the lane, which
+  is a protocol miss; recorded rather than tidied away. No collision: no OPEN
+  lane claimed `deploy_claim.py` or `deploy_preflight.py`.
+- Files: `scripts/deploy_claim.py`, `scripts/deploy_preflight.py`,
+  `tests/test_deploy_lock_worktree.py` (NEW).
+- Verification (done): `deploy_claim.py acquire` run from the worktree
+  `C:/tmp/m642-wt` wrote the claim into the PRIMARY tree's
+  `.syndicate/deploy_claims/live-odds-worker.json` with
+  `holder=worktree-lock-proof`, while `.syndicate/deploy_claims/` in the
+  worktree stayed empty. Released immediately.
+- Blocked by: none.
+
+### fleet-catchup-round5 — CLOSED 2026-09-03 — **ALL THREE to `498a4320` in one window** (22:11:36-51Z), every preflight CLEAR first try. Verified BY CONTENT with tokens proven absent from the previously-live SHA: `YIELD` 0→2, `sim_view_basis` 0→1; plus `#643` and the deploy-lock fix re-checked for SURVIVAL. 300 log lines, 0 errors. — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: all three services on `498a4320`. Substantive runtime content this
+  round: `939a8c00` (layer2 board — the sim-disagrees tag was unreachable and
+  Win% was showing the BOOK COUNT), `ca05aa7b` (NCAAF chips), `d5c1c0fa`
+  (basketball props name-join yield), `f3bb47d0` (`#632` odds_history merge 43%
+  cheaper). `4b997c31` / `23bf6bc7` / `2283f7fa` are `scripts/` tooling the
+  services do not execute — they ride along, they are not the reason.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: per service, BY CONTENT on the deployed SHA (not ancestry), plus
+  its own log stream showing role work with 0 tracebacks, plus
+  `pending_deploys.py` reading 0 for it. Content token: `chip_join_key` is
+  already live, so this round uses a token from `939a8c00` in `layer2_board.py`.
+- Blocked by: none.
+
+### fleet-catchup-round6 — CLOSED 2026-09-03 — **BOTH WORKERS to `6a41098f`** (22:52:49Z / 22:54:23Z), verified by content (`_edge_unavailable_reason` 0→1, absent from the prior SHA) with both earlier fixes re-checked for survival; 200 log lines, 0 errors. **Web NOT taken — `web-oom-profiler-steady` held the claim all round and was not forced.** — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: all three services on `6a41098f`. ONE substantive commit, `36161e83`
+  (layer2 board splits `sim_view: none` into "no model" vs "model, unpriced" at
+  the source; web also gets `templates/intelligence.html`). `742724bd` is
+  `scripts/split_state.py`, ledger tooling no service executes.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: BY CONTENT on the deployed SHA using
+  `_edge_unavailable_reason`, checked to be ABSENT from the currently-live
+  `498a4320` (live=0, target=1) so a pass discriminates; plus each service's own
+  log stream with 0 tracebacks; plus `pending_deploys.py` reading 0.
+- Blocked by: none.
+
+### steam-test-clock-freeze — CLOSED 2026-09-03 — session c38d3e5c
+- Outcome: `test_layer2_movement_live_segment` no longer depends on how long
+  the suite ran before it. Clock frozen from the test; `layer2_board.py` not
+  touched. Shipped `a046d0b5`.
+- Evidence + full narrative: `log/2026-09-03.md`, session c38d3e5c.
+- Files: none held (CLOSED).
+- Blocked by: none.
+
+### nfl-dispatch-order-assertion — CLOSED 2026-09-03 — session c38d3e5c
+- Outcome: TWO tests were red on `main`, not one. Absolute chain indices
+  deleted (not raised a third time) in `test_nfl_pbp_fetch_autorun.py` and
+  `test_nfl_roster_depth_autorun.py`; position now asserted against the
+  high-frequency branches. `run_refresh_worker.py` not touched. Shipped
+  `a046d0b5`. Also fixed `accuracy-autorun-rearm`'s phantom claim (`aeb42333`).
+- Evidence + full narrative: `log/2026-09-03.md`, session c38d3e5c.
+- Files: none held (CLOSED).
+- Blocked by: none.
+
+### web-catchup-round7 — CLOSED 2026-09-03 — **web `9987c545`→`39ed4ef5`, live 23:08:51Z, no force used.** `#643` survival checked BEFORE deploying (two commits touched `execution_ledger.py`, the file where it was silently reverted at 19:22Z) — all present. `_edge_unavailable_reason` 0→1, 9 MLB cards, 0 errors. **`#642` confirmed live: 1458/1457/1 — the first non-zero `total_tracked`.** — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: web off `9987c545` onto `39ed4ef5`, now that `web-oom-profiler-steady`
+  released the claim it held through round 6. Content: `36161e83` (layer2
+  `sim_view` split + `templates/intelligence.html`), `cb223b62` and `733a28f0`
+  (orders carry what the sim SAID, and pin the vocabulary).
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: BY CONTENT on the deployed SHA — `_edge_unavailable_reason`,
+  confirmed ABSENT from the currently-live `9987c545` (live=0, target=1). PLUS a
+  survival check on `#643`, because `cb223b62`/`733a28f0` touch
+  `execution_ledger.py` — the exact file and the exact shape of commit that
+  silently reverted that fix at 19:22Z today. **Checked BEFORE deploying:
+  `bytes_per_order` x1, `_store_max_bytes` x3, `UNBOUNDED` x2 all present in
+  `39ed4ef5`.** Plus web serving MLB cards with 0 tracebacks.
+- Blocked by: none (claim released).
+
+### lane-guard-never-marker — CLOSED 2026-09-03 — **FALSE POSITIVE, FIXED.** `render.yaml` was never claimed: both lanes wrote "**never `render.yaml`**", a PROHIBITION, and `never` was missing from `_DISCLAIMER_MARKERS`. Added to script AND hook (+8/-0 each). Claim-set diff MEASURED before/after: the only change is the 3 `render.yaml` false positives disappearing. Two alternatives rejected after measurement (cross-line carry-over; word-boundary matching, which moved 129 claims). 5 tests, 492 in the lane/guard suites, CI OK. — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: `check_lane_invariants.py` reports `render.yaml` CONTESTED by
+  `accuracy-autorun-rearm` and `ncaaf-live-cadence`. **Neither claims it** —
+  both write "**never `render.yaml`**", a PROHIBITION, and `never` is missing
+  from `_DISCLAIMER_MARKERS` (which has `not touch`, `not taken`, `released`).
+  So the two lanes most carefully avoiding the repo's highest-blast-radius file
+  are reported as fighting over it.
+- Files: `scripts/check_lane_invariants.py`, `.claude/hooks/lane-guard.py`,
+  `tests/test_lane_guard_prohibition_marker.py` (NEW). Collision check with the
+  module's own `claims()`: no OPEN lane claims any of them, and the one
+  contested entry is the false positive this lane removes. **Not claimed here:**
+  the blueprint file, named in the Goal above.
+  (Two self-inflicted bugs worth keeping: I first wrote "Collision-checked",
+  which is not the marker `collision check`, and so claimed that file inside the
+  lane fixing that exact bug. And the test was first named `..._never_marker.py`
+  — the marker cut INSIDE its own path and silently dropped a real claim, the
+  dangerous direction. Renamed; do not put a marker word in a claimed path.)
+- Hypothesis: adding `never` to both marker tuples plus a one-line REFLOW of the
+  ncaaf block (its `never` and its `render.yaml` sit on either side of a line
+  break, and the cut is line-scoped) clears it with no parser cleverness.
+- **DELIBERATELY NOT IMPLEMENTING CROSS-LINE CARRY-OVER.** The failure modes are
+  asymmetric: a false claim is noisy but SAFE, a missed claim lets two lanes edit
+  one file silently. Carry-over buys tidiness in the dangerous direction.
+- Falsification test: if `INVARIANTS HOLD` does not follow, or if any previously
+  claimed path stops being claimed, the change is wrong.
+- Verification: `check_lane_invariants.py` returns INVARIANTS HOLD; the claim set
+  is otherwise UNCHANGED (compared before/after, not eyeballed); marker tuples
+  still identical between script and hook.
+- Blocked by: none.

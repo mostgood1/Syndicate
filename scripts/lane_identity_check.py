@@ -60,38 +60,42 @@ CLOSED_FILES = (
 )
 CLOSED = CLOSED_FILES[0]  # retained: existing references expect a single path
 HISTORY = REPO_ROOT / ".syndicate" / "lanes_history.md"
-GUARD = REPO_ROOT / ".claude" / "hooks" / "lane-guard.py"
+# The parser moved to `lane_claims.py` 2026-09-03; `_load_guard` imports it.
+GUARD = REPO_ROOT / ".claude" / "hooks" / "lane_claims.py"
 
 
 REQUIRED_ATTRS = ("HEADER_RE", "LANE_RE", "ASCII_LANE_RE", "OPEN_RE")
 
 
 def _load_guard():
-    """Import `lane-guard.py` for its header regexes. The hyphen blocks a plain import.
+    """The shared lane parser, for its header regexes.
 
-    IT ENDS IN A BARE `sys.exit(main())`, being a hook rather than a library, so
-    importing it RUNS it: it reads an empty stdin, decides there is nothing to
-    guard, and exits 0. The first version of this file swallowed that and printed
-    NOTHING while exiting 0 -- a silent pass that looked exactly like a clean
-    ledger. Catching SystemExit is safe because the regexes are module-level and
-    defined long before that line.
+    IT USED TO IMPORT `lane-guard.py` ITSELF, through `importlib` because the
+    hyphen blocks a plain import, and had to swallow that file's trailing
+    `sys.exit(main())` -- it is a hook, not a library, so importing it RAN it.
+    The parser moved to `.claude/hooks/lane_claims.py` on 2026-09-03 (three
+    callers now need it, and `learnings.md` forbids a second copy), which makes
+    this a normal import and deletes that whole hazard.
 
-    The assert is the part that matters: a success code is not evidence the code
-    ran. If the exit happens EARLIER in future -- an import error, a guard added
-    at the top -- the attributes are missing and this fails loudly instead of
-    grading the ledger with a half-built parser.
+    THE ASSERT BELOW IS WHY THAT MOVE WAS SAFE, and it is the reason it stays.
+    When the parser moved, THIS FIRED -- "its parser moved and this tool would
+    grade nothing" -- at the session-start coherence loop, on the same run that
+    introduced the move. That is exactly the job: a success code is not evidence
+    the code ran, and a tool that grades the ledger with a half-built parser
+    reads as a clean ledger. Do not weaken it to a try/except.
     """
-    spec = importlib.util.spec_from_file_location("lane_guard", GUARD)
-    if spec is None or spec.loader is None:
-        raise SystemExit(f"FATAL: cannot load {GUARD}")
-    module = importlib.util.module_from_spec(spec)
+    hooks = REPO_ROOT / ".claude" / "hooks"
+    if str(hooks) not in sys.path:
+        sys.path.insert(0, str(hooks))
     try:
-        spec.loader.exec_module(module)
-    except SystemExit:
-        pass
+        import lane_claims as module
+    except Exception as exc:
+        print(f"FATAL: cannot import lane_claims ({exc}) -- the shared lane "
+              "parser is gone and this tool would grade nothing.", file=sys.stderr)
+        raise SystemExit(2)
     missing = [a for a in REQUIRED_ATTRS if not hasattr(module, a)]
     if missing:
-        print(f"FATAL: {GUARD.name} loaded without {', '.join(missing)} -- "
+        print(f"FATAL: lane_claims loaded without {', '.join(missing)} -- "
               "its parser moved and this tool would grade nothing.", file=sys.stderr)
         raise SystemExit(2)
     return module
