@@ -2171,7 +2171,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### accuracy-autorun-rearm — OPEN, **BLOCKED. TWO attempts 2026-09-03 both stood down; NO DEPLOY TAKEN either time, key still `false`, claim free. Handed to the 03:00 CT scheduled task.** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### accuracy-autorun-rearm — OPEN, **BLOCKED. TWO attempts 2026-09-03 both stood down; NO DEPLOY TAKEN either time, key still `false`, claim free. Handed to the 03:00 CT scheduled task, which is now DISABLED (stood down 2026-09-03 pm) -- nothing is armed.** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `#626`(h) runs in production for the first time WITHOUT killing the
   worker. ONE testable outcome: `[accuracy_summary] AUTORUN_DONE ... error=none`
   in refresh-worker logs, with the peak `memory_anon_mb` during that window
@@ -2260,6 +2260,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   a board build were in flight at 10:20 CT.
 
 
+- **BOTH SCHEDULED TASKS DISABLED 2026-09-03 ~15:0x CT `[user decision: "stand down for tonight"]`.**
+  `arm-accuracy-autorun-626h` and `verify-accuracy-autorun-626h` are `enabled:
+  false`. **Nothing will arm tonight and nothing will deploy unattended.** The
+  verifier was disabled WITH its sibling on purpose — with nothing armed it can
+  only report NOT-ARMED, and a task that fires to say nothing happened is noise
+  that trains people to ignore it. **Re-enable them together, never the verifier
+  alone.** Verified at stand-down by reading the Render env-vars API, not from
+  memory: `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN = false`.
+  Nothing else changed — the bounded code stays live, the lane stays OPEN, and
+  `#626`(h) has still never run in production. Re-arming is two
+  `update_scheduled_task` calls setting `enabled: true` plus a future `fireAt`;
+  the runbook and the four traps are unchanged in `deploys.md` 2026-09-03.
 ### web-oom-rate-escalation — CLOSED 2026-09-03 — opened 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: `#632` records 2 OOM kills and a `+32 MB/h` steady-state model implying
   **~23 h to reach the limit**. The events API now shows **THREE MORE kills, all
