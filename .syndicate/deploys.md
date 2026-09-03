@@ -19653,3 +19653,28 @@ first: `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN = 'false'`, not staged.
 Their key is still theirs to set.
 
 Residual: web is 2 commits behind (`b7c2b220`); not in this lane's scope.
+
+## 2026-09-03 — web `b7c2b220` → `552c942b` — lane `web-catchup-deploy`
+
+Completes the fleet catch-up: all three services now run current code.
+Carried two commits web executes — `portfolio_commit.py` (`no_model_edge_pct`
+by sport) and `soccer_projections.py` (short-vs-full join).
+
+Claim + preflight CLEAR at 17:43Z; live 17:47:18Z.
+
+verify: three readings at 17:47:43Z, on the live SHA.
+1. `/api/ops/version` → `552c942b`.
+2. `/api/portfolio/summary` → `ledger_rows_total=1457`, `excluded_auto_tracked=1457`,
+   `total_tracked=0` — identical to the pre-deploy reading on `b7c2b220`, so the
+   app booted AND completed a real keyvalue read, not just a health response.
+3. `/mlb/api/cards?date=2026-09-03` → **9 cards, 3 Live / 6 Preview**;
+   `/mlb/api/market-board` → 9 games. The board serves real content.
+Web's own log stream since boot: 100 lines, **0 tracebacks / 500s / CRITICAL**.
+
+Note for the next reader: `[home] MLB_GAME_MARKET_ROWS_DIAG ... has_markets_ml=False`
+appears repeatedly after boot. NOT attributed to this deploy — no pre-deploy
+baseline for that line was taken, and the board reads healthy above. Recorded so
+nobody later reads it as a regression introduced here.
+
+**Fleet state after this deploy — all three current:**
+web `552c942b` · refresh-worker `c1c4211a` · live-odds-worker `d4f0b8a3`.

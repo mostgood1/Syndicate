@@ -2305,6 +2305,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
       past OOM window must come from the EVENTS API, not from logs.
 - Blocked by: none. `#632` is unowned.
 
+### web-catchup-deploy — CLOSED 2026-09-03 — **DONE AND VERIFIED.** web `b7c2b220`→`552c942b`, live 17:47:18Z; version reads the target, `/api/portfolio/summary` returns 1457 rows (a real keyvalue read, not just a health response), MLB board serves 9 games (3 live / 6 preview), 0 errors. Fleet now all-current. — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: web runs current code. Live `b7c2b220`, 2 pending code commits
+  (`portfolio_commit.py`, `soccer_projections.py`). Target `552c942b`.
+- Files: NONE — deploy only, no code change. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: `/api/ops/version` reads the target SHA **and** the app actually
+  serves — `/api/portfolio/summary` returns its `#642` provenance fields
+  (`ledger_rows_total`), proving boot + a real read, with 0 tracebacks in web's
+  own log stream after boot.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
