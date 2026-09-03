@@ -133,3 +133,36 @@ def test_promotion_still_only_happens_on_a_CONFIRMED_absence(
     monkeypatch.setattr(prediction_ledger, "read_text_file_result", lambda path: (None, True))
     prediction_ledger._read_payload(keyvalue_ledger)
     assert len(promoted) == 1, "a CONFIRMED absence with real disk predictions should promote"
+
+
+def test_a_parsed_ledger_with_no_predictions_reports_its_counts(
+    keyvalue_ledger: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """`#642` second pass. The FIRST instrumentation went into the failed-read
+    branch, shipped, and NEITHER token fired -- the read succeeds and returns a
+    payload whose `predictions` list is empty. This is the branch that actually
+    runs, and the counts are what distinguish "2 MiB of results, no predictions"
+    from "a small payload the usage endpoint rounded up to a 2 MiB bucket"."""
+    body = '{"schema_version": 1, "predictions": [], "results": [{"prediction_id": "x"}]}'
+    monkeypatch.setattr(prediction_ledger, "read_text_file_result", lambda path: (body, True))
+
+    payload = prediction_ledger._read_payload(keyvalue_ledger)
+
+    assert payload["predictions"] == []
+    out = capsys.readouterr().out
+    assert "PREDICTION_LEDGER_PARSED_NO_PREDICTIONS" in out
+    assert f"shared_bytes={len(body)}" in out
+    assert "predictions=0" in out and "results=1" in out
+
+
+def test_a_populated_ledger_still_logs_nothing(
+    keyvalue_ledger: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """The anomaly-only rule: this is a request-path read of a multi-MiB value,
+    so a healthy ledger must not log on every read."""
+    body = '{"schema_version": 1, "predictions": [{"id": "p1"}], "results": []}'
+    monkeypatch.setattr(prediction_ledger, "read_text_file_result", lambda path: (body, True))
+
+    prediction_ledger._read_payload(keyvalue_ledger)
+
+    assert "PREDICTION_LEDGER" not in capsys.readouterr().out

@@ -163,6 +163,26 @@ def _read_payload(path: Path) -> dict[str, Any]:
         except Exception:
             shared_payload = None
         if shared_payload is not None:
+            # `#642`, SECOND PASS. The first pass instrumented the FAILED-read
+            # branch below, deployed it, and **neither token fired** -- so the
+            # read is succeeding and returning HERE, and the summary's zero
+            # comes from a payload that parses with an empty `predictions`
+            # list. I had instrumented my hypothesis rather than the live path.
+            #
+            # This reports the ANOMALY only -- a parsed ledger with no
+            # predictions -- so the healthy path stays silent on what is a
+            # request-path read of a multi-MiB value. The counts are what settle
+            # it: 2 MiB of `results` with no `predictions` is a very different
+            # fact from a small payload the usage endpoint rounded up to a 2 MiB
+            # allocator bucket.
+            if not shared_payload.get("predictions"):
+                print(
+                    "[prediction_ledger] PREDICTION_LEDGER_PARSED_NO_PREDICTIONS "
+                    f"path={path.name} shared_bytes={len(str(shared_text))} "
+                    f"predictions=0 results={len(shared_payload.get('results') or [])} "
+                    f"keys={sorted(shared_payload)}",
+                    flush=True,
+                )
             return shared_payload
 
     disk_payload = _read_disk_payload(path)
