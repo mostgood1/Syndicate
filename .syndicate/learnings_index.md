@@ -1,8 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 749 rules `[generated]`
-## Index — 748 rules `[generated]`
-## Index — 751 rules `[generated]`
+## Index — 753 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -10,8 +8,6 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 266**
-**FORBIDDEN — 265**
 **FORBIDDEN — 267**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
@@ -290,7 +286,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 479**
+**Rules and corrections — 481**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -462,6 +458,7 @@
 - [2026-09-03 — a deploy CLAIM can be force-broken while live, and spacing will not catch…](#2026-09-03-a-deploy-claim-can-be-force-broken-while-live-and-spacing-will-not-catch-it)
 - [2026-09-03 — RULE: before you compact a file, measure whether it is BLOATED or merely B…](#2026-09-03-rule-before-you-compact-a-file-measure-whether-it-is-bloated-or-merely-big-they-look-identical-from-the-size-alone-and-take-opposite-fixes-lane-none-ledger-structure-pass)
 - [2026-09-03 — FIXED: a file lock is only a lock if every holder computes the SAME path](#2026-09-03-fixed-a-file-lock-is-only-a-lock-if-every-holder-computes-the-same-path)
+- [2026-09-03 — lane session ids are NOT CCD session ids, so a roster miss proves nothing](#2026-09-03-lane-session-ids-are-not-ccd-session-ids-so-a-roster-miss-proves-nothing)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

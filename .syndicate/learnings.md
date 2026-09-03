@@ -24,9 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 749 rules `[generated]`
-## Index — 748 rules `[generated]`
-## Index — 751 rules `[generated]`
+## Index — 753 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4416,3 +4414,33 @@ line rather than happening silently.
 Proven end-to-end, not just unit-tested: `acquire` run from the worktree wrote
 the claim into the PRIMARY tree and left `.syndicate/deploy_claims/` in the
 worktree empty.
+
+## 2026-09-03 — lane session ids are NOT CCD session ids, so a roster miss proves nothing
+
+`.syndicate/lanes.md` records `CLAUDE_CODE_SESSION_ID`s. `list_sessions` returns
+`local_<uuid>` CCD ids. **Different namespaces.** Measured rather than assumed:
+four lane ids checked against a 200-row roster *including archived* —
+`3492626c`, `82fe0160`, `b2b5b45b`, and my own `cfcce46d` — **all four returned
+zero**, while two of those sessions were provably alive minutes earlier (3492626c
+had just deployed refresh-worker, and cfcce46d is me).
+
+So "that lane's session is not in the roster" is **not** evidence it ended. It is
+evidence of nothing at all. Same family as *session roster hides archived*, but
+worse: there, absence was ambiguous; here, absence is guaranteed regardless of
+liveness, so treating it as a liveness signal is always wrong.
+
+**Consequences that matter.** `send_message` cannot reach a lane owner — session
+82fe0160 recorded "not found" for this exact id at `lanes.md:1409` before I
+repeated the lookup from scratch. And any rule of the form "if that session is
+gone, `--force` it" must NOT be settled with `list_sessions` on a lane id: the
+deploy-claim tool's own prompt says an unrecorded session is UNKNOWN, not gone,
+and this is precisely why.
+
+**The channel that works: a bullet in the target lane's OWN block**, which is how
+82fe0160 reached this same owner. Prefer it to any messaging attempt.
+
+**And re-check the premise before pushing a cross-session notice.** Mine went
+stale in the minutes between writing and pushing — the owner committed the very
+thing I was warning was uncommitted. Retract rather than leave it: a stale
+warning in someone else's block is indistinguishable from a live one, and dilutes
+whatever real notice is already sitting there.
