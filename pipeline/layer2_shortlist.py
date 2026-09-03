@@ -2013,6 +2013,16 @@ def _attach_projections_over_window(
         "player_alias_ambiguous",
         "unmatched_player_rows",
         "unsupported_market_rows",
+        # LEFT OUT OF THE FIRST PASS AT THIS LIST, and the omission is the
+        # candidate for an 80,655-row hole. Measured 2026-09-03 18:09:22Z, after
+        # the other buckets began summing: projected + the summed misses came to
+        # 62,586 of considered 143,241, leaving 56.3% unaccounted -- while a
+        # static audit of the row loop found SIX exits and SIX counters, i.e. no
+        # uncounted exit at all. The only counter still merged by
+        # "first non-falsy wins" was this one, reading 106 where a summed value
+        # should be four figures. Adding a bucket to the sum is not evidence it
+        # is the hole; the next reading is.
+        "unmatched_match_rows",
     )
     # Per-key SUM, because a dict cannot go through `summable` above.
     summable_dicts = ("unprojected_by_market",)
