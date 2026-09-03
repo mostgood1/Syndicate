@@ -4279,3 +4279,13 @@ A one-line surgical fix to `state.md` (+178 chars) left the file **11,249 bytes 
 It was caught by `wc -c` — a size that moved the wrong DIRECTION for an edit that only added text. The arithmetic then closed exactly: 750877 - 739628 + 178 = 11427 CRs.
 
 **How to apply:** for any `.syndicate/**` edit, use binary I/O (`open(p,'rb')` / `'wb'`) or `Edit`, and check `wc -c` against the expected delta before moving on. A byte count that moves the wrong way is the only cheap detector; the diff is blind to this by design.
+
+## 2026-09-03 — FORBIDDEN: judging what a reworded ledger would lose by a LINE-level diff. It reports as unique the prose that was superseded, which is exactly the prose you must not land. `[state.md archival pass]`
+
+Promoted out of `state.md`'s MLB gameline cell during the 2026-09-03 archival pass, because the narrative around it was moved to `state_archive_2026-09-03.md` and an archive is not read at session start. The rule was measured, the narrative is not needed to apply it.
+
+Deleting backup ref `backup/unpushed-main-2026-09-03` was gated on "is anything lost". A LINE-level diff said **110 lines existed only there**. A TOKEN-level check found every distinctive fact (`1,701`, `0.057 MB`, `local_ea1e4863`, `#632`/`#634`/`#635`, the m625 gate's `280,840` leaves / `58,335` clock-derived / 0 mismatches) already on `main`, inside CLOSED and RICHER `lanes_history.md` blocks. The 110 "unique" lines were superseded OPEN-status planning prose. **Landing them would have re-injected an OPEN header for a CLOSED lane** — the diff's answer was not merely noisy, it pointed the wrong way.
+
+**Why a line diff fails here specifically.** A ledger gets REWORDED as it is corrected: the same fact is restated shorter, or moved under a new heading. Line identity tracks the wording, which is the part designed to change; the fact is the part that persists. So the residue a line diff reports is biased TOWARD superseded text.
+
+**How to apply:** before deleting any ledger branch, archive, or duplicate, extract distinctive tokens (SHAs, comma-numbers, decimals, backticked identifiers, issue ids) from the candidate and assert each one appears in the copy you are keeping. Do not reason from line counts. This same check is what verified the 2026-09-03 `state.md` archival: 27 distinctive tokens across both moved regions, 0 lost.
