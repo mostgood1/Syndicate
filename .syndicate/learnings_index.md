@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 746 rules `[generated]`
+## Index — 749 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 264**
+**FORBIDDEN — 266**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -200,6 +200,8 @@
 - [2026-09-03 FORBIDDEN: joining two FEEDS on exact string equality. Four instances in one…](#2026-09-03-forbidden-joining-two-feeds-on-exact-string-equality-four-instances-in-one-sport-in-one-day-each-one-silent-lanes-soccer-anchor-wiring-soccer-projection-names)
 - [2026-09-03 — FORBIDDEN: correcting a false claim in ONE copy and calling it fixed. Fix…](#2026-09-03-forbidden-correcting-a-false-claim-in-one-copy-and-calling-it-fixed-fix-the-operator-visible-copy-first)
 - [2026-09-03 — FORBIDDEN: editing a ledger file with Python TEXT-mode I/O. It rewrites ev…](#2026-09-03-forbidden-editing-a-ledger-file-with-python-text-mode-io-it-rewrites-every-line-ending-in-the-file-and-git-diff-will-not-show-you-scheduled-task-live-gameline-accuracy-snapshot-checkpoint)
+- [2026-09-03 — FORBIDDEN: judging what a reworded ledger would lose by a LINE-level diff.…](#2026-09-03-forbidden-judging-what-a-reworded-ledger-would-lose-by-a-line-level-diff-it-reports-as-unique-the-prose-that-was-superseded-which-is-exactly-the-prose-you-must-not-land-statemd-archival-pass)
+- [2026-09-03 — FORBIDDEN: verifying a deploy by ANCESTRY. Check the deployed file's CONTE…](#2026-09-03-forbidden-verifying-a-deploy-by-ancestry-check-the-deployed-files-content)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -283,7 +285,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 477**
+**Rules and corrections — 478**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -452,6 +454,7 @@
 - [2026-09-03 — A per-date join counter is not safe to SUM across a multi-day window unles…](#2026-09-03-a-per-date-join-counter-is-not-safe-to-sum-across-a-multi-day-window-unless-it-is-scoped-to-that-date-first-second-confirmed-instance-of-the-same-shape-as-513)
 - [2026-09-03 — A per-date join counter is not safe to SUM across a multi-day window unles…](#2026-09-03-a-per-date-join-counter-is-not-safe-to-sum-across-a-multi-day-window-unless-it-is-scoped-to-that-date-first-second-confirmed-instance-of-the-same-shape-as-513)
 - [2026-09-03 — the DIVIDE rule, restated because I broke it the same day I wrote it](#2026-09-03-the-divide-rule-restated-because-i-broke-it-the-same-day-i-wrote-it)
+- [2026-09-03 — a deploy CLAIM can be force-broken while live, and spacing will not catch…](#2026-09-03-a-deploy-claim-can-be-force-broken-while-live-and-spacing-will-not-catch-it)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

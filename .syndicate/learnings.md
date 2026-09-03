@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 746 rules `[generated]`
+## Index — 749 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4324,3 +4324,51 @@ On refresh-worker the same evening, forcing `fleet-catchup-round3` off left
 `refresh_odds_job.py` still running, and a deploy kills in-flight jobs — so the
 deploy waited anyway. Say which of the two waits a force actually shortens
 before taking one.
+## 2026-09-03 — FORBIDDEN: verifying a deploy by ANCESTRY. Check the deployed file's CONTENT.
+
+**Measured.** `#643`'s fix (`8add1bbe`) was on `main`. live-odds-worker deployed
+`48c68546`, and `git merge-base --is-ancestor 8add1bbe 48c68546` answers **YES**.
+The fix was still absent: `git show 48c68546:syndicate/features/shared/execution_ledger.py
+| grep -c bytes_per_order` answers **0**, and production went on printing the old
+line for 32 minutes across two deploys I had called successful.
+
+`04187cdf` — an unrelated, legitimate change to the same file, committed from a
+tree that predated mine — deleted my function and restored the old string. **No
+conflict. No test failure. No signal of any kind.** Git merged a whole-file state
+that happened to omit a region, which is not a conflict and never will be.
+
+**THE RULE. A commit being an ancestor proves it was APPLIED, never that it
+SURVIVED.** Anything a later commit can overwrite must be verified by asking the
+deployed tree for the CONTENT:
+
+    git show <deployed-sha>:<path> | grep -c <a token unique to the change>
+
+This is the same family as *presence ≠ reachability* and *test the fix's
+predicate, not its deploy state*, and it is the sharpest instance: every earlier
+one had the code present and unreached. Here the code was **gone** while every
+git-level check said it was there.
+
+**Corollary for concurrent trees.** The failure mode is a lost update, and it is
+structural: N sessions each hold a worktree, each edits the same file, and
+whichever commits last writes a whole-file state. `git add` on a stale copy is
+enough. So after ANY rebase onto a moved `main`, re-grep your own change before
+pushing — I did that for `lanes.md` duplicates the same afternoon and still did
+not do it for code.
+
+## 2026-09-03 — a deploy CLAIM can be force-broken while live, and spacing will not catch it
+
+`.syndicate/deploy_claims/refresh-worker.json` recorded
+`replaced: {holder: fleet-catchup-round3, acquired_at_iso: 20:30:47Z}`: another
+session forced my claim at 20:43:44Z, **13 minutes into a 45-minute TTL**, and
+its deploy CANCELED my in-flight build at 20:44:34Z.
+
+The second lock did not compensate. Their preflight at 20:44:32Z read
+`seconds_since_last_deploy: 3525` — it measures from the last FINISHED deploy,
+so **a build in flight is invisible to the spacing rule**. Serialisation rests
+on the claim alone, and `--force` is a single command away.
+
+No damage this time only because `150cc95b` was a DESCENDANT of my commit and
+carried my change by content. Had it been a sibling, it would have reverted a
+verified fix exactly as `04187cdf` did above. **Record the force in `deploys.md`
+when you break a claim, and before forcing, check the holder is actually gone —
+the tool asks for that and it is not decoration.**

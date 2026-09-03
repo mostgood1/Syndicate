@@ -20015,3 +20015,59 @@ pass:
 The web deploy was not wasted — it carried `6f28b474`, another lane's `#643`
 restore — but it was not the deploy this reading needed.
 
+
+## 2026-09-03 — round 3 — lane `fleet-catchup-round3` — **and a merged fix that shipped INERT**
+
+| service | to | live | verification |
+|---|---|---|---|
+| web | `48c68546` | 19:37:46Z | 9 MLB cards; `ledger_rows_total=1458`; 0 errors in 100 lines |
+| live-odds-worker | `48c68546` | 19:54:36Z | publisher active, 0 errors — **but see below** |
+| live-odds-worker | `6f28b474` | 20:26:34Z | **the `#643` line finally prints its real shape** |
+| refresh-worker | — | — | my `a6f5f586` build was CANCELED at 20:44:34Z; a peer's `150cc95b` went live instead (0 pending, and it CONTAINS the `#643` fix by content) |
+
+### THE FINDING: `#643` was merged, then silently reverted, and deployed inert
+
+At 19:54 live-odds-worker ran `48c68546`, which has `8add1bbe` (`#643`) as an
+ancestor. Production still printed the OLD line:
+
+```
+[execution_ledger] SIZE_WARNING bytes=2518436 warn_at=2097152 orders=2301 -- the store refuses at 8MB
+```
+
+`04187cdf` — a legitimate, unrelated change to the same file, committed from a
+tree that predated mine — deleted `_store_max_bytes()` and restored the old
+string. No conflict, no signal, nothing failed.
+
+**`git merge-base --is-ancestor 8add1bbe 48c68546` says YES while
+`git show 48c68546:...execution_ledger.py | grep -c bytes_per_order` says 0.**
+Ancestry is not presence. Restored in `6f28b474` on top of their work — 53
+insertions, exactly ONE deletion — with 111 tests passing across both files.
+
+verify: live-odds-worker `6f28b474`, 20:29Z —
+```
+SIZE_WARNING bytes=2518477 ... orders=2301 bytes_per_order=1095 cap=5000
+projected_at_cap=5472570 ceiling=8388608 -- BOUNDED: the record cap holds this
+to 65% of the refusal ceiling, so this is not an approaching outage
+```
+Production computed independently what `#643` derived offline: 1,095 B/order vs
+1,094 predicted, 5,472,570 vs 5,470,000, 65% vs 65%.
+
+### A CLAIM WAS FORCE-BROKEN WHILE LIVE, and it canceled a build
+
+`.syndicate/deploy_claims/refresh-worker.json` records
+`replaced: {holder: fleet-catchup-round3, acquired_at_iso: 2026-09-03T20:30:47Z}`.
+Session `3492626c` took the claim at 20:43:44Z — **13 minutes into my 45-minute
+TTL** — and its deploy canceled my in-flight `a6f5f586` build at 20:44:34Z.
+
+Their preflight (20:44:32Z) read `seconds_since_last_deploy: 3525`, i.e. it
+measured from the last FINISHED deploy and **could not see a build in flight**.
+So the spacing rule does not protect against cancelling a peer mid-build; only
+the claim does, and the claim was forced.
+
+No harm this time, and worth stating precisely why: `150cc95b` is a DESCENDANT
+of my `6f28b474` and carries the `#643` fix by content, so their deploy
+superseded mine with something strictly newer. That is luck, not the mechanism
+working.
+
+**Fleet:** web `ac32034b` (0 pending) · refresh-worker `150cc95b` (0 pending) ·
+live-odds-worker `6f28b474` (3 pending, churn since 20:20Z).
