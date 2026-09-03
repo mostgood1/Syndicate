@@ -22,6 +22,32 @@ class OpsRefreshApiTests(unittest.TestCase):
         app = create_app()
         app.testing = True
         self.client = app.test_client()
+        # PIN THE ARTIFACT-ROOT BRANCH. `#637` sweep, 2026-09-03.
+        #
+        # `refresh_odds_sources._local_source_artifact_root` returns TWO
+        # legitimate shapes and picks by environment:
+        #
+        #     hosted (SYNDICATE_DATA_ROOT set)  -> <root>/<slug>_source
+        #     local  (unset)                    -> <repo>/data/<slug>_source/source_artifacts
+        #
+        # Every `..._syndicate_runner_in_source_mode` test below asserts the
+        # LOCAL shape and none of them pinned the variable, so they inherited
+        # whatever the runner had. That made five of them pass ONLY when the
+        # data mirror was absent and fail the moment it was present -- and
+        # PRESENT is production: all three Render services set
+        # SYNDICATE_DATA_ROOT. A test that only passes in a configuration
+        # production never has is worse than no test, because it reads as
+        # coverage of the shipped path.
+        #
+        # Unset here so the local-shape assertions are DETERMINISTIC rather
+        # than environmental. The hosted branch -- the one production actually
+        # takes -- had no coverage at all and now gets its own test below.
+        # Tests that want the hosted branch set the variable themselves, which
+        # still wins over this default.
+        self._data_root_patch = patch.dict(os.environ, {}, clear=False)
+        self._data_root_patch.start()
+        self.addCleanup(self._data_root_patch.stop)
+        os.environ.pop("SYNDICATE_DATA_ROOT", None)
 
     def test_status_requires_admin_token(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
@@ -859,6 +885,55 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("-SourceArtifactRoot", mirror_command)
         self.assertIn("data/mlb_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in mirror_command))
         self.assertNotIn("source checkout", " ".join(str(part) for part in mirror_command).lower())
+
+    def test_the_HOSTED_artifact_root_has_no_source_artifacts_nesting(self) -> None:
+        """PRODUCTION'S BRANCH, which had no coverage until 2026-09-03.
+
+        `_local_source_artifact_root` returns `<SYNDICATE_DATA_ROOT>/<slug>_source`
+        when a hosted root is set and `<repo>/data/<slug>_source/source_artifacts`
+        when it is not. All three Render services set the variable, so the hosted
+        shape is the one that ships -- and every existing assertion in this class
+        pinned the LOCAL shape, passing only because the runner happened to have
+        no data mirror. Five of them flipped to failing the moment one was
+        present.
+
+        The two shapes are deliberate, not a bug: the mounted disk is not laid
+        out like the git mirror. What was missing was a test that says so.
+
+        Tests the RESOLVER directly rather than building a whole plan. A first
+        draft pointed a hosted root at an empty temp dir and asserted on
+        `build_refresh_plan`; `plan["ok"]` came back False, because an empty
+        directory is not a valid hosted configuration. Requiring a populated
+        mirror would have re-coupled this test to `data/` -- the exact defect it
+        exists to fix. The branch is one function, so test that function.
+        """
+        from syndicate.features.shared import ops_refresh
+
+        module = ops_refresh._refresh_script_module()
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        hosted = tmp.name.replace("\\", "/").rstrip("/")
+
+        for slug in ("mlb", "nhl", "nba", "wnba", "nfl", "ncaaf"):
+            with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": tmp.name}, clear=False):
+                got = str(module._local_source_artifact_root(slug)).replace("\\", "/")
+            self.assertTrue(
+                got.endswith(f"/{slug}_source"),
+                f"hosted root for {slug} should end in /{slug}_source, got {got}",
+            )
+            self.assertNotIn("source_artifacts", got, f"hosted root for {slug} must not nest source_artifacts")
+
+            env = dict(os.environ)
+            env.pop("SYNDICATE_DATA_ROOT", None)
+            with patch.dict(os.environ, env, clear=True):
+                local = str(module._local_source_artifact_root(slug)).replace("\\", "/")
+            # BOTH branches asserted in one test, deliberately: they are a pair,
+            # and pinning only the hosted one would let the local shape drift
+            # without anything noticing.
+            self.assertTrue(
+                local.endswith(f"/data/{slug}_source/source_artifacts"),
+                f"local root for {slug} should nest source_artifacts, got {local}",
+            )
 
     def test_build_refresh_plan_uses_nhl_existing_mirror_command_in_mirror_only_mode(self) -> None:
         from syndicate.features.shared import ops_refresh
