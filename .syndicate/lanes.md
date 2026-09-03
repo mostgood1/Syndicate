@@ -1217,7 +1217,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   not the second digit.
 - Blocked by: none
 
-### accuracy-autorun-rearm — OPEN, **UNOWNED — session 82fe0160 CLOSED ITSELF 2026-09-03 ~19:3xZ, saying so in commit `48c68546`: "checkpoint 82fe0160 part 3 (final): session closing with one lane armed, not finished". Absent from the session roster including archived. LEDGER CLAIMS RELEASED by lane `order-model-view` 2026-09-03 20:0xZ — `deploys.md`/`lanes.md`/`state.md` are a RECORD in this block, not a claim; the ENV work itself is untouched and still owed. A lane resuming it reclaims them by striking this note.** BLOCKED. TWO attempts 2026-09-03 both stood down; NO DEPLOY TAKEN either time, key still `false`, claim free. Handed to the 03:00 CT scheduled task, which is now DISABLED (stood down 2026-09-03 pm) -- nothing is armed.** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### accuracy-autorun-rearm — OPEN, **RECLAIMED 2026-09-03 ~20:2xZ by session 82fe0160, WHICH IS ALIVE — it wrapped up and then kept working; treat the UNOWNED note below as withdrawn. Prior note: session 82fe0160 was read as having CLOSED ITSELF 2026-09-03 ~19:3xZ, saying so in commit `48c68546`: "checkpoint 82fe0160 part 3 (final): session closing with one lane armed, not finished". Absent from the session roster including archived. LEDGER CLAIMS RELEASED by lane `order-model-view` 2026-09-03 20:0xZ — `deploys.md`/`lanes.md`/`state.md` are a RECORD in this block, not a claim; the ENV work itself is untouched and still owed. A lane resuming it reclaims them by striking this note.** BLOCKED. TWO attempts 2026-09-03 both stood down; NO DEPLOY TAKEN either time, key still `false`, claim free. Handed to the 03:00 CT scheduled task, which IS ARMED for 2026-09-04 03:00 CT (stood down then RE-ARMED 2026-09-03 pm, user decision).** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `#626`(h) runs in production for the first time WITHOUT killing the
   worker. ONE testable outcome: `[accuracy_summary] AUTORUN_DONE ... error=none`
   in refresh-worker logs, with the peak `memory_anon_mb` during that window
@@ -1318,6 +1318,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `#626`(h) has still never run in production. Re-arming is two
   `update_scheduled_task` calls setting `enabled: true` plus a future `fireAt`;
   the runbook and the four traps are unchanged in `deploys.md` 2026-09-03.
+- **RE-ARMED ~15:1x CT, SAME DAY `[user decision: "yes, re-arm them for 03:00"]` — the bullet above is SUPERSEDED, not deleted.** Both tasks are `enabled: true` again with fresh `fireAt`: `arm-accuracy-autorun-626h` **2026-09-04T08:00:00Z (03:00 CT)** and `verify-accuracy-autorun-626h` **2026-09-04T12:45:00Z (07:45 CT)**, both confirmed by re-reading the task list, not from the update's own return value. Descriptions restored to their real purpose. **So the overnight attempt IS on.** The stand-down bullet is kept because the reason it existed — my misreading of "stand down for tonight" as "cancel tonight's arm" when it meant "I am done for the night" — is the useful part: in this session "stand down" HAD meant "do not take the action" three times, so the phrase was genuinely ambiguous, and the recovery cost two task edits because disabling is reversible. **Prefer the reversible reading of an ambiguous instruction, then say plainly which one you took.**
 ### fleet-catchup-round3 — OPEN — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
 - Goal: all three services on `48c68546`. Unlike round 2, every service has REAL
   runtime content pending: `04187cdf` (order provenance —
@@ -1366,6 +1367,44 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   next web deploy rather than taking a claim to read telemetry.
 - Both changes mutation-checked: disabling `knows_player` fails 3 of 7 new
   tests, disabling the rate recompute fails 3 of 5.
+
+### web-oom-profiler-steady — OPEN — opened 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: take `#632`'s owed STEADY-STATE per-request attribution — arm
+  `SYNDICATE_REQUEST_MEMORY_PROFILE` on web and difference two LATE emissions,
+  because every existing emission sits within ~25 min of a boot and the
+  accumulator is cumulative from boot.
+- Files: `.syndicate/{lanes,state,log,deploys}.md`, `docs/ai_context/todo.md`
+  (`#632`), **`syndicate/blueprints/ops.py`** and
+  **`tests/test_artifact_merge_child_cap.py`** [claimed 2026-09-03T20:1xZ, user
+  directive "cap the merge children"]. Production CONFIG change: the env key on
+  web plus the deploy that makes it reach the process.
+- **CAP SCOPE.** `_spawn_artifact_merge` has no ceiling; measured peak 19
+  concurrent children / 334.6 MB. Refusal is safe to send: 503 is NOT in
+  `_PUBLISH_STREAM_UNSUPPORTED_STATUSES` `{400,404,405,415}`, so it does not
+  trigger the envelope fallback (which is HEAVIER on the parent), and
+  `_LAST_PUBLISHED_CHECKSUM` is set only on success, so the publisher retries
+  next sweep instead of suppressing itself. Cost of refusing is near zero:
+  **96 of 100 sampled merges added 0 rows (26 rows total across 100)**.
+- Hypothesis: at steady state the SOLO request path does not account for web's
+  anon growth; `#632`'s 2% and 76-83% figures were both warm-up-contaminated.
+- Falsification test: a late-window difference in which `SUM(route total_mb)`
+  tracks the anon delta over the same interval.
+- Verification: two emissions >75 min after boot, differenced, reported beside
+  the anon delta for that interval.
+- Blocked by: none.
+- **`[2026-09-03]` SCOPE DEFECT FOUND ON ARMING — the instrument cannot deliver
+  its own guarantee at `WEB_CONCURRENCY=2`.** `inflight` is module state (per
+  WORKER); `_anon_mb()` reads the CONTAINER cgroup, and live config is 2 workers
+  x 4 threads. Proof this is not theoretical: a CUMULATIVE sum FELL —
+  `/api/ops/artifacts/publish` 211.59 -> 167.13 MB while its own `solo_n` rose
+  405 -> 502 in the SAME process. Any number this run yields is an upper bound
+  and must be reported as one.
+- **SECOND MECHANISM, invisible to BOTH falsified hypotheses:** uncapped merge
+  subprocesses spawned per publish from a request handler (`ops.py:1774`).
+  Bursts to 46 completions / 42 s / 414.8 MB of input; >=3 concurrent observed
+  live. Recorded in `#632`; peak concurrency still sampling.
+- Deploy: web `142e5e1a` live 2026-09-03T20:00Z; claim held; measurement owed in
+  `deploys.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
