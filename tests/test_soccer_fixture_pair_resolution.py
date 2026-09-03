@@ -102,14 +102,53 @@ def test_the_join_matches_a_fixture_the_global_map_cannot(joined):
     assert _teams_match(row, {"home": "fcb", "away": "stu"}, "soccer") is True
 
 
-def test_the_join_refuses_when_the_sides_are_swapped(joined):
-    """Home/away order is part of the identity, not a detail.
+def test_a_swapped_soccer_fixture_is_the_SAME_GAME_and_still_matches(joined):
+    """`_teams_match` answers "same GAME"; SIDE is decided downstream by NAME.
 
-    Matching a swapped fixture would pair our row with the opposite side of the
-    same game -- the failure `_side_to_kalshi` refuses for the same reason.
+    THIS ASSERTION WAS INVERTED, 2026-09-03. It used to require `False` here,
+    on the reasoning that "matching a swapped fixture would pair our row with
+    the opposite side of the same game". That contract changed when the soccer
+    PAIR resolver landed (2026-08-27/29), and the change is deliberate:
+    `_teams_match` compares `board_pair == slug_pair` as SETS and returns
+    immediately, with the comment "a wrong-GAME check must not be entangled
+    with a wrong-SIDE one". The venue's slug order is not a reliable home/away
+    signal, so requiring it here refused real fixtures -- that fallback exists
+    because 119 h2h rows were being dropped, and it rescued 43 of 93.
+
+    WHY THIS IS NOT A WRONG-SIDE BET, traced rather than assumed:
+    `_probability_for_side` (polymarket_board_join.py:2988) is what turns a
+    matched market into a price, and it resolves team outcomes THROUGH
+    `team_aliases` by name, never positionally. Its own docstring: "None is the
+    important return ... assigning a side positionally is a bet on the wrong
+    team half the time, at a price that looks confident." It also re-verifies
+    the subject rather than trusting the candidate filter, so a caller that
+    skipped the check cannot obtain a confident price. A swapped match yields a
+    row whose side must still be NAMED, or refused.
+
+    THE CONTRACT IS SPLIT BY SPORT, which is the part worth pinning:
+    `_teams_match` ends (line 2985) with a genuinely ordered check --
+    `pair[0] == board_home and pair[1] == board_away` -- but for any soccer
+    fixture the pair resolver can name, the unordered return fires first and
+    that line is unreachable. So ORDER IS ENFORCED FOR OTHER SPORTS AND NOT FOR
+    SOCCER, which the function's name and its "Both clubs, or no match"
+    docstring do not convey. `test_the_fallback_is_soccer_only` below pins the
+    other half.
     """
     row = {"home": "VfB Stuttgart", "away": "Bayern Munich"}
-    assert _teams_match(row, {"home": "fcb", "away": "stu"}, "soccer") is False
+    assert _teams_match(row, {"home": "fcb", "away": "stu"}, "soccer") is True
+
+
+def test_the_ordered_check_still_governs_a_NON_soccer_swap(joined):
+    """The other half of the split contract, so the asymmetry is pinned on
+    BOTH sides rather than only where it was discovered.
+
+    A non-soccer sport never reaches the pair resolver at all (see
+    `test_the_fallback_is_soccer_only`), so a swap there stays unmatched --
+    for that reason rather than because of an order check, and either way the
+    behaviour a caller depends on is the same.
+    """
+    row = {"home": "VfB Stuttgart", "away": "Bayern Munich"}
+    assert _teams_match(row, {"home": "fcb", "away": "stu"}, "mlb") is False
 
 
 def test_the_fallback_is_soccer_only(joined):
