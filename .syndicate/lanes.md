@@ -1649,6 +1649,44 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Claims: NONE held.
 - Narrative: `log/2026-09-02.md`, `todo.md #639`.
 
+### soccer-anchor-surrogate-heldout — CLOSED 2026-09-02 — opened 2026-09-02 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **GOAL MET. The surrogate PASSES held-out: neither pre-registered kill condition fired. `b_train=3.6955` frozen on 4 leagues, scored on 8 fixtures from 4 OTHERS (3 goals-rated; targets 0.364-0.838 vs a training range of 0.14-0.65). Surrogate **0.0144** vs the 500-sim solver's **0.0225**; slope bias only +2.9%. **BUT the in-sample '2x better' does NOT replicate** — 1.3x once a CLAMP ARTIFACT is removed, sign test p=0.289/0.453 NOT significant, and the reference's own uncertainty (0.0187) EXCEEDS the surrogate error being claimed. **Defensible claim: EQUAL ACCURACY AT ZERO COST**, which is enough to adopt it as the cost lever (500 sims/fixture → 0) and nothing more. Does not change arming, which was declined on edge and evidence, not cost.**
+- Goal: `todo.md #622` OWED item (2). Decide whether the pooled-slope surrogate
+  (`shift = (logit(target) - logit(p_base)) / b`, ZERO extra simulations)
+  survives a HELD-OUT test. Its in-sample 0.0221 vs the 500-sim solver's 0.0497
+  cannot be shipped on — standing rule, 2 failures on record.
+- Files: `.syndicate/{lanes,state,log}.md`, `docs/ai_context/todo.md` (`#622`).
+  Harness lives in the session scratchpad; NO repo code is touched, this lane is
+  measurement only.
+- Split: TRAIN = epl, la_liga, serie_a, bundesliga (8 fixtures, M2) -> `b_train`
+  = 3.6955, FROZEN. TEST = ligue_1 + eredivisie, primeira_liga, championship —
+  3 of 4 are GOALS-rated, a different rating construction, and the test targets
+  span 0.364-0.838 against a training range of 0.14-0.65, so it is an
+  extrapolation test as well as a held-out one. Asserted disjoint in code.
+- Hypothesis: the slope is stable enough (train cv 0.094) that one frozen
+  `b_train` beats a 500-simulation bisection on fixtures it never saw.
+- Falsification test: if held-out surrogate error >= the solver's on the same
+  fixtures, the in-sample result was overfit and the surrogate is dead as a cost
+  lever. A slope BIAS on the test set (mean b_test far from b_train) falsifies
+  the pooled form even if the error looks acceptable.
+- Verification: mean |err| vs a per-fixture logistic reference, surrogate vs
+  500-sim solver, on the held-out fixtures only, with the reference's own
+  uncertainty (fitted-vs-monotone gap) reported beside it.
+- `p_base` is drawn at 400 sims from a seed block DISJOINT from the reference
+  grid — taking it from the reference's shift=0 point would share noise with the
+  truth and flatter the surrogate.
+- DOES NOT arm anchoring. Weight stays 0.0; arming was proposed and DECLINED
+  2026-09-02 by user decision, recorded on `#622`.
+- Verification RAN, 89,600 simulations, 2,231 s on 10 cores. Per-fixture table
+  and both corrections in `todo.md #622` and `log/2026-09-02.md`.
+- **Two things I had to correct in my own result before reporting it:** (a) the
+  clamp artifact — `AZ Alkmaar v Willem II` has BOTH truth and surrogate pinned
+  at `+shift_bound`, so its 0.0000 error is saturation, and it was the largest
+  single contributor in the surrogate's favour; (b) the reference is not precise
+  enough to resolve the residual difference, so "beats the solver" is not
+  established at n=8 even though "does not lose to it" is.
+- CLAIMS: none held. Measurement only; no repo code was touched.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

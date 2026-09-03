@@ -1972,9 +1972,37 @@ path (a) is FALSIFIED, and two name joins were losing most of the mechanism.**
   artifact~~ **DONE + DEPLOYED + VERIFIED 2026-09-02** (refresh-worker
   `99c3731f` live 22:54:26Z; three production artifacts carry `anchor`, 0
   missing; `state=disabled`, `by_stage.fuzzy` 2/2/1 reproducing the pre-fix
-  prediction exactly). **(2) HELD-OUT surrogate validation — fit `b_pooled` on
-  one set of leagues, score on another; the in-sample 0.0221-vs-0.0497 is a
-  reason to run it, not a result. (3) Multi-week anchored-vs-base on PROPS
+  prediction exactly). ~~**(2) HELD-OUT surrogate validation**~~ **RUN 2026-09-02 — IT PASSES,
+  BUT NOT FOR THE REASON THE IN-SAMPLE NUMBER SUGGESTED.** `b_train = 3.6955`
+  frozen on epl/la_liga/serie_a/bundesliga (8 fixtures); scored on 8 fixtures
+  from ligue_1/eredivisie/primeira_liga/championship — **3 of 4 GOALS-rated**
+  (a different rating construction) and targets spanning **0.364-0.838 against
+  a training range of 0.14-0.65**, so it extrapolates as well as holds out.
+  89,600 simulations.
+
+      held-out surrogate  mean |err| 0.0144   (0.0164 excluding a clamp artifact)
+      500-sim solver      mean |err| 0.0225   (0.0212 excluding it)
+      slope bias  b_test 3.803 vs b_train 3.696  -> +0.107 (+2.9%)
+
+  **BOTH pre-registered kill conditions failed to fire:** held-out error did not
+  exceed the solver's, and the slope did not drift. So the pooled form
+  generalises and the surrogate is a LIVE cost lever — **500 simulations per
+  fixture -> 0**, using a `p_base` the artifact already publishes.
+
+  **BUT THE "TWICE AS ACCURATE" CLAIM DOES NOT SURVIVE, and it must not be
+  repeated.** In-sample it was 0.0221 vs 0.0497 (2.2x); held out it is 1.6x, and
+  1.3x once a CLAMP ARTIFACT is removed — `AZ Alkmaar v Willem II` has BOTH truth
+  and surrogate pinned at the +0.30 `shift_bound`, so its 0.0000 error is
+  saturation, not accuracy, and it was the single largest contributor in the
+  surrogate's favour. Exact two-sided **sign test p = 0.289 (n=8), 0.453 (n=7)
+  — NOT SIGNIFICANT** either way. And the reference's own uncertainty
+  (fitted-vs-monotone gap, mean **0.0187**) EXCEEDS the surrogate error being
+  claimed, so this instrument cannot resolve a difference that small.
+
+  **The defensible statement is therefore: EQUAL ACCURACY AT ZERO COST, not
+  better accuracy.** That is enough to adopt it as the cost lever and it
+  collapses the anchor's 83.2 min/4h to ~0 — but it changes nothing about
+  arming, which was declined on EDGE and EVIDENCE, not on cost. (3) Multi-week anchored-vs-base on PROPS
   against OUTCOMES, not h2h vs market.** (2) and (3) are now the gate on any
   future arming, and both are cheaper than they were because the anchor
   publishes its own state.

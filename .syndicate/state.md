@@ -393,6 +393,21 @@ evidence: `.syndicate/findings_2026-09-02_soccer_anchor_cost.md`.
   returns 0 log matches (incl. `player projections`, printed on every success)
   while parent tokens return normally. The audit must become a PUBLISHED
   ARTIFACT FIELD, not a log line.
+- **THE COST QUESTION IS CLOSED: the surrogate SURVIVES HELD-OUT VALIDATION
+  `[2026-09-02, 89,600 sims]`.** `b_train=3.6955` frozen on
+  epl/la_liga/serie_a/bundesliga, scored on 8 fixtures from
+  ligue_1/eredivisie/primeira_liga/championship (3 goals-rated; targets
+  0.364-0.838 vs training 0.14-0.65). Surrogate mean |err| **0.0144** vs the
+  500-simulation solver's **0.0225**; slope bias **+2.9%**. Neither
+  pre-registered kill condition fired, so
+  `shift = (logit(target) − logit(p_base)) / b` is a LIVE cost lever taking the
+  anchor from **500 simulations per fixture to 0** — `p_base` is already
+  published as `win_probability.home` at `simulations: 400`.
+  **DO NOT REPEAT THE "TWICE AS ACCURATE" LINE.** Held out it is 1.3x once the
+  `AZ Alkmaar v Willem II` CLAMP ARTIFACT is removed (both truth and surrogate
+  pinned at `+shift_bound`), the sign test is p=0.289/0.453 (NOT significant),
+  and the reference's own uncertainty (0.0187) exceeds the surrogate error being
+  claimed. **The defensible claim is EQUAL ACCURACY AT ZERO COST.**
 - **WHY ARMING IT WOULD CHANGE LITTLE:** the anchor moves h2h **3.58 pp** and
   props **2.9–5.1% relative**, while the staked soccer surface is **99 board
   rows / 58 fixtures, 74% h2h, ZERO player props**. Largest effect on the market
