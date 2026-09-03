@@ -19547,3 +19547,72 @@ own query echo, a paginated list read as a total, and now this.
 **NEXT REAL WORK, and do NOT re-arm before it:** measure what inside
 `build_accuracy_summary` allocates ~2 GB. `intelligence_evaluation.py:2657` is
 the frame that was on the stack in all three dumps.
+## 2026-09-03 ~17:0xZ — `#626`(h) RE-ARM ATTEMPTED AND STOOD DOWN. **NO DEPLOY TAKEN; production unchanged.** `[lane accuracy-autorun-rearm]`
+
+**Outcome: nothing shipped.** refresh-worker still live `c4ce0502`;
+`ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN` still `false`; claim released;
+no drain set. The running process never saw a changed value at any point.
+
+**verify:** `pending_deploys.py` reports `refresh-worker live=c4ce0502`, and the
+Render env-vars API returns `'false'` for the key. Both read AFTER stand-down.
+
+**WHY IT DID NOT SHIP — four findings worth not re-deriving:**
+
+1. **A same-SHA redeploy is REFUSED.** The plan was env-injection only, targeting
+   the already-live `c4ce0502`. Preflight: `HOLD: c4ce0502 is already contained
+   in live c4ce0502 -- the deploy is redundant`. **An env-only change must
+   therefore target a NEWER commit**, which means shipping whatever else has
+   landed — here `f05284f9` (main tip) carrying 6-7 other lanes' commits (`#642`
+   prediction_ledger/portfolio, `#631` + soccer measurement harnesses). Normal
+   drift, but it is NOT a no-op deploy and must not be described as one.
+2. **Windows are scarce during a live slate.** Preflight was polled continuously
+   ~11:24-12:05 CT and returned CLEAR **exactly once, for under 25 seconds**. The
+   worker cycles board builds every ~2 min with odds refreshes, soccer artifact
+   builds and MLB sims filling the gaps.
+3. **`check_deploy_safety` is COARSER than preflight — poll preflight.** What the
+   safety check called "board build only" preflight showed as **3 killable jobs**
+   including a soccer artifact build. The safety check reports categories;
+   preflight enumerates processes, and it is what the guard gates on.
+4. **A stopped background poller kept running and clobbered shared state.**
+   `TaskStop` ended the task wrapper; the child loop kept issuing preflights and
+   overwrote `.syndicate/deploy/preflight/refresh-worker.json` 24s AFTER the
+   CLEAR with a stale `c4ce0502` HOLD — which is what blocked the deploy at the
+   one moment it could have gone. **Kill children explicitly.**
+
+**THE ONE UNSAFE MOMENT, and how it was closed.** The key was set `true` at
+11:58:34 CT on a CLEAR preflight, the deploy was then blocked (finding 4), and by
+the time preflight was re-run an MLB sim had started. That left an ARMED KEY WITH
+NO DEPLOY for ~2 minutes — harmless to the running process, but a landmine: any
+other session's unrelated refresh-worker deploy would have injected it and armed
+the autorun unobserved. **Reverted to `false` immediately.** The deploy claim was
+held throughout, which is the only reason no peer could have hit it.
+
+**RUNBOOK for the overnight attempt** (worker should be near-idle with no slates):
+
+    scripts/deploy_claim.py     acquire --service refresh-worker --holder <lane>
+    scripts/deploy_preflight.py --service refresh-worker --holder <lane> \
+                                --target-commit <main tip>
+    # ONLY if CLEAR:
+    scripts/render_env_set.py   --service refresh-worker \
+        --key ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN --value true
+    scripts/render_deploy.py    --service refresh-worker --commit <main tip>
+    scripts/deploy_claim.py     release --service refresh-worker --token <TOKEN>
+
+Two syntax traps met today: `release` takes `--token`, NOT `--holder`; and the
+deploy-guard pattern-matches the COMMAND STRING, so even a shell command that
+merely CONTAINS the deploy invocation (a heredoc writing this runbook) is
+blocked — write such files with an editor, not a shell heredoc.
+
+**IT FIRES ON THE NEXT TICK, not at 07:00.** Gate is `hour >= 7 CT` AND
+`last_run_date < today`; the last claim was 2026-09-02, so arming any time after
+07:00 CT runs it immediately. **Arming BEFORE 07:00 CT is better** — it then
+waits for the hour and runs on a quiet worker, observed.
+
+**EXPECT** `PREVIOUS_RUN_NEVER_COMPLETED ... Not retrying today` on the first
+run. The code does NOT return after printing it; the run proceeds.
+
+**WATCH:** `LEDGER_CHUNKS_ACCEPTED ... budget=2000000000` (bytes + dates),
+`[accuracy_summary] AUTORUN_DONE sports=8 ... error=none`, and peak
+`memory_anon_mb` against 4,096 with the 1,877 MiB baseline cycle peak. **If it
+OOMs, set the key back to `false`** — `#256`'s claim-before-work caps the damage
+at one run per day, not a loop.

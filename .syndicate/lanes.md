@@ -2147,7 +2147,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   See `learnings.md` 09-03 (instrument the join) and `log/2026-09-03.md`.
 - Blocked by: none.
 
-### accuracy-autorun-rearm — OPEN — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### accuracy-autorun-rearm — OPEN, **BLOCKED: stood down 2026-09-03, no deploy taken, key still `false`. Retry OVERNIGHT before 07:00 CT** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `#626`(h) runs in production for the first time WITHOUT killing the
   worker. ONE testable outcome: `[accuracy_summary] AUTORUN_DONE ... error=none`
   in refresh-worker logs, with the peak `memory_anon_mb` during that window
@@ -2184,7 +2184,20 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   because 09-02's death left `state: "started"`. **The code does NOT return
   after printing it** — it proceeds to claim and run. Do not read that line as
   "the run was skipped".
-- Blocked by: none once `check_deploy_safety` is CLEAR. Polling; an MLB sim and
+- **STOOD DOWN 2026-09-03 ~12:05 CT `[user decision]`. NOTHING SHIPPED.**
+  refresh-worker still `c4ce0502`, key still `false`, claim RELEASED, no drain.
+  Full attempt record + RUNBOOK: `deploys.md` 2026-09-03.
+  Four findings: (1) a same-SHA redeploy is REFUSED as redundant, so an
+  env-only change must target a NEWER commit and therefore ships other lanes'
+  work; (2) preflight was CLEAR exactly ONCE in ~40 min of polling, for <25s;
+  (3) `check_deploy_safety` is coarser than preflight and disagreed — poll
+  preflight; (4) a `TaskStop`-ed poller kept running and overwrote the
+  preflight record 24s after the CLEAR, which is what blocked the one window.
+  **ONE UNSAFE MOMENT, closed:** key was `true` with no deploy for ~2 min;
+  reverted. The held claim is why no peer could inject it.
+- **BLOCKED ON: a quiet worker.** Retry overnight and ARM BEFORE 07:00 CT so it
+  waits for the hour and runs observed, rather than firing on the next tick.
+- Blocked by: a quiet refresh-worker (no MLB sim / odds refresh / soccer build in flight). Overnight.
   a board build were in flight at 10:20 CT.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
