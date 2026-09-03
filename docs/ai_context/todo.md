@@ -84,7 +84,7 @@ production copy. See the transport note in `#625`(2).
 
 ---
 
-### `#641` — **THE "TRANSPORT GAP" FOR RECONCILIATION OUTPUTS WAS A MISFILED PATTERN, not a missing mechanism** — lane `worker-artifact-transport`, 2026-09-03 — **FIXED, deploys OWED**
+### `#641` — **FIXED, DEPLOYED AND VERIFIED 2026-09-03 06:03:12Z — a family unreachable for this system's whole life is now readable** — was: the reconciliation "transport gap" was a misfiled pattern — lane `worker-artifact-transport` — **CLOSED, with one residual named**
 
 `#625`(2) and `#639` both recorded that `mlb_source/reconciliation/*` could not
 be got off refresh-worker, and named it as blocking two things. **There was no
@@ -109,11 +109,19 @@ the whole 12-date window is **~663 KB, published ONCE each** (the sweep only
 sends changed files) — against a `book_grid` of 12.7 MB/day that already
 publishes. Affordable even with both services at 91-97%.
 
-**OWED: deploys to web AND refresh-worker** — web to accept the publish (its
-endpoint gates on `is_hot_artifact_relative_path`), refresh-worker to sweep it.
-Until then the family is still unreachable. **Verification:** `?path=` on a
-`props_actuals` CSV returns CONTENT rather than `count: 0`, which also makes
-`#639`'s residual answerable — whether the seven June files ever held rows.
+**DEPLOYED AND VERIFIED.** web `c4ce0502` 05:32Z then refresh-worker 05:36Z
+(web first — its publish endpoint gates on the list). Baseline 0 files; at
+**06:03:12Z** `props_actuals_2026-09-02.csv` (8,162 B) and `_2026-09-03.csv`
+(42 B) appeared, and the first pulled back as **133 lines = header + 132 graded
+rows**. Read on BYTES, not a status code.
+
+**RESIDUAL, predicted in advance and confirmed:** only dates that WRITE ever
+cross. The seven June dates refuse (`input_absent`, `#639`), never become
+"changed", and the watermark sweep never sends them. **So `#639`'s question —
+did those files ever hold rows, was anything destroyed — remains unanswerable.**
+The only mechanism that would answer it is a one-off republish of the whole hot
+set, which costs a full sweep against services at 91-97%. Not justified for a
+retrospective question; recorded rather than pursued.
 
 ---
 

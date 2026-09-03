@@ -19155,3 +19155,33 @@ Baseline the floor was raised against (`BUILD_SPAN_ENTER stage=pull_hot_artifact
 med=3,854.1 s, min=1,331.2 s. **A clip rate of 0 over a real window is a
 LEGITIMATE RESULT** and means the floor is the wrong lever — the queue coalesces
 — not that the measurement failed.
+
+## 2026-09-03 05:32Z + 05:36Z — web AND refresh-worker `c4ce0502` — `#641`, reconciliation moved to the WRITE list — lane `worker-artifact-transport`
+
+Both behind claim + preflight CLEAR, both confirmed cumulative against their
+live SHAs (`5885c339`, `33b181ee`), both claims released. **Web FIRST on
+purpose:** its publish endpoint gates on `is_hot_artifact_relative_path`, so
+deploying the worker first would have had every publish refused 403.
+
+**verify: PASS, read on BYTES rather than a status code.** Baseline right after
+the deploys was **0 files**; the sweep is watermark-driven so nothing crosses
+until a file is written. At **06:03:12Z**, after 22 minutes and seven readings
+of zero:
+
+    mlb_source/reconciliation/props_actuals_2026-09-02.csv   8,162 B
+    mlb_source/reconciliation/props_actuals_2026-09-03.csv      42 B
+
+Pulled the first one back in full: **8,154 bytes, 133 lines = header + 132
+graded rows**, e.g. `mlb,Pitcher Strikeouts,Jacob Misiorowski,...,5.0,7.5`.
+**A family that was unreachable from outside for the whole of this system's
+life is now readable.** The 42-byte file is today's, header-only — the
+`#639` "write an empty result when there is nothing to destroy" branch,
+behaving correctly.
+
+**THE PREDICTED LIMIT HELD, and it was stated BEFORE the reading:** only dates
+that WRITE ever cross. The seven June dates now refuse (`input_absent`, `#639`),
+so they never become "changed" and the watermark sweep never sends them. **So
+`#639`'s residual — whether those files ever held rows, i.e. whether anything
+was destroyed before the fix — is STILL unanswerable.** The only thing that
+would answer it is a one-off republish of the whole hot set, which costs a full
+sweep against services at 91-97%; not justified for a retrospective question.

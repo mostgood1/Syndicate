@@ -1906,12 +1906,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   reasoning error. Nothing new was built.
 - The saturation constraint still held and shaped the answer: ~663 KB one-time
   is affordable on services at 91-97% where a standing flow would not be.
-- **OWED: deploys to BOTH web and refresh-worker** — web to accept the publish
-  (its endpoint gates on `is_hot_artifact_relative_path`) and refresh-worker to
-  sweep it. Until then the family is still unreachable.
-- Verification when it ships: `?path=` on a `props_actuals` CSV returns CONTENT
-  (not `count: 0`), and `#639`'s residual becomes answerable — whether the seven
-  June files ever held rows.
+- **DEPLOYED AND VERIFIED 2026-09-03.** web `c4ce0502` 05:32Z, refresh-worker
+  `c4ce0502` 05:36Z (web FIRST, because its publish endpoint gates on the
+  list). **PASS on bytes:** 0 files at baseline; at 06:03:12Z
+  `props_actuals_2026-09-02.csv` (8,162 B) and `_2026-09-03.csv` (42 B, today's,
+  header-only) appeared, and the first pulled back as **133 lines = header +
+  132 graded rows**. A family unreachable for this system's whole life is now
+  readable. Full measurement: `deploys.md` 2026-09-03 05:32Z.
+- **THE PREDICTED LIMIT HELD, stated before the reading:** only dates that WRITE
+  cross. The seven June dates refuse (`input_absent`, `#639`) so they never
+  become "changed" and the sweep never sends them — **`#639`'s residual stays
+  unanswerable**, and the only fix (a full-sweep republish) is not justified
+  against services at 91-97%.
 - Claims: NONE held.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
