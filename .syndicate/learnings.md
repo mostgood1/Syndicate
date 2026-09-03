@@ -4873,3 +4873,31 @@ back in one queue cycle, not in minutes.
   finds it.
 - **Cost:** one commit on `main` with a mangled subject. Content intact,
   findable by body, and the item is fully recorded in `todo.md` and `lanes.md`.
+
+## 2026-09-02 FORBIDDEN: multiplying a measured unit cost by a population from a DIFFERENT query. State the scope of both, or the product is invented. `[lane soccer-anchor-wiring, corrected by soccer-anchor-cost]`
+
+- **What we believed:** soccer market-anchoring costs 40.9 s/fixture, and today's
+  slate has 84 priced events, so a cycle costs 57 min and ten leagues ~136 min
+  — too much to run, which supersedes the mechanism-vs-estimator re-fit as the
+  reason the weight stays 0.0.
+- **What was actually true:** the 40.9 s was right. The 84 was not a per-cycle
+  workload — it counts priced EVENTS in `game_odds_current.csv`, a forward book
+  running to **d+13**, while the consumer `build_artifacts` calls
+  `_fetch_fixtures(league, iso_date)` for **one date**. Production-measured, the
+  anchor costs **83.2 min per 4h interval** with its joins working: 76% of the
+  interval, alongside a build already at 98.2 min, memory untouched. **It fits.**
+- **How we found out:** a delegated session read the CONSUMER instead of the
+  feed, and measured against `SOCCER_UNIT_*` telemetry on the live worker rather
+  than extrapolating. Nothing in my own numbers could have revealed it — both
+  factors were real measurements, and the product had no unit that disagreed.
+- **The rule going forward:** **a unit cost becomes a workload only when
+  multiplied by the population the CONSUMER iterates.** Before multiplying, name
+  the scope of each factor — its date window, its league set, its filter — and
+  assert they are the same scope. A feed's row count is almost never the
+  consumer's loop count: feeds are forward-looking and shared, consumers are
+  usually single-date. Sibling of `a rate, not a count`, with the denominator
+  drawn from the wrong table entirely.
+- **Cost:** a validated edge asset (−40..−51% MAE vs a held-out consensus) was
+  recorded as un-runnable for a day, and two real defects in the same feed — name
+  joins losing 66 of 136 fixtures and 76 of 214 team slots — went unnoticed
+  behind the cost story. The false blocker HID the true ones.

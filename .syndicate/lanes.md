@@ -1473,6 +1473,11 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   it. Anchoring is validated (-40..-51% MAE, non-circular, held-out) and OFF
   because ONE fixture costs 40.9s of solver time; 84 fixtures = 57 min/cycle,
   200 = 136 min, on a refresh-worker that already OOM-killed once today.
+  **PREMISE SUPERSEDED — by this lane's own finding (see header): the 84/200 are
+  priced EVENTS in a forward book to d+13, not a single-date fixture list, and
+  `build_artifacts` is SINGLE-DATE. Measured cost is 83.2 min per 4h interval
+  with the joins working — 76% of the interval, memory untouched. IT FITS; the
+  weight stays 0.0 on the re-fit and on path (a) being falsified, not on cost.**
 - Files: scripts/measure_soccer_anchor_cost.py (NEW),
   scripts/validate_soccer_vs_market.py (released by `soccer-model-dispersion`),
   .syndicate/{lanes,state,deploys}.md.
