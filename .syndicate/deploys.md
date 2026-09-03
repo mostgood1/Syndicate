@@ -19102,3 +19102,56 @@ wanted by another lane throughout.
 write a non-empty `live_game_state.lens_fingerprint.sha256_12`. **Its ABSENCE on
 a fresh `generated_at` means the field is inert, NOT that the lens was empty**
 — the fingerprint is emitted for an empty lens too, by test.
+
+
+## 2026-09-03 04:15–04:21Z — refresh-worker `33b181ee` — the board-window floor is now OBSERVABLE — lane `board-window-floor-raise`
+
+`dep-dacf8ogae00c73f47il0`, live 04:20:45Z. Ships `#631`'s decline telemetry on
+the board-window queue path, which had emitted NOTHING.
+
+### verify: THE TELEMETRY IS EMITTING, and one reading proves three things
+
+    04:21:22Z  BOARD_WINDOW_QUEUED date=2026-09-02 throttled=no  elapsed_s=none floor_s=1800
+    04:21:28Z  BOARD_WINDOW_QUEUED date=2026-09-03 throttled=yes elapsed_s=none floor_s=1800
+
+`floor_s=1800` in the SERVED line is the strong part. It proves (1) the env set
+reached the process, (2) the code path actually executes, and (3) the value the
+throttle is using is the new one — not merely what the API reports. Presence is
+not reachability; this is the reachability reading.
+
+`elapsed_s=none` on both is correct for the first pass after a restart: nothing
+has a prior queue stamp yet. **GATED=0 / ADMITTED=2 is NOT a clip rate** — it is
+one tick on a cold process, and nothing COULD be gated. Reported here only so the
+number is not mistaken later for a measurement.
+
+### WHAT ELSE SHIPPED, named because a deploy of `main` is never one change
+
+35 commits since `f84eb21b`, including FIVE other sessions' runtime code:
+`pipeline/kalshi_odds_refresh.py` (+97),
+`syndicate/features/shared/board_enrichment.py` (+74, NEW),
+`artifact_publisher.py` (+40), `kalshi_client.py` (+15),
+`syndicate/features/wnba/cards.py` (+36). Unavoidable under
+"deploy a commit that is on `origin/main`" — any such commit carries everything
+before it. Rollback target if the worker misbehaves: `f84eb21b`.
+
+### Nothing was killed
+
+    04:11:31Z jobs=2 HOLD ... 04:15:11Z jobs=0 CLEAR  <- deployed here
+
+An MLB daily sim held the window for ~20 minutes beforehand and was allowed to
+finish. The claim was ALSO held by `mlens-snapshot-dating` for part of that; it
+was NOT forced — "no PID recorded" means UNKNOWN, not gone — and the waiter was
+built to accept EITHER outcome, since that session's own deploy would have
+carried this commit too.
+
+### verify: STILL OWED — the clip rate
+
+Now ANSWERABLE for the first time, which it was not before this deploy:
+
+    clip rate = GATED / (GATED + ADMITTED)   for a non-today date, over hours
+
+Baseline the floor was raised against (`BUILD_SPAN_ENTER stage=pull_hot_artifacts`,
+13.6 h to 2026-09-03T02:16Z): today n=46 med=940.8 s; non-today n=5
+med=3,854.1 s, min=1,331.2 s. **A clip rate of 0 over a real window is a
+LEGITIMATE RESULT** and means the floor is the wrong lever — the queue coalesces
+— not that the measurement failed.
