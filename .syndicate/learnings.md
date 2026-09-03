@@ -5694,3 +5694,28 @@ traced the failure mode instead of assuming it: the store raises a dedicated
 `run_execution` → `place_order` → `record_order` → `_persist`. So the worst case
 was a loud tick failure, never silent order loss — which would have changed the
 urgency completely had I assumed the opposite.
+
+## 2026-09-03 FORBIDDEN: carrying an obligation as "unverified" when a LATER change made the signal UNREACHABLE. In a log the two are identical; in meaning they are opposites.
+
+- **I said it several times, including in a checkpoint:** refresh-worker's `#638`
+  trim "has never executed in production" and "verifies itself the next time that
+  service is first past the budget". The first half was true. The second was
+  impossible by then and I kept repeating it.
+- **The mechanism.** `#638`'s trim fires by catching `KeyValuePayloadTooLarge`,
+  which ONLY the keyvalue backend raises. `#637` then moved that artifact class
+  to disk, which has no ceiling — so the write can never be refused and the trim
+  can never run. **My own second fix retired my first one and I did not notice
+  for a day.**
+- **What made it readable was a CONTROL, not the silence.** live-odds-worker
+  trimmed TWICE before the move and zero times after. Same silence on both
+  services, but one of them is known to have worked — which converts "no signal"
+  from ambiguous into "the ceiling is gone".
+- **The rule.** When a fix's trigger is an ERROR CONDITION, ask after every
+  later change whether that condition can still arise. If it cannot, the status
+  is **UNREACHABLE / VOID**, never "owed" — an unverified fix might still be
+  broken, an unreachable one cannot run, and only the first is worth a future
+  session's time. Say which, and name the change that closed the path.
+- **Corollary:** dormant is not dead. `#638` stays — proven on the other service,
+  unit-tested, and the safety net if the class returns to keyvalue. Retiring the
+  OBLIGATION is not retiring the CODE.
+- *(full account: `deploys.md` 2026-09-03 correction entry)*

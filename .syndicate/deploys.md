@@ -19755,3 +19755,42 @@ the next. Kill children, then verify zero remain, before starting another poller
 **Nothing was armed at any point in this attempt.** The key-set step is gated on
 a CLEAR preflight that never came, so unlike the first attempt there was no
 armed-key-without-deploy window.
+
+---
+
+## 2026-09-03 — **CORRECTION: refresh-worker's `#638` trim is UNREACHABLE, not unverified. The obligation is VOID, not pending.**
+
+The 2026-09-02 19:56Z entry above says refresh-worker's trim path "has never
+executed in production" and "verifies itself the next time that service is
+first to push a file past the budget". **The first half is true and the second
+is wrong** — that condition can no longer occur, and I repeated it several
+times including in a checkpoint.
+
+**WHY.** The trim fires by catching `KeyValuePayloadTooLarge`, raised ONLY by
+the keyvalue backend. `#637` (`e4a471c0`) moved `venue_odds` to per-service
+disk. Disk has no 8 MB ceiling, so the write cannot be refused, so the trim
+cannot be reached. **`#637` made `#638` dormant for the only artifact class that
+ever hit it.**
+
+**MEASURED**, since refresh-worker's `e4a471c0` go-live 2026-09-02T19:26:44Z:
+
+| service | `TRIMMED_TO_FIT` | `KEYVALUE_WRITE_REJECTED` (venue_odds) |
+|---|---|---|
+| refresh-worker | **0** | **0** |
+| live-odds-worker | **0** | **0** |
+
+live-odds-worker is the control that makes this readable: it trimmed **twice**
+before the move (2026-09-02 17:11:43Z and 17:13:47Z) and zero times after. The
+silence is the ceiling being gone, not a writer that stopped.
+
+**UNREACHABLE IS NOT UNVERIFIED.** They are indistinguishable in a log and mean
+opposite things: an unverified fix might still be broken, an unreachable one
+cannot run. Left as "owed", this sends the next session hunting a signal that
+can never appear — the same trap that got the hydration census task disabled
+rather than left armed.
+
+**`#638` IS STILL CORRECT AND STAYS.** The mechanism is proven on
+live-odds-worker (`markets_dropped=0`, `status=ok` book, `appended=8749`), it is
+unit-tested in both directions, and it is the safety net if `venue_odds` ever
+returns to keyvalue. It is dormant code, not dead code — and not an open
+obligation.

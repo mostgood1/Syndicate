@@ -4494,9 +4494,25 @@ to the expiry moment**. Wrong data, permanently. Gate before any expiry:
 `scripts/check_venue_odds_hydration_census.py` (exits 0 only when every censused
 key is SAFE and nothing was truncated; first run **27 SAFE / 15 PENDING**).
 
-**OWED:** refresh-worker's `#638` trim path has never executed in production —
-its rejections stopped 50 min BEFORE its own deploy, because the other worker's
-trim shrank the shared key.
+**NOT OWED — VOID. `#637` MADE `#638`'s TRIM UNREACHABLE, and "wait for it to
+fire" was wrong `[corrected 2026-09-03]`.** The trim triggers by catching
+`KeyValuePayloadTooLarge`, which ONLY the keyvalue backend raises. `#637` moved
+`venue_odds` to disk, and disk has no 8 MB ceiling — so the write cannot be
+refused, so the trim cannot be reached. Measured since the disk move
+(2026-09-02T19:26:44Z): **zero `TRIMMED_TO_FIT` and zero
+`KEYVALUE_WRITE_REJECTED` for `venue_odds` on BOTH workers**, including
+live-odds-worker, which had trimmed twice before the move. That is the ceiling
+being gone, not a stalled writer.
+
+**UNREACHABLE IS NOT UNVERIFIED, and the two look identical in a log.** An
+unverified fix might still be broken; an unreachable one cannot run at all.
+Carrying this as "owed" would send a future session hunting a signal that can
+never appear.
+
+**The mechanism IS proven** — live-odds-worker emitted two `TRIMMED_TO_FIT`
+lines on 2026-09-02 with `markets_dropped=0` and a `status=ok` book. `#638`
+remains correct, unit-tested both directions, and is now DORMANT: the safety net
+if `venue_odds` ever returns to keyvalue.
 
 ## [artifact-delivery-topology] AN ARTIFACT AN ENGINE READS IS A THREE-SERVICE CHANGE `[measured 2026-08-31]`
 
