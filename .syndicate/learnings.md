@@ -5414,3 +5414,34 @@ check are the ones whose slate spans multiple days (nfl, ncaaf, soccer); MLB's
 **Cost:** a full diagnostic session driven by this single log line, before the
 counting bug was found; zero production impact (no price/edge/stake reads the
 inflated counter), so the cost was entirely session time, not board harm.
+
+
+## 2026-09-03 FORBIDDEN: inferring an environment variable's NAME from the name of the function that reads it. Read the key out of the code. `[lane soccer-projection-names]`
+
+- **What we believed:** the settlement autorun was off. Evidence offered: a
+  paginated read of refresh-worker's env showing
+  `EVALUATION_SETTLEMENT_AUTO_REFRESH_ENABLED` as ABSENT, and CLAUDE.md's note
+  that "`_evaluation_settlement_auto_refresh_enabled` treats absent as False".
+- **What was actually true:** **that env var does not exist anywhere.** The
+  CLAUDE.md line names the FUNCTION. The function reads
+  `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN`, and its live value is
+  `'true'` — the loop had been settling for weeks, and its 947 graded bets were
+  the material used, in the same breath, to argue the loop was not running.
+- **How we found out:** only when about to ARM it, by opening
+  `run_refresh_worker.py:1957` to check the daily gate before touching
+  production. One `git grep` of the key would have done it at any earlier point.
+- **Why the instrument lied so convincingly:** a paginated env read is a GOOD
+  instrument, and it answered the question asked exactly and correctly. The
+  question was wrong. **An absent key proves absence of THAT KEY, never absence
+  of the FEATURE**, and a key that has never existed is absent in precisely the
+  same way as one that was deliberately unset.
+- **The rule going forward:** **before reading an env var to decide anything,
+  grep the key literal in the code that consumes it.** Accessor names, ledger
+  prose and CLAUDE.md all paraphrase; only the `os.environ.get("...")` string is
+  the key. If a probe returns ABSENT, confirm the literal exists somewhere in the
+  repo before reporting it — otherwise "absent" is a statement about your
+  spelling. Sibling of `presence is not reachability`, one level lower: this is
+  ABSENCE IS NOT DISABLEMENT.
+- **Cost:** a published artifact whose headline finding ("both halves of the
+  feedback loop are disabled") was false, and a recommendation to arm something
+  already armed. Caught before any production change was made.
