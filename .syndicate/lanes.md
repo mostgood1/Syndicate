@@ -1942,6 +1942,90 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Claims: NONE held. No deploy.
 - Narrative: `log/2026-09-02.md`, `todo.md #639`.
 
+### soccer-anchor-odds-feed — CLOSED 2026-09-02 (step 1 of 2 done) — opened 2026-09-02 — session 3492626c — **LANDED `5c99c153`. The de-vigged odds feed exists and is VERIFIED ON REAL PRODUCTION DATA: 84 priced events from 2,939 rows across 4 leagues, overround 1.048-1.105 (a real 5-10% three-way vig), P(home) 0.069-0.827, 0 refused. Anchoring is still OFF and still unwired into the builder -- that is step 2 and needs a weight knob, an off!=on test, and the mechanism-vs-estimator re-fit.**
+- Goal: make soccer market-anchoring REACHABLE. Production fixtures carry only
+  {match_id, home_team, away_team}, so `anchor_ratings_to_market` would skip every
+  fixture and be a silent no-op. Feed de-vigged home-win probabilities from
+  `<league>/api/odds/game_odds_current.csv` and publish anchored/skipped counts.
+- Files: syndicate/features/soccer/features/market_odds.py (NEW),
+  tests/test_soccer_market_odds.py (NEW), scripts/build_soccer_artifacts.py
+- Hypothesis: n/a (making a validated-but-dead mechanism reachable)
+- Falsification test: if the anchored count is 0 on a real matchday, the feed
+  does not work and the mechanism is still inert.
+- Verification: anchored/skipped counts published per league-date; a fixture's
+  home_win_probability matches a hand-computed de-vig of its book rows.
+- Blocked by: none. NOTE the mechanism itself stays OFF until (2) — wiring the
+  feed does not turn anchoring on.
+
+### accuracy-autorun-decline-telemetry — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `24efb82b`, DEPLOYED, AND IT VERIFIED ITS OWN FIX.** The autorun declined silently on both paths, so "disabled", "gate refused" and "never reached" were one indistinguishable silence — which cost a 100-minute watch that taught nothing. Now emits `ACCURACY_SUMMARY_AUTORUN_GATED reason=...` with `never_run=yes|no`.
+- Goal: `_launch_autorun_accuracy_summary` returns False SILENTLY on both decline
+  paths, so "flag off", "gate refused" and "never reached" are indistinguishable.
+  100 minutes of silence taught nothing. Mirror `RECONCILIATION_AUTORUN_GATED`.
+- Files: scripts/run_refresh_worker.py, tests/test_accuracy_summary_autorun.py
+- Hypothesis: n/a (fixing an instrument I built blind)
+- Verification: an `ACCURACY_SUMMARY_AUTORUN_GATED reason=...` line in
+  refresh-worker logs that names WHY it declined.
+- Verification RAN, and the line proved a SECOND thing hours later: when the
+  autorun was disarmed after OOM-killing the worker, `reason` flipped
+  `daily_gate` -> `disabled` at 19:32:27Z. That is direct proof the process read
+  the new env value, rather than inferring it from deploy ordering.
+- The pattern was already one function above (`RECONCILIATION_AUTORUN_GATED`,
+  `#341`), with a comment stating this exact lesson. It shipped without it.
+- Blocked by: none (needs a refresh-worker deploy, preflight for in-flight sims)
+
+### soccer-anchor-wiring — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `3cdbcf4c` and DEPLOYED. Anchoring is reachable, instrumented, and OFF (weight 0.0). COST FINDING CORRECTED 2026-09-02 by lane `soccer-anchor-cost`: my *"57 min/cycle at 84 priced events, ~136 min at ten leagues — cannot run on the refresh cycle as written"* was a DENOMINATOR ERROR (84 counts priced EVENTS in a forward book to d+13; the builder is SINGLE-DATE). Production-measured cost is **83.2 min per 4h interval** with the joins working — 76% of the interval, and it FITS. Weight stays 0.0 on the mechanism-vs-estimator re-fit and on path (a) being FALSIFIED, NOT on cost.** This lane also carried the accuracy-autorun OOM to resolution (disarmed, verified `reason=disabled` 19:32Z).
+- Goal: wire `anchor_ratings_to_market` into `build_soccer_artifacts.py` behind a
+  WEIGHT knob defaulting to 0.0 (off), publishing attached/skipped/anchored counts
+  so an inert anchor is visible. Step 2 of 2; step 1 (`ed48c2e7`) built the feed.
+- Files: scripts/build_soccer_artifacts.py, tests/test_soccer_anchor_wiring.py (NEW)
+- Hypothesis: n/a (making a validated mechanism reachable)
+- Falsification test: off != on -- with weight 0 the ratings must be UNCHANGED;
+  with weight > 0 they must differ. If they match either way, the wiring is inert.
+- Verification: anchored count > 0 on a real matchday with weight > 0, and the
+  counts published even when weight is 0.
+- DOES NOT turn anchoring on. Default stays 0.0 pending the mechanism-vs-estimator
+  re-fit the standard requires (measured negative interaction 4/4 markets).
+- Verification RAN: off!=on asserted before any correctness claim (weight 0
+  leaves ratings identical; weight 0.35 moves them). Odds counts publish even
+  when off, so the feed's health and the mechanism's arming stay separable.
+- **CORRECTION 2026-09-02 — the PRODUCTION half of "Verification" above was NOT
+  SATISFIABLE AS WRITTEN.** `ODDS_ATTACHED`/`ANCHOR_SKIPPED`/`ANCHORED` are `print`
+  lines, and a delegated session found them unreadable in production — so this lane
+  closed on its unit-test half (`off != on`) only. The counts need a PUBLISHED
+  ARTIFACT FIELD beside `promoted_prior_teams`, not a log line.
+- **CORRECTION 2026-09-02 — two name joins in my feed were switched off.** Both
+  compared exact strings across feeds with different naming conventions
+  (fixture `match_id` is an ESPN id, the odds file keys on an OddsAPI hash; the
+  team-pair fallback then needed exact team names). Cost: 66 of 136 fixtures and
+  76 of 214 team slots. Fixed by `686d8282` on main — NOT deployed, NOT armed.
+- Handed to a delegated session: the three cost paths (cut solver sims / anchor
+  only board-relevant fixtures / move off the refresh cycle), with the caution
+  that better h2h MAE from anchoring is EXPECTED and is not evidence of edge —
+  measure anchored-vs-base on PROP markets.
+- Blocked by: none
+
+### board-window-throttle-binds — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `965823d4`. `#631`'s PRECONDITION IS DISCHARGED: the throttle BINDS** — tomorrow's median build gap 38.8 min against a 30-min floor, today free at 15.8, over a 744-minute production window. **And it corrects the cost model that blocked the item:** "they alternate at ~42 min each" did not happen — the throttle SHEDS the extra date's turns rather than alternating, so widening does NOT halve today's refresh rate.
+- Goal: discharge `#631`'s stated PRECONDITION — verify
+  `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` actually BINDS
+  before anyone widens the board window. Three tuning changes to that knob had
+  reportedly done nothing, so whether it binds at all was unestablished.
+- Files: docs/ai_context/todo.md, .syndicate/state.md
+- Hypothesis (REFUTED): the throttle branch is dead code because the window only
+  ever contains today, so tuning it could not do anything.
+- Falsification test: if non-today dates build at gaps >= the 30-min floor while
+  today runs free, the throttle binds and the hypothesis is wrong.
+- Verification: measured per-date build intervals from BUILD_SPAN_ENTER over a
+  744-minute production window.
+- Hypothesis REFUTED, recorded: I predicted the throttle branch was dead code
+  (window only contains today). The window contains tomorrow; the branch fires.
+- Second error, same session: I read a 12-line log TAIL and concluded tomorrow
+  out-built today 3:1. Over the full span it is 39 to 7 the other way — a tail
+  read as a population, the standing 'a rate, not a count' rule.
+- STILL OWED before widening: `display_prediction_dates.json` staleness (risk 2
+  in the scoping note) is unverified — a binding throttle does not help if the
+  date list feeding it is stale.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
