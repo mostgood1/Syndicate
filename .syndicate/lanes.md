@@ -1704,7 +1704,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
       so — that would mean the queue coalesces and the floor is the wrong lever.
 - Blocked by: none
 
-### intelligence-suite-runtime — OPEN — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### intelligence-suite-runtime — OPEN, **NOT A STALL: 221 pass in 586s (9:46). Top 25 = 66%, all `test_intelligence_query*`. AND ISOLATING THEM MAKES THEM SLOWER — the durations do not decompose** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `tests/test_intelligence.py` (221 tests) completes in a STATED, bounded
   time. One testable outcome: a full run finishes and its total is recorded, and
   whatever dominates it is either fixed or documented as irreducible with the
@@ -1742,6 +1742,74 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   2026-08-22 — `reports/manifests/*.json`, `reports/refresh_state.json`,
   `reports/intelligence/intelligence_state.json` and more), so check
   `git status` before committing and never `git add -A`.
+- **MEASURED 2026-09-02. IT IS NOT A STALL. Hypothesis CONFIRMED by the
+  falsification test as written.**
+
+      221 passed in 586.00s (9:46)   -- it COMPLETES; faulthandler never fired
+      slowest single test   28.94s = 4.9% of the run   -> nothing dominates
+      top 25 durations     387.6s = 66.2% of the run
+      remaining 196 tests  198.4s = 33.8%
+      25th slowest          12.54s -> the band extends well past 25
+
+  The falsification test said: *if `--durations` shows ONE test dominating, or
+  one that never returns, it IS a stall.* The worst test is 4.9% and everything
+  returns. **All 25 of the slowest are
+  `IntelligenceBlueprintTests::test_intelligence_query*`.**
+
+  **THE EARLIER ">10 MINUTES, STALLED AT 32%" IS EXPLAINED AND RETRACTED AS A
+  STALL.** 9:46 against a 10-minute timeout is a suite that finishes just past
+  the wall — the "stall at 32%" was the timeout landing mid-run, not a hang. The
+  percentage was stable across observations because pytest prints it per output
+  line, not because progress stopped. Two of this session's fixes
+  (`kalshi-discovery-deadline`'s venue guard, `wnba-cards-fallback-recursion`)
+  also removed real time from this file, so the pre-fix figure was never a valid
+  baseline for it either.
+
+- **THE SHAPE OF THE COST, and it rules out the obvious fix.**
+  `IntelligenceBlueprintTests` holds **182 tests, 49 of them
+  `test_intelligence_query*`**, each driving a real candidate-pool build. There
+  is **no `setUp`/`setUpClass` doing the heavy work** — each test constructs its
+  own scenario inline, so a class-scoped fixture is NOT a drop-in and would mean
+  rewriting 49 tests' arrangement. Anyone reaching for "just share the setup"
+  should read that first.
+- **FILES: still only `tests/test_intelligence.py`.** The measurement implicates
+  test-side arrangement, not a production module, so no source file is claimed
+  and none should be until something names one.
+- **OWED, and running:** the cluster's share of the 586s, measured directly
+  (`-k intelligence_query`) rather than extrapolated from the top-25 sum. That
+  number decides whether the cluster is worth restructuring at all — the top 25
+  are 66%, but 24 more query tests sit in the untimed remainder.
+
+- **THE OBVIOUS REMEDY BACKFIRES, and this is the finding that matters.**
+  Isolating the cluster to measure its share made it SLOWER, not faster:
+
+      in the full run   51 query tests inside 221, whole file 586s,
+                        the 25 slowest averaging 15.5s each
+      isolated (-k)     34 tests in >1200s before the timeout killed it
+                        -> >35s each, at least 2.3x their in-situ cost
+
+  **So the per-test durations do NOT decompose.** "The top 25 are 66% of the
+  run" is true of that run in that order; it does NOT license "removing or
+  splitting them saves 387s". Something earlier in the file warms state these
+  tests reuse — on-disk artifacts under `reports/`, module-level caches, or
+  both — and a cold cluster pays for it individually.
+  **Anyone who reacts to the 66% figure by splitting the slow tests into their
+  own job will make the total worse.** That was measured, not predicted.
+
+  Also measured and not free: **collection alone is 43-75s** for this file
+  (182-test class: 42.87s; `-k` selection over 221: 74.86s), before a single
+  test body runs.
+
+- **NEXT STEP — identify what warms, not what is slow.** The lever is the shared
+  state, and it is not yet named. Concretely: run the file with the cluster
+  FIRST versus LAST and compare the same tests' durations; whatever moves is the
+  warm dependency. Only then is there a fix worth designing.
+- **DO NOT, on current evidence:** split the slow tests into a separate job,
+  add a class-scoped fixture (there is no `setUp` to hoist — each of the 182
+  tests arranges its own scenario inline), or mark them slow and skip them by
+  default. The first is measured to backfire; the second is a 49-test rewrite;
+  the third trades runtime for coverage on the only tests that exercise the
+  candidate-pool build end to end.
 - Blocked by: none. No deploy — this is test-suite runtime, not production
   behaviour.
 
