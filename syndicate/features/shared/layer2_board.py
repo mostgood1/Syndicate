@@ -2965,7 +2965,37 @@ def _layer2_board_columns(
         # derived from.
         contradiction = _sim_direction_contradiction(row, projection)
         if contradiction is None:
-            columns["sim_view"] = "none"
+            # `none` STILL HAD TWO STATES IN IT, and naming the bucket printed
+            # the wrong one. USER-REPORTED 2026-09-03, minutes after the badge
+            # shipped: MLB rows labelled "no sim view" with a number in the
+            # PROJECTED column beside them.
+            #
+            #   Corey Seager, batter_total_bases over 1.5
+            #     projected 1.046  model_probability 0.2407  model_edge_pct None
+            #
+            # Measured the same minute on the served payload: 16,284 rows,
+            # `sim_view: none` on 10,032, and **3,300 of those (32.9%) carry a
+            # model number** -- ncaaf 2,364, mlb 732, soccer 204. The sim had a
+            # view; it could not be PRICED into an edge, typically because only
+            # one side is quoted so there is no two-sided fair
+            # (`_edge_unavailable_reason`, "one-sided market").
+            #
+            # The direction fallback above rescues the subset that also points
+            # the wrong way past the gap threshold. Everything else fell to
+            # `none` and was published as "the sim has no view", which is false.
+            #
+            # SPLIT AT THE SOURCE, not only in the renderer, because `sim_view`
+            # is about to be PERSISTED ONTO ORDERS for the ROI split. A field
+            # that conflates "no model" with "model, unpriced" would make that
+            # split wrong on its first day, and unlike a badge nobody would see
+            # it. Renderers are one consumer; the ledger is another.
+            has_view = (
+                _as_float(projection.get("projected")) is not None
+                or _as_float(row.get("projected")) is not None
+                or _as_float(row.get("model_probability")) is not None
+                or _as_float(projection.get("model_prob_over")) is not None
+            )
+            columns["sim_view"] = "unpriced" if has_view else "none"
         else:
             columns["sim_view"] = "live_contradicts" if sim_is_live else "contradicts"
             columns["sim_line_gap"] = contradiction

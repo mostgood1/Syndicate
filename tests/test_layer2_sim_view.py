@@ -233,3 +233,82 @@ def test_the_state_backfill_no_longer_puts_book_breadth_in_the_win_percent_colum
     intelligence_state._backfill_layer2_board_columns(card)
     assert "confidence" not in card
     assert card["book_confidence"] == pytest.approx(1.0)
+
+
+# ---------------------------------------------------------------------------
+# `none` HAD TWO STATES IN IT, and naming the bucket printed the wrong one.
+#
+# USER-REPORTED 2026-09-03, minutes after the badge shipped: MLB rows labelled
+# "no sim view" with a number in the PROJECTED column beside them. Measured the
+# same minute on the served payload -- 16,284 rows, `sim_view: none` on 10,032,
+# and 3,300 of those (32.9%) carrying a model number (ncaaf 2,364, mlb 732,
+# soccer 204). The sim had a view; it could not be PRICED into an edge.
+#
+# Split at the SOURCE and not only in the renderer, because `sim_view` is about
+# to be persisted onto orders for the ROI split. A field that conflates "no
+# model" with "model, unpriced" makes that split wrong on its first day, and
+# unlike a badge nobody would see it.
+# ---------------------------------------------------------------------------
+
+
+def test_a_model_with_no_priced_edge_is_UNPRICED_not_none():
+    """The reported row, values copied off the served payload.
+
+    Gap is 1.5 - 1.046 = 0.454 on a 1.5 line = 30% -- above the contradiction
+    threshold -- so this row is `contradicts` once the direction fallback can
+    see it. The point of THIS test is the one below it: the same shape without a
+    qualifying gap must still not claim the sim was silent.
+    """
+    columns = _publish(
+        {
+            "side": "over",
+            "line": 1.5,
+            "model_edge_pct": None,
+            "model_probability": 0.2407,
+            "projection": {"projected": 1.046, "side": "over"},
+        }
+    )
+    assert columns["sim_view"] in {"contradicts", "unpriced"}
+    assert columns["sim_view"] != "none", "the sim projected 1.046 -- it was not silent"
+
+
+def test_a_model_that_AGREES_in_direction_but_cannot_be_priced_is_unpriced():
+    """THE DISCRIMINATING CASE. The direction fallback returns None here --
+    the sim points the SAME way as the pick -- so before this split the row fell
+    through to `none` and was published as "the sim has no view", while carrying
+    a projection of 2.4 against a 1.5 line."""
+    columns = _publish(
+        {
+            "side": "over",
+            "line": 1.5,
+            "model_edge_pct": None,
+            "projection": {"projected": 2.4, "side": "over"},
+        }
+    )
+    assert columns["sim_view"] == "unpriced"
+    assert "sim_line_gap" not in columns, "nothing contradicts here"
+
+
+def test_a_model_probability_alone_is_enough_to_count_as_a_view():
+    """A moneyline has no line to contradict, so the direction fallback can
+    never speak for it -- but a `model_probability` is still a view."""
+    columns = _publish({"side": "home", "market": "h2h", "model_edge_pct": None,
+                        "model_probability": 0.62})
+    assert columns["sim_view"] == "unpriced"
+
+
+def test_genuinely_no_model_is_STILL_none():
+    """The state the badge was built for. `unpriced` must not swallow it --
+    absent is not the same as unpriced, and neither is agreement."""
+    columns = _publish({"side": "under", "line": 53.5, "model_edge_pct": None})
+    assert columns["sim_view"] == "none"
+
+
+def test_a_projection_of_ZERO_is_a_view():
+    """`0.0` is a real projection. A truthiness test would call it absent --
+    the same class of bug `_as_optional_float` exists to prevent on the order
+    side, where a real 0.0 edge must not read as "no model ran"."""
+    columns = _publish({"side": "over", "line": 1.5, "model_edge_pct": None,
+                        "projection": {"projected": 0.0, "side": "over"}})
+    assert columns["sim_view"] in {"contradicts", "unpriced"}
+    assert columns["sim_view"] != "none"

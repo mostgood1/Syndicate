@@ -2208,7 +2208,16 @@
   // refresh-worker as I write this.
   function simViewBadgeKind(item) {
     const view = item && item.sim_view;
+    // `unpriced` is the BACKEND's own name for this state (`layer2_board`), and
+    // it must be honoured rather than fall through the `view !== "none"` guard
+    // into `null` -- which would make the badge VANISH the moment the worker
+    // ships the split. Written at the same time as that backend change for
+    // exactly that reason: a renderer that only understands the old vocabulary
+    // is a landmine armed by the next deploy.
+    if (view === "unpriced") return "unpriced";
     if (view && view !== "none") return null;          // agrees/disagrees/contradicts speak for themselves
+    // Derived, for the build where the worker has not shipped `unpriced` yet.
+    // Both inputs are already on the row, so this is correct against either.
     const hasNumber = item
       && ((item.model_probability !== null && item.model_probability !== undefined)
         || (item.projected !== null && item.projected !== undefined));

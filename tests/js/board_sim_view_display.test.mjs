@@ -470,5 +470,15 @@ eq('agrees is left alone', simViewBadgeKind({ sim_view: 'agrees', projected: 1.0
 eq('disagrees is left alone', simViewBadgeKind({ sim_view: 'disagrees' }), null);
 eq('contradicts is left alone', simViewBadgeKind({ sim_view: 'contradicts', projected: 67.8 }), null);
 
+// The BACKEND now publishes `unpriced` itself (`layer2_board`). Without this
+// branch the `view !== "none"` guard above returns null for it and the badge
+// VANISHES the moment refresh-worker ships -- a landmine armed by the next
+// deploy, which is why it is asserted here and not left to be discovered.
+eq('a backend "unpriced" is honoured, not swallowed by the guard',
+  simViewBadgeKind({ sim_view: 'unpriced', projected: 1.046 }), 'unpriced');
+eq('a backend "unpriced" with no numbers on the row is still unpriced',
+  simViewBadgeKind({ sim_view: 'unpriced' }), 'unpriced');
+
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);
