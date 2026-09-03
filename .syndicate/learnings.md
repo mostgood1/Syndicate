@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 720 rules `[generated]`
+## Index — 726 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5165,3 +5165,37 @@ usually the thing every row in a group shares.
   it, and — across the two instances — two lanes closed or recorded on evidence
   weaker than they claimed. Sibling of `presence is not reachability`: this is
   its planning-time form.
+
+## 2026-09-03 FORBIDDEN: choosing the READ-only allowlist because "nothing serves this". The test is whether there is a serving HAZARD — export-only makes a family readable IF PRESENT, and if nothing publishes it the entry does nothing at all. `[lane worker-artifact-transport]`
+
+- **What we believed:** `mlb_source/reconciliation/*` belonged on
+  `EXPORT_ONLY_ARTIFACT_PATTERNS` rather than the publishable list, because
+  nothing on web serves those files. I reasoned it, wrote it into the code
+  comment, the commit message and two ledger files, and then recorded a
+  "transport gap" in `#625`(2) and `#639` when the family stayed unreachable.
+- **What was actually true:** there was no transport gap. **Export-only makes a
+  family readable IF PRESENT; it is not a transport.** For a family that reaches
+  web some other way (bootstrap seeding, an existing publish) that is enough —
+  `feed_live` and the prop-history CSVs were sitting there already. For a
+  genuinely worker-only family it does nothing, because the ONLY worker->web
+  path is the publish sweep, and export-only is precisely the list the sweep
+  ignores. The family was excluded from the one mechanism that could move it,
+  by my own choice.
+- **How we found out:** pricing the alternative. A real `props_actuals` is
+  **56,564 bytes**; the whole 12-date window is **~663 KB published once each**
+  — trivially affordable next to a `book_grid` of 12.7 MB/day that already
+  publishes. Nothing about the cost had ever justified the exclusion; I had
+  never measured it.
+- **The rule going forward:** **the question is not "does anything serve this",
+  it is "is there a serving HAZARD".** Ask what READS the path on the receiving
+  service and whether its behaviour changes on PRESENCE. For reconciliation the
+  answer is no twice over — the autorun is false on web, and the reader defaults
+  its roots to the repo checkout rather than `data_root()`. For
+  `raw/statsapi/feed_live` the answer is yes, and that one stays read-only
+  forever: `_mlb_feed_live_payload` returns the cached file if it exists, so
+  presence IS the trigger. **Pin the discriminating pair in a test**, or the
+  distinction decays back into a preference.
+- **Cost:** two ledger entries and a `#625` build item recorded a "gap" that did
+  not exist, and `#639` left a question open ("was anything destroyed?") that
+  was answerable all along. Caught by measuring the thing I had assumed was
+  expensive.

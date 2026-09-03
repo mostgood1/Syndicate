@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 720 rules `[generated]`
+## Index — 726 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 244**
+**FORBIDDEN — 249**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -180,6 +180,11 @@
 - [2026-09-02 FORBIDDEN: reading a DIFFERENTIAL in which more than one variable moved. And…](#2026-09-02-forbidden-reading-a-differential-in-which-more-than-one-variable-moved-and-an-absent-trace-is-not-an-absent-dependency)
 - [2026-09-02 FORBIDDEN: acting on a tool's OUTPUT without checking the tool's actual THRE…](#2026-09-02-forbidden-acting-on-a-tools-output-without-checking-the-tools-actual-threshold-or-predicate-its-output-is-a-claim-about-the-tool-not-about-the-system-lane-ledger-stale-tree-guard)
 - [2026-09-02 FORBIDDEN: a blanket `except` in a guard. It converts VERSION SKEW into sile…](#2026-09-02-forbidden-a-blanket-except-in-a-guard-it-converts-version-skew-into-silence-and-a-silent-guard-is-indistinguishable-from-a-clean-result-lane-ledger-precommit-hook)
+- [2026-09-02 FORBIDDEN: dropping rows whose OUTCOME is zero. It reads as "cleaning the da…](#2026-09-02-forbidden-dropping-rows-whose-outcome-is-zero-it-reads-as-cleaning-the-data-and-it-is-selection-on-the-dependent-variable-79-of-my-sample-went-and-the-survivors-all-had-realized-1-lane-soccer-anchor-cost-6223)
+- [2026-09-02 FORBIDDEN: attributing dirt in a shared tree to the thing you just ran, with…](#2026-09-02-forbidden-attributing-dirt-in-a-shared-tree-to-the-thing-you-just-ran-without-checking-what-was-dirty-before-you-ran-it)
+- [2026-09-02 — FORBIDDEN: paying for an expensive CONTROL without first checking that its…](#2026-09-02-forbidden-paying-for-an-expensive-control-without-first-checking-that-its-inputs-can-produce-the-signal-i-nearly-spent-a-34690-file-checkout-on-a-control-that-was-arithmetically-incapable-of-answering-the-question-lane-wnba-cards-fallback-recursion)
+- [2026-09-03 FORBIDDEN: writing a verification predicate into a lane without first checki…](#2026-09-03-forbidden-writing-a-verification-predicate-into-a-lane-without-first-checking-that-it-is-observable-do-that-check-before-the-work-not-after-lanes-soccer-anchor-wiring-board-window-floor-raise)
+- [2026-09-03 FORBIDDEN: choosing the READ-only allowlist because "nothing serves this". T…](#2026-09-03-forbidden-choosing-the-read-only-allowlist-because-nothing-serves-this-the-test-is-whether-there-is-a-serving-hazard-export-only-makes-a-family-readable-if-present-and-if-nothing-publishes-it-the-entry-does-nothing-at-all-lane-worker-artifact-transport)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -263,7 +268,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 471**
+**Rules and corrections — 472**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -426,6 +431,7 @@
 - [2026-09-02 REQUIRED: `git rebase --continue` re-runs the message CLEANUP, so a commit s…](#2026-09-02-required-git-rebase---continue-re-runs-the-message-cleanup-so-a-commit-subject-starting-with-is-silently-deleted-every-item-id-in-this-repo-starts-with-lane-m639-actuals-zero-rows)
 - [2026-09-02 — RULE: run `lane_identity_check` AFTER landing, not only before. A rebase d…](#2026-09-02-rule-run-lane_identity_check-after-landing-not-only-before-a-rebase-duplicates-a-lane-block-wholesale-and-the-write-side-rule-does-not-cover-it-lane-kalshi-discovery-deadline)
 - [2026-09-03 REQUIRED: before proposing to ARCHIVE or DATE anything in this repo, check w…](#2026-09-03-required-before-proposing-to-archive-or-date-anything-in-this-repo-check-whether-the-path-is-keyvalue-backed-and-price-it-the-live-lens-snapshot-is-a-4-mb-redis-key-on-a-60s-tick----dating-it-would-have-written-576-gbday-into-a-256-mb-store-lane-mlens-snapshot-dating)
+- [2026-09-02 REQUIRED: when a sign test and a t-statistic DISAGREE, believe neither until…](#2026-09-02-required-when-a-sign-test-and-a-t-statistic-disagree-believe-neither-until-you-have-found-the-clustering-mine-said-p00027-and-t-128-on-the-same-rows-lane-soccer-anchor-cost-6223)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

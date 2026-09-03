@@ -1846,6 +1846,22 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none. No deploy — this is test-suite runtime, not production
   behaviour.
 
+### worker-artifact-transport — CLOSED 2026-09-03 — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **THERE IS NO TRANSPORT GAP FOR THIS FAMILY. I PUT IT ON THE WRONG LIST, and the fix is a one-line move.** `#625`(2) placed `*_source/reconciliation/*` on the READ-only list arguing "nothing on web serves these". True, and the WRONG TEST — export-only makes a family readable IF PRESENT, and nothing published these, so the entry did nothing. The question is **"is there a serving HAZARD"**, and there is none: `RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN` is **false on web**, and `reconcile_prediction_results_for_date` defaults `result_roots` to **`_repo_root()/data`** (`prediction_reconciliation.py:349`) — the CHECKOUT, not `data_root()` — so presence on web changes nothing. **COST MEASURED: a real `props_actuals` is 56,564 bytes for 1,123 rows; the whole 12-date window is ~663 KB, published ONCE each** (the sweep only sends changed files), against a `book_grid` of 12.7 MB/day that already publishes. Moved to `HOT_ARTIFACT_PATTERNS`. **`feed_live` STAYS export-only forever** — there PRESENCE is the trigger (`_mlb_feed_live_payload` returns the cached file if it exists), which is the discriminating pair a new test pins.
+- Files: released — `syndicate/features/shared/artifact_publisher.py`,
+  `tests/test_export_only_patterns.py`.
+- Falsification test: FIRED, and usefully — the hypothesis was that a bounded
+  request-channel transport had to be BUILT. It did not: the existing publish
+  sweep is the transport, and the family was excluded from it by my own
+  reasoning error. Nothing new was built.
+- The saturation constraint still held and shaped the answer: ~663 KB one-time
+  is affordable on services at 91-97% where a standing flow would not be.
+- **OWED: deploys to BOTH web and refresh-worker** — web to accept the publish
+  (its endpoint gates on `is_hot_artifact_relative_path`) and refresh-worker to
+  sweep it. Until then the family is still unreachable.
+- Verification when it ships: `?path=` on a `props_actuals` CSV returns CONTENT
+  (not `count: 0`), and `#639`'s residual becomes answerable — whether the seven
+  June files ever held rows.
+- Claims: NONE held.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -45,12 +45,6 @@ EXPORT_ONLY_SAMPLES = (
     "mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/2026-06-14/822722.json.gz",
     "mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/2026-06-14/822722.json",
     "mlb_source/tracking/odds_mlb_hitter_props_history_2026-06-10.csv",
-    # Reconciliation outputs -- the graded "what actually happened" side of the
-    # evaluation chain, and the OUTPUT a `build_mlb_actuals` replay-diff needs
-    # to compare against. They were in neither list, so that output was
-    # unauditable from outside.
-    "mlb_source/reconciliation/props_actuals_2026-06-14.csv",
-    "mlb_source/reconciliation/game_results_2026-06-14.json",
 )
 
 FEED_LIVE_SAMPLE = EXPORT_ONLY_SAMPLES[0]
@@ -65,6 +59,11 @@ ALREADY_HOT_SAMPLES = (
     # Production's real layout: directly under snapshots/<date>/, not roster_objs/.
     # A mirror pull fetched 16 of these from web on 2026-09-02.
     "mlb_source/source_artifacts/data/daily/snapshots/2026-09-01/roster_9_ATH_at_TEX_pk822854_g1.json",
+    # Reconciliation outputs. MOVED to the WRITE list 2026-09-03: export-only
+    # made them readable IF PRESENT and nothing published them, so they stayed
+    # unreachable. Publishable is what makes them auditable.
+    "mlb_source/reconciliation/props_actuals_2026-06-14.csv",
+    "mlb_source/reconciliation/game_results_2026-06-14.json",
 )
 
 
@@ -84,6 +83,24 @@ def test_export_only_samples_are_readable_but_not_writable(relative_path: str) -
     assert not is_hot_artifact_relative_path(relative_path), (
         "the WRITE predicate must REFUSE it -- if this fails the sweep will start "
         "publishing this family to web"
+    )
+
+
+def test_reconciliation_is_publishable_but_feed_live_is_not() -> None:
+    """The DISCRIMINATING pair, and the reason they differ is a hazard, not a
+    preference.
+
+    Reconciliation outputs are safe to publish because presence on web changes
+    nothing: `RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN` is false on web, and
+    `reconcile_prediction_results_for_date` defaults its roots to the repo
+    CHECKOUT rather than `data_root()`. `feed_live` is the opposite -- presence
+    IS the trigger, because `_mlb_feed_live_payload` returns the cached file if
+    it exists and only fetches live when it is absent.
+    """
+    assert is_hot_artifact_relative_path("mlb_source/reconciliation/props_actuals_2026-06-14.csv")
+    assert not is_hot_artifact_relative_path(FEED_LIVE_SAMPLE), (
+        "if this ever passes, the sweep will push current-date feed_live to web and freeze "
+        "live game state for every reader (`#413`)"
     )
 
 

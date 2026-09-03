@@ -324,6 +324,18 @@ live-odds-worker **exit 0, 620.2 MB** of 2048. Production run-modes preserved �
   sampler. Useful for the slow ratchet, NOT evidence about Render's ceiling.
 
 ## [artifact-allowlist-split] THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT a census of the disk `[verified 2026-09-02 in production, web `e6fa165b`, lane m625-export-only-patterns]`
+**CORRECTED 2026-09-03 — `reconciliation/*` MOVED TO THE WRITE LIST.** `#625`(2)
+put it on the READ-only list arguing "nothing on web serves these". True, and
+the WRONG TEST: export-only makes a family readable IF PRESENT, and nothing
+published it, so the entry did nothing and the family stayed unreachable. **The
+question is "is there a serving HAZARD", not "does web serve it".** For
+reconciliation there is none — the autorun is false on web AND
+`reconcile_prediction_results_for_date` defaults its roots to the repo CHECKOUT,
+not `data_root()`. Cost measured: **56,564 bytes for a real one, ~663 KB for the
+whole 12-date window, published once each.** `feed_live` stays export-only
+forever, because there PRESENCE is the trigger. **So there was never a transport
+gap for this family — only a misfiled pattern.**
+
 
 `is_hot_artifact_relative_path` = WRITE (publish + sweep), unchanged.
 `is_exportable_artifact_relative_path` = READ (export + stream) = hot +

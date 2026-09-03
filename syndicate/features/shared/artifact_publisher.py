@@ -105,6 +105,34 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # halves so a future tidy-up cannot hit either one silently.
     "*_source/source_artifacts/data/sim_input_report/sim_input_report_*.json",
     "*_source/data/book_grid/book_grid_*.json",
+    # RECONCILIATION OUTPUTS -- the graded "what actually happened" side of the
+    # evaluation chain (`props_actuals_<date>.csv`, `game_results_<date>.*`),
+    # written by `build_mlb_actuals` under the refresh-worker autorun.
+    #
+    # **MOVED HERE FROM `EXPORT_ONLY_ARTIFACT_PATTERNS` `[2026-09-03]`, and the
+    # correction is mine.** `#625`(2) put them on the READ-only list on the
+    # argument that "nothing on web serves these". That is true and it was the
+    # WRONG TEST: export-only makes a family readable IF PRESENT, and nothing
+    # published these, so they stayed unreachable and the list did nothing. The
+    # question is not "does web serve it" but **"is there a serving HAZARD"**.
+    #
+    # THERE IS NONE HERE, checked rather than assumed:
+    #   - `RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN` is **false on web**
+    #     (true only on refresh-worker), so no web path consumes them; and
+    #   - `reconcile_prediction_results_for_date` defaults `result_roots` to
+    #     **`_repo_root()/data`** (`prediction_reconciliation.py:349`) -- the
+    #     CHECKOUT, not `data_root()` -- so even with the autorun on, web would
+    #     not read the mounted copy.
+    # Contrast `raw/statsapi/feed_live`, which stays export-only forever because
+    # `_mlb_feed_live_payload` returns the cached file IF IT EXISTS: there,
+    # PRESENCE is the trigger.
+    #
+    # COST, measured not assumed: a REAL `props_actuals` is **56,564 bytes for
+    # 1,123 rows**; the worker's whole 12-date window is **~663 KB, published
+    # ONCE each** because the sweep only sends CHANGED files. Against a
+    # 12.7 MB/day `book_grid` that already publishes, this is noise.
+    "*_source/reconciliation/*.csv",
+    "*_source/reconciliation/*.json",
     "settlement_inputs/closing_lines_*.csv",
     "settlement_inputs/finals_*.json",
     "*_source/source_artifacts/data/live_lens/live_lens_report_*.json",
@@ -1055,37 +1083,6 @@ EXPORT_ONLY_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "*_source/source_artifacts/data/raw/statsapi/feed_live/*/*/*.json.gz",
     # Prop-history CSVs, under `tracking/` -- not a bootstrap root, not swept.
     "*_source/tracking/odds_*_props_history_*.csv",
-    # RECONCILIATION OUTPUTS (`props_actuals_<date>.csv`, `game_results_<date>.*`).
-    # The graded "what actually happened" side of the evaluation chain, written
-    # by `build_mlb_actuals.write_mlb_actuals_for_date` under the refresh-worker
-    # autorun (`RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER=true`, hourly) and read
-    # by `prediction_reconciliation.RECONCILIATION_PATTERNS` on the same worker.
-    #
-    # WORKER-LOCAL, SO READ-ONLY IS THE RIGHT LIST: nothing on web serves these.
-    # `blueprints/mlb.py`'s `reconciliation` keys come from an artifact's own
-    # `diagnostics` dict, not from these files.
-    #
-    # WHY THEY ARE HERE: they were in NEITHER list, so the producer's output was
-    # unauditable from outside -- `model_engine_standard.md` §3b's "an
-    # unallowlisted artifact is an unauditable one", on the outputs the
-    # settlement and accuracy chain rests on.
-    #
-    # **STILL ZERO ON WEB AFTER DEPLOYING THIS, AND THAT IS THE POINT.** Measured
-    # on web `5885c339`: `/api/ops/artifacts/export?names_only=1` returns 0
-    # reconciliation files. Unlike `feed_live` and the prop-history CSVs -- which
-    # were present and merely invisible, because `bootstrap_data_root` seeds the
-    # git-tracked copies -- this family is **git-tracked 0 files and under NO
-    # `BOOTSTRAP_ROOT`**, so nothing puts it on web's disk at all.
-    #
-    # THE LESSON, which corrects how `#625`(2) was framed: an export-only entry
-    # makes a family READABLE IF PRESENT. It is not a transport. It unlocks a
-    # family that already reaches web by some other route; for a genuinely
-    # worker-only family the worker publishes to web or nothing does, and there
-    # is no third path. Kept anyway: the entry is correct, costs three globs that
-    # match nothing, and works the moment a transport exists -- `#208`,
-    # allowlisting PERMITS a transfer and does not make one happen.
-    "*_source/reconciliation/*.csv",
-    "*_source/reconciliation/*.json",
 )
 
 

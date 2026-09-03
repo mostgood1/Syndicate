@@ -84,6 +84,39 @@ production copy. See the transport note in `#625`(2).
 
 ---
 
+### `#641` — **THE "TRANSPORT GAP" FOR RECONCILIATION OUTPUTS WAS A MISFILED PATTERN, not a missing mechanism** — lane `worker-artifact-transport`, 2026-09-03 — **FIXED, deploys OWED**
+
+`#625`(2) and `#639` both recorded that `mlb_source/reconciliation/*` could not
+be got off refresh-worker, and named it as blocking two things. **There was no
+gap.** I had put the family on the READ-only list, on the argument that nothing
+on web serves it. That is true and it is the wrong test: **export-only makes a
+family readable IF PRESENT**, and nothing published it.
+
+**The right test is whether there is a serving HAZARD**, and there is none:
+
+- `RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN` is **false on web**;
+- `reconcile_prediction_results_for_date` defaults `result_roots` to
+  **`_repo_root()/data`** (`prediction_reconciliation.py:349`) — the CHECKOUT,
+  not `data_root()` — so even with the autorun on, web would not read the
+  mounted copy.
+
+Contrast `raw/statsapi/feed_live`, which STAYS export-only forever: there
+PRESENCE is the trigger, because `_mlb_feed_live_payload` returns the cached
+file if it exists. A new test pins that discriminating pair.
+
+**Cost, measured:** a real `props_actuals` is **56,564 bytes for 1,123 rows**;
+the whole 12-date window is **~663 KB, published ONCE each** (the sweep only
+sends changed files) — against a `book_grid` of 12.7 MB/day that already
+publishes. Affordable even with both services at 91-97%.
+
+**OWED: deploys to web AND refresh-worker** — web to accept the publish (its
+endpoint gates on `is_hot_artifact_relative_path`), refresh-worker to sweep it.
+Until then the family is still unreachable. **Verification:** `?path=` on a
+`props_actuals` CSV returns CONTENT rather than `count: 0`, which also makes
+`#639`'s residual answerable — whether the seven June files ever held rows.
+
+---
+
 ### `#640` — **DATING THE LIVE-LENS SNAPSHOT IS REJECTED WITH A MEASUREMENT; a fingerprint shipped instead** — lane `mlens-snapshot-dating`, 2026-09-03 — **CLOSED (the decision), one deploy OWED**
 
 `#625`(5) named "DATE the live-lens snapshot" as the way to make the board's
