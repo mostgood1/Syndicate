@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 741 rules `[generated]`
+## Index — 746 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 259**
+**FORBIDDEN — 264**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -195,6 +195,11 @@
 - [2026-09-03 — FORBIDDEN: assuming a stopped background task is stopped. Its CHILDREN kee…](#2026-09-03-forbidden-assuming-a-stopped-background-task-is-stopped-its-children-keep-running-and-if-they-write-shared-state-that-gates-something-they-will-gate-it-against-you-lane-accuracy-autorun-rearm)
 - [2026-09-03 — FORBIDDEN: polling a friendlier proxy instead of the instrument that GATES…](#2026-09-03-forbidden-polling-a-friendlier-proxy-instead-of-the-instrument-that-gates-the-action-lane-accuracy-autorun-rearm)
 - [2026-09-03 — FORBIDDEN: leaving a tree after `git reset --mixed` to a NEWER ref without…](#2026-09-03-forbidden-leaving-a-tree-after-git-reset---mixed-to-a-newer-ref-without-refreshing-the-working-files)
+- [2026-09-03 — FORBIDDEN: writing a poll predicate against the vocabulary you EXPECT inst…](#2026-09-03-forbidden-writing-a-poll-predicate-against-the-vocabulary-you-expect-instead-of-the-states-the-tool-actually-emits-three-instances-in-one-afternoon-two-would-have-acted-on-a-false-signal-lane-accuracy-autorun-rearm)
+- [2026-09-03 FORBIDDEN: carrying an obligation as "unverified" when a LATER change made t…](#2026-09-03-forbidden-carrying-an-obligation-as-unverified-when-a-later-change-made-the-signal-unreachable-in-a-log-the-two-are-identical-in-meaning-they-are-opposites)
+- [2026-09-03 FORBIDDEN: joining two FEEDS on exact string equality. Four instances in one…](#2026-09-03-forbidden-joining-two-feeds-on-exact-string-equality-four-instances-in-one-sport-in-one-day-each-one-silent-lanes-soccer-anchor-wiring-soccer-projection-names)
+- [2026-09-03 — FORBIDDEN: correcting a false claim in ONE copy and calling it fixed. Fix…](#2026-09-03-forbidden-correcting-a-false-claim-in-one-copy-and-calling-it-fixed-fix-the-operator-visible-copy-first)
+- [2026-09-03 — FORBIDDEN: editing a ledger file with Python TEXT-mode I/O. It rewrites ev…](#2026-09-03-forbidden-editing-a-ledger-file-with-python-text-mode-io-it-rewrites-every-line-ending-in-the-file-and-git-diff-will-not-show-you-scheduled-task-live-gameline-accuracy-snapshot-checkpoint)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
