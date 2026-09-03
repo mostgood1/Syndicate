@@ -64,6 +64,49 @@ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,60}$")
 # `!/data/` drops the 34,690-file tree under it.
 SPARSE_PATTERNS = ("/*", "!/data/")
 
+# `--with-test-data`: the mirror MINUS its four heaviest leaves.
+#
+# WHY THIS EXISTS. The default worktree has no `data/`, and **92 tests fail
+# there for that reason alone** -- measured 2026-09-03, holding data constant
+# and varying only its presence. They are not broken: their SUBJECT is the
+# data. `test_ncaaf_team_registry_reachability` says so itself -- "a value
+# assertion over a fixture cannot catch either; the fixture is the thing that
+# lied" -- and stubbing them would recreate the vacuous-pass defect this repo
+# has already paid for. Skipping the modules instead would drop **601 passing
+# tests**, 353 of them in `test_archives.py`, the file CI runs. The tests are
+# right; the ENVIRONMENT was wrong.
+#
+# `SYNDICATE_DATA_ROOT` does NOT solve it. Nine of these read
+# `REPO_ROOT/data/...` directly and ignore the variable entirely, which is why
+# they stayed invisible to a differential built on that env var. Only a real
+# checkout reaches them.
+#
+# MEASURED, both numbers from this tree:
+#     full mirror            34,690 files / 3,547.5 MB
+#     with these exclusions   6,013 files / 2,071.2 MB
+# and the 24 files that carried all 118 sweep failures go to
+# **1,031 passed, 0 failed**.
+#
+# THE EXCLUSIONS ARE THE FOUR BIGGEST LEAVES, none of which any test opened:
+#     source_artifacts/data/cache            27,287 files / 833.1 MB
+#     source_artifacts/data/daily_pitcher_props  720 files / 283.3 MB
+#     source_artifacts/data/daily_hitter_props   709 files / 282.7 MB
+#     data/daily/ladders                          17 files / 221.0 MB
+# `source_artifacts/data/daily` (1,977 files / 903.3 MB) is deliberately KEPT:
+# `test_archives.py` opens 26 of its `daily_summary_*.json`, and they are
+# date-stamped, so a narrower pattern would rot as the mirror advances.
+#
+# STILL OPT-IN, not the default. 2 GB per worktree across 20+ concurrent
+# worktrees is real disk, and most sessions never run these tests. Ask for it
+# when you intend to.
+SPARSE_PATTERNS_TEST_DATA = (
+    "/*",
+    "!/data/mlb_source/source_artifacts/data/cache/",
+    "!/data/mlb_source/source_artifacts/data/daily_pitcher_props/",
+    "!/data/mlb_source/source_artifacts/data/daily_hitter_props/",
+    "!/data/mlb_source/data/daily/ladders/",
+)
+
 
 def git(*args, cwd: Path | None = None, check: bool = False) -> subprocess.CompletedProcess:
     result = subprocess.run(["git", *args], cwd=str(cwd or REPO_ROOT),
@@ -126,7 +169,8 @@ def cmd_open(args) -> int:
     if not args.with_data:
         # Non-cone: cone mode cannot express "everything except this directory".
         git("sparse-checkout", "init", "--no-cone", cwd=path, check=True)
-        git("sparse-checkout", "set", *SPARSE_PATTERNS, cwd=path, check=True)
+        patterns = SPARSE_PATTERNS_TEST_DATA if args.with_test_data else SPARSE_PATTERNS
+        git("sparse-checkout", "set", *patterns, cwd=path, check=True)
     git("checkout", cwd=path, check=True)
 
     # `ls-files` lists the INDEX, which sparse-checkout does not shrink -- it
@@ -140,9 +184,18 @@ def cmd_open(args) -> int:
     print(f"files on disk    {count:,}"
           + (f"   ({skipped:,} skipped -- data/ excluded)" if skipped else ""))
     print(f"index            its own -- `git add` here touches no other session")
-    if not args.with_data:
+    if args.with_test_data and not args.with_data:
+        print("\nNOTE: data/ is present MINUS its four heaviest leaves (cache,")
+        print("daily_pitcher_props, daily_hitter_props, ladders) -- ~6,013 files /")
+        print("~2.1 GB against the full mirror's 34,690 / 3.5 GB. This is what the 92")
+        print("data-dependent tests need; without it they fail for the environment")
+        print("rather than for a defect. It is still a LOSSY MIRROR and never")
+        print("evidence about production -- check Render before diagnosing a gap.")
+    elif not args.with_data:
         print("\nNOTE: data/ is absent by design. It is a lossy mirror, never evidence")
         print("about production. Re-run with --with-data if you genuinely need it.")
+        print("**92 tests fail in this tree for that absence alone** -- they are not")
+        print("broken. `--with-test-data` provisions what they read (~2.1 GB).")
     print(f"\n  cd {path}")
     return 0
 
@@ -397,6 +450,11 @@ def main() -> int:
     p.add_argument("--lane", required=True)
     p.add_argument("--with-data", action="store_true",
                    help="check out data/ too (+34,690 files); say why in your lane")
+    p.add_argument("--with-test-data", action="store_true",
+                   help="check out the mirror MINUS its 4 heaviest leaves "
+                        "(~6,013 files / ~2.1GB). This is what the 92 "
+                        "data-dependent tests read; without it they fail for the "
+                        "environment, not for a defect.")
     p.set_defaults(func=cmd_open)
 
     p = sub.add_parser("adopt", help="what this lane must land from the primary tree first")
