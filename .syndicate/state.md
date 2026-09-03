@@ -226,6 +226,36 @@ invisible to any predicate that looks only at what is present.**
   stale branch resurrects archived blocks (19 of them). Its remedy was MANUAL;
   this makes refusal automatic.
 
+## [live-lens-snapshot] THE LIVE-LENS SNAPSHOT CANNOT BE DATED — it is a 4 MB KEYVALUE key, not a file, and archiving it would cost ~5.76 GB/day against a 256 MB store `[measured 2026-09-03, lane mlens-snapshot-dating]`
+
+`data_root()/live/<sport>_live_lens.json` is ONE undated, MUTABLE object. It is
+why `#625`(5) had to declare five blocks of the board artifact UNREPLAYABLE, and
+the obvious fix — date it — **must not be built.** Measured at one instant:
+
+- **IT IS NOT A FILE.** `_KEYVALUE_EXCLUDED_PATH_MARKERS` is only
+  `migration_runs/`, so `live/` routes to the KEYVALUE store. That is also why
+  `/api/ops/artifacts/export` reports **0 files under `live/*`** while the
+  pattern IS allowlisted — the inventory globs a disk the object never touches.
+- **SIZE: `live/mlb_live_lens.json` = 4,194,400 bytes (4.0 MB), ONE key.**
+- **STORE: 222.28 MB of 256 MB (86.8%), policy `volatile-lru`, 12,203 keys
+  already evicted.** `reports/intelligence` alone is 189.51 MB of it.
+- **COST OF DATING: 4 MB x 1,440 ticks/day = ~5.76 GB/day for MLB ALONE**, about
+  22x the whole store's capacity, and five sports write on the same 60s tick.
+- **AND IT WOULD BE UNRELIABLE AS WELL AS RUINOUS.** A path containing a date
+  token automatically takes a TTL (`_default_keyvalue_ttl_seconds`), and under
+  `volatile-lru` ONLY keys with a TTL are evicted — so dated snapshots would be
+  the FIRST thing dropped. The archive would be partial with no way to know
+  what was missing.
+
+**WHAT WAS DONE INSTEAD:** the board artifact's `live_game_state` block now
+carries a `lens_fingerprint` — a sha256 of the NORMALISED games plus counts and
+the snapshot age, **98 bytes** on an artifact that IS dated, disk-backed and
+mirrorable. It does NOT make the correction reproducible. It makes a divergence
+**ATTRIBUTABLE**: two boards can be compared, and a replay can say "I had a
+different lens input" instead of diverging for unstated reasons. The hash is
+over the normalised games, not the raw payload, because the raw payload churns
+on timestamps that change nothing.
+
 ## [substrate-rule] A CLAIM MUST NAME ITS SUBSTRATE, AND THERE ARE THREE — the standard's §3b was widened and strengthened at the same time `[2026-09-02, lane m625-standard-substrate-label, commit 6211bdf9, NO DEPLOY]`
 
 `model_engine_standard.md` §3b used to say the substrate "must be Render", full

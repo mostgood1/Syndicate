@@ -1496,6 +1496,19 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   median here vs 15.8 min there, two independent windows.
 - Blocked by: none
 
+### mlens-snapshot-dating — CLOSED 2026-09-03 — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **THE ASK WAS MEASURED AND REJECTED, and a bounded substitute shipped instead.** Dating `live/<sport>_live_lens.json` must NOT be built: it is not a file — `live/` is KEYVALUE-backed (`_KEYVALUE_EXCLUDED_PATH_MARKERS` is only `migration_runs/`), which is also why `artifacts/export` reports 0 files under `live/*` while the pattern IS allowlisted. **One key = 4,194,400 bytes, written every 60s, five sports, against a store at 222.28 MB of 256 MB (86.8%) with 12,203 keys already evicted — ~5.76 GB/day for MLB alone, ~22x the whole store.** And a dated path auto-takes a TTL, which under `volatile-lru` makes the archive the FIRST thing evicted: ruinous AND unreliable. **SHIPPED INSTEAD: a `lens_fingerprint` in the board artifact's `live_game_state` block** — sha256 of the NORMALISED games plus counts and age, **98 bytes**, on an artifact that IS dated, disk-backed and mirrorable. It does not make the correction reproducible; it makes a divergence ATTRIBUTABLE.
+- Files: released — `syndicate/features/shared/board_enrichment.py`,
+  `tests/test_lens_fingerprint.py`, `scripts/replay_diff_gate.py` (exclusion
+  reason updated to point at the fingerprint).
+- Falsification test: FIRED, and it is the lane's main output — the hypothesis
+  "dating is a one-line change" was wrong in kind, not in degree.
+- Verification: the fingerprint is stable on a repeat, changes on a changed
+  score or state, does NOT change on age alone (so "the lens stopped moving"
+  stays distinguishable from "the board changed"), and stays under 400 bytes on
+  a 30-game slate. 6 new tests; 27 board-grid tests pass.
+- **OWED: a refresh-worker deploy**, or the field is landed-but-inert. The board
+  build writes it on the next book-grid tick (~10 min after deploy).
+- Claims: NONE held.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

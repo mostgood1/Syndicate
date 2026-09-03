@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 711 rules `[generated]`
+## Index — 720 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5019,3 +5019,37 @@ back in one queue cycle, not in minutes.
 - **Cost:** a guard reported as installed and working while enforcing nothing;
   caught the same session only because reachability was checked explicitly.
   Measured after the fix, same injected duplicate: 0 violations before, 2 after.
+
+## 2026-09-03 REQUIRED: before proposing to ARCHIVE or DATE anything in this repo, check whether the path is KEYVALUE-backed and price it. The live-lens snapshot is a 4 MB Redis key on a 60s tick -- dating it would have written ~5.76 GB/day into a 256 MB store. `[lane mlens-snapshot-dating]`
+
+- **What we believed:** `data_root()/live/<sport>_live_lens.json` is a file, and
+  dating it is a one-line change at the single write site
+  (`live_lens_loop.py:718`). I proposed exactly this as a follow-up, in writing,
+  in two ledger files.
+- **What was actually true:** it is not a file at all.
+  `_KEYVALUE_EXCLUDED_PATH_MARKERS` contains only `migration_runs/`, so `live/`
+  routes to the keyvalue store — which is also why
+  `/api/ops/artifacts/export` reports **0 files under `live/*`** while the
+  pattern IS allowlisted, a "0" I had already half-misread once. Measured:
+  **4,194,400 bytes for ONE key**, written every **60s**, for **five sports**,
+  against a store at **222.28 MB of 256 MB (86.8%)** with **12,203 keys already
+  evicted**. Dating it is **~5.76 GB/day from MLB alone, ~22x the whole store's
+  capacity.** Worse, a path with a date token AUTOMATICALLY takes a TTL, and the
+  policy is `volatile-lru` — which evicts ONLY keys that have one. The archive
+  would have been the first thing dropped: ruinous *and* unreliable.
+- **How we found out:** pricing it before building it — `/api/ops/keyvalue/usage`
+  gives per-bucket bytes and `/api/ops/keyvalue/diagnostics` gives the ceiling,
+  the policy and the eviction count. Two calls, before any code.
+- **The rule going forward:** **"date it" and "archive it" are storage decisions,
+  not code decisions.** Before proposing either: (1) is the path keyvalue-backed
+  (`_keyvalue_backed`, and the exclusion list is one entry long, so assume YES);
+  (2) how big is one object; (3) how often is it written; (4) what does the
+  store have left. Multiply. And check whether adding a date token silently
+  attaches a TTL — in this repo it does, which `execution_ledger.py` already
+  documents for its own ledger ("NO DATE TOKEN -- a dated path takes the store's
+  10-day TTL and the record would silently expire").
+  **When the archive is unaffordable, a FINGERPRINT is usually the right
+  substitute**: it cannot make the thing reproducible, but it makes a divergence
+  attributable, which is most of the value at ~100 bytes instead of 4 MB.
+- **Cost:** none — it was priced before it was built. Had it shipped, it would
+  have evicted production state from a store that is already 86.8% full.

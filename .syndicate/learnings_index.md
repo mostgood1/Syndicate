@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 711 rules `[generated]`
+## Index — 720 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 237**
+**FORBIDDEN — 244**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -173,6 +173,13 @@
 - [2026-09-02 FORBIDDEN: installing a guard in `sitecustomize.py` that RAISES. CPython swa…](#2026-09-02-forbidden-installing-a-guard-in-sitecustomizepy-that-raises-cpython-swallows-it-prints-a-warning-and-the-process-runs-on-my-guard-announced-its-refusal-and-permitted-the-thing-it-refused-lane-m625-fleet-runner)
 - [2026-09-02 FORBIDDEN: taking a deploy claim or preflight from a SESSION WORKTREE. `depl…](#2026-09-02-forbidden-taking-a-deploy-claim-or-preflight-from-a-session-worktree-deploy-guardpy-reads-claude_project_dir-the-primary-tree-so-worktree-locks-are-invisible-and-the-deploy-is-blocked-with-a-message-that-names-the-wrong-lane-lane-soccer-anchor-audit-artifact)
 - [2026-09-02 FORBIDDEN: drawing a conclusion from a log line the API TRUNCATED. Render's…](#2026-09-02-forbidden-drawing-a-conclusion-from-a-log-line-the-api-truncated-renders-logs-api-cut-a-json-payload-at-1200-chars-the-visible-part-was-all-zeros-and-i-published-zero-for-every-date-when-it-was-7-of-12-lane-m639-actuals-zero-rows)
+- [2026-09-02 FORBIDDEN: multiplying a measured unit cost by a population from a DIFFERENT…](#2026-09-02-forbidden-multiplying-a-measured-unit-cost-by-a-population-from-a-different-query-state-the-scope-of-both-or-the-product-is-invented-lane-soccer-anchor-wiring-corrected-by-soccer-anchor-cost)
+- [2026-09-02 — FORBIDDEN: deriving a worst case from the NAMES of the limits instead of t…](#2026-09-02-forbidden-deriving-a-worst-case-from-the-names-of-the-limits-instead-of-the-loops-actual-control-flow-my-3-x-20-x-20-1200s-described-a-nesting-that-does-not-exist-lane-kalshi-discovery-deadline)
+- [2026-09-02 — FORBIDDEN: calling a repeated-cost measurement a PER-REQUEST cost without…](#2026-09-02-forbidden-calling-a-repeated-cost-measurement-a-per-request-cost-without-finding-the-state-that-decides-whether-it-recurs-measured-once-it-was-254-calls-measured-an-hour-later-0-lane-kalshi-discovery-deadline)
+- [2026-09-02 — FORBIDDEN: adding a bound that returns a PARTIAL result without checking h…](#2026-09-02-forbidden-adding-a-bound-that-returns-a-partial-result-without-checking-how-the-caller-reads-emptiness-this-one-would-have-blanked-150-series-off-the-board-for-an-hour-lane-kalshi-discovery-deadline)
+- [2026-09-02 FORBIDDEN: reading a DIFFERENTIAL in which more than one variable moved. And…](#2026-09-02-forbidden-reading-a-differential-in-which-more-than-one-variable-moved-and-an-absent-trace-is-not-an-absent-dependency)
+- [2026-09-02 FORBIDDEN: acting on a tool's OUTPUT without checking the tool's actual THRE…](#2026-09-02-forbidden-acting-on-a-tools-output-without-checking-the-tools-actual-threshold-or-predicate-its-output-is-a-claim-about-the-tool-not-about-the-system-lane-ledger-stale-tree-guard)
+- [2026-09-02 FORBIDDEN: a blanket `except` in a guard. It converts VERSION SKEW into sile…](#2026-09-02-forbidden-a-blanket-except-in-a-guard-it-converts-version-skew-into-silence-and-a-silent-guard-is-indistinguishable-from-a-clean-result-lane-ledger-precommit-hook)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -256,7 +263,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 469**
+**Rules and corrections — 471**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -417,6 +424,8 @@
 - [2026-09-02 REQUIRED: derive a local run's config from a SNAPSHOT of production's, not b…](#2026-09-02-required-derive-a-local-runs-config-from-a-snapshot-of-productions-not-by-hand-the-roles-are-their-env-and-they-differ-on-137-of-194-keys-lane-m625-fleet-runner)
 - [2026-09-02 REQUIRED: `deploy_preflight.py` CLEAR means "no job was running when I looke…](#2026-09-02-required-deploy_preflightpy-clear-means-no-job-was-running-when-i-looked-not-no-job-dies-the-old-container-keeps-launching-work-for-the-whole-build-phase-lane-soccer-anchor-audit-artifact)
 - [2026-09-02 REQUIRED: `git rebase --continue` re-runs the message CLEANUP, so a commit s…](#2026-09-02-required-git-rebase---continue-re-runs-the-message-cleanup-so-a-commit-subject-starting-with-is-silently-deleted-every-item-id-in-this-repo-starts-with-lane-m639-actuals-zero-rows)
+- [2026-09-02 — RULE: run `lane_identity_check` AFTER landing, not only before. A rebase d…](#2026-09-02-rule-run-lane_identity_check-after-landing-not-only-before-a-rebase-duplicates-a-lane-block-wholesale-and-the-write-side-rule-does-not-cover-it-lane-kalshi-discovery-deadline)
+- [2026-09-03 REQUIRED: before proposing to ARCHIVE or DATE anything in this repo, check w…](#2026-09-03-required-before-proposing-to-archive-or-date-anything-in-this-repo-check-whether-the-path-is-keyvalue-backed-and-price-it-the-live-lens-snapshot-is-a-4-mb-redis-key-on-a-60s-tick----dating-it-would-have-written-576-gbday-into-a-256-mb-store-lane-mlens-snapshot-dating)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

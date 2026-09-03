@@ -407,6 +407,57 @@ def _soccer_live_state_games(selected_date: str) -> tuple[list[dict], float | No
     return lens_games, oldest_age
 
 
+def _lens_fingerprint(lens_games: list, age_seconds: float | None) -> dict:
+    """A stable identity for the live-lens input that actually drove a correction.
+
+    Hashes the NORMALISED games rather than the raw snapshot on purpose. The raw
+    payload carries timestamps and render metadata that churn between ticks
+    without changing a single game state, so hashing it would produce a
+    fingerprint that always differs and therefore says nothing. The normalised
+    list is exactly what the join reads, so two boards with the same digest were
+    corrected from the same effective input.
+
+    Cheap by construction -- a digest and three counts, on the order of a
+    hundred bytes -- because the alternative (archiving the snapshot itself) was
+    measured at ~5.76 GB/day against a 256 MB store. See the note at the return
+    site.
+    """
+    import hashlib
+
+    digest = hashlib.sha256()
+    for game in lens_games:
+        if not isinstance(game, dict):
+            continue
+        home = (game.get("home") or {}).get("name") or (game.get("home") or {}).get("abbr") or ""
+        away = (game.get("away") or {}).get("name") or (game.get("away") or {}).get("abbr") or ""
+        digest.update(
+            "|".join(
+                [
+                    str(away),
+                    str(home),
+                    str(game.get("state") or ""),
+                    str(game.get("home_score")),
+                    str(game.get("away_score")),
+                ]
+            ).encode("utf-8")
+        )
+        digest.update(bytes([10]))
+    states: dict[str, int] = {}
+    for game in lens_games:
+        if isinstance(game, dict):
+            key = str(game.get("state") or "unknown")
+            states[key] = states.get(key, 0) + 1
+    return {
+        "sha256_12": digest.hexdigest()[:12],
+        "games": len(lens_games),
+        "states": states,
+        # The snapshot's own age at read time. Two boards can share a digest and
+        # differ in age -- that means the lens stopped moving, not that the
+        # board changed.
+        "age_seconds": round(age_seconds, 1) if age_seconds is not None else None,
+    }
+
+
 def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: str) -> dict:
     """Correct a FROZEN chip game state from the live lens (`#413`).
 
@@ -575,6 +626,29 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
         # being fixed, while a flood of `pregame->live` would mean the chip join
         # is degrading and this is quietly carrying the whole board.
         "transitions": transitions,
+        # THE SNAPSHOT'S IDENTITY, so a divergence here is ATTRIBUTABLE.
+        #
+        # The live-lens snapshot lives at ONE undated, MUTABLE key
+        # (`data_root()/live/<sport>_live_lens.json`), so there is no historical
+        # value of it and this correction cannot be re-derived after the fact.
+        # `#625`(5) had to declare five whole blocks of the board artifact
+        # UNREPLAYABLE for exactly this reason -- 167 of 167 rows whose
+        # projection differed traced back to it.
+        #
+        # **DATING THE SNAPSHOT WAS MEASURED AND REJECTED** (2026-09-03): it is
+        # KEYVALUE-backed, not a file -- `live/mlb_live_lens.json` is a single
+        # **4,194,400-byte** key -- so one write per 60s tick is **~5.76 GB/day
+        # for MLB alone against a 256 MB store** that is already 86.8% full with
+        # 12,203 keys evicted. A dated path also picks up a TTL automatically,
+        # and under `volatile-lru` that makes the archive the FIRST thing
+        # evicted: ruinous AND unreliable.
+        #
+        # So this records the snapshot's FINGERPRINT instead -- about a hundred
+        # bytes, on an artifact that IS dated, disk-backed and mirrorable. It
+        # does not make the correction reproducible. It makes a divergence
+        # ATTRIBUTABLE: two boards can be compared, and a replay can say "I had
+        # a different lens input" instead of diverging for unstated reasons.
+        "lens_fingerprint": _lens_fingerprint(lens_games, age_seconds),
     }
 
 

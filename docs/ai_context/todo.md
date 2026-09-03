@@ -84,6 +84,33 @@ production copy. See the transport note in `#625`(2).
 
 ---
 
+### `#640` — **DATING THE LIVE-LENS SNAPSHOT IS REJECTED WITH A MEASUREMENT; a fingerprint shipped instead** — lane `mlens-snapshot-dating`, 2026-09-03 — **CLOSED (the decision), one deploy OWED**
+
+`#625`(5) named "DATE the live-lens snapshot" as the way to make the board's
+live-state correction verifiable. **Priced before building, and it must not be
+built.**
+
+- **It is not a file.** `live/` is KEYVALUE-backed —
+  `_KEYVALUE_EXCLUDED_PATH_MARKERS` is only `migration_runs/`. That is also why
+  `artifacts/export` shows **0 files under `live/*`** while the pattern IS
+  allowlisted: the inventory globs a disk the object never touches.
+- **`live/mlb_live_lens.json` = 4,194,400 bytes, ONE key**, rewritten every 60s,
+  five sports on the same tick.
+- **Store: 222.28 MB of 256 MB (86.8%), `volatile-lru`, 12,203 keys evicted.**
+- **Dating = ~5.76 GB/day for MLB alone, ~22x the store's capacity.** And a
+  dated path auto-takes a TTL; under `volatile-lru` only TTL'd keys are
+  evicted, so the archive would be the first thing dropped.
+
+**SHIPPED INSTEAD:** `lens_fingerprint` in the board artifact's
+`live_game_state` block — sha256 over the NORMALISED games (not the raw
+payload, which churns on timestamps that change nothing) plus counts and the
+snapshot age. **98 bytes**, on an artifact that IS dated and mirrorable. It does
+not make the correction reproducible; it makes a divergence **attributable**.
+
+**OWED:** a refresh-worker deploy, or the field is landed-but-inert.
+
+---
+
 ### `#638` — **CLOSED 2026-09-03 — comment corrected, decision recorded, tripwire in place. NO DEPLOY.** Was: the publisher's `roster_objs` comment is stale and the pattern above it is broader than its author thought — lane `m638-roster-objs-comment`
 
 `artifact_publisher.py` says roster objects are *"deliberately NOT allowlisted --

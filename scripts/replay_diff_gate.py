@@ -293,7 +293,11 @@ BOOK_GRID_TOLERANCE = Tolerance(
         # counted again downstream.
         (
             "live_game_state*",
-            "UNREPLAYABLE: needs live/mlb_live_lens.json, a non-dated mutable snapshot with no historical value.",
+            "UNREPLAYABLE: needs live/mlb_live_lens.json, a non-dated mutable snapshot with no "
+            "historical value. DATING IT WAS MEASURED AND REJECTED 2026-09-03 -- it is a single "
+            "4,194,400-byte KEYVALUE key, so one write per 60s tick is ~5.76 GB/day for MLB alone "
+            "against a 256 MB store already 86.8% full. The block now carries a `lens_fingerprint` "
+            "instead: a divergence here is ATTRIBUTABLE even though it is not reproducible.",
         ),
         ("live_gamelines*", "UNREPLAYABLE: same live-lens snapshot."),
         ("live_projections*", "UNREPLAYABLE: same live-lens snapshot."),
