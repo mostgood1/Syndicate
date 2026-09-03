@@ -1697,13 +1697,25 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `pending_deploys.py` reading 0 for it. Content token: `chip_join_key` is
   already live, so this round uses a token from `939a8c00` in `layer2_board.py`.
 - Blocked by: none.
-### order-sim-view — **CLOSED-PENDING-DEPLOY 2026-09-03** — opened 2026-09-03 — session 37abeca0-5c86-4c57-b85a-62fb489e761a — **SHIPPED TO `main` (`cb223b62` + `733a28f0`), NOT DEPLOYED. Goal met; the pre-registered measurement it was built for is only PARTLY unblocked, and the unblocked half needs a caveat carried with it.**
+### order-sim-view — **REOPENED 2026-09-03 for the READ side** — opened 2026-09-03 — session 37abeca0-5c86-4c57-b85a-62fb489e761a — **WRITE side SHIPPED (`cb223b62` + `733a28f0`), NOT DEPLOYED. Now adding the ROI-by-`sim_view` aggregate the write side left unserved `[user directive]`.**
 - Goal: an order records the SIM'S OWN VERDICT on the row it came from, so the
   settled book can be split by `sim_view`.
 - Files: `syndicate/features/shared/execution_ledger.py`,
   `pipeline/execute_portfolio.py`,
   `syndicate/features/shared/portfolio_commit.py`,
-  `tests/test_order_sim_view.py` (NEW).
+  `syndicate/features/shared/paper_settlement.py` [claimed 2026-09-03 ~22:4xZ,
+  free — no OPEN lane named it],
+  `tests/test_order_sim_view.py`, `tests/test_sim_view_roi_summary.py` (NEW).
+- **`syndicate/blueprints/ops.py` — FUNCTION-SCOPED CLAIM on
+  `api_ops_execution_ledger_summary` ONLY** `[2026-09-03 ~22:4xZ]`. The OPEN lane
+  `web-oom-profiler-steady` (session `b2b5b45b`) holds this file and **its claim
+  stands** — I am not taking it. Checked before touching anything: that lane's
+  ops.py work is the artifact-merge/publish region (`_spawn_artifact_merge`,
+  `_merge_child_cap`, `_publish_streamed_body`, `_write_published_artifact`,
+  ~L1714-2200, commit `a6f5f586`), which mentions the ledger-summary endpoint
+  **zero times**; mine is ~L334-460. Disjoint by function and ~1,300 lines apart.
+  That lane also holds the live `web` deploy claim (22:21:55Z, TTL 2700s) and
+  **I am not deploying**, so nothing of mine touches it.
 - **CLAIMS TAKEN FROM `order-model-view`** (first two files), whose session
   `3492626c` was absent from the session roster INCLUDING ARCHIVED when checked
   2026-09-03 ~22:0xZ. Struck from that lane's `- Files:` with a matching note;
@@ -1719,10 +1731,32 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   Full working, the `disagrees` selection effect, the size cost and the
   unserved-field gap: `state.md [order-model-attribution]` and
   `log/2026-09-03.md` 22:0x-23:0xZ.
+- **READ SIDE DONE AND LANDED.** `paper_settlement.sim_view_roi_summary()` cuts
+  settled ROI by sport x market family x `sim_view`, served as `sim_view_roi` on
+  `/api/ops/execution/ledger-summary`. **No new arithmetic** — buckets come from
+  `_grouped`, the same function behind `by_market_family` / `by_sport` /
+  `by_venue_family`, so this ROI IS `settlement_summary`'s ROI (pinned by
+  `test_roi_matches_settlement_summary_on_the_same_rows`). Portfolio rows only,
+  or the venue-scoped shadow copies double-count — proven discriminatingly
+  (10 rows + 5 `paper:kalshi` rows gives a byte-identical result).
+- **THE PAYLOAD CARRIES ITS OWN CAVEATS, and that is the point of it.** Four
+  verdicts are absent BY CONSTRUCTION and two more are EV-selected; a reader
+  without that would read the gap as a broken join. `verdict_reachability` names
+  the unreachable set, the EV-conditioned pair and the `(unrecorded)` sentinel
+  with reasons. **The claim is checked against the real commit gate at three EVs
+  by `test_the_published_unreachable_set_is_exactly_what_the_gate_refuses`**, so
+  the endpoint cannot keep asserting a structural fact after the structure moves.
+- **COUNT CORRECTED, same lane: FOUR verdicts are unreachable, not three.** I
+  missed `live_contradicts`, which is in the same `model_edge_pct is None`
+  branch — I had enumerated my own fixtures rather than the branch. Caught when
+  encoding the set as a constant forced a re-measure of all nine. Corrected in
+  `state_portfolio.md`, `todo.md`, `learnings.md`, the log and both test files.
 - **Verification (OWED, and nothing here discharges it):** a NON-NULL `sim_view`
   on an order whose `submitted_at` is after the deploy, from
-  `/api/portfolio/paper` or `/api/portfolio/live`. **A null does not count in
-  either direction.**
+  `/api/portfolio/paper` or `/api/portfolio/live`; and a non-empty
+  `sim_view_roi.by_sport_family_verdict` on `/api/ops/execution/ledger-summary`.
+  **A null does not count in either direction.** Note the ROI cut will show
+  `(unrecorded)` for every bet already in the book — that is correct, not a bug.
 - Blocked by: nothing in the code. **Deploy deliberately not taken** — held by
   lane `prop-join-yield` per user instruction. Needs BOTH order-placing
   services, same as `04187cdf`.

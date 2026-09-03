@@ -22,9 +22,11 @@ reachable, and the unreachable part is not a coverage problem that time fixes:**
 
 `36161e83` landed mid-lane and split `none` into `none` / `unpriced` at the
 source, expressly because this field was about to be persisted. Nine verdicts
-now, and the finding WIDENS rather than changes: `contradicts`, `unpriced` and
-`none` are all computed in exactly the branch where `model_edge_pct is None`,
-which `sizing_inputs_from_row` refuses BY NAME before
+now, and the finding WIDENS rather than changes: `contradicts`,
+**`live_contradicts`**, `unpriced` and `none` — **FOUR, not three; the first
+record of this missed `live_contradicts`, corrected same lane** — are all
+computed in exactly the branch where `model_edge_pct is None`, which
+`sizing_inputs_from_row` refuses BY NAME, at every `ev_pct`, before
 anything is sized. So the `contradicts` arm's denominator is zero and stays
 zero however long the ledger runs — consistent with NCAAF having 0 orders ever,
 and with production on 2026-09-03 (41 orders on `/api/portfolio/paper`: mlb 29,
@@ -41,13 +43,20 @@ it.** The stake gates admit a disagreement only when the EV outruns it — at
 Control for `ev_pct` (on the order since `04187cdf`) or the comparison measures
 the EV gap and reports it as a sim effect.
 
-**OPEN, and it is the next step for whoever takes the measurement: nothing
-SERVES the field per order.** `/api/portfolio/paper` returns `ledger.orders` as
-an integer COUNT; `bet_status.rows` and `live_marks.marks` carry no model
-fields; `/api/ops/execution/ledger-summary` is aggregates-only BY DESIGN and
-carries no outcome or P&L, so it cannot express ROI at all. An ROI-by-`sim_view`
-aggregate has to be added there, respecting that endpoint's stated safety
-property (it increments counters and never places an order dict in the response).
+**THE READ SIDE IS NOW BUILT** `[2026-09-03, same lane]`.
+`paper_settlement.sim_view_roi_summary()` is served as `sim_view_roi` on
+`/api/ops/execution/ledger-summary`, cutting settled ROI by sport x market
+family x `sim_view` with denominators. It reuses `_grouped`, so it is the SAME
+ROI as every other cut in that module rather than a second definition; it is
+restricted to portfolio rows so the venue-scoped shadow books cannot
+double-count; and it preserves the endpoint's aggregates-only shape (checked
+over the whole serialised response). `verdict_reachability` ships in the payload
+so four permanently-empty buckets are not read as a broken join, and that claim
+is re-derived from the live commit gate by a test at three EVs.
+
+**Still OPEN and still the blocker: the measurement cannot RETURN A NUMBER until
+orders accumulate post-deploy.** Every bet already in the book will bucket as
+`(unrecorded)`, which is correct rather than a defect.
 
 **OWED: the deploy, and the reading.** Verification is a NON-NULL `sim_view` on
 an order whose `submitted_at` is after the deploy, from `/api/portfolio/paper`

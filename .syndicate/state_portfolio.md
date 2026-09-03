@@ -147,7 +147,7 @@ real evaluation records: the ledger is worker-local and not in
 `[ledger_bridge]` line carries the breakdown that falsifies it —
 `by_identity` large with `matched_by_identity: 0` means the mapping is wrong.
 
-## [order-model-attribution] AN ORDER NOW RECORDS THE SIM'S VERDICT — AND THE COMMIT GATE MAKES THREE OF THE NINE VERDICTS UNREACHABLE `[verified 2026-09-03, lane order-sim-view, commits cb223b62 + 733a28f0, NOT DEPLOYED]`
+## [order-model-attribution] AN ORDER NOW RECORDS THE SIM'S VERDICT — AND THE COMMIT GATE MAKES FOUR OF THE NINE VERDICTS UNREACHABLE `[verified 2026-09-03, lane order-sim-view, commits cb223b62 + 733a28f0, NOT DEPLOYED]`
 
 `sim_view` / `sim_line_gap` / `sim_probability_railed` are stamped onto the
 position by `portfolio_commit._sim_view_of`, copied across the `OrderRequest`
@@ -158,14 +158,25 @@ board attaches the verdict to `shortlist["cards"]` while the commit path prices
 `shortlist["rows"]`, so there is nothing to read it off.
 
 **THE LOAD-BEARING FACT, and it is about the GATE rather than the field.**
-`contradicts`, `unpriced` and `none` are all computed in exactly the branch
-where `model_edge_pct is None`, and `sizing_inputs_from_row` refuses that row by
-name (`no_model_edge_pct`) before anything is sized. Measured by running the
-real `commit_portfolio` over one row per verdict class:
+`contradicts`, **`live_contradicts`**, `unpriced` and `none` — **FOUR of the
+nine verdicts, not three** `[count corrected 2026-09-03 in the same lane; the
+first record missed `live_contradicts`, which sits in the same branch]` — are
+all computed where `model_edge_pct is None`, and `sizing_inputs_from_row`
+refuses that row by name (`no_model_edge_pct`) before anything is sized, **at
+every ev_pct**. Measured by running the real `commit_portfolio` over one row per
+verdict class:
 
     agrees     PLACED     contradicts  REFUSED  no_model_edge_pct
     neutral    PLACED     unpriced     REFUSED  no_model_edge_pct
     disagrees  PLACED*    none         REFUSED  no_model_edge_pct
+
+The nine verdicts fall into three classes, and the middle one is the
+dangerous one because its buckets FILL UP and look like a fair sample:
+
+    ALWAYS REACHABLE (3)      agrees, live_agrees, neutral
+    EV-CONDITIONED   (2)      disagrees, live_disagrees  -- placeable only when
+                              the EV outruns the disagreement
+    UNREACHABLE      (4)      contradicts, live_contradicts, unpriced, none
 
 **So a STORED order can only ever carry `agrees`, `disagrees`, `neutral` or a
 `live_` form — and the `contradicts`-vs-`agrees` ROI split that
@@ -188,13 +199,32 @@ through `commit_portfolio` at price -110:
 orders. **Any ROI comparison must control for `ev_pct`** — which is on the order
 since `04187cdf` — or it measures the EV gap and reports it as a sim effect.
 
-**NOTHING SERVES THE FIELD PER ORDER, and that is the next step.**
-`/api/portfolio/paper` returns `ledger.orders` as an integer COUNT;
-`bet_status.rows` and `live_marks.marks` carry no model fields;
-`/api/ops/execution/ledger-summary` is aggregates-only BY DESIGN (its docstring:
-order-level data over HTTP is a different risk class) and carries no outcome or
-P&L, so it cannot express ROI at all. An ROI-by-`sim_view` aggregate has to be
-added there.
+**THE READ SIDE IS BUILT** `[2026-09-03, same lane, NOT DEPLOYED]`.
+`paper_settlement.sim_view_roi_summary()` cuts settled ROI by sport x market
+family x `sim_view`, served as `sim_view_roi` on
+`/api/ops/execution/ledger-summary` — the only keyvalue-aware reader of the
+ledger, and it is handed the rows the endpoint ALREADY read, so the counts and
+the ROI describe one snapshot rather than two reads seconds apart.
+
+Buckets come from `_grouped` — the same function behind `by_market_family`,
+`by_sport` and `by_venue_family` — so there is **one** ROI definition, not two;
+`test_roi_matches_settlement_summary_on_the_same_rows` pins it. **Portfolio rows
+only**, or the unrestricted book pools with its own `paper:<venue>` shadow
+copies (proven discriminatingly: adding 5 shadow rows to 10 portfolio rows
+changes nothing). Percentages stay `None` rather than `0.0` on an empty
+denominator, inherited from `_grouped`.
+
+The endpoint's aggregates-only shape is PRESERVED, not merely respected: the cut
+emits counters, money sums and three label strings, and reads only `sport`,
+`market`, `venue`, `mode`, `selected_date`, `status`, `outcome`,
+`fill_stake_dollars`, `pnl_dollars` and `sim_view`. Verified over the whole
+serialised response — no ticker, key, price, position key, event id or player
+name survives.
+
+`verdict_reachability` travels IN the payload, because four buckets are empty by
+construction and two more are EV-selected, and a reader without that reads the
+gap as a broken join. **That claim is re-derived from the live commit gate at
+three EVs by a test**, so it cannot go stale silently.
 
 Size cost, since `_LEAN_FIELDS` bounds a document two services
 read-modify-write: +74 B/record, **+361 KB at the 5,000-record ceiling**, where

@@ -426,6 +426,41 @@ def api_ops_execution_ledger_summary() -> Any:
             bucket["staked_dollars"] = round(bucket["staked_dollars"], 2)
             bucket["by_status"] = dict(sorted(bucket["by_status"].items()))
 
+    # SETTLED ROI SPLIT BY THE SIM'S OWN VERDICT, within sport x market family.
+    #
+    # WHY IT BELONGS HERE AND NOT IN A NEW ROUTE. This is the only keyvalue-aware
+    # reader of the execution ledger -- the same reason `last_blind_write` is
+    # surfaced below. A second route would need a second read of the same
+    # document and could answer a DIFFERENT snapshot of it, which is precisely
+    # the ambiguity a book-level ROI number must not carry.
+    #
+    # `orders=orders` FOR THAT REASON: the rows already read above, not a fresh
+    # `_load()`. The counts and the ROI then describe one snapshot rather than
+    # two reads seconds apart, and no second store round trip is made.
+    #
+    # THE SHAPE PROPERTY OF THIS ENDPOINT IS PRESERVED. `sim_view_roi_summary`
+    # returns counters, money sums and three label strings per bucket -- no order
+    # dict, no ticker, no price, no client id, no idempotency key. It reads
+    # `sport`, `market`, `venue`, `mode`, `selected_date`, `status`, `outcome`,
+    # `fill_stake_dollars`, `pnl_dollars` and `sim_view`, and nothing else. As
+    # above, that is a property of the construction rather than of remembering
+    # to strip fields.
+    #
+    # WINDOWED THE SAME WAY as everything else in this response (`keep` and
+    # `want_mode`), so the ROI answers the window the reader asked for. A cut
+    # that silently covered the whole ledger while the counts beside it covered
+    # seven days would be read as one payload and is two.
+    try:
+        from syndicate.features.shared.paper_settlement import sim_view_roi_summary
+
+        sim_view_roi = sim_view_roi_summary(
+            selected_dates=keep, mode=(want_mode or None), orders=orders
+        )
+    except Exception as exc:  # noqa: BLE001
+        # An ops read must not 500 -- see this function's own error handling
+        # above. A named failure, so an absent cut is never read as an empty one.
+        sim_view_roi = {"error": f"{type(exc).__name__}: {exc}"}
+
     # DID A WRITE EVER GO IN BLIND? `#600`.
     #
     # `execution_ledger._persist` stamps `last_blind_write` when it could not
@@ -457,6 +492,11 @@ def api_ops_execution_ledger_summary() -> Any:
         "orders_without_date": skipped_no_date,
         "last_blind_write": blind_write,
         "summary": {d: summary[d] for d in sorted(summary)},
+        # WHAT THE SIM SAID ABOUT THE BETS, and how they then settled. Carries
+        # its own `verdict_reachability` block, which is not decoration: four
+        # verdicts are absent from these buckets BY CONSTRUCTION and a reader
+        # who does not know that will read the gap as a broken join.
+        "sim_view_roi": sim_view_roi,
     })
 
 

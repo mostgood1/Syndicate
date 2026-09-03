@@ -1184,6 +1184,149 @@ def settlement_summary(
     }
 
 
+# ---------------------------------------------------------------------------
+# ROI BY THE SIM'S OWN VERDICT
+# ---------------------------------------------------------------------------
+
+# An order placed before `cb223b62`, which is when `sim_view` began being
+# recorded. DISTINCT FROM `"none"`, which is the sim being ASKED and having no
+# view -- collapsing the two would silently pool every pre-2026-09-03 bet into a
+# verdict bucket and report the result as a finding about the sim. The
+# parentheses guarantee no collision: every real verdict is a bare identifier.
+SIM_VIEW_UNRECORDED = "(unrecorded)"
+
+# WHICH VERDICTS CAN REACH AN ORDER AT ALL. Measured 2026-09-03 by running
+# `commit_portfolio` over one row per verdict at ev_pct 1/5/20/100 (lane
+# `order-sim-view`). This is a property of the COMMIT GATE, not of this module,
+# and it is published in the response because a reader who does not know it will
+# read four permanently-absent buckets as a broken join.
+#
+# These four are exactly the verdicts computed in the branch where
+# `model_edge_pct is None`, and `sizing_inputs_from_row` refuses that row by name
+# (`no_model_edge_pct`) before anything is sized, at every EV. So the
+# `contradicts`-vs-`agrees` split that `layer2-sim-disagrees` pre-registered has
+# a denominator that is structurally zero and stays zero however long this runs.
+SIM_VIEW_UNREACHABLE = ("contradicts", "live_contradicts", "unpriced", "none")
+
+# Placeable, but ONLY when the EV outruns the disagreement: the stake gates
+# refuse `below_min_stake` and then `zero_kelly_stake` as the sim's probability
+# falls under the price's implied. Measured at -110: ev_pct 5 admits
+# model_edge_pct -0.5, ev 10 admits -2.0, ev 20 admits -5.0, ev 40 admits -10.0.
+# So these buckets are a BIASED SAMPLE -- systematically high-EV against the
+# `agrees` buckets -- and a comparison that does not hold `ev_pct` fixed measures
+# the EV gap and reports it as a sim effect. Said in the payload, because a
+# number that needs a caveat and does not carry one gets quoted without it.
+SIM_VIEW_EV_CONDITIONED = ("disagrees", "live_disagrees")
+
+
+def sim_view_roi_summary(
+    *,
+    selected_dates=None,
+    mode=None,
+    orders=None,
+):
+    """Settled ROI split by the SIM'S VERDICT, within sport x market family.
+
+    THE QUESTION THIS EXISTS FOR, pre-registered by `layer2-sim-disagrees`: does
+    a row the sim CONTRADICTS settle worse than one it agrees with, held within
+    a sport and a market family, with denominators reported? The book's own
+    split (`game_line` +13.28% n=296 vs `game_total` -1.78% n=351) cannot answer
+    it, because it is not decomposed by what the sim said.
+
+    NO NEW ARITHMETIC. Buckets come from `_grouped`, the same function behind
+    `by_market_family`, `by_sport` and `by_venue_family` -- so ROI here is the
+    same ROI, `pnl / settled stake`, with the same three-way treatment of
+    unsettled rows and the same `execution_guard.is_non_position` rule. This
+    module already records what a second definition costs; a cut that cannot be
+    compared to the cuts beside it is worth less than no cut.
+
+    PORTFOLIO ROWS ONLY, AND THAT IS NOT OPTIONAL. This key carries NO VENUE, so
+    over the full ledger it would pool the unrestricted book with its own
+    venue-scoped shadow copies -- the double-count `by_market_family` and
+    `by_sport` are already restricted for, one level down and harder to see.
+
+    PERCENTAGES ARE `None`, NEVER `0.0`, WHEN NOTHING IS SETTLED. Inherited from
+    `_grouped`: a 0.0% ROI on zero settled bets and a 0.0% ROI on fifty are the
+    same string and opposite facts.
+    """
+    from syndicate.features.shared.execution_ledger import _load
+
+    rows = list(orders) if orders is not None else (_load().get("orders") or [])
+    if selected_dates is not None:
+        keep = {str(d) for d in selected_dates}
+        rows = [o for o in rows if str(o.get("selected_date") or "") in keep]
+    if mode:
+        want = str(mode).strip().lower()
+        rows = [o for o in rows if str(o.get("mode") or "").strip().lower() == want]
+    rows = [o for o in rows if book_of(o) == BOOK_PORTFOLIO]
+
+    # The triple is captured AS the key is built rather than parsed back out of
+    # it. A sport is free text, and a separator that "cannot appear" in one is a
+    # bet this file does not need to take.
+    labels = {}
+
+    def _key(order):
+        sport = str(order.get("sport") or "unknown").strip().lower() or "unknown"
+        family = _market_family(order)
+        raw = order.get("sim_view")
+        verdict = str(raw).strip() if raw is not None and str(raw).strip() else SIM_VIEW_UNRECORDED
+        key = f"{sport} | {family} | {verdict}"
+        labels[key] = {"sport": sport, "market_family": family, "sim_view": verdict}
+        return key
+
+    buckets = _grouped(rows, _key)
+    for bucket in buckets:
+        bucket.update(labels.get(bucket["key"], {}))
+
+    # THE SAME ROWS POOLED BY VERDICT ALONE. Offered BESIDE the cross and never
+    # instead of it: pooling across sports and families is exactly the confound
+    # the pre-registered measurement says to hold fixed, so this is an index,
+    # not the answer. `_aggregate` is the shared roll-up, so these totals cannot
+    # drift from the buckets they summarise.
+    by_verdict = {}
+    for bucket in buckets:
+        by_verdict.setdefault(bucket.get("sim_view") or "unknown", []).append(bucket)
+    pooled = []
+    for verdict in sorted(by_verdict):
+        rolled = _aggregate(by_verdict[verdict])
+        rolled["sim_view"] = verdict
+        rolled["ev_conditioned"] = verdict in SIM_VIEW_EV_CONDITIONED
+        pooled.append(rolled)
+
+    return {
+        # THE CUT THE MEASUREMENT ASKED FOR: sport and family held fixed.
+        "by_sport_family_verdict": buckets,
+        # An index across them. Read the cross before quoting this.
+        "by_verdict": pooled,
+        # WHAT THE BUCKETS CANNOT SAY ABOUT THEMSELVES, and would be misread
+        # without. Four verdicts are absent BY CONSTRUCTION rather than for want
+        # of data, and one pair is present but selected on EV. A permanently
+        # empty bucket and a not-yet-populated one look identical.
+        "verdict_reachability": {
+            "unreachable": list(SIM_VIEW_UNREACHABLE),
+            "unreachable_reason": (
+                "computed where model_edge_pct is None, which "
+                "portfolio_commit.sizing_inputs_from_row refuses by name "
+                "(no_model_edge_pct) before sizing, at every ev_pct. These "
+                "buckets are structurally empty and stay empty; the "
+                "contradicts-vs-agrees ROI split cannot be taken from this book."
+            ),
+            "ev_conditioned": list(SIM_VIEW_EV_CONDITIONED),
+            "ev_conditioned_reason": (
+                "placeable only when ev_pct outruns the disagreement (at -110: "
+                "ev 5 admits model_edge_pct -0.5, ev 20 admits -5.0), so these "
+                "buckets are systematically high-EV. Hold ev_pct fixed, or the "
+                "comparison measures the EV gap rather than the sim."
+            ),
+            "unrecorded_bucket": SIM_VIEW_UNRECORDED,
+            "unrecorded_reason": (
+                "placed before sim_view was recorded (cb223b62). NOT the same "
+                "as the verdict 'none', which is the sim answering."
+            ),
+        },
+    }
+
+
 def _venue_family(order: Mapping[str, Any]) -> str:
     """`<venue>/<market_family>` -- the cross, as one key.
 

@@ -15,11 +15,13 @@ The suite is in four parts:
   2. it survives the position -> OrderRequest -> ledger record chain
   3. absence survives as absence, and `"none"` never collapses into `None`
   4. WHAT IS STILL UNREACHABLE -- the commit gate refuses the exact rows a
-     contradiction lives on, so three of the nine verdicts can never appear on
-     a stored order and the `contradicts` arm of the pre-registered measurement
+     contradiction lives on, so FOUR of the nine verdicts can never appear on a
+     stored order and the `contradicts` arm of the pre-registered measurement
      has a structurally empty denominator. Pinned here so that a change to that
      gate turns this file red rather than silently changing what the
-     measurement means.
+     measurement means. The set itself lives in
+     `paper_settlement.SIM_VIEW_UNREACHABLE` -- the endpoint publishes it, so
+     there must not be a second copy of it here.
 """
 
 from __future__ import annotations
@@ -366,25 +368,40 @@ def test_the_verdict_is_not_part_of_a_bets_identity():
 
 
 def test_a_contradicted_row_still_cannot_become_an_order():
-    """THREE OF THE NINE VERDICTS HAVE A STRUCTURALLY EMPTY DENOMINATOR.
+    """FOUR OF THE NINE VERDICTS HAVE A STRUCTURALLY EMPTY DENOMINATOR.
 
-    `contradicts`, `unpriced` and `none` are computed in exactly the branch
-    where `model_edge_pct` is None, and `sizing_inputs_from_row` refuses that
-    row BY NAME (`no_model_edge_pct`) before anything is sized. So persisting
-    the verdict is NECESSARY and NOT SUFFICIENT: `contradicts`-vs-`agrees`
-    settled ROI cannot accumulate at all while this gate stands, no matter how
-    long the ledger runs. Only `agrees`, `disagrees` and `neutral` (and their
-    `live_` forms) can ever appear on a stored order.
+    They are computed in exactly the branch where `model_edge_pct` is None, and
+    `sizing_inputs_from_row` refuses that row BY NAME (`no_model_edge_pct`)
+    before anything is sized. So persisting the verdict is NECESSARY and NOT
+    SUFFICIENT: `contradicts`-vs-`agrees` settled ROI cannot accumulate at all
+    while this gate stands, no matter how long the ledger runs. Only `agrees`,
+    `neutral` and (EV-permitting) `disagrees`, with their `live_` forms, can
+    ever appear on a stored order.
+
+    THE SET IS IMPORTED, NOT RESTATED. `/api/ops/execution/ledger-summary`
+    publishes `SIM_VIEW_UNREACHABLE` to explain four permanently-empty buckets,
+    so a second copy here could drift out of agreement with the one users read.
+    An earlier version of this test listed THREE and omitted `live_contradicts`
+    -- which is that drift, caught late.
 
     Asserted rather than written down, so that changing the gate turns this red
     and whoever changes it reads the note instead of quietly redefining what the
     measurement is measuring.
     """
-    for verdict, row in (
-        ("contradicts", _row(model_edge_pct=None, side="under", projection={"projected": 67.8})),
-        ("unpriced", _row(model_edge_pct=None, projection={"projected": None})),
-        ("none", _row(model_edge_pct=None, projection={"projected": None, "model_prob_over": None})),
-    ):
+    from syndicate.features.shared.paper_settlement import SIM_VIEW_UNREACHABLE
+
+    fixtures = {
+        "contradicts": _row(model_edge_pct=None, side="under", projection={"projected": 67.8}),
+        "live_contradicts": _row(model_edge_pct=None, side="under",
+                                 projection={"projected": 67.8, "basis": "live_resim"}),
+        "unpriced": _row(model_edge_pct=None, projection={"projected": None}),
+        "none": _row(model_edge_pct=None, projection={"projected": None, "model_prob_over": None}),
+    }
+    assert set(fixtures) == set(SIM_VIEW_UNREACHABLE), (
+        "this test and the published set disagree about which verdicts are "
+        "unreachable -- one of them is stale"
+    )
+    for verdict, row in fixtures.items():
         assert _sim_view_of(row)["sim_view"] == verdict
         inputs, reason = sizing_inputs_from_row(row)
         assert inputs is None

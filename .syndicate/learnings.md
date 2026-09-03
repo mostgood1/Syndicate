@@ -4454,12 +4454,19 @@ The task was to persist `sim_view` onto orders so a pre-registered ROI split —
 taken. The plumbing was the easy half and it works. **The measurement still
 cannot be taken, and no amount of waiting fixes it.**
 
-`contradicts`, `unpriced` and `none` are computed in exactly the branch where
-`model_edge_pct is None`. `portfolio_commit.sizing_inputs_from_row` refuses that
-row by name (`no_model_edge_pct`) before anything is sized. **The verdicts the
-measurement is ABOUT are, by construction, the verdicts that can never be
-placed.** Three of nine. The `contradicts` arm's denominator is not thin, it is
-structurally zero.
+`contradicts`, `live_contradicts`, `unpriced` and `none` are computed in exactly
+the branch where `model_edge_pct is None`.
+`portfolio_commit.sizing_inputs_from_row` refuses that row by name
+(`no_model_edge_pct`) before anything is sized. **The verdicts the measurement is
+ABOUT are, by construction, the verdicts that can never be placed.** Four of
+nine. The `contradicts` arm's denominator is not thin, it is structurally zero.
+
+**I first wrote "three of nine" and it was wrong** — I enumerated the verdicts I
+had written fixtures for instead of the ones the BRANCH produces, and missed
+`live_contradicts`. Caught only when I went to encode the set as a constant and
+re-measured all nine. **A count derived from your own test fixtures is a count of
+your fixtures, not of the system.** Enumerate from the code that produces the
+values, then measure every one.
 
 **Reading the code was not enough to see this, and neither was reading either
 function alone.** Both are correct in isolation: the board is right to publish
