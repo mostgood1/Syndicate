@@ -534,6 +534,24 @@ evidence: `.syndicate/findings_2026-09-02_soccer_anchor_cost.md`.
   pinned at `+shift_bound`), the sign test is p=0.289/0.453 (NOT significant),
   and the reference's own uncertainty (0.0187) exceeds the surrogate error being
   claimed. **The defensible claim is EQUAL ACCURACY AT ZERO COST.**
+- **THE EDGE QUESTION IS ANSWERED, AND THE ANSWER IS NO `[2026-09-03, 6,486
+  rows / 136 matches / 56 league-date units, 8 leagues, 2026-08-07..09-01]`.**
+  Anchored vs base re-simulated in ONE harness with ratings `as_of` each fixture
+  date, graded on REALIZED SHOTS from ESPN — never on a book price, because
+  anchoring converges to the market by construction and scoring against it
+  rewards exactly that.
+  **base MAE 0.52126, anchored 0.52163 -> +0.00038 shots per player-match,
+  +0.072% WORSE.** Per match: worse in **95/136 (70%)**, sign test p=0.0000,
+  mean delta -0.00101, sd 0.01106, **t = -1.06**, median delta **+0.0000**.
+  **The DIRECTION is consistent and the MAGNITUDE is inside the noise — report
+  both.** A large n makes a nothing-sized effect "significant"; 0.0004 shots is
+  nothing.
+  **So anchoring MOVES prop values (2.9-5.1% relative) without making them more
+  accurate. Movement without accuracy is noise, not signal — the
+  derivative-market edge thesis for this mechanism is RETIRED.** Weight stays
+  0.0 on evidence now, not on caution. Caveats all add noise SYMMETRICALLY (24
+  teams resolved to zero players; season-aggregate player rows leak into both
+  arms so only the paired delta is quotable; 1..31 priced events per date).
 - **WHY ARMING IT WOULD CHANGE LITTLE:** the anchor moves h2h **3.58 pp** and
   props **2.9–5.1% relative**, while the staked soccer surface is **99 board
   rows / 58 fixtures, 74% h2h, ZERO player props**. Largest effect on the market

@@ -2071,8 +2071,42 @@ path (a) is FALSIFIED, and two name joins were losing most of the mechanism.**
   better accuracy.** That is enough to adopt it as the cost lever and it
   collapses the anchor's 83.2 min/4h to ~0 — but it changes nothing about
   arming, which was declined on EDGE and EVIDENCE, not on cost. (3) Multi-week anchored-vs-base on PROPS
-  against OUTCOMES, not h2h vs market — HARNESS
-  BUILT AND PROVEN 2026-09-02, RUN BLOCKED ON SERVICE HEALTH, NOT MEASURED.**
+  against OUTCOMES, not h2h vs market — **RUN
+  2026-09-03. ANSWERED, AND THE ANSWER IS NO.**
+
+  **Anchoring produces NO practical gain on props graded against realized shots,
+  and is consistently, negligibly WORSE.** 6,486 gradeable (player, match) rows
+  over **136 matches / 56 league-date units**, 8 leagues, 2026-08-07..09-01.
+  Base and anchored re-simulated in ONE harness, ratings `as_of` each fixture
+  date, differing only in the ratings handed to the simulator.
+
+      base MAE      0.52126 shots
+      anchored MAE  0.52163 shots
+      difference    +0.00038 shots per player-match  =  +0.072% WORSE
+      per-match     anchored worse in 95/136 (70%), sign test p = 0.0000
+                    mean delta -0.00101, sd 0.01106  ->  t = -1.06
+      median per-match delta  +0.0000
+
+  **DIRECTION AND MAGNITUDE DISAGREE AND BOTH ARE THE ANSWER.** The direction is
+  real — worse in 70% of matches, overwhelming at n=136. The magnitude is INSIDE
+  THE NOISE (t = -1.06) and the MEDIAN match delta is exactly **0.0000**. Never
+  quote that p-value without the effect size: 0.0004 shots is nothing, and a
+  large n makes a nothing-sized effect "significant".
+
+  **THIS RETIRES THE EDGE THESIS FOR THIS MECHANISM.** Anchoring moves prop
+  VALUES by 2.9-5.1% relative (measured 2026-09-02) and that movement buys ZERO
+  accuracy against outcomes. Movement without accuracy is noise, not signal.
+  Beside the other two: h2h moves 3.58 pp toward the market, which cannot create
+  edge by construction, and the staked soccer surface is 74% h2h / 0 props.
+  **The weight stays 0.0 on EVIDENCE now, not on caution.**
+
+  **CAVEATS, none of which rescue it:** absolute MAEs are optimistic (season
+  aggregate `players_*.csv` leak into BOTH arms, so only the paired delta is
+  quotable); **24 distinct teams resolved to ZERO players** (alias gaps such as
+  `RasenBallsport Leipzig` vs `RB Leipzig`, plus cup ties pulling non-league
+  clubs in), degrading both arms equally; priced events per date ran 1..31 so a
+  few dates dominate; 138/139 matches returned actuals. All add noise
+  SYMMETRICALLY — none could hide a benefit of the size the thesis needed.
   Feasible: 76 soccer `odds_history` files carry de-vigged h2h, archived
   `recommendations_*.json` carry base props, ESPN carries actuals; **75
   gradeable league-dates over 22 dates, 8 leagues, ~300 fixtures**. Blocked

@@ -5199,3 +5199,30 @@ usually the thing every row in a group shares.
   not exist, and `#639` left a question open ("was anything destroyed?") that
   was answerable all along. Caught by measuring the thing I had assumed was
   expensive.
+
+## 2026-09-03 REQUIRED: when a sign test says p=0.0000 and the t says -1.06, publish BOTH — the direction and the magnitude are different findings and only one of them decides anything. `[lane soccer-anchor-cost, #622(3)]`
+
+**Measured.** Anchored-vs-base soccer props over 136 matches: anchoring was
+worse in **95/136 (70%)**, exact sign test **p = 0.0000**. On the same data the
+per-match mean delta was **-0.00101 shots with sd 0.01106 — t = -1.06**, and the
+MEDIAN match delta was exactly **0.0000**.
+
+Both statistics are correct. They answer different questions: the sign test asks
+*"is the direction consistent"* (emphatically yes), the t asks *"is the size
+distinguishable from zero"* (no). At n=136 a consistent but vanishing effect
+produces exactly this pair, and quoting either alone misleads in opposite
+directions — the p-value alone reads as a strong finding, the t alone reads as
+"no effect at all" when the direction is in fact reliable.
+
+**The decision came from the EFFECT SIZE, not the p-value.** +0.00038 shots per
+player-match, +0.072%. That is nothing, and no amount of significance makes it
+something. The correct conclusion was "the mechanism moves projections without
+improving them", which needed the magnitude to state and the direction to rule
+out "it helps a bit sometimes".
+
+**How to apply.** Report effect size FIRST and significance second, in that
+order, for anything that will inform a money decision. If they disagree, say so
+explicitly rather than picking the one that supports the write-up — and check
+the median, which here was flatly 0.0000 and settled the argument on its own.
+Sibling of the same day's clustering rule: a p-value is a statement about
+sampling, never about importance.
