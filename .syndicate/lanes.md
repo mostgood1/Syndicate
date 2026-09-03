@@ -2224,6 +2224,70 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: a quiet refresh-worker (no MLB sim / odds refresh / soccer build in flight). Overnight.
   a board build were in flight at 10:20 CT.
 
+
+### web-oom-rate-escalation — CLOSED 2026-09-03 — opened 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: `#632` records 2 OOM kills and a `+32 MB/h` steady-state model implying
+  **~23 h to reach the limit**. The events API now shows **THREE MORE kills, all
+  at 2.5-3.1 h of uptime**. Establish whether the rate has ESCALATED or whether
+  `#632`'s steady-state window was unrepresentative — and do it without
+  repeating the warm-up error that item has already retracted twice.
+- Files: `.syndicate/{lanes,state,log}.md`, `docs/ai_context/todo.md` (`#632`).
+  Measurement only; NO repo code and NO production change in this lane.
+- NEW EVIDENCE `#632` DOES NOT HAVE (Render events API, service
+  `srv-d88ahvrbc2fs73eodu30`):
+      2026-09-02T20:51:54Z  oomKilled   uptime 3.13 h (from 17:43:48 available)
+      2026-09-03T01:46:58Z  oomKilled   uptime 2.45 h (from 23:20:01 deploy)
+      2026-09-03T05:21:48Z  oomKilled   uptime 3.09 h (from 02:16:30 restart)
+  Five kills total, three inside ~9 hours. `#632` asks "whether 2 kills in 24
+  deploys is a rate worth acting on"; that denominator has moved.
+- Hypothesis: the climb does NOT plateau at the ~900 MB working set `#632`
+  records. If it continues past warm-up at even a fraction of the observed
+  warm-up slope, the limit is reachable in ~3 h and the 2.5-3.1 h uptimes are
+  arithmetic rather than coincidence.
+- Falsification test: **if anon PLATEAUS once warm-up ends, the hypothesis is
+  wrong** and the three kills need a different explanation (a burst, a specific
+  request, a slate-size effect). A plateau is a real result here, not a
+  non-result.
+- Verification RAN: 24 samples, uptime 47 → 105 min, no restart inside it.
+- **MY HYPOTHESIS IS FALSIFIED, by the test I pre-registered.** anon PLATEAUS at
+  **~1,582 MB** (late-half sd **17.1**) and no OOM occurred at 1.8 h uptime,
+  against my predicted 1.8-2.2 h. I predicted a climb to the limit; it flattened.
+  Slope by window: last 24 **+283** MB/h, last 14 **+34**, last 10 **+87** — the
+  big early number is ramp, not trend.
+- **AND MY OWN 45-MIN WARM-UP CUTOFF WAS TOO SHORT.** The "+206 MB level shift
+  larger than the within-half noise" I reported as evidence of a real climb was
+  the ramp still finishing at 47-76 min. Samples I labelled `steady` were not.
+  This is `#632`'s twice-retracted window error in a subtler form — I guarded
+  against it and still put the boundary in the wrong place.
+- **WHAT THE RUN ESTABLISHES, and it is worth more than the hypothesis was:**
+  **`#632`'S RATE IS RIGHT AND ITS BASELINE IS STALE.**
+
+      #632 steady-state rate    +32 MB/h  |  my last-14 slope  +34 MB/h   AGREE
+      #632 plateau / working set  ~900 MB  |  measured now     ~1,582 MB  +682 MB
+
+  Excursion tolerance is what kills it: headroom to the 2,048 MB limit falls
+  **1,148 → 466 MB**. `#632` recorded a single **+402 MB** step in one 20-minute
+  window; on a 900 MB baseline that reaches 1,302 MB and survives, on a 1,582 MB
+  baseline it reaches **1,984 MB = 97% of the limit**. **The same excursions
+  that were survivable are now fatal — which explains 3 kills in 9 hours with no
+  change in the leak rate.** Headroom was observed at **29.2 MB** during this run.
+- **SO THE HUNT IS FOR WHAT RAISED THE PLATEAU, and for the excursion source —
+  NOT for a leak rate.** `#632`'s own surviving sentence ("something exceeds the
+  working set sometimes, and that excursion is what this is about") is the
+  correct framing; its `~23 h to OOM` arithmetic is not, and should be replaced
+  with this baseline+excursion model.
+- **TRAPS THIS LANE MUST NOT REPEAT, all already paid for in `#632`:**
+  (a) a warm-up window quoted as a leak rate — retracted twice there, and a
+      663 -> 1,086 MB / +724 MB/h reading taken 11-46 min after the 15:38:49Z
+      deploy was nearly quoted as one here;
+  (b) `memory_current_mb` instead of `memory_anon_mb` — `current` carries page
+      cache (`#566`, `[memory.current is page cache]`);
+  (c) the Render logs API `start` parameter is IGNORED — verified this session,
+      identical output with and without it — so HISTORICAL windows are not
+      retrievable and every series is "the recent N lines". Any claim about a
+      past OOM window must come from the EVENTS API, not from logs.
+- Blocked by: none. `#632` is unowned.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -901,6 +901,47 @@ memory — the MLB `book_quotes` shards it serves are **60-70 MB each**. OOM #1
 had no export in flight, just a `/portfolio` render. **A per-route correlation
 against the anon series is the next measurement**, not a fix.
 
+**BASELINE CORRECTION `[2026-09-03, lane `web-oom-rate-escalation`]`. THIS
+ITEM'S RATE IS RIGHT; ITS BASELINE IS STALE, AND ITS `~23 h to OOM` ARITHMETIC
+SHOULD BE REPLACED.**
+
+**THREE MORE KILLS this item does not list**, all at short uptime:
+
+    2026-09-02T20:51:54Z  oomKilled   uptime 3.13 h
+    2026-09-03T01:46:58Z  oomKilled   uptime 2.45 h
+    2026-09-03T05:21:48Z  oomKilled   uptime 3.09 h
+
+Five total, three inside ~9 h. The question "is 2 kills in 24 deploys a rate
+worth acting on" now has a different denominator.
+
+**A 24-sample watch (uptime 47 → 105 min, no restart inside it) FALSIFIED the
+obvious reading.** anon does NOT climb to the limit: it **PLATEAUS at ~1,582 MB**
+(late-half sd 17.1), and no kill followed at 1.8 h. Slope by window — last 24
+**+283** MB/h, last 14 **+34** — the large early figure is the warm-up ramp.
+
+**WHAT CHANGED IS THE PLATEAU, NOT THE RATE:**
+
+    this item's steady-state rate  +32 MB/h   |  independent re-measure  +34 MB/h   AGREE
+    this item's working set          ~900 MB  |  measured 2026-09-03   ~1,582 MB   +682 MB
+
+**Excursion tolerance is the killer.** Headroom to 2,048 MB falls **1,148 → 466
+MB**. This item's own recorded **+402 MB** single-window step reaches 1,302 MB on
+a 900 MB baseline (survives) and **1,984 MB = 97% of the limit** on a 1,582 MB
+one. **The same excursions that were survivable are now fatal**, which explains
+three kills in nine hours with no change in leak rate. Headroom **29.2 MB** was
+observed during the watch.
+
+**SO THE NEXT QUESTION IS WHAT RAISED THE PLATEAU BY ~680 MB**, and separately
+what produces the several-hundred-MB excursions — not what the leak rate is.
+This item's surviving sentence ("something exceeds the working set sometimes,
+and that excursion is what this is about") is the right frame.
+
+**A TOOLING FACT THAT COST TIME:** the Render logs API **IGNORES `startTime`** —
+verified, byte-identical output with and without it. Historical windows are NOT
+retrievable from logs; every series is "the recent N lines". Any claim about a
+past OOM window must come from the EVENTS API. Two readings were nearly
+misattributed to the wrong window this way.
+
 **NOT YET ESTABLISHED, and do not skip to a fix:** whether 2 kills in 24 deploys
 is a rate worth acting on, what the web service's anon (not page-cache) high-water
 mark actually is, and whether these correlate with a deploy, a slate size, or a
