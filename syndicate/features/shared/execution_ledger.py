@@ -95,6 +95,31 @@ STATUS_FAILED = "failed"
 _MAX_RECORDS = 5000
 _WARN_BYTES = 2 * 1024 * 1024  # a quarter of the store's 8MB refusal ceiling
 
+
+def _store_max_bytes() -> int:
+    """The store's REAL refusal ceiling, not a copy of it.
+
+    `#643`: the size warning used to name a hardcoded "8MB". That number lives
+    in `refresh_state_store._keyvalue_max_bytes()` and is overridable by
+    `SYNDICATE_KEYVALUE_MAX_BYTES`, so a copy here would go stale silently and
+    the warning would misreport exactly the threshold it exists to warn about.
+    Falls back to the documented default if the private accessor ever moves --
+    a warning that raises is worse than one that is slightly conservative.
+
+    RESTORED 2026-09-03. `8add1bbe` added this; `04187cdf` -- a legitimate,
+    unrelated change to this same file, committed from a tree that predated it
+    -- silently reverted it, and production went on printing the old line while
+    the fix sat merged on `main`. Caught only by checking the DEPLOYED FILE'S
+    CONTENT rather than whether the commit was an ancestor: it was an ancestor,
+    and the code was still gone.
+    """
+    try:
+        from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
+
+        return int(_keyvalue_max_bytes())
+    except Exception:
+        return 8 * 1024 * 1024
+
 # Only these fields are persisted per order. Anything not named here does not
 # reach the ledger, which is the bound that keeps a growing document small.
 _LEAN_FIELDS = (
@@ -801,9 +826,36 @@ def _persist(state: dict[str, Any]) -> dict[str, Any]:
     serialized = json.dumps(state, separators=(",", ":"))
     size = len(serialized.encode("utf-8", errors="replace"))
     if size >= _WARN_BYTES:
+        # `#643`, RESTORED 2026-09-03 after `04187cdf` reverted it -- see the
+        # note on `_store_max_bytes` below.
+        #
+        # This line used to end "-- the store refuses at 8MB", which is true and
+        # reads as an approaching outage. It is not one: `_MAX_RECORDS` trims
+        # BEFORE this serialization, so the payload is bounded by
+        # (bytes-per-order x cap), not by uptime. Measured on live-odds-worker:
+        # 1,094 B/order over three readings spanning 1.92h (1093.6 / 1094.1 /
+        # 1094.0 -- flat), and `TRIMMED` had never fired in 72h. At the cap that
+        # projects to ~5.47MB, 65% of the ceiling, so growth in COUNT cannot
+        # reach it.
+        #
+        # So the line reports the JOIN that decides it -- per-order size against
+        # the cap -- because that is the only number that can make the ceiling
+        # reachable, and it is invisible in a total.
+        per_order = size / len(orders) if orders else float(size)
+        projected_at_cap = int(per_order * _MAX_RECORDS)
+        ceiling = _store_max_bytes()
+        bounded = projected_at_cap < ceiling
         print(
             f"[execution_ledger] SIZE_WARNING bytes={size} warn_at={_WARN_BYTES} "
-            f"orders={len(orders)} -- the store refuses at 8MB",
+            f"orders={len(orders)} bytes_per_order={per_order:.0f} "
+            f"cap={_MAX_RECORDS} projected_at_cap={projected_at_cap} ceiling={ceiling} "
+            + (
+                f"-- BOUNDED: the record cap holds this to {projected_at_cap * 100 // ceiling}% "
+                "of the refusal ceiling, so this is not an approaching outage"
+                if bounded
+                else "-- UNBOUNDED: at the record cap this EXCEEDS the refusal ceiling; "
+                "the cap no longer protects the write and orders will fail to persist"
+            ),
             flush=True,
         )
     write_json_file(_ledger_path(), state)
