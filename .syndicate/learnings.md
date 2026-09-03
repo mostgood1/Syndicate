@@ -4444,3 +4444,43 @@ stale in the minutes between writing and pushing — the owner committed the ver
 thing I was warning was uncommitted. Retract rather than leave it: a stale
 warning in someone else's block is indistinguishable from a live one, and dilutes
 whatever real notice is already sitting there.
+
+## 2026-09-03 — FORBIDDEN: calling a field's persistence "the measurement is now possible" without checking the population can REACH the table
+
+`[lane order-sim-view, session 37abeca0]`
+
+The task was to persist `sim_view` onto orders so a pre-registered ROI split —
+`contradicts` vs `agrees` vs `none`, within sport and market family — could be
+taken. The plumbing was the easy half and it works. **The measurement still
+cannot be taken, and no amount of waiting fixes it.**
+
+`contradicts`, `unpriced` and `none` are computed in exactly the branch where
+`model_edge_pct is None`. `portfolio_commit.sizing_inputs_from_row` refuses that
+row by name (`no_model_edge_pct`) before anything is sized. **The verdicts the
+measurement is ABOUT are, by construction, the verdicts that can never be
+placed.** Three of nine. The `contradicts` arm's denominator is not thin, it is
+structurally zero.
+
+**Reading the code was not enough to see this, and neither was reading either
+function alone.** Both are correct in isolation: the board is right to publish
+`contradicts` on an unpriced row, and the sizer is right to refuse an unpriced
+row. The defect only exists in the JOIN between them, and it only became
+visible by RUNNING `commit_portfolio` over one row per verdict class and reading
+the refusal counters.
+
+**How to apply — the check is one line and it is not "does the field flow":**
+before reporting that a persisted field unblocks a measurement, run the real
+producer over one input per VALUE OF THE GROUPING KEY and count what survives to
+the table. A field that flows perfectly and only ever carries three of its nine
+values has not unblocked a split across all nine.
+
+**And check the SHAPE of what does survive.** The one arm that is reachable here
+— `disagrees` — is admitted only when the EV outruns the disagreement (at -110:
+`ev_pct` 5.0 admits `model_edge_pct` -0.5, 20.0 admits -5.0), so `disagrees`
+orders are systematically high-EV. An ROI comparison that did not control for
+`ev_pct` would measure the EV gap and report it as a sim effect. **A non-empty
+denominator is not the same as an unbiased one.**
+
+This is `presence != reachability` applied to a POPULATION rather than to code:
+the fix is present, the path is live, and the rows that would exercise it are
+filtered out upstream.

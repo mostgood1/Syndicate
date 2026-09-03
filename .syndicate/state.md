@@ -471,6 +471,7 @@ once this index exists: re-splitting would orphan the parts.
 | [polymarket-order-fills] | 2026-08-30 — four causes REFUTED; fills are mostly fine | `state_polymarket.md` |
 | [portfolio-live-surface] | `/portfolio` IS THE LIVE BUYING ENGINE, the venue caps BIND, and the VENUE now settles our bets `[verified 202 | `state_portfolio.md` |
 | [portfolio-settlement] | PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[ver | `state_portfolio.md` |
+| [order-model-attribution] | AN ORDER NOW RECORDS THE SIM'S VERDICT — AND THE COMMIT GATE MAKES THREE OF THE NINE VERDICTS UNREACHABLE `[ve | `state_portfolio.md` |
 | [soccer-market-anchor] | MARKET-ANCHORING IS REACHABLE AND STILL OFF BY DECISION — MEASURED 2026-09-02 `[lane soccer-anchor-cost, main  | `state_soccer.md` |
 | [soccer-board-coverage] | — MEASURED 2026-09-02, production, NOT A DEFECT | `state_soccer.md` |
 | [soccer-live-match-state] | Soccer's live tier is WIRED AND VERIFIED ON LIVE MATCHES (2026-08-21) | `state_soccer.md` |

@@ -146,3 +146,61 @@ real evaluation records: the ledger is worker-local and not in
 `HOT_ARTIFACT_PATTERNS`, so no service with an API can read it. The next
 `[ledger_bridge]` line carries the breakdown that falsifies it —
 `by_identity` large with `matched_by_identity: 0` means the mapping is wrong.
+
+## [order-model-attribution] AN ORDER NOW RECORDS THE SIM'S VERDICT — AND THE COMMIT GATE MAKES THREE OF THE NINE VERDICTS UNREACHABLE `[verified 2026-09-03, lane order-sim-view, commits cb223b62 + 733a28f0, NOT DEPLOYED]`
+
+`sim_view` / `sim_line_gap` / `sim_probability_railed` are stamped onto the
+position by `portfolio_commit._sim_view_of`, copied across the `OrderRequest`
+boundary by `execute_portfolio`, and persisted by `execution_ledger`
+(`_LEAN_FIELDS`), alongside `model_edge_pct`/`ev_pct` from `04187cdf`. The rule
+is IMPORTED from the board's own `_layer2_board_columns`, never recopied — the
+board attaches the verdict to `shortlist["cards"]` while the commit path prices
+`shortlist["rows"]`, so there is nothing to read it off.
+
+**THE LOAD-BEARING FACT, and it is about the GATE rather than the field.**
+`contradicts`, `unpriced` and `none` are all computed in exactly the branch
+where `model_edge_pct is None`, and `sizing_inputs_from_row` refuses that row by
+name (`no_model_edge_pct`) before anything is sized. Measured by running the
+real `commit_portfolio` over one row per verdict class:
+
+    agrees     PLACED     contradicts  REFUSED  no_model_edge_pct
+    neutral    PLACED     unpriced     REFUSED  no_model_edge_pct
+    disagrees  PLACED*    none         REFUSED  no_model_edge_pct
+
+**So a STORED order can only ever carry `agrees`, `disagrees`, `neutral` or a
+`live_` form — and the `contradicts`-vs-`agrees` ROI split that
+`layer2-sim-disagrees` pre-registered has a denominator that is structurally
+zero and stays zero however long the ledger runs.** Persisting the field was
+NECESSARY AND IS NOT SUFFICIENT. Corroborated on production the same day:
+`/api/portfolio/paper` served 41 orders — mlb 29, soccer 12, **no NCAAF**, which
+is where the contradictions live. Pinned by
+`test_a_contradicted_row_still_cannot_become_an_order`.
+
+**\* `disagrees` IS REACHABLE BUT CENSORED, and the censoring is not random.**
+The stake gates admit a disagreement only when the EV outruns it. Measured
+through `commit_portfolio` at price -110:
+
+    ev_pct 5.0   admits model_edge_pct -0.5  (-1.0 below_min_stake, -5.0 zero_kelly_stake)
+    ev_pct 10.0  admits -2.0               (-5.0 below_min_stake)
+    ev_pct 20.0  admits -5.0               (nothing in range refused)
+
+`disagrees` orders are therefore systematically HIGH-EV against `agrees`
+orders. **Any ROI comparison must control for `ev_pct`** — which is on the order
+since `04187cdf` — or it measures the EV gap and reports it as a sim effect.
+
+**NOTHING SERVES THE FIELD PER ORDER, and that is the next step.**
+`/api/portfolio/paper` returns `ledger.orders` as an integer COUNT;
+`bet_status.rows` and `live_marks.marks` carry no model fields;
+`/api/ops/execution/ledger-summary` is aggregates-only BY DESIGN (its docstring:
+order-level data over HTTP is a different risk class) and carries no outcome or
+P&L, so it cannot express ROI at all. An ROI-by-`sim_view` aggregate has to be
+added there.
+
+Size cost, since `_LEAN_FIELDS` bounds a document two services
+read-modify-write: +74 B/record, **+361 KB at the 5,000-record ceiling**, where
+the whole ledger is ~4.40 MB against an 8 MB refusal — already 220% of its own
+2 MB warn line before this change.
+
+**NOT DEPLOYED.** The discharging reading is a NON-NULL `sim_view` on an order
+whose `submitted_at` is after the deploy. A null does not count in either
+direction.
