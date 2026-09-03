@@ -18,7 +18,7 @@ from syndicate.features.ncaaf.sources import default_ncaaf_source_root
 from syndicate.features.ncaaf.sources import default_season
 from syndicate.features.ncaaf.sources import _legacy_default_season_from_summary_index
 from syndicate.features.ncaaf.sources import default_week
-from syndicate.features.ncaaf.sources import ncaaf_week_and_card_keys_for_date
+from syndicate.features.ncaaf.sources import fbs_relevant, ncaaf_week_and_card_keys_for_date
 from syndicate.features.ncaaf.sources import format_moneyline
 from syndicate.features.ncaaf.sources import format_num
 from syndicate.features.ncaaf.sources import format_pct
@@ -846,7 +846,11 @@ def build_ncaaf_chip_games(context_label: str, *, season: int | None = None) -> 
     for row in schedule:
         if not isinstance(row, dict) or row.get("week") != week:
             continue
-        if row.get("homeClassification") != "fbs" or row.get("awayClassification") != "fbs":
+        # CHIPS, NOT CARDS. `_smartsim2_standalone_rows` above keeps the
+        # both-sides-FBS gate because it joins a SmartSim 2.0 projection and the
+        # sim has no FCS rows; a scoreboard chip needs no model. Widened
+        # 2026-09-03 -- see `fbs_relevant`.
+        if not fbs_relevant(row):
             continue
         home_team = str(row.get("homeTeam") or "").strip()
         away_team = str(row.get("awayTeam") or "").strip()

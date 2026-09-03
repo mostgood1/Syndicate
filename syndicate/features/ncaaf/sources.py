@@ -291,6 +291,48 @@ def ncaaf_target_week(season: int) -> int | None:
             continue
     return min(weeks_with_unplayed_games) if weeks_with_unplayed_games else None
 
+def fbs_relevant(row: object) -> bool:
+    """Is this schedule row on the FBS board -- at least ONE side FBS?
+
+    WIDENED 2026-09-03 FROM "BOTH SIDES FBS" `[user decision]`. The old gate hid
+    7 of the 11 NCAAF games on the 2026-09-03 board: every FBS-vs-FCS game got
+    no scoreboard chip at all, so its card fell back to rendering
+    "Arkansas Pine Bluff Golden Lions @ Missouri Tigers" where every other sport
+    shows tri-codes, a score and a clock. User-reported.
+
+    MEASURED BEFORE WIDENING, 2026 schedule, 888 rows -- the classification data
+    is complete and there is nothing to guess:
+
+        ('fbs', 'fbs')  761        ('fbs', 'fcs')  127
+        ('fcs', 'fbs')    0        ('fcs', 'fcs')    0
+
+    No nulls, and the FCS side is always the visitor -- CFBD publishes the FBS
+    schedule, so an FCS team appears only as somebody's opponent. All seven of
+    2026-09-03's FCS visitors resolve in the team registry with a `team_id` and
+    a logo, so the ESPN live-score join (which keys on that id) works for them
+    and the chips get real scores rather than permanent dashes.
+
+    UNKNOWN IS NOT FBS. An absent or unrecognised classification returns False
+    rather than falling through to the permissive branch: a guard that maps
+    "I could not tell" onto "allow" turns a data gap into a silently relaxed
+    rule. Today nothing takes that branch; if the feed ever stops publishing
+    classifications, this narrows rather than floods, and narrowing is visible.
+
+    NOT USED BY `_smartsim2_standalone_rows`, AND THAT ASYMMETRY IS DELIBERATE.
+    That function builds CARDS by joining SmartSim 2.0 projections, and the
+    projection index for 2026 week 1 holds exactly 51 entries against exactly 51
+    FBS-vs-FBS games -- the sim does not cover FCS opponents. A chip needs teams,
+    a kickoff and a score; a card needs a model. Widening the card builder would
+    manufacture cards with no projection behind them, which is a worse product
+    than a full-name label. So: cards stay FBS-vs-FBS, chips do not.
+    """
+    if not isinstance(row, dict):
+        return False
+    home = str(row.get("homeClassification") or "").strip().lower()
+    away = str(row.get("awayClassification") or "").strip().lower()
+    return "fbs" in (home, away)
+
+
 def ncaaf_week_and_card_keys_for_date(season: int, date_text: str) -> tuple[int, set[str]] | None:
     """(week, card gamePk keys) for the real NCAAF games on `date_text`.
 
@@ -342,16 +384,25 @@ def ncaaf_week_and_card_keys_for_date(season: int, date_text: str) -> tuple[int,
 
         gamePk = f"{week}_{away_team}_{home_team}".replace(" ", "_")
 
-    over `load_games_season(season)`, keeping only rows where `week` matches and
-    BOTH classifications are `fbs`. Reconstructing it from that same source with
-    that same filter is exact by construction rather than by join -- there is no
-    id to match, no name to normalise, and no second artifact that has to exist.
-    It also removes the last consumer of `cfbd_lines_*.json` from the chips path.
+    over `load_games_season(season)`, keeping rows where `week` matches and the
+    game is on the FBS board (`fbs_relevant`). Reconstructing it from that same
+    source with that same filter is exact by construction rather than by join --
+    there is no id to match, no name to normalise, and no second artifact that
+    has to exist. It also removes the last consumer of `cfbd_lines_*.json` from
+    the chips path.
 
-    The FBS filter is load-bearing and is why this cannot just return every
-    schedule row for the date: the board is a curated subset (cfbd lists 99
-    week-1 games; the board builds cards for the FBS-vs-FBS ones), and a key
-    the board never built would filter every game out of the chip list.
+    A CLASSIFICATION FILTER IS STILL LOAD-BEARING and is why this cannot just
+    return every schedule row for the date: the board is a curated subset (cfbd
+    lists 99 week-1 games), and a key the board never built would filter every
+    game out of the chip list.
+
+    **WIDENED 2026-09-03 from BOTH-sides-FBS to `fbs_relevant` (at least one
+    side)** `[user decision]`, which deliberately makes this set a SUPERSET of
+    what `_smartsim2_standalone_rows` builds cards for. See `fbs_relevant` for
+    the measurement and for why cards and chips no longer share one gate. The
+    two consumers both stay correct under a wider set: `cards.py` filters the
+    chip list with it, which is the point; `home.py:6613` intersects it with
+    cards that already exist, so a key with no card simply never matches.
 
     ------------------------------------------------------------------
     THE DATE IS COMPARED IN CENTRAL, AND THE UTC PREFIX IS A REAL BUG
@@ -394,8 +445,10 @@ def ncaaf_week_and_card_keys_for_date(season: int, date_text: str) -> tuple[int,
         # kickoff is the next UTC day, and prefix matching drops it.
         if central_date_from_iso(game.get("startDate")) != target_day:
             continue
-        # Same gate `_smartsim2_standalone_rows` applies before building a card.
-        if game.get("homeClassification") != "fbs" or game.get("awayClassification") != "fbs":
+        # DELIBERATELY WIDER than `_smartsim2_standalone_rows`, which needs a
+        # SmartSim 2.0 projection and so stays FBS-vs-FBS. A chip needs teams,
+        # a kickoff and a score. See `fbs_relevant`.
+        if not fbs_relevant(game):
             continue
         home_team = str(game.get("homeTeam") or "").strip()
         away_team = str(game.get("awayTeam") or "").strip()
