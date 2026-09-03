@@ -964,6 +964,34 @@ what produces the several-hundred-MB excursions — not what the leak rate is.
 This item's surviving sentence ("something exceeds the working set sometimes,
 and that excursion is what this is about") is the right frame.
 
+**THE `MLB_ENABLE_REFRESH_WORKER_AUTORUN` QUESTION IS CLOSED `[2026-09-03, lane
+`web-oom-spike-source`]`, and the answer is neither branch this item offered.**
+It is not "never fires or does not log" — **it CANNOT run on web.** Sole reader
+is `run_refresh_worker.py:262`; that file is refresh-worker's `startCommand`,
+web's is `gunicorn wsgi:application`, and every mention in `syndicate/` is a
+comment. `render.yaml` `#129/#312` already documented this and removed the key
+from the web block, but the LIVE env still reports `true` on web — a
+`blueprint_sync` upserts declared keys and leaves live-only keys alone. Cosmetic
+today; it is also exactly the drift that misleads a reader. The autorun is
+`false` on refresh-worker BY DECISION (`#129`: second independent OddsAPI
+caller, burning credit), so nothing is failing to run.
+
+**CONSEQUENCE: web has NO reachable background loop.** Three flags are `false`
+and this one is unreachable, so this item's residual reduces to its OTHER branch
+— **something that only happens under CONCURRENCY** (`WEB_CONCURRENCY=2`).
+
+**BYTES SERVED TESTED AND FALSIFIED `[same lane]`.** The access log carries a
+response size on every line, which this item never used (it correlated COUNTS
+from a censored window and said so). Four captured spikes:
+`corr(bytes served, anon delta) = -0.706`. The decisive case: **+254.0 MB at
+81.1 min uptime served only 29.1 MB over 216 requests, while its own prior
+same-length quiet window served MORE (36.8 MB / 188 reqs) with no spike**, and
+the next sample read **-128.6 MB**. An early window showing 127.7 MB of
+`/api/intelligence/query` alongside a +138.6 MB spike did NOT survive three more
+windows — the same one-window artefact this item already recorded for `stream`.
+**So the request path now has three independent negatives: counts, solo
+retention, and bytes served. Do not "fix" a route on this evidence.**
+
 **A TOOLING FACT THAT COST TIME:** the Render logs API **IGNORES `startTime`** —
 verified, byte-identical output with and without it. Historical windows are NOT
 retrievable from logs; every series is "the recent N lines". Any claim about a

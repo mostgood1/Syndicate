@@ -2353,6 +2353,81 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Verification: new tests pass; post-fix pool matches `d9fb0b43`;
   `history.jsonl` is READ ONLY and byte-unchanged (append-only, concurrently
   written).
+
+### web-oom-spike-source — CLOSED 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: name what produces the several-hundred-MB anon EXCURSIONS on web. Not
+  the leak rate (`+32-34 MB/h`, settled and reproduced) and not the plateau
+  level (`~1,582 MB`, measured by `web-oom-rate-escalation`) — the SPIKE, which
+  on a 1,582 MB baseline is what actually reaches the 2,048 MB limit.
+- Files: `.syndicate/{lanes,state,log}.md`, `docs/ai_context/todo.md` (`#632`).
+  Measurement only; NO repo code, NO production change, NO deploy.
+- **THE NEW ANGLE: correlate against BYTES SERVED, not request COUNTS.**
+  `#632`'s per-route test used counts from the logs API's censored 100-line
+  window and said so itself — *"per-route SHARES OF A CENSORED SAMPLE... cannot
+  distinguish 'more stream' from 'less of everything else'"*. The access log
+  carries the RESPONSE SIZE on every line, and bytes are the better proxy for
+  allocation: an export returning a 60-70 MB shard allocates that much to
+  serialise it. Bytes were available the whole time and were never used.
+- Hypothesis: the excursions are driven by BYTES SERVED in a short window —
+  specifically large `/api/ops/artifacts/export` or `stream` responses — even
+  though `#632`'s SOLO attribution measured those endpoints retaining 0.000 MB.
+  Retention and PEAK are different quantities: a request can allocate 60 MB,
+  spike the container, and return it all, showing 0.000 retained.
+- Falsification test: if a spike occurs in a window whose bytes-served is
+  unremarkable, or if the biggest byte-windows produce no spike, then bytes do
+  not explain it and the excursion is not request-driven. **A null here is a
+  real result** and would point back at background work or concurrency.
+- Verification RAN. **THE BYTES HYPOTHESIS IS FALSIFIED, by the pre-registered
+  test.** Four spikes captured; `corr(bytes served, anon delta) = -0.706`.
+
+      spike  regime   anon d   MB served   top contributor
+        1    steady   +138.6     127.7     2x /api/intelligence/query
+        2    WARMUP   +181.1      85.7     mixed
+        3    WARMUP   +133.7      60.9     mixed
+        4    steady   +254.0      29.1     mixed, NO intelligence/query
+
+  **The decisive window:** spike 4, +254.0 MB at 81.1 min uptime (genuine steady
+  state, largest excursion), served only 29.1 MB over 216 requests — and its own
+  control, the prior same-length quiet window, served **MORE** (36.8 MB over 188
+  requests) with **no spike**. The next sample after it read **-128.6 MB**.
+- **THIS IS `#632`'s `stream` FAILURE REPEATING ON ME, exactly as I flagged it
+  might.** Spike 1's 127.71 MB of `/api/intelligence/query` was one window
+  driving an apparent association; three more windows collapsed it. I named the
+  risk in this lane's own hypothesis and still had to be shown.
+- **SO `/api/intelligence/query` IS NOT THE CAUSE on this evidence and must not
+  be "fixed" on it.** Combined with `#632`: request COUNTS tested (weak,
+  censored), solo RETENTION tested (0.000 MB for export/stream), and now BYTES
+  SERVED tested (negative). The request path is looking genuinely exonerated.
+- **`MLB_ENABLE_REFRESH_WORKER_AUTORUN` ON WEB IS INERT — `#632`'s open question
+  is CLOSED, with a third answer neither of its branches anticipated.** It is not
+  "never fires or does not log": it **cannot run there**. Sole reader is
+  `run_refresh_worker.py:262` (`_mlb_auto_refresh_enabled`); that file is
+  refresh-worker's `startCommand`, while web's is `gunicorn wsgi:application`,
+  and every mention in `syndicate/` is a comment. `render.yaml` `#129/#312`
+  already documents this and removed the key from the web block — but the LIVE
+  env still carries `true` on web, because a `blueprint_sync` upserts declared
+  keys and leaves live-only keys alone. Cosmetic today, but it is the exact drift
+  that misleads a reader: the ledger says removed, the service says `true`.
+  The autorun is `false` on refresh-worker BY DECISION (`#129`: it made that
+  worker a second independent OddsAPI caller, burning credit) — so nothing is
+  failing to run.
+- **WHAT THIS NARROWS IT TO.** Web now has NO reachable background loop (three
+  flags `false`, this one unreachable), so `#632`'s residual reduces to its other
+  branch: **something that only happens under CONCURRENCY** (`WEB_CONCURRENCY=2`).
+  That fits the measured shape — +134..+254 MB appearing and RELEASING within
+  minutes, uncorrelated with what is served.
+- **NEXT MEASUREMENT, and it needs a production change so it is not this lane's
+  to take:** `#632`'s own owed read — arm `SYNDICATE_REQUEST_MEMORY_PROFILE` via
+  a single-key PUT plus a deploy, wait hours, then difference two LATE emissions.
+  Landed and inert at `97260296`.
+- Instrument note: the catcher died on an unhandled HTTP 503 from the Render API.
+  Long-running watchers here need the same backoff `fetch_prod_artifacts_paced.py`
+  has; I fixed it there and did not carry it over.
+- **TRAPS CARRIED FORWARD:** anon not `memory_current_mb`; every window stated
+  relative to the last restart, and warm-up (which runs to ~75 min, longer than
+  I assumed) excluded; the logs API `startTime` is IGNORED so only recent
+  windows exist; 100 log lines is ~70 s at current traffic, so polling must be
+  faster than that or coverage has holes.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
