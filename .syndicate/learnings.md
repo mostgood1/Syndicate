@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 756 rules `[generated]`
+## Index — 757 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4525,3 +4525,24 @@ silently, for every guard written this way. Capture first, then test:
 
 Same family as *unknown must not default permissive* — here the unknown is the
 exit code itself, and the plumbing chooses the permissive branch for you.
+
+## 2026-09-03 — check SURVIVAL in the TARGET before deploying, not in the deployed tree after
+
+`#643`'s fix was silently reverted at 19:22Z by `04187cdf`, an unrelated but
+legitimate change to the same file committed from a tree that predated it. I
+found that out AFTER two deploys had shipped it inert.
+
+Round 7 had the identical setup — `cb223b62` and `733a28f0`, two unrelated
+commits touching `execution_ledger.py` — and this time the check ran BEFORE the
+deploy: read the TARGET SHA for `bytes_per_order`, `_store_max_bytes` and
+`UNBOUNDED`, all present, merged cleanly. Cost: one `git show`.
+
+**The rule.** *Verify by content, not ancestry* says what to check. This says
+WHEN: when a pending commit touches a file you fixed recently, check the target
+before you deploy it. After-the-fact detection means the regression is already
+live and you have spent the deploy; before-the-fact costs a single read and the
+answer is the same either way.
+
+The trigger is mechanical and worth automating eventually: `pending_deploys.py`
+already prints the files each commit touches, so "does any pending commit touch a
+file I changed today" is answerable without judgement.
