@@ -1996,7 +1996,26 @@ def _attach_projections_over_window(
     merged: dict[str, Any] = {}
     per_date: dict[str, Any] = {}
     errors: dict[str, str] = {}
-    summable = ("rows_considered", "rows_with_projection", "rows_with_true_probability")
+    # EVERY per-date COUNT belongs here. A counter merged by the `elif` below is
+    # merged by "first non-falsy wins", which reports ONE PASS rather than the
+    # window -- and for a dict it is worse: `{}` equals none of
+    # `(None, 0, False, "")`, so an empty first pass STICKS PERMANENTLY and the
+    # field can never be overwritten. Measured 2026-09-03: `unprojected_by_market`
+    # was added outside this tuple and read `{}` on a window that had values,
+    # while `player_alias_hits` read one pass's 1,211. Same defect the merged
+    # `reason` has, found the same day.
+    summable = (
+        "rows_considered",
+        "rows_with_projection",
+        "rows_with_true_probability",
+        "unprojected_no_field",
+        "player_alias_hits",
+        "player_alias_ambiguous",
+        "unmatched_player_rows",
+        "unsupported_market_rows",
+    )
+    # Per-key SUM, because a dict cannot go through `summable` above.
+    summable_dicts = ("unprojected_by_market",)
 
     for date_key in dates:
         try:
@@ -2015,6 +2034,11 @@ def _attach_projections_over_window(
         for key, value in coverage.items():
             if key in summable and isinstance(value, (int, float)):
                 merged[key] = (merged.get(key) or 0) + value
+            elif key in summable_dicts and isinstance(value, Mapping):
+                bucket = merged.setdefault(key, {})
+                for sub_key, sub_value in value.items():
+                    if isinstance(sub_value, (int, float)):
+                        bucket[sub_key] = bucket.get(sub_key, 0) + sub_value
             elif key not in merged or merged.get(key) in (None, 0, False, ""):
                 merged[key] = value
 

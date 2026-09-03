@@ -235,3 +235,47 @@ def test_the_soccer_window_matches_the_quote_read_it_accompanies():
     from syndicate.features.shared.layer1_board import resolve_window_dates, slate_window_days
 
     assert len(resolve_window_dates("soccer", "2026-08-17", window="slate")) == slate_window_days("soccer")
+
+
+def test_every_per_date_COUNT_is_summed_across_the_window(monkeypatch) -> None:
+    """A counter outside `summable` is merged by "first non-falsy wins", which
+    reports ONE PASS rather than the window -- and for a DICT it is worse: `{}`
+    equals none of `(None, 0, False, "")`, so an empty first pass sticks
+    permanently and the field can never be overwritten.
+
+    Measured 2026-09-03: `unprojected_by_market` shipped outside `summable` and
+    read `{}`; `player_alias_hits` read a single pass's 1,211. Same defect the
+    merged `reason` field has.
+    """
+    from pipeline import layer2_shortlist as mod
+
+    passes = iter([
+        {"rows_considered": 10, "rows_with_projection": 1,
+         "unprojected_no_field": 0, "unprojected_by_market": {},
+         "player_alias_hits": 0, "unmatched_player_rows": 1},
+        {"rows_considered": 10, "rows_with_projection": 2,
+         "unprojected_no_field": 5, "unprojected_by_market": {"player_shots": 5},
+         "player_alias_hits": 300, "unmatched_player_rows": 2},
+        {"rows_considered": 10, "rows_with_projection": 3,
+         "unprojected_no_field": 7,
+         "unprojected_by_market": {"player_shots": 7, "totals": 2},
+         "player_alias_hits": 911, "unmatched_player_rows": 4},
+    ])
+    monkeypatch.setattr(
+        "syndicate.features.shared.board_enrichment.attach_projections",
+        lambda grid, **kw: next(passes),
+    )
+
+    merged = mod._attach_projections_over_window(
+        [], sport="soccer", selected_date="2026-09-04",
+        window_dates=["2026-09-04", "2026-09-05", "2026-09-06"],
+    )
+
+    assert merged["rows_considered"] == 30
+    assert merged["rows_with_projection"] == 6
+    # The counters that were being dropped:
+    assert merged["unprojected_no_field"] == 12, "int summed, not first-non-falsy"
+    assert merged["player_alias_hits"] == 1211
+    assert merged["unmatched_player_rows"] == 7
+    # The dict, summed PER KEY -- the case an empty first pass used to freeze.
+    assert merged["unprojected_by_market"] == {"player_shots": 12, "totals": 2}
