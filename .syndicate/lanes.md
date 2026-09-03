@@ -1705,6 +1705,47 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
       so — that would mean the queue coalesces and the floor is the wrong lever.
 - Blocked by: none
 
+### intelligence-suite-runtime — OPEN — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+- Goal: `tests/test_intelligence.py` (221 tests) completes in a STATED, bounded
+  time. One testable outcome: a full run finishes and its total is recorded, and
+  whatever dominates it is either fixed or documented as irreducible with the
+  per-test cost named.
+- Files: `tests/test_intelligence.py`. **No source file is claimed yet, on
+  purpose** — the cost has not been attributed, and claiming files before the
+  measurement names them is how the last three lanes got aimed at the wrong
+  mechanism. Whatever `--durations` implicates gets claimed then, in an edit to
+  this block.
+- Hypothesis: **NOT a stall — a cluster of individually-expensive integration
+  tests.** ~12 `test_intelligence_query_api_*` tests each drive a real
+  candidate-pool build; one of them (`resolves_preview_date_and_preserves_contract`)
+  is MEASURED at 26.6s alone. 12 x ~25s is ~5 minutes from that cluster before
+  the other 209 tests are counted. Collection order puts them around index
+  60-75, which is where the run visibly crawls (~1 test/minute observed).
+- Falsification test: if `--durations` shows ONE test dominating, or a test that
+  never returns, then "many slow tests" is wrong and it IS a stall — a different
+  defect with a different fix. Equally, if the slowest tests are NOT the
+  `query_api` cluster, the hypothesis is wrong about which tests.
+- Verification: (1) a completed run with the TOTAL recorded — this does not
+  exist yet and is the first step; (2) `--durations=25` naming the per-test
+  cost, so the claim "N tests cost M seconds" is a reading rather than an
+  inference; (3) after any change, the same two numbers re-measured, and the
+  suite must still pass 221/221 (a faster suite that tests less is not a fix).
+- **BASELINE DOES NOT EXIST YET, and the lane says so rather than quoting the
+  old one.** The previously observed ">10 minutes, stalled ~32%" was measured
+  BEFORE `kalshi-discovery-deadline` (venue guard) and `wnba-cards-fallback-recursion`
+  (247-deep recursion) both landed. A re-run on current `origin/main` was started
+  and deliberately KILLED at 32% because a plain run can only produce a total,
+  while `--durations` produces the total AND the attribution for the same cost.
+  Quoting the pre-fix figure as this lane's baseline would be citing a number
+  from a system that no longer exists (`learnings.md`: re-baseline before
+  judging).
+- Note for whoever runs it: this suite MUTATES TRACKED FILES (`learnings.md`
+  2026-08-22 — `reports/manifests/*.json`, `reports/refresh_state.json`,
+  `reports/intelligence/intelligence_state.json` and more), so check
+  `git status` before committing and never `git add -A`.
+- Blocked by: none. No deploy — this is test-suite runtime, not production
+  behaviour.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
