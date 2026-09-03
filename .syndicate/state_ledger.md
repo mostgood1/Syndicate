@@ -5,6 +5,41 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [state-file-split] state.md IS AN INDEX PLUS NINE PARTS `[2026-09-03, scripts/split_state.py, commit 23bf6bc7]`
+
+**Read `state.md` first, then open only the part your work touches.** It holds
+the cross-cutting subjects and the `[subject-index]` table naming every subject
+and its file. Bodies live in `state_<domain>.md`: mlb, soccer, football,
+basketball, venues, board, worker, model, ledger.
+
+    state.md   746,526 -> 62,510 B      largest part  state_venues.md 152,212
+    total across ten files  774,933 B   -- the split ADDED ~28 KB of part
+                                           headers and index rows
+
+**COMPACTION WAS MEASURED FIRST AND REJECTED ON THE NUMBERS.** Of ~746,500
+chars only **1,460 (0.2%)** was reclaimable superseded prose, and all 8
+remaining candidates were audited by hand and found NOT archivable -- six had
+no dead body (the superseded claim was deleted when its correction was written
+and survives only as a quotation inside it), two keep their old block on
+purpose and say so. This file is not bloated, it is BIG, because it is live
+current truth. Do not send anyone hunting fat here again.
+
+**ONE SUBJECT, ONE SECTION IS NOW GLOBAL.** `state_key_check.py` pools slugs
+across state.md + every part (archives excluded, they legitimately repeat a
+slug). The commit guard `ledger_invariants.py` checks each file SEPARATELY and
+**cannot see a cross-file stack** -- that gap is covered only by
+`state_key_check.py` in session-start's coherence loop.
+
+**Adding a subject to a part means adding its index row:**
+`py -3 scripts/split_state.py --reindex --apply`. Plain `--apply` REFUSES once
+the index exists -- re-splitting would rewrite the index to cover only what is
+left in state.md and orphan the parts.
+
+Budget alarms are three now, not one (`session-start.sh`): index 120,000,
+per-part 250,000, total 1,100,000. The old single 920,000 cap could not fire
+after the split -- state.md would sit at 7% of it forever while a part grew
+unbounded.
+
 ## [session-harness] SESSION HARNESS — what the hooks actually enforce
 
 - **`lane-guard` STRIPPED THE LEADING DOT until 2026-08-31, so every claim under

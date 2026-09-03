@@ -1,6 +1,7 @@
 <!-- LEARNINGS-INDEX:START -->
 
 ## Index — 749 rules `[generated]`
+## Index — 748 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -9,6 +10,7 @@
 > `[evidence]` have their body in `learnings_evidence.md`.
 
 **FORBIDDEN — 266**
+**FORBIDDEN — 265**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -455,6 +457,7 @@
 - [2026-09-03 — A per-date join counter is not safe to SUM across a multi-day window unles…](#2026-09-03-a-per-date-join-counter-is-not-safe-to-sum-across-a-multi-day-window-unless-it-is-scoped-to-that-date-first-second-confirmed-instance-of-the-same-shape-as-513)
 - [2026-09-03 — the DIVIDE rule, restated because I broke it the same day I wrote it](#2026-09-03-the-divide-rule-restated-because-i-broke-it-the-same-day-i-wrote-it)
 - [2026-09-03 — a deploy CLAIM can be force-broken while live, and spacing will not catch…](#2026-09-03-a-deploy-claim-can-be-force-broken-while-live-and-spacing-will-not-catch-it)
+- [2026-09-03 — RULE: before you compact a file, measure whether it is BLOATED or merely B…](#2026-09-03-rule-before-you-compact-a-file-measure-whether-it-is-bloated-or-merely-big-they-look-identical-from-the-size-alone-and-take-opposite-fixes-lane-none-ledger-structure-pass)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

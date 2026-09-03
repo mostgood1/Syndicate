@@ -25,6 +25,7 @@
 <!-- LEARNINGS-INDEX:START -->
 
 ## Index — 749 rules `[generated]`
+## Index — 748 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4372,3 +4373,14 @@ carried my change by content. Had it been a sibling, it would have reverted a
 verified fix exactly as `04187cdf` did above. **Record the force in `deploys.md`
 when you break a claim, and before forcing, check the holder is actually gone —
 the tool asks for that and it is not decoration.**
+## 2026-09-03 — RULE: before you compact a file, measure whether it is BLOATED or merely BIG. They look identical from the size alone and take opposite fixes. `[lane none — ledger structure pass]`
+
+`state.md` hit 746,526 B and the obvious reading was "it needs compacting". The hook comment I wrote during the cap raise said as much: *"there IS reclaimable prose -- superseded readings and closed operational narrative -- buried inside live cells"*. I then measured it and disproved my own claim.
+
+**The measurement.** 31 superseded markers. One self-delimiting region, 1,460 B. All 8 remaining candidates audited individually: SIX had no dead body at all — the superseded claim was DELETED when its correction was written and survives only as a quotation inside that correction, so the flagged paragraph IS the record and moving it deletes the correction. TWO keep their old block deliberately and say so in the correction. Total reclaimable: **0.2%**.
+
+**Why the distinction decides the fix.** A BLOATED file has dead weight, and compaction is right. A BIG file is dense with live current truth, and compaction can only damage it — the only lever is structural (split, index, or raise the alarm). Guessing wrong wastes the effort in the safe direction and DELETES A CORRECTION in the unsafe one.
+
+**The tell, and it is cheap.** Count what is marked superseded, then read a sample of it. A correction written as *"the entry that stood here said X"* is past tense: the corpse is already gone and only the headstone remains. That phrasing distinguishes the two cases in one read, with no tooling.
+
+**How to apply:** state the reclaimable percentage before proposing compaction, and treat anything under a few percent as evidence the file is big rather than bloated. `scripts/compact_state.py` (audit mode) does this counting; its docstring carries the worked result so nobody re-runs the audit expecting a different answer.
