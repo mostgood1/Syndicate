@@ -1681,6 +1681,52 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `lanes.md` 212,015 -> 175,694 B with all other invariants CLEAN.
 - Fails OPEN with no root, no git or no `origin/main` ref — it never guesses.
 - Blocked by: none
+### wnba-cards-fallback-recursion — OPEN — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+- Goal: `syndicate/features/wnba/cards.py` cannot re-enter itself. ONE testable
+  outcome: with the recursion path ENABLED (no `SYNDICATE_WEB_DYNO`, date ==
+  today), `tests/test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_query_api_resolves_preview_date_and_preserves_contract`
+  completes in the same order of time as with it disabled (~22s), and a test
+  proves the cycle cannot recur.
+- Files: `syndicate/features/wnba/cards.py` (`_artifact_bundle` +
+  `_games_from_live_state_fallback` only), `tests/test_wnba_cards_fallback_recursion.py` (NEW).
+- Hypothesis: **mutual recursion, bounded by Python's recursion limit rather
+  than by design, and SILENT.** `_artifact_bundle:1686` calls
+  `_games_from_live_state_fallback(selected_date)`; `:3078` calls
+  `_artifact_bundle(selected_date)` straight back. `_artifact_bundle` is NOT
+  memoised (checked), so nothing breaks the cycle. It fires only when
+  `not rows and selected_date == central_today_iso() and not _render_web_dyno()`
+  -- date-triggered, which is why it is not a standing red. Each level does
+  artifact path checks and JSON loads, so ~500 nested pairs is the cost.
+- **NOT "an infinite hang", and I will not repeat that framing.** I called it
+  one earlier today and was wrong twice about this same test (see
+  `learnings.md` 2026-09-02, "slow and hung are not the same finding"). The
+  recursive call sits inside `try: ... except Exception: rows = []`, and
+  `RecursionError` subclasses `Exception` -- so it is most likely CAUGHT, making
+  this pathologically slow AND silent rather than fatal. Unverified: I have
+  never let this run to completion without `SYNDICATE_WEB_DYNO=1`.
+- Falsification test: if the same test completes in normal time with the guard
+  path enabled, the recursion is not the cost and this lane is wrong. Equally,
+  if the recursion does NOT terminate (no `RecursionError`, no completion), the
+  "bounded and caught" half is wrong and the fix must differ.
+- Verification: (1) TIME the test with the recursion path enabled, before any
+  change -- the baseline this lane rests on does not exist yet; (2) a test that
+  drives `_artifact_bundle` down the fallback branch and FAILS if
+  `_games_from_live_state_fallback` re-enters it (assert on call depth, not on
+  wall clock, so it cannot pass by being fast on a quiet machine); (3) off != on
+  -- the fallback must still return its rows when reached legitimately, or the
+  fix is a silent feature removal.
+- Note: the `except Exception` swallowing a `RecursionError` is a finding in its
+  own right whatever the timing shows -- an expensive pathological path that
+  reports nothing is how this survived unnoticed.
+- Claims checked against `lane-guard`'s OWN parser, not by reading: it reports
+  NO holder for `cards.py`. Two lanes (`wnba-chip-live-token`,
+  `wnba-halftime-elapsed`) list it under "CLAIMS RELEASED 2026-08-29 -- phantom
+  sweep", and `wnba-accuracy-assessment`'s brace path sits on a line that says
+  "nothing held". The parser also MANGLES that brace form
+  (`syndicate/features/wnba/{cards`), so it enforces nothing there -- worth
+  knowing before anyone relies on it.
+- Blocked by: none. No deploy: `cards.py` runs on web, and this path is disabled
+  on Render by `_render_web_dyno()`, so the fix is not urgent in production.
 
 ### ledger-precommit-hook — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **The ledger invariants now run on EVERY commit, not only those made through a Claude session. `.claude/hooks/ledger-commit-guard.py` is a PreToolUse hook and cannot see a commit made outside one — which is the exact shape of `376bfa94`, the kalshi code commit that reverted the trim pass. `core.hooksPath` points git at the tracked `.githooks/`, so one setting covers all 47 worktrees of this clone and the hook everyone runs is the hook in the commit.**
 - Goal: a stale-tree ledger commit is refused by git itself.
