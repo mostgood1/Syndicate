@@ -2331,6 +2331,30 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
+### gameline-trend-pooling — OPEN — opened 2026-09-03 — session 89f908c7-df9d-4279-9764-35dd6ebd550b
+- Goal: 08-30 and 08-31 (proven POST-FIX in `d9fb0b43`) are pooled into the
+  accumulated live-gameline trend, and the trend stops being an ad-hoc one-liner
+  living in a scheduled-task brief.
+- Files: `scripts/pool_live_gameline_trend.py` (NEW),
+  `tests/test_pool_live_gameline_trend.py` (NEW),
+  `scripts/snapshot_live_gameline_score.py` (comment fix ONLY, ~line 166).
+  Collision-checked against all 44 OPEN blocks: none claim these paths.
+- Hypothesis: n/a — the measurement is already done (`d9fb0b43`); this encodes it
+  so the next run cannot re-derive the wrong pool.
+- Constrained by two standing rules, HONOURED not overridden: `learnings.md:3235`
+  split on provenance BEFORE the first statistic, and `:3430` never pool an
+  accuracy history across a SCORER-version boundary. The script classifies each
+  row's scorer era and pools WITHIN an era; it must be incapable of emitting a
+  cross-era pooled number. `:3397` also applies — report the fresh-quote cut, not
+  only `priceable_only`.
+- Falsification test: the script REFUSES (non-zero) when asked to pool across
+  eras, and its post-fix pool reproduces 4 dates / 53 games / -0.00218 from the
+  current `history.jsonl`.
+- Verification: new tests pass; post-fix pool matches `d9fb0b43`;
+  `history.jsonl` is READ ONLY and byte-unchanged (append-only, concurrently
+  written).
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
