@@ -1369,6 +1369,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   tests, disabling the rate recompute fails 3 of 5.
 
 ### web-oom-profiler-steady — OPEN — opened 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- **HOLDING THE `web` DEPLOY CLAIM UNTIL ~23:07Z FOR A MEASUREMENT, NOT A DEPLOY `[web-oom-profiler-steady, 2026-09-03 ~22:2xZ]`.** `#632`'s owed steady-state
+  per-request attribution needs ONE uninterrupted process life. Web booted at
+  21:14:17, 22:02:31, 22:11:51 and 22:16:04 — four deploys in 62 min, all clean
+  (zero `server_failed`, zero `oomKilled` since 21:00Z; this is cadence, not
+  instability). The profiler's counters are cumulative FROM BOOT, so every
+  restart resets the window and the reading has now been lost six times.
+  The ramp is ~20 min on this service — NOT the 75 min previously assumed, which
+  I re-derived from today's anon series — so a 45-min claim yields ~25 min of
+  usable steady window. **I will release as soon as the reading is taken, and
+  sooner on request — if you need web, take it: `deploy_claim.py acquire
+  --service web --holder <you> --force` and say so here. I am not deploying;
+  breaking this claim costs me a retry, not work.**
 - Goal: take `#632`'s owed STEADY-STATE per-request attribution — arm
   `SYNDICATE_REQUEST_MEMORY_PROFILE` on web and difference two LATE emissions,
   because every existing emission sits within ~25 min of a boot and the
