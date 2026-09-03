@@ -4323,11 +4323,64 @@ what would make the shed unreachable rather than merely rare.
   did not settle it.** Full working: `deploys.md`, 2026-08-31 16:48Z.
   **AND THE UNDERLYING CAUSE IS NOW MEASURED AND CORRECTED AT SOURCE
   `[2026-08-31, lane soccer-shot-shrinkage]`:** the soccer shots model
-  over-predicts 1.398x, so the large model edges feeding those rows were mostly
-  a level error rather than disagreement. A fitted divisor (1.3979) is deployed
-  to all three services and published; see `[soccer-shots-prop-skill]`. **It has
-  NOT yet been observed changing the board** — the soccer sim runs every 4h and
-  the board carried no shot props at publish time.
+  over-predicts ~1.39x, so the large model edges feeding those rows were mostly
+  a level error rather than disagreement. See `[soccer-shots-prop-skill]`.
+  **DIVISOR NOW 1.3930 `[2026-09-02, refit, n=10,176 / 254 matches / 9 leagues;
+  held out 2026-08-22: SCALAR MAE 0.5491 vs RAW 0.6178, bias +0.0281 vs +0.1687,
+  beat AFFINE in all 9]`. Published and read back.**
+  **AND IT IS NOW OBSERVED WORKING — in the ENGINE, not on the board
+  `[2026-09-02]`.** Measured on the prediction archive, self-normalised over the
+  3,434 players present both sides of the ship date: median post/pre
+  `expected_shots` **0.720** against a predicted 1/1.3979 = **0.715**, with
+  `expected_minutes_share` flat at **1.000** so the step is not "future fixtures
+  carry fewer minutes". Second, independent confirmation via a different
+  denominator (`#636`): pre **0.925** → post **0.631**, ratio 0.682 vs 0.718.
+  `todo #612` CLOSED. Tools: `scripts/check_soccer_divisor_reached_engine.py`,
+  `scripts/check_soccer_shot_divisor_vs_season_rate.py`.
+  **NOT claimed: that 1.3930 SPECIFICALLY is live.** The two divisors differ by
+  0.35%, far below this measure's noise; what is proven is that a divisor of
+  roughly the shipped size is applied and the resolver did not break.
+  **The lane's own `1.19 → 0.85` target is RETIRED, not met** — that baseline
+  came from a construction I could not reproduce (this instrument reads the
+  pre-divisor window at 0.925). Only before/after on ONE instrument is valid.
+
+## [venue-odds-storage] `venue_odds` LIVES ON DISK, NOT IN THE SHARED KEYVALUE `[measured + deployed 2026-09-02, lane venue-odds-byte-aware-trim]`
+
+`reports/intelligence/venue_odds/` held **41 keys / 114.9 MB of a 224.3 MB
+store** — 51% of a 256 MB Redis at 93% with 11,852 keys evicted — and the reader
+trace found **nothing reads it**: the only read is `record_daily_odds`'s own
+read-modify-write, and both external importers take write paths only. It is a
+deliberate capture-first archive whose consumer was never built.
+
+Two changes, both live on BOTH workers and measured:
+
+- **`#638` byte-aware trim** (`21de4a9e`). The count caps could never bind:
+  `MAX_POINTS_PER_MARKET=48` / `MAX_MARKETS_PER_FILE=8000` bound COUNTS while the
+  guard bounds BYTES. **3,192 refused writes in 40h** (live-odds-worker 2,203,
+  refresh-worker 989; web none — it does not run this writer). Trim is REACTIVE:
+  it catches `KeyValuePayloadTooLarge` and retries at 90% of the ceiling, so it
+  costs nothing on the happy path and is inert on a disk backend.
+  **The criterion is a PAIR, not zero rejections** — one rejection per file per
+  growth cycle is BY DESIGN; the failure is a rejection with no `TRIMMED_TO_FIT`
+  after it.
+- **`#637` moved off keyvalue** (`e4a471c0`). `_KEYVALUE_EXCLUDED_PATH_MARKERS`
+  gains `/intelligence/venue_odds/`. **50 and 37 files hydrated, distinct ==
+  total on both workers.** Disk is PER-SERVICE where Redis was shared — not a
+  regression, since two services doing RMW on one key already lost each other's
+  updates. `reports_root()` is `/opt/render/project/data/reports`, the MOUNTED
+  disk (read off live env), so these survive a deploy.
+
+**MEMORY NOT RECLAIMED, DELIBERATELY.** ~115 MB stays until the 10-day TTL.
+Hydration reads the old key on a service's FIRST write of a file, and
+refresh-worker has not yet written polymarket — expiring now would make those
+start empty, and an accumulator that starts empty **re-dates every `opened_at`
+to the expiry moment**. Wrong data, permanently. Gate before any expiry:
+`scripts/check_venue_odds_hydration_census.py` (exits 0 only when every censused
+key is SAFE and nothing was truncated; first run **27 SAFE / 15 PENDING**).
+
+**OWED:** refresh-worker's `#638` trim path has never executed in production —
+its rejections stopped 50 min BEFORE its own deploy, because the other worker's
+trim shrank the shared key.
 
 ## [artifact-delivery-topology] AN ARTIFACT AN ENGINE READS IS A THREE-SERVICE CHANGE `[measured 2026-08-31]`
 

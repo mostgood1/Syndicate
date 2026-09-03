@@ -1166,7 +1166,27 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   artifact.
 - Blocked by: none (the contested file needs a decision, not a blocker).
 
-### keyvalue-pressure-637 — OPEN — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
+### keyvalue-pressure-637 — OPEN, **UNOWNED — session 92987093 checkpointed and ended 2026-09-02** — opened 2026-09-02 — session 92987093-6cef-495b-a82b-4bb376dc45dc
+- **STATUS 2026-09-02.** Diagnosis DONE and the fix SHIPPED and MEASURED on both
+  workers (`#638` `21de4a9e`, `#637` `e4a471c0`) — see `state.md
+  [venue-odds-storage]` and `log/2026-09-02.md`. **This lane stays OPEN for ONE
+  thing only: the ~115 MB is NOT reclaimed.**
+- **THE ONLY REMAINING ACTION, and it is gated, not free.** Run
+  `py -3 scripts/check_venue_odds_hydration_census.py`. It exits 0 only when every
+  censused key is SAFE and the key listing was not truncated. First run:
+  **27 SAFE / 15 PENDING / exit 2 — NOT safe to expire.** Expiring a key a service
+  has not yet hydrated makes that file start empty, and an accumulator that starts
+  empty **re-dates every `opened_at` to the expiry moment** — wrong data,
+  permanently, with no way back. The 10-day TTL reclaims it at zero risk.
+- **What moves it to SAFE:** refresh-worker writing polymarket at least once
+  (should clear ~13 of the 15). Two `kalshi__mlb__2026-08-3x` keys will never
+  hydrate — those game dates have passed and nothing writes them — so they clear
+  only via TTL.
+- Claims: `.gitignore` and `scripts/check_venue_odds_hydration_census.py`.
+- Also owed from this lane's work: **refresh-worker's `#638` trim path has never
+  executed in production** (its rejections stopped 50 min before its own deploy,
+  the other worker's trim having shrunk the shared key). It verifies itself the
+  next time that service is first to push a file past the budget.
 - Goal: `#637`. Say WHAT holds the shared Redis at 93% and WHETHER the eviction it
   is doing costs anything, with numbers. Diagnosis only — **no production mutation
   in this lane.** `/api/ops/keyvalue/expire-run-artifacts` and `/api/ops/keyvalue/sweep`
