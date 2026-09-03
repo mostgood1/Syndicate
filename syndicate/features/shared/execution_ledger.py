@@ -157,6 +157,15 @@ _LEAN_FIELDS = (
     # because they are exactly derivable from these plus `requested_price`.
     "model_edge_pct",
     "ev_pct",
+    # THE SIM'S VERDICT on the row, next to its rating. Three fields, and the
+    # bound they buy past is the same one the two above bought: without them
+    # the settled book cannot be cut by what the sim SAID, only by how much it
+    # liked the price -- and `layer2-sim-disagrees` declined to penalise a
+    # contradicted row precisely because that cut did not exist. Measured cost
+    # at the 5,000-record ceiling in `test_order_sim_view`.
+    "sim_view",
+    "sim_line_gap",
+    "sim_probability_railed",
     # The sport's own game id (MLB `gamePk`), needed to look up a live feed and
     # answer "is this bet winning". `event_id` is the odds-feed id and is not
     # interchangeable with it.
@@ -292,45 +301,56 @@ class OrderRequest:
     model_edge_pct: float | None = None
     ev_pct: float | None = None
     # ------------------------------------------------------------------
-    # WHY THE BET WAS MADE. Without these an order records WHAT was bet and at
-    # WHAT PRICE and never WHY, so the book cannot be split by whether a model
-    # view was involved.
+    # WHAT THE SIM THOUGHT, as opposed to HOW MUCH it liked the price.
+    # `model_edge_pct` above is a RATING; these are a VERDICT, and they are
+    # different claims about the same bet:
     #
-    # MEASURED 2026-09-03: 947 settled paper bets, `game_line` +13.28% ROI over
-    # 296 and `player_prop` -15.35% over 300 -- the opposite of the edge plan's
-    # organising verdict, which holds that the market beats the sim on main
-    # lines and that the edge lives in props. Whether that main-line result
-    # belongs to the SIM or to the EXECUTION stack decides what the next month
-    # of work is, and it was UNANSWERABLE: no query, no join, no reconstruction.
-    # `#426` records that the board ranks on ARBITRAGE rather than the model and
-    # that only 218 of 1,198 rows carry a `model_edge_pct` at all, so the two
-    # populations are genuinely different and cannot be told apart after the
-    # fact.
+    #   agrees / disagrees      the sim rates this side better / worse than
+    #                           the price implies  (a claim about VALUE)
+    #   contradicts             the sim's own projection points the OTHER WAY
+    #                           from the side being taken  (a claim about
+    #                           DIRECTION -- `projected 67.8` under `Under 53.5`)
+    #   neutral                 the sim landed exactly on the de-vigged price
+    #   none                    the sim has no view on this row at all
+    #   live_*                  the same verdict, from the LIVE re-sim
     #
-    # The tempting shortcut is refuted in this repo's own code
-    # (`portfolio_commit.py:696`): "I expected `no_model_edge_pct` to keep soccer
-    # out of positions on its own. It does not: 4 soccer positions in the 7 days
-    # to 2026-09-01." So a non-zero stake does NOT imply a model view.
+    # WHY THEY ARE ON THE ORDER. `layer2-sim-disagrees` measured 71 of 141
+    # NCAAF totals rows (50%) pointing the opposite way to the sim, 21 of them
+    # carrying a POSITIVE score -- and then declined to put a score penalty on
+    # any of it, because the measurement that would SIZE one does not exist:
+    # settled ROI of contradicted rows against agreeing ones, within a sport
+    # and market family. That measurement needs the verdict recorded AT COMMIT
+    # TIME. Nothing recovers it afterwards: `sim_view` is a function of the
+    # row's `projection`, `side` and `line`, and the plan carrying those is
+    # rewritten on every board build.
     #
-    # EVERY ONE OF THESE ALREADY EXISTS on the plan position at commit time and
-    # was simply dropped here. Optional because orders placed before this
-    # existed have none, and an absent view must read as absent rather than be
-    # invented -- the same contract `home_team` above already follows.
+    # `"none"` IS NOT `None`. The string is the sim saying it has no view;
+    # the null is us never having asked -- in practice an order placed
+    # before this field existed, since every board row reaches one of the
+    # verdicts above. Collapsing them would destroy the only distinction
+    # these fields are here to make -- the same argument
+    # `_as_optional_float` makes for keeping a real `0.0` apart from an
+    # absent edge.
     #
-    # THEY ARE NOT IN `idempotency_key`, and must never be: that key is built
-    # from an explicit field list precisely so a re-priced or re-scored row is
-    # not mistaken for a new bet. A model view that moved between builds is the
-    # same bet.
-    # TWO FIELDS, NOT FIVE. `market_fair_probability` and `model_probability`
-    # are EXACTLY derivable from these plus `requested_price`, which is already
-    # stored -- `sizing_inputs_from_row` computes
-    # `fair = (ev_pct/100 + 1) / (net_profit(price) + 1)` and
-    # `model_probability = fair + model_edge_pct/100`. Storing them too would
-    # widen a size-bounded document that is read-modify-written by two services
-    # for nothing. `price_reliability` is a SIZING input and answers a different
-    # question than attribution, so it stays out.
-    model_edge_pct: float | None = None
-    ev_pct: float | None = None
+    # NOT IN `idempotency_key`, and must never be, for the reason the two
+    # fields above are not: that key is an explicit list precisely so a
+    # re-scored row is not mistaken for a new bet. A verdict that moved between
+    # board builds is the same bet. Pinned by test.
+    sim_view: str | None = None
+    # `projected - line`, in the market's own units, on a `contradicts` row.
+    # NULL ON EVERY ORDER TODAY and that is the contract, not a defect: a
+    # contradiction is computed exactly where `model_edge_pct` is None, and
+    # `sizing_inputs_from_row` refuses that row by name before anything is
+    # sized. Carried because the gate is a policy under review, and because a
+    # column added after the gate moves says nothing about the bets before it.
+    sim_line_gap: float | None = None
+    # TRI-STATE. `True` = the sim returned a certainty (probability at or past
+    # the repo's own 0.01/0.99 rails -- Rutgers at -3233 served `WIN% 0%` on
+    # 2026-09-03). `False` = a verdict was computed and the probability was
+    # on-scale. `None` = no verdict computed. Kept separate from `sim_view`
+    # because the two are orthogonal: a row can be `agrees` AND railed, and
+    # folding them would throw away whichever half was written second.
+    sim_probability_railed: bool | None = None
 
 
 def execution_mode() -> str:
@@ -1054,9 +1074,12 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         # WHY, alongside what and at what price. See `OrderRequest`.
         "model_edge_pct": request.model_edge_pct,
         "ev_pct": request.ev_pct,
-        # WHY, alongside what and at what price. See `OrderRequest`.
-        "model_edge_pct": request.model_edge_pct,
-        "ev_pct": request.ev_pct,
+        # WHAT THE SIM THOUGHT of the row this bet came from. See
+        # `OrderRequest` for why a verdict is not the same claim as a rating,
+        # and why `"none"` must not collapse into `None`.
+        "sim_view": request.sim_view,
+        "sim_line_gap": request.sim_line_gap,
+        "sim_probability_railed": request.sim_probability_railed,
         # Ungraded until something grades it. `None` rather than absent so the
         # field is present on every record and a summary cannot mistake "no such
         # key" for "not settled yet".

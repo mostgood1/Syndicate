@@ -116,6 +116,10 @@ from typing import Any, Mapping
 
 from syndicate.features.bankroll_manager import apply_exposure_budgets, compute_board_stake
 from syndicate.features.shared.clv_position_join import opening_key_for_row
+# THE SIM VERDICT, IMPORTED RATHER THAN REIMPLEMENTED. See
+# `_sim_view_of` for why this reaches for a private name, and why the
+# import is at module scope with no `try` around it.
+from syndicate.features.shared.layer2_board import _layer2_board_columns
 from syndicate.features.shared.portfolio_settings import PortfolioSettings, resolve_settings
 from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 
@@ -436,6 +440,79 @@ def resolve_excluded_families() -> frozenset[str]:
 DEFAULT_EXCLUDED_FAMILIES = "mlb:player_prop"
 
 
+_SIM_VIEW_FIELDS = ("sim_view", "sim_line_gap", "sim_probability_railed")
+
+
+def _sim_view_of(row: Mapping[str, Any]) -> dict[str, Any]:
+    """THE SIM'S OWN VERDICT on this row, in the board's own words.
+
+    Returns all three keys always. In practice the board always reaches a
+    verdict -- every branch of `_layer2_board_columns` sets one, and `"none"`
+    is the verdict for a row it has nothing to say about -- so the `None`
+    case here is the defensive one: it fires only if that function raises.
+    On a STORED order `None` means something different and more common: the
+    order was placed before this field existed. The
+    caller stamps them onto the position, `execute_portfolio` copies them onto
+    the `OrderRequest`, and `execution_ledger` persists them -- so a settled bet
+    can be split by what the sim thought of it, which the 947 graded bets of
+    2026-09-03 could not be.
+
+    ONE RULE, ONE IMPLEMENTATION, AND THAT IS WHY THIS IMPORTS A PRIVATE NAME.
+    `sim_view` is decided in `_layer2_board_columns`, which the BOARD calls
+    (through `layer2_rows_to_board_cards`) on this same row object. Recomputing
+    the rule here would be a second contract that can disagree with the first --
+    the failure `layer2_rows_to_board_cards`'s own docstring names: "emitting a
+    second, parallel card shape would be a second contract that can disagree
+    with the first". The board attaches the verdict to `shortlist["cards"]`
+    while the commit path prices `shortlist["rows"]`, and those are different
+    objects, so there is nothing to read it off. Calling the board's own
+    function is the only way an order records the verdict the board PUBLISHED
+    rather than a lookalike computed twice.
+
+    THE IMPORT IS AT MODULE SCOPE WITH NO `try` AROUND IT, deliberately. If
+    that function is renamed this must fail LOUDLY at import rather than
+    degrade to a null verdict on every order -- a silent null here is
+    indistinguishable from "the sim had no view", which is the exact
+    distinction these fields exist to carry. `tests/test_order_sim_view.py`
+    pins the coupling so a rename is a red test, not a production surprise.
+
+    `sim_probability_railed` IS TRI-STATE ON PURPOSE. `False` means the board
+    computed a verdict and the probability was on-scale; `None` means no
+    verdict was computed at all. The board omits the key entirely when a row is
+    not railed, so mapping absent -> `False` here would fold "not asked" into
+    "asked, and fine" -- the same conflation `_as_optional_float` refuses for a
+    `0.0` edge one layer down.
+    """
+    quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+    score = row.get("score") if isinstance(row.get("score"), Mapping) else {}
+    try:
+        columns = _layer2_board_columns(row, quote, score)
+    except Exception:
+        # A verdict we could not compute must read as ABSENT, never as "the sim
+        # had no view". Pricing a bet is not the place to raise over a display
+        # column -- and it is not the place to invent one either.
+        return {field: None for field in _SIM_VIEW_FIELDS}
+
+    view = columns.get("sim_view")
+    if not view:
+        return {field: None for field in _SIM_VIEW_FIELDS}
+    return {
+        "sim_view": str(view),
+        # SET ONLY ON A `contradicts` ROW, AND THOSE CANNOT REACH AN ORDER
+        # TODAY. A contradiction is computed in exactly the branch where
+        # `model_edge_pct` is None, and `sizing_inputs_from_row` refuses that
+        # row by name (`no_model_edge_pct`) before anything is sized -- so this
+        # column is expected to be null on 100% of orders, and that null is the
+        # CONTRACT rather than a bug. Carried anyway because the gate is a
+        # POLICY the `layer2-sim-disagrees` lane has open, and a field added
+        # after the gate changes records nothing about the bets placed before
+        # it. Its nullness is also the cheapest available proof the gate is
+        # still there.
+        "sim_line_gap": _as_float(columns.get("sim_line_gap")),
+        "sim_probability_railed": bool(columns.get("sim_probability_railed")),
+    }
+
+
 def commit_portfolio(
     rows: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...],
     *,
@@ -712,6 +789,21 @@ def commit_portfolio(
                 "stake_fraction": round(fraction, 6),
                 "ev_pct": _as_float(row.get("ev_pct")),
                 "model_edge_pct": _as_float(row.get("model_edge_pct")),
+                # WHAT THE SIM THOUGHT OF THIS ROW, alongside how much it
+                # liked it. `model_edge_pct` is the sim's RATING and these are
+                # its VERDICT, and the two are not the same claim: `#445`'s
+                # `disagrees` says "worse than the price implies", while
+                # `contradicts` says the projection points the OTHER WAY from
+                # the side being taken. Split out so a settled book can be cut
+                # by either.
+                #
+                # NOT DERIVABLE FROM WHAT IS ALREADY STORED, which is the test
+                # `order-model-view` used to cut five fields to two: `sim_view`
+                # is a function of `projection`, `side` and `line` as they were
+                # AT COMMIT TIME, and the plan holding them is rewritten on
+                # every board build -- minutes later there is nothing left to
+                # recompute it from.
+                **_sim_view_of(row),
                 # THE PRICE COST OF BEING RESTRICTED TO THIS VENUE, carried
                 # through from `venue_scope`. On an unrestricted row these are
                 # absent and stay None -- there is no "best book elsewhere" when

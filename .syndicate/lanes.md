@@ -1338,8 +1338,16 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 ### order-model-view — OPEN — opened 2026-09-03 — session 3492626c — **LIVE ON BOTH ORDER SERVICES (`04187cdf`); VERIFY STILL OWED after 100 min of polling produced ZERO orders written past 19:54:36Z — a null result about the board's PLACEMENT RATE, not evidence about the change. Ambiguous window 8.9 min.**
 - Goal: an order records WHY it was made, not only what and at what price, so the
   settled book can be split by whether a model view was involved.
-- Files: `syndicate/features/shared/execution_ledger.py`,
-  `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`.
+- Files: `tests/test_execute_portfolio.py`.
+  RELEASED `[2026-09-03, lane order-sim-view, session 37abeca0]`: `syndicate/features/shared/execution_ledger.py`
+  RELEASED `[2026-09-03, lane order-sim-view, session 37abeca0]`: `pipeline/execute_portfolio.py`
+  **Basis: session `3492626c` is absent from the session roster INCLUDING
+  ARCHIVED** (30 most recent, checked ~22:0xZ; this lane's own note above says
+  its watcher was still polling at 21:2xZ, so the absence is recent). The
+  successor lane extends the SAME two fields' plumbing one layer over and
+  re-states this lane's own verification contract verbatim. The `model_edge_pct`
+  reading this lane still owes is NOT discharged by that and is not claimed.
+  Take the files back by striking this note.
 - Verification: a NON-NULL `model_edge_pct` on an order whose `submitted_at` is
   after 2026-09-03T19:54:36Z, from `/api/portfolio/live` or `/api/portfolio/paper`.
   **A null does not count in either direction** — the two positions read at 19:5xZ
@@ -1689,6 +1697,100 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `pending_deploys.py` reading 0 for it. Content token: `chip_join_key` is
   already live, so this round uses a token from `939a8c00` in `layer2_board.py`.
 - Blocked by: none.
+### order-sim-view — OPEN — opened 2026-09-03 — session 37abeca0-5c86-4c57-b85a-62fb489e761a
+- Goal: an order records the SIM'S OWN VERDICT on the row it came from, so the
+  settled book can be split by `sim_view` and the score penalty that
+  `layer2-sim-disagrees` deliberately did not size stops being a guess.
+- Files: `syndicate/features/shared/execution_ledger.py`,
+  `pipeline/execute_portfolio.py`,
+  `syndicate/features/shared/portfolio_commit.py`,
+  `tests/test_order_sim_view.py` (NEW).
+- **CLAIMS TAKEN FROM `order-model-view`, which is OPEN and lists the first two
+  files.** Its owning session `3492626c` is ABSENT from the session roster
+  *including archived* (checked 2026-09-03 ~22:0xZ, 30 most recent; its lanes'
+  last marker write was 15:14 local today). Its per-session marker
+  `.syndicate/.current-lane.3492626c-…` is stale on disk and reads
+  `prop-join-yield`. Same ownership-sweep basis other lanes in this file record.
+  `portfolio_commit.py` is marked `released:` by `portfolio-decision-and-execution`.
+  Take them back by striking this note.
+- Hypothesis: n/a — plumbing with a pre-registered consumer.
+- Falsification test: n/a.
+- Verification: a NON-NULL `sim_view` on an order whose `submitted_at` is after
+  the deploy, read from `/api/portfolio/paper` or `/api/portfolio/live`.
+  **A null does not count in either direction** — the same contract
+  `order-model-view` wrote for `model_edge_pct`.
+- **DONE AND LANDED, NOT DEPLOYED.** `_sim_view_of` in `portfolio_commit` calls
+  the BOARD'S OWN `_layer2_board_columns` on the same row and stamps the three
+  fields on the position; `execute_portfolio` copies them across the
+  `OrderRequest` boundary; `execution_ledger` declares them, records them and
+  names them in `_LEAN_FIELDS`. Proven through the real `commit_portfolio` over
+  every verdict class, not through the helper alone. 21 new tests, 400 green
+  across the six executor/ledger suites.
+- **THE RULE IS IMPORTED, NEVER RECOPIED.** The board attaches `sim_view` to
+  `shortlist["cards"]` while the commit path prices `shortlist["rows"]` — two
+  different objects — so there is nothing to read the verdict off. Recomputing
+  it in `portfolio_commit` would be the second parallel contract
+  `layer2_rows_to_board_cards`'s own docstring warns about. The import is at
+  module scope with no `try`, so a rename fails LOUDLY instead of nulling every
+  order's verdict; `test_the_verdict_comes_from_the_boards_own_function` pins it.
+- **THE PRE-REGISTERED MEASUREMENT IS NOW PARTLY POSSIBLE AND PARTLY NOT, AND
+  THE SPLIT IS STRUCTURAL. Persisting the field was NECESSARY AND IS NOT
+  SUFFICIENT.** Measured by running the real `commit_portfolio` over one row
+  per verdict class, default settings, price -110:
+
+      agrees        PLACED
+      neutral       PLACED
+      disagrees     PLACED **only when a large EV carries it** (below)
+      contradicts   REFUSED  no_model_edge_pct
+      none          REFUSED  no_model_edge_pct
+
+  `contradicts` and `none` are computed in EXACTLY the branch where
+  `model_edge_pct is None`, and `sizing_inputs_from_row` refuses that row by
+  name before anything is sized. **So the `contradicts` arm of the
+  pre-registered measurement has a denominator that is structurally zero and
+  will stay zero however long the ledger runs.** This is consistent with the
+  lane's own note that NCAAF has 0 orders ever, and with production: the served
+  `/api/portfolio/paper` book read 41 orders today, mlb 29 / soccer 12, no NCAAF.
+  Sizing a penalty for a CONTRADICTION still cannot be done from the order book.
+  Pinned by `test_a_contradicted_row_still_cannot_become_an_order`, so changing
+  that gate turns the suite red rather than quietly redefining the measurement.
+- **WHAT *IS* NOW MEASURABLE, WITH A CAVEAT THAT MUST BE CARRIED WITH IT:**
+  `agrees` vs `disagrees` vs `neutral` settled ROI, within a sport and market
+  family. But the `disagrees` arm is a BIASED SAMPLE, not a clean one — the
+  stake gates admit a disagreement only when the EV is big enough to outrun it.
+  Measured through `commit_portfolio` at price -110:
+
+      ev_pct    most-negative model_edge_pct that still places
+         5.0    -0.5   (-1.0 refused below_min_stake, -5.0 zero_kelly_stake)
+        10.0    -2.0   (-5.0 refused below_min_stake)
+        20.0    -5.0   (nothing in range refused)
+
+  So `disagrees` orders are systematically HIGH-EV relative to `agrees` orders.
+  **Any ROI comparison must control for `ev_pct` — which is on the order since
+  `04187cdf` — or it measures the EV gap and reports it as a sim effect.**
+- **A SECOND GAP, NOT CLOSED HERE AND NOT MINE TO CLOSE: nothing SERVES the
+  field per order.** `/api/portfolio/paper` returns `ledger.orders` as an
+  integer COUNT; `bet_status.rows` and `live_marks.marks` carry no model fields;
+  and `/api/ops/execution/ledger-summary` is aggregates-only BY DESIGN (its
+  docstring: order-level data over HTTP is a different risk class) and carries
+  no outcome or P&L, so it cannot express ROI at all. The measurement will need
+  an ROI-by-`sim_view` aggregate added to that endpoint. Surfaced, not taken —
+  `ops.py` is outside this lane and the shape is a deliberate safety property.
+- **SIZE COST, since `_LEAN_FIELDS` exists to bound this document:** +74 bytes
+  per record typical, +83 worst case; **+361 KB at the 5,000-record ceiling.**
+  Context worth having: at that ceiling the whole ledger is ~4.40 MB against an
+  8 MB refusal, already 220% of its own 2 MB warn line BEFORE this change. My
+  three fields are ~4.5% of the total budget. Not a blocker; do not add a fourth
+  without re-measuring.
+- **FIXED IN PASSING: `04187cdf` LANDED ITS OWN CHANGE TWICE.** 40 lines of
+  comment plus `model_edge_pct`/`ev_pct` were declared twice in `OrderRequest`,
+  and the same two keys appeared twice in `record_order`'s dict. Both are legal
+  Python (last wins, same value) so nothing misbehaved — but it is a merge
+  artifact sitting in the exact block this lane extends. Collapsed to one copy;
+  verified by diff that the ONLY non-comment lines removed are the duplicates.
+- Blocked by: none for the CODE. **Deploy deliberately not taken** — held by
+  lane `prop-join-yield` per user instruction. **The verification above is NOT
+  discharged by any of this: it needs a post-deploy order.**
 
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

@@ -106,6 +106,35 @@ def _as_optional_float(value: object) -> float | None:
         return None
 
 
+def _as_optional_str(value: object) -> str | None:
+    """`None` for absent or blank, the text otherwise. Never the string "None".
+
+    `sim_view` carries `"none"` as a REAL verdict -- the sim was asked and had
+    no view -- so the absent case has to stay `None` and must not be stringified
+    into something that sorts alongside it. A `str(value)` here would put the
+    literal `"None"` in the ledger and a later `GROUP BY sim_view` would show it
+    as a fourth verdict nobody wrote.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _as_optional_bool(value: object) -> bool | None:
+    """Tri-state. `None` stays `None`; anything else is its truthiness.
+
+    `sim_probability_railed` distinguishes "computed, on-scale" (`False`) from
+    "never computed" (`None`), so the absent case cannot be folded onto the
+    permissive branch -- a `bool(value)` would map both onto `False` and the
+    ledger would report a rail check that never ran as a rail check that
+    passed.
+    """
+    if value is None:
+        return None
+    return bool(value)
+
+
 def _order_from_position(position: Mapping[str, Any], selected_date: str, venue: str) -> OrderRequest | None:
     """One committed position -> one order request, or None with nothing placed.
 
@@ -159,6 +188,21 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
         # a real edge and `None` is the absence of one.
         model_edge_pct=_as_optional_float(position.get("model_edge_pct")),
         ev_pct=_as_optional_float(position.get("ev_pct")),
+        # WHAT THE SIM THOUGHT, alongside how much it liked the price. Same
+        # boundary, same failure if dropped: `portfolio_commit._sim_view_of`
+        # stamps these on the position from the board's own
+        # `_layer2_board_columns`, and an order that does not carry them cannot
+        # be split by the sim's verdict after the fact -- the plan that held
+        # the projection is rewritten on the next board build.
+        #
+        # ABSENT STAYS ABSENT, and for `sim_view` the trap is sharper than for
+        # a float: `"none"` is the sim SAYING it has no view, `None` is us not
+        # having asked. `_as_optional_str` keeps them apart; a `str()` cast
+        # would turn a missing verdict into the string "None" and a `or ""`
+        # would turn it into a third thing that is neither.
+        sim_view=_as_optional_str(position.get("sim_view")),
+        sim_line_gap=_as_optional_float(position.get("sim_line_gap")),
+        sim_probability_railed=_as_optional_bool(position.get("sim_probability_railed")),
         # THE PRE-2026-08-30 KEY, and WITHOUT THIS LINE THE MIGRATION GUARD IS
         # INERT. `portfolio_commit` emits it and `record_order` checks it, but
         # the request in between never carried it -- so `_legacy_idempotency_key`
