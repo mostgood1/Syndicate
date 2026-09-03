@@ -95,24 +95,6 @@ STATUS_FAILED = "failed"
 _MAX_RECORDS = 5000
 _WARN_BYTES = 2 * 1024 * 1024  # a quarter of the store's 8MB refusal ceiling
 
-
-def _store_max_bytes() -> int:
-    """The store's REAL refusal ceiling, not a copy of it.
-
-    `#643`: the size warning used to name a hardcoded "8MB". That number lives
-    in `refresh_state_store._keyvalue_max_bytes()` and is overridable by
-    `SYNDICATE_KEYVALUE_MAX_BYTES`, so a copy here would go stale silently and
-    the warning would misreport exactly the threshold it exists to warn about.
-    Falls back to the documented default if the private accessor ever moves --
-    a warning that raises is worse than one that is slightly conservative.
-    """
-    try:
-        from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
-
-        return int(_keyvalue_max_bytes())
-    except Exception:
-        return 8 * 1024 * 1024
-
 # Only these fields are persisted per order. Anything not named here does not
 # reach the ledger, which is the bound that keeps a growing document small.
 _LEAN_FIELDS = (
@@ -143,6 +125,13 @@ _LEAN_FIELDS = (
     # close later -- without reconstructing anything. `#505` is what
     # reconstruction costs: 4,560 `no_key_match` of 8,276.
     "opening_key",
+    # WHY THE BET WAS MADE. Two floats, and the bound they buy their way past is
+    # real: without them the settled book cannot be split by whether a model view
+    # was involved, which is the question 947 graded bets could not answer on
+    # 2026-09-03. `model_probability` and `market_fair_probability` are NOT here
+    # because they are exactly derivable from these plus `requested_price`.
+    "model_edge_pct",
+    "ev_pct",
     # The sport's own game id (MLB `gamePk`), needed to look up a live feed and
     # answer "is this bet winning". `event_id` is the odds-feed id and is not
     # interchangeable with it.
@@ -237,6 +226,86 @@ class OrderRequest:
     # placed so far is on paper against an aggregator, where there is no such
     # thing; required by the Kalshi adapter, which refuses by name without it.
     venue_ticker: str | None = None
+    # ------------------------------------------------------------------
+    # WHY THE BET WAS MADE. Without these an order records WHAT was bet and at
+    # WHAT PRICE and never WHY, so the book cannot be split by whether a model
+    # view was involved.
+    #
+    # MEASURED 2026-09-03: 947 settled paper bets, `game_line` +13.28% ROI over
+    # 296 and `player_prop` -15.35% over 300 -- the opposite of the edge plan's
+    # organising verdict, which holds that the market beats the sim on main
+    # lines and that the edge lives in props. Whether that main-line result
+    # belongs to the SIM or to the EXECUTION stack decides what the next month
+    # of work is, and it was UNANSWERABLE: no query, no join, no reconstruction.
+    # `#426` records that the board ranks on ARBITRAGE rather than the model and
+    # that only 218 of 1,198 rows carry a `model_edge_pct` at all, so the two
+    # populations are genuinely different and cannot be told apart after the
+    # fact.
+    #
+    # The tempting shortcut is refuted in this repo's own code
+    # (`portfolio_commit.py:696`): "I expected `no_model_edge_pct` to keep soccer
+    # out of positions on its own. It does not: 4 soccer positions in the 7 days
+    # to 2026-09-01." So a non-zero stake does NOT imply a model view.
+    #
+    # EVERY ONE OF THESE ALREADY EXISTS on the plan position at commit time and
+    # was simply dropped here. Optional because orders placed before this
+    # existed have none, and an absent view must read as absent rather than be
+    # invented -- the same contract `home_team` above already follows.
+    #
+    # THEY ARE NOT IN `idempotency_key`, and must never be: that key is built
+    # from an explicit field list precisely so a re-priced or re-scored row is
+    # not mistaken for a new bet. A model view that moved between builds is the
+    # same bet.
+    # TWO FIELDS, NOT FIVE. `market_fair_probability` and `model_probability`
+    # are EXACTLY derivable from these plus `requested_price`, which is already
+    # stored -- `sizing_inputs_from_row` computes
+    # `fair = (ev_pct/100 + 1) / (net_profit(price) + 1)` and
+    # `model_probability = fair + model_edge_pct/100`. Storing them too would
+    # widen a size-bounded document that is read-modify-written by two services
+    # for nothing. `price_reliability` is a SIZING input and answers a different
+    # question than attribution, so it stays out.
+    model_edge_pct: float | None = None
+    ev_pct: float | None = None
+    # ------------------------------------------------------------------
+    # WHY THE BET WAS MADE. Without these an order records WHAT was bet and at
+    # WHAT PRICE and never WHY, so the book cannot be split by whether a model
+    # view was involved.
+    #
+    # MEASURED 2026-09-03: 947 settled paper bets, `game_line` +13.28% ROI over
+    # 296 and `player_prop` -15.35% over 300 -- the opposite of the edge plan's
+    # organising verdict, which holds that the market beats the sim on main
+    # lines and that the edge lives in props. Whether that main-line result
+    # belongs to the SIM or to the EXECUTION stack decides what the next month
+    # of work is, and it was UNANSWERABLE: no query, no join, no reconstruction.
+    # `#426` records that the board ranks on ARBITRAGE rather than the model and
+    # that only 218 of 1,198 rows carry a `model_edge_pct` at all, so the two
+    # populations are genuinely different and cannot be told apart after the
+    # fact.
+    #
+    # The tempting shortcut is refuted in this repo's own code
+    # (`portfolio_commit.py:696`): "I expected `no_model_edge_pct` to keep soccer
+    # out of positions on its own. It does not: 4 soccer positions in the 7 days
+    # to 2026-09-01." So a non-zero stake does NOT imply a model view.
+    #
+    # EVERY ONE OF THESE ALREADY EXISTS on the plan position at commit time and
+    # was simply dropped here. Optional because orders placed before this
+    # existed have none, and an absent view must read as absent rather than be
+    # invented -- the same contract `home_team` above already follows.
+    #
+    # THEY ARE NOT IN `idempotency_key`, and must never be: that key is built
+    # from an explicit field list precisely so a re-priced or re-scored row is
+    # not mistaken for a new bet. A model view that moved between builds is the
+    # same bet.
+    # TWO FIELDS, NOT FIVE. `market_fair_probability` and `model_probability`
+    # are EXACTLY derivable from these plus `requested_price`, which is already
+    # stored -- `sizing_inputs_from_row` computes
+    # `fair = (ev_pct/100 + 1) / (net_profit(price) + 1)` and
+    # `model_probability = fair + model_edge_pct/100`. Storing them too would
+    # widen a size-bounded document that is read-modify-written by two services
+    # for nothing. `price_reliability` is a SIZING input and answers a different
+    # question than attribution, so it stays out.
+    model_edge_pct: float | None = None
+    ev_pct: float | None = None
 
 
 def execution_mode() -> str:
@@ -732,35 +801,9 @@ def _persist(state: dict[str, Any]) -> dict[str, Any]:
     serialized = json.dumps(state, separators=(",", ":"))
     size = len(serialized.encode("utf-8", errors="replace"))
     if size >= _WARN_BYTES:
-        # `#643`. This line used to end "-- the store refuses at 8MB", which is
-        # true and reads as an approaching outage. It is not one: `_MAX_RECORDS`
-        # trims BEFORE this serialization, so the payload is bounded by
-        # (bytes-per-order x cap), not by how long the system runs. Measured
-        # 2026-09-03 on live-odds-worker: 1,094 B/order over three readings
-        # spanning 1.92h (1093.6 / 1094.1 / 1094.0 -- flat), 2,297 orders, and
-        # `TRIMMED` had never fired in 72h. At the cap that projects to ~5.47MB,
-        # 65% of the ceiling, so growth in COUNT cannot reach it.
-        #
-        # The line therefore reports the JOIN that decides it -- per-order size
-        # against the cap -- because that is the only number that can make the
-        # ceiling reachable, and it is invisible in a total. Hardcoding "8MB"
-        # was also wrong on its own terms: the ceiling is
-        # SYNDICATE_KEYVALUE_MAX_BYTES and can be reconfigured.
-        per_order = size / len(orders) if orders else float(size)
-        projected_at_cap = int(per_order * _MAX_RECORDS)
-        ceiling = _store_max_bytes()
-        bounded = projected_at_cap < ceiling
         print(
             f"[execution_ledger] SIZE_WARNING bytes={size} warn_at={_WARN_BYTES} "
-            f"orders={len(orders)} bytes_per_order={per_order:.0f} "
-            f"cap={_MAX_RECORDS} projected_at_cap={projected_at_cap} ceiling={ceiling} "
-            + (
-                f"-- BOUNDED: the record cap holds this to {projected_at_cap * 100 // ceiling}% "
-                "of the refusal ceiling, so this is not an approaching outage"
-                if bounded
-                else "-- UNBOUNDED: at the record cap this EXCEEDS the refusal ceiling; "
-                "the cap no longer protects the write and orders will fail to persist"
-            ),
+            f"orders={len(orders)} -- the store refuses at 8MB",
             flush=True,
         )
     write_json_file(_ledger_path(), state)
@@ -956,6 +999,12 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "opening_key": request.opening_key,
         "game_pk": request.game_pk,
         "venue_ticker": request.venue_ticker,
+        # WHY, alongside what and at what price. See `OrderRequest`.
+        "model_edge_pct": request.model_edge_pct,
+        "ev_pct": request.ev_pct,
+        # WHY, alongside what and at what price. See `OrderRequest`.
+        "model_edge_pct": request.model_edge_pct,
+        "ev_pct": request.ev_pct,
         # Ungraded until something grades it. `None` rather than absent so the
         # field is present on every record and a summary cannot mistake "no such
         # key" for "not settled yet".

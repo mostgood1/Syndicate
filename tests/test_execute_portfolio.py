@@ -1882,3 +1882,78 @@ def test_a_soccer_yes_no_leg_is_tested_against_the_REQUESTS_teams(monkeypatch):
     resolution = {"home_team": "CA Osasuna", "away_team": "Getafe"}
     assert _subject_is_side(candidate, resolution, "home", "soccer") is False
     assert _subject_is_side(candidate, resolution, "away", "soccer") is True
+
+
+# ---------------------------------------------------------------------------
+# WHY the bet was made, not just what and at what price.
+#
+# Measured 2026-09-03: 947 settled paper bets showed `game_line` at +13.28% ROI
+# and `player_prop` at -15.35% -- the opposite of the edge plan's verdict. Which
+# of those is the SIM and which is the EXECUTION stack was UNANSWERABLE, because
+# `OrderRequest` recorded no model view at all. These pin the fix.
+# ---------------------------------------------------------------------------
+
+
+def _sized_position(**over):
+    base = {
+        "position_key": "p1", "sport": "mlb", "event_id": "e1",
+        "market": "h2h", "side": "home", "price": -110.0, "stake_dollars": 5.0,
+        "model_edge_pct": 3.2, "model_probability": 0.55,
+        "market_fair_probability": 0.52, "ev_pct": 1.1, "price_reliability": 0.9,
+    }
+    base.update(over)
+    return base
+
+
+def test_the_order_records_WHY_the_bet_was_made() -> None:
+    from pipeline.execute_portfolio import _order_from_position
+
+    request = _order_from_position(_sized_position(), "2026-09-03", "kalshi")
+    assert request.model_edge_pct == 3.2
+    assert request.ev_pct == 1.1
+
+
+def test_a_row_with_NO_model_view_records_None_and_not_zero() -> None:
+    """A zero edge is a real claim -- "the model agrees with the market exactly".
+    Defaulting an absent view to 0.0 would make the two indistinguishable, which
+    is the whole thing these fields exist to separate."""
+    from pipeline.execute_portfolio import _order_from_position
+
+    bare = _sized_position()
+    for f in ("model_edge_pct", "ev_pct"):
+        bare.pop(f)
+    request = _order_from_position(bare, "2026-09-03", "kalshi")
+    assert request.model_edge_pct is None
+    assert request.ev_pct is None
+
+    real_zero = _order_from_position(_sized_position(model_edge_pct=0.0),
+                                     "2026-09-03", "kalshi")
+    assert real_zero.model_edge_pct == 0.0, "a genuine zero must survive"
+
+
+def test_the_new_fields_DO_NOT_change_the_idempotency_key() -> None:
+    """THE HAZARD. `idempotency_key` is identity: if these fields entered it, a
+    re-scored row would mint a new key and the same bet could be placed twice.
+    The key is built from an explicit field list precisely so a re-priced or
+    re-scored row is not a new bet."""
+    from pipeline.execute_portfolio import _order_from_position
+    from syndicate.features.shared.execution_ledger import idempotency_key
+
+    without = _sized_position()
+    for f in ("model_edge_pct", "ev_pct"):
+        without.pop(f)
+    a = _order_from_position(without, "2026-09-03", "kalshi")
+    b = _order_from_position(_sized_position(), "2026-09-03", "kalshi")
+    c = _order_from_position(_sized_position(model_edge_pct=99.9), "2026-09-03", "kalshi")
+
+    assert idempotency_key(a) == idempotency_key(b) == idempotency_key(c)
+
+
+def test_junk_in_the_model_fields_reads_as_ABSENT_rather_than_crashing() -> None:
+    from pipeline.execute_portfolio import _order_from_position
+
+    request = _order_from_position(
+        _sized_position(model_edge_pct="", ev_pct="n/a"),
+        "2026-09-03", "kalshi")
+    assert request.model_edge_pct is None
+    assert request.ev_pct is None

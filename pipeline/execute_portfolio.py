@@ -90,6 +90,22 @@ def _venue_ticker_of(position: Mapping[str, Any]) -> str | None:
     return text or None
 
 
+def _as_optional_float(value: object) -> float | None:
+    """`None` for anything that is not a number, INCLUDING a blank string.
+
+    Absence must survive as absence. A row with no model view has to record
+    `None`, never `0.0` -- a zero edge is a real claim ("the model agrees with
+    the market exactly") and would be indistinguishable from "no model ran".
+    That distinction is the entire point of carrying these fields.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _order_from_position(position: Mapping[str, Any], selected_date: str, venue: str) -> OrderRequest | None:
     """One committed position -> one order request, or None with nothing placed.
 
@@ -135,6 +151,14 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
         home_team=position.get("home_team"),
         away_team=position.get("away_team"),
         commence_time=position.get("commence_time"),
+        # WHY THIS BET WAS MADE. All five are already on the plan position --
+        # `portfolio_commit` computes them from `SizingInputs` and writes them
+        # there -- and were being dropped at this boundary, which is why the
+        # settled book cannot be split by model view. Absent stays absent: a
+        # row with no model view must record none, not a zero, because zero is
+        # a real edge and `None` is the absence of one.
+        model_edge_pct=_as_optional_float(position.get("model_edge_pct")),
+        ev_pct=_as_optional_float(position.get("ev_pct")),
         # THE PRE-2026-08-30 KEY, and WITHOUT THIS LINE THE MIGRATION GUARD IS
         # INERT. `portfolio_commit` emits it and `record_order` checks it, but
         # the request in between never carried it -- so `_legacy_idempotency_key`
