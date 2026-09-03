@@ -1257,9 +1257,30 @@ class OpsRefreshApiTests(unittest.TestCase):
         # `#552`: the OddsAPI capture step now precedes the legacy bundle
         # runner. Looked up BY NAME, not by index, so a future third step
         # cannot silently repoint this at the wrong command.
+        #
+        # THE THIRD STEP ARRIVED AND THIS LIST WAS NOT UPDATED WITH IT.
+        # `28324d06` (2026-08-26) moved the NCAAF props capture OUT of
+        # `refresh_ncaaf_oddsapi.py` onto its own plan step, because that runner
+        # is structurally dead for 2026: `_resolve_data_root` requires a
+        # `college_football_schedule_<season>_predicted_totals_enhanced*.csv`,
+        # and git holds 359 of them, every one season 2025. Props were wired to
+        # a path that could not execute in the season they were built for.
+        # Production confirmed it 2026-08-27T01:04:55Z -- `ncaaf_lines_snapshot`
+        # died in zero seconds with FileNotFoundError while
+        # `ncaaf_game_lines_oddsapi` succeeded in the same sweep.
+        #
+        # So the extra step is CORRECT and this assertion was stale. Kept as an
+        # EXACT list rather than relaxed to a membership check: catching an
+        # unannounced step is precisely what it just did. The failure was that
+        # nobody updated it when the step WAS announced, and a looser assertion
+        # would have hidden that rather than fixed it.
         self.assertEqual(
             [s.get("name") for s in refresh_steps],
-            ["ncaaf_game_lines_oddsapi", "ncaaf_lines_snapshot"],
+            [
+                "ncaaf_game_lines_oddsapi",
+                "ncaaf_player_props_oddsapi",
+                "ncaaf_lines_snapshot",
+            ],
         )
         capture = next(
             s for s in refresh_steps if s.get("name") == "ncaaf_game_lines_oddsapi"
@@ -1300,9 +1321,30 @@ class OpsRefreshApiTests(unittest.TestCase):
         # `#552`: the OddsAPI capture step now precedes the legacy bundle
         # runner. Looked up BY NAME, not by index, so a future third step
         # cannot silently repoint this at the wrong command.
+        #
+        # THE THIRD STEP ARRIVED AND THIS LIST WAS NOT UPDATED WITH IT.
+        # `28324d06` (2026-08-26) moved the NCAAF props capture OUT of
+        # `refresh_ncaaf_oddsapi.py` onto its own plan step, because that runner
+        # is structurally dead for 2026: `_resolve_data_root` requires a
+        # `college_football_schedule_<season>_predicted_totals_enhanced*.csv`,
+        # and git holds 359 of them, every one season 2025. Props were wired to
+        # a path that could not execute in the season they were built for.
+        # Production confirmed it 2026-08-27T01:04:55Z -- `ncaaf_lines_snapshot`
+        # died in zero seconds with FileNotFoundError while
+        # `ncaaf_game_lines_oddsapi` succeeded in the same sweep.
+        #
+        # So the extra step is CORRECT and this assertion was stale. Kept as an
+        # EXACT list rather than relaxed to a membership check: catching an
+        # unannounced step is precisely what it just did. The failure was that
+        # nobody updated it when the step WAS announced, and a looser assertion
+        # would have hidden that rather than fixed it.
         self.assertEqual(
             [s.get("name") for s in refresh_steps],
-            ["ncaaf_game_lines_oddsapi", "ncaaf_lines_snapshot"],
+            [
+                "ncaaf_game_lines_oddsapi",
+                "ncaaf_player_props_oddsapi",
+                "ncaaf_lines_snapshot",
+            ],
         )
         command = next(
             s for s in refresh_steps if s.get("name") == "ncaaf_lines_snapshot"
