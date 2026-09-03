@@ -20221,3 +20221,41 @@ so it must never justify `--force`.
 
 **Fleet:** live-odds-worker `6a41098f` · refresh-worker `6a41098f` · web
 `9987c545` (3 pending, owner-held).
+
+---
+
+## 2026-09-03 — web — **`WEB_CONCURRENCY=1` IS TEMPORARY. RESTORE IT TO `2`.** (`#632`, lane `web-oom-profiler-steady`)
+
+**READ THIS FIRST IF YOU ARE NOT ME.** Web is being run on ONE gunicorn worker
+for a measurement window of roughly 45-60 minutes. **That halves request
+capacity — 1 worker x 4 threads = 4 concurrent slots instead of 8 — and it must
+not be left in place.**
+
+    RESTORE:  python scripts/render_env_set.py --service web --key WEB_CONCURRENCY --value 2
+    THEN DEPLOY (an env change does not reach a running process).
+
+**Why the change is worth a temporary capacity cut.** `#632`'s steady-state
+reading came back with an attributed share of **61-150%** depending on framing,
+and a share above 100% is arithmetically impossible for a true partition. The
+cause is known and structural: `_REQUEST_MEMORY_STATE["inflight"]` is module
+state (per WORKER) while `_anon_mb()` reads the per-CONTAINER cgroup, so at
+`WEB_CONCURRENCY=2` **both workers difference the SAME cgroup and each absorbs
+the other's allocation**. The instrument can rule innocence out — it did — but it
+cannot apportion. On ONE worker the solo guarantee is real, and the share becomes
+a measurement instead of a range.
+
+**What this does NOT remove.** Merge subprocesses are still inside the container
+cgroup, so a "solo" window can still contain a child's allocation. That residue
+is handled by FILTERING on the child count rather than by hoping, which is why
+the collector records it per sample.
+
+**Baseline to restore to, read from the live service before the change:**
+
+    WEB_CONCURRENCY                       2
+    GUNICORN_THREADS                      4
+    SYNDICATE_REQUEST_MEMORY_PROFILE      on
+    SYNDICATE_ARTIFACT_MERGE_CHILD_CAP    2
+    SYNDICATE_ARTIFACT_MERGE_INFLIGHT_MB  32
+
+**If this session ends before the restore, the restore is still owed** — that is
+the entire reason this entry is written BEFORE the change rather than after.
