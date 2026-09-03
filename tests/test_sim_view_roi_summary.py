@@ -141,6 +141,39 @@ def test_venue_scoped_shadow_copies_are_excluded():
     assert sum(b["settled"] for b in out["by_verdict"]) == 1
 
 
+def test_LIVE_orders_are_in_the_cut_and_only_PAPER_scoped_ones_are_excluded():
+    """THE RESTRICTION MUST NOT SWALLOW REAL MONEY, and it would be silent.
+
+    `book_of` keys on a `paper:` prefix, and `run_execution` adds that prefix
+    ONLY in paper mode (`execute_portfolio.py:420-431` -- in live mode the venue
+    IS the scope, because suffixing produced `kalshi:kalshi` and resolved to no
+    adapter). So a live order books under the bare venue and belongs to the
+    portfolio book.
+
+    Pinned because the failure would be invisible: if that suffix rule ever
+    applied in live mode, this cut would quietly stop counting every real-money
+    bet while still returning a confident, well-formed ROI for the paper ones.
+
+    (Recorded 2026-09-03: a parallel lane's log entry stated that live runs book
+    under `paper:kalshi`/`paper:polymarket`. They do not -- that describes the
+    PAPER scoped case. Re-derived here rather than taken on trust, because it
+    decides whether this cut can see live money at all.)
+    """
+    live = [
+        _order(mode="live", venue="kalshi", outcome="won", pnl_dollars=9.09),
+        _order(mode="live", venue="polymarket", outcome="lost", pnl_dollars=-10.0),
+    ]
+    out = sim_view_roi_summary(orders=live)
+    assert sum(b["settled"] for b in out["by_sport_family_verdict"]) == 2, (
+        "live orders were excluded from the ROI cut -- the portfolio-rows "
+        "restriction is swallowing real money"
+    )
+
+    # ...while the PAPER venue-scoped shadow copies still are excluded.
+    shadow = [_order(mode="paper", venue="paper:kalshi", outcome="won", pnl_dollars=9.09)]
+    assert not sim_view_roi_summary(orders=shadow)["by_sport_family_verdict"]
+
+
 def test_never_recorded_is_its_own_bucket_and_not_the_verdict_none():
     """`"none"` is the sim ANSWERING that it has no view. `None` is an order
     placed before the field existed. Pooling them would put every pre-`cb223b62`
