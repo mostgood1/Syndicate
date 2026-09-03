@@ -1714,6 +1714,65 @@ _PUBLISH_CONSECUTIVE_REFUSALS: dict[str, int] = {}
 _PENDING_MERGE_CHILDREN: list = []
 
 
+# `#632`. A CEILING ON CONCURRENT MERGES, AND WHY A COUNT ALONE IS NOT ENOUGH.
+#
+# Nothing read this list's length before spawning, so concurrency was bounded
+# only by how fast publishes arrived. Measured 2026-09-03 on the live service, a
+# publish burst reached **19 concurrent children holding 334.6 MB**, and a
+# different burst reached **365.9 MB across only 6**. That ~10x spread in
+# per-child cost is exactly why a COUNT cap is necessary and not sufficient:
+# four small shards and four large ones are the same number and a quarter of a
+# gigabyte apart.
+#
+# So there are two ceilings and a spawn must clear both -- a count, and the
+# total INPUT bytes already in flight. Input is the honest predictor because
+# `#630` measured this union at ~3.13x input (276 MB peak on 88 MB), and unlike
+# the child's eventual RSS it is known BEFORE the decision is made.
+#
+# WHY REFUSING IS SAFE. The target is not touched, so a refusal can never
+# clobber -- it leaves the copy already on disk, which is the pre-merge
+# behaviour. The answer is 503, chosen deliberately: it is NOT in
+# `artifact_publisher._PUBLISH_STREAM_UNSUPPORTED_STATUSES` ({400,404,405,415}),
+# so it does not trip that module's fall-back-to-JSON branch, which would resend
+# the SAME artifact as an envelope and parse it whole IN THIS PROCESS -- the
+# heavier path, taken exactly when the service can least afford it. And
+# `_LAST_PUBLISHED_CHECKSUM` is recorded only on success, so a refused publish
+# retries on the next sweep rather than suppressing itself.
+#
+# WHY REFUSING IS ALSO CHEAP. The merge being deferred is almost always a no-op:
+# across 100 consecutive production `ODDS_HISTORY_MERGE` lines, **96 added zero
+# rows**, and the whole hundred added 26 between them.
+_MERGE_CHILD_CAP_DEFAULT = 4
+_MERGE_INFLIGHT_INPUT_MB_DEFAULT = 64.0
+
+
+def _merge_child_cap() -> int:
+    """Max concurrent merge children; <= 0 disables this ceiling.
+
+    An unparseable value falls back to the DEFAULT rather than to "unlimited" --
+    a typo in an env var must not silently restore the uncapped behaviour this
+    exists to remove.
+    """
+    raw = str(os.environ.get("SYNDICATE_ARTIFACT_MERGE_CHILD_CAP") or "").strip()
+    if not raw:
+        return _MERGE_CHILD_CAP_DEFAULT
+    try:
+        return int(raw)
+    except ValueError:
+        return _MERGE_CHILD_CAP_DEFAULT
+
+
+def _merge_inflight_input_mb_cap() -> float:
+    """Max INPUT megabytes across live children; <= 0 disables this ceiling."""
+    raw = str(os.environ.get("SYNDICATE_ARTIFACT_MERGE_INFLIGHT_MB") or "").strip()
+    if not raw:
+        return _MERGE_INFLIGHT_INPUT_MB_DEFAULT
+    try:
+        return float(raw)
+    except ValueError:
+        return _MERGE_INFLIGHT_INPUT_MB_DEFAULT
+
+
 def _reap_finished_merge_children() -> int:
     """Poll previously spawned merge children so they stop being zombies."""
     global _PENDING_MERGE_CHILDREN
@@ -1729,6 +1788,28 @@ def _reap_finished_merge_children() -> int:
             reaped += 1
     _PENDING_MERGE_CHILDREN = alive
     return reaped
+
+
+_MERGE_INPUT_BYTES_ATTR = "_syndicate_merge_input_bytes"
+
+
+def _merge_inflight_input_bytes() -> int:
+    """Input bytes across the children still running.
+
+    The size rides ON the child handle rather than turning this list into a list
+    of tuples. The list is reached into directly by the reap tests that `#630`
+    left behind -- they assert `assertIn(child, _PENDING_MERGE_CHILDREN)` -- and
+    changing its shape would break assertions about REAPING to add accounting
+    about BYTES, two unrelated concerns. A handle with no such attribute
+    (anything older, or a test double) simply contributes 0.
+    """
+    total = 0
+    for proc in _PENDING_MERGE_CHILDREN:
+        try:
+            total += int(getattr(proc, _MERGE_INPUT_BYTES_ATTR, 0) or 0)
+        except (TypeError, ValueError):
+            continue
+    return total
 
 
 def _spawn_artifact_merge(relative_path: str, family: str, target_path: Path, incoming_path: Path) -> dict:
@@ -1751,6 +1832,34 @@ def _spawn_artifact_merge(relative_path: str, family: str, target_path: Path, in
     deleting the staging file, including on refusal.
     """
     reaped = _reap_finished_merge_children()
+    # CHECKED BEFORE STAGING, so a refusal leaves `incoming_path` exactly where
+    # the caller put it. Staging first and then refusing would move the caller's
+    # temp file out from under it and turn a clean 503 into a 500 on the next
+    # `os.replace`.
+    try:
+        incoming_bytes = int(incoming_path.stat().st_size)
+    except Exception:
+        incoming_bytes = 0
+    cap = _merge_child_cap()
+    mb_cap = _merge_inflight_input_mb_cap()
+    inflight = len(_PENDING_MERGE_CHILDREN)
+    inflight_mb = _merge_inflight_input_bytes() / 1024 / 1024
+    incoming_mb = incoming_bytes / 1024 / 1024
+    over_count = cap > 0 and inflight >= cap
+    # `inflight > 0` so the FIRST child is never refused on size alone. Without
+    # it, a single artifact larger than the whole budget could never merge at
+    # all -- permanent starvation of exactly the biggest shard, the one whose
+    # rows matter most.
+    over_bytes = mb_cap > 0 and inflight > 0 and (inflight_mb + incoming_mb) > mb_cap
+    if over_count or over_bytes:
+        reason = "count" if over_count else "inflight_mb"
+        print(f"[ops.publish] ARTIFACT_MERGE_AT_CAPACITY path={relative_path} "
+              f"reason={reason} inflight={inflight} cap={cap} "
+              f"inflight_mb={inflight_mb:.1f} incoming_mb={incoming_mb:.1f} "
+              f"mb_cap={mb_cap:.1f} reaped={reaped}", flush=True)
+        return {"spawned": False, "handled": False, "at_capacity": True,
+                "reason": reason, "inflight": inflight, "cap": cap,
+                "inflight_mb": round(inflight_mb, 1)}
     staging = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.staged"
     try:
         os.replace(incoming_path, staging)
@@ -1787,6 +1896,10 @@ def _spawn_artifact_merge(relative_path: str, family: str, target_path: Path, in
             pass
         return {"spawned": False, "handled": promoted,
                 "error": f"spawn_failed: {type(exc).__name__}: {exc}"}
+    try:
+        setattr(child, _MERGE_INPUT_BYTES_ATTR, incoming_bytes)
+    except Exception:
+        pass          # accounting is best-effort; the COUNT ceiling still holds
     _PENDING_MERGE_CHILDREN.append(child)
     return {"spawned": True, "staged": staging.name, "reaped": reaped,
             "pending_children": len(_PENDING_MERGE_CHILDREN)}
@@ -1984,6 +2097,19 @@ def _publish_streamed_body() -> Any:
             )
         merged = _merge_published_artifact(relative_path, target_path, temp_path)
         if merged is not None:
+            if merged.get("at_capacity"):
+                # The ceiling refused BEFORE staging, so temp_path is still ours
+                # to remove and the target keeps the copy it already had. Must
+                # not fall through to the replace below -- that replace is the
+                # `#630` clobber, and 503 is what makes the publisher retry next
+                # sweep instead of escalating to the heavier envelope form.
+                temp_path.unlink(missing_ok=True)
+                return jsonify({
+                    "ok": False, "relative_path": relative_path,
+                    "error": "artifact merge at capacity; retry next sweep",
+                    "merge": "at_capacity", "reason": merged.get("reason"),
+                    "inflight": merged.get("inflight"), "cap": merged.get("cap"),
+                }), 503
             if merged.get("spawned"):
                 # temp_path has been MOVED to staging; the child owns it now and
                 # the target is deliberately untouched. Must not fall through to
@@ -2065,6 +2191,19 @@ def _write_published_artifact(relative_path: str, content: Any) -> Any:
         # that cause it, which is the whole defect.
         merged = _merge_published_artifact(relative_path, target_path, temp_path)
         if merged is not None:
+            if merged.get("at_capacity"):
+                # The ceiling refused BEFORE staging, so temp_path is still ours
+                # to remove and the target keeps the copy it already had. Must
+                # not fall through to the replace below -- that replace is the
+                # `#630` clobber, and 503 is what makes the publisher retry next
+                # sweep instead of escalating to the heavier envelope form.
+                temp_path.unlink(missing_ok=True)
+                return jsonify({
+                    "ok": False, "relative_path": relative_path,
+                    "error": "artifact merge at capacity; retry next sweep",
+                    "merge": "at_capacity", "reason": merged.get("reason"),
+                    "inflight": merged.get("inflight"), "cap": merged.get("cap"),
+                }), 503
             if merged.get("spawned"):
                 print(f"[ops.publish] ARTIFACT_MERGE_DEFERRED path={relative_path} "
                       f"transport=envelope staged={merged.get('staged')}", flush=True)
