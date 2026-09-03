@@ -201,8 +201,12 @@ def main() -> int:
     print(f"  fresh_quotes_only (<={row.get('fresh_quote_seconds')}s) "
           f"model_brier={fm.get('brier')} market_brier={fk.get('brier')} "
           f"diff={fq.get('model_minus_market_brier')} n={fm.get('n')}/{fk.get('n')}")
+    # Absence dates THIS SCRIPT, not the scorer -- see the comment on the
+    # field above. Era is stamp OR capture time; `pool_live_gameline_trend.py`
+    # is the one implementation, and this line must not contradict it.
     print(f"  scored_markets={row.get('scored_markets')} "
-          f"(absent => PRE-2026-08-30 SCORER, not poolable with later rows)")
+          f"(absent => this SCRIPT predates the stamp, NOT necessarily the "
+          f"pre-fix scorer; era = stamp OR capture time vs 2026-08-30T16:59:02Z)")
     print(f"  ledger written={row['ledger_written']} candidates={row['ledger_candidates']} "
           f"priceable={row['rows_priceable']} "
           f"(v2 discriminator satisfied: {bool((row['ledger_written'] or 0) > (row['rows_priceable'] or 0))})")
