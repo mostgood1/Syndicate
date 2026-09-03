@@ -1635,7 +1635,23 @@ def _artifact_root_paths(selected_date: str) -> dict[str, Path]:
     }
 
 
-def _artifact_bundle(selected_date: str) -> dict[str, Any]:
+def _artifact_bundle(selected_date: str, *, allow_fallback: bool = True) -> dict[str, Any]:
+    """Cards/recommendations/sim/props for a date, from the best available root.
+
+    ``allow_fallback=False`` is how the live-state fallback calls back in
+    WITHOUT re-entering itself. MEASURED 2026-09-02 (lane
+    `wnba-cards-fallback-recursion`): this function called
+    `_games_from_live_state_fallback`, which called this function, which called
+    it again -- **247 frames deep, 247 redundant artifact loads for one
+    request**, ending in a `RecursionError` that the `except Exception` below
+    swallowed. Default True, so every one of the five ordinary callers is
+    unchanged.
+
+    The trigger is an EMPTY artifact, not a date: with one row in
+    `game_cards_<date>.csv` the depth is 1 and the fallback is never reached;
+    with none it is 247. It is also off entirely on Render
+    (`_render_web_dyno()`), which is why this survived as a cold/dev path.
+    """
     csv_name = f"game_cards_{selected_date}.csv"
     repo_data_root = _repo_root_from(__file__) / "data" / "wnba_source"
     candidate_roots = list(_wnba_source_roots()) + [repo_data_root]
@@ -1681,10 +1697,20 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
 
     # Runtime WNBA fallback is disabled on Render so the deployed app only
     # serves published artifacts.
-    if not rows and selected_date == central_today_iso() and not _render_web_dyno():
+    if allow_fallback and not rows and selected_date == central_today_iso() and not _render_web_dyno():
         try:
             rows, _ = _games_from_live_state_fallback(selected_date)
-        except Exception:
+        except Exception as error:
+            # NAMED, not swallowed. Before this, "WNBA has no cards today" and
+            # "the fallback blew the stack 247 frames deep" were the SAME
+            # observable -- nothing logged either way. That silence is how the
+            # recursion lived here unnoticed, and it cost three separate
+            # mis-attributions in one session before anyone dumped a stack.
+            print(
+                f"[wnba_cards] LIVE_STATE_FALLBACK_FAILED date={selected_date} "
+                f"error={type(error).__name__}: {error}",
+                flush=True,
+            )
             rows = []
 
     props_index = _artifact_games_index(paths["props"]) if paths["props"].exists() else {}
@@ -3075,7 +3101,9 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
     if payload is None:
         payload = {}
     rows = payload.get("games") if isinstance((payload or {}).get("games"), list) else []
-    sim_index = _artifact_bundle(selected_date).get("sim", {})
+    # allow_fallback=False CLOSES THE CYCLE. This is the call that used to come
+    # straight back here through `_artifact_bundle`'s own fallback branch.
+    sim_index = _artifact_bundle(selected_date, allow_fallback=False).get("sim", {})
     games: list[dict[str, Any]] = []
     for row in rows:
         if not isinstance(row, dict):

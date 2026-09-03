@@ -1314,7 +1314,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### wnba-cards-fallback-recursion — OPEN, **PREMISE FALSIFIED: recursion is REAL (depth 234, 700 calls) but costs +5.7s, not minutes; the stall was KALSHI. CONTROL DONE: the cycle fires ONLY on an empty artifact (one CSV row -> depth 1), so it is COLD/DEV-ONLY and LOW severity; the real defect is the SWALLOWED RecursionError** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### wnba-cards-fallback-recursion — OPEN, **PREMISE FALSIFIED: recursion is REAL (depth 234, 700 calls) but costs +5.7s, not minutes; the stall was KALSHI. CONTROL DONE: the cycle fires ONLY on an empty artifact (one CSV row -> depth 1), so it is COLD/DEV-ONLY and LOW severity; the real defect is the SWALLOWED RecursionError. **FIXED: depth 247 -> 1, bundle calls 701 -> 2, and the failure is now NAMED**** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `syndicate/features/wnba/cards.py` cannot re-enter itself. ONE testable
   outcome: with the recursion path ENABLED (no `SYNDICATE_WEB_DYNO`, date ==
   today), `tests/test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_query_api_resolves_preview_date_and_preserves_contract`
@@ -1458,6 +1458,45 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   fallback to return rows, or touching `_render_web_dyno`. The fallback returning
   nothing here is a data-absence fact, not a code fact, and this lane has no
   evidence about its behaviour when its inputs exist.
+- **FIXED AND MEASURED 2026-09-02. The cycle is closed and the silence is gone.**
+
+  `_artifact_bundle(selected_date, *, allow_fallback: bool = True)`. The
+  fallback's call back in at `:3078` now passes `allow_fallback=False`, which
+  closes the cycle at the one place it can form; and the `except` branch prints
+  `[wnba_cards] LIVE_STATE_FALLBACK_FAILED date=... error=<Type>: <msg>` instead
+  of swallowing. Keyword-only with a True default, so all five ordinary callers
+  are untouched.
+
+      probe, no cards CSV        before: bundle 247 depth 247 RecursionError 2  0.79s
+                                  after: bundle   1 depth   1 RecursionError 0  0.01s
+
+      intelligence test, path LIVE
+                                 before: wall 33.6s bundle 701 depth 234 fallback 700 RecErr 3
+                                  after: wall 26.6s bundle   2 depth   1 fallback   3 RecErr 0
+                                control: wall 27.9s bundle   2 depth   1 fallback   0 RecErr 0
+
+  **The enabled path now matches the disabled control** (26.6s vs 27.9s, within
+  noise) and the fallback is STILL REACHED (3 calls) — fixed, not disabled.
+
+  6 tests. **4 of them fail against the pre-fix `cards.py` extracted from
+  `origin/main`** — depth 247 vs the `<= 2` assertion, the missing
+  `allow_fallback` parameter, and the absent log marker. The other 2 pass in
+  both states BY DESIGN: one is a no-regression check (a failed fallback still
+  degrades to an empty slate) and one pins the pre-existing trigger condition
+  (one CSV row means the fallback is never reached). Depth is asserted rather
+  than wall clock, because a timing assertion passes on a fast machine while the
+  recursion is still there — which is how this survived.
+
+  **REGRESSION: 809 pass across the WNBA suites. 2 fail in
+  `test_wnba_refresh_runner.py` and they are NOT mine** — the same two fail
+  identically with the pre-fix `cards.py` swapped in from `origin/main`.
+  Pre-existing, unrelated, untouched.
+
+- **STATUS: goal met, and it was not the goal this lane opened with.** The lane
+  opened believing this recursion was a multi-minute hang; it was ~5.7s, and the
+  real hang was Kalshi. What was fixed is what the evidence supported: a 247-deep
+  mutual recursion that reported nothing. No deploy — this path is disabled on
+  Render by `_render_web_dyno()`.
 - Blocked by: none. No deploy: `cards.py` runs on web, and this path is disabled
   on Render by `_render_web_dyno()`, so the fix is not urgent in production.
 
