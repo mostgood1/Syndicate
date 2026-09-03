@@ -237,6 +237,27 @@ def _compute_props_edges_file_only_local(
         suffixes=("", "_pred"),
     )
 
+    # THE FALLBACK'S YIELD, WHICH NOTHING HAS EVER REPORTED.
+    #
+    # The short-key merge below is a real name-join fallback and it has run in
+    # production for as long as it has existed without publishing a single
+    # number: how many rows it rescued, and how many are still unmatched after
+    # it. A fallback with no measured yield cannot be told from a fallback that
+    # never fires, and neither can be told from a slate the sim genuinely has no
+    # players for.
+    #
+    # Same defect fixed for MLB props on 2026-09-03, where the split turned out
+    # to matter: 191 of 1,423 player rows (13.4%) carried no projection because
+    # the NAME did not match, against 43 where the sim genuinely had no view --
+    # so 82% of the blanks were a broken join wearing an honest blank's clothes.
+    # That number could not be obtained at all before the counter existed, and
+    # this file is in the same position now.
+    #
+    # NBA/NCAAB are out of season and WNBA's sprint opens 2026-09-17, so this
+    # publishes nothing until then BY CONSTRUCTION -- it is written now because
+    # the alternative is discovering the gap on the first live slate.
+    rows_considered = int(len(merged))
+    unmatched_before = int(merged["player_id"].isna().sum())
     unmatched = merged[merged["player_id"].isna()].copy()
     if not unmatched.empty:
         alt = odds.merge(
@@ -257,6 +278,22 @@ def _compute_props_edges_file_only_local(
             alt_column = f"{column}_alt"
             if column in merged.columns and alt_column in merged.columns:
                 merged[column] = merged[column].fillna(merged[alt_column])
+
+    unmatched_after = int(merged["player_id"].isna().sum()) if "player_id" in merged.columns else unmatched_before
+    # `print`, not `logger.info`: this repo's logger never reaches Render's log
+    # collector, and a counter nobody can read is the thing being fixed.
+    # Emitted even when every count is zero -- a line that only appears on
+    # failure cannot confirm the join ran, which is the rule this repo keeps
+    # relearning.
+    print(
+        "[basketball_props_edges] PROP_NAME_JOIN "
+        f"rows_considered={rows_considered} "
+        f"unmatched_before_fallback={unmatched_before} "
+        f"unmatched_after_fallback={unmatched_after} "
+        f"short_key_recovered={max(unmatched_before - unmatched_after, 0)} "
+        f"pct_unmatched={round(100.0 * unmatched_after / rows_considered, 1) if rows_considered else 0.0}",
+        flush=True,
+    )
 
     log_dataframe_memory("basketball_props_edges.merged_odds_predictions", merged)
 
