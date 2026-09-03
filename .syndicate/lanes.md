@@ -1920,7 +1920,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   against services at 91-97%.
 - Claims: NONE held.
 
-### soccer-anchor-harness-land — OPEN — opened 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### soccer-anchor-harness-land — CLOSED 2026-09-03 — opened 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: land the measurement harness that answered `todo.md #622`(1)(2)(3) into
   `scripts/`, so the next mechanism-vs-outcome question does not pay for it
   again. It exists ONLY in a session scratchpad and dies with the session.
@@ -1934,9 +1934,24 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   numbers — base MAE 0.52126 / anchored 0.52163 over 6,486 rows, and the
   held-out surrogate 0.0144 vs 0.0225 — then what landed is not what ran, and
   the ledger's evidence has no reproducible source.
-- Verification: each script imports and `--help`s from a clean checkout with NO
-  machine-specific path; the backtest reproduces its recorded population and
-  clustering behaviour under test.
+- Verification RAN, and it PARTLY passed — recording the split rather than the
+  headline. **VERIFIED:** all three scripts `--help` from this checkout; **no
+  machine-specific path in any of the four files**; 10/10 tests pass; job
+  assembly reproduces the original **3 units / 6 fixtures** exactly; and a
+  2-unit end-to-end run graded **300 of 300 paired rows with 0 dropped**, which
+  is the population fix live (the old filter kept only `realized >= 1`), with
+  5/5 ESPN actuals and match-clustering reported apart from the labelled
+  player-level figure.
+  **NOT VERIFIED, and my falsification test was written at the wrong scope:**
+  the recorded aggregate (base 0.52126 / anchored 0.52163 over 136 matches) is
+  NOT reproduced, because a 2-unit subset cannot reproduce a 136-match
+  aggregate. The subset read anchored BETTER by 0.385% over 5 matches at
+  **p=1.0000**; the full run read anchored WORSE by 0.072% over 136. Those do
+  not conflict — the effect is ~0.001 shots against a per-match sd of 0.011, so
+  5 matches cannot resolve it, and the harness correctly declined to claim
+  anything. MAE LEVELS also differ by construction (0.359 vs 0.521) because
+  leagues have different shot distributions. **Re-verifying the aggregate needs
+  the full ~2 h run and has not been done.**
 - **THE TWO DEFECTS THAT MUST BE LOCKED IN BY TEST, because both produced a
   plausible wrong answer before being caught:** (a) the grading population must
   include every predicted player with `realized = 0` when absent — filtering
