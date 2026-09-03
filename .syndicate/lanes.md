@@ -2128,35 +2128,24 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   ledger and a reader that sees nothing in it is the same class as the
   documented cross-disk defect in `prediction_ledger.py:80-95`.
 - Claims: NONE held. NO DEPLOY — read-only throughout.
-### m642-ledger-read-silence — OPEN — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
-- Goal: `todo.md #642`. `/api/portfolio/summary` reads `total_tracked: 0` while
-  `prediction_ledger.json` occupies ~2 MiB across 1 key. Make the two
-  possibilities DISTINGUISHABLE, and thereby answer which it is.
-- Files: `syndicate/features/prediction_ledger.py`,
-  `tests/test_prediction_ledger_read_silence.py` (NEW).
-- **TWO LEADS CHECKED AND KILLED FIRST, both recorded so nobody re-runs them:**
-  (1) a namespace split — `SYNDICATE_REFRESH_STATE_NAMESPACE` is set on web
-  ONLY, but its value is `syndicate` which is exactly `_state_namespace()`'s
-  default, so all three services build the SAME key; (2) `read_ok` fetched and
-  ignored — it IS used, at `prediction_ledger.py:180`, to gate the
-  promote-upward path on a CONFIRMED absence. I nearly published both.
-- THE ACTUAL GAP, read from the code: when the shared read FAILS
-  (`read_ok=False`) and web's disk copy is absent, `_read_payload` returns
-  `_blank_payload()` **with no signal to its caller**. So `load_all_predictions`
-  returns `[]` and the summary reports 0, indistinguishable from a genuinely
-  empty ledger. That is the exact ambiguity `read_text_file_result`'s own
-  docstring exists to remove — applied to PROMOTION but not to the RETURN.
-- Hypothesis: the observed 0 is a failed 2 MiB read on a web service that is
-  documented UNSTABLE, against a Redis at 86.8% with 12,203 evictions — not an
-  empty ledger.
-- Falsification test: **the fix IS the instrument.** If, after it ships, the
-  read is confirmed to SUCCEED and still yields 0 predictions, the hypothesis
-  is wrong and the ledger really is empty — which is a different and larger
-  problem (nothing is recording bets), and would need its own lane.
-- Verification: a `PREDICTION_LEDGER_READ_FAILED` line on web at the moment
-  `/api/portfolio/summary` reports 0. Absence of that line while it still
-  reports 0 is the falsifying reading, not a pass.
-- Blocked by: none. Needs a WEB deploy to observe.
+### m642-ledger-read-silence — CLOSED 2026-09-03 — **HYPOTHESIS FALSIFIED BY ITS OWN TEST; NOT A DATA OR READER DEFECT.** The reader works: 1,457 rows read, all 1,457 excluded by the documented stake filter, so `total_tracked: 0` is CORRECT (zero bets ever placed via the bet slip). The real defect was one layer up and is fixed: the payload rendered "read returned nothing" (an incident) identically to "returned rows, none user-placed" (a normal empty portfolio). — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: `todo.md #642` — make the two possibilities DISTINGUISHABLE and thereby
+  answer which it is. **Met**, though not where the goal assumed.
+- Files: `syndicate/features/portfolio_summary.py`,
+  `syndicate/features/prediction_ledger.py`,
+  `tests/test_prediction_ledger_read_silence.py` (NEW, 12 tests).
+- Verification: `/api/portfolio/summary` on web `b7c2b220`, 2026-09-03T15:39:13Z
+  — `ledger_rows_total=1457`, `excluded_auto_tracked=1457`, `total_tracked=0`.
+  Cross-check: 1,457 rows against the ~2 MiB key is ~1.4 KB/row, the size a
+  prediction row with `recommendation`/`query`/`response` has. The byte count
+  and the payload count were never in conflict.
+- Falsification test FIRED as written ("the read is confirmed to SUCCEED and
+  still yields 0" → hypothesis wrong). Its named follow-on — "nothing is
+  recording bets" — is ALSO ruled out: 1,457 rows are recorded; they are legacy
+  stakeless auto-tracked rows whose writer `#72` deleted 2026-07-27.
+- Cost: FOUR web deploys, three of them spent instrumenting the reader.
+  See `learnings.md` 09-03 (instrument the join) and `log/2026-09-03.md`.
+- Blocked by: none.
 
 ### accuracy-autorun-rearm — OPEN — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `#626`(h) runs in production for the first time WITHOUT killing the

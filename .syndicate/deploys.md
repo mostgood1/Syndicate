@@ -19236,3 +19236,35 @@ NOT assumed to be the known scheduled-session hang, since that was diagnosed for
 a different task. **This row was written from a manual run, not from that task's
 output.** If a scheduled verification is going to be relied on, its run needs to
 leave a trace whether it succeeds or fails.
+
+## 2026-09-03 — web ×4 — `#642` prediction-ledger read silence — lane `m642-ledger-read-silence`
+
+Four deploys on one question. **Three of them were wasted, and the record says
+so** because the pattern is what is worth keeping.
+
+| # | commit | live | what it added | READING |
+|---|---|---|---|---|
+| 1 | `bcd1e299` | 14:19Z | `PREDICTION_LEDGER_READ_FAILED` / `_CONFIRMED_EMPTY` on the failed-read branch | 3× `total_tracked=0`; **neither token in 12 min of web logs** |
+| 2 | `0acb7a43` | 14:33Z | `PREDICTION_LEDGER_PARSED_NO_PREDICTIONS` | probe 14:46:15Z, `total_tracked=0` ×3; **all four tokens 0 lines / 20 min** |
+| 3 | `e194c48f` | 15:23Z | the last two exits (`_SHARED_PARSE_FAILED`, `_SERVED_FROM_DISK`) — all five now labelled | probe 15:26:38Z, `total_tracked=0` ×2; **`PREDICTION_LEDGER_*` = 0 lines / 10 min** |
+| 4 | `b7c2b220` | 15:35Z | `ledger_rows_total` + `excluded_auto_tracked` on the summary payload | **`ledger_rows_total=1457`, `excluded_auto_tracked=1457`, `total_tracked=0`** at 15:39:13Z |
+
+verify: `/api/portfolio/summary` on web `b7c2b220` at 2026-09-03T15:39:13Z
+returns `ledger_rows_total=1457` with `excluded_auto_tracked=1457`. That is the
+reading that resolves the item: the shared read SUCCEEDS and returns 1,457
+predictions, and `_is_user_placed_bet` (`portfolio_summary.py:26`) excludes all
+1,457 as stakeless. `total_tracked: 0` was correct the entire time — no bet has
+ever been placed through the bet slip.
+
+Independent cross-check that the two numbers were never in conflict: 1,457 rows
+against a ~2 MiB key is ~1.4 KB/row, the size of a prediction row carrying
+`recommendation` / `query` / `response`. (The ~2 MiB itself is allocator-rounded,
+per the `#640` correction — not a document length.)
+
+**Deploy 3's silence is the useful artifact.** With every exit under a distinct
+token, "no line" stopped being ambiguous and became proof that `_read_payload`
+returns a POPULATED payload. Deploys 1 and 2 could not have concluded that,
+because in both of them silence was still consistent with an unlabelled exit.
+
+Instrumentation from deploys 1–3 is KEPT: `_read_payload` had five returns and
+zero labels, and three of them can still produce a misleading answer.

@@ -84,29 +84,41 @@ production copy. See the transport note in `#625`(2).
 
 ---
 
-### `#642` — **A ~2 MiB PREDICTION LEDGER AND A READER THAT SEES NOTHING IN IT** — surfaced by lane `m639-residual-was-anything-destroyed`, 2026-09-03 — **OPEN, not investigated, not mine**
+### `#642` — **CLOSED 2026-09-03 — NOT A DEFECT IN THE DATA OR THE READER. The reader sees all 1,457 rows; the documented stake filter excludes all 1,457, so `total_tracked: 0` is CORRECT. The real defect was that the payload could not SAY that, and is fixed.** — was: a ~2 MiB prediction ledger and a reader that sees nothing in it — lane `m642-ledger-read-silence`
 
-`/api/portfolio/summary` on web reads `total_tracked: 0, settled_count: 0,
-pending_count: 0, positions: []` — while `/api/ops/keyvalue/usage` shows
-`prediction_ledger.json` occupying **~2 MiB across 1 key**. Both read at one
-instant, 2026-09-03 ~13:5xZ.
+**The contradiction was not one.** `/api/portfolio/summary` on web `b7c2b220`,
+2026-09-03T15:39:13Z: `ledger_rows_total=1457`, `excluded_auto_tracked=1457`,
+`total_tracked=0`. The shared keyvalue read succeeds and returns 1,457
+predictions. `_is_user_placed_bet` (`portfolio_summary.py:26`) keeps only rows
+with a `stake`, and every one of the 1,457 is a legacy stakeless auto-tracked
+row — written by the `run_intelligence_query` recorder that `#72` DELETED on
+2026-07-27, which removed the writer and left the rows. No bet has ever been
+placed through the bet slip, so zero is the true answer.
 
-Either the ledger holds ~2 MiB of predictions that the portfolio reader cannot
-see, or the key holds something other than predictions. **This is the same
-class as the defect `prediction_ledger.py:80-95` already documents** —
-reconciliation running daily and correctly against a ledger with no bets in it,
-while `/api/portfolio/summary` read `settled_count: 0` for weeks and three fixes
-landed on the wrong side of the boundary. That note says the cure was to route
-IO through the keyvalue store; the numbers above suggest the two sides still
-disagree.
+Cross-check the item told the reader to skip: 1,457 rows against a ~2 MiB key is
+~1.4 KB/row, exactly a prediction row with `recommendation`/`query`/`response`.
+The item was right that ~2 MiB is allocator-rounded and wrong to conclude the
+two numbers therefore disagreed — at 1,457 rows they AGREE, and one division
+would have shown it before any deploy.
 
-**Do NOT read the ~2 MiB as a payload size** — the usage endpoint reports
-allocator-rounded memory (see `state.md [live-lens-snapshot]`). The
-contradiction is between "non-trivially occupied" and "zero rows", which holds
-regardless of the exact payload.
+**WHAT WAS ACTUALLY BROKEN, and is now fixed.** The payload rendered two states
+identically: "the ledger read returned nothing" (an incident) and "it returned
+rows and none are user-placed" (a normal empty portfolio). `ledger_rows_total`
+and `excluded_auto_tracked` now separate them, so this question costs one HTTP
+read forever. `_read_payload`'s five returns also now carry five distinct log
+tokens — it had zero, which is why three deploys of instrumentation each landed
+on a branch the live path never took.
 
-Found while trying to answer `#639`'s residual from the consumer side; the
-contradiction is precisely why that route could not be used.
+**COST: four web deploys, three wasted.** The rule is in `learnings.md` 09-03
+(instrument the JOIN, not the component you suspect): the contradiction was
+between a byte count and a payload count, and neither number lives in the
+reader. Full record in `.syndicate/deploys.md`.
+
+**Residual, NOT worth a lane.** 1,457 orphaned stakeless rows are carried and
+re-read on every `/api/portfolio/summary` request. They are correctly excluded
+and cost ~2 MiB of a 256 MB `volatile-lru` Redis. Deleting them is a destructive
+write to a shared key for no measured benefit; naming it here is the right
+disposition. If portfolio reads ever need to be cheap, that is the cleanup.
 
 ---
 

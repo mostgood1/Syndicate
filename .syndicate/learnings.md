@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 726 rules `[generated]`
+## Index — 729 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5234,3 +5234,42 @@ sampling, never about importance.
 - **How we found out:** by building the instrument the earlier comparison lacked. The first profile attempt was inconclusive BY CONSTRUCTION (it profiled `pytest.main`, so the warm profile contained 20 extra tests — a 1-test profile against a 21-test one). Fixing that to profile one test's call phase showed no difference, which is what forced the replication that settled it.
 - **The rule going forward:** **n=1 per condition cannot support a comparative claim, and a large effect is not protection — it is the warning sign.** Before writing a ratio into a ledger, run each condition at least three times and report the spread, not the point. Two specific traps this hit: the "cold" side was triple-measured and the "warm" side was not, which felt like rigour and was not — replicate the side you are ARGUING FOR; and ruling mechanisms out gave the effect false weight, because every exoneration made it feel better established when none of them tested whether it was real. When an isolated instrument disagrees with an end-to-end reading, the isolated one is usually right and the end-to-end one usually has a confound.
 - **Cost:** most of a long diagnostic lane. Four mechanisms investigated and cleared against a phantom, a landed ledger entry that had to be retracted, and operational guidance ("do not split the cluster") withdrawn as unevidenced. The genuine finding — the suite is not stalled, 221 pass in 586s — came from the very first clean run and needed none of it.
+
+## 2026-09-03 — FORBIDDEN: instrumenting a COMPONENT when the contradiction is between two NUMBERS
+
+**Cost: four web deploys on `#642`, three of them wasted.**
+
+The contradiction was `/api/ops/keyvalue/usage` saying `prediction_ledger.json`
+occupies ~2 MiB and `/api/portfolio/summary` saying `total_tracked: 0`. I had a
+hypothesis about the READER (a failed 2 MiB shared read returning a blank
+payload silently, on a web service documented UNSTABLE against a Redis at 86.8%
+with 12,203 evictions) and I instrumented the reader. Three times. Deploy 1
+labelled the failed-read branch — silence. Deploy 2 added the parsed-but-empty
+branch — silence. Deploy 3 labelled the remaining two of five returns — silence.
+
+The reader was never involved. The read succeeded and returned 1,457 rows, and
+`_is_user_placed_bet` excluded all 1,457 as stakeless. Deploy 4 put the count on
+the payload and answered it in one reading.
+
+**THE RULE.** Neither of the two contradicting numbers lives in the component I
+instrumented. A byte count comes from the store; a row count comes from the
+filter; the reader sits between them and reports neither. **Instrument where the
+two numbers MEET** — the join — because that is the only place a discriminator
+can be cheap. Before touching a component, name which of the contradicting
+numbers it emits. If it emits neither, it is not the instrument site no matter
+how good the hypothesis about it is.
+
+**A COROLLARY THAT WOULD HAVE COST NOTHING.** Two numbers in tension are worth
+DIVIDING before they are worth investigating. 2 MiB ÷ 1,457 rows ≈ 1.4 KB/row is
+exactly a prediction row with `recommendation`/`query`/`response`, so the numbers
+AGREED and there was no contradiction to chase. The `#642` item explicitly warned
+"do NOT read the ~2 MiB as a payload size" and I took that as licence to stop
+reasoning about the size at all, rather than as a caution about precision.
+
+**AND THE THING THAT DID WORK, worth keeping.** Deploy 3's silence was
+conclusive where deploys 1 and 2's was not — because after it, ALL FIVE returns
+carried distinct tokens. A null result is only evidence once the emitter is
+exhaustively labelled; until then "no line" and "no such branch" are the same
+reading. (Same family as 08-2x *absent signal ≠ absent path* and *instrument
+blindness*, and this is the third lane to pay for it.) `_read_payload` keeps its
+five tokens for that reason.
