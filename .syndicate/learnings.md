@@ -24,8 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 729 rules `[generated]`
-## Index — 688 rules `[generated]`
+## Index — 741 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5661,3 +5660,37 @@ inflated counter), so the cost was entirely session time, not board harm.
 - **How we found out:** by reading raw output instead of the predicate's answer, each time only after the predicate produced something impossible (an instant "clear" on a busy worker; a wait that never ended).
 - **The rule going forward:** prefer a documented EXIT CODE to string matching — `check_deploy_safety` states its own contract (0 clear / 1 busy / **2 could not determine, "which is NOT the same as clear, and is deliberately not exit 0"**). Where only text exists, ENUMERATE the states from the tool (`--help`, the source, or by reading a real sample of each) before writing the match, and make the predicate require the positive state explicitly rather than the absence of a negative one. An unknown or unrecognised state is NEVER a pass.
 - **Cost:** more time than every real production constraint combined. Two false go-signals, one wasted 25-minute wait on an already-free lock, and a deploy window lost.
+## 2026-09-03 — the DIVIDE rule, restated because I broke it the same day I wrote it
+
+`#642` closed with: *two numbers in tension are worth DIVIDING before they are
+worth investigating.* Hours later I read this off a live-odds-worker log line —
+
+```
+[execution_ledger] SIZE_WARNING bytes=2509900 warn_at=2097152 orders=2294 -- the store refuses at 8MB
+```
+
+— and filed `#643` as *"20% into a hard refusal ceiling, on the service that
+trades"*. Both numbers were in the line. `2509900 / 2294 = 1094` bytes per
+order; `1094 x _MAX_RECORDS(5000) = 5.47MB`, **65% of the ceiling**, and the trim
+runs before serialization so it cannot go higher by adding records. Two
+operations on numbers already in front of me, and the alarm evaporates.
+
+**Why it fooled me twice in one day.** A total is a SUM, and a sum hides the
+factor that decides whether a limit is reachable. `bytes` alone genuinely cannot
+distinguish "2.5MB of many small records, structurally capped" from "2.5MB of
+few huge records, about to breach" — the test I wrote builds both at the same
+total size to pin that. So the rule is not merely "divide": **a threshold
+warning must report the RATIO that determines reachability, not the level.** A
+level tells you where you are; only the ratio tells you whether you can arrive.
+
+**Corollary on writing alarms.** The line's `-- the store refuses at 8MB` was
+true, load-bearing, and the direct cause of a wrong item. A warning that names a
+limit without naming what bounds you away from it will be read as an approaching
+outage every time, by me included. Say BOUNDED/UNBOUNDED, or say nothing.
+
+**The one thing done right, worth repeating.** Before proposing any change I
+traced the failure mode instead of assuming it: the store raises a dedicated
+`KeyValuePayloadTooLarge`, and there is no broad `except` anywhere on
+`run_execution` → `place_order` → `record_order` → `_persist`. So the worst case
+was a loud tick failure, never silent order loss — which would have changed the
+urgency completely had I assumed the opposite.

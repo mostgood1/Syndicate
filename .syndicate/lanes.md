@@ -2430,6 +2430,26 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   faster than that or coverage has holes.
 - Blocked by: none.
 
+### m643-execution-ledger-ceiling — CLOSED 2026-09-03 — **HYPOTHESIS CONFIRMED: the ceiling is unreachable by growth.** 1,094 B/order flat over 3 readings; `_MAX_RECORDS=5000` bounds the payload at 5.47MB = 65% of the 8,388,608 refusal, and the trim runs before serialization. Failure mode traced, not assumed: the store RAISES and no broad `except` exists on the whole execution path, so a refusal fails loudly rather than dropping orders. Warning line now reports BOUNDED/UNBOUNDED. 8 tests; NOT deployed (log-line-only). — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: `todo.md #643`. Answer whether the execution ledger can actually reach
+  the keyvalue store's refusal ceiling, and make the warning line say the
+  answer instead of inviting the wrong one.
+- Files: `syndicate/features/shared/execution_ledger.py`,
+  `tests/test_execution_ledger_size_warning.py` (NEW).
+- MEASURED FIRST (live-odds-worker log stream, 3 readings over 1.92h):
+  bytes/order 1093.6 / 1094.1 / 1094.0 — flat; +2,081 B/h, +1.6 orders/h;
+  `TRIMMED` 0 lines in 72h.
+- Hypothesis: the 8 MB refusal is UNREACHABLE by record growth, because
+  `_MAX_RECORDS=5000` caps the payload at 5000 x 1094 = ~5.47 MB (65% of the
+  ceiling). The real risk is per-order SIZE growth past ~1,678 B/order (+53%).
+- Falsification test: if bytes/order is not stable, or the cap does not apply to
+  the serialized payload, the hypothesis is wrong and the ceiling IS reachable.
+- Verification: a unit test that FAILS if the cap stops bounding the payload
+  below the store's real (env-configurable) ceiling, plus the warning line
+  reporting the binding constraint rather than a hardcoded "8MB".
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

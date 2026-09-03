@@ -2719,3 +2719,57 @@ write to a shared key for no measured benefit; naming it here is the right
 disposition. If portfolio reads ever need to be cheap, that is the cleanup.
 
 ---
+
+---
+
+### `#643` — **CLOSED 2026-09-03 — THE CEILING IS NOT REACHABLE, AND MY OWN FRAMING OF THIS ITEM WAS THE DEFECT.** The record cap bounds the payload at 65% of the refusal; the warning now reports that instead of inviting the alarm I raised. — was: the execution ledger is 20% into a hard refusal ceiling — lane `m643-execution-ledger-ceiling`
+
+**MEASURED FIRST** (live-odds-worker's own log stream, three readings spanning
+1.92h): `bytes=2,508,823 / 2,509,822 / 2,512,819` against
+`orders=2,294 / 2,294 / 2,297` — **1093.6, 1094.1, 1094.0 bytes per order,
+flat**. Growth +2,081 B/h, +1.6 orders/h. `TRIMMED`: **0 lines in 72h.**
+
+**Why the ceiling cannot be reached by growth.** `_MAX_RECORDS = 5000` trims
+oldest-out BEFORE the payload is serialized, so size is bounded by
+(bytes-per-order x cap), not by uptime: 5,000 x 1,094 = **5,470,000 bytes, 65%
+of the 8,388,608 ceiling**. Count growth plateaus there. At +1.6 orders/h the
+cap is ~70 days away, and reaching it starts trimming — it does not start
+failing.
+
+**The actual risk surface is per-order SIZE, not time or count.** Break-even is
+8,388,608 / 5,000 = **1,677 bytes/order**, a **53% increase** over the measured
+1,094. That number is invisible in a total, which is the whole reason the item
+looked alarming.
+
+**What the failure mode would be, traced rather than assumed.** The store raises
+`KeyValuePayloadTooLarge` (its own type, deliberately, so callers can tell it
+from a transient `ConnectionError`). There is **no broad `except` anywhere on
+`run_execution` → `place_order` → `record_order` → `_persist` → `write_json_file`**
+— checked at every call site. So a refusal fails the tick **loudly**; it is not
+silent order loss. The item's worst case does not exist.
+
+**FIXED, because the log line caused this.** It ended `-- the store refuses at
+8MB`: true, and it reads as an approaching outage. It now reports the join that
+decides the question — `bytes_per_order`, `cap`, `projected_at_cap`, `ceiling` —
+and states **BOUNDED** or **UNBOUNDED** explicitly. It also no longer hardcodes
+8MB, which was independently wrong: the ceiling is `SYNDICATE_KEYVALUE_MAX_BYTES`
+and a copy would go stale against the very threshold it warns about.
+
+Tests: `tests/test_execution_ledger_size_warning.py`, 8 tests. The load-bearing
+one builds two payloads of the SAME total size (~2.4MB) with different shapes and
+asserts one reads BOUNDED and the other UNBOUNDED — a total cannot tell them
+apart, which is exactly what went wrong here.
+
+**THE LESSON, and it is the same one as `#642` one day earlier.** I read a
+number off a log line and filed an item on it without dividing it by the number
+next to it. `2,509,900 / 2,294 = 1,094`, then `x 5000` — two operations, both
+available in the line I was already looking at, and they turn "20% into a hard
+ceiling" into "structurally bounded at 65%". `learnings.md` 09-03 already said
+*two numbers in tension are worth DIVIDING before they are worth investigating*;
+I wrote that rule and then filed this item the same session without applying it.
+
+Residual, genuinely open: nothing bounds per-order size. If order records grow
+53% the cap stops protecting the write. The new UNBOUNDED verdict is the guard
+for that, and it fires on the persist path before the ceiling is reached.
+
+---

@@ -1,7 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 729 rules `[generated]`
-## Index — 688 rules `[generated]`
+## Index — 741 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -9,8 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 251**
-**FORBIDDEN — 223**
+**FORBIDDEN — 259**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -164,6 +162,7 @@
 - [2026-09-02 FORBIDDEN: a `git` command that can DISCARD work taking its tree from the wo…](#2026-09-02-forbidden-a-git-command-that-can-discard-work-taking-its-tree-from-the-working-directory-cd-persists-and-the-destructive-call-is-not-the-one-that-moved-you)
 - [2026-09-02 — FORBIDDEN: a log or metric query whose window straddles a restart. You get…](#2026-09-02-forbidden-a-log-or-metric-query-whose-window-straddles-a-restart-you-get-the-wrong-process-and-it-looks-like-an-answer-lane-web-request-memory-attribution)
 - [2026-09-02 FORBIDDEN: verifying a fix only in the window AFTER go-live, where a defect…](#2026-09-02-forbidden-verifying-a-fix-only-in-the-window-after-go-live-where-a-defect-that-stopped-on-its-own-is-indistinguishable-from-one-you-fixed)
+- [2026-09-02 — FORBIDDEN: calling a job "bounded" because something downstream of it is c…](#2026-09-02-forbidden-calling-a-job-bounded-because-something-downstream-of-it-is-capped-a-cap-on-the-output-cannot-bound-the-working-set-that-produced-it-and-a-cap-that-reports-a-count-is-not-a-bound-until-you-check-which-container-it-counted-lane-accuracy-summary-alloc-profile)
 - [2026-09-02 — FORBIDDEN: arming a periodic job on refresh-worker on the strength of a bo…](#2026-09-02-forbidden-arming-a-periodic-job-on-refresh-worker-on-the-strength-of-a-bound-that-does-not-bound-memory-lane-soccer-anchor-wiring)
 - [2026-09-02 FORBIDDEN: trusting a FILTER, EXCLUSION or ALLOW rule that has never been sh…](#2026-09-02-forbidden-trusting-a-filter-exclusion-or-allow-rule-that-has-never-been-shown-to-match-something-two-inert-rules-in-one-file-both-reading-as-correct-lane-m625-replay-diff-gate)
 - [2026-09-02 FORBIDDEN: reporting a clean result for anything a bounded scan did not reac…](#2026-09-02-forbidden-reporting-a-clean-result-for-anything-a-bounded-scan-did-not-reach-a-cap-on-recording-must-never-become-a-cap-on-traversal-lane-m625-replay-diff-gate)
@@ -189,10 +188,13 @@
 - [2026-09-03 FORBIDDEN: choosing the READ-only allowlist because "nothing serves this". T…](#2026-09-03-forbidden-choosing-the-read-only-allowlist-because-nothing-serves-this-the-test-is-whether-there-is-a-serving-hazard-export-only-makes-a-family-readable-if-present-and-if-nothing-publishes-it-the-entry-does-nothing-at-all-lane-worker-artifact-transport)
 - [2026-09-03 — FORBIDDEN: a comparative claim from ONE run per condition. I published a 4…](#2026-09-03-forbidden-a-comparative-claim-from-one-run-per-condition-i-published-a-40-effect-ruled-out-four-mechanisms-for-it-and-three-paired-replications-erased-it-lane-intelligence-suite-runtime)
 - [2026-09-03 — FORBIDDEN: instrumenting a COMPONENT when the contradiction is between two…](#2026-09-03-forbidden-instrumenting-a-component-when-the-contradiction-is-between-two-numbers)
-- [2026-09-02 — FORBIDDEN: calling a job "bounded" because something downstream of it is c…](#2026-09-02-forbidden-calling-a-job-bounded-because-something-downstream-of-it-is-capped-a-cap-on-the-output-cannot-bound-the-working-set-that-produced-it-and-a-cap-that-reports-a-count-is-not-a-bound-until-you-check-which-container-it-counted-lane-accuracy-summary-alloc-profile)
-- [2026-09-02 — FORBIDDEN: arming a periodic job on refresh-worker on the strength of a bo…](#2026-09-02-forbidden-arming-a-periodic-job-on-refresh-worker-on-the-strength-of-a-bound-that-does-not-bound-memory-lane-soccer-anchor-wiring)
-- [2026-09-02 FORBIDDEN: trusting a FILTER, EXCLUSION or ALLOW rule that has never been sh…](#2026-09-02-forbidden-trusting-a-filter-exclusion-or-allow-rule-that-has-never-been-shown-to-match-something-two-inert-rules-in-one-file-both-reading-as-correct-lane-m625-replay-diff-gate)
-- [2026-09-02 FORBIDDEN: reporting a clean result for anything a bounded scan did not reac…](#2026-09-02-forbidden-reporting-a-clean-result-for-anything-a-bounded-scan-did-not-reach-a-cap-on-recording-must-never-become-a-cap-on-traversal-lane-m625-replay-diff-gate)
+- [2026-09-03 FORBIDDEN: inferring an environment variable's NAME from the name of the fun…](#2026-09-03-forbidden-inferring-an-environment-variables-name-from-the-name-of-the-function-that-reads-it-read-the-key-out-of-the-code-lane-soccer-projection-names)
+- [2026-09-03 — FORBIDDEN: reading a provenance stamp emitted by the OBSERVER as evidence…](#2026-09-03-forbidden-reading-a-provenance-stamp-emitted-by-the-observer-as-evidence-about-the-subject)
+- [2026-09-03 — FORBIDDEN: concluding content is LOST from a line-level diff of a REWORDED…](#2026-09-03-forbidden-concluding-content-is-lost-from-a-line-level-diff-of-a-reworded-ledger)
+- [2026-09-03 FORBIDDEN: concluding a RESOLVER is broken without printing the path it actu…](#2026-09-03-forbidden-concluding-a-resolver-is-broken-without-printing-the-path-it-actually-reads-two-files-with-the-same-row-count-can-differ-and-the-one-you-grep-is-not-always-the-one-it-loads)
+- [2026-09-03 — FORBIDDEN: assuming a stopped background task is stopped. Its CHILDREN kee…](#2026-09-03-forbidden-assuming-a-stopped-background-task-is-stopped-its-children-keep-running-and-if-they-write-shared-state-that-gates-something-they-will-gate-it-against-you-lane-accuracy-autorun-rearm)
+- [2026-09-03 — FORBIDDEN: polling a friendlier proxy instead of the instrument that GATES…](#2026-09-03-forbidden-polling-a-friendlier-proxy-instead-of-the-instrument-that-gates-the-action-lane-accuracy-autorun-rearm)
+- [2026-09-03 — FORBIDDEN: leaving a tree after `git reset --mixed` to a NEWER ref without…](#2026-09-03-forbidden-leaving-a-tree-after-git-reset---mixed-to-a-newer-ref-without-refreshing-the-working-files)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -276,8 +278,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 473**
-**Rules and corrections — 460**
+**Rules and corrections — 477**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -432,6 +433,7 @@
 - [2026-09-02 — REQUIRED: mutate the code before believing a green test. Two of mine asser…](#2026-09-02-required-mutate-the-code-before-believing-a-green-test-two-of-mine-asserted-on-a-constant-and-on-a-fixture-that-could-not-fail-lane-game-market-entry-roi-curve)
 - [2026-09-02 — REQUIRED: when you correct a number, re-check the CLAIMS AROUND IT. Mine r…](#2026-09-02-required-when-you-correct-a-number-re-check-the-claims-around-it-mine-rode-through-two-corrections-untouched-and-was-wrong-the-whole-time-lane-game-market-entry-roi-curve)
 - [2026-09-02 REQUIRED: a ledger APPEND computed in one tree is not valid in another. Both…](#2026-09-02-required-a-ledger-append-computed-in-one-tree-is-not-valid-in-another-both-the-insertion-point-and-the-base-content-differ-and-neither-difference-announces-itself-lane-maxmun-pregame-read)
+- [2026-09-02 — RULE: TWO WRITERS IS A PRECONDITION FOR HARM, NOT HARM. And "fix all N con…](#2026-09-02-rule-two-writers-is-a-precondition-for-harm-not-harm-and-fix-all-n-contested-paths-is-the-wrong-instinct-when-the-paths-are-rebuilt-rather-than-accumulating-lane-book-quotes-publish-clobber)
 - [2026-09-02 — RULE: a WATCHER carries the assumptions it was armed with, and those expir…](#2026-09-02-rule-a-watcher-carries-the-assumptions-it-was-armed-with-and-those-expire-re-read-the-world-before-acting-on-what-a-watcher-tells-you-lane-soccer-anchor-wiring)
 - [2026-09-02 REQUIRED: when a mechanism is under-reaching, measure whether the CHEAP vers…](#2026-09-02-required-when-a-mechanism-is-under-reaching-measure-whether-the-cheap-version-is-louder-than-the-mechanism-itself-cost-lever-costs-accuracy-is-not-the-finding-cost-lever-exceeds-the-signal-is-lane-soccer-anchor-cost)
 - [2026-09-02 — RULE: a commit subject starting with `#` is a COMMENT to git, and cherry-p…](#2026-09-02-rule-a-commit-subject-starting-with-is-a-comment-to-git-and-cherry-pickrebase-silently-delete-it-this-repos-id-convention-walks-into-it-every-time-lane-accuracy-summary-ledger-budget)
@@ -442,8 +444,9 @@
 - [2026-09-03 REQUIRED: before proposing to ARCHIVE or DATE anything in this repo, check w…](#2026-09-03-required-before-proposing-to-archive-or-date-anything-in-this-repo-check-whether-the-path-is-keyvalue-backed-and-price-it-the-live-lens-snapshot-is-a-4-mb-redis-key-on-a-60s-tick----dating-it-would-have-written-576-gbday-into-a-256-mb-store-lane-mlens-snapshot-dating)
 - [2026-09-02 REQUIRED: when a sign test and a t-statistic DISAGREE, believe neither until…](#2026-09-02-required-when-a-sign-test-and-a-t-statistic-disagree-believe-neither-until-you-have-found-the-clustering-mine-said-p00027-and-t-128-on-the-same-rows-lane-soccer-anchor-cost-6223)
 - [2026-09-03 REQUIRED: when a sign test says p=0.0000 and the t says -1.06, publish BOTH…](#2026-09-03-required-when-a-sign-test-says-p00000-and-the-t-says--106-publish-both-the-direction-and-the-magnitude-are-different-findings-and-only-one-of-them-decides-anything-lane-soccer-anchor-cost-6223)
-- [2026-09-02 — RULE: TWO WRITERS IS A PRECONDITION FOR HARM, NOT HARM. And "fix all N con…](#2026-09-02-rule-two-writers-is-a-precondition-for-harm-not-harm-and-fix-all-n-contested-paths-is-the-wrong-instinct-when-the-paths-are-rebuilt-rather-than-accumulating-lane-book-quotes-publish-clobber)
-- [2026-09-02 — RULE: a WATCHER carries the assumptions it was armed with, and those expir…](#2026-09-02-rule-a-watcher-carries-the-assumptions-it-was-armed-with-and-those-expire-re-read-the-world-before-acting-on-what-a-watcher-tells-you-lane-soccer-anchor-wiring)
+- [2026-09-03 — A per-date join counter is not safe to SUM across a multi-day window unles…](#2026-09-03-a-per-date-join-counter-is-not-safe-to-sum-across-a-multi-day-window-unless-it-is-scoped-to-that-date-first-second-confirmed-instance-of-the-same-shape-as-513)
+- [2026-09-03 — A per-date join counter is not safe to SUM across a multi-day window unles…](#2026-09-03-a-per-date-join-counter-is-not-safe-to-sum-across-a-multi-day-window-unless-it-is-scoped-to-that-date-first-second-confirmed-instance-of-the-same-shape-as-513)
+- [2026-09-03 — the DIVIDE rule, restated because I broke it the same day I wrote it](#2026-09-03-the-divide-rule-restated-because-i-broke-it-the-same-day-i-wrote-it)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
