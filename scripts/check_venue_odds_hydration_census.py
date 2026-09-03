@@ -52,6 +52,9 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVICES = ("live-odds-worker", "refresh-worker")
 BASE = "https://syndicate-an21.onrender.com"
 
+# Local date, used only to tell a FINISHED game date from a future one.
+_TODAY = __import__("datetime").date.today().isoformat()
+
 # venue_odds/<venue>__<sport>__<YYYY_MM_DD>.json
 KEY_RE = re.compile(r"venue_odds/([a-z0-9]+)__([a-z0-9_]+)__(\d{4}_\d{2}_\d{2})\.json")
 HYD_RE = re.compile(
@@ -164,6 +167,31 @@ def main() -> int:
             verdict = "UNKNOWN (no writes seen: %s)" % ",".join(unknown)
         elif not owed:
             verdict = "NO WRITER (no service wrote %s in window)" % venue
+        elif missing and key[2] < _TODAY:
+            # NEVER, not "not yet" -- and the distinction is the whole point.
+            #
+            # `#637`, corrected 2026-09-03. The first version of this census had
+            # one failure bucket, so a key that could never hydrate was reported
+            # identically to one that simply had not yet. Measured: 7 of 15
+            # PENDING keys were PAST GAME DATES. Nothing writes a finished date
+            # again, so no service will ever open those files, so hydration can
+            # never happen -- and a report that says "wait" about them is telling
+            # the reader to wait for something that cannot occur. It sent me
+            # chasing a refresh-worker write for hours.
+            #
+            # WHY EXPIRING THESE CANNOT CAUSE THE HARM THIS GATE EXISTS TO
+            # PREVENT. The harm is not "data is lost", it is "a file starts empty
+            # and the accumulator RE-DATES every `opened_at` to the expiry
+            # moment", which is wrong data rather than absent data. That requires
+            # a subsequent WRITE. A file nothing will write again cannot be
+            # re-dated, so the failure mode is structurally unreachable here.
+            #
+            # WHAT IT DOES COST, stated because it is a real trade and not zero:
+            # the Redis copy is the only copy, and expiring forfeits whatever
+            # remains of its 10-day TTL. That is a decision about how much longer
+            # to keep a write-only archive nobody currently reads -- a judgement
+            # for a person, which is why this still does NOT return 0.
+            verdict = "UNREACHABLE (past game date; %s will never write it again)" % ",".join(missing)
         elif missing:
             verdict = "PENDING (%s)" % ",".join(missing)
         else:
@@ -184,12 +212,29 @@ def main() -> int:
     for name, count in sorted(verdicts.items()):
         print("    %-12s %d" % (name, count))
 
+    unreachable_bytes = sum(sz for v, _, sz, _ in rows if v.startswith("UNREACHABLE"))
+    if verdicts["UNREACHABLE"]:
+        print("")
+        print("  %d key(s) / %.1f MB are UNREACHABLE -- a PAST game date, which no"
+              % (verdicts["UNREACHABLE"], unreachable_bytes / 1048576.0))
+        print("  service will write again, so they can NEVER hydrate. WAITING DOES")
+        print("  NOTHING FOR THEM. Expiring them cannot re-date an opening (that needs")
+        print("  a later write, and there will not be one), but it DOES forfeit the")
+        print("  rest of their 10-day TTL on the only remaining copy. A person decides.")
+
     if verdicts["SAFE"] == len(keys) and not truncated:
         print("\nEVERY key censused is SAFE. Expiry may proceed -- and it is still a")
         print("separate, explicit, destructive call that a human decides.")
         return 0
-    print("\nNOT SAFE TO EXPIRE. The 10-day TTL reclaims this on its own at zero risk;")
-    print("early expiry is only worth it if the memory is needed sooner than that.")
+    if verdicts["PENDING"] or verdicts["UNKNOWN"] or truncated:
+        print("\nNOT SAFE TO EXPIRE WHOLESALE. The 10-day TTL reclaims this at zero")
+        print("risk; early expiry is only worth it if the memory is needed sooner.")
+        return 2
+    # Only SAFE + UNREACHABLE remain: nothing is waiting on anything, so a
+    # further run cannot change the verdict. Still non-zero -- expiring the
+    # UNREACHABLE set forfeits real data, which is a judgement, not a gate.
+    print("\nNOTHING IS PENDING. Every key is SAFE or UNREACHABLE, so no further")
+    print("waiting will change this reading.")
     return 2
 
 

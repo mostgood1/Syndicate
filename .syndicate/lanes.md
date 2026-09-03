@@ -1172,8 +1172,30 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   [venue-odds-storage]` and `log/2026-09-02.md`. **This lane stays OPEN for ONE
   thing only: the ~115 MB is NOT reclaimed.**
 - **CENSUS RE-RUN TWICE 2026-09-02 (22:19 and ~23:0x CDT) — IDENTICAL, exit 2.**
-  42 keys / 100.3 MB, SAFE 27 / PENDING 15. `refresh-worker` still shows
-  `wrote venues: kalshi` only. Nothing expired. **A third reading is ARMED:**
+  42 keys / 100.3 MB, SAFE 27 / PENDING 15. Nothing expired.
+- **CORRECTED 2026-09-03 — I HAD THE BLOCKER WRONG, in this file, in the log, and
+  in the scheduled task's prompt.** I said repeatedly that the hold-up was
+  "refresh-worker has not written polymarket, and doing so clears ~13 of the 15".
+  **That was never true.** The census already knows refresh-worker does not write
+  that venue: every `polymarket__*` row lists `live-odds-worker` ALONE as expected
+  to hydrate. Refresh-worker was never owed those keys. Confirmed in the logs —
+  `venue_odds_loop` on refresh-worker DOES reach polymarket
+  (`REFRESH venue=polymarket status=ok count=2000`), but that refreshes the venue
+  CATALOGUE; the daily book is written by `run_live_odds_refresh_worker.py`, which
+  runs only on live-odds-worker. **Zero `POLYMARKET_DAILY_BOOK` on refresh-worker
+  since go-live, and that is correct behaviour, not a stall.**
+- **WHAT THE 15 PENDING KEYS ACTUALLY ARE `[2026-09-03]`:**
+  - **7 are PAST GAME DATES** — `kalshi mlb 08-31/09-01`, `kalshi nfl 08-29`,
+    `kalshi soccer 08-30/08-31`, `polymarket mlb 09-01`, `polymarket wnba 08-30`.
+    Nothing writes those dates again, so they can **NEVER** hydrate. TTL only.
+  - **8 are FUTURE dates not in a current slate** — `polymarket ncaaf
+    09-06/09-11/09-12`, `polymarket nfl 09-09/09-10/09-13/09-14`,
+    `polymarket soccer 09-07`. These clear only if the fixture enters a slate
+    before the TTL expires.
+  **So the reclaim is NOT "pending, clearing shortly" — at least 7 of 15 are
+  permanently blocked and the 10-day TTL is the actual mechanism, not a
+  fallback.** Waiting adds nothing.
+- **A third reading is ARMED (its prompt has been corrected too):**
   scheduled task `check-venue-odds-hydration-census`, one-shot
   2026-09-03T04:19:00Z, report-only, expiry forbidden in its prompt.
   **That task lives OUTSIDE the repo** (`~/.claude/scheduled-tasks/...`) and is
