@@ -20293,3 +20293,83 @@ deploys.
 
 **Fleet:** web `39ed4ef5` · refresh-worker `6a41098f` · live-odds-worker
 `6a41098f`.
+
+## 2026-09-03 23:14:37Z — `sim_view` ROI cut LIVE ON WEB, carried by another lane's deploy — lane `order-sim-view`
+
+**What shipped.** `paper_settlement.sim_view_roi_summary()` and its `sim_view_roi`
+block on `/api/ops/execution/ledger-summary`: settled ROI cut by sport x market
+family x `sim_view`, with denominators, plus a `verdict_reachability` block.
+This is the READ side of `order-sim-view`. The WRITE side (`sim_view` /
+`sim_line_gap` / `sim_probability_railed` onto the order) is `cb223b62` +
+`733a28f0` and is **NOT deployed** — see the pending section below.
+
+**I DID NOT FIRE THIS DEPLOY.** Web went live on `b48a9480` at 23:14:37Z,
+trigger `api`, from lane `fleet-catchup-round7` ("round 7: web to 39ed4ef5").
+`b48a9480` is on `origin/main` and contains `9685a181`, so it carried my change
+for free — the same shape as `04187cdf` riding `48c68546` at 19:54Z today. My
+own web deploy was therefore never needed and was never queued; the `web` claim
+stayed with `web-oom-profiler-steady` throughout and **I did not break it.**
+
+**verify: DONE, ON THE SERVED PAYLOAD, and it is a content check rather than an
+ancestry one.** `GET /api/ops/execution/ledger-summary?days=60` with the admin
+token returns `sim_view_roi` carrying all three sub-keys, and
+`verdict_reachability.unreachable` reads exactly
+`["contradicts", "live_contradicts", "unpriced", "none"]` — the list this lane
+computed. 14 dates, 950 settled bets, 9 buckets:
+
+    sport    family        verdict           n     staked        pnl      ROI%    win%
+    mlb      game_line     (unrecorded)    283    1327.50    +169.51    +12.77    51.1
+    mlb      game_total    (unrecorded)    314    1359.13     +10.13     +0.75    44.3
+    mlb      player_prop   (unrecorded)    242     786.92    -140.07    -17.80    37.6
+    nfl      game_total    (unrecorded)     18      70.62      -2.87     -4.06    50.0
+    soccer   game_line     (unrecorded)     12      29.99      -5.23    -17.44    41.7
+    soccer   game_total    (unrecorded)     15      84.82     -28.65    -33.78    46.7
+    wnba     game_line     (unrecorded)      2      15.19     +16.65   +109.61   100.0
+    wnba     game_total    (unrecorded)      6      20.17      +1.24     +6.15     50.0
+    wnba     player_prop   (unrecorded)     58     251.24     -19.30     -7.68    41.4
+
+**EVERY ROW IS `(unrecorded)`, AND THAT IS THE PASS CONDITION, NOT A NULL
+RESULT.** No order in the book was placed by code carrying `sim_view`, because
+the write side is not on either order-placing service yet. The sentinel is doing
+exactly the job it exists for: keeping 950 pre-change bets out of the verdict
+buckets instead of silently pooling them into one and reporting the result as a
+finding about the sim. **Anyone reading this table before the workers ship must
+not read it as "the sim view does not vary".**
+
+**A FREE CROSS-CHECK THAT THE ARITHMETIC AGREES WITH THE EXISTING BOOK.** The
+family split above reproduces `04187cdf`'s independently-computed numbers on the
+same book a few hours earlier — `game_line` +12.77% n=283 against its +13.28%
+n=296, `game_total` +0.75% n=314 against -1.78% n=351, `player_prop` -17.80%
+n=242 against -15.35% n=300. Same direction, same ordering, drifting only by the
+bets settled in between. That is what reusing `_grouped` rather than writing a
+second ROI was for, and it is now observed rather than merely asserted.
+
+**STILL PENDING, and it is the half that matters:** `cb223b62` + `733a28f0` on
+**refresh-worker** (live `6a41098f`) and **live-odds-worker**. Both are
+order-placing services — `run_execution` has two callers on two services
+(`intelligence_state.py` on refresh-worker, `run_live_odds_refresh_worker.py` on
+live-odds-worker) and both reach `record_order`, exactly as `04187cdf` recorded.
+Until BOTH ship, new orders keep recording no verdict.
+
+    refresh-worker    claim HELD by order-sim-view from 23:14Z. BLOCKED: MLB sim
+                      RUNNING (pid=543, evening_next_day_sim, started 23:09:29Z),
+                      plus a board build in flight. `check_deploy_safety` NOT
+                      CLEAR. Drain is UNAVAILABLE from a dev shell — it needs the
+                      keyvalue backend and `SYNDICATE_REFRESH_STATE_URL` is a
+                      Render-internal `fromService` host, so the flag would be
+                      written to a local file the worker never reads. The script
+                      refuses rather than pretending, which is correct. Watcher
+                      armed on the sim instead.
+    live-odds-worker  claim HELD by `prop-join-yield` (session 3492626c) from
+                      23:10:51Z, TTL 2700s, expires ~23:56Z. **NOT forced.**
+
+**THE SESSION-LIVENESS CORRECTION THAT BELONGS WITH THIS.** Earlier today this
+lane recorded session `3492626c` as gone, on the basis that it is absent from
+`list_sessions` *including archived*, and took two file claims from its
+`order-model-view` lane on that basis. **That session acquired the
+live-odds-worker deploy claim at 23:10:51Z** and is still absent from the
+roster. So the roster does not list unattended or scheduled runs, and "absent
+from `list_sessions`" is not evidence a holder is gone — which is what
+`deploy_claim.py`'s own refusal text says in those words ("An unrecorded session
+is UNKNOWN, not gone"). The file take was narrow, disjoint by function, already
+landed and marked reversible in `lanes.md`; the BASIS was weaker than I wrote it.
