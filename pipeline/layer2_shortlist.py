@@ -1200,6 +1200,14 @@ def build_layer2_shortlist(
                         # already meets one level up.
                         f"player_no_roster={proj_stats.get('player_miss_no_roster')} "
                         f"player_name_miss={proj_stats.get('player_miss_name')} "
+                        # The fallback's yield and its refusals, together --
+                        # a hit count with no ambiguity count is a claim
+                        # without its error bar.
+                        f"player_alias_hits={proj_stats.get('player_alias_hits')} "
+                        f"player_alias_ambiguous={proj_stats.get('player_alias_ambiguous')} "
+                        # THE 75% BUCKET, previously unattributed entirely.
+                        f"unprojected_no_field={proj_stats.get('unprojected_no_field')} "
+                        f"unprojected_by_market={proj_stats.get('unprojected_by_market')} "
                         f"matches_with_players={proj_stats.get('matches_with_players')} "
                         f"board_players={proj_stats.get('unmatched_player_sample')} "
                         f"sim_players={proj_stats.get('sim_roster_sample')} "

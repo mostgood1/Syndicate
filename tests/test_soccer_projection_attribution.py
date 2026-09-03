@@ -382,3 +382,130 @@ def test_a_player_that_MATCHES_is_absent_from_every_miss_counter(tmp_path: Path)
     assert coverage["player_miss_name"] == 0
     assert coverage["player_miss_no_roster"] == 0
     assert coverage["unmatched_player_sample"] == []
+
+
+# ---------------------------------------------------------------------------
+# THE SHORT-vs-FULL NAME JOIN, and the three ways it must refuse.
+#
+# `_norm_name` already folds accents (fixed for MLB 2026-08-16), so the residue
+# in soccer is the naming CONVENTION: the sim publishes `Alisson` where the
+# board says `Alisson Ramses Becker`. Measured on production 2026-09-03:
+# `player_name_miss=7020` with `player_no_roster=0` -- every miss a name, not a
+# missing roster.
+#
+# A WRONG PLAYER IS WORSE THAN AN UNMATCHED ROW: the row still prices, and
+# nothing downstream can tell it apart from a correct one. So the refusals below
+# are the load-bearing half of this feature, not the happy path.
+# ---------------------------------------------------------------------------
+
+
+def test_a_SHORT_sim_name_joins_a_FULL_board_name(tmp_path: Path) -> None:
+    _write_with_players(tmp_path, "epl", DATE, "Liverpool", "Chelsea", ["Alisson"])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    rows = [_player_row("epl", "Liverpool", "Chelsea", "Alisson Ramses Becker")]
+    coverage = attach_soccer_projections(rows, index)
+
+    assert coverage["unmatched_player_rows"] == 0
+    assert coverage["player_alias_hits"] == 1
+    assert coverage["player_alias_ambiguous"] == 0
+    assert rows[0].get("projection") is not None
+
+
+def test_a_FULL_sim_name_joins_a_SHORT_board_name(tmp_path: Path) -> None:
+    """The convention runs both directions, so the subset test must too."""
+    _write_with_players(
+        tmp_path, "epl", DATE, "Liverpool", "Chelsea", ["Emersonn Correia da Silva"]
+    )
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    rows = [_player_row("epl", "Liverpool", "Chelsea", "Emersonn")]
+    coverage = attach_soccer_projections(rows, index)
+
+    assert coverage["unmatched_player_rows"] == 0
+    assert coverage["player_alias_hits"] == 1
+
+
+def test_an_AMBIGUOUS_surname_is_REFUSED_and_counted_not_guessed(tmp_path: Path) -> None:
+    """Two players, one surname, same match. Picking either is a silently wrong
+    projection on a row that still prices -- so it must refuse."""
+    _write_with_players(
+        tmp_path, "epl", DATE, "Liverpool", "Chelsea", ["Rodrigo Silva", "Bruno Silva"]
+    )
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    rows = [_player_row("epl", "Liverpool", "Chelsea", "Silva")]
+    coverage = attach_soccer_projections(rows, index)
+
+    assert coverage["unmatched_player_rows"] == 1
+    assert coverage["player_alias_hits"] == 0
+    assert coverage["player_alias_ambiguous"] == 1
+    assert rows[0].get("projection") is None
+
+
+def test_a_SHORT_token_cannot_swallow_a_roster(tmp_path: Path) -> None:
+    """A one-token subset under four characters is not distinctive enough to
+    join on -- `da`, `de` and initials would otherwise match half a squad."""
+    _write_with_players(tmp_path, "epl", DATE, "Liverpool", "Chelsea", ["Ali Hassan"])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    rows = [_player_row("epl", "Liverpool", "Chelsea", "Ali")]
+    coverage = attach_soccer_projections(rows, index)
+
+    assert coverage["unmatched_player_rows"] == 1
+    assert coverage["player_alias_hits"] == 0
+    assert coverage["player_alias_ambiguous"] == 0
+
+
+def test_an_EXACT_match_is_not_counted_as_an_alias(tmp_path: Path) -> None:
+    """The fallback's yield has to be its OWN number, or it will be credited
+    with joins the exact match was always making."""
+    _write_with_players(tmp_path, "epl", DATE, "Liverpool", "Chelsea", ["Mohamed Salah"])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    rows = [_player_row("epl", "Liverpool", "Chelsea", "Mohamed Salah")]
+    coverage = attach_soccer_projections(rows, index)
+
+    assert coverage["unmatched_player_rows"] == 0
+    assert coverage["player_alias_hits"] == 0
+
+
+# ---------------------------------------------------------------------------
+# THE SILENT DROP. Measured 2026-09-03: `considered=140924 projected=25145`
+# while the three named miss buckets summed to 9,329 -- so 106,450 rows (75.5%)
+# fell through `if projection is None: continue` with NO counter at all. That is
+# 92% of everything unprojected, against 6.1% for the name join above.
+# ---------------------------------------------------------------------------
+
+
+def test_a_matched_player_with_NO_VALUE_for_the_market_is_ATTRIBUTED(tmp_path: Path) -> None:
+    """The fixture matched, the market is supported, the player was found -- the
+    sim just published no value for this field. Previously invisible."""
+    _write_with_players(tmp_path, "epl", DATE, "Liverpool", "Chelsea", ["Mohamed Salah"])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    # The fixture writes `expected_shots` only, so shots-on-target has no value.
+    rows = [
+        _player_row(
+            "epl", "Liverpool", "Chelsea", "Mohamed Salah", market="player_shots_on_target"
+        )
+    ]
+    coverage = attach_soccer_projections(rows, index)
+
+    assert rows[0].get("projection") is None
+    assert coverage["unmatched_player_rows"] == 0, "the player MATCHED; this is not a name miss"
+    assert coverage["unprojected_no_field"] == 1
+    assert coverage["unprojected_by_market"].get("player_shots_on_target") == 1
+
+
+def test_the_unprojected_bucket_stays_ZERO_when_everything_projects(tmp_path: Path) -> None:
+    """A counter that is never zero is not a measurement."""
+    _write_with_players(tmp_path, "epl", DATE, "Liverpool", "Chelsea", ["Mohamed Salah"])
+    index = load_soccer_projections([tmp_path], DATE, window_dates=[DATE])
+
+    rows = [_player_row("epl", "Liverpool", "Chelsea", "Mohamed Salah")]
+    coverage = attach_soccer_projections(rows, index)
+
+    assert rows[0].get("projection") is not None
+    assert coverage["unprojected_no_field"] == 0
+    assert coverage["unprojected_by_market"] == {}

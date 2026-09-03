@@ -837,8 +837,73 @@ def attach_soccer_projections(
     # written from the board's spelling alone.
     player_miss_no_roster = 0
     player_miss_name = 0
+    # `#263` follow-up. TWO counters that did not exist, and the second is the
+    # larger finding by an order of magnitude.
+    #
+    # `player_alias_*` measure the token-subset fallback below.
+    # `unprojected_by_market` attributes the SILENT DROP at the end of this
+    # loop: measured 2026-09-03, `considered=140924 projected=25145` while the
+    # three named miss buckets summed to only 9,329 -- so **106,450 rows
+    # (75.5%) fell through `if projection is None: continue` with NO counter at
+    # all**, which is 92% of everything unprojected. The player-name join this
+    # was opened to fix is 6.1% of it. A bucket that large has to be
+    # attributable before anyone chooses what to fix next.
+    player_alias_hits = 0
+    player_alias_ambiguous = 0
+    unprojected_no_field = 0
+    unprojected_by_market: dict[str, int] = {}
     unmatched_players: dict[str, str] = {}
     roster_sample_by_match: dict[str, list[str]] = {}
+
+    def _lookup_player(pool: Mapping[str, Any], board_name: Any) -> tuple[Any, str]:
+        """`(value, state)` for a board player name against a per-match pool.
+
+        EXACT NORMALISED MATCH FIRST; the fallback is a UNIQUE TOKEN-SUBSET
+        match and nothing looser. `_norm_name` already folds accents (fixed for
+        MLB 2026-08-16), so the residue here is not diacritics -- it is the
+        short-vs-full-name convention this sport is full of: the sim publishes
+        `Alisson` where the board says `Alisson Ramses Becker`, and the board
+        says `Emersonn Correia da Silva` where the sim says `Emersonn`.
+
+        THREE THINGS KEEP THIS FROM INVENTING A MATCH, and each is a real risk
+        rather than a hypothetical:
+
+        1. The pool is ONE MATCH'S roster, not a league or a season. Two
+           players sharing a surname across different fixtures can never meet.
+        2. AMBIGUITY REFUSES. More than one candidate returns `ambiguous` and
+           is COUNTED, never resolved by picking the first -- a silently wrong
+           player is worse than an unmatched row, because the row still prices
+           and nothing downstream can tell.
+        3. A ONE-TOKEN subset must be at least four characters, so `da`, `de`
+           and initials cannot swallow a roster.
+        """
+        key = _norm_name(board_name)
+        if not key or not pool:
+            return None, "empty"
+        hit = pool.get(key)
+        if hit is not None:
+            return hit, "exact"
+        tokens = set(key.split())
+        if not tokens:
+            return None, "empty"
+        candidates: list[Any] = []
+        for pool_key, pool_value in pool.items():
+            pool_tokens = set(str(pool_key or "").split())
+            if not pool_tokens:
+                continue
+            shorter, longer = (
+                (pool_tokens, tokens) if len(pool_tokens) <= len(tokens) else (tokens, pool_tokens)
+            )
+            if not shorter <= longer:
+                continue
+            if len(shorter) == 1 and len(next(iter(shorter))) < 4:
+                continue
+            candidates.append(pool_value)
+        if len(candidates) == 1:
+            return candidates[0], "alias"
+        if len(candidates) > 1:
+            return None, "ambiguous"
+        return None, "miss"
 
     def _note_player_miss(match: Mapping[str, Any], row: Mapping[str, Any], roster: Mapping[str, Any]) -> None:
         nonlocal player_miss_no_roster, player_miss_name
@@ -934,8 +999,13 @@ def attach_soccer_projections(
         elif market in _DERIVED_SCORER_MARKETS:
             match_id = str(match.get("match_id") or "").strip()
             race = _scorer_race_for(index, match_id, match)
-            name = _norm_name(row.get("player_name"))
-            prob = (race.get("by_player") or {}).get(name) if race else None
+            prob, race_state = _lookup_player(
+                (race.get("by_player") or {}) if race else {}, row.get("player_name")
+            )
+            if race_state == "alias":
+                player_alias_hits += 1
+            elif race_state == "ambiguous":
+                player_alias_ambiguous += 1
             if prob is None:
                 unmatched_player += 1
                 # The scorer race is DERIVED from the same per-match player
@@ -959,7 +1029,11 @@ def attach_soccer_projections(
                 projection["assumption"] = "last scorer equals first scorer under time-reversal symmetry"
         elif market in _PLAYER_FIELDS or market in _PLAYER_PROB_BY_LINE:
             players = index.players_by_match.get(str(match.get("match_id") or "").strip()) or {}
-            entry = players.get(_norm_name(row.get("player_name")))
+            entry, player_state = _lookup_player(players, row.get("player_name"))
+            if player_state == "alias":
+                player_alias_hits += 1
+            elif player_state == "ambiguous":
+                player_alias_ambiguous += 1
             if entry is None:
                 unmatched_player += 1
                 _note_player_miss(match, row, players)
@@ -993,6 +1067,12 @@ def attach_soccer_projections(
             continue
 
         if projection is None:
+            # THE BUCKET THAT WAS INVISIBLE. The row matched its fixture, its
+            # market is supported and its player was found -- the sim simply
+            # published no value for the field this market needs. Counted BY
+            # MARKET because that is the only cut that says what to fix.
+            unprojected_no_field += 1
+            unprojected_by_market[market] = unprojected_by_market.get(market, 0) + 1
             continue
         # #263: a model probability that is never priced against the market
         # cannot rank anything.
@@ -1070,6 +1150,14 @@ def attach_soccer_projections(
         # The player-level split, same contract as the league one above.
         "player_miss_no_roster": player_miss_no_roster,
         "player_miss_name": player_miss_name,
+        "player_alias_hits": player_alias_hits,
+        "player_alias_ambiguous": player_alias_ambiguous,
+        "unprojected_no_field": unprojected_no_field,
+        # Top markets only: the whole dict on one log line is unreadable, and
+        # the tail is never the thing anyone acts on.
+        "unprojected_by_market": dict(
+            sorted(unprojected_by_market.items(), key=lambda kv: -kv[1])[:12]
+        ),
         "unmatched_player_sample": sorted(unmatched_players),
         "sim_roster_sample": sorted(
             name for names in roster_sample_by_match.values() for name in names
