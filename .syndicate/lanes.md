@@ -1375,7 +1375,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Measurement + the 8.9-minute ambiguous window: `.syndicate/deploys.md`
   2026-09-03 19:45:44Z/19:54:36Z.
 
-### prop-join-yield — OPEN — opened 2026-09-03 — session 3492626c — **GOAL MET AND MEASURED ON PRODUCTION. `c5e78549` live on refresh-worker + web; artifact 20:48:16Z reads `player_unmatched_name 191` of `player_rows_considered 1423` = 13.4%, `player_no_projection 43`, accounting closes to 0. 82% of unprojected MLB player rows are a NAME MISS, not an honest blank. OWED: soccer's windowed counts are inflated (`ac735931` NOT deployed).**
+### prop-join-yield — OPEN — opened 2026-09-03 — session 3492626c — **THREE CHANGES VERIFIED IN PRODUCTION: MLB prop cause split (191/1423 name misses, 13.4%), soccer joined ONCE (`ac735931` — 6.9x inflation removed, coverage 19.0% -> 57.0%, unmatched_match 67.4% -> 0.6%), and `sim_view: unpriced` (`36161e83` — 3,306 rows). NCAAF pregame cadence `a9247011` shipped + enabled, reading OWED.** GOAL MET AND MEASURED ON PRODUCTION. `c5e78549` live on refresh-worker + web; artifact 20:48:16Z reads `player_unmatched_name 191` of `player_rows_considered 1423` = 13.4%, `player_no_projection 43`, accounting closes to 0. 82% of unprojected MLB player rows are a NAME MISS, not an honest blank. OWED: soccer's windowed counts are inflated (`ac735931` NOT deployed).**
 - Goal: MLB prop rows that carry no projection must say WHY — the name did not
   match, versus the sim genuinely has no view. `prop_projections` had no
   `unmatched` counter of any kind, so the two were one number.
