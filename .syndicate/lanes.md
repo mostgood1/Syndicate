@@ -1278,7 +1278,6 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### kalshi-discovery-deadline — OPEN, **BOUNDS IMPLEMENTED; GUARD VALIDATED (103-152s -> 22.5s); FAN-OUT REPRODUCED (cold state -> 150 = DEFAULT_SERIES_PER_TICK); BUDGET VALIDATED IN SITU (50.1s -> 10.7s); MY MEMO DELETED on 0 measured hits: the cost is FAN-OUT (243 per-series fetches), not pagination or host retries** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 ### soccer-anchor-cost — CLOSED 2026-09-02 — opened 2026-09-02 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **GOAL MET. The cost blocker was a DENOMINATOR ERROR — the 57/136 min figures count priced EVENTS in a forward book to d+13, and the builder is SINGLE-DATE. Path (a) FALSIFIED on props (`D_cheap/D_anchor` = 1.81 at half budget; the shift REVERSES SIGN on 2 of 6 fixtures); (b) and (c) were ALREADY BUILT. Both name joins fixed and landed: reach 66→122 of 136 fixtures, 138→214 of 214 team slots. NOT DEPLOYED, NOT ARMED; weight stays 0.0. Narrative `log/2026-09-02.md`; evidence `findings_2026-09-02_soccer_anchor_cost.md`; recorded on `todo.md #622`.**
 - Goal: a MEASURED cost/accuracy tradeoff for soccer market-anchoring across the
   three candidate paths (cut solver simulations / anchor only staked fixtures /
