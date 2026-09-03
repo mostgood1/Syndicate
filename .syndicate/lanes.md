@@ -1735,6 +1735,30 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
       min=1,331.2 s (covered 2026-09-02T12:42:56Z -> 2026-09-03T02:16:34Z);
   (c) the honest null result is allowed: if non-today's share does NOT fall, say
       so — that would mean the queue coalesces and the floor is the wrong lever.
+- **STEP 2, `1800` -> `1200` `[user decision 2026-09-03]`.** 87% was more
+  aggressive than wanted: non-today sat at a 2,096.7 s median build gap. Env SET
+  14:4xZ (single-key endpoint); injection needs a SAME-SHA redeploy of the live
+  `c4ce0502`.
+- **PRE-REGISTERED PREDICTION, written BEFORE the deploy so the re-measure is a
+  TEST and not a description.** Derived from the observed gated `elapsed_s`
+  distribution under the 1800 floor (n=131, date=2026-09-04):
+
+        elapsed_s  min=66  p25=513  med=983  p75=1384  max=1795
+
+  At a 1200 s floor every attempt with `elapsed_s >= 1200` FLIPS to admitted:
+  **42 flip, 89 stay gated**, so
+
+        predicted clip rate ~= 89/150 = 59%      (was 131/150 = 87%)
+        predicted non-today build gap: BELOW the 2,096.7 s median
+
+  **FALSIFIED IF** the clip rate stays near 87%, or rises, or the non-today
+  build gap does not fall — any of which would mean the floor is not the thing
+  setting non-today's cadence and the 87% reading was coincidental.
+- **The approximation is NAMED: admitting 42 more non-today builds consumes
+  worker capacity and will itself shift the timing.** So 59% is a point estimate
+  under an unchanged attempt pattern, not an identity. A result of 50-70% should
+  be read as CONFIRMING; the discriminating question is direction and magnitude,
+  not the second digit.
 - Blocked by: none
 
 ### intelligence-suite-runtime — CLOSED 2026-09-03 — QUESTION ANSWERED (not a stall); MOST OF THE LANE RETRACTED — **NOT A STALL: 221 pass in 586s (9:46). Top 25 = 66%, all `test_intelligence_query*`. AND ISOLATING THEM MAKES THEM SLOWER — the durations do not decompose. **THE WARM EFFECT IS RETRACTED — 3 paired replications show cold 31.32s vs warm 31.45s, and the founding 52.74s reading does not reproduce.** What stands: 221 pass in 586s, not a stall** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
