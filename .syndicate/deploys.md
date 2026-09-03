@@ -20145,3 +20145,43 @@ claim.
 Cost: 5.38s -> 5.77s per merge, +7%.
 
 Claim released after this entry.
+
+## 2026-09-03 — round 5 — ALL THREE to `498a4320` — lane `fleet-catchup-round5`
+
+All three preflights returned CLEAR on the first try (rare — live-odds-worker
+usually needs 5-13 polls), so the three deploys went out within 22 seconds of
+each other and all reached `live` within 15 s: refresh-worker 22:11:36Z,
+live-odds-worker 22:11:37Z, web 22:11:51Z.
+
+Substantive runtime content: `939a8c00` (layer2 board — the sim-disagrees tag was
+unreachable and Win% was showing the BOOK COUNT), `ca05aa7b` (NCAAF chips),
+`d5c1c0fa` (basketball props name-join yield), `f3bb47d0` (`#632` odds_history
+merge 43% cheaper). `4b997c31` / `23bf6bc7` / `2283f7fa` are `scripts/` tooling
+the services do not execute — they rode along, they were not the reason.
+
+verify — **BY CONTENT on the deployed SHA, with tokens checked to be ABSENT from
+the previously-live SHA so they actually discriminate:**
+
+| token | file | live before | on `498a4320` |
+|---|---|---|---|
+| `YIELD` | `basketball_props_edges.py` | 0 | **2** |
+| `sim_view_basis` | `layer2_board.py` | 0 | **1** |
+
+Plus both of today's earlier fixes re-checked for SURVIVAL, because one was
+silently reverted this afternoon: `#643`'s `bytes_per_order` x1 and the
+deploy-lock `_main_worktree_root` x2 are still present in the deployed tree.
+
+Runtime: 300 log lines across the three services, **0 tracebacks / CRITICAL /
+OOM**. web serves 9 MLB cards, `NCAAF_LIVE_STATE week=1 games=11 matched=11
+live=1`, soccer 234 games, `ledger_rows_total=1458`. live-odds-worker is in its
+Kalshi odds phase (`[kalshi_odds] GAP series=...`), refresh-worker publishing.
+
+**One observation, deliberately NOT claimed as caused by this deploy.**
+`MLB_GAME_MARKET_ROWS_DIAG` now reads `has_markets_ml=True has_markets_totals=True`,
+where the 17:47Z record noted `False` and declined to attribute it. It is
+consistent with `939a8c00`'s board fixes AND with ordinary game-state progression
+over five hours; nothing here separates the two. Recorded as an observation so
+the earlier note is not left dangling, not as a result.
+
+**Fleet:** web `9987c545` (0 pending — a peer deployed it after me) ·
+refresh-worker `498a4320` (1 pending) · live-odds-worker `498a4320` (1 pending).

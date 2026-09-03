@@ -1663,6 +1663,22 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
+### fleet-catchup-round5 — CLOSED 2026-09-03 — **ALL THREE to `498a4320` in one window** (22:11:36-51Z), every preflight CLEAR first try. Verified BY CONTENT with tokens proven absent from the previously-live SHA: `YIELD` 0→2, `sim_view_basis` 0→1; plus `#643` and the deploy-lock fix re-checked for SURVIVAL. 300 log lines, 0 errors. — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: all three services on `498a4320`. Substantive runtime content this
+  round: `939a8c00` (layer2 board — the sim-disagrees tag was unreachable and
+  Win% was showing the BOOK COUNT), `ca05aa7b` (NCAAF chips), `d5c1c0fa`
+  (basketball props name-join yield), `f3bb47d0` (`#632` odds_history merge 43%
+  cheaper). `4b997c31` / `23bf6bc7` / `2283f7fa` are `scripts/` tooling the
+  services do not execute — they ride along, they are not the reason.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: per service, BY CONTENT on the deployed SHA (not ancestry), plus
+  its own log stream showing role work with 0 tracebacks, plus
+  `pending_deploys.py` reading 0 for it. Content token: `chip_join_key` is
+  already live, so this round uses a token from `939a8c00` in `layer2_board.py`.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
