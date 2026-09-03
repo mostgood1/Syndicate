@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 710 rules `[generated]`
+## Index — 711 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4850,3 +4850,26 @@ back in one queue cycle, not in minutes.
   the hour. The underlying defect stood up — an unconditional `open("w")`
   truncating a real artifact — so the correction narrowed a finding rather than
   withdrawing one.
+
+## 2026-09-02 REQUIRED: `git rebase --continue` re-runs the message CLEANUP, so a commit subject starting with `#` is silently deleted. Every item id in this repo starts with `#`. `[lane m639-actuals-zero-rows]`
+
+- **What we believed:** `git commit -F msg.txt` with a subject like
+  `#639: ...` works — and it does, which is why every commit in this session
+  landed with its item number intact.
+- **What was actually true:** on a rebase CONFLICT, `git rebase --continue`
+  re-processes the stored message through the default `cleanup=strip`, which
+  removes every line beginning with `#`. The subject was deleted and the second
+  line of the body was promoted to subject — so the commit landed on `main` as
+  `THE FINDING. build_mlb_actuals replayed locally...` with no item number.
+- **How we found out:** reading `git log --oneline -1` after the push, which is
+  the only reason it was noticed at all.
+- **The rule going forward:** when a rebase may re-open a message whose subject
+  starts with `#`, pass **`--cleanup=verbatim`** (`git commit --cleanup=verbatim
+  -F msg.txt`, and `git -c commit.cleanup=verbatim rebase --continue`), or put
+  the id after a word: `todo #639: ...`. **Do not fix it afterwards by
+  force-pushing `main`** — several sessions push there in real time, and
+  rewriting shared history to repair a subject line trades a cosmetic problem
+  for a real one. Leave it, and make the body carry the id so `--grep` still
+  finds it.
+- **Cost:** one commit on `main` with a mangled subject. Content intact,
+  findable by body, and the item is fully recorded in `todo.md` and `lanes.md`.

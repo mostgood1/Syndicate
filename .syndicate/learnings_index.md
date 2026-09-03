@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 710 rules `[generated]`
+## Index — 711 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -256,7 +256,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 468**
+**Rules and corrections — 469**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -416,6 +416,7 @@
 - [2026-09-02 — RULE: a commit subject starting with `#` is a COMMENT to git, and cherry-p…](#2026-09-02-rule-a-commit-subject-starting-with-is-a-comment-to-git-and-cherry-pickrebase-silently-delete-it-this-repos-id-convention-walks-into-it-every-time-lane-accuracy-summary-ledger-budget)
 - [2026-09-02 REQUIRED: derive a local run's config from a SNAPSHOT of production's, not b…](#2026-09-02-required-derive-a-local-runs-config-from-a-snapshot-of-productions-not-by-hand-the-roles-are-their-env-and-they-differ-on-137-of-194-keys-lane-m625-fleet-runner)
 - [2026-09-02 REQUIRED: `deploy_preflight.py` CLEAR means "no job was running when I looke…](#2026-09-02-required-deploy_preflightpy-clear-means-no-job-was-running-when-i-looked-not-no-job-dies-the-old-container-keeps-launching-work-for-the-whole-build-phase-lane-soccer-anchor-audit-artifact)
+- [2026-09-02 REQUIRED: `git rebase --continue` re-runs the message CLEANUP, so a commit s…](#2026-09-02-required-git-rebase---continue-re-runs-the-message-cleanup-so-a-commit-subject-starting-with-is-silently-deleted-every-item-id-in-this-repo-starts-with-lane-m639-actuals-zero-rows)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
