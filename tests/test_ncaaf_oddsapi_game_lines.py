@@ -416,7 +416,25 @@ def test_the_sweep_runs_the_game_lines_capture_before_the_legacy_bundle():
         argparse.Namespace(week=None, season=None, date="2026-08-29")
     )
     names = [step.name for step in steps]
-    assert names == ["ncaaf_game_lines_oddsapi", "ncaaf_lines_snapshot"]
+    # THIRD COPY OF A STALE STEP LIST, and the last one. `28324d06`
+    # (2026-08-26) added `ncaaf_player_props_oddsapi` between these two,
+    # moving the props capture OFF `refresh_ncaaf_oddsapi.py` because that
+    # runner cannot execute for 2026: `_resolve_data_root` requires a
+    # `college_football_schedule_<season>_predicted_totals_enhanced*.csv` and
+    # git holds 359 of them, every one season 2025. Production confirmed it
+    # 2026-08-27T01:04:55Z -- `ncaaf_lines_snapshot` died in zero seconds with
+    # FileNotFoundError while `ncaaf_game_lines_oddsapi` succeeded in the same
+    # sweep. Two sibling assertions in `tests/test_ops.py` carried the same
+    # staleness and were corrected in `f05284f9`.
+    #
+    # The ORDER claim in this test's docstring still holds and is what matters:
+    # the OddsAPI capture runs BEFORE the legacy bundle, so a bundle failure
+    # cannot cost the board its prices.
+    assert names == [
+        "ncaaf_game_lines_oddsapi",
+        "ncaaf_player_props_oddsapi",
+        "ncaaf_lines_snapshot",
+    ]
 
     capture = steps[0]
     assert capture.phases == ("pregame", "live")
@@ -502,7 +520,16 @@ def test_the_state_abbreviation_alias_does_not_capture_real_saint_schools():
     one of them, which is why the alias is generated per registered team
     instead.
     """
-    for name in ("St. Anselm", "Saint John's (MN)", "St. Francis (PA)", "Saint Vincent"):
+    # THE 2026 SPELLINGS. These names are read from the CFBD catalog, and
+    # `d195be63` (2026-08-26, "build the 2026 team data") regenerated
+    # `ncaaf_team_registry_snapshot.csv` -- which is what `resolve_team` reads --
+    # with several schools RENAMED: `St. Anselm` -> `Saint Anselm`,
+    # `St. Francis (PA)` -> `Saint Francis`. The older
+    # `ncaaf_team_registry.csv` alongside it still carries the pre-rename
+    # spellings and is NOT what the resolver reads, which is why asserting the
+    # old names failed while the alias logic was working correctly the whole
+    # time. Verified against the snapshot, not remembered.
+    for name in ("Saint Anselm", "Saint John's (MN)", "Saint Francis", "Saint Vincent"):
         assert ol.resolve_team(name) == name, name
     assert ol.resolve_team("St. Lawrence Saints") == "St. Lawrence"
     # And the abbreviation still reaches the State schools it was added for.

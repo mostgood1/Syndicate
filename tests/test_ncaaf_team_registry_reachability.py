@@ -245,13 +245,21 @@ def test_bare_mascots_still_refuse():
 
 
 def test_albany_is_a_stated_judgement_not_an_inferred_one():
-    """The registry carries BOTH `UAlbany` and `Albany State GA`. The feed
+    """The registry carries BOTH `UAlbany` and `Albany State`. The feed
     sends the bare word; a Division II school is not on a book's slate, so the
     answer is UAlbany -- an inference from the slate's composition, recorded as
     a hand-verified entry rather than left to the alias generator, which
-    correctly refuses ambiguity and would have resolved nothing."""
+    correctly refuses ambiguity and would have resolved nothing.
+
+    THE D-II SCHOOL WAS RENAMED, NOT DROPPED. `d195be63` (2026-08-26) rebuilt
+    `ncaaf_team_registry_snapshot.csv` from the 2026 CFBD catalog, where
+    `Albany State GA` is now `Albany State`. The resolver reads that snapshot;
+    the older `ncaaf_team_registry.csv` beside it still says `Albany State GA`
+    and is NOT what is read. Asserting the old name failed while the
+    disambiguation this test exists to protect was working correctly.
+    """
     assert lines.resolve_team("Albany") == "UAlbany"
-    assert lines.resolve_team("Albany State GA") == "Albany State GA"
+    assert lines.resolve_team("Albany State") == "Albany State"
 
 
 def test_every_supplement_entry_names_a_real_canonical_team():
