@@ -5053,3 +5053,53 @@ back in one queue cycle, not in minutes.
   attributable, which is most of the value at ~100 bytes instead of 4 MB.
 - **Cost:** none — it was priced before it was built. Had it shipped, it would
   have evicted production state from a store that is already 86.8% full.
+## 2026-09-02 FORBIDDEN: dropping rows whose OUTCOME is zero. It reads as "cleaning the data" and it is selection on the dependent variable — 79% of my sample went, and the survivors all had realized >= 1. `[lane soccer-anchor-cost, #622(3)]`
+
+**Measured.** Grading anchored-vs-base soccer prop projections against realized
+shots, I skipped (player, match) rows where the player took no shots, reasoning
+that a 0 for an unused substitute is an availability fact rather than a
+prediction error. That is superficially sound and it is wrong.
+
+    with the filter   n =  42   base MAE 0.9762   anchored 1.0299
+    without it        n = 197   base MAE 0.5868   anchored 0.5930
+
+**155 of 197 rows — 79% — were discarded, and every surviving row had
+realized >= 1.** The MAE nearly halved once they came back, which is the tell:
+the filtered population was not the population the model predicts on. Worse, the
+direction under test was whether anchoring RAISES projections (it does, for
+favourites), and a sample forced to `realized >= 1` rewards or punishes exactly
+that, for reasons unrelated to skill.
+
+**The fix was already in the repo.** `fit_soccer_shot_shrinkage.py` grades the
+FULL predicted set for any match with a healthy feed — `D = [r for r in rows if
+r[2] in ok]`, then `realized.get(..., 0)` — and grades the UNCONDITIONAL
+`expected_shots`, not `_if_playing`. The unconditional number already prices in
+the chance the player does not appear, which is what makes a zero a legitimate
+OUTCOME instead of an artefact. My `_if_playing` choice is what made the filter
+feel necessary in the first place.
+
+**How to apply.** Before excluding rows, ask what the exclusion CORRELATES WITH.
+"No outcome recorded" is almost never missing-at-random. And when a sibling
+script already grades the same quantity, read its denominator before inventing
+one — the answer was forty lines away.
+
+## 2026-09-02 REQUIRED: when a sign test and a t-statistic DISAGREE, believe neither until you have found the clustering. Mine said p=0.0027 and t=-1.28 on the same rows. `[lane soccer-anchor-cost, #622(3)]`
+
+**Measured.** 197 (player, match) rows, anchored vs base: exact two-sided sign
+test **p = 0.0027** (wildly significant) beside a paired **t-ish of -1.28** (not
+significant). Both computed from the same 197 numbers.
+
+The disagreement IS the diagnosis. A sign test counts directions and a t counts
+magnitudes, so they diverge when many observations share a direction but each
+carries little weight — the signature of **non-independence**. Here the cause was
+structural and obvious once looked for: those 197 rows came from **5 matches**,
+and every player in a match receives the SAME anchor shift. The unit of
+independence is the match, not the player, so the sign test was treating 5
+effective observations as 197.
+
+**How to apply.** State the clustering unit BEFORE computing any p-value, and
+report the clustered statistic beside the row-level one rather than instead of
+it — the row-level number is still the effect size, it is only the CONFIDENCE
+that is fake. A p-value that disagrees with its own t is not a lucky finding, it
+is an unmodelled correlation, and in a repeated-measures design the cluster is
+usually the thing every row in a group shares.

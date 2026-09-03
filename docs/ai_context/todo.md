@@ -2038,7 +2038,22 @@ path (a) is FALSIFIED, and two name joins were losing most of the mechanism.**
   better accuracy.** That is enough to adopt it as the cost lever and it
   collapses the anchor's 83.2 min/4h to ~0 — but it changes nothing about
   arming, which was declined on EDGE and EVIDENCE, not on cost. (3) Multi-week anchored-vs-base on PROPS
-  against OUTCOMES, not h2h vs market.** (2) and (3) are now the gate on any
+  against OUTCOMES, not h2h vs market — HARNESS
+  BUILT AND PROVEN 2026-09-02, RUN BLOCKED ON SERVICE HEALTH, NOT MEASURED.**
+  Feasible: 76 soccer `odds_history` files carry de-vigged h2h, archived
+  `recommendations_*.json` carry base props, ESPN carries actuals; **75
+  gradeable league-dates over 22 dates, 8 leagues, ~300 fixtures**. Blocked
+  because web `oomKilled` at 2Gi (01:46:58Z) and stays degraded between restarts
+  (**26.9 s for a ONE-FILE request**), while refresh-worker sits at 91-97% of
+  4Gi having OOM'd at 15:32:56Z — see `state.md [service-memory-saturation]`.
+  **Strongest evidence so far, and it is NOT a result: anchoring ~1% WORSE on
+  realized shots (base MAE 0.5868 vs 0.5930), 5 matches, clustered.**
+  Two harness defects were caught before they produced a number — a
+  zero-outcome row filter that cut 79% of the sample (selection on the dependent
+  variable) and player-level p-values inflated by match clustering; both are now
+  standing rules in `learnings.md`. Finishing it is ~30 min of paced fetching
+  once the services are healthy: `prefetch.py` fills a resumable disk cache, then
+  the harness runs with zero web traffic. (2) and (3) are now the gate on any
   future arming, and both are cheaper than they were because the anchor
   publishes its own state.
 

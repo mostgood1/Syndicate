@@ -411,6 +411,32 @@ CHECKOUT of `origin/main` after pushing. Full evidence:
   sha256 — `names_only` returns no hash and no endpoint does, so it is NOT a
   claim that production's bytes equal ours.
 
+## [service-memory-saturation] BOTH PRODUCTION SERVICES WERE MEMORY-SATURATED 2026-09-02/03 — MEASURED, and it BLOCKS analysis work `[lane soccer-anchor-cost]`
+
+**Read from the Render events + memory telemetry, not inferred.**
+
+- **web: `oomKilled` at the 2Gi limit `2026-09-03T01:46:58Z`**, then
+  `server_failed / unhealthy: HTTP health check failed (timed out after 5s)` at
+  `02:15:54Z`, `server_restarted` + `server_available` `02:16:30Z`. No deploy was
+  in flight — the live SHA had landed at 23:20:01Z.
+- **THE SYMPTOM THE OOM EVENTS DO NOT SHOW: it stays degraded between restarts.**
+  After recovery, a *one-file* `names_only` artifact request took **26.9 s**, and
+  a paced prefetch made **0 progress in 8 minutes**. "server_available" is not
+  "serving".
+- **refresh-worker: 3,724-3,986 / 4,096 MB (91-97%)**, unreclaimable
+  2,071-2,229 MB, 10 processes; `oomKilled` at 4Gi `2026-09-02T15:32:56Z`.
+
+**CONSEQUENCE, and it is not only about one lane:** any analysis needing bulk
+artifact reads is blocked on web, and any analysis needing worker CPU is blocked
+by `#241`-shaped memory risk. `#622`(3)'s multi-week props validation was stopped
+for exactly this — both routes fail for the same underlying reason.
+
+**Attribution is UNRESOLVED and must not be recorded as settled.** The 01:46:58Z
+OOM predates that lane's first bulk run by ~13 minutes, but 9 MB artifact exports
+were being pulled throughout the window and the 02:15:54Z health-check timeout
+coincides with a second run's assembly. Corroborates `#632` (web OOM at 2Gi,
+unowned) with a fresh instance.
+
 ## [soccer-market-anchor] MARKET-ANCHORING IS REACHABLE AND STILL OFF BY DECISION — MEASURED 2026-09-02 `[lane soccer-anchor-cost, main 686d8282/0844694c]`
 
 **Weight stays 0.0. The blocker was never cost; it was two dead name joins, an
