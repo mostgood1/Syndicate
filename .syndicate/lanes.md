@@ -2221,6 +2221,23 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   reverted. The held claim is why no peer could inject it.
 - **BLOCKED ON: a quiet worker.** Retry overnight and ARM BEFORE 07:00 CT so it
   waits for the hour and runs observed, rather than firing on the next tick.
+- **ARMED AS TWO SCHEDULED TASKS `[2026-09-03, user decision: schedule the overnight attempt]`:**
+  `arm-accuracy-autorun-626h` fires **2026-09-04 03:00 CT** — claim, poll
+  PREFLIGHT (not `check_deploy_safety`) up to 20 min, set the key, deploy
+  origin/main tip, release with `--token`, record. It ABORTS and reverts the
+  key if the deploy does not complete, because an armed key with no deploy is
+  a landmine for any other session's deploy.
+  `verify-accuracy-autorun-626h` fires **2026-09-04 07:45 CT** — the autorun
+  gate is `hour >= 7 CT`, so 03:00 arming means it WAITS for 07:00 and runs on
+  a quiet worker. It reads `AUTORUN_DONE`, `LEDGER_CHUNKS_ACCEPTED`, peak
+  `memory_anon_mb` (NOT `memory_headroom_mb`) and restart events, and **sets
+  the key back to `false` if the run OOMed or `AUTORUN_DONE` is absent**.
+  Both tasks carry the four traps from `deploys.md` so they are not re-hit.
+- **CAVEAT ON THE SCHEDULE, not a defect in it:** scheduled tasks run only
+  while the app is open, and this machine has previously stalled a scheduled
+  call by 9h13m under Modern Standby. `lastRunAt` is DISPATCH, not execution —
+  verify against the ARTIFACT (live SHA, key value, log lines), never the
+  task's own timestamp.
 - Blocked by: a quiet refresh-worker (no MLB sim / odds refresh / soccer build in flight). Overnight.
   a board build were in flight at 10:20 CT.
 
