@@ -2238,6 +2238,24 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   call by 9h13m under Modern Standby. `lastRunAt` is DISPATCH, not execution —
   verify against the ARTIFACT (live SHA, key value, log lines), never the
   task's own timestamp.
+- **CAVEAT NOW HANDLED, not just noted `[2026-09-03 late, user: "check the autorun result in the morning"]`.**
+  The caveat above was written down and then not acted on: the verifier assumed
+  the 03:00 arm had already happened hours earlier. If this machine sleeps —
+  **measured at ~60% of nights**, recorded in the `live-gameline-accuracy-snapshot`
+  task's own description — BOTH tasks fire back-to-back at next launch, and the
+  verifier would look for `AUTORUN_DONE` seconds after the arming deploy and
+  report an OOM for a run that had not started. **A false OOM verdict disarms a
+  fix that never got a chance**, which is worse than no reading.
+  `verify-accuracy-autorun-626h` now opens with an ordering step that reads three
+  clocks (local time, arming-deploy `finishedAt`, whether 07:00 CT has passed)
+  and branches four ways — NOT-YET-DUE (before the gate; re-arms itself and
+  stops), a 25-min poll if the deploy is <20 min old, the real judgement only
+  when the run is genuinely due, and NOT-ARMED. **The discriminator is the
+  restart/`oomKilled` EVENT, not the missing line:** absence of `AUTORUN_DONE`
+  proves only absence of the line. Same class as this session's three bad poll
+  predicates — a predicate written against the expected sequence rather than the
+  one that actually occurs. This session is subscribed to the verifier's
+  completion.
 - Blocked by: a quiet refresh-worker (no MLB sim / odds refresh / soccer build in flight). Overnight.
   a board build were in flight at 10:20 CT.
 
