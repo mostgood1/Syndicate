@@ -1462,6 +1462,28 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   paths are deeper than `snapshots/<date>/<file>`, so the breadth is incidental
   rather than load-bearing.
 - Claims: NONE held. No deploy.
+### board-throttle-600s-remeasure — OPEN — opened 2026-09-03 — session 3492626c
+- Goal: re-decide `#631` risk 1 against the REAL floor. `board-window-throttle-binds`
+  concluded "the throttle BINDS" from tomorrow's 38.8-min median vs a 30-min floor,
+  but the code is `max(30, _env_int(KEY, 1800))` and the LIVE value on refresh-worker
+  is **`600`** (read from the Render API 2026-09-03T02:2xZ; the running process
+  booted 01:10:00Z on `f84eb21b`, so 600 is what it holds).
+- Files: none claimed — READ-ONLY measurement from production logs.
+- **HYPOTHESIS (written before testing): the 600 s floor does NOT bind.** Non-today
+  build spacing is set by SERIALISATION, not the throttle — a full board build was
+  measured at ~1005 s and builds run serially, so today alone (15.8-min median)
+  nearly saturates the loop and tomorrow takes whatever turns are left.
+- Prediction if true: the MINIMUM non-today gap is far above 600 s and there is NO
+  clustering just above 600 s. The floor would then never be the active constraint.
+- Falsification test: if a meaningful share of non-today gaps sit in [600, ~750] s
+  — i.e. clipped to the floor — the throttle IS binding and the hypothesis is wrong.
+  A single gap below 600 s would instead mean the floor is not applied at all.
+- Verification: per-date gap distribution (n, min, p25, median, max) from
+  `BUILD_SPAN_ENTER` on refresh-worker, segmented at the 01:10Z deploy boundary so
+  the window where the 600 floor is CONFIRMED is reported separately from the
+  earlier window where the env value is not established.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
