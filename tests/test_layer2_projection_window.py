@@ -130,3 +130,114 @@ def test_the_call_site_passes_the_window(monkeypatch):
     assert "_attach_projections_over_window(" in source
     assert "window_dates=window_dates" in source
     assert 'attach_projections(grid, sport=sport, selected_date=selected_date)' not in source
+
+
+# ---------------------------------------------------------------------------
+# RATES, which are not counts.
+#
+# A key that is not in `summable` falls to "first non-falsy wins", so a windowed
+# join has been serving the FIRST date's `pct_projected` beside a SUMMED
+# `rows_considered` and a SUMMED `rows_with_projection` -- three numbers from two
+# different populations in one dict, and the rate is the one a reader quotes.
+# Summing rates instead is not the fix; percentages do not add.
+# ---------------------------------------------------------------------------
+
+
+def _rate_attach(monkeypatch, by_date):
+    import syndicate.features.shared.board_enrichment as be
+
+    def _fake(grid, *, sport, selected_date):
+        return dict(by_date[selected_date])
+
+    monkeypatch.setattr(be, "attach_projections", _fake)
+
+
+def test_a_windowed_rate_describes_the_WINDOW_not_its_first_date(monkeypatch):
+    """First date 100%, second 0%. The window is 50%, and 100% is the bug."""
+    _rate_attach(monkeypatch, {
+        "2026-09-03": {"supported": True, "rows_considered": 100,
+                       "rows_with_projection": 100, "pct_projected": 100.0},
+        "2026-09-04": {"supported": True, "rows_considered": 100,
+                       "rows_with_projection": 0, "pct_projected": 0.0},
+    })
+    out = l2._attach_projections_over_window(
+        [], sport="ncaaf", selected_date="2026-09-03",
+        window_dates=["2026-09-03", "2026-09-04"],
+    )
+    assert out["rows_considered"] == 200
+    assert out["rows_with_projection"] == 100
+    assert out["pct_projected"] == 50.0, "the rate must match the counts beside it"
+
+
+def test_the_edge_rate_gets_a_summed_numerator_too(monkeypatch):
+    """`rows_with_edge` was missing from `summable` while `pct_with_edge` was
+    being merged -- so the numerator was one pass and the denominator was all
+    of them."""
+    _rate_attach(monkeypatch, {
+        "2026-09-03": {"supported": True, "rows_considered": 100,
+                       "rows_with_edge": 40, "pct_with_edge": 40.0},
+        "2026-09-04": {"supported": True, "rows_considered": 100,
+                       "rows_with_edge": 20, "pct_with_edge": 20.0},
+    })
+    out = l2._attach_projections_over_window(
+        [], sport="mlb", selected_date="2026-09-03",
+        window_dates=["2026-09-03", "2026-09-04"],
+    )
+    assert out["rows_with_edge"] == 60
+    assert out["pct_with_edge"] == 30.0
+
+
+def test_the_name_miss_rate_uses_the_player_denominator_across_the_window(monkeypatch):
+    """The MLB cause split, and the denominator trap it carries.
+
+    `player_rows` in that payload is a LEGACY ALIAS for every row, game markets
+    included. 30 name misses over 60 PLAYER rows is 50%, not the 15% that
+    dividing by the 200-row alias would give.
+    """
+    _rate_attach(monkeypatch, {
+        "2026-09-03": {"supported": True, "rows_considered": 100, "player_rows": 100,
+                       "player_rows_considered": 40, "player_unmatched_name": 20,
+                       "player_no_projection": 5, "pct_player_name_missed": 50.0},
+        "2026-09-04": {"supported": True, "rows_considered": 100, "player_rows": 100,
+                       "player_rows_considered": 20, "player_unmatched_name": 10,
+                       "player_no_projection": 3, "pct_player_name_missed": 50.0},
+    })
+    out = l2._attach_projections_over_window(
+        [], sport="mlb", selected_date="2026-09-03",
+        window_dates=["2026-09-03", "2026-09-04"],
+    )
+    assert out["player_rows_considered"] == 60, "the counts must SUM, not freeze"
+    assert out["player_unmatched_name"] == 30
+    assert out["player_no_projection"] == 8
+    assert out["pct_player_name_missed"] == 50.0
+
+
+def test_a_rate_whose_denominator_did_not_survive_is_DROPPED(monkeypatch):
+    """Better absent than stale.
+
+    A rate left holding one pass's value is indistinguishable from a current one
+    at the point somebody reads it, which is the whole defect. If the counts it
+    is derived from are not there, neither is the rate.
+    """
+    _rate_attach(monkeypatch, {
+        "2026-09-03": {"supported": True, "pct_player_name_missed": 50.0},
+        "2026-09-04": {"supported": True, "pct_player_name_missed": 10.0},
+    })
+    out = l2._attach_projections_over_window(
+        [], sport="mlb", selected_date="2026-09-03",
+        window_dates=["2026-09-03", "2026-09-04"],
+    )
+    assert "pct_player_name_missed" not in out
+
+
+def test_a_single_date_window_keeps_its_rate_unchanged(monkeypatch):
+    """The no-op path must stay a no-op: re-deriving from the same counts has to
+    reproduce the join's own number, or the recompute is itself a rewrite."""
+    _rate_attach(monkeypatch, {
+        "2026-09-03": {"supported": True, "rows_considered": 143, "rows_with_projection": 37,
+                       "pct_projected": 25.9},
+    })
+    out = l2._attach_projections_over_window(
+        [], sport="mlb", selected_date="2026-09-03", window_dates=["2026-09-03"],
+    )
+    assert out["pct_projected"] == 25.9

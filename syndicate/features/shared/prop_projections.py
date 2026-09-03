@@ -250,6 +250,13 @@ class PropProjectionIndex:
         self._pitchers: dict[str, dict[str, Any]] = {}
         self._hitters: dict[tuple[str, str], dict[str, Any]] = {}
         self._hitter_means: dict[str, dict[str, float]] = {}
+        # DERIVED, not maintained in parallel -- see `knows_player`. Cached
+        # against the dict's SIZE because `_hitters` is append-only (assigned
+        # only at ingest, never cleared, never rekeyed), so a size change is a
+        # sound invalidation and a stale set is not reachable. A hand-maintained
+        # set would go stale the first time someone adds a fourth ingest site.
+        self._hitter_names: set[str] = set()
+        self._hitter_names_at: int = -1
         # (away_tri, home_tri) -> {segment_payload_name: payload}
         self._games: dict[tuple[str, str], dict[str, Any]] = {}
         self.games = 0
@@ -386,6 +393,35 @@ class PropProjectionIndex:
             except Exception:
                 continue
         return None
+
+    def knows_player(self, player_name: Any) -> bool:
+        """Is this name in the index AT ALL, regardless of market or line?
+
+        THE ONLY THING THAT SEPARATES A NAME-JOIN MISS FROM AN HONEST BLANK.
+        `project` returns None for four different reasons -- no such name, no
+        such market, an unusable line, a whole-number line on a threshold-only
+        market -- and this file counted none of them. Its own docstring calls a
+        blank cell honest, which is true of a genuine absence and false of a
+        name that did not match, and until now nothing could tell them apart.
+
+        Soccer had the same shape and it cost roughly half that sport's model
+        coverage: measured 2026-09-03, `player_no_roster=0` alongside
+        `player_name_miss=7020` is what proved the rosters were present and the
+        NAMES were the problem. Without the first number the second reads as a
+        producer gap, which is how it was first reported. MLB props are Phase 1
+        of the edge plan and 300 of 947 settled bets at -15.35%; that figure
+        cannot be read at all while an unknown share of prop rows may be priced
+        with no model view because a name did not match.
+        """
+        name = _norm_name(player_name)
+        if not name:
+            return False
+        if name in self._pitchers or name in self._hitter_means:
+            return True
+        if self._hitter_names_at != len(self._hitters):
+            self._hitter_names = {key[0] for key in self._hitters}
+            self._hitter_names_at = len(self._hitters)
+        return name in self._hitter_names
 
     def project(self, *, player_name: Any, market: Any, line: Any) -> dict[str, Any] | None:
         """Projection + modelled P(over) for one market line, or None.
@@ -931,15 +967,31 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
     attached = 0
     considered = 0
     with_edge = 0
+    # THE CAUSE SPLIT. `considered - attached` was a bare miss count, and a bare
+    # miss count cannot say whether the sim has no view or the JOIN failed --
+    # the distinction that hid half of soccer's coverage until 2026-09-03.
+    player_rows = 0
+    player_unmatched_name = 0     # the index has never heard of this player
+    player_no_projection = 0      # name known; no value for this market/line
+    game_rows = 0
+    game_no_projection = 0
     for row in grid_rows:
         player = row.get("player_name")
         sides = list(row.get("sides") or ())
         considered += 1
         projected_side = None
         if player:
+            player_rows += 1
             projection = index.project(
                 player_name=player, market=row.get("market"), line=row.get("line")
             )
+            if projection is None:
+                # Asked BEFORE the row is dropped, because after the `continue`
+                # the name is gone and the reason is unrecoverable.
+                if index.knows_player(player):
+                    player_no_projection += 1
+                else:
+                    player_unmatched_name += 1
             # Props: `model_prob_over` is the OVER, so it belongs on that row.
             projected_side = next((s for s in sides if str(s).lower() in {"over", "yes"}), None)
         else:
@@ -952,6 +1004,7 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
                 (s for s in sides if str(s).lower() in {"over", "home", "yes", "1"}), None
             )
             projected_side = over_side
+            game_rows += 1
             if over_side is not None:
                 projection = project_game_market(
                     index,
@@ -964,6 +1017,8 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
                     segment=row.get("segment"),
                 )
         if projection is None:
+            if not player:
+                game_no_projection += 1
             continue
         # Which SIDE this projection describes. A prop's `model_prob_over` is
         # the over; a game market's is home (or the over). Rendering it against
@@ -1065,4 +1120,22 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
         # "we can price that view honestly" are different claims.
         "pct_with_edge": round(100.0 * with_edge / considered, 1) if considered else 0.0,
         "pitcher_names_resolved": getattr(index, "pitcher_name_map_size", 0),
+        # WHY a row carries no projection, split by cause.
+        #
+        # READ THE NAME CAREFULLY: `player_rows` two keys up is a LEGACY ALIAS
+        # for `considered` -- EVERY row, game markets included -- as its own
+        # comment says. The denominator a name-miss belongs over is
+        # `player_rows_considered`, which is what it sounds like. Dividing by
+        # the alias would understate the miss rate by the whole game-market
+        # book, and that is the failure mode that has cost this session three
+        # wrong numbers already: a count without the right denominator is a
+        # count, not a rate.
+        "player_rows_considered": player_rows,
+        "player_unmatched_name": player_unmatched_name,
+        "player_no_projection": player_no_projection,
+        "game_rows_considered": game_rows,
+        "game_no_projection": game_no_projection,
+        "pct_player_name_missed": (
+            round(100.0 * player_unmatched_name / player_rows, 1) if player_rows else 0.0
+        ),
     }

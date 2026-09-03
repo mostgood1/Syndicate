@@ -2007,6 +2007,10 @@ def _attach_projections_over_window(
     summable = (
         "rows_considered",
         "rows_with_projection",
+        # The numerator of `pct_with_edge`. It was NOT here while that rate was
+        # being merged by "first non-falsy wins", so a window served one pass's
+        # edge count next to a summed denominator.
+        "rows_with_edge",
         "rows_with_true_probability",
         "unprojected_no_field",
         "player_alias_hits",
@@ -2023,9 +2027,34 @@ def _attach_projections_over_window(
         # should be four figures. Adding a bucket to the sum is not evidence it
         # is the hole; the next reading is.
         "unmatched_match_rows",
+        # MLB props' cause split. Same rule as everything above: a count that is
+        # not here reports one pass and reads as the window.
+        "player_rows_considered",
+        "player_unmatched_name",
+        "player_no_projection",
+        "game_rows_considered",
+        "game_no_projection",
     )
     # Per-key SUM, because a dict cannot go through `summable` above.
     summable_dicts = ("unprojected_by_market",)
+    # RATES ARE NOT COUNTS AND MUST NOT BE MERGED AT ALL -- they have to be
+    # RE-DERIVED from the merged counts after the loop.
+    #
+    # A rate falls to the `elif` below, which is "first non-falsy wins", so a
+    # window has been reporting the FIRST date's `pct_projected` beside a summed
+    # `rows_considered` and a summed `rows_with_projection` -- three numbers from
+    # two different populations, in one dict, where the rate is the one a reader
+    # quotes. Summing them instead would be worse (percentages do not add).
+    #
+    # Explicit table rather than a `pct_` prefix rule: the numerator and the
+    # denominator are the whole content of a rate, and guessing them from a name
+    # is how `pct_player_name_missed` would have been divided by `player_rows` --
+    # a legacy alias for EVERY row, game markets included.
+    derived_rates = {
+        "pct_projected": ("rows_with_projection", "rows_considered"),
+        "pct_with_edge": ("rows_with_edge", "rows_considered"),
+        "pct_player_name_missed": ("player_unmatched_name", "player_rows_considered"),
+    }
 
     for date_key in dates:
         try:
@@ -2051,6 +2080,21 @@ def _attach_projections_over_window(
                         bucket[sub_key] = bucket.get(sub_key, 0) + sub_value
             elif key not in merged or merged.get(key) in (None, 0, False, ""):
                 merged[key] = value
+
+    # Re-derive every rate from the counts that ended up in `merged`, so the
+    # rate and the counts beside it describe the same population. Only when both
+    # terms actually merged as numbers: a rate whose denominator did not survive
+    # is DROPPED rather than left holding one pass's value, because a stale rate
+    # is indistinguishable from a current one at the point somebody reads it.
+    for rate_key, (num_key, den_key) in derived_rates.items():
+        if rate_key not in merged:
+            continue
+        num = merged.get(num_key)
+        den = merged.get(den_key)
+        if isinstance(num, (int, float)) and isinstance(den, (int, float)):
+            merged[rate_key] = round(100.0 * num / den, 1) if den else 0.0
+        else:
+            merged.pop(rate_key, None)
 
     if len(dates) > 1:
         merged["window_dates"] = list(dates)
