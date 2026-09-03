@@ -163,7 +163,15 @@ def main() -> int:
         # worse on 10 of 12 dates" -- a statement about a fixed bug, not about
         # the model. `scored_markets` is now recorded from the payload so the
         # boundary is visible IN THE DATA rather than by remembering a date.
-        # A row with `scored_markets` absent is pre-fix by construction.
+        # A row with `scored_markets` ABSENT IS NOT PRE-FIX -- this line used
+        # to claim it was, "by construction", and that was wrong. The stamp is
+        # emitted HERE, by the observer, which gained the field days after the
+        # scorer fix `75cf9aec` (2026-08-30T16:59:02Z), so absence dates THIS
+        # SCRIPT, not the scorer. Reading it the other way misclassified
+        # 2026-08-30 and 2026-08-31 and silently halved the poolable sample.
+        # Disproved 2026-09-03 in `d9fb0b43`; era classification now lives in
+        # `scripts/pool_live_gameline_trend.py:row_era`, which falls back to
+        # capture time against the fix commit.
         "scored_markets": score.get("scored_markets"),
         "records_by_market": score.get("records_by_market"),
         # --- THE CUT A MODEL CLAIM MUST BE MADE ON (see the scorer) ---
