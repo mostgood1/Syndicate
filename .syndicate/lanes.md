@@ -2040,7 +2040,17 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   is the population fix live (the old filter kept only `realized >= 1`), with
   5/5 ESPN actuals and match-clustering reported apart from the labelled
   player-level figure.
-  **NOT VERIFIED, and my falsification test was written at the wrong scope:**
+  **SUPERSEDED 2026-09-03: THE FULL RUN WAS REDONE THROUGH THE LANDED SCRIPT AND
+  IT REPRODUCES.** 56 units / 113 anchored fixtures and **6,595 paired
+  projection rows — IDENTICAL**, so the simulation half is deterministic and
+  reproduced exactly. Headline unchanged to 4 dp: **+0.00038 shots (+0.072%)**,
+  **t = −1.06**, median **+0.00000**, anchored better in **41** matches. The only
+  drift is the ACTUALS JOIN — the original fetched 138/139 matches, the rerun
+  139/139 — which adds 1 match and 18 gradeable rows (6,486 → 6,504; 136 → 137)
+  and moves the MAEs in the 4th decimal (0.52126 → 0.52135 base, 0.52163 →
+  0.52173 anchored). **The recorded evidence now has a reproducible source.**
+  The earlier note below stands as written, because the reasoning was right:
+  **NOT VERIFIED AT THE TIME, and my falsification test was written at the wrong scope:**
   the recorded aggregate (base 0.52126 / anchored 0.52163 over 136 matches) is
   NOT reproduced, because a 2-unit subset cannot reproduce a 136-match
   aggregate. The subset read anchored BETTER by 0.385% over 5 matches at
