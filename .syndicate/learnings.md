@@ -4642,3 +4642,49 @@ calling the count complete. Corollary for the fix: three sibling files here had
 already replaced literal indices with relative ones, so the pattern was
 discoverable by looking at the family — `grep` for the assertion shape, not for
 the failing test.
+
+
+## 2026-09-03 — FORBIDDEN: reading a repo file through `subprocess(text=True)` on Windows. It decodes with the LOCALE codepage, and this ledger is made of em-dashes
+
+- **The rule.** Any pipeline that reads source or ledger content out of git —
+  `git show`, `git cat-file`, `git diff` — must capture BYTES and
+  `.decode("utf-8")` explicitly. `text=True` uses
+  `locale.getpreferredencoding()`, which is cp1252 here, and a cp1252
+  round-trip of U+2014 (`e2 80 94`) produces `c3 a2 e2 82 ac` — which still
+  RENDERS as a dash in most terminals and matches no regex looking for the real
+  one.
+- **What it cost.** Regenerating `lane-guard`'s parser through that path wrote
+  mojibake into `LANE_RE`. The live claim set went **50 → 0** and `lane-guard`
+  enforced NOTHING — every lane in the repo unguarded — while every checker
+  downstream reported success, because zero claims trivially satisfies "each
+  claim has one holder" and "no claim names a missing file".
+- **The second half, which is the transferable one.** The outage was invisible
+  to every existing check and was found only by a differential that asserted a
+  NON-ZERO count. **A parser's output count is a health signal and belongs in
+  the check** — `scripts/check_lane_claims.py` now treats zero claims against
+  OPEN headers as FATAL and names the em-dash by its bytes. Compare BYTES, not
+  glyphs: `grep '^LANE_RE' .claude/hooks/lane_claims.py | xxd`.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-03 — A guard's COVERAGE is measured against the writes that reach it, not the writes it handles
+
+- **The rule.** Before citing a guard as protection, measure the denominator:
+  how many of the operations it exists to catch actually route through the tool
+  it is registered on. `lane-guard.py` was registered on
+  `Edit|Write|MultiEdit|NotebookEdit` only. Census over all 292 session
+  transcripts, counting writes whose target resolves to a `git ls-files` path:
+  writes to tracked SOURCE files ran **9,023 Edit-family against 1,045
+  Bash/PowerShell — 10.4% never checked**, and under `.syndicate/` the shell is
+  the MAJORITY path (2,618 vs 1,069).
+- **Why it stayed hidden.** A guard that never sees an operation is
+  indistinguishable from one that saw it and allowed it. `lane-guard` was the
+  only guard in `.claude/hooks` standing on a single layer —
+  `ledger-append-guard` shares the same Edit-only matcher but is backstopped at
+  write time AND at commit time, which is why the ledger's shell-heavy profile
+  never showed up as damage.
+- **How to apply.** For every PreToolUse guard, ask which OTHER tool can perform
+  the same effect, and either cover it or write down that it is uncovered.
+  Prefer watching the OUTCOME over parsing the command: predicting a file write
+  from a shell string needs seven regex families and still misses cases, and a
+  guard that blocks on a guess is one people route around.
+- *(evidence in `learnings_evidence.md`)*

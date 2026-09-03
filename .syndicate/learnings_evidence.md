@@ -22525,3 +22525,103 @@ usually the thing every row in a group shares.
 - **How we found out:** one `git ls-tree` against the mirror before starting the checkout, asking what dates actually exist.
 - **The rule going forward:** before running a control that costs real time, state what INPUT it needs and confirm that input exists FOR THE CONDITION UNDER TEST — the date, the sport, the state file, whichever discriminates. `data/` in this repo is a lossy mirror on its own per-family schedule (CLAUDE.md says so), so "the tree has data/" never implies "the tree has the data this test needs". When the input does not exist, MANUFACTURE the trigger instead: here, `rows` comes from `game_cards_<date>.csv`, so writing one row was the whole control — 0.01s against a 34,690-file checkout, and it answered the question exactly. And run the back-control: remove the fixture and confirm the old behaviour returns, or the fixture is not what changed.
 - **Cost:** none paid — caught one command before the checkout. Recorded because the reflex "get the real data" is usually right and was wrong here, and because the earlier 0-rows reading shows what it looks like when this is NOT caught: a confident finding about code, produced entirely by the measurement environment.
+
+
+## 2026-09-03 — `subprocess(text=True)` on Windows silently mojibakes the ledger's em-dashes, and it made `lane-guard` inert
+
+**HOW IT HAPPENED.** A parallel session landed `f57a02f2` (adding the `never`
+disclaimer marker) while this lane held uncommitted work on the same file, and
+a rebase in the shared primary tree reverted it. Re-applying meant rebuilding
+from the canonical commit rather than from the mixed on-disk state:
+
+    out = subprocess.run(["git", "show", BASE + ":" + path],
+                         capture_output=True, text=True)   # <-- the bug
+
+`text=True` decodes with `locale.getpreferredencoding()`. On this machine that
+is cp1252. `LANE_RE` is:
+
+    LANE_RE = re.compile(r"^###\s+(\S+)\s+—\s*([^—]*)")
+
+and its em-dash `e2 80 94` came back as `c3 a2 e2 82 ac e2 80 9d`. Written back
+out as UTF-8, the regex now looks for a character no lane header contains.
+
+**WHAT THAT DID.** `### slug — OPEN — ...` stopped matching. `_claims()`
+returned an empty generator. The live claim set went 50 → 0, so `lane-guard`
+allowed every edit to every claimed file in the repo, and `lane-postwrite-check`
+watched nothing.
+
+**WHY NOTHING CAUGHT IT, which is the part worth keeping.** Every downstream
+check passed, and passed CORRECTLY:
+
+  * `lane_identity_check.py` — grades headers, and its own guard is on the
+    parser's ATTRIBUTES, not its output. The attributes were all present.
+  * `check_lane_invariants.py` — "each claim has exactly one holder" is
+    vacuously true of zero claims.
+  * `check_lane_claims.py` — "every claim names a real file" is vacuously true
+    of zero claims. It printed `[ok  ] all 0 lane claim(s) name a real,
+    guardable file` and exited 0.
+
+Three checks, three green, total loss of enforcement. Each was answering a
+question about the claims it was GIVEN and none asked whether it had been given
+any. It was found only because a differential harness asserted `len(a) > 0`
+alongside `a == b`, and the equality half was ALSO green — both parsers agreed,
+because both were the same broken parser.
+
+**THE GLYPH IS THE TRAP.** The corrupted bytes render as `â€"` in a UTF-8
+terminal and as a plausible dash in others. Reading the regex on screen shows
+nothing wrong. Only `xxd` distinguishes them.
+
+**FIXED TWO WAYS.** The decode is explicit (`capture_output=True` with
+`.decode("utf-8")`), and `check_lane_claims.py` now fails FATAL when the parser
+yields zero claims while `lanes.md` holds headers reading OPEN — pointing
+directly at the em-dash and printing the byte comparison. A parser's output
+count is a health signal, and the check that could have caught this outage was
+the one reporting success.
+
+## 2026-09-03 — the Bash bypass in `lane-guard`: the census, and why the ledger never showed the damage
+
+**THE CENSUS.** All 292 session transcripts for this repo, every `tool_use`
+block. Write TARGETS were extracted from shell commands by seven pattern
+families (`>`/`>>` redirects, heredocs, `sed -i`, `open(..., "w")` inside
+`python -` scripts, `.write_text`, PowerShell `Set-Content`/`Out-File`, `tee`,
+`cp`/`mv`, `git apply`) and kept ONLY when the target resolved to a path
+`git ls-files` knows — which drops scratch paths and prose without a hand-tuned
+exclusion list. Tokens with no path separator were dropped, because a markdown
+blockquote inside a heredoc (`> the rule`) matches a redirect pattern and can
+resolve to a unique basename.
+
+| area | Edit-family (guard sees) | shell (guard blind) |
+|---|---:|---:|
+| source (`syndicate/`, `scripts/`, `tests/`, `pipeline/`) | 9,023 | **1,045** |
+| `docs/` | 1,401 | 43 |
+| `.syndicate/` | 1,069 | **2,618** |
+| `.claude/` | 185 | 24 |
+
+**WHY THE LEDGER NEVER SHOWED IT.** The `.syndicate/` row is the tell: the
+shell is the majority path there, which is exactly why that file family already
+had `ledger-postwrite-check.py` on `Bash|PowerShell` and
+`ledger-commit-guard.py` at the commit boundary. Lane OWNERSHIP had neither.
+`commit-guard.py` does no ownership work at all — it guards the shared index.
+So the one guard with a single layer was the one whose bypass produced no
+artifact anybody would later read.
+
+**A CLAIM AUDIT RAN AT THE SAME TIME**, per the standing rule from 2026-08-31
+that was never built into a tool: 9 of 50 live claims named a path
+`git ls-files` does not have — four brace-expansion fragments from one lane
+(`scripts/{build_wnba_recon`, written as shell syntax and read literally), a
+glob, and prose. Those claims guard nothing and their owning lanes cannot tell
+from reading the ledger. `scripts/check_lane_claims.py` reports them at session
+start; it deliberately does NOT fail on claims that name a real file under
+`.syndicate/`/`.claude/`, since those are exempt from lane-guarding by design
+and a permanently-red check gets scrolled past.
+
+**A LIVE DEFECT FELL OUT OF SHARING THE MARKER READ.** There were two copies of
+"which lane is this session holding". `deploy-guard.py` read `utf-8-sig`;
+`lane-guard.py` read plain `utf-8`. A marker written with a BOM therefore
+resolved to the lane slug for DEPLOYS and to the literal U+FEFF for EDITS — and
+U+FEFF matches no lane, so that session was locked out of editing its OWN
+claimed files by a guard whose remedy text told it to write the marker it had
+already written. One such marker was live in `.syndicate/`
+(`.current-lane.92987093...`, three bytes: `ef bb bf`). Red/green against
+`f57a02f2`: BEFORE `exit 2 BLOCKED: a/mine.py is claimed by OPEN lane 'mine'`
+while the session's lane WAS `mine`; AFTER `exit 0`.

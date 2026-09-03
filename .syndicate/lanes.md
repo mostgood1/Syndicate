@@ -1811,7 +1811,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: deploy is owned by lane `prop-join-yield`; this lane lands on
   `origin/main` and hands over the env keys.
 
-### lane-guard-bash-bypass — OPEN — opened 2026-09-03 — session f97ad5ab
+### lane-guard-bash-bypass — CLOSED 2026-09-03 — the Bash bypass is measured (10.4% of source writes) and backstopped; parser/tree/marker shared; two live defects fixed — session f97ad5ab
 - Goal: close the measured hole where a file edit made through Bash/PowerShell
   is invisible to `lane-guard.py`, WITHOUT weakening the Edit-path enforcement
   and WITHOUT adding a guard that can false-block a shell command.
@@ -1852,6 +1852,53 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   set, so the extraction provably changes no enforcement;
   (3) `.claude/hooks/test_lane_guard_hyphen.py` green after the refactor.
 - Blocked by: none.
+- **OUTCOME `[commits 1d6b2f13, 38b217b3 — NO DEPLOY, harness only]`.**
+  - `lane-postwrite-check.py`, pre+post on `Bash|PowerShell`. `--pre` snapshots
+    the (mtime,size) of paths claimed by OTHER open lanes; the post pass
+    compares. Window is ONE TOOL CALL, so another lane owner's legitimate work
+    is not reported to everyone else. Warns, never blocks; says a file CHANGED,
+    never who wrote it. Live now, watching 27 paths across 7 lanes for this
+    session, 0 of them mine and 0 exempt. 23 tests, throwaway repos only.
+  - `scripts/check_lane_claims.py`, wired into the session-start coherence loop.
+    **9 of 50 live claims name no file in the repo** — 4 brace-expansion
+    fragments (`wnba-accuracy-assessment`, whose whole Files block is therefore
+    inert), 1 more (`web-oom-profiler-steady`), a glob
+    (`wnba-live-props-data`), prose in two lanes, and
+    `tests/test_ncaaf_live_autorun.py` which does not exist yet
+    (`ncaaf-live-cadence`). **NOT fixed here — they belong to other lanes'
+    blocks.** Owners: run `python scripts/check_lane_claims.py`.
+  - Parser, tree-resolution and marker-read moved to `lane_claims.py`,
+    `hook_trees.py`, `lane_marker.py` and shared. `f57a02f2` had just had to
+    hand-sync the `never` marker across two copies; this change would have made
+    it four.
+- **VERIFICATION, all run:**
+  - Extraction changes no decision: 50 claims parsed from the live `lanes.md`
+    before and after are IDENTICAL, malformed-header set identical,
+    `matches()`/`is_exempt()` agree with the old inline expressions on 400
+    pairs. `test_lane_guard_hyphen.py` 10/10 either side.
+  - BOM marker, red/green vs `f57a02f2`: BEFORE `exit 2 BLOCKED: a/mine.py is
+    claimed by OPEN lane 'mine'` while the session's lane WAS `mine`; AFTER
+    `exit 0`.
+  - Zero-claim FATAL branch, red/green on a throwaway repo with a deliberately
+    mojibaked parser: healthy `exit 1` (real broken claims), mojibaked `exit 1`
+    with `[FATAL]` naming U+2014.
+  - Every hook suite green (6 files), every ledger checker green except
+    `check_lane_claims` at `exit 1`, which is the 9 claims above.
+- **TWO THINGS I GOT WRONG, both corrected in the ledger rather than quietly:**
+  - The cost argument for this design was **wrong**. `git status` at 200 ms vs
+    1.3 ms of stats weighed a subprocess against a warm-process loop. End to
+    end the pair is ~247 ms wall / +90 ms work against ~139-174 ms for one
+    `git status` process. It is a wash. The design stands on PRECISION, not
+    speed, and the docstring now says so. An (mtime,size) cache added to
+    recover the difference bought 0.4 ms and was reverted.
+  - Regenerating the parser through `subprocess(text=True)` mojibaked
+    `LANE_RE`'s em-dash via cp1252, took the live claim set **50 → 0**, and
+    left `lane-guard` INERT while all three ledger checkers reported green.
+    Both learnings entries are filed.
+- **KNOWN GAP, deliberate:** `scripts/check_lane_invariants.py` still holds its
+  own copy of the parser. It is claimed by OPEN lane `ncaaf-live-cadence`, so
+  migrating it would be the exact cross-lane write these guards prevent. Fold it
+  in when that lane closes.
 ### order-sim-view — **REOPENED 2026-09-03 for the READ side** — opened 2026-09-03 — session 37abeca0-5c86-4c57-b85a-62fb489e761a — **WRITE side SHIPPED (`cb223b62` + `733a28f0`), NOT DEPLOYED. Now adding the ROI-by-`sim_view` aggregate the write side left unserved `[user directive]`.**
 - Goal: an order records the SIM'S OWN VERDICT on the row it came from, so the
   settled book can be split by `sim_view`.
