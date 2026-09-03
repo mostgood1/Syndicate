@@ -1920,11 +1920,30 @@ path (a) is FALSIFIED, and two name joins were losing most of the mechanism.**
   do not reach the board. **Arming this changes almost nothing about what soccer
   stakes.** The lever that would is `soccer-board-coverage`'s: give soccer a
   model view worth ranking on.
-- **OWED, in order:** (1) publish the anchor audit into the recommendations
-  artifact — every `[soccer_anchor]` line currently goes to `/dev/null` because
-  `ops_refresh.py:1402` launches units with `stdout=DEVNULL`, so NO production
-  reading of this mechanism is possible today; (2) held-out surrogate validation;
-  (3) multi-week anchored-vs-base on PROPS against OUTCOMES, not h2h vs market.
+- **ARMING AT 0.4 WAS PROPOSED AND DECLINED, 2026-09-02 `[user decision, after
+  the evidence below was put to them]`.** Production stays at
+  `SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT` ABSENT = 0.0; nothing was changed. The
+  deciding facts, all from this session's measurements: the only validation this
+  mechanism has EVER had is **n=10, one slate, h2h only**, and its own author
+  called it *"a sensitivity check, not a tuned production default"*; anchoring
+  shrinks the sim TOWARD the market, so **on h2h it cannot create edge by
+  construction** — it converges to market-minus-vig; and the staked soccer
+  surface is **74% h2h / 0 props**, so the mechanism's largest effect (3.58 pp)
+  lands where staking is discouraged and its smallest (2.9-5.1% relative) lands
+  on markets that do not reach the board. Cost if armed: soccer's build goes
+  **98.2 -> 181.4 min per 4h window** and 5 of 42 units overrun their launch
+  slot. **Do not re-propose arming without a HELD-OUT result** — re-deciding this
+  from the same evidence is re-litigating a recorded decision.
+- **OWED, in order:** ~~(1) publish the anchor audit into the recommendations
+  artifact~~ **DONE + DEPLOYED + VERIFIED 2026-09-02** (refresh-worker
+  `99c3731f` live 22:54:26Z; three production artifacts carry `anchor`, 0
+  missing; `state=disabled`, `by_stage.fuzzy` 2/2/1 reproducing the pre-fix
+  prediction exactly). **(2) HELD-OUT surrogate validation — fit `b_pooled` on
+  one set of leagues, score on another; the in-sample 0.0221-vs-0.0497 is a
+  reason to run it, not a result. (3) Multi-week anchored-vs-base on PROPS
+  against OUTCOMES, not h2h vs market.** (2) and (3) are now the gate on any
+  future arming, and both are cheaper than they were because the anchor
+  publishes its own state.
 
 ---
 
