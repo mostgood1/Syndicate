@@ -1314,7 +1314,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### wnba-cards-fallback-recursion — OPEN, **PREMISE FALSIFIED: recursion is REAL (depth 234, 700 calls) but costs +5.7s, not minutes; the stall was KALSHI** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### wnba-cards-fallback-recursion — OPEN, **PREMISE FALSIFIED: recursion is REAL (depth 234, 700 calls) but costs +5.7s, not minutes; the stall was KALSHI. CONTROL DONE: the cycle fires ONLY on an empty artifact (one CSV row -> depth 1), so it is COLD/DEV-ONLY and LOW severity; the real defect is the SWALLOWED RecursionError** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `syndicate/features/wnba/cards.py` cannot re-enter itself. ONE testable
   outcome: with the recursion path ENABLED (no `SYNDICATE_WEB_DYNO`, date ==
   today), `tests/test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_query_api_resolves_preview_date_and_preserves_contract`
@@ -1410,6 +1410,54 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   reports nothing should at minimum be self-limiting and say so. The 700
   redundant loads are wasteful but cost 5.7s, so they do not justify a risky
   edit to a file three other lanes have historically touched.
+- **CONTROL RUN 2026-09-02. THE TRIGGER IS AN EMPTY ARTIFACT, and the severity
+  question is settled: this is a COLD/DEV path, not a production one.**
+
+  The control as originally planned — "re-run in a tree that HAS `data/`" —
+  **would have proved nothing, and was not run.** The git mirror's newest
+  WNBA `live_state_*.jsonl` is **2026-07-15**, and the recursion guard requires
+  `selected_date == central_today_iso()` (2026-09-02). Checking out 34,690 files
+  would have returned the same empty read for a reason having nothing to do with
+  the code. `CLAUDE.md`'s lossy-mirror rule, met head on.
+
+  Instead the trigger condition was MANIPULATED DIRECTLY — `rows` comes from
+  `game_cards_<date>.csv` (`_artifact_bundle:1639`), so writing one is the
+  control. Probe calls `_artifact_bundle(today)` with a depth spy; no pytest:
+
+      no cards CSV        bundle 247  depth 247  fallback 247  RecursionError 2  0.79s  games 0
+      WITH one CSV row    bundle   1  depth   1  fallback   0  RecursionError 0  0.00s  games 1
+      CSV removed again   bundle 247  depth 247  fallback 247  RecursionError 2  0.61s  games 0
+
+  The third row is a BACK-CONTROL: the behaviour returns when the fixture is
+  removed, so the fixture is what changed and not run-to-run variance.
+
+  **ANSWERS to the two questions this lane could not answer before:**
+  (a) *Does the cycle fire when the artifact has rows?* **NO.** One row is
+      enough — depth 1, fallback never called.
+  (b) *Does the fallback return rows when its inputs exist?* **STILL UNANSWERED,
+      and now uninteresting**: it is only ever reached when the artifact is
+      empty, and on Render the whole branch is disabled by `_render_web_dyno()`.
+
+  **SEVERITY, stated plainly: LOW.** Fires only on an empty/missing
+  `game_cards_<today>.csv`, only off-Render, costs 0.6-0.8s standalone. The
+  earlier "multi-minute hang" attribution was wrong and is retracted above.
+
+- **WHAT IS STILL A REAL DEFECT, and it is the one worth fixing: the SILENCE.**
+  `except Exception: rows = []` at `:1686` swallows the `RecursionError`, so
+  "WNBA has no cards today" and "the fallback blew the stack 247 frames deep"
+  are the SAME observable. Nothing is logged. That is how a 247-deep mutual
+  recursion lived in a request path unnoticed, and it is what made three
+  separate mis-attributions possible today.
+- **RECOMMENDED SCOPE, small and contained to this lane's two functions:** make
+  the re-entry impossible (a `_allow_fallback=False` argument or a thread-local
+  guard so `_games_from_live_state_fallback` cannot re-enter `_artifact_bundle`),
+  and LOG when the fallback bails. Not a performance fix — a
+  make-it-diagnosable fix. The 247 redundant loads then disappear as a
+  by-product.
+- **EXPLICITLY NOT RECOMMENDED:** widening the artifact search, "fixing" the
+  fallback to return rows, or touching `_render_web_dyno`. The fallback returning
+  nothing here is a data-absence fact, not a code fact, and this lane has no
+  evidence about its behaviour when its inputs exist.
 - Blocked by: none. No deploy: `cards.py` runs on web, and this path is disabled
   on Render by `_render_web_dyno()`, so the fix is not urgent in production.
 
