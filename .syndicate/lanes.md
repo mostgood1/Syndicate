@@ -1737,7 +1737,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
       so — that would mean the queue coalesces and the floor is the wrong lever.
 - Blocked by: none
 
-### intelligence-suite-runtime — OPEN, **NOT A STALL: 221 pass in 586s (9:46). Top 25 = 66%, all `test_intelligence_query*`. AND ISOLATING THEM MAKES THEM SLOWER — the durations do not decompose. WARM EFFECT QUANTIFIED (216.4s cold -> 131.4s after 20 tests costing 8s); MECHANISM NOT FOUND, four candidates ruled out** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### intelligence-suite-runtime — OPEN, **NOT A STALL: 221 pass in 586s (9:46). Top 25 = 66%, all `test_intelligence_query*`. AND ISOLATING THEM MAKES THEM SLOWER — the durations do not decompose. **THE WARM EFFECT IS RETRACTED — 3 paired replications show cold 31.32s vs warm 31.45s, and the founding 52.74s reading does not reproduce.** What stands: 221 pass in 586s, not a stall** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `tests/test_intelligence.py` (221 tests) completes in a STATED, bounded
   time. One testable outcome: a full run finishes and its total is recorded, and
   whatever dominates it is either fixed or documented as irreducible with the
@@ -1894,6 +1894,51 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   run it cold and warm, and diff cumulative time by function. That is the
   instrument that names the dependency; everything cheaper has now been tried
   and eliminated.
+- **RETRACTED 2026-09-03: THE "WARM STATE" EFFECT DOES NOT EXIST. It was built on
+  single unreplicated runs with an outlier, and paired replication killed it.**
+
+  The properly-isolated probe (a `pytest_runtest_call` hookwrapper profiling ONLY
+  the target test's call phase, so cold and warm cover identical work) showed
+  **cold 49.9s vs warm 49.1s** with identical call counts — no difference. That
+  contradicted the unprofiled durations, so the durations were replicated,
+  3 paired runs, no profiler:
+
+      rep1  cold=32.48s  warm=30.82s
+      rep2  cold=31.34s  warm=32.28s
+      rep3  cold=30.13s  warm=31.24s
+      ---------------------------------
+      cold mean 31.32s   warm mean 31.45s      -> warm is marginally SLOWER
+
+  **The founding number does not replicate.** This test measured **52.74s** in
+  the first isolated run; it measures **~31s** now, cold, three times. The whole
+  216.4s-vs-131.4s story rested on that run.
+
+- **WHAT IS WITHDRAWN, explicitly:**
+  - "isolating the cluster makes it ~1.7x slower" — NOT ESTABLISHED. The one
+    test that could be replicated properly shows no penalty at all.
+  - "~8s of earlier tests buys ~85s" — WITHDRAWN, same cause.
+  - "the durations do not decompose" — UNPROVEN. It may still be true; nothing
+    here shows it.
+  - The four "ruled out" mechanisms (lru_cache, module containers, OS page
+    cache, the service singleton) were ruled out against an effect that is not
+    real. Those readings stand as facts about the caches; they explain nothing,
+    because there was nothing to explain.
+  - **The "DO NOT split the slow tests into their own job" guidance rests on
+    nothing measured and must not be cited.** It may still be wise; it is not
+    evidenced.
+
+- **WHAT SURVIVES, and it is the part that was measured once and cleanly:**
+  `tests/test_intelligence.py` is **NOT stalled — 221 pass in 586.00s (9:46)**,
+  the armed faulthandler never fired, no single test exceeds 4.9% of the run,
+  and the 25 slowest are all `test_intelligence_query*` at 12.5-28.9s each.
+  Collection alone is 43-75s. The suite is simply a large integration suite
+  where ~50 tests each drive a real candidate-pool build at ~20-30s. That is the
+  finding.
+- **NEXT, if anyone continues:** the only question left is whether ~50 tests
+  each paying a full candidate-pool build is reducible at all. Answering it
+  needs a paired, replicated design from the start — n>=3 per condition, and no
+  comparative claim from single runs. This lane spent most of its effort
+  chasing an effect that three replications erased.
 - Blocked by: none. No deploy — this is test-suite runtime, not production
   behaviour.
 
