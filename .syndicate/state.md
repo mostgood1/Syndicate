@@ -11325,3 +11325,46 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 (`LIVE_STATE_FALLBACK_FAILED`) instead of swallowed by `except Exception`.
 **The cost was never the point (~5.7s); the SILENCE was** — "no cards today" and
 "the stack blew" were the same observable, which is how it survived unnoticed.
+
+## [accuracy-autorun-rearm-state] `#626`(h) IS ONE ENV KEY AWAY — THE CODE IS ALREADY LIVE `[2026-09-03, lane accuracy-autorun-rearm, no deploy taken]`
+
+**Do not re-derive this: refresh-worker ALREADY RUNS the bounded code.** Verified
+by CONTENT on the deployed tree (`c4ce0502`), not by ancestry:
+`_project_evaluation_record` x4, `_accuracy_summary_ledger_budget_bytes` x6,
+`ledger_coverage` x2. Arming `#626`(h) needs **no code deploy** — only
+`ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN=true` plus a deploy to inject it.
+
+    key           false          (read from the Render env-vars API after stand-down)
+    claim         free
+    autorun       has never run in production
+
+**THREE OPERATIONAL FACTS, each measured 2026-09-03:**
+
+- **A same-SHA redeploy is REFUSED** — `HOLD: <sha> is already contained in live
+  <sha> -- the deploy is redundant`. So an "env-only" change must target a NEWER
+  commit and therefore ships whatever else has landed. It is never a no-op.
+- **`check_deploy_safety` is COARSER than `deploy_preflight` and they disagree.**
+  What the safety check called "board build only", preflight enumerated as THREE
+  killable jobs. **Poll preflight — it is what the deploy guard reads.** Its exit
+  codes are the reliable predicate: 0 clear / 1 busy / **2 = could not determine,
+  which is NOT clear**.
+- **Windows are scarce during a live slate:** preflight polled continuously
+  ~11:24-12:05 CT was CLEAR **once, for under 25 seconds**.
+
+**`--drain` CANNOT BE RUN FROM A DEV MACHINE.** It refuses without the keyvalue
+backend (correctly — otherwise the flag goes to a local file the worker never
+sees), and `SYNDICATE_REFRESH_STATE_URL` is an internal Render hostname that only
+resolves inside their network.
+
+**THE FIRING GATE, read not assumed:** `hour >= 7 Central` AND
+`last_run_date < today`. The last claim was 2026-09-02, so arming at any time
+after 07:00 CT fires on the NEXT TICK. **Arm before 07:00 CT** and it waits for
+the hour on a quiet worker instead.
+
+**NEVER LEAVE THE KEY `true` WITHOUT A COMPLETED DEPLOY.** It is inert to the
+running process but any other session's unrelated refresh-worker deploy will
+inject it and arm the autorun unobserved.
+
+**ARMED AS SCHEDULED TASKS:** `arm-accuracy-autorun-626h` (2026-09-04 03:00 CT)
+and `verify-accuracy-autorun-626h` (07:45 CT, disarms on OOM). Full runbook and
+the four traps: `deploys.md` 2026-09-03.

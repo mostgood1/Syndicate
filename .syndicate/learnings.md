@@ -5597,3 +5597,18 @@ inflated counter), so the cost was entirely session time, not board harm.
   test's fixture is inconclusive, not contradictory**; run the mutation INSIDE
   the fixture or it is measuring a different function.
 - *(full account: `log/2026-09-03.md`, session 92987093)*
+## 2026-09-03 — FORBIDDEN: assuming a stopped background task is stopped. Its CHILDREN keep running, and if they write shared state that gates something, they will gate it against you. `[lane accuracy-autorun-rearm]`
+
+- **What we believed:** that `TaskStop` on a polling loop ended it. A poller had been left running against the wrong target commit; I stopped its task and moved on.
+- **What was actually true:** `TaskStop` ended the task WRAPPER. The child `bash` loop and its `python` children kept going, kept calling `deploy_preflight.py`, and kept overwriting `.syndicate/deploy/preflight/refresh-worker.json` — the file the deploy guard reads. It clobbered a CLEAR verdict **24 seconds after** it was written, with a stale HOLD for a different target. That is precisely what blocked the deploy at the one moment in ~40 minutes when preflight was actually clear, and it left an env key armed with no deploy behind it.
+- **How we found out:** the guard refused a deploy quoting a reason (`already contained in live`) that belonged to a probe I had run minutes earlier against a different SHA. Reading the persisted record's mtime showed it was written AFTER the CLEAR.
+- **The rule going forward:** after stopping a background task, VERIFY the processes are gone (`Get-CimInstance Win32_Process` filtered on the command line, then `Stop-Process`), not just that the task reports stopped. And treat any background loop that writes a file OTHER TOOLS READ as a shared mutation, not private scratch — in this repo that includes the preflight record, the refresh state store and every `.syndicate/**` file. A poller is not read-only just because its purpose is to look.
+- **Cost:** the only clear deploy window in ~40 minutes of polling, and ~2 minutes with a production env key armed and no deploy to inject it — a landmine for any other session, closed only because the deploy claim was held throughout.
+
+## 2026-09-03 — FORBIDDEN: polling a friendlier proxy instead of the instrument that GATES the action. `[lane accuracy-autorun-rearm]`
+
+- **What we believed:** that `check_deploy_safety.py` reporting a cheap-looking window ("board build only") meant a deploy would be permitted and cheap.
+- **What was actually true:** `deploy_preflight.py` is what the deploy guard reads, and it is STRICTER — it enumerates actual worker processes rather than categories. The same window it called "board build only" contained THREE killable jobs including a soccer artifact build. I proposed a compromise to the user on the strength of the coarser reading and had to correct it.
+- **How we found out:** running preflight in the window and reading its process list.
+- **The rule going forward:** identify which instrument ENFORCES the thing you want, and poll that one. A friendlier tool that answers a similar question is a proxy, and proxies disagree exactly when it matters. Related and separately paid for the same day: poll on a documented EXIT CODE, not on substring-matching output — `"CLEAR"` matches inside `"NOT CLEAR"`, and an `[UNKNOWN]` read-failure is not a pass (`check_deploy_safety`'s own help says exit 2 "is NOT the same as clear, and is deliberately not exit 0").
+- **Cost:** two wrong go-signals — one that exited the wait immediately, one that would have deployed on a 502.
