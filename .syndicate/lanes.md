@@ -1413,7 +1413,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none. No deploy: `cards.py` runs on web, and this path is disabled
   on Render by `_render_web_dyno()`, so the fix is not urgent in production.
 
-### soccer-date-index-staleness — OPEN — opened 2026-09-02 — session 3492626c
+### soccer-date-index-staleness — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **`#631` RISK 2 DISCHARGED: THE INDEX IS NOT STALE, IT LEADS BY UP TO 7 DAYS. My hypothesis was REFUTED — I predicted it could only ever hold dates already BUILT, making the widening inert; in fact the soccer autorun runs a 7-DAY HORIZON every 4h (`SYNDICATE_SOCCER_SIM_HORIZON_DAYS=7`, `..._INTERVAL_SECONDS=14400`, autorun `true`), so 9 of 10 leagues carry a future date and none is behind today. The widening has real input. SEPARATELY: the live board-window floor is `600`, not the `1800` the risk-1 throttle analysis assumed — that conclusion's MECHANISM needs re-measuring.**
 - Goal: discharge `#631` risk 2 — *"`display_prediction_dates.json` staleness;
   WHO WRITES IT AND HOW OFTEN IS UNVERIFIED"* (`state.md [week-scoped-board-window]`).
   Answer both halves with a production measurement, and say whether the proposed
@@ -1440,6 +1440,14 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Verification: a per-league table of `max(dates)` vs today, read from production
   (not the local mirror — `data/` in git is a lossy mirror), plus a statement of
   which of {works, inert, regresses} the widening falls into.
+- Falsification test RAN and REFUTED the hypothesis: `max(dates) > today` for 9 of
+  10 leagues (out to +7 days), 0 leagues behind today. Read from production disk,
+  `count=10 truncated=False` — all ten leagues, nothing elided.
+- Per-day membership (not just max, because these are MATCH dates and not a
+  contiguous range): today 2 leagues, +1 3, +2/+3/+4 7 each, +5 3, +6 1, +7 3.
+  A 2-day window yields both today and tomorrow. TODAY IS THE THIN DAY.
+- Verification MET: per-league table vs today, from production, plus the verdict —
+  the widening WORKS (real input), it is neither inert nor a regression on this axis.
 - Blocked by: none
 
 ### m638-roster-objs-comment — CLOSED 2026-09-03 — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **GOAL MET. NO DEPLOY (comment + tests; the predicate is deliberately unchanged).** The `roster_objs` note was wrong on THREE counts, each now measured in place: (1) they ARE allowlisted, because fnmatch `*` crosses `/`; (2) production writes rosters FLAT as `snapshots/<date>/roster_*.json`, never into `roster_objs/` — **0 of 2,552 snapshot files on web are deeper than one level**; (3) the feared cost is **1,348 files / 99.4 MB over 89 dates = 15 files and 1.12 MB per date, mean 72 KB**, not "hundreds of large files per date". **THE GLOB IS LEFT BROAD, and that is a CONSTRAINT not a preference: fnmatch cannot express "one level"** — the obvious `snapshots/*/[!/]*.json` still matches the deep path, verified, because the trailing `*` crosses `/` regardless. Narrowing means abandoning fnmatch for a load-bearing predicate to remove a risk that has never materialised.

@@ -9291,6 +9291,58 @@ to that knob that did nothing (see `[board-window-staleness]`).
    eligible dates: per-date period 30-66 min.
 2. **`display_prediction_dates.json` staleness** -- if that artifact lags, the same
    class of bug recurs one level down. WHO WRITES IT AND HOW OFTEN IS UNVERIFIED.
+
+   > **DISCHARGED 2026-09-02 — THE INDEX IS NOT STALE. IT LEADS.**
+   > `[lane soccer-date-index-staleness]` Read live off production disk,
+   > `/api/ops/artifacts/export?pattern=soccer_source/*/api/display_prediction_dates.json`,
+   > `count=10 truncated=False` — all ten leagues, nothing elided.
+   >
+   > **WHO WRITES IT:** `build_soccer_artifacts.py:696` calls `_update_date_index`
+   > at the END of a league+date build, right after the recommendations file.
+   > ACCUMULATE-ONLY — read `dates`, add `iso_date`, write sorted + `latest`.
+   > Nothing ever removes a date.
+   >
+   > **HOW OFTEN:** the soccer weekly autorun, live on refresh-worker —
+   > `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN=true`,
+   > `SYNDICATE_SOCCER_WEEKLY_REFRESH_INTERVAL_SECONDS=14400` (4 h),
+   > `SYNDICATE_SOCCER_SIM_HORIZON_DAYS=7`. So every 4 hours across a SEVEN-DAY
+   > forward horizon, which is exactly why the index leads rather than lags.
+   >
+   > **MY HYPOTHESIS WAS REFUTED.** I predicted the index records dates that were
+   > BUILT and so could never hold tomorrow, making the widening INERT. Wrong:
+   > 9 of 10 leagues carry a future date, out to **+7 days**, and NO league's max
+   > is before today. The builder runs a horizon, not just today.
+   >
+   > Per-day league counts, measured (central dates):
+   >
+   >     today +0  2026-09-02   2 leagues    +3  2026-09-05   7 leagues
+   >           +1  2026-09-03   3 leagues    +4  2026-09-06   7 leagues
+   >           +2  2026-09-04   7 leagues    +5..+7           3,1,3 leagues
+   >
+   > **The widening has real input:** a 2-day window yields both `2026-09-02` and
+   > `2026-09-03`; 8 forward days carry at least one league. Note TODAY IS THE
+   > THIN DAY (2 leagues) while +2..+4 carry 7 each — an argument FOR widening,
+   > since most soccer activity sits two to four days out.
+   >
+   > Residual, NOT a blocker: the index is accumulate-only and never pruned
+   > (MLS reaches back to 2026-07-22), so anything intersecting it must be
+   > window-bounded. `#631`'s formula already intersects the board window.
+
+   > **CAUTION RAISED ON RISK 1 BY THE SAME READ.** The live
+   > `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` on refresh-worker
+   > is **`600`**, not the code default `1800` the throttle analysis above reasons
+   > against (`max(30, _env_int(KEY, 1800))`). Read from the Render API
+   > 2026-09-03T02:2xZ; the running process booted 01:10:00Z (`f84eb21b`), so
+   > `600` is what it holds. **"Tomorrow's 38.8-min median sits above the 30-min
+   > floor" is therefore not evidence the throttle binds** — against a 10-minute
+   > floor a 38.8-minute gap means the floor is NOT the constraint, and something
+   > else is spacing those builds.
+   >
+   > What SURVIVES that correction, because it was measured directly rather than
+   > inferred from the floor: **with two eligible dates, today still built at a
+   > 15.8-minute median** — so widening did not halve today's refresh rate. The
+   > practical conclusion stands; the MECHANISM story ("the throttle binds") does
+   > not, and re-measuring it needs its own pass.
 3. Memory: builds are serial, and the OOM history is on `build_intelligence_overview`
    per build, not across concurrent dates -- likely fine, not verified.
 
