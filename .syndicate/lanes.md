@@ -1314,7 +1314,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### wnba-cards-fallback-recursion — OPEN — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### wnba-cards-fallback-recursion — OPEN, **PREMISE FALSIFIED: recursion is REAL (depth 234, 700 calls) but costs +5.7s, not minutes; the stall was KALSHI** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `syndicate/features/wnba/cards.py` cannot re-enter itself. ONE testable
   outcome: with the recursion path ENABLED (no `SYNDICATE_WEB_DYNO`, date ==
   today), `tests/test_intelligence.py::IntelligenceBlueprintTests::test_intelligence_query_api_resolves_preview_date_and_preserves_contract`
@@ -1358,6 +1358,58 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   "nothing held". The parser also MANGLES that brace form
   (`syndicate/features/wnba/{cards`), so it enforces nothing there -- worth
   knowing before anyone relies on it.
+- **TIMED 2026-09-02. THE RECURSION IS REAL AND IT IS CHEAP — my premise is
+  FALSIFIED by my own falsification test, which said so in advance.**
+
+      CONTROL  (SYNDICATE_WEB_DYNO=1, path off)  wall 27.9s
+               _artifact_bundle calls 2, max depth 1, fallback calls 0
+      ENABLED  (unset, path live)                wall 33.6s
+               _artifact_bundle calls 701, MAX DEPTH 234, fallback calls 700,
+               RecursionError raised 3x, test PASSED
+
+  **+5.7s, +20%.** The lane's stated goal — "completes in the same order of time
+  as with it disabled" — is ALREADY MET with no change made. The recursion costs
+  seconds, not minutes.
+
+  **CONFIRMED, and worth keeping:**
+  - the cycle fires for real: **234 frames deep, 700 redundant
+    `_artifact_bundle` entries for ONE request**, each re-doing artifact path
+    checks and JSON loads;
+  - `RecursionError` IS raised and IS swallowed by
+    `except Exception: rows = []` at `:1686` — the "bounded and silent" half of
+    the hypothesis holds. Nothing is logged. An expensive pathological path that
+    reports nothing is how this survived unnoticed.
+
+  **RETRACTED: the multi-minute stall was never this.** I attributed it to this
+  recursion when opening the lane. It was KALSHI — the same test ran 103-152s
+  before `kalshi-discovery-deadline` added the suite transport guard, and 27.9s
+  after. With the guard in place the recursion adds 5.7s to a 28s test. Third
+  time today I have mis-attributed a cost on this one test; the rule already
+  recorded (`learnings.md` 2026-09-02) is the one I should have applied sooner.
+
+- **A SECOND READING WAS TAKEN AND IS CONFOUNDED — do not cite it.** Instrumenting
+  the fallback's return showed **933 calls, 0 returning rows**. That looks like
+  "the fallback never delivers", and it is NOT evidence: `processed_root()`
+  resolves to `data/wnba_source/source_artifacts/data/processed`, and
+  `session_worktree.py open` EXCLUDES `data/` by design (34,690 files). The path
+  does not exist in this tree, so an empty read is the expected result of the
+  measurement environment, not a property of the code.
+  **It also raises the more interesting possibility:** the guard is
+  `if not rows and ...`, so the recursion may only fire BECAUSE the artifact is
+  empty here. With data present, `rows` may be non-empty and the cycle may never
+  start — which would make this a cold/dev-only path, not a production one.
+
+- **NEXT STEP, and it is a control rather than a fix:** re-run both harnesses in
+  a tree that HAS `data/` (`session_worktree.py open --with-data`, or widen this
+  worktree's sparse-checkout). Two questions, both currently unanswered:
+  (a) does the cycle fire at all when the artifact has rows? (b) does the
+  fallback return rows when its inputs exist? Building a fix before that would
+  be fixing a path whose trigger condition is not established.
+- **REVISED SCOPE, pending that control.** The defensible defect today is the
+  SILENT `RecursionError`, not the runtime: a fallback that blows the stack and
+  reports nothing should at minimum be self-limiting and say so. The 700
+  redundant loads are wasteful but cost 5.7s, so they do not justify a risky
+  edit to a file three other lanes have historically touched.
 - Blocked by: none. No deploy: `cards.py` runs on web, and this path is disabled
   on Render by `_render_web_dyno()`, so the fix is not urgent in production.
 
