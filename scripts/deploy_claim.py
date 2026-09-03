@@ -60,7 +60,59 @@ import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CLAIM_DIR = REPO_ROOT / ".syndicate" / "deploy_claims"
+
+
+def _main_worktree_root() -> Path:
+    """The tree the DEPLOY GUARD reads -- not necessarily the one this file is in.
+
+    THE FAILURE THIS REMOVES, measured 2026-09-03. Sessions each work in their
+    own git worktree (`session_worktree.py`), so a copy of this script inside a
+    worktree resolved `REPO_ROOT` to that worktree and wrote the claim there.
+    `deploy-guard.py` reads `CLAUDE_PROJECT_DIR or cwd`, which is the PRIMARY
+    tree, so it never saw those claims: it reported `claim NOT HELD by anyone`
+    seconds after a successful `acquire`, three times in one session.
+
+    A guard that cannot see a claim is the smaller half. The larger half is that
+    two sessions in two worktrees could each `acquire` the same service and both
+    succeed, because they were writing to different files -- the lock would be
+    silently non-mutual at exactly the moment it is load-bearing. That is
+    `#635`'s bug along a new axis: there it was two NAMES for one box, here it is
+    two TREES for one repo, and in both cases every claim involved was "valid".
+
+    `--git-common-dir` is the same for every worktree of a repo and points at the
+    primary tree's `.git`, so its parent is the tree the guard reads. Falls back
+    to `REPO_ROOT` when git cannot answer -- a claim in the wrong place still
+    beats a crash in the tool that serialises deploys.
+    """
+    import subprocess
+
+    for args in (
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],  # git >= 2.31
+        ["git", "rev-parse", "--git-common-dir"],
+    ):
+        try:
+            done = subprocess.run(
+                args, cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=15
+            )
+        except Exception:
+            continue
+        if done.returncode != 0:
+            continue
+        raw = (done.stdout or "").strip()
+        if not raw:
+            continue
+        common = Path(raw)
+        if not common.is_absolute():
+            common = (REPO_ROOT / common).resolve()
+        # `.git` -> its parent is the main worktree. A bare repo or anything
+        # unexpected falls through to REPO_ROOT rather than guessing.
+        if common.name == ".git" and common.parent.is_dir():
+            return common.parent
+    return REPO_ROOT
+
+
+#: Tests monkeypatch this attribute, so it stays a module-level constant.
+CLAIM_DIR = _main_worktree_root() / ".syndicate" / "deploy_claims"
 SERVICES = ("web", "syndicate", "refresh-worker", "live-odds-worker")
 DEFAULT_TTL_SECONDS = 45 * 60
 
@@ -308,6 +360,20 @@ def main(argv: list[str] | None = None) -> int:
     s.set_defaults(func=cmd_status)
 
     args = ap.parse_args(argv)
+
+    # Say it out loud when the claim is not where this script lives. Silent
+    # redirection would fix the lock and leave the next reader hunting for a
+    # file that is not in the tree they are standing in.
+    try:
+        CLAIM_DIR.relative_to(REPO_ROOT)
+    except ValueError:
+        print(
+            f"[deploy_claim] worktree detected -- claims live in the MAIN tree, "
+            f"which is what deploy-guard.py reads: {CLAIM_DIR}",
+            file=sys.stderr,
+            flush=True,
+        )
+
     return args.func(args)
 
 

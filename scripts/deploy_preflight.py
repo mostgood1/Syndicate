@@ -554,7 +554,40 @@ def is_ancestor(candidate: str, descendant: str) -> bool | None:
         return None
 
 
-RECEIPT_DIR = REPO_ROOT / ".syndicate" / "deploy" / "preflight"
+def _main_worktree_root() -> Path:
+    """The tree `deploy-guard.py` reads -- see `deploy_claim._main_worktree_root`.
+
+    Same fix, same measurement, 2026-09-03: run from a session worktree this
+    wrote its CLEAR receipt into that worktree, while the guard read the primary
+    tree and answered `the CLEAR preflight is for <other sha>`. Both locks have
+    to land in the tree the guard reads, or fixing only one still blocks.
+    """
+    import subprocess
+
+    for args in (
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        ["git", "rev-parse", "--git-common-dir"],
+    ):
+        try:
+            done = subprocess.run(
+                args, cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=15
+            )
+        except Exception:
+            continue
+        if done.returncode != 0:
+            continue
+        raw = (done.stdout or "").strip()
+        if not raw:
+            continue
+        common = Path(raw)
+        if not common.is_absolute():
+            common = (REPO_ROOT / common).resolve()
+        if common.name == ".git" and common.parent.is_dir():
+            return common.parent
+    return REPO_ROOT
+
+
+RECEIPT_DIR = _main_worktree_root() / ".syndicate" / "deploy" / "preflight"
 
 
 def _write_receipt(args, report, verdict, reason, live_commit) -> None:

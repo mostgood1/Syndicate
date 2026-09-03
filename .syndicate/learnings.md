@@ -26,6 +26,7 @@
 
 ## Index — 749 rules `[generated]`
 ## Index — 748 rules `[generated]`
+## Index — 751 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4384,3 +4385,34 @@ the tool asks for that and it is not decoration.**
 **The tell, and it is cheap.** Count what is marked superseded, then read a sample of it. A correction written as *"the entry that stood here said X"* is past tense: the corpse is already gone and only the headstone remains. That phrasing distinguishes the two cases in one read, with no tooling.
 
 **How to apply:** state the reclaimable percentage before proposing compaction, and treat anything under a few percent as evidence the file is big rather than bloated. `scripts/compact_state.py` (audit mode) does this counting; its docstring carries the worked result so nobody re-runs the audit expecting a different answer.
+
+## 2026-09-03 — FIXED: a file lock is only a lock if every holder computes the SAME path
+
+Companion to the claim-force entry above, and the deeper of the two.
+
+`deploy_claim.py` and `deploy_preflight.py` both derived their storage from
+`Path(__file__).parents[1]`. Under the one-worktree-per-session protocol that is
+the SESSION'S tree, while `deploy-guard.py` reads `CLAUDE_PROJECT_DIR or cwd` —
+the primary tree. Measured symptom, three times in one session: `claim NOT HELD
+by anyone` seconds after a successful `acquire`, and `the CLEAR preflight is for
+<a different sha>`.
+
+**The blocked deploy was the harmless half.** Two sessions in two worktrees
+could each `acquire` the same service and both succeed, writing to different
+files — the lock silently non-mutual at exactly the moment it is load-bearing.
+Nothing would have reported it; both claims would have been "valid". That is
+`#635` on a new axis (two NAMES for one box → two TREES for one repo), and the
+shared shape is worth stating: **a lock is only a lock if every participant
+computes the same path. Derive that path from something GLOBAL to the repo, never
+from where the running copy of the code happens to live.**
+
+Fix: `git rev-parse --path-format=absolute --git-common-dir` is identical from
+every worktree and points at the primary tree's `.git`, so its parent is the tree
+the guard reads. Falls back to the local root when git cannot answer — a lock in
+the wrong place beats a crash in the tool that serialises deploys — and refuses
+to guess when the common dir is not a `.git` directory. The redirect prints a
+line rather than happening silently.
+
+Proven end-to-end, not just unit-tested: `acquire` run from the worktree wrote
+the claim into the PRIMARY tree and left `.syndicate/deploy_claims/` in the
+worktree empty.

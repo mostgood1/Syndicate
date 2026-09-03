@@ -1579,6 +1579,21 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
+### deploy-lock-worktree-split — CLOSED 2026-09-03 — **FIXED AND PROVEN END-TO-END.** Both deploy locks now resolve to the tree `deploy-guard.py` reads, via `--git-common-dir`. Acquired from a worktree, the claim file landed in the PRIMARY tree and nothing was written locally. 8 new tests + 54 in the existing deploy suites. — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: a claim taken from a session worktree must be the same lock every other
+  session sees. Opened retroactively — the edit was made before the lane, which
+  is a protocol miss; recorded rather than tidied away. No collision: no OPEN
+  lane claimed `deploy_claim.py` or `deploy_preflight.py`.
+- Files: `scripts/deploy_claim.py`, `scripts/deploy_preflight.py`,
+  `tests/test_deploy_lock_worktree.py` (NEW).
+- Verification (done): `deploy_claim.py acquire` run from the worktree
+  `C:/tmp/m642-wt` wrote the claim into the PRIMARY tree's
+  `.syndicate/deploy_claims/live-odds-worker.json` with
+  `holder=worktree-lock-proof`, while `.syndicate/deploy_claims/` in the
+  worktree stayed empty. Released immediately.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
