@@ -2010,6 +2010,39 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   before landing. A copy-paste would be unrunnable for anyone else.
 - Blocked by: none. No OPEN lane claims these paths.
 
+### m639-residual-was-anything-destroyed — CLOSED 2026-09-03 — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a — **ANSWER: UNKNOWABLE FROM OUTSIDE, and the falsification test named this outcome in advance. Two BETTER findings came out of it, one of which corrects a number I published yesterday.**
+- **The residual is not answerable.** Three witnesses, all closed: (1) the files
+  themselves — HOT-allowlisted since `#641` but the sweep is watermark-driven
+  and those dates REFUSE to write, so they never become "changed" and never
+  cross; (2) git — 0 reconciliation files tracked, ever; (3) the consumer — see
+  below, its signal is self-contradictory. **Recorded as unknowable rather than
+  softened into "probably nothing was lost".**
+- MEASURED, and it bounds the window only: **327 parseable `MLB_ACTUALS_TICK`
+  payloads over 13 days back to 2026-08-20 — ZERO June dates with
+  `top_props_rows > 0`.** So nothing was destroyed in those 13 days; the
+  truncation was writing a header over a header. **13 days is not "ever"** and
+  the June dates are ~80 days old.
+- INFERENCE, labelled as such and NOT a measurement: replaying production's own
+  June bytes produced **1,123 resolved rows for 2026-06-15**, so when the input
+  was fresh the writer almost certainly did produce ~1,100 rows/date. On that
+  reasoning the pre-fix truncation likely destroyed **~7,800 graded rows across
+  the seven dates**. Mechanism, not evidence.
+- **FINDING 1, and it corrects `#640`: `/api/ops/keyvalue/usage` reports
+  ALLOCATOR-ROUNDED memory, not payload bytes.** Both single-key buckets sit
+  exactly **+96 bytes above a power of two** (`prediction_ledger.json`
+  2,097,248 = 2 MiB+96; `live/mlb_live_lens.json` 4,194,400 = 4 MiB+96) while
+  multi-key buckets have arbitrary gaps — jemalloc rounds large values to
+  powers of two. So the live-lens snapshot OCCUPIES ~4 MiB; its payload is
+  somewhere in (2 MiB, 4 MiB]. **`#640`'s decision is unchanged** — even at the
+  2 MiB lower bound, 1,440 ticks/day is ~2.9 GB/day against a 256 MB store,
+  ~11x capacity — but the figure I published was overstated by up to 2x and is
+  now labelled.
+- **FINDING 2, filed as `#642`, not mine to fix:** `/api/portfolio/summary`
+  reads `total_tracked: 0, settled_count: 0, positions: []` while the
+  `prediction_ledger.json` keyvalue key occupies ~2 MiB with 1 key. A 2 MiB
+  ledger and a reader that sees nothing in it is the same class as the
+  documented cross-disk defect in `prediction_ledger.py:80-95`.
+- Claims: NONE held. NO DEPLOY — read-only throughout.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -84,6 +84,32 @@ production copy. See the transport note in `#625`(2).
 
 ---
 
+### `#642` — **A ~2 MiB PREDICTION LEDGER AND A READER THAT SEES NOTHING IN IT** — surfaced by lane `m639-residual-was-anything-destroyed`, 2026-09-03 — **OPEN, not investigated, not mine**
+
+`/api/portfolio/summary` on web reads `total_tracked: 0, settled_count: 0,
+pending_count: 0, positions: []` — while `/api/ops/keyvalue/usage` shows
+`prediction_ledger.json` occupying **~2 MiB across 1 key**. Both read at one
+instant, 2026-09-03 ~13:5xZ.
+
+Either the ledger holds ~2 MiB of predictions that the portfolio reader cannot
+see, or the key holds something other than predictions. **This is the same
+class as the defect `prediction_ledger.py:80-95` already documents** —
+reconciliation running daily and correctly against a ledger with no bets in it,
+while `/api/portfolio/summary` read `settled_count: 0` for weeks and three fixes
+landed on the wrong side of the boundary. That note says the cure was to route
+IO through the keyvalue store; the numbers above suggest the two sides still
+disagree.
+
+**Do NOT read the ~2 MiB as a payload size** — the usage endpoint reports
+allocator-rounded memory (see `state.md [live-lens-snapshot]`). The
+contradiction is between "non-trivially occupied" and "zero rows", which holds
+regardless of the exact payload.
+
+Found while trying to answer `#639`'s residual from the consumer side; the
+contradiction is precisely why that route could not be used.
+
+---
+
 ### `#641` — **FIXED, DEPLOYED AND VERIFIED 2026-09-03 06:03:12Z — a family unreachable for this system's whole life is now readable** — was: the reconciliation "transport gap" was a misfiled pattern — lane `worker-artifact-transport` — **CLOSED, with one residual named**
 
 `#625`(2) and `#639` both recorded that `mlb_source/reconciliation/*` could not
@@ -115,13 +141,24 @@ publishes. Affordable even with both services at 91-97%.
 (42 B) appeared, and the first pulled back as **133 lines = header + 132 graded
 rows**. Read on BYTES, not a status code.
 
-**RESIDUAL, predicted in advance and confirmed:** only dates that WRITE ever
-cross. The seven June dates refuse (`input_absent`, `#639`), never become
-"changed", and the watermark sweep never sends them. **So `#639`'s question —
-did those files ever hold rows, was anything destroyed — remains unanswerable.**
-The only mechanism that would answer it is a one-off republish of the whole hot
-set, which costs a full sweep against services at 91-97%. Not justified for a
-retrospective question; recorded rather than pursued.
+**RESIDUAL CLOSED AS UNKNOWABLE 2026-09-03** (lane
+`m639-residual-was-anything-destroyed`). Three witnesses, all closed: the files
+never become "changed" so the watermark sweep never sends them; git has tracked
+0 reconciliation files ever; and the consumer's signal is self-contradictory
+(`#642`). **Recorded as unknowable rather than softened into "probably nothing
+was lost".**
+
+Measured, and it bounds only the window: **327 parseable `MLB_ACTUALS_TICK`
+payloads over 13 days back to 2026-08-20, ZERO June dates with
+`top_props_rows > 0`** — so nothing was destroyed in those 13 days, the
+truncation was writing a header over a header. **13 days is not "ever"**; the
+June dates are ~80 days old.
+
+INFERENCE, labelled and NOT a measurement: replaying production's own June bytes
+gave **1,123 resolved rows for 2026-06-15**, so when the input was fresh the
+writer almost certainly produced ~1,100 rows/date, and the pre-fix truncation
+likely destroyed **~7,800 graded rows across the seven dates**. Mechanism, not
+evidence.
 
 ---
 

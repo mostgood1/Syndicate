@@ -236,7 +236,16 @@ the obvious fix — date it — **must not be built.** Measured at one instant:
   `migration_runs/`, so `live/` routes to the KEYVALUE store. That is also why
   `/api/ops/artifacts/export` reports **0 files under `live/*`** while the
   pattern IS allowlisted — the inventory globs a disk the object never touches.
-- **SIZE: `live/mlb_live_lens.json` = 4,194,400 bytes (4.0 MB), ONE key.**
+- **SIZE: `live/mlb_live_lens.json` OCCUPIES ~4 MiB, ONE key — and that is an
+  ALLOCATED size, not a payload size `[corrected 2026-09-03]`.**
+  `/api/ops/keyvalue/usage` reports allocator-rounded memory: the two
+  single-key buckets sit exactly **+96 bytes above a power of two**
+  (4,194,400 = 4 MiB+96; `prediction_ledger.json` 2,097,248 = 2 MiB+96) while
+  multi-key buckets have arbitrary gaps, which is jemalloc rounding large
+  values to powers of two. **The true payload is in (2 MiB, 4 MiB].** The
+  decision below is unchanged — even at the 2 MiB lower bound, 1,440 ticks/day
+  is ~2.9 GB/day against a 256 MB store, ~11x capacity — but the figure first
+  published was overstated by up to 2x.
 - **STORE: 222.28 MB of 256 MB (86.8%), policy `volatile-lru`, 12,203 keys
   already evicted.** `reports/intelligence` alone is 189.51 MB of it.
 - **COST OF DATING: 4 MB x 1,440 ticks/day = ~5.76 GB/day for MLB ALONE**, about
