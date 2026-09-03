@@ -1029,6 +1029,138 @@ route. **Read anon vs inactive_file before calling anything a leak** —
 `state.md [memory.current is page cache]` and `#566` both exist because that step
 was skipped.
 
+**`[2026-09-03]` THE PROFILER'S SOLO GUARANTEE DOES NOT HOLD AT
+`WEB_CONCURRENCY=2`, AND EVERY EXISTING EMISSION IS WARM-UP.** Re-armed
+`SYNDICATE_REQUEST_MEMORY_PROFILE=on` (web `142e5e1a`, live 2026-09-03T20:00Z)
+to take the steady-state reading this item still owes. Arming it produced two
+findings that change how its own numbers must be read.
+
+*The scope mismatch.* `_REQUEST_MEMORY_STATE["inflight"]` is module-level, so it
+counts only requests in **this gunicorn worker**. `_anon_mb()` reads the
+**container** cgroup. Live config is `WEB_CONCURRENCY=2` with
+`GUNICORN_THREADS=4`, so up to four requests in the SIBLING worker — plus every
+merge subprocess — allocate inside a window the instrument calls "provably
+alone". The module's own comment states the assumption it was built on: *"web
+runs ONE gunicorn worker"*. That is no longer true. The guarantee is per-worker;
+the measurement is per-container.
+
+**This is not theoretical, and the emissions prove it.** `route.total_mb` is a
+CUMULATIVE SUM of attributed deltas, so it can only fall if deltas are negative.
+Between two emissions of the SAME process (`solo_attributed` 800 -> 1000, so no
+restart) `/api/ops/artifacts/publish` went **211.59 MB -> 167.13 MB while its own
+`solo_n` rose 405 -> 502**, and container anon moved **-294 MB** (767.7 ->
+473.8). A solo request cannot un-allocate 44 MB; the sibling worker and exiting
+merge children can. **Treat magnitudes from this instrument as upper bounds.**
+
+*All seven existing emissions are warm-up* — every one within ~25 min of a boot
+(`09-02T05:11-05:19Z`, `09-02T15:22-15:46Z`), the same contamination already
+retracted twice against this item. The accumulator is cumulative from boot, so a
+steady-state reading must DIFFERENCE two late emissions, never read one.
+
+Even contaminated, the ranking is a lead: publish took **211.59 MB over 405 solo
+requests, 65.13 MB single-request max**, against 17.42 MB for the runner-up
+(`/api/portfolio/summary`) and 0.00 MB for `/healthz` (172 samples) and
+`/api/ops/artifacts/stream` (117).
+
+**`[2026-09-03]` A SECOND MECHANISM BOTH FALSIFIED HYPOTHESES WERE STRUCTURALLY
+BLIND TO: UNCAPPED MERGE SUBPROCESSES SPAWNED FROM A REQUEST HANDLER.** `#630`'s
+deferred merge (`ops.py:1774`) runs `subprocess.Popen` per publish and appends to
+`_PENDING_MERGE_CHILDREN`. **Nothing reads that list's length to refuse a
+spawn**, and reaping is lazy — it happens on the NEXT spawn — so there is no cap
+on how many run at once.
+
+    bursts (ODDS_HISTORY_MERGE completions, 09-02T02:52-03:00Z, gap>30s):
+      02:52:45   n=14   span= 8.0s   input=122.2 MB
+      02:54:24   n=16   span= 6.0s   input= 76.3 MB
+      02:57:45   n=46   span=42.0s   input=414.8 MB
+      02:59:27   n=22   span= 6.0s   input= 84.5 MB
+
+    live samples: 09-03T19:51Z one child at 161.5 MB RSS
+                  09-03T19:57:50Z THREE concurrent children, 68 MB
+
+`#630` measured the merge itself at **3.13x input** (276 MB on 88 MB), so a
+414.8 MB burst is ~1.3 GB of parse if it runs concurrently, plus a fresh
+interpreter per child, on a 2,048 MB service whose headroom sat at 200-416 MB
+throughout this session.
+
+**WHY NEITHER EARLIER HYPOTHESIS COULD HAVE FOUND IT.** The bytes-served
+analysis correlated anon against the access log's RESPONSE size — but a publish
+carries its payload in the REQUEST body and answers with a small JSON ack, so
+this service's largest memory events appear there as near-zero bytes. That is
+exactly the shape the data had (**corr = -0.706**), and it was read as
+exonerating the request path when it is equally consistent with the WRITE path
+being the mechanism. The request profiler cannot see it either: a child's
+allocation is never in the parent's anon, so a publish scores ~0 however large
+the child grows. **Two instruments, both blind to the same path.**
+
+Transport split, web logs 09-03T19:51-20:01Z: **57 of 100 publishes are
+`transport=envelope`**, 43 stream. The envelope form materialises the artifact in
+the PARENT (`ops.py:2135-2159`); it is already hardened (`get_data(cache=False)`,
+`del raw`, `del text`, `pop("content")`), but `json.loads(text)` still holds the
+decoded str and the parsed envelope at once, and CPython does not return freed
+arenas. `live-odds-worker` is pinned to an older commit and sends this form.
+
+**MEASURED 2026-09-03T20:04-20:08Z** (adaptive sampler, 1.5 s while a child is
+alive, 58 samples). Peak **19 concurrent merge children at 334.6 MB summed
+RSS**; a separate burst reached **365.9 MB across only 6**. Children are alive
+**34% of the wall clock**. On the metric that actually has to fit —
+`container_memory_unreclaimable_mb`, **not** `container_memory_mb`, which carries
+reclaimable page cache and is precisely the `#566` trap — the post-warm-up idle
+mean is **840.4 MB** and the burst maximum **1,053.4 MB**: a **+213 MB
+excursion**, uncapped, on an 8-minute-old process.
+
+**THIS IS THE KILL MECHANISM, AND IT IS NOT THE LEAK.** The children RETURN their
+memory — unreclaimable falls back to ~840 MB within seconds of every burst — so
+this is not what ratchets the baseline. It is what converts a high baseline into
+an OOM. This item records anon peaking at **1,823.8 MB**; 1,823.8 + 213 =
+**2,037 MB against a 2,048 MB limit**. Neither term kills on its own, which is
+why single-cause hunts kept exonerating both. Every headroom minimum in the
+sampled window coincides with a burst (`20:04:07` 266 MB, `20:05:05` 292 MB,
+`20:07:54` the 1,053 MB unreclaimable peak).
+
+**The cheap mitigation is a CAP, and it is not a fix for the leak.** Nothing
+reads `len(_PENDING_MERGE_CHILDREN)` before spawning, so the excursion has no
+ceiling; bounding it would clip the excursion without touching the growth. The
+growth is still the profiler's question, and that steady-state difference is
+still owed.
+
+**`[2026-09-03]` THE CEILING IS LIVE (`a6f5f586`), IT FIRES, AND IT BOUGHT NO
+MEMORY — THE COUNT WAS NEVER THE BINDING TERM.** Shipped a count cap plus an
+in-flight input-bytes cap on `_spawn_artifact_merge`, checked before staging so
+a refusal cannot clobber, answered 503 so the publisher retries next sweep
+without escalating to the envelope form.
+
+It works exactly as specified: six `ARTIFACT_MERGE_AT_CAPACITY` lines at
+`20:33:31-34Z`, all `reason=count inflight=4 cap=4`, and across 22 samples at
+1.2 s the maximum in any single worker was **4, never 5**.
+
+    peak concurrent children   19  ->   8      (ppid97=4  ppid98=4)
+    peak summed child RSS   334.6  -> 338.5 MB (across 7)
+
+**A 58% cut in child COUNT moved peak child memory by less than nothing.** Two
+measured reasons:
+
+1. **The ceiling is PER GUNICORN WORKER.** `_PENDING_MERGE_CHILDREN` is module
+   state; `WEB_CONCURRENCY=2`; so the container-wide ceiling is `cap x 2`.
+   Confirmed by PARENT PID rather than inferred — `ppid97=4 ppid98=4` in one
+   sample. **This is the same scope mismatch recorded above against the request
+   profiler**: a per-worker guarantee measured against a per-container resource.
+   Twice in one item, in unrelated code, is a pattern worth naming.
+2. **Per-child cost is ~40-58 MB, dominated by a fresh Python interpreter.** So
+   count IS the lever and 4 was too high. The pre-cap 17.6 MB/child (334.6/19)
+   was an artefact of catching children EARLY IN LIFE at 1.5 s sampling, not
+   evidence of a cheaper child — a reading that would have justified leaving the
+   cap loose.
+
+Retuned to `CHILD_CAP=2` / `INFLIGHT_MB=32` (container-wide 4 children,
+~180 MB). **The excursion is reduced, not removed**, and the baseline growth it
+rides on is still unattributed — that remains the profiler's question.
+
+**KNOWN COUPLING:** a refused publish joins `_FAILED_DIRECT_PUBLISH`, which
+exempts that path from `_PUBLISH_MAX_BYTES` for one sweep
+(`artifact_publisher.py:1676-1682`). Logged as `SWEEP_REPAIRING`, bounded, but a
+refusal does let a path return exempt from a size guard.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove

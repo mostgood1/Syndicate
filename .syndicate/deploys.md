@@ -19845,3 +19845,108 @@ post-deploy orders comes back all-null, that is not a discharge and not a
 condemnation either — the next step is reading the PLAN position for one of
 those keys to see whether the field was there to be copied.
 
+---
+
+## 2026-09-03 — web `142e5e1a` — ARM `SYNDICATE_REQUEST_MEMORY_PROFILE` (lane `web-oom-profiler-steady`)
+
+**What shipped and why a REDUNDANT deploy was the point.** No repo code changed
+for this purpose: the change is a single env key set through
+`render_env_set.py` (`SYNDICATE_REQUEST_MEMORY_PROFILE=on`, `before None`), and
+an env change does not reach a running process without a deploy. Preflight
+refuses a same-SHA deploy as redundant, so the deploy carried web from
+`48c68546` forward to `origin/main` `142e5e1a` — 8 commits, all ledger/docs
+except `scripts/snapshot_live_gameline_score.py` and a `reports/` jsonl, and
+that script is referenced only from a docstring, never imported by the web
+graph. NOT a `render.yaml` push, so no `blueprint_sync`.
+
+**verify: the profiler is armed — SATISFIED.** Two `REQUEST_MEMORY_ATTRIBUTION`
+lines from the process booted 2026-09-03T20:00Z: `20:06:47` and `20:07:46`.
+Before this deploy the newest emission on record was 09-02, so these lines are
+the env key reaching the running process.
+
+**Both read `solo_attributed = 200`, which is itself the evidence for finding 1
+below.** The emitter fires at every 200th solo request, so two FIRST-TIME
+emissions 59 s apart are TWO INDEPENDENT ACCUMULATORS — one per gunicorn worker
+— both differencing the same CONTAINER cgroup. It also means the log cannot say
+which worker an emission came from: a steady-state difference must first
+reconstruct the two monotonic `solo_attributed` sequences, or it will subtract
+one worker from the other.
+
+**Two findings came out of arming it, both recorded on `#632`:**
+
+1. **The instrument cannot deliver its own guarantee at `WEB_CONCURRENCY=2`.**
+   `inflight` is module state (per WORKER); `_anon_mb()` reads the CONTAINER
+   cgroup; live config is 2 workers x 4 threads. Proof it is not theoretical: a
+   CUMULATIVE sum FELL — `/api/ops/artifacts/publish` 211.59 -> 167.13 MB while
+   its own `solo_n` rose 405 -> 502 in the same process. Magnitudes from this
+   instrument are upper bounds.
+
+2. **The OOM excursion is measured and it is not the leak.** Peak **19
+   concurrent merge subprocesses, 334.6 MB**, spawned uncapped from the publish
+   request handler. On `container_memory_unreclaimable_mb` (page cache excluded,
+   per `#566`): idle 840.4 MB, burst max 1,053.4 MB = **+213 MB**. The memory is
+   RETURNED after each burst, so it does not ratchet the baseline — but
+   1,823.8 MB recorded anon + 213 MB = 2,037 MB against a 2,048 MB limit.
+
+**Claim held throughout; released after this entry.** Web sat at 266-292 MB
+headroom during bursts while measured, which is the normal state of this
+service, not a consequence of the deploy.
+
+---
+
+## 2026-09-03 — web `a6f5f586` — CAP CONCURRENT ARTIFACT-MERGE SUBPROCESSES (`#632`, lane `web-oom-profiler-steady`)
+
+Ships the `#632` ceiling on `_spawn_artifact_merge`: a count cap
+(`SYNDICATE_ARTIFACT_MERGE_CHILD_CAP`, default 4) and an in-flight INPUT-bytes
+cap (`SYNDICATE_ARTIFACT_MERGE_INFLIGHT_MB`, default 64). Refusal is decided
+BEFORE staging, the target is never touched, and the answer is 503 — chosen
+because it is NOT in `artifact_publisher._PUBLISH_STREAM_UNSUPPORTED_STATUSES`
+`{400,404,405,415}` and so does not trip the fall-back-to-JSON branch that would
+resend the same artifact as an envelope and parse it whole in the web process.
+
+**verify: the ceiling FIRES in production — SATISFIED.** Six
+`ARTIFACT_MERGE_AT_CAPACITY` lines at `20:33:31-34Z`, every one
+`reason=count inflight=4 cap=4`. Two of them carry different `inflight_mb` in
+the same second (32.2 and 4.6), which is the per-worker state showing through.
+
+**verify: the ceiling is never exceeded per worker — SATISFIED.** Across 22
+samples at 1.2 s (11 with children), `max per single worker = 4`, exactly the
+cap, never 5.
+
+**AND THE MEASUREMENT SAYS THE DEFAULT WAS TUNED WRONG. Reported because it is
+the result, not because it is the one I wanted.**
+
+| | pre-cap | post-cap (`cap=4`) |
+|---|---|---|
+| peak concurrent children | 19 | **8** (`ppid97=4 ppid98=4`) |
+| peak summed child RSS | 334.6 MB | **338.5 MB** (across 7) |
+
+**The count cap worked perfectly and bought no memory.** Two independent
+reasons, both measured:
+
+1. **The ceiling is PER WORKER.** `_PENDING_MERGE_CHILDREN` is module state and
+   `WEB_CONCURRENCY=2`, so the container-wide ceiling is `cap x 2 = 8`, not 4.
+   Confirmed by parent pid, not inferred: `ppid97=4 ppid98=4` in one sample.
+   This is the SAME per-worker-vs-per-container scope mismatch already recorded
+   on this item against the request profiler.
+2. **Per-child cost is ~40-58 MB and dominated by a fresh interpreter**, so
+   COUNT is the lever and 4 was simply too high: 4 x 2 x ~45 MB ~= 360 MB, which
+   is what was measured. The pre-cap figure of 17.6 MB/child (334.6 / 19) was
+   children caught EARLY IN LIFE by 1.5 s sampling, not a cheaper child.
+
+**Retuned to `CHILD_CAP=2`, `INFLIGHT_MB=32`** — container-wide 4 children,
+~180 MB, roughly half the measured excursion. Env keys set via
+`render_env_set.py`; an env change does not reach a running process, and
+preflight refuses a same-SHA deploy as redundant, so the values ride the next
+forward commit. **That deploy's SHA is incidental — the env values are the
+payload.**
+
+**A COUPLING WORTH KNOWING.** A refused publish is added to
+`_FAILED_DIRECT_PUBLISH`, which grants that path a one-sweep EXEMPTION from
+`_PUBLISH_MAX_BYTES` on retry (`artifact_publisher.py:1676-1682`). It is not a
+feedback loop — the file does not grow because it was refused — and it prints
+`SWEEP_REPAIRING`. But refusals do let a path come back exempt from a size
+guard, which is the opposite of throttling, and it is a real interaction rather
+than a theoretical one.
+
+Claim released after this entry.
