@@ -20409,3 +20409,63 @@ env set ran anyway** — a refused claim does not stop the next command in a cha
 It came up with 2 workers because Render injects env at CONTAINER start, after
 the build, and the revert landed first. **`acquire` must never be chained with
 the action it gates.**
+
+## 2026-09-03 23:46:43Z / 23:50:56Z — `sim_view` WRITE SIDE live on BOTH order-placing services — lane `order-sim-view`
+
+**What shipped.** `sim_view`, `sim_line_gap` and `sim_probability_railed` onto
+the order: stamped on the position by `portfolio_commit._sim_view_of` (which
+calls the BOARD's own `_layer2_board_columns`, so there is one rule and not a
+copy), carried across the `OrderRequest` boundary by `execute_portfolio`, and
+persisted by `execution_ledger` via `_LEAN_FIELDS`. Target `1e5ae2b1`, on
+`origin/main`, containing `cb223b62` + `733a28f0`.
+
+**BOTH services, because `run_execution` has two callers on two services** —
+`intelligence_state.py` on refresh-worker and `run_live_odds_refresh_worker.py`
+on live-odds-worker — and both reach `record_order`. Same reasoning `04187cdf`
+recorded at 19:45Z/19:54Z today.
+
+    refresh-worker     1e5ae2b1  live       finished 2026-09-03T23:46:43.518252Z
+    live-odds-worker   1e5ae2b1  live       finished 2026-09-03T23:50:56.855911Z
+
+**NOTHING WAS KILLED, and that was the hard part rather than the deploy.** Both
+fired on a preflight that returned CLEAR with **`jobs_in_flight=0`**, seconds
+before the POST. That is not luck and it is not an override:
+
+- `check_deploy_safety --drain` REFUSES from a dev shell — it needs the keyvalue
+  backend, and `SYNDICATE_REFRESH_STATE_URL` is a Render-internal `fromService`
+  host, so the drain flag would land in a LOCAL FILE the worker never reads. It
+  said so instead of pretending, which is the correct behaviour and is why the
+  drain route was abandoned rather than worked around.
+- Waiting by hand does not work either. Measured tonight: `evening_next_day_sim`
+  (pid 543) ran 23:09:29Z→~23:26Z, and `tip_off_window` (pid 1276) started
+  23:28:21Z — **a clear window ~2 minutes wide**, narrower than a human read-and-
+  fire round trip. An earlier preflight at 23:29Z read `HOLD: 1 job(s) in flight`.
+- So preflight and deploy were run back to back in one loop, firing on the first
+  CLEAR. The guard's invariant is satisfied MORE tightly this way than by hand:
+  the CLEAR it reads is seconds old and describes the state the deploy lands in.
+  `SYNDICATE_DEPLOY_GUARD` was never touched.
+
+**AMBIGUOUS WINDOW: 4.2 minutes, 23:46:43Z → 23:50:56Z.**
+refresh-worker carried the write side first. An order written by live-odds-worker inside
+that window records **no verdict because of the deploy**, not because the row had
+none. Anyone splitting the settled book by `sim_view` must exclude it rather than
+read its nulls as data — the same correction `04187cdf` owed for its 8.9 minutes.
+
+**verify: OWED, AND THE OBVIOUS READING IS NOT IT.** The discharging measurement
+is a bucket in `/api/ops/execution/ledger-summary` → `sim_view_roi` whose
+`sim_view` is anything other than `(unrecorded)`. That single reading proves the
+write side RAN on a real bet (reachability, not presence — grepping the deployed
+SHA would only prove the code is there), that the read side serves it, and that
+the two agree on the field name.
+
+**IT MAY BE A LONG WAIT, AND A NULL IS NOT A FAILURE.** No order had been written
+since 15:27:33Z when this shipped — lane `prop-join-yield` measured that at
+22:3xZ and EXONERATED the placement path (`status=ok mode=live placed=0
+duplicates=0 refused={}`, both venues funded, 1 order per venue against a 15/day
+cap). So "still all `(unrecorded)`" means no bet was placed, not that the field is
+broken. Watcher `watch_first_verdict.py` distinguishes the two and refuses to
+exit 0 on a null.
+
+**Read side reminder:** already live on web since 23:14:37Z (`b48a9480`, carried
+by lane `fleet-catchup-round7`, verified on the served payload). See the entry
+above.
