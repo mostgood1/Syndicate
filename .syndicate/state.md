@@ -9461,6 +9461,22 @@ to that knob that did nothing (see `[board-window-staleness]`).
    > **The mechanism exists and is simply set too low to fire** — raise
    > `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` above the
    > serialisation period as part of any widening, and re-measure that it clips.
+
+   > **RAISED AND INJECTED 2026-09-03.** `[lane board-window-floor-raise]` Env
+   > `600` -> `1800` (single-key endpoint; absent from `render.yaml`), injected by
+   > a SAME-SHA redeploy of `f84eb21b` (live 03:08:48Z) so no code shipped with
+   > it. Then `33b181ee` (live 04:20:45Z) made the floor OBSERVABLE for the first
+   > time: `BOARD_WINDOW_QUEUE_GATED` / `BOARD_WINDOW_QUEUED`, both branches, so
+   > the gate has a denominator.
+   >
+   > **The mechanism is demonstrated; the RATE is not measured yet.** A non-today
+   > enqueue was GATED at `elapsed_s=725` against `floor_s=1800` — under the old
+   > `600` floor that same enqueue would have been ADMITTED. n=2, twelve minutes
+   > after a cold start: that is a mechanism, NOT a clip rate.
+   >
+   > Owed: `py -3 scripts/measure_board_window_clip_rate.py` (committed, carries
+   > its own baseline). **A clip rate of 0 is a LEGITIMATE RESULT** meaning the
+   > queue coalesces and the floor is the wrong lever — not a failed measurement.
 2. **`display_prediction_dates.json` staleness** -- if that artifact lags, the same
    class of bug recurs one level down. WHO WRITES IT AND HOW OFTEN IS UNVERIFIED.
 

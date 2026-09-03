@@ -1688,7 +1688,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   on a fresh `generated_at` means the field is inert**, not that the lens was
   empty — the fingerprint is emitted even for an empty lens, by test.
 - Claims: NONE held.
-### board-window-floor-raise — OPEN — opened 2026-09-03 — session 3492626c
+### board-window-floor-raise — OPEN, **GOAL MET AND INJECTED; ONLY THE RATE IS OWED** — opened 2026-09-03 — session 3492626c — **Env `600`->`1800` injected by a SAME-SHA redeploy (`f84eb21b`, live 03:08:48Z, no code shipped), then `33b181ee` (live 04:20:45Z) made the floor OBSERVABLE — the queue path had emitted NOTHING, so the verification originally written here was not satisfiable. `floor_s=1800` in the served line proves the injection reached the process. MECHANISM shown: an enqueue GATED at `elapsed_s=725` that the old 600 floor would have ADMITTED. n=2 is NOT a rate — measurement scheduled 08:00 local, and a clip rate of 0 is a legitimate result.**
 - Goal: make the board-window throttle capable of binding. ENV-ONLY change,
   `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` `600` -> `1800` on
   refresh-worker (SET 2026-09-03, single-key endpoint; the key is ABSENT from

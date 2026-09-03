@@ -5138,3 +5138,30 @@ usually the thing every row in a group shares.
 - **How we found out:** one `git ls-tree` against the mirror before starting the checkout, asking what dates actually exist.
 - **The rule going forward:** before running a control that costs real time, state what INPUT it needs and confirm that input exists FOR THE CONDITION UNDER TEST — the date, the sport, the state file, whichever discriminates. `data/` in this repo is a lossy mirror on its own per-family schedule (CLAUDE.md says so), so "the tree has data/" never implies "the tree has the data this test needs". When the input does not exist, MANUFACTURE the trigger instead: here, `rows` comes from `game_cards_<date>.csv`, so writing one row was the whole control — 0.01s against a 34,690-file checkout, and it answered the question exactly. And run the back-control: remove the fixture and confirm the old behaviour returns, or the fixture is not what changed.
 - **Cost:** none paid — caught one command before the checkout. Recorded because the reflex "get the real data" is usually right and was wrong here, and because the earlier 0-rows reading shows what it looks like when this is NOT caught: a confident finding about code, produced entirely by the measurement environment.
+
+## 2026-09-03 FORBIDDEN: writing a verification predicate into a lane without first checking that it is OBSERVABLE. Do that check BEFORE the work, not after. `[lanes soccer-anchor-wiring, board-window-floor-raise]`
+
+- **What we believed:** twice in one session, that a lane's stated verification
+  could actually be performed. `soccer-anchor-wiring` promised
+  *"anchored/skipped counts published per league-date"*.
+  `board-window-floor-raise` promised to measure whether the throttle CLIPS.
+- **What was actually true:** neither was satisfiable. The soccer counters are
+  `print` lines a delegated session found unreadable in production. The
+  board-window queue path emitted **nothing at all** — not the loop, not
+  `queue_refresh` — so the only downstream signal was `BUILD_SPAN_ENTER`, and a
+  build span cannot separate a CLIPPED ENQUEUE from a capacity-limited build.
+- **How we found out:** the second time, only by trying to run the measurement
+  and grepping the emitter first. **The lesson from the first instance was
+  already written down in this same session's log**, and I wrote the same
+  unsatisfiable shape into the next lane anyway.
+- **The rule going forward:** **before a verification line goes into a lane, grep
+  for the emitter and confirm the signal EXISTS on the path you intend to
+  measure.** One `git grep` answers it. If nothing emits, the first deliverable
+  of the lane is the telemetry, not the change — ship the observation, then the
+  behaviour. That ordering is what turned this one from unanswerable into a
+  reading: `33b181ee` shipped the log line, and the very first tick showed a
+  gated enqueue at `elapsed_s=725` that the old floor would have admitted.
+- **Cost:** a deploy whose verify could not be discharged, a second deploy to fix
+  it, and — across the two instances — two lanes closed or recorded on evidence
+  weaker than they claimed. Sibling of `presence is not reachability`: this is
+  its planning-time form.
