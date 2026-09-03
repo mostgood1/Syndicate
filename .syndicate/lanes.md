@@ -1775,6 +1775,23 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
+### web-catchup-round7 — CLOSED 2026-09-03 — **web `9987c545`→`39ed4ef5`, live 23:08:51Z, no force used.** `#643` survival checked BEFORE deploying (two commits touched `execution_ledger.py`, the file where it was silently reverted at 19:22Z) — all present. `_edge_unavailable_reason` 0→1, 9 MLB cards, 0 errors. **`#642` confirmed live: 1458/1457/1 — the first non-zero `total_tracked`.** — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: web off `9987c545` onto `39ed4ef5`, now that `web-oom-profiler-steady`
+  released the claim it held through round 6. Content: `36161e83` (layer2
+  `sim_view` split + `templates/intelligence.html`), `cb223b62` and `733a28f0`
+  (orders carry what the sim SAID, and pin the vocabulary).
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: BY CONTENT on the deployed SHA — `_edge_unavailable_reason`,
+  confirmed ABSENT from the currently-live `9987c545` (live=0, target=1). PLUS a
+  survival check on `#643`, because `cb223b62`/`733a28f0` touch
+  `execution_ledger.py` — the exact file and the exact shape of commit that
+  silently reverted that fix at 19:22Z today. **Checked BEFORE deploying:
+  `bytes_per_order` x1, `_store_max_bytes` x3, `UNBOUNDED` x2 all present in
+  `39ed4ef5`.** Plus web serving MLB cards with 0 tracebacks.
+- Blocked by: none (claim released).
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

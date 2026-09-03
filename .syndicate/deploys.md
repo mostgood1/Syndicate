@@ -20259,3 +20259,37 @@ the collector records it per sample.
 
 **If this session ends before the restore, the restore is still owed** — that is
 the entire reason this entry is written BEFORE the change rather than after.
+## 2026-09-03 — round 7 — web `9987c545` → `39ed4ef5` — lane `web-catchup-round7`
+
+Taken once `web-oom-profiler-steady` released the claim it held through round 6.
+No force was used at any point. Preflight CLEAR first try; live 23:08:51Z.
+
+Content: `36161e83` (layer2 `sim_view` split + `templates/intelligence.html`),
+`cb223b62` and `733a28f0` (orders carry what the SIM SAID, and pin the
+vocabulary).
+
+**SURVIVAL CHECKED BEFORE DEPLOYING, not after.** `cb223b62` and `733a28f0` both
+touch `execution_ledger.py` — the exact file, and the exact shape of commit, that
+silently reverted `#643` at 19:22Z today. Read on `39ed4ef5` first:
+`bytes_per_order` x1, `_store_max_bytes` x3, `UNBOUNDED` x2 — all present, so
+those two merged cleanly around it. Had they not, this deploy would have shipped
+a regression to a fix verified six hours earlier.
+
+verify: web `39ed4ef5` at 23:09:26Z. `_edge_unavailable_reason` 0 → 1 on the
+deployed SHA (absence from `9987c545` confirmed first, so the pass
+discriminates). 9 MLB cards served. 100 log lines since boot, **0 tracebacks /
+500s / CRITICAL**.
+
+**`#642` CONFIRMED LIVE, and this is the first time it could be:**
+```
+ledger_rows_total=1458  excluded_auto_tracked=1457  total_tracked=1
+```
+Every prior reading was 1458 / 1458 / 0. A real staked order now exists, so the
+stake filter is demonstrated DISCRIMINATING rather than merely argued — 1,457
+legacy stakeless rows excluded, 1 user-placed bet counted. The provenance fields
+added for `#642` are what make that legible from one HTTP read; before them this
+would have been indistinguishable from the failed-read case that cost three
+deploys.
+
+**Fleet:** web `39ed4ef5` · refresh-worker `6a41098f` · live-odds-worker
+`6a41098f`.
