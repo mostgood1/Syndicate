@@ -84,7 +84,7 @@ OVERRIDES = {
     "probability-statistic-ownership": "model",
     "replay-diff-gate": "model",
     "settlement-resolver-coverage": "model",
-    "ask-the-syndicate": "board",
+    "ask-the-syndicate": "ui",
     "cfbd-monthly-quota-exhausted": "football",
     "espn-egress-and-wnba-boxscores": "basketball",
 }
@@ -105,7 +105,16 @@ RULES = [
     ("polymarket", r"^polymarket"),
     ("kalshi", r"^kalshi"),
     ("venues", r"venue|exchange|odds|book|arb|fee|price|quote|market|clv|shopping"),
-    ("board", r"board|card|surface|lens|display|chip|layer2|^ui|games-rail|portfolio"),
+    # state_board.md was the largest part after the venues re-split (107,312 B /
+    # 22 sections) and mixed four concerns. These three come out FIRST, and the
+    # order inside them matters: `portfolio-live-surface` contains "surface" and
+    # would otherwise land in ui, and `ui-board-cards` contains "board" and
+    # would otherwise stay behind. What is left in `board` is the BUILD side --
+    # windows, freshness, overview cost, coverage.
+    ("portfolio", r"^portfolio"),
+    ("layer2", r"^layer1|^layer2|chip"),
+    ("ui", r"^ui|surface|lens|^ask-the-syndicate"),
+    ("board", r"board|card|display|games-rail"),
     ("worker", r"worker|memory|oom|deploy|render|keyvalue|artifact|publish|cache|runtime|budget|refresh|subprocess|disk|env"),
     ("model", r"sim|model|eval|accuracy|calibrat|intelligence|shortlist|projection|prop|ladder|scorer|edge|rank"),
     ("ledger", r"session|lane|ledger|state|todo|harness|checkpoint|protocol|guard|commit|test"),

@@ -10,7 +10,8 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
 **Read `state.md` first, then open only the part your work touches.** It holds
 the cross-cutting subjects and the `[subject-index]` table naming every subject
 and its file. Bodies live in `state_<domain>.md`: mlb, soccer, football,
-basketball, venues, polymarket, kalshi, board, worker, model, ledger.
+basketball, venues, polymarket, kalshi, board, ui, layer2, portfolio, worker,
+model, ledger.
 
     state.md   746,526 -> 62,510 B      largest part  state_venues.md 152,212
     total across ten files  774,933 B   -- the split ADDED ~28 KB of part

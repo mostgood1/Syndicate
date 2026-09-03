@@ -60,9 +60,27 @@ def test_sport_wins_over_generic():
     assert ss.classify("soccer-shots-prop-skill") == "soccer"
 
 
+def test_specific_wins_over_the_bucket_it_came_from():
+    """The board re-split's rule order, asserted because two of these are
+    genuinely ambiguous and a reorder would silently misfile them.
+
+    `portfolio-live-surface` contains 'surface' and must NOT go to ui;
+    `ui-board-cards` contains 'board' and must NOT stay in board."""
+    assert ss.classify("portfolio-live-surface") == "portfolio"
+    assert ss.classify("ui-board-cards") == "ui"
+    assert ss.classify("board-chip-coverage") == "layer2"
+    assert ss.classify("live-surface-tier5") == "ui"
+    # what deliberately STAYS on the build side
+    assert ss.classify("week-scoped-board-window") == "board"
+    assert ss.classify("board-freshness") == "board"
+    assert ss.classify("locked-cards-retuned-no-autorun") == "board"
+
+
 def test_overrides_beat_rules():
     """The 19 a keyword sweep could not place are assigned by hand."""
-    assert ss.classify("ask-the-syndicate") == "board"
+    # retargeted board -> ui in the 2026-09-03 board re-split: it is a product
+    # SURFACE, and what stayed in `board` is the build side.
+    assert ss.classify("ask-the-syndicate") == "ui"
     assert ss.classify("fleet") == "worker"
     assert ss.classify("replay-diff-gate") == "model"
 
