@@ -19715,3 +19715,43 @@ never used.
 warn_at=2097152 orders=2294 -- the store refuses at 8MB`, on the trading service.
 Filed as `todo #643`; the growth RATE is unmeasured and is the load-bearing
 unknown, so one reading cannot size the risk.
+
+### SECOND ATTEMPT, same day ~12:30-14:10 CT — also stood down. **Still no deploy.** `[lane accuracy-autorun-rearm]`
+
+Key `false`, claim released, live commit untouched by me. Scheduled tasks
+`arm-accuracy-autorun-626h` (03:00 CT) / `verify-accuracy-autorun-626h`
+(07:45 CT) remain the plan.
+
+**What blocked it this time was NOT the worker — it was the claim, then my own
+polling predicates.**
+
+- The refresh-worker claim was **held by another lane** (`soccer-projection-names`,
+  session `3492626c`) for ~45 min. **Not forced.** That session is absent from a
+  40-session roster, but `list_sessions` omits archived sessions and the standing
+  rule is explicit that an unrecorded session is UNKNOWN, not gone — and breaking
+  a peer's lock to arm a non-urgent autorun, with a scheduled task already
+  covering it, is not a trade worth making. They were demonstrably active: the
+  live commit moved to `552c942b` during the wait.
+- **A THIRD claim state exists: `EXPIRED (does not block)`.** My waiter polled for
+  the literal string `free` and sat through the entire expiry without noticing.
+  The claim had been acquirable for **~25 minutes** before I read the status
+  directly.
+- When finally acquired (target `5158a77f`, live `da179b75`), preflight was HOLD
+  with **6-7 jobs** in flight — heavier than the morning's 3. No window in the
+  budget.
+
+**THE PATTERN THAT COST THE MOST TIME TODAY, three instances:** every one was a
+predicate written against the vocabulary I EXPECTED rather than the one the tool
+emits — `"CLEAR"` matching inside `"NOT CLEAR"`; `[UNKNOWN]` (a 502) treated as a
+pass; and `free` missing `EXPIRED (does not block)`. Two of the three would have
+deployed on a false signal. **Poll documented exit codes, and when a tool has
+states, enumerate them from the tool.**
+
+**Also confirmed again:** a stopped background task's children keep running.
+Three survived one `TaskStop` and had to be killed explicitly; a fourth survived
+the next. Kill children, then verify zero remain, before starting another poller
+— they write the preflight record the deploy guard reads.
+
+**Nothing was armed at any point in this attempt.** The key-set step is gated on
+a CLEAR preflight that never came, so unlike the first attempt there was no
+armed-key-without-deploy window.

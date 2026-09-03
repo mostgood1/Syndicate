@@ -5653,3 +5653,11 @@ inflated counter), so the cost was entirely session time, not board harm.
 - **Cost:** none realised — both were caught before any commit. The exposure was
   a commit that would have reverted 177 commits of six sessions' work, from the
   shared primary tree, which is the highest-blast-radius mistake available here.
+
+## 2026-09-03 — FORBIDDEN: writing a poll predicate against the vocabulary you EXPECT instead of the states the tool actually emits. Three instances in one afternoon; two would have acted on a false signal. `[lane accuracy-autorun-rearm]`
+
+- **What we believed:** that a status/verdict could be matched with an obvious substring — wait for `"CLEAR"`, wait for `"free"`.
+- **What was actually true:** every one of the three was wrong. `grep "CLEAR"` matches inside **`"NOT CLEAR"`** and exited the wait on the first poll. Treating "no NOT CLEAR" as clear passed an **`[UNKNOWN] ... HTTP 502`** read-failure as a go-signal — a deploy on an unreadable state. And waiting for `free` never matched **`EXPIRED (does not block)`**, a third claim state I had not enumerated, so the waiter sat through ~25 minutes in which the lock was already available.
+- **How we found out:** by reading raw output instead of the predicate's answer, each time only after the predicate produced something impossible (an instant "clear" on a busy worker; a wait that never ended).
+- **The rule going forward:** prefer a documented EXIT CODE to string matching — `check_deploy_safety` states its own contract (0 clear / 1 busy / **2 could not determine, "which is NOT the same as clear, and is deliberately not exit 0"**). Where only text exists, ENUMERATE the states from the tool (`--help`, the source, or by reading a real sample of each) before writing the match, and make the predicate require the positive state explicitly rather than the absence of a negative one. An unknown or unrecognised state is NEVER a pass.
+- **Cost:** more time than every real production constraint combined. Two false go-signals, one wasted 25-minute wait on an already-free lock, and a deploy window lost.
