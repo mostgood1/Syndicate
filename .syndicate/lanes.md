@@ -2333,7 +2333,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none (needs a refresh-worker deploy, preflight for in-flight sims)
 
 
-### soccer-anchor-wiring — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `3cdbcf4c` and DEPLOYED. Anchoring is reachable, instrumented, and OFF (weight 0.0). THE FINDING IS THE COST: 40.9s per fixture — 57 min/cycle at today's 84 priced events, ~136 min at ten leagues — so it cannot run on the refresh cycle as written. That supersedes the mechanism-vs-estimator re-fit as the blocker.** This lane also carried the accuracy-autorun OOM to resolution (disarmed, verified `reason=disabled` 19:32Z).
+### soccer-anchor-wiring — CLOSED 2026-09-02 — opened 2026-09-02 — session 3492626c — **LANDED `3cdbcf4c` and DEPLOYED. Anchoring is reachable, instrumented, and OFF (weight 0.0). COST FINDING CORRECTED 2026-09-02 by lane `soccer-anchor-cost`: my *"57 min/cycle at 84 priced events, ~136 min at ten leagues — cannot run on the refresh cycle as written"* was a DENOMINATOR ERROR (84 counts priced EVENTS in a forward book to d+13; the builder is SINGLE-DATE). Production-measured cost is **83.2 min per 4h interval** with the joins working — 76% of the interval, and it FITS. Weight stays 0.0 on the mechanism-vs-estimator re-fit and on path (a) being FALSIFIED, NOT on cost.** This lane also carried the accuracy-autorun OOM to resolution (disarmed, verified `reason=disabled` 19:32Z).
 - Goal: wire `anchor_ratings_to_market` into `build_soccer_artifacts.py` behind a
   WEIGHT knob defaulting to 0.0 (off), publishing attached/skipped/anchored counts
   so an inert anchor is visible. Step 2 of 2; step 1 (`ed48c2e7`) built the feed.
@@ -2348,6 +2348,16 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Verification RAN: off!=on asserted before any correctness claim (weight 0
   leaves ratings identical; weight 0.35 moves them). Odds counts publish even
   when off, so the feed's health and the mechanism's arming stay separable.
+- **CORRECTION 2026-09-02 — the PRODUCTION half of "Verification" above was NOT
+  SATISFIABLE AS WRITTEN.** `ODDS_ATTACHED`/`ANCHOR_SKIPPED`/`ANCHORED` are `print`
+  lines, and a delegated session found them unreadable in production — so this lane
+  closed on its unit-test half (`off != on`) only. The counts need a PUBLISHED
+  ARTIFACT FIELD beside `promoted_prior_teams`, not a log line.
+- **CORRECTION 2026-09-02 — two name joins in my feed were switched off.** Both
+  compared exact strings across feeds with different naming conventions
+  (fixture `match_id` is an ESPN id, the odds file keys on an OddsAPI hash; the
+  team-pair fallback then needed exact team names). Cost: 66 of 136 fixtures and
+  76 of 214 team slots. Fixed by `686d8282` on main — NOT deployed, NOT armed.
 - Handed to a delegated session: the three cost paths (cut solver sims / anchor
   only board-relevant fixtures / move off the refresh cycle), with the caution
   that better h2h MAE from anchoring is EXPECTED and is not evidence of edge —
