@@ -27,12 +27,23 @@ marker slot blocked three consecutive correct edits in one session. So this
 watches OUTCOMES, not commands: it never parses a shell string and it can
 never refuse one.
 
-WHY NOT DIFF THE WORKING TREE. `git status --porcelain` measured at 200 ms per
-call here. `ledger-postwrite-check.py` already rejected a 41 ms git subprocess
-on this same hook path as too expensive, for the identical reason -- a slow
-guard gets switched off. Statting only the paths some OTHER open lane claims
-measured 1.3 ms for the 43 claims live at the time. That is the whole trick:
-the interesting set is tiny, and it is exactly the set the ledger already names.
+WHY NOT DIFF THE WORKING TREE -- and this is NOT the cost argument it started
+as, because the cost argument did not survive being measured. The design was
+chosen on `git status --porcelain` at 200 ms against 1.3 ms to `os.stat` the 43
+paths another lane claimed. Both numbers are real and the comparison between
+them was wrong: it weighed a SUBPROCESS against a warm-process loop. Measured
+end to end afterwards, this pair costs about +90 ms of work per Bash call and
+~250 ms wall across two interpreter starts, while a single post-only hook
+shelling out to `git status` would be ~140-175 ms wall in one process. THIS IS
+NOT THE CHEAPER DESIGN. It is roughly a wash, and the ~78 ms Python takes to
+boot dominates both.
+
+What it IS, is the one that cannot be wrong. `git status` answers "what differs
+from HEAD", which conflates your write with every uncommitted change already
+sitting in a shared tree -- and this repo's primary tree routinely carries
+dozens of those from other sessions. Statting a named set answers "did THIS
+claimed file change in the last few seconds", which is the question actually
+being asked. The interesting set is tiny, and the ledger already names it.
 
 THE WINDOW IS ONE TOOL CALL, and this is the part that makes the signal usable.
 An obvious implementation compares against "the last time I looked", which in a
@@ -110,6 +121,23 @@ def _candidates(root, session_id):
 
     Empty when this tree has no ledger, when the marker names no lane, or when
     every claim belongs to you. Never raises.
+
+    THE PARSE IS NOT CACHED, and that was tried and REVERTED rather than never
+    considered. `ledger-postwrite-check.py` caches on (mtime, size) and says so
+    prominently, so caching here looked obviously right; a warm-process figure
+    (4.65 ms to parse a 191 KB `lanes.md` against 2.61 ms to stat 49 claimed
+    paths) seemed to confirm it. Measured end to end, the cache moved the pair
+    from +92.6 ms to +90.3 ms of work -- inside the noise -- because the real
+    cost of these hooks is TWO PYTHON INTERPRETERS BOOTING (~78 ms each), not
+    the parse. It bought ~0.4 ms per call for a second temp file, a composite
+    staleness key over the ledger AND the lane marker, and a cache that answers
+    with your previous lane if that key is ever got wrong.
+
+    The sibling's cache is right for the sibling: it guards THREE files and skips
+    a full invariant evaluation. Here the skipped work is one regex pass. Copying
+    a justified optimisation into a place where its numbers do not hold is how
+    complexity accretes, so this stays simple and the measurement stays written
+    down.
     """
     lanes_file = os.path.join(root, ".syndicate", "lanes.md")
     try:
