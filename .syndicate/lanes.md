@@ -1824,83 +1824,13 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   log stream with 0 tracebacks; plus `pending_deploys.py` reading 0.
 - Blocked by: none.
 
-### steam-test-clock-freeze — CLOSED 2026-09-03 — **FIXED AND MEASURED. The clock `layer2_board` reads is frozen from the test; a 141s sweep that used to fail now passes, and the assertion is proven still able to fail.** — opened 2026-09-03 — session c38d3e5c-c0fa-4ddd-9a67-f05654541e7e
-- Goal: `test_layer2_movement_live_segment::test_steam_requires_a_sharp_move_in_a_short_window`
-  passes regardless of how long the suite has been running before it. It is
-  order-dependent today and has been failing in every long sweep since at
-  least 2026-08-29, where it was correctly attributed ("in 49 min", "a
-  wall-clock drift against a fixed fixture") and then left in place — so it
-  has been padding the "pre-existing failures" count of every regression
-  sweep since.
-- Files: `tests/test_layer2_movement_live_segment.py` (TEST ONLY).
-  **No claim taken on `syndicate/features/shared/layer2_board.py`** — the OPEN
-  lane `layer2-sim-disagrees` (session `3492626c`) holds it for
-  `_projection_side_in_row_frame` / `_model_edge_for` / `_model_prob_for_side`
-  / `_publication_columns`. The clock read that causes this is in
-  `_movement_from_opening`, not in that set, but the fix does not need to touch
-  the module at all: the test freezes `layer2_board.datetime` from the outside.
-- Hypothesis: module-level `NOW = datetime.now(timezone.utc)` (line 25) pins
-  `captured_at` at import time while `_movement_from_opening`
-  (`layer2_board.py:2572`) measures age against the LIVE clock, so
-  `steam_reason` renders "in {import-to-execution delay + 25} min" and the
-  `"25 min"` assertion drifts out.
-- Falsification test: if the elapsed string tracked something other than the
-  import-to-execution gap, back-dating `captured_at` against a stale `NOW`
-  would not reproduce it. It does.
-- Verification: (a) the file passes alone; (b) it passes when the same process
-  has been running for minutes before the test executes — proven by an
-  in-process artificial delay, not by hoping a sweep is slow; (c) the
-  `off != on` probe of `learnings.md:878` — break the underlying behaviour and
-  confirm the test still FAILS, so the fix is not a widened assertion that
-  cannot fail (`learnings.md:2464`).
+### steam-test-clock-freeze — CLOSED 2026-09-03 — session c38d3e5c
+- Outcome: `test_layer2_movement_live_segment` no longer depends on how long
+  the suite ran before it. Clock frozen from the test; `layer2_board.py` not
+  touched. Shipped `a046d0b5`.
+- Evidence + full narrative: `log/2026-09-03.md`, session c38d3e5c.
+- Files: none held (CLOSED).
 - Blocked by: none.
-- **MEASURED 2026-09-03.** The fix is a module-scoped autouse fixture that
-  points `layer2_board.datetime` at a `datetime` SUBCLASS whose `now()` returns
-  the module's `NOW` (a subclass, not a stub, because the same code path calls
-  `datetime.fromisoformat` on the record under test). `_recent_iso()` was moved
-  onto `NOW` too — left on a live `datetime.now()` it would have run AHEAD of
-  the frozen clock by the suite's runtime, reintroducing the drift with the
-  sign flipped and eventually producing a NEGATIVE age. `layer2_board.py` was
-  NOT touched.
-
-      file alone                                   27 passed in 2.94s
-      90s gap forced between import and execution  27 passed in 93.81s
-      `-k "portfolio or layer2 or commit or order or shortlist"`
-                                    1432 passed, 141.37s, steam test PASSED
-
-  The 141s run is the point: the reported failure was observed in a 187s run of
-  that same selector, and anything over ~30s used to fail.
-
-  **The green is only worth what the red proves.** Three probes against the
-  real code path, with the import artificially back-dated 200s:
-
-      UNFROZEN     "+20 at draftkings in 28 min ..."   '25 min' False  <- bug reproduces
-      FROZEN       "+20 at draftkings in 25 min ..."   '25 min' True
-      fixture->40  "+20 at draftkings in 40 min ..."   '25 min' False  <- still load-bearing
-
-  The third probe is `learnings.md:2464` ("a fixture that cannot violate the
-  property it asserts is zero coverage that reads as strong"). The assertion
-  text was NOT changed — the tempting fix here was a looser regex over the
-  minutes, which would have gone green forever and silently stopped testing the
-  CLOCK half of steam, i.e. the half `_STEAM_WINDOW_SECONDS` exists for and the
-  half the pre-`#372` implementation lacked.
-
-  **This was already diagnosed once and left.** The 2026-08-29 sweep recorded
-  it verbatim — *"asserts `\"25 min\"` and gets `\"in 49 min since we published
-  it\"`, i.e. a wall-clock drift against a fixed fixture"* — correctly ruled it
-  pre-existing, and carried it as one of five known failures. It then sat in
-  every baseline for five days. A correctly-attributed flake that nobody owns
-  becomes permanent noise in exactly the runs where the failure count matters
-  most; attribution closed the question and left the defect.
-- **NOT MINE, reported not fixed:** `test_nfl_roster_depth_autorun.py::
-  DispatchOrder::test_both_sit_high_in_the_chain` fails on `main` for an
-  unrelated and legitimate reason — see the analysis handed to the user. The
-  autorun chain grew by one ahead of the NFL block
-  (`_launch_autorun_accuracy_summary`, commit `258d312f`, phase0 `#626(h)`), so
-  its hardcoded `roster_index <= 4` is stale by exactly one. The real invariant
-  is intact and its sibling test still passes. Left for whoever owns
-  `run_refresh_worker.py`.
-
 ### ncaaf-live-cadence — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, BUILT, LANDED ON `origin/main` AS `a9247011`. NOT DEPLOYED; THE CADENCE IMPROVEMENT IS UNMEASURED AND THIS LANE CANNOT MEASURE IT.**
 - **THE PREMISE IS HALF WRONG, AND THE HALF THAT IS WRONG CHANGES THE
   DIAGNOSIS.** The 3.6h is real. "NCAAF games in play" is NOT: probing the same
@@ -2026,134 +1956,15 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: deploy is owned by lane `prop-join-yield`; this lane lands on
   `origin/main` and hands over the env keys.
 
-### nfl-dispatch-order-assertion — CLOSED 2026-09-03 — **FIXED AND MUTATION-PROVEN. TWO tests were red on `main`, not one; both literals deleted rather than raised, and the replacement is measured strictly stronger.** — opened 2026-09-03 — session c38d3e5c-c0fa-4ddd-9a67-f05654541e7e
-- Goal: `test_nfl_roster_depth_autorun.py::DispatchOrder::
-  test_both_sit_high_in_the_chain` passes on `origin/main` **and still goes RED
-  when roster/depth are moved below `_launch_autorun_mlb_refresh`** — i.e. it
-  asserts the starvation property `#341` is about, not an absolute index that
-  every future insertion invalidates. Currently the only failure in a
-  1,433-test sweep.
-- Files: `tests/test_nfl_roster_depth_autorun.py`,
-  `tests/test_nfl_pbp_fetch_autorun.py` (TEST ONLY).
-- **CLAIM EXTENDED to the pbp file 2026-09-03, because the reported failure was
-  one of TWO.** `test_nfl_pbp_fetch_autorun.py::NotStarvedByTheElifChain::
-  test_pbp_fetch_sits_high_in_the_chain` fails on `main` for the identical
-  cause — `assertLessEqual(index, 2)` against pbp now at 3. It was invisible to
-  the `-k "portfolio or layer2 or commit or order or shortlist"` sweep that
-  found the first one, because that selector matched the roster file's class
-  `DispatchOrder` and the pbp file's class is `NotStarvedByTheElifChain`. **The
-  selector, not the chain, is why one of the two was reported.** Collision
-  check: no OPEN lane claims either file.
-- Not claimed, read-only reference: `scripts/run_refresh_worker.py`. The chain
-  itself is correct and this lane does not write it. **Named here and NOT under
-  `- Files:` on purpose** — `_claims()` turns every path under that block into a
-  claim, disclaimer prose included, and `check_lane_invariants.py` copies the
-  parser from `lane-guard.py`, which is the real `Edit` hook. The first draft of
-  this block said "READ-ONLY REFERENCE, NOT CLAIMED" *inside* `- Files:` and the
-  checker flagged it as a live claim within a minute — the same phantom claim
-  its own docstring records as having blocked another lane's one-line fix. A
-  disclaimer written in the wrong place is a claim.
-- Collision check 2026-09-03: no OPEN lane claims the test file. The two lanes
-  that name the worker mark it `released:` and scope themselves to
-  `_mlb_betting_day_backfill_*`.
-- Hypothesis: **a stale constant, not a regression.** The chain grew by one
-  branch AHEAD of the NFL block — `_launch_autorun_accuracy_summary` at index 2
-  (commit `258d312f`, phase0 `#626(h)`) — shifting roster 4→5 and depth 5→6
-  against hardcoded `assertLessEqual(..., 4)` / `(..., 5)`. Measured order:
-
-      0 reconciliation   1 evaluation_settlement   2 accuracy_summary
-      3 nfl_pbp_fetch    4 nfl_injuries_fetch      5 nfl_roster_snapshot
-      6 nfl_depth_chart  7 nfl_news_capture        8 nfl_fantasy_artifact
-      9 mlb_refresh     10 weekly_sports  11 soccer_weekly
-     12 season_projections  13 preseason_projections
-
-- Falsification test: if this were REAL starvation rather than a stale bound,
-  the inserted branch would have to win ticks often enough to displace the NFL
-  block. It does not — `_launch_autorun_accuracy_summary` is daily-gated
-  (`ACCURACY_SUMMARY_AUTORUN_GATED reason=daily_gate`, target hour Central), so
-  it takes at most one tick per 24h, which is the same reason the branches
-  above it are documented as "safe this high". Second falsifier: the sibling
-  test `test_roster_and_depth_chart_sit_directly_behind_injuries` asserts the
-  RELATIVE invariant (roster == injuries+1, depth == roster+1) and PASSES. If
-  either of those readings flips, the conclusion flips with it and the fix
-  becomes a worker change needing a claim and a separate decision — not a test
-  edit.
-- Verification: (a) the file passes; (b) **mutation probe, and it is the whole
-  point of the lane** — with roster moved below `mlb_refresh` in a synthetic
-  source, the test must go RED. The bar is `learnings.md:2464`: renumbering 4→5
-  would go green today and be invalidated by the next insertion, and a bound
-  loose enough to survive insertions cannot fail at all. Same shape as the
-  900MB-floor-guarding-an-1873MB-stage finding: suspect a stale constant, then
-  make sure the replacement still has teeth; (c) the sibling relative test must
-  still pass, unchanged.
+### nfl-dispatch-order-assertion — CLOSED 2026-09-03 — session c38d3e5c
+- Outcome: TWO tests were red on `main`, not one. Absolute chain indices
+  deleted (not raised a third time) in `test_nfl_pbp_fetch_autorun.py` and
+  `test_nfl_roster_depth_autorun.py`; position now asserted against the
+  high-frequency branches. `run_refresh_worker.py` not touched. Shipped
+  `a046d0b5`. Also fixed `accuracy-autorun-rearm`'s phantom claim (`aeb42333`).
+- Evidence + full narrative: `log/2026-09-03.md`, session c38d3e5c.
+- Files: none held (CLOSED).
 - Blocked by: none.
-- **MEASURED 2026-09-03. Hypothesis held: stale constants, nothing starved.**
-  Both files now assert position against the branches that actually win ticks
-  (`mlb_refresh`, `weekly_sports_refresh`, `soccer_weekly_refresh`) instead of a
-  literal index. `scripts/run_refresh_worker.py` was NOT touched.
-
-      five chain-scraping test files, before   73 passed, 2 FAILED
-      five chain-scraping test files, after    75 passed
-
-  **THE REPORTED FAILURE WAS ONE OF TWO, AND THE SELECTOR IS WHY.**
-  `test_nfl_pbp_fetch_autorun.py::NotStarvedByTheElifChain::
-  test_pbp_fetch_sits_high_in_the_chain` was equally red on `main`
-  (`assertLessEqual(index, 2)`, pbp at 3) from the identical insertion. The
-  sweep that found the first one selected on `-k "... order ..."`, which matches
-  the roster file's class `DispatchOrder` and does not match
-  `NotStarvedByTheElifChain`. Two tests, one cause, and the one that got
-  reported was decided by a substring. Worth generalising: a `-k` sweep
-  partitions by NAME, so a defect that spans a family is reported at whatever
-  fraction of the family happens to share a word.
-
-  **THE LITERAL WAS DELETED, NOT RAISED — the third raise was the tell.**
-  pbp's bound went `<= 1`, then `<= 2` by `#504`, and `258d312f` would have made
-  it `<= 3`. Every one of those insertions was legitimate and daily-gated, so
-  every red was FALSE. Its own comment already said a lost tick per day "is not
-  the hazard this test exists for", and already called the loop beneath it
-  "strictly stronger" — the literal had been dead weight through two raises. The
-  sibling files had reached this conclusion first and independently:
-  `test_nfl_injuries_fetch_autorun.py` deleted its literal for contradicting a
-  relative assertion in the same file ("two assertions that cannot both pass are
-  not an alarm, they are noise"), `test_nfl_fantasy_artifact_autorun.py`
-  replaced `position <= 3` with a producer-relative bound. This lane finished a
-  migration the repo had already made twice.
-
-  **MUTATION PROBE — `learnings.md:878`, and the reason the green counts.** The
-  tests read the chain as TEXT from `worker.__file__`, so the probe patches that
-  attribute to a reordered COPY; the worker is never edited and the copy need
-  not be valid Python. Hoisting `mlb_refresh` above the NFL block:
-
-      RED    test_nfl_pbp_fetch_autorun::test_pbp_fetch_sits_high_in_the_chain
-      RED    test_nfl_roster_depth_autorun::test_both_sit_high_in_the_chain
-      GREEN  test_roster_and_depth_chart_sit_directly_behind_injuries  (control,
-             correctly unaffected — roster is still directly behind injuries)
-
-  **STRICTLY STRONGER, MEASURED RATHER THAN ASSERTED.** The claim is in the code
-  comments, so it needed a discriminating case: drop the two daily-gated
-  branches AND hoist `mlb_refresh`, giving `0 reconciliation 1 mlb_refresh
-  2 pbp 3 injuries 4 roster 5 depth`. Every deleted literal PASSES there
-  (pbp<=2, roster<=4, depth<=5) while all three branches sit behind the branch
-  that wins nearly every tick during a slate. Both rewritten tests: **RED.** The
-  new form catches a starvation the old literals waved through at the very
-  indices they were written to permit.
-- **7 UNRELATED FAILURES SEEN IN THE WIDE SWEEP — NOT "pre-existing on main".
-  They are an artifact of THIS CHECKOUT and would pass in a fresh clone.**
-  `test_nfl_fantasy_artifact.py` (3), `test_nfl_props.py` (3),
-  `test_nfl_props_board.py` (1). Not caused by this lane: none imports anything
-  edited here, and the three files this session modified are the ONLY modified
-  `.py` in the whole tree. The mechanism is CLAUDE.md's `data/**` trap —
-  `test_missing_file_returns_empty` calls `nfl_props_rows_for_week(2025, 5)`
-  expecting absence and gets **3,626 real prop rows**, because
-  `data/nfl_source/oddsapi_player_props_2025_wk5.csv` (320KB, dated 2026-08-20)
-  is present on disk and **UNTRACKED** — mirror output CI would never have.
-  `SYNDICATE_DATA_ROOT` does NOT isolate them (they resolve through
-  `nfl_props_path`/`default_nfl_source_root()`), which is why the usual
-  isolated-root technique does not clear them. Left for a lane that owns those
-  files; the real defect is a fixture whose result depends on ambient untracked
-  data. `learnings.md:2409` is the standing rule this instance confirms again.
-
-
 ### web-catchup-round7 — CLOSED 2026-09-03 — **web `9987c545`→`39ed4ef5`, live 23:08:51Z, no force used.** `#643` survival checked BEFORE deploying (two commits touched `execution_ledger.py`, the file where it was silently reverted at 19:22Z) — all present. `_edge_unavailable_reason` 0→1, 9 MLB cards, 0 errors. **`#642` confirmed live: 1458/1457/1 — the first non-zero `total_tracked`.** — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
 - Goal: web off `9987c545` onto `39ed4ef5`, now that `web-oom-profiler-steady`
   released the claim it held through round 6. Content: `36161e83` (layer2
@@ -2183,7 +1994,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `.claude/hooks/session-start.sh`,
   `.claude/settings.json`.
   Collision check RUN 2026-09-03 against all OPEN lanes via `lane-guard._claims()`:
-  no OPEN lane names any `.claude/` path or any of the new scripts. CLEAR.
+  no OPEN lane names any hook, settings, or script path in this set. CLEAR.
 - **NOT claimed, deliberately:** `scripts/check_lane_invariants.py` — held by OPEN
   lane `ncaaf-live-cadence` (as the bare token `check_lane_invariants.py`, which
   `lane-guard` suffix-matches onto it). The claim-validity check therefore lands

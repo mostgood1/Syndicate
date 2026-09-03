@@ -4581,3 +4581,64 @@ pass/fail line, which read `INVARIANTS HOLD` while the claim set was wrong.
 named `test_lane_guard_never_marker.py`; the new marker cut inside its own path
 and dropped the claim. Substring matching is what makes the other markers work,
 so the constraint belongs on the naming side, not the parser.
+## 2026-09-03 — FORBIDDEN: writing a disclaimer INSIDE a `- Files:` block. It is a CLAIM, and the more emphatic the wording the more certain it is to be one. `[lane nfl-dispatch-order-assertion]`
+
+`_claims()` turns every backticked path under `- Files:` into a claim, and its
+disclaimer handling is a **PREFIX CUT**: a marker governs only what FOLLOWS it on
+the SAME line. So both halves have to be right — the marker must be in
+`_DISCLAIMER_MARKERS`, and it must come BEFORE the path.
+
+Two live instances, hit within an hour of each other:
+
+- `accuracy-autorun-rearm` wrote `**never \`render.yaml\`**` in its Files block.
+  `"never"` is not a marker at all. The lane HELD the file it was forbidding, so
+  `lane-guard.py` refused `render.yaml` to every OTHER lane while this lane did
+  not want it. `ncaaf-live-cadence` had the identical defect the same day.
+- **I did it myself, in the lane block written to announce that I was not doing
+  it.** I wrote ``\`scripts/run_refresh_worker.py\` is **READ-ONLY REFERENCE, NOT
+  CLAIMED**``. Both markers are real — and both came AFTER the path, so the
+  prefix cut removed nothing. Caught by the checker within a minute.
+
+**How to apply:** name the path in a SEPARATE bullet (a line starting `- ` that
+is not `- \``ends the Files block), or put a real marker before it. Never
+describe a file inside `- Files:` in order to exclude it. The repo's own
+`ask-sport-coverage` incident is the same bug and it blocked another lane's
+one-line fix.
+
+## 2026-09-03 — FORBIDDEN: reading a green `check_lane_invariants.py` as evidence that a path is unclaimed. Its invariant is "exactly ONE holder", which a phantom holder SATISFIES. `[lane nfl-dispatch-order-assertion]`
+
+The checker reported `INVARIANTS HOLD` while `accuracy-autorun-rearm` still held
+a phantom claim on `render.yaml`. It had reported `[FAIL] ... held by
+accuracy-autorun-rearm, ncaaf-live-cadence` an hour earlier; when the second lane
+fixed ITS block, the contest disappeared and the checker went green **with the
+defect fully intact**. The guard was still blocking.
+
+**A contest is the symptom; the claim is the defect.** Going green because a
+rival withdrew is not a fix, and the check cannot tell those apart by design —
+its own docstring says the phantom scan is a HINT that is never failed on,
+because it cannot distinguish a real multi-line `Files:` list from prose.
+
+**How to apply:** ask the parser WHO HOLDS the path
+(`claims(text)` filtered to it), never infer absence from the absence of a
+contest. And note the checker only COPIES `lane-guard.py`'s parser — the two
+drifted once already (`FILES_RE` missing the bold form, 2026-08-19). You cannot
+import the hook to ask it directly; it runs as a hook and blocks on stdin
+(2-minute timeout, measured). `tests/test_check_lane_invariants.py` is what
+proves the two agree, via source comparison.
+
+## 2026-09-03 — A `-k` sweep partitions by NAME, so a defect spanning a family is reported at whatever fraction of that family happens to share a word. `[lane nfl-dispatch-order-assertion]`
+
+One insertion into the autorun `elif` chain (`_launch_autorun_accuracy_summary`,
+`258d312f`) broke TWO absolute-index assertions. The sweep that found it ran
+`-k "portfolio or layer2 or commit or order or shortlist"`, which matches
+`test_nfl_roster_depth_autorun`'s class `DispatchOrder` and does NOT match
+`test_nfl_pbp_fetch_autorun`'s class `NotStarvedByTheElifChain`. **Which of the
+two got reported was decided by a substring**, and the unreported one had been
+red on `main` just as long.
+
+**How to apply:** when a `-k` run surfaces a failure, ask what else shares the
+CAUSE rather than the NAME, and re-run scoped to the cause's file family before
+calling the count complete. Corollary for the fix: three sibling files here had
+already replaced literal indices with relative ones, so the pattern was
+discoverable by looking at the family — `grep` for the assertion shape, not for
+the failing test.
