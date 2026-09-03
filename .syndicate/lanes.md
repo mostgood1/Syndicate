@@ -1462,7 +1462,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   paths are deeper than `snapshots/<date>/<file>`, so the breadth is incidental
   rather than load-bearing.
 - Claims: NONE held. No deploy.
-### board-throttle-600s-remeasure — OPEN — opened 2026-09-03 — session 3492626c
+### board-throttle-600s-remeasure — CLOSED 2026-09-03 — opened 2026-09-03 — session 3492626c — **HYPOTHESIS CONFIRMED: THE 600 s FLOOR DOES NOT BIND. 0 of 5 non-today gaps below it, 0 in [600,750) s, smallest 1,331.2 s = 2.2x the floor; spacing is set by SERIALISATION (today's median 940.8 s vs a ~1005 s build = 0.94, back-to-back). The earlier "IT BINDS" finding is WRONG on both its premise and its inference — and the 1800 s floor it assumed was demonstrably never in effect, since a 22.2-min gap cannot exist under a 30-min floor. `#631` risk 1 is STILL LIVE; raise the floor before widening.**
 - Goal: re-decide `#631` risk 1 against the REAL floor. `board-window-throttle-binds`
   concluded "the throttle BINDS" from tomorrow's 38.8-min median vs a 30-min floor,
   but the code is `max(30, _env_int(KEY, 1800))` and the LIVE value on refresh-worker
@@ -1482,6 +1482,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `BUILD_SPAN_ENTER` on refresh-worker, segmented at the 01:10Z deploy boundary so
   the window where the 600 floor is CONFIRMED is reported separately from the
   earlier window where the env value is not established.
+- Falsification test RAN and did NOT fire: a pile of non-today gaps in [600,750) s
+  would have proved binding. There were ZERO, and zero below the floor either.
+- Verification MET: per-date gap distribution from `BUILD_SPAN_ENTER
+  stage=pull_hot_artifacts`, refresh-worker, COVERED window 2026-09-02T12:42:56Z ->
+  2026-09-03T02:16:34Z (13.6 h), 341 lines / 5 pages. today n=46 med=940.8 s;
+  non-today n=5 med=3,854.1 s min=1,331.2 s.
+- The deploy-boundary segmentation turned out NOT to be needed: an 1800 s floor
+  forbids the observed 1,331.2 s gap, so the floor was <=1,331 s across the whole
+  window regardless of when the env value was set. Post-deploy alone is n=0
+  non-today and could not have decided it.
+- Corroborates the superseded block on the half that survives: today 15.7 min
+  median here vs 15.8 min there, two independent windows.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

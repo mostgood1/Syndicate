@@ -9268,7 +9268,8 @@ exists precisely for this and already applies to non-today dates -- **verify it
 BINDS before widening**, because this lane has already shipped three tuning changes
 to that knob that did nothing (see `[board-window-staleness]`).
 
-> **VERIFIED 2026-09-02 — IT BINDS, AND THIS COST MODEL IS WRONG.**
+> **PARTLY SUPERSEDED 2026-09-03 — "IT BINDS" IS WRONG (see the correction
+> below the block). The COST-MODEL half stands and was measured again.**
 > `[lane board-window-throttle-binds]` Measured per-date `BUILD_SPAN_ENTER`
 > intervals, 744-minute window on refresh-worker:
 >
@@ -9285,10 +9286,61 @@ to that knob that did nothing (see `[board-window-staleness]`).
 > out-built today 3:1. Over the full span it is 39 to 7 the other way — a tail
 > read as a population, which is the standing "a rate, not a count" rule.
 
+> **CORRECTION 2026-09-03 — THE THROTTLE DOES NOT BIND, AND THE FLOOR IT WAS
+> JUDGED AGAINST WAS NEVER IN EFFECT.** `[lane board-throttle-600s-remeasure]`
+>
+> The block above reasons against a 30-minute floor. The code is
+> `max(30, _env_int(SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS, 1800))`
+> and the LIVE value on refresh-worker is **`600`**, read from the Render API.
+>
+> Re-measured from `BUILD_SPAN_ENTER stage=pull_hot_artifacts`, refresh-worker,
+> covered window **2026-09-02T12:42:56Z → 2026-09-03T02:16:34Z (13.6 h)**,
+> 341 matching lines over 5 pages:
+>
+>     date        n   min      p25      median    max        (gap seconds)
+>     2026-09-02  46  128.1    806.9     940.8    3,484.7    <- today, no floor
+>     2026-09-03   5  1,331.2  2,329.3   3,854.1  28,518.5   <- non-today
+>
+> **THE FLOOR NEVER CLIPS.** Of the non-today gaps: **0 below 600 s, and 0 in
+> [600, 750) s** — no pile at the floor. The smallest gap tomorrow ever achieved
+> is **1,331.2 s = 2.2x the floor**. A constraint that is never the binding one
+> is not "binding"; a gap sitting ABOVE a floor is not evidence the floor caused
+> it.
+>
+> **AND THE 1800 s FLOOR WAS DEMONSTRABLY NOT IN EFFECT**, which removes the
+> objection that the env value is only confirmed for the process that booted at
+> 01:10Z: a **1,331.2 s (22.2 min) gap CANNOT EXIST under an 1800 s floor**. So
+> the effective floor across the whole measured window was <= 1,331 s,
+> independently corroborating the API's `600`.
+>
+> **WHAT ACTUALLY SPACES THE BUILDS IS SERIALISATION.** Today's median gap
+> 940.8 s against the ~1005 s measured full-board-build cost is a ratio of
+> **0.94** — the worker builds today essentially BACK-TO-BACK, and non-today
+> dates get whatever turns are left (median 64 min, worst 7.9 h).
+>
+> **WHAT STILL STANDS:** the cost model *"add tomorrow and they alternate at
+> ~42 min each"* is still wrong. Today measured **15.7 min median here**, against
+> 15.8 min in the superseded block — two independent windows agreeing. Widening
+> did not halve today's refresh rate.
+>
+> Sample caveat, stated rather than buried: non-today n=5 gaps. The post-deploy
+> window where `600` is directly confirmed holds **n=0** non-today builds (1.1 h),
+> so this rests on the full window plus the <=1,331 s inference above, not on the
+> post-deploy segment.
+
 ### Risks
 
 1. **Today regresses** if the throttle does not bind. Measured earlier today with 2
    eligible dates: per-date period 30-66 min.
+
+   > **STILL LIVE 2026-09-03 — the throttle does NOT bind, so this risk is NOT
+   > discharged.** `[lane board-throttle-600s-remeasure]` Today is currently
+   > protected only because the window holds TWO dates on a saturated worker, not
+   > because anything sheds load. The soccer index offers **8 forward days** (see
+   > risk 2), and with the floor at `600` they would compete freely.
+   > **The mechanism exists and is simply set too low to fire** — raise
+   > `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` above the
+   > serialisation period as part of any widening, and re-measure that it clips.
 2. **`display_prediction_dates.json` staleness** -- if that artifact lags, the same
    class of bug recurs one level down. WHO WRITES IT AND HOW OFTEN IS UNVERIFIED.
 
