@@ -83,6 +83,7 @@ def main(argv=None) -> int:
     admitted = collections.Counter()
     floors = collections.Counter()
     gated_elapsed = collections.defaultdict(list)
+    admitted_throttled = 0  # ADMITTED lines the loop itself marked throttled=yes
     for line in doc["lines"]:
         msg = line["message"]
         m = re.search(r"BOARD_WINDOW_QUEUE_GATED date=(\S+) elapsed_s=(\S+) floor_s=(\S+)", msg)
@@ -98,6 +99,8 @@ def main(argv=None) -> int:
         if m:
             admitted[m.group(1)] += 1
             floors[m.group(3)] += 1
+            if m.group(2).strip().lower() in ("yes", "true", "1"):
+                admitted_throttled += 1
 
     print("floor_s seen    : %s" % dict(floors))
     print()
@@ -112,10 +115,17 @@ def main(argv=None) -> int:
             note = "gated elapsed_s med=%.0f" % statistics.median(gated_elapsed[d])
         print("%-14s %8d %10d %10s   %s" % (d, g, a, rate, note))
 
-    non_today = [d for d in dates if admitted[d] and d != min(dates)]
     print()
-    tg = sum(gated[d] for d in dates if d != min(dates))
-    ta = sum(admitted[d] for d in dates if d != min(dates))
+    # READ THE FIELD, DO NOT INFER IT. The first version of this called
+    # `min(dates)` "today", which is wrong the moment the central date rolls
+    # over inside the measured window -- and it did: on 2026-09-03 the window
+    # spanned the 05:00Z rollover, so TODAY's 151 admitted enqueues were counted
+    # as non-today and the aggregate printed 44% instead of 87%. The emitter
+    # already publishes `throttled=yes|no` on every ADMITTED line, which is the
+    # loop's OWN answer to "is this date throttled", and GATED lines are
+    # throttled by construction. No date arithmetic, no timezone, no rollover.
+    tg = sum(gated.values())
+    ta = admitted_throttled
     if tg + ta == 0:
         print("VERDICT: no non-today enqueue attempts observed -- window too short.")
         return 2

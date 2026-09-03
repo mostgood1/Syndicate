@@ -19185,3 +19185,54 @@ so they never become "changed" and the watermark sweep never sends them. **So
 was destroyed before the fix — is STILL unanswerable.** The only thing that
 would answer it is a one-off republish of the whole hot set, which costs a full
 sweep against services at 91-97%; not justified for a retrospective question.
+
+
+## 2026-09-03 14:36Z — `verify:` DISCHARGED on the `33b181ee` row — THE FLOOR BINDS, 87% — lane `board-window-floor-raise`
+
+The owed half of `#631`. Measured with `scripts/measure_board_window_clip_rate.py`
+over the covered window **2026-09-03T04:21:22Z -> 14:36:10Z (10.2 h, 306 lines)**.
+`floor_s seen: {'1800': 306}` — every line, so the raised floor was live
+throughout and no reading came from a stale process.
+
+### The clip rate
+
+    non-today enqueues   GATED 130   ADMITTED 19   ->  87%
+    gated elapsed_s median 993 s  (against a 1800 s floor)
+
+**The floor is a live constraint.** At `600` it could not have been: the gated
+attempts sit at a ~993 s median, i.e. they would ALL have been admitted under the
+old floor. That is the mechanism and the rate together.
+
+### Today got FASTER, which is the point of raising it
+
+    BUILD_SPAN_ENTER stage=pull_hot_artifacts, median gap
+      today      BASELINE 940.8 s  ->  665.7 s   (n=35)
+      non-today  BASELINE 3,854.1 s -> 2,096.7 s (n=12)
+
+Today's board rebuilds ~29% faster than the pre-change baseline while non-today
+is held off. **CONFOUND, stated: deploy `33b181ee` carried 35 commits including
+five other sessions' runtime code, so today's improvement is CONSISTENT WITH the
+floor raise but not isolated to it.** The clip rate above IS isolated — it is the
+loop's own decision, not a downstream effect.
+
+### A BUG IN THE MEASUREMENT SCRIPT, found by the number looking wrong
+
+The first run printed **44%**. The script called `min(dates)` "today", which
+breaks the moment the central date rolls over inside the window — and it did, at
+05:00Z: TODAY's 151 admitted enqueues were counted as non-today. Confirmed by
+timestamps: `date=2026-09-03` was gated twice, both BEFORE 05:00Z while it was
+still tomorrow; `date=2026-09-04` was gated 130 times, all AFTER.
+
+Fixed by reading `throttled=yes|no`, **which the emitter already publishes** —
+the loop's own answer to the question the script was trying to reconstruct. No
+date arithmetic, no timezone, no rollover. Standing rule: read the field you
+already have.
+
+### The scheduled run fired and recorded NOTHING
+
+`board-window-clip-rate-remeasure` shows `lastRunAt 2026-09-03T13:00:42Z` and
+auto-disabled, but left no ledger entry and no report. Cause not established —
+NOT assumed to be the known scheduled-session hang, since that was diagnosed for
+a different task. **This row was written from a manual run, not from that task's
+output.** If a scheduled verification is going to be relied on, its run needs to
+leave a trace whether it succeeds or fails.
