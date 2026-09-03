@@ -1518,6 +1518,33 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   on a fresh `generated_at` means the field is inert**, not that the lens was
   empty — the fingerprint is emitted even for an empty lens, by test.
 - Claims: NONE held.
+### board-window-floor-raise — OPEN — opened 2026-09-03 — session 3492626c
+- Goal: make the board-window throttle capable of binding. ENV-ONLY change,
+  `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` `600` -> `1800` on
+  refresh-worker (SET 2026-09-03, single-key endpoint; the key is ABSENT from
+  `render.yaml`, so no `blueprint_sync` will revert it). Deploy to inject it.
+- Files: none — no code change. Env + deploy only.
+- Why 1800: above the ~1005 s serialisation period AND above the observed
+  1,331 s minimum non-today BUILD gap, so it can actually clip; `600` is below
+  both, which is the likely reason three prior tunings of this knob "did
+  nothing". It is also the code default and the value the comment at
+  `intelligence_state.py:6863-6875` justifies against `QUOTE_AGE_SERVED` p50
+  4,285 s. Conservative and reversible; `3600` remains available.
+- **THE PREDICATE IS ENQUEUES, NOT BUILDS.** `_board_window_last_queued_at` is
+  stamped at QUEUE time (`intelligence_state.py:6886`), so this floor gates how
+  often a non-today date is ENQUEUED. The prior lane measured BUILD spans, which
+  cannot see enqueue clipping when the queue is saturated. Do not repeat that.
+- Verification (BEFORE deploying, so it cannot be rationalised after):
+  (a) the live env value reads `1800` AND the deployed process is newer than the
+      set — an env change alone never reaches a running process;
+  (b) re-measure `BUILD_SPAN_ENTER stage=pull_hot_artifacts` per date over a
+      window of >= 4 h and compare non-today's build COUNT and median gap against
+      the pre-change baseline: today n=46 med=940.8 s; non-today n=5 med=3,854.1 s,
+      min=1,331.2 s (covered 2026-09-02T12:42:56Z -> 2026-09-03T02:16:34Z);
+  (c) the honest null result is allowed: if non-today's share does NOT fall, say
+      so — that would mean the queue coalesces and the floor is the wrong lever.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
