@@ -114,7 +114,21 @@
     one. A row our model loves by 40 points earns no more than one it likes by
     12. So this is a price-led board that the simulation breaks ties on and
     nudges the margins of, <em>not</em> a list of bets our model picked. The <span class="board-disclosure__chip">sim disagrees</span>
-    tag marks rows our own model rates worse than the price implies.
+    tag marks rows our own model rates worse than the price implies. That is a
+    statement about <em>rating</em>, and it needs a priced model edge to exist at
+    all — which is why a second tag was added. <span class="board-disclosure__chip">sim contradicts</span>
+    is about <em>direction</em>: our simulation's own projected number lands on
+    the far side of the line from the bet being shown, whether or not it has
+    ever been priced. On 2026-09-03 the board's second-best row was
+    <em>Under 53.5</em> against a projection of <em>67.8</em>, with no tag of any
+    kind. <span class="board-disclosure__chip">sim ±</span> is neither: it means
+    the model returned a certainty (0% or 100%), which is an instrument reading
+    off-scale rather than an opinion. And <span class="board-disclosure__chip">no sim view</span>
+    is shown deliberately, because a blank must not read the same as agreement —
+    on that same board the model had no view on 980 of 1,198 rows.
+    <strong>None of these change the score.</strong> The measurement that would
+    size a penalty does not exist yet: nothing on this board has been graded
+    against outcomes by the sim's own verdict.
     <strong>Nothing here has been graded against outcomes yet</strong> — the
     weights are a stated prior, not a measured finding, and the Score column
     takes itself apart on hover so you can disagree with it.
@@ -3168,16 +3182,44 @@
               // because labelling it live would be the fabrication the
               // Projected column already refuses.
               const simDissents = item.sim_view === "disagrees" || item.sim_view === "live_disagrees";
-              const simIsLive = item.sim_view === "live_disagrees" || item.sim_basis === "live_resim";
+              // DIRECTION, NOT RATING -- a different claim, and until 2026-09-03
+              // the board had no word for it. `disagrees` needs a priced
+              // `model_edge_pct`, which is null on 100% of NCAAF rows BY DESIGN,
+              // so on that sport the older tag can never fire however far the
+              // sim is from the pick. Backend sets this off `projected` vs
+              // `line` vs the row's own side; see `_sim_direction_contradiction`.
+              const simContradicts = item.sim_view === "contradicts" || item.sim_view === "live_contradicts";
+              const simIsLive = item.sim_view === "live_disagrees" || item.sim_view === "live_contradicts" || item.sim_basis === "live_resim";
               const simPct = Math.abs(Number(item.sim_disagreement_pct || 0)).toFixed(1);
-              const simBadge = simDissents
-                ? `<span class="board-badge board-badge--sim-disagrees${simIsLive ? " board-badge--sim-disagrees-live" : ""}" title="${simIsLive
+              const simGap = Math.abs(Number(item.sim_line_gap || 0)).toFixed(1);
+              const simProjected = Number(item.sim_projection ?? item.projected);
+              const simProjectedText = Number.isFinite(simProjected) ? simProjected.toFixed(1) : "its own projection";
+              let simBadge = "";
+              if (simDissents) {
+                simBadge = `<span class="board-badge board-badge--sim-disagrees${simIsLive ? " board-badge--sim-disagrees-live" : ""}" title="${simIsLive
                     ? `The LIVE re-sim, using the current game state, rates this side ${simPct}% worse than the live market price implies.`
-                    : `Our pregame simulation rates this side ${simPct}% worse than the market price implies.`} That disagreement lowers this row's score, capped at 1.5 EV points, and has not been graded against outcomes.">${simIsLive ? "live sim disagrees" : "sim disagrees"}</span>`
+                    : `Our pregame simulation rates this side ${simPct}% worse than the market price implies.`} That disagreement lowers this row's score, capped at 1.5 EV points, and has not been graded against outcomes.">${simIsLive ? "live sim disagrees" : "sim disagrees"}</span>`;
+              } else if (simContradicts) {
+                simBadge = `<span class="board-badge board-badge--sim-contradicts${simIsLive ? " board-badge--sim-disagrees-live" : ""}" title="Our simulation projects ${simProjectedText} against this line, which is ${simGap} on the WRONG side of it for the bet shown. This is a direction contradiction, not a price one: it does NOT change the score, because the sim has never been graded on this market. Read it as a reason to look, not as a veto.">${simIsLive ? "live sim contradicts" : "sim contradicts"}</span>`;
+              }
+              // A RAILED PROBABILITY IS ITS OWN STATE. `Win% 0%` beside a
+              // recommended moneyline is not the model dissenting, it is the
+              // model returning a certainty -- and it must not be read as
+              // either agreement or disagreement.
+              const simRailed = item.sim_probability_railed === true
+                ? `<span class="board-badge board-badge--sim-railed" title="Our model returned a certainty (at or past 0%/100%) for this side. That is an instrument reading off-scale, not an opinion -- treat the Win% cell as unusable on this row rather than as a verdict.">sim &plusmn;</span>`
+                : "";
+              // ABSENT IS NOT AGREEMENT, and a blank cell said neither. 980 of
+              // 1,198 rows carried no model view on 2026-09-03 and every one of
+              // them rendered exactly like a row the model had approved. Muted
+              // on purpose: this is the unremarkable case and must not compete
+              // with the two tags above for attention.
+              const simNoView = (!simDissents && !simContradicts && (item.sim_view === "none" || item.sim_view == null))
+                ? `<span class="board-badge board-badge--sim-noview" title="Our simulation has no view on this row at all. That is NOT the same as the model agreeing with it -- this row is ranked on price alone.">no sim view</span>`
                 : "";
               return `
                 <tr ${rowAttrs}>
-                  <td data-label="State"><span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span>${steamBadge}${simBadge}</td>
+                  <td data-label="State"><span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span>${steamBadge}${simBadge}${simRailed}${simNoView}</td>
                   <td data-label="Score">${renderBlotterScore(item)}</td>
                   <td data-label="Pick" class="board-blotter__cell--primary">
                     <div class="board-blotter__primary">${headshot}${escapeHtml(title)}</div>

@@ -1171,6 +1171,165 @@ def _modelled_fair_edge_for(projection: Mapping[str, Any], side: str) -> float |
     return edge
 
 
+#: Two-way markets, in the row-side vocabulary the board actually serves
+#: (measured on `/api/intelligence/query` 2026-09-03, 1,344 rows: the complete
+#: set of `side` values is over/under/home/away/draw/yes/no/None). A pair here
+#: licenses the `1 - p` / `-edge` identity and NOTHING ELSE does -- see
+#: `_projection_side_in_row_frame`.
+#: A stated framing this cannot place. NOT "" -- see
+#: `_projection_side_in_row_frame`. Deliberately a token no side vocabulary
+#: contains, so an accidental `== row_side` is impossible.
+_SIDE_UNPLACEABLE = "__unplaceable__"
+
+_TWO_WAY_OPPOSITE_SIDE: Mapping[str, str] = {
+    "over": "under",
+    "under": "over",
+    "home": "away",
+    "away": "home",
+    "yes": "no",
+    "no": "yes",
+    "1": "2",
+    "2": "1",
+}
+
+
+def _projection_side_in_row_frame(row: Mapping[str, Any], projection: Mapping[str, Any]) -> str:
+    """`projection["side"]`, restated in the row's own side vocabulary.
+
+    THE PRODUCERS AND THE ROWS DO NOT SPEAK THE SAME LANGUAGE, and until now
+    both `_model_edge_for` and `_model_prob_for_side` compared them as bare
+    strings. Three producers -- `ncaaf/game_projections.py`,
+    `shared/nfl_game_projections.py` and `shared/wnba_game_projections.py` --
+    frame a game-line projection on the HOME TEAM and write its NAME:
+
+        projection["side"] = str(row.get("home_team"))   # "Georgia Tech Yellow Jackets"
+        row["side"]        = "home"
+
+    Those tokens can never be equal, so EVERY side of every such market fell
+    into the "not my framing" branch and was negated. Both sides of a two-way
+    market therefore received the SAME number, and the side the projection was
+    actually about received `1 - p`.
+
+    MEASURED on the served board 2026-09-03, NCAAF moneylines, **17 of 17 pairs
+    identical on both sides**:
+
+        Georgia Tech (home, -223)   0.35     Colorado (away, +217)  0.35
+        Colorado State (home, -148) 0.56     Wyoming  (away, +147)  0.56
+        Illinois (home, -2532)      0.0067   <- the sim says 0.9933
+
+    The last row is the shape of the damage: a 96%-implied favourite served with
+    a model probability of 0.67% in a column headed **Win%**.
+
+    THREE OUTCOMES, AND THE THIRD IS THE ONE THAT MATTERS:
+
+        "home"/"over"/...   placed. Compare it.
+        ""                  the projection states NO side. Fall back to the
+                            field's own definition (`model_prob_over` IS the
+                            over, and for a game market the home) exactly as
+                            before -- this branch is unchanged.
+        `_SIDE_UNPLACEABLE` a side WAS stated and could not be placed. Callers
+                            must DROP the row. Folding this into "" would put
+                            an unknown framing on the permissive branch, which
+                            is the same class of mistake as the one above.
+    """
+    raw = str(projection.get("side") or "").strip().lower()
+    if not raw:
+        return ""
+    if raw in _TWO_WAY_OPPOSITE_SIDE or raw in {"draw", "tie", "x"}:
+        return raw
+    # A TEAM NAME. Resolve it against THIS ROW'S OWN teams rather than against
+    # any alias map: the projection and the row came from the same grid row, so
+    # the strings are the same feed's spelling and no canonicalisation is needed
+    # or wanted (`ncaaf-chip-compact` records why filling `_alias_map("ncaaf")`
+    # is FORBIDDEN -- it re-opens the cross-game token collisions `#603` fixed).
+    home = " ".join(str(row.get("home_team") or "").strip().lower().split())
+    away = " ".join(str(row.get("away_team") or "").strip().lower().split())
+    if home and raw == home:
+        return "home"
+    if away and raw == away:
+        return "away"
+    return _SIDE_UNPLACEABLE
+
+
+#: How far past the line the sim has to land before the board says so, as a
+#: FRACTION OF THE LINE.
+#:
+#: RELATIVE, NOT ABSOLUTE, and that is the only part of this number that is
+#: forced rather than chosen. The same field carries NCAAF points, MLB runs and
+#: soccer goals; three points is noise on a 53.5 total and three goals is a
+#: different sport. There is no shared unit, so there cannot be a shared
+#: absolute threshold.
+#:
+#: THE MAGNITUDE IS A LOUDNESS CHOICE AND IS NOT DERIVED FROM THE SIM BEING
+#: RIGHT -- state that plainly, because a number in a constant reads as a
+#: measurement. What the sim's error against OUTCOMES looks like is unmeasured
+#: for NCAAF totals ("No model-vs-market accuracy measurement exists for totals
+#: at all" -- `football/pick_gate.py`), and NCAAF has 0 graded rows and 0 orders
+#: ever, so nothing can be fitted to it today.
+#:
+#: What IS measured is the gap distribution itself, on the served board
+#: 2026-09-03, 141 NCAAF totals rows over 43 games:
+#:
+#:     |projected - line| / line      p25 0.071   p50 0.154   p75 0.252
+#:     rows contradicted at   0%   71 (50%)   <- a chip on half the board
+#:                           10%   43 (30%)
+#:                           25%   17 (12%)
+#:
+#: 0.10 sits between the p25 and the median: loud enough that the tag is not on
+#: half the rows, quiet enough that it still catches the 14.3-point Under that
+#: started this. Set `SYNDICATE_SIM_CONTRADICTION_MIN_GAP=0` to tag every
+#: contradiction; it is one env key and no deploy.
+_SIM_CONTRADICTION_MIN_GAP = _env_float("SYNDICATE_SIM_CONTRADICTION_MIN_GAP", 0.10)
+
+#: The rails. Identical to the producer-side certainty clamp WNBA already ships
+#: (`_CERTAINTY_FLOOR/_CERTAINTY_CEILING = 0.01, 0.99`), held here under its own
+#: name so the two cannot drift silently.
+_SIM_CERTAINTY_FLOOR = 0.01
+_SIM_CERTAINTY_CEILING = 0.99
+
+
+def _sim_direction_contradiction(row: Mapping[str, Any], projection: Mapping[str, Any]) -> float | None:
+    """How far the sim's own projection lands on the WRONG side of this row's line.
+
+    Returns the signed gap IN THE STAT'S OWN UNITS, positive and only positive:
+    a return value is by construction a contradiction. `None` means either that
+    the sim cannot be read on this row or that it points the same way we do.
+
+    This is a claim about DIRECTION, which is a different thing from
+    `model_edge_pct`'s claim about RATING, and the board had no word for it.
+    Worked example, the row the 2026-09-03 report was written about:
+
+        UMass @ Rutgers   line 53.5   pick UNDER   projected 67.803
+        -> the sim wants the OVER by 14.3 points, and we are recommending the
+           UNDER, at score +1.67, second-best row on the board, untagged.
+
+    ONLY AN OVER/UNDER MARKET. A spread's `line` does not state which side it
+    belongs to (`ncaaf/game_projections.py` carries that finding as
+    `probability_unavailable_reason`, inherited verbatim from NFL), so a guessed
+    sign would invert the verdict while looking plausible -- the exact failure
+    `_model_prob_for_side` exists to prevent. Moneylines have no line at all;
+    their degeneracy is reported separately, by `sim_probability_railed`.
+    """
+    projected = _as_float(projection.get("projected"))
+    if projected is None:
+        projected = _as_float(row.get("projected"))
+    line = _as_float(row.get("line"))
+    if projected is None or line is None or line == 0:
+        return None
+    side = str(row.get("side") or "").strip().lower()
+    if side == "under":
+        gap = projected - line
+    elif side == "over":
+        gap = line - projected
+    else:
+        return None
+    if gap <= 0:
+        return None
+    if abs(gap) / abs(line) < _SIM_CONTRADICTION_MIN_GAP:
+        return None
+    return round(gap, 3)
+
+
 def model_edge_basis(row: Mapping[str, Any], side: str) -> str | None:
     """Which fair the row's `model_edge_pct` was priced against, or None.
 
@@ -1231,8 +1390,14 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
         # ranking at the ceiling value and make every affected row tie at the
         # top -- a wrong answer wearing a plausible one's clothes (#242).
         return None
-    projected_side = str(projection.get("side") or "").strip().lower()
+    # RESTATED IN THE ROW'S FRAME FIRST. A bare string compare treats the
+    # home-team NAME that NCAAF/NFL/WNBA write here as "not my side" and negates
+    # BOTH sides of the market -- see `_projection_side_in_row_frame` for the
+    # 17-of-17 production reading.
+    projected_side = _projection_side_in_row_frame(row, projection)
     row_side = str(side).strip().lower()
+    if projected_side == _SIDE_UNPLACEABLE:
+        return None
     if not projected_side or projected_side == row_side:
         return edge
 
@@ -1280,6 +1445,14 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
         return round(direct, 4)
 
     # Two-way market: the identity holds and MLB/WNBA behaviour is unchanged.
+    #
+    # BUT ONLY FOR AN ACTUAL OPPOSITE. `-edge` is "the other side's edge" only
+    # when this row IS the other side; two tokens that merely fail to be equal
+    # are not opposites. An unplaceable framing is DROPPED, which is the same
+    # rule the three-way branch above already applies and the same rule
+    # `_model_prob_for_side` states in its own last line.
+    if _TWO_WAY_OPPOSITE_SIDE.get(projected_side) != row_side:
+        return None
     return -edge
 
 
@@ -1341,14 +1514,26 @@ def _model_prob_for_side(row: Mapping[str, Any], side: Any = None) -> float | No
 
     if model_prob_over is None:
         return None
-    projected_side = str(projection.get("side") or "").strip().lower()
+    # RESTATED IN THE ROW'S FRAME. See `_projection_side_in_row_frame`: three
+    # producers write the home TEAM NAME here, which no bare compare against
+    # "home"/"away" can ever match, so both sides of every NCAAF/NFL/WNBA game
+    # market took the `1 - p` branch and received the SAME number.
+    projected_side = _projection_side_in_row_frame(row, projection)
+    if projected_side == _SIDE_UNPLACEABLE:
+        return None
     if not row_side:
         return model_prob_over
     if projected_side:
         if projected_side == row_side:
             return model_prob_over
-        # Two-way: P(other side) = 1 - P(this side). Exact, not an approximation.
-        return round(1.0 - model_prob_over, 6)
+        # Two-way: P(other side) = 1 - P(this side). Exact, not an approximation
+        # -- BUT ONLY BETWEEN ACTUAL OPPOSITES. "not equal" is not "opposite",
+        # and negating on inequality is precisely how a team name became a
+        # complement. A framing this cannot place is dropped, exactly as the
+        # unplaceable ROW side is dropped at the bottom of this function.
+        if _TWO_WAY_OPPOSITE_SIDE.get(projected_side) == row_side:
+            return round(1.0 - model_prob_over, 6)
+        return None
 
     # NO STATED FRAMING. Fall back to the field's OWN DEFINITION rather than to
     # its value.
@@ -2747,7 +2932,44 @@ def _layer2_board_columns(
 
     model_edge = _as_float(row.get("model_edge_pct"))
     if model_edge is None:
-        columns["sim_view"] = "none"
+        # `none` IS THE ANSWER ONLY IF THE SIM REALLY HAS NO VIEW, and until now
+        # it was the answer whenever the sim had no PRICED view -- which is a
+        # different and much larger set.
+        #
+        # `sim_view` reads exactly one field. Measured on the served
+        # `/api/intelligence/query` 2026-09-03, 1,344 ranked rows:
+        # `model_edge_pct` is non-null on **0 of 514 NCAAF rows**, 10 of 631 MLB,
+        # 87 of 181 soccer. The badge is not mis-firing on NCAAF -- it is
+        # UNREACHABLE there, because `ncaaf/game_projections.py` sets
+        # `edge_vs_market_pct = None` on all three markets ON PURPOSE (margins
+        # lose to the close by 3.563 MAE at t=17.20, n=2233; totals were never
+        # scored against the close at all and run 1.67x over-dispersed).
+        #
+        # But the sim still SAID something on those rows, and the board printed
+        # it: `projected` 67.803 in the PROJECTED column next to a recommended
+        # **Under 53.5**, scored +1.67, untagged. That is a DIRECTION
+        # contradiction, and `disagrees` -- whose whole claim is about RATING
+        # ("worse than the price implies") -- has never covered it. A missing
+        # concept, not a broken one.
+        #
+        # SO: fall back to the sim's own continuous projection where a priced
+        # edge does not exist. Every input is already on the row.
+        #
+        #   MEASURED, same payload: 71 of 141 NCAAF totals rows (50%) point the
+        #   opposite way to the sim, and 21 of those carry a POSITIVE score.
+        #   Gap `projected - line` over 43 games: mean +4.80, median +5.48,
+        #   per-event SD 9.81, 46% of rows past 10 points.
+        #
+        # `_SIM_CONTRADICTION_MIN_GAP` is what keeps this from being a chip on
+        # half the board -- see its own comment for what it is and is not
+        # derived from.
+        contradiction = _sim_direction_contradiction(row, projection)
+        if contradiction is None:
+            columns["sim_view"] = "none"
+        else:
+            columns["sim_view"] = "live_contradicts" if sim_is_live else "contradicts"
+            columns["sim_line_gap"] = contradiction
+            columns["sim_view_basis"] = "projection_vs_line"
     elif model_edge < 0:
         columns["sim_view"] = "live_disagrees" if sim_is_live else "disagrees"
         columns["sim_disagreement_pct"] = round(model_edge, 4)
@@ -2760,6 +2982,25 @@ def _layer2_board_columns(
         # overstates what the model said. Its own bucket, so it can never again
         # be counted as support.
         columns["sim_view"] = "neutral"
+
+    # `#445` follow-up: A RAILED PROBABILITY IS NOT A DISAGREEMENT, IT IS AN
+    # INSTRUMENT READING OFF-SCALE, and it needs its own word.
+    #
+    # `WIN% 0%` sat beside a RECOMMENDED moneyline on the served board
+    # 2026-09-03 (Rutgers, -3233). Nothing about `agrees`/`disagrees`/`none`
+    # describes that: the sim did not dissent, it returned a certainty. Kept as
+    # a SEPARATE field rather than folded into `sim_view`, because the two are
+    # orthogonal -- a row can be `agrees` AND railed, and collapsing them would
+    # throw away whichever half was written second.
+    #
+    # Rails are the repo's own (`_CERTAINTY_FLOOR/CEILING`, 0.01/0.99), so a
+    # value at or past them is by this platform's existing definition a
+    # certainty claim, which `wnba-accuracy-assessment` records as the thing
+    # a served card must never make.
+    if model_prob is not None and (
+        model_prob <= _SIM_CERTAINTY_FLOOR or model_prob >= _SIM_CERTAINTY_CEILING
+    ):
+        columns["sim_probability_railed"] = True
 
     composite = _as_float(score.get("score"))
     if composite is not None:

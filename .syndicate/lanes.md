@@ -1554,10 +1554,53 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `none` rows within the same sport and market family, with denominators. The
   book's own split (`game_line` +13.28% n=296 vs `game_total` -1.78% n=351)
   cannot answer it — it is not decomposed by the sim's view.
+- **THE THRESHOLD IS A LOUDNESS KNOB AND MUST BE LABELLED ONE.** What is FORCED
+  is that it be RELATIVE (`|gap| / line`): the same field carries NCAAF points,
+  MLB runs and soccer goals, so there is no shared absolute unit. What is CHOSEN
+  is 0.10, and it is chosen against the gap distribution, NOT against any claim
+  that the sim is right — `pick_gate.py` states in those words that no
+  model-vs-market accuracy measurement exists for NCAAF totals at all.
+
+      threshold   tagged of 141   score>0        |gap|/line   p25 0.071
+          0%       71  (50%)         21                       p50 0.154
+          5%       54  (38%)          -                       p75 0.252
+         10%       43  (30%)          8
+         25%       17  (12%)          3
+
+  `SYNDICATE_SIM_CONTRADICTION_MIN_GAP` — one env key, no deploy, 0 tags
+  everything. **Calibrated against NCAAF ONLY**: no MLB/soccer/WNBA row on
+  today's board carried `projected` + `line` + an over/under side together.
+- **IF A PENALTY IS EVER ADDED IT GOES IN THE MULTIPLICATIVE RELIABILITY GROUP,
+  NOT THE ADDITIVE VALUE GROUP.** A contradiction is not a claim the sim is
+  right, it is lower confidence in the row — which is what `blended_score`'s
+  reliability terms already mean ("not additional value, they are confidence in
+  the value already computed"). That placement buys four properties free: it
+  cannot flip a sign, it cannot promote anything (`min(value, discounted)`), it
+  is bounded by construction, and it is NOT a gate because the floor is above
+  zero. **Suggested floor 0.70 — A JUDGEMENT, calibrated by PRECEDENT** (it is
+  the same discount the board already applies for two books instead of five,
+  `_book_confidence(2)`), **not by measurement. Do not ship it as though it were
+  measured.**
 - **DO NOT ADD A GATE.** `[user decision 2026-09-03, verbatim]` *"I also dont
   want an all or nothing gate, we should still be seeing EV opps and potentially
   our sim should be giving us some level of correctness based on scoring model.
   We cant rule out our work as ALWAYS WRONG with a generalized statement"*
+- **COULD NOT VERIFY, stated so nobody inherits these as settled:**
+  (1) the NFL/WNBA half of the `_model_edge_for` sign inversion IN PRODUCTION —
+  neither sport had a game on today's board, and there it feeds the SCORE and
+  the ORDER path, not just a column;
+  (2) the threshold on any sport but NCAAF;
+  (3) that `model_sd 5.77 / market_sd 3.46` are dispersions of the PROJECTIONS
+  rather than of a residual series — a cross-game market total SD of 3.46 is
+  implausibly low, the two readings disagree, and **no threshold here was built
+  on that number for exactly that reason**;
+  (4) anything at all in production, because nothing is deployed;
+  (5) the brief's 947-bet denominators against the 638 settled I read off
+  `/api/portfolio/paper` myself (`game_line` 244 / **+18.86%**, `game_total` 228
+  / **+1.37%**, `player_prop` 166 / **-20.29%**, portfolio 638 / +3.96% vs
+  venue_comparison 908 / +9.34%). Same signs, same ordering, different counts;
+  I did not force them to reconcile. Either way that split **cannot** answer the
+  penalty question, because it is not decomposed by the sim's view.
 - **NOT DEPLOYED, DELIBERATELY** — deploys are being coordinated by
   `prop-join-yield`. `sim_view` is computed on the WORKER and read by the
   template, so this needs refresh-worker AND web to be visible.

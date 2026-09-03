@@ -585,6 +585,20 @@ body.syndicate-body .cards-shell {
    scanning a board of mostly-pregame rows can see which verdicts are being made
    by the re-sim watching the game right now. */
 .board-badge--sim-disagrees-live { background: rgba(231, 76, 60, 0.34); color: #fff1ee; border-color: rgba(231, 76, 60, 0.85); font-weight: 600; }
+/* DIRECTION, NOT RATING. Amber rather than red, and that is a deliberate
+   ranking of the two warnings: `sim disagrees` is a PRICED disagreement, this
+   one is the sim's raw projection landing the wrong side of the line with no
+   price attached to it. Same caution family so it reads as a sibling, one step
+   quieter so it cannot be mistaken for the measured one. */
+.board-badge--sim-contradicts { background: rgba(243, 156, 18, 0.18); color: #ffe9c2; border-color: rgba(243, 156, 18, 0.45); }
+/* AN INSTRUMENT OFF-SCALE, not an opinion. Purple keeps it out of the
+   agree/disagree colour axis entirely, because it is on neither end of it. */
+.board-badge--sim-railed { background: rgba(155, 89, 182, 0.2); color: #ecd9f5; border-color: rgba(155, 89, 182, 0.5); }
+/* ABSENT IS NOT AGREEMENT -- but it is also the unremarkable case, and a loud
+   chip on the majority of rows is a chip nobody reads. Grey, low contrast,
+   present. The point is that a reader can SEE the difference between "the model
+   looked and approved" and "the model never looked", which a blank cannot say. */
+.board-badge--sim-noview { background: rgba(127, 140, 141, 0.14); color: #b9c2c4; border-color: rgba(127, 140, 141, 0.32); }
 
 /* WHICH SLICE OF THE GAME a line is for. `8.5 · totals_alt` sat beside
    `11.5 · totals` with nothing saying the first was FIRST FIVE INNINGS --

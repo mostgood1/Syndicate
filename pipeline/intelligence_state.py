@@ -1885,9 +1885,31 @@ def _backfill_layer2_board_columns(card: dict[str, Any]) -> None:
     if ev_pct is not None:
         card.setdefault("ev_vs_fair_pct", ev_pct)
 
+    # THIS BACKFILL PUT THE BOOK COUNT BACK IN THE `Win%` COLUMN.
+    #
+    # `layer2_board._layer2_board_columns` sets `confidence` to the side-correct
+    # MODEL PROBABILITY and deliberately leaves it ABSENT where there is no
+    # model -- it carries a long comment and a user screenshot explaining why
+    # ("Win% 100%" meant "five or more books quote this market", read by a
+    # bettor as a certainty). `setdefault` then fired on EXACTLY the rows that
+    # blanking had just protected, because those are the only rows where the key
+    # is absent. A backfill downstream of a deliberate blank re-creates the
+    # defect the blank removed, and it does it silently.
+    #
+    # MEASURED on the served board 2026-09-03: Akron @ Wake Forest `Over 50.5`,
+    # no projection, `confidence 1.0` identical to `book_confidence 1.0` --
+    # `Win% 100%` on a row the sim has never priced. Two more on the same
+    # screenshot at 0.85 and 1.0.
+    #
+    # `book_confidence` is still carried, under its OWN name, so nothing is
+    # lost: the score breakdown keeps every term it had and any surface that
+    # genuinely wants book breadth can read the field that means book breadth.
+    # `intelligence_evaluation` reads `confidence` as a fallback for
+    # `model_probability` (`:2152`), so leaving this in was also feeding a book
+    # count to the evaluator as if it were a probability.
     confidence = _num(score.get("book_confidence"))
     if confidence is not None:
-        card.setdefault("confidence", confidence)
+        card.setdefault("book_confidence", confidence)
 
     composite = _num(score.get("score"))
     if composite is not None:
