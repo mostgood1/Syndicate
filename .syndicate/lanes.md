@@ -1335,7 +1335,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### order-model-view — OPEN — opened 2026-09-03 — session 3492626c — **SHIPPED AND LIVE ON BOTH ORDER-PLACING SERVICES (`04187cdf`); the discharging READING is owed, and the obvious one does not count.**
+### order-model-view — OPEN — opened 2026-09-03 — session 3492626c — **LIVE ON BOTH ORDER SERVICES (`04187cdf`); VERIFY STILL OWED after 100 min of polling produced ZERO orders written past 19:54:36Z — a null result about the board's PLACEMENT RATE, not evidence about the change. Ambiguous window 8.9 min.**
 - Goal: an order records WHY it was made, not only what and at what price, so the
   settled book can be split by whether a model view was involved.
 - Files: `syndicate/features/shared/execution_ledger.py`,
@@ -1349,7 +1349,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Measurement + the 8.9-minute ambiguous window: `.syndicate/deploys.md`
   2026-09-03 19:45:44Z/19:54:36Z.
 
-### prop-join-yield — OPEN — opened 2026-09-03 — session 3492626c — **COMMITTED `c5e78549`, NOT YET DEPLOYED. Telemetry only.**
+### prop-join-yield — OPEN — opened 2026-09-03 — session 3492626c — **GOAL MET AND MEASURED ON PRODUCTION. `c5e78549` live on refresh-worker + web; artifact 20:48:16Z reads `player_unmatched_name 191` of `player_rows_considered 1423` = 13.4%, `player_no_projection 43`, accounting closes to 0. 82% of unprojected MLB player rows are a NAME MISS, not an honest blank. OWED: soccer's windowed counts are inflated (`ac735931` NOT deployed).**
 - Goal: MLB prop rows that carry no projection must say WHY — the name did not
   match, versus the sim genuinely has no view. `prop_projections` had no
   `unmatched` counter of any kind, so the two were one number.
