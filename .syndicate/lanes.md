@@ -2147,7 +2147,6 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   See `learnings.md` 09-03 (instrument the join) and `log/2026-09-03.md`.
 - Blocked by: none.
 
-### accuracy-autorun-rearm — OPEN, **BLOCKED: stood down 2026-09-03, no deploy taken, key still `false`. Retry OVERNIGHT before 07:00 CT** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 ### worker-catchup-deploy — CLOSED 2026-09-03 — **BOTH WORKERS CAUGHT UP AND VERIFIED.** live-odds-worker `e4a471c0`→`d4f0b8a3` (live 17:04:06Z, 16 PUBLISH_OK, 0 errors); refresh-worker `c4ce0502`→`c1c4211a` (live 17:19:03Z, 25 publisher lines, peak anon 1,119 MB of 4,096, 0 errors) — opened 2026-09-03 — session cfcce46d-8ad8-4978-9992-5848cba4122a
 - Goal: the two background workers run current code. live-odds-worker is 31
   commits / 26h behind (live `e4a471c0`, 2026-09-02 13:38); refresh-worker is 6
@@ -2172,7 +2171,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
-### accuracy-autorun-rearm — OPEN — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### accuracy-autorun-rearm — OPEN, **BLOCKED: stood down 2026-09-03, no deploy taken, key still `false`. Retry OVERNIGHT before 07:00 CT** — opened 2026-09-03 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `#626`(h) runs in production for the first time WITHOUT killing the
   worker. ONE testable outcome: `[accuracy_summary] AUTORUN_DONE ... error=none`
   in refresh-worker logs, with the peak `memory_anon_mb` during that window
