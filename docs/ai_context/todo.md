@@ -1,5 +1,55 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#645` — **FOUR MEASUREMENTS OWED ON WORK THAT ALREADY SHIPPED. Each one is a number nobody can currently obtain, not a feature** — lane `prop-join-yield`, 2026-09-03 — **CODE LANDED AND LIVE; READINGS OUTSTANDING**
+
+Everything below is deployed and running. What is missing is the reading that
+turns "it should work" into "it does", and each is blocked on a different thing.
+Filed as one item because they share a failure mode: a shipped change with no
+measurement is indistinguishable from a shipped change that did nothing.
+
+**(a) NCAAF pregame cadence, steady state.** `a9247011` + env
+`SYNDICATE_ENABLE_NCAAF_LINES_REFRESH_AUTORUN=1`, live-odds-worker `0aacb2fa`
+live 23:21:37Z, first `NCAAF_LINES_AUTORUN_LAUNCHED` 23:26:25Z. First reading:
+ncaaf `quote_seen_age_seconds` p50 **1,687.0s against a 12,948.4s baseline**.
+**DO NOT QUOTE THAT AS THE RESULT.** The board state was stamped 23:09:41Z,
+BEFORE the first launch, so it is the deploy's boot sweep; p50 and p90 were
+IDENTICAL at 1,687.0s, which is one bulk capture, not a rolling refresh. MLB
+also improved 45.5 -> 5.2s on a change that does not touch MLB. **The
+discriminator is the LAUNCH COUNT and the p90-p25 SPREAD**, not the median.
+
+**(b) `04187cdf`'s order-record hop.** Plan positions carry the model view
+(`model_edge_pct` 8.87 / 10.78, `ev_pct`, `attribution.sim_share_of_stake`
+0.905 / 0.926), so the fields reach SIZING. Whether they survive into an ORDER
+is unproven because **no order has been written since 15:27:33Z** — 100 minutes
+of polling produced zero. The executor is healthy (`status=ok mode=live
+placed=0 duplicates=0 refused={}`, both venues funded); a live run is
+venue-SCOPED and reads the `paper2` artifact, not the main plan. Discharge =
+a NON-NULL `model_edge_pct` on an order submitted after 2026-09-03T19:54:36Z.
+A null does not discharge and does not condemn.
+
+**(c) One NCAAF moneyline pair still identical on both sides**, 1 of 44 (was 17
+of 17). Hawaii Rainbow Warriors vs UNLV Rebels, both sides `model_probability
+0.72`, no `projected`. **`_model_prob_for_side` is EXONERATED by direct test**:
+every constructible input gives `0.72/0.28` or `None/None`, never `0.72/0.72`,
+and the apostrophe-in-`hawai'i` hypothesis is dead. Remaining candidate,
+unconfirmable from the served payload because it strips `projection`: the AWAY
+row's projection carries a different `model_prob_over` (~0.28) while still
+claiming home framing. **Producer-side, not board-side.**
+
+**(d) `d5c1c0fa`'s basketball prop name-join yield cannot be read until
+2026-09-17.** NBA and NCAAB are out of season; WNBA's sprint opens then. The
+counter is tested through the real pandas pipeline, not a source grep, so it is
+known to work — it is simply unobservable in production until there is a slate.
+**This is a scheduled defect, not a completed item**: it comes due on 09-17.
+
+**Why (a) and (b) matter more than they look.** The whole point of tonight's
+telemetry was to make the platform able to explain its own P&L. `sim_view:
+unpriced` (3,306 rows) and the MLB prop cause split (191 of 1,423 player rows
+blank because the NAME did not match, 13.4%) are both live and measured. Those
+feed `#644`'s pre-registered ROI split, which needs ORDERS carrying the fields —
+so (b) is that measurement's denominator, and it is currently zero.
+
+
 ### `#644` — **THE SIM'S VERDICT IS NOW ON THE ORDER — and that is NECESSARY, NOT SUFFICIENT: two of the three arms of the measurement it was built for have a STRUCTURALLY ZERO denominator** — lane `order-sim-view`, 2026-09-03 — **LANDED, NOT DEPLOYED**
 
 `sim_view` / `sim_line_gap` / `sim_probability_railed` are stamped on the
