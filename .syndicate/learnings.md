@@ -5612,3 +5612,37 @@ inflated counter), so the cost was entirely session time, not board harm.
 - **How we found out:** running preflight in the window and reading its process list.
 - **The rule going forward:** identify which instrument ENFORCES the thing you want, and poll that one. A friendlier tool that answers a similar question is a proxy, and proxies disagree exactly when it matters. Related and separately paid for the same day: poll on a documented EXIT CODE, not on substring-matching output — `"CLEAR"` matches inside `"NOT CLEAR"`, and an `[UNKNOWN]` read-failure is not a pass (`check_deploy_safety`'s own help says exit 2 "is NOT the same as clear, and is deliberately not exit 0").
 - **Cost:** two wrong go-signals — one that exited the wait immediately, one that would have deployed on a 502.
+
+## 2026-09-03 — FORBIDDEN: leaving a tree after `git reset --mixed` to a NEWER ref without refreshing the working files
+
+- **What was believed:** that `git reset --mixed origin/main` brings a stale
+  branch up to date safely, because it moves HEAD and the index while leaving
+  the working tree alone — the appealing property when the tree holds edits you
+  want to keep.
+- **What is actually true:** it moves HEAD and the index and leaves the FILES at
+  the old content. On a tree 177 commits behind, that produced a state where the
+  index said `origin/main` and 95 tracked files on disk said something else,
+  including `D tests/test_wnba_cards_fallback_recursion.py` — a file that exists
+  upstream and simply was not on disk. **`git add -A` from there stages a mass
+  revert of 177 commits, and the tree looks "modified", not "stale".** This repo
+  has already paid for that exact shape twice (4,993 staged deletions; the
+  `git add -A` sweep that `83abbb82` had to revert).
+- **How we found out:** reading the `reset` output instead of the exit code —
+  the `M`/`D` list names files nobody had edited, which is the tell. The
+  distinction that makes it safe: BEFORE the reset only 5 tracked files were
+  genuinely modified, so everything else differing afterwards was staleness and
+  could be refreshed with `git checkout -- .`.
+- **The rule going forward:** after any `reset --mixed`/`--soft` onto a newer
+  ref, the working tree is NOT updated — finish the job. Record the genuinely
+  modified paths FIRST (`git diff --name-only` before you touch anything), back
+  them up, `git checkout -- .` to bring the files to the new HEAD, then restore
+  those paths. Never commit from the intermediate state, and never trust
+  "modified" to mean "someone edited this".
+- **Same shape, caught minutes later:** `git checkout -- .` then silently
+  replaced `.syndicate/log/2026-09-03.md` with another session's version,
+  because a file I had created locally already existed upstream. Caught only by
+  a byte-count mismatch against my own backup. **A file being yours locally does
+  not make it untracked** — check before assuming a checkout will leave it alone.
+- **Cost:** none realised — both were caught before any commit. The exposure was
+  a commit that would have reverted 177 commits of six sessions' work, from the
+  shared primary tree, which is the highest-blast-radius mistake available here.
