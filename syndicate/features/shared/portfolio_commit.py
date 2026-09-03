@@ -467,19 +467,35 @@ def commit_portfolio(
     # Same defect twice fixed elsewhere tonight: a counter that names a problem
     # while withholding the data needed to act on it.
     refusals_by_market: dict[str, dict[str, int]] = {}
+    # THE SAME CUT, ONE DIMENSION OVER, and it answers a question the market cut
+    # cannot. Measured 2026-09-03 across 4 days and 4 venues: 6,312 of 6,722
+    # in-scope rows (93.9%) were refused `no_model_edge_pct`, while the BOARD's
+    # own projection join reported healthy coverage for MLB (1,472/1,645 = 89%)
+    # and NFL (6,643/8,736 = 76%) on the same day. Those two readings cannot both
+    # describe the same sport, and with no sport on the refusal there is no way
+    # to tell which sports the venue-scoped misses belong to -- board coverage
+    # does not transfer, because a venue plan only contains rows that venue
+    # quotes. Without this the gap is unattributable and stays a guess.
+    refusals_by_sport: dict[str, dict[str, int]] = {}
     rows_in = 0
 
     def refuse(reason: str, row: Any = None) -> None:
         refusals[reason] = refusals.get(reason, 0) + 1
         market = ""
+        sport = ""
         if isinstance(row, Mapping):
             market = str(row.get("market") or "").strip().lower()
+            sport = str(row.get("sport") or "").strip().lower()
         # `unkeyed` rather than dropping the count: a refusal whose row carries
         # no market is still a refusal, and silently omitting it would make the
         # per-market totals disagree with `refusals` for no visible reason.
         bucket = refusals_by_market.setdefault(reason, {})
         key = market or "unkeyed"
         bucket[key] = bucket.get(key, 0) + 1
+        # Same `unkeyed` contract, for the same reason.
+        sport_bucket = refusals_by_sport.setdefault(reason, {})
+        sport_key = sport or "unkeyed"
+        sport_bucket[sport_key] = sport_bucket.get(sport_key, 0) + 1
 
     excluded_families = resolve_excluded_families()
 
@@ -803,6 +819,10 @@ def commit_portfolio(
         "refusals_by_market": {
             reason: dict(sorted(markets.items(), key=lambda kv: (-kv[1], kv[0])))
             for reason, markets in sorted(refusals_by_market.items())
+        },
+        "refusals_by_sport": {
+            reason: dict(sorted(markets.items(), key=lambda kv: (-kv[1], kv[0])))
+            for reason, markets in sorted(refusals_by_sport.items())
         },
         "exposure": exposure,
     }

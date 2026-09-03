@@ -998,6 +998,13 @@ def run_portfolio_commit(
         for reason, markets in by_market.items()
         if markets
     }
+    # THE SPORT SPLIT OF `no_model_edge_pct` SPECIFICALLY, in full rather than
+    # trimmed to a leader. That one refusal was 93.9% of in-scope rows across 4
+    # days and 4 venues, and the board's own projection join reported MLB at 89%
+    # and NFL at 76% coverage on the same day -- readings that cannot both
+    # describe the same sport. The leader alone cannot settle it; the whole
+    # split can, and there are only a handful of sports.
+    no_view_by_sport = (plan.get("refusals_by_sport") or {}).get("no_model_edge_pct") or {}
 
     # print, not logger.info -- logger.info never reaches Render's collector.
     print(
@@ -1006,7 +1013,8 @@ def run_portfolio_commit(
         f"positions={totals.get('positions')} staked=${totals.get('staked_dollars')} "
         f"bankroll=${plan.get('bankroll_units')} bankroll_source={bankroll_source} "
         f"scale={totals.get('slate_scale_factor')} "
-        f"refusals={plan.get('refusals')} top_market_per_refusal={leaders}",
+        f"refusals={plan.get('refusals')} top_market_per_refusal={leaders} "
+        f"no_model_edge_by_sport={no_view_by_sport}",
         flush=True,
     )
     # ---- paper2: the same pipeline, restricted to one venue's prices --------
@@ -1079,7 +1087,9 @@ def run_portfolio_commit(
                 # wrong two runs.
                 f"vs_unrestricted_positions={main_totals.get('positions')} "
                 f"vs_unrestricted_staked=${main_totals.get('staked_dollars')} "
-                f"refusals={venue_refusals}",
+                f"refusals={venue_refusals} "
+                # Same split, on the plan that the 93.9% was measured from.
+                f"no_model_edge_by_sport={(venue_plan.get('refusals_by_sport') or {}).get('no_model_edge_pct') or {}}",
                 flush=True,
             )
             venue_plans[venue] = venue_plan

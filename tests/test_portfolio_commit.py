@@ -881,3 +881,59 @@ def test_a_refusal_with_no_market_is_counted_not_dropped():
                             settings=PortfolioSettings())
     assert plan["refusals"]["row_not_a_mapping"] == 1
     assert plan["refusals_by_market"]["row_not_a_mapping"] == {"unkeyed": 1}
+
+
+def test_no_model_edge_refusals_are_attributed_BY_SPORT(monkeypatch) -> None:
+    """The market cut cannot answer WHICH SPORT is unsized, and that is the
+    question the number gets asked.
+
+    Measured 2026-09-03 across 4 days and 4 venues: 6,312 of 6,722 in-scope rows
+    (93.9%) refused `no_model_edge_pct`, while the board's own projection join
+    reported MLB at 1,472/1,645 (89%) and NFL at 6,643/8,736 (76%) coverage the
+    same day. Those readings cannot both describe the same sport, and with no
+    sport on the refusal there was no way to tell which one was wrong -- board
+    coverage does not transfer, because a venue plan only holds rows that venue
+    quotes.
+    """
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES", "")
+    from syndicate.features.shared.portfolio_commit import commit_portfolio
+    from syndicate.features.shared.portfolio_settings import PortfolioSettings
+
+    rows = [
+        {"sport": "mlb", "market": "strikeouts", "side": "over", "line": 1.5,
+         "quote": {"price": -110}, "ev_pct": 5.0},
+        {"sport": "soccer", "market": "player_shots", "side": "over", "line": 1.5,
+         "quote": {"price": -110}, "ev_pct": 5.0},
+        {"sport": "soccer", "market": "player_shots", "side": "over", "line": 2.5,
+         "quote": {"price": -110}, "ev_pct": 5.0},
+    ]
+    plan = commit_portfolio(rows, selected_date="2026-08-25",
+                            settings=PortfolioSettings(bankroll_units=1000.0))
+
+    by_sport = plan["refusals_by_sport"]["no_model_edge_pct"]
+    assert by_sport == {"soccer": 2, "mlb": 1}
+    # Sorted by count desc, like the market cut, so the leader reads first.
+    assert list(by_sport) == ["soccer", "mlb"]
+
+
+def test_the_sport_split_RECONCILES_with_the_refusal_total(monkeypatch) -> None:
+    """A split that does not sum to its parent is two numbers, not one fact."""
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES", "")
+    from syndicate.features.shared.portfolio_commit import commit_portfolio
+    from syndicate.features.shared.portfolio_settings import PortfolioSettings
+
+    rows = [
+        {"sport": "mlb", "market": "strikeouts", "side": "over", "line": 1.5,
+         "quote": {"price": -110}, "ev_pct": 5.0},
+        {"sport": "", "market": "totals", "side": "over", "line": 2.5,
+         "quote": {"price": -110}, "ev_pct": 5.0},
+    ]
+    plan = commit_portfolio(rows, selected_date="2026-08-25",
+                            settings=PortfolioSettings(bankroll_units=1000.0))
+
+    for reason, total in plan["refusals"].items():
+        split = plan["refusals_by_sport"].get(reason, {})
+        assert sum(split.values()) == total, reason
+    # A row with no sport is counted as `unkeyed`, never dropped -- dropping it
+    # is exactly how a split stops reconciling without anything looking wrong.
+    assert plan["refusals_by_sport"]["no_model_edge_pct"].get("unkeyed") == 1
