@@ -5103,3 +5103,31 @@ it — the row-level number is still the effect size, it is only the CONFIDENCE
 that is fake. A p-value that disagrees with its own t is not a lucky finding, it
 is an unmodelled correlation, and in a repeated-measures design the cluster is
 usually the thing every row in a group shares.
+
+## 2026-09-02 FORBIDDEN: attributing dirt in a shared tree to the thing you just ran, without checking what was dirty BEFORE you ran it.
+
+- **I reported "the suite MUTATES tracked files" and named four. It does not.**
+  Each of 24 modules alone: tree clean. All 24 together, 1,031 tests: tree clean.
+  **Two of the files were already modified in this session's OPENING `git status`
+  snapshot**, before I ran anything. A `git status` taken AFTER a long session
+  attributes every prior session's dirt, and every one of your own earlier
+  commands, to whatever you happened to run last.
+- **The check is free and I skipped it:** compare against the session-start
+  status, or restore-and-rerun. I did the restore-and-rerun only after being
+  asked to FIX the thing, which is one step too late — by then the false claim
+  was already in `lanes.md`.
+- **THEN I MISDIAGNOSED THE CAUSE OF THE THING THAT WASN'T HAPPENING.** I called
+  it a "conftest subprocess leak" because I saw dirty files and a `patch.object`
+  in a nearby fixture. `_isolate_reports_root` uses `monkeypatch.setenv`, and
+  **subprocesses inherit environment variables** — there was no leak, and the
+  fixture I was about to "fix" was correct. Reading the fixture took two minutes
+  and I did it only after committing to the story.
+- **The likely real source was my own harness:** passes run with
+  `SYNDICATE_DATA_ROOT` pointed at the real tree, which is documented as taking
+  precedence over the isolation. **When your measurement sets a production-shaped
+  root, you have disabled the guard you are then measuring.**
+- **The rule.** Before reporting that X dirties a tree: (1) establish the tree was
+  CLEAN before X, (2) reproduce X in isolation, (3) read the guard that is
+  supposed to prevent it BEFORE naming how it failed. A retraction in the same
+  session is cheap; the ledger entry it corrects is not.
+- *(full account: lane `venue-quote-tests-data-dependent`)*

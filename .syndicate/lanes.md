@@ -1306,11 +1306,39 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   over a fixture cannot catch either — the fixture is the thing that lied"*; and
   module-level skips would drop **601 passing tests**, 353 in `test_archives.py`,
   the file CI runs. The tests are right; the ENVIRONMENT is wrong.
-- **ALSO OBSERVED, not chased:** the suite MUTATES tracked files —
+- ~~**ALSO OBSERVED, not chased:** the suite MUTATES tracked files —
   `data/mlb_source/.../live_lens_2026_06_02.jsonl`,
   `reports/intelligence/kalshi_markets.json`, and
   `vendor/wnba_betting_repo/data/processed/schedule_2026.{csv,json}` were dirty
-  after these runs and had to be restored before committing.
+  after these runs and had to be restored before committing.~~
+- **RETRACTED 2026-09-02, SAME SESSION. THE SUITE DOES NOT DIRTY TRACKED FILES,
+  AND I ALSO MISDIAGNOSED THE CAUSE ON TOP OF THE WRONG OBSERVATION.**
+  - **Each of the 24 modules run ALONE: tree clean.** All 24 run TOGETHER
+    (1,031 tests, 115 failed / 911 passed): **tree clean.** Restored baseline
+    before each. The claim does not reproduce under any configuration I ran.
+  - **Two of the three tracked files were ALREADY MODIFIED AT SESSION START** —
+    `live_lens_2026_06_02.jsonl` and both `schedule_2026.{csv,json}` appear in
+    this session's opening `git status` snapshot, before I ran anything. I
+    attributed pre-existing dirt to my own test runs.
+  - **The likely real cause of what I saw is MY OWN HARNESS:** several passes
+    ran with `SYNDICATE_DATA_ROOT` pointed at the primary tree's real `data/`,
+    which is exactly the override the isolation fixture documents as taking
+    precedence. Setting a real root disables the isolation for anything
+    resolving through it. Not proven — I declined to prove it, because proving
+    it means deliberately dirtying the SHARED primary tree.
+  - **AND THE FOLLOW-UP DIAGNOSIS WAS ALSO WRONG.** I called this a "conftest
+    subprocess leak". There is no leak: `_isolate_reports_root` uses
+    `monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", ...)`, and **subprocesses
+    inherit environment variables**. I named a mechanism from a symptom —
+    saw dirty files, saw a `patch.object` in a nearby fixture, assembled a
+    story — which `learnings.md` already forbids by name.
+  - **NOTHING WAS CHANGED IN `conftest.py`.** There was no defect to fix. The
+    fixture is correct as written.
+  - The one thing here that IS true and unaddressed: the suite-wide isolation
+    covers `reports_root()` only. `data_root()` and `vendor/` have no
+    equivalent seam, so a test that resolves through those CAN reach tracked
+    files. That is a gap in coverage, not an observed failure, and no test I
+    ran exercised it.
 - Blocked by: none.
 
 
