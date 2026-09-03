@@ -434,5 +434,41 @@ console.log('\n--- a real live TOTAL still wins over the probability ---');
 // than the cover probability.
 eq('a game row prefers its live total', displayLiveProjection({ market: 'totals', live_total: 2.7, live_model_probability: 0.55 }), '2.7');
 
+console.log('\n--- "no sim view" is a CLAIM, and it must read the fields it claims about ---');
+// USER-REPORTED 2026-09-03, minutes after the badge shipped: MLB rows tagged
+// `no sim view` with a number in the PROJECTED column beside them. Measured the
+// same minute on the served payload -- 16,284 rows, `sim_view: none` on 10,032,
+// and 3,300 of those (32.9%) carry a `model_probability` or `projected`.
+//
+// `sim_view` is a function of `model_edge_pct` alone, so `none` has always meant
+// "no PRICED edge", never "no model". The blank cell hid that; the badge printed
+// it as a falsehood.
+const simViewBadgeKind = (new Function(`${extract('simViewBadgeKind')}\nreturn simViewBadgeKind;`))();
+
+// The row the user reported, values copied off the served payload.
+eq('Corey Seager over 1.5 TB: projected 1.046, no priced edge -> NOT "no sim view"',
+  simViewBadgeKind({ sim_view: 'none', model_probability: 0.2407, projected: 1.046 }), 'unpriced');
+eq('Jarren Duran over 1.5 TB, same shape',
+  simViewBadgeKind({ sim_view: 'none', model_probability: 0.2152, projected: 0.998 }), 'unpriced');
+
+// The state the badge was actually built for survives.
+eq('genuinely no model -> "no sim view"',
+  simViewBadgeKind({ sim_view: 'none' }), 'none');
+eq('an absent sim_view is still "no sim view" when nothing else is there',
+  simViewBadgeKind({}), 'none');
+
+// A projection of ZERO is a view. `0` is falsy in JS and a truthiness test here
+// would call it absent -- the same class of bug as reporting a real 0.0 edge as
+// "no model", which `_as_optional_float` exists to prevent on the order side.
+eq('projected 0 is a VIEW, not an absence',
+  simViewBadgeKind({ sim_view: 'none', projected: 0 }), 'unpriced');
+eq('model_probability 0 is a VIEW, not an absence',
+  simViewBadgeKind({ sim_view: 'none', model_probability: 0 }), 'unpriced');
+
+// Rows that already say something must not be relabelled.
+eq('agrees is left alone', simViewBadgeKind({ sim_view: 'agrees', projected: 1.0 }), null);
+eq('disagrees is left alone', simViewBadgeKind({ sim_view: 'disagrees' }), null);
+eq('contradicts is left alone', simViewBadgeKind({ sim_view: 'contradicts', projected: 67.8 }), null);
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILED`);
 process.exit(failures === 0 ? 0 : 1);

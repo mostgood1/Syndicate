@@ -123,7 +123,9 @@
     <em>Under 53.5</em> against a projection of <em>67.8</em>, with no tag of any
     kind. <span class="board-disclosure__chip">sim ±</span> is neither: it means
     the model returned a certainty (0% or 100%), which is an instrument reading
-    off-scale rather than an opinion. And <span class="board-disclosure__chip">no sim view</span>
+    off-scale rather than an opinion. And <span class="board-disclosure__chip">sim, no edge</span> means the model DID
+    have a view -- the Projected column shows it -- but it could not be priced against
+    this market, usually because only one side is quoted. <span class="board-disclosure__chip">no sim view</span>
     is shown deliberately, because a blank must not read the same as agreement —
     on that same board the model had no view on 980 of 1,198 rows.
     <strong>None of these change the score.</strong> The measurement that would
@@ -2182,6 +2184,37 @@
     return league ? league.toUpperCase() : fallback;
   }
 
+  // "No sim view" is a CLAIM, and on 3,300 rows it was a false one.
+  //
+  // USER-REPORTED 2026-09-03, minutes after the badge first shipped: MLB rows
+  // tagged `no sim view` while the PROJECTED column right beside them showed a
+  // number. Measured on the served `/api/intelligence/query` the same minute --
+  // 16,284 rows, `sim_view: none` on 10,032, and **3,300 of those (32.9%) carry
+  // a `model_probability` or a `projected`** (ncaaf 2,364, mlb 732, soccer 204).
+  // Corey Seager, `batter_total_bases` over 1.5: `projected 1.046`,
+  // `model_probability 0.2407`, `model_edge_pct null` -> `none` -> "no sim view".
+  // The sim had a view. It could not be PRICED into an edge.
+  //
+  // `sim_view` is derived from `model_edge_pct` alone, so `none` has always
+  // meant "no priced edge", never "no model". That was survivable while the
+  // value rendered as a blank cell; this badge turned a silent conflation into
+  // a printed falsehood, which is the cost of naming a state without checking
+  // what is actually in it.
+  //
+  // THE BADGE NOW READS THE FIELDS IT IS MAKING A CLAIM ABOUT. Both are already
+  // on the row -- no new payload, and this works against the CURRENT worker
+  // build rather than waiting on one, which matters because the backend half
+  // (`layer2_board`'s `contradicts`) is deployed to web and NOT to
+  // refresh-worker as I write this.
+  function simViewBadgeKind(item) {
+    const view = item && item.sim_view;
+    if (view && view !== "none") return null;          // agrees/disagrees/contradicts speak for themselves
+    const hasNumber = item
+      && ((item.model_probability !== null && item.model_probability !== undefined)
+        || (item.projected !== null && item.projected !== undefined));
+    return hasNumber ? "unpriced" : "none";
+  }
+
   function chipTeamRow(side, chip) {
     const team = chip[side] || {};
     const isLeader = chip.leader === side;
@@ -3214,8 +3247,11 @@
               // them rendered exactly like a row the model had approved. Muted
               // on purpose: this is the unremarkable case and must not compete
               // with the two tags above for attention.
-              const simNoView = (!simDissents && !simContradicts && (item.sim_view === "none" || item.sim_view == null))
+              const simNoViewKind = (!simDissents && !simContradicts) ? simViewBadgeKind(item) : null;
+              const simNoView = simNoViewKind === "none"
                 ? `<span class="board-badge board-badge--sim-noview" title="Our simulation has no view on this row at all. That is NOT the same as the model agreeing with it -- this row is ranked on price alone.">no sim view</span>`
+                : simNoViewKind === "unpriced"
+                ? `<span class="board-badge board-badge--sim-noview" title="Our simulation DOES have a view on this row -- see the Projected column -- but it could not be priced into an edge against this market, usually because only one side is quoted so there is no two-sided fair to compare against. Ranked on price; the model number is shown but is not scoring.">sim, no edge</span>`
                 : "";
               return `
                 <tr ${rowAttrs}>
