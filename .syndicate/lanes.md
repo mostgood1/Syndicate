@@ -1737,7 +1737,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
       so — that would mean the queue coalesces and the floor is the wrong lever.
 - Blocked by: none
 
-### intelligence-suite-runtime — OPEN, **NOT A STALL: 221 pass in 586s (9:46). Top 25 = 66%, all `test_intelligence_query*`. AND ISOLATING THEM MAKES THEM SLOWER — the durations do not decompose. **THE WARM EFFECT IS RETRACTED — 3 paired replications show cold 31.32s vs warm 31.45s, and the founding 52.74s reading does not reproduce.** What stands: 221 pass in 586s, not a stall** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### intelligence-suite-runtime — CLOSED 2026-09-03 — QUESTION ANSWERED (not a stall); MOST OF THE LANE RETRACTED — **NOT A STALL: 221 pass in 586s (9:46). Top 25 = 66%, all `test_intelligence_query*`. AND ISOLATING THEM MAKES THEM SLOWER — the durations do not decompose. **THE WARM EFFECT IS RETRACTED — 3 paired replications show cold 31.32s vs warm 31.45s, and the founding 52.74s reading does not reproduce.** What stands: 221 pass in 586s, not a stall** — opened 2026-09-02 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `tests/test_intelligence.py` (221 tests) completes in a STATED, bounded
   time. One testable outcome: a full run finishes and its total is recorded, and
   whatever dominates it is either fixed or documented as irreducible with the
@@ -1939,6 +1939,35 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   needs a paired, replicated design from the start — n>=3 per condition, and no
   comparative claim from single runs. This lane spent most of its effort
   chasing an effect that three replications erased.
+- **CLOSED 2026-09-03. Verification RAN.**
+  (1) *a completed run with the TOTAL recorded* — RAN: **221 pass in 586.00s
+  (9:46)**, faulthandler never fired.
+  (2) *`--durations=25` naming the per-test cost* — RAN: top 25 = 387.6s, all
+  `test_intelligence_query*`, 12.5-28.9s each; collection alone 43-75s.
+  (3) *re-measure after a change* — VACUOUS: no change was made, and none is
+  proposed on current evidence.
+  **GOAL MET on its documentation branch:** the suite completes in a stated
+  time, and what dominates it is named with per-test costs — ~50 tests each
+  driving a real candidate-pool build at 20-30s. Nothing is 'fixed' because
+  nothing was shown to be broken.
+  **THE ORIGINAL PREMISE WAS FALSE.** This lane opened on a '>10 minutes,
+  stalled at 32%' observation. That was a 10-minute timeout landing mid-run on
+  a suite that finishes at 9:46; the frozen percentage was pytest printing per
+  output line. There was never a stall.
+  **AND MOST OF WHAT THE LANE THEN PRODUCED IS RETRACTED** — see the retraction
+  above. The 'warm state' effect, the 1.7x isolation penalty, the four
+  mechanism exonerations and the 'do not split the cluster' guidance all rested
+  on one unreplicated comparison with an outlier cold reading. Three paired
+  replications erased it (cold 31.32s vs warm 31.45s). **Do not cite any of
+  them.** The only durable outputs are the 586s/221-pass measurement and the
+  learnings rule.
+  POSTMORTEM: landed as `learnings.md` 2026-09-03 — *FORBIDDEN: a comparative
+  claim from ONE run per condition*. Also a REPEAT of the 2026-08-29 rule on
+  validating a profiler's SCOPE: the first cProfile attempt wrapped
+  `pytest.main`, so the warm profile contained 20 extra tests and compared a
+  1-test profile against a 21-test one. Same rule, second instance, five days
+  apart.
+  No deploy; no source file was ever claimed or changed.
 - Blocked by: none. No deploy — this is test-suite runtime, not production
   behaviour.
 
