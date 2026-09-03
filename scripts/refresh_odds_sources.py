@@ -131,6 +131,35 @@ class RefreshStep:
     command: tuple[str, ...]
     env_updates: dict[str, str] | None = None
     description: str | None = None
+    #: Which `--mode` values this step runs under. `None` means EVERY mode,
+    #: which is exactly today's behaviour and is why every existing step can
+    #: stay untouched -- a step only opts IN to being mode-scoped.
+    #:
+    #: WHY THIS EXISTS (`ncaaf-live-cadence`, 2026-09-03). Phase already lets a
+    #: step say WHEN it belongs; nothing let it say HOW EXPENSIVE it is. NCAAF's
+    #: three steps differ by three orders of magnitude in cost:
+    #:
+    #:     ncaaf_game_lines_oddsapi     1 OddsAPI request   (9 credits at
+    #:                                  regions us,eu,us_ex -- billed per
+    #:                                  REQUEST, 3 credits per region)
+    #:     ncaaf_player_props_oddsapi   ~130 events x 9 markets = ~1,170
+    #:                                  requests, billed per EVENT per market
+    #:
+    #: Measured on production 2026-09-03T22:50Z, `/api/ops/oddsapi/quota`:
+    #: ncaaf has made **113,843 calls for 9,495 credits** -- nearly free today
+    #: only because OddsAPI returns no props for most college events and an
+    #: empty response is not billed. The CALLS are real regardless, and they are
+    #: why an NCAAF-inclusive sweep takes minutes.
+    #:
+    #: So the cheap half was hostage to the expensive half: the only way to
+    #: refresh an NCAAF price was to run the prop sweep too. Mode scoping lets a
+    #: `mode="fast"` launch take the price and leave the props, which is what
+    #: makes a short NCAAF cadence affordable at all.
+    #:
+    #: NOT A BEHAVIOUR CHANGE IN PRODUCTION: `SYNDICATE_LIVE_ODDS_REFRESH_MODE`
+    #: reads `full` on both workers (verified live via the Render env-vars API
+    #: 2026-09-03), so every existing sweep keeps every step it has today.
+    modes: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -1150,6 +1179,24 @@ def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
         RefreshStep(
             name="ncaaf_player_props_oddsapi",
             phases=("pregame", "live"),
+            # `ncaaf-live-cadence`, 2026-09-03. FULL ONLY, and this is the step
+            # that made a short NCAAF cadence impossible.
+            #
+            # It is billed per EVENT per MARKET and issues one HTTP request per
+            # (event, market) pair on the per-market fallback path -- ~130
+            # events x 9 markets. Production 2026-09-03T22:50Z: ncaaf has made
+            # **113,843 calls for 9,495 credits**, i.e. the calls are real and
+            # the credits are only low because OddsAPI returns nothing for most
+            # college events right now. That is a property of THIS week's
+            # market, not a guarantee: once the books post college props the
+            # same sweep costs ~1,170 credits, and at a 30-minute cadence that
+            # alone is ~1.7M credits/month against a 5,000,000 cap.
+            #
+            # So the game lines -- ONE request, 9 credits -- are exempted from
+            # it rather than the other way round. `mode="fast"` takes the price
+            # and leaves the props; `mode="full"` (what both workers run today)
+            # is unchanged.
+            modes=("full",),
             cwd=REPO_ROOT,
             command=(
                 python_exe,
@@ -1166,6 +1213,16 @@ def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
         RefreshStep(
             name="ncaaf_lines_snapshot",
             phases=("pregame", "live"),
+            # FULL ONLY, same lane change as the props step above. This is the
+            # LEGACY recommendation-bundle runner, and the comment on the props
+            # step records that it CANNOT run for 2026 at all
+            # (`_resolve_data_root` wants a 2025-only predicted-totals CSV;
+            # measured `STEP_FAIL ... return_code=1` on production
+            # 2026-08-27T01:04:55Z). Carrying a step that is known to fail into
+            # a 5-minute autorun would mean every run reports `ok=false` and the
+            # one signal that matters -- did the PRICE land -- would be buried
+            # under a failure nobody is acting on.
+            modes=("full",),
             cwd=REPO_ROOT,
             command=tuple(command),
             description="Refresh NCAAF lines and bundle source recommendation artifacts through a Syndicate-owned runner.",
@@ -2601,10 +2658,22 @@ def _hosted_source_mode_writes_directly(*, spec: SportSpec, execution_mode: str,
     return spec.slug in {"mlb", "nba", "nhl", "nfl", "wnba", "ncaaf"}
 
 
-def _filter_steps(steps: Sequence[RefreshStep], phase: str) -> list[RefreshStep]:
-    if phase == "all":
-        return list(steps)
-    return [step for step in steps if phase in step.phases]
+def _filter_steps(steps: Sequence[RefreshStep], phase: str, mode: str | None = None) -> list[RefreshStep]:
+    """Steps that belong in THIS launch, by phase and then by mode.
+
+    `mode=None` skips the mode filter entirely, so every existing caller keeps
+    exactly the behaviour it had. A step with `modes=None` runs in every mode --
+    see `RefreshStep.modes` for why a step would ever opt out of one.
+
+    `phase == "all"` deliberately still respects `modes`: "run every phase" is a
+    statement about WHEN, and mode is a statement about HOW MUCH. Conflating
+    them would make `--phase all --mode fast` silently run the expensive half.
+    """
+    kept = list(steps) if phase == "all" else [step for step in steps if phase in step.phases]
+    if mode is None:
+        return kept
+    normalized = str(mode or "").strip().lower()
+    return [step for step in kept if step.modes is None or normalized in step.modes]
 
 
 def _publish_sport_manifest_threadsafe(*, sport: str, artifact_paths: list[str], metadata: dict[str, Any]) -> dict[str, Any]:
@@ -2675,7 +2744,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         after=sport_start_memory,
     )
 
-    refresh_steps = [] if execution_mode == "ingest" else _filter_steps(spec.step_builder(args), args.phase)
+    refresh_steps = [] if execution_mode == "ingest" else _filter_steps(spec.step_builder(args), args.phase, refresh_mode)
     if refresh_steps and any(_step_requires_source_root(step) for step in refresh_steps):
         source_error = _validate_source_root(spec)
         if source_error is not None:

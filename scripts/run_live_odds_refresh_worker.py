@@ -464,6 +464,229 @@ def _launch_autorun_wnba_live_refresh() -> None:
     print(f"[live_odds_worker] WNBA_LIVE_AUTORUN_LAUNCHED date={selected_date} phase=live mode=fast", flush=True)
 
 
+# `ncaaf-live-cadence`, 2026-09-03. NCAAF PRICES ARE HOURS OLD ON A BOARD THAT
+# CARRIES FIVE DAYS OF NCAAF GAMES, and the cause is not a slow run -- it is that
+# NCAAF is only INVITED to a sweep once every two hours.
+#
+# MEASURED, not inferred, on 2026-09-03 (live-odds-worker logs + the served
+# board + `ncaaf_source/tracking/book_quotes/*.state.json` read back from
+# production):
+#
+#   * `ODDS_SWEEP_LAUNCHED` fires every ~90s and reads `sports=mlb,soccer` on
+#     essentially every tick. NCAAF appears in exactly ONE launch between
+#     17:09Z and 20:07Z: `sports=mlb,ncaaf,soccer` at 18:43:22Z.
+#   * `PREGAME_CADENCE_DETAIL` names the gate and its number:
+#     `ncaaf:marker_age_s=7042/interval_s=7200`. The 7200 comes from
+#     `FIXTURE_CADENCE sport=ncaaf interval=7200 reason=near:4h_out` -- the
+#     fixture-aware "near" tier, with `SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE`
+#     true on this service.
+#   * The observed gap was worse than the interval: last-seen stamps jump
+#     **18:43:39Z -> 22:16:37Z, 3h33m**. NCAAF WAS launched at 20:43 (its marker
+#     resets to `marker_age_s=89` one tick later) and no capture landed. Markers
+#     are stamped BEFORE the launch by `#25`'s fail-closed rule, so a launch that
+#     produces nothing costs a FULL interval -- at 7200s that is a 4-hour hole
+#     from one lost run.
+#   * The served board at 22:20:12Z: 4,644 of 5,928 NCAAF rows at
+#     `quote_seen_age_seconds` 12,948s, scored `freshness_factor: 0.25`. The
+#     h2h rows are the clean instrument -- a moneyline key carries no line, so it
+#     is never orphaned by a line move, and 948 of 948 read the same 12,948s.
+#
+# THE FIX IS ISOLATION, AND THE REASON IS COST, NOT DURATION. This borrows the
+# WNBA live autorun's shape below it, but not its diagnosis. WNBA's problem was a
+# combined run colliding with itself; NCAAF's is that its cheap step is hostage
+# to its expensive one. `refresh_odds_sources.py`'s NCAAF leg is three steps:
+#
+#     ncaaf_game_lines_oddsapi     ONE request. Billed per REQUEST at 3 credits
+#                                  per region, and `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS`
+#                                  is `eu,us_ex` on this service, so `us,eu,us_ex`
+#                                  = 9 credits. This is the step that writes the
+#                                  prices the board reads.
+#     ncaaf_player_props_oddsapi   ~130 events x 9 markets, billed per EVENT per
+#                                  MARKET. Production `/api/ops/oddsapi/quota`
+#                                  2026-09-03T22:50Z: ncaaf 113,843 calls for
+#                                  9,495 credits -- cheap only because OddsAPI
+#                                  returns nothing for most college events today.
+#     ncaaf_lines_snapshot         the legacy bundle runner, which CANNOT run for
+#                                  2026 (measured `STEP_FAIL` 2026-08-27).
+#
+# So this launches `mode="fast"`, which `RefreshStep.modes` now uses to drop the
+# two expensive steps and keep the price capture. THE BUDGET, against the
+# 5,000,000 cap (production read the same instant: `remaining 4,803,782`,
+# `credits_per_hour 2,776`, `projected_30d_credits 1,998,715`):
+#
+#     300s cadence   12 runs/h x 9 credits = 108/h = 2,592/day
+#     game-day gated (~4 of 7 days)         ~44,400 / 30 days
+#     ALWAYS on, worst case                  77,760 / 30 days = 1.6% of the cap
+#                                            and 3.9% on top of today's burn
+#
+# The cap is not the binding constraint at this cadence; the props step would
+# have been (~1.7M/month at a 30-minute cadence on its own), which is exactly why
+# it is excluded rather than throttled.
+#
+# ONE CALL REFRESHES EVERY DATE. `fetch_ncaaf_oddsapi_game_lines.py` takes
+# whatever OddsAPI is quoting and shards each event by its OWN commence date, so
+# a Thursday run also re-prices Saturday's slate. That is why the game-day gate
+# below is not the narrowing it looks like.
+#
+# EXPLICIT, DISTINCT LANE, same reason WNBA's live autorun has one:
+# `SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES` is on in production, so an explicit
+# `lane=` is honoured and this can never contend with the combined sweep's lane.
+def _ncaaf_lines_refresh_enabled() -> bool:
+    # DEFAULT OFF, the convention every autorun in this file uses. New periodic
+    # worker work is never free (`#241` caused a production restart loop), and
+    # this service was reading 96% of its 2,048MB with 81MB headroom on
+    # 2026-09-03T22:24Z.
+    raw_value = str(os.environ.get("SYNDICATE_ENABLE_NCAAF_LINES_REFRESH_AUTORUN") or "").strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _ncaaf_lines_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_NCAAF_LINES_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        # 300s. The run is one OddsAPI request plus an append to the date-sharded
+        # quote log, so the margin over its own duration is large -- unlike
+        # WNBA's 240s, which was fitted to a measured ~368s run. Deliberately not
+        # 60s: the publish sweep re-streams whichever `book_quotes` shards
+        # changed, and the 2026-09-05 shard alone is 22MB.
+        value = int(raw_value or 300)
+    except ValueError:
+        value = 300
+    return max(1, value)
+
+
+def _ncaaf_lines_refresh_horizon_days() -> int:
+    # 1 = today and tomorrow. Matches `WEEKLY_SPORTS_GAME_HORIZON_DAYS`' own
+    # default and the Layer 2 shortlist horizon rather than this service's live
+    # value of 7, because 7 would make this fire every hour of the season for
+    # games four days out -- affordable, but it is periodic work on a service at
+    # 96% memory and the prices that move are the ones near a kickoff.
+    raw_value = str(os.environ.get("SYNDICATE_NCAAF_LINES_REFRESH_HORIZON_DAYS") or "").strip()
+    try:
+        return max(0, int(raw_value or 1))
+    except ValueError:
+        return 1
+
+
+def _ncaaf_lines_refresh_lane() -> str:
+    raw_value = str(os.environ.get("SYNDICATE_NCAAF_LINES_REFRESH_LANE") or "").strip()
+    return raw_value or "live-odds-worker-ncaaf-lines"
+
+
+def _ncaaf_lines_autorun_status_path() -> Path:
+    return reports_root() / "refresh_status" / "latest" / "ncaaf_lines_autorun_status.json"
+
+
+def _ncaaf_active_for_date(date_str: str) -> bool:
+    active = {item.strip().lower() for item in _active_sports_for_date(date_str).split(",") if item.strip()}
+    return "ncaaf" in active
+
+
+def _ncaaf_has_games_within_horizon(date_str: str) -> bool:
+    """Game-day gate, on the SAME predicate the ownership split already uses.
+
+    `sport_has_games_within` is `live_refresh_loop._weekly_sport_claimed_by_fast_tick`'s
+    implementation, and `#520` records what happens when a second copy of an
+    ownership rule is grown next to the first. Nothing here decides ownership --
+    this launch has its own lane -- but reusing the predicate means a schedule
+    the rest of the system cannot read produces one answer, not two.
+
+    `unknown_means_yes` is inherited: an unresolvable schedule over-captures at 9
+    credits a run rather than going dark, and going dark is the failure this
+    whole autorun exists to remove.
+    """
+    try:
+        from syndicate.features.shared.schedule_adapter import sport_has_games_within
+
+        return bool(sport_has_games_within("ncaaf", date_str, horizon_days=_ncaaf_lines_refresh_horizon_days()))
+    except Exception:
+        return True
+
+
+def _report_previous_ncaaf_lines_run(last_status: dict) -> None:
+    """Same reason as every other `_report_previous_*` here (`#433`): the launch
+    is detached with stdout to DEVNULL, so without this the last thing anyone
+    hears about a run is that it started.
+    """
+    if not last_status:
+        return
+    err = last_status.get("error")
+    if err:
+        print(f"[live_odds_worker] NCAAF_LINES_AUTORUN_PREV date={last_status.get('date')} FAILED {err}", flush=True)
+        return
+    print(
+        f"[live_odds_worker] NCAAF_LINES_AUTORUN_PREV date={last_status.get('date')} "
+        f"launched=ok runStamp={last_status.get('runStamp')} artifactsDir={last_status.get('artifactsDir')}",
+        flush=True,
+    )
+
+
+def _launch_autorun_ncaaf_lines_refresh() -> None:
+    if not _ncaaf_lines_refresh_enabled():
+        return
+    selected_date = central_today_iso()
+    if not _ncaaf_active_for_date(selected_date):
+        return
+    if not _ncaaf_has_games_within_horizon(selected_date):
+        return
+    status_path = _ncaaf_lines_autorun_status_path()
+    last_status = read_json_file(status_path) or {}
+    # BEFORE the cadence gate, same reason as every other autorun here.
+    _report_previous_ncaaf_lines_run(last_status)
+    if last_status and not last_status.get("reported"):
+        try:
+            write_json_file(status_path, {**last_status, "reported": True})
+        except Exception:  # noqa: BLE001
+            pass
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_ncaaf_lines_refresh_interval_seconds()):
+        return
+    try:
+        result = launch_refresh_run(
+            date=selected_date,
+            sports="ncaaf",
+            phase="live",
+            execution_mode="source",
+            regions="us",
+            skip_mirror=True,
+            # LOAD-BEARING, not copied from WNBA. `mode="fast"` is what drops
+            # `ncaaf_player_props_oddsapi` (billed per event per market) and the
+            # legacy bundle step, leaving the single 9-credit game-line request.
+            # Without it this autorun would be the most expensive job on the
+            # service instead of one of the cheapest.
+            mode="fast",
+            launch_mode="web_process",
+            lane=_ncaaf_lines_refresh_lane(),
+        )
+    except Exception as exc:
+        if _is_refresh_run_contention_error(exc):
+            # `#472`'s fix: preserve the ORIGINAL epoch on contention so one lost
+            # mutex race costs a short retry rather than a full interval. That
+            # rule matters more here than anywhere else in this file -- the
+            # 3h33m hole this autorun exists to remove was itself a single lost
+            # run charged at a full interval.
+            write_json_file(status_path, {**last_status, "sports": "ncaaf", "date": selected_date, "error": f"{type(exc).__name__}: {exc}", "reported": False})
+        else:
+            write_json_file(status_path, {"epoch": time.time(), "sports": "ncaaf", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        print(f"[live_odds_worker] NCAAF_LINES_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return
+    write_json_file(
+        status_path,
+        {
+            "epoch": time.time(),
+            "sports": "ncaaf",
+            "date": selected_date,
+            "artifactsDir": (result or {}).get("artifactsDir"),
+            "runStamp": (result or {}).get("runStamp"),
+            "reported": False,
+        },
+    )
+    print(
+        f"[live_odds_worker] NCAAF_LINES_AUTORUN_LAUNCHED date={selected_date} phase=live mode=fast "
+        f"lane={_ncaaf_lines_refresh_lane()} interval_s={_ncaaf_lines_refresh_interval_seconds()}",
+        flush=True,
+    )
+
+
 def _launch_autorun_soccer_pregame_refresh() -> None:
     if not _soccer_pregame_refresh_enabled():
         return
@@ -706,6 +929,14 @@ def _run_tick() -> dict[str, object] | None:
         _launch_autorun_wnba_live_refresh()
     except Exception as exc:
         print(f"[live_odds_worker] WNBA_LIVE_AUTORUN_ERROR {type(exc).__name__}: {exc}", flush=True)
+    # `ncaaf-live-cadence`. Same independence as the three above: its enable
+    # flag, season gate, game-day gate and interval gate make this a no-op on
+    # almost every call, and its own try/except means an NCAAF failure can never
+    # take down the WNBA autoruns or the general tick that follows.
+    try:
+        _launch_autorun_ncaaf_lines_refresh()
+    except Exception as exc:
+        print(f"[live_odds_worker] NCAAF_LINES_AUTORUN_ERROR {type(exc).__name__}: {exc}", flush=True)
     try:
         _log_worker_memory("tick_start")
         meta = _run_live_refresh_tick()
