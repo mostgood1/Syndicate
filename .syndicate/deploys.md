@@ -19794,3 +19794,54 @@ live-odds-worker (`markets_dropped=0`, `status=ok` book, `appended=8749`), it is
 unit-tested in both directions, and it is the safety net if `venue_odds` ever
 returns to keyvalue. It is dormant code, not dead code — and not an open
 obligation.
+
+
+## 2026-09-03 19:45:44Z / 19:54:36Z — `04187cdf` model view on every order — BOTH order-placing services — lane `order-model-view`
+
+**What shipped.** `model_edge_pct` and `ev_pct` on `OrderRequest`, on the
+`record_order` record, and in `_LEAN_FIELDS`. Read from the plan position, which
+already carried them and was dropping them at that boundary — which is why the
+947-bet settled book cannot be split by whether a model view was involved, and
+why `#627`'s organising verdict (market beats the sim on main lines, the edge
+lives in props) can be neither confirmed nor overturned by the book. Recovers
+nothing retrospectively; that is the argument for not deferring it.
+
+**Two fields, not the five on the dataclass.** `market_fair_probability` and
+`model_probability` are exactly derivable —
+`fair = (ev_pct/100 + 1) / (net_profit(price) + 1)` and
+`model_probability = fair + model_edge_pct/100` — and this document is
+read-modify-written by two services, so width is not free. `price_reliability`
+is a SIZING input and answers a different question.
+
+**MEASURED — both services, because `run_execution` has two callers on two
+services** (`intelligence_state.py:6452` on refresh-worker,
+`run_live_odds_refresh_worker.py:1754` on live-odds-worker) and both reach
+`record_order`:
+
+    refresh-worker    04187cdf              live 2026-09-03T19:45:44.056937Z
+    live-odds-worker  48c68546 (CONTAINS)   live 2026-09-03T19:54:36.846875Z
+
+`48c68546` is another lane's commit; `git merge-base --is-ancestor 04187cdf
+48c68546` returns 0 and it is on `origin/main`, so it carried this change for
+free. **My own queued live-odds-worker deploy was STOOD DOWN** rather than fired
+behind it — serialisation would have ordered them correctly and still cost a
+redundant worker restart.
+
+**AMBIGUOUS WINDOW: 8.9 minutes, 19:45:44Z → 19:54:36Z.** Orders written by
+live-odds-worker inside it carry no model view *because of the deploy*, not
+because none existed. Anyone splitting the book by model view must exclude that
+window rather than read its nulls as data.
+
+**verify: OWED, and the obvious reading is NOT it.** Both live positions at
+19:5xZ show `model_edge_pct: null` — and both were `submitted_at`
+2026-09-03T15:27:33Z, four hours before either service ran the code. A null on a
+pre-deploy order says nothing. Nor does a null on a post-deploy one: the
+contract is that a row with no model view records `None` (`_as_optional_float`
+exists to keep that distinguishable from a real `0.0`), and
+`no_model_edge_pct` was 72% on NCAAF. **The discharging reading is a NON-NULL
+`model_edge_pct` on an order whose `submitted_at` is after 19:54:36Z**, from
+`/api/portfolio/live` or `/api/portfolio/paper`. Watcher armed. If a run of
+post-deploy orders comes back all-null, that is not a discharge and not a
+condemnation either — the next step is reading the PLAN position for one of
+those keys to see whether the field was there to be copied.
+
