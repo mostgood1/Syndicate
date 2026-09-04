@@ -46,8 +46,10 @@ import glob
 import math
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+from zoneinfo import ZoneInfo
 
 from syndicate.features.shared.team_aliases import teams_match
 from syndicate.features.shared.source_roots import preferred_source_roots
@@ -71,6 +73,74 @@ def _as_float(value: Any) -> float | None:
 
 def _norm(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().split())
+
+
+# The NFL schedule's own clock. `gameday`/`gametime` in the nflverse schedule
+# files are LOCAL EASTERN (`2026_01_NE_SEA` reads `2026-09-09` / `20:20`), so
+# this is the zone the index is keyed in.
+#
+# A NAMED ZONE, NEVER A FIXED OFFSET. The NFL season spans the DST boundary --
+# September is EDT (UTC-4) and January is EST (UTC-5) -- so a hardcoded `-4`
+# would be right for the regular season and wrong for the playoffs, twice a
+# year, silently. Matches `layer1_board._row_local_date` and
+# `candidate_slate_filter._slate_date`, which already resolve a board row's
+# local day this way.
+SCHEDULE_TIMEZONE = ZoneInfo("America/New_York")
+
+
+def schedule_date_key(value: Any) -> str:
+    """The ET calendar day a board `commence_time` actually falls on.
+
+    THE DEFECT THIS EXISTS TO REMOVE, measured on production 2026-09-04T20:56Z.
+    `lookup` keyed on `commence_time[:10]`, which is **UTC**, while the index is
+    built from the schedule's `gameday`, which is **local ET**. Those are two
+    different quantities, and they disagree for every kickoff at or after 20:00
+    ET, which rolls into the next UTC day:
+
+        schedule   2026_01_NE_SEA   gameday 2026-09-09   gametime 20:20  (ET)
+        board      commence_time    2026-09-10T00:20:00Z                 (UTC)
+
+    So the join missed every prime-time game and hit every afternoon one. The
+    served NFL board showed exactly that signature -- Sunday-afternoon UTC dates
+    at ~100% projected (09-13: 74/74, 09-20: 57/57, 09-27: 61/61) and EVERY
+    Thursday / Sunday-night / Monday-night UTC date at zero (09-10: 0/4,
+    09-11: 0/5, 09-14: 0/5, 09-15: 0/7, ...), for `unmatched_game_rows: 299`
+    of `rows_considered: 1252` -- 23.9% of the board, and 100% of the rows
+    inside the horizon at the time of reading.
+
+    Converting rather than skewing by a day is deliberate. `date_key - 1` would
+    paper over the mismatch and would then be wrong for the afternoon games it
+    was not meant to touch; converting makes the two sides the SAME QUANTITY,
+    which is the thing that was actually broken.
+
+    Returns the raw 10-character prefix -- i.e. the old behaviour -- for
+    anything this cannot resolve, so an unparseable or already-local value is
+    never made worse than it was:
+
+      * A DATE-ONLY value ("2026-09-13") is already a calendar day and is
+        returned unchanged. Parsing it would yield naive midnight, which read
+        as UTC converts to the PREVIOUS ET day -- a new off-by-one, in the one
+        case that was never broken.
+      * A naive timestamp is read as UTC, which is this repo's stated
+        convention for a stamp with no zone (`timezone.central_clock`: "a naive
+        stamp in this repo is UTC by convention").
+      * Anything unparseable falls through to the slice.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if "T" not in text and " " not in text:
+        return text[:10]
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text[:10]
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    try:
+        return moment.astimezone(SCHEDULE_TIMEZONE).date().isoformat()
+    except Exception:
+        return text[:10]
 
 
 def _normal_cdf(z: float) -> float:
@@ -121,7 +191,15 @@ class NflGameProjectionIndex:
     rows_superseded_by_newer: int = 0
 
     def lookup(self, game_date: str, home: Any, away: Any) -> dict[str, Any] | None:
-        date_key = str(game_date or "")[:10]
+        """Resolve a projection for one board row.
+
+        `game_date` is the row's `commence_time` -- the FULL timestamp, not a
+        pre-sliced date. It used to be sliced at the call site, which is why
+        converting here alone would have been inert: the time component the
+        conversion needs had already been thrown away one frame up. Passing a
+        bare `YYYY-MM-DD` still works and is treated as a calendar day.
+        """
+        date_key = schedule_date_key(game_date)
         if not date_key:
             return None
         h, a = _norm(home), _norm(away)
@@ -290,8 +368,14 @@ def attach_nfl_game_projections(
             # margin/total means are full-game; a quarter market is a different bet.
             non_full_segment += 1
             continue
-        game_date = str(row.get("commence_time") or "")[:10]
-        entry = index.lookup(game_date, row.get("home_team"), row.get("away_team"))
+        # THE FULL TIMESTAMP, NOT A SLICE. `commence_time[:10]` is a UTC
+        # calendar day and the index is keyed on the schedule's ET `gameday`;
+        # see `schedule_date_key`. Slicing here discarded the only information
+        # that could reconcile them, so the conversion has to receive the whole
+        # stamp. `game_date` below is the RESOLVED ET key, so the bias-warning
+        # dedupe groups a game on the same day the index does.
+        game_date = schedule_date_key(row.get("commence_time"))
+        entry = index.lookup(row.get("commence_time"), row.get("home_team"), row.get("away_team"))
         if entry is None:
             unmatched += 1
             continue
