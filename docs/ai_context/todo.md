@@ -2662,6 +2662,33 @@ worker-local export-only set once (2) unblocks.
    (+0.01..+0.04); tails are wrong exactly where "model > market" fires
    (LogLoss 1.92 vs Brier 0.269). Gate: held-out fortnight LogLoss beats
    uncalibrated; bucket errors within ±0.05.
+   **BOTH HALVES NOW SHIPPED.** Calibration 2026-09-01 (`f03ef38a` — the
+   incumbent was worse than raw, replaced on a three-way split). **The REFUSAL
+   did not ship until 2026-09-04**, and it is worth recording why it was missed
+   for three days: the item reads as one step, so "step 1 shipped" was true of
+   the clause everyone was looking at.
+   - `f1508e78` refused inside `_dist_prob_over`. Live on refresh-worker
+     04:30:44Z; on the first artifact it built, **EXACT 1.0 went 1 → 0 with
+     `model_prob_over` coverage 77.7% → 78.2%** (1,451/1,867 → 1,461/1,869). The
+     denominator is half the verification — the board had exactly ONE
+     certainty, so a bare zero count and a board that lost the field entirely
+     read identically.
+   - **It covered 1 of 17.** The same read showed **16 EXACT 0.0 unchanged**:
+     threshold rungs (`basis` `hr_2plus`/`hr_3plus`) read from `p_hr_Nplus_cal`,
+     a producer that never touches a distribution. `77b36315` moved the refusal
+     to the exit both public entries share (`project()` /
+     `project_game_market()`), so all four producers are covered by
+     construction.
+   - **0.0 is the dangerous sign, not 1.0.** It says the OVER is impossible,
+     pricing the UNDER at 100% confidence against whatever the book pays. All 16
+     are unpriced today only because `market_fair_prob_over` is None on those
+     rows — the same accident that spared the 1.0 (whose +59.4-point edge was
+     suppressed by an unrelated "game is final" guard). **Neither is a property
+     of the rule.**
+   - The blank is LABELLED (`model_prob_over_refused`,
+     `model_prob_over_refused_value`) because
+     `test_a_genuine_zero_is_still_a_projection` pins that absence and zero must
+     not collapse into each other, and it was right to.
 2. **THEN the HRR null — CLOSED 2026-09-01 AS ALREADY FIXED. NOT ACTIONABLE.**
    Measured on production: all 993 zero-probability graded HRR rows fall in
    **2026-06-04..07-08**; from 08-07 every graded HRR row is non-zero. On the
@@ -2678,11 +2705,38 @@ worker-local export-only set once (2) unblocks.
    dropped — because the first run of that script was itself poisoned by these
    six dates and produced a confident wrong conclusion (see step 1's
    correction).
-3. **Substitution ON + joint refit** — the built-but-dark hazard model
-   (`position_substitutions=False`) whose absence inflates `pa_mean` +19.7%
-   (55% of the prop bias is opportunity). Mechanism+estimator pair per the
-   standard §4.4. Then re-run the de-biased model-skill measurement (prior
-   reading: de-biasing flips 5 of 7 markets past a constant baseline).
+3. **Substitution ON + joint refit** — **MECHANISM SHIPPED AND NOW VERIFIED IN
+   PRODUCTION. THE REFIT IS WHAT IS LEFT.**
+   `GameConfig.position_substitutions` defaulted False, inflating `pa_mean`
+   +19.7% (55% of the prop bias is opportunity). `e3bdbc8b` flipped it, and it
+   went live on refresh-worker in `51cf8b83` at **2026-09-01T23:22:12Z**.
+   **THE OWED PRODUCTION READING IS DISCHARGED (2026-09-04).** Starter `ab_mean`
+   on the served `/mlb/api/hr-targets` board, `rows` + `reconciliation.
+   excluded_rows`, restricted to rows carrying a lineup (`lineup_status` in
+   {confirmed, projected}):
+
+   | window | dates | rows | `ab_mean` | per-date sd |
+   |---|---|---|---|---|
+   | ≤ 08-31 (code not live) | 14 | 2,511 | **3.8361** | 0.0333 |
+   | ≥ 09-02 (code live) | 3 | 638 | **3.6669** | 0.0321 |
+
+   **−0.1692 AB, −4.41%. The 09-01 offline A/B predicted 3.880 → 3.708 =
+   −0.172, −4.43%.** The windows do not overlap: the AFTER maximum (3.6979)
+   sits 0.0686 below the BEFORE minimum, 2.1× the before-window per-date sd.
+   09-01 itself (3.6587) is in NEITHER arm — the code went live mid-day, so that
+   date is ambiguous by construction rather than by measurement.
+   **THE FILTER IS LOAD-BEARING, and I nearly published without it.** Unfiltered,
+   today's slate reads `ab_mean` 2.4787 and the step looks like −21.95% — a
+   headline "3× better than predicted" that is pure composition. 160 of 445 rows
+   that date have `lineup_status: None` and `ab_mean` 0.3070; on the
+   lineup-carrying population the same date reads 3.6979. **A finished or
+   not-yet-set slate is a different population, not a regression.**
+   STILL OWED, and it is the estimator half of the §4.4 pair: the rate re-fit
+   (`scripts/refit_mlb_rates.py`). Substitution UNDER-corrects — opportunity bias
+   is still positive at ~+4.4% after it — so it cannot overshoot what the rates
+   absorbed, but the residual is real and the ~12% per-PA RATE bias is untouched.
+   Then re-run the de-biased model-skill measurement (prior reading: de-biasing
+   flips 5 of 7 markets past a constant baseline).
 4. **`#202` EXECUTED 2026-09-01 — 4 tests run, 0 candidates, NO EDGE FOUND**
    (the pre-registration's own prior). `scripts/run_mlb_edge_scan.py`, 9,479
    graded rows / 51 dates. **7 of 8 hypotheses are NOT EXECUTABLE:** the per-row
