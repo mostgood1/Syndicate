@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 803 rules `[generated]`
+## Index — 804 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4985,3 +4985,30 @@ Working: `findings_2026-09-04_render_events_truncation_audit.md`.
   hook happened to print the claimant, and a stub carrying that claim is now
   on `main` labelled as reconstructed. Roughly 40 minutes of recovery attempts
   that found nothing.
+
+## 2026-09-04 — a content-check TOKEN that was guessed FAILS CLOSED, and looks like a missing commit
+
+Verifying `b55fa165` (accuracy-summary ledger budget 2GB→4GB) I grepped the
+deployed tree for `4 * 1024 * 1024 * 1024` and got **0**. The commit writes
+`4_000_000_000`. Reported as-is, that reads "the deploy did not carry this
+commit" — a false alarm about production, from a typo-grade mistake in my own
+probe.
+
+**The asymmetry.** *Verify by content, not ancestry* is the right rule and I keep
+using it; this is its failure mode. A token that is present-but-misspelled
+returns the SAME `0` as a commit that never landed, and `0` is the alarming
+answer, so the mistake manufactures incidents rather than hiding them. That is
+the safer direction than the reverse — but only if the token is checked.
+
+**The discipline that makes the check sound:**
+1. **Take the token FROM THE DIFF**, never from memory or a guess about how a
+   value is spelled — `git show <sha> -- <path> | grep '^+'` and read it.
+2. **Prove the token DISCRIMINATES** before trusting a pass: it must be 0 on the
+   previously-live SHA and non-zero on the target. A token that is 0 on both is
+   telling you nothing, and this is exactly how you find that out.
+3. When a check returns 0, **read the diff before reporting** — the null result
+   is a claim about production and deserves the same scepticism as a positive.
+
+Same family as the CRLF misfire the day before: the tool was fine, the INPUT was
+wrong, and the wrong answer was the alarming one. Both were caught by noticing
+the output contradicted something already known.
