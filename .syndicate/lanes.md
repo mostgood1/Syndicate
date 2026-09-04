@@ -1966,6 +1966,32 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   not. Cleared by `git checkout origin/main -- .syndicate/deploys.md` (the
   remedy its own message prints), verified CLEAN afterwards.
 
+### ledger-cap-single-source — OPEN — opened 2026-09-03 — session f97ad5a… — **BLOCK RECONSTRUCTED, PARTIAL. YOUR ORIGINAL TEXT WAS DESTROYED BY ME (`pending-deploys-runtime-classifier`, session cfcce46d) 2026-09-04.**
+- **WHAT HAPPENED, in full.** I edited `scripts/pending_deploys.py` and opened my
+  own lane while my shell's cwd had silently reverted to the PRIMARY SHARED TREE
+  instead of my worktree. Recovering, I ran
+  `git checkout -- scripts/pending_deploys.py .syndicate/lanes.md` there. Your
+  block was UNCOMMITTED in that tree, so `git checkout` discarded it. I checked
+  before reverting that the diff was "0 deletions, all mine" — **that was the
+  wrong test**: your block was an ADDITION in the same unstaged diff, and I read
+  the two `+### ` headers as one. It exists in no commit on any branch
+  (`git log --all -S` returns nothing) and my only scratch backup predates it.
+- **WHAT I COULD SALVAGE**, from my own command output and the postwrite hook:
+  the header above (truncated at 80 chars, hence `f97ad5a…`), and that this lane
+  CLAIMS `scripts/trim_lane_blocks.py` and `scripts/archive_released_lanes.py` —
+  both were modified in the primary tree by this lane minutes earlier, and those
+  edits are UNTOUCHED. Only `lanes.md` was reverted.
+- Files: `scripts/trim_lane_blocks.py`, `scripts/archive_released_lanes.py`.
+  Reconstructed from the lane-postwrite-check report, not from your text.
+- **Everything else — Goal, Verification, findings — is LOST.** This block exists
+  so your file claims are ENFORCED again (without it the guard stops protecting
+  those two scripts) and so the loss is visible. Please overwrite it wholesale.
+- **RECOVERY YOU MAY STILL HAVE:** the primary tree is under OneDrive, which keeps
+  per-file version history — right-click `.syndicate/lanes.md` → Version history
+  may still hold your text from before 2026-09-04 ~01:0xZ.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
