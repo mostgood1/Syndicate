@@ -646,53 +646,44 @@ sizing. NEW from-code facts this session `[from-code, agent surveys]`:
   `odds_regions.py:63-66` — the [sharp-reference-price] 92.8%-burn line above
   is overwritten as stale. Historical endpoints: 10 credits/market-region.
 
-## [accuracy-autorun-rearm-state] `#626`(h) IS ONE ENV KEY AWAY — THE CODE IS ALREADY LIVE `[2026-09-03, lane accuracy-autorun-rearm, no deploy taken]`
+## [accuracy-autorun-rearm-state] `#626`(h) IS ARMED, RAN, AND PASSED. The budget, not memory, is now the constraint. `[2026-09-04, lane accuracy-autorun-rearm CLOSED / accuracy-ledger-budget-raise OPEN]`
 
-**Do not re-derive this: refresh-worker ALREADY RUNS the bounded code.** Verified
-by CONTENT on the deployed tree (`c4ce0502`), not by ancestry:
-`_project_evaluation_record` x4, `_accuracy_summary_ledger_budget_bytes` x6,
-`ledger_coverage` x2. Arming `#626`(h) needs **no code deploy** — only
-`ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN=true` plus a deploy to inject it.
+**Do not re-derive any of this. Superseded the 09-03 "one env key away" text.**
 
-    key           false          (read from the Render env-vars API after stand-down)
-    claim         free
-    autorun       has never run in production
+    ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN = true   (armed 2026-09-04, deploy 7f44f5eb live 14:20:32Z)
+    AUTORUN_DONE sports=8 elapsed_s=669.389 error=none      14:34:27Z -- FIRST production run ever
+    peak memory_anon_mb 1481.6 of a 4096 ceiling            BELOW the ~1877 baseline cycle peak
+    09-02 OOM peak was 3868                                 this run peaked 2386 MiB under it
+    oomKilled: LAST FAIL 2026-09-02T15:32:56Z, none since, zero restarts
 
-**THREE OPERATIONAL FACTS, each measured 2026-09-03:**
+**THE OOM RISK IS DISCHARGED.** `_project_evaluation_record` took 4.014 resident
+bytes per file byte to 0.053; the 09-02 kill cannot recur from this path.
 
-- **A same-SHA redeploy is REFUSED** — `HOLD: <sha> is already contained in live
-  <sha> -- the deploy is redundant`. So an "env-only" change must target a NEWER
-  commit and therefore ships whatever else has landed. It is never a no-op.
-- **`check_deploy_safety` is COARSER than `deploy_preflight` and they disagree.**
-  What the safety check called "board build only", preflight enumerated as THREE
-  killable jobs. **Poll preflight — it is what the deploy guard reads.** Its exit
-  codes are the reliable predicate: 0 clear / 1 busy / **2 = could not determine,
-  which is NOT clear**.
-- **Windows are scarce during a live slate:** preflight polled continuously
-  ~11:24-12:05 CT was CLEAR **once, for under 25 seconds**.
+**WHAT REPLACED IT — the cap now costs coverage, which is what the 90MB budget
+did before it:** `bytes=1999970055 budget=2000000000` (99.9985% of cap),
+`skipped_budget=24`, `truncated=1`, `dates=8` of ~32 chunks. Raised 2GB -> 4GB
+(`b55fa165`), **LIVE on `2332b47b` since 15:00:12Z**, verified by CONTENT.
+Staged rather than jumping to the ~8.2GB that would admit all 32 chunks: measured
+marginal cost is AT MOST 350.6 MiB per 2GB accepted, ~3x worse than the ratio
+predicts, so 8.2GB projects to ~2566 MiB and lands too close to the ceiling if it
+coincides with the 1877 baseline peak.
 
-**THE CLAIM HAS THREE STATES, not two:** `free`, `HELD by <lane> N min`, and
-**`EXPIRED (does not block)`** — the last is acquirable and a waiter polling for
-the literal `free` will sit on it forever. Cost ~25 minutes on 2026-09-03.
+**UNEXERCISED.** The autorun is once per Central day and 09-04's ran under the OLD
+2GB budget. First 4GB read is >= 07:00 CT 2026-09-05, pre-registered in the lane:
+`skipped_budget` 0 = headroom to spare, ~12 = the BYTE budget is the wrong
+instrument and the next step is a CHUNK-COUNT bound, between = report the number.
 
-**`--drain` CANNOT BE RUN FROM A DEV MACHINE.** It refuses without the keyvalue
-backend (correctly — otherwise the flag goes to a local file the worker never
-sees), and `SYNDICATE_REFRESH_STATE_URL` is an internal Render hostname that only
-resolves inside their network.
+**A LEDGER RECORD IS ONE PER BOARD RECOMMENDATION PER `source_fingerprint` CHANGE**
+(`maybe_record_board_state_to_evaluation_ledger`, `pipeline/intelligence_state.py:3023`),
+~2.9 per row per day over ~2,027 rows — **NOT one per order.** `record_recommendation`
+is the primary writer (`intelligence_evaluation.py:2542`); `record_portfolio_event`
+(`:2553`) writes nothing only because that caller passes no `portfolio_events` key.
+**A payload accident, not a structural guarantee** — a caller that supplies one makes
+a per-order growth term real.
 
-**THE FIRING GATE, read not assumed:** `hour >= 7 Central` AND
-`last_run_date < today`. The last claim was 2026-09-02, so arming at any time
-after 07:00 CT fires on the NEXT TICK. **Arm before 07:00 CT** and it waits for
-the hour on a quiet worker instead.
-
-**NEVER LEAVE THE KEY `true` WITHOUT A COMPLETED DEPLOY.** It is inert to the
-running process but any other session's unrelated refresh-worker deploy will
-inject it and arm the autorun unobserved.
-
-**TWO ARM ATTEMPTS ON 2026-09-03 BOTH STOOD DOWN, nothing deployed** — first
-blocked by a zombie poller clobbering the preflight record at the one clear
-window, second by a peer's 45-min claim then a busy worker. Detail: `deploys.md`.
-
-**ARMED AS SCHEDULED TASKS:** `arm-accuracy-autorun-626h` (2026-09-04 03:00 CT)
-and `verify-accuracy-autorun-626h` (07:45 CT, disarms on OOM). Full runbook and
-the four traps: `deploys.md` 2026-09-03.
+**HOW TO GET A DEPLOY WINDOW ON THIS SERVICE, after four attempts failed on "wait
+for a quiet worker":** preflight CLEAR stays VALID 15 MINUTES once written, so it
+only has to be CAUGHT once and need not coincide with the deploy. Windows last
+under 25 seconds; **poll at ~12s**. CLEAR arrived on the 4th poll. Also expect the
+25-minute deploy-spacing lockout (`#563`) — the worker is often idle DURING the
+lockout and busy by the time it lifts, which is exactly why waiting kept losing.
