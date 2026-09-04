@@ -242,6 +242,118 @@ def _response_hash(payload: dict[str, object]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _provably_same(left: Any, right: Any, _depth: int = 0) -> bool:
+    """Deep equality PROVED WITHOUT SERIALISING ANYTHING.
+
+    `_slim_embedded_board_payload` proves redundancy with `json.dumps` on both
+    sides. That is affordable once per page render and NOT on a request path:
+    the pairs here are 5.9-6.4 MB each, so the proof would add ~13 MB of
+    transient strings to the very peak this is meant to reduce.
+
+    Measured on real alias output instead: of a normalised row's 19 fields, 15
+    are THE SAME OBJECT on both sides (they come from `dict(item)` over the same
+    source row) and the other four are freshly computed scalars -- `sport_slug`,
+    `american_odds`, `rationale`, `missing_advanced_inputs`. So identity carries
+    most of the proof and `==` finishes it, with no allocation at all.
+
+    Conservative in every direction it can be: differing types, an exceeded depth
+    bound, or any value it cannot compare returns False, which means "keep the
+    key". The failure mode is "no saving", never "wrong data".
+    """
+    if left is right:
+        return True
+    if _depth > 8:
+        return False
+    kind = type(left)
+    if kind is not type(right):
+        return False
+    if kind is dict:
+        if len(left) != len(right):
+            return False
+        for key, value in left.items():
+            if key not in right or not _provably_same(value, right[key], _depth + 1):
+                return False
+        return True
+    if kind is list:
+        if len(left) != len(right):
+            return False
+        return all(_provably_same(a, b, _depth + 1) for a, b in zip(left, right))
+    if kind in (str, int, float, bool) or left is None:
+        return left == right
+    return False
+
+
+def _slim_response_aliases(response: Any) -> Any:
+    """Drop API payload keys that are provably rebuildable, and say how.
+
+    MEASURED on the live endpoint 2026-09-04, after the self-mirror fix:
+
+        recommendations == top_opportunities     6,441,138 B
+        boardContract   == board_contract        5,857,770 B
+        by_sport         regroups from ranked_all 5,859,557 B
+        -------------------------------------------------------
+                                                18,158,465 B  ~50% of what remains
+
+    **THE CANONICAL FOR THE OPPORTUNITY PAIR IS `top_opportunities`, NOT
+    `ranked_all`.** `_slim_embedded_board_payload` aliases both to `ranked_all`,
+    which is right for the EMBED and wrong here: on this payload
+    `recommendations` matches `top_opportunities` (both 6,441,138 B) and does NOT
+    match `ranked_all` (5,859,516 B). Reusing that function unchanged would have
+    silently saved 6.4 MB less.
+
+    OPT-IN, because dropping keys IS a contract change. Consumers that do not ask
+    get exactly what they got before -- see `_alias_slim_requested`.
+    """
+    if not isinstance(response, dict):
+        return response
+    slim = dict(response)
+    aliases: dict[str, str] = {}
+
+    canonical = slim.get("top_opportunities")
+    if isinstance(canonical, list) and canonical and "recommendations" in slim:
+        if _provably_same(slim.get("recommendations"), canonical):
+            slim.pop("recommendations", None)
+            aliases["recommendations"] = "top_opportunities"
+
+    if "boardContract" in slim and isinstance(slim.get("board_contract"), dict):
+        if _provably_same(slim.get("boardContract"), slim.get("board_contract")):
+            slim.pop("boardContract", None)
+            aliases["boardContract"] = "board_contract"
+
+    # `by_sport` is `ranked_all` PARTITIONED. Rebuilt by grouping on each row's
+    # own `sport` and dropped only when that reconstruction is exact, so any
+    # payload whose grouping differs -- ordering, a row with no sport, a key the
+    # rows do not carry -- keeps the original.
+    by_sport = slim.get("by_sport")
+    ranked_all = slim.get("ranked_all")
+    if isinstance(by_sport, dict) and by_sport and isinstance(ranked_all, list):
+        rebuilt: dict[str, list] = {}
+        for row in ranked_all:
+            if not isinstance(row, dict):
+                rebuilt = {}
+                break
+            rebuilt.setdefault(str(row.get("sport") or ""), []).append(row)
+        if rebuilt and _provably_same(rebuilt, by_sport):
+            slim.pop("by_sport", None)
+            aliases["by_sport"] = "__group_ranked_all_by_sport__"
+
+    if aliases:
+        slim["_response_aliases"] = aliases
+    return slim
+
+
+def _alias_slim_requested(payload: Any) -> bool:
+    """Only slim when the caller asks. Absent means NO.
+
+    Dropping keys is a contract change, and the consumers of this endpoint are
+    not all in this repository. An opt-in costs the caller one field and costs
+    everyone else nothing.
+    """
+    if not isinstance(payload, dict):
+        return False
+    return _query_bool(payload.get("slim_aliases"))
+
+
 def _versioned_query_response(response_payload: dict[str, object]) -> dict[str, object]:
     response_payload = _json_safe_value(dict(response_payload))
     payload_hash = _response_hash(dict(response_payload))
@@ -1798,6 +1910,8 @@ def intelligence_query_api():
             LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
             if _mirror_is_ours:
                 response_payload.pop("response", None)      # `#632`: 50% of the payload
+            if _alias_slim_requested(payload):
+                response_payload = _slim_response_aliases(response_payload)
             versioned_response = _versioned_query_response(response_payload)
             versioned_response.update(_debug_state_fields(response_payload, source="combined_board_window"))
             # Was unconditionally None -- correct back when this branch was
@@ -1844,6 +1958,8 @@ def intelligence_query_api():
                 LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
                 if _mirror_is_ours:
                     response_payload.pop("response", None)  # `#632`: 50% of the payload
+                if _alias_slim_requested(payload):
+                    response_payload = _slim_response_aliases(response_payload)
                 versioned_response = _versioned_query_response(response_payload)
                 versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
                 versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
@@ -1898,6 +2014,8 @@ def intelligence_query_api():
             LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
             if _mirror_is_ours:
                 response_payload.pop("response", None)      # `#632`: 50% of the payload
+            if _alias_slim_requested(payload):
+                response_payload = _slim_response_aliases(response_payload)
             versioned_response = _versioned_query_response(response_payload)
             versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
             versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()

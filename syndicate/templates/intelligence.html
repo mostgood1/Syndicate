@@ -709,9 +709,15 @@
   // so any read that happened before this ran would see an absent key rather
   // than a slimmer payload -- which is the one way this change could break the
   // page, and the reason it is not deferred into a function that runs later.
-  (function rehydrateEmbedAliases(payload) {
+  // `#632`: shared by BOTH callers. The embed calls it immediately below;
+  // the /api/intelligence/query fetch calls it on `json.response` before the
+  // merge. A function DECLARATION so hoisting makes it available to the fetch
+  // handler defined much further down.
+  function rehydrateAliases(payload) {
     if (!payload || typeof payload !== "object") return;
-    const aliases = payload._embed_aliases;
+    // `_embed_aliases` is the HTML embed's; `_response_aliases` is the API's
+    // opt-in slimming. Same rebuild, two producers.
+    const aliases = payload._embed_aliases || payload._response_aliases;
     if (!aliases || typeof aliases !== "object") return;
     Object.keys(aliases).forEach(function (key) {
       const source = aliases[key];
@@ -729,7 +735,8 @@
         payload[key] = payload[source];
       }
     });
-  })(initialIntelligenceResponse);
+  }
+  rehydrateAliases(initialIntelligenceResponse);
 
   function escapeHtml(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({
@@ -3646,6 +3653,11 @@
       timing: "all",
       background: Boolean(opts.background),
       force_refresh: Boolean(opts.forceRefresh),
+      // `#632`: opt in to alias slimming. The server drops only keys it can
+      // PROVE are rebuildable and tells us how in `_response_aliases`; a server
+      // that does not slim simply sends everything and the rebuild is a no-op.
+      // Measured 18.16 MB of a 36 MB payload once the self-mirror was gone.
+      slim_aliases: true,
     };
     // Only forward state.date to the server when it's a deliberate override
     // (URL deep link or the free-text date input) -- day-tab clicks set
@@ -3679,6 +3691,10 @@
           return;
         }
         const json = await res.json();
+        // `#632`: rebuild the dropped aliases IMMEDIATELY after the parse, before
+        // any consumer reads the payload -- the same placement rule the embed
+        // path follows, and for the same reason.
+        if (json && typeof json.response === "object" && json.response) rehydrateAliases(json.response);
         const version = json.version ?? null;
         const responseHash = String(json.response_hash || "").trim() || null;
         const workerStateUpdated = String(json.state_last_updated || "").trim() || null;
