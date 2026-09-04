@@ -21240,3 +21240,49 @@ expired, and CLEAR appeared on the 4th poll. Preflight's CLEAR verdict stays
 valid 15 min once written, so it only has to be CAUGHT once; it does not have to
 coincide with the deploy. Four earlier attempts polled too slowly for a window
 measured at under 25 seconds.
+
+### Addendum to the PASS above, from the 07:45 CT verify task — two things the entry does not cover `[lane accuracy-autorun-rearm]`
+
+**Independent confirmation first, so the agreement is on the record:** measured
+separately from the entry above, same run — `AUTORUN_DONE sports=8
+elapsed_s=669.389 error=none` at `14:34:27.646Z`, peak `memory_anon_mb`
+**1,481.594** at `14:32:14Z` over **615** samples (14:23–14:35Z), and **zero**
+`server_failed` / restart events since 13:00Z, read from the events API. No
+disagreement with any figure above.
+
+**1. `ledger_coverage` is carried — but mind which substrate says so.** The brief
+called its absence a defect, so it was checked. `_bounded_accuracy_summary`
+builds from a FIELD WHITELIST, and on the DEPLOYED SHA `7f44f5eb` that whitelist
+contains `"ledger_coverage": summary.get("ledger_coverage")`. **That is CONTENT
+on the deployed commit, NOT a read-back of the published artifact.** The
+artifact could not be read:
+
+    GET /api/ops/artifacts/export
+        ?path=reports/refresh_status/latest/accuracy_summary_autorun_status.json
+    -> HTTP 403   (path is not in the exportable allowlist)
+
+So *"the field is in the code that ran"* is proven and *"the persisted key
+contains it"* is **NOT**. Closing it needs an allowlist entry or a keyvalue read.
+Do not upgrade this to "verified in production" without one.
+
+**2. `scripts/render_events.py` IS A FALSE-NEGATIVE INSTRUMENT — do not trust an
+OOM reading taken through it.** It crashes partway:
+
+    AttributeError: 'str' object has no attribute 'get'
+    scripts/render_events.py:212 in _reason_detail   (reason is a str, not a dict)
+    reached from :412  detail = _reason_detail(event) or _deploy_trigger(event)
+
+It prints events and **THEN** dies, so a caller piping it through `tail`/`grep`
+sees plausible output from the **WRONG WINDOW** — it would support "no
+`oomKilled` events" while never having reached the window in question. It died in
+the July 2026 range here, nowhere near the run. **The restart figures above and
+in the entry should rest on the events API directly**; if the entry's
+"`oomKilled` LAST FAIL 2026-09-02T15:32:56Z, NONE since" came from this script,
+re-confirm it. Filed as a background task.
+
+**Method note, since it cost two readings in one verification.** Both instruments
+that failed here failed SILENTLY-ISH: `render_logs.py ... | grep AUTORUN`
+returned empty because the script requires `--text` and `--start` and `grep` ate
+the usage message. **An empty grep over a FAILED command is not a null result** —
+check the exit status before reporting an absence, especially when the absence is
+the thing that would be reported as a failure.
