@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 808 rules `[generated]`
+## Index — 812 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -313,7 +313,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 509**
+**Rules and corrections — 513**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -511,6 +511,9 @@
 - [2026-09-04 — "SELF-VERIFYING" is only true where the EMITTER runs. Find the print, then…](#2026-09-04-self-verifying-is-only-true-where-the-emitter-runs-find-the-print-then-ask-who-owns-it)
 - [2026-09-04 — A FLAT READING FROM AN INSTRUMENT THAT CANNOT SEE THE SUSPECT IS NOT EVIDE…](#2026-09-04-a-flat-reading-from-an-instrument-that-cannot-see-the-suspect-is-not-evidence)
 - [2026-09-04 — PRE-REGISTER THE GATE, AND LET IT BIND WHEN THE DATA IS POINTING WHERE YOU…](#2026-09-04-pre-register-the-gate-and-let-it-bind-when-the-data-is-pointing-where-you-hope)
+- [2026-09-04 — 100% OF WHAT YOU SAMPLED IS NOT 100% OF THE THING. THE DENOMINATOR MUST CO…](#2026-09-04-100-of-what-you-sampled-is-not-100-of-the-thing-the-denominator-must-come-from-outside-the-instrument)
+- [2026-09-04 — A PRE-REGISTERED FALSIFICATION TEST IS WORTH WRITING, BECAUSE IT FIRES](#2026-09-04-a-pre-registered-falsification-test-is-worth-writing-because-it-fires)
+- [2026-09-04 WHEN A COMMIT NARROWS A PREDICATE, THE DOCSTRING IS PART OF THE PREDICATE —…](#2026-09-04-when-a-commit-narrows-a-predicate-the-docstring-is-part-of-the-predicate-a-stale-contract-line-does-not-read-as-stale-it-reads-as-corroboration-for-whichever-test-still-encodes-the-old-rule)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
@@ -817,6 +820,7 @@
 - [2026-09-03 — `subprocess(text=True)` on Windows silently mojibakes the ledger's em-dash…](learnings_evidence.md#2026-09-03-subprocesstexttrue-on-windows-silently-mojibakes-the-ledgers-em-dashes-and-it-made-lane-guard-inert) `[evidence]`
 - [2026-09-03 — the Bash bypass in `lane-guard`: the census, and why the ledger never show…](learnings_evidence.md#2026-09-03-the-bash-bypass-in-lane-guard-the-census-and-why-the-ledger-never-showed-the-damage) `[evidence]`
 - [2026-09-03 — a census is only as wide as its pattern: "prose only" for five scripts my…](learnings_evidence.md#2026-09-03-a-census-is-only-as-wide-as-its-pattern-prose-only-for-five-scripts-my-own-refactor-had-just-broken) `[evidence]`
+- [2026-09-04 WHEN A COMMIT NARROWS A PREDICATE, THE DOCSTRING IS PART OF THE PREDICATE —…](learnings_evidence.md#2026-09-04-when-a-commit-narrows-a-predicate-the-docstring-is-part-of-the-predicate-a-stale-contract-line-does-not-read-as-stale-it-reads-as-corroboration-for-whichever-test-still-encodes-the-old-rule-lane-soccer-card-final-state) `[evidence]`
 - [2026-08-12 — Do not batch changes during a diagnosis](learnings_archive.md#2026-08-12-do-not-batch-changes-during-a-diagnosis) `[evidence]`
 - [2026-08-12 — A rate ceiling is not a fix](learnings_archive.md#2026-08-12-a-rate-ceiling-is-not-a-fix) `[evidence]`
 - [2026-08-12 — Parallel sessions on one problem need lane discipline](learnings_archive.md#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline) `[evidence]`

@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 808 rules `[generated]`
+## Index — 812 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5253,3 +5253,7 @@ time in this codebase is computed once for all workers.
 Related: `[2026-09-04]` "100% of what you sampled is not 100% of the thing", and
 the standing `presence is not reachability` — three variants of the same failure,
 where a check confirmed a property the defect also satisfied.
+## 2026-09-04 WHEN A COMMIT NARROWS A PREDICATE, THE DOCSTRING IS PART OF THE PREDICATE — a stale contract line does not read as stale, it reads as CORROBORATION for whichever test still encodes the old rule
+
+- **The rule going forward.** A guard's docstring is part of the change that narrows it, not documentation of it. Left behind, it does not read as stale — it reads as a SECOND SOURCE agreeing with whichever test still encodes the old rule, and the pair is an instruction to revert a change that was made on a production measurement. **Before committing a narrowed predicate, grep the whole enclosing docstring for the rule you just edited.** `28e55d86` rewrote the branch and its inline comment and left the docstring twenty lines above it stating the opposite; the contradiction sat red for two weeks and pointed the wrong way.
+- *(evidence in `learnings_evidence.md`)*
