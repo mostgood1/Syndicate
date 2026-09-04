@@ -5399,6 +5399,20 @@ records the trap that OUTLIVES the identity fix -- *a free claim is not an idle
 box*, measured at the 22:46Z expiry with an eredivisie build and an MLB sim both
 still in flight. Read that note first; this entry is the ledger trace.
 
+**THE SECOND COST, and it OUTLIVES the identity fix: you cannot CONTACT a claim
+holder from the claim.** The correct response to a live holder is to ask them,
+and there is no channel — the claim records an id the roster cannot resolve.
+Measured 2026-09-04: `search_session_transcripts` on the holder id looked like a
+way in (background-task notifications embed a session's own scratchpad path) and
+returned TWO CONFLICTING candidates, one of which had already told me a
+different id. Unsound; not used.
+
+**What worked, in one round trip: a CONDITIONAL message to the best candidate**
+("ignore if this is not you"), plus the ask left in the holder's LANE BLOCK so it
+lands regardless. The holder confirmed, and had already retargeted to the tip.
+Guessing a recipient would have been wrong; asking one cost nothing. The ledger
+is the only channel that reaches a holder identified solely by a claim.
+
 THE RULE: before comparing two identifiers, confirm they come from the same
 namespace. When a check returns the same answer for a case you KNOW is healthy,
 it is not a check. The cheapest test is to run it against yourself: if
