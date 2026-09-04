@@ -305,6 +305,60 @@ _HITTER_PROP_DIST_SPECS: Tuple[Tuple[str, str, str], ...] = (
 )
 
 
+# --- `#621` Phase 4: the joint outcome distribution -------------------------
+#
+# WHAT WAS BEING THROWN AWAY. `_sim_many` runs 1,000 full game simulations and
+# reduces every one into MARGINAL counters. The joint -- which players score
+# together, and how a batter's own markets move as one -- is computed on every
+# run and discarded. Only 50 per-segment score `samples` survive to the
+# artifact: **0.137% of the ~292,000 scalars a 1,000-sim game produces.**
+#
+# It reaches real money. Parlay pricing, the board's correlation badges and
+# `bankroll_manager.build_portfolio` bet SIZING all read a correlation that is
+# today a sum of categorical flags plus a static table holding ONE constant for
+# every player in every game -- `("mlb", ("home_runs", "total_bases")): 1.35` at
+# `syndicate/features/intelligence.py:617`, never measured against an outcome.
+#
+# MEASURED on production's own DET@CLE roster for 2026-09-04 (pk824424), 1,000
+# sims: that pair's Spearman rho runs **+0.227 (Steven Kwan) to +0.805 (Dillon
+# Dingler), mean +0.610** across the 18 lineup batters. The static table gives
+# all eighteen the same number. The SPREAD is the finding, not the mean.
+#
+# COST, measured in the same run: the accumulator is 160,000 B against a
+# 36,950,016 B peak RSS -- **0.433%** -- and the published payload is 16,634 B
+# per game, ~0.3 MB across a 17-game slate. `sim_*.json` is already in
+# `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py:586,596`), so nothing needs an
+# allowlist change and no web deploy is required to read it.
+#
+# See `sim_engine/joint_outcomes.py` for the six data shapes that were measured
+# before `array('h')` was chosen, and for why a constant column publishes as
+# `null` and never `0.0`.
+from sim_engine.joint_outcomes import (
+    HITTER_MARKET_ROW_KEYS as _JOINT_HITTER_MARKETS,
+    JointAccumulator as _JointAccumulator,
+    build_labels as _joint_build_labels,
+    hitter_label as _joint_hitter_label,
+)
+
+
+def _joint_accumulator_for(batter_ids, n_sims: int):
+    """One game's joint accumulator, or None when there is nothing to measure.
+
+    Returning None rather than an empty accumulator matters: an accumulator with
+    no dimensions would publish `{"labels": [], "corr_lower": []}`, which reads
+    as "measured, and there was nothing there" instead of "not measured".
+    """
+    ids = [int(p) for p in (batter_ids or []) if int(p or 0) > 0]
+    if not ids or int(n_sims or 0) < 2:
+        return None
+    try:
+        return _JointAccumulator(_joint_build_labels(ids), int(n_sims))
+    except Exception:
+        # A joint is an ADDITION. It must never be able to fail a sim that
+        # would otherwise have produced its marginals.
+        return None
+
+
 def _simw_init(
     away_roster,
     home_roster,
@@ -657,9 +711,18 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
         h = sum((r.home_inning_runs or [])[:innings])
         return {"away": int(a), "home": int(h)}
 
+    # `#621` PHASE 4, FIRST OF TWO SITES. The joint accumulator sits alongside
+    # the marginal counters below and reads the SAME per-sim values -- see the
+    # long note at the second site (`_sim_many`) for why the joint is worth
+    # keeping at all. Rows are indexed from 0 WITHIN this chunk: a rank
+    # correlation is invariant to row order, so the parent concatenates chunks
+    # without reindexing (`JointAccumulator.extend`).
+    joint_acc = _joint_accumulator_for(batter_ids, int(n)) if want_hitter else None
+
     for i in range(int(start_i), int(start_i) + int(n)):
         cfg = GameConfig(rng_seed=seed + int(i), weather=weather, park=park, umpire=umpire, **cfg_kwargs)
         r = simulate_game(away_roster, home_roster, cfg)
+        joint_row: Dict[str, int] = {}
 
         ps = r.pitcher_stats or {}
         if ps:
@@ -762,6 +825,13 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
                 # already bins. Do not recompute it here; the two must not drift.
                 _inc_sum(pid, "H+R+RBI", hrr)
 
+                # `#621` PHASE 4, FIRST SITE. Same values, kept JOINTLY rather
+                # than summed away. Reads `hitter_stat_values` so it can never
+                # disagree with the marginal histograms built from it.
+                if joint_acc is not None:
+                    for _jm, _jk in _JOINT_HITTER_MARKETS:
+                        joint_row[_joint_hitter_label(pid, _jm)] = int(hitter_stat_values.get(_jk, 0))
+
                 acc = hitter_prop_acc.setdefault(int(pid), {})
                 for dist_key, row_key, mean_key in _HITTER_PROP_DIST_SPECS:
                     value = int(hitter_stat_values.get(str(row_key), 0))
@@ -805,6 +875,16 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
         f5 = seg_score(r, 5)
         f3 = seg_score(r, 3)
 
+        # `#621` PHASE 4, FIRST SITE. The eight segment scores as joint
+        # dimensions. `samples` below keeps 50 of these per segment; this keeps
+        # every one, and keeps them ALIGNED with the batter outcomes from the
+        # same simulation, which is the whole point.
+        if joint_acc is not None:
+            for _seg_name, _score in (("full", full), ("first1", f1), ("first3", f3), ("first5", f5)):
+                joint_row[f"team|{_seg_name}|away"] = int(_score["away"])
+                joint_row[f"team|{_seg_name}|home"] = int(_score["home"])
+            joint_acc.record(int(i) - int(start_i), joint_row)
+
         for seg, score in ((seg_full, full), (seg_f5, f5), (seg_f3, f3), (seg_f1, f1)):
             if len(seg["samples"]) < 50:
                 seg["samples"].append(score)
@@ -831,6 +911,12 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
         "prop_acc": prop_acc,
         "hitter_prop_acc": hitter_prop_acc,
         "pitcher_box_acc": pitcher_box_acc,
+        # `#621` PHASE 4. `array('h')` pickles as a raw buffer, so a 1,000x100
+        # chunk crosses the process boundary as ~200 KB of bytes rather than
+        # 100,000 PyObjects. Before this key existed NOTHING joint crossed at
+        # all -- `_merge_seg` merges counts only, so the multiprocessing path
+        # (the DEFAULT: `--workers` is 4) discarded the joint entirely.
+        "joint": joint_acc.to_transport() if joint_acc is not None else None,
     }
 
 
@@ -4347,6 +4433,16 @@ def _sim_many(
 
     batter_ids = [int(pid) for pid in batter_meta.keys()] if batter_meta else []
     cfg_kwargs = dict(cfg_kwargs or {})
+
+    # `#621` PHASE 4. Built empty here and grown by `extend`, because the two
+    # execution paths fill it differently: the worker path CONCATENATES four
+    # chunk matrices, the serial path writes rows directly. Both end with the
+    # same `n_sims x D` matrix, which `tests/test_mlb_sim_joint_outcomes.py`
+    # pins by asserting the two produce identical coefficients.
+    joint_total = _joint_accumulator_for(batter_ids, total_sims) if want_hitter else None
+    if joint_total is not None:
+        joint_total = _JointAccumulator(joint_total.labels, 0) if workers > 1 and total_sims > 1 else joint_total
+
     if workers > 1 and total_sims > 1:
         ctx = multiprocessing.get_context("spawn")
         chunk_count = min(int(workers), int(total_sims))
@@ -4387,10 +4483,20 @@ def _sim_many(
                 _merge_prop_acc(res.get("prop_acc") or {})
                 _merge_hitter_prop_acc(res.get("hitter_prop_acc") or {})
                 _merge_pitcher_box_acc(res.get("pitcher_box_acc") or {})
+                # `#621` PHASE 4. THE MISSING MERGE. Every other counter above
+                # has a `_merge_*` and the joint had none, which is why the
+                # multiprocessing path -- the DEFAULT, `--workers` is 4 -- could
+                # never have carried one. `extend` raises on a label mismatch
+                # rather than concatenating columns that mean different things.
+                if joint_total is not None:
+                    _joint_chunk = res.get("joint")
+                    if _joint_chunk:
+                        joint_total.extend(_joint_chunk)
     else:
         for i in range(total_sims):
             cfg = GameConfig(rng_seed=rng_seed + i, weather=weather, park=park, umpire=umpire, **cfg_kwargs)
             r = simulate_game(away_roster, home_roster, cfg)
+            joint_row: Dict[str, int] = {}  # `#621` PHASE 4, SECOND SITE
 
             ps = r.pitcher_stats or {}
             if ps:
@@ -4480,6 +4586,14 @@ def _sim_many(
                     # at the first site for why the omission zeroes `hrr_mean`.
                     _inc_sum(pid, "H+R+RBI", hrr)
 
+                    # `#621` PHASE 4, SECOND SITE. Identical to the first by
+                    # construction -- both read `hitter_stat_values`, so the
+                    # joint and the marginal histograms can never disagree
+                    # about what a simulation produced.
+                    if joint_total is not None:
+                        for _jm, _jk in _JOINT_HITTER_MARKETS:
+                            joint_row[_joint_hitter_label(pid, _jm)] = int(hitter_stat_values.get(_jk, 0))
+
                     acc = hitter_prop_acc.setdefault(int(pid), {})
                     for dist_key, row_key, mean_key in _HITTER_PROP_DIST_SPECS:
                         value = int(hitter_stat_values.get(str(row_key), 0))
@@ -4509,6 +4623,13 @@ def _sim_many(
             f1 = seg_score(r, 1)
             f5 = seg_score(r, 5)
             f3 = seg_score(r, 3)
+
+            # `#621` PHASE 4, SECOND SITE. See the first.
+            if joint_total is not None:
+                for _seg_name, _score in (("full", full), ("first1", f1), ("first3", f3), ("first5", f5)):
+                    joint_row[f"team|{_seg_name}|away"] = int(_score["away"])
+                    joint_row[f"team|{_seg_name}|home"] = int(_score["home"])
+                joint_total.record(int(i), joint_row)
 
             for seg, score in ((seg_full, full), (seg_f1, f1), (seg_f5, f5), (seg_f3, f3)):
                 if len(seg["samples"]) < 50:
@@ -4569,6 +4690,30 @@ def _sim_many(
             "first3": finalize(seg_f3),
         },
     }
+
+    # `#621` PHASE 4. The joint, published beside the marginals it was derived
+    # from. Absent (not empty) when there was nothing to measure -- a consumer
+    # must be able to tell "not measured" from "measured, no dependence", and
+    # `syndicate/features/mlb/sim_joint_correlation.py` counts which it saw.
+    #
+    # Wrapped because a joint is an ADDITION: it must never be able to fail a
+    # sim that would otherwise have written its marginals. A failure prints
+    # rather than passing silently -- `logger.info` never reaches Render's log
+    # collector, so `print(..., flush=True)` is the only line that survives.
+    if joint_total is not None and joint_total.rows_written >= 2:
+        try:
+            out["joint"] = joint_total.to_payload(
+                players={
+                    str(pid): {
+                        "name": str((row or {}).get("name") or ""),
+                        "team": str((row or {}).get("team") or ""),
+                        "side": str((row or {}).get("side") or ""),
+                    }
+                    for pid, row in (batter_meta or {}).items()
+                }
+            )
+        except Exception as exc:
+            print(f"[sim_many] JOINT_FAILED away={away_abbr} home={home_abbr} err={exc!r}", flush=True)
 
     out["aggregate_boxscore"] = _build_aggregate_boxscore(
         sims=int(sims),

@@ -324,6 +324,196 @@ def output_spec_problems() -> list:
     return problems
 
 
+def joint_site_problems() -> list:
+    """Two-site identity for the `#621` Phase 4 JOINT accumulation.
+
+    WHY THIS IS SEPARATE FROM `output_spec_problems`. That gate proves every
+    `_HITTER_PROP_DIST_SPECS` row key is SET in `hitter_stat_values`. It says
+    nothing about a second structure written at the same two sites, and the
+    joint is exactly that -- so assuming coverage would leave the new code with
+    the protection the old code has and none of its own.
+
+    WHY A REACHABILITY TEST IS NOT ENOUGH HERE, MEASURED. With `_simw_chunk`
+    (site 1) broken and `_sim_many` (site 2) intact, BOTH `off != on`
+    reachability tests still PASS, because `workers=1` never enters
+    `_simw_chunk` -- and `--workers` DEFAULTS TO 4, so the path the tests take is
+    the one production does not. `model_engine_standard` §4.3 is necessary and
+    not sufficient for a duplicated site; only a structural invariant sees it.
+
+    WHY `ast` AND NEVER A REGEX. Measured on this very file: the `#621` fix's
+    own comment contains a literal `{0: n_sims}`, and that brace truncates a
+    non-greedy `hitter_stat_values = \\{(.*?)\\}` match. The regex reports **6
+    keys where the dict has 10**, silently dropping `"SO"` -- a false reading
+    shaped precisely like the bug being guarded against.
+
+    THE HISTORY THAT EARNS THIS. `#334` fixed one site and zeroed `hrr_mean`;
+    `#429` added loud warning comments at BOTH sites; the third instance
+    happened anyway, WITH those comments in place. A comment asking a human to
+    remember is not a control.
+    """
+    import ast
+    import copy
+
+    problems: list = []
+    try:
+        tree = ast.parse(DAILY_UPDATE_PY.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [f"could not parse {DAILY_UPDATE_PY}: {exc}"]
+
+    # The ENCLOSING STATEMENT of every joint_row write, grouped by function --
+    # not the bare assignment.
+    #
+    # THIS DISTINCTION WAS MEASURED, NOT REASONED. The first version compared
+    # only the `Assign` nodes and MISSED a real single-site break: deleting
+    # `("first5", f5)` from one site's segment tuple left every assignment
+    # byte-identical, because the tuple lives in the `for` header. The gate
+    # read CLEAN while the two sites accumulated different dimensions -- which
+    # `JointAccumulator.extend` would then reject at runtime, on the worker,
+    # mid-slate. Dumping the enclosing `for`/`if` captures what is iterated.
+    class _Normalize(ast.NodeTransformer):
+        """Erase the two LEGITIMATE differences between the sites.
+
+        The accumulator is named `joint_acc` in the chunk and `joint_total` in
+        the parent, and the chunk offsets its row index by `start_i` because it
+        owns rows [0, n) of its own matrix. Both are correct; neither is drift.
+        Without normalising them the check would cry wolf on every run, and a
+        gate that always fails is a gate nobody reads.
+        """
+
+        def visit_Name(self, node):  # noqa: N802 - ast API
+            if node.id in {"joint_acc", "joint_total"}:
+                return ast.copy_location(ast.Name(id="JOINT", ctx=node.ctx), node)
+            return node
+
+        def visit_Expr(self, node):  # noqa: N802 - ast API
+            call = node.value
+            if (
+                isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Attribute)
+                and call.func.attr == "record"
+            ):
+                # Checked separately, by presence -- its ARGS legitimately differ.
+                return None
+            return self.generic_visit(node)
+
+    def _writes_joint_row(node) -> bool:
+        for sub in ast.walk(node):
+            if not isinstance(sub, ast.Assign):
+                continue
+            for target in sub.targets:
+                if (
+                    isinstance(target, ast.Subscript)
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id == "joint_row"
+                ):
+                    return True
+        return False
+
+    def _joint_statements(func) -> list:
+        found = []
+
+        def _walk_body(body) -> None:
+            for stmt in body:
+                if not _writes_joint_row(stmt):
+                    continue
+                if isinstance(stmt, ast.Assign):
+                    found.append(stmt)
+                    continue
+                # A `for` or `if` that CONTAINS writes: dump it whole, so the
+                # iterated tuple and the guard are part of the comparison.
+                if isinstance(stmt, (ast.For, ast.If, ast.While, ast.With)):
+                    inner = [s for s in stmt.body if _writes_joint_row(s)]
+                    if inner and all(isinstance(s, ast.Assign) for s in inner):
+                        found.append(stmt)
+                        continue
+                for field in ("body", "orelse", "finalbody"):
+                    _walk_body(getattr(stmt, field, []) or [])
+
+        _walk_body(func.body)
+        out = []
+        for stmt in found:
+            clone = _Normalize().visit(copy.deepcopy(stmt))
+            ast.fix_missing_locations(clone)
+            out.append(ast.dump(clone))
+        return sorted(out)
+
+    writes: dict = {}
+    functions = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
+    for func in functions:
+        found = _joint_statements(func)
+        if found:
+            writes[func.name] = found
+
+    if not writes:
+        return [
+            "no joint_row writes found at all -- the `#621` Phase 4 producer is "
+            "ABSENT, or this invariant has stopped matching it and is now inert"
+        ]
+    if set(writes) != {"_simw_chunk", "_sim_many"}:
+        problems.append(
+            f"joint_row is written in {sorted(writes)}, expected exactly "
+            "['_simw_chunk', '_sim_many'] -- the multiprocessing site and the serial one"
+        )
+    if len(writes) == 2:
+        first, second = (writes[k] for k in sorted(writes))
+        if first != second:
+            only_a = [w for w in first if w not in second]
+            only_b = [w for w in second if w not in first]
+            problems.append(
+                "the two joint_row accumulation sites have DRIFTED -- this is the "
+                f"`#334`/`#429` failure mode. Only in one: {only_a[:2]}; "
+                f"only in the other: {only_b[:2]}"
+            )
+
+    # Every joint market's row key must exist in BOTH hitter_stat_values dicts.
+    # The joint reads that dict, so a key absent there yields a CONSTANT column,
+    # whose rank correlation is undefined for every pair it appears in.
+    try:
+        from sim_engine.joint_outcomes import HITTER_MARKET_ROW_KEYS
+    except Exception as exc:
+        return problems + [f"could not import joint_outcomes -- invariant did NOT run: {exc}"]
+
+    sites = [
+        [k.value for k in node.value.keys if isinstance(k, ast.Constant)]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Dict)
+        and any(isinstance(t, ast.Name) and t.id == "hitter_stat_values" for t in node.targets)
+    ]
+    if len(sites) != 2:
+        problems.append(f"expected 2 hitter_stat_values sites, found {len(sites)}")
+    for i, keys in enumerate(sites, start=1):
+        missing = sorted({row_key for _m, row_key in HITTER_MARKET_ROW_KEYS} - set(keys))
+        if missing:
+            problems.append(
+                f"hitter_stat_values site #{i} never sets {missing}, which "
+                "HITTER_MARKET_ROW_KEYS publishes as joint dimensions -- those "
+                "columns are CONSTANT and every correlation touching them is undefined"
+            )
+
+    # The record() call is what makes a write reach the matrix. A site that
+    # populates joint_row and never records it is a no-op that this invariant
+    # would otherwise call identical and healthy.
+    for name in ("_simw_chunk", "_sim_many"):
+        func = next((f for f in functions if f.name == name), None)
+        if func is None:
+            problems.append(f"{name} not found -- invariant did NOT run for it")
+            continue
+        recorded = any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "record"
+            and any(isinstance(a, ast.Name) and a.id == "joint_row" for a in node.args)
+            for node in ast.walk(func)
+        )
+        if not recorded:
+            problems.append(
+                f"{name} populates joint_row but never calls .record(..., joint_row) -- "
+                "the values are built and dropped"
+            )
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--games", type=int, default=40)
@@ -352,6 +542,21 @@ def main() -> int:
     else:
         print("ok: every _HITTER_PROP_DIST_SPECS row_key is set at both "
               "hitter_stat_values sites, and the two sites match")
+
+    # `#621` Phase 4. Same class of invariant, different structure. Also needs
+    # no rosters, so it speaks on a box where the roster glob exits REFUSED.
+    joint_problems = joint_site_problems()
+    if joint_problems:
+        print("=" * 88)
+        print("FAIL: JOINT accumulation sites disagree -- a correlation built from half a slate")
+        for problem in joint_problems:
+            print(f"    {problem}")
+        print("=" * 88)
+        print("")
+    else:
+        print("ok: joint_row is written identically at both accumulation sites, "
+              "recorded at both, and every joint market's row_key exists in both dicts")
+    spec_problems = list(spec_problems) + list(joint_problems)
 
     from sim_engine.data.roster_artifact import read_game_roster_artifact
     from sim_engine.models import BatterProfile, PitcherProfile

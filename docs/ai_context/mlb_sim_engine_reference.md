@@ -240,3 +240,111 @@ population numbers here come from mirrored artifacts, not a live read.**
 The intended route is `sim_input_checklist.py --publish` **run on the worker**,
 which emits a small allowlisted report. Until that runs, production population is
 **inferred, not measured.**
+
+---
+
+## 8. The JOINT outcome distribution (`#621` Phase 4)
+
+`model_engine_standard` §2 requires a documented pipeline trace, file:line at
+each hop, including what it writes. This is that trace for the joint.
+
+### What it fixes
+
+`_sim_many` runs 1,000 game simulations and reduces every one into MARGINAL
+counters. The joint — which outcomes land TOGETHER — was computed on every run
+and discarded. Only 50 per-segment score `samples` survived to the artifact:
+**0.137% of the ~292,000 scalars a 1,000-sim game produces.**
+
+Meanwhile the correlation the platform prices parlays with is a sum of
+categorical flags plus a static table holding one constant for every player in
+every game — `("mlb", ("home_runs", "total_bases")): 1.35`,
+`syndicate/features/intelligence.py:617`. It reaches real money via parlay
+pricing, the board correlation badges, and `bankroll_manager.build_portfolio`
+bet SIZING.
+
+### Trace
+
+```
+live_refresh_loop._run_mlb_sim_tick
+  -> scripts/run_mlb_daily_sim_job.py                       (detached subprocess)
+    -> vendor/mlb_bettingv2/tools/daily_update.py
+       :336  from sim_engine.joint_outcomes import ...      (the math + accumulator)
+       :344  _joint_accumulator_for(batter_ids, n_sims)     -> None when nothing to measure
+
+       -- PATH A, the DEFAULT (`--workers` = 4) ------------------------------
+       :645  _simw_chunk(start_i, n)                        (one of four processes)
+       :720    joint_acc = _joint_accumulator_for(...)
+       :833    joint_row[batter|<id>|<market>] = hitter_stat_values[<row_key>]
+       :886    joint_acc.record(i - start_i, joint_row)     (+ 8 segment scores)
+       :919    return {..., "joint": joint_acc.to_transport()}
+       :4494   joint_total.extend(res["joint"])             THE MERGE THAT DID NOT EXIST
+
+       -- PATH B, `--workers 1` ----------------------------------------------
+       :4595   joint_row[...] = hitter_stat_values[...]     (second copy)
+       :4632   joint_total.record(i, joint_row)
+
+       :4705 out["joint"] = joint_total.to_payload(players=...)
+       :8237 _write_json(sim_path, record)
+  writes: data/daily/sims/<date>/sim_*.json  ->  record["sim"]["joint"]
+```
+
+Read back by `syndicate/features/mlb/sim_joint_correlation.py`, which builds the
+`measured_lookup` that `correlation_engine.compute_correlation` has accepted
+since `1bbcc246`. A measured coefficient REPLACES the heuristic and stamps
+`correlation_basis="measured_joint"`.
+
+**No allowlist change and no web deploy.** `data/daily/sims/*/sim_*.json` is
+already in `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py:586,596`).
+
+### Reuse flag (§3 corollary)
+
+`--use-roster-artifacts` defaults to `on`, but it governs ROSTER INPUTS, not sim
+OUTPUTS. The joint is computed inside `_sim_many` from live per-sim results, so
+nothing short-circuits it — a reused roster still produces a fresh joint.
+**What it does need is a SIM RUN**: shipping this code does not rewrite an
+existing `sim_*.json`, so a date simmed before it landed has no `joint` and the
+resolver counts that as `joint_field_absent` rather than reporting zero.
+
+### Two-site invariant — and why reachability is NOT sufficient
+
+The accumulation is duplicated at `_simw_chunk` and `_sim_many`. That
+duplication has drifted three times (`#334` zeroed `hrr_mean`; `#429` added
+warning comments at both sites; a third instance happened anyway WITH those
+comments in place).
+
+**Measured: with site 1 broken and site 2 intact, BOTH `off != on` reachability
+tests still PASS**, because `workers=1` never enters `_simw_chunk` — and
+`--workers` defaults to 4, so the tests take the path production does not.
+`model_engine_standard` §4.3 is necessary and not sufficient for a duplicated
+site.
+
+`scripts/sim_input_checklist.py::joint_site_problems()` is the control. It parses
+with `ast`, **never a regex**: measured on this file, a non-greedy
+`hitter_stat_values = \{(.*?)\}` reads **6 keys where the dict has 10**, because
+the `#621` fix's own comment contains a literal `{0: n_sims}` whose brace closes
+the match early — a false reading shaped exactly like the bug.
+
+### Measured, 2026-09-04
+
+Substrate: input `render` (production roster
+`snapshots/2026-09-04/roster_0_DET_at_CLE_pk824424_g1.json`), run local — so per
+§3b this is evidence about the CODE, not the deployment.
+
+| pair | mean rho | median | range | n |
+|---|---|---|---|---|
+| `home_runs x total_bases` | **+0.610** | +0.611 | +0.227 .. +0.805 | 18/18 |
+| `hits x total_bases` | +0.922 | +0.918 | +0.877 .. +0.959 | 18/18 |
+| `hits x home_runs` | +0.369 | +0.364 | +0.136 .. +0.546 | 18/18 |
+| `hits x rbi` | +0.514 | +0.514 | +0.385 .. +0.625 | 18/18 |
+| `rbi x total_bases` | +0.645 | +0.652 | +0.428 .. +0.786 | 18/18 |
+| `home_runs x rbi` | +0.608 | +0.633 | +0.278 .. +0.767 | 18/18 |
+
+Cross-batter `total_bases x total_bases`: **same team +0.097** (n=72),
+**opposing +0.018** (n=81).
+
+**THE SPREAD IS THE FINDING, NOT THE MEAN.** One constant serves all eighteen
+batters today; the measured range on the headline pair is 3.5x end to end
+(Steven Kwan +0.227, a contact hitter, against Dillon Dingler +0.805).
+
+Cost: accumulator 160,000 B against a 36,950,016 B peak RSS (**0.433%**);
+payload 16,634 B/game, ~0.3 MB across a 17-game slate; 3,160 pairs in 0.32 s.
