@@ -21750,3 +21750,62 @@ observable, which is exactly what an instrument would separate.
 `refresh_skipped_final / attempted / succeeded / failed` on
 `_daily_actual_by_game`, then re-read. Guessing between three causes that share
 one observable is how four inert features shipped in one session on this repo.
+
+## 2026-09-04 — **PROJECTION AGAINST PRODUCTION SHAPES: the reduction is ~76x, NOT 20.2x. My own figure above was the wrong invariant.** `[no code shipped, no deploy]`
+
+**CORRECTS THE ENTRY ABOVE.** That entry reported a 20.2x reduction and warned a
+250 MB chunk would project to ~12.4 MB, "just OVER the 12 MiB ceiling, and gzip
+closes it". **Both the number and the worry are wrong, and in the safe
+direction** — the real figure against production record sizes is ~3.3 MB and no
+compression is needed.
+
+**THE MISTAKE WAS CARRYING A RATIO ACROSS ENVIRONMENTS.** A ratio has a
+denominator that moves. The quantity that actually transfers is **projected
+BYTES PER RECORD, and it SATURATES** — the projection keeps a fixed field list,
+so once a record is big enough to populate those fields, projecting it costs the
+same no matter how much else the record carries.
+
+Measured over **1,463 local records**, binned by raw size:
+
+    raw quartile 1   raw mean  5,407 B  ->  projected mean  423 B
+    raw quartile 2   raw mean 11,397 B  ->  projected mean  566 B
+    raw quartile 3   raw mean 12,336 B  ->  projected mean  563 B
+    raw quartile 4   raw mean 13,226 B  ->  projected mean  558 B
+
+Raw grows 16% across quartiles 2-4 and projected **falls slightly**. It is flat
+above a floor, max observed 599 B. (Pearson r = 0.88 on the full set is an
+artifact of quartile 1 and must not be read as proportionality — that is exactly
+the trap that produced the 20.2x figure.)
+
+**THE PRODUCTION ANCHOR, and it is a real production measurement:** the 09-04
+run logged `bytes=1,999,976,768 records=46,953` = **42,595 B/record raw**, which
+is **4.0x larger than local's 10,597** and above the entire local range (max
+17,666). So production records sit well past the saturation floor, and project
+to ~560 B like everything else past it.
+
+    implied full-corpus ratio   560 / 42,595 = 0.0131   -> ~76x reduction
+
+    typical 250 MB chunk  ~5,869 records -> ~3.29 MB projected   (ceiling 12 MiB)
+    largest 332 MB chunk  ~7,794 records -> ~4.36 MB projected
+
+    ceiling breach needs 2,144 B/rec (3.8x saturated) on a typical chunk,
+                         1,614 B/rec (2.9x saturated) on the largest
+
+**So a projected daily chunk publishes comfortably by the ordinary sweep, with a
+2.9-3.8x margin and WITHOUT gzip.** Even at a pessimistic 1,500 B/record —
+2.7x anything observed — the largest chunk lands at 11.69 MB, still under.
+
+**WHAT THIS IS AND IS NOT.** Substrate: **`checkout` for the per-record
+projection cost, `render` for the raw density.** It is an INFERENCE joining the
+two, not a production measurement of projected bytes. The residual risk is
+narrow and named: production may populate projected fields that local records
+leave empty. That risk is bounded by the fixed field list (`_PROJECTED_TOP_LEVEL`
++ `_PROJECTED_RECOMMENDATION` + `_PROJECTED_METADATA`), whose local maximum is
+599 B, and it would have to be **~3x** wrong to matter.
+
+**HOW TO CLOSE IT PROPERLY — two lines, one run.** Accumulate
+`len(json.dumps(projected))` inside the existing stream and print it on the
+`LEDGER_CHUNKS_ACCEPTED` line as `projected_bytes=`. The projection is ALREADY
+computed there and thrown away, so this measures the real thing at zero extra
+work and turns the inference into a reading on the next autorun. Not built; it
+needs a worker deploy.
