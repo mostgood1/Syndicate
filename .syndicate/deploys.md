@@ -21077,3 +21077,67 @@ verify: `py -3 scripts/measure_board_window_clip_rate.py --since
 `NON-TODAY clip rate: 85/145 = 59%`. Run by the scheduled task
 `board-window-clip-rate-1200`, which — unlike its `-remeasure` predecessor —
 left this trace.
+
+## 2026-09-04 13:4xZ — `#626`(h) VERIFY (scheduled, 07:45 CT): **NOT-ARMED, confirmed independently — and the cause IS recoverable.** `[lane accuracy-autorun-rearm]`
+
+**This confirms attempt 4's verdict above and corrects one line of it.** That
+entry says the reason "is not recoverable here" because session `a3502fdc` left
+no transcript. It is recoverable from the machine, not from the session:
+
+    Kernel-Power 506  2026-09-04 00:14:39 CT (05:14:39Z)  ENTERING Modern Standby
+    Kernel-Power 507  2026-09-04 08:24:21 CT (13:24:21Z)  EXITING  Modern Standby
+
+One unbroken 8h09m42s span, no wake between. **The 03:00 CT dispatch
+(08:00:48Z) fell 2h46m inside it.** So "fired on time" is true of DISPATCH and
+false of EXECUTION — the already-documented `lastRunAt` rule, the same mechanism
+that suspended a scheduled call 9h13m on 2026-08-27. Nothing could execute on
+this machine at 08:00:48Z.
+
+**My own fire is the control, and it proves the mechanism rather than assuming
+it:** this verify task was scheduled 07:45 CT / 12:45Z and its `lastRunAt` is
+**13:36:50Z** — 51m50s late, i.e. 12 minutes AFTER the 13:24:21Z wake. Two tasks
+scheduled inside the standby span, both displaced past it, exactly one of which
+left a record.
+
+**THE VERDICT, four readings taken 13:4xZ (all after 07:00 CT, so the gate was
+open and the run was genuinely due — this is NOT a NOT-YET-DUE):**
+
+    local time                   2026-09-04 08:40:20 CT (-05:00)   gate hour >= 7 CT  MET
+    last_run_date                2026-09-02 < today                gate date          MET
+    ACCURACY_SUMMARY_..._AUTORUN 'false'   (env-vars API, srv-d91dpertqb8s73co8ls0)
+    refresh-worker live          5af2c517, finishedAt 05:32:13Z (00:32 CT)
+    deploys in 08:00-13:00Z      NONE  (prior five: 05:32 / 04:30 / 02:54 / 02:17 / 00:50Z)
+
+Steps 2-4 of this brief were **not** run and must not be reported as null: with
+the key `false` there is no autorun to find, so an absent `AUTORUN_DONE` here
+carries no information about memory. **No disarm was needed** (the key never
+went `true`), and per Step 1 I did not arm it myself.
+
+**THE DURABLE FINDING — attempt 4's remedy is defeated by a property of this
+machine that is already in the ledger.** The 03:00 CT scheduled task existed to
+escape "windows are scarce during a live slate" (preflight CLEAR once for <25s
+in ~40min of polling). But **this machine is in Modern Standby at 03:00 CT** —
+measured at 6 of 10 nights in the `live-gameline-accuracy-snapshot` record, and
+8h10m unbroken last night. So the quiet window is not merely hard to hit, it is
+**unreachable by a laptop-scheduled task**: the hour chosen for its quietness is
+the same hour the scheduler cannot run. That is a structural defeat, not a
+fourth piece of bad luck, and it means attempt 4 stood down in favour of an
+alternative that does not exist.
+
+**This STRENGTHENS attempt 4's recommendation and does not replace it.** Arming
+still needs the user decision it names, and I did not take it. Two constraints
+for whoever does:
+
+- **Before 07:00 CT still matters** — after it, both gate conditions are already
+  true and the autorun fires on the next tick, on a live slate. As I write, it
+  is 08:4x CT, so today's arm would fire immediately.
+- **A laptop task cannot hold that window.** The next attempt should ride an
+  ordinary window from a session that is actually awake, or move off this
+  machine — not re-arm the same 03:00 CT slot, which has now failed for a
+  reason that will recur tonight.
+
+**verify:** the env-vars API returns `'false'` for the key and the deploys API
+shows no refresh-worker deploy between 05:32:13Z and 13:4xZ, both read after the
+08:24:21Z wake. refresh-worker's claim was HELD by `catchup-632-thread-gating`
+(14 min, preflight CLEAR, target `b24c89b0`) throughout my reading, so no window
+was available to this lane regardless.
