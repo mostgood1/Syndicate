@@ -516,6 +516,47 @@ def _board_rows_for_join(selected_date: str | None) -> list[dict]:
     return [r for r in (rows or []) if isinstance(r, dict)]
 
 
+
+# WHY A VENUE HAS NO DIRECT FEED. Keyed by venue, and ABSENT means "this venue is
+# supposed to have one" -- so a venue that should be priced and is not falls
+# through to `reader_failed`, which is the alarm rather than a shrug.
+#
+# Each reason is a MEASURED capability gap, not an intention:
+#   novig     the public CSV tier is anonymised at game/player/team level, so
+#             `reportTicker` names a CATEGORY and can never price a named bet
+#             (measured 2026-08-24). The credentialed NBX REST tier is
+#             implemented and needs founder-gated credentials that are absent.
+#   prophetx  no fan-in adapter is registered at all, the API token is
+#             partner-issued with no self-serve signup, and the production base
+#             URL is unconfirmed -- the client defaults to SANDBOX.
+_VENUE_FEED_GAP = {
+    "novig": "capability_gap:public_csv_anonymised;needs_NOVIG_CLIENT_ID",
+    "prophetx": "capability_gap:no_fanin_adapter;partner_token;sandbox_base_url",
+}
+
+#: Venues that DO have a direct feed. One of these reading `no_feed` is a defect,
+#: not a gap, and the stamp says so in capitals so it cannot be skimmed past.
+_VENUES_WITH_FEEDS = ("kalshi", "polymarket")
+
+
+def _venue_feed_status(venue: str, resolver: object) -> str:
+    """One token explaining `venue_priced`, for the plan line.
+
+    THE POINT IS THE THIRD CASE. `venue_feed` and `capability_gap` are both
+    fine; `READER_FAILED` is a venue we can price, silently pricing from the
+    aggregator instead -- exactly the Kalshi failure of 2026-08-25, which cost
+    weeks because its symptom was a zero that looked like Novig's zero.
+    """
+    name = str(venue or "").strip().lower()
+    if resolver is not None:
+        return "venue_feed"
+    if name in _VENUE_FEED_GAP:
+        return _VENUE_FEED_GAP[name]
+    if name in _VENUES_WITH_FEEDS:
+        return "READER_FAILED:has_a_feed_but_resolver_returned_none"
+    return "no_feed:unregistered_venue"
+
+
 def _venue_price_resolver(venue: str, selected_date: str | None = None):
     """`(price_resolver, ticker_resolver)` for a venue, or `(None, None)`.
 
@@ -1118,6 +1159,7 @@ def run_portfolio_commit(
             # direct feed today; every other venue falls back to the aggregator,
             # and `price_source` on each scoped row records which was used.
             venue_price_resolver, venue_ticker_resolver = _venue_price_resolver(venue, normalized)
+            feed_status = _venue_feed_status(venue, venue_price_resolver)
             scoped, scope_refusals = scope_rows_to_venue(
                 rows,
                 venue,
@@ -1156,6 +1198,12 @@ def run_portfolio_commit(
                 # aggregator -- the difference between a real coverage number
                 # and OddsAPI's view of one.
                 f"venue_priced={sum(1 for r in scoped if r.get('price_source') == 'venue_feed')} "
+                # ...AND WHY, because a zero here has two opposite causes and
+                # they call for opposite work. `capability_gap` is nothing to
+                # do; `READER_FAILED` is a venue that HAS a feed pricing off
+                # the aggregator instead, which is what Kalshi did silently for
+                # weeks while the fan-in produced 2,344 quotes for it.
+                f"feed={feed_status} "
                 # HOW MANY PLACEABLE ROWS THE POSITION CAP COST, which is the
                 # number that says whether `max_positions` is the binding
                 # constraint on this venue actually trading. A cut that reports
