@@ -1702,6 +1702,42 @@ horizon is **5.7 h**, i.e. past the uptimes at which this service was dying.
 So: consistent with the fix, not proof of it, and the direction and magnitude are
 both large enough to act on.
 
+**`[2026-09-04]` RETRACTION: THE BACKGROUND-LOOP EXPLANATION FOR THE >100% SHARE IS
+WRONG. NEITHER LOOP RUNS ON WEB.** The thread gate shipped (`b24c89b0`), is
+correct and tested — and is **INERT on the service being measured**.
+
+I attributed the impossible attribution (+395.8 MB against +225.9 MB of actual
+growth, 175%; a route at -49.46 MB) to `app.py`'s live-refresh and
+intelligence-state loops sharing the process. **Checked three ways after
+deploying, all agreeing they do not run there:**
+
+    SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP              = false
+    SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP  = false
+    `_is_live_refresh_loop_enabled()` -> `_env_bool(..., default=False)`
+    web logs: ZERO TICK_COMPLETE / BACKGROUND_LOOP_START / LOOP_ITERATION lines
+
+The first post-deploy emission reads `skipped_background = 0`, which is the
+CORRECT answer for a service with no loops — **not** evidence the gate works.
+
+**I SHOULD HAVE CHECKED WHETHER THE LOOPS RAN BEFORE BUILDING A GATE FOR THEM.**
+The evidence was already in this session: an earlier note records
+`MLB_ENABLE_REFRESH_WORKER_AUTORUN` on web as INERT and web as having no
+reachable background loop. I had written it down and reasoned past it because the
+mechanism was plausible and the numbers were suggestive.
+
+**WHAT IS ACTUALLY TRUE NOW.** The same emission shows **zero negative route
+totals** and `SUM +38.65 MB` across 6 routes — the symptom is not currently
+reproducing. But the >100% and the negatives were measured at `00:24-00:39Z` on
+`442f82fe`, BEFORE the self-mirror fix and the alias slimming, i.e. under a much
+heavier payload. So the third source is **UNKNOWN, not eliminated**, and one
+clean emission is not proof it is gone.
+
+**THE GATE STAYS, LABELLED INERT.** It is correct, tested (10 tests, including
+the start-and-finish-inside-one-request case a single counter misses), costs two
+integer updates per loop iteration, and is the right invariant the moment either
+loop is enabled on web or the profiler is armed on a worker where they DO run. It
+must not be counted as having fixed anything.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove

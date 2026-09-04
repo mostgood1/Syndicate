@@ -4750,3 +4750,33 @@ seen this yet" is about injection, and is not a safety claim.
 - **What it cost, measured, on one evening:** (1) this lane's ledger claims were RELEASED by `order-model-view` at ~20:0xZ; (2) the refresh-worker DEPLOY CLAIM was force-acquired off `fleet-catchup-round3` (`cfcce46d`) at ~20:4xZ on the same reasoning. **The second one displaced a deploy in flight** — `a6f5f586` was cancelled at 20:44:34Z, the exact second `150cc95b` was created. **No content was lost, and the reason is instructive: `a6f5f586` IS AN ANCESTOR of `150cc95b`.** That is the "deploy a commit that is on `origin/main`" rule paying out — cumulative deploys are what being on `main` buys, and had either deploy been off-main this would have been a silent revert.
 - **The rule going forward:** **liveness must be established POSITIVELY, from an artifact the session itself writes** — a commit in the last N minutes, a claim whose age RESETS, a fresh preflight record — never from absence in a roster you cannot join to the id you hold. Before forcing any lock, read `/v1/services/<id>/deploys` and check for a deploy in flight; a build in `created` state IS the holder working. And if you must act on a stale-looking claim, prefer waiting: an unexpired claim costs minutes, a displaced deploy can cost a revert nobody sees.
 - **My own contribution to it, stated because it is the fixable half:** I announced "session closing" in a checkpoint and then kept working for hours. A peer reading that plus roster-absence had every reason to conclude I was gone. **Do not publish a terminal status you are not about to honour** — and if work resumes after one, strike the note in the same edit that resumes it.
+
+## 2026-09-04 — CHECK THAT THE THING YOU ARE GATING ACTUALLY RUNS, BEFORE YOU BUILD THE GATE
+
+`#632`. Per-request attribution returned an impossible share (175% on one worker,
+a route at -49.46 MB). I diagnosed it as `app.py`'s background loops sharing the
+process, built a gate for them, tested it, landed it and deployed it.
+
+**Neither loop runs on web.** `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`,
+`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`, the code gate
+defaults to False, and web has logged ZERO loop lines ever. The gate is correct
+and inert, and the diagnosis it rests on is FALSIFIED.
+
+**The evidence was already in the session.** An earlier finding recorded
+`MLB_ENABLE_REFRESH_WORKER_AUTORUN` on web as INERT and web as having no
+reachable background loop. I had read it, written it down, and then reasoned past
+it because the mechanism was plausible and the numbers were suggestive.
+
+THE RULE: before building anything that excludes, suppresses, or compensates for
+a subsystem, **prove that subsystem is REACHED on the service in question** —
+env, code gate, and a log line it would have emitted if it ran. Plausible-and-
+unchecked is how a correct change ends up fixing nothing, and `#632` produced
+that outcome twice in one night (`f9c4733d`'s identity check was the other).
+
+Note the shape of the false confirmation: `skipped_background = 0` is exactly
+what a WORKING gate looks like on a quiet service. The reading that would have
+distinguished them is not in the instrument at all — it is whether the subsystem
+exists.
+
+Related: `[2026-09-04]` "a deploy that succeeds, tests that pass, and a smaller
+response can all be true while the change does nothing."
