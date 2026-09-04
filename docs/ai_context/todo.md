@@ -1738,6 +1738,42 @@ integer updates per loop iteration, and is the right invariant the moment either
 loop is enabled on web or the profiler is armed on a worker where they DO run. It
 must not be counted as having fixed anything.
 
+**`[2026-09-04]` THE THIRD SOURCE: THE ANOMALY NO LONGER REPRODUCES, AND THE GC
+HYPOTHESIS HAS NO CASE. Measured on `3ee5e4b0`, not argued.**
+
+    solo attributed              200
+    WITH a gen-2 collection    n=  0          0.0 MB
+    WITHOUT one                n=200       +24.709 MB
+    gen-2 collections since boot: 10
+    route SUM +24.71 MB      NEGATIVE ROUTES: 0
+
+**GC IS NOT SUPPORTED AS THE MECHANISM.** Collections do happen (10 since boot)
+and the probe reads them, but **none overlapped an attributed request** — 0 of
+200. A route total of -49.46 MB would need many overlaps; this window has none.
+Not disproven, but it has no case, and that distinction is the point.
+
+**THE SYMPTOM ITSELF IS GONE.** No negative routes, no >100% share, and the whole
+200-request sample sums to +24.7 MB. The impossible readings (175% / 37%, a route
+at -49.46 MB) were taken at `00:24-00:39Z` on `442f82fe`, **before** the
+self-mirror fix and alias slimming, when a single `/api/intelligence/query` cost
+82-144 MB. Today the same instrument on the same service reads clean.
+
+**THE MOST LIKELY ACCOUNT, LABELLED AS INFERENCE.** The negatives were arena
+churn following very large transient allocations — a CONSEQUENCE of the 67 MB
+payload rather than a separate mechanism — and the ~74% payload cut removed the
+allocations that produced them. **This is not proof: an absent symptom cannot be
+diagnosed**, and no measurement here distinguishes "fixed" from "not currently
+triggered".
+
+**WHAT THIS LEAVES.** The attributed share is now internally consistent (all
+positive, sums below total growth), so the route RANKING and the magnitudes are
+usable again. The `gc2_split` probe stays armed: if the anomaly returns under a
+heavier load it will be caught with the collector's role already instrumented,
+rather than re-derived. Three candidate sources were tested — cross-worker
+(CONFIRMED and fixed), background loops (FALSIFIED, gate inert), GC timing (NO
+CASE) — and the honest state is that the symptom is absent, not that its cause
+is known.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
