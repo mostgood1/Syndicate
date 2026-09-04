@@ -71,10 +71,18 @@ def load_guard():
     importing process with exit code 0 and no output -- documented in
     `check_lane_invariants.py` as having bitten two earlier attempts.
     """
-    src = (ROOT / ".claude" / "hooks" / "lane-guard.py").read_text(encoding="utf-8")
+    # REPOINTED 2026-09-03 from `lane-guard.py` to `lane_claims.py`. The parser
+    # moved into that shared module; the hook now merely imports it. Loading the
+    # HOOK here broke outright -- it does `sys.path.insert(0, os.path.dirname(
+    # os.path.abspath(__file__)))` at import, and an exec'd namespace has no
+    # `__file__`. `lane_claims.py` is a pure library with no `__file__`, no
+    # `sys.exit(main())` and no stdin read, so the neutralising hacks below are
+    # now redundant rather than load-bearing. Same parser either way: the hook
+    # imports these exact objects.
+    src = (ROOT / ".claude" / "hooks" / "lane_claims.py").read_text(encoding="utf-8")
     src = src.replace("sys.exit(main())", "pass")
     ns = {"__name__": "_lane_guard_loaded_not_run"}
-    exec(compile(src, str(ROOT / ".claude/hooks/lane-guard.py"), "exec"), ns)
+    exec(compile(src, str(ROOT / ".claude/hooks/lane_claims.py"), "exec"), ns)
     return ns
 
 

@@ -90,7 +90,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
-    from hook_trees import roots
+    from hook_trees import head_sig, roots
     from lane_claims import claims_by_path, is_exempt
     from lane_marker import current_lane, safe_session_id
 except Exception as exc:  # pragma: no cover - only when a shared module is gone
@@ -181,9 +181,10 @@ def _sig(path):
 
 def _pre(payload, session_id):
     """Record the BEFORE picture. Always exits 0, whatever happens."""
-    snap = {}
+    snap = {"__heads__": {}}
     for root in roots(payload):
         try:
+            snap["__heads__"][root] = head_sig(root)
             for path, (claimed, slugs) in _candidates(root, session_id).items():
                 snap[path] = {"sig": _sig(path), "claimed": claimed,
                               "slugs": slugs, "root": root}
@@ -220,9 +221,36 @@ def _post(payload, session_id):
     except Exception:
         pass
 
+    # A GIT OPERATION THAT MOVED HEAD IS NOT A WRITE BY YOU.
+    #
+    # `git rebase`, `checkout`, `pull`, `merge` all rewrite tracked files, which
+    # moves their (mtime, size) inside this window. Reported 2026-09-03 by
+    # session c38d3e5c after the first version shipped: it warned on two claimed
+    # files following `git rebase origin/main`, neither of which that session had
+    # edited. In a tree where several sessions rebase all day, that is not an
+    # occasional false positive -- it is most of the output, and a check that
+    # cries wolf gets ignored, which this file's own docstring argues at length.
+    #
+    # So a root whose HEAD moved is skipped entirely, and SILENTLY: a note on
+    # every rebase would be the same noise wearing a different label.
+    #
+    # THE COST, stated because it is real: an out-of-lane write made in the SAME
+    # command as a rebase is missed. That is the safe direction -- this hook
+    # detects, it does not prevent, and `lane-guard` still blocks the Edit path.
+    # An empty head_sig means UNKNOWN (no gitdir, packed refs unreadable) and is
+    # NOT treated as "did not move"; unknown-on-both-sides compares equal and
+    # reports, which keeps a non-git tree working exactly as before.
+    heads = snap.pop("__heads__", {}) or {}
+    moved = set()
+    for root, before_head in heads.items():
+        if before_head and head_sig(root) != before_head:
+            moved.add(root)
+
     changed = []
     for path, rec in snap.items():
         if not isinstance(rec, dict):
+            continue
+        if rec.get("root") in moved:
             continue
         before = rec.get("sig")
         after = _sig(path)

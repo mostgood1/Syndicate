@@ -76,7 +76,14 @@ FILES_RE = re.compile(r"^\s*-\s*\*{0,2}Files\b[^:]*:?(.*)$")
 # a claim. Over-claiming blocks sessions from files nobody holds, which is a
 # different failure and not a smaller one.
 FIELD_RE = re.compile(r"^-\s*\*{0,2}\w")
-PATHISH_RE = re.compile(r"^[\w.\-]+\.\w{1,5}$")
+# The extension must START WITH A LETTER. `\w{1,5}` accepted `15.0`, `1.5` and
+# every other version-shaped token as a claimed path -- the phantom class
+# `learnings.md` named on 2026-08-31 ("reject tokens that do not look like
+# paths: catches `1/p`, `15.0`") and which was written up but never fixed here.
+# Real extensions are alphabetic; nothing in the repo has a digit-leading one.
+# Tokens containing a separator are unaffected -- `_paths_in` accepts those on
+# the "/" arm without consulting this pattern at all.
+PATHISH_RE = re.compile(r"^[\w.\-]+\.[A-Za-z]\w{0,4}$")
 
 
 # A bullet inside a `- Files:` block that DISCLAIMS a path rather than claiming
@@ -169,9 +176,47 @@ _DISCLAIMER_MARKERS = (
 )
 
 
+def _mask_backticked(line):
+    """`line` with every backtick-quoted span blanked out, same length.
+
+    A MARKER INSIDE A PATH IS PART OF THE FILENAME, NOT A DISCLAIMER. Found
+    2026-09-03 by a lane that tried to claim `scripts/archive_released_lanes.py`
+    -- whose NAME contains "released" -- and got `scripts/archive` instead,
+    because `_claimable_prefix` cut at the marker it found inside the filename.
+    The cut is a PREFIX, so it did not merely mangle that one token: every path
+    listed AFTER it on the same line was dropped too. A three-file Files line
+    became one broken token, and both the lane and the guard read that as normal.
+
+    The ledger writes paths in backticks by convention, and every disclaimer
+    incident on record puts its marker in PROSE, outside them:
+    "**NOT claimed, deliberately:** `x.py`", "Collision check: CLEAR",
+    "held by OPEN lane `other`", "**never `render.yaml`**". So blanking the
+    quoted spans before looking for markers keeps every one of those working and
+    stops the parser reading a filename as a sentence about a filename.
+
+    Positions are preserved (same length) so the caller can cut the ORIGINAL
+    string at an index found in the mask.
+    """
+    out = []
+    inside = False
+    for ch in line:
+        if ch == "`":
+            inside = not inside
+            out.append("`")
+        else:
+            out.append("\x00" if inside else ch)
+    return "".join(out)
+
+
 def _is_disclaimer(line):
-    """True when this Files-block bullet talks ABOUT a path instead of claiming it."""
-    text = line.lstrip("- ").strip().strip("*_").lower()
+    """True when this Files-block bullet talks ABOUT a path instead of claiming it.
+
+    NOT CALLED BY `_claims()` -- kept because `archive_released_lanes.py` reads
+    it, and because it documents the predicate `_claimable_prefix` implements
+    positionally. It was ALSO named in a comment inside `_claims` that claimed
+    it did the skipping; it never has, and that comment is now corrected.
+    """
+    text = _mask_backticked(line.lstrip("- ").strip().strip("*_")).lower()
     return any(marker in text for marker in _DISCLAIMER_MARKERS)
 
 
@@ -196,7 +241,11 @@ def _claimable_prefix(line):
     claimable prefix is empty and the file stays unclaimed -- which is the whole
     reason this machinery exists.
     """
-    low = line.lower()
+    # Markers are located in the BACKTICK-MASKED copy so a marker word occurring
+    # inside a quoted path (`scripts/archive_released_lanes.py`) is not read as a
+    # sentence about that path -- see `_mask_backticked`. The mask is the same
+    # length as the line, so the index found there cuts the ORIGINAL correctly.
+    low = _mask_backticked(line).lower()
     positions = [low.find(m) for m in _DISCLAIMER_MARKERS]
     positions = [p for p in positions if p != -1]
     return line[:min(positions)] if positions else line
@@ -301,7 +350,9 @@ def _claims(text):
             #
             # Safe because the block is bounded: FIELD_RE ends it at the next
             # top-level field, so only the declaration's own lines are read, and
-            # `_is_disclaimer` still skips "NOT claimed, deliberately" bullets.
+            # `_claimable_prefix` still cuts at "NOT claimed, deliberately".
+            # (An earlier version of this comment credited `_is_disclaimer`,
+            # which `_claims` has never called. Corrected 2026-09-03.)
             if open_lane:
                 for f in _paths_in(_claimable_prefix(stripped).lstrip("- ")):
                     yield slug, f

@@ -70,7 +70,15 @@ import types
 
 LANES = pathlib.Path(".syndicate/lanes.md")
 HISTORY = pathlib.Path(".syndicate/lanes_history.md")
-GUARD = pathlib.Path(".claude/hooks/lane-guard.py")
+# REPOINTED 2026-09-03 from `lane-guard.py` to `lane_claims.py`. The parser
+# moved into that shared module; the hook now merely imports it. Loading the
+# HOOK here broke outright -- it does `sys.path.insert(0, os.path.dirname(
+# os.path.abspath(__file__)))` at import, and an exec'd namespace has no
+# `__file__`. `lane_claims.py` is a pure library with no `__file__`, no
+# `sys.exit(main())` and no stdin read, so the neutralising hacks below are
+# now redundant rather than load-bearing. Same parser either way: the hook
+# imports these exact objects.
+GUARD = pathlib.Path(".claude/hooks/lane_claims.py")
 
 HEADER_RE = re.compile(r"^###\s+(\S+)\s")
 BOUNDARY_RE = re.compile(r"^#{2,3}\s")

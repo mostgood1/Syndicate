@@ -223,6 +223,57 @@ b = run(r, session="session-B")[0]
 check("session A sees its own window", a, 2)
 check("session B's slot was not consumed by A", b, 2)
 
+print()
+print("A GIT OPERATION THAT MOVES HEAD IS NOT A WRITE BY YOU:")
+
+
+def git(root, *args):
+    return subprocess.run(["git", "-C", root] + list(args),
+                          capture_output=True, text=True)
+
+
+def git_tree():
+    """A throwaway repo with two commits that differ in a CLAIMED file."""
+    r = tree(TWO_LANES, "mine", SEED)
+    git(r, "init", "-q")
+    git(r, "config", "user.email", "t@t"); git(r, "config", "user.name", "t")
+    git(r, "add", "-A"); git(r, "commit", "-q", "-m", "one")
+    first = git(r, "rev-parse", "HEAD").stdout.strip()
+    touch(r, "syndicate/features/theirs.py", "theirs, as of the SECOND commit\n")
+    git(r, "add", "-A"); git(r, "commit", "-q", "-m", "two")
+    return r, first
+
+
+r, first = git_tree()
+run(r, pre=True)
+git(r, "checkout", "-q", first)          # moves HEAD, rewrites theirs.py
+rc, err = run(r)
+check("`git checkout` rewriting a claimed file is SILENT", rc, 0,
+      "" if rc == 0 else err.splitlines()[0][:60])
+
+# The suppression must be scoped to a HEAD MOVE, not to "this tree is a repo".
+r, _first = git_tree()
+run(r, pre=True)
+touch(r, "syndicate/features/theirs.py", "a real out-of-lane write, HEAD unmoved\n")
+rc, err = run(r)
+check("a real write with HEAD UNMOVED is still reported", rc, 2)
+check("  ^ still names the owning lane", "theirs" in err, True)
+
+# `git add` / `git status` do not move HEAD, so they must not suppress anything.
+r, _first = git_tree()
+run(r, pre=True)
+touch(r, "syndicate/features/theirs.py", "written, then staged\n")
+git(r, "add", "-A")
+check("`git add` does not move HEAD, so the write is still reported",
+      run(r)[0], 2)
+
+# A tree that is not a repo at all: head_sig is "" on both sides, which compares
+# EQUAL and must therefore behave exactly as it did before HEAD tracking existed.
+r = tree(TWO_LANES, "mine", SEED)
+run(r, pre=True)
+touch(r, "syndicate/features/theirs.py", "no git here\n")
+check("a non-git tree is unaffected by HEAD tracking", run(r)[0], 2)
+
 for t in TREES:
     shutil.rmtree(t, ignore_errors=True)
 

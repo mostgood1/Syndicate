@@ -26,12 +26,19 @@ is claimed by the OPEN lane `ncaaf-live-cadence`. Editing it would be the exact
 cross-lane write this repo's guards exist to prevent, so the check lands here
 instead. Fold it in when that lane closes.
 
-TWO SEVERITIES, ON PURPOSE.
+THREE SEVERITIES, ON PURPOSE.
 
   BROKEN (exit 1) -- the claim names no file in the repo. Always wrong, always
   the owning lane's to fix, and it goes away when they fix it. That is what
   makes it safe to fail on: a check that can never go green is one people learn
   to scroll past, and this repo has lost guards that way.
+
+  NEAR-MISS HEADER (exit 1) -- the block declares files, but its header status
+  is REOPENED/OPENED rather than a standalone OPEN, so `\\bOPEN\\b` rejects it
+  and NONE of its claims reaches any claim set. Same outcome as BROKEN (files
+  declared, nothing enforced) reached a different way, and invisible to every
+  set-comparison in the repo -- `trim_lane_blocks.py` verifies a trim by
+  recomputing the claim set, so it reads these blocks as claim-free.
 
   INERT (reported, exit 0) -- the claim names a real file that `lane-guard`
   EXEMPTS anyway, i.e. anything under `.syndicate/` or `.claude/`. Listing
@@ -51,7 +58,18 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), ".claude", "hooks"))
 try:
-    from lane_claims import _claims, is_exempt
+    from lane_claims import (
+        ASCII_LANE_RE,
+        FIELD_RE,
+        FILES_RE,
+        HEADER_RE,
+        LANE_RE,
+        OPEN_RE,
+        _claimable_prefix,
+        _claims,
+        _paths_in,
+        is_exempt,
+    )
 except Exception as exc:
     sys.stderr.write("check_lane_claims: cannot import the shared lane parser "
                      "(%s); not checking.\n" % exc)
@@ -92,6 +110,69 @@ def _resolves(claim, paths, by_base, root):
         if p == claim or p.endswith("/" + claim) or claim.endswith("/" + p):
             return True
     return False
+
+
+def _near_miss_open(text):
+    """Blocks that DECLARE files under a header that is not quite OPEN.
+
+    Returns [(slug, status, [paths])].
+
+    THE FAILURE THIS CATCHES, found 2026-09-03 by session c38d3e5c: a lane
+    relabelled its header to `**REOPENED 2026-09-03 for the READ side**`.
+    `OPEN_RE` is `\\bOPEN\\b`, which correctly rejects REOPENED -- that
+    strictness is deliberate and documented (the session-start hook once counted
+    "NO LANE WAS EVER OPENED" as an open lane). But the lane still declared SIX
+    files plus a function-scoped claim, and NONE of them entered any claim set.
+    `lane-guard` had not enforced them since the relabel, and nothing said so.
+
+    IT DEFEATS EVERY SET-COMPARISON WE HAVE. `trim_lane_blocks.py` verifies a
+    trim by recomputing the claim set and asserting it is unchanged -- so it
+    happily moved that block out of `lanes.md` and reported "claims unchanged",
+    because those claims were never counted. A set comparison cannot protect a
+    claim it never saw.
+
+    Deliberately NARROW: only headers whose status CONTAINS "OPEN" but does not
+    match it as a standalone word. That is the near-miss class -- REOPENED,
+    OPENED -- where the author plainly meant the lane to be live. A CLOSED lane
+    with a Files block is a normal historical record and is not reported.
+    """
+    out = []
+    slug = status = None
+    near = False
+    in_files = False
+    paths = []
+
+    def flush():
+        if near and slug and paths:
+            out.append((slug, status.strip(), sorted(set(paths))))
+
+    for line in text.splitlines():
+        if HEADER_RE.match(line):
+            flush()
+            m = LANE_RE.match(line) or ASCII_LANE_RE.match(line)
+            if m:
+                slug, status = m.group(1), m.group(2)
+                near = ("OPEN" in status.upper()) and not OPEN_RE.search(status)
+            else:
+                slug = status = None
+                near = False
+            in_files, paths = False, []
+            continue
+        if not near:
+            continue
+        m = FILES_RE.match(line)
+        if m:
+            in_files = True
+            paths += _paths_in(_claimable_prefix(m.group(1)))
+            continue
+        if in_files:
+            stripped = line.strip()
+            if not stripped or (FIELD_RE.match(line) and not line[:1].isspace()):
+                in_files = False
+                continue
+            paths += _paths_in(_claimable_prefix(stripped).lstrip("- "))
+    flush()
+    return out
 
 
 def _why(claim):
@@ -171,6 +252,8 @@ def main():
               "all.")
         return 1
 
+    near = _near_miss_open(text)
+
     broken, inert = [], []
     for slug, claim in claims:
         if not _resolves(claim, paths, by_base, root):
@@ -179,9 +262,36 @@ def main():
             inert.append((slug, claim))
 
     total = len(claims)
-    if not broken and not inert:
+    if not broken and not inert and not near:
         print("[ok  ] all %d lane claim(s) name a real, guardable file" % total)
         return 0
+
+    if near:
+        print("[BAD ] %d block(s) DECLARE files under a header that is not OPEN, so "
+              "none of" % len(near))
+        print("       those claims is in any claim set and lane-guard does not "
+              "enforce them:")
+        for slug, status, paths in near:
+            print()
+            print("       %s   header status: %s" % (slug, status[:70]))
+            for p in paths:
+                print("         %s" % p)
+        print()
+        print("       `OPEN_RE` is \\bOPEN\\b, which rejects REOPENED and OPENED on "
+              "purpose --")
+        print("       the loose version once counted \"NO LANE WAS EVER OPENED\" as "
+              "open. So the")
+        print("       fix belongs in the HEADER, not the regex: give the status a "
+              "standalone")
+        print("       OPEN token (e.g. `OPEN - REOPENED 2026-09-03 for ...`). If "
+              "the lane is")
+        print("       not yours, tell its owner -- this is silent for them too.")
+        print("       NOTE: a set-comparison cannot catch this. trim_lane_blocks "
+              "verifies by")
+        print("       recomputing the claim set, so it reads these blocks as "
+              "claim-free and")
+        print("       will move them out of lanes.md reporting \"claims "
+              "unchanged\".")
 
     if inert:
         print("[note] %d of %d claim(s) name a file lane-guard EXEMPTS, so they "
@@ -213,7 +323,9 @@ def main():
         print("       is not yours, tell its owner rather than editing across "
               "lanes.")
         return 1
-    return 0
+    # A near-miss header is the same failure as a broken claim -- files
+    # declared, nothing enforced -- so it fails the check on its own.
+    return 1 if near else 0
 
 
 if __name__ == "__main__":

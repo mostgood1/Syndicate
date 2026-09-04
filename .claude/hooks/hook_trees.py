@@ -36,6 +36,80 @@ other session reads at start.
 """
 import os
 
+
+def _git_dir(root):
+    """The gitdir for `root`, following the `.git` FILE a linked worktree uses."""
+    g = os.path.join(root, ".git")
+    if os.path.isdir(g):
+        return g
+    try:
+        with open(g, encoding="utf-8") as fh:
+            line = fh.read().strip()
+        if line.startswith("gitdir:"):
+            p = line.split(":", 1)[1].strip()
+            return p if os.path.isabs(p) else os.path.normpath(os.path.join(root, p))
+    except Exception:
+        pass
+    return None
+
+
+def head_sig(root):
+    """A cheap string that CHANGES WHEN HEAD MOVES, or "" if it cannot be read.
+
+    Exists so a postwrite hook can tell "the user wrote this file" from "a
+    `git rebase`/`checkout`/`pull` rewrote it". Without that distinction a
+    watcher on a shared tree fires constantly: measured 2026-09-03 by session
+    c38d3e5c, `lane-postwrite-check` warned on two claimed files after a
+    `git rebase origin/main` that the reporting session had not edited at all.
+    In this tree rebases are routine, so that is the cry-wolf failure every
+    guard here is written to avoid.
+
+    FILE READS ONLY -- no `git` subprocess. Same budget rule as `roots()`: this
+    runs after every Bash command, and 41 ms of subprocess is what that
+    docstring already rejected. Two small reads: `HEAD`, plus the ref it names.
+
+    Refs are looked for in the gitdir AND in `commondir`, because a linked
+    worktree keeps its own `HEAD` but shares `refs/`. A packed ref resolves to
+    no file at all; that is why the ref's (mtime, size) is a fallback and why
+    the whole thing degrades to "" rather than raising. "" means UNKNOWN, and
+    the caller must decide what to do with that -- it must not be confused with
+    "HEAD did not move".
+    """
+    gd = _git_dir(root)
+    if not gd:
+        return ""
+    try:
+        with open(os.path.join(gd, "HEAD"), encoding="utf-8") as fh:
+            head = fh.read().strip()
+    except Exception:
+        return ""
+    if not head.startswith("ref:"):
+        return head                      # detached: HEAD holds the sha itself
+
+    ref = head.split(":", 1)[1].strip()
+    common = gd
+    try:
+        with open(os.path.join(gd, "commondir"), encoding="utf-8") as fh:
+            c = fh.read().strip()
+        common = c if os.path.isabs(c) else os.path.normpath(os.path.join(gd, c))
+    except Exception:
+        pass
+    for base in (gd, common):
+        p = os.path.join(base, *ref.split("/"))
+        try:
+            with open(p, encoding="utf-8") as fh:
+                return head + "|" + fh.read().strip()
+        except Exception:
+            continue
+    # Packed ref, or unreadable: fall back to whatever moves when it moves.
+    for base in (gd, common):
+        try:
+            st = os.stat(os.path.join(base, "packed-refs"))
+            return head + "|packed:%d:%d" % (int(st.st_mtime_ns), st.st_size)
+        except OSError:
+            continue
+    return ""
+
 def ledger_root(start):
     """Nearest ancestor of `start` that HOLDS a ledger, or None.
 
