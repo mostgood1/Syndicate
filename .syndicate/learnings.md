@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 805 rules `[generated]`
+## Index — 806 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5054,3 +5054,33 @@ the output contradicted something already known.
   one lane block, one `state.md` row, one log section and one commit message
   carrying a false fact, all now corrected in place except the pushed commit
   message, which cannot be.
+
+## 2026-09-04 — "SELF-VERIFYING" is only true where the EMITTER runs. Find the print, then ask who owns it.
+
+`60afda80` made the Kalshi doubleheader fix self-verifying — its comment says the
+counter is *"counted so the fix can be VERIFIED FROM THE LOGS"*. I deployed it to
+web and live-odds-worker and the verification signal did not appear, because it
+cannot:
+
+    doubleheader_resolved is COMPUTED in syndicate/features/shared/kalshi_board_join.py
+        -> owned by web, refresh-worker AND live-odds-worker
+    doubleheader_resolved is PRINTED at exactly one place repo-wide,
+        pipeline/portfolio_commit.py:665
+        -> `pipeline/` is owned by refresh-worker ALONE
+
+So two of three services now compute the counter and discard it. The
+`[kalshi_odds] BOARD_JOIN` line those services DO emit carries
+`kalshi_markets`, `board_rows`, `matched`, `reasons` — and not this field.
+
+**The rule.** A verification signal has an owner service exactly like the code it
+verifies, **and they need not be the same one**. Computation in `shared/` reaches
+all three; emission in `pipeline/` reaches one. So before claiming a deploy makes
+something verifiable: **locate the PRINT — `git grep <field>` for an f-string,
+repo-wide — and ask `_owners()` who runs THAT file.** Deploying the computation
+to a service that cannot print it buys nothing observable.
+
+**And the second-order trap, which is worse.** Grepping the trading service's
+logs for the token returns **0 lines, correctly** — indistinguishable from "the
+fix is broken". A null result on the wrong service is not evidence about the fix
+at all. Same family as *absent signal ≠ absent path* and *presence is not
+reachability*; the new axis is that the EMITTER has its own deployment identity.
