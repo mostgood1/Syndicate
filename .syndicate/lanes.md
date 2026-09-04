@@ -1885,6 +1885,23 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   the hook will fire on other sessions' work, and that rate is the thing to
   watch before trusting it as a signal.
 
+### refresh-catchup-round10 — CLOSED 2026-09-04 — **NO DEPLOY TAKEN: the owning lane shipped it while I was checking.** `prop-join-yield` held refresh-worker's claim with a deploy in flight; `dbe0f3b4` carries the NCAAF fix by content (`chip_join_key` x3, `9d106d11` an ancestor) and went live 00:50:28Z. live-odds-worker's only pending commit is inert lane-guard tooling; web was already 0 pending. No claim taken, none forced. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: refresh-worker off `442f82fe` onto `f31a6db9`. ONE substantive commit,
+  `9d106d11` (layer2 — NCAAF live rows stuck in the pregame lane because the
+  chip/card join used raw names from two different feeds; `intelligence_state.py`).
+- **ONLY refresh-worker.** live-odds-worker's single pending commit is
+  `scripts/check_lane_claims.py`, lane-guard tooling with zero runtime references
+  (verified round 8), and web already reads 0 pending. Deploying either would be
+  a reboot that changes no behaviour.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Hypothesis: n/a (not diagnostic).
+- Verification: BY CONTENT on the deployed SHA — `chip_join_key` in
+  `pipeline/intelligence_state.py`, confirmed ABSENT from the currently-live
+  `442f82fe` (live=0, target=3) so a pass discriminates; plus refresh-worker's own
+  log stream with 0 tracebacks.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

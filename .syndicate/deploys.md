@@ -20617,3 +20617,32 @@ reader has the rate rather than an impression.
 
 **Fleet:** refresh-worker `442f82fe` · live-odds-worker `442f82fe` · web
 `1d6b2f13` (1 pending, owner-held).
+
+## 2026-09-04 — round 10 — **NO DEPLOY TAKEN; the owning lane shipped it** — lane `refresh-catchup-round10`
+
+Only refresh-worker had substantive content: `9d106d11` (layer2 — NCAAF live rows
+stuck in the pregame lane, because the chip/card join compared RAW NAMES from two
+different feeds). live-odds-worker's single pending commit was
+`scripts/check_lane_claims.py`, lane-guard tooling with zero runtime references
+(verified round 8), and web already read 0 pending.
+
+`prop-join-yield` (session 3492626c) held refresh-worker's claim and had a deploy
+**in flight** when I looked. Checked by CONTENT rather than assuming: `dbe0f3b4`
+carries `chip_join_key` x3 in `pipeline/intelligence_state.py` and has `9d106d11`
+as an ancestor — the same fix I would have shipped, plus more. It went live
+00:50:28Z.
+
+verify: refresh-worker `dbe0f3b4`, `chip_join_key` x3 present in the deployed
+`intelligence_state.py`. **The NCAAF pregame-lane fix is in production**, shipped
+by the lane that owns the file (`layer2-sim-disagrees` claims
+`intelligence_state.py`) rather than by a catch-up round.
+
+No claim was taken, none forced, nothing deployed by me. Residual on both workers
+is `f31a6db9` — the same inert lane-guard script.
+
+**Worth stating because it is the second time today:** the right move for a
+catch-up round is often to check whether the owner is already shipping it. Round 9
+skipped web for its owner's measurement window; this round skipped refresh-worker
+because its owner was mid-deploy with the same content. A catch-up deploy that
+duplicates an owner's in-flight deploy risks cancelling their build — measured
+2026-08-15, and done TO me at 20:44Z yesterday.
