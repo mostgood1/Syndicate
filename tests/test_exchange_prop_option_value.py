@@ -144,6 +144,280 @@ class GateBookTests(unittest.TestCase):
         self.assertFalse(MOD.in_gate_book({"selection": None, "market": "batter_hits"}))
 
 
+class DerivedEntryCostTests(unittest.TestCase):
+    """`GATE_PER_SIDE_TODAY = 4.05` WAS NEVER MEASURED. It is `8.1% / 2`, the
+    label on the top row of item 07's table, halved — and that halving is an
+    identity that holds only AT EVEN MONEY. Measured on production shards
+    2026-09-01..09-04, the gate book's unders sit at fair 0.607, so they carry
+    ~61% of the hold and the real per-side cost is 4.233pp at a 7.012% two-way
+    hold, not 4.05pp at 8.1%. Substituting it flipped step 6's ROI leg from MET
+    to NOT MET.
+
+    These tests pin the DERIVATION, not a replacement number. A hard-coded
+    4.233 fails exactly the same way: the value moved 4.327 -> 3.776 across four
+    consecutive days."""
+
+    WINDOW = 30 * 60
+
+    @staticmethod
+    def _row(stamp, book, price, selection="under", market="batter_hits",
+             captured="c1", player="A", line=0.5, event="e1"):
+        payload = {"event_id": event, "market": market, "player_name": player,
+                   "line": line, "selection": selection, "captured_at": captured}
+        probability = MOD.implied(price)
+        return (stamp, book, probability, payload)
+
+    def _book(self, captured, stamp, under, over, book="draftkings", **kw):
+        return [self._row(stamp, book, under, "under", captured=captured, **kw),
+                self._row(stamp, book, over, "over", captured=captured, **kw)]
+
+    # ---- the identity the constant got wrong ---------------------------
+
+    def test_the_two_sides_split_the_hold_50_50_ONLY_at_even_money(self) -> None:
+        """`side_cost = fair x hold`. The whole 4.05 error in one assertion."""
+        even = MOD.side_cost_of(0.55, 0.55)          # fair 0.5 exactly
+        self.assertAlmostEqual(even[0] * 2, even[1], places=9)
+        skewed = MOD.side_cost_of(0.70, 0.37)        # fair well above 0.5
+        self.assertGreater(skewed[0] * 2, skewed[1],
+                           "doubling a favourite's cost OVERSTATES the hold")
+
+    def test_the_hold_transform_is_cost_over_fair_not_twice_cost(self) -> None:
+        cost, hold, fair = MOD.side_cost_of(0.70, 0.37)
+        self.assertAlmostEqual(MOD.two_way_hold_pct(cost, fair), hold, places=9)
+        self.assertNotAlmostEqual(2 * cost, hold, places=2)
+
+    def test_the_asserted_constant_disagrees_with_its_own_hold(self) -> None:
+        """4.05pp was published as "== today's ~8.1% two-way hold". At the
+        measured fair of 0.607 it implies 6.67%, not 8.1% — the constant and its
+        own stated justification never agreed."""
+        implied_hold = MOD.two_way_hold_pct(MOD.GATE_PER_SIDE_ASSERTED_2026_08_31, 0.607)
+        self.assertLess(implied_hold, 7.0)
+        self.assertGreater(abs(implied_hold - 8.1), 1.4)
+
+    def test_an_unusable_overround_is_refused_not_priced_at_zero(self) -> None:
+        """Unknown must not default permissive: a broken pair dropped onto a
+        cheap default reads as a FREE entry."""
+        self.assertIsNone(MOD.side_cost_of(0.40, 0.40))   # overround 0.80, arb
+        self.assertIsNone(MOD.side_cost_of(0.80, 0.60))   # overround 1.40
+        self.assertIsNotNone(MOD.side_cost_of(0.60, 0.47))
+
+    def test_the_hold_transform_refuses_a_non_probability(self) -> None:
+        for bad in (0.0, 1.0, -0.2, 1.5):
+            with self.assertRaises(ValueError):
+                MOD.two_way_hold_pct(4.0, bad)
+
+    # ---- REACHABILITY: the number must MOVE with the data ---------------
+
+    def test_the_cost_RESPONDS_to_the_prices_it_is_given(self) -> None:
+        """THE PIN. A hard-coded constant cannot answer two different books
+        differently. `off != on`, before any correctness check: if this passes
+        with the derivation removed, the derivation is not wired in."""
+        cheap = self._book("c1", 100.0, -120, +115)
+        rich = self._book("c1", 100.0, -160, +135)
+        a = MOD.derive_entry_cost(cheap, self.WINDOW)["today_pp"]
+        b = MOD.derive_entry_cost(rich, self.WINDOW)["today_pp"]
+        self.assertGreater(abs(a - b), 0.5,
+                           "the derived cost did not move with the prices — "
+                           "something is answering from a constant")
+
+    def test_the_cost_is_NOT_the_asserted_constant_on_arbitrary_input(self) -> None:
+        """Belt and braces on the same point: three unrelated books must give
+        three unrelated answers, none of them 4.05."""
+        seen = set()
+        for under, over in ((-120, +115), (-160, +135), (-105, -105)):
+            value = MOD.derive_entry_cost(
+                self._book("c1", 100.0, under, over), self.WINDOW)["today_pp"]
+            self.assertNotAlmostEqual(
+                value, MOD.GATE_PER_SIDE_ASSERTED_2026_08_31, places=2)
+            seen.add(round(value, 4))
+        self.assertEqual(len(seen), 3)
+
+    def test_the_arithmetic_never_READS_the_asserted_constant(self) -> None:
+        """The constant is kept only so the drift is printable. If anything in
+        the derivation consults it, changing it would change an answer."""
+        rows = self._book("c1", 100.0, -140, +125)
+        before = MOD.derive_entry_cost(rows, self.WINDOW)
+        original = MOD.GATE_PER_SIDE_ASSERTED_2026_08_31
+        try:
+            MOD.GATE_PER_SIDE_ASSERTED_2026_08_31 = 99.0
+            after = MOD.derive_entry_cost(rows, self.WINDOW)
+        finally:
+            MOD.GATE_PER_SIDE_ASSERTED_2026_08_31 = original
+        for field in ("today_pp", "gain_pp", "after_pp", "fair", "hold_measured_pct"):
+            self.assertAlmostEqual(before[field], after[field], places=9, msg=field)
+
+    def test_the_module_no_longer_defines_the_unmeasured_constant(self) -> None:
+        """`GATE_PER_SIDE_TODAY` is the name the arithmetic used to read. If it
+        comes back, so has the defect."""
+        self.assertFalse(hasattr(MOD, "GATE_PER_SIDE_TODAY"))
+
+    # ---- correctness, only after reachability ---------------------------
+
+    def test_the_derived_cost_matches_the_reference_definition_by_hand(self) -> None:
+        """One cell, arithmetic done longhand: -150 / +130 -> q 0.6, q_opp
+        0.43478, overround 1.03478, fair 0.57983, cost 2.0169pp, hold 3.478%."""
+        report = MOD.derive_entry_cost(self._book("c1", 100.0, -150, +130), self.WINDOW)
+        self.assertEqual(report["n"], 1)
+        self.assertAlmostEqual(report["today_pp"], 2.0169, places=3)
+        self.assertAlmostEqual(report["hold_measured_pct"], 3.4783, places=3)
+        self.assertAlmostEqual(report["fair"], 0.57983, places=4)
+        self.assertTrue(report["hold_identity_ok"])
+
+    def test_it_takes_the_CHEAPEST_book_at_the_snapshot(self) -> None:
+        """The gain is measured against the best book, so the baseline must be
+        too — that population mismatch is worth -0.807pp, twice the constant
+        error it hid behind."""
+        rows = (self._book("c1", 100.0, -150, +130, book="draftkings")
+                + self._book("c1", 100.0, -190, +160, book="betmgm"))
+        report = MOD.derive_entry_cost(rows, self.WINDOW)
+        self.assertEqual(report["n"], 1, "two books at one snapshot is ONE cell")
+        self.assertAlmostEqual(report["today_pp"], 2.0169, places=3)
+
+    def test_an_absent_exchange_quote_is_a_ZERO_GAIN_not_a_dropped_cell(self) -> None:
+        """The population fix. Dropping uncovered cells answers 'the exchange is
+        cheaper where it quotes'; the gate asks about the BOOK, and you cannot
+        take a price that is not there."""
+        report = MOD.derive_entry_cost(self._book("c1", 100.0, -150, +130), self.WINDOW)
+        self.assertEqual(report["n"], 1)
+        self.assertEqual(report["covered"], 0)
+        self.assertEqual(report["gain_pp"], 0.0)
+        self.assertAlmostEqual(report["after_pp"], report["today_pp"], places=9)
+        self.assertEqual(report["subset_n"], 0)
+
+    def test_the_subset_and_the_book_are_reported_as_different_numbers(self) -> None:
+        rows = (self._book("c1", 100.0, -150, +130, player="A")
+                + self._book("c1", 100.0, -150, +130, player="B")
+                + [self._row(100.0, "kalshi", -110, "under", player="A")])
+        report = MOD.derive_entry_cost(rows, self.WINDOW)
+        self.assertEqual((report["n"], report["covered"], report["subset_n"]), (2, 1, 1))
+        self.assertGreater(report["subset_gain_pp"], report["gain_pp"],
+                           "the covered subset must look better than the book")
+
+    def test_a_stale_exchange_quote_outside_the_window_does_not_count(self) -> None:
+        fresh = [self._row(100.0, "kalshi", -110, "under")]
+        stale = [self._row(100.0 - 10 * self.WINDOW, "kalshi", -110, "under")]
+        base = self._book("c1", 100.0, -150, +130)
+        self.assertEqual(MOD.derive_entry_cost(base + fresh, self.WINDOW)["covered"], 1)
+        self.assertEqual(MOD.derive_entry_cost(base + stale, self.WINDOW)["covered"], 0)
+
+    def test_it_takes_the_LATEST_exchange_quote_not_the_cheapest_in_the_window(self) -> None:
+        """A venue shows one price at a time. The minimum over a half hour is a
+        price nobody could have taken — this script's own documented defect #1,
+        and on the real shards it reads +3.172pp against +3.069pp."""
+        base = self._book("c1", 1000.0, -150, +130)          # sportsbook under q=0.600
+        stale = self._row(400.0, "kalshi", +200, "under")    # q=0.333 -- CHEAP, and OLD
+        current = self._row(900.0, "kalshi", -145, "under")  # q=0.592 -- dear, CURRENT
+        both = MOD.derive_entry_cost(base + [stale, current], self.WINDOW)
+        self.assertEqual(both["covered"], 1)
+        self.assertLess(both["subset_gain_pp"], 1.0,
+                        "the stale +200 must not be what got priced")
+        # And prove the fixture can SEE the difference. My first version of this
+        # test had the price sign backwards -- it used -400 as "cheap", which is
+        # q=0.8 and the DEAREST quote on the board -- so a cheapest-in-window
+        # rule passed it. A fixture that cannot distinguish the two rules proves
+        # nothing about which one is running, and the mutation check is what
+        # caught it: the defect was reintroduced and the suite stayed green.
+        only_stale = MOD.derive_entry_cost(base + [stale], self.WINDOW)
+        self.assertEqual(only_stale["covered"], 1)
+        self.assertGreater(only_stale["subset_gain_pp"], 20.0)
+
+    def test_excluded_markets_stay_out_of_the_derivation(self) -> None:
+        """One definition of the book, used by both halves. `in_gate_market` is
+        `in_gate_book` without the side filter — de-vig needs the other leg."""
+        rows = self._book("c1", 100.0, -150, +130, market="batter_home_runs")
+        self.assertEqual(MOD.derive_entry_cost(rows, self.WINDOW).get("n", 0), 0)
+        for market in ("batter_home_runs", "batter_hits_runs_rbis"):
+            self.assertFalse(MOD.in_gate_market({"market": market}))
+            self.assertFalse(MOD.in_gate_book({"market": market, "selection": "under"}))
+        self.assertTrue(MOD.in_gate_market({"market": "batter_hits", "selection": "over"}))
+
+    def test_a_one_sided_cell_cannot_be_de_vigged_and_is_refused(self) -> None:
+        rows = [self._row(100.0, "draftkings", -150, "under")]
+        report = MOD.derive_entry_cost(rows, self.WINDOW)
+        self.assertEqual(report.get("n", 0), 0)
+        self.assertEqual(report["refused"]["no_opposite_side_at_this_book"], 1)
+
+    def test_snapshots_are_separate_cells_not_pooled(self) -> None:
+        """Keyed on `captured_at`, the refresh-cycle stamp. Pooling snapshots
+        would let a price from one cycle de-vig against another's."""
+        rows = (self._book("c1", 100.0, -150, +130)
+                + self._book("c2", 200.0, -150, +130))
+        self.assertEqual(MOD.derive_entry_cost(rows, self.WINDOW)["n"], 2)
+
+    def test_pooling_dates_is_weighted_by_n_not_a_flat_mean(self) -> None:
+        """09-01 carries 37,111 cells and 09-04 carries 6,362; a flat mean over
+        dates would give the thin day equal say in the gate's number."""
+        fat = {"n": 900, "covered": 0, "today_pp": 4.0, "gain_pp": 0.0,
+               "after_pp": 4.0, "fair": 0.6, "hold_measured_pct": 6.667,
+               "subset_n": 0, "subset_today_pp": None, "subset_gain_pp": None,
+               "subset_after_pp": None, "subset_fair": None, "refused": {}}
+        thin = dict(fat, n=100, today_pp=1.0, after_pp=1.0, hold_measured_pct=1.667)
+        pooled = MOD.combine_entry_costs([fat, thin])
+        self.assertEqual(pooled["n"], 1000)
+        self.assertAlmostEqual(pooled["today_pp"], 3.7, places=6)   # not 2.5
+
+    def test_the_hold_identity_is_CHECKED_not_assumed(self) -> None:
+        """Gate on the output. If the de-vig and the cost stop describing the
+        same price, `cost / fair` stops reproducing the overround — and that is
+        the exact failure 4.05 represents, so it must be an assertion."""
+        report = MOD.derive_entry_cost(self._book("c1", 100.0, -150, +130), self.WINDOW)
+        self.assertIn("hold_identity_ok", report)
+        self.assertTrue(report["hold_identity_ok"])
+        self.assertLess(report["hold_identity_slack_pp"], MOD.HOLD_IDENTITY_TOLERANCE_PP)
+
+    def test_a_cost_past_the_table_is_flagged_rather_than_silently_clamped(self) -> None:
+        """Today's measured 4.233pp is OUTSIDE item 07's table, which ends at
+        4.05pp. Clamping is right; clamping QUIETLY is how an anchor gets
+        asserted in the first place."""
+        dear = MOD.derive_entry_cost(self._book("c1", 100.0, -400, +250), self.WINDOW)
+        self.assertGreater(dear["today_pp"], MOD.GATE_SENSITIVITY[-1][0])
+        self.assertTrue(dear["today_off_table"])
+        self.assertFalse(MOD.derive_entry_cost(
+            self._book("c1", 100.0, -150, +130), self.WINDOW)["today_off_table"])
+
+
+class GateVerdictTests(unittest.TestCase):
+    """The verdict at the corrected numbers. Measured on production shards
+    2026-09-01..09-04, n=85,591 gate cells: 4.233pp -> 3.956pp, hold
+    7.01% -> 6.52%, ROI +1.14%. BOTH LEGS NOT MET."""
+
+    MEASURED_TODAY_PP = 4.233
+    MEASURED_AFTER_PP = 3.956
+    MEASURED_FAIR = 0.607
+
+    def test_the_book_fails_BOTH_legs_at_the_measured_numbers(self) -> None:
+        verdict = MOD.gate_verdict(self.MEASURED_AFTER_PP, self.MEASURED_FAIR)
+        self.assertAlmostEqual(verdict["roi_pct"], 1.14, places=1)
+        self.assertAlmostEqual(verdict["hold_pct"], 6.52, places=1)
+        self.assertFalse(verdict["roi_met"])
+        self.assertFalse(verdict["hold_met"])
+
+    def test_the_asserted_constant_was_the_difference_between_ship_and_dont(self) -> None:
+        """4.05 - 1.172 = 2.88pp -> +3.05%, which CLEARS the +3% bar. The
+        measured 4.198 - 1.172 = 3.03pp -> +2.79%, which does not. An unmeasured
+        constant was the whole decision."""
+        asserted = MOD.roi_at_side_cost(MOD.GATE_PER_SIDE_ASSERTED_2026_08_31 - 1.172)
+        measured = MOD.roi_at_side_cost(4.198 - 1.172)
+        self.assertGreaterEqual(asserted, MOD.GATE_ROI_TARGET_PCT)
+        self.assertLess(measured, MOD.GATE_ROI_TARGET_PCT)
+        self.assertAlmostEqual(asserted, 3.05, places=1)
+        self.assertAlmostEqual(measured, 2.79, places=1)
+
+    def test_the_hold_leg_has_never_been_met_by_any_method(self) -> None:
+        """5.8% by the old doubling, 6.52% derived, 7.09% measured directly.
+        Every reading is above the 5.0% bar."""
+        for hold in (5.8, 6.52, 7.09):
+            self.assertGreater(hold, MOD.GATE_HOLD_TARGET_PCT)
+
+    def test_the_old_doubling_would_have_reported_a_kinder_hold(self) -> None:
+        """2 x 3.956 = 7.91%... but 2 x (4.05 - 1.172) = 5.76%, which is what
+        shipped. The doubling was wrong in whichever direction the anchor was."""
+        self.assertAlmostEqual(
+            2 * (MOD.GATE_PER_SIDE_ASSERTED_2026_08_31 - 1.172), 5.76, places=2)
+        self.assertGreater(
+            MOD.two_way_hold_pct(self.MEASURED_AFTER_PP, self.MEASURED_FAIR), 5.76)
+
+
 class SensitivityTests(unittest.TestCase):
     def test_the_table_reproduces_item_07_exactly_at_its_own_points(self) -> None:
         for side_cost, roi in MOD.GATE_SENSITIVITY:
@@ -176,7 +450,7 @@ class SensitivityTests(unittest.TestCase):
         the shard: gate book n=1,235, gain +0.824pp, per-side 4.05 -> 3.23,
         two-way hold 6.5%, ROI +2.43%. Shortfall 0.57 points, wider than the
         clobbered copy's 0.35."""
-        side_cost = MOD.GATE_PER_SIDE_TODAY - 0.824
+        side_cost = MOD.GATE_PER_SIDE_ASSERTED_2026_08_31 - 0.824
         roi = MOD.roi_at_side_cost(side_cost)
         self.assertAlmostEqual(roi, 2.43, places=1)
         self.assertLess(roi, MOD.GATE_ROI_TARGET_PCT)
@@ -189,8 +463,8 @@ class SensitivityTests(unittest.TestCase):
         where it looks best (64.5% taken / +1.021pp before the old cutoff
         against 40.2% / +0.737pp after), so the clobber was biased in the
         exchange's favour."""
-        healed = MOD.roi_at_side_cost(MOD.GATE_PER_SIDE_TODAY - 0.824)
-        clobbered = MOD.roi_at_side_cost(MOD.GATE_PER_SIDE_TODAY - 0.949)
+        healed = MOD.roi_at_side_cost(MOD.GATE_PER_SIDE_ASSERTED_2026_08_31 - 0.824)
+        clobbered = MOD.roi_at_side_cost(MOD.GATE_PER_SIDE_ASSERTED_2026_08_31 - 0.949)
         self.assertLess(healed, clobbered)
         self.assertAlmostEqual(clobbered - healed, 0.22, places=1)
 
@@ -200,7 +474,7 @@ class SensitivityTests(unittest.TestCase):
         repaired. Kept because they exercise the interpolator across a wide
         span, and because the decision has survived every restatement."""
         for gain, expected_roi in ((0.955, 2.66), (0.703, 2.22)):
-            side_cost = MOD.GATE_PER_SIDE_TODAY - gain
+            side_cost = MOD.GATE_PER_SIDE_ASSERTED_2026_08_31 - gain
             self.assertAlmostEqual(MOD.roi_at_side_cost(side_cost), expected_roi, places=1)
             self.assertLess(MOD.roi_at_side_cost(side_cost), MOD.GATE_ROI_TARGET_PCT)
             self.assertGreater(2 * side_cost, MOD.GATE_HOLD_TARGET_PCT)
@@ -265,7 +539,7 @@ class KalshiMultiplierTests(unittest.TestCase):
         multipliers: +0.949pp -> +2.65%. Resolving the multiplier COLLAPSED the
         bound to its optimistic end — it did not close the gate, and saying it
         was 'worth 0.44 points' overstated it. The current number is +2.43%."""
-        side_cost = MOD.GATE_PER_SIDE_TODAY - 0.949
+        side_cost = MOD.GATE_PER_SIDE_ASSERTED_2026_08_31 - 0.949
         roi = MOD.roi_at_side_cost(side_cost)
         self.assertAlmostEqual(roi, 2.65, places=1)
         self.assertLess(roi, MOD.GATE_ROI_TARGET_PCT)
