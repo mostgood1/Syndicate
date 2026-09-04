@@ -269,6 +269,7 @@ def _resolve_event(
     """Which of our games this game-line market belongs to."""
     from syndicate.features.shared.kalshi_catalogue import (
         event_blob_from_ticker,
+        event_start_from_ticker,
         match_event_blob,
         sport_for_series,
     )
@@ -290,13 +291,26 @@ def _resolve_event(
                 "event_id": event_id,
                 "home_team": row.get("home_team"),
                 "away_team": row.get("away_team"),
+                # CARRIED FOR THE DOUBLEHEADER SPLIT. Both halves share a team
+                # pair, so the pair alone is `ambiguous` and the contract is
+                # lost; the start time is what separates them. Omitting this is
+                # how the first version of that fix shipped INERT -- the matcher
+                # was correct and the caller handed it nothing to decide on.
+                "commence_time": row.get("commence_time"),
             }
     # Kalshi's own code -> name pairing for THIS COMPETITION only. Absent for
     # every sport that does not supply one, which leaves those resolutions
     # byte-identical to before.
     family_names = (code_names or {}).get(_series_family(market.get("series"))) if code_names else None
     result = match_event_blob(
-        blob, list(seen.values()), sport=sport, code_names=family_names
+        blob,
+        list(seen.values()),
+        sport=sport,
+        code_names=family_names,
+        # The ticker's own start stamp, in Eastern, converted through zoneinfo.
+        # Used ONLY to separate an otherwise-ambiguous pair -- it never matches
+        # a game on its own, because a slate has many simultaneous starts.
+        commence_hint=event_start_from_ticker(market.get("ticker")),
     )
     result.setdefault("sport", sport)
     return result

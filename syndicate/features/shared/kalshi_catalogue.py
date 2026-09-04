@@ -41,6 +41,7 @@ like, so one daily discovery run is the whole discovery loop.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
@@ -934,12 +935,110 @@ def _game_number_of(game) -> int | None:
     return None
 
 
+
+# Kalshi's event segment carries the START TIME after the date:
+# `26SEP041915DETCLEG2` is 2026-09-04, 19:15 EASTERN. Verified against the board
+# on 2026-09-04 -- six tickers, every one within 0-1 minute of our
+# `commence_time` once converted.
+_EVENT_DATETIME = re.compile(
+    r"^(?P<yy>\d{2})(?P<mon>[A-Z]{3})(?P<dd>\d{2})(?P<hh>\d{2})(?P<mi>\d{2})"
+)
+
+_MONTHS = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+           "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
+
+
+def event_start_from_ticker(ticker: Any) -> "datetime | None":
+    """UTC start time encoded in a Kalshi ticker's event segment, or None.
+
+    **THROUGH `zoneinfo`, NOT A FIXED OFFSET.** September is EDT (UTC-4) and
+    November is EST (UTC-5); hardcoding +4 would silently shift every match by an
+    hour once the clocks change, and an hour is more than enough to pick the
+    wrong half of a doubleheader. `America/New_York` knows which is which.
+
+    Returns None on anything it cannot establish -- an unparseable ticker must
+    leave the match exactly as it was rather than push it toward a guess.
+    """
+    text = str(ticker or "")
+    parts = text.split("-")
+    if len(parts) < 2:
+        return None
+    match = _EVENT_DATETIME.match(parts[1])
+    if not match:
+        return None
+    month = _MONTHS.get(match.group("mon"))
+    if not month:
+        return None
+    try:
+        naive = datetime(
+            2000 + int(match.group("yy")), month, int(match.group("dd")),
+            int(match.group("hh")), int(match.group("mi")),
+        )
+    except ValueError:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+
+        return naive.replace(tzinfo=ZoneInfo("America/New_York")).astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def _commence_of(game) -> "datetime | None":
+    """A board game's start time as an aware UTC datetime, or None."""
+    raw = game.get("commence_time") if hasattr(game, "get") else None
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(raw).strip().replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+#: How far the ticker's stamp may sit from our `commence_time` and still be the
+#: same game. Measured deltas were 0-1 minutes; 90 allows for a schedule edit
+#: without ever reaching the ~5h that separates a doubleheader's two games.
+_COMMENCE_TOLERANCE_MINUTES = 90.0
+#: How much CLEARER the best candidate must be than the runner-up. Without this
+#: a slate of simultaneous starts would let a 1-minute difference decide a bet.
+_COMMENCE_MARGIN_MINUTES = 60.0
+
+
+def _pick_by_commence(hits, hint):
+    """The one game whose start matches `hint`, or None if that is not clear.
+
+    None is the REFUSAL, and it is the important half: an ambiguous pair that
+    cannot be separated on time must stay ambiguous rather than collapse to
+    whichever game sorted first.
+    """
+    if hint is None:
+        return None
+    scored = []
+    for game in hits:
+        commence = _commence_of(game)
+        if commence is None:
+            continue
+        scored.append((abs((commence - hint).total_seconds()) / 60.0, game))
+    if not scored:
+        return None
+    scored.sort(key=lambda pair: pair[0])
+    if scored[0][0] > _COMMENCE_TOLERANCE_MINUTES:
+        return None
+    if len(scored) > 1 and (scored[1][0] - scored[0][0]) < _COMMENCE_MARGIN_MINUTES:
+        return None
+    return scored[0][1]
+
+
 def match_event_blob(
     blob: Any,
     games: Sequence[Mapping[str, Any]],
     *,
     sport: Any = None,
     code_names: Mapping[str, str] | None = None,
+    commence_hint: "datetime | None" = None,
 ) -> dict[str, Any]:
     """Which of OUR games is `blob`? Returns the answer AND how sure it is.
 
@@ -1082,37 +1181,51 @@ def match_event_blob(
         # no existing pairing can change.
         base, game_number = _split_doubleheader(wanted)
         if base and game_number is not None:
-            retry = match_event_blob(base, games, sport=sport, code_names=code_names)
-            # `ambiguous` is the EXPECTED verdict here and the one worth having:
-            # it means both halves of the doubleheader are on our board and the
-            # suffix is exactly what tells them apart.
-            candidates = [
+            # STRIP THE SUFFIX SO THE TEAM MATCH CAN SUCCEED, then separate the
+            # halves on START TIME -- which is what our board actually carries.
+            #
+            # The first version of this selected on `game_number` and was INERT
+            # in production: `kalshi_board_join` builds its games as
+            # `{event_id, home_team, away_team}` and nothing supplies a number,
+            # so every candidate scored None and the retry refused. Measured
+            # after it went live -- `DETCLEG1`/`DETCLEG2` still unmatched. The
+            # discriminator has to be a field the CALLER HAS.
+            base_hits = [
                 game
                 for game in (games or [])
-                if _game_number_of(game) == game_number
-                and match_event_blob(
+                if match_event_blob(
                     base, [game], sport=sport, code_names=code_names
                 ).get("status") == "ok"
             ]
-            if len(candidates) == 1:
-                game = candidates[0]
+            if base_hits:
+                chosen = _pick_by_commence(base_hits, commence_hint)
+                if chosen is None and len(base_hits) == 1:
+                    # Only one game wears this pair. The suffix told us which
+                    # half Kalshi means and we hold exactly one -- but WITHOUT a
+                    # usable time we cannot tell whether it is that half, so
+                    # this still refuses.
+                    return {
+                        "status": "no_match",
+                        "blob": wanted,
+                        "reason": "doubleheader_needs_commence_time",
+                        "game_number": game_number,
+                    }
+                if chosen is not None:
+                    return {
+                        "status": "ok",
+                        "blob": wanted,
+                        "event_id": chosen.get("event_id"),
+                        "home_team": chosen.get("home_team"),
+                        "away_team": chosen.get("away_team"),
+                        "doubleheader_game": game_number,
+                        "matched_by": "commence_time",
+                    }
                 return {
-                    "status": "ok",
+                    "status": "ambiguous",
                     "blob": wanted,
-                    "event_id": game.get("event_id"),
-                    "home_team": game.get("home_team"),
-                    "away_team": game.get("away_team"),
-                    "doubleheader_game": game_number,
+                    "count": len(base_hits),
+                    "reason": "doubleheader_not_separable_on_commence_time",
                 }
-            # Nothing our side numbers this way. REFUSED rather than guessed --
-            # `retry` may well be `ok` on a single game, but accepting it would
-            # pair "game 2" with whichever game we happen to hold.
-            return {
-                "status": "no_match",
-                "blob": wanted,
-                "reason": "doubleheader_game_%d_not_on_our_board" % game_number,
-                "base_status": retry.get("status"),
-            }
         return {"status": "no_match", "blob": wanted}
     if len(hits) > 1:
         return {"status": "ambiguous", "blob": wanted, "count": len(hits)}
