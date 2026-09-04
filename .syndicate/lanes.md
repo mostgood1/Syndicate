@@ -642,7 +642,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   plus web serving MLB cards and `/api/portfolio/summary`; plus 0 tracebacks.
 - Blocked by: none.
 
-### mlb-prop-phase1 — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **`#624` Phase 1, the MLB prop program. STEP 1's REFUSAL IS LANDED AS `f1508e78` AND NOT YET DEPLOYED.**
+### mlb-prop-phase1 — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **`#624` STEP 1 COMPLETE AND VERIFIED ON EVERY SPORT (`5af2c517`, all 3 services).** Platform EXACT 0.0/1.0 = 0/0 (was 24/1); 23 rows labelled refused; near-zero bands SURVIVED (182 soccer, 70 mlb), proving the rule is EXACT not a band; MLB coverage ROSE 77.7%->84.5%. All 9 MLB refusals are `hr_2plus` — the producer `f1508e78` could not see, which is why that first fix covered 1 OF 17. Step 3's MECHANISM also verified in production: starter `ab_mean` -4.41% vs a predicted -4.43%. **NEXT: step 3's ESTIMATOR half — the rate re-fit, compute-heavy, own lane.**
 - Goal: `#624` Phase 1 on MLB props, step by step, each one measured on the served board before the next is started.
 - Step 1 (calibration) shipped 2026-09-01 as `f03ef38a`. **Its other half — "hard refusal of p in {0.0, 1.0}" — had never shipped**, and this lane landed it: `f1508e78`, `_dist_prob_over` returns None on an exact certainty instead of publishing it.
 - Files: syndicate/features/shared/prop_projections.py
