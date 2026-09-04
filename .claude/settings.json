@@ -6,7 +6,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh",
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh ]; then \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh; else echo \"WARN: session-start.sh is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
             "timeout": 20,
             "statusMessage": "Loading Syndicate ledger..."
           }
@@ -20,13 +20,14 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-guard.py",
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-guard.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-guard.py; else echo \"WARN: lane-guard.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
             "timeout": 15,
             "statusMessage": "Checking lane ownership..."
           },
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-append-guard.py"
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-append-guard.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-append-guard.py; else echo \"WARN: ledger-append-guard.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
+            "shell": "bash"
           }
         ]
       },
@@ -36,13 +37,14 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/commit-guard.py",
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/commit-guard.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/commit-guard.py; else echo \"WARN: commit-guard.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
             "timeout": 25,
             "statusMessage": "Checking the shared git index..."
           },
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-commit-guard.py"
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-commit-guard.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-commit-guard.py; else echo \"WARN: ledger-commit-guard.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
+            "shell": "bash"
           }
         ]
       },
@@ -51,21 +53,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/discard-guard.py",
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/discard-guard.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/discard-guard.py; else echo \"WARN: discard-guard.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
             "timeout": 15,
-            "statusMessage": "Checking for content that exists nowhere else..."
+            "statusMessage": "Checking for content that exists nowhere else...",
+            "shell": "bash"
           },
           {
             "type": "command",
             "shell": "bash",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deploy-guard.py",
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deploy-guard.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deploy-guard.py; else echo \"WARN: deploy-guard.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
             "timeout": 15,
             "statusMessage": "Checking deploy ownership..."
           },
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-postwrite-check.py --pre",
-            "timeout": 10
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-postwrite-check.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-postwrite-check.py --pre; else echo \"WARN: lane-postwrite-check.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
+            "timeout": 10,
+            "shell": "bash"
           }
         ]
       }
@@ -76,7 +80,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/checkpoint-guard.py",
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/checkpoint-guard.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/checkpoint-guard.py; else echo \"WARN: checkpoint-guard.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
             "timeout": 30,
             "statusMessage": "Checking for uncheckpointed work..."
           }
@@ -89,13 +93,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-postwrite-check.py"
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-postwrite-check.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ledger-postwrite-check.py; else echo \"WARN: ledger-postwrite-check.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
+            "shell": "bash"
           },
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-postwrite-check.py",
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-postwrite-check.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane-postwrite-check.py; else echo \"WARN: lane-postwrite-check.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
             "timeout": 10,
-            "statusMessage": "Reconciling shell writes against lane claims..."
+            "statusMessage": "Reconciling shell writes against lane claims...",
+            "shell": "bash"
           }
         ]
       }

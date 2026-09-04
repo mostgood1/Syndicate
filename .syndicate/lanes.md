@@ -600,6 +600,10 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 
 
+### hook-missing-file-tolerant — CLOSED 2026-09-04 — all 11 hook invocations warn-and-continue when their file is absent, and still block when it is present — session f97ad5ab
+- Files: `.claude/settings.json`.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
