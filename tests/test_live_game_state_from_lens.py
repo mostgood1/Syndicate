@@ -42,9 +42,19 @@ import pytest
 from syndicate.features.shared import board_enrichment as BE
 
 
-def _snapshot(*games, age_seconds: float = 30.0):
+# `date` is REQUIRED, not decorative. The overlay gained a third guard
+# (a lens for another slate may not correct this one), so an undated snapshot
+# is now refused before any of the behaviour below is reached. Production has
+# always carried it -- `mlb/live_lens.py` sets it inside `page_context` and
+# `apply_game_board_contract` preserves it -- so a dateless fixture was
+# testing a shape that never ships. Default matches the `selected_date` every
+# test here passes; override it to exercise the mismatch path.
+_FIXTURE_DATE = "2026-08-12"
+
+
+def _snapshot(*games, age_seconds: float = 30.0, date: str = _FIXTURE_DATE):
     generated = datetime.now(timezone.utc) - timedelta(seconds=age_seconds)
-    return {"generatedAt": generated.isoformat(), "games": list(games)}
+    return {"date": date, "generatedAt": generated.isoformat(), "games": list(games)}
 
 
 def _lens_game(away, home, abstract, detailed="", away_score=None, home_score=None):
