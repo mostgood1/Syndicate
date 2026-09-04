@@ -752,3 +752,22 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
 * **NEXT:** attribution must cover ALL requests, not an allowlist, and needs
   process readings dense enough to divide by — an emission every 200 solo
   requests cannot verify a 10-minute window.
+
+### `[web-oom-leak]` UPDATE 8 — `proc_token` shipped INERT (fork inheritance); residual still unmeasured, 2026-09-04T20:3xZ `[session b2b5b45b]`
+
+* **`proc_token` was generated at IMPORT and gunicorn forks workers AFTER the
+  import**, so every worker inherited the same value — pid 99 and pid 98 both
+  emitted `6178fc632433` (measured 20:24-20:26). Fixed by deriving it lazily and
+  re-minting whenever `os.getpid()` changes (`b36d993f`).
+* **The broken version produced a CONFIDENT WRONG ANSWER, not a null:**
+  `r = +0.870`, "residual tracks skipping", 18.0% coverage over 3 "clean"
+  windows. **DISCARDED** — those windows differenced one worker against another.
+  The tell was a window reporting `solo 0` beside `attributed -103.22 MB`.
+* **The residual is therefore STILL UNMEASURED.** Nothing about skipped requests
+  as the gap is established; the earlier `r = +0.870` must not be quoted.
+* Two instrument defects fixed and landed before it (`63e45361`): `routes` is
+  truncated to `top=12` (differencing it read **4842% unexplained**), so
+  `attributed_total_mb` is now untruncated; and `skipped_concurrent` counts
+  CONTAMINATED WINDOWS, not requests — one overlap increments it twice.
+* **NEXT:** collect >= 3 windows on `b36d993f`, with the collector refusing any
+  token that spans more than one pid.

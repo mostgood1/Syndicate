@@ -5211,3 +5211,45 @@ cheaper than the argument for relaxing it would have been worth.
 THE RULE: write the falsification condition into the lane before the first
 measurement, in terms concrete enough to recognise on sight. Its value is
 precisely that it costs something when it fires.
+
+## 2026-09-04 — A BROKEN IDENTIFIER IS WORSE THAN NO IDENTIFIER, BECAUSE IT MANUFACTURES FALSE CONTINUITY
+
+`#632`. Differencing per-process counters needs a process identity, and `pid` is
+not one — a respawned gunicorn worker gets a recycled pid, and differencing
+across that boundary produced **-117% coverage**. So I added `proc_token`.
+
+**It shipped INERT, and inert in the worst available way.** The token was
+generated at module import, and **gunicorn forks its workers AFTER the import**,
+so every worker inherited the identical value. Measured in production 20:24-20:26:
+pid 99 and pid 98 both emitted `6178fc632433`.
+
+The damage is not that the token failed to distinguish workers. It is that a
+SHARED token reads as CONTINUITY. The collector saw one token, concluded one
+process, and confidently differenced pid 99's reading against pid 98's —
+producing a `-110.74 MB` process delta and a `-135.30 MB` residual from two
+different processes. With no token at all it would have refused to compute
+anything. **The fix for the merging defect made the merging invisible.**
+
+It then produced a clean, satisfying answer — `r = +0.870`, "the residual tracks
+skipping" — which I would have reported as the result had I not already been
+chasing the anomaly.
+
+THE TELL WAS IN THE DATA, NOT THE TESTS: `solo_attributed` read **200 at two
+consecutive emissions** while `skipped_concurrent` **fell 33 -> 20**. No
+cumulative counter does that. A second tell in the discarded output: a window
+showing `solo 0` beside `attributed -103.22 MB` — 103 MB attributed across zero
+requests.
+
+The old tests asserted the token was PRESENT and STABLE. **Both were true of the
+broken version.** Presence and stability are exactly the properties a shared
+token has.
+
+THE RULE: an identifier must be tested for the thing it exists to DISTINGUISH,
+not for presence and stability. For any per-process value in a forking server,
+the test is "does a child differ from its parent" — mock `os.getpid()` and
+assert inequality. And derive such values LAZILY: anything computed at import
+time in this codebase is computed once for all workers.
+
+Related: `[2026-09-04]` "100% of what you sampled is not 100% of the thing", and
+the standing `presence is not reachability` — three variants of the same failure,
+where a check confirmed a property the defect also satisfied.
