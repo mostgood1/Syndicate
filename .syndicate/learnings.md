@@ -4621,10 +4621,29 @@ because it cannot distinguish a real multi-line `Files:` list from prose.
 **How to apply:** ask the parser WHO HOLDS the path
 (`claims(text)` filtered to it), never infer absence from the absence of a
 contest. And note the checker only COPIES `lane-guard.py`'s parser — the two
-drifted once already (`FILES_RE` missing the bold form, 2026-08-19). You cannot
-import the hook to ask it directly; it runs as a hook and blocks on stdin
-(2-minute timeout, measured). `tests/test_check_lane_invariants.py` is what
-proves the two agree, via source comparison.
+drifted once already (`FILES_RE` missing the bold form, 2026-08-19).
+`tests/test_check_lane_invariants.py` is what proves the two agree, via source
+comparison.
+
+**CORRECTED 2026-09-03, same day, by session f97ad5ab and re-measured here.**
+This paragraph first said *"you cannot import the hook to ask it directly; it
+runs as a hook and blocks on stdin (2-minute timeout, measured)."* The timeout
+was real; the conclusion drawn from it was over-general. Importing it with
+`sys.stdin` stubbed to a `StringIO` completes in **0.02s** and raises a catchable
+`SystemExit(0)` from the module-level `sys.exit(main())` — measured on the exact
+464-line file the timeout came from. What blocks is `main()` READING a real stdin
+that never closes, which is what a tool-invoked shell hands it.
+
+**The generalisable error is the shape, not the fact.** One failed attempt was
+turned into a property of the module (*"cannot be imported"*) when it was a
+property of the ENVIRONMENT it was attempted in. A single observation supports
+"this did not work here", never "this cannot work" — and the difference matters,
+because the false version tells the next reader not to try.
+
+Prefer `lane_claims.py` regardless, but for the accurate reasons: it is a pure
+library with no module-level `main()`, no `__file__` dependency and no stdin
+read, so it needs none of the `sys.exit`-neutralising hacks the five consumer
+scripts had grown.
 
 ## 2026-09-03 — A `-k` sweep partitions by NAME, so a defect spanning a family is reported at whatever fraction of that family happens to share a word. `[lane nfl-dispatch-order-assertion]`
 
