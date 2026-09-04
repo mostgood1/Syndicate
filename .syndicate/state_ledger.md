@@ -59,6 +59,32 @@ unbounded.
   reports live files as phantom. `check_lane_invariants` catches neither: one
   holder per claim is true of a claim that guards nothing.
 
+- **THE CLAIM PARSER HAS ONE DEFINITION: `.claude/hooks/lane_claims.py`**
+  `[verified 2026-09-04, lane lane-invariant-single-source, 312c93a9, NO DEPLOY]`.
+  `lane-guard.py` imports it, and `scripts/check_lane_invariants.py` now does
+  too -- it used to carry frozen copies of four regexes and the 14-marker tuple,
+  pinned against `lane-guard.py`'s SOURCE TEXT by a test. **That test had been
+  silently red since the parser was extracted** (it searched the hook for
+  definitions that had moved), and with it 8 more in
+  `test_lane_guard_dot_directory_claim.py` and 1 in
+  `test_lane_guard_prohibition_marker.py` -- **14 across three files, all bound
+  to the hook's pre-extraction shape**, while the checker still exited 0 and
+  printed INVARIANTS HOLD.
+  **The regexes had NOT drifted; four unpinned behaviours had.** Measured on one
+  adversarial ledger: the OLD checker read **1 OPEN lane / 1 claim** and printed
+  `INVARIANTS HOLD` exit 0 against a file that held a CONTESTED path AND a stray
+  OPEN lane under `## Archived lanes`; the new one reads **3 lanes / 4 claims**
+  and reports both, exit 1. The severe case is a `- Files:` line naming
+  `scripts/archive_released_lanes.py` -- a filename CONTAINING the marker
+  "released" -- which yielded the checker ZERO claims for that lane, so it could
+  contest nothing and the one-holder invariant passed vacuously.
+  Consequence to hold onto: **`is` does not prove a regex was not copied.**
+  `re.compile` memoises, so a re-pasted pattern returns the other module's own
+  object and an identity assertion passes -- verified by mutation, the copy went
+  in and all 30 tests stayed green. `test_the_checker_defines_none_of_them_itself`
+  asks the AST for the ABSENCE of a second definition, which is the form that
+  survives the next refactor of the hook.
+
 - **THE LEDGERS ARE KEYED AND CHECKED** `[verified 2026-08-18]`. One checker per
   ledger, all three ENFORCED in CI and reported at session start as
   `LEDGER INCOHERENT`: `scripts/lane_identity_check.py` (slug, one OPEN block,
