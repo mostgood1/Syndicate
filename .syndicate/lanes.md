@@ -1732,6 +1732,22 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   unreachable from here.
 - Blocked by: none.
 
+### nfl-projection-deploy — OPEN — opened 2026-09-04 — session ff257687-e3c6-48e0-b92a-e6e494211885
+- Goal: discharge the `web` deploy OWED since `52870f57` (NFL projection ET
+  date key) and now also carrying `fb7a1f96` (the `LA` Rams alias). `[user: "deploy web once the current claim frees up"]`
+- Files: none — deploy only, no code change. `render.yaml` NOT touched, so no
+  `blueprint_sync` and the blast radius is the one service.
+- Hypothesis: n/a.
+- Falsification test: `unmatched_game_rows` on `/api/board/book-grid?sport=nfl`
+  after the deploy. `deploys.md` predicts **0**; 78 means the alias commit did
+  not ship, 299 means neither did, and anything else is a third defect.
+- Verification: the READING above on the SERVED payload, plus the live web SHA
+  being a descendant of `fb7a1f96`. Written to `deploys.md` with its working.
+- Blocked by: none. The prior `web` claim (`web-oom-allrequest-reconcile`,
+  session `b2b5b45b`) EXPIRED at 79.9 min against a 45-min TTL and
+  `deploy_claim.py status` reports it "does not block"; that session is not in
+  the running roster.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
