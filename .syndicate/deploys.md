@@ -7,6 +7,45 @@
 
 
 
+## 2026-09-04 06:15Z — MLB VERIFIED — the owed reading on the 05:27-05:43Z row is DISCHARGED
+
+MLB's board built for the rolled-over 09-04 date at **06:14:15Z**, after the
+05:32:13Z deploy, so the reading that could not be taken then can be taken now.
+
+    sport   rows   w/prob    cov    EXACT0.0  EXACT1.0  (0,.01)   generated_at
+    mlb     1752     1481  84.5%           0         0       70   06:14:15Z
+    nfl     1254      600  47.8%           0         0        0   06:14:58Z
+    ncaaf     68        3   4.4%           0         0        0   06:15:04Z
+    soccer  2000     1080  54.0%           0         0      182   06:04:27Z
+
+    PLATFORM  EXACT 0.0 = 0   EXACT 1.0 = 0   rows labelled refused = 23
+
+**THE 9 MLB REFUSALS ARE EXACTLY THE PRODUCER THE FIRST FIX COULD NOT SEE.**
+Every one is `basis: hr_2plus`, market `batter_home_runs`, refused value `0.0` --
+the threshold rungs read from `p_hr_Nplus_cal`, which never touch
+`_dist_prob_over` and so survived `f1508e78` untouched:
+
+    Brayan Rocchio  batter_home_runs 1.5  p=None was=0.0  edge=None  projected=0.064
+    Steven Kwan     batter_home_runs 1.5  p=None was=0.0  edge=None  projected=0.007
+    John Peck       batter_home_runs 1.5  p=None was=0.0  edge=None  projected=0.008
+
+**`projected` SURVIVES on all of them** (0.064, 0.007, 0.008), which is the
+designed contract: the sim genuinely has a MEAN, what it cannot state is
+P(over 1.5 HR) from a sample in which no run produced two. Visible, and
+unpriceable.
+
+**COVERAGE ROSE, it did not fall** -- 84.5% here against 77.7%/78.2% on the
+09-03 slate. The refusal costs 9 rows of 1,481 and the field is plainly intact,
+which is the clause that distinguishes this from a board that lost
+`model_prob_over` altogether.
+
+**The near-zero control held on MLB too: 70 rows in (0, 0.01) survived.** Exact,
+not a band, on the sport with the largest priced population.
+
+Nothing is owed on this thread now. `#624` step 1 is complete on every sport.
+
+---
+
 ## 2026-09-04 06:04Z — CORRECTION to the 05:27-05:43Z row — all three services were ALREADY live
 
 That row ends "Still pending: `web` and `live-odds-worker` both execute this code
