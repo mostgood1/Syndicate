@@ -172,6 +172,38 @@ out and gunicorn being SIGTERM'd. **One worker of two, one boot, ~4 minutes —
 that is not a rate.** Handed to `mlb-feed-live-terminal-refresh` and
 `render-web-request-path`, not chased here.
 
+## THE COUNTER IS A WEB-ONLY INSTRUMENT — do not read it as platform-wide
+
+`GET /api/ops/request-path-guard` exists **only on web**, and its numbers can
+only ever describe web. Both the guard and the counter are structurally inert on
+refresh-worker and live-odds-worker:
+
+    def warn_if_compute_in_request_path(operation):
+        if not has_request_context():
+            return          # <-- always taken on a worker
+
+Both workers are plain scripts with no Flask app, so `has_request_context()` is
+always False there. `refused=0` from that endpoint means "web refused nothing",
+never "the platform refused nothing" — and the workers could not refuse anything
+even if they wanted to, because the branch is unreachable. `blueprints/ops.py`
+serves no routes on a worker either.
+
+**Deliberately NOT deployed to the workers `[user decision 2026-09-04]`.** The
+premise for doing so was that they needed these fixes; they do not. Established
+before the decision, not after: refresh-worker was ALREADY on `58ecba3a`
+(deployed 18:15:15Z by another session, carrying both `08d3fae5` and the
+counter), and on live-odds-worker the code would be inert. Every hard gate
+agreed independently — refresh-worker had a live MLB sim running
+(`run_mlb_daily_sim_job.py` plus multiprocessing children), preflight returned
+**TOO_SOON** (19 min into a 25-min minimum; `#563`), and its claim was taken 18
+seconds earlier by `mlb-feed-live-terminal-refresh`; live-odds-worker returned
+**CLAIMED** with an odds refresh job in flight. Nothing was forced.
+
+Bringing the workers current is still a live option, but it is a DIFFERENT
+decision: they are 31-36 commits behind and that payload is 11-14 runtime files
+of other lanes' in-flight work (the MLB sim engine, prop/soccer projections,
+portfolio commit, the accuracy ledger), not mine.
+
 ## What is STILL not done
 
 **All three are now LIVE on web** as of `ee20c522`, 2026-09-04T18:20:29Z
