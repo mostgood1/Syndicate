@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 799 rules `[generated]`
+## Index — 800 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4871,3 +4871,28 @@ event span. Working (shapes, falsification, the first honest census):
 `log/2026-09-04.md`.
 
 
+
+## 2026-09-04 — a BLOCKED money-relevant commit needs a follow-up read, not just a flag
+
+`848bcab9` — *"every stake was 1/16 Kelly, not 1/4"* — touches
+`pipeline/portfolio_commit.py`, which **only refresh-worker runs**. That service
+was claimed by another lane, so I could not deploy it. I did the right first
+half: named it in my lane as a stake-sizing correction that could not reach
+production until that lane shipped or released, instead of silently skipping a
+commit because its service was busy.
+
+**The half that is easy to miss is going back to check.** I did, and it had
+shipped — refresh-worker `2332b47b`, 0 pending, verified BY CONTENT
+(`_sample_credibility` x1, `_settled_sample_size_by_sport` x2, `848bcab9` an
+ancestor). Bet sizing is corrected in production.
+
+**Why the follow-up matters more than the flag.** A flag without it decays into
+a false open item: it reads as "unresolved" forever, and the next reader spends
+real time re-investigating something already fixed — or worse, treats a live
+correction as still pending and re-derives the wrong risk picture. Cost of the
+check: one `git show <live-sha>:<path> | grep`.
+
+**When it applies.** Any commit you decline to deploy because the service is
+owned or busy, where the content is money-, safety- or correctness-relevant.
+Record what it was, which service is the ONLY one that runs it, and then read
+that service's live SHA for the change before closing the lane.
