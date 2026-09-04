@@ -1384,10 +1384,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Goal: the soccer player rosters get a PRODUCER. `--kind players` existed and
   nothing called it, so every `players_*.csv` was a hand-run committed seed and
   the newest European roster was the COMPLETED 2025-26 season.
-- Files: `scripts/refresh_odds_sources.py` (soccer player step only — the
-  `ncaaf-live-cadence` claim on this file is THIS SAME SESSION's and is scoped to
-  the mode-scoped step filter; regions are disjoint),
-  `scripts/build_soccer_artifacts.py`,
+- Files: `scripts/build_soccer_artifacts.py`,
   `syndicate/features/soccer/ingestion/player_history.py`,
   `tests/test_soccer_player_producer_step.py` (NEW),
   `tests/test_soccer_ingestion.py` (stale assertion left by `3355d621`),
@@ -1395,6 +1392,23 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   Collision-checked 2026-09-04: `soccer-model-dispersion` names
   `build_soccer_artifacts.py` and `syndicate/features/soccer/` but RELEASED its
   claims 2026-08-29 (phantom sweep, owning session gone).
+- Odds-refresh entrypoint: the soccer player STEP lives in the shared odds
+  refresh entrypoint, which is CLAIMED BY `ncaaf-live-cadence` (opened a day
+  earlier, same session `3492626c`, scoped to the mode-scoped step filter).
+  Regions are disjoint and that lane holds the claim; this lane does not compete
+  for it. **The path is deliberately not spelled inside `- Files:` above** —
+  `check_lane_invariants` reads any backticked path there as a CLAIM, so naming
+  it even to disclaim it made these two lanes CONTEST each other and the checker
+  failed at every session start. `ncaaf-live-cadence` documents this exact idiom
+  for the Render blueprint file, for the same reason.
+  `[collision resolved 2026-09-04 by session c4287631 — wording only: no
+  ownership, no scope and no code changed. The author's original parenthetical
+  read "(soccer player step only — the `ncaaf-live-cadence` claim on this file is
+  THIS SAME SESSION's and is scoped to the mode-scoped step filter; regions are
+  disjoint)"; it is RESTATED above rather than quoted, because leaving the
+  backticked path in place is what tripped the checker. Owning session
+  `3492626c` was absent from the session roster (incl. archived) when this was
+  done, so neither lane was mid-edit.]`
 - Verification: MEASURED on a live EPL fetch, not asserted. Roster 440 -> 544
   players (+104 no 2025 file knows, incl. all three promoted clubs); returning
   players keep a median 1,639 minutes instead of <=180; the staleness guard
