@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 801 rules `[generated]`
+## Index — 803 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4929,3 +4929,59 @@ Working: `findings_2026-09-04_render_events_truncation_audit.md`.
 - **How we found out:** a peer disputed the ARITHMETIC — not the concern — and named the discriminating check ("what IS one record: one per board candidate, or one per order?"). Reading the writer settled it in minutes. Conceding the argument would have left the wrong cause in place; only going to the source replaced it with the right one.
 - **The rule going forward:** pre-register **what reading counts as which outcome**, and keep candidate CAUSES out of it unless the mechanism is already established. A registered cause is not a neutral hypothesis — it is the explanation the next reader adopts first, and it steers them AWAY from the real driver precisely when the measurement goes bad and attention is short. If you do register one, register the check that would discriminate it. And **when retracting, mark the wrong claim false IN PLACE rather than deleting it**: a retraction needs something to point at, or the next reader meets a clean ledger and no reason to doubt the surrounding numbers.
 - **Cost:** none — caught before the measurement existed, by a peer who checked the arithmetic instead of accepting a plausible-sounding second-order effect.
+
+## 2026-09-04 — FORBIDDEN: REBUILDING a shared ledger file from `origin/main`. Every git discard guard watches git; a rebuild is a plain WRITE and none of them fire. `[lane mlb-feed-live-terminal-refresh]`
+
+- **What we believed.** That rebuilding `.syndicate/lanes.md` from
+  `git show origin/main:.syndicate/lanes.md` and re-applying my own block was
+  the SAFE alternative to `git checkout` — precisely because the 2026-09-03
+  rule forbids clearing a checkout on a deletions count. I even ran a check:
+  `git diff origin/main -- .syndicate/lanes.md | grep -c '^-[^-]'` returned
+  **0**, and I reported "zero deletions vs origin/main" as evidence that
+  nothing was lost. I ran that same check twice, an hour apart, and it was
+  worthless both times.
+- **What was actually true.** The primary tree's copy held
+  `### render-events-nondict-reason`, an OPEN lane block that a concurrently
+  running session had written and not yet committed. It existed in the shared
+  working tree and NOWHERE else. My rebuild wrote upstream's bytes over it.
+  **A comparison against upstream cannot see local-only content by
+  construction** — that is not a gap in the check, it is the check's
+  definition. The measured cost: the block is unrecoverable. I searched
+  `origin/main`, all ~40 worktrees under `C:/tmp/syndicate-sessions/`
+  (including the lane's OWN worktree), `lanes_closed.md`,
+  `lanes_closed_archive.md` and `lanes_history.md`. No copy. And
+  `send_message` is unavailable from a scheduled-task run, so I could not even
+  tell the owner.
+- **Two guards were live and neither could fire.** `discard-guard.py` blocked
+  me three separate times that same hour on `git checkout` — it works. It
+  watches GIT OPERATIONS. A Python `write_text()` is not one, so the single
+  most destructive act of the session was the one thing nothing inspected.
+  **Do not read "the guards have been catching me all session" as coverage;
+  read it as a map of what they cover.**
+- **How we found out.** `.claude/hooks/lane-postwrite-check.py` fired on the
+  owner's next write and named `render-events-nondict-reason` as the claimant
+  of `scripts/render_events.py` — a lane I could no longer find in `lanes.md`.
+  The guard that caught it was the one keyed on a DIFFERENT file.
+- **The rule going forward.** **Never rebuild a shared ledger file from a
+  remote. Rebase your own copy, or edit in place.** If a rebuild is genuinely
+  the only option, the pre-check is not against upstream — it is
+  `set(slugs in the file you are about to overwrite) - set(slugs in your
+  replacement)`, which must be empty. Same shape as the 2026-09-03 rule
+  (*"what does this contain that exists NOWHERE ELSE"*) with the answer
+  computed against the WORKING TREE rather than against a remote.
+- **A CHECK, NOT MORE PROSE — shipped in this lane.**
+  `scripts/check_lane_invariants.py` gained
+  `orphaned_lane_markers()`: `.syndicate/.current-lane.<session>` is a
+  SEPARATE FILE, so it survives anything that rewrites `lanes.md`, and every
+  slug a live marker names must have a block in some ledger file. Missing from
+  `lanes.md` but present in `lanes_closed`/`lanes_history` is a stale marker
+  (hint — a FAIL there would be noise and noise gets ignored); missing from
+  ALL of them is a block that exists nowhere, and that FAILS. Six tests,
+  including a reproduction of this incident. **Run against the live tree it
+  immediately found a SECOND orphan, `web-oom-arena-trend`, which nobody had
+  noticed** — so this was not a one-off, it was an unmeasured class.
+- **Cost.** One OPEN lane's goal, hypothesis, falsification test and
+  verification, permanently. Its file CLAIM was reconstructible only because a
+  hook happened to print the claimant, and a stub carrying that claim is now
+  on `main` labelled as reconstructed. Roughly 40 minutes of recovery attempts
+  that found nothing.

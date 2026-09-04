@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 801 rules `[generated]`
+## Index — 803 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 291**
+**FORBIDDEN — 292**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -227,6 +227,7 @@
 - [2026-09-04 — FORBIDDEN: treating absence from `list_sessions` as evidence a session is…](#2026-09-04-forbidden-treating-absence-from-list_sessions-as-evidence-a-session-is-gone-lanesmd-carries-claude_code_session_ids-list_sessions-returns-ccd-sessionids-the-two-id-spaces-do-not-match-so-the-test-has-never-been-valid-lane-accuracy-autorun-rearm)
 - [2026-09-04 — FORBIDDEN: acting on a comparison guard whose inputs are not NORMALIZED](#2026-09-04-forbidden-acting-on-a-comparison-guard-whose-inputs-are-not-normalized)
 - [2026-09-04 FORBIDDEN: an instrument whose partial output is indistinguishable from its…](#2026-09-04-forbidden-an-instrument-whose-partial-output-is-indistinguishable-from-its-complete-output-lane-render-events-nondict-reason)
+- [2026-09-04 — FORBIDDEN: REBUILDING a shared ledger file from `origin/main`. Every git d…](#2026-09-04-forbidden-rebuilding-a-shared-ledger-file-from-originmain-every-git-discard-guard-watches-git-a-rebuild-is-a-plain-write-and-none-of-them-fire-lane-mlb-feed-live-terminal-refresh)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -311,7 +312,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 504**
+**Rules and corrections — 505**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -504,6 +505,7 @@
 - [2026-09-04 — AN IN-PYTHON FREE CANNOT MOVE PROCESS ANON. CHECK THE ALLOCATOR BEFORE HYP…](#2026-09-04-an-in-python-free-cannot-move-process-anon-check-the-allocator-before-hypothesising-about-frees)
 - [2026-09-04 — a BLOCKED money-relevant commit needs a follow-up read, not just a flag](#2026-09-04-a-blocked-money-relevant-commit-needs-a-follow-up-read-not-just-a-flag)
 - [2026-09-04 CITE THE COMMAND YOU RAN, WITH ITS FLAGS — an abridged citation cannot be re…](#2026-09-04-cite-the-command-you-ran-with-its-flags-an-abridged-citation-cannot-be-re-checked-and-one-day-it-will-have-to-be-lane-render-events-truncation-audit)
+- [2026-09-04 — A WRONG CAUSE IN A PRE-REGISTRATION IS WORSE THAN NO PRE-REGISTRATION, bec…](#2026-09-04-a-wrong-cause-in-a-pre-registration-is-worse-than-no-pre-registration-because-it-is-the-first-explanation-the-next-reader-reaches-for-lane-accuracy-ledger-budget-raise-challenged-by-lane-mlb-rate-refit)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
