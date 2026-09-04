@@ -31,6 +31,7 @@ market -- lives in `odds_book_quotes`, next to the data.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Iterable, Mapping, Sequence
 
 # Below this, a de-vig is numerically meaningless and usually means one leg is
@@ -887,3 +888,110 @@ def model_edge_pct(model_prob: Any, fair_prob: Any) -> float | None:
     if not (0.0 < model < 1.0) or not (0.0 < fair < 1.0):
         return None
     return round((model - fair) * 100.0, 4)
+
+
+# ---------------------------------------------------------------------------
+# PHASE 3 (`#622`) -- THE STAKED PROBABILITY
+# ---------------------------------------------------------------------------
+#: How far into the tail a blended probability may land, in logits. +-9.2 is
+#: about p = 1e-4 .. 1-1e-4. The clamp is not cosmetic: `logit` diverges at 0
+#: and 1, so an un-clamped blend of two confident inputs produces a probability
+#: that prices a bet at effectively infinite EV. `#624` step 1 shipped a hard
+#: REFUSAL of exact certainty for the same reason, and this is that rule
+#: surviving one arithmetic layer further down.
+_BLEND_MAX_ABS_LOGIT = 9.2
+
+
+def _logit(p: float) -> float:
+    return math.log(p / (1.0 - p))
+
+
+def staked_probability(
+    market_fair: Any,
+    model_prob: Any,
+    *,
+    beta: Any = 0.0,
+    alpha: Any = None,
+) -> float | None:
+    """The probability a bet is actually PRICED and SIZED on: a fitted blend.
+
+    ``logit(p_staked) = alpha * logit(market_devig) + beta * logit(sim_cal)``
+
+    WHY THIS EXISTS. Today `ev_pct` is `expected_value_pct(price, market_fair)`,
+    and for a normally-priced market that is exactly ``1/overround - 1`` -- so
+    ``ev_pct == -hold_pct``, a property of MARKET STRUCTURE carrying no view of
+    the bet at all. The simulation reaches the board only as a capped additive
+    term in `blended_score` (weight 0.125, cap 1.5 EV points), which can reorder
+    rows but can never make one exist. Measured on production 2026-09-04:
+    `positions_where_sim_picked_the_side` was **0 of 13**, which is not a bug but
+    the arithmetic -- every positive-EV row was found by price, because EV *is*
+    price. This function is the seam that lets the model into the number itself.
+
+    IT IS NOT "TRUST THE MODEL INSTEAD". The repo has already run both endpoints
+    and recorded what they cost:
+
+      * ``beta = 0`` -- today. Market-only, model mute.
+      * ``beta = 1`` -- `layer2_board._model_value_ev`, EV against the raw model
+        probability, and DELIBERATELY confined to one-sided rows whose market EV
+        is a hold restatement. Its docstring names the reason to fear it
+        elsewhere: substituting a modelled number for a measured one on rows
+        that do not need it is "the failure this repo has paid for most often".
+
+    The fitted middle is the answer to that objection, and only because a GATE
+    comes with it: `beta` is fitted per (sport, market) and held to
+    ``Brier(blend) <= Brier(market alone)`` OUT OF SAMPLE, else it is zero for
+    that market. So the model displaces a measured number exactly where
+    measurement says it should, and nowhere else.
+
+    ``beta = 0.0`` RETURNS THE MARKET PROBABILITY UNCHANGED, BIT FOR BIT -- no
+    logit round-trip, an early return. That property is what makes this safe to
+    wire in before any coefficient exists: the seam can ship, be reachable, and
+    move nothing, so the fit lands into a consumer that is already proven live
+    rather than the other way round. This codebase has a graveyard of the other
+    order -- `calibration_profile_store` says "nothing calls this yet from a
+    live sim path", and Phase 3's own text gives soccer's fitted scaler an
+    ultimatum to find "a consumer or gets deleted".
+
+    `alpha` defaults to ``1 - beta``, making the blend CONVEX: the result then
+    provably lies between the two inputs, so a fit cannot produce a probability
+    more extreme than both of the things it blends. Pass `alpha` explicitly only
+    for a genuinely two-coefficient fit, and know that you have given up that
+    guarantee.
+
+    Returns the market probability (not None) when the model has no view, which
+    is most rows -- a blend that blanked those would delete EV from the board.
+    Returns None only when the MARKET probability is unusable, which is the same
+    condition under which `expected_value_pct` already returns None.
+    """
+    market = _as_float(market_fair)
+    if market is None or not (0.0 < market < 1.0):
+        return None
+
+    weight = _as_float(beta)
+    if weight is None or weight == 0.0:
+        # Byte-identical passthrough. Deliberately BEFORE the model is even
+        # parsed: with beta at zero the model cannot matter, and a round trip
+        # through logit/expit would perturb the board by float noise for no
+        # reason.
+        return market
+
+    model = _as_float(model_prob)
+    if model is None:
+        return market
+    if model > 1.0:
+        model = model / 100.0  # sports modules are inconsistent about percent vs fraction
+    if not (0.0 < model < 1.0):
+        # A degenerate model probability is refused, not clamped. `#624` step 1
+        # established that 0.0 is the dangerous sign -- it says the outcome is
+        # IMPOSSIBLE and prices the other side at 100% confidence -- and that
+        # absence and zero must not collapse into each other. Falling back to
+        # the market is the honest reading: this row has no usable model view.
+        return market
+
+    market_weight = _as_float(alpha)
+    if market_weight is None:
+        market_weight = 1.0 - weight
+
+    blended = market_weight * _logit(market) + weight * _logit(model)
+    blended = max(-_BLEND_MAX_ABS_LOGIT, min(_BLEND_MAX_ABS_LOGIT, blended))
+    return 1.0 / (1.0 + math.exp(-blended))

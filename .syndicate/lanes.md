@@ -1607,6 +1607,27 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Nothing deployed. refresh-worker is mid-deploy under another lane behind an
   in-flight MLB sim; this lane took no claim and ran no deploy.
 
+### phase3-staked-probability — OPEN — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+- Goal: `#622` PHASE 3. Let the simulation into the PRICE, not just the ranking
+  tiebreak. `logit(p_staked) = alpha*logit(market_devig) + beta*logit(sim_cal)`,
+  fitted per (sport, market), gated on held-out Brier vs market-alone.
+- Files: `syndicate/features/shared/opportunity_signals.py` (the blend seam),
+  `tests/test_staked_probability_blend.py` (NEW). Collision-checked 2026-09-04:
+  every OPEN lane naming this file (`portfolio-decision-and-execution`) has
+  RELEASED its claims.
+- Verification: `staked_probability` shipped with beta=0 a PROVEN bit-for-bit
+  passthrough (35 tests, 6/6 mutants caught), so the consumer is live and inert
+  before any coefficient exists. Consumer-before-fit is deliberate: this repo
+  has `calibration_profile_store` ("nothing calls this yet") and soccer's
+  fitted scaler on an explicit "consumer or deleted" ultimatum.
+- STILL OWED (this is step 1 of 6): wire the seam into `ev_pct`'s two producers
+  (`odds_book_quotes.py:1502`, `layer2_board.py:1870`); a per-(sport,market)
+  coefficient store; the out-of-sample fit; the Brier gate in code; ranking on
+  Kelly of the blended prob (EV on a model prob amplifies by 1/p -- measured,
+  23 of top 25 rows were `hr_1plus`); and RETIRING `_SCORE_SIM_WEIGHT`, which
+  double-counts once EV carries the model.
+- Blocked by: none. NOT DEPLOYED, and inert until beta is non-zero.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
