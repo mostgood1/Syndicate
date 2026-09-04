@@ -728,7 +728,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   WRONG, and the claim-take now rests on DISJOINTNESS ALONE.** It said session
   `3492626c` is "GONE — verified, not assumed" because
   `list_sessions(include_archived=true, limit=100)` did not list it. **Roster
-  absence is NOT evidence a holder is gone** — `deploy_claim.py:212` says so in
+  absence is NOT evidence a holder is gone, and it is INERT rather
+  than merely weak `[2nd correction 22:2xZ]`: `deploy_claim.py:251` records
+  `CLAUDE_CODE_SESSION_ID`, a BARE uuid, while `list_sessions` returns
+  `local_<uuid>` from a DIFFERENT id space. Demonstrated, not argued — I
+  messaged `local_05200b16` and was answered by the session identifying itself
+  as `b2b5b45b`, holder of the `web` claim: one session, two ids. NO claim's
+  `holder_session` can appear in that roster, so the test reads "absent" for a
+  LIVE holder as readily as a dead one. Never cite a roster read about a claim
+  holder; the TTL is the only bound.** `deploy_claim.py:212` says so in
   as many words ("An unrecorded session is UNKNOWN, not gone. TTL is the real
   bound"), and `deploys.md` carries a counter-example on THIS EXACT SESSION ID:
   recorded gone on the same roster reasoning, it then acquired the
