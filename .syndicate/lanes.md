@@ -1521,6 +1521,92 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `3223baa1`, refresh-worker pending behind an in-flight MLB sim). Landing on
   `origin/main` only.
 
+### soccer-espn-player-leagues — OPEN — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **THE FETCH WORKS AND WAS RUN FOR ALL FOUR LEAGUES; THE HALF I OWN IS LANDED (`9d66495b`); THE PRODUCER STAYS INERT UNTIL TWO OTHER LANES' FILES ARE EDITED, AND ONE OF THEM IS A TRAP THAT MUST LAND FIRST.**
+- Goal: eredivisie, primeira_liga, championship and belgian_pro_league get a
+  CURRENT-season player source. `3223baa1` shipped a weekly `--kind players`
+  producer for the other six; these four were excluded because `fetch_players`
+  raised `SystemExit` for them without `--espn-date-windows`, so listing them
+  would have made every refresh tick a FAILING step. They therefore run the sim
+  against `players_2025.csv` — the COMPLETED 2025-26 season.
+- Files: `syndicate/features/soccer/ingestion/espn_player_stats.py`
+  (unclaimed — new `season_date_windows`),
+  `syndicate/features/soccer/ingestion/__init__.py` (unclaimed — re-export),
+  `tests/test_soccer_espn_player_leagues.py` (NEW).
+  Claim NOT taken and left where it is — the marker has to sit on the SAME LINE
+  as the path, before it, or the parser reads the path as a claim anyway:
+  held by OPEN lane `soccer-player-producer`: `scripts/fetch_soccer_history_local.py`,
+  handed to this work by that lane's owning session (same session id). The
+  region edited is `fetch_players`' ESPN branch and the module docstring only;
+  `_write_csv` is untouched and its empty-frame refusal is now pinned by a test
+  here as well.
+  Two more paths are deliberately NOT spelled inside `- Files:` — `lane-guard`
+  reads any backticked path there as a CLAIM, and naming them even to disclaim
+  them would make this lane CONTEST their owners. `soccer-player-producer` and
+  `ncaaf-live-cadence` both document this idiom. They are named in the OWED
+  bullet below in prose.
+- **STEP 1 ANSWERED: the sources ARE comparable, and the caveat that said
+  otherwise is STALE.** ESPN rows have been true per-90 since
+  `compute_minutes_played` landed (they are tagged `espn_true_per90`); the
+  "season-aggregated APPEARANCE RATES" line survived only in
+  `fetch_soccer_history_local.py`'s docstring and is corrected. The real
+  difference is the ESTIMATOR — ESPN's `xg_per90`/`xa_per90` are REALISED goals
+  and assists, not model xG/xA — which is safe because the source is a pure
+  function of the LEAGUE, so `build_usage_profiles` never normalises an ESPN row
+  against an Understat one. Now a test, not an observation.
+- **STEP 3 RUN, NOT PREDICTED** (real ESPN fetches, 2026-09-04, before any
+  wiring): eredivisie 224 rows / max 450.0 min / 17 teams / 9.0s;
+  primeira_liga 230 / 360.0 / 17 / 9.3s; championship 348 / 360.0 / 24 / 13.0s;
+  belgian_pro_league 256 / 450.0 / 18 / 10.7s.
+- **STEP 4 — THE GUARD IS BLIND ON EXACTLY THESE FOUR LEAGUES, MEASURED.**
+  `_busiest_player_minutes` and the de-duplicator in `build_soccer_artifacts.py`
+  both read the column `minutes`; ESPN rows say `minutes_played`. So on the real
+  eredivisie pair the guard reads `latest_max_minutes=0` against a true 450.0
+  (`too_early` stuck True forever — safe, but permanently inert), and the
+  "keep the row with the MOST MINUTES" rule silently degrades to "keep the newest
+  season": **161 of 161 dual-season players resolved to the THIN 2026 file, mean
+  minutes 1648.1 -> 258.4.** That is precisely the regression `3223baa1` changed
+  the de-duplicator to prevent. **Shipping the allowlist without this fix would
+  arm it.**
+- Verification: 83 tests green across the touched files and their real
+  dependents. MUTATION CHECK RUN — six changes backed out one at a time, each
+  turning named tests red (5 / 4 / 1 / 6 / 1 / 2 failures). One pre-existing red,
+  `test_soccer_history_step.py::test_no_step_when_history_is_already_present`,
+  confirmed red on a pristine `origin/main` in the same worktree: it reads
+  `data/`, which a worktree excludes by design.
+- **OWED, AND NOT MINE TO TAKE — two files, both owned by lanes belonging to
+  this same session, both patches WRITTEN AND EXERCISED against real data:**
+  1. `build_soccer_artifacts.py` (lane `soccer-player-producer`) — resolve the
+     minutes column as `minutes` OR `minutes_played` in both
+     `_busiest_player_minutes` and the dedupe sort key. Verified on a copy: the
+     guard then reads 450.0 / 3136.1, 150 of 161 dual-season players keep the
+     BIGGER sample (mean 1654.9), all EIGHT of that lane's own guard/dedupe
+     assertions still pass, and the per-league verdicts are sane — eredivisie
+     refuses on `too_few`, primeira_liga and championship on `too_early`,
+     belgian_pro_league runs the filter and produces 18 squads of 13-28 (median
+     24) with only a relegated club emptied. **THIS MUST LAND BEFORE THE
+     ALLOWLIST.**
+  2. The odds-refresh entrypoint (lane `ncaaf-live-cadence`, whose claim is
+     scoped in its own body to "mode-scoped step filter only" — disjoint from
+     this region) — add the four leagues to `_SOCCER_PLAYER_FETCH_LEAGUES`, plus
+     a `_SOCCER_PLAYER_MIN_SEASON_DAYS = 28` gate derived from
+     `season_date_range` so the step declines instead of failing every tick for
+     the first three weeks of a season. That gate also closes the SAME latent
+     August failure for the six leagues shipped by `3223baa1` (Understat/ASA
+     return zero rows under their 180-minute floor just as ESPN does under its
+     3-appearance floor), and changes nothing today: 34 days elapsed for the
+     Europeans, 215 for MLS. The patched copy was imported and exercised — all
+     ten leagues get a step when absent, fresh is a no-op, 8 days old refetches,
+     an unknown league gets nothing, and at a simulated 2026-08-05 all five
+     European leagues decline while MLS proceeds.
+- Blocked by: `lane-guard` on the odds-refresh entrypoint. NOT worked around —
+  no edit was made to it, and the claim is real. Also worth recording: the
+  per-session marker `.syndicate/.current-lane.3492626c-…` is a single slot
+  that sibling agents in one session rewrite (it read `gate-per-side-derived`,
+  then `sim-clv-decomposition`, during this lane's work), so the guard cannot
+  tell two concurrent workers in the same session apart.
+- Nothing deployed. refresh-worker is mid-deploy under another lane behind an
+  in-flight MLB sim; this lane took no claim and ran no deploy.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
