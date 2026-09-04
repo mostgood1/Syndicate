@@ -110,6 +110,7 @@ FORBIDDEN).
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass, fields as dataclass_fields
 from datetime import datetime, timezone
 from typing import Any, Mapping
@@ -232,6 +233,46 @@ def _net_profit_per_unit(american: float) -> float | None:
     return (american / 100.0) if american > 0 else (100.0 / abs(american))
 
 
+
+def _market_fair_sports() -> frozenset[str]:
+    """Sports allowed to size on MARKET FAIR when they carry no model edge.
+
+    **DEFAULT EMPTY: absent means OFF and today's behaviour is byte-identical.**
+    An allowlist rather than a global flag, because switching this on everywhere
+    would begin sizing roughly 40% of the whole board -- every row that ranks on
+    price alone, in every sport -- in one unreviewed step.
+
+        SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS=ncaaf
+
+    WHY A SPORT WOULD WANT IT. NCAAF's margin model is gated off by a MEASURED
+    17-sigma out-of-sample loss to the closing line (3.563 pts MAE over 2,233
+    games), so `model_edge_pct` is never numeric -- 0 of 480 rows -- and every
+    NCAAF row refuses `no_model_edge_pct`. That gate is about MODEL SKILL. It
+    says nothing about PRICE DISPERSION, which needs no model: the edge is
+    `fair - implied`, i.e. buying the best book's price against the no-vig
+    consensus.
+    """
+    raw = str(os.environ.get("SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS") or "").strip()
+    if not raw:
+        return frozenset()
+    return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
+
+
+def sizing_basis_of(row: Mapping[str, Any]) -> str:
+    """`"model_edge"` or `"market_fair"` -- what this row's stake is bet ON.
+
+    Derived from the row rather than carried on `SizingInputs`, which is walked
+    by a gating checklist that requires every field to be numeric.
+
+    **IT MUST TRAVEL WITH THE POSITION.** Two strategies sharing one settlement
+    pool cannot be told apart afterwards, and their ROIs are not comparable: a
+    model-edge bet is a claim about the world, a market-fair bet is a claim
+    about the price. Recording only the total would make the next accuracy read
+    uninterpretable in exactly the way `#624` step 6 had to unpick.
+    """
+    return "model_edge" if _as_float(row.get("model_edge_pct")) is not None else "market_fair"
+
+
 def sizing_inputs_from_row(row: Mapping[str, Any]) -> tuple[SizingInputs | None, str | None]:
     """Derive sizing inputs from a Layer 2 shortlist row, or say why not.
 
@@ -262,13 +303,30 @@ def sizing_inputs_from_row(row: Mapping[str, Any]) -> tuple[SizingInputs | None,
 
     model_edge_pct = _as_float(row.get("model_edge_pct"))
     if model_edge_pct is None:
-        # Roughly 40% of the served board: 65 of 108 rows carried
-        # `model_edge_pct` when measured 2026-08-16. Those rows rank on market
-        # EV and price shopping alone, which is a legitimate way to RANK and not
-        # a basis on which to SIZE -- without a model view, `model_probability`
-        # would equal `fair` and Kelly would be exactly zero anyway. Refused by
-        # name so the board's unsizable half is visible rather than inferred.
-        return None, "no_model_edge_pct"
+        # Roughly 40% of the served board ranks on market EV and price shopping
+        # alone -- 65 of 108 rows carried `model_edge_pct` when measured
+        # 2026-08-16.
+        #
+        # **THE COMMENT THAT STOOD HERE WAS WRONG, AND IT IS WHY NOBODY TRIED.**
+        # It said `model_probability` would equal `fair` so "Kelly would be
+        # exactly zero anyway". Kelly differences the model against the PRICE,
+        # not against fair (`bankroll_manager.py:135`,
+        # `edge = model_probability - implied_probability`), and
+        # `fair = (ev_pct/100 + 1)/(profit + 1)` equals the price-implied
+        # probability ONLY at `ev_pct == 0`. Measured at -110:
+        #
+        #     ev  0%  -> fair 0.5238  implied 0.5238  stake 0.00000
+        #     ev  3%  -> fair 0.5395  implied 0.5238  stake 0.00432
+        #     ev  6%  -> fair 0.5552  implied 0.5238  stake 0.00865
+        #
+        # Zero only at zero EV. Sizing on `fair` bets `fair - implied`, the
+        # PRICE-SHOPPING edge, which is a real quantity needing no model.
+        #
+        # STILL REFUSED BY DEFAULT. A sport opts in by name, because enabling it
+        # globally would start sizing 40% of the board in one unreviewed step.
+        if str(row.get("sport") or "").strip().lower() not in _market_fair_sports():
+            return None, "no_model_edge_pct"
+        model_edge_pct = 0.0
 
     model_probability = fair + (model_edge_pct / 100.0)
     if not (0.0 < model_probability < 1.0):
@@ -846,6 +904,11 @@ def commit_portfolio(
                 # trusted: which Kelly fraction, shrunk by how much, on what
                 # settled evidence.
                 "sizing": {
+                    # WHAT THIS STAKE IS BET ON. Without it, model-edge and
+                    # market-fair positions land in one settlement pool and
+                    # their ROIs stop being separable -- two different claims
+                    # averaged into one uninterpretable number.
+                    "basis": sizing_basis_of(row),
                     "kelly_fraction": stake.get("kelly_fraction"),
                     "kelly_multiplier": stake.get("kelly_multiplier"),
                     "sample_credibility": stake.get("sample_credibility"),
