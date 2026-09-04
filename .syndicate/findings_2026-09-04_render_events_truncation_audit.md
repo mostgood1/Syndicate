@@ -134,14 +134,39 @@ re-derivation to clear a conclusion that was never in doubt.
    2026-09-02T15:32:56Z. It is load-bearing — it is the "no measurement window
    exists" argument for `#387`. Line corrected in place with this measurement.
 
-2. **`nonZeroExit` is an unbucketed failure reason and it is not rare.** All 10
-   `failed:unknown` across both workers are `{"evicted": false, "nonZeroExit":
-   1}` — 4 on refresh-worker (2026-08-22), 6 on live-odds-worker. It became
-   visible only because the fix prints the raw shape of an unrecognised reason.
-   Whether it is the same thing as `earlyExit` wearing a different key is
-   **NOT established** — do not assume it. Giving it a named bucket in
-   `classify()` was deliberately not done here; that is a decision for whoever
-   owns the OOM lanes, and the raw shape is visible in the meantime.
+2. **`nonZeroExit` is an unbucketed failure reason and it is not rare.** It
+   became visible only because the fix prints the raw shape of an unrecognised
+   reason. Whether it is the same thing as `earlyExit` wearing a different key
+   is **NOT established** — do not assume it.
+
+   **SUPERSEDED, and the count above was too small.** This section originally
+   said 10 occurrences and left the bucketing "for whoever owns the OOM lanes".
+   The user decided it the same day (`[user decision 2026-09-04]`, lane
+   `render-events-nonzeroexit-bucket`) and the full census is **67, not 10** —
+   the 10 were only what fell inside the recent windows this audit happened to
+   sample. Full unfiltered reads of all three services:
+
+   | service | n | value | window |
+   |---|---|---|---|
+   | refresh-worker | 12 | `1` x12 | 2026-07-24 .. 2026-08-22 |
+   | live-odds-worker | 17 | `1` x17 | 2026-07-31 .. 2026-08-27 |
+   | **web** | **38** | **`137` x38** | 2026-06-15 .. 2026-07-09 |
+
+   **`137` is `128+9` — SIGKILL** — and every one of web's 38 is a 137, while
+   every one of the workers' 29 is a plain `1`. Those are not the same event
+   wearing one name, so the bucket carries the CODE onto the row
+   (`nonZeroExit=137 (128+9 = SIGKILL)`) rather than flattening them. A SIGKILL
+   cohort on web is the shape an OOM triage looks for even where Render did not
+   label it `oomKilled`; **that it IS an OOM is not established here** — the
+   annotation reports the code, not a cause.
+
+   Two further facts the census turned up: `nonZeroExit` **never** co-occurs
+   with `oomKilled` / `earlyExit` / `unhealthy` / a true `evicted` (67/67 pair
+   with `evicted: false` alone), so bucket order decides nothing silently; and
+   **one of the 67 is a `job_run_ended`, not a `server_failed`**
+   (2026-07-31T01:03:05.175631Z, `job-d9lv7vu417fc73dm37ng`) whose exit code was
+   invisible on the row until now. `classify()` still, correctly, returns
+   `job_run_ended` for it — a job failure is not a service failure.
 
 Corroborations, no change needed: `state.md`'s "23 `server_failed` since
 2026-08-26, `evicted: false` on all of them" for live-odds-worker re-measures at

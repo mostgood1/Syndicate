@@ -371,3 +371,75 @@ def test_the_abort_banner_goes_to_stdout_not_stderr(capsys):
     assert "ABORTED" in captured.out
     assert "INCOMPLETE" in captured.out
     assert "simulated transport blowup" in captured.out
+
+
+# --------------------------------------------------------------------------
+# `nonZeroExit` is a NAMED bucket `[user decision 2026-09-04]`. Measured the
+# same day over full unfiltered reads of all three services: 67 occurrences --
+# refresh-worker 12, web 38, live-odds-worker 17 -- none of which co-occur with
+# any other reason key. Two values, and they are not the same event: `1` x29 on
+# the two workers, and `137` x38 on web ALONE (128+9 = SIGKILL).
+# --------------------------------------------------------------------------
+
+
+def test_nonzeroexit_is_named_not_unknown():
+    """The exact shape, verbatim from the API."""
+    event = _event("2026-08-22T19:30:36.393131Z", reason={"evicted": False, "nonZeroExit": 1})
+    assert render_events.classify(event) == "nonZeroExit"
+    assert render_events._reason_detail(event) == "nonZeroExit=1"
+
+
+def test_exit_137_is_flagged_as_sigkill_and_keeps_its_raw_code():
+    """All 38 of web's are 137. A SIGKILL is what an OOM triage is looking for,
+    so the row must say so -- while still showing the code it read."""
+    event = _event("2026-06-15T20:09:10.891135Z", reason={"evicted": False, "nonZeroExit": 137})
+    detail = render_events._reason_detail(event)
+    assert "137" in detail and "SIGKILL" in detail
+    assert render_events.classify(event) == "nonZeroExit"
+
+
+def test_the_new_bucket_does_not_swallow_a_genuinely_unknown_reason():
+    """The whole point of `failed:unknown` survives the addition."""
+    event = _event("2026-08-14T20:03:11Z", reason={"evicted": False, "someFutureReason": True})
+    assert render_events.classify(event) == "failed:unknown"
+    assert "someFutureReason" in render_events._reason_detail(event)
+
+
+def test_oomkilled_outranks_a_co_occurring_nonzeroexit():
+    """Never observed together -- which is exactly why the order needs a lock.
+
+    If Render ever emits both, an OOM must not be reported as a plain non-zero
+    exit; the specific cause outranks the generic one.
+    """
+    event = _event(
+        "2026-08-14T20:03:11Z",
+        reason={"evicted": False, "oomKilled": {"memoryLimit": "4Gi"}, "nonZeroExit": 137},
+    )
+    assert render_events.classify(event) == "oomKilled"
+    assert render_events._reason_detail(event) == "memoryLimit=4Gi"
+
+
+def test_a_zero_exit_code_is_shown_rather_than_dropped():
+    """Presence, not truthiness. `nonZeroExit: 0` is a contradiction; a reader
+    that quietly routed it to `failed:unknown` would hide the contradiction."""
+    event = _event("2026-08-14T20:03:11Z", reason={"evicted": False, "nonZeroExit": 0})
+    assert render_events.classify(event) == "nonZeroExit"
+    assert render_events._reason_detail(event) == "nonZeroExit=0"
+
+
+def test_a_job_run_ended_keeps_its_type_but_still_shows_its_exit_code():
+    """The 67th occurrence, verbatim. `classify` must NOT relabel a job failure
+    as a service failure -- and the code must stop being invisible anyway."""
+    event = {
+        "id": "evt-d9lv8i9srm7s73cv0m30",
+        "timestamp": "2026-07-31T01:03:05.175631Z",
+        "type": "job_run_ended",
+        "details": {
+            "jobId": "job-d9lv7vu417fc73dm37ng",
+            "status": "failed",
+            "reason": {"evicted": False, "nonZeroExit": 1},
+        },
+    }
+    assert render_events.classify(event) == "job_run_ended"
+    assert render_events._reason_detail(event) == "nonZeroExit=1"
+

@@ -888,6 +888,40 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   distinction is being written down rather than assumed away.
 - Blocked by: none for live-odds-worker.
 
+### render-events-nonzeroexit-bucket — CLOSED-VERIFIED 2026-09-04 — `classify()` names `nonZeroExit` and the row carries the EXIT CODE; 34/34 tests pass, 4 of 6 new ones fail against the prior file (the other 2 are precedence locks, green either way). Local tooling — no deploy. — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
+- Goal: `classify()` names `nonZeroExit` instead of dropping it in
+  `failed:unknown`, and the EXIT CODE is visible on the row. `[user decision
+  2026-09-04 — this overrides the "left for the OOM lanes" note in
+  findings_2026-09-04_render_events_truncation_audit.md]`
+- Files: `scripts/render_events.py`, `tests/test_render_events.py`,
+  `.syndicate/findings_2026-09-04_render_events_truncation_audit.md`.
+- Measured BEFORE writing the code, full unfiltered reads of all three services:
+  **67 events carry `reason.nonZeroExit`** — refresh-worker 12, web 38,
+  live-odds-worker 17. It **never** co-occurs with `oomKilled` / `evicted:true`
+  / `unhealthy` / `earlyExit` (67/67 pair with `evicted: false` and nothing
+  else), so bucket ORDER cannot silently decide which name is shown.
+- **Two values, and they are not the same event.** `1` x29 (refresh-worker
+  2026-07-24..08-22, live-odds-worker 07-31..08-27) and **`137` x38 (web ONLY,
+  2026-06-15..07-09)**. 137 = 128+9 = **SIGKILL**. A single flat bucket would
+  bury that, which is the exact failure this file's docstring exists to prevent
+  — hence the code goes in the DETAIL, annotated.
+- **66 of the 67 are `server_failed`; one is a `job_run_ended`**
+  (2026-07-31T01:03:05.175631Z, `job-d9lv7vu417fc73dm37ng`). `classify()`
+  returns early for non-`server_failed` and must keep doing so — but its exit
+  code is invisible today, so the DETAIL branch is deliberately type-agnostic.
+- Falsification test: the new bucket must NOT swallow a genuinely unrecognised
+  reason — a `{"someFutureReason": true}` must still be `failed:unknown`, and
+  `oomKilled` must still win over a co-occurring `nonZeroExit`.
+- Verification (RAN): **34/34 pass**; against the prior file 4 of the 6 new
+  tests FAIL (`nonZeroExit` naming, the 137 annotation, the `0` case, the
+  `job_run_ended` code) and 2 pass by design — they lock precedence
+  (`oomKilled` outranks a co-occurring `nonZeroExit`) and guard that the new
+  bucket does not swallow `failed:unknown`. Live: refresh-worker's four
+  2026-08-22 rows now read `nonZeroExit  nonZeroExit=1` where they read
+  `failed:unknown  raw reason: {...}`; web's cohort renders 38/38 as
+  `nonZeroExit=137 (128+9 = SIGKILL)`; the `job_run_ended` keeps its type and
+  now shows `nonZeroExit=1`.
+- Blocked by: none. Local tooling — no deploy.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

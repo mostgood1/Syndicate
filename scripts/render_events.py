@@ -33,10 +33,14 @@ WHAT IT GETS RIGHT, and why each one is load-bearing:
   NOT a measurement.
 
 - **`server_failed` is not one thing.** `oomKilled`, `evicted`,
-  `unhealthy` (health-check timeout) and `earlyExit` (the process returned) have
-  different causes and different fixes; live-odds-worker's 19 failures over a
-  week are ALL `earlyExit` and zero OOM, which a "19 failures" summary would
-  bury. The reason is classified, never flattened.
+  `unhealthy` (health-check timeout), `earlyExit` (the process returned) and
+  `nonZeroExit` (it returned a code) have different causes and different fixes;
+  live-odds-worker's 19 failures over a week are ALL `earlyExit` and zero OOM,
+  which a "19 failures" summary would bury. The reason is classified, never
+  flattened -- and `nonZeroExit` carries its CODE onto the row for the same
+  reason the bucket exists: measured 2026-09-04, its 67 occurrences split into
+  29 x `1` on the two workers and **38 x `137` (128+9 = SIGKILL) on web alone**,
+  which one flat bucket would bury exactly as "19 failures" would.
 
 - **A run that DIED is never mistaken for a run that finished.** The event
   rows are the last thing printed, so anything that raises while rendering them
@@ -225,8 +229,8 @@ def _reason_of(event: dict):
 def classify(event: dict) -> str:
     """The REASON a `server_failed` fired, never flattened to 'failed'.
 
-    Returns one of oomKilled / evicted / unhealthy / earlyExit / unknown for a
-    failure, or the event type itself for anything else.
+    Returns one of oomKilled / evicted / unhealthy / earlyExit / nonZeroExit /
+    unknown for a failure, or the event type itself for anything else.
     """
     kind = str(event.get("type") or "?")
     if kind != "server_failed":
@@ -245,6 +249,20 @@ def classify(event: dict) -> str:
         return "unhealthy"
     if reason.get("earlyExit"):
         return "earlyExit"
+    if "nonZeroExit" in reason:
+        # Presence, not truthiness. The other branches test truth because
+        # `evicted: false` is routinely present-and-false; this key is only ever
+        # emitted WITH a code, and a hypothetical `nonZeroExit: 0` is a
+        # contradiction worth SEEING rather than dropping into the unknown
+        # bucket. The code itself goes on the row -- see `_reason_detail`.
+        #
+        # Measured 2026-09-04 across all three services, full unfiltered reads:
+        # 67 occurrences, and NOT ONE co-occurs with `oomKilled`, `earlyExit`,
+        # `unhealthy` or a true `evicted` (all 67 pair with `evicted: false` and
+        # nothing else). So this branch's position cannot silently outrank a
+        # more specific one on any shape yet observed -- and it is last among
+        # the named buckets so that it cannot do so on a shape not yet observed.
+        return "nonZeroExit"
     # An unrecognised reason must not land in a known bucket -- an unknown that
     # defaults onto a familiar branch is how a new failure mode stays invisible.
     return "failed:unknown"
@@ -274,6 +292,20 @@ def _reason_detail(event: dict) -> str:
         return f"memoryLimit={oom['memoryLimit']}"
     if reason.get("unhealthy"):
         return str(reason["unhealthy"])
+    if "nonZeroExit" in reason:
+        code = reason["nonZeroExit"]
+        # Deliberately NOT gated on `server_failed`. 66 of the 67 measured
+        # occurrences are one, but the 67th is a `job_run_ended`
+        # (2026-07-31T01:03:05.175631Z) whose exit code was invisible on the row
+        # because `classify` -- correctly -- returns the event type for anything
+        # that is not a service failure, and nothing else printed it.
+        if code == 137:
+            # 128+9. A shell/POSIX convention rather than a Render guarantee, so
+            # it is annotated as a reading and the raw code is still shown. It
+            # matters: all 38 of web's are 137, and a SIGKILL is the shape an
+            # OOM triage is looking for even when Render did not label it one.
+            return "nonZeroExit=137 (128+9 = SIGKILL)"
+        return f"nonZeroExit={code}"
     if classify(event) == "failed:unknown" and reason:
         # The whole point of a failed:unknown bucket is that someone can SEE the
         # shape that did not match. Printing nothing would hide the new mode as
