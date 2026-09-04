@@ -653,6 +653,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: on the first refresh-worker build carrying `f1508e78`, the served MLB prop rows contain **zero** `model_prob_over` at exactly 0.0 or 1.0, and total `model_prob_over` coverage falls by AT MOST the number of certainties that were there. **A ZERO COUNT IS NOT SELF-EVIDENT** — the pre-deploy board had exactly one, so this reading needs the coverage denominator beside it or it is indistinguishable from a board that lost the field entirely.
 - Blocked by: none. (Deploy target is refresh-worker — the ARTIFACT WRITER. Web reads the precomputed board artifact; the inline join is fallback only, so deploying web alone would not move this.)
 
+### catchup-624-certainty — CLOSED 2026-09-04 — **web + live-odds-worker to `5af2c517`** (05:11:33Z / 05:11:31Z), `#624` certainty refusal. Verified by content (`refuse_published_certainty` 0→6, `probability_refusal` 0→1) with `#643` and `4ead66c3` re-checked for survival; 16 MLB cards, 0 errors. refresh-worker excluded — `mlb-prop-phase1` holds it and the work is that lane's own. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: web and live-odds-worker onto `5af2c517`. Behavioural: `#624`'s certainty
+  refusal — refuse an exact 0.0/1.0 probability at the producer and at the choke
+  point, on EVERY sport rather than MLB props only (`prop_projections.py`,
+  `intelligence_contracts.py`, `layer2_board.py`, `live_gameline_join.py`,
+  `ncaaf/game_projections.py`, wnba projections; 13 files, +349).
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- **refresh-worker EXCLUDED.** `mlb-prop-phase1` has held its claim 41 min and is
+  already on `99479bd4`; the `#624` prop work is that lane's own. Theirs to ship.
+- Verification: BY CONTENT on the deployed SHA — `refuse_published_certainty` in
+  `prop_projections.py`, confirmed ABSENT from the currently-live `e713939f`
+  (live=0, target=6); plus web serving cards; plus 0 tracebacks per service.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -20786,3 +20786,33 @@ verify: web `906f9537` at 03:45:09Z.
 
 **Fleet: web `906f9537` · refresh-worker `4ead66c3` · live-odds-worker
 `e713939f` — 0 pending on all three, VERDICT: NO DEPLOY WARRANTED.**
+
+## 2026-09-04 — web + live-odds-worker to `5af2c517` (`#624` certainty refusal) — lane `catchup-624-certainty`
+
+Behavioural: `#624` refuses an exact 0.0/1.0 probability at the PRODUCER and at
+the CHOKE POINT, on every sport rather than MLB props only — 13 files, +349.
+Both preflights CLEAR first try; web live 05:11:33Z, live-odds-worker 05:11:31Z.
+
+verify — BY CONTENT on the deployed SHA, tokens confirmed ABSENT from the
+previously-live `e713939f` first:
+
+    refuse_published_certainty  prop_projections.py        0 -> 6
+    probability_refusal         intelligence_contracts.py  0 -> 1
+
+Two earlier fixes re-checked for SURVIVAL and intact: `#643`'s `bytes_per_order`
+and `4ead66c3`'s `corners_mean`.
+
+Runtime: 200 lines across both, **0 tracebacks / 500s / CRITICAL**. web serving
+**16 MLB cards** for 09-04; live-odds-worker on its live-MC pass.
+
+**No `CERTAINTY_REFUSED` line has fired yet** — 0 in the first two minutes on
+both. That is the expected state, not a null result: the refusal only emits when a
+producer actually publishes an exact 0.0/1.0, and the fix exists because that was
+rare-but-real. Naming it so the next reader does not read the silence as "the
+deploy did nothing" — the CONTENT check above is what proves it shipped.
+
+**refresh-worker EXCLUDED, fifth round decided by the same check.**
+`mlb-prop-phase1` has held its claim 41 min and the service is already on
+`99479bd4`; the `#624` prop work is that lane's own. It stays 2 behind and the
+VERDICT still reads "deploy warranted for refresh-worker" — correct, and theirs
+to discharge.
