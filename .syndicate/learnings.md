@@ -5365,6 +5365,35 @@ assert both directions are empty — nothing of yours that upstream archived
   it — that **2 of 18 `TRACKED` files have no predicate that can ever fire**.
   Both are wrong. `_deploys` and `_learnings` are registered in `CHECKS` and
   both fire.
+- **AMENDED `[2026-09-03, session c38d3e5c]` — THE FIRST OF THOSE TWO WAS TRUE
+  WHEN IT WAS MADE, AND IS WHY THE GUARD EXISTS.** Only the second is a false
+  reading. `dbe0f3b4` is what closed it, and its diff is unambiguous:
+
+      -TRACKED = (LANES, STATE, *STATE_PARTS, LEARNINGS)
+      +DEPLOYS = ".syndicate/deploys.md"
+      +TRACKED = (LANES, STATE, *STATE_PARTS, LEARNINGS, DEPLOYS)
+      +def dropped_sections(...)      +def _deploys(text, root)
+      +          DEPLOYS: _deploys,
+
+  Before that commit `deploys.md` was absent from `TRACKED`, had no `_deploys`,
+  and was not in `CHECKS` — measured at the time, alongside `ledger-append-guard`
+  (two hits, both PROSE: docstring :31, remedy string :176) and
+  `ledger-postwrite-check` (zero mentions). That commit's own added comment
+  restates the finding as its justification: *"ledger file with no guard at ANY
+  stage: absent from TRACKED, and its two ..."*.
+
+  **The correction is therefore a TIME error, not a fact error** — a true claim
+  re-evaluated against code that had changed in response to it, and then filed
+  as a false alarm. **This matters beyond attribution:** left as written, a
+  reader concludes `deploys.md` was never unguarded, which removes the reason
+  the guard was added and makes deleting it look like tidying. `_deploys` is
+  load-bearing — probed against the real 1.13MB upstream file: unchanged text
+  0 violations, two sections REMOVED 1 violation, an APPEND 0 violations, so it
+  blocks a drop while preserving append-only.
+
+  Your second claim stands exactly as you wrote it, and the `root=None` lesson
+  is the durable half: a probe is only evidence once it can produce the other
+  value.
 - **How the false reading was manufactured.** I drove every tracked file with
   empty/garbage text and `root=None`, and read the nulls as absence.
   `_deploys`' own first line is *"Fails OPEN: no root, no git, no ref -> no
