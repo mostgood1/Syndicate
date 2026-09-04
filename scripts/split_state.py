@@ -252,12 +252,61 @@ def index_rows_for(files_texts):
     return rows
 
 
+ROW = "| ["
+
+
+def table_span(lines, start):
+    """(sep, end) for the index table: the `|---` line, and one past its last row.
+
+    The table is the `|---` header separator plus the CONTIGUOUS run of `| [`
+    rows following it. Contiguity is the point -- the old code took "every
+    `| [` line anywhere below the index heading", which has no notion of where
+    the table ENDS and cannot tell a row from a line of somebody's prose.
+    Returns (None, None) when there is no separator.
+    """
+    try:
+        sep = next(i for i in range(start, len(lines)) if lines[i].startswith("|---"))
+    except StopIteration:
+        return None, None
+    end = sep + 1
+    while end < len(lines) and lines[end].startswith(ROW):
+        end += 1
+    return sep, end
+
+
 def reindex(lines, crlf, raw, apply_):
     """Rebuild state.md's index over state.md + every part, in place.
 
     This is what you run after ADDING a subject to a part: the index is the
     only place that lists every subject, so a subject missing from it is
     invisible even though state_key_check.py still sees it.
+
+    IT REWRITES ONE REGION AND NOTHING ELSE. The rows are SPLICED in place;
+    every byte above and BELOW them is carried through untouched.
+
+    WHY THAT IS SPELLED OUT AT THIS LENGTH. This used to rebuild the file as
+    `head + body[:hdr+1] + rows + [""]`, which never re-emits `body[hdr+1:]`
+    -- i.e. EVERYTHING below the table. Measured 2026-09-04 by lane
+    `sim-clv-decomposition`: registering one new subject deleted 55 lines of
+    another session's uncommitted `### [web-oom-leak]` UPDATE block appended
+    below the table. That block existed in no commit on any branch; it was
+    recovered only because `git diff` was read before committing and showed
+    `-58 +3`.
+
+    That is the worst shape a defect can have here. `state.md` is a SHARED
+    ledger every parallel session writes, `CLAUDE.md` instructs sessions to
+    run `--reindex --apply` after adding a subject, and the loss was SILENT:
+    "reindex: 179 subject(s) across 15 file(s) / WROTE state.md (index
+    rebuilt)", exit 0.
+
+    ONE CAVEAT, STATED SO IT IS NOT MISTAKEN FOR BYTE-IDENTITY. Preservation
+    is of CONTENT, line for line. Line ENDINGS are still normalised across the
+    whole file by `load()` + the write below, which has always been true and is
+    not specific to the tail. It is visible here because the live `state.md` is
+    MIXED: measured 2026-09-04, lines 1-580 were CRLF and the 55 appended tail
+    lines were bare LF, because the appending session's tool wrote LF. After a
+    reindex all 635 are CRLF and no line is lost. If you diff and see the whole
+    tail flagged, check for `\r` before reading it as a content change.
     """
     parts = sorted(p for p in SYN.glob("state_*.md")
                    if not p.name.startswith("state_archive"))
@@ -269,21 +318,56 @@ def reindex(lines, crlf, raw, apply_):
     if start is None:
         print("REFUSED: no index section found to rebuild.")
         return 1
-    head = lines[:start]
-    body = [l for l in lines[start:] if not l.startswith("| [")]
-    # keep everything up to the table header, then re-emit rows
-    try:
-        hdr = next(i for i, l in enumerate(body) if l.startswith("|---"))
-    except StopIteration:
+    sep, end = table_span(lines, start)
+    if sep is None:
         print("REFUSED: index section has no table header.")
         return 1
-    out = head + body[: hdr + 1] + rows + [""]
+
+    head, tail = lines[: sep + 1], lines[end:]
     print(f"reindex: {len(rows)} subject(s) across {len(files_texts)} file(s)")
+
+    # CLASSIFY THE POST-TABLE REGION. Three outcomes, and the unknown one is a
+    # REFUSAL, not a write -- `learnings.md`: an unknown must not default onto
+    # the permissive branch.
+    stray = [l for l in tail if l.startswith(ROW)]
+    if stray:
+        print(f"REFUSED: {len(stray)} index-shaped row(s) sit BELOW the table, "
+              "separated from it by other content.")
+        for l in stray[:3]:
+            print(f"  * {l.strip()[:90]}")
+        print("Cannot tell a stale row to replace from content to keep. Move the")
+        print("rows back into the contiguous table, or move the content below")
+        print("them, then re-run.")
+        return 1
+    kept = [l for l in tail if l.strip()]
+    if kept:
+        print(f"post-table region: {len(tail)} line(s) PRESERVED "
+              f"({len(kept)} non-blank), first: {kept[0].strip()[:60]!r}")
+        out = head + rows + tail
+    else:
+        # Blank-only tail: normalise to exactly one trailing newline, which is
+        # what this has always written and what every part file ends with.
+        out = head + rows + [""]
+
     dupes = collections.Counter(r.split("]")[0] for r in rows)
     bad = [s for s, c in dupes.items() if c > 1]
     if bad:
         print(f"REFUSED: subject(s) listed twice: {bad[:5]}")
         return 1
+
+    # RUNTIME GUARD, not merely a test: every non-blank input line that is not
+    # an index row must survive into the output. This is the check that would
+    # have fired on the 2026-09-04 loss, and it fires again for any future edit
+    # that reintroduces a truncation by another route.
+    before = collections.Counter(l for l in lines if l.strip() and not l.startswith(ROW))
+    after = collections.Counter(l for l in out if l.strip() and not l.startswith(ROW))
+    lost = list((before - after).elements())
+    if lost:
+        print(f"REFUSED: {len(lost)} line(s) outside the index table would be lost:")
+        for l in lost[:5]:
+            print(f"  * {l.strip()[:70]}")
+        return 1
+
     if not apply_:
         print("\nDRY RUN. Re-run with --apply to write.")
         return 0
