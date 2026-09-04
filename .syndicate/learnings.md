@@ -5285,3 +5285,33 @@ than hoping the early run cleaned up. The mistimed run is now a third data point
 (0 live / 1 live / ~12 live), which is a better experiment than the two-point
 one I had planned — but that is luck, not design.
 
+
+## 2026-09-04 — A COEFFICIENT IS NOT A FINDING UNTIL IT SURVIVES LEAVE-ONE-OUT AND A RANK TEST
+
+`#632`. One collector, one metric, four verdicts, three of them wrong — and each
+wrong one was a clean number with a plausible mechanism attached:
+
+| n | pearson | verdict it printed | why it was wrong |
+|---|---|---|---|
+| 3 | `-0.999` | "FALSIFIED: does not track" | three points |
+| 3 | `+0.870` | "TRACKS skipping" | windows differenced ACROSS two workers |
+| 8 | `+0.710` | "TRACKS skipping" | one window; `-0.297` without it |
+| 16 | `+0.236` | does not track | spearman `-0.047`, `+0.087` on leave-one-out |
+
+The n=3 and n=8 runs gave OPPOSITE conclusions from the same pipeline on the same
+metric. That alone bounds what a coefficient is worth here.
+
+THE RULE: never report a correlation without (a) a rank correlation beside it —
+if Pearson and Spearman disagree in sign or magnitude, the Pearson is describing
+one point's leverage, not a relationship; (b) leave-one-out, naming the most
+influential observation and what the coefficient becomes without it; and (c) the
+raw magnitudes, because `r` says nothing about whether the effect matters.
+
+A corollary that cost real time: **a gate threshold must be set for the
+STATISTIC, not for convenience.** I gated this collector at "3 clean windows"
+because 3 was reachable quickly, and it duly printed FALSIFIED on three points.
+The gate is now n>=8 with the robustness tests built in.
+
+Related: `[2026-09-04]` "100% of what you sampled is not 100% of the thing" and
+"a broken identifier is worse than none" — the same session, the same instrument,
+three different ways of producing a confident wrong number.

@@ -87,7 +87,7 @@ death, never life — do not invert it.
   capped per process, solo requests only, and the instrument TIMES ITSELF.
 - Blocked by: none.
 
-### web-oom-allrequest-reconcile — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-allrequest-reconcile — CLOSED 2026-09-04 — opened 2026-09-04 — **RESIDUAL MEASURED; FALSIFICATION TEST FIRED.** 16 clean windows, 2 distinct process tokens: process `+669.30 MB`, attributed `+550.67 MB`, residual `+118.63 MB` — **82.3% covered**, stable under doubling n. The residual does NOT track `skipped_concurrent` (pearson `+0.236`, spearman `-0.047`, `+0.087` without one leverage window), so skipped requests are not the gap. THREE instrument defects found and fixed on the way, each of which had produced a confident wrong number: `routes` truncated at top=12 (read 4842% unexplained); `pid` reused across a respawn (-117%); and `proc_token` generated at import so gunicorn workers INHERITED it across the fork (merged two workers, gave `r=+0.870`). Per-window coverage ranges `-130%`..`+452%` and must never be quoted — only the aggregate. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: make `#632`'s ALL-REQUEST attribution reconcilable — emit a total that
   covers every route and a token that identifies the PROCESS — then report the
   RESIDUAL (process climb minus everything attributed) rather than a share

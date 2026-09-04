@@ -771,3 +771,27 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   CONTAMINATED WINDOWS, not requests — one overlap increments it twice.
 * **NEXT:** collect >= 3 windows on `b36d993f`, with the collector refusing any
   token that spans more than one pid.
+
+### `[web-oom-leak]` UPDATE 9 — **the residual is measured: 82.3% covered, and skipping is NOT the gap**, 2026-09-04T21:3xZ `[session b2b5b45b]`
+
+* **16 clean windows, 2 distinct process tokens, ~50 min: process `+669.30 MB`,
+  attributed `+550.67 MB`, residual `+118.63 MB` — 82.3% COVERED.** Stable under
+  doubling n (75.9% at n=8). This is `#632`'s first stable share.
+* **FALSIFICATION TEST FIRED — the residual does NOT track `skipped_concurrent`:**
+  pearson `+0.236`, spearman `-0.047`, and `+0.087` without the single leverage
+  window. Skipped requests are not the gap; the solo-only rule is not what hides
+  the memory.
+* **PER-WINDOW COVERAGE IS UNUSABLE** (`-130%` to `+452%`, over 100% in five
+  windows, negative in four). Under munmap-heavy churn, a per-request delta and a
+  net process change are different quantities. **Quote the aggregate, never a
+  window.**
+* `residual` vs `process climb` (pearson `+0.856`) is PARTLY DEFINITIONAL —
+  `residual = process - attributed`. Not independent evidence.
+* **Three earlier verdicts from this same collector were wrong**, all small-n
+  coefficients: `-0.999` at n=3, `+0.870` on merged workers, `+0.710` at n=8
+  collapsing to `-0.297` on leave-one-out. Gate is now n>=8 + leave-one-out +
+  Spearman beside Pearson.
+* **NEXT for `#632`:** the 8-64MB mappings are identified and requests own ~82%
+  of the movement, but no single route owns it and per-request attribution
+  cannot be made to compose. The open question is the remaining ~18% and whether
+  the churn HIGH-WATER MARK — not a leak — is what OOMs the service.

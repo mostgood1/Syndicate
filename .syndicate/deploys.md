@@ -22552,3 +22552,49 @@ what calibrates the harness against the handed-down number instead of assuming
 it. Substrate `checkout` for the index, production rows for the payload —
 evidence about the CODE. **Not a claim about what production serves, and no
 deploy taken: the fleet is still another lane's.**
+
+
+---
+
+## 2026-09-04T20:36Z — web — `b36d993f` — `#632` **THE RESIDUAL, MEASURED: skipped requests are NOT the gap**
+
+`[lane web-oom-allrequest-reconcile, session b2b5b45b]`
+
+verify: **16 clean windows, 2 verified-distinct process tokens, ~50 minutes.**
+A window counts as clean only if its token spans ONE pid and `solo_attributed`
+did not fall. The guard REFUSED token `6178fc632433` for spanning pids 98 and
+99 — the fork-inheritance defect, now caught automatically rather than by my
+noticing an impossible counter.
+
+    POOLED   process +669.30 MB   attributed +550.67 MB   residual +118.63 MB
+                                                          82.3% COVERED
+
+    residual vs skipped_concurrent:   pearson +0.236   spearman -0.047   n=16
+    drop the one leverage window:     pearson +0.087
+
+**THE LANE'S FALSIFICATION TEST FIRES: the residual does NOT track skipping.**
+Pearson and Spearman disagree, Spearman is ~0, and the Pearson survives only on
+one window. Skipped requests are not the gap, and the solo-only rule is not what
+hides the memory.
+
+**WHAT THIS ESTABLISHES, and it is the first stable share in `#632`:** across
+~50 minutes, **requests account for 82.3% of the process's net anon change**
+(75.9% on the first 8 windows — stable under doubling n). Attribution is not
+broken; it is broadly right in aggregate.
+
+**PER-WINDOW COVERAGE IS NOT STABLE** and must not be quoted: -130.4%, -99.5%,
+-51.5%, -3.9%, 4.2%, 9.1%, 16.6%, 18.9%, 59.5%, 81.3%, 127.6%, 227.5%, 303.9%,
+451.5%. It exceeds 100% in five windows and goes negative in four. Under
+munmap-heavy churn a per-request delta and a net process change are different
+quantities: the sum over disjoint solo windows equals the net only if nothing
+moves between them, and things demonstrably do. **The aggregate is meaningful;
+the individual window is not.**
+
+**NOT INDEPENDENT EVIDENCE, stated so nobody later reads it as such:** residual
+vs process climb reads pearson +0.856 / spearman +0.786, which is tempting and
+partly DEFINITIONAL — `residual = process - attributed`.
+
+**Three collector verdicts were wrong before this one, all from small-n
+coefficients:** `r=-0.999` "FALSIFIED" at n=3, `r=+0.870` "tracks" (on merged
+workers), `r=+0.710` "tracks" at n=8 collapsing to -0.297 without one window.
+The gate is now n>=8 with leave-one-out and Spearman reported beside Pearson.
