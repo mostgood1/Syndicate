@@ -552,6 +552,27 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `lane_claims._claims()`: CLEAR on all four.
 - Blocked by: none.
 
+### pending-deploys-runtime-classifier — CLOSED 2026-09-04 — **BUILT AND VERIFIED.** `pending_deploys.py` now computes script reachability transitively: 152 of 328 scripts are named by runtime code, 176 are tooling and excluded, and a VERDICT line answers "is a deploy warranted" directly. All six scripts observed running in production classify RUNTIME. 8 tests, CI OK. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: decide a catch-up round mechanically instead of hand-reading the file
+  list, which is what rounds 8-11 each did. **Met.**
+- Files: `scripts/pending_deploys.py`,
+  `tests/test_pending_deploys_runtime.py` (NEW).
+- **CONSERVATIVE BY CONSTRUCTION**, same asymmetry as `check_lane_invariants`:
+  a false RUNTIME is noise, a false INERT hides a needed deploy. A script is
+  demoted only on proof that no runtime file names it; the closure returns
+  `None` ("treat all as executed") when the tree cannot be read.
+- Verification (done): all six scripts seen in `deploy_preflight`'s live job
+  listing — `refresh_odds_sources`, `build_soccer_artifacts`,
+  `run_mlb_daily_sim_job`, `run_refresh_worker`, `run_live_odds_refresh_worker`,
+  `run_refresh_odds_job` — classify RUNTIME. `f31a6db9` (`check_lane_claims.py`)
+  dropped out of all three services' pending lists, which is the round-11 result
+  reproduced mechanically.
+- Residual, deliberate: five tooling scripts still read RUNTIME because runtime
+  STRING literals name them. Noise in the safe direction; tightening further
+  would risk false INERT, so it is left and documented.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

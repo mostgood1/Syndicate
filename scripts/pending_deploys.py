@@ -40,8 +40,114 @@ PATH_OWNERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("syndicate/features/shared/", ("web", "refresh-worker", "live-odds-worker")),
     ("syndicate/features/", ("web", "refresh-worker", "live-odds-worker")),
     ("vendor/", ("refresh-worker",)),
+    # `scripts/` is resolved by `_owners` via `_executed_scripts` below; this
+    # row is the FALLBACK owner set, used when reachability cannot be computed.
     ("scripts/", ("refresh-worker", "live-odds-worker")),
 )
+#: Where runtime code lives. A script NAMED anywhere in here is executed.
+_RUNTIME_ROOTS = ("syndicate", "pipeline", "vendor")
+#: Seeds for the reachability closure: what Render actually starts.
+_RUNTIME_SEED_FILES = (
+    "wsgi.py",
+    "app.py",
+    "render.yaml",
+    "scripts/run_refresh_worker.py",
+    "scripts/run_live_odds_refresh_worker.py",
+)
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def _strip_comments(src: str) -> str:
+    """`src` with `#` comments removed; unchanged if it will not tokenise.
+
+    A script is judged executed by whether runtime code NAMES it, and prose
+    names things too. Measured: `deploy_preflight` was classified RUNTIME
+    because `syndicate/blueprints/ops.py:1747` mentions it IN A COMMENT, and
+    three more tooling scripts matched transitively the same way.
+
+    Only comments are stripped -- never string literals, because a subprocess
+    launch IS a string literal (`"scripts/build_soccer_artifacts.py"`) and
+    dropping those would cause a false INERT, the dangerous direction. On any
+    tokenise failure the raw text is returned, which can only over-report.
+    """
+    try:
+        import io
+        import tokenize
+
+        out = []
+        for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+            if tok.type != tokenize.COMMENT:
+                out.append(tok.string)
+        return "\n".join(out)
+    except Exception:
+        return src
+
+
+def _executed_scripts():
+    """Basenames under `scripts/` that runtime code NAMES, transitively.
+
+    WHY THIS EXISTS. The `("scripts/", both workers)` row above attributes EVERY
+    script to both workers. Four consecutive catch-up rounds (2026-09-03/04) then
+    reported lane-guard and ledger tooling as pending runtime code, and each had
+    to be dismissed by hand-reading the file list. The judgement is mechanical;
+    this makes it so.
+
+    **`scripts/` IS NOT UNIFORMLY INERT**, which is why this is a reachability
+    closure and not a prefix rule. The workers really do execute
+    `refresh_odds_sources.py`, `build_soccer_artifacts.py` and
+    `run_mlb_daily_sim_job.py` -- all three observed in `deploy_preflight.py`'s
+    live job listing on 2026-09-03/04. A "scripts are inert" shortcut would have
+    hidden every one of them.
+
+    **CONSERVATIVE BY CONSTRUCTION.** The failure modes are asymmetric, exactly
+    as in `check_lane_invariants` (`learnings.md` 2026-09-03): a false RUNTIME is
+    noise, a false INERT HIDES A NEEDED DEPLOY. So a script is demoted only when
+    the closure proves no runtime file names it, and `None` -- "cannot tell,
+    treat every script as executed" -- is returned if the tree cannot be read.
+
+    TRANSITIVE, because launches chain: `run_refresh_worker.py` starts
+    `run_mlb_daily_sim_job.py`, which starts `daily_update.py`, which starts
+    vendor tools. A one-hop scan would call the last of those inert.
+    """
+    scripts_dir = REPO_ROOT / "scripts"
+    if not scripts_dir.is_dir():
+        return None
+
+    corpus = []
+    for root in _RUNTIME_ROOTS:
+        base = REPO_ROOT / root
+        if base.is_dir():
+            corpus.extend(_strip_comments(_read_text(f)) for f in base.rglob("*.py"))
+    for rel in _RUNTIME_SEED_FILES:
+        corpus.append(_strip_comments(_read_text(REPO_ROOT / rel)))
+    if not any(corpus):
+        return None
+
+    blob = "\n".join(corpus)
+    candidates = {f.stem: f for f in scripts_dir.glob("*.py")}
+    executed = set()
+    changed = True
+    while changed:
+        changed = False
+        for stem, path in candidates.items():
+            if stem in executed:
+                continue
+            # Named as a module (`import x`, `-m x`) or as a file (`x.py`).
+            if stem in blob or (stem + ".py") in blob:
+                executed.add(stem)
+                blob += "\n" + _strip_comments(_read_text(path))
+                changed = True
+    return frozenset(executed)
+
+
+_EXECUTED_SCRIPTS = _executed_scripts()
+
 
 # Paths that change nothing at runtime. Excluded so the manifest reports work,
 # not noise -- ledger churn alone is ~73 files per service.
@@ -58,6 +164,12 @@ def _git(*args: str) -> str:
 def _owners(path: str) -> tuple[str, ...]:
     for prefix, owners in PATH_OWNERS:
         if path.startswith(prefix):
+            # `scripts/` is the one prefix whose members are not all executed.
+            # Demote ONLY on proof; `None` means the closure could not be
+            # computed, so the conservative owners stand.
+            if prefix == "scripts/" and _EXECUTED_SCRIPTS is not None:
+                if Path(path).stem not in _EXECUTED_SCRIPTS:
+                    return ()
             return owners
     return ()
 
@@ -117,12 +229,36 @@ def main() -> int:
 
     print(f"# pending deploys against {args.base} ({base[:8]})")
     print("# only commits touching code the service EXECUTES; ledger/docs/data/tests excluded")
+    if _EXECUTED_SCRIPTS is not None:
+        total = len(list((REPO_ROOT / "scripts").glob("*.py")))
+        print(
+            f"# scripts/ reachability: {len(_EXECUTED_SCRIPTS)} of {total} are named by "
+            "runtime code; the rest are tooling and are excluded"
+        )
     for service, data in report.items():
         print(f"\n== {service}   live={data['live']}   {data['pending_code_commits']} pending code commit(s)")
         for c in data["commits"]:
             print(f"   {c['sha']}  {c['subject'][:78]}")
             for f in c["files"][:4]:
                 print(f"        {f}")
+    # THE VERDICT LINE. This tool existed to LIST drift; the question actually
+    # being asked of it, ten catch-up rounds running, was "is a deploy worth a
+    # reboot". Answer it here rather than leaving it to be re-derived by reading
+    # file lists -- that re-derivation is what made rounds 8 and 11 no-ops and
+    # nearly made round 10 a duplicate of a peer's in-flight deploy.
+    warranted = [s for s, d in report.items() if d["pending_code_commits"]]
+    print()
+    if _EXECUTED_SCRIPTS is None:
+        print("# NOTE: script reachability could not be computed; every scripts/ path")
+        print("#       is being treated as executed (conservative fallback).")
+    if warranted:
+        print(f"VERDICT: deploy warranted for {', '.join(sorted(warranted))}")
+        print("         (each has >=1 pending commit touching code it EXECUTES)")
+    else:
+        print("VERDICT: NO DEPLOY WARRANTED -- every service is current in the only")
+        print("         sense that matters. Any remaining drift is files no service")
+        print("         runs, and a reboot to ship it is pure cost (~21 min to first")
+        print("         board publish on refresh-worker, `#563`).")
     return 0
 
 
