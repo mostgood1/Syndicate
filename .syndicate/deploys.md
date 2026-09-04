@@ -21199,3 +21199,44 @@ reverted once by an unrelated commit to the same file.
 Runtime: 100 lines since boot, **0 tracebacks / CRITICAL / OOM**, 19 lens-related
 lines. The visible `[live_mc] LIVE_MC_BAIL reason=status_not_live
 abstract='Preview'` is the correct state for a pre-game slate, not an error.
+
+## 2026-09-04 14:17-14:34Z — `#626`(h) **RAN IN PRODUCTION FOR THE FIRST TIME. PASS.** `[lane accuracy-autorun-rearm, user decision "arm it right now, watched"]`
+
+**deploy** `7f44f5eb` -> refresh-worker, `dep-dadd62afngtc738sqcs0`, live 14:20:32Z.
+Claim held by `accuracy-autorun-rearm` (token `b9fcd03a...`), preflight **CLEAR**
+("only infrastructure processes running") for the exact target.
+
+**verify: THE RUN COMPLETED AND THE MEMORY BOUND HELD, MEASURED NOT ASSUMED.**
+
+    [accuracy_summary] AUTORUN_DONE sports=8 elapsed_s=669.389 error=none   14:34:27Z
+    peak memory_anon_mb  1481.6   at 14:32:14Z   (400 samples, 14:22:30-14:34:40Z)
+    min  memory_anon_mb  1131.0
+    ceiling 4096.0   headroom at peak 2614.4 MiB
+    09-02 OOM peak      3868      <- this run peaked 2386 MiB BELOW it
+    baseline cycle peak ~1877     <- and BELOW the ordinary baseline too
+    oomKilled events: LAST FAIL 2026-09-02T15:32:56Z. NONE since. Zero restarts.
+
+Per-sport: mlb sample_size=25983 settled=35; wnba 1518/166; ncaaf 2377/0;
+soccer 26/0; nfl 78/0; nba/ncaab/nhl 0/0. Eight sports scored in 669s.
+
+**THE ONE REAL FINDING: THE BUDGET IS NOW BINDING, AND COVERAGE IS BEING CUT.**
+
+    LEDGER_CHUNKS_ACCEPTED count=8 bytes=1999970055 budget=2000000000
+                           records=46944 dates=8 partial=1 truncated=1
+                           skipped_budget=24 ceiling=256000000
+
+`bytes` is **99.9985% of the budget** and **24 chunks were SKIPPED**. The summary
+rests on 8 dates / 46,944 records, not on the full history. So the 2 GB cap that
+was raised on 09-02 because "at 0.053 bytes/byte the cap only cost coverage" is
+now the thing costing coverage. **Memory is NOT the constraint any more — the
+budget is.** At the measured ratio the full ledger would still be affordable:
+peak was 1481.6 MiB with 2 GB accepted, i.e. ~2.6 GB of headroom unused. Raising
+the budget is now a coverage decision with measured room underneath it, not a
+memory risk. Recorded as the follow-up on `#626`(h).
+
+**What made this attempt work after four failures:** not a quieter worker — the
+window was found by TIGHT polling (12s) after the 25-min deploy-spacing lockout
+expired, and CLEAR appeared on the 4th poll. Preflight's CLEAR verdict stays
+valid 15 min once written, so it only has to be CAUGHT once; it does not have to
+coincide with the deploy. Four earlier attempts polled too slowly for a window
+measured at under 25 seconds.
