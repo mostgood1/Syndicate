@@ -202,15 +202,35 @@ def _busiest_player_minutes(frame: "pd.DataFrame") -> float:
     filter rather than quietly permitting it. A guard whose unknown case falls
     through to its permissive branch is not a guard.
     """
-    if "minutes" not in getattr(frame, "columns", []):
+    series = _minutes_series(frame)
+    if series is None:
         return 0.0
     try:
-        value = pd.to_numeric(frame["minutes"], errors="coerce").max()
+        value = series.max()
     except Exception:
         return 0.0
     if value is None or pd.isna(value):
         return 0.0
     return float(value)
+
+
+_MINUTES_COLUMNS = ("minutes", "minutes_played")
+
+
+def _minutes_series(frame):
+    """Minutes for every row, whatever the source called the column.
+
+    Understat and ASA rows say `minutes`; ESPN rows say `minutes_played`.
+    Reading only `minutes` made BOTH guards below blind on exactly the four
+    leagues ESPN serves.
+    """
+    present = [c for c in _MINUTES_COLUMNS if c in getattr(frame, "columns", [])]
+    if not present:
+        return None
+    series = pd.to_numeric(frame[present[0]], errors="coerce")
+    for column in present[1:]:
+        series = series.combine_first(pd.to_numeric(frame[column], errors="coerce"))
+    return series
 
 
 def _drop_departed_players(
@@ -325,12 +345,11 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     # rather than dropped.
     has_id = combined["player_id"].astype(str).str.strip() != ""
     with_id = combined[has_id].copy()
-    if "minutes" in with_id.columns:
+    _minutes = _minutes_series(with_id)
+    if _minutes is not None:
         # A non-numeric or missing value sorts FIRST, i.e. loses to any row
         # with real minutes -- an unreadable sample is not a better one.
-        with_id["_dedupe_minutes"] = pd.to_numeric(
-            with_id["minutes"], errors="coerce"
-        ).fillna(-1.0)
+        with_id["_dedupe_minutes"] = _minutes.fillna(-1.0)
     else:
         with_id["_dedupe_minutes"] = -1.0
     with_id = (

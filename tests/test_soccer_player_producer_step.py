@@ -463,3 +463,55 @@ def test_a_non_empty_fetch_still_writes(tmp_path):
     fetch._write_csv([{"league": "epl", "player_id": "p1", "minutes": 900}], target)
     written = pd.read_csv(target)
     assert len(written) == 1 and written.iloc[0]["player_id"] == "p1"
+
+
+# ---------------------------------------------------------------------------
+# The ESPN leagues call the column something else
+# ---------------------------------------------------------------------------
+
+
+def _espn_frame(rows: list[tuple[str, float]]) -> pd.DataFrame:
+    """ESPN rows say `minutes_played`; Understat and ASA say `minutes`."""
+    frame = _frame(rows)
+    return frame.rename(columns={"minutes": "minutes_played"})
+
+
+def test_the_guard_reads_the_ESPN_column_too(artifacts):
+    """Both guards read `minutes` only, which made them BLIND on exactly the
+    four leagues ESPN serves (eredivisie, primeira_liga, championship,
+    belgian_pro_league).
+
+    Measured on real eredivisie data: the guard read `latest_max_minutes=0`
+    against a true 450.0 -- `too_early` stuck True forever, which is safe but
+    permanently inert.
+    """
+    espn = _espn_frame([(f"p{i}", 450.0) for i in range(200)])
+    assert artifacts._busiest_player_minutes(espn) == 450.0
+
+
+def test_dedupe_keeps_the_bigger_sample_on_ESPN_rows(artifacts, tmp_path):
+    """The worse half. With the column unreadable, "keep the most minutes"
+    silently degraded to "keep the newest season" -- on real eredivisie data,
+    161 of 161 dual-season players resolved to the thin 2026 file and mean
+    minutes fell 1648.1 -> 258.4. That is exactly the regression this
+    de-duplicator was changed to prevent, re-armed for four leagues.
+    """
+    players_dir = tmp_path / "eredivisie" / "players"
+    players_dir.mkdir(parents=True)
+    old = _espn_frame([(f"p{i}", 2000.0) for i in range(300)])
+    old["shots_per90"] = 3.0
+    old.to_csv(players_dir / "players_2025.csv", index=False)
+    new = _espn_frame([(f"p{i}", 90.0) for i in range(300)])
+    new["shots_per90"] = 0.4
+    new.to_csv(players_dir / "players_2026.csv", index=False)
+
+    rows = artifacts._load_player_rows("eredivisie", tmp_path)
+    kept = {str(r["player_id"]): r for r in rows}
+    assert len(kept) == 300
+    assert float(kept["p0"]["minutes_played"]) == 2000.0
+    assert float(kept["p0"]["shots_per90"]) == 3.0
+
+
+def test_a_frame_with_NEITHER_column_still_refuses(artifacts):
+    """Unknown must not become permissive just because a second name exists."""
+    assert artifacts._busiest_player_minutes(pd.DataFrame([{"player_id": "a"}])) == 0.0
