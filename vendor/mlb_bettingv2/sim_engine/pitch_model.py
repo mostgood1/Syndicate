@@ -278,14 +278,41 @@ class PitchModelConfig:
     # Deterministic run-environment multipliers (neutral by default).
     # These apply before weather/park and can be used to calibrate mean totals/margins
     # without injecting extra variance.
-    hr_rate_mult: float = 1.03
+    # ------------------------------------------------------------------
+    # REFIT 2026-09-04 (`#624` step 3's estimator half). THREE OF FOUR SHIPPED.
+    #
+    # Fitted with all mechanisms on over 186 games / 13 dates / 80 sims, against
+    # 3,209 date-MATCHED actual rows, and validated OUT OF SAMPLE on 4 dates the
+    # fit never saw:
+    #
+    #   rate               oos before   oos after
+    #   hr_rate                +40.3%      +12.5%   shipped
+    #   inplay_hit_rate         +2.7%      +10.3%   NOT SHIPPED -- 3.8x worse
+    #   k_rate                  +3.4%       +0.8%   shipped
+    #   bb_rate                +24.0%      +13.3%   shipped
+    #
+    # In-sample this was 4 of 4 and `inplay`'s correction read as a harmless
+    # 5.6% -> 5.5%. Out of sample it made a rate that was ALREADY NEARLY RIGHT
+    # nearly four times worse. `learnings.md` 2026-08-31 FORBIDS shipping a
+    # calibration validated only in-sample; that rule is the only reason this is
+    # three values and not four.
+    #
+    # Values are the FULL-SAMPLE fit multiplied onto the knob's prior baseline
+    # (hr already carried a fitted 1.03, so the raw 1.8019 would have discarded
+    # it). The held-out run validates the METHOD; the full sample is the better
+    # point estimate.
+    #
+    # STILL WRONG AFTERWARDS, and deliberately recorded: HR +12.5% and BB +13.3%
+    # out of sample. A large improvement on +40.3% and +24.0%, not a fix -- HR
+    # remains this engine's worst-calibrated rate. Fitted on JUNE dates.
+    # ------------------------------------------------------------------
+    hr_rate_mult: float = 1.856
+    #: UNCHANGED at its prior value. The refit's `inplay` correction was
+    #: measured and REJECTED out of sample -- see the table above. Do not set it
+    #: from that run without a fresh held-out result.
     inplay_hit_rate_mult: float = 1.03
-    # K AND BB, added 2026-09-04 so a four-rate refit has four knobs. NEUTRAL by
-    # default (1.0) rather than 1.03: hr/inplay carry a previously fitted value,
-    # these carry none yet, and starting at exactly no-op keeps `off != on`
-    # measurable and this commit behaviour-preserving.
-    k_rate_mult: float = 1.0
-    bb_rate_mult: float = 1.0
+    k_rate_mult: float = 0.9557
+    bb_rate_mult: float = 1.2794
     xb_share_mult: float = 0.94
 
     # Optional: per-game run environment multiplier (latent).
