@@ -21445,3 +21445,40 @@ live`), but the point is the check came before the attempt.
 14:34Z under the OLD 2GB budget. The 4GB default gets its first read at
 >= 07:00 CT tomorrow. Until then `skipped_budget=24 / dates=8` remains the
 latest real measurement.
+
+## 2026-09-04 — live-odds-worker `f3f4c13c` → `de53e367` — lane `catchup-kalshi-doubleheader`
+
+**Order-path content on the service that TRADES.** `e61600ff` (both halves of
+every doubleheader were invisible to the order path) plus `e00c4cbb` (that first
+fix SHIPPED INERT — separate the halves on commence time). Also `b55fa165`
+(accuracy-summary ledger budget 2GB→4GB) and `18bb3031` (`#632` arena time
+series). Preflight CLEAR first try; live 15:35:10Z.
+
+verify — BY CONTENT on the deployed SHA, tokens confirmed ABSENT from the
+previously-live `f3f4c13c` first:
+
+    _split_doubleheader      kalshi_catalogue.py    0 -> 2
+    event_start_from_ticker  kalshi_board_join.py   0 -> 2
+    4_000_000_000            intelligence_evaluation.py  -> 1  (2_000_000_000 now 0)
+
+Two earlier fixes re-checked for SURVIVAL and intact: `#624`'s
+`refuse_published_certainty` x6 and `#643`'s `bytes_per_order` x1. Runtime: 100
+lines, **0 tracebacks / CRITICAL / OOM**.
+
+**A false negative I caught in my own check.** The budget raise first read `0`
+because I grepped for `4 * 1024 * 1024 * 1024`; the commit writes
+`4_000_000_000`. I read the actual diff rather than reporting the commit as
+missing. **A content check is only as good as the token, and a guessed token
+fails CLOSED** — which looks exactly like a commit that did not land.
+
+**PRESENCE IS NOT REACHABILITY, and this deploy is the reason to say so.**
+`e00c4cbb` exists because `e61600ff` shipped INERT. My content check proves the
+code is in the deployed tree; it cannot prove the order path reaches it. The
+discriminating reading would be a doubleheader actually splitting into two
+tickers on the board — not available right now (`LIVE_MC_BAIL
+reason=status_not_live abstract='Preview'`, a pregame slate). **Owed to whoever
+next touches Kalshi: read a real doubleheader before calling `e00c4cbb`
+verified.**
+
+**refresh-worker EXCLUDED** — `mlb-rate-refit` held the claim; it needs
+`e00c4cbb`/`18bb3031` and stays behind. web current (`25fdd659`).

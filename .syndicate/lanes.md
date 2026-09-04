@@ -871,6 +871,24 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   re-derived: 56 kills, both endpoints to the microsecond.
 - Blocked by: none.
 
+### catchup-kalshi-doubleheader — CLOSED 2026-09-04 — **live-odds-worker `f3f4c13c`→`de53e367`, live 15:35:10Z.** Verified by content (`_split_doubleheader` 0→2, `event_start_from_ticker` 0→2, budget `4_000_000_000`) with `#624`/`#643` re-checked; 0 errors. **OWED: presence ≠ reachability — `e00c4cbb` exists because `e61600ff` shipped INERT, so a real doubleheader must be read before calling it verified.** refresh-worker owner-held. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: live-odds-worker off `f3f4c13c` onto `de53e367`. **Order-path content on
+  the service that TRADES:** `e61600ff` (both halves of every doubleheader were
+  invisible to the order path) and `e00c4cbb` (that first fix shipped INERT —
+  separate the halves on commence time). Also `b55fa165` (accuracy-summary ledger
+  budget 2GB→4GB) and `18bb3031` (`#632` arena time series).
+- **refresh-worker EXCLUDED** — claimed by `mlb-rate-refit` (9.5 min). It needs
+  `e00c4cbb`/`18bb3031` and stays 2 behind; named, not skipped silently.
+  web is current (`25fdd659`, 0 pending).
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Verification: BY CONTENT on the deployed SHA — `_split_doubleheader` in
+  `kalshi_catalogue.py`, confirmed ABSENT from the currently-live `f3f4c13c`
+  (live=0, target=2); plus 0 tracebacks. **Content proves PRESENCE, not
+  reachability** — and `e61600ff` shipping inert is precisely why that
+  distinction is being written down rather than assumed away.
+- Blocked by: none for live-odds-worker.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
