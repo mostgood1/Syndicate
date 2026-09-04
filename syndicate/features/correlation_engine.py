@@ -216,6 +216,43 @@ def _cross_game_correlation(candidate_a: dict[str, Any], candidate_b: dict[str, 
 CORRELATION_BASIS_HEURISTIC = "heuristic_flags"
 CORRELATION_BASIS_MEASURED = "measured_joint"
 
+#: The process-wide resolver, consulted when a caller passes no explicit
+#: `measured_lookup`.
+#:
+#: WHY A REGISTRY AND NOT A PARAMETER. `compute_correlation` has TEN call sites
+#: -- `bankroll_manager` sizing, the board badges, the parlay pricer, the audit
+#: -- and none of them passes a lookup. Threading a new argument through all ten
+#: is exactly how a feature ends up wired into some paths and not others, which
+#: is worse than not wiring it at all: the same pair would score differently
+#: depending on which consumer asked. Registering once makes every consumer
+#: reachable BY CONSTRUCTION, and makes "is it reachable" a testable question
+#: instead of a review question.
+#:
+#: THE RESOLVER MUST BE CHEAP. This function carries
+#: `warn_if_compute_in_request_path`, and it is called O(n^2) over a candidate
+#: set. A resolver that reads an artifact per pair belongs behind a cache the
+#: resolver owns; this module will not add one, because a cache here could not
+#: know when the underlying joint was rebuilt.
+_MEASURED_RESOLVER: Any = None
+
+
+def register_measured_correlation_resolver(resolver: Any) -> None:
+    """Install the process-wide measured-correlation resolver.
+
+    Called by whatever loads the simulation's joint distribution. Passing None
+    clears it and returns every consumer to the heuristic, which is the
+    documented degraded state rather than an error.
+    """
+    global _MEASURED_RESOLVER
+    _MEASURED_RESOLVER = resolver
+
+
+def measured_correlation_resolver() -> Any:
+    """The installed resolver, or None. Exposed so a caller can ASSERT the
+    measured path is live rather than assume it -- a registry that silently
+    holds None looks identical to one nobody registered."""
+    return _MEASURED_RESOLVER
+
 
 def compute_correlation(
     candidate_a: dict[str, Any],
@@ -275,10 +312,13 @@ def compute_correlation(
     if same_game and first_direction and second_direction and first_direction != second_direction:
         script_dependency -= 0.08
 
+    # An explicit lookup wins over the registry, so a test or a one-off caller
+    # can inject without disturbing the process-wide wiring.
+    resolver = measured_lookup if measured_lookup is not None else _MEASURED_RESOLVER
     measured = None
-    if measured_lookup is not None:
+    if resolver is not None:
         try:
-            measured = measured_lookup(candidate_a, candidate_b)
+            measured = resolver(candidate_a, candidate_b)
         except Exception:
             # A resolver that raises must not take the board down with it. An
             # absent measurement is the normal case, not an error, and the
