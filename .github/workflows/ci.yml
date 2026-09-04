@@ -91,6 +91,7 @@ jobs:
           python .claude/hooks/test_ledger_commit_guard.py
           python .claude/hooks/test_ledger_append_guard.py
           python .claude/hooks/test_ledger_postwrite_check.py
+          python .claude/hooks/test_ledger_deploys_invariant.py
           python .claude/hooks/test_lane_guard_hyphen.py
 
   # `#517`. THE FULL PYTEST SUITE, GATED ON NO NEW FAILURES -- not on green.

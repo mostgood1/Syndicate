@@ -75,7 +75,18 @@ def _discover_state_parts():
 # suffix match so a part that appeared after import is still routed.
 STATE_PARTS = _discover_state_parts()
 LEARNINGS = ".syndicate/learnings.md"
-TRACKED = (LANES, STATE, *STATE_PARTS, LEARNINGS)
+# THE FILE THE PROTOCOL'S NON-NEGOTIABLE RESTS ON, and until 2026-09-04 the only
+# ledger file with no guard at ANY stage: absent from TRACKED, and its two
+# mentions in `ledger-append-guard.py` are prose (a docstring and a remedy
+# string), not predicates. `ledger-postwrite-check.py` never named it at all.
+#
+# It was not a discovery miss -- `_discover_state_parts()` only globs
+# `state_*.md`, so `deploys.md` was never a candidate -- it was simply never
+# added. Found because a grep COUNT of the guard source returned 2 for
+# `deploys.md` and 2 for `learnings.md`, which have opposite coverage; a count
+# of a filename cannot tell a predicate from a sentence mentioning the file.
+DEPLOYS = ".syndicate/deploys.md"
+TRACKED = (LANES, STATE, *STATE_PARTS, LEARNINGS, DEPLOYS)
 
 _LANE_HDR = re.compile(r"(?m)^###\s+(\S+)\s")
 _ARCHIVE = re.compile(r"(?m)^## Archived lanes")
@@ -157,6 +168,73 @@ def _resurrected(text, root):
     return resurrected_blocks(text, up_lanes, up_hist)
 
 
+def dropped_sections(text, upstream_deploys, upstream_history):
+    """`## ` headers upstream has that this text and the archive BOTH lack.
+
+    THE FAILURE THIS CATCHES IS A LOST MEASUREMENT, which is the one failure
+    `deploys.md` cannot tolerate: `CLAUDE.md`'s non-negotiable is *"Never claim
+    a fix works without a measurement written to `.syndicate/deploys.md`"*, and
+    the session-start digest reads open deploy obligations out of this file. An
+    entry that silently stops existing turns an unverified deploy into one that
+    looks verified, and turns an owed reading into one nobody is tracking.
+
+    IT IS THE OPPOSITE DIRECTION FROM `resurrected_blocks`, deliberately. That
+    predicate fires on a stale tree bringing ARCHIVED content BACK, because on
+    `lanes.md` nothing is lost and the damage is duplication. Here the file is
+    APPEND-ONLY prose, so the stale-tree damage is subtraction instead --
+    different symptom, same cause, and neither predicate sees the other's case.
+
+    ARCHIVING IS NOT DROPPING. `.syndicate/deploys_history.md` exists and is
+    used, so a header that moved there is accounted for and clean; only a header
+    that is in NEITHER place is a loss.
+
+    PROVENANCE, stated honestly rather than dressed up: unlike the other
+    predicates in this module, this one is PREVENTIVE. The stale-tree commit it
+    guards against was measured on `lanes.md` (2026-09-02, a code commit
+    reverting a trim pass; and 2026-09-04, a `land` correctly BLOCKED for the
+    same reason). No `deploys.md` loss is on record -- git's own rebase of a
+    pure append usually prevents it. What is on record is two hand-resolved
+    ledger conflicts in one session, where a careless resolution drops exactly
+    this way and nothing would have said so.
+
+    Fails OPEN, like every other upstream-reading predicate here.
+    """
+    def headers(blob):
+        return [ln.strip() for ln in (blob or "").splitlines() if ln.startswith("## ")]
+
+    have = set(headers(text)) | set(headers(upstream_history))
+    return [h for h in headers(upstream_deploys) if h not in have]
+
+
+def _deploys(text, root):
+    """Fails OPEN: no root, no git, no ref -> no opinion."""
+    if not root:
+        return []
+    up = _git_show(root, "origin/main:.syndicate/deploys.md")
+    if up is None:
+        return []
+    # Absent history is not a reason to refuse -- treat it as empty and let the
+    # main file answer. `_git_show` returns None for a path that does not exist.
+    hist = _git_show(root, "origin/main:.syndicate/deploys_history.md") or ""
+    missing = dropped_sections(text, up, hist)
+    if not missing:
+        return []
+    shown = "\n".join(f"    {h[:110]}" for h in missing[:5])
+    more = f"\n    ... and {len(missing) - 5} more" if len(missing) > 5 else ""
+    return [(
+        f"{len(missing)} measurement section(s) on origin/main are MISSING from this "
+        f"commit's deploys.md, and are not in deploys_history.md either:\n"
+        f"{shown}{more}",
+        "Your deploys.md is BEHIND origin/main and this commit would DROP those\n"
+        "measurements. deploys.md is append-only and is where the protocol's\n"
+        "non-negotiable measurement lands; a lost entry makes an unverified\n"
+        "deploy look verified.\n"
+        "  git fetch origin main\n"
+        "  git checkout origin/main -- .syndicate/deploys.md   # take upstream's\n"
+        "then re-append YOUR entry to that copy.",
+    )]
+
+
 def _lanes(text, root=None):
     out = []
     counts = collections.Counter(m.group(1) for m in _LANE_HDR.finditer(text))
@@ -229,6 +307,7 @@ def _learnings(text, root=None):
 
 
 CHECKS = {LANES: _lanes, STATE: _state, LEARNINGS: _learnings,
+          DEPLOYS: _deploys,
           **{p: _state for p in STATE_PARTS}}
 
 
