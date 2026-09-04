@@ -1402,6 +1402,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   10/10 mutants caught.
 - Blocked by: none. NOT DEPLOYED — the step is inert until refresh-worker runs it.
 
+### soccer-card-final-state — OPEN — opened 2026-09-04 — session b9bc926d-f167-4923-9344-eac7e86a5761
+- Goal: `tests/test_soccer_board_mlb_parity.py::StaleArtifactStateTests::test_it_cannot_downgrade_a_started_match` passes on a pristine `origin/main`, with the surviving assertion matching the contract the code actually enforces.
+- Files: `tests/test_soccer_board_mlb_parity.py`, `syndicate/features/soccer/cards.py` (docstring only, no behaviour change).
+  Collision check: `check_lane_invariants.py` treats a `released:`-prefixed path as a NON-claim (its `_claimable_prefix` list, line 84). Every `tests/test_soccer_*` mention in this file is under `released:` in the UNOWNED `soccer-board-mlb-parity` block; `syndicate/features/soccer/cards.py` appears nowhere in `lanes.md` at all — the bare-filename `cards.py` hazard that lane caused was removed 2026-08-29. Not touching the `soccer-player-producer` lane's files.
+- Hypothesis, WRITTEN BEFORE THE VERDICT: the TEST is obsolete, not the code. `4b4533b5` (2026-08-20 16:51) added the function AND this test together, when the rule was "`in`/`post` returns immediately". `28e55d86` (2026-08-22 12:08) deliberately narrowed the guard to `post` only, on a PRODUCTION MEASUREMENT — 8 of 15 cards rendering a live head with a running clock were finished matches — and pinned the new contract in a new file, `tests/test_soccer_effective_state_terminal.py`. It did not update this older duplicate assertion.
+- Falsification test: if the box were the LESS authoritative source, or if the terminal-guard direction (`post` -> `in`) were also broken, the code regressed and the guard needs restoring instead. Checked: the box is `poll_soccer_live_state`'s per-event ESPN reading on a ~60s tick; the artifact it overrides was measured a MONTH stale (`generated_at 2026-07-20`) on the live surface. `post` -> `in` is still refused (first branch of the function, and `test_final_is_terminal_and_never_returns_to_live`).
+- Verification: the 6 tests in `test_soccer_effective_state_terminal.py` and all 5 in `StaleArtifactStateTests` pass together; the amended assertion FAILS if the terminal guard is removed (`off != on`).
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
