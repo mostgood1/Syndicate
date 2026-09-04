@@ -1028,6 +1028,52 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `_build_candidate_pool`. (c) 348 silent degradations in 7h with no counter.
 - Blocked by: none. Read-only — no deploy.
 
+### request-path-guard-arming — CLOSED-VERIFIED 2026-09-04 — **the hard gate can no longer be disarmed by deleting a user-editable env var, `RENDER=false` no longer suppresses the fallback, and the refusal names the operation. 11/11 tests pass; 3 behavioural claims falsified against the prior file, 1 regression held. NOT DEPLOYED.** — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
+- Goal: `refuse_if_compute_in_request_path` cannot be disarmed by deleting a
+  user-editable env var, and its log line says WHICH entry point it refused.
+  `[user decision 2026-09-04, items (a) and (b) of
+  findings_2026-09-04_web_request_path_intelligence.md]`
+- Files: `syndicate/features/shared/request_path_guard.py`,
+  `tests/test_request_path_guard.py`. **Zero OPEN lanes claim either** (checked).
+- **SETTLED FIRST, by measurement, the thing the findings file left open.**
+  `/api/ops/version` on the live web dyno reports its OWN runtime env:
+  `RENDER_SERVICE_NAME='syndicate-an21'`,
+  `RENDER_INSTANCE_ID='srv-d88ahvrbc2fs73eodu30-7cff65c8c4-68pvq'`,
+  `RENDER_EXTERNAL_URL`, plus `RENDER_GIT_COMMIT`/`RENDER_GIT_BRANCH`
+  (`commit_source='env'`). **None of these are among web's 76 user-defined env
+  vars** — Render injects them, and a dashboard edit cannot delete them. That is
+  the durable arming signal.
+- **A second defect found while reading, not in the findings file.**
+  `os.environ.get("RENDER") or os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE")`
+  short-circuits on any NON-EMPTY `RENDER`, so **`RENDER=false` disarms the guard
+  even with the storage key set to `true`** — the fallback is never consulted.
+- Hypothesis: this is hardening only, with NO production behaviour change,
+  because the guard is already armed there.
+- Falsification test: it would be WRONG if the guard were currently warn-only on
+  web — but it demonstrably REFUSES in production (348 events on 2026-08-27), a
+  branch unreachable unless `_is_render_hosted()` is already true. So arming
+  cannot be newly introduced by this change; only made undeletable.
+- Verification (RAN). Behavioural falsification, old module and new loaded side
+  by side and exercised directly — the import-error kind of "failure" proves
+  nothing, so this compares BEHAVIOUR:
+    1. only `RENDER_INSTANCE_ID` set (the real production shape) — OLD warn-only,
+       NEW refuses. FALSIFIED.
+    2. `RENDER=false` + `SYNDICATE_REQUIRE_HOSTED_STORAGE=true` — OLD warn-only
+       (the short-circuit), NEW refuses. FALSIFIED.
+    3. refusal message — OLD `REFUSED: compute in request path on hosted web`,
+       NEW appends `(operation=_build_candidate_pool, hosted_signal=...)`.
+       FALSIFIED.
+    4. nothing set at all — BOTH warn-only. Regression held: local dev unaffected.
+  `py -3 -m pytest tests/test_request_path_guard.py -q` → **11 passed** (was 7).
+  Only that file asserts the warn signature (grepped); its 3 assertions were
+  updated deliberately, and its "not hosted" case now pops the injected markers
+  too, so it no longer depends on where it runs.
+- **NOT DEPLOYED, and inert until someone does.** No deploy claim taken. The
+  change is hardening only: web was ALREADY refusing (348 events 2026-08-27), so
+  nothing is newly armed — only made undeletable.
+  refusal message names the operation and the signal that armed it.
+- Blocked by: none. Local code — **no deploy is being taken by this lane.**
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

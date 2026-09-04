@@ -10,7 +10,12 @@ from flask import Flask
 from syndicate.features.bankroll_manager import compute_bet_size
 from syndicate.features.wnba.live_lens import build_live_lens_page_context
 from syndicate.features.shared.request_path_guard import ComputeInRequestPathError
+from syndicate.features.shared.request_path_guard import _HOSTED_FLAGS
+from syndicate.features.shared.request_path_guard import _HOSTED_MARKERS
+from syndicate.features.shared.request_path_guard import hosted_signal
 from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
+
+_ALL_HOSTED_KEYS = tuple(_HOSTED_FLAGS) + tuple(_HOSTED_MARKERS)
 
 
 class RequestPathGuardTests(unittest.TestCase):
@@ -30,7 +35,11 @@ class RequestPathGuardTests(unittest.TestCase):
             ) as mocked_warning:
                 build_live_lens_page_context("2026-06-19")
 
-        mocked_warning.assert_called_once_with("WARNING: compute in request path", extra={"operation": "build_live_lens_page_context"})
+        mocked_warning.assert_called_once_with(
+            "WARNING: compute in request path (operation=%s)",
+            "build_live_lens_page_context",
+            extra={"operation": "build_live_lens_page_context"},
+        )
 
     def test_compute_function_logs_warning_in_request_context(self) -> None:
         app = Flask(__name__)
@@ -38,7 +47,11 @@ class RequestPathGuardTests(unittest.TestCase):
             with patch("syndicate.features.shared.request_path_guard.logger.warning") as mocked_warning:
                 result = compute_bet_size({"model_probability": 0.55, "implied_probability": 0.5, "odds": -110})
 
-        mocked_warning.assert_called_once_with("WARNING: compute in request path", extra={"operation": "compute_bet_size"})
+        mocked_warning.assert_called_once_with(
+            "WARNING: compute in request path (operation=%s)",
+            "compute_bet_size",
+            extra={"operation": "compute_bet_size"},
+        )
         self.assertIn("recommended_bet_size", result)
 
     def test_refuse_raises_in_request_context_on_hosted_deployment(self) -> None:
@@ -63,11 +76,15 @@ class RequestPathGuardTests(unittest.TestCase):
         app = Flask(__name__)
         with app.test_request_context("/api/test", method="GET"):
             with patch.dict(os.environ, {}, clear=False):
-                os.environ.pop("RENDER", None)
-                os.environ.pop("SYNDICATE_REQUIRE_HOSTED_STORAGE", None)
+                for key in _ALL_HOSTED_KEYS:
+                    os.environ.pop(key, None)
                 with patch("syndicate.features.shared.request_path_guard.logger.warning") as mocked_warning:
                     refuse_if_compute_in_request_path("some_heavy_operation")
-        mocked_warning.assert_called_once_with("WARNING: compute in request path", extra={"operation": "some_heavy_operation"})
+        mocked_warning.assert_called_once_with(
+            "WARNING: compute in request path (operation=%s)",
+            "some_heavy_operation",
+            extra={"operation": "some_heavy_operation"},
+        )
 
     def test_refuse_is_a_no_op_outside_any_request_context(self) -> None:
         # refresh-worker is a plain script with no Flask app, so this must
@@ -103,3 +120,70 @@ class RequestPathGuardTests(unittest.TestCase):
             with patch.dict(os.environ, {"RENDER": "true", "SYNDICATE_DATA_ROOT": str(Path(__file__).resolve().parent.parent / "data")}, clear=False):
                 with self.assertRaises(ComputeInRequestPathError):
                     service._compute_response({"question": "top edges today", "date": "2026-07-27"}, force_refresh=True)
+
+
+class RequestPathGuardArmingTests(unittest.TestCase):
+    """`[user decision 2026-09-04]` -- items (a) and (b) of
+    `findings_2026-09-04_web_request_path_intelligence.md`.
+
+    The audit could prove the guard was ARMED on web (348 refusals on
+    2026-08-27, a branch unreachable otherwise) but not WHICH key armed it, and
+    one candidate -- `SYNDICATE_REQUIRE_HOSTED_STORAGE`, a name about storage --
+    was deletable from the dashboard. These lock the durable answer.
+    """
+
+    def _clean_env(self):
+        env = patch.dict(os.environ, {}, clear=False)
+        env.start()
+        for key in _ALL_HOSTED_KEYS:
+            os.environ.pop(key, None)
+        self.addCleanup(env.stop)
+
+    def test_an_injected_render_marker_arms_the_guard_on_its_own(self) -> None:
+        """The real production shape: measured 2026-09-04, the live web dyno
+        reports RENDER_INSTANCE_ID from its own environment while NONE of the
+        RENDER_* markers appear among its 76 user-defined env vars. Deleting
+        every key a human can edit must still leave the gate hard."""
+        self._clean_env()
+        os.environ["RENDER_INSTANCE_ID"] = "srv-d88ahvrbc2fs73eodu30-7cff65c8c4-68pvq"
+        self.assertEqual(hosted_signal(), "RENDER_INSTANCE_ID")
+        app = Flask(__name__)
+        with app.test_request_context("/api/test", method="GET"):
+            with self.assertRaises(ComputeInRequestPathError):
+                refuse_if_compute_in_request_path("some_heavy_operation")
+
+    def test_render_false_no_longer_disarms_the_storage_flag(self) -> None:
+        """The original chained the LOOKUPS, not the results: `os.environ.get
+        ("RENDER") or os.environ.get("SYNDICATE_...")` short-circuits on ANY
+        non-empty RENDER, so `RENDER=false` suppressed the fallback entirely and
+        the guard went warn-only with the storage flag sitting at `true`."""
+        self._clean_env()
+        os.environ["RENDER"] = "false"
+        os.environ["SYNDICATE_REQUIRE_HOSTED_STORAGE"] = "true"
+        self.assertEqual(hosted_signal(), "SYNDICATE_REQUIRE_HOSTED_STORAGE")
+        app = Flask(__name__)
+        with app.test_request_context("/api/test", method="GET"):
+            with self.assertRaises(ComputeInRequestPathError):
+                refuse_if_compute_in_request_path("some_heavy_operation")
+
+    def test_hosted_signal_is_none_off_render(self) -> None:
+        """Local dev keeps warn-only. The gate must not fire on a laptop."""
+        self._clean_env()
+        self.assertIsNone(hosted_signal())
+
+    def test_the_refusal_log_names_the_operation_and_the_signal(self) -> None:
+        """All 348 refusals on 2026-08-27 were byte-identical: `operation` went
+        only into `extra`, which the default formatter drops, so
+        `_compute_response` could not be told from `_build_candidate_pool`."""
+        self._clean_env()
+        os.environ["RENDER"] = "true"
+        app = Flask(__name__)
+        with app.test_request_context("/api/test", method="GET"):
+            with patch("syndicate.features.shared.request_path_guard.logger.error") as mocked_error:
+                with self.assertRaises(ComputeInRequestPathError):
+                    refuse_if_compute_in_request_path("_build_candidate_pool")
+
+        rendered = mocked_error.call_args.args[0] % mocked_error.call_args.args[1:]
+        self.assertIn("_build_candidate_pool", rendered)
+        self.assertIn("RENDER", rendered)
+
