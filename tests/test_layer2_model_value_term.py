@@ -76,8 +76,16 @@ def test_ev_pct_is_not_the_field_being_changed():
     marker = 'if _model_value_term() == "edge" and model_edge is not None:'
     assert marker in src, "the value-term branch is gone"
     after = src[src.index(marker): src.index(marker) + 400]
-    assert "value_ev = model_edge" in after
+    # `value_ev` is assigned FROM the model edge. Deliberately not pinned to an
+    # exact literal: `2026-09-04` wrapped it in `_compress_model_value(...)` to
+    # bound the ranking contribution, and a source-text pin failed on a change
+    # that PRESERVED this test's whole intent. Pin the property -- the edge
+    # reaches `value_ev` and nothing else -- not the spelling.
+    assert "value_ev" in after and "model_edge" in after, after
     assert 'candidate["ev_pct"] = model_edge' not in src, (
         "the edge leaked into ev_pct -- portfolio_commit would re-derive a "
         "fair from a probability-scale number"
     )
+    # The load-bearing half, stated positively: `ev_pct` carries the MARKET EV.
+    assert 'candidate["ev_pct"] = ev' in src
+    assert 'candidate["ev_pct"] = value_ev' not in src

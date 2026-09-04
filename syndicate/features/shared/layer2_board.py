@@ -68,6 +68,7 @@ INTEGRATION (not yet wired — deliberately):
 from __future__ import annotations
 
 import json
+import math
 import os
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -1031,6 +1032,71 @@ def _fair_by_side(row: Mapping[str, Any], sides: list[str]) -> tuple[dict[str, f
 # enormous and still passes.
 _MODEL_EDGE_MAX_POINTS = 15.0
 
+#: The ceiling a MODEL-DERIVED value term may reach in the ranking, in EV points.
+#: Env: `SYNDICATE_MODEL_EDGE_VALUE_CAP_PCT`.
+#:
+#: WHY 5.0. Measured on the served shortlist 2026-09-04 (n=1,200), the RANKING
+#: value by basis:
+#:
+#:     market_fair    n=840   median -0.92   p90 2.25   max  5.14
+#:     model_edge     n=360   median +0.14   p90 7.30   max 14.99
+#:
+#: So every row above 5.14 was NECESSARILY a model disagreement -- a real price
+#: dislocation physically could not reach there. `batter_home_runs` was 340 of
+#: 1,200 rows, EVERY ONE an `over`, and 25 of the top 50. USER-REPORTED as
+#: "a lot of long shots at the top", and the mechanism is arithmetic, not taste:
+#: a one-sided prop has no two-sided fair, so its `ev_pct` collapses to `-hold`
+#: and it ranks on the modelled edge instead, at FULL value.
+#:
+#: 5.0 says: the model may argue a row up to what the best real price
+#: dislocation achieves, and no further.
+#:
+#: AND THE EVIDENCE SAYS IT SHOULD NOT REACH EVEN THAT UNCHALLENGED. The CLV
+#: decomposition run 2026-09-04 over 14,111 resolved rows found the sim's
+#: contribution does NOT predict close: game lines -0.186pp [-0.340, -0.033],
+#: props -0.113pp, props dose-response monotone the WRONG way. This is the one
+#: signal measured as non-predictive, and it owned the top of the board.
+_MODEL_EDGE_VALUE_CAP_PCT = _env_float("SYNDICATE_MODEL_EDGE_VALUE_CAP_PCT", 5.0)
+
+
+def _compress_model_value(value: float | None) -> float | None:
+    """Bound a model-derived ranking value WITHOUT creating ties at the ceiling.
+
+    SATURATING, NOT CLAMPING, and the difference is the whole design. This
+    file's own `_model_edge_for` rejects a hard clamp for a stated reason --
+    "Clamping would keep an unusable number in the ranking at the ceiling value
+    and make every affected row tie at the top -- a wrong answer wearing a
+    plausible one's clothes" -- and that objection is correct. `tanh` is
+    strictly monotone, so ordering among model rows is preserved exactly: a
+    13-point edge still outranks a 12-point one. What changes is that neither
+    can outrank the whole market-priced board.
+
+    Near zero it is the IDENTITY to first order (`tanh(x) ~ x`), so the small
+    genuine edges this path exists to surface are untouched -- 5.0*tanh(1/5) =
+    0.993 for an edge of 1.0. It bends only where the number was implausible
+    anyway.
+
+    Applied to BOTH branches. `model_ev` needs it at least as much as
+    `model_edge`: it is `expected_value_pct(price, model_prob)`, which near fair
+    is `edge / p`, so it AMPLIFIES by 1/p -- measured on this board at
+    edge 4.11 -> ev 50.92 on a p=0.067 shot, which is exactly how longshots
+    sweep a ranking.
+
+    `ev_pct` on the candidate is NOT touched. `portfolio_commit` back-derives
+    the market fair from that field and reaches the model probability by adding
+    `model_edge_pct`; compressing what the SIZER reads would change stake sizes,
+    and this is a RANKING fix. Same reason the model substitution happens on the
+    value term and nowhere else.
+    """
+    if value is None:
+        return None
+    cap = _MODEL_EDGE_VALUE_CAP_PCT
+    if not (cap > 0.0):
+        # Explicitly disabled -- restores the pre-2026-09-04 behaviour rather
+        # than silently flooring the model out of the ranking.
+        return value
+    return cap * math.tanh(float(value) / cap)
+
 # The real fix is an explicit `basis` on the projection, which #263's own filing
 # already argued for ("each sport emitting the strongest claim its source
 # actually supports, labelled with its basis"). That was written as a parity
@@ -1887,10 +1953,10 @@ def build_layer2_rows(
                 # probability-scale number leak into that field would corrupt
                 # the sizer rather than merely re-rank the board.
                 if _model_value_term() == "edge" and model_edge is not None:
-                    value_ev = model_edge
+                    value_ev = _compress_model_value(model_edge)
                     ev_basis = EV_BASIS_MODEL_EDGE
                 else:
-                    value_ev = model_ev
+                    value_ev = _compress_model_value(model_ev)
                     ev_basis = EV_BASIS_MODEL
                 # `model_edge` is DROPPED from the blend for these rows, not
                 # kept alongside. The two are the same information twice over --

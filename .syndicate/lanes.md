@@ -809,7 +809,12 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   passes. If you still need the file, say so and I will coordinate rather than assume.
 - Files: `syndicate/features/shared/layer2_board.py`
   (**`_projection_side_in_row_frame` / `_model_edge_for` / `_model_prob_for_side`
-  / `_publication_columns` ONLY** — the OPEN lane `ncaaf-chip-compact` lists this
+  / `_publication_columns`, and `[2026-09-04]` the `value_ev` assignment in
+  `build_layer2_rows` where the model edge becomes the RANKING value — same
+  subject as this lane, disjoint from the four functions above and from
+  `ncaaf-chip-compact`'s chip join, checked line-by-line. USER-REPORTED:
+  longshots at the top; `model_edge` reached 14.99 as a ranking value while
+  market EV maxed at 5.14** ONLY — the OPEN lane `ncaaf-chip-compact` lists this
   file for the CHIP JOIN (`away_key` / `home_key` stamping) and is the SAME session
   id, `3492626c`; the two edits are disjoint by function and were checked
   line-by-line before taking this),
