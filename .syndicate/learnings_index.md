@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 766 rules `[generated]`
+## Index — 778 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 272**
+**FORBIDDEN — 280**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -208,6 +208,14 @@
 - [2026-09-03 — FORBIDDEN: writing a disclaimer INSIDE a `- Files:` block. It is a CLAIM,…](#2026-09-03-forbidden-writing-a-disclaimer-inside-a---files-block-it-is-a-claim-and-the-more-emphatic-the-wording-the-more-certain-it-is-to-be-one-lane-nfl-dispatch-order-assertion)
 - [2026-09-03 — FORBIDDEN: reading a green `check_lane_invariants.py` as evidence that a p…](#2026-09-03-forbidden-reading-a-green-check_lane_invariantspy-as-evidence-that-a-path-is-unclaimed-its-invariant-is-exactly-one-holder-which-a-phantom-holder-satisfies-lane-nfl-dispatch-order-assertion)
 - [2026-09-03 — FORBIDDEN: reading a repo file through `subprocess(text=True)` on Windows.…](#2026-09-03-forbidden-reading-a-repo-file-through-subprocesstexttrue-on-windows-it-decodes-with-the-locale-codepage-and-this-ledger-is-made-of-em-dashes)
+- [2026-09-04 — FORBIDDEN: inferring a session is GONE from its absence in `list_sessions`…](#2026-09-04-forbidden-inferring-a-session-is-gone-from-its-absence-in-list_sessions-even-with-include_archived)
+- [2026-09-04 — FORBIDDEN: counting a set from your own TEST FIXTURES instead of from the…](#2026-09-04-forbidden-counting-a-set-from-your-own-test-fixtures-instead-of-from-the-code-that-produces-it)
+- [2026-09-03 — FORBIDDEN: reporting a census result as a property of the POPULATION when…](#2026-09-03-forbidden-reporting-a-census-result-as-a-property-of-the-population-when-it-is-a-property-of-your-probe)
+- [2026-09-03 — FORBIDDEN: reporting a worker's `server_failed` as an incident without rea…](#2026-09-03-forbidden-reporting-a-workers-server_failed-as-an-incident-without-reading-the-log-at-the-exit-on-live-odds-worker-20-of-23-are-a-scheduled-self-recycle-lane-prop-join-yield)
+- [2026-09-04 — FORBIDDEN: verifying a ledger mutation with a BEFORE/AFTER set comparison…](#2026-09-04-forbidden-verifying-a-ledger-mutation-with-a-beforeafter-set-comparison-computed-by-the-parser-that-is-blind-to-the-thing-at-risk)
+- [2026-09-03 — FORBIDDEN: reporting a commit as PUSHED on the strength of a command that…](#2026-09-03-forbidden-reporting-a-commit-as-pushed-on-the-strength-of-a-command-that-also-succeeds-when-it-is-not-and-after-a-rebase---is-ancestor-on-the-old-sha-is-not-evidence-it-is-absent-session-c38d3e5c-with-f97ad5ab)
+- [2026-09-03 — FORBIDDEN: comparing a CONTROL window sampled differently from the treatme…](#2026-09-03-forbidden-comparing-a-control-window-sampled-differently-from-the-treatment-window-the-rate-ratio-is-an-artefact-of-the-sampling-and-it-will-flatter-whichever-side-you-sampled-less-lane-prop-join-yield)
+- [2026-09-04 — FORBIDDEN: asserting absence from a range whose START YOU CHOSE — and the…](#2026-09-04-forbidden-asserting-absence-from-a-range-whose-start-you-chose-and-the-reason-this-one-got-through-which-is-the-actually-useful-part)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -291,7 +299,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 489**
+**Rules and corrections — 493**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -470,6 +478,9 @@
 - [2026-09-03 — A `-k` sweep partitions by NAME, so a defect spanning a family is reported…](#2026-09-03-a--k-sweep-partitions-by-name-so-a-defect-spanning-a-family-is-reported-at-whatever-fraction-of-that-family-happens-to-share-a-word-lane-nfl-dispatch-order-assertion)
 - [2026-09-03 — A guard's COVERAGE is measured against the writes that reach it, not the w…](#2026-09-03-a-guards-coverage-is-measured-against-the-writes-that-reach-it-not-the-writes-it-handles)
 - [2026-09-03 — WHICH TREE: locks/markers/receipts to the PRIMARY tree, ledger/code to the…](#2026-09-03-which-tree-locksmarkersreceipts-to-the-primary-tree-ledgercode-to-the-worktree)
+- [2026-09-04 — A LANE CLAIM ON A LEDGER FILE GUARDS NOTHING, and I read the evidence for…](#2026-09-04-a-lane-claim-on-a-ledger-file-guards-nothing-and-i-read-the-evidence-for-that-twice-without-extracting-it)
+- [2026-09-03 — A false REASSURANCE is worse than a false WARNING, so it needs a higher ba…](#2026-09-03-a-false-reassurance-is-worse-than-a-false-warning-so-it-needs-a-higher-bar-every-one-of-five-errors-in-one-night-was-in-the-reassuring-direction-sessions-c38d3e5c-37abeca0)
+- [2026-09-04 — a failed rebase leaves a STALE ledger file that `git add` will happily rec…](#2026-09-04-a-failed-rebase-leaves-a-stale-ledger-file-that-git-add-will-happily-record)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
@@ -775,6 +786,7 @@
 - [2026-08-29 — PowerShell reserved variables can fake a regression](learnings_evidence.md#2026-08-29-powershell-reserved-variables-can-fake-a-regression) `[evidence]`
 - [2026-09-03 — `subprocess(text=True)` on Windows silently mojibakes the ledger's em-dash…](learnings_evidence.md#2026-09-03-subprocesstexttrue-on-windows-silently-mojibakes-the-ledgers-em-dashes-and-it-made-lane-guard-inert) `[evidence]`
 - [2026-09-03 — the Bash bypass in `lane-guard`: the census, and why the ledger never show…](learnings_evidence.md#2026-09-03-the-bash-bypass-in-lane-guard-the-census-and-why-the-ledger-never-showed-the-damage) `[evidence]`
+- [2026-09-03 — a census is only as wide as its pattern: "prose only" for five scripts my…](learnings_evidence.md#2026-09-03-a-census-is-only-as-wide-as-its-pattern-prose-only-for-five-scripts-my-own-refactor-had-just-broken) `[evidence]`
 - [2026-08-12 — Do not batch changes during a diagnosis](learnings_archive.md#2026-08-12-do-not-batch-changes-during-a-diagnosis) `[evidence]`
 - [2026-08-12 — A rate ceiling is not a fix](learnings_archive.md#2026-08-12-a-rate-ceiling-is-not-a-fix) `[evidence]`
 - [2026-08-12 — Parallel sessions on one problem need lane discipline](learnings_archive.md#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline) `[evidence]`

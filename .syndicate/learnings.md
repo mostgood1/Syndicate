@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 766 rules `[generated]`
+## Index — 778 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5225,3 +5225,32 @@ instrument-blindness rule (*a healthy reading is evidence only once you know
 what makes it read unhealthy*). This entry is the direction they share, recorded
 because each was filed as its own mechanism and the common shape was only
 visible with five of them side by side.
+
+## 2026-09-04 — a failed rebase leaves a STALE ledger file that `git add` will happily record
+
+`git rebase origin/main` refused with "cannot rebase: You have unstaged changes"
+because `deploys.md` was already modified. I did not notice — the refusal is one
+line among a command's output — and went on to edit and stage `lanes.md` from
+that stale tree. `ledger-commit-guard.py` blocked the commit: it would have
+UN-ARCHIVED three lane blocks a peer had trimmed minutes earlier, reverting their
+whole pass as a side effect of an unrelated deploy record.
+
+**Two rules.**
+
+1. **A rebase that did not run is not a rebase that succeeded.** When a rebase is
+   part of a compound command, check its result before touching ledger files.
+   The dirty file blocking it is usually one you are ABOUT to commit anyway,
+   which is what makes the failure so easy to walk past.
+
+2. **Stat a staged ledger diff against `origin/main`, not against your own HEAD.**
+   Mine read **214 deletions**, which looks exactly like clobbering a peer. It was
+   an artifact: `git checkout origin/main -- lanes.md` onto a stale HEAD shows
+   upstream's trim as *my* deletions. After rebasing, the same commit was **12
+   insertions, 0 deletions**. Both readings are "true"; only one is about what
+   you are recording.
+
+The recovery is the guard's own printed remedy and it works: take upstream's copy
+(`git checkout origin/main -- .syndicate/lanes.md`), re-apply YOUR block only,
+then verify the peer's blocks stayed archived — `lanes.md` count 0 AND
+`lanes_history.md` count >= 1, checked on `origin/main` after pushing. Do not
+verify by re-reading your own working file; it cannot see what upstream holds.
