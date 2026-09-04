@@ -5390,6 +5390,15 @@ That framing implies the check works most of the time and has exceptions. It
 never works. Anything resting on it — including lane notes that justified taking
 a file claim with "session X is GONE — verified, not assumed" — rests on nothing.
 
+**AUTHORITATIVE STATEMENT NOW LIVES IN THE CODE**, which is where the bad
+instruction was and therefore the only place a correction stops reproducing:
+`scripts/deploy_claim.py`, the `holder_session` note (`c1a33299` removed the two
+false sentences, `e8ebdbbf` made it self-verifying). It carries the self-test,
+names `deploy_preflight.py`'s process list as the evidence that does work, and
+records the trap that OUTLIVES the identity fix -- *a free claim is not an idle
+box*, measured at the 22:46Z expiry with an eredivisie build and an MLB sim both
+still in flight. Read that note first; this entry is the ledger trace.
+
 THE RULE: before comparing two identifiers, confirm they come from the same
 namespace. When a check returns the same answer for a case you KNOW is healthy,
 it is not a check. The cheapest test is to run it against yourself: if
