@@ -2801,6 +2801,62 @@ _GC_SPLIT_STATE: dict[str, Any] = {
 }
 
 
+_GLOBAL_REASSIGN_STATE: dict[str, Any] = {}
+
+
+def note_global_reassign(label: str, alloc_mb: float | None, free_mb: float | None) -> None:
+    """Record what reassigning one long-lived global cost and refunded.
+
+    `#632`. The negatives are NOT the garbage collector: measured 2026-09-04, the
+    only gen-2-overlapping request read **+32.344 MB (positive)** while the
+    non-overlapping group swung to **-30.108 MB**. CPython frees on refcount
+    zero, with no collector involved -- so a statement that drops the last
+    reference to a large object allocated by an EARLIER request refunds that
+    memory inside the CURRENT request's window, and the instrument charges the
+    refund to whoever happened to be running.
+
+    `LAST_RESULT` is exactly that shape: a module-level global in
+    `blueprints/intelligence.py`, reassigned on every query, holding a copy of
+    the intelligence payload. Each query allocates a new one and frees the
+    previous one in the same breath.
+
+    ALLOC AND FREE ARE RECORDED SEPARATELY on purpose. If only the net were
+    taken, a new value the same size as the old would read ~0 and the mechanism
+    would be invisible -- which is precisely how it has stayed hidden through
+    three rounds of this investigation.
+    """
+    row = _GLOBAL_REASSIGN_STATE.setdefault(
+        str(label), {"n": 0, "alloc_mb": 0.0, "free_mb": 0.0,
+                     "max_alloc_mb": 0.0, "max_free_mb": 0.0})
+    row["n"] += 1
+    if alloc_mb is not None:
+        row["alloc_mb"] = round(row["alloc_mb"] + alloc_mb, 3)
+        row["max_alloc_mb"] = round(max(row["max_alloc_mb"], alloc_mb), 3)
+    if free_mb is not None:
+        row["free_mb"] = round(row["free_mb"] + free_mb, 3)
+        row["max_free_mb"] = round(min(row["max_free_mb"], free_mb), 3)
+
+
+def measure_global_reassign(label: str):
+    """Returns (probe, finish). Cheap enough for a request path: two
+    `smaps_rollup` reads, no allocation. Returns (None, None) when the profile
+    is off so callers pay nothing."""
+    if not request_memory_profile_enabled():
+        return None, None
+    return _process_anon_mb(), label
+
+
+def finish_global_reassign(before: float | None, label: str | None,
+                           mid: float | None) -> None:
+    """Close the pair opened by `measure_global_reassign`."""
+    if before is None or label is None:
+        return
+    after = _process_anon_mb()
+    alloc = (mid - before) if (mid is not None) else None
+    free = (after - mid) if (mid is not None and after is not None) else None
+    note_global_reassign(label, alloc, free)
+
+
 def _gc_gen2_collections() -> int:
     """Cumulative generation-2 collection count, or -1 when unreadable."""
     try:
@@ -3071,6 +3127,10 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         # `no_gc2_mb` is positive, the collector is the third source.
         "gc2_split": dict(_GC_SPLIT_STATE),
         "gc2_collections_total": _gc_gen2_collections(),
+        # `#632`: what reassigning long-lived globals allocated and refunded.
+        # A large `free_mb` here means the negatives belong to a PREVIOUS
+        # request's object being released inside this one's window.
+        "global_reassign": {k: dict(v) for k, v in _GLOBAL_REASSIGN_STATE.items()},
         "unreadable": state["unreadable"],
         # A reader must be able to see how much of the traffic this DECLINED to
         # attribute. A top-routes table with no denominator invites treating the
@@ -3089,3 +3149,4 @@ def reset_request_memory_attribution() -> None:
     _BACKGROUND_MEMORY_STATE.update({"inflight": 0, "seq": 0})
     _GC_SPLIT_STATE.update({"with_gc2_n": 0, "with_gc2_mb": 0.0,
                             "no_gc2_n": 0, "no_gc2_mb": 0.0})
+    _GLOBAL_REASSIGN_STATE.clear()

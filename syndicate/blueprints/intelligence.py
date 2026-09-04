@@ -29,6 +29,7 @@ from pipeline.intelligence_state import _timestamp_age_seconds
 from pipeline.intelligence_state import read_latest_intelligence_board_state
 from pipeline.intelligence_state import slice_intelligence_board_state_for_request
 from pipeline.intelligence_state import read_combined_intelligence_response
+from syndicate.features.shared import memory_observability
 from syndicate.features.intelligence import _market_focus_labels
 from syndicate.features.intelligence import _parlay_request_summary
 from syndicate.features.intelligence import _query_preferences
@@ -1907,7 +1908,17 @@ def intelligence_query_api():
             _mirror_is_ours = "response" not in response_payload
             response_payload.setdefault("response", dict(response_payload))
             _attach_intelligence_response_aliases(response_payload)
+            # `#632`: measure what this reassignment ALLOCATES and what it
+            # REFUNDS. The old value -- a full copy of the previous query's
+            # payload -- loses its last reference here and is freed by refcount,
+            # inside THIS request's measured window. Split, because a new value
+            # the same size as the old nets to ~0 and hides the mechanism.
+            _lr_before, _lr_label = memory_observability.measure_global_reassign("LAST_RESULT")
+            _lr_prev = LAST_RESULT
             LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
+            _lr_mid = memory_observability._process_anon_mb() if _lr_before is not None else None
+            del _lr_prev
+            memory_observability.finish_global_reassign(_lr_before, _lr_label, _lr_mid)
             if _mirror_is_ours:
                 response_payload.pop("response", None)      # `#632`: 50% of the payload
             if _alias_slim_requested(payload):
@@ -2011,7 +2022,17 @@ def intelligence_query_api():
             _mirror_is_ours = "response" not in response_payload
             response_payload.setdefault("response", dict(response_payload))
             _attach_intelligence_response_aliases(response_payload)
+            # `#632`: measure what this reassignment ALLOCATES and what it
+            # REFUNDS. The old value -- a full copy of the previous query's
+            # payload -- loses its last reference here and is freed by refcount,
+            # inside THIS request's measured window. Split, because a new value
+            # the same size as the old nets to ~0 and hides the mechanism.
+            _lr_before, _lr_label = memory_observability.measure_global_reassign("LAST_RESULT")
+            _lr_prev = LAST_RESULT
             LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
+            _lr_mid = memory_observability._process_anon_mb() if _lr_before is not None else None
+            del _lr_prev
+            memory_observability.finish_global_reassign(_lr_before, _lr_label, _lr_mid)
             if _mirror_is_ours:
                 response_payload.pop("response", None)      # `#632`: 50% of the payload
             if _alias_slim_requested(payload):
