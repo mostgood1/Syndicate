@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 781 rules `[generated]`
+## Index — 787 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 281**
+**FORBIDDEN — 284**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -217,6 +217,9 @@
 - [2026-09-03 — FORBIDDEN: comparing a CONTROL window sampled differently from the treatme…](#2026-09-03-forbidden-comparing-a-control-window-sampled-differently-from-the-treatment-window-the-rate-ratio-is-an-artefact-of-the-sampling-and-it-will-flatter-whichever-side-you-sampled-less-lane-prop-join-yield)
 - [2026-09-04 — FORBIDDEN: asserting absence from a range whose START YOU CHOSE — and the…](#2026-09-04-forbidden-asserting-absence-from-a-range-whose-start-you-chose-and-the-reason-this-one-got-through-which-is-the-actually-useful-part)
 - [2026-09-03 — FORBIDDEN: choosing a REMEDY from a checker's finding without reading the…](#2026-09-03-forbidden-choosing-a-remedy-from-a-checkers-finding-without-reading-the-owning-blocks-intent-a-true-finding-can-carry-a-false-fix-and-the-fix-is-the-part-that-does-damage-session-c38d3e5c-caught-by-f97ad5ab)
+- [2026-09-03 — FORBIDDEN: clearing a `git checkout -- <path>` on a DELETIONS count. It is…](#2026-09-03-forbidden-clearing-a-git-checkout----path-on-a-deletions-count-it-is-structurally-blind-to-the-addition-you-are-about-to-destroy)
+- [2026-09-03 — FORBIDDEN: retracting a claim you re-checked, without first asking whether…](#2026-09-03-forbidden-retracting-a-claim-you-re-checked-without-first-asking-whether-the-code-moved-between-the-claim-and-the-check-re-derivation-cannot-see-this)
+- [2026-09-04 — FORBIDDEN: clearing a shared-tree file on a STRUCTURE check. Content dies…](#2026-09-04-forbidden-clearing-a-shared-tree-file-on-a-structure-check-content-dies-inside-retained-structure)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -292,15 +295,16 @@
 - [2026-08-29 — FORBIDDEN: closing a name-join gap by POPULATING an alias map, without fir…](learnings_evidence.md#2026-08-29-forbidden-closing-a-name-join-gap-by-populating-an-alias-map-without-first-checking-the-maps-source-carries-the-missing-name) `[evidence]`
 - [2026-08-29 — FORBIDDEN: never treat a `lanes.md` claim as evidence that anyone is holdi…](learnings_evidence.md#2026-08-29-forbidden-never-treat-a-lanesmd-claim-as-evidence-that-anyone-is-holding-the-file-lane-guardpy-has-no-liveness-notion-so-a-claim-outlives-its-session-forever) `[evidence]`
 
-**EXONERATED — 5**
+**EXONERATED — 6**
 
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
+- [2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions file…](#2026-09-03-exonerated-deploysmd-and-learningsmd-are-guarded-two-sessions-filed-the-same-false-gap-and-the-second-re-derived-it-with-the-same-blind-spot)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](learnings_evidence.md#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works) `[evidence]`
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 495**
+**Rules and corrections — 497**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -484,6 +488,8 @@
 - [2026-09-04 — a failed rebase leaves a STALE ledger file that `git add` will happily rec…](#2026-09-04-a-failed-rebase-leaves-a-stale-ledger-file-that-git-add-will-happily-record)
 - [2026-09-04 — before a catch-up deploy, check whether the OWNING lane is already shippin…](#2026-09-04-before-a-catch-up-deploy-check-whether-the-owning-lane-is-already-shipping-it)
 - [2026-09-04 — REBASE FIRST, then edit ledger files](#2026-09-04-rebase-first-then-edit-ledger-files)
+- [2026-09-04 — OVERTURNED: `_SCORE_SIM_WEIGHT` is **0.125**, not 0.0. Two load-bearing co…](#2026-09-04-overturned-_score_sim_weight-is-0125-not-00-two-load-bearing-comments-say-00-and-one-of-them-is-the-entire-basis-of-side_picked_by-lane-prop-join-yield)
+- [2026-09-04 — THE LEDGER COMMIT GUARD CANNOT SEE A WITHIN-BLOCK REVERT, measured at 117,…](#2026-09-04-the-ledger-commit-guard-cannot-see-a-within-block-revert-measured-at-117321-characters)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

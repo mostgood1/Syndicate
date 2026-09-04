@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 781 rules `[generated]`
+## Index — 787 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5581,3 +5581,44 @@ work is one people route around. Handed to the session that owns the compaction.
 caught it where a structural predicate did not. When a guard's predicate is
 structural, ask what a change of a DIFFERENT SHAPE at the same location looks
 like to it -- here, same file, same direction, different granularity, invisible.
+
+## 2026-09-04 — FORBIDDEN: clearing a shared-tree file on a STRUCTURE check. Content dies inside retained structure.
+
+**Twice-real, same day, two sessions, opposite roles.** The generalisation is
+session c38d3e5c's and it is sharper than either incident:
+
+> "My error and my change were the same mistake, one level apart. I checked at
+> BLOCK level — no lane block existed only in the shared tree — and concluded the
+> checkout was safe. The loss was INSIDE existing blocks."
+
+- **Me, ~01:0xZ.** Ran `git checkout -- .syndicate/lanes.md` in the shared tree
+  after verifying the diff was "139 insertions, **0 deletions**, all mine".
+  Destroyed `ledger-cap-single-source`'s uncommitted block, which existed in no
+  commit anywhere. A peer's unstaged ADDITION is indistinguishable from my own in
+  that stat.
+- **c38d3e5c, ~02:0xZ.** Broadcast `git checkout origin/main -- .syndicate/lanes.md`
+  as the remedy for a stale copy, having checked that no lane BLOCK existed only
+  in the shared tree — true, and 0 of 39. Fourteen uncommitted lines existed
+  nowhere on `origin/main`: a live claim transfer written INSIDE two existing
+  blocks. Caught before anyone ran it.
+
+**Why every guard agreed with both of us.** `ledger-commit-guard`'s `_resurrected`
+looks for resurrected BLOCKS; a compaction moves narrative WITHIN blocks, so it
+passed. `git diff --stat` counts lines, not authorship. A block-level set
+comparison answers "same headings?", not "same content?". Each check is sound and
+each is blind to the same axis.
+
+**THE TEST THAT ACTUALLY WORKS** — content, against the remote, both files:
+
+    git diff HEAD -- <file>            # non-empty? someone is mid-edit: STOP
+    # then, for each added line, does it exist anywhere on origin/main?
+    #   (for lanes.md that means lanes.md AND lanes_history.md, because
+    #    compaction legitimately MOVES lines between them)
+
+In a shared tree the question is never "am I deleting lines". It is **"is
+anything here not mine, and does it exist anywhere else"** — and only the second
+half is answerable by a tool.
+
+**Corollary, also c38d3e5c's:** *"Committing a live session's in-progress edit to
+protect it is the shared-tree hazard wearing a helpful face."* Back it up outside
+the repo and tell the owner; do not land it for them.
