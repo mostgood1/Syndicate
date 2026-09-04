@@ -94,9 +94,21 @@ unbounded.
   names the claiming lane. **With the marker empty it blocks your OWN lane's
   files**, reporting `Current lane: 'none'` — so a session that hand-edits
   `lanes.md` instead of running `/lane` locks itself out.
-- **`Bash` bypasses it entirely** — the matcher is
-  `Edit|Write|MultiEdit|NotebookEdit`. The guard bounds the file tools, not the
-  session.
+- **`Bash` is not BLOCKED, but is no longer UNSEEN** `[updated 2026-09-04,
+  verified, session f97ad5ab]`. `lane-guard`'s matcher is still
+  `Edit|Write|MultiEdit|NotebookEdit`, so a shell write cannot be REFUSED —
+  predicting a file write from a command STRING is not reliably possible, and a
+  guard that blocks on a guess gets routed around. `lane-postwrite-check.py`
+  (Pre+PostToolUse on `Bash|PowerShell`) DETECTS it instead: it snapshots
+  `(mtime,size)` of paths claimed by OTHER open lanes before the command and
+  compares after, so the window is ONE TOOL CALL. It WARNS, never blocks.
+  **Scale of the gap, measured over all 292 session transcripts:** writes to
+  tracked SOURCE files ran 9,023 Edit-family vs **1,045 Bash/PowerShell
+  (10.4%)**; under `.syndicate/` the shell is the MAJORITY path (2,618 vs 1,069).
+  **Two limits, both real:** a `git rebase`/`checkout` is suppressed by a
+  HEAD-move check, but a concurrent session's UNCOMMITTED write to a claimed file
+  is indistinguishable from your own — observed once, live — so it names no
+  author.
 - **A CLAIM OUTLIVES ITS SESSION FOREVER — the guard has NO liveness notion**
   `[verified 2026-08-29T23:2xZ, lane lane-claim-phantom-sweep]`. Nothing released
   a claim when a session ended, so they accumulated: **26 OPEN lanes holding 133
