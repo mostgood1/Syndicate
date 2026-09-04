@@ -5184,3 +5184,44 @@ than payload fields.** The rule generalises: when a command prints more than the
 line you went looking for, the rest of it is not noise, it is findings you did
 not have to work for. Before describing a capability as missing, run the tool
 that would already report it.
+
+## 2026-09-03 — A false REASSURANCE is worse than a false WARNING, so it needs a higher bar. Every one of five errors in one night was in the reassuring direction. `[sessions c38d3e5c + 37abeca0]`
+
+**The asymmetry.** A wrong claim that says *worry about this* costs someone a
+check they did not need — expensive, and self-correcting, because they go and
+look and the claim dies. A wrong claim that says *this is covered* removes a
+check they did need, removes it **silently**, and nobody goes looking, because
+the whole point of a reassurance is that it ends the enquiry. So the two are not
+symmetric errors and must not carry the same evidentiary bar.
+
+**This is not a tendency, it is selection, and one night made it visible.** Five
+independent errors between two sessions, every single one reassuring:
+
+    "confirmed on origin"          `git log -1 <sha>` succeeds whether or not it is pushed
+    witness printed "agrees: True"  it had parsed 0 blocks; nothing to disagree with
+    `cmd | head || echo 0`          the fallback can never fire; `$?` belongs to `head`
+    "commit-time still covers them" grep-count of a filename, both hits were prose
+    "absent from origin/main"       an empty `A..B` range whose A the author chose
+
+Not one false alarm among them. False alarms do not survive: they are
+investigated within minutes and die. False reassurances are shipped, quoted to
+other people, and committed to the ledger — which is exactly the selection
+pressure that leaves a repo's records full of the second kind and empty of the
+first. **The population of surviving errors is biased toward the reassuring
+ones, so the base rate you should assume for a comforting result is worse than
+for an alarming one.**
+
+**How to apply.** Before a null, a green, or an "already covered" becomes an
+assertion — especially to someone else, and above all in the ledger — state what
+would have made it read the other way, and confirm the check can produce that
+value. If it cannot, you have not measured anything. Warnings may be reported on
+suspicion; reassurances need the failing branch demonstrated.
+
+**Sibling rules, all special cases of this one:** `reporting a commit as PUSHED
+on the strength of a command that also succeeds when it is not`; `reporting a
+census result as a property of the POPULATION when it is a property of your
+PROBE`; `absence-in-a-window-is-not-absence`; and the standing
+instrument-blindness rule (*a healthy reading is evidence only once you know
+what makes it read unhealthy*). This entry is the direction they share, recorded
+because each was filed as its own mechanism and the common shape was only
+visible with five of them side by side.
