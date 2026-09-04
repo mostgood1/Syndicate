@@ -724,10 +724,19 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 
 ### ncaaf-chip-compact — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, FIXED, LANDED. NOT DEPLOYED. The reported symptom is a JOIN failure, not a missing abbreviation — the chip already carried `MAS`/`RUT`.**
 - Files: RELEASED `[2026-09-04, TAKEN by lane nfl-la-rams-alias, session ff257687]`: `syndicate/features/shared/team_aliases.py`
-  Taken because THIS lane's session `3492626c` is GONE — verified, not
-  assumed: `list_sessions(include_archived=true, limit=100)` returns 100 sessions
-  back to 2026-08-21 and `3492626c` is in none of them, while this lane and
-  `gate-per-side-derived` were both opened under it. Disjoint by function in any
+  **CORRECTION `[2026-09-04 22:1xZ, same lane]`: the reason first written here was
+  WRONG, and the claim-take now rests on DISJOINTNESS ALONE.** It said session
+  `3492626c` is "GONE — verified, not assumed" because
+  `list_sessions(include_archived=true, limit=100)` did not list it. **Roster
+  absence is NOT evidence a holder is gone** — `deploy_claim.py:212` says so in
+  as many words ("An unrecorded session is UNKNOWN, not gone. TTL is the real
+  bound"), and `deploys.md` carries a counter-example on THIS EXACT SESSION ID:
+  recorded gone on the same roster reasoning, it then acquired the
+  live-odds-worker claim at 23:10:51Z while still absent. The roster does not
+  list unattended or scheduled runs. Surfaced by lane `web-oom-highwater`
+  (session b2b5b45b) and re-verified here against the code and the ledger, not
+  taken on their word. **What still stands, and is independently sufficient:
+  disjointness.** In any
   case: ONE key added to `_NFL_ALIAS_TO_NAME` (`la` -> Los Angeles Rams, the
   nflverse code); your claim is the NCAAF chip join, which this block's own
   header records as already LANDED, and `_ncaaf_registry_name` / `chip_join_key`
