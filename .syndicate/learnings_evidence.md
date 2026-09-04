@@ -22625,3 +22625,69 @@ already written. One such marker was live in `.syndicate/`
 (`.current-lane.92987093...`, three bytes: `ef bb bf`). Red/green against
 `f57a02f2`: BEFORE `exit 2 BLOCKED: a/mine.py is claimed by OPEN lane 'mine'`
 while the session's lane WAS `mine`; AFTER `exit 0`.
+
+
+## 2026-09-03 — a census is only as wide as its pattern: "prose only" for five scripts my own refactor had just broken
+
+**THE SETUP.** The lane-claim parser moved out of `.claude/hooks/lane-guard.py`
+into a shared `lane_claims.py`. The hook kept a re-export, so anything importing
+`lane-guard` for `_claims` still worked. To find everything that would care, I
+grepped:
+
+    grep -E "spec_from_file_location|exec_module|import_module|_load_guard"
+
+against the nine files mentioning `lane-guard.py`, and classified the rest
+"mentions in prose only". One file came back as a real consumer
+(`session_worktree.py`) and I verified it still worked.
+
+**WHAT THE PATTERN COULD NOT SEE.** Five scripts load the hook by reading its
+source and `exec(compile(src, ...), ns)` into a bare namespace — an idiom none
+of those four tokens appear in. And the refactor had added, at hook line 38:
+
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+An `exec`'d namespace has no `__file__`. So:
+
+    archive_released_lanes.py        NameError: name '__file__' is not defined
+    audit_lane_unguarding.py         NameError
+    release_phantom_lane_claims.py   NameError
+    trim_lane_blocks.py              NameError
+    lane_claim_audit.py              exit 2, "lane-guard.py has no _claims -- parser changed"
+
+The fifth is the interesting one: it has a self-check on the parser's
+attributes, so it refused rather than grading the ledger with a half-built
+parser — the same guard `lane_identity_check.py` has, and the reason that one
+surfaced the breakage immediately.
+
+**HOW IT WAS ACTUALLY FOUND.** Not by me. A peer session ran
+`trim_lane_blocks.py`, hit the `NameError`, and reported it. Widening the check
+from a grep to "run each of them and look for the error" turned one into five:
+
+    for f in ...; do out=$(python scripts/$f.py 2>&1)
+      echo "$out" | grep -q "__file__|no _claims|Traceback" && echo BROKEN; done
+
+That probe has no blind spot, costs seconds, and was available the whole time.
+
+**THE SYMMETRIC ERROR, in the reviewing session, the same day.** They tried to
+import `lane-guard.py` to test it, hit a two-minute timeout, and concluded the
+module could not be imported — writing that into `learnings.md` (inside a rule
+about green checkers not being evidence) and a daily log. It is false: the
+module imports in 0.02 s with `sys.stdin` stubbed to a `StringIO`, raising a
+catchable `SystemExit(0)` from its trailing `sys.exit(main())`. That is how the
+before/after parser differential ran all day. What blocked was `main()` reading
+a real stdin that never closed — a property of the shell they invoked it from.
+Corrected in `c09ea92e`, in both copies, each quoting the original verbatim.
+
+**THE SHARED SHAPE, which is why both are one entry.** Each of us took a
+negative result from a single probe and promoted it to a property of the
+population: "my grep did not match it" became "it is prose only"; "my shell
+hung" became "the module is unimportable". Both false versions are worse than
+saying nothing, because each one instructs the next reader not to look.
+
+**FIXED, AND THE GUIDANCE SURVIVES THE CORRECTION.** Prefer `lane_claims.py`
+over the hook because it is a pure library — no module-level `main()`, no
+`__file__`, no stdin read — not because the hook cannot be imported. All five
+scripts were repointed at it, which also retires each one's
+`sys.exit(main())`-neutralising hack, and each was verified to run AND return a
+NON-EMPTY claim set, because exit 0 alone is the vacuous pass this same work had
+already been caught by once that day.

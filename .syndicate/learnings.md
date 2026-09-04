@@ -4798,3 +4798,34 @@ the values — a branch sweep, a literal set, `dataclasses.fields()` — never f
 the fixtures in your test. And where the count is load-bearing enough to
 publish, make it a constant with a test that re-derives it from the source,
 which is what caught this one.
+
+## 2026-09-03 — FORBIDDEN: reporting a census result as a property of the POPULATION when it is a property of your PROBE
+
+- **The rule.** A census answers "what my pattern matched", never "what is
+  out there". Before writing the conclusion, ask what a member of the
+  population would have to look like to be MISSED, then check whether such
+  members exist. If the probe is cheap to run directly — running the scripts,
+  calling the function — prefer that over a grep, because the direct probe
+  cannot have a blind spot the grep has.
+- **Two instances the same day, in two sessions, one reviewing the other.**
+  I refactored a shared parser and grepped for consumers with
+  `spec_from_file_location|exec_module|import_module`. Five scripts load it via
+  `exec(compile(...))`, which matches none of those, so I reported all five as
+  "prose only". **My refactor had broken every one of them** — four dead on
+  `NameError: __file__`, a fifth refusing correctly. A peer found ONE by running
+  it; running all of them found five. Symmetrically, that peer hit a timeout
+  importing a hook, concluded the module was unimportable, and wrote it into two
+  ledger files; it imports in 0.02 s with `sys.stdin` stubbed. What blocked was
+  their shell, not the module.
+- **Why the false version is worse than silence.** "Prose only" told me those
+  files were fine, so I did not run them. "Unimportable" tells the next reader
+  not to try. **One failed probe licenses "this did not work here", never "this
+  cannot work"** — and one unmatched pattern licenses "my grep found nothing",
+  never "there is nothing".
+- **How to apply.** State the probe alongside the count ("grep for X found N",
+  not "there are N"). When the conclusion is that something is ABSENT or
+  UNAFFECTED, run the direct check on at least the members you are about to act
+  on. Same family as the caller-census rule of 2026-08-20 (`A DOCSTRING THAT
+  NAMES ITS OWN PRECONDITION IS A CHECKABLE CLAIM`), which is about doing a
+  census at all; this one is about the census being narrower than its claim.
+- *(evidence in `learnings_evidence.md`)*
