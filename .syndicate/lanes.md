@@ -1243,12 +1243,8 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `mlb_feed_payload_is_final` -> `mlb_status_is_final(abstractGameState, detailedState)`, `_source_status` -> those
   two strings raw — so they cannot both be right about one payload. `_source_status(None)` would yield
   `Pregame/Scheduled`, so it is NOT reading a missing payload; it is reading a payload that says Live.
-- **NEXT MEASUREMENT, and do not guess before taking it:** print `game_pk`, `abstractGameState` and `detailedState`
-  per game inside the `_daily_actual_by_game` loop for one build. That is a one-line change in `mlb/cards.py`, which
-  lane `mlb-feed-live-terminal-refresh` holds — so it goes THERE, not here. Two candidates it separates: the counter
-  and `_source_status` are reading different objects (a keying or pruning divergence between `out[int(game_pk)]` and
-  `actual_games.get(game_pk)` — note `cards.py:5573` uses `.get(int(game_pk))` while `:5623` uses `.get(game_pk)`),
-  or `mlb_status_is_final` is returning True on a status that reads "Live"/"In Progress".
+- **MEASUREMENT TAKEN 2026-09-04 19:19:37Z (deploy `ef9fd7bf`). BOTH CANDIDATES ELIMINATED.** `FEED_LIVE_STATUS date=2026-09-03` for all NINE game_pks: `present=True source_status_abstract='Final' source_status_detailed='Final' is_final_predicate=True key_types=['int']`. The predicates AGREE and the keying is int throughout — so it is neither a predicate divergence nor the `.get(int(game_pk))`/`.get(game_pk)` split. **Therefore the served status does not come from this map at all**: same instant, `/mlb/api/cards?date=2026-09-03` publishes ATH@SEA and STL@LAD as `{"abstract": "Live"}` and the 19:19:37Z board still reads them `live` with `games_with_outcome` 7 of 9. `_source_status(None)` would give `Pregame/Scheduled`, so the consumer is reading a DIFFERENT payload, not a missing one.
+- **HANDOFF — the next lane's starting point, with no measurement yet taken:** `build_cards_page_context`'s source for a PAST date (artifact-backed vs inline-built — the `one endpoint, two code paths` trap). The 2 stale games are exactly the 2 that finished AFTER the midnight-Central roll, the same boundary as the rest of this thread. Measurement in `deploys.md` 2026-09-04 19:15:51Z.
 - **Third attribution avoided.** Freshness and the lens overlay were both wrong on this symptom; this trace deliberately
   stops at a contradiction rather than proposing a cause for it.
 

@@ -22182,3 +22182,52 @@ Predicted from the checkout substrate, recorded so tomorrow can falsify it:
 coverage; ~76x is the per-record figure against production density). **If it
 comes back above ~120 MB the projected-mirror design is off** and the 12 MiB
 publish ceiling stops being comfortably clearable.
+
+## 2026-09-04 19:15:51Z — refresh-worker `ef9fd7bf` (`dep-dadhhpqd0e5s73e22fi0`, live 19:18:24Z) — lane `mlb-feed-live-terminal-refresh` — **DIAGNOSTIC DEPLOY, PASS**
+
+Both locks satisfied, nothing forced: claim held by this lane, preflight
+**CLEAR** ("only infrastructure processes running") after spacing elapsed at
+26.1 min and the in-flight `run_mlb_daily_sim_job.py` finished ON ITS OWN. No
+`--allow-rapid`, no `--force`, no sim killed. Target verified BY CONTENT
+(`FEED_LIVE_STATUS` present in `origin/main:mlb/cards.py`), not ancestry alone.
+Claim released with its token afterwards; `refresh-worker free`.
+
+**verify — the reading, from the 19:19:37Z rebuild. THE TWO READERS AGREE, so
+the contradiction resolves the OTHER way:**
+
+    FEED_LIVE_REFRESH date=2026-09-03 ... games=9 skipped_final=9 attempted=0 failed=0
+    FEED_LIVE_STATUS  date=2026-09-03 game_pk=823337 present=True
+      source_status_abstract='Final' source_status_detailed='Final'
+      is_final_predicate=True key_types=['int']
+    ... IDENTICAL for all NINE game_pks (823337 824388 824144 824796 824632
+        824069 822853 823095 823907).
+
+So `_source_status` computed over the map `_daily_actual_by_game` RETURNS says
+**Final for all nine**, including ATH @ SEA and STL @ LAD, with `present=True`
+and `key_types=['int']`. The predicates do NOT diverge and the keying is NOT
+mismatched — both candidates named in the lane are eliminated.
+
+**AND YET the consumers still publish Live.** Same instant:
+`/mlb/api/cards?date=2026-09-03` -> `ATH@SEA {"abstract": "Live", "detailed":
+"In Progress"}`, `STL@LAD` the same, `BOS@BAL` correctly `Final`; the board
+artifact rebuilt at **19:19:37Z** still reads `ATH @ SEA live`, `STL @ LAD
+live`, `games_with_outcome` **7 of 9**.
+
+**CONCLUSION: THE SERVED STATUS DOES NOT COME FROM THIS MAP.** `_source_status`
+over the returned map is Final; the published payload is Live; therefore there
+is a SECOND source for a past date's cards context — cached or artifact-backed
+— and it is frozen from when those two games were genuinely in progress.
+`_source_status(None)` would yield `Pregame/Scheduled`, so the consumer is not
+reading a missing payload; it is reading a DIFFERENT one. Note the shape of the
+survivors: the 2 stale games are exactly the 2 that finished AFTER the
+midnight-Central roll (05:05Z, 05:09Z), the same boundary as everything else in
+this thread.
+
+**THIRD LOCALIZATION, AND THE FIRST TWO ARE NOW EXONERATED BY MEASUREMENT, not
+by retraction:** the live-lens overlay (gated, `rows_corrected: 0`) and feed
+freshness (`skipped_final=9`, payloads Final) are both ruled out. The remaining
+suspect is `build_cards_page_context`'s source for a PAST date — artifact-backed
+vs inline-built, the `one endpoint, two code paths` trap — which is where the
+next lane should start and where NO measurement has been taken yet.
+
+**Cost of the counter: it has now killed two wrong causes and located a third.**
