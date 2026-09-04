@@ -100,9 +100,26 @@ class FeedLivePruneTests(unittest.TestCase):
         actually routed through the prune. Four inert features shipped in one
         session on this codebase were caught by exactly this and nothing else."""
         pks = [823368]
+
+        def _must_not_fetch(_game_pk):
+            # HERMETIC BY ASSERTION, not by luck. This test pins a PAST date so
+            # the loader takes the cached document -- but "past" is a moving
+            # target: `mlb_feed_live_is_refreshable` now also refreshes
+            # YESTERDAY off the request path, and the old `2026-06-15` "today"
+            # made 06-14 exactly that. The test then made a REAL call to
+            # statsapi and quietly graded a live 79-play document against its
+            # 500-play fixture. Two days back keeps it outside any window, and
+            # this stub turns a future widening into a failure that names
+            # itself instead of a network call nobody notices.
+            raise AssertionError(
+                "the prune test must not re-fetch -- its date is meant to be outside the refresh window"
+            )
+
         with patch.object(cards, "raw_feed_live_path", return_value=Path("unused")), patch.object(
             cards, "load_json_or_gz_file", side_effect=lambda _path: _feed_live_doc()
-        ), patch.object(cards, "central_today_iso", return_value="2026-06-15"):
+        ), patch.object(cards, "_fetch_current_feed_live", side_effect=_must_not_fetch), patch.object(
+            cards, "central_today_iso", return_value="2026-06-16"
+        ):
             with patch.dict("os.environ", {"SYNDICATE_MLB_FEED_LIVE_PRUNE": "0"}):
                 off = cards._daily_actual_by_game("2026-06-14", pks)
             with patch.dict("os.environ", {"SYNDICATE_MLB_FEED_LIVE_PRUNE": "1"}):
