@@ -642,6 +642,16 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   plus web serving MLB cards and `/api/portfolio/summary`; plus 0 tracebacks.
 - Blocked by: none.
 
+### mlb-prop-phase1 — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **`#624` Phase 1, the MLB prop program. STEP 1's REFUSAL IS LANDED AS `f1508e78` AND NOT YET DEPLOYED.**
+- Goal: `#624` Phase 1 on MLB props, step by step, each one measured on the served board before the next is started.
+- Step 1 (calibration) shipped 2026-09-01 as `f03ef38a`. **Its other half — "hard refusal of p in {0.0, 1.0}" — had never shipped**, and this lane landed it: `f1508e78`, `_dist_prob_over` returns None on an exact certainty instead of publishing it.
+- Files: syndicate/features/shared/prop_projections.py
+  tests/test_prop_certainty_refusal.py
+  (claim released by lane `layer1-model-edge-join` on 2026-08-31 — phantom sweep, owning session gone; no live lane holds either path)
+- Hypothesis: n/a for the refusal (it is a contract change, not a diagnosis). For step 3: `position_substitutions=False` inflates `pa_mean` by +19.7%, so turning substitution ON requires a JOINT REFIT rather than a flag flip — a mechanism added to a calibrated engine displaces the rates that were absorbing it.
+- Falsification test: the refusal is wrong if a legitimate probability disappears from the board. It refuses EXACTLY 0.0 and 1.0 and nothing else — 0.9 from a real distribution is untouched — so the falsifier is a drop in `model_prob_over` coverage larger than the certainty count (1 of 872 on the 09-04Z board).
+- Verification: on the first refresh-worker build carrying `f1508e78`, the served MLB prop rows contain **zero** `model_prob_over` at exactly 0.0 or 1.0, and total `model_prob_over` coverage falls by AT MOST the number of certainties that were there. **A ZERO COUNT IS NOT SELF-EVIDENT** — the pre-deploy board had exactly one, so this reading needs the coverage denominator beside it or it is indistinguishable from a board that lost the field entirely.
+- Blocked by: none. (Deploy target is refresh-worker — the ARTIFACT WRITER. Web reads the precomputed board artifact; the inline join is fallback only, so deploying web alone would not move this.)
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
