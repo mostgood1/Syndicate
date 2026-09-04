@@ -28,7 +28,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from syndicate.features.shared.prop_projections import (  # noqa: E402
+from syndicate.features.shared.prop_projections import (
+    _refuse_published_certainty,  # noqa: E402
     PropProjectionIndex,
     _dist_prob_over,
 )
@@ -94,3 +95,87 @@ def test_the_refusal_reaches_the_INDEX_and_keeps_the_MEAN():
 def test_an_empty_distribution_is_still_None():
     assert _dist_prob_over({}, 6.5) is None
     assert _dist_prob_over({"5": 0}, 6.5) is None
+
+
+# ---------------------------------------------------------------------------
+# THE CHOKE POINT. `_dist_prob_over` is one of FOUR producers of
+# `model_prob_over`; a refusal sited there caught 1 of the 17 certainties on the
+# 2026-09-04T04:28:48Z board. These pin the other three.
+# ---------------------------------------------------------------------------
+
+
+def _hr_rung_index(prob):
+    """An index whose HR-rung probability is whatever the artifact stored.
+
+    This path NEVER touches a distribution -- it reads `p_hr_2plus` straight
+    off `hitter_hr_likelihood_all` -- so `_dist_prob_over` cannot see it.
+    """
+    index = PropProjectionIndex()
+    index.ingest_game({
+        "hitter_hr_likelihood_all": {"overall": [
+            {"name": "Andrew Vaughn", "hr_mean": 0.21,
+             "p_hr_1plus": 0.19, "p_hr_2plus": prob, "p_hr_3plus": prob},
+        ]},
+    })
+    return index
+
+
+def test_the_hr_RUNG_producer_is_refused_too():
+    """16 of the 17 certainties on the real board came from here."""
+    got = _hr_rung_index(0.0).project(
+        player_name="Andrew Vaughn", market="batter_home_runs", line=1.5)
+    assert got is not None, "the mean is real; only the certainty goes"
+    assert got["model_prob_over"] is None
+    assert got["projected"] == 0.21
+
+
+def test_a_real_rung_probability_still_passes():
+    """Off != on in the other direction: this refuses 0.0, not small."""
+    got = _hr_rung_index(0.004).project(
+        player_name="Andrew Vaughn", market="batter_home_runs", line=1.5)
+    assert got is not None and got["model_prob_over"] == 0.004
+
+
+def test_zero_is_refused_not_only_one():
+    """`model_prob_over = 0.0` is the DANGEROUS sign -- it says the over is
+    impossible, making the under a 100%-confidence bet against any price."""
+    assert _refuse_published_certainty({"model_prob_over": 0.0})["model_prob_over"] is None
+    assert _refuse_published_certainty({"model_prob_over": 1.0})["model_prob_over"] is None
+
+
+def test_it_does_not_touch_anything_else():
+    payload = {"model_prob_over": 0.0, "projected": 4.2, "source": "x", "basis": "hr_2plus"}
+    out = _refuse_published_certainty(payload)
+    assert out["projected"] == 4.2 and out["source"] == "x" and out["basis"] == "hr_2plus"
+
+
+def test_None_passes_through_as_None():
+    """`None` is the honest 'no projection' and must not become a dict."""
+    assert _refuse_published_certainty(None) is None
+
+
+def test_booleans_are_not_probabilities():
+    """`False == 0.0` and `True == 1.0` in Python. A bool in this field is a
+    different bug, and silently rewriting it to None would hide it."""
+    out = _refuse_published_certainty({"model_prob_over": False})
+    assert out["model_prob_over"] is False
+
+
+def test_the_uncensored_path_still_produces_the_certainty():
+    """OFF != ON. If `_project_uncensored` had stopped producing 1.0 for its own
+    reasons, every test above would pass while the censor did nothing."""
+    index = PropProjectionIndex()
+    index.ingest_game(
+        {"pitcher_props": {"111": {"outs_dist": {str(v): 1 for v in range(10, 20)},
+                                   "outs_mean": 14.5}}},
+        pitcher_names={"111": "Lake Bachar"},
+    )
+    raw = index._project_uncensored(player_name="Lake Bachar", market="outs", line=6.5)
+    assert raw is not None and raw["model_prob_over"] is None, (
+        "the helper-level refusal is the FIRST line of defence and still holds")
+    rung = _hr_rung_index(0.0)
+    raw_rung = rung._project_uncensored(
+        player_name="Andrew Vaughn", market="batter_home_runs", line=1.5)
+    assert raw_rung["model_prob_over"] == 0.0, (
+        "the rung producer DOES emit an exact 0.0 -- if this ever stops being "
+        "true, the censor test above proves nothing")

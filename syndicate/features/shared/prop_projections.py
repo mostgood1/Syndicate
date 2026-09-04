@@ -189,6 +189,59 @@ def _dist_mean(dist: Mapping[str, Any]) -> float | None:
 _CERTAINTY_REFUSED = frozenset({0.0, 1.0})
 
 
+def _refuse_published_certainty(payload: Any) -> Any:
+    """Blank `model_prob_over` when it is EXACTLY 0.0 or 1.0, at the exit.
+
+    **THE REFUSAL IN `_dist_prob_over` COVERED ONE PRODUCER OF FOUR.** Measured
+    on the served board 2026-09-04T04:28:48Z, 1,451 MLB rows carrying
+    `model_prob_over`: **17 certainties, and 16 of them never touch a
+    distribution.** They come from the threshold rungs -- `basis` `hr_2plus` /
+    `hr_3plus`, read straight out of `p_hr_Nplus_cal` on the hitter artifact --
+    so a refusal sited in the distribution helper is blind to 94% of them:
+
+        Lake Bachar    outs               6.5   p=1.0   basis=outs_dist   <- caught
+        Andrew Vaughn  batter_home_runs   1.5   p=0.0   basis=hr_2plus    <- missed
+        Pete Alonso    batter_home_runs   2.5   p=0.0   basis=hr_3plus    <- missed
+
+    So the refusal belongs at the CHOKE POINT EVERY CALLER SHARES, which is the
+    public exit of `project()` and `project_game_market()`, not at the one
+    producer that happened to be visible when the row was found.
+
+    **0.0 IS THE DANGEROUS SIGN, not 1.0.** `model_prob_over = 0.0` says the
+    OVER is impossible, which makes the UNDER a 100%-confidence bet against
+    whatever the market pays. The 16 are unpriced today only because
+    `market_fair_prob_over` is None on those rows -- the same accident that
+    spared the Bachar row, and not a property of the rule.
+
+    **THE FILE ALREADY MAKES THIS ARGUMENT, one branch away.** The rung reader
+    refuses a MISSING probability with "Absent, not zero -- a 0.0 here would be
+    indistinguishable from 'the model says it will not happen' and would price
+    against it." That is exactly the hazard, and it was applied to `None` while
+    an actual 0.0 went through untouched.
+
+    Mutates and returns the payload; a non-dict passes through so `None` (the
+    honest "no projection") stays `None`.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    value = payload.get("model_prob_over")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if float(value) in _CERTAINTY_REFUSED:
+            payload["model_prob_over"] = None
+            # SAY WHY IT IS BLANK. `test_a_genuine_zero_is_still_a_projection`
+            # (hr ladder) exists because absence and zero must not collapse into
+            # each other, and blanking the field is exactly that collapse unless
+            # the reason travels with it. The row-level distinction does survive
+            # on its own -- an UNCOUNTED rung returns None for the whole
+            # projection, a COUNTED 0.0 returns this dict with its `projected`
+            # and `basis` intact -- but a consumer should not have to infer that
+            # from the shape. Same rule as `projected_derived_from` and
+            # `edge_unavailable_reason`: a labelled blank beats a bare one.
+            payload["model_prob_over_refused"] = "exact_certainty"
+            payload["model_prob_over_refused_value"] = float(value)
+    return payload
+
+
 def _dist_prob_over(dist: Mapping[str, Any], line: float) -> float | None:
     """P(outcome > line) straight off the simulated distribution.
 
@@ -468,6 +521,22 @@ class PropProjectionIndex:
     def project(self, *, player_name: Any, market: Any, line: Any) -> dict[str, Any] | None:
         """Projection + modelled P(over) for one market line, or None.
 
+        Thin wrapper: the work is `_project_uncensored`, and this applies
+        `_refuse_published_certainty` to whatever it returns. **Sited here
+        rather than in each producer** because there are four of them and a
+        refusal in one caught 1 of 17 certainties on a real board.
+        """
+        return _refuse_published_certainty(
+            self._project_uncensored(player_name=player_name, market=market, line=line)
+        )
+
+    def _project_uncensored(self, *, player_name: Any, market: Any, line: Any) -> dict[str, Any] | None:
+        """Projection + modelled P(over) for one market line, or None.
+
+        **NOT the public entry point** -- `project()` is, and it censors exact
+        certainties on the way out. Call this only where an uncensored read is
+        deliberately wanted (the refusal's own tests).
+
         None is returned rather than a guess whenever the sim cannot answer:
         no such player, no such market, or a whole-number line on a
         threshold-only (hitter) market. A blank cell is honest; an invented
@@ -691,6 +760,30 @@ def _dist_prob_below(dist: Mapping[str, Any], line: float) -> float | None:
 
 
 def project_game_market(
+    index: "PropProjectionIndex",
+    *,
+    sport: Any,
+    home_team: Any,
+    away_team: Any,
+    market: Any,
+    selection: Any,
+    line: Any,
+    segment: Any,
+) -> dict[str, Any] | None:
+    """The sim's view of a GAME market -- h2h, spreads, totals -- censored.
+
+    Game markets get the same treatment as props: an exact 0.0 or 1.0 is a
+    statement about the SAMPLE and is refused at the exit. A game line is the
+    place a certainty would be most expensive, because these rows are priced by
+    every book on the board.
+    """
+    return _refuse_published_certainty(_project_game_market_uncensored(
+        index, sport=sport, home_team=home_team, away_team=away_team,
+        market=market, selection=selection, line=line, segment=segment,
+    ))
+
+
+def _project_game_market_uncensored(
     index: "PropProjectionIndex",
     *,
     sport: Any,

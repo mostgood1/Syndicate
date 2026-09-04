@@ -88,10 +88,29 @@ def test_a_genuine_zero_is_still_a_projection():
 
     The other side of the test above: absence and zero must not collapse into
     each other in either direction.
+
+    **AMENDED 2026-09-04 for `#624` step 1's certainty refusal, which publishes
+    no `model_prob_over` of exactly 0.0 or 1.0.** The invariant this test exists
+    for is UNCHANGED and is still asserted below: an UNCOUNTED rung returns
+    `None` for the whole projection, a COUNTED zero returns a row. What changed
+    is that the distinction no longer travels in the VALUE of
+    `model_prob_over` -- a finite sim cannot establish impossibility, and a 0.0
+    published there says the OVER cannot happen, which prices the UNDER at 100%
+    confidence against whatever the book pays. So the zero is now carried as a
+    labelled refusal instead, and the collapse this test guards against still
+    cannot happen: the two cases differ in shape AND carry a reason.
     """
     idx = _index(p_hr_1plus=0.41, p_hr_2plus=0.0)
     out = _project(idx, 1.5)
-    assert out is not None and out["model_prob_over"] == 0.0
+    assert out is not None, "a counted zero is still a ROW -- this is the invariant"
+    assert _project(_index(p_hr_1plus=0.41), 1.5) is None, (
+        "...and an UNCOUNTED rung is still no row at all, which is what keeps "
+        "absence and zero distinguishable")
+    assert out["model_prob_over"] is None, "no certainty is published"
+    assert out["model_prob_over_refused"] == "exact_certainty"
+    assert out["model_prob_over_refused_value"] == 0.0, (
+        "the original value is retained, so the refusal is auditable and this "
+        "is not information LOSS -- only a refusal to price on it")
 
 
 def test_a_whole_number_line_is_still_refused():
