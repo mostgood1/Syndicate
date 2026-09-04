@@ -214,3 +214,30 @@ not a verdict, and no lane should be archived on them without reading its body.
 
 **Revised position: 0 of 25 are archivable today.** Every one either records
 owed work or is live. The honest options remain ADOPT or leave OPEN.
+
+---
+
+## DECISION — **LEAVE ALL 25 OPEN** `[2026-09-03, user decision, session c38d3e5c]`
+
+Triaged, and the answer is no change. The 25 stay OPEN and unowned; nothing is
+archived, nothing is closed, no claim is released.
+
+**This is a resolution, not an omission.** Do not re-run this triage expecting a
+different answer — the work these lanes record is owed, and an UNOWNED lane
+carrying owed findings is the correct state for it, not a backlog to be tidied.
+Their cost is 25 headers in `lanes.md`, which the 2026-09-03 compaction already
+made affordable: the file sits at ~0.76x its 120,000-byte cap with every lane's
+narrative preserved in `lanes_history.md`.
+
+**Two of these need a person, not a sweep, and should not wait for one to notice
+them here:**
+
+- `polymarket-pregame-price-gate` — an OPEN MONEY POSITION on the wrong side,
+  `atc-sea-ata-bol` (Bologna, not Atalanta), needing **manual closure**. Not
+  fixable by deploy. This is the one item on the list with a live cost.
+- `accuracy-autorun-rearm` — **not unowned**; session `82fe0160` reclaimed it and
+  is alive, with a scheduled task **armed for 2026-09-04 03:00 CT**. It appears
+  in this list only because the UNOWNED regex matched a withdrawn note.
+
+Adopting any of the other 23 means taking its owed items as your own; the
+verbatim list above is enough to decide without re-reading the ledger.
