@@ -21411,3 +21411,37 @@ and the fix is verified there BY CONTENT — `_sample_credibility` x1,
 Recorded because the flag was worth making and the follow-up was worth doing:
 naming a money-relevant commit as blocked is only half the job if nobody checks
 whether it later cleared.
+
+## 2026-09-04 15:00Z — ledger budget 2GB -> 4GB IS LIVE. **No deploy of mine was needed; a peer's carried it.** `[lane accuracy-ledger-budget-raise]`
+
+**deploy** `2332b47b` -> refresh-worker, created 14:57:10Z, finished **15:00:12Z**,
+by lane `mlb-rate-refit` (session `3492626c`) deploying the `origin/main` tip —
+which was my own commit, ~5 minutes after I pushed it.
+
+**verify — BY CONTENT ON THE DEPLOYED TREE, not by ancestry:**
+
+    git show 2332b47b:syndicate/features/shared/intelligence_evaluation.py
+      -> DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = 4_000_000_000
+    b55fa165 (the raise) IS contained in the live commit
+    SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES absent across all 153 env
+      keys (paginated, 2 pages) and absent from render.yaml -> the code default
+      is what runs, so the raise is REACHABLE, not merely present.
+
+**This is the prediction paying out, and it is worth stating because the
+opposite reasoning was a landmine yesterday.** I declined to deploy this on the
+grounds that it is CODE, nothing reads it until ~07:00 CT tomorrow, and peers
+deploy this service several times a day. It shipped in five minutes on someone
+else's deploy. **The same "let a peer's deploy carry it" reasoning applied to
+an ENV KEY THAT ARMS BEHAVIOUR is the 09-03 hazard** — there the unrelated
+deploy would have FIRED the first ever autorun mid-slate. Code rides along
+harmlessly; an arming key does not.
+
+**Claim discipline:** I took the claim intending to deploy, found the change
+already live, and RELEASED it with its token rather than deploying redundantly.
+A same-content redeploy would have been refused anyway (`already contained in
+live`), but the point is the check came before the attempt.
+
+**STILL NOT EXERCISED.** The autorun is once per Central day and already ran at
+14:34Z under the OLD 2GB budget. The 4GB default gets its first read at
+>= 07:00 CT tomorrow. Until then `skipped_budget=24 / dates=8` remains the
+latest real measurement.
