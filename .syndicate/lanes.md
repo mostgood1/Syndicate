@@ -746,6 +746,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 
 
+### catchup-live-odds-slate-lens — CLOSED 2026-09-04 — **live-odds-worker `b24c89b0`→`4597077d`, live 14:34:59Z.** Verified by content, one token per commit (`requested_date` 0→2, `_collections_total` 0→1), with `#624`/`#643`/`#632` all re-checked for survival; 0 errors. Only this service was behind. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: live-odds-worker off `b24c89b0` onto `4597077d`. Two commits it executes:
+  `2248ed78` (live-lens — a lens built for ANOTHER slate must not correct this
+  one; `board_enrichment.py`) and `3ee5e4b0` (`#632` GC instrumentation,
+  explicitly NOT a gate; `memory_observability.py`).
+- **ONLY live-odds-worker.** refresh-worker (`7f44f5eb`) and web (`3ee5e4b0`)
+  both read 0 pending — peers already carried them.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Verification: BY CONTENT on the deployed SHA, one token per commit, each
+  confirmed ABSENT from the currently-live `b24c89b0`: `requested_date` in
+  `board_enrichment.py` (0→2) and `_collections_total` in
+  `memory_observability.py` (0→1); plus 0 tracebacks.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

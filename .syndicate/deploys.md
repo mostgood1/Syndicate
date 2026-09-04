@@ -21174,3 +21174,28 @@ read the receipt from BEFORE the command ran and refused on a stale verdict
 
 Two further commits landed during this round; `main` moves continuously and that
 is churn, not drift.
+
+## 2026-09-04 — live-odds-worker `b24c89b0` → `4597077d` — lane `catchup-live-odds-slate-lens`
+
+Two commits it executes: `2248ed78` (live-lens — a lens built for ANOTHER slate
+must not correct this one; `board_enrichment.py`) and `3ee5e4b0` (`#632` GC
+instrumentation, explicitly NOT a gate; `memory_observability.py`). Preflight
+CLEAR first try; live 14:34:59Z.
+
+**Only live-odds-worker was behind** — refresh-worker (`7f44f5eb`) and web
+(`3ee5e4b0`) both read 0 pending; peers had already carried them.
+
+verify — BY CONTENT on the deployed SHA, one token per commit, each confirmed
+ABSENT from the previously-live `b24c89b0` first:
+
+    requested_date      board_enrichment.py       0 -> 2
+    _collections_total  memory_observability.py   0 -> 1
+
+**Three earlier fixes re-checked for SURVIVAL and all intact**: `#624`'s
+`refuse_published_certainty` x6, `#643`'s `bytes_per_order` x1, `#632`'s
+`background_work` x5. That check keeps earning its place — `#643` was silently
+reverted once by an unrelated commit to the same file.
+
+Runtime: 100 lines since boot, **0 tracebacks / CRITICAL / OOM**, 19 lens-related
+lines. The visible `[live_mc] LIVE_MC_BAIL reason=status_not_live
+abstract='Preview'` is the correct state for a pre-game slate, not an error.
