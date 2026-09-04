@@ -21286,3 +21286,101 @@ returned empty because the script requires `--text` and `--start` and `grep` ate
 the usage message. **An empty grep over a FAILED command is not a null result** —
 check the exit status before reporting an absence, especially when the absence is
 the thing that would be reported as a failure.
+
+## 2026-09-04 14:5xZ — `#626`(h) SUPPLEMENT to `6413403e`. **The PASS stands. Two numbers under it need re-sizing, and four findings from the failed scheduled attempt.** `[lane accuracy-autorun-rearm, session 51297aa5 — the retired 03:00 CT task]`
+
+Not a reopen. `6413403e` closed the lane correctly and its headline is confirmed:
+I measured **peak `memory_anon_mb` 1481.6 at 14:32:14Z** independently, from a
+separate query, and it agrees to the decimal. `AUTORUN_DONE ... error=none` and
+zero `oomKilled` since 2026-09-02T15:32:56Z both re-read clean here.
+
+### 1. THE MEMORY COMPARISON IS COLD-VS-WARM, and the headroom is ~1.5 GB, not ~2.6 GB
+
+`6413403e` reads `min memory_anon_mb 1131.0` and concludes the run peaked "BELOW
+the ordinary baseline too (~1877)". The peak is right; the baseline comparison is
+not like-for-like.
+
+**The run began 2m46s after a reboot** (deploy live 14:20:32Z, run start
+14:23:18Z), so it started from a COLD heap. Measured over 14:23:02–14:34:29Z,
+540 samples, split by emitter:
+
+    CONTAINER_MEMORY   n=238   min  730.7   max 1462.6
+    MEMORY_WATCHDOG    n=302   min  845.2   max 1481.6
+    first sample       14:23:02.989   739.3 MiB   (CONTAINER_MEMORY, game_count=51)
+
+Neither series has a floor near 1131, so that figure is a sampling artifact of a
+sparser window, not the base the run actually started from. The run's own delta
+is therefore **~+640 to +750 MiB**, from a cold ~730–845 base.
+
+`~1877` is a WARM figure — the ordinary baseline cycle peak on a worker that has
+been up for hours. **Applying the same delta at a warm base lands near
+2,520–2,630 MiB.** That is still comfortably inside 4,096 and the PASS is
+unaffected — but the usable headroom is roughly **1.5 GB, not the 2.6 GB** the
+budget recommendation below it leans on. This is the boot-confound the ledger
+already knows about (*"the floor IS the ratchet; every deploy reboots, so every
+fix looks good for 5 minutes"*), showing up in the one reading that matters.
+
+### 2. THE RATIO THAT JUSTIFIES RAISING THE BUDGET IS A SINGLE POINT, AT THE CAP
+
+`6413403e` argues the full ledger is affordable "at the measured ratio". Two
+cautions before anyone acts on it:
+
+- **The old model is already broken.** `#626`(h) was bounded on *"peak is
+  proportional to accepted ledger bytes, 4.01–4.41x"*. This run accepted
+  **2.0 GB and peaked at 1.48 GB** — a ratio below 1. `streamed=1` is why:
+  accepted bytes no longer imply resident bytes. The model that justified the
+  2 GB ceiling no longer describes the allocator, so it cannot be used to argue
+  about that ceiling in *either* direction.
+- **There is exactly one measurement, taken AT the cap** (`bytes` = 99.9985% of
+  budget, `skipped_budget=24`). Raising the budget means accepting bytes in a
+  range never observed. The right next step is a measured run at a raised budget
+  on a WARM worker, not an extrapolation from one cold point.
+
+The coverage finding itself is unaffected and correct: **the budget is now the
+binding constraint, not memory**, and the summary rests on 8 dates.
+
+### 3. FOUR FINDINGS FROM THE RETIRED 03:00 CT TASK, which stood down without arming
+
+That task executed 13:24:45Z, **5h24m late** (Modern Standby 00:14:39→08:24:21
+CT, waking 24s before it started), and never acquired the claim. Both it and
+`verify-accuracy-autorun-626h` are now **RETIRED** (user decision) with STOP
+banners, briefs preserved, and the outcome written into their descriptions.
+
+1. **An env-only arm does NOT necessarily mean shipping other lanes' code.** The
+   09-03 finding 1 says it does. Measured 13:30Z: `5af2c517..48fee490` was 5
+   commits touching **three files, all `.syndicate/`, zero runtime code** — a
+   code-free deploy that still satisfies the newer-SHA rule.
+   `git diff --name-only <live>..<tip>` is the whole test, and overnight that
+   window is common.
+2. **`min_deploy_interval_seconds: 1500` bounds any retry budget.** When a peer
+   holds the claim AND deploys, the window does not open on their release — it
+   opens 25 minutes later. A 20-minute budget cannot survive one peer deploy, by
+   construction. (`6413403e` reached the same conclusion from the winning side:
+   it beat the lockout with 12s polling.)
+3. **Trap 4 reproduced, and its mirror image matters more.** `TaskStop` reported
+   success and left **two** `claimpoll.sh` children alive — found via
+   `CommandLine` matching in `Get-CimInstance Win32_Process`, killed with
+   `Stop-Process`. Mine only READ the claim file. The mirror: this session
+   deliberately **never ran `deploy_preflight` for refresh-worker**, because that
+   overwrites `deploy/preflight/refresh-worker.json` — the verdict a peer is
+   gating its own deploy on. Attempt 4 was blocked by exactly that file being
+   clobbered.
+4. **Check what a peer's commit DOES, not just whether it conflicts.** Riding
+   along on `catchup-632-thread-gating`'s deploy was raised and rejected:
+   `b24c89b0` is `memory_observability.py` — per-process anon-MB attribution,
+   chasing a residue measured at 175% of a true partition. Arming a multi-GB job
+   into the one deploy whose purpose is a clean memory reading would have
+   corrupted the measurement it exists to take.
+
+### 4. A DEFECT FOUND WHILE TAKING THESE READINGS
+
+`scripts/render_events.py` crashes on the full refresh-worker event set:
+
+    AttributeError: 'str' object has no attribute 'get'
+    render_events.py:212  in _reason_detail   ->   reason.get("oomKilled")
+
+At least one event carries `reason` as a **str**, not a dict. It dies mid-listing
+after printing the summary header, so the per-event tail is unusable — you get
+the counts and the span, then a traceback. The header is computed from a full
+76-page read and remains trustworthy, which is what the OOM check rests on. Not
+fixed here; out of lane.
