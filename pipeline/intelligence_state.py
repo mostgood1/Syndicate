@@ -1699,15 +1699,75 @@ def _refresh_layer2_live_state(cards: list[dict[str, Any]], requested_dates: Seq
     if not sports:
         return 0
 
+    # JOIN ON THE CANONICAL KEY, NOT THE RAW NAME.
+    #
+    # This joined chip `away.name`/`home.name` to card `away_team`/`home_team` by
+    # exact lowercase equality. The two come from DIFFERENT FEEDS and NCAAF spells
+    # them differently, so the lookup missed on every row, `continue` fired, and
+    # the lane was never restated.
+    #
+    # MEASURED on production 2026-09-04T00:35Z, with 9 of 11 NCAAF chips reading
+    # `state=live` and carrying real scores (MAS 27-7, AKR 3-28, BET 0-38):
+    #
+    #     sport   rows    (market_state, lane)
+    #     mlb    3,100    (live, live) 104        <- names happen to match exactly
+    #     ncaaf  6,240    (live, pregame) 184     <- EVERY live row stuck pregame
+    #
+    #     chip away.name        card away_team
+    #     "Akron"               "Akron Zips"
+    #     "Colorado"            "Colorado Buffaloes"
+    #     "Massachusetts"       "UMass Minutemen"
+    #     "San Francisco Giants"  "San Francisco Giants"   <- why MLB worked
+    #
+    # So NCAAF live lines could not reach the live board no matter how fresh the
+    # quotes were -- which is a SEPARATE defect from the pregame cadence fixed
+    # the same night, and was hidden behind it.
+    #
+    # `chip_join_key` is the canonical key added 2026-09-03 for exactly this two-
+    # feeds-spell-it-differently case, and `chipForGame` in the template already
+    # joins on it client-side. Both sides ALSO publish it directly now
+    # (`chip["away"]["key"]`, `card["away_key"]`, measured 11/11 and 88/88), so
+    # the published value is preferred and the function is the fallback -- one
+    # rule, two places to read it from, and no third name comparison invented
+    # here.
+    #
+    # THE RAW NAME IS KEPT AS A SECOND KEY, not replaced. A sport whose key is
+    # None (no registry entry) must keep working exactly as before; narrowing
+    # this join while widening it would trade one silent miss for another.
+    from syndicate.features.shared.team_aliases import chip_join_key
+
+    def _keys(sport: str, side: Any, published: Any) -> list[str]:
+        """Every key this side may be found under, best first."""
+        out: list[str] = []
+        pub = str(published or "").strip().lower()
+        if pub:
+            out.append(pub)
+        name = str(side or "").strip().lower()
+        if name:
+            try:
+                canon = chip_join_key(sport, name)
+            except Exception:
+                canon = None
+            if canon and str(canon).strip().lower() not in out:
+                out.append(str(canon).strip().lower())
+            if name not in out:
+                out.append(name)
+        return out
+
     index: dict[tuple[str, str, str], dict[str, Any]] = {}
     for requested_date in requested_dates or ():
         try:
             for chip in build_game_chips(str(requested_date), list(sports)) or []:
                 sport = str(chip.get("sport") or "").strip().lower()
-                away = str((chip.get("away") or {}).get("name") or "").strip().lower()
-                home = str((chip.get("home") or {}).get("name") or "").strip().lower()
-                if sport and away and home:
-                    index.setdefault((sport, away, home), chip)
+                away_side = (chip.get("away") or {})
+                home_side = (chip.get("home") or {})
+                aways = _keys(sport, away_side.get("name"), away_side.get("key"))
+                homes = _keys(sport, home_side.get("name"), home_side.get("key"))
+                if not (sport and aways and homes):
+                    continue
+                for a in aways:
+                    for h in homes:
+                        index.setdefault((sport, a, h), chip)
         except Exception:
             continue
     if not index:
@@ -1716,9 +1776,14 @@ def _refresh_layer2_live_state(cards: list[dict[str, Any]], requested_dates: Seq
     restated = 0
     for card in cards:
         sport = str(card.get("sport") or card.get("sport_slug") or "").strip().lower()
-        away = str(card.get("away_team") or "").strip().lower()
-        home = str(card.get("home_team") or "").strip().lower()
-        chip = index.get((sport, away, home))
+        chip = None
+        for a in _keys(sport, card.get("away_team"), card.get("away_key")):
+            for h in _keys(sport, card.get("home_team"), card.get("home_key")):
+                chip = index.get((sport, a, h))
+                if chip:
+                    break
+            if chip:
+                break
         if not chip:
             continue
         state = str(chip.get("state") or "").strip().lower()
