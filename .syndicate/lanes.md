@@ -768,6 +768,24 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Tests: 24 new (`tests/test_mlb_feed_live_terminal_refresh.py`); 3 of the 6 reader tests fail against unmodified code (off != on). `tests/test_mlb_cards_worker_hydration_cost.py` was pinned outside the window -- its "today" was one day off its slate, so under the new window it made a REAL statsapi call and graded a live 79-play document against a 500-play fixture.
 - Regression: 256 + 213 passed across the directly-affected files. `tests/test_archives.py` shows 31 failed / 350 passed -- IDENTICAL on unmodified code (this worktree has no `data/`), so none are from this change.
 
+### render-events-nondict-reason — OPEN — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd — **BODY DESTROYED 2026-09-04 ~09:4x local BY SESSION b9013cf2. THIS IS A STUB, NOT THE LANE.**
+- WHAT I DESTROYED AND HOW. Session b9013cf2 (lane `mlb-feed-live-terminal-refresh`) rebuilt this file from `git show origin/main:.syndicate/lanes.md` to avoid committing a stale copy. This block was an UNCOMMITTED working-tree edit living ONLY in the primary tree, so it was absent from origin/main and the rebuild dropped it. The check I ran was "0 deletions vs origin/main", which is STRUCTURALLY BLIND to a local-only block — the same failure `learnings.md` 2026-09-03 already records for `git checkout -- <path>`, arriving through a file REBUILD instead of a checkout.
+- NOT RECOVERABLE BY ME. Searched: origin/main, all ~40 worktrees under `C:/tmp/syndicate-sessions/` (including `render-events-nondict-reason/.syndicate/lanes.md`), `lanes_closed.md`, `lanes_history.md`. No copy. The only surviving trace is `.syndicate/.current-lane.c4287631-...`, so the claim marker is intact. I could not message the owning session — `send_message` is unavailable from a scheduled-task run.
+- The header line above is VERBATIM what I saw before overwriting. Everything else in this stub is reconstructed from evidence and is NOT the owner's text.
+- Files: `scripts/render_events.py`, `tests/test_render_events.py`.
+  OBSERVED, not guessed: `.claude/hooks/lane-postwrite-check.py` named this lane as claimant of both paths while the owning session wrote them (18312->24410 and 9831->15828 bytes). Restated here so lane-guard keeps enforcing the claim, which it stops doing the moment nothing in `lanes.md` carries the block.
+- Goal / Hypothesis / Verification: LOST. Owner (session c4287631, titled "Fix render_events.py crash on string reason") should overwrite this stub with the real block. OneDrive version history on `.syndicate/lanes.md` holds the pre-overwrite copy from ~09:4x local 2026-09-04 if retyping is worse than restoring.
+- Blocked by: none.
+
+### accuracy-ledger-budget-raise — OPEN — opened 2026-09-04 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+- Goal: `build_accuracy_summary` stops truncating its ledger read. ONE testable outcome: the next autorun logs `LEDGER_CHUNKS_ACCEPTED ... skipped_budget=0 truncated=0` with `dates` materially above 8, and peak `memory_anon_mb` stays under 2,600 MiB.
+- Files: `syndicate/features/shared/intelligence_evaluation.py`, `tests/test_accuracy_summary_ledger_budget.py`, `docs/ai_context/todo.md`, `.syndicate/*`.
+- Hypothesis: the 2 GB budget, not memory, is what caps coverage. **Measured 2026-09-04, not assumed:** `bytes=1999970055` against `budget=2000000000` (99.9985% of cap), `skipped_budget=24`, `truncated=1`, `dates=8` — while peak anon was **1481.6 MiB of a 4096 ceiling**, i.e. ~2,614 MiB unused.
+- Falsification test: if raising the budget does NOT reduce `skipped_budget`, the cap was not the binding constraint and something else (the 256 MB per-chunk ceiling, or chunk count) is. If peak anon rises faster than ~0.18 MiB per accepted MB, the projection ratio has drifted and the raise must be reverted.
+- Verification: tomorrow's autorun (the job is once-per-Central-day, so THIS CANNOT BE VERIFIED TODAY) — read `LEDGER_CHUNKS_ACCEPTED` for `skipped_budget`/`dates` and the peak `memory_anon_mb` over the run window, both against the 09-04 baseline above.
+- **STAGED ON PURPOSE: 2 GB -> 4 GB, not straight to full coverage.** Full history is ~32 chunks; admitting all of them at the 256 MB per-chunk ceiling would need ~8.2 GB. The marginal cost measured today is at most 350.6 MiB per 2 GB accepted (peak 1481.6 minus min 1131.0 over the run window, and that spread still includes concurrent work, so it is an UPPER bound). At that rate 8.2 GB projects to ~1,131 + 1,435 = ~2,566 MiB, which lands too close to the ceiling if it ever coincides with the ~1,877 MiB baseline cycle peak. 4 GB projects to ~1,832 MiB. One step, measured, then decide — the repo's own "one change per deploy when diagnosing" rule.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
