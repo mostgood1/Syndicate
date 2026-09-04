@@ -5101,3 +5101,50 @@ a deleted-header list and noticing `REOPENED` — not by instrumentation. They
 recorded that their checks had been written up as though they had done the work
 (`02654303`). Attention caught it twice tonight; attention does not scale, which
 is why `_near_miss_open` and the declared-vs-enforced witness are the real fixes.
+
+## 2026-09-04 — A LANE CLAIM ON A LEDGER FILE GUARDS NOTHING, and I read the evidence for that TWICE without extracting it
+
+`[lane order-sim-view, session 37abeca0; surfaced by session c38d3e5c]`
+
+`lane-guard.py` exempts every path containing a `.syndicate` or `.claude`
+segment (`if is_exempt(path): return 0`), and the surrounding comment says it is
+deliberate — *"a file this guard was never supposed to check at all."* So a
+`- Files:` block naming `lanes.md`, `deploys.md` or `state.md` expresses INTENT
+and enforces nothing. `check_lane_claims.py` reports it as a `[note]`:
+3 of 45 claims, all `accuracy-autorun-rearm`'s.
+
+**REFINEMENT, because "guards nothing" reads as "unprotected" and that is
+false.** Ledger files are guarded by CONTENT INVARIANTS rather than by
+OWNERSHIP, which is a different model and a better fit — every session must
+write them, so an exclusive claim would be wrong:
+
+    lane-guard.py            EXEMPTS .syndicate/ and .claude/ entirely
+    ledger-append-guard.py   Edit|Write -- lanes.md (2 predicates), state.md (1)
+    ledger-commit-guard.py   Bash -- this is what BLOCKED me tonight on a stale
+                             lanes.md that would have un-archived 6 blocks
+    ledger-postwrite-check   Bash|PowerShell, after the fact
+
+Note the asymmetry worth knowing: `deploys.md` and `learnings.md` are barely
+referenced by the append guard, so their edit-time protection is thinner than
+`lanes.md`'s. Commit-time still covers them.
+
+**THE PART THAT IS MINE.** I had this on screen twice and extracted neither:
+
+1. I READ the exemption block in `lane-guard.py` earlier in the session, while
+   tracing how it resolves the per-session marker. I understood it as
+   path-normalisation trivia and never asked what it implied for claims.
+2. I RAN `check_lane_claims.py` and its output printed `[note] 3 of 45 claim(s)
+   name a file lane-guard EXEMPTS, so they guard nothing` and `[BAD ] 9 of 45
+   claim(s) name NO FILE IN THE REPO` — directly above the line I was looking
+   for. I scrolled past both.
+
+Then I told a peer that the declared-vs-enforced witness needed BUILDING and
+described its construction — when its output had been in my own terminal. They
+caught it by RUNNING the tool instead of reading my summary, and correctly did
+not relay a build request for something that already exists.
+
+**This is `read-the-field-you-already-have` at the level of TOOL OUTPUT rather
+than payload fields.** The rule generalises: when a command prints more than the
+line you went looking for, the rest of it is not noise, it is findings you did
+not have to work for. Before describing a capability as missing, run the tool
+that would already report it.
