@@ -20948,3 +20948,45 @@ deploy did nothing" — the CONTENT check above is what proves it shipped.
 `99479bd4`; the `#624` prop work is that lane's own. It stays 2 behind and the
 VERDICT still reads "deploy warranted for refresh-worker" — correct, and theirs
 to discharge.
+
+## 2026-09-04 — `#626`(h) ATTEMPT 4 (scheduled, 03:00 CT): FIRED, ARMED NOTHING, LEFT NO RECORD. Verdict **NOT-ARMED**. `[lane accuracy-autorun-rearm]`
+
+**The autorun has still never run in production.** Read at 08:2x CT / 13:2xZ:
+
+    arm-accuracy-autorun-626h   lastRunAt 2026-09-04T08:00:48Z   <- FIRED ON TIME
+    ACCURACY_SUMMARY_..._AUTORUN = false                          <- not armed
+    last refresh-worker deploy   5af2c517, finished 05:32Z        <- BEFORE the window
+    deploy claim                 free
+    preflight record             written 06:05Z by mlb-prop-phase1, NOT by the arm run
+    deploys.md / lanes.md        no entry from the arm run at all
+
+So the task fired and either aborted early or ended without acting. **It left no
+trace anywhere**, which is the fourth attempt at this key to produce no
+measurement. Its session (`a3502fdc`) has **no transcript file under
+`.claude/projects/` and no live process**, so the reason is not recoverable
+from evidence on this machine. `lastActivityAt` said 13:26 and is worthless —
+three unrelated sessions carry the same second, so that field moves on roster
+refresh, not on work. (Consistent with the 09-04 rule: establish liveness
+POSITIVELY.)
+
+**THE REAL FINDING IS NOT THIS RUN — IT IS THE PRECONDITION.** Four attempts,
+zero deploys, and every stand-down was on the same gate: a quiet refresh-worker.
+Measured occupancy across those attempts — HOLD/3 jobs, HOLD/6-7 jobs, HOLD/10
+jobs, HOLD/3 jobs — and **CLEAR exactly once in ~40 minutes of continuous
+polling, for under 25 seconds.** A precondition that is satisfiable for 25s in
+40min is not a precondition, it is a lottery.
+
+**AND THE RISK IT GUARDS NO LONGER EXISTS.** The bounded code has been live
+since 09-02, verified BY CONTENT on `4ead66c3` (`_project_evaluation_record` x4,
+budget `2_000_000_000`). The 09-02 OOM cannot recur from this path. What a
+deploy still costs is killing in-flight jobs — **which is true of every deploy,
+and peers took SEVEN of them on refresh-worker on 09-03 alone** (17:13, 17:51,
+18:30, 19:39, 20:44, 22:08, 22:49Z) without this ceremony. This lane has been
+holding itself to a standard no other lane applies, to avoid a risk that was
+repaired four days ago.
+
+**RECOMMENDATION, not taken unilaterally:** stop waiting for a quiet worker.
+Arm it on the next ordinary window like any other change, accepting one killed
+job cycle, at an hour BEFORE 07:00 CT so the gate still holds the first run.
+Arming after 07:00 fires it immediately on a live slate — that is what made the
+peer's 22:4x key-set unsafe on 09-03.
