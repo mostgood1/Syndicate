@@ -242,7 +242,61 @@ def _response_hash(payload: dict[str, object]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _drop_self_nested_response(response_payload: dict[str, object]) -> dict[str, object]:
+    """Drop `payload["response"]` when it is the payload's own shallow copy.
+
+    MEASURED on the live `/api/intelligence/query` 2026-09-04, one call:
+
+        response bytes                                    67.19 MB
+          response.response  (the payload's copy of itself)  36.42 MB   <- 50%
+          top_opportunities == recommendations                6.44 MB each
+          board_contract    == boardContract                  5.86 MB each
+          ranked_all                                          5.86 MB
+          by_sport                                            5.86 MB
+
+    Five sites in this module do `payload.setdefault("response", dict(payload))`
+    and then read `payload["response"]` back for `LAST_RESULT`, so the nesting is
+    a load-bearing idiom during CONSTRUCTION and is not touched there. It is only
+    dropped here, at the serialisation boundary, after every server-side reader
+    has already run.
+
+    WHY THIS IS PROVABLY SAFE AND ALSO CHEAP. `dict(payload)` is a SHALLOW copy,
+    so the inner mapping's values are THE SAME OBJECTS as the outer's. That makes
+    redundancy an IDENTITY test -- `outer[key] is inner[key]` -- which is O(1) per
+    key and cannot be fooled the way an equality test on 36 MB of nested data
+    could be. It is also the only affordable check: serialising both sides to
+    compare them would cost more than the saving.
+
+    If ANY key of the inner mapping is missing from the outer, or is a different
+    object, nothing is dropped and the payload is returned untouched. The failure
+    mode is "no saving", never "wrong data" -- the same rule
+    `_slim_embedded_board_payload` already established for the HTML embed.
+
+    THE CLIENT ALREADY TOLERATES THE ABSENCE. `intelligence.html:1517` reads
+    `unwrapVersionedIntelligenceResponse(boardResponse.response || boardResponse)`
+    -- it falls back to the outer mapping when the inner one is gone. And because
+    the inner is a strict subset sharing the same objects, the spread at :1518-21
+    produces byte-identical output either way.
+    """
+    if not isinstance(response_payload, dict):
+        return response_payload
+    inner = response_payload.get("response")
+    if not isinstance(inner, dict) or not inner:
+        return response_payload
+    for key, value in inner.items():
+        if key not in response_payload:
+            return response_payload
+        if response_payload[key] is not value:
+            return response_payload
+    slim = dict(response_payload)
+    slim.pop("response", None)
+    return slim
+
+
 def _versioned_query_response(response_payload: dict[str, object]) -> dict[str, object]:
+    # BEFORE `_json_safe_value`: that rebuilds the structure into new objects and
+    # would destroy the identity relationship this check depends on.
+    response_payload = _drop_self_nested_response(response_payload)
     response_payload = _json_safe_value(dict(response_payload))
     payload_hash = _response_hash(dict(response_payload))
     return {
