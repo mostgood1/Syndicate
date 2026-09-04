@@ -38,6 +38,21 @@ WHAT IT GETS RIGHT, and why each one is load-bearing:
   week are ALL `earlyExit` and zero OOM, which a "19 failures" summary would
   bury. The reason is classified, never flattened.
 
+- **A run that DIED is never mistaken for a run that finished.** The event
+  rows are the last thing printed, so anything that raises while rendering them
+  leaves a screenful of plausible output on stdout and the traceback on stderr
+  -- and a caller piping through `tail`/`grep` sees only the first of those.
+  That is how this reader could answer "no OOM events" without ever having
+  reached the recent window: `details.reason` is a bare STRING on
+  `auto_deploy_disabled` and `_reason_detail` assumed a mapping, so from the day
+  this shipped, ANY window containing one of those events died at it. Measured
+  2026-09-04 -- an unfiltered refresh-worker read printed 289 plausible lines,
+  died on the 2026-07-01 event, and never saw the other 7,236. So: no
+  single event can kill the run (an unrenderable one prints as a row and is
+  counted), and the listing ends with an explicit `END`/`COMPLETE` marker whose
+  ABSENCE is the tell. `learnings.md` 2026-09-02 FORBIDDEN: drawing a conclusion
+  from output the transport truncated.
+
 - **Local time, because that is when the operator was awake.** Slates, peaks and
   the MLB evening window are all local; UTC has produced a wrong recommendation
   here before. Both stamps are printed.
@@ -57,6 +72,7 @@ import argparse
 import datetime as dt
 import json
 import sys
+import traceback
 import urllib.parse
 from pathlib import Path
 
@@ -74,7 +90,7 @@ _MAX_PAGES = 100
 
 DEFAULT_TZ = "America/Chicago"
 
-EXIT_OK, EXIT_READER_FAILED = 0, 2
+EXIT_OK, EXIT_READER_FAILED, EXIT_ABORTED = 0, 2, 3
 
 
 def _local_zone(name: str):
@@ -184,6 +200,28 @@ def newest_event(service: str) -> dict | None:
     return None
 
 
+def _reason_of(event: dict):
+    """`details.reason` EXACTLY as the API sent it -- mapping, string, or None.
+
+    Render does NOT use one shape for this field, and the reader assumed it did.
+    Measured 2026-09-04 over a fully-paged read of refresh-worker (7,525 events,
+    76 pages): 759 `server_failed` and 1,522 `deploy_ended` events carry an
+    OBJECT here, while all 9 `auto_deploy_disabled` events carry the bare string
+    `"setting_change"` (first at 2026-07-01T21:19:15.826277Z). The old
+    `(details or {}).get("reason") or {}` looks defensive and is not: `or {}`
+    only rescues the falsey cases, so a non-empty string passes straight through
+    to `.get` and raises.
+
+    Returning the raw value -- rather than coercing it to a mapping -- keeps the
+    two cases distinguishable at the call sites, so an unexpected shape can be
+    PRINTED instead of silently flattened into "no reason".
+    """
+    details = event.get("details")
+    if not isinstance(details, dict):
+        return None
+    return details.get("reason")
+
+
 def classify(event: dict) -> str:
     """The REASON a `server_failed` fired, never flattened to 'failed'.
 
@@ -193,7 +231,12 @@ def classify(event: dict) -> str:
     kind = str(event.get("type") or "?")
     if kind != "server_failed":
         return kind
-    reason = (event.get("details") or {}).get("reason") or {}
+    reason = _reason_of(event)
+    if not isinstance(reason, dict):
+        # Absent, or a shape these buckets cannot be tested against. Either way
+        # it is not evidence of any known failure mode, so it goes to the
+        # unknown bucket -- never assumed empty and never assumed familiar.
+        return "failed:unknown"
     if reason.get("oomKilled"):
         return "oomKilled"
     if reason.get("evicted"):
@@ -208,7 +251,24 @@ def classify(event: dict) -> str:
 
 
 def _reason_detail(event: dict) -> str:
-    reason = (event.get("details") or {}).get("reason") or {}
+    """The human-readable half of `details.reason`, for ANY event type.
+
+    This runs against every row, not just failures, so it must tolerate every
+    shape Render puts in that field -- see `_reason_of`. A scalar reason IS the
+    detail and gets printed as-is: `auto_deploy_disabled  setting_change` is
+    precisely what a reader chasing CLAUDE.md `#284` wants to see, and dropping
+    it to keep the mapping assumption would trade a crash for a silent omission.
+    """
+    reason = _reason_of(event)
+    if reason is None:
+        return ""
+    if not isinstance(reason, dict):
+        # A string, or something stranger. Show it rather than discarding it --
+        # an unrecognised shape the operator can READ is a lead; one the reader
+        # swallowed is the next hour of someone's life.
+        if isinstance(reason, str):
+            return reason
+        return "raw reason: " + json.dumps(reason, sort_keys=True, default=str)
     oom = reason.get("oomKilled")
     if isinstance(oom, dict) and oom.get("memoryLimit"):
         return f"memoryLimit={oom['memoryLimit']}"
@@ -218,7 +278,7 @@ def _reason_detail(event: dict) -> str:
         # The whole point of a failed:unknown bucket is that someone can SEE the
         # shape that did not match. Printing nothing would hide the new mode as
         # effectively as mis-bucketing it.
-        return "raw reason: " + json.dumps(reason, sort_keys=True)
+        return "raw reason: " + json.dumps(reason, sort_keys=True, default=str)
     return ""
 
 
@@ -249,6 +309,21 @@ def _deploy_trigger(event: dict) -> str:
         # `#284`. Say so rather than printing an empty column.
         parts.append("NO USER (blueprint_sync shape?)")
     return " ".join(parts)
+
+
+def _describe(event: dict) -> tuple[str, str]:
+    """`(kind, detail)` for one row, or a visible placeholder if it cannot be.
+
+    One malformed event must not cost the census. The alternative -- letting it
+    propagate -- is what made this tool a false-negative instrument: the rows
+    print last, so the exception lands on stderr underneath a screenful of
+    perfectly plausible stdout. An unrenderable row is loud, counted in the END
+    line, and does not stop the read.
+    """
+    try:
+        return classify(event), (_reason_detail(event) or _deploy_trigger(event))
+    except Exception as exc:  # noqa: BLE001 -- shape errors are the whole point
+        return "!!UNRENDERABLE", f"{type(exc).__name__}: {exc}"
 
 
 def main() -> int:
@@ -285,7 +360,7 @@ def main() -> int:
 
     kinds: dict[str, int] = {}
     for event in selected:
-        key = classify(event)
+        key = _describe(event)[0]
         kinds[key] = kinds.get(key, 0) + 1
 
     failures = [e for e in events if str(e.get("type")) == "server_failed"]
@@ -296,6 +371,17 @@ def main() -> int:
     span_to = str(events[-1].get("timestamp")) if events else None
     requested_from = args.since or "(service start)"
     requested_to = args.end or "(now, i.e. this read)"
+
+    def row_payload(event: dict) -> dict:
+        stamp = str(event.get("timestamp"))
+        kind, detail = _describe(event)
+        return {
+            "timestamp": stamp,
+            "local": local(stamp),
+            "type": str(event.get("type")),
+            "kind": kind,
+            "detail": detail,
+        }
 
     if args.json:
         payload = {
@@ -318,7 +404,7 @@ def main() -> int:
                 {
                     "timestamp": str(last_failure.get("timestamp")),
                     "local": local(str(last_failure.get("timestamp"))),
-                    "kind": classify(last_failure),
+                    "kind": _describe(last_failure)[0],
                 }
                 if last_failure
                 else None
@@ -329,16 +415,10 @@ def main() -> int:
                 if control
                 else None
             ),
-            "events": [
-                {
-                    "timestamp": str(e.get("timestamp")),
-                    "local": local(str(e.get("timestamp"))),
-                    "type": str(e.get("type")),
-                    "kind": classify(e),
-                    "detail": _reason_detail(e) or _deploy_trigger(e),
-                }
-                for e in (selected[-args.tail :] if args.tail > 0 else selected)
-            ],
+            # A JSON document is self-terminating: a run that died mid-print
+            # yields text that will not parse, so this mode needs no separate
+            # completeness marker the way the text listing does.
+            "events": [row_payload(e) for e in (selected[-args.tail :] if args.tail > 0 else selected)],
         }
         print(json.dumps(payload, indent=2))
         return EXIT_OK if (events or control) else EXIT_READER_FAILED
@@ -393,7 +473,7 @@ def main() -> int:
         if parsed and end_parsed:
             minutes = (end_parsed - parsed).total_seconds() / 60.0
             gap = f"   ({minutes:.1f} min before the NEWEST EVENT, which is not 'now')"
-        print(f"# LAST FAIL  {stamp}  ({local(stamp)} local)  {classify(last_failure)}{gap}")
+        print(f"# LAST FAIL  {stamp}  ({local(stamp)} local)  {_describe(last_failure)[0]}{gap}")
     # What bounds 'clean' is the window READ, not the span of events in it. Under
     # the old single COVERED line these looked like the same thing, and the
     # narrower one won -- which understated a clean read to a ~6-minute slice.
@@ -407,12 +487,50 @@ def main() -> int:
     shown = selected[-args.tail :] if args.tail > 0 else selected
     if args.tail > 0 and len(selected) > args.tail:
         print(f"# showing last {args.tail} of {len(selected)}")
+    unrenderable = 0
     for event in shown:
         stamp = str(event.get("timestamp"))
-        detail = _reason_detail(event) or _deploy_trigger(event)
-        print(f"{local(stamp):19s}  {stamp:32s}  {classify(event):16s}  {detail}")
+        kind, detail = _describe(event)
+        if kind == "!!UNRENDERABLE":
+            unrenderable += 1
+        print(f"{local(stamp):19s}  {stamp:32s}  {kind:16s}  {detail}")
+
+    # THE COMPLETENESS MARKER. The rows are the last thing printed, so a run
+    # that dies here leaves stdout looking finished; stderr carries the
+    # traceback and a pipe through `tail`/`grep` throws it away. This line is
+    # the only thing that distinguishes the two, and its ABSENCE is the signal.
+    print("#")
+    print(f"# END        {len(shown)} row(s) printed of {len(selected)} selected, {len(events)} read.")
+    if unrenderable:
+        print(f"# BAD SHAPE  {unrenderable} event(s) could not be rendered -- see the !!UNRENDERABLE")
+        print("#            rows above. They were COUNTED, not skipped, but their kind is unknown.")
+    print("# OUTPUT COMPLETE -- this run reached the end of its listing. If you do not see")
+    print("#            this line, what you are reading is a FRAGMENT and settles nothing.")
     return EXIT_OK
 
 
+def _abort(exc: BaseException) -> int:
+    """Say on STDOUT that the run died; the traceback still goes to stderr.
+
+    Deliberately printed to stdout: the caller who most needs this is the one
+    piping through `tail`/`grep`, and stderr is exactly what that caller has
+    already discarded. Exit code is its own value (3) so a script can tell an
+    aborted run from a quiet window (0) and from a dead reader (2).
+    """
+    print("#")
+    print(f"# ABORTED    render_events died mid-run: {type(exc).__name__}: {exc}")
+    print("# OUTPUT ABOVE IS INCOMPLETE. It is not a census and supports no conclusion")
+    print("#            in either direction -- least of all 'no OOM events'.")
+    sys.stdout.flush()
+    traceback.print_exc()
+    return EXIT_ABORTED
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        _code = main()
+    except KeyboardInterrupt:
+        _code = _abort(KeyboardInterrupt("interrupted"))
+    except Exception as exc:  # noqa: BLE001 -- the banner is the point
+        _code = _abort(exc)
+    raise SystemExit(_code)

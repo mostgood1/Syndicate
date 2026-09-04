@@ -242,3 +242,132 @@ def test_deploy_by_a_user_reports_the_user():
 def test_oom_detail_carries_the_memory_limit():
     event = _event("2026-08-14T20:03:11Z", reason={"oomKilled": {"memoryLimit": "4Gi"}})
     assert render_events._reason_detail(event) == "memoryLimit=4Gi"
+
+
+# --------------------------------------------------------------------------
+# `details.reason` IS NOT ALWAYS A MAPPING. Measured 2026-09-04 over a fully
+# paged read of refresh-worker (7,525 events, 76 pages): 759 `server_failed`
+# carry an object there, and all 9 `auto_deploy_disabled` carry the bare string
+# `"setting_change"`. `_reason_detail` assumed the mapping, so the listing died
+# at 2026-07-01 with `AttributeError: 'str' object has no attribute 'get'` --
+# after printing 289 lines of plausible rows and never reaching the recent
+# window. A false-negative instrument: `learnings.md` 2026-09-02 FORBIDDEN.
+# --------------------------------------------------------------------------
+
+
+def test_a_string_reason_does_not_crash_the_reader():
+    """The exact shape and event that broke it, verbatim from the API."""
+    event = {
+        "id": "ev-auto-deploy-disabled",
+        "timestamp": "2026-07-01T21:19:15.826277Z",
+        "type": "auto_deploy_disabled",
+        "details": {"fromTrigger": "commit", "reason": "setting_change"},
+    }
+    assert render_events._reason_detail(event) == "setting_change"
+
+
+def test_a_string_reason_on_a_failure_is_unknown_not_a_crash():
+    """`classify` made the same assumption one line further down.
+
+    No `server_failed` has been seen with a scalar reason -- which is the point:
+    the shape that breaks a reader is by definition the one nobody has seen yet,
+    and this branch must not be waiting to raise when it arrives.
+    """
+    event = _event("2026-08-14T20:03:11Z", reason="somethingNew")
+    assert render_events.classify(event) == "failed:unknown"
+    assert render_events._reason_detail(event) == "somethingNew"
+
+
+def test_a_non_dict_details_block_does_not_crash():
+    event = {"id": "x", "timestamp": "2026-07-01T21:19:15Z", "type": "server_failed", "details": "opaque"}
+    assert render_events.classify(event) == "failed:unknown"
+    assert render_events._reason_detail(event) == ""
+
+
+def test_a_list_reason_is_shown_rather_than_swallowed():
+    """An unreadable shape the operator can SEE is a lead; a dropped one is not."""
+    event = _event("2026-07-01T21:19:15Z", "plan_changed", reason=["a", "b"])
+    assert "a" in render_events._reason_detail(event)
+
+
+# --------------------------------------------------------------------------
+# One bad event must not cost the census, and a run that dies must never look
+# like one that finished.
+# --------------------------------------------------------------------------
+
+
+class _Hostile:
+    """A value that raises even on being rendered -- the NEXT bad shape.
+
+    Non-dict reasons are now handled, so this stands in for whatever the API
+    does after that. The guarantee under test is not "we anticipated it" but
+    "an unanticipated one costs a row, not the run".
+    """
+
+    def __repr__(self):
+        raise RuntimeError("hostile shape")
+
+
+def test_one_unrenderable_event_is_a_visible_row_not_an_exception():
+    event = {"id": "x", "timestamp": "2026-07-01T21:19:15Z", "type": "server_failed", "details": {"reason": _Hostile()}}
+    kind, detail = render_events._describe(event)
+    assert kind == "!!UNRENDERABLE"
+    assert "hostile shape" in detail
+
+
+def test_the_listing_ends_with_a_completeness_marker(monkeypatch, capsys):
+    """The ABSENCE of this line is how a truncated run is caught. So it must be
+    present on a good run, and it must come AFTER the last row."""
+    rows = [
+        _row(_event("2026-07-01T21:19:15.826277Z", "auto_deploy_disabled", reason="setting_change"), "c0"),
+        _row(_event("2026-08-16T16:38:05Z", reason={"earlyExit": True}), "c1"),
+    ]
+    monkeypatch.setattr(render_events, "_api_key", lambda: "k")
+    monkeypatch.setattr(render_events, "_get", lambda url, key: rows)
+    monkeypatch.setattr(sys, "argv", ["render_events.py", "--service", "refresh-worker"])
+
+    assert render_events.main() == render_events.EXIT_OK
+    lines = capsys.readouterr().out.splitlines()
+
+    def index_of(needle: str) -> int:
+        return next(i for i, ln in enumerate(lines) if needle in ln)
+
+    # The marker means "the listing finished", so it has to come after the last
+    # row. A marker printed before the rows would certify nothing.
+    assert index_of("setting_change") < index_of("OUTPUT COMPLETE")
+
+
+def test_a_full_run_over_the_real_mixed_shapes_reaches_the_end(monkeypatch, capsys):
+    """The regression in one line: the old reader stopped at the string row."""
+    mixed = [
+        _row(_event("2026-07-01T21:19:15.826277Z", "auto_deploy_disabled", reason="setting_change"), "c0"),
+        _row(_event("2026-08-17T03:55:17Z", reason={"oomKilled": {"memoryLimit": "4Gi"}}), "c1"),
+        _row(_event("2026-09-01T10:00:00Z", "deploy_started", trigger={"manual": True}), "c2"),
+    ]
+    monkeypatch.setattr(render_events, "_api_key", lambda: "k")
+    monkeypatch.setattr(render_events, "_get", lambda url, key: mixed)
+    monkeypatch.setattr(sys, "argv", ["render_events.py", "--service", "refresh-worker"])
+
+    assert render_events.main() == render_events.EXIT_OK
+    out = capsys.readouterr().out
+    # Every row PAST the string-reason event is what the crash used to eat.
+    assert "memoryLimit=4Gi" in out
+    assert "2026-09-01T10:00:00Z" in out
+    assert "OUTPUT COMPLETE" in out
+
+
+def test_the_abort_banner_goes_to_stdout_not_stderr(capsys):
+    """The caller who most needs the banner is the one piping through `tail`.
+
+    That caller has already discarded stderr -- which is exactly why the
+    traceback alone was not enough, and why this assertion is about the STREAM
+    and not merely about the text.
+    """
+    code = render_events._abort(RuntimeError("simulated transport blowup"))
+    captured = capsys.readouterr()
+
+    assert code == render_events.EXIT_ABORTED
+    assert render_events.EXIT_ABORTED not in (render_events.EXIT_OK, render_events.EXIT_READER_FAILED)
+    assert "ABORTED" in captured.out
+    assert "INCOMPLETE" in captured.out
+    assert "simulated transport blowup" in captured.out
