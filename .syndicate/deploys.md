@@ -22463,3 +22463,25 @@ global alias maps that a new lane should address explicitly rather than inherit.
    serves. Read `unmatched_game_rows` on `/api/board/book-grid?sport=nfl` after
    the deploy; the prediction on the same grid is **299 -> 78**, and prime-time
    dates going 0 -> full is the visible half.
+
+**SUPERSEDED — THE PREDICTION IS NOW `299 → 0`, NOT `299 → 78`.**
+`[2026-09-04, lane nfl-la-rams-alias, commit fb7a1f96, NO DEPLOY]`
+
+The 78-row residual handed off above was ONE MISSING ALIAS, now fixed and on
+`origin/main`: nflverse spells the Rams `LA`, and `_NFL_ALIAS_TO_NAME` carried
+`lar`/`stl` and no `la`. **Whoever takes the owed `web` deploy ships BOTH
+commits, so read the `after` against 0 and treat ANY residue as a third defect**
+— do not read 78 as success.
+
+Measured on the SAME captured grid as the entry above (2026-09-04T20:56:12Z),
+one binary both arms, the alias popped in memory for the `before`:
+
+    unmatched_game_rows       78 → 0        (of 1,252 considered)
+    rows_with_projection   1,174 → 1,252
+    distinct unmatched fx     17 → 0        (all 17 were Rams games)
+
+The `before` arm reproduces this entry's own 321 / 1,252 / 78 EXACTLY, which is
+what calibrates the harness against the handed-down number instead of assuming
+it. Substrate `checkout` for the index, production rows for the payload —
+evidence about the CODE. **Not a claim about what production serves, and no
+deploy taken: the fleet is still another lane's.**

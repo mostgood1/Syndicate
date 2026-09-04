@@ -701,7 +701,17 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 
 ### ncaaf-chip-compact — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, FIXED, LANDED. NOT DEPLOYED. The reported symptom is a JOIN failure, not a missing abbreviation — the chip already carried `MAS`/`RUT`.**
-- Files: `syndicate/features/shared/team_aliases.py`,
+- Files: RELEASED `[2026-09-04, TAKEN by lane nfl-la-rams-alias, session ff257687]`: `syndicate/features/shared/team_aliases.py`
+  Taken because THIS lane's session `3492626c` is GONE — verified, not
+  assumed: `list_sessions(include_archived=true, limit=100)` returns 100 sessions
+  back to 2026-08-21 and `3492626c` is in none of them, while this lane and
+  `gate-per-side-derived` were both opened under it. Disjoint by function in any
+  case: ONE key added to `_NFL_ALIAS_TO_NAME` (`la` -> Los Angeles Rams, the
+  nflverse code); your claim is the NCAAF chip join, which this block's own
+  header records as already LANDED, and `_ncaaf_registry_name` / `chip_join_key`
+  are untouched. Enumerated before taking: of 5,041 ordered NFL token pairs
+  exactly 6 verdicts move, every one a Rams/LA pair.
+  Take it back by striking this note and restoring the path on its own line.
   `syndicate/features/shared/game_chip_scoreboard.py`,
   RELEASED `[2026-09-03, lane layer2-sim-disagrees, SAME session 3492626c]`: the
   layer2 board module. Narrow and disjoint by function: that lane edits
@@ -1686,6 +1696,41 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   23 of top 25 rows were `hr_1plus`); and RETIRING `_SCORE_SIM_WEIGHT`, which
   double-counts once EV carries the model.
 - Blocked by: none. NOT DEPLOYED, and inert until beta is non-zero.
+
+### nfl-la-rams-alias — CLOSED 2026-09-04 — opened 2026-09-04 — session ff257687-e3c6-48e0-b92a-e6e494211885 — **FIXED, MUTATION-CHECKED, LANDED (`fb7a1f96`). NOT DEPLOYED — the fleet is `nfl-projection-et-datekey`'s, and `deploys.md`'s owed entry is updated to predict `299 → 0` so nobody reads 78 as success.** Hypothesis CONFIRMED exactly: the 78-row residual was one missing alias and nothing else.
+- Goal: `teams_match("nfl", "los angeles rams", "la")` returns True. nflverse
+  writes the Rams as `LA` (`schedule_2026.csv` row `2026_01_SF_LA`); the map knew
+  `lar` and `stl` and not `la`. MET.
+- Files: `syndicate/features/shared/team_aliases.py` (TAKEN from the phantom lane
+  `ncaaf-chip-compact` — see the note in its block), `tests/test_team_aliases.py`.
+- Falsification test (pre-registered): if `la` is the cause, the replay's
+  `unmatched_game_rows` goes to 0; ANY residue is a different defect. **Result: 0
+  residue, so the hypothesis stands as stated.**
+- Verification, all three run:
+  1. Replay of production's own grid (2026-09-04T20:56:12Z), both arms on the
+     identical payload: `unmatched_game_rows` **78 → 0**, `rows_with_projection`
+     1,174 → 1,252, distinct unmatched fixtures 17 → 0. The `before` arm
+     reproduces the handed-down 321 / 1,252 / 78 exactly — that is what calibrates
+     the harness rather than trusting the number.
+  2. Mutation check: removing the single dict entry turns BOTH fix-detecting tests
+     red; the third is an invariant guard and correctly stays green either way.
+  3. Regression control: the SAME 11 failures with and without the fix (the
+     excluded-`data/` failures of a session worktree), 139 → 142 passed — the
+     delta is exactly the three new tests, re-baselined against pristine HEAD in
+     the same tree rather than assumed.
+- FORBIDDEN 2026-08-29 on populating an alias map, both limbs answered:
+  (a) the SOURCE carries the name — `LA` is literally one of the 32 codes in
+  `schedule_2026.csv`, not inferred from the failure; (b) the semantics flip is
+  ENUMERATED over the whole vocabulary — 71 tokens, 5,041 ordered pairs, 6
+  verdicts move, all Rams/LA, and 0 map-resolvable pairs disagree with the map
+  afterwards. **One of the 6 is a `true → false`: the initials heuristic already
+  matched `la` to the CHARGERS, so this REMOVES a live wrong-club match rather
+  than risking one.** `_nickname_alias_map` (32) and `unambiguous_club_tokens`
+  (95) both derive from VALUES and do not move; asserted in the tests.
+- NOT the FORBIDDEN global alias map: one per-sport key in a map that already
+  exists, and `teams_match` is sport-scoped, so the basketball `LA` is
+  unreachable from here.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
