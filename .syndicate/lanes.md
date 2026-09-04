@@ -858,10 +858,14 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   (16-game slate, all `Preview`). One warn = one synchronous statsapi call, 8s
   timeout, inside a web request, against a 5s health-check budget. Every
   non-zero increment observed was exactly **32** — the loop runs the full
-  16-game slate twice per event. The gate `_actual_payload_is_live` (`cards.py:3434`)
+  16-game slate twice per event. ~~The gate `_actual_payload_is_live` (`cards.py:3434`)
   is false for `Preview` AND `Final`, so the re-fetch fires for most of the
-  slate most of the day; a "tracks live games" hypothesis was pre-registered and
-  FALSIFIED. Not established: who the caller is (all bursts hit ONE worker on a
+  slate most of the day~~ **— RETRACTED 2026-09-04: I read that predicate out of
+  the primary tree, 145 commits behind; the deployed `ee20c522` uses
+  `mlb_feed_payload_is_final`, and the owner's counter shows the MISSING-FILE
+  branch firing (`no_cached_payload=16`), not the staleness one. The NUMBER
+  stands; the mechanism does not. See their REPLY in the handoff doc.** The
+  "tracks live games" hypothesis was pre-registered and FALSIFIED. Not established: who the caller is (all bursts hit ONE worker on a
   ~60s beat — smells like a poller, unproven) and whether latency is actually
   harmed. Beware `@lru_cache` — see `scope_2026-08-21_home_request_path_compute.md`
   §3. Full working: `handoff_2026-09-04_feed_live_request_path_rate.md`.

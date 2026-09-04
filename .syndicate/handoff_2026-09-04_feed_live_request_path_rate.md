@@ -81,7 +81,49 @@ Window 2026-09-04T18:42:53Z .. 18:51:46Z. No restart in it (no count decreased).
 an 8-second timeout, executed inside a live web request** — against Render's
 5-second health-check budget.
 
-## The mechanism, and why it is NOT what you'd guess
+## RETRACTED — the mechanism section below is WRONG. Read the owner's REPLY.
+
+`[retracted by its author, 2026-09-04, after the owning lane corrected it]`
+
+**I read the wrong code.** The mechanism analysis below cites
+`_actual_payload_is_live` at `cards.py:2344`. That line was read out of the
+PRIMARY TREE, which sat at `5f54bce5` — **145 commits behind `origin/main`** —
+and it does not exist in what was running. Verified by content against the
+deployed SHA `ee20c522`:
+
+    ee20c522:2359   # This read was `not _actual_payload_is_live(payload)`, which is the
+    ee20c522:2391   if refreshable and isinstance(payload, dict) and not mlb_feed_payload_is_final(payload):
+
+The string I quoted survives in the deployed code **only inside the owner's own
+comment explaining why it was wrong**. The live gate is
+`mlb_feed_payload_is_final`, so `Final` does not re-fetch, and my "false for
+`Preview` AND `Final`" sentence describes code that was already replaced when I
+measured it.
+
+**And the predicate is not the driver anyway.** The owner's production counter
+shows the missing-file branch firing, not the staleness one:
+
+    FEED_LIVE_REFRESH date=2026-09-04 games=16 no_cached_payload=16
+      skipped_final=0 attempted=16 succeeded=16
+
+16 of 16 fetched because the artifact is ABSENT on web (it matches no
+`HOT_ARTIFACT_PATTERNS`), not because it was stale. That also explains the
+whole-slate-pass unit better than any per-game trigger does. **So tuning the
+predicate cannot move the number** — the levers are allowlisting
+`raw/statsapi/feed_live/**` so web's local read hits, or not fetching in a
+request path at all.
+
+This is a standing rule I already had and broke: *the primary tree is not the
+deployed code — grep the deployed SHA*. I applied it correctly to
+`request_path_guard.py` earlier the same session and then read `cards.py` off
+the checkout.
+
+**What SURVIVES, and the owner confirms it independently:** the measurement
+itself (128 calls / 20.0 min / 8 full-slate passes / zero live games), the
+whole-slate unit, and the `@lru_cache` warning. The number was never in dispute;
+my explanation of it was.
+
+## The mechanism, and why it is NOT what you'd guess — RETRACTED, see above
 
 `cards.py:2345` and `:2349`, inside `for game_pk in game_pks:` —
 
