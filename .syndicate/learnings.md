@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 778 rules `[generated]`
+## Index — 781 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5318,3 +5318,42 @@ routinely in the same line as the token. And when the fix would CREATE an
 obligation for someone else (a claim, a lock, an owner), that is the case to
 route to the owner rather than remedy yourself, because a wrong fix in that
 direction is silent and lands on a third party.
+
+## 2026-09-04 — before a catch-up deploy, check whether the OWNING lane is already shipping it
+
+Twice in consecutive rounds the correct action was to deploy nothing:
+
+- **Round 9, web.** `442f82fe` was `web-oom-profiler-steady`'s OWN commit. That
+  lane held web's claim and web had booted 24 minutes earlier — one minute short
+  of the 25-min window its late-emission method needs, because the accumulator is
+  cumulative from boot. A deploy would have reset the clock as the reading came
+  due.
+- **Round 10, refresh-worker.** `prop-join-yield` held the claim with a deploy
+  ALREADY IN FLIGHT. `dbe0f3b4` carried the same fix by content (`chip_join_key`
+  x3, `9d106d11` an ancestor). Deploying would have duplicated it and risked
+  cancelling their build — the 2026-08-15 incident, and what was done to me at
+  20:44Z on 09-03.
+
+**The rule.** A catch-up round is not entitled to a service. Before deploying,
+ask two questions the claim alone does not answer:
+1. **Who OWNS the pending content?** `check_lane_invariants.claims()` maps file →
+   lane. If the lane that claims the file is live, the commit is theirs to ship.
+2. **Is a deploy already in flight?** `/deploys?limit=1` — a `build_in_progress`
+   is invisible to the preflight's spacing check, which measures from the last
+   FINISHED deploy.
+
+Then check the in-flight commit BY CONTENT, not by ancestry: if it already
+carries the change, there is nothing to do and the catch-up is complete.
+
+## 2026-09-04 — REBASE FIRST, then edit ledger files
+
+Corollary to the stale-rebase rule, hit one round after writing it. Appending to
+`deploys.md` before rebasing makes the tree dirty, `git rebase` refuses with one
+line of output, and every ledger file you then edit is written against a stale
+base. The rule catches it; the SEQUENCING prevents it. Rebase, verify it said
+something other than a refusal, then edit.
+
+Cheap pre-check that beats waiting for `ledger-commit-guard`: compare your
+`lanes.md` block headings against `git show origin/main:.syndicate/lanes.md` and
+assert both directions are empty — nothing of yours that upstream archived
+(would un-archive), nothing of upstream's that you lack (would drop).

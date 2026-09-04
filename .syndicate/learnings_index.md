@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 778 rules `[generated]`
+## Index — 781 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 280**
+**FORBIDDEN — 281**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -216,6 +216,7 @@
 - [2026-09-03 — FORBIDDEN: reporting a commit as PUSHED on the strength of a command that…](#2026-09-03-forbidden-reporting-a-commit-as-pushed-on-the-strength-of-a-command-that-also-succeeds-when-it-is-not-and-after-a-rebase---is-ancestor-on-the-old-sha-is-not-evidence-it-is-absent-session-c38d3e5c-with-f97ad5ab)
 - [2026-09-03 — FORBIDDEN: comparing a CONTROL window sampled differently from the treatme…](#2026-09-03-forbidden-comparing-a-control-window-sampled-differently-from-the-treatment-window-the-rate-ratio-is-an-artefact-of-the-sampling-and-it-will-flatter-whichever-side-you-sampled-less-lane-prop-join-yield)
 - [2026-09-04 — FORBIDDEN: asserting absence from a range whose START YOU CHOSE — and the…](#2026-09-04-forbidden-asserting-absence-from-a-range-whose-start-you-chose-and-the-reason-this-one-got-through-which-is-the-actually-useful-part)
+- [2026-09-03 — FORBIDDEN: choosing a REMEDY from a checker's finding without reading the…](#2026-09-03-forbidden-choosing-a-remedy-from-a-checkers-finding-without-reading-the-owning-blocks-intent-a-true-finding-can-carry-a-false-fix-and-the-fix-is-the-part-that-does-damage-session-c38d3e5c-caught-by-f97ad5ab)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -299,7 +300,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 493**
+**Rules and corrections — 495**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -481,6 +482,8 @@
 - [2026-09-04 — A LANE CLAIM ON A LEDGER FILE GUARDS NOTHING, and I read the evidence for…](#2026-09-04-a-lane-claim-on-a-ledger-file-guards-nothing-and-i-read-the-evidence-for-that-twice-without-extracting-it)
 - [2026-09-03 — A false REASSURANCE is worse than a false WARNING, so it needs a higher ba…](#2026-09-03-a-false-reassurance-is-worse-than-a-false-warning-so-it-needs-a-higher-bar-every-one-of-five-errors-in-one-night-was-in-the-reassuring-direction-sessions-c38d3e5c-37abeca0)
 - [2026-09-04 — a failed rebase leaves a STALE ledger file that `git add` will happily rec…](#2026-09-04-a-failed-rebase-leaves-a-stale-ledger-file-that-git-add-will-happily-record)
+- [2026-09-04 — before a catch-up deploy, check whether the OWNING lane is already shippin…](#2026-09-04-before-a-catch-up-deploy-check-whether-the-owning-lane-is-already-shipping-it)
+- [2026-09-04 — REBASE FIRST, then edit ledger files](#2026-09-04-rebase-first-then-edit-ledger-files)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
