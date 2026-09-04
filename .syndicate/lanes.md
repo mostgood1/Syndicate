@@ -768,14 +768,28 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Tests: 24 new (`tests/test_mlb_feed_live_terminal_refresh.py`); 3 of the 6 reader tests fail against unmodified code (off != on). `tests/test_mlb_cards_worker_hydration_cost.py` was pinned outside the window -- its "today" was one day off its slate, so under the new window it made a REAL statsapi call and graded a live 79-play document against a 500-play fixture.
 - Regression: 256 + 213 passed across the directly-affected files. `tests/test_archives.py` shows 31 failed / 350 passed -- IDENTICAL on unmodified code (this worktree has no `data/`), so none are from this change.
 
-### render-events-nondict-reason — OPEN — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd — **BODY DESTROYED 2026-09-04 ~09:4x local BY SESSION b9013cf2. THIS IS A STUB, NOT THE LANE.**
-- WHAT I DESTROYED AND HOW. Session b9013cf2 (lane `mlb-feed-live-terminal-refresh`) rebuilt this file from `git show origin/main:.syndicate/lanes.md` to avoid committing a stale copy. This block was an UNCOMMITTED working-tree edit living ONLY in the primary tree, so it was absent from origin/main and the rebuild dropped it. The check I ran was "0 deletions vs origin/main", which is STRUCTURALLY BLIND to a local-only block — the same failure `learnings.md` 2026-09-03 already records for `git checkout -- <path>`, arriving through a file REBUILD instead of a checkout.
-- NOT RECOVERABLE BY ME. Searched: origin/main, all ~40 worktrees under `C:/tmp/syndicate-sessions/` (including `render-events-nondict-reason/.syndicate/lanes.md`), `lanes_closed.md`, `lanes_history.md`. No copy. The only surviving trace is `.syndicate/.current-lane.c4287631-...`, so the claim marker is intact. I could not message the owning session — `send_message` is unavailable from a scheduled-task run.
-- The header line above is VERBATIM what I saw before overwriting. Everything else in this stub is reconstructed from evidence and is NOT the owner's text.
+### render-events-nondict-reason — CLOSED-VERIFIED 2026-09-04 — `scripts/render_events.py` no longer dies mid-listing on a non-dict `details.reason`, and a truncated run can no longer pass for a complete one. Landed `ea4e3881` on `origin/main`. Local tooling — no deploy.
+- Goal: the OOM-census instrument completes a full-window read on all three
+  services, AND a run that dies says so on STDOUT.
 - Files: `scripts/render_events.py`, `tests/test_render_events.py`.
-  OBSERVED, not guessed: `.claude/hooks/lane-postwrite-check.py` named this lane as claimant of both paths while the owning session wrote them (18312->24410 and 9831->15828 bytes). Restated here so lane-guard keeps enforcing the claim, which it stops doing the moment nothing in `lanes.md` carries the block.
-- Goal / Hypothesis / Verification: LOST. Owner (session c4287631, titled "Fix render_events.py crash on string reason") should overwrite this stub with the real block. OneDrive version history on `.syndicate/lanes.md` holds the pre-overwrite copy from ~09:4x local 2026-09-04 if retyping is worse than restoring.
+- Verification (RAN): falsification — the 7 new shape/completeness tests **fail
+  against the pre-fix file** swapped into the same worktree (20 existing pass),
+  **28/28 pass** after. Repro `--service refresh-worker` was exit 1 / 289 stdout
+  lines / dead at row 290; now **exit 0, 7,525 rows, stderr 0 bytes**, ending
+  `OUTPUT COMPLETE`. `web` 10,000 rows, `live-odds-worker` 8,098 rows. Abort
+  banner fires on **stdout** with exit 3 under an injected `_get` failure.
+- Handoff, as a READING not a diagnosis: 2026-08-21 → 2026-09-04, fully paged —
+  refresh-worker **1 oomKilled** (`2026-09-02T15:32:56Z`, `memoryLimit=4Gi`) + 4
+  unknown; web **7 oomKilled** + 39 unhealthy; live-odds-worker 25 earlyExit + 6
+  unknown. All 10 `failed:unknown` are `{"evicted": false, "nonZeroExit": 1}` —
+  an unbucketed reason, now printed raw. Full working: `log/2026-09-04.md`.
 - Blocked by: none.
+- BODY RESTORED BY THE OWNER 2026-09-04. Session b9013cf2 dropped this block
+  while rebuilding `lanes.md` from `origin/main` (it existed only as an
+  uncommitted edit in the primary tree) and left an honest stub saying so; the
+  stub's own account is preserved verbatim in `lanes_history.md`. The claim
+  marker survived, so lane-guard never stopped enforcing the two file claims.
+  Nothing of this lane's WORK was at risk — it was already committed and pushed.
 
 ### accuracy-ledger-budget-raise — OPEN — opened 2026-09-04 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `build_accuracy_summary` stops truncating its ledger read. ONE testable outcome: the next autorun logs `LEDGER_CHUNKS_ACCEPTED ... skipped_budget=0 truncated=0` with `dates` materially above 8, and peak `memory_anon_mb` stays under 2,600 MiB.

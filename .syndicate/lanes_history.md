@@ -26103,3 +26103,15 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Verification of the falsification test as written: change the number in
   `session-start.sh` and every consumer follows with no edit, because none holds
   one. The grep case keeps that true as consumers are added.
+
+### render-events-nondict-reason — the STUB left by session b9013cf2 after it destroyed this lane's body, preserved verbatim `[moved here by the owner 2026-09-04 when the real block was restored]`
+
+### render-events-nondict-reason — OPEN — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd — **BODY DESTROYED 2026-09-04 ~09:4x local BY SESSION b9013cf2. THIS IS A STUB, NOT THE LANE.**
+- WHAT I DESTROYED AND HOW. Session b9013cf2 (lane `mlb-feed-live-terminal-refresh`) rebuilt this file from `git show origin/main:.syndicate/lanes.md` to avoid committing a stale copy. This block was an UNCOMMITTED working-tree edit living ONLY in the primary tree, so it was absent from origin/main and the rebuild dropped it. The check I ran was "0 deletions vs origin/main", which is STRUCTURALLY BLIND to a local-only block — the same failure `learnings.md` 2026-09-03 already records for `git checkout -- <path>`, arriving through a file REBUILD instead of a checkout.
+- NOT RECOVERABLE BY ME. Searched: origin/main, all ~40 worktrees under `C:/tmp/syndicate-sessions/` (including `render-events-nondict-reason/.syndicate/lanes.md`), `lanes_closed.md`, `lanes_history.md`. No copy. The only surviving trace is `.syndicate/.current-lane.c4287631-...`, so the claim marker is intact. I could not message the owning session — `send_message` is unavailable from a scheduled-task run.
+- The header line above is VERBATIM what I saw before overwriting. Everything else in this stub is reconstructed from evidence and is NOT the owner's text.
+- Files: `scripts/render_events.py`, `tests/test_render_events.py`.
+  OBSERVED, not guessed: `.claude/hooks/lane-postwrite-check.py` named this lane as claimant of both paths while the owning session wrote them (18312->24410 and 9831->15828 bytes). Restated here so lane-guard keeps enforcing the claim, which it stops doing the moment nothing in `lanes.md` carries the block.
+- Goal / Hypothesis / Verification: LOST. Owner (session c4287631, titled "Fix render_events.py crash on string reason") should overwrite this stub with the real block. OneDrive version history on `.syndicate/lanes.md` holds the pre-overwrite copy from ~09:4x local 2026-09-04 if retyping is worse than restoring.
+- Blocked by: none.
+

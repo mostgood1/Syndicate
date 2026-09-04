@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 797 rules `[generated]`
+## Index — 799 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4837,3 +4837,37 @@ per-statement probe will ever find it, however well built.
 Related: `[2026-09-04]` "check that the thing you are gating actually runs",
 which is the same error one level up — both are cases of building a correct
 instrument for a mechanism that was never there.
+
+## 2026-09-04 FORBIDDEN: an instrument whose partial output is indistinguishable from its complete output. `[lane render-events-nondict-reason]`
+
+`render_events.py` — the tool this file NAMES as the only valid source for an
+`oomKilled` census — crashed mid-listing on a shape it did not expect
+(`details.reason` is a bare string on `auto_deploy_disabled`, 9 of 7,525 events;
+`or {}` rescues only the falsey cases). It printed **289 lines of plausible
+event rows, died at 2026-07-01, and never reached the recent window.** The
+traceback went to **stderr** — which a caller piping through `tail`/`grep` has
+already discarded. So the tool could answer "no OOM events" about a window it
+never read, and had been able to since it shipped 2026-08-16.
+
+The rule is not "handle that shape". It is: **a reader that can stop early MUST
+be able to say that it did, on the stream the caller reads.** Three parts, all
+now in `render_events.py` as the reference:
+
+1. **A completeness marker as the LAST line** (`# OUTPUT COMPLETE`). Its
+   ABSENCE is the signal; nothing else distinguishes a finished listing from a
+   fragment, because a fragment ends too.
+2. **The failure banner goes to STDOUT, not stderr**, with a distinct exit code
+   (3 — apart from quiet-window 0 and dead-reader 2). Writing the warning only
+   to the stream the caller threw away is the same defect one layer up.
+3. **One bad record costs a ROW, not the run.** Render it as
+   `!!UNRENDERABLE <exception>` and count it. Anything else trades a visible
+   anomaly for an invisible truncation.
+
+This is the twin of `[2026-09-02]` "drawing a conclusion from a log line the API
+TRUNCATED": there the transport truncated and here the reader did, and in both
+the output that survived looked complete. **Coverage that is not asserted is not
+coverage** — the same reason this tool already prints READ separately from the
+event span. Working (shapes, falsification, the first honest census):
+`log/2026-09-04.md`.
+
+
