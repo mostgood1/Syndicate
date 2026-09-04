@@ -912,6 +912,7 @@ def staked_probability(
     *,
     beta: Any = 0.0,
     alpha: Any = None,
+    model_is_current: bool = True,
 ) -> float | None:
     """The probability a bet is actually PRICED and SIZED on: a fitted blend.
 
@@ -973,6 +974,26 @@ def staked_probability(
         # parsed: with beta at zero the model cannot matter, and a round trip
         # through logit/expit would perturb the board by float noise for no
         # reason.
+        return market
+
+    if not model_is_current:
+        # THE LIVE RULE, and it is the same rule as "no model view" -- which is
+        # why it lives here rather than as a separate refusal downstream.
+        #
+        # A pregame probability priced against a RE-PRICED live market yields
+        # the score, not an edge. `#340` measured it: a +23-point "edge" on a
+        # coin-flip. `#414` is the sharper warning -- the re-sim used to ship a
+        # live MEAN with no live probability, and the `modelProbOver` sitting
+        # beside it was BIT-IDENTICAL to the pregame value on 24 of 28 live
+        # rows while the projection genuinely moved. A stale model view does not
+        # announce itself; it looks exactly like a current one.
+        #
+        # `live_projection_join` already enforces this at the JOIN (it accepts
+        # only `live_prob_over` and refuses to fall back). This carries the same
+        # rule into PRICING, because the sizer has no live awareness at all --
+        # `portfolio_commit` records `sim_view` and never gates on it, and the
+        # `market_fair` path deliberately bypasses the `no_model_edge_pct`
+        # refusal that was the only thing implicitly enforcing it.
         return market
 
     model = _as_float(model_prob)

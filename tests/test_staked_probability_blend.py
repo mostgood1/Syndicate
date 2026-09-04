@@ -175,3 +175,40 @@ def test_the_clamp_binds_symmetrically():
     high = staked_probability(0.9999, 0.9999, beta=8.0, alpha=8.0)
     assert low is not None and high is not None
     assert low == pytest.approx(1.0 - high, abs=1e-9)
+
+
+# --- the live rule -----------------------------------------------------------
+
+
+def test_a_STALE_model_view_gets_no_weight_however_large_beta_is():
+    """`model_is_current=False` collapses to the market, at any beta.
+
+    A pregame probability priced against a RE-PRICED live market yields the
+    score, not an edge -- `#340` measured a +23-point "edge" on a coin-flip.
+    And a stale view does not announce itself: `#414` found the pregame
+    `modelProbOver` bit-identical to the pregame value on 24 of 28 live rows
+    while the projection beside it genuinely moved.
+    """
+    for beta in (0.25, 0.5, 1.0, 4.0):
+        assert staked_probability(0.3, 0.9, beta=beta, model_is_current=False) == 0.3
+
+
+def test_the_live_rule_is_not_a_kill_switch():
+    """`off != on` in the other direction: a CURRENT model view at the same
+    beta must still move the price, or the gate is just a disable."""
+    stale = staked_probability(0.3, 0.9, beta=0.5, model_is_current=False)
+    current = staked_probability(0.3, 0.9, beta=0.5, model_is_current=True)
+    assert stale == 0.3
+    assert current is not None and abs(current - 0.3) > 0.1, current
+
+
+def test_current_is_the_DEFAULT_so_the_pregame_path_is_untouched():
+    """Most rows are pregame and their model view is valid by construction.
+    Defaulting to False would silently mute the model everywhere."""
+    assert staked_probability(0.3, 0.9, beta=1.0) == pytest.approx(0.9, abs=1e-9)
+
+
+def test_a_stale_view_still_refuses_an_unusable_MARKET_probability():
+    """The live rule must not become a way to price a row the market cannot."""
+    assert staked_probability(0.0, 0.9, beta=0.5, model_is_current=False) is None
+    assert staked_probability(None, 0.9, beta=0.5, model_is_current=False) is None
