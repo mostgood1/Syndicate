@@ -20990,3 +20990,90 @@ Arm it on the next ordinary window like any other change, accepting one killed
 job cycle, at an hour BEFORE 07:00 CT so the gate still holds the first run.
 Arming after 07:00 fires it immediately on a live slate — that is what made the
 peer's 22:4x key-set unsafe on 09-03.
+
+## 2026-09-04 08:20 CDT (13:20Z) — floor-1200 tune (`c4ce0502`, `dep-dacof4rl550s73eajb4g`) VERIFIED — the pre-registered prediction is **CONFIRMED**, 59% — lane `board-window-floor-raise`
+
+`SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` `1800` -> `1200` on
+refresh-worker, injected by deploy `dep-dacof4rl550s73eajb4g` of `c4ce0502`
+(live ~2026-09-03T14:5xZ). This row discharges what the `1800` reading
+(14:36Z, 87%) left owed when that floor was judged correct-by-mechanism and too
+blunt.
+
+**THE PREDICTION WAS RECORDED BEFORE THE DEPLOY, so this is a test and not a
+description.** At 1800 the gated `elapsed_s` distribution was n=131, min 66,
+p25 513, med 983, p75 1384, max 1795. At a 1200 floor every attempt with
+`elapsed_s >= 1200` flips to admitted — 42 flip, 89 stay gated:
+
+    predicted clip rate ~= 89/150 = 59%   (was 131/150 = 87%)
+    predicted non-today build gap: BELOW the 2,096.7 s median seen at 1800
+    CONFIRMED = a rate in 50-70% TOGETHER WITH a fall in the non-today gap
+
+### The gate, checked before any rate was read
+
+    floor_s seen : {'1200': 290}
+
+All 290 telemetry lines carry `floor_s=1200`, so the window holds ONE floor and
+the rate is not an average of two regimes. `--since 2026-09-03T15:00:00Z` was
+chosen for exactly that — the default `--since` starts in the 1800 era.
+
+### The window ACTUALLY covered (not the one requested)
+
+    2026-09-03T15:09:31.729Z -> 2026-09-04T13:20:31.867Z   (22.2 h, 290 lines)
+
+### The clip rate, with its denominator
+
+| date | GATED | ADMITTED | clip rate | gated `elapsed_s` median |
+|---|---|---|---|---|
+| 2026-09-03 | 0 | 69 | 0% | — |
+| 2026-09-04 | 30 | 115 | 21% | 851 s |
+| 2026-09-05 | 55 | 21 | 72% | 626 s |
+
+    NON-TODAY:  GATED 85 / (85 gated + 60 admitted-throttled) = 145  ->  59%
+
+Today/non-today comes off `throttled=yes|no`, the loop's OWN flag, never
+`min(dates)`. The window spans the 05:00Z rollover — read straight off that
+flag, `2026-09-03` was today until 04:49:36Z and `2026-09-04` from 05:00:52Z —
+and inferring today from the dates is what produced a wrong 44% on the 1800
+reading.
+
+**Predicted 59%, measured 59%, band 50-70%. CONFIRMED.** A second pass minutes
+later, over a window 4 lines longer, read 86/147 = 59%. This also reconciles the
+short early reading of 55% carried in the lane block: same band, over a window
+an order of magnitude shorter.
+
+### The build gap, bucketed by that same flag
+
+`BUILD_SPAN_ENTER stage=pull_hot_artifacts`, every gap assigned to today or
+non-today by whether the loop called that date throttled at the gap's START:
+
+| bucket | at 1800 | at 1200 | n (at 1200) |
+|---|---|---|---|
+| non-today median gap | 2,096.7 s | **1,704.8 s** | 41 |
+| today median gap | 665.7 s | **1,163.5 s** | 70 |
+
+Non-today fell 392 s (-19%), which is the second half of the prediction.
+**CONFIRMED.**
+
+**The cost side, stated rather than buried.** Today's gap ROSE 498 s (+75%). The
+prediction named the mechanism — "admitting ~42 more non-today builds consumes
+worker capacity and shifts the timing" — but did not quantify it, and the
+observed rise is LARGER than the non-today fall. **Do not read that as a
+net-negative verdict:** the two readings come from different windows (10.2 h vs
+22.2 h) over different slates, the 1800 today-figure was itself taken on a deploy
+carrying 35 commits of five sessions of code, and medians over unequal n are not
+a capacity accounting. What it does establish is that 1200 is NOT free for today,
+which the 1800 row's "today got FASTER" framing would not have predicted. Whether
+1200 is the right POINT is a different question from whether the floor is the
+LEVER; only the second is answered here.
+
+**BUILD SPANS ARE A WEAK PROXY and the verdict does not rest on them.** A span
+gap cannot separate a clipped enqueue from a capacity-limited build; they are
+kept only for continuity with the 1800 and 600 baselines. The clip rate is the
+isolated reading — it is the loop's own decision, not a downstream effect.
+
+verify: `py -3 scripts/measure_board_window_clip_rate.py --since
+2026-09-03T15:00:00Z` on the primary tree prints `floor_s seen : {'1200': 290}`,
+`COVERED 2026-09-03T15:09:31.729Z -> 2026-09-04T13:20:31.867Z (290 lines)` and
+`NON-TODAY clip rate: 85/145 = 59%`. Run by the scheduled task
+`board-window-clip-rate-1200`, which — unlike its `-remeasure` predecessor —
+left this trace.

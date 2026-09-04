@@ -1743,6 +1743,16 @@ added date here is soccer-only, and `display_prediction_dates.json` staleness
 (risk 2 in the scoping note) remains UNVERIFIED — who writes it and how often. A
 throttle that binds does not help if the date list feeding it is stale.
 
+**FLOOR RETUNED AND THE CLIP RATE MEASURED, 2026-09-04.** The live value is now
+`1200`, not the `1800` named above (`600` -> `1800` -> `1200`). At 1200 the
+non-today clip rate is **85/145 = 59%** over a 22.2 h production window
+(gate: `floor_s seen {'1200': 290}`, one floor only), non-today build-gap
+median 2,096.7 s -> 1,704.8 s and today's 665.7 s -> 1,163.5 s. A ~59%
+prediction recorded before the deploy is CONFIRMED; the floor IS the lever for
+non-today cadence, and it is not free for today. Row in `.syndicate/deploys.md`
+2026-09-04; lane `board-window-floor-raise` CLOSED. **This item stays OPEN** —
+the widening itself and `display_prediction_dates.json` staleness are untouched.
+
 ### `#630` — **PUBLISHED ARTIFACTS WERE SILENTLY LOSING ROWS: two services each published a WHOLE-FILE REPLACE of the same path** — lane `book-quotes-publish-clobber`, 2026-09-01 — **FIXED AND LIVE (`e78aee52`, `bfaa5ecc`, `cf569731`, `8db62f85`, `f027fda6`); three follow-ups OPEN below**
 
 **The defect.** `odds_book_quotes.append_book_quotes` appends LOCALLY with
