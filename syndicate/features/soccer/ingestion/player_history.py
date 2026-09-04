@@ -133,13 +133,80 @@ def _per90(value: Any, minutes: float) -> float:
     return round(numeric / minutes * 90.0, 4) if minutes > 0 else 0.0
 
 
+#: Per-90 fields that are SHRUNK toward a positional prior. `expected_minutes_
+#: share` is deliberately absent: it is a share of a player's own appearances,
+#: not a rate estimated from them, so shrinking it would distort the very
+#: quantity that says how thin the sample is.
+_SHRUNK_PER90_FIELDS = (
+    "shots_per90", "xg_per90", "xa_per90",
+    "goals_per90", "assists_per90", "key_passes_per90",
+)
+
+#: Minutes at which a player's own rate carries HALF the weight of the prior.
+#: This is the 180.0 that used to be a cutoff, doing the job it was really for.
+_RATE_STABILISATION_MINUTES = 180.0
+
+
+def _shrink_toward_prior(rows: list[dict[str, Any]]) -> None:
+    """Pull each per-90 toward its (league, position) mean by sample size.
+
+    THE WEIGHT IS `minutes / (minutes + 180)`, so the old constant now expresses
+    what it always meant -- 180 minutes is where a player's own rate becomes as
+    trustworthy as the prior -- instead of where they stop existing.
+
+        1 min    -> 0.6% own rate    (effectively the positional prior)
+        180 min  -> 50%
+        1800 min -> 91%
+
+    Mutates in place. The prior is the MINUTES-WEIGHTED mean of the same
+    population, so a squad of thin samples cannot bootstrap a confident prior
+    out of itself.
+    """
+    if not rows:
+        return
+    buckets: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        key = str(row.get("position") or "?").upper()[:2]
+        buckets.setdefault(key, []).append(row)
+    for key, bucket in buckets.items():
+        total_minutes = sum(float(r.get("minutes") or 0.0) for r in bucket)
+        if total_minutes <= 0:
+            continue
+        prior = {
+            field: sum(float(r.get(field) or 0.0) * float(r.get("minutes") or 0.0)
+                       for r in bucket) / total_minutes
+            for field in _SHRUNK_PER90_FIELDS
+        }
+        for row in bucket:
+            minutes = float(row.get("minutes") or 0.0)
+            weight = minutes / (minutes + _RATE_STABILISATION_MINUTES)
+            for field in _SHRUNK_PER90_FIELDS:
+                own = float(row.get(field) or 0.0)
+                row[field] = round(weight * own + (1.0 - weight) * prior[field], 4)
+            # SAY HOW MUCH OF THIS IS THE PLAYER. A consumer that cannot tell a
+            # 2,000-minute rate from a shrunken 20-minute one will treat them
+            # alike, which is the whole hazard the cutoff was avoiding.
+            row["rate_own_weight"] = round(weight, 4)
+
+
 def normalize_understat_players(
     raw_players: list[dict[str, Any]],
     *,
     league: str,
     season: int,
-    minimum_minutes: float = 180.0,
+    minimum_minutes: float = 1.0,
 ) -> list[dict[str, Any]]:
+    """Understat rows -> per-90 player rows, THIN SAMPLES INCLUDED AND SHRUNK.
+
+    `minimum_minutes` was 180.0 and acted as a ROSTER FILTER: measured on the
+    live feed, epl 2026-27 yields 100 rows at 180 and 364 at 1, and 41 of 288
+    production fixture-sides published ZERO players. Those absences are ~80% of
+    the soccer projection gap and no name-matching rule can reach them.
+
+    It is now 1.0 -- a player must have actually played -- and rate stability is
+    handled where it belongs, by shrinking each per-90 toward its positional
+    prior rather than by deleting the player. See `_shrink_toward_prior`.
+    """
     rows: list[dict[str, Any]] = []
     for player in raw_players:
         try:
@@ -174,6 +241,8 @@ def normalize_understat_players(
                 "source": "understat",
             }
         )
+    # AFTER the loop, because the prior is computed from the population.
+    _shrink_toward_prior(rows)
     return rows
 
 
