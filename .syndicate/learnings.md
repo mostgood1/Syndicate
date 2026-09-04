@@ -5469,3 +5469,36 @@ direction. **A comment that names a constant's VALUE is a copy, and copies drift
   reasoning tonight all rest on this one.
 - A cheap empirical check beats reading either: `sim_component` non-zero on any
   served row falsifies "the sim contributes nothing" in one query.
+## 2026-09-03 — FORBIDDEN: clearing a `git checkout -- <path>` on a DELETIONS count. It is structurally blind to the ADDITION you are about to destroy
+
+- **The rule.** Before any discarding git operation in a shared tree
+  (`checkout -- <path>`, `restore`, `reset --hard`, `stash` without `-u`), the
+  check is *"what does this path contain that exists NOWHERE ELSE"*, not
+  *"whose deletions are these"*. Run `git diff -- <path>` and read the `+`
+  lines; anything added and uncommitted is gone the moment the command returns,
+  and it is gone from every session, because the tree is shared.
+- **What happened `[session c38d3e5c, on this session's lane block]`.** Their
+  shell's cwd had silently reverted from their own worktree to the PRIMARY
+  SHARED TREE. Recovering an unrelated edit, they ran
+  `git checkout -- scripts/pending_deploys.py .syndicate/lanes.md` there. They
+  DID check first, and the check was the wrong shape: the diff read **"0
+  deletions, all mine"**. Another session's lane block was an ADDITION in that
+  same unstaged diff, and the two `+### ` headers read as one. It existed in no
+  commit on any branch — `git log --all -S` returned nothing — and no backup was
+  newer than it.
+- **The check was not weak, it was aimed elsewhere.** A deletions count answers
+  "am I removing someone's existing lines". The hazard was "am I removing
+  someone's NEW lines", which has no deletions at all. Same family as the
+  session's other findings — a guard that cannot read the unhealthy state is
+  silent in exactly the case it was reached for.
+- **What worked, and it is the cheap half:** they left a PARTIAL
+  RECONSTRUCTION in place rather than a hole, so the destroyed lane's file
+  claims stayed ENFORCED and the loss stayed visible instead of reading as a
+  lane that never existed. Reconstructing from the `lane-postwrite-check`
+  report recovered the slug and the claims; everything else was lost.
+- **The rebuild then duplicated the slug** — the owning session no longer had
+  the block locally, rewrote it, and landed on a base that already carried the
+  reconstruction. `ledger-postwrite-check` caught the double block within
+  seconds of the push. Two blocks for one slug means two sessions can each read
+  themselves as holder of the same files.
+- *(evidence in `learnings_evidence.md`)*
