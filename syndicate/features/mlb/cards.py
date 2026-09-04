@@ -2342,6 +2342,15 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
     # `overview_counts` rows it sits next to.
     pruned_docs = 0
     plays_dropped = 0
+    refresh = {
+        "no_cached_payload": 0,
+        "skipped_final": 0,
+        "skipped_window": 0,
+        "attempted": 0,
+        "succeeded": 0,
+        "failed": 0,
+        "became_final": 0,
+    }
     for game_pk in game_pks:
         feed_path = raw_feed_live_path(selected_date, int(game_pk))
         payload = load_json_or_gz_file(feed_path)
@@ -2363,12 +2372,43 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
         refreshable = mlb_feed_live_is_refreshable(
             selected_date, today_iso, in_request_context=has_request_context()
         )
+        # EVERY BRANCH IS COUNTED, because the first production reading of this
+        # fix was a NULL I could not attribute. Measured 2026-09-04: the 09-03
+        # board still scored 7 of 9 finals after the fix went live, and
+        # `FEED_LIVE_PRUNE ... plays_dropped=669` was byte-identical before and
+        # after the deploy -- so no re-fetch happened, and *three different
+        # causes predicted exactly that*: the payload already reading final, the
+        # fetch failing and silently falling back, or the date being outside the
+        # window. A counter per branch is what separates them; a deployed fix
+        # with no counter is a belief.
+        if not isinstance(payload, dict):
+            refresh["no_cached_payload"] += 1
+        elif mlb_feed_payload_is_final(payload):
+            refresh["skipped_final"] += 1
+        elif not refreshable:
+            refresh["skipped_window"] += 1
+
         if refreshable and isinstance(payload, dict) and not mlb_feed_payload_is_final(payload):
+            refresh["attempted"] += 1
             live_payload = _fetch_current_feed_live(int(game_pk))
             if isinstance(live_payload, dict):
                 payload = live_payload
+                refresh["succeeded"] += 1
+                if mlb_feed_payload_is_final(live_payload):
+                    refresh["became_final"] += 1
+            else:
+                # NOT silent. This is the branch that keeps a stale document,
+                # and it used to be indistinguishable from never having tried.
+                refresh["failed"] += 1
         if not isinstance(payload, dict) and refreshable:
+            refresh["attempted"] += 1
             payload = _fetch_current_feed_live(int(game_pk))
+            if isinstance(payload, dict):
+                refresh["succeeded"] += 1
+                if mlb_feed_payload_is_final(payload):
+                    refresh["became_final"] += 1
+            else:
+                refresh["failed"] += 1
         if isinstance(payload, dict):
             # Pruned at the point of RETENTION, after every branch above has had
             # its say -- `_actual_payload_is_live` reads `gameData.status`, which
@@ -2389,6 +2429,20 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
         print(
             f"[mlb_cards] FEED_LIVE_PRUNE enabled={prune} date={selected_date} "
             f"games={len(out)} pruned={pruned_docs} plays_dropped={plays_dropped}",
+            flush=True,
+        )
+        # SEPARATE LINE, not more fields on the one above: that line is about
+        # retention and this one is about freshness, and folding them would
+        # make one family's zero look like the other's.
+        #
+        # `today` and `in_request` are printed rather than inferred. A window
+        # that is not firing and a window that is firing and finding nothing
+        # are different bugs, and without the two inputs on the row you cannot
+        # tell which one a `skipped_window` count describes.
+        print(
+            f"[mlb_cards] FEED_LIVE_REFRESH date={selected_date} today={today_iso} "
+            f"in_request={has_request_context()} games={len(game_pks)} "
+            + " ".join(f"{k}={v}" for k, v in refresh.items()),
             flush=True,
         )
     return out
