@@ -147,7 +147,7 @@ real evaluation records: the ledger is worker-local and not in
 `[ledger_bridge]` line carries the breakdown that falsifies it —
 `by_identity` large with `matched_by_identity: 0` means the mapping is wrong.
 
-## [order-model-attribution] AN ORDER NOW RECORDS THE SIM'S VERDICT — AND THE COMMIT GATE MAKES FOUR OF THE NINE VERDICTS UNREACHABLE `[verified 2026-09-03, lane order-sim-view, commits cb223b62 + 733a28f0, NOT DEPLOYED]`
+## [order-model-attribution] AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NINE VERDICTS UNREACHABLE `[verified on production 2026-09-04 00:03:26Z, lane order-sim-view]`
 
 `sim_view` / `sim_line_gap` / `sim_probability_railed` are stamped onto the
 position by `portfolio_commit._sim_view_of`, copied across the `OrderRequest`
@@ -231,6 +231,18 @@ read-modify-write: +74 B/record, **+361 KB at the 5,000-record ceiling**, where
 the whole ledger is ~4.40 MB against an 8 MB refusal — already 220% of its own
 2 MB warn line before this change.
 
-**NOT DEPLOYED.** The discharging reading is a NON-NULL `sim_view` on an order
-whose `submitted_at` is after the deploy. A null does not count in either
-direction.
+**DEPLOYED AND VERIFIED.** web `1d6b2f13` (read side, live 2026-09-03T23:14:37Z,
+carried by another lane's deploy); refresh-worker + live-odds-worker `1e5ae2b1`
+(write side, live 23:46:43Z / 23:50:56Z, both fired at `jobs_in_flight=0`).
+**Ambiguous window 4.2 min — exclude orders written in it.**
+
+**VERIFIED 2026-09-04 00:03:26Z** by the first non-`(unrecorded)` bucket,
+`mlb | game_line | agrees`, on the served payload. That proves the write side
+RAN (reachability, not presence), that `_LEAN_FIELDS` persists it, that the read
+side serves it, and that both agree on the field name.
+
+**IT PROVES NOTHING ABOUT ROI, and the shape of the reading says so:**
+`orders=1, settled=0, pending=0, unknown=0` ⇒ `execution_guard.is_non_position`
+⇒ that order was REJECTED, never opened a position, and contributes $0 to staked
+and pnl permanently. **The ROI arm still needs SETTLED rows carrying a verdict,
+and none exist yet.**

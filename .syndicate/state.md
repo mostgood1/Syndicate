@@ -471,7 +471,7 @@ once this index exists: re-splitting would orphan the parts.
 | [polymarket-order-fills] | 2026-08-30 — four causes REFUTED; fills are mostly fine | `state_polymarket.md` |
 | [portfolio-live-surface] | `/portfolio` IS THE LIVE BUYING ENGINE, the venue caps BIND, and the VENUE now settles our bets `[verified 202 | `state_portfolio.md` |
 | [portfolio-settlement] | PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[ver | `state_portfolio.md` |
-| [order-model-attribution] | AN ORDER NOW RECORDS THE SIM'S VERDICT — AND THE COMMIT GATE MAKES FOUR OF THE NINE VERDICTS UNREACHABLE `[ver | `state_portfolio.md` |
+| [order-model-attribution] | AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NI | `state_portfolio.md` |
 | [soccer-market-anchor] | MARKET-ANCHORING IS REACHABLE AND STILL OFF BY DECISION — MEASURED 2026-09-02 `[lane soccer-anchor-cost, main  | `state_soccer.md` |
 | [soccer-board-coverage] | — MEASURED 2026-09-02, production, NOT A DEFECT | `state_soccer.md` |
 | [soccer-live-match-state] | Soccer's live tier is WIRED AND VERIFIED ON LIVE MATCHES (2026-08-21) | `state_soccer.md` |
@@ -519,32 +519,3 @@ once this index exists: re-splitting would orphan the parts.
 | [web-preflight-dead-sample] | WEB'S PREFLIGHT SAMPLE HAS BEEN DEAD SINCE 2026-08-14 — CAUSE STILL UNKNOWN AFTER FOUR WRONG ANSWERS `[2026-08 | `state_worker.md` |
 | [refresh-worker-deploy-hold] | refresh-worker: THE OOM DEPLOY HOLD IS ORPHANED. Branch READY, NOT DEPLOYED. `[2026-08-18]` — **ARCHIVED 2026- | `state_worker.md` |
 | [test-intelligence-runtime] | `tests/test_intelligence.py` IS SLOW, NOT STALLED — and the "warm state" finding is RETRACTED `[2026-09-03, la | `state_worker.md` |
-
-### `[web-oom-leak]` — web memory, as of 2026-09-03T23:5xZ `[session b2b5b45b]`
-
-* **The EXCURSION is solved and verified in production.** Artifact-merge
-  subprocesses are the excursion, ~1:1 (corr **+0.997** between child RSS and the
-  container's unreclaimable step). Two changes shipped: a ceiling on concurrent
-  merge children (`a6f5f586`, tuned to `cap=2`/`32 MB` in `ac32034b`) and a
-  per-merge string pool in the merge itself (`f3bb47d0`). Measured:
-  **largest single merge child 281.8 -> 128.1 MB; peak summed 400.6 -> 163.3 MB.**
-  Output is byte-identical (sha256 equal on both arms of a real-scale bench).
-* **THE CAP ALONE DID NOTHING** (334.6 -> 338.5 MB). The excursion is ONE large
-  merge, not many, so per-merge cost was the binding term. The cap only became
-  useful once that fell.
-* **THE RECORDED GROWTH RATE IS WRONG BY ~10x.** Fitted on merge-child-free
-  samples: unreclaimable **+503 MB/h** (R^2 0.75, n=32), anon **+671 MB/h**
-  (R^2 0.93) — against `#632`'s 32-75 MB/h. At ~500 MB/h the 2,048 MB limit is
-  ~1.6 h away, which explains the OOM kills at 2.45/3.09/3.13 h uptime that the
-  old rate could not.
-* **Warm-up on web is ~20 min, NOT ~75.** Re-derived from the anon series.
-* **The solo request path is NOT innocent, but is not apportionable** with the
-  current instrument: 61-150% depending on framing. Cause is structural —
-  `inflight` is per-WORKER, `_anon_mb()` reads the per-CONTAINER cgroup.
-* **`WEB_CONCURRENCY=1` IS NOT AVAILABLE as a measurement setting.** It evicted
-  the container in 22 min (`['evicted','unhealthy']`, 23:37:08Z). A clean
-  apportionment needs an INSTRUMENT change — per-process anon via
-  `/proc/self/smaps` — not a worker-count change.
-* Live config: `WEB_CONCURRENCY=2`, `GUNICORN_THREADS=4`,
-  `SYNDICATE_REQUEST_MEMORY_PROFILE=on`, `SYNDICATE_ARTIFACT_MERGE_CHILD_CAP=2`,
-  `SYNDICATE_ARTIFACT_MERGE_INFLIGHT_MB=32`.

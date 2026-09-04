@@ -4740,3 +4740,61 @@ OUT-OF-LANE WRITE on two files that were not mine: a `git rebase` pulls PEERS'
 commits into the worktree, and the hook compares `(mtime, size)` with no author.
 Expect false positives around a rebase and check authorship before acting —
 reverting on that signal would have destroyed a peer's landed work.
+## 2026-09-04 — FORBIDDEN: inferring a session is GONE from its absence in `list_sessions`, even with `include_archived`
+
+`[lane order-sim-view, session 37abeca0]`
+
+I checked the roster twice, with `include_archived: true`, and session
+`3492626c` was absent both times. I wrote it down as gone and borrowed two file
+claims from its lane on that basis. **It then acquired the `live-odds-worker`
+deploy claim at 23:10:51Z** — and was STILL absent from the roster.
+
+**The roster does not list unattended runs.** Scheduled tasks and
+remote-dispatched sessions execute without appearing, which the `send_message`
+tool documents in its own description ("Unavailable in unattended sessions
+(scheduled-task runs and remote-dispatched sessions)"). So the roster answers
+"is there an ATTENDED session", never "is anything running as this id".
+
+**`deploy_claim.py` already said so, in the exact words, and I had read it that
+same session**: *"THIS CLAIM RECORDS NO PID: the one it used to record was the
+acquire CLI's own and always read dead. An unrecorded session is UNKNOWN, not
+gone."* I applied that correctly to the DEPLOY claim — I did not force it — and
+failed to apply the same standard to the FILE claims twenty minutes earlier.
+Same predicate, same evidence, two different conclusions.
+
+**How to apply.** Roster absence is a NULL, not a negative. To act on "that lane
+is gone" you need a positive signal: an explicit release in `lanes.md`, an
+expired TTL on a lock it holds, or the user saying so. Where none exists, the
+correct move is what the lock protocol already prescribes — take it only if the
+work is disjoint, say so reversibly, and expect the holder back.
+
+**This is `absence-in-a-window-is-not-absence` in a new costume**, and the
+retrospective tell is that I described the evidence accurately ("absent from the
+roster") and then silently upgraded it to a conclusion ("is gone") in the same
+sentence I acted on.
+
+## 2026-09-04 — FORBIDDEN: counting a set from your own TEST FIXTURES instead of from the code that produces it
+
+`[lane order-sim-view, session 37abeca0]`
+
+I published "three of the nine `sim_view` verdicts are unreachable" into
+`state.md`, `todo.md`, `learnings.md`, a commit message and two test files. **It
+is four.** `live_contradicts` sits in the same `model_edge_pct is None` branch
+and I never wrote a fixture for it, so it never entered my count.
+
+The error survived a careful measurement — I ran the REAL `commit_portfolio`
+over "one row per verdict class" and read the refusals honestly. The
+measurement was sound; **the enumeration it ran over was mine, not the
+system's.** A per-verdict sweep is only as complete as the list of verdicts you
+hand it, and I built that list from the cases I had already thought of.
+
+It surfaced only because a later task forced the set to become a PUBLISHED
+CONSTANT (`SIM_VIEW_UNREACHABLE`, served in `verdict_reachability`), which made
+me re-derive it from `_layer2_board_columns` and measure all nine.
+
+**How to apply: enumerate from the producer, then measure every member.** When a
+claim is "N of M have property P", the M has to come from the code that emits
+the values — a branch sweep, a literal set, `dataclasses.fields()` — never from
+the fixtures in your test. And where the count is load-bearing enough to
+publish, make it a constant with a test that re-derives it from the source,
+which is what caught this one.
