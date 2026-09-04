@@ -5124,9 +5124,45 @@ write them, so an exclusive claim would be wrong:
                              lanes.md that would have un-archived 6 blocks
     ledger-postwrite-check   Bash|PowerShell, after the fact
 
-Note the asymmetry worth knowing: `deploys.md` and `learnings.md` are barely
+**~~Note the asymmetry worth knowing: `deploys.md` and `learnings.md` are barely
 referenced by the append guard, so their edit-time protection is thinner than
-`lanes.md`'s. Commit-time still covers them.
+`lanes.md`'s. Commit-time still covers them.~~ THAT SENTENCE WAS FALSE, and it
+was a REASSURANCE, which is the worst direction to be wrong in.** Struck rather
+than deleted, because the way it was wrong is the lesson `[corrected 2026-09-04,
+found by session c38d3e5c, measured by me before accepting]`:
+
+    ledger_invariants.TRACKED       17 files: lanes.md, state.md, 14 state_*.md, learnings.md
+    .syndicate/learnings.md         IN TRACKED   -> commit-time DOES cover it
+    .syndicate/deploys.md           ABSENT       -> commit-time does NOT
+
+    ledger-append-guard.py          2 hits on `deploys.md`, BOTH PROSE --
+                                    a docstring at :31 and a remedy string at :176
+    ledger-postwrite-check.py       0 mentions
+
+**So `.syndicate/deploys.md` has NO ledger-guard coverage at any stage**, while
+every other ledger file has some.
+
+**I reached the opposite conclusion from a grep COUNT, and the count measured
+nothing:**
+
+    file                      my grep count    actual commit-time cover
+    .syndicate/deploys.md                 2                       False
+    .syndicate/learnings.md               2                        True
+
+Same number, opposite truth. Counting occurrences of a filename in a guard's
+source cannot distinguish a PREDICATE from a sentence mentioning the file — and
+I used it to certify the file the protocol's own non-negotiable rests on
+(*"Never claim a fix works without a measurement written to
+`.syndicate/deploys.md`"*), and that the session-start digest reads open
+obligations from.
+
+**OPEN, and stated as open rather than settled: I could not determine whether
+the gap is deliberate.** `TRACKED` is an explicit tuple and
+`_discover_state_parts()` only globs `state_*.md`, so `deploys.md` was never a
+candidate for auto-discovery — this is a choice, not a discovery miss. It is
+also append-only prose with no structural invariant of the kind lane headers and
+state keys give the others, so there may be nothing for a guard to check. Worth
+someone resolving; not resolved here.
 
 **THE PART THAT IS MINE.** I had this on screen twice and extracted neither:
 
