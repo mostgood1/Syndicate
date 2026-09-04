@@ -881,15 +881,46 @@ class StaleArtifactStateTests(unittest.TestCase):
             "pre",
         )
 
-    def test_it_cannot_downgrade_a_started_match(self) -> None:
+    def test_final_is_terminal_but_the_match_ending_is_not_a_downgrade(self) -> None:
+        """WAS `test_it_cannot_downgrade_a_started_match`, and it asserted
+        `in` + a `post` box -> `in`. THE RULE WAS NARROWED ON PURPOSE two days
+        after this class was written, and this assertion was left behind.
+
+        `4b4533b5` (2026-08-20) returned early for BOTH `in` and `post`, so no
+        box could move a started match at all. `28e55d86` (2026-08-22) cut the
+        early return down to `post`, on a production measurement: **8 of 15
+        cards rendering a LIVE head at 16:5xZ were FINISHED matches** --
+        WAT@WXM, CHA@WHU, SHU@SWA, STK@SOU among them, each carrying
+        `match_box.final: true` and a clock frozen at `90'+7'`. A stale `in`
+        could never be corrected once the match ended.
+
+        `in` -> `post` is the match ENDING, not a downgrade, and the box wins
+        on authority: it is `poll_soccer_live_state`'s own per-event-id ESPN
+        reading on a ~60s tick, while the artifact it corrects is the same
+        month-stale git mirror this class is named for.
+
+        THE GUARD THAT SURVIVED IS THE ONE THAT MATTERS, and it is what the
+        first two assertions pin: `post` NEVER returns to `in`. Final only
+        ever becomes wrong in one direction. The second assertion is the one
+        that actually exercises it -- with no box at all the function returns
+        early regardless, so the original `post`/`None` case would still pass
+        with the terminal guard deleted. Both directions are pinned again in
+        `tests/test_soccer_effective_state_terminal.py`.
+        """
         self.assertEqual(
             cards._effective_state_with_box("post", "2026-08-20T19:00Z", None), "post"
         )
         self.assertEqual(
             cards._effective_state_with_box(
+                "post", "2026-08-20T19:00Z", {"status_state": "in"}
+            ),
+            "post",
+        )
+        self.assertEqual(
+            cards._effective_state_with_box(
                 "in", "2026-08-20T19:00Z", {"status_state": "post"}
             ),
-            "in",
+            "post",
         )
 
     def test_a_box_with_no_usable_state_changes_nothing(self) -> None:

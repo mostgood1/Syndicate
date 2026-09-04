@@ -1940,7 +1940,7 @@ def _match_box_sections(
 
 
 def _effective_state_with_box(status_state: Any, kickoff: Any, match_box: dict[str, Any] | None) -> str:
-    """`_effective_status_state`, but a FRESH per-match reading may upgrade it.
+    """`_effective_status_state`, but a FRESH per-match reading may correct it.
 
     THE FAILURE THIS FIXES, measured on production 2026-08-20 21:45Z, minutes
     after the card fix went live. `/soccer/api/cards?date=2026-08-20` served
@@ -1962,13 +1962,24 @@ def _effective_state_with_box(status_state: Any, kickoff: Any, match_box: dict[s
     started. `match_box.status_state` is ESPN's own scoreboard state for that
     exact event id, written by `poll_soccer_live_state` on its last tick.
 
-    ONLY EVER AN UPGRADE, and never past the same guard. It cannot downgrade a
-    started match (`in`/`post` returns immediately), and the upgraded value is
-    put back through `_effective_status_state`, so the kickoff refusal still
-    applies -- a `post` whose kickoff is days away is still refused, whichever
-    source claimed it. A fixture that has not kicked off has no `match_box`
-    entry at all (the poller writes only `in` and `post`), so this cannot
-    invent a state for one.
+    NEVER PAST THE SAME GUARDS -- but there is now ONE of them, not two.
+    This said "ONLY EVER AN UPGRADE ... it cannot downgrade a started match
+    (`in`/`post` returns immediately)" until `28e55d86` narrowed the early
+    return to `post` alone, and the old wording survived the change. It was
+    false for two weeks and it is what made a since-corrected test look
+    load-bearing. **`post` is terminal and never returns to `in`; `in` ->
+    `post` is the match ENDING, not a downgrade** -- the reasoning, and the
+    production measurement behind it, are on that branch below.
+
+    The chosen value is put back through `_effective_status_state`, so the
+    kickoff refusal still applies -- a `post` whose kickoff is days away is
+    still refused, whichever source claimed it. A fixture that has not kicked
+    off has no `match_box` entry at all (the poller writes only `in` and
+    `post`), so this cannot invent a state for one.
+
+    The `STATE_UPGRADED_FROM_MATCH_BOX` log token keeps the older word on
+    purpose: it is a production string, and every correction it reports is
+    still a stale artifact being overtaken by a fresher reading.
     """
     state = _effective_status_state(status_state, kickoff)
     # FINAL IS TERMINAL. A match the artifact already calls finished is never
