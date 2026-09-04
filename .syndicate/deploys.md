@@ -22097,3 +22097,31 @@ now a narrow one: `gameData.status` says Final, `build_game_chip` publishes
 **Cost of not having had the counter: two wrong attributions in one day** — the
 lens overlay first, then freshness. Both were plausible, both were wrong, and
 one log line settled it.
+
+## 2026-09-04 — live-odds-worker `60afda80` → `c21ba449` — lane `catchup-market-fair-sizing`
+
+Substantive: `e6d5ab29` (let a NAMED sport size on market fair —
+`shared/portfolio_commit.py`, sizing-adjacent). Plus three `#632` memory
+instrumentation commits (`76c0e174`, `b71ef377`, `440ff1a1`).
+
+**Preflight HOLD ×27 over ~40 minutes** — the longest wait of the session. This
+worker runs two concurrent `refresh_odds_sources.py` cycles, each spawning
+`build_soccer_artifacts.py` / `poll_soccer_live_state.py`, so idle windows are
+rare and short. It dipped to 1 job at 18:23:47Z and climbed again; CLEAR finally
+at 18:33:34Z at a 60s poll interval. Live 18:39:37Z.
+
+verify — BY CONTENT: `_market_fair_sports` **0 → 2**, token taken FROM THE DIFF
+and proven to discriminate first. `doubleheader_resolved` x4 and `#643`'s
+`bytes_per_order` x1 re-checked for survival. 100 lines, **0 tracebacks**.
+
+**THREE CANDIDATE TOKENS WERE TESTED AND REJECTED**, which is the rule earning
+its keep rather than a footnote: `by_kind_mb`, `anon_mmap_by_size_mb` and
+`attribution_emit` each read **1 on the live SHA and 2 on the target**. They are
+in the `#632` diffs but already existed, so a "present" result would have proven
+nothing about whether the deploy landed. Only `_market_fair_sports` was 0→0-free.
+
+**The owed `doubleheader_resolved` reading DEFERS AGAIN.** refresh-worker has
+been claim-held by `mlb-rate-refit` across every round today; it is still on
+`8518a662` and lacks `60afda80`. The emitter runs ONLY there
+(`pipeline/portfolio_commit.py:665`), so no amount of live-odds-worker or web
+deploying can produce that reading. web is current at `76c0e174`.

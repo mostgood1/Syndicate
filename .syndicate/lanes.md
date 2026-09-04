@@ -1160,6 +1160,23 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   deployed `ee20c522` three minutes later after a peer pushed; the runtime delta
   was unchanged but I confirmed that AFTER the POST, not before.
 - Blocked by: none.
+### catchup-market-fair-sizing — CLOSED 2026-09-04 — **live-odds-worker `60afda80`→`c21ba449`, live 18:39:37Z** after preflight HOLD ×27 over ~40 min. Verified by content (`_market_fair_sports` 0→2) with three `#632` tokens TESTED AND REJECTED for not discriminating; `doubleheader_resolved`/`#643` re-checked; 0 errors. **Owed doubleheader reading defers again — refresh-worker still claim-held and still lacks `60afda80`.** — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: live-odds-worker off `60afda80` onto `c21ba449`. Substantive:
+  `e6d5ab29` (let a NAMED sport size on market fair — `shared/portfolio_commit.py`,
+  sizing-adjacent). Plus three `#632` memory-instrumentation commits
+  (`76c0e174`, `b71ef377`, `440ff1a1`).
+- **refresh-worker EXCLUDED AGAIN** — `mlb-rate-refit` holds the claim for the
+  Nth consecutive round. It is on `8518a662` and still lacks `60afda80`, so
+  **the owed `doubleheader_resolved` reading defers again**; the emitter runs
+  ONLY on refresh-worker (`pipeline/portfolio_commit.py:665`). web is current.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Verification: BY CONTENT — `_market_fair_sports`, taken FROM THE DIFF and
+  PROVEN to discriminate (0 on live `60afda80`, 2 on target). Three `#632`
+  candidate tokens (`by_kind_mb`, `anon_mmap_by_size_mb`, `attribution_emit`)
+  were TESTED AND REJECTED — each already 1 on live, so a pass would have been
+  meaningless. Plus `/api/ops/version` and 0 tracebacks.
+- Blocked by: none for live-odds-worker.
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
