@@ -1516,7 +1516,46 @@ FULL_GAME_SEGMENT = "full"
 # cannot match a contract saying `full`, whatever the venue series is called.
 # This list only closes the MIRROR failure -- a whole-game row matching a
 # segment contract we failed to recognise.
+#: MATCHED BY SHAPE, because the enumeration that stood here was a guess about
+#: SPELLING and Kalshi used the other one. It listed `Q1..Q4` while the venue
+#: writes `1Q..4Q`, and `F5` while the venue also ships `F3` and `F7` (the
+#: catalogue's own segment-winner note names "KXMLBF3/F5/F7"). Measured
+#: 2026-09-04, every one of these read `full` -- a SEGMENT contract classified as
+#: a WHOLE-GAME one, which is `#563`: five orders, $7.08. The MLB board carries
+#: 31 `first3` rows for such a contract to land on.
+#:
+#:   `F<n>`        first N innings   KXMLBF3 / KXMLBF5TOTAL / KXMLBF7
+#:   `<n>Q`/`Q<n>` quarter           KXNCAAF1QSPREAD, either order
+#:   `<n>H`/`H<n>` half              KXNCAAF1HSPREAD, either order
+#:   `INNING`      single inning     KXMLBINNINGTOTAL
+#:
+#: A shape rule covers `F1`, `5Q` and whatever ships next without a table anyone
+#: has to keep current -- which is the failure mode being fixed, not just the
+#: eight names it happened to miss.
+#: `H2H` IS NOT A HALF. Measured while writing this: `KXNFLH2HWINS` matched
+#: `\dH` on the `2H` inside "head-to-head". It is inert (that series is
+#: out-of-scope and refused earlier) but the collision is real, and a false
+#: positive here REFUSES a whole-game series -- taking the Kalshi order path
+#: to zero, which is the failure the original comment warns about at length.
+#: The lookarounds require the half marker not to be flanked by another H.
+_SEGMENT_MARKER_RE = re.compile(r"(?:F\d|\dQ|Q\d|(?<!H)\dH(?!H)|H\d(?!H)|INNING)")
+
+#: Kept as the explicit list the tests and readers name, derived from nothing --
+#: the RE above is the authority. Retained because it is referenced by name in
+#: the module's own prose about the `#563` defect.
 _SEGMENT_MARKERS = ("F5", "INNING", "1H", "2H", "H1", "H2", "Q1", "Q2", "Q3", "Q4")
+
+
+def _looks_like_a_segment(series: str) -> bool:
+    """True when a series NAME carries a period marker in any spelling.
+
+    Whole-game and prop series must NOT match: `KXMLBKS`, `KXWNBAREB`,
+    `KXMLBHIT`, `KXNCAAFTOTAL` and the rest of the prop book are inherently
+    whole-game and are absent from `_SERIES_SEGMENT`, so a false positive here
+    would refuse them and take the Kalshi order path to zero -- the failure the
+    original comment warns about at length.
+    """
+    return bool(_SEGMENT_MARKER_RE.search(str(series or "").upper()))
 
 
 # THE BOARD SPELLS A SEGMENT TWO WAYS, and only one of them is a `segment`
@@ -1577,7 +1616,7 @@ def segment_for_series(series: Any) -> str | None:
     known = _SERIES_SEGMENT.get(key)
     if known is not None:
         return known
-    if any(marker in key for marker in _SEGMENT_MARKERS):
+    if _looks_like_a_segment(key):
         return None
     return FULL_GAME_SEGMENT
 
