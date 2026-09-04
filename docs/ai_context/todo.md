@@ -50,7 +50,7 @@ feed `#644`'s pre-registered ROI split, which needs ORDERS carrying the fields �
 so (b) is that measurement's denominator, and it is currently zero.
 
 
-### `#644` — **THE SIM'S VERDICT IS NOW ON THE ORDER — and that is NECESSARY, NOT SUFFICIENT: two of the three arms of the measurement it was built for have a STRUCTURALLY ZERO denominator** — lane `order-sim-view`, 2026-09-03 — **LANDED, NOT DEPLOYED**
+### `#644` — **THE SIM'S VERDICT IS ON THE ORDER, DEPLOYED AND VERIFIED ON PRODUCTION — and it is still NECESSARY, NOT SUFFICIENT: the contradiction arm has a STRUCTURALLY ZERO denominator** — lane `order-sim-view`, 2026-09-03 — **DEPLOYED + VERIFIED 2026-09-04 00:03:26Z; the MEASUREMENT stays OPEN**
 
 `sim_view` / `sim_line_gap` / `sim_probability_railed` are stamped on the
 position by `portfolio_commit._sim_view_of`, copied across the `OrderRequest`
@@ -108,10 +108,17 @@ is re-derived from the live commit gate by a test at three EVs.
 orders accumulate post-deploy.** Every bet already in the book will bucket as
 `(unrecorded)`, which is correct rather than a defect.
 
-**OWED: the deploy, and the reading.** Verification is a NON-NULL `sim_view` on
-an order whose `submitted_at` is after the deploy, from `/api/portfolio/paper`
-or `/api/portfolio/live`. A null does not count in either direction. Deploy
-deliberately not taken — held by lane `prop-join-yield`.
+**DEPLOYED AND VERIFIED.** web `1d6b2f13` (read side, 23:14:37Z), refresh-worker
++ live-odds-worker `1e5ae2b1` (write side, 23:46:43Z / 23:50:56Z; both fired at
+`jobs_in_flight=0`, nothing killed; ambiguous window 4.2 min — exclude orders
+written in it). Verified 2026-09-04 00:03:26Z by the first non-`(unrecorded)`
+bucket, `mlb | game_line | agrees` — reachability, not presence.
+
+**THAT READING DOES NOT TOUCH THE ROI.** The verdict-bearing order was REJECTED
+(`orders=1, settled=0, pending=0, unknown=0` ⇒ `is_non_position`), so it never
+opens a position and contributes $0 forever. **WHAT IS STILL OPEN:** settled rows
+carrying a verdict have to accumulate before `agrees` vs `disagrees` vs `neutral`
+can be read — and the `contradicts` arm needs a COMMIT-GATE decision, not time.
 
 Also fixed in passing: `04187cdf` landed its own change TWICE (both field
 declarations and both record-dict keys duplicated). Legal Python, no

@@ -20469,3 +20469,66 @@ exit 0 on a null.
 **Read side reminder:** already live on web since 23:14:37Z (`b48a9480`, carried
 by lane `fleet-catchup-round7`, verified on the served payload). See the entry
 above.
+
+## 2026-09-04 00:03:26Z — `sim_view` VERIFIED ON PRODUCTION: the write side ran on a real bet — lane `order-sim-view`
+
+**verify: DISCHARGED for the PLUMBING. Not for the ROI, and the distinction is
+the whole point of this entry.**
+
+`/api/ops/execution/ledger-summary?days=3` → `sim_view_roi`, 00:03:26Z, first
+bucket in the book whose verdict is not `(unrecorded)`:
+
+    key            "mlb | game_line | agrees"
+    sport          mlb          market_family  game_line     sim_view  agrees
+    orders         1
+    settled        0     pending  0     unknown  0
+    staked_dollars 0.0   pnl_dollars 0.0   roi_pct null   win_pct null
+
+**WHAT THIS PROVES, and it is the reachability claim rather than a presence
+one.** Grepping the deployed SHA would only show the code is there. This shows
+it RAN, end to end, on production, on a real bet:
+
+- `portfolio_commit._sim_view_of` executed on a live board row and returned
+  `agrees` — so the import of the BOARD's own `_layer2_board_columns` resolves
+  in the deployed process, and the rule was not silently null
+- `execute_portfolio._order_from_position` carried it across the `OrderRequest`
+  boundary — the exact boundary that dropped `model_edge_pct` before `04187cdf`
+- `execution_ledger.record_order` persisted it, which means `_LEAN_FIELDS`
+  really does include it (a field carried but unnamed there is dropped on the
+  way to the store with every layer above it looking correct)
+- the read side serves it, and buckets it under the right sport and family
+- both sides agree on the field name
+
+**WHAT IT DOES NOT PROVE, AND MUST NOT BE READ AS.** `orders=1` with `settled`,
+`pending` AND `unknown` all zero has exactly one explanation in `_grouped`:
+`execution_guard.is_non_position` is True, i.e. the order was **rejected** and
+never opened a position. Today's counts corroborate — `live:kalshi` 3 rejected,
+`live:polymarket` 2 rejected — so this came from the LIVE path on
+live-odds-worker, stamped at `record_order` time and refused afterwards.
+
+A rejected order never settles and contributes $0 to staked and pnl **forever**.
+So `roi_pct: null` here is correct and permanent for this row. **The ROI arm of
+the pre-registered measurement is untouched by this reading** and still needs
+SETTLED orders carrying a verdict.
+
+**THE STANDING OWED ITEM, restated so it cannot be quietly dropped:** settled ROI
+of `contradicts` vs `agrees` vs `none`, within sport and market family, with
+denominators. Two things still bound it and neither is a deploy:
+
+1. **`contradicts` can never appear on an order at all.** It, `live_contradicts`,
+   `unpriced` and `none` are computed where `model_edge_pct is None`, which
+   `sizing_inputs_from_row` refuses by name at every EV. That arm's denominator
+   is structurally zero, and the endpoint says so in `verdict_reachability`.
+2. **`disagrees` is EV-conditioned**, admitted only when the EV outruns the
+   disagreement, so its rows are systematically high-EV against `agrees` rows.
+   Control for `ev_pct` — on the order since `04187cdf` — or the comparison
+   measures the EV gap and reports it as a sim effect.
+
+So what the book can now answer is `agrees` vs `disagrees` vs `neutral`, with
+that caveat carried. What it cannot answer, and could not be made to answer by
+waiting, is the contradiction question the lane was opened for.
+
+**Deploy provenance for this reading:** web `1d6b2f13` (read side, live
+23:49:25Z), refresh-worker + live-odds-worker `1e5ae2b1` (write side, live
+23:46:43Z / 23:50:56Z). The verdict-bearing order was written after both, so it
+is outside the 4.2-minute ambiguous window recorded above.

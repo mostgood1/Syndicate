@@ -1885,70 +1885,44 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   own copy of the parser. It is claimed by OPEN lane `ncaaf-live-cadence`, so
   migrating it would be the exact cross-lane write these guards prevent. Fold it
   in when that lane closes.
-### order-sim-view — **REOPENED 2026-09-03 for the READ side** — opened 2026-09-03 — session 37abeca0-5c86-4c57-b85a-62fb489e761a — **WRITE side SHIPPED (`cb223b62` + `733a28f0`), NOT DEPLOYED. Now adding the ROI-by-`sim_view` aggregate the write side left unserved `[user directive]`.**
+### order-sim-view — **CLOSED-VERIFIED 2026-09-04** — opened 2026-09-03 — session 37abeca0-5c86-4c57-b85a-62fb489e761a — **SHIPPED, DEPLOYED TO ALL THREE SERVICES, AND VERIFIED ON PRODUCTION. The plumbing question is answered; the MEASUREMENT it was built for is bounded by the COMMIT GATE, not by this lane.**
 - Goal: an order records the SIM'S OWN VERDICT on the row it came from, so the
-  settled book can be split by `sim_view`.
-- Files: `syndicate/features/shared/execution_ledger.py`,
-  `pipeline/execute_portfolio.py`,
-  `syndicate/features/shared/portfolio_commit.py`,
-  `syndicate/features/shared/paper_settlement.py` [claimed 2026-09-03 ~22:4xZ,
-  free — no OPEN lane named it],
-  `tests/test_order_sim_view.py`, `tests/test_sim_view_roi_summary.py` (NEW).
-- **`syndicate/blueprints/ops.py` — FUNCTION-SCOPED CLAIM on
-  `api_ops_execution_ledger_summary` ONLY** `[2026-09-03 ~22:4xZ]`. The OPEN lane
-  `web-oom-profiler-steady` (session `b2b5b45b`) holds this file and **its claim
-  stands** — I am not taking it. Checked before touching anything: that lane's
-  ops.py work is the artifact-merge/publish region (`_spawn_artifact_merge`,
-  `_merge_child_cap`, `_publish_streamed_body`, `_write_published_artifact`,
-  ~L1714-2200, commit `a6f5f586`), which mentions the ledger-summary endpoint
-  **zero times**; mine is ~L334-460. Disjoint by function and ~1,300 lines apart.
-  That lane also holds the live `web` deploy claim (22:21:55Z, TTL 2700s) and
-  **I am not deploying**, so nothing of mine touches it.
-- **CLAIMS TAKEN FROM `order-model-view`** (first two files), whose session
-  `3492626c` was absent from the session roster INCLUDING ARCHIVED when checked
-  2026-09-03 ~22:0xZ. Struck from that lane's `- Files:` with a matching note;
-  `check_lane_invariants.py` reports one holder per file. `portfolio_commit.py`
-  was marked `released:` by `portfolio-decision-and-execution`. Take them back
-  by striking this note.
-- **THE FINDING, and it is about the COMMIT GATE rather than the field:
-  `contradicts`, `unpriced` and `none` can never appear on an order.** All three
-  live in the branch where `model_edge_pct is None`, which
-  `sizing_inputs_from_row` refuses by name. **So the `contradicts`-vs-`agrees`
-  arm of `layer2-sim-disagrees`'s pre-registered measurement has a structurally
-  zero denominator — persisting the field was NECESSARY AND IS NOT SUFFICIENT.**
-  Full working, the `disagrees` selection effect, the size cost and the
-  unserved-field gap: `state.md [order-model-attribution]` and
-  `log/2026-09-03.md` 22:0x-23:0xZ.
-- **READ SIDE DONE AND LANDED.** `paper_settlement.sim_view_roi_summary()` cuts
-  settled ROI by sport x market family x `sim_view`, served as `sim_view_roi` on
-  `/api/ops/execution/ledger-summary`. **No new arithmetic** — buckets come from
-  `_grouped`, the same function behind `by_market_family` / `by_sport` /
-  `by_venue_family`, so this ROI IS `settlement_summary`'s ROI (pinned by
-  `test_roi_matches_settlement_summary_on_the_same_rows`). Portfolio rows only,
-  or the venue-scoped shadow copies double-count — proven discriminatingly
-  (10 rows + 5 `paper:kalshi` rows gives a byte-identical result).
-- **THE PAYLOAD CARRIES ITS OWN CAVEATS, and that is the point of it.** Four
-  verdicts are absent BY CONSTRUCTION and two more are EV-selected; a reader
-  without that would read the gap as a broken join. `verdict_reachability` names
-  the unreachable set, the EV-conditioned pair and the `(unrecorded)` sentinel
-  with reasons. **The claim is checked against the real commit gate at three EVs
-  by `test_the_published_unreachable_set_is_exactly_what_the_gate_refuses`**, so
-  the endpoint cannot keep asserting a structural fact after the structure moves.
-- **COUNT CORRECTED, same lane: FOUR verdicts are unreachable, not three.** I
-  missed `live_contradicts`, which is in the same `model_edge_pct is None`
-  branch — I had enumerated my own fixtures rather than the branch. Caught when
-  encoding the set as a constant forced a re-measure of all nine. Corrected in
-  `state_portfolio.md`, `todo.md`, `learnings.md`, the log and both test files.
-- **Verification (OWED, and nothing here discharges it):** a NON-NULL `sim_view`
-  on an order whose `submitted_at` is after the deploy, from
-  `/api/portfolio/paper` or `/api/portfolio/live`; and a non-empty
-  `sim_view_roi.by_sport_family_verdict` on `/api/ops/execution/ledger-summary`.
-  **A null does not count in either direction.** Note the ROI cut will show
-  `(unrecorded)` for every bet already in the book — that is correct, not a bug.
-- Blocked by: nothing in the code. **Deploy deliberately not taken** — held by
-  lane `prop-join-yield` per user instruction. Needs BOTH order-placing
-  services, same as `04187cdf`.
-
+  settled book can be split by `sim_view`. **MET.**
+- Files: `syndicate/features/shared/{execution_ledger,portfolio_commit,paper_settlement}.py`,
+  `pipeline/execute_portfolio.py`, `syndicate/blueprints/ops.py`
+  (**`api_ops_execution_ledger_summary` ONLY** — function-scoped beside OPEN lane
+  `web-oom-profiler-steady`, whose claim was checked line-by-line and NOT taken;
+  its work is the artifact-merge region ~1,300 lines away),
+  `tests/{test_order_sim_view,test_sim_view_roi_summary,test_ops_execution_ledger_summary}.py`.
+  **ALL DEPLOY CLAIMS RELEASED with their tokens; none forced.**
+  `docs/ai_context/todo.md` — **ITEM-SCOPED to `#644` ONLY.** The OPEN lane
+  `web-oom-profiler-steady` claims this file for `#632` and that claim STANDS;
+  the two items are disjoint and I touched nothing of theirs. Surfaced because
+  `lane-postwrite-check` flagged it and a shared ledger file is exactly where
+  silent cross-lane edits hide — see `deploys.md` for the same check's earlier
+  FALSE positive on a rebase, which is why it is a warning and not a block.
+- **VERIFIED ON PRODUCTION 2026-09-04 00:03:26Z.** First non-`(unrecorded)`
+  bucket: `mlb | game_line | agrees`. That single reading proves the write side
+  RAN on a real bet (reachability, not presence), that `_LEAN_FIELDS` really
+  persists it, that the read side serves it, and that both agree on the name.
+  **It proves NOTHING about ROI** — `orders=1, settled=0, pending=0, unknown=0`
+  means `is_non_position`, i.e. the order was REJECTED and will never settle.
+  Full working: `deploys.md` 2026-09-04 00:03:26Z.
+- **Deployed:** web `b48a9480`→`1d6b2f13` (read side, carried by another lane,
+  23:14:37Z); refresh-worker + live-odds-worker `1e5ae2b1` (write side, 23:46:43Z
+  / 23:50:56Z, **both fired at `jobs_in_flight=0`, nothing killed**).
+  **Ambiguous window 4.2 min** — exclude orders written in it.
+- **WHAT REMAINS OWED IS NOT THIS LANE'S TO CLOSE.** The pre-registered
+  `contradicts`-vs-`agrees` ROI split is bounded by the COMMIT GATE:
+  `contradicts`, `live_contradicts`, `unpriced` and `none` all live where
+  `model_edge_pct is None`, which `sizing_inputs_from_row` refuses by name at
+  every EV — a structurally zero denominator, published in
+  `verdict_reachability` and pinned by test. `disagrees` IS reachable but
+  EV-conditioned, so it must be compared holding `ev_pct` fixed. **Answerable
+  today: `agrees` vs `disagrees` vs `neutral`, once rows SETTLE. Not answerable
+  at all without a gate decision: the contradiction question.**
+- Blocked by: none. Follow-on for whoever takes the measurement: settled rows
+  carrying a verdict have to accumulate first.
 
 
 ### lane-guard-refactor-fallout — CLOSED 2026-09-03 — five scripts repaired, the rebase false positive fixed, and two silent-unenforcement classes now checked — session f97ad5ab
