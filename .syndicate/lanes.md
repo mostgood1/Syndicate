@@ -87,6 +87,30 @@ death, never life — do not invert it.
   capped per process, solo requests only, and the instrument TIMES ITSELF.
 - Blocked by: none.
 
+### web-oom-allrequest-reconcile — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: make `#632`'s ALL-REQUEST attribution reconcilable — emit a total that
+  covers every route and a token that identifies the PROCESS — then report the
+  RESIDUAL (process climb minus everything attributed) rather than a share
+  computed over a denominator I chose.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_attribution_reconciliation.py` (NEW). No OPEN lane claims either.
+- TWO DEFECTS FOUND IN THE EXISTING INSTRUMENT, both invalidating:
+  1. `routes` is TRUNCATED to `top=12`. pid 80 at 19:38:38 had
+     `distinct_routes=13, len(routes)=12`, and differencing that emission
+     produced a nonsense **4842% unexplained**.
+  2. `pid` DOES NOT IDENTIFY A PROCESS. pid 79's `solo_attributed` went
+     `800 -> 200` at 19:55:32: a worker respawned and the OS reused the pid.
+     Differencing across that boundary gave **-117% coverage**.
+- Hypothesis: with both fixed, attributed + residual = process climb exactly,
+  and the residual is dominated by `skipped_concurrent` (51-172 per window,
+  i.e. a quarter to a half of traffic is unattributed by design).
+- Falsification test: the residual stays large and does NOT track
+  `skipped_concurrent` — then skipped requests are not the gap and something
+  else holds the memory.
+- Verification: >= 3 windows on one process token with no reset and no
+  truncation, reporting attributed / residual / coverage that sum exactly.
+- Blocked by: none.
+
 ## OPEN
 ### web-oom-arena-trend — CLOSED 2026-09-04 — opened 2026-09-04 — **FIRST POSITIVE IDENTIFICATION IN `#632`.** The arena hypothesis was FALSIFIED (arenas flat, fragmentation 56.6 MB and stable) and the falsification exposed the instrument: pymalloc sees ~40% of worker RSS and cannot register an allocation over 512 bytes. The smaps trend, split by pid with a gate pre-registered before the data, found it — **the growth is 8-64MB ANONYMOUS MAPPINGS**: pid 79 `+148.70 MB / 37.3 min`, 80.5% in that bucket; pid 78 `+54.10 MB / 34.6 min`, 85.4%. `UNNAMED 0.00` on both. NOT established: what allocates them, and the rates are early-life so they are NOT comparable to the +173 MB/h plateau. NEXT: does the climb track the worker serving `/api/intelligence/query`? — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: answer whether `#632`'s ~173 MB/h is FRAGMENTATION or RETENTION, by

@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -3150,6 +3151,13 @@ def _process_anon_mb() -> float | None:
         return None
 
 
+# `#632`: `pid` IS NOT A PROCESS IDENTITY. Measured 2026-09-04: pid 79's
+# `solo_attributed` went 800 -> 200 at 19:55:32 because a gunicorn worker
+# respawned and the OS reused the pid, and differencing across that boundary
+# produced -117% coverage. Generated at import, so it changes with the process
+# and a reader can tell a restart from a continuation.
+_PROC_TOKEN = uuid.uuid4().hex[:12]
+
 _PER_REQUEST_SMAPS_STATE: dict[str, Any] = {"count": 0, "routes": {}}
 _PER_REQUEST_SMAPS_MAX_DEFAULT = 120
 
@@ -3304,6 +3312,13 @@ def note_request_end(token: dict[str, Any] | None, route: str,
         row["solo_n"] += 1
         row["total_mb"] = round(row["total_mb"] + delta, 3)
         row["max_mb"] = round(max(row["max_mb"], delta), 3)
+        # The UNTRUNCATED total. `routes` is capped at `top` for display, so
+        # summing it under-reports whenever a process serves more distinct
+        # routes than the cap -- pid 80 had `distinct_routes=13, len=12` and
+        # differencing it read 4842% unexplained. Reconciliation must never
+        # depend on a list that is truncated for readability.
+        state["attributed_total_mb"] = round(
+            float(state.get("attributed_total_mb") or 0.0) + delta, 3)
         if collected:
             _GC_SPLIT_STATE["with_gc2_n"] += 1
             _GC_SPLIT_STATE["with_gc2_mb"] = round(_GC_SPLIT_STATE["with_gc2_mb"] + delta, 3)
@@ -3386,6 +3401,11 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         # for a reader to infer: `attribution_basis` distinguishes the two
         # regimes in the log, where nothing else would.
         "attribution_basis": "process_anon_smaps_rollup",
+        # Reconciliation triple: differencing these two across a window, on ONE
+        # `proc_token`, gives attributed vs the process's own climb -- and the
+        # RESIDUAL, which is the number that was never recoverable before.
+        "attributed_total_mb": round(float(_REQUEST_MEMORY_STATE.get("attributed_total_mb") or 0.0), 3),
+        "proc_token": _PROC_TOKEN,
         # WHICH WORKER. `#632`: gunicorn runs 2 workers and both emit into one
         # log stream, so a series read without this is TWO interleaved series.
         # Measured 2026-09-04: five consecutive emissions alternated between
@@ -3449,5 +3469,6 @@ def reset_request_memory_attribution() -> None:
                             "no_gc2_n": 0, "no_gc2_mb": 0.0})
     _GLOBAL_REASSIGN_STATE.clear()
     _PER_REQUEST_SMAPS_STATE.update({"count": 0, "routes": {}})
+    _REQUEST_MEMORY_STATE["attributed_total_mb"] = 0.0
     _ARENA_TREND_STATE.update({"count": 0, "last": None})
     _SMAPS_TREND_STATE.update({"count": 0, "last": None})
