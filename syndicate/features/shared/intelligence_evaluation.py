@@ -2978,8 +2978,32 @@ def build_accuracy_summary(
     # PROJECT INSIDE THE STREAM. The fat record is transient; only the ~20
     # scalars the statistics read are retained. This is what decouples peak from
     # `manifest_summary` bloat -- see `_project_evaluation_record`.
+    #
+    # `projected_bytes` MEASURES WHAT A PROJECTED LEDGER WOULD COST ON DISK.
+    # It exists to turn one specific inference into a reading: the 2026-09-04
+    # estimate that a projected daily chunk fits under the 12 MiB sweep ceiling
+    # joins a CHECKOUT per-record cost (~560 B, saturating) to production's raw
+    # density (42,595 B/record) -- two substrates, never one measurement. This is
+    # the only place the projection actually happens, so it is the only place
+    # that can close it.
+    #
+    # Cost was measured BEFORE adding it, because a per-record encode inside a
+    # 46,953-record loop is not obviously free: 7.7 us/record, i.e. +0.36 s on
+    # the 669.4 s production run = +0.054%. Projection itself is 11.6 us/record.
+    projected_bytes = 0
+
+    def _projected_and_counted(record: Mapping[str, Any]) -> dict[str, Any]:
+        nonlocal projected_bytes
+        slim = _project_evaluation_record(record)
+        try:
+            projected_bytes += len(json.dumps(slim, separators=(",", ":")).encode("utf-8"))
+        except (TypeError, ValueError):
+            # Instrumentation must never break the summary it measures.
+            pass
+        return slim
+
     record_rows = _latest_by_recommendation_id(
-        _project_evaluation_record(record)
+        _projected_and_counted(record)
         for record in _stream_record_payloads(
             records,
             ledger_path=ledger_path,
@@ -2987,6 +3011,11 @@ def build_accuracy_summary(
             stats=ledger_stats,
         )
     )
+    # AFTER the stream is drained, never before: _stream_chunked_ledger_records
+    # ends with stats.update(), which would overwrite a key set earlier.
+    # _latest_by_recommendation_id materialises, so the generator is exhausted
+    # by the time this line runs.
+    ledger_stats["projected_bytes"] = projected_bytes
     if sport_slug:
         record_rows = [record for record in record_rows if _record_sport(record) in {sport_slug, None}]
 

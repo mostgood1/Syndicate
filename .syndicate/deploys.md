@@ -21936,3 +21936,50 @@ loosening the threshold. pid 79 then crossed it honestly at 37.3 min.
 
 **Not a fix — an identification.** Nothing about web's memory behaviour changed
 in this deploy; it is instrumentation only. `#632` remains open.
+
+## 2026-09-04 — `projected_bytes` **APPLIED TO `origin/main` UNDER AN EXPLICIT USER OVERRIDE OF A LANE CLAIM.** No deploy. `[user: "override the lane claim and apply it"]`
+
+**THE OVERRIDE IS THE HEADLINE, not the code.** The entry above stopped because
+`accuracy-ledger-budget-raise` (OPEN, session `82fe0160`) claims
+`intelligence_evaluation.py`. The claim was **not satisfied, it was
+OVERRULED**, by the user, explicitly. Recorded here and on that lane's block so
+the owning session finds it, because a cross-lane edit that is not written down
+is indistinguishable from the accident the rule exists to prevent.
+
+**Scope of the override, kept as narrow as it could be:** `build_accuracy_summary`
+only (two hunks), plus a NEW file `tests/test_accuracy_summary_projected_bytes.py`.
+**`test_accuracy_summary_ledger_budget.py` — also claimed — was NOT touched.**
+The claim is handed straight back; nothing else of that lane's was borrowed.
+
+**verify — run on the APPLIED tree, not the scratch copy that was used to build
+the patch:**
+
+    py -3 -m pytest tests/test_accuracy_summary_projected_bytes.py \
+        tests/test_accuracy_summary_ledger_budget.py tests/test_build_accuracy_summary.py \
+        tests/test_accuracy_summary_projection.py tests/test_bounded_accuracy_summary.py
+    -> 44 passed        (the owning lane's 40, plus the 4 new)
+
+    end-to-end on real records, SYNDICATE_REPORTS_ROOT at the primary tree:
+    ledger_coverage = { bytes_accepted 10,596,942, projected_bytes 544,056,
+                        records 1,048, dates_covered 9, truncated false }
+    -> 19.5x reduction        [substrate: checkout]
+
+**NO DEPLOY TAKEN, and none is owed.** The change is diagnostic-only and costs
+**+0.054%** of runtime (7.7 us/record over 46,953 records = +0.36 s on 669.4 s).
+It rides the next ordinary refresh-worker deploy. **Until it does, it is
+`origin/main` and live on NOTHING** — the distinction this ledger exists to keep.
+
+**WHAT IT BUYS ON THE NEXT AUTORUN, at zero extra cost:**
+`ledger_coverage.projected_bytes` appears beside `skipped_budget` / `dates`, so
+tomorrow's `verify-ledger-budget-4gb` reading closes TWO open questions instead
+of one — the 4 GB coverage result, and the **76x projection estimate that is
+currently an inference joining a checkout per-record cost to a render raw
+density**. It also makes the owning lane's own falsification criterion ("if the
+projection ratio has drifted...") checkable for the first time; it was
+unmeasurable in production when they wrote it.
+
+**Residual risk, stated rather than discovered later:** if that lane has the file
+open in an editor or an unlanded worktree, this lands under them and their next
+rebase carries a conflict in `build_accuracy_summary`. It is two hunks and one
+line, so the conflict is small and legible — but it is a real cost of the
+override and belongs on the record, not in a footnote.
