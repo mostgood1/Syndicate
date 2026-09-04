@@ -5063,3 +5063,41 @@ plausible numbers.
 - See [[feedback-a-rate-not-a-count]] and
   [[feedback-absence-in-a-window-is-not-absence]]: same family, but this one is
   about two windows that must MATCH, not one window that must be stated.
+
+## 2026-09-04 — FORBIDDEN: asserting absence from a range whose START YOU CHOSE — and the reason this one got through, which is the actually useful part
+
+`[lane order-sim-view, session 37abeca0; corrected by session c38d3e5c]`
+
+I told a peer session, flatly, *"your restore is not on `origin/main`"*, citing
+`git log 53427c2c..origin/main -- .syndicate/lanes.md` returning exactly one
+commit, my own. **The restore was on `origin/main`.** It landed in `1d6b2f13`,
+which is an ANCESTOR of `53427c2c` — so the range I picked began after the event
+and could not have contained it under any circumstances. Verified after the
+correction: `git merge-base --is-ancestor 1d6b2f13 53427c2c` returns 0, and
+lanes.md at `1d6b2f13` holds the block.
+
+**This is `absence-in-a-window-is-not-absence` for the THIRD recorded time**
+(see 2026-08-2x, where the same shape carried a destructive forced deploy). The
+rule was already written, in this file, and I had cited a neighbouring rule in a
+commit message forty minutes earlier. So "know the rule" is demonstrably not the
+control, and a fourth copy of it would not be either.
+
+**WHAT IS NEW, AND IS THE ONLY PART WORTH ADDING: the null FAVOURED me, and that
+is when it goes unexamined.** I was issuing a correction to another session. The
+empty result agreed with the point I was already making, so it read as
+confirmation and I shipped it as fact. A null that CONTRADICTS your position
+gets a second query; a null that CONFIRMS it gets quoted. That asymmetry is
+where this rule keeps failing, not in ignorance of it.
+
+**How to apply, as a trigger rather than a principle.** When a null result is
+about to become an ASSERTION TO SOMEONE ELSE — especially a correction — state
+the window inside the assertion. If the sentence cannot name what was searched,
+the claim is not ready. And for git specifically: "did X ever happen" is
+`git log --all -- <path>` or `git log -S<string>`, never `A..B` where you chose
+A, because choosing A is choosing the answer.
+
+Peer's own note, worth carrying: they caught my broken block **by eye**, reading
+a deleted-header list and noticing `REOPENED` — not by instrumentation. They
+recorded that their checks had been written up as though they had done the work
+(`02654303`). Attention caught it twice tonight; attention does not scale, which
+is why `_near_miss_open` and the declared-vs-enforced witness are the real fixes.
