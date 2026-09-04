@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 806 rules `[generated]`
+## Index — 808 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5047,6 +5047,19 @@ the output contradicted something already known.
   a log line, a counter, an emitted stamp. A gate that is really inert is
   silent, and silence is directly observable. Sibling of *presence is not
   reachability* pointed the other way: this is ABSENCE is not INERTNESS.
+- **SECOND INSTANCE, SAME DAY, SAME ROOT `[2026-09-04 19:2xZ]`.** Watching for
+  the `FEED_LIVE_STATUS date=2026-09-03` line, I polled the Render logs API
+  with `text=FEED_LIVE_STATUS&limit=20` every 30s. It returned **`0` on all 24
+  polls over 12 minutes** — while the nine 09-03 lines were in the log the
+  whole time. `text=` + `limit=N` is a **RECENCY WINDOW, not a search**: the
+  worker emits `date=2026-09-04` lines continuously, so the once-emitted 09-03
+  lines were pushed out of the newest 20 within seconds. The unfiltered
+  capture over the same window found all nine immediately. Had I trusted the
+  poller I would have concluded the print never ran and redeployed to "fix" a
+  working instrument.
+  **So: a filtered log query answers "is this among the last N lines", never
+  "did this happen".** To ask the second question, capture the window
+  unfiltered and grep locally — which is what `capture_build.py` exists for.
 - **Cost.** No production change was made — the error was caught on the way to
   making one, when investigating the blast radius of a config write the user had
   authorised. Had I acted on it instead, I would have "fixed" a correct service
