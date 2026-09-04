@@ -96,19 +96,85 @@ def _parlay_correlation_profile(legs: tuple[dict[str, Any], ...]) -> dict[str, A
     }
 
 
+#: How far the correlation SCORE is allowed to move a parlay off independence,
+#: as a fraction of the distance to the Frechet bound. Capped because
+#: `correlation_score` is a heuristic built from categorical flags
+#: (`correlation_engine.compute_correlation`), NOT a measured correlation
+#: coefficient -- so it is trusted for its SIGN and only partly for its
+#: magnitude. Matches the authority the previous multiplier had (a <=25% move).
+#: Raise it only against measured same-game correlations (`#621`).
+_PARLAY_CORRELATION_MAX_SHIFT = 0.25
+
+
+def _frechet_bounds(leg_probabilities: list[float]) -> tuple[float, float]:
+    """The only values `P(all legs win)` can take, whatever the dependence.
+
+    Upper: everything cannot be likelier than its likeliest single leg.
+    Lower: `sum(p) - (n - 1)`, floored at 0 -- the most the legs can avoid
+    overlapping. Interpolating between them cannot produce an invalid
+    probability, which is why the adjustment is expressed this way rather than
+    as a free multiplier on the product.
+    """
+    return (
+        max(0.0, sum(leg_probabilities) - (len(leg_probabilities) - 1)),
+        min(leg_probabilities),
+    )
+
+
+def _correlation_adjusted_probability(
+    leg_probabilities: list[float], average_correlation: float
+) -> float:
+    """`P(all legs win)`, moved off independence in the direction the legs imply.
+
+    THE PREVIOUS FORM HAD THE SIGN WRONG IN BOTH DIRECTIONS:
+
+        correlation_multiplier = 1.0 - min(0.25, max(0.0, avg_corr) * 0.35)
+
+      * POSITIVE correlation REDUCED the parlay. For an AND of legs, positive
+        dependence makes the joint MORE likely than the product, not less -- so
+        genuinely correlated same-game parlays were systematically underpriced.
+      * NEGATIVE correlation did NOTHING, because `max(0.0, ...)` discarded it.
+        That is the dangerous half: `compute_correlation` returns -0.30 for the
+        same subject in opposite directions, -0.06 for opposing teams in one
+        game, and takes a further -0.08 for opposed directions -- exactly the
+        legs that CONFLICT. Priced as independent, a conflicting parlay's
+        probability, and therefore its EV, was OVERSTATED.
+
+    Now: interpolate between independence and the Frechet bound on the side the
+    sign points to. Exact at zero correlation, monotone in it, and bounded by
+    construction -- at full weight it reaches the comonotone (or countermonotone)
+    extreme and never passes it.
+
+    NOT A COPULA, and deliberately not dressed as one. `average_correlation` is
+    a sum of categorical flags, not a measured coefficient, so its magnitude is
+    capped (`_PARLAY_CORRELATION_MAX_SHIFT`). Replacing it with a MEASURED
+    same-game correlation is `#621`; this function is where that value lands,
+    and its shape does not change when it does.
+    """
+    independent = 1.0
+    for leg_probability in leg_probabilities:
+        independent *= leg_probability
+    lower, upper = _frechet_bounds(leg_probabilities)
+    weight = max(-1.0, min(1.0, average_correlation))
+    weight = max(-_PARLAY_CORRELATION_MAX_SHIFT, min(_PARLAY_CORRELATION_MAX_SHIFT, weight))
+    if weight >= 0.0:
+        adjusted = independent + weight * (upper - independent)
+    else:
+        adjusted = independent + weight * (independent - lower)
+    return max(0.0, min(1.0, adjusted))
+
+
 def _combined_probability(legs: tuple[dict[str, Any], ...], correlation_profile: dict[str, Any]) -> float | None:
-    probability = 1.0
-    seen_probability = False
+    leg_probabilities: list[float] = []
     for leg in legs:
         leg_probability = _candidate_parlay_probability(leg)
         if leg_probability is None:
             return None
-        probability *= leg_probability
-        seen_probability = True
-    if not seen_probability:
+        leg_probabilities.append(float(leg_probability))
+    if not leg_probabilities:
         return None
-    correlation_multiplier = 1.0 - min(0.25, max(0.0, float(correlation_profile.get("average_correlation") or 0.0)) * 0.35)
-    return round(max(0.0, min(1.0, probability * correlation_multiplier)), 4)
+    average_correlation = float(correlation_profile.get("average_correlation") or 0.0)
+    return round(_correlation_adjusted_probability(leg_probabilities, average_correlation), 4)
 
 
 def _combined_expected_value(combined_probability: float | None, combined_decimal_odds: float | None, combined_bet_size: float) -> float | None:
