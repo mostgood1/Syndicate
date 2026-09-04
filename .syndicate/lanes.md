@@ -66,6 +66,24 @@ markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
 ## OPEN
+### web-oom-arena-trend — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: answer whether `#632`'s ~173 MB/h is FRAGMENTATION or RETENTION, by
+  sampling pymalloc's `arena_mb` against `bytes_in_allocated_blocks_mb` over
+  time. Four per-request explanations are already ruled out, and the last ruled
+  itself out on the fact that reframes the question: **CPython frees to ARENAS,
+  not to the OS**, so "which request freed it" is unanswerable in principle.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_arena_trend.py` (NEW). Both unclaimed by any other OPEN lane.
+- Opened AFTER `web-oom-thread-gating` closed — new work, and reopening a closed
+  lane would hide that.
+- Hypothesis: `arena_mb` climbs while `bytes_in_allocated_blocks_mb` stays flat,
+  i.e. the growth is memory the OS has given us that Python cannot hand back.
+- Falsification test: live bytes climb WITH the arenas — then it is genuine
+  retention and the fragmentation story is wrong.
+- Verification: `arena_trend` present in successive attribution emissions with a
+  rising `fragmentation_mb`, or a flat one, over >= 30 min of one process life.
+- Blocked by: none.
+
 ### web-oom-thread-gating — CLOSED 2026-09-04 — opened 2026-09-04 — **FALSIFICATION TEST ANSWERED, AND THE ANSWER WAS NO.** The gate is correct, tested and **INERT**: neither loop runs on web. Three further candidates were then measured — GC timing EXCLUDED (the sole gen-2-overlapping request read +32.344 MB while the non-overlapping group swung to -30.108 MB) and `LAST_RESULT` EXCLUDED (0.0 MB both halves). **The constraint that ends this line of attack: CPython frees to pymalloc ARENAS, not the OS, so an in-Python free cannot move `Anonymous:` at all** — a negative anon delta requires arena release, which belongs to no statement, request or thread. Rate separately re-measured at **+173 MB/h, down 66%**. NEXT: `malloc_info`/arena counts, not another attribution probe. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: close `#632`'s LAST contamination source so the attributed SHARE becomes
   recoverable. `inflight` proves no other REQUEST overlapped a window; it says
