@@ -241,6 +241,26 @@ carried by another lane's deploy); refresh-worker + live-odds-worker `1e5ae2b1`
 RAN (reachability, not presence), that `_LEAN_FIELDS` persists it, that the read
 side serves it, and that both agree on the field name.
 
+**WHAT THE ROI ARM IS ACTUALLY WAITING ON, measured 2026-09-04 01:5xZ: A
+ONCE-DAILY JOB, NOT THE MATCHES.**
+`EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN` is `true` on
+refresh-worker, but `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` is an
+**EMPTY STRING**. Empty is falsy, so `if str(os.environ.get(...) or "").strip():`
+(`run_refresh_worker.py:2039`) skips the interval override and the
+**once-per-Central-calendar-day** gate applies, target hour default **06:00 CT**.
+So `settled` cannot leave zero before ~06:00 CT / ~11:00Z however the matches
+finish, and four identical hand-polls between 00:21Z and 01:27Z are explained by
+that rather than by anything being wrong.
+
+Two things follow. **`bet_status` and the ledger disagree ON PURPOSE and both are
+right:** three soccer totals read `decided=True, status=lost` in the live view
+while the ledger still counted them among 111 pending, because the live view
+answers "is this bet winning" and `outcome` is written by settlement. **And the
+empty string is a near-miss on a documented hazard** — `CLAUDE.md` records that
+setting that key AT ALL overrides the daily gate and once produced 4 runs/day of
+a ~1.4GB job. It currently behaves correctly by Python truthiness rather than by
+intent, and reads as "set" to anyone scanning env vars.
+
 **IT PROVES NOTHING ABOUT ROI, and the shape of the reading says so:**
 `orders=1, settled=0, pending=0, unknown=0` ⇒ `execution_guard.is_non_position`
 ⇒ that order was REJECTED, never opened a position, and contributes $0 to staked
