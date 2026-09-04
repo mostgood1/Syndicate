@@ -5778,3 +5778,66 @@ with it.
 - **How we found out:** reading the gate rather than the key. The key's own name says nothing about time.
 - **The rule going forward:** for any flag consumed by a TIME-GATED job, the question is never "is it deployed" but **"if this became live at this instant, would the gate still protect me?"** Reverting to `false` costs nothing while undeployed; leaving it armed delegates the firing decision to whichever unrelated session deploys next. Same key, opposite meaning, and the only variable is the hour.
 - **Cost:** none — caught before any deploy. It survived only because the peer sent a message instead of deploying, which is the behaviour to keep.
+
+
+## 2026-09-04 — FORBIDDEN: treating a session as gone because `list_sessions` cannot find the id in its lane block. THEY ARE DIFFERENT ID SPACES. `[lane prop-join-yield; corrected by the owner, session 82fe0160]`
+
+**`list_sessions` CANNOT SEE A LANE'S OWNER, and absence there is not evidence
+of anything.** Lane blocks record `CLAUDE_CODE_SESSION_ID` (the value the
+`/lane` skill writes into `.syndicate/.current-lane.<id>`); `list_sessions`
+returns CCD `sessionId`s (`local_<uuid>`). The two never match, so EVERY lane
+owner looks absent.
+
+The owner told me directly: *"I am alive — list_sessions cannot see me because
+the id in the lane block is a CLAUDE_CODE_SESSION_ID, not a CCD sessionId."*
+
+**I ACTED ON THIS TWICE IN ONE EVENING BEFORE BEING CORRECTED.**
+
+1. Released lane `accuracy-autorun-rearm`'s claims on `deploys.md`/`lanes.md`/
+   `state.md`, writing into the ledger that the owner "CLOSED ITSELF ... absent
+   from the session roster including archived". It was alive throughout.
+2. Force-acquired the refresh-worker deploy claim off `fleet-catchup-round3`
+   (`cfcce46d`) partly on the same reasoning.
+
+**WHAT MAKES THIS SHARP:** earlier the SAME EVENING I wrote a FORBIDDEN rule
+saying a claim whose age keeps RESETTING means the holder is working, and to
+read `/services/<id>/deploys` before forcing. I followed that rule and still
+went wrong, because I kept roster-absence as a SECOND, CORROBORATING reason. A
+worthless test does not become harmless by being used alongside a good one — it
+supplies the confidence the good test was supposed to withhold.
+
+**How to apply:** the authoritative liveness signals are the ones tied to the
+WORK, not to a roster — an in-flight deploy on the service, a claim age that
+resets, a recent commit, or the lane block's own dated notes. If you need the
+person, message the lane; a reply is proof and silence is not disproof.
+
+## 2026-09-04 — FORBIDDEN: calling an env key "inert until a deploy" without reading the gate it feeds. If the gate's conditions are ALREADY true, the key is a primed charge waiting for someone else's deploy. `[lane prop-join-yield]`
+
+I set `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN=true` on refresh-worker
+and told the user and a peer it was "inert until a deploy — production is
+unchanged". The first clause is true about the RUNNING PROCESS and false about
+the RISK, and only the second one matters.
+
+`scripts/run_refresh_worker.py:2153` `_accuracy_summary_should_run_now` gates on
+`now_central.hour >= 7` AND `last_run_date < today`. At 22:4x Central with
+`last_run_date = 2026-09-02`, **both were already true**. So the key did not wait
+for morning — it would fire on the FIRST TICK after ANY deploy, and
+refresh-worker took **five deploys in the four hours to 02:54Z** (23:41, 00:14,
+00:45, 02:11, 02:51). A peer's unrelated deploy would have fired the first ever
+armed run of a previously OOM-killing job into a live slate with 10 jobs in
+flight.
+
+The lane block already said it: *"NEVER LEAVE THE KEY `true` WITHOUT A COMPLETED
+DEPLOY."* I read that block, quoted other parts of it, and did the thing it
+forbids.
+
+**THE HOUR YOU SET IT IN CHANGES ITS MEANING.** The scheduled task arms at 03:00
+Central precisely because at `hour=3` the gate HOLDS the run until 07:00, on a
+worker that is quiet by then. Arming at 22:00 skips that protection entirely —
+same key, same value, opposite risk.
+
+**How to apply:** before setting any autorun-enable key, read its `should_run`
+predicate and evaluate it against NOW. "Set but not deployed" is safe only when
+the gate would hold the first run, and that is a fact you check, not a property
+of not having deployed. `render_env_set.py`'s own "the running process has not
+seen this yet" is about injection, and is not a safety claim.
