@@ -109,6 +109,20 @@ unbounded.
   HEAD-move check, but a concurrent session's UNCOMMITTED write to a claimed file
   is indistinguishable from your own — observed once, live — so it names no
   author.
+- **A COMMIT CANNOT REVERT A LEDGER COMPACTION** `[2026-09-04, verified]`.
+  `ledger_invariants.resurrected_lines()` refuses a `lanes.md` carrying lines
+  upstream moved to `lanes_history.md`. `resurrected_blocks` was blind to it --
+  `a8000faf` compacted WITHIN blocks (203,047 -> 84,956 B), so no block read as
+  resurrected and `violations()` returned 0 on a stale copy whose commit would
+  have restored 1,308 lines. Same shape `_deploys` already refused on its file.
+- **A DESTRUCTIVE `git checkout` IS NOW GATED** `[2026-09-04, verified]`.
+  `discard-guard.py` (PreToolUse `Bash|PowerShell`) refuses `checkout -- <path>`,
+  `restore` and `reset --hard` when the working file holds non-blank lines in
+  neither the incoming version nor `HEAD` -- i.e. content with no other copy.
+  Before it, that command was allowed by EVERY hook here and had destroyed an
+  uncommitted lane block once and nearly a second time. The predicate is
+  "exists nowhere else", NOT "has deletions": a deletions count is structurally
+  blind to an uncommitted ADDITION, which is what both incidents lost.
 - **A CLAIM OUTLIVES ITS SESSION FOREVER — the guard has NO liveness notion**
   `[verified 2026-08-29T23:2xZ, lane lane-claim-phantom-sweep]`. Nothing released
   a claim when a session ended, so they accumulated: **26 OPEN lanes holding 133
