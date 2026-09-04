@@ -756,6 +756,66 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+
+def _settled_sample_size_by_sport() -> dict[str, int]:
+    """Per-sport SETTLED counts, for the S6 sample-credibility ramp.
+
+    **THIS EXISTS BECAUSE THE HOOK BELOW WAS NEVER WIRED, AND ITS OWN COMMENT
+    SAID WHEN IT SHOULD BE.** `commit_portfolio` shrinks every stake by
+    `_sample_credibility(settled_sample_size)`, which ramps 0.25 -> 1.0 at 50
+    settled bets (`bankroll_manager.py:158,187`). No caller ever passed the map,
+    so the argument defaulted to `None` and EVERY market sized at the 0.25
+    floor. Combined with the fixed quarter-Kelly multiplier that is
+
+        staked_fraction = full_kelly * 0.25 * 0.25   = 1/16 Kelly
+
+    The hook's comment read "correct while `settled_count` is 0 platform-wide".
+    Measured 2026-09-04, that premise had expired: settlement carries **1,594
+    settled orders** (book 662, kalshi 474, polymarket 224, prophetx 150, novig
+    84), and the dominant sport has **616 settled at +5.76% ROI** -- credibility
+    1.00, four times what it was being sized at. The whole board wanted $19.64
+    of a $1,000 bankroll.
+
+    **DERIVED HERE RATHER THAN PASSED BY THE CALLER, deliberately.** There is
+    exactly one production caller (`intelligence_state.py`) and it did not pass
+    it; making the fix depend on a caller remembering is how it was lost the
+    first time. A default of `None` now means "work it out", not "size
+    everything at the floor".
+
+    `by_sport` is scoped to PORTFOLIO rows, so each decision is counted once
+    rather than pooled with its own venue-scoped copies -- the double-count
+    `settlement_summary` documents at its own `by_sport` line.
+
+    Keys are lowercased to match the consumption site, which looks the sport up
+    as `str(row.get("sport") or "").strip().lower()`. A key that does not match
+    is silently 0, which is the floor again -- the exact failure this repairs.
+
+    Returns `{}` on any failure, which reverts to the old behaviour rather than
+    breaking the commit. The reason is printed, because a silent revert here is
+    indistinguishable from the bug.
+    """
+    try:
+        from syndicate.features.shared.paper_settlement import settlement_summary
+
+        summary = settlement_summary()  # no date -> ALL TIME
+    except Exception as exc:  # noqa: BLE001
+        print(f"[portfolio_commit] SETTLED_SAMPLE_UNAVAILABLE error={exc}", flush=True)
+        return {}
+
+    out: dict[str, int] = {}
+    for bucket in (summary.get("by_sport") or []):
+        if not isinstance(bucket, Mapping):
+            continue
+        key = str(bucket.get("key") or "").strip().lower()
+        try:
+            settled = int(bucket.get("settled") or 0)
+        except (TypeError, ValueError):
+            continue
+        if key and key != "unknown" and settled > 0:
+            out[key] = settled
+    return out
+
+
 def run_portfolio_commit(
     selected_date: str,
     *,
@@ -824,16 +884,33 @@ def run_portfolio_commit(
     # bankroll the plan was not sized with.
     settings = resolve_settings()
 
+    # S6 HOOK, NOW WIRED (2026-09-04). The comment that stood here said this was
+    # "correct while `settled_count` is 0 platform-wide" and that "when
+    # settlement starts producing records this is where the real per-sport
+    # sample enters, and stakes rise on evidence rather than on a constant being
+    # edited". Settlement has been producing records for weeks; the caveat came
+    # due and nothing noticed, so every stake sized at 1/16 Kelly instead of 1/4.
+    if settled_sample_size_by_sport is None:
+        settled_sample_size_by_sport = _settled_sample_size_by_sport()
+    # OBSERVABLE, because a silent derivation is indistinguishable from the bug
+    # it replaces. `credibility` is what the sizer will actually apply.
+    print(
+        "[portfolio_commit] SETTLED_SAMPLE date=%s samples=%s credibility=%s"
+        % (
+            normalized,
+            dict(sorted((settled_sample_size_by_sport or {}).items())),
+            {
+                sport: round(min(1.0, max(0.25, n / 50.0)), 3)
+                for sport, n in sorted((settled_sample_size_by_sport or {}).items())
+            },
+        ),
+        flush=True,
+    )
+
     plan = commit_portfolio(
         rows,
         selected_date=normalized,
         settings=settings,
-        # S6 HOOK. Layer 2 rows carry no `historical_profile`, so this is empty
-        # today and every market therefore sizes at `_MIN_SAMPLE_CREDIBILITY`
-        # (0.25) -- which is correct while `settled_count` is 0 platform-wide.
-        # When settlement starts producing records this is where the real
-        # per-sport sample enters, and stakes rise on evidence rather than on a
-        # constant being edited.
         settled_sample_size_by_sport=settled_sample_size_by_sport,
     )
 
