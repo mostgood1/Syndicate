@@ -802,6 +802,24 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 
 - **CODE IS ON `main` AT `b55fa165` (2 GB -> 4 GB) BUT IS NOT IN PRODUCTION — A DEPLOY IS OWED.** `autoDeploy` is off, so refresh-worker keeps running the 2 GB default until some refresh-worker deploy carries this commit. **Not deployed deliberately:** the autorun is once per Central day and already ran today at 14:34Z, so nothing can exercise this before ~07:00 CT tomorrow, and forcing a deploy now would kill in-flight jobs to ship a change nothing will read for 17 hours. Peers deploy this service several times a day; any of those carries it. **This is safe to let ride ONLY because it is CODE.** The same reasoning would be wrong for an env key that arms behaviour — that is the 09-03 landmine, where a key set `true` waits for someone else's unrelated deploy to fire it.
 - **BEFORE TRUSTING TOMORROW'S RESULT, CHECK THE DEPLOYED SHA CONTAINS THE RAISE** — by CONTENT, not ancestry: `git show <live-sha>:syndicate/features/shared/intelligence_evaluation.py | grep "DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = "` must read `4_000_000_000`. If it still reads `2_000_000_000`, tomorrow's `skipped_budget` measures the OLD budget and says nothing about this change.
+### catchup-feed-live-terminal — CLOSED 2026-09-04 — **web + live-odds-worker to `f3f4c13c`** (14:56:54Z / 14:56:48Z), mlb feed_live terminal-state fix. Verified by content (`mlb_feed_live_is_refreshable` 0→1) with three earlier fixes re-checked; 16 MLB cards, 0 errors. refresh-worker was owner-held; the money-relevant Kelly stake fix `848bcab9` SHIPPED under that lane and is verified live on `2332b47b`. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: web and live-odds-worker onto `f3f4c13c`. Content they execute:
+  `20221619` (mlb feed_live — final is terminal, everything else must be
+  refreshed; `cards.py`, `game_state.py`, `home.py`) and `d525a80c` (`#632`
+  LAST_RESULT instrumentation).
+- **refresh-worker EXCLUDED** — claimed by `mlb-rate-refit` (12 min). Its
+  extra commit `848bcab9` ("every stake was 1/16 Kelly, not 1/4") touches
+  `pipeline/portfolio_commit.py`, which ONLY refresh-worker runs, and is
+  plausibly that lane's own work. **Named because it is money-relevant: the
+  stake-sizing correction cannot reach production until that lane ships or
+  releases.**
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Verification: BY CONTENT on the deployed SHA — `mlb_feed_live_is_refreshable`
+  in `game_state.py`, confirmed ABSENT from the currently-live `4597077d`
+  (live=0, target=1); plus web serving cards; plus 0 tracebacks.
+- Blocked by: none for web/live-odds.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

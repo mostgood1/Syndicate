@@ -21384,3 +21384,30 @@ after printing the summary header, so the per-event tail is unusable — you get
 the counts and the span, then a traceback. The header is computed from a full
 76-page read and remains trustworthy, which is what the OOM check rests on. Not
 fixed here; out of lane.
+
+## 2026-09-04 — web + live-odds-worker to `f3f4c13c` — lane `catchup-feed-live-terminal`
+
+Content they execute: `20221619` (mlb feed_live — **final is terminal, everything
+else must be refreshed**; `cards.py`, `game_state.py`, `home.py`) and `d525a80c`
+(`#632` LAST_RESULT instrumentation). Both preflights CLEAR first try; web live
+14:56:54Z, live-odds-worker 14:56:48Z.
+
+verify — BY CONTENT on the deployed SHA, token confirmed ABSENT from the
+previously-live `4597077d` first: `mlb_feed_live_is_refreshable` **0 → 1** in
+`game_state.py`. Three earlier fixes re-checked for SURVIVAL and intact:
+`#624`'s `refuse_published_certainty` x6, `#643`'s `bytes_per_order` x1,
+`2248ed78`'s `requested_date` x2. web serving **16 MLB cards**; 200 log lines
+across both, **0 tracebacks / 500s / CRITICAL**.
+
+**refresh-worker was NOT mine to take, and the money-relevant fix shipped
+anyway.** `mlb-rate-refit` held its claim, and the commit I flagged —
+`848bcab9`, *"every stake was 1/16 Kelly, not 1/4"* — touches
+`pipeline/portfolio_commit.py`, which ONLY refresh-worker runs. I named it in the
+lane as a stake-sizing correction that could not reach production until that lane
+shipped or released. It shipped: refresh-worker is now `2332b47b`, **0 pending**,
+and the fix is verified there BY CONTENT — `_sample_credibility` x1,
+`_settled_sample_size_by_sport` x2, with `848bcab9` an ancestor.
+
+Recorded because the flag was worth making and the follow-up was worth doing:
+naming a money-relevant commit as blocked is only half the job if nobody checks
+whether it later cleared.
