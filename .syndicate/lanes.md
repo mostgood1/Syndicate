@@ -1425,6 +1425,45 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: the 6 tests in `test_soccer_effective_state_terminal.py` and all 5 in `StaleArtifactStateTests` pass together; the amended assertion FAILS if the terminal guard is removed (`off != on`).
 - Blocked by: none.
 
+### nfl-projection-et-datekey — OPEN — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DEFECT CONFIRMED ON `origin/main`, FIXED, MUTATION-CHECKED AND LANDED (`52870f57`). DEPLOYED NOWHERE — A DEPLOY IS OWED AND IS NOT MINE.** Production `render` 2026-09-04T20:56:12Z: `unmatched_game_rows 299` of `1252` (23.9%), afternoon UTC dates 74/74 and 57/57 projected while EVERY prime-time UTC date reads 0. Replaying production's own rows through both versions on an identical index (`games_in_index 321`, matching production's 321): pre-fix reproduces production **EXACTLY** (953 projected / 299 unmatched, 4 of 4 counters) and the fix gives **1174 / 78, -73.9%**. Mutation check, 4 mutations, each red exactly where predicted — the discriminating one (B: UTC-slice join restored, helper still exported) turns **the 3 defect tests red and leaves the other 8 green**. Scoped suite 176 passed / 23 subtests; `test_ncaaf_game_projections.py`'s 7 failures are PRE-EXISTING, re-baselined against pristine `origin/main` in the same worktree. **THE ENTIRE 78-ROW RESIDUAL IS ONE TEAM** — 17 of 17 fixtures are the Rams, `teams_match("nfl","los angeles rams","la")` is False while `"lar"` is True and the schedule writes `LA`; separate defect, separate file, spawned as its own task. Full working: `deploys.md` 2026-09-04 ~21:1xZ.
+- Goal: every NFL prime-time game row on the board carries a projection —
+  `NflGameProjectionIndex.lookup` joins on the SAME quantity on both sides.
+  Today it does not: `lookup` slices `commence_time[:10]`, which is **UTC**
+  (`nfl_game_projections.py:123`), while the index is keyed on the schedule's
+  `gameday`, which is **local ET** (`:176-184`). Any kickoff at/after 20:00 ET
+  rolls into the next UTC day and misses, and the `teams_match` fallback is
+  pinned to `d == date_key` (`:139`) so it misses too.
+- Files: `syndicate/features/shared/nfl_game_projections.py`,
+  `tests/test_nfl_game_projection_date_key.py` (NEW).
+  Collision check: `check_lane_invariants.py` reports 10 OPEN lanes / 37 claims,
+  INVARIANTS HOLD. The only OPEN-lane mentions of `nfl_game_projections.py` and
+  `tests/test_nfl_game_projections.py` are in `layer1-model-edge-join`, all
+  under `released:` (lines 369/373/379/383), which `_claimable_prefix` treats as
+  a NON-claim. The new test file appears nowhere in `lanes.md`. Not touching
+  `soccer-player-producer`'s six files.
+- Hypothesis: n/a — this is a CONFIRMED, measured defect, not a diagnosis.
+  Verified against `origin/main` itself (not the primary tree, which is behind):
+  `git show origin/main:...` carries `date_key = str(game_date or "")[:10]` and
+  the `d == date_key` fallback verbatim. Schedule row `2026_01_NE_SEA` reads
+  `gameday=2026-09-09 gametime=20:20` against a board `commence_time` of
+  `2026-09-10T00:20:00Z` — a genuine one-day skew, not a naming gap.
+- Falsification test: if the two sides were already the same quantity, an
+  afternoon game (13:00 ET, same UTC day) and a prime-time game (20:20 ET, next
+  UTC day) would join identically. They do not — that asymmetry IS the defect,
+  and the mutation check below is what proves the tests can see it.
+- Verification: (a) new tests FAIL on `origin/main` and pass with the fix — run
+  the MUTATION CHECK, back the fix out and confirm each new test goes red, and
+  report that result; a green test never seen fail proves nothing; (b) an
+  afternoon case and a DST-boundary case both keep working; (c) production
+  `unmatched_game_rows` before/after and projected-row counts for a prime-time
+  date. Convert `commence_time` to `America/New_York` (matching
+  `layer1_board._row_local_date` / `candidate_slate_filter._slate_date`), never
+  a fixed offset — 2026-09 is EDT and January is EST.
+- Blocked by: nothing for the code. **A DEPLOY IS OWED AND IS NOT MINE:** lane
+  `soccer-player-producer` is mid-deploy on this fleet (live-odds-worker on
+  `3223baa1`, refresh-worker pending behind an in-flight MLB sim). Landing on
+  `origin/main` only.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

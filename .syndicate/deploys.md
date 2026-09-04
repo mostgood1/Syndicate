@@ -22359,3 +22359,107 @@ web attempt because my lane marker in the PRIMARY tree still read
 `accuracy-autorun-rearm` while the claim was held by
 `evaluation-ledger-projected-mirror` — I had updated the marker in the WORKTREE
 only. The guard was right and the fix was to correct the marker, not the claim.
+
+---
+
+## 2026-09-04 ~21:1xZ — NFL projection date-key: LANDED ON `origin/main`, **DEPLOYED NOWHERE. A DEPLOY IS OWED AND IS NOT MINE.** `[lane nfl-projection-et-datekey, commit 52870f57]`
+
+**NO DEPLOY WAS RUN, no claim was taken, no preflight.** Lane
+`soccer-player-producer` is mid-deploy on this fleet (live-odds-worker on
+`3223baa1`, refresh-worker pending behind an in-flight MLB sim). Recorded here
+because the measurement exists and would otherwise be lost, NOT because
+something shipped. `autoDeploy = no`, so `52870f57` on `main` is running on
+nothing.
+
+**THE DEFECT — the projection join compared a UTC day against an ET day.**
+`NflGameProjectionIndex.lookup` keyed on `commence_time[:10]`, which is UTC,
+while the index is built from the schedule's `gameday`, which is local Eastern.
+Every kickoff at or after 20:00 ET rolls into the next UTC day and missed; the
+`teams_match` fallback was pinned to `d == date_key`, so it missed too. The
+`[:10]` slice at the CALL SITE was half the fix — converting inside `lookup`
+alone would have been INERT, because the time component had already been thrown
+away one frame up.
+
+### before — substrate `render`, `GET /api/board/book-grid?sport=nfl&limit=5000`, `server_time 2026-09-04T20:56:12Z`
+
+    games_in_index        321
+    rows_considered      1252
+    rows_with_projection  953
+    unmatched_game_rows   299        <- 23.9% of the NFL board
+
+Per-date, and the signature is the whole diagnosis — afternoon UTC dates full,
+prime-time UTC dates empty, on all 18 weeks in the grid:
+
+    2026-09-13   74 rows   74 projected    (Sun 13:00 / 16:25 ET)
+    2026-09-14    5 rows    0 projected    (SNF, 20:20 ET on 09-13)
+    2026-09-15    7 rows    0 projected    (MNF, 20:15 ET on 09-14)
+    2026-09-20   57 rows   57 projected
+    2026-09-21    6 rows    0 projected
+
+### after — **NOT a production reading. Substrate: production's own ROWS, this checkout's CODE.**
+
+Production's grid rows replayed through both versions with an identical index.
+`state.md [substrate-rule]`: a local run is evidence about the CODE, never about
+the deployment. What makes it trustworthy anyway is that **the pre-fix control
+reproduces production EXACTLY** — same 321 / 1252 / 953 / 299, four for four —
+so the harness is calibrated against the thing it is predicting.
+
+    pre-fix join    rows_with_projection  953    unmatched 299
+    fixed           rows_with_projection 1174    unmatched  78     -73.9%
+
+    2026-09-10   0/4  ->  4/4        2026-09-14   0/5  ->  5/5
+    2026-09-15   0/7  ->  7/7        2026-09-18   0/4  ->  4/4
+    2026-09-21   0/6  ->  6/6        2026-09-13  74/74 -> 74/74   (unchanged)
+    2026-09-20  57/57 -> 57/57       (unchanged)
+
+Harness: `scratchpad/nfl_replay_ab.py`.
+
+### verify — the MUTATION CHECK, because a green test never seen fail proves nothing
+
+Four mutations, each producing exactly the predicted red set and nothing else:
+
+| mutation | result |
+|---|---|
+| A — full revert of the module to `origin/main` | all 11 new tests red (import error — blunt, reported as such) |
+| B — UTC-slice join restored, helper still exported | **the 3 defect tests red, the other 8 green** |
+| C — `ZoneInfo("America/New_York")` -> fixed `-4` | only the DST test red |
+| D — date-only guard removed | only the date-only test red |
+
+B is the discriminating one: it isolates the JOIN from the missing symbol.
+C is why the zone is named and not an offset — the season spans the DST
+boundary, so `-4` is right for September and wrong for the January playoffs.
+Note honestly that the DST *transition-weekend* test is NOT offset-discriminating
+(both -4 and -5 put those two stamps on the right day); the 04:30Z pair is the
+one that catches it.
+
+Scoped suite: **176 passed, 23 subtests**, over the 5 NFL projection test files
+plus the 9 board-enrichment dependents grep found. `tests/test_ncaaf_game_projections.py`
+has **7 failures that are PRE-EXISTING** — re-baselined by stashing and running
+against pristine `origin/main` in the same worktree, identical set and count.
+
+### the residual is fully attributed, and it is a DIFFERENT defect
+
+All **78** remaining unmatched rows — 17 of 17 distinct fixtures — are Los
+Angeles Rams games, across the whole season. The ET day is in the index for
+every one, so it is not a date problem:
+
+    teams_match("nfl", "los angeles rams", "la")  -> False
+    teams_match("nfl", "los angeles rams", "lar") -> True
+
+The nflverse schedule writes the club as `LA` (`2026_01_SF_LA`, `home_team=LA`).
+Washington resolves fine both ways. This module's own docstring predicted it:
+"WSH, LAR ... whose nflverse abbreviations do not resolve". Separate file
+(`team_aliases.py`), separate lane — not folded into this one, because it is a
+shared cross-sport identity file and `learnings.md` carries a FORBIDDEN on
+global alias maps that a new lane should address explicitly rather than inherit.
+
+### owed
+
+1. **A deploy of `52870f57` to `web`** — `_attach_book_grid_projections` runs in
+   the request path there, so web is what serves `/api/board/book-grid`. The
+   workers rebuild the board, so they want it too. **Not taken: another lane
+   holds this fleet.**
+2. **The production `after`.** Nothing here is a claim about what production
+   serves. Read `unmatched_game_rows` on `/api/board/book-grid?sport=nfl` after
+   the deploy; the prediction on the same grid is **299 -> 78**, and prime-time
+   dates going 0 -> full is the visible half.
