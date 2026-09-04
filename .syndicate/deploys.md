@@ -21637,3 +21637,73 @@ apart, and found **3–4 defunct children awaiting reap** on both gunicorn worke
 each time. Zombies hold no memory so this does not explain `#632`, but it is
 `#630`'s reap path leaving children unreaped in steady state. Owed to whoever
 next touches merge children.
+
+## 2026-09-04 — **THE EVALUATION LEDGER CANNOT LEAVE refresh-worker BY ANY EXISTING HTTP PATH. An allowlist entry would 404 FOREVER.** `[user: "run it locally and push it back"; NO CODE SHIPPED, NO DEPLOY]`
+
+**I proposed adding `reports/intelligence/evaluation_ledger_chunks/*` to
+`EXPORT_ONLY_ARTIFACT_PATTERNS` so the ledger could be mirrored locally, the
+summary computed unbounded, and the result published back. THAT PROPOSAL IS
+WRONG and was withdrawn before anything shipped.** Three facts kill it, and each
+was read rather than reasoned:
+
+1. **refresh-worker is `type: worker` in `render.yaml` (line 263). It serves no
+   HTTP.** Only `syndicate` is `type: web`.
+2. **`/api/ops/artifacts/stream` and `/export` run on WEB and read WEB's disk.**
+   `ops.py` says so twice in its own comments: the route "gates on
+   `target.is_file()`", and allowlisting a path web does not hold "would 404
+   forever". The contrast the file draws is with `read_json_file`, which IS
+   keyvalue-aware and therefore "crosses the service boundary" — the artifact
+   routes do not.
+3. **The worker->web publish sweep caps at `_PUBLISH_MAX_BYTES = 12 MiB`**
+   (`artifact_publisher.py:1607`). Production ledger chunks are **95-332 MB/day**,
+   i.e. 8-27x over. They can never cross by that path either.
+
+So the ledger is reachable only from inside the worker. **Render disks are not
+shared, the keyvalue store is internal-network-only** (the same constraint that
+stops `--drain` from a dev machine), **and the artifact routes read the wrong
+disk.** There is no HTTP route out for a 250 MB file today.
+
+### WHAT IS MEASURED AND WORKS — the local compute half, proven end to end
+
+Substrate **`checkout`** (local untracked chunks, NOT production — this says
+nothing about what production would produce):
+
+    SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES=0
+    -> effective budget 0 (unlimited), HONOURED
+    LEDGER_CHUNKS_ACCEPTED count=9 bytes=10,596,942 streamed=1
+    ledger_coverage: dates_covered 9, date_min 2026-06-04, date_max 2026-07-21,
+                     truncated FALSE
+    elapsed 1.02 s, peak python heap 2.2 MiB
+
+**`budget=0` is a first-class supported mode** — the docstring reserves it for
+"offline/CLI full-history runs" — and `scripts/build_accuracy_summary.py` already
+accepts `--ledger-path`. The offline path is built; only the DATA cannot get out.
+
+### THE NUMBER THAT MAKES A CORRECTED DESIGN VIABLE — projection is 20.2x
+
+Measured over **1,330 real records / 14.24 MB** of local chunks by applying
+`_project_evaluation_record` and re-serialising:
+
+    raw 14.24 MB -> projected 0.706 MB     ratio 0.0496, reduction 20.2x
+    per-file ratios 0.0508 / 0.0467 / 0.0510   (stable across three chunks)
+
+    a 250 MB production chunk projects to ~12.4 MB   vs the 12 MiB ceiling
+
+**That lands just OVER the publish ceiling, and gzip closes it comfortably** —
+this is JSONL of scalars, which compresses several-fold. So the shape of a
+working design is: **the worker writes a PROJECTED (and gzipped) daily chunk,
+which is small enough to publish by the ordinary sweep; local pulls that and
+runs unbounded.** The projection already exists and is already applied in the
+stream; it would simply be persisted rather than discarded.
+
+**Caveat that must not be dropped: the 20.2x ratio is a CHECKOUT measurement.**
+Local records may not match production's field population. Confirm on production
+shapes before sizing anything on it.
+
+### WHAT IS STILL OPEN
+
+Building that producer is a NEW worker-side artifact family plus allowlist
+entries plus a deploy, on the service with this job's OOM history. **Not taken
+unilaterally — it needs a decision.** The alternative levers are unchanged and
+cheaper: compact the ledger, fix `#505`, or lower `baseline_days` to the window
+the budget actually buys.
