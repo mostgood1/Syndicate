@@ -165,8 +165,8 @@ class ProcessIdentityTests(unittest.TestCase):
         exactly that boundary and read -117% coverage."""
         payload = MOD.request_memory_attribution_payload()
 
-        self.assertEqual(payload["proc_token"], MOD._PROC_TOKEN)
-        self.assertEqual(len(MOD._PROC_TOKEN), 12)
+        self.assertEqual(payload["proc_token"], MOD._proc_token())
+        self.assertEqual(len(MOD._proc_token()), 12)
 
     def test_the_token_is_STABLE_within_a_process(self) -> None:
         """It must not change per emission, or every window would look like a
@@ -176,10 +176,40 @@ class ProcessIdentityTests(unittest.TestCase):
 
         self.assertEqual(first, second)
 
+    def test_a_FORKED_WORKER_does_not_inherit_the_parent_token(self) -> None:
+        """THE defect this token was re-written for, and it shipped inert once.
+
+        The first version generated the token at IMPORT, and gunicorn forks its
+        workers after the import -- so every worker carried the identical token.
+        Measured in production 2026-09-04 20:24-20:26: pid 99 and pid 98 emitted
+        the same `6178fc632433`, merging two workers into one apparent series.
+        That is worse than having no token: a shared one reads as continuity
+        rather than as a collision, so differencing produced a confident number
+        from two different processes.
+        """
+        parent = MOD._proc_token()
+
+        with mock.patch.object(MOD.os, "getpid", return_value=987654):
+            child = MOD._proc_token()
+            self.assertNotEqual(child, parent)
+            self.assertEqual(MOD._proc_token(), child, "stable within the child too")
+
+    def test_a_RESPAWNED_worker_on_a_RECYCLED_pid_gets_a_fresh_token(self) -> None:
+        """The other direction. A new process starts with empty module state, so
+        its first call disagrees with the recorded pid and mints a new token even
+        when the OS handed back the same pid."""
+        MOD._PROC_TOKEN_STATE.update({"pid": None, "token": None})
+        first = MOD._proc_token()
+
+        MOD._PROC_TOKEN_STATE.update({"pid": None, "token": None})   # fresh process
+        second = MOD._proc_token()
+
+        self.assertNotEqual(first, second)
+
     def test_reset_does_NOT_change_the_token(self) -> None:
         """Reset clears counters; it does not make a new process. If reset
         rotated the token, a reader would see a restart that never happened."""
-        before = MOD._PROC_TOKEN
+        before = MOD._proc_token()
 
         MOD.reset_request_memory_attribution()
 

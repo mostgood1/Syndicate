@@ -3154,9 +3154,28 @@ def _process_anon_mb() -> float | None:
 # `#632`: `pid` IS NOT A PROCESS IDENTITY. Measured 2026-09-04: pid 79's
 # `solo_attributed` went 800 -> 200 at 19:55:32 because a gunicorn worker
 # respawned and the OS reused the pid, and differencing across that boundary
-# produced -117% coverage. Generated at import, so it changes with the process
-# and a reader can tell a restart from a continuation.
-_PROC_TOKEN = uuid.uuid4().hex[:12]
+# produced -117% coverage.
+#
+# DERIVED LAZILY, PER PID, and that is the whole design. The first attempt
+# generated it at import -- and gunicorn FORKS ITS WORKERS AFTER THE IMPORT, so
+# every worker inherited the identical token. Measured 2026-09-04 20:24-20:26:
+# pid 99 and pid 98 emitted the SAME token `6178fc632433`, which merged two
+# workers into one apparent series -- the exact defect the token was added to
+# fix, made worse, because a shared token looks like continuity rather than
+# like a collision.
+#
+# Re-deriving whenever `os.getpid()` changes covers both directions: a forked
+# child sees the parent's recorded pid, disagrees, and mints its own; and a
+# respawned worker that the OS gave a recycled pid gets a fresh token because
+# its module state starts empty.
+_PROC_TOKEN_STATE: dict[str, Any] = {"pid": None, "token": None}
+
+
+def _proc_token() -> str:
+    pid = os.getpid()
+    if _PROC_TOKEN_STATE["pid"] != pid:
+        _PROC_TOKEN_STATE.update({"pid": pid, "token": uuid.uuid4().hex[:12]})
+    return str(_PROC_TOKEN_STATE["token"])
 
 _PER_REQUEST_SMAPS_STATE: dict[str, Any] = {"count": 0, "routes": {}}
 _PER_REQUEST_SMAPS_MAX_DEFAULT = 120
@@ -3405,7 +3424,7 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         # `proc_token`, gives attributed vs the process's own climb -- and the
         # RESIDUAL, which is the number that was never recoverable before.
         "attributed_total_mb": round(float(_REQUEST_MEMORY_STATE.get("attributed_total_mb") or 0.0), 3),
-        "proc_token": _PROC_TOKEN,
+        "proc_token": _proc_token(),
         # WHICH WORKER. `#632`: gunicorn runs 2 workers and both emit into one
         # log stream, so a series read without this is TWO interleaved series.
         # Measured 2026-09-04: five consecutive emissions alternated between
