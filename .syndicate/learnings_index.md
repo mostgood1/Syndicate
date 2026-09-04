@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 787 rules `[generated]`
+## Index — 788 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 284**
+**FORBIDDEN — 289**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -220,6 +220,11 @@
 - [2026-09-03 — FORBIDDEN: clearing a `git checkout -- <path>` on a DELETIONS count. It is…](#2026-09-03-forbidden-clearing-a-git-checkout----path-on-a-deletions-count-it-is-structurally-blind-to-the-addition-you-are-about-to-destroy)
 - [2026-09-03 — FORBIDDEN: retracting a claim you re-checked, without first asking whether…](#2026-09-03-forbidden-retracting-a-claim-you-re-checked-without-first-asking-whether-the-code-moved-between-the-claim-and-the-check-re-derivation-cannot-see-this)
 - [2026-09-04 — FORBIDDEN: clearing a shared-tree file on a STRUCTURE check. Content dies…](#2026-09-04-forbidden-clearing-a-shared-tree-file-on-a-structure-check-content-dies-inside-retained-structure)
+- [2026-09-03 — FORBIDDEN: pushing a REBUILT file without asserting the EXPECTED diff shap…](#2026-09-03-forbidden-pushing-a-rebuilt-file-without-asserting-the-expected-diff-shape-first-a-stale-base-produces-correct-looking-content-and-a-silently-wrong-delta-session-c38d3e5c)
+- [2026-09-03 — FORBIDDEN: reading the clock with Git Bash `date` in this repo. It is FIVE…](#2026-09-03-forbidden-reading-the-clock-with-git-bash-date-in-this-repo-it-is-five-hours-slow-and-date--u-is-wrong-too-lane-accuracy-autorun-rearm)
+- [2026-09-03 — FORBIDDEN: treating an env key as INERT because the process has not been r…](#2026-09-03-forbidden-treating-an-env-key-as-inert-because-the-process-has-not-been-restarted-inertness-is-about-the-deploy-the-damage-is-decided-by-the-hour-you-set-it-in-lane-accuracy-autorun-rearm)
+- [2026-09-04 — FORBIDDEN: calling an env key "inert until a deploy" without reading the g…](#2026-09-04-forbidden-calling-an-env-key-inert-until-a-deploy-without-reading-the-gate-it-feeds-if-the-gates-conditions-are-already-true-the-key-is-a-primed-charge-waiting-for-someone-elses-deploy-lane-prop-join-yield)
+- [2026-09-04 — FORBIDDEN: treating absence from `list_sessions` as evidence a session is…](#2026-09-04-forbidden-treating-absence-from-list_sessions-as-evidence-a-session-is-gone-lanesmd-carries-claude_code_session_ids-list_sessions-returns-ccd-sessionids-the-two-id-spaces-do-not-match-so-the-test-has-never-been-valid-lane-accuracy-autorun-rearm)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -304,7 +309,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 497**
+**Rules and corrections — 493**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -471,7 +476,6 @@
 - [2026-09-02 REQUIRED: when a sign test and a t-statistic DISAGREE, believe neither until…](#2026-09-02-required-when-a-sign-test-and-a-t-statistic-disagree-believe-neither-until-you-have-found-the-clustering-mine-said-p00027-and-t-128-on-the-same-rows-lane-soccer-anchor-cost-6223)
 - [2026-09-03 REQUIRED: when a sign test says p=0.0000 and the t says -1.06, publish BOTH…](#2026-09-03-required-when-a-sign-test-says-p00000-and-the-t-says--106-publish-both-the-direction-and-the-magnitude-are-different-findings-and-only-one-of-them-decides-anything-lane-soccer-anchor-cost-6223)
 - [2026-09-03 — A per-date join counter is not safe to SUM across a multi-day window unles…](#2026-09-03-a-per-date-join-counter-is-not-safe-to-sum-across-a-multi-day-window-unless-it-is-scoped-to-that-date-first-second-confirmed-instance-of-the-same-shape-as-513)
-- [2026-09-03 — A per-date join counter is not safe to SUM across a multi-day window unles…](#2026-09-03-a-per-date-join-counter-is-not-safe-to-sum-across-a-multi-day-window-unless-it-is-scoped-to-that-date-first-second-confirmed-instance-of-the-same-shape-as-513)
 - [2026-09-03 — the DIVIDE rule, restated because I broke it the same day I wrote it](#2026-09-03-the-divide-rule-restated-because-i-broke-it-the-same-day-i-wrote-it)
 - [2026-09-03 — a deploy CLAIM can be force-broken while live, and spacing will not catch…](#2026-09-03-a-deploy-claim-can-be-force-broken-while-live-and-spacing-will-not-catch-it)
 - [2026-09-03 — RULE: before you compact a file, measure whether it is BLOATED or merely B…](#2026-09-03-rule-before-you-compact-a-file-measure-whether-it-is-bloated-or-merely-big-they-look-identical-from-the-size-alone-and-take-opposite-fixes-lane-none-ledger-structure-pass)
@@ -490,6 +494,10 @@
 - [2026-09-04 — REBASE FIRST, then edit ledger files](#2026-09-04-rebase-first-then-edit-ledger-files)
 - [2026-09-04 — OVERTURNED: `_SCORE_SIM_WEIGHT` is **0.125**, not 0.0. Two load-bearing co…](#2026-09-04-overturned-_score_sim_weight-is-0125-not-00-two-load-bearing-comments-say-00-and-one-of-them-is-the-entire-basis-of-side_picked_by-lane-prop-join-yield)
 - [2026-09-04 — THE LEDGER COMMIT GUARD CANNOT SEE A WITHIN-BLOCK REVERT, measured at 117,…](#2026-09-04-the-ledger-commit-guard-cannot-see-a-within-block-revert-measured-at-117321-characters)
+- [2026-09-04 — THE UNIFYING RULE: A COMPARISON PROTECTS ONLY AT THE GRANULARITY IT COUNTS](#2026-09-04-the-unifying-rule-a-comparison-protects-only-at-the-granularity-it-counts)
+- [2026-09-03 — A comparison protects only at the GRANULARITY IT COUNTS. Three instances i…](#2026-09-03-a-comparison-protects-only-at-the-granularity-it-counts-three-instances-in-one-night-and-the-finest-grained-one-destroyed-work-session-c38d3e5c-with-37abeca0-cfcce46d)
+- [2026-09-04 — A DEPLOY THAT SUCCEEDS, TESTS THAT PASS, AND A SMALLER RESPONSE CAN ALL BE…](#2026-09-04-a-deploy-that-succeeds-tests-that-pass-and-a-smaller-response-can-all-be-true-while-the-change-does-nothing)
+- [2026-09-04 — THE TWO THINGS ROSTER-ABSENCE ALREADY COST, and what to check before the N…](#2026-09-04-the-two-things-roster-absence-already-cost-and-what-to-check-before-the-next-force-lane-prop-join-yield)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
@@ -796,12 +804,5 @@
 - [2026-09-03 — `subprocess(text=True)` on Windows silently mojibakes the ledger's em-dash…](learnings_evidence.md#2026-09-03-subprocesstexttrue-on-windows-silently-mojibakes-the-ledgers-em-dashes-and-it-made-lane-guard-inert) `[evidence]`
 - [2026-09-03 — the Bash bypass in `lane-guard`: the census, and why the ledger never show…](learnings_evidence.md#2026-09-03-the-bash-bypass-in-lane-guard-the-census-and-why-the-ledger-never-showed-the-damage) `[evidence]`
 - [2026-09-03 — a census is only as wide as its pattern: "prose only" for five scripts my…](learnings_evidence.md#2026-09-03-a-census-is-only-as-wide-as-its-pattern-prose-only-for-five-scripts-my-own-refactor-had-just-broken) `[evidence]`
-- [2026-08-12 — Do not batch changes during a diagnosis](learnings_archive.md#2026-08-12-do-not-batch-changes-during-a-diagnosis) `[evidence]`
-- [2026-08-12 — A rate ceiling is not a fix](learnings_archive.md#2026-08-12-a-rate-ceiling-is-not-a-fix) `[evidence]`
-- [2026-08-12 — Parallel sessions on one problem need lane discipline](learnings_archive.md#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline) `[evidence]`
-- [2026-08-13 — A grep excerpt is not the file](learnings_archive.md#2026-08-13-a-grep-excerpt-is-not-the-file) `[evidence]`
-- [2026-08-10 — a briefed premise is a hypothesis, not a starting condition](learnings_archive.md#2026-08-10-a-briefed-premise-is-a-hypothesis-not-a-starting-condition) `[evidence]`
-- [2026-08-19 — a disclaimer marker must PRECEDE the path it disclaims, not follow it](learnings_archive.md#2026-08-19-a-disclaimer-marker-must-precede-the-path-it-disclaims-not-follow-it) `[evidence]`
-- [2026-08-19 — NEAR-MISS: an object-database merge updates the REF, not the working tree,…](learnings_archive.md#2026-08-19-near-miss-an-object-database-merge-updates-the-ref-not-the-working-tree-and-a-later-working-tree-write-can-silently-revert-real-content) `[evidence]`
 
 <!-- LEARNINGS-INDEX:END -->
