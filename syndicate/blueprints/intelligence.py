@@ -242,61 +242,7 @@ def _response_hash(payload: dict[str, object]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _drop_self_nested_response(response_payload: dict[str, object]) -> dict[str, object]:
-    """Drop `payload["response"]` when it is the payload's own shallow copy.
-
-    MEASURED on the live `/api/intelligence/query` 2026-09-04, one call:
-
-        response bytes                                    67.19 MB
-          response.response  (the payload's copy of itself)  36.42 MB   <- 50%
-          top_opportunities == recommendations                6.44 MB each
-          board_contract    == boardContract                  5.86 MB each
-          ranked_all                                          5.86 MB
-          by_sport                                            5.86 MB
-
-    Five sites in this module do `payload.setdefault("response", dict(payload))`
-    and then read `payload["response"]` back for `LAST_RESULT`, so the nesting is
-    a load-bearing idiom during CONSTRUCTION and is not touched there. It is only
-    dropped here, at the serialisation boundary, after every server-side reader
-    has already run.
-
-    WHY THIS IS PROVABLY SAFE AND ALSO CHEAP. `dict(payload)` is a SHALLOW copy,
-    so the inner mapping's values are THE SAME OBJECTS as the outer's. That makes
-    redundancy an IDENTITY test -- `outer[key] is inner[key]` -- which is O(1) per
-    key and cannot be fooled the way an equality test on 36 MB of nested data
-    could be. It is also the only affordable check: serialising both sides to
-    compare them would cost more than the saving.
-
-    If ANY key of the inner mapping is missing from the outer, or is a different
-    object, nothing is dropped and the payload is returned untouched. The failure
-    mode is "no saving", never "wrong data" -- the same rule
-    `_slim_embedded_board_payload` already established for the HTML embed.
-
-    THE CLIENT ALREADY TOLERATES THE ABSENCE. `intelligence.html:1517` reads
-    `unwrapVersionedIntelligenceResponse(boardResponse.response || boardResponse)`
-    -- it falls back to the outer mapping when the inner one is gone. And because
-    the inner is a strict subset sharing the same objects, the spread at :1518-21
-    produces byte-identical output either way.
-    """
-    if not isinstance(response_payload, dict):
-        return response_payload
-    inner = response_payload.get("response")
-    if not isinstance(inner, dict) or not inner:
-        return response_payload
-    for key, value in inner.items():
-        if key not in response_payload:
-            return response_payload
-        if response_payload[key] is not value:
-            return response_payload
-    slim = dict(response_payload)
-    slim.pop("response", None)
-    return slim
-
-
 def _versioned_query_response(response_payload: dict[str, object]) -> dict[str, object]:
-    # BEFORE `_json_safe_value`: that rebuilds the structure into new objects and
-    # would destroy the identity relationship this check depends on.
-    response_payload = _drop_self_nested_response(response_payload)
     response_payload = _json_safe_value(dict(response_payload))
     payload_hash = _response_hash(dict(response_payload))
     return {
@@ -1826,9 +1772,32 @@ def intelligence_query_api():
         if isinstance(response_payload, dict):
             response_payload = _hydrate_board_response_payload(response_payload)
             response_payload.setdefault("ok", True)
+            # `#632`. THE MIRROR BELOW IS SERIALISED AND IT IS DEAD WEIGHT.
+            # Measured on the live endpoint 2026-09-04: `response.response` was **36.42 MB of
+            # a 67.19 MB payload -- 50%** -- and this route is the largest per-request
+            # allocator the per-process profiler found (~82 MB/call). All 17 keys of the
+            # mirror were VALUE-EQUAL to the outer payload.
+            #
+            # It exists for exactly one reader: `LAST_RESULT`, two lines down. Once that has
+            # been taken it is redundant, and the client already copes without it --
+            # `intelligence.html:1517` reads `boardResponse.response || boardResponse`, and
+            # `normalizeIntelligenceResponse` prefers top-level keys and consults the nested
+            # copy only as a fallback.
+            #
+            # WHY THE FLAG RATHER THAN A COMPARISON. `setdefault` only creates the mirror
+            # when the key is ABSENT, so "did we create it" is the exact question, is free,
+            # and can never remove a `response` that a caller genuinely supplied. The first
+            # attempt at this compared identities instead (`outer[k] is inner[k]`) on the
+            # reasoning that `dict()` is a shallow copy -- correct in principle, INERT in
+            # production, because `_attach_intelligence_response_aliases` runs in between and
+            # `_normalize_opportunity_item` rebuilds each item with `dict(item)`. It shipped,
+            # saved nothing, and only a measurement of the SERVED payload caught it.
+            _mirror_is_ours = "response" not in response_payload
             response_payload.setdefault("response", dict(response_payload))
             _attach_intelligence_response_aliases(response_payload)
             LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
+            if _mirror_is_ours:
+                response_payload.pop("response", None)      # `#632`: 50% of the payload
             versioned_response = _versioned_query_response(response_payload)
             versioned_response.update(_debug_state_fields(response_payload, source="combined_board_window"))
             # Was unconditionally None -- correct back when this branch was
@@ -1865,6 +1834,7 @@ def intelligence_query_api():
                 response_payload["execution_source"] = execution_source
                 response_payload.setdefault("queued", queued)
                 response_payload.setdefault("ok", True)
+                _mirror_is_ours = "response" not in response_payload   # `#632`, see above
                 response_payload.setdefault("response", dict(response_payload))
                 _attach_intelligence_response_aliases(response_payload)
                 # global LAST_RESULT already declared at the top of this
@@ -1872,6 +1842,8 @@ def intelligence_query_api():
                 # SyntaxError, since the new combined-board branch above
                 # assigns to LAST_RESULT earlier in the function body.
                 LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
+                if _mirror_is_ours:
+                    response_payload.pop("response", None)  # `#632`: 50% of the payload
                 versioned_response = _versioned_query_response(response_payload)
                 versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
                 versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
@@ -1900,9 +1872,32 @@ def intelligence_query_api():
             response_payload["execution_source"] = execution_source
             response_payload.setdefault("queued", queued)
             response_payload.setdefault("ok", True)
+            # `#632`. THE MIRROR BELOW IS SERIALISED AND IT IS DEAD WEIGHT.
+            # Measured on the live endpoint 2026-09-04: `response.response` was **36.42 MB of
+            # a 67.19 MB payload -- 50%** -- and this route is the largest per-request
+            # allocator the per-process profiler found (~82 MB/call). All 17 keys of the
+            # mirror were VALUE-EQUAL to the outer payload.
+            #
+            # It exists for exactly one reader: `LAST_RESULT`, two lines down. Once that has
+            # been taken it is redundant, and the client already copes without it --
+            # `intelligence.html:1517` reads `boardResponse.response || boardResponse`, and
+            # `normalizeIntelligenceResponse` prefers top-level keys and consults the nested
+            # copy only as a fallback.
+            #
+            # WHY THE FLAG RATHER THAN A COMPARISON. `setdefault` only creates the mirror
+            # when the key is ABSENT, so "did we create it" is the exact question, is free,
+            # and can never remove a `response` that a caller genuinely supplied. The first
+            # attempt at this compared identities instead (`outer[k] is inner[k]`) on the
+            # reasoning that `dict()` is a shallow copy -- correct in principle, INERT in
+            # production, because `_attach_intelligence_response_aliases` runs in between and
+            # `_normalize_opportunity_item` rebuilds each item with `dict(item)`. It shipped,
+            # saved nothing, and only a measurement of the SERVED payload caught it.
+            _mirror_is_ours = "response" not in response_payload
             response_payload.setdefault("response", dict(response_payload))
             _attach_intelligence_response_aliases(response_payload)
             LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
+            if _mirror_is_ours:
+                response_payload.pop("response", None)      # `#632`: 50% of the payload
             versioned_response = _versioned_query_response(response_payload)
             versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
             versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
