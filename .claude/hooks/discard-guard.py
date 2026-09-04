@@ -92,7 +92,17 @@ def _targets(head):
     bug this repo already paid for in `ledger-commit-guard`.
     """
     if _RESET_HARD.search(head):
-        return ("HEAD", None)          # None = every modified tracked path
+        # THE SOURCE IS THE NAMED REV, NOT `HEAD`. `git reset --hard origin/main`
+        # installs origin/main; comparing against HEAD instead made the message
+        # read "in neither HEAD nor HEAD" and OVER-REPORTED -- it counted every
+        # line HEAD lacks, including content that is safely on the very rev being
+        # installed. Measured on its own author: 14 settings.json lines flagged
+        # where the true figure against origin/main was 0. A guard that
+        # over-reports trains people to override it, which is worse than silence.
+        rest = head.split("reset", 1)[-1]
+        revs = [t for t in rest.split()
+                if t and not t.startswith('-') and t != '--']
+        return ((revs[0] if revs else "HEAD"), None)
     if not (_CHECKOUT.search(head) or _RESTORE.search(head)):
         return (None, [])
 

@@ -91,6 +91,30 @@ check("the off switch",
             {"SYNDICATE_DISCARD_GUARD": "off"})[0], 0)
 
 print()
+print("THE SOURCE REV MUST BE THE ONE NAMED, not HEAD")
+# `git reset --hard origin/main` installs origin/main. Comparing against HEAD
+# instead made the message read "in neither HEAD nor HEAD" and OVER-REPORTED --
+# every line HEAD lacks was counted, including content safely on the very rev
+# being installed. Measured on the author's own tree: 14 settings.json lines
+# flagged where the truth against origin/main was 0. An over-reporting guard
+# trains people to override it.
+import importlib.util as _ilu, io as _io
+_spec = _ilu.spec_from_file_location('dg', HOOK)
+_dg = _ilu.module_from_spec(_spec)
+_old = sys.stdin; sys.stdin = _io.StringIO('{}')
+try:
+    _spec.loader.exec_module(_dg)
+except SystemExit:
+    pass
+finally:
+    sys.stdin = _old
+for _cmd, _want in [('git reset --hard origin/main', 'origin/main'),
+                    ('git reset --hard', 'HEAD'),
+                    ('git reset --hard HEAD~2', 'HEAD~2'),
+                    ('git checkout origin/main -- a/b.py', 'origin/main'),
+                    ('git checkout HEAD -- a/b.py', 'HEAD')]:
+    check('source rev for: ' + _cmd, _dg._targets(_cmd)[0], _want)
+
 print("THE COUNT MUST BE RIGHT, not merely non-zero")
 # git output decoded as cp1252 mojibakes em-dashes, so lines stop matching their
 # own committed copies and the count inflates. Measured while writing this hook:
