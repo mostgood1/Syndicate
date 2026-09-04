@@ -1813,6 +1813,18 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: deploy is owned by lane `prop-join-yield`; this lane lands on
   `origin/main` and hands over the env keys.
 
+### worker-catchup-round9 — CLOSED 2026-09-04 — **BOTH WORKERS to `442f82fe`** (00:19:35Z / 00:33:09Z), verified by content (`_process_anon_mb` 0→4, absent from the prior SHA), `#643` re-checked, 200 log lines, 0 errors. **Web excluded by design** — its owner held the claim and web was 24 min from boot, one minute short of the 25-min late-emission window their measurement needs; `442f82fe` is their own commit. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: both WORKERS off `1e5ae2b1` onto `442f82fe`. Substance is `442f82fe`
+  (`#632` — per-request memory attributed to THIS PROCESS, not the container,
+  in `memory_observability.py`); the other three pending commits are `scripts/`
+  lane-guard tooling with zero runtime references, verified round 8.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Verification: BY CONTENT on the deployed SHA — `_process_anon_mb`, confirmed
+  ABSENT from the previously-live `1e5ae2b1` (live=0, target=4). Measurements in
+  `.syndicate/deploys.md`.
+- Blocked by: none for the workers; web is owner-held by design.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

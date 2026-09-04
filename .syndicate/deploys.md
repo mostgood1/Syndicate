@@ -20576,3 +20576,44 @@ serves `model_edge_pct` per order -- so the owning lane decides whether it count
 Session marker `.current-lane.37abeca0-…` emptied in both trees. The SHARED bare
 `.current-lane` was deliberately NOT written, per `/lane`'s own rule about the
 single contended slot.
+
+## 2026-09-04 — round 9 — BOTH WORKERS to `442f82fe`; **web excluded by design** — lane `worker-catchup-round9`
+
+| service | to | live | wait |
+|---|---|---|---|
+| refresh-worker | `442f82fe` | 00:19:35Z | CLEAR on the 2nd poll |
+| live-odds-worker | `442f82fe` | 00:33:09Z | HOLD x10 over ~13 min |
+| web | — | — | **owner-held, deliberately skipped (see below)** |
+
+Substance: `442f82fe` (`#632` — per-request memory attributed to THIS PROCESS,
+not the container, in `memory_observability.py`). The other three pending commits
+are `scripts/` lane-guard tooling with zero runtime references, verified round 8.
+
+verify — BY CONTENT on `442f82fe`, token confirmed ABSENT from the previously-live
+`1e5ae2b1` first: **`_process_anon_mb` 0 → 4**, `attribution_basis` 0 → 2. `#643`'s
+`bytes_per_order` re-checked and still present. 200 log lines across the two
+workers, **0 tracebacks / CRITICAL / OOM**; live-odds-worker `memory_anon_mb=540.8`
+against its 2,048 MiB cap.
+
+**WEB WAS NOT DEPLOYED, AND THAT WAS THE POINT.** `442f82fe` is
+`web-oom-profiler-steady`'s OWN commit. That lane took web's claim 0.4 min before
+I looked, and web had booted **24 minutes** earlier — its stated method needs
+LATE emissions 25+ min after boot, because the accumulator is cumulative from
+boot. Deploying would have reset that clock in the minute the reading came due,
+and it is their commit to ship when their measurement is done. No force.
+
+**Two log lines checked rather than flagged, because a rate needs a denominator.**
+refresh-worker emits `[artifact_publisher] PUBLISH_FAILED` and
+`SWEEP_SKIPPED {'too_large': N}`. Measured across the deploy boundary:
+
+    PUBLISH_FAILED   before 100 / 39 min (>=2.56/min, query-capped)  after 36 / 17 min (2.12/min)
+    SWEEP_SKIPPED     before  26 / 39 min (0.67/min)                  after  8 / 17 min (0.47/min)
+
+Pre-existing and no higher afterwards, so NOT introduced here. Deliberately not
+filed as an item: the `too_large` payload suggests the size guard refusing
+oversized artifacts by design, and `#643` was filed this session off one
+unmeasured log line and turned out to be a non-defect. Recorded so the next
+reader has the rate rather than an impression.
+
+**Fleet:** refresh-worker `442f82fe` · live-odds-worker `442f82fe` · web
+`1d6b2f13` (1 pending, owner-held).
