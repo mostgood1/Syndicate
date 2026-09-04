@@ -1452,6 +1452,57 @@ was called "moderate but real", and it was not modelled against it. Restored to
 `2` (`1d6b2f13`, live 23:49:48Z, verified 2 workers / `--workers 2`, web serving
 at 790 MB with 1,258 MB headroom).
 
+**`[2026-09-04]` THE INSTRUMENT WAS FIXED AND THE GROWTH NOW HAS A NAMED
+SUSPECT: `/api/intelligence/query`, ~95 MB PER CALL.**
+
+`442f82fe` moves per-request attribution from the CONTAINER cgroup to THIS
+PROCESS's own anon (`/proc/self/smaps_rollup`), so the measurement scope finally
+matches the per-worker `inflight` guarantee. **Verified REACHED, not just
+deployed:** emission `00:24:36Z` carries `attribution_basis =
+process_anon_smaps_rollup`, `process_anon_mb_now = 426.9` (so `smaps_rollup`
+exists on this kernel — the one way this change could be present and silent) and
+`unreadable = 0`.
+
+**THE OLD NUMBERS BLAMED THE WRONG ROUTE.** `/api/ops/artifacts/publish` read
+**211 MB** container-scoped; per-process it reads **1.15 MB across 81 solo
+requests**. That difference IS the contamination: a publish spawns a merge CHILD,
+and the container-scoped instrument charged the child's memory to the parent's
+request. Per-process, publish is nearly free — which is correct, because the work
+happens in a child.
+
+**WHAT REPLACES IT, replicated across BOTH workers (n=5 calls):**
+
+    WORKER 0  process anon +225.9 MB    attributed +395.8 MB
+      +381.72 MB   +4 solo  /api/intelligence/query      (~95 MB per call)
+       +14.11 MB +179 solo  /api/ops/artifacts/publish
+    WORKER 1  process anon +104.9 MB    attributed  +39.3 MB
+       -49.46 MB +252 solo  /api/ops/artifacts/publish   (NEGATIVE)
+       +40.33 MB   +3 solo  /wnba/api/live_player_boxscore
+       +26.33 MB   +1 solo  /api/intelligence/query
+       +23.09 MB   +7 solo  /api/ops/artifacts/export
+
+Nothing else is close: publish moves tens of MB across HUNDREDS of requests;
+query moves hundreds across a handful.
+
+**THE RANKING IS TRUSTWORTHY; THE SHARE STILL IS NOT.** Attribution overshoots
+actual process growth on worker 0 (395.8 vs 225.9 = 175%) and undershoots on
+worker 1 (39.3 vs 104.9 = 37%), and a route can still go negative. **The
+remaining source is named and specific: `syndicate/app.py` starts the
+live-refresh and intelligence-state BACKGROUND LOOPS IN THE SAME PROCESS.**
+`inflight` guarantees no other REQUEST is in flight; it says nothing about a
+background thread allocating or freeing inside that window. Three contamination
+sources existed — cross-worker, merge children, same-process threads — and this
+change removed the first two.
+
+**ON THE SUSPECT ITSELF, before anyone assumes an architecture violation:**
+`/api/intelligence/query` does NOT recompute. `read_combined_intelligence_response`
+"never computes, only reads what the background loop's board-window watch set has
+already built", and the handler is careful to stay on that branch. It
+MATERIALISES AND HYDRATES a large precomputed payload
+(`_hydrate_board_response_payload`), and CPython does not return freed arenas —
+which fits ~95 MB a call with no rule broken. Note also
+`intelligence.py:1600`: slimming that payload "would change an API contract".
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
