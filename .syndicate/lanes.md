@@ -326,7 +326,7 @@ death, never life — do not invert it.
   **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
   released: - `scripts/capture_wnba_live_player_box.py` — the capture (new).
   - ~~**BLOCKED, NOT CLAIMED:** the `HOT_ARTIFACT_PATTERNS` entry for
-    `wnba_source/data/live/live_player_box_*.json` lives in a file held by the
+    NOT claimed: `wnba_source/data/live/live_player_box_*.json` lives in a file held by the
     OPEN lane `nfl-props-odds-allowlist`.~~
     **RETIRED 2026-09-02 — THIS BLOCKER IS NOT REAL, AND THE FIX IT ASKS FOR IS
     FORBIDDEN.** See the RETIRED note at the bottom of this lane for the
@@ -1037,7 +1037,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Goal: MET. WNBA went from six accuracy instruments reading zero to a settling, graded surface. `n_settled 38` (08-29) + `54` (08-30), `win_rate 0.6415094339622641` — byte-identical to the pre-deploy local run; `gradeable` false → true; `verify_wnba_settlement_gate.py` exit 0 on both dates.
 - Deployed: web `ad33df21`, refresh-worker + live-odds-worker `1c078f46`. Four deploys, each verified on the SERVED PAYLOAD, not on deploy status. **ALL CLAIMS RELEASED; all four services free.**
 - **CLAIMED 2026-09-01 (exchange prices onto the board):** `syndicate/features/shared/{book_shortlist,book_grid,odds_regions}.py`; `pipeline/kalshi_odds_refresh.py` (**`_capture_kalshi_quotes` ONLY** — the sibling lane's claim is `join_to_board`; they verified and accepted the one-line stamp); `syndicate/features/shared/odds_book_quotes.py` (**NEW `quote_rows_from_polymarket_matches` ONLY** — that lane claims its own `quote_rows_from_kalshi_matches`, explicitly NOT `_normalize`/`append_book_quotes`, and handed me Polymarket); `pipeline/portfolio_commit.py` (**`_capture_polymarket_quotes` + its one call site ONLY** — `portfolio-decision-and-execution` marks the file `released:`); NEW `tests/{test_direct_feed_provenance,test_wnba_odds_regions}.py`. NOT editing `polymarket_board_join.py` (`released:` by `open-bet-live-status`).
-- Files (all landed on `origin/main`, nothing held): `syndicate/features/shared/{live_lens_paths,wnba_card_provenance}.py` NEW, `{live_lens_local,basketball_live_artifacts,artifact_publisher}.py`; `syndicate/features/wnba/{cards,live_lens_daily_accuracy,live_game_accuracy,live_prop_accuracy,live_prop_audit}.py`; `scripts/{build_wnba_recon,verify_wnba_settlement_gate,assess_wnba_accuracy}.py` NEW, `scripts/{run_refresh_worker,refresh_wnba_oddsapi_props}.py`; 6 new test files.
+- Files (all landed on `origin/main`, nothing held): **ALL RELEASED -- this list is a RECORD of what the lane touched, not a claim; nothing here is held.** `syndicate/features/shared/{live_lens_paths,wnba_card_provenance}.py` NEW, `{live_lens_local,basketball_live_artifacts,artifact_publisher}.py`; `syndicate/features/wnba/{cards,live_lens_daily_accuracy,live_game_accuracy,live_prop_accuracy,live_prop_audit}.py`; `scripts/{build_wnba_recon,verify_wnba_settlement_gate,assess_wnba_accuracy}.py` NEW, `scripts/{run_refresh_worker,refresh_wnba_oddsapi_props}.py`; 6 new test files.
 - Verification: settlement gate PASS ×2; signals `exists` false → true on **14/14 days** (1,814 records, matching an independent count); served card max `p_win` **0.99**, zero certainty claims; leakage note populated on the served payload.
 - **OWED LIST RE-READ AGAINST THE SYSTEM `[2026-09-01, lane game-market-entry-roi-curve]`. Of the three, ONE IS DISCHARGED, ONE IS BOUNDED, ONE IS GENUINELY BLOCKED. The header's "ONE DEPLOY OWED" was STALE.**
   **(c) DISCHARGED — `refresh_nba_oddsapi_props`'s inversion is READ AND CLEAR.** It is not merely sharing the chokepoint; it carries the whole ported fix. Identical `_CERTAINTY_FLOOR/CEILING = 0.01, 0.99`, identical `certainty_clamped` counter, identical `_plausible_ev_pct` at `_MAX_PLAUSIBLE_EV_PCT = 100.0`, and at `refresh_nba_oddsapi_props.py:1246` the corrected `implied_prob * (1.0 + (ev or 0.0))` under a comment that names the source: *"THE INVERSION WAS DIMENSIONALLY WRONG (ported fix, WNBA `bef61c33`) ... EV per unit staked is q/p - 1, so the inversion is q = p * (1 + ev), NOT p + ev."* Dimensions check: `ev` is a fraction there (`ev_pct = ev * 100.0` one line above), so the expression is sound. **Nothing owed.**
@@ -1429,13 +1429,19 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `SYNDICATE_REQUEST_MEMORY_PROFILE` on web and difference two LATE emissions,
   because every existing emission sits within ~25 min of a boot and the
   accumulator is cumulative from boot.
-- Files: `.syndicate/{lanes,state,log,deploys}.md`, `docs/ai_context/todo.md`
+- Files: `docs/ai_context/todo.md`
   (`#632`), `syndicate/blueprints/ops.py`,
   `syndicate/features/shared/artifact_merge.py`,
   `tests/test_artifact_merge_child_cap.py` and
   `tests/test_artifact_merge_string_pool.py` [claimed 2026-09-03T20:1xZ and
   21:0xZ, user directives "cap the merge children" then "make the merge
   cheaper"]. All LANDED on main and live on web.
+  **NOT claimed, listed for the record:** this lane also writes the
+  ledger files under .syndicate (lanes, state, deploys, log). They are EXEMPT
+  from lane-guard -- every session writes them -- so naming them as claims
+  guards nothing, and naming them as PATHS makes them read as CONTESTED
+  against every other lane that lists them. Written as a shell brace list
+  until 2026-09-03, which the parser read as one broken token.
 - **SHIPPED AND VERIFIED IN PRODUCTION, three changes, each measured.**
   (1) profiler armed `142e5e1a`; (2) merge ceiling `a6f5f586`, retuned to
   `cap=2`/`32 MB` in `ac32034b`; (3) the string pool `f3bb47d0`.
@@ -1498,7 +1504,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   RELEASED `[2026-09-03, lane layer2-sim-disagrees, SAME session 3492626c]`: the
   layer2 board module. Narrow and disjoint by function: that lane edits
   `_projection_side_in_row_frame` / `_model_edge_for` / `_model_prob_for_side` /
-  `_publication_columns`; YOUR chip-join work (`away_key`/`home_key` stamping)
+  `_publication_columns`; YOUR chip-join work (`away_key` / `home_key` stamping)
   is untouched and is already LANDED per this block's own header. Checked
   line-by-line before taking it. Take it back by striking this note and
   restoring the path on its own line.
@@ -1566,7 +1572,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Files: `syndicate/features/shared/layer2_board.py`
   (**`_projection_side_in_row_frame` / `_model_edge_for` / `_model_prob_for_side`
   / `_publication_columns` ONLY** — the OPEN lane `ncaaf-chip-compact` lists this
-  file for the CHIP JOIN (`away_key`/`home_key` stamping) and is the SAME session
+  file for the CHIP JOIN (`away_key` / `home_key` stamping) and is the SAME session
   id, `3492626c`; the two edits are disjoint by function and were checked
   line-by-line before taking this),
   `pipeline/intelligence_state.py` (**the `confidence` backfill at ~1888 ONLY**;
@@ -1743,7 +1749,7 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   instead of the measured 12,948s.
 - Files: `scripts/run_live_odds_refresh_worker.py`,
   `scripts/refresh_odds_sources.py` (mode-scoped step filter only),
-  `tests/test_ncaaf_live_autorun.py` (NEW),
+  `tests/test_ncaaf_lines_autorun.py` (NEW),
   `tests/test_refresh_step_modes.py` (NEW).
   Render ENV on **live-odds-worker** via the single-key API only. The Render
   blueprint file is deliberately NOT named as a path here and is NOT claimed —
