@@ -209,7 +209,46 @@ def _cross_game_correlation(candidate_a: dict[str, Any], candidate_b: dict[str, 
     return score
 
 
-def compute_correlation(candidate_a: dict[str, Any], candidate_b: dict[str, Any]) -> dict[str, Any]:
+#: What produced `correlation_score`. Travels on every result because a
+#: measured coefficient and a sum of categorical flags are not the same kind of
+#: number, and nothing downstream could previously tell them apart. Same reason
+#: `ev_basis` travels on a candidate.
+CORRELATION_BASIS_HEURISTIC = "heuristic_flags"
+CORRELATION_BASIS_MEASURED = "measured_joint"
+
+
+def compute_correlation(
+    candidate_a: dict[str, Any],
+    candidate_b: dict[str, Any],
+    *,
+    measured_lookup: Any = None,
+) -> dict[str, Any]:
+    """Correlation between two candidates, MEASURED where we have it.
+
+    `measured_lookup(candidate_a, candidate_b) -> float | None` is the Phase 4
+    (`#621`) seam: a resolver over the simulation's own joint outcome
+    distribution. When it answers, its coefficient REPLACES the heuristic stack
+    below -- not adjusts it -- because the two are different objects and
+    averaging a measurement with a guess produces neither.
+
+    WHY THIS IS WORTH REPLACING. Everything below is a sum of categorical flags
+    (`same_game` 0.25, `same_team` 0.14, `same_subject` 0.40) plus a static
+    per-market-pair table -- one constant for every player in every game. It has
+    never been measured against an outcome. Its three consumers are parlay
+    pricing, the board correlation badges, and `bankroll_manager.build_portfolio`
+    bet SIZING, so the guess reaches real money.
+
+    The simulation already produces the joint that would answer it and discards
+    it: `_sim_many` reduces every per-sim result into marginal counters, and only
+    50 per-segment score samples survive to the artifact -- **0.137% of the
+    292,000 scalars a 1,000-sim game produces**. That is the one thing a
+    price-taking competitor cannot copy from the market, and it is thrown away
+    every run.
+
+    `measured_lookup=None` -- the default, and every current caller -- leaves
+    this function BYTE-IDENTICAL to before, so the seam ships inert and the
+    producer lands into a consumer already proven live.
+    """
     warn_if_compute_in_request_path("compute_correlation")
     same_game = _candidate_game_key(candidate_a) and _candidate_game_key(candidate_a) == _candidate_game_key(candidate_b)
     same_team = _candidate_team_key(candidate_a) and _candidate_team_key(candidate_a) == _candidate_team_key(candidate_b)
@@ -236,10 +275,29 @@ def compute_correlation(candidate_a: dict[str, Any], candidate_b: dict[str, Any]
     if same_game and first_direction and second_direction and first_direction != second_direction:
         script_dependency -= 0.08
 
-    correlation_score = _clamp(raw_score + player_dependency + script_dependency)
+    measured = None
+    if measured_lookup is not None:
+        try:
+            measured = measured_lookup(candidate_a, candidate_b)
+        except Exception:
+            # A resolver that raises must not take the board down with it. An
+            # absent measurement is the normal case, not an error, and the
+            # heuristic below is the documented fallback.
+            measured = None
+    try:
+        measured = None if measured is None else float(measured)
+    except (TypeError, ValueError):
+        measured = None
+    if measured is not None and measured == measured:  # NaN is not a measurement
+        correlation_score = _clamp(measured)
+        correlation_basis = CORRELATION_BASIS_MEASURED
+    else:
+        correlation_score = _clamp(raw_score + player_dependency + script_dependency)
+        correlation_basis = CORRELATION_BASIS_HEURISTIC
 
     return {
         "correlation_score": correlation_score,
+        "correlation_basis": correlation_basis,
         "same_game": bool(same_game),
         "same_team": bool(same_team),
         "same_subject": bool(same_subject),
