@@ -5734,3 +5734,31 @@ duplicate within five minutes.
 Sibling: `a comparison protects only at the granularity it counts` — this is the
 case where the right granularity is not the file at all, but the file's delta
 against a base you must re-read to know.
+## 2026-09-04 — A DEPLOY THAT SUCCEEDS, TESTS THAT PASS, AND A SMALLER RESPONSE CAN ALL BE TRUE WHILE THE CHANGE DOES NOTHING
+
+`#632`, `f9c4733d`. A fix shipped to drop a 36 MB self-nested copy from
+`/api/intelligence/query`. It dropped the key only when `outer[k] is inner[k]`
+for every key — sound reasoning, since `dict()` is a shallow copy — and it was
+INERT, because `_attach_intelligence_response_aliases` runs between the copy and
+the serialisation and rebuilds every item with `dict(item)`.
+
+Three signals all read as success: the deploy succeeded, every test passed, and
+the served response came back **32.5% smaller**. The size drop was a **smaller
+slate** (1154 rows against 1901 at baseline), not the change. The saving was
+zero.
+
+**THE RULE: verify a payload change by the STRUCTURE you intended to change, not
+by the size of the result.** "Is the key actually gone?" found it in one call;
+the byte count would never have. The same trap re-appeared immediately after the
+real fix landed at a flattering **68.9%**, which was again partly slate size —
+the honest figure was 50.0%, from differencing the SAME captured payload.
+
+Corollary, and it is what makes a size comparison usable at all: **assert the
+denominator is unchanged before quoting a percentage.** The final alias
+measurement ran both arms minutes apart against ONE deploy and asserted
+`870 vs 870 rows` before reporting 47.9%.
+
+Related: `[2026-09-03]` "a conservative guard that cannot be wrong can still be
+worth nothing" — this is that failure in its most convincing costume, because
+the guard was not merely silent, it was accompanied by a number that agreed
+with it.

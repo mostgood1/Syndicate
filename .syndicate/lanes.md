@@ -459,7 +459,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `pipeline/layer2_shortlist.py`, `tests/test_prop_join_yield.py`,
   `tests/test_layer2_projection_window.py`.
 
-### web-oom-profiler-steady — OPEN — opened 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-profiler-steady — CLOSED 2026-09-04 — opened 2026-09-03 — **#632: the excursion is fixed (merge child 281.8 -> 128.1 MB), the rate was wrong by ~10x (~500 MB/h, not 32-75, which explains kills at 2.45-3.13 h), the profiler now measures THIS PROCESS, and the biggest allocator `/api/intelligence/query` is ~74% smaller. Verified in production throughout. OPEN and handed on: the exact attributed SHARE, blocked by background loops in-process, and whether the payload cut moves the growth rate.** — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - **`syndicate/templates/intelligence.html` CLAIM TAKEN from `layer2-sim-disagrees` `[2026-09-04, checked line-by-line first]`.** Its work on that file is LANDED; its
   edits are the row-badge renderer (`sim_view` tags ~3168-3258 across
   `939a8c00`/`9987c545`/`36161e83`) plus ~114-135 and ~2182-2224. Mine are

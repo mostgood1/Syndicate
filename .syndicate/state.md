@@ -588,3 +588,28 @@ named: `syndicate/app.py` runs the live-refresh and intelligence-state loops IN
 THE SAME PROCESS, and `inflight` guarantees no other REQUEST, not no other
 THREAD. Of three sources — cross-worker, merge children, same-process threads —
 two are gone.
+
+### `[web-oom-leak]` UPDATE 2 — the payload is down ~74% and the instrument is honest, 2026-09-04T02:3xZ `[session b2b5b45b]`
+
+* **Per-request attribution now measures THIS PROCESS** (`/proc/self/smaps_rollup`),
+  so its scope matches the per-worker `inflight` guarantee (`442f82fe`, verified
+  REACHED). **Supersedes every earlier route ranking**: `/api/ops/artifacts/publish`
+  read 211 MB container-scoped and **1.15 MB across 81 solo requests** per-process,
+  because a publish spawns a merge CHILD that the old scope charged to the parent.
+* **The largest per-request allocator is `/api/intelligence/query`, ~82 MB/call**
+  (408 MB over 5 calls, both workers). It does NOT recompute; it materialises and
+  hydrates a large precomputed payload.
+* **That payload is now ~74% smaller.** The self-nested mirror is gone (50.0%,
+  `53a1052b`) and the alias duplication is opt-in-slimmed (47.9% on a same-slate
+  live A/B, `b3966bf1`): `recommendations` -> `top_opportunities`, `boardContract`
+  -> `board_contract`, `by_sport` regrouped from `ranked_all`, described in
+  `_response_aliases` and rebuilt client-side.
+* **OPT-IN: a caller that does not send `slim_aliases` is byte-for-byte
+  unaffected.** Verified live; a test exists whose only job is to fail if that
+  ever changes.
+* **STILL OPEN:** one contamination source remains and it is named —
+  `syndicate/app.py` runs the live-refresh and intelligence-state loops IN THE
+  SAME PROCESS, and `inflight` guarantees no other REQUEST, not no other THREAD.
+  So the route RANKING is trustworthy and the exact SHARE is not.
+* **NOT re-measured:** whether the ~74% cut moves the ~500 MB/h growth rate. That
+  needs a fresh uninterrupted window.
