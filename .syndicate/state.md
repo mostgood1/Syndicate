@@ -370,6 +370,25 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
 - **`SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES` is UNSET** (default `mlb:player_prop`
   only) and **`SYNDICATE_PORTFOLIO_MIN_EV_PCT=0`**. Neither is a hidden throttle.
 
+### Order attribution is COMPLETE, and the dataset is EMPTY — 2026-09-04 02:2xZ `[lane prop-join-yield]`
+
+- **Every order now records WHY.** `_LEAN_FIELDS` carries `model_edge_pct`,
+  `ev_pct`, `sim_view`, `sim_line_gap`, `sim_probability_railed`,
+  `side_picked_by`, `stake_fraction_ev_only`, `sim_share_of_stake`. Live on BOTH
+  order-placing services from `ab42b221` (02:12:41Z / 02:17:12Z, 4.5-min
+  ambiguous window). Per-order size ~1,184 B against a 5,000 cap = ~70% of the
+  8MB refusal ceiling; still bounded.
+- **IT RECOVERS NOTHING RETROSPECTIVELY and there is nothing new to read.** The
+  638 settled bets pre-date the fields, and **no order has been written since
+  2026-09-03T15:27:33Z**. The measurement is unblocked and unpopulated.
+- **The board buys nothing because the model is not allowed to speak on most
+  rows.** Both venue plans size 0: kalshi 534 rows -> 274 `market_family_excluded`
+  + 252 `no_model_edge_pct` + 8 `below_min_ev_pct`; polymarket 383 -> 180/180/20/3.
+  Venues are healthy (`venue_priced` 276/534 and 264/383, funded, caps slack).
+- **live-odds-worker memory is uptime-driven, not load-driven.** 100.0% at
+  23:37Z, 66.0% at 02:00Z after a recycle. `evicted: false` on all 23
+  `server_failed` since 2026-08-26 — nine days at 95-100%, zero platform kills.
+
 ## [subject-index] SUBJECT INDEX — every subject, and which file holds it
 
 One subject, one section, ACROSS ALL FILES. `state_key_check.py` checks
