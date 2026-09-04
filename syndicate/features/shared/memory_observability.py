@@ -1526,7 +1526,8 @@ _PYMALLOC_STATS_MAX_PER_PROCESS = 3
 _PYMALLOC_STATS_STATE: dict[str, int] = {"count": 0}
 
 
-def log_pymalloc_arena_stats(reason: str) -> dict[str, Any] | None:
+def log_pymalloc_arena_stats(reason: str, *, budget: tuple[dict, int] | None = None,
+                             raw: bool = True, quiet: bool = False) -> dict[str, Any] | None:
     """PYMALLOC's arena accounting -- the last place the missing anon can be.
 
     `#435`, and this is the measurement the other three point at. Established:
@@ -1551,14 +1552,20 @@ def log_pymalloc_arena_stats(reason: str) -> dict[str, Any] | None:
     (`arenas * 1MB` against live bytes) is the whole answer and a parse that
     silently misses a line must not turn into a confident zero.
     """
-    if _PYMALLOC_STATS_STATE["count"] >= _PYMALLOC_STATS_MAX_PER_PROCESS:
+    # `#632`: a caller may supply its OWN budget. The watchdog's 3 exist for an
+    # ALARM census and must never be spent by routine trend sampling -- if the
+    # trend ate them, the one census that fires when anon is already critical
+    # would find its budget gone. Separate counters, never shared.
+    budget_state, budget_max = (budget if budget is not None
+                                else (_PYMALLOC_STATS_STATE, _PYMALLOC_STATS_MAX_PER_PROCESS))
+    if budget_state["count"] >= budget_max:
         return None
     try:
         import os
         import re
         import tempfile
 
-        _PYMALLOC_STATS_STATE["count"] += 1
+        budget_state["count"] += 1
         # FD-LEVEL CAPTURE, and the first version of this got it wrong.
         # `_debugmallocstats` writes from C to fd 2, so `redirect_stderr` (which
         # only rebinds `sys.stderr`) captured NOTHING -- measured
@@ -1611,7 +1618,7 @@ def log_pymalloc_arena_stats(reason: str) -> dict[str, Any] | None:
         live_mb = _bytes_to_mb(bytes_in_use) if isinstance(bytes_in_use, int) else None
         payload = {
             "reason": str(reason or "")[:80],
-            "stats_index": _PYMALLOC_STATS_STATE["count"],
+            "stats_index": budget_state["count"],
             "arenas_currently_allocated": arenas,
             "arena_mb": arena_mb,
             "bytes_in_allocated_blocks_mb": live_mb,
@@ -1627,8 +1634,18 @@ def log_pymalloc_arena_stats(reason: str) -> dict[str, Any] | None:
             ),
             "captured_chars": len(text),
         }
-        print(f"PYMALLOC_STATS {json.dumps(payload, default=str)}", flush=True)
-        if text:
+        # `quiet` for TREND sampling: the reading is published inside the
+        # attribution emission as `arena_trend`, so a second line here is pure
+        # duplication -- and one extra line per emission is exactly what
+        # `test_it_emits_only_every_nth_request` counts, and rightly so.
+        if not quiet:
+            print(f"PYMALLOC_STATS {json.dumps(payload, default=str)}", flush=True)
+        # `raw=False` for TREND sampling: this block is ~4,000 characters. The
+        # alarm census emits it 3 times per process, where that is worth it; a
+        # trend samples 60 times, and 60 of these would flood the very log the
+        # instrument is read in. `test_it_emits_only_every_nth_request` exists
+        # to prevent exactly that, and it is what caught this.
+        if text and raw and not quiet:
             # The raw table, once. A loose parse that misses a renamed line must
             # not be the only record -- the counts above are derived, this is not.
             print("PYMALLOC_STATS_RAW\n" + text[:4000], flush=True)
@@ -1636,6 +1653,62 @@ def log_pymalloc_arena_stats(reason: str) -> dict[str, Any] | None:
     except Exception as exc:
         print(f"PYMALLOC_STATS_FAILED {type(exc).__name__}: {exc}", flush=True)
         return None
+
+
+_ARENA_TREND_STATE: dict[str, Any] = {"count": 0, "last": None}
+_ARENA_TREND_MAX_DEFAULT = 60
+
+
+def _arena_trend_budget() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_ARENA_TREND_SAMPLES") or "").strip()
+    if not raw_value:
+        return _ARENA_TREND_MAX_DEFAULT
+    try:
+        return int(raw_value)
+    except ValueError:
+        return _ARENA_TREND_MAX_DEFAULT
+
+
+def sample_arena_trend(reason: str) -> dict[str, Any] | None:
+    """One arena reading for a TIME SERIES, not for an alarm.
+
+    `#632`. Four per-request explanations for the anon climb have now been ruled
+    out by measurement, and the last one ruled itself out on a fact that reframes
+    the question: **CPython returns freed objects to pymalloc's ARENAS, not to
+    the OS.** So the quantity that matters is not which request allocated, but
+    how much the process holds from the OS that is no longer holding live data.
+
+    `log_pymalloc_arena_stats` already reports both halves -- `arena_mb` against
+    `bytes_in_allocated_blocks_mb` -- and the gap between them IS fragmentation:
+    memory the OS has given us and Python cannot hand back, because an arena is
+    only returned when it is COMPLETELY empty and one survivor pins the whole
+    megabyte.
+
+    **If `arena_mb` climbs while `bytes_in_allocated_blocks_mb` stays flat, the
+    ~173 MB/h is fragmentation and not retention, and no amount of freeing
+    objects will return it.** That is a different defect with different fixes,
+    and it is the fork every remaining hypothesis rests on.
+
+    BUDGETED SEPARATELY from the watchdog's alarm census, and capped: this walks
+    every arena and briefly repoints fd 2, so it is emphatically not free --
+    `#241` is the precedent for periodic work that was assumed to be. It runs
+    only where the caller already pays for measurement, off the emission path
+    that fires every 200 solo requests.
+    """
+    payload = log_pymalloc_arena_stats(
+        reason, budget=(_ARENA_TREND_STATE, _arena_trend_budget()), raw=False, quiet=True)
+    if payload is not None:
+        _ARENA_TREND_STATE["last"] = {
+            "arenas": payload.get("arenas_currently_allocated"),
+            "arena_mb": payload.get("arena_mb"),
+            "live_mb": payload.get("bytes_in_allocated_blocks_mb"),
+        }
+        arena_mb = payload.get("arena_mb")
+        live_mb = payload.get("bytes_in_allocated_blocks_mb")
+        if isinstance(arena_mb, (int, float)) and isinstance(live_mb, (int, float)):
+            # THE number: what the OS has given us that Python is not using.
+            _ARENA_TREND_STATE["last"]["fragmentation_mb"] = round(arena_mb - live_mb, 3)
+    return payload
 
 
 def _run_censuses(reason: str) -> None:
@@ -3091,6 +3164,13 @@ def note_request_end(token: dict[str, Any] | None, route: str,
         if state["since_emit"] < max(1, int(emit_every)):
             return None
         state["since_emit"] = 0
+    # OUTSIDE the lock: this walks every arena and must not hold the lock that
+    # every request takes at start and end.
+    try:
+        sample_arena_trend("attribution_emit")
+    except Exception:
+        pass
+    with _request_memory_lock():
         payload = request_memory_attribution_payload()
     print(f"REQUEST_MEMORY_ATTRIBUTION {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
     return payload
@@ -3127,6 +3207,10 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         # `no_gc2_mb` is positive, the collector is the third source.
         "gc2_split": dict(_GC_SPLIT_STATE),
         "gc2_collections_total": _gc_gen2_collections(),
+        # `#632`: arenas held from the OS vs bytes actually live in them. The
+        # difference is fragmentation -- memory no free() can return.
+        "arena_trend": dict(_ARENA_TREND_STATE.get("last") or {}),
+        "arena_trend_samples": _ARENA_TREND_STATE["count"],
         # `#632`: what reassigning long-lived globals allocated and refunded.
         # A large `free_mb` here means the negatives belong to a PREVIOUS
         # request's object being released inside this one's window.
