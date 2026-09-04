@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 816 rules `[generated]`
+## Index — 819 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 294**
+**FORBIDDEN — 295**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -230,6 +230,7 @@
 - [2026-09-04 — FORBIDDEN: REBUILDING a shared ledger file from `origin/main`. Every git d…](#2026-09-04-forbidden-rebuilding-a-shared-ledger-file-from-originmain-every-git-discard-guard-watches-git-a-rebuild-is-a-plain-write-and-none-of-them-fire-lane-mlb-feed-live-terminal-refresh)
 - [2026-09-04 — FORBIDDEN: reporting a key as ABSENT from a paginated API without paginati…](#2026-09-04-forbidden-reporting-a-key-as-absent-from-a-paginated-api-without-paginating-an-unpaginated-list-read-manufactures-false-absence-and-absence-is-the-finding-people-act-on-lane-mlb-feed-live-terminal-refresh)
 - [2026-09-04 FORBIDDEN: editing a scheduled task's prompt while a session of that task is…](#2026-09-04-forbidden-editing-a-scheduled-tasks-prompt-while-a-session-of-that-task-is-still-alive-it-can-fire-the-new-prompt-immediately-lane-feed-live-warn-rate-session-c4287631)
+- [2026-09-04 FORBIDDEN: pinning a copied definition against ANOTHER FILE'S SOURCE TEXT. W…](#2026-09-04-forbidden-pinning-a-copied-definition-against-another-files-source-text-when-the-definition-moves-the-test-stops-existing-instead-of-failing-lane-lane-invariant-single-source)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -314,7 +315,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 516**
+**Rules and corrections — 518**
 
 - [2026-09-04 — A SPEC THAT NAMES A KEY IS NOT A GUARANTEE THE KEY IS FED — check the JOIN…](#2026-09-04-a-spec-that-names-a-key-is-not-a-guarantee-the-key-is-fed-check-the-join-not-the-two-sides-lane-mlb-hitter-so-dead-field-commit-0b9a03e7-no-deploy)
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
@@ -518,6 +519,8 @@
 - [2026-09-04 — A BROKEN IDENTIFIER IS WORSE THAN NO IDENTIFIER, BECAUSE IT MANUFACTURES F…](#2026-09-04-a-broken-identifier-is-worse-than-no-identifier-because-it-manufactures-false-continuity)
 - [2026-09-04 WHEN A COMMIT NARROWS A PREDICATE, THE DOCSTRING IS PART OF THE PREDICATE —…](#2026-09-04-when-a-commit-narrows-a-predicate-the-docstring-is-part-of-the-predicate-a-stale-contract-line-does-not-read-as-stale-it-reads-as-corroboration-for-whichever-test-still-encodes-the-old-rule)
 - [2026-09-04 — A COEFFICIENT IS NOT A FINDING UNTIL IT SURVIVES LEAVE-ONE-OUT AND A RANK…](#2026-09-04-a-coefficient-is-not-a-finding-until-it-survives-leave-one-out-and-a-rank-test)
+- [2026-09-04 — "THE CLAIM HOLDER IS NOT IN THE SESSION ROSTER" IS TRUE OF EVERY CLAIM. IT…](#2026-09-04-the-claim-holder-is-not-in-the-session-roster-is-true-of-every-claim-it-is-a-category-error-not-a-liveness-check)
+- [2026-09-04 — A RUNNING MINIMUM CANNOT DETECT A RISING FLOOR. CHECK THAT THE STATISTIC C…](#2026-09-04-a-running-minimum-cannot-detect-a-rising-floor-check-that-the-statistic-can-express-the-answer)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

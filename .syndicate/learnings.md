@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 816 rules `[generated]`
+## Index — 819 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5448,3 +5448,29 @@ suspect is not evidence". Same family: there the instrument could not see the
 memory, here it could not express the shape. **Both are answered by asking what
 the instrument would read if the hypothesis were TRUE, before trusting it when
 it reads negative.**
+
+## 2026-09-04 FORBIDDEN: pinning a copied definition against ANOTHER FILE'S SOURCE TEXT. When the definition moves, the test stops existing instead of failing `[lane lane-invariant-single-source]`
+
+- **The rule going forward:** a module may not hold its own copy of a definition
+  another module enforces -- import it. If you cannot, do NOT settle for a test
+  that scrapes the other file for the definition and compares: that test's
+  precondition is *being able to FIND both copies*, so the refactor that moves
+  one turns the test red for a reason unrelated to drift, and drift then
+  accumulates behind it unwatched. Assert the ABSENCE of a second definition in
+  the file you control (`ast`, module scope) -- that survives any refactor of
+  the other side. **14 tests across three files had been red on `origin/main`
+  for exactly this**, all bound to `lane-guard.py`'s shape after its parser
+  moved to `lane_claims.py`, while `check_lane_invariants.py` still exited 0 and
+  printed INVARIANTS HOLD. The four pinned regexes had NOT drifted; four things
+  nobody had thought to pin had. Worst: a `- Files:` line naming
+  `scripts/archive_released_lanes.py` -- a filename CONTAINING the marker
+  "released" -- yielded the checker ZERO claims, so that lane could contest
+  nothing and the two-holder invariant passed vacuously. Measured on one
+  adversarial ledger: old checker `INVARIANTS HOLD` exit 0 against a contested
+  file AND a stray OPEN lane under `## Archived lanes`; new checker, 2
+  violations, exit 1. Fixed in `312c93a9`.
+- **Corollary, and it cost a wrong green: `is` DOES NOT PROVE A REGEX WAS NOT
+  COPIED.** `re.compile` memoises, so re-pasting `re.compile(r"^###\s")` returns
+  the object the other module already compiled and an identity assertion passes.
+  Verified by mutation: the copy went in, all 30 tests stayed green. Identity
+  still binds tuples and functions; for a regex, ask the AST.
