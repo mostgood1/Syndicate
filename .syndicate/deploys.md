@@ -21588,3 +21588,51 @@ not take that step on today's numbers; take it on tomorrow's.
 **Owed:** scheduled task `verify-ledger-budget-4gb` (2026-09-05 07:45 CT).
 Nothing here is a fix that has been shown to work — it is a change that has been
 shown to be LIVE.
+---
+
+## 2026-09-04T16:19:55Z — web — `08ca5ff2` — `#632` smaps anon-by-region-size trend
+
+`[lane web-oom-arena-trend, session b2b5b45b]`
+deploy `dep-dadetpe1egvs73d6fe8g`, trigger=api. Claim held by this lane;
+preflight `CLEAR` **pinned to `--target-commit 08ca5ff2`** — the first attempt
+was blocked by the guard for vouching for no particular SHA, which is the check
+doing its job.
+
+**GO-LIVE 16:19:55Z, from the deploy's `finishedAt`.** Recorded explicitly and
+pinned into the collector, because using a deploy's CREATION time as the
+boundary made me read a pre-deploy emission as a result twice in this
+investigation. Live before: `60afda80`.
+
+**What shipped.** `sample_smaps_trend()` — anon bucketed by mapping SIZE from
+`/proc/self/smaps`, published as `smaps_trend` on the attribution emission.
+Instrumentation only; emits nothing unless `SYNDICATE_REQUEST_MEMORY_PROFILE`
+is set. Carries two peer commits that were already on main (`76424c22`,
+`08ca5ff2`).
+
+**WHY, and it is a correction to a result I reported an hour earlier.** The
+arena trend came back flat and I recorded fragmentation as excluded. That
+reading stands, but it is *weaker than it looked*: **pymalloc arenas are 40% of
+worker RSS**, and every allocation over 512 bytes bypasses pymalloc for
+malloc/mmap — which a 28 MB JSON payload does. `#435` found glibc `malloc_info`
+blind the same way (13.9% coverage). **A flat reading from an instrument that
+cannot see the suspect allocation is not evidence of a flat process.** smaps
+reads the kernel's own accounting and can see a large direct mmap.
+
+verify: **PENDING — this deploy is NOT yet verified.** The reading that will
+settle it: >= 5 `smaps_trend` emissions after 16:19:55Z spanning >= 20 min, and
+a per-bucket delta showing whether the climb concentrates in `8-64MB` /`>64MB`
+(a payload-sized direct mmap, invisible to both allocator views) or is spread
+across the small buckets (diffuse, and the payload story is wrong). Claim held
+deliberately during collection: a peer deploy mid-series restarts the process
+and destroys the window.
+
+**Read the reconciliation with the worker/container caveat.** `total_anon_mb` is
+one worker's smaps; `cgroup_anon_mb` is the whole container (2 workers +
+parent). `reconciles: false` at ~0.5 is EXPECTED here and is not a parse error.
+A ratio > 1.0 would be the real warning.
+
+**Noted in passing, not part of this deploy:** preflight sampled web twice, 90s
+apart, and found **3–4 defunct children awaiting reap** on both gunicorn workers
+each time. Zombies hold no memory so this does not explain `#632`, but it is
+`#630`'s reap path leaving children unreaped in steady state. Owed to whoever
+next touches merge children.
