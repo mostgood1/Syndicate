@@ -842,3 +842,35 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
 * **`#632` STILL HAS NO FIX.** Retention is the dominant mechanism (`VmHWM -
   VmRSS` ~29 MB both workers; every polled series floor == first reading), it has
   no identified owner, and neither env change touches it.
+
+### `[web-oom-leak]` UPDATE 12 — **CORRECTION to UPDATE 10: it is BOTH, and my "retention, not churn" rested on one time point**, 2026-09-04T23:2xZ `[session b2b5b45b]`
+
+* **UPDATE 10 said "RETENTION, not churn" on the strength of `VmHWM - VmRSS`
+  reading ~29 MB on both workers. A later emission from the SAME session
+  undercuts it.** The full series, in time order:
+
+        22:17:09  pid 98   HWM 436.0  RSS 389.3   gap  46.8
+        22:20:49  pid 97   HWM 606.2  RSS 571.9   gap  34.4
+        22:22:57  pid 98   HWM 683.0  RSS 606.0   gap  77.0
+        22:29:14  pid 97   HWM 640.9  RSS 612.1   gap  28.8
+        22:31:00  pid 98   HWM 683.0  RSS 654.3   gap  28.7
+        22:36:33  pid 97   HWM 766.8  RSS 612.1   gap 154.7   <-- 155 MB RETURNED
+
+* **pid 97 reached 766.8 MB and came back down ~155 MB** — memory RETURNED, which
+  is churn. **pid 98 held its HWM flat at 683.0 while RSS climbed 606.0 -> 654.3**
+  — memory RETAINED. **Two workers in one container doing different things.**
+* **The 29 MB reading I built a verdict on was a COINCIDENCE of one sample
+  instant**, when both workers happened to sit near their peaks. Two emissions
+  later the same worker read 154.7.
+* **Correct statement: BOTH mechanisms are present.** Peaks are returned
+  sometimes, and the baseline still trends up. UPDATE 10's exclusive framing is
+  withdrawn; the container-level facts in it (ramp `1066.8 -> 1988.5`, restart
+  buying ~15 min) stand.
+* The `anon_extremes` collector printed `VERDICT: ... CHURN` — **ignore that
+  line.** It is computed from `floor_mb`, a running minimum that cannot rise
+  (UPDATE 10 records the defect). Its own caveat says to read `VmHWM - VmRSS`
+  instead, which is what the series above does.
+* **METHOD NOTE:** a single-timepoint reading of a monotone-vs-current gap cannot
+  distinguish these mechanisms — the gap is near zero whenever a process happens
+  to be AT its peak, regardless of whether it returns memory later. It needs a
+  SERIES, and UPDATE 10 did not have one.
