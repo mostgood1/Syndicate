@@ -801,6 +801,19 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Tests: 24 new (`tests/test_mlb_feed_live_terminal_refresh.py`); 3 of the 6 reader tests fail against unmodified code (off != on). `tests/test_mlb_cards_worker_hydration_cost.py` was pinned outside the window -- its "today" was one day off its slate, so under the new window it made a REAL statsapi call and graded a live 79-play document against a 500-play fixture.
 - Regression: 256 + 213 passed across the directly-affected files. `tests/test_archives.py` shows 31 failed / 350 passed -- IDENTICAL on unmodified code (this worktree has no `data/`), so none are from this change.
 
+- **HANDOFF IN 2026-09-04 from lane `feed-live-warn-rate` (session c4287631) —
+  measurement only, none of your files touched.** `_fetch_current_feed_live` is
+  firing **8.7/min service-wide** on the REQUEST PATH with **zero live games**
+  (16-game slate, all `Preview`). One warn = one synchronous statsapi call, 8s
+  timeout, inside a web request, against a 5s health-check budget. Every
+  non-zero increment observed was exactly **32** — the loop runs the full
+  16-game slate twice per event. The gate `_actual_payload_is_live` (`cards.py:3434`)
+  is false for `Preview` AND `Final`, so the re-fetch fires for most of the
+  slate most of the day; a "tracks live games" hypothesis was pre-registered and
+  FALSIFIED. Not established: who the caller is (all bursts hit ONE worker on a
+  ~60s beat — smells like a poller, unproven) and whether latency is actually
+  harmed. Beware `@lru_cache` — see `scope_2026-08-21_home_request_path_compute.md`
+  §3. Full working: `handoff_2026-09-04_feed_live_request_path_rate.md`.
 ### render-events-nondict-reason — CLOSED-VERIFIED 2026-09-04 — `scripts/render_events.py` no longer dies mid-listing on a non-dict `details.reason`, and a truncated run can no longer pass for a complete one. Landed `ea4e3881` on `origin/main`. Local tooling — no deploy.
 - Goal: the OOM-census instrument completes a full-window read on all three
   services, AND a run that dies says so on STDOUT.
@@ -1211,6 +1224,39 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   or `mlb_status_is_final` is returning True on a status that reads "Live"/"In Progress".
 - **Third attribution avoided.** Freshness and the lens overlay were both wrong on this symptom; this trace deliberately
   stops at a contradiction rather than proposing a cause for it.
+
+### feed-live-warn-rate — CLOSED-VERIFIED 2026-09-04 — **8.7/min service-wide with ZERO live games; the "tracks live games" hypothesis is FALSIFIED. Every burst is exactly 32 = the 16-game slate, twice. HANDED to `mlb-feed-live-terminal-refresh`; no code touched.** — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
+- Goal: turn `mlb_cards_fetch_current_feed_live` from a COUNT into a RATE, with
+  its denominator and scope stated. `[user instruction 2026-09-04]`
+- Files: `.syndicate/` write-up only. No code file claimed — observation is
+  read-only over `GET /api/ops/request-path-guard`.
+- Lane coordination: the emitting code belongs to `mlb-feed-live-terminal-refresh`
+  (OPEN, session b9013cf2), which holds the claim on the MLB cards module. This
+  lane never edited it. Naming that path under `- Files:` registers as a
+  COMPETING CLAIM — `check_lane_invariants` flagged it when this block was first
+  written, which is why the coordination note lives here instead.
+- Method, and it is the load-bearing part: the counter is PER-PROCESS and web
+  runs `WEB_CONCURRENCY=2`, so every delta is computed WITHIN a pid. Differencing
+  two reads that landed on different workers yields a fictional (possibly
+  negative) rate. A DECREASING count for a pid means that worker restarted.
+- RESULT (19 samples, 2026-09-04T18:42:53Z..18:51:46Z, no restart in window):
+  pid 98 **176→240 = +64 over 7.1 min = 9.0/min**; pid 97 **192→192 = 0.0/min**;
+  service-wide **+64 / 7.4 min = 8.7/min**. Both workers observed, so coverage is
+  explicit rather than assumed.
+- **HYPOTHESIS FALSIFIED, exactly as pre-registered.** 16-game slate, ALL
+  `Preview`, zero live — rate held at 8.7/min. The driver is artifact liveness,
+  not game state: `_actual_payload_is_live` (`cards.py:3434`) is false for
+  `Preview` AND `Final`, so the re-fetch fires for most of the slate most of the
+  day.
+- **Every non-zero increment was 32, never 16** — the loop covers the whole
+  16-game slate twice per event. One warn = one synchronous statsapi call at an
+  8s timeout inside a web request, against a 5s health-check budget.
+- NOT established, and said so in the handoff rather than implied: who the
+  caller is (all bursts hit ONE worker on a ~60s beat — suggests a poller,
+  unproven) and whether latency is actually harmed.
+- Handoff: `handoff_2026-09-04_feed_live_request_path_rate.md`, plus a notice
+  left inside the owning lane's block.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
