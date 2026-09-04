@@ -20646,3 +20646,47 @@ skipped web for its owner's measurement window; this round skipped refresh-worke
 because its owner was mid-deploy with the same content. A catch-up deploy that
 duplicates an owner's in-flight deploy risks cancelling their build — measured
 2026-08-15, and done TO me at 20:44Z yesterday.
+
+## 2026-09-04 — both workers to `ab42b221` `[user: "deploy 3777397d"]` — lane `worker-deploy-3777397d`
+
+**Shipped the TIP, not `3777397d` alone, and the reason is the point.**
+`3777397d` is **docstring-only** — it corrects six stale claims that
+`_SCORE_SIM_WEIGHT` is 0.0 when it is now 0.125 capped at 1.5 (and
+`sim_component` was non-zero on 5,108 of 25,830 served rows on 2026-09-04).
+Every changed line is prose inside a docstring, so deploying it by itself costs
+three reboots for zero behaviour change AND leaves the behavioural work pending.
+`ab42b221` contains it and adds `008aca69` (orders persist WHICH CHANNEL placed
+the stake). Same reboot cost, strictly more value.
+
+| service | to | live |
+|---|---|---|
+| live-odds-worker | `ab42b221` | 02:12:41Z |
+| refresh-worker | `ab42b221` | 02:17:12Z |
+| web | — | **owner-held, excluded** |
+
+verify — BY CONTENT on the deployed SHA, both halves of `008aca69` checked with
+tokens confirmed ABSENT from the previously-live `442f82fe`:
+
+    price_shopping  execution_ledger.py    0 -> 2
+    attribution     execute_portfolio.py   0 -> 7
+    "0.125"         portfolio_commit.py    -> 3   (the docstring fix asked for)
+
+**`#643` re-checked for SURVIVAL and intact** (`bytes_per_order` x1, `UNBOUNDED`
+x1) — `008aca69` touches `execution_ledger.py`, the exact file and exact shape of
+unrelated commit that silently reverted that fix at 19:22Z on 09-03.
+
+Runtime: 200 lines across the two workers, **0 tracebacks / CRITICAL / OOM**.
+live-odds-worker on its Kalshi title pass; refresh-worker serving MLB rows with
+`has_markets_ml=True has_markets_totals=True`.
+
+**Web excluded on purpose.** `web-oom-profiler-steady` held the claim, and the
+web-only pending commit `b3966bf1` (`#632` alias slimming on
+`/api/intelligence/query`) is that lane's OWN work. Third time in four rounds
+that checking ownership before deploying was the operative decision.
+
+**A note on the classifier shipped an hour earlier (`c84df0f7`).** It correctly
+flagged `3777397d` as touching runtime FILES, and `3777397d` changes no runtime
+BEHAVIOUR. The verdict is file-level by design; a diff-level "is this
+comment-only" test is a different and riskier judgement (a docstring and a
+constant live in the same file). Recorded as a known limit, not a defect: the
+tool narrowed the question correctly and a human read the diff.

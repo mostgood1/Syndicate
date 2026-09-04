@@ -593,6 +593,13 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Also, from the same thread: `.claude/hooks/discard-guard.py` (new) +
   `.claude/hooks/test_discard_guard.py` (new) + `.claude/settings.json`.
 
+### worker-deploy-3777397d — CLOSED 2026-09-04 — **BOTH WORKERS to `ab42b221`** (02:12:41Z / 02:17:12Z). Shipped the tip because `3777397d` is docstring-only; `ab42b221` contains it plus `008aca69`. Verified by content on both halves (`price_shopping` 0→2, `attribution` 0→7) with `#643` re-checked for survival; 0 errors. Web excluded — owner-held, and its pending commit is that lane's own. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Verification: BY CONTENT on the deployed SHA, tokens confirmed absent from the
+  previously-live `442f82fe` first. Measurements in `.syndicate/deploys.md`.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
