@@ -835,8 +835,12 @@ def commit_portfolio(
                 "price_reliability": round(inputs.price_reliability, 5),
                 "board_score": _score_value(row),
                 # THE S6 INPUT. See `stake_attribution` -- this is what lets
-                # settlement decompose CLV by component and is the stated
-                # condition for ever raising `_SCORE_SIM_WEIGHT` off 0.0.
+                # settlement decompose CLV by component. It was the stated
+                # condition for raising `_SCORE_SIM_WEIGHT` off 0.0; the weight
+                # is now 0.125 capped at 1.5, raised on a SCREEN
+                # (`score_sim_weight_impact.py`: 0/286 negative-EV rows promoted)
+                # rather than on this decomposition, which still has no settled
+                # sample to run against.
                 "attribution": attribution,
                 # The full breadcrumb, so the number is inspectable rather than
                 # trusted: which Kelly fraction, shrunk by how much, on what
@@ -887,12 +891,18 @@ def commit_portfolio(
         # to infer from the refusal counts.
         #
         # WHY IT IS REPORTED HERE AND NOWHERE ELSE. The board's own
-        # `sim_component` cannot answer this: it is
-        # `_SCORE_SIM_WEIGHT * value_sim` with the weight at 0.0, so it is
-        # **structurally** `0.0` for every row that HAS a sim view and `None`
-        # for every row that does not. It can never be non-zero, which makes
-        # "the board is 0% sim" true and also uninformative -- it says nothing
-        # about whether the sim produced anything.
+        # `sim_component` is `_SCORE_SIM_WEIGHT * value_sim`, and it does not
+        # answer this question even now that the weight is non-zero: it is a
+        # CONTRIBUTION TO THE SCORE, bounded by `_SCORE_SIM_CAP_PCT`, not a count
+        # of rows the sim reached.
+        #
+        # **THIS COMMENT SAID `sim_component` "can never be non-zero", AND THAT
+        # IS FALSE.** It was true at `_SCORE_SIM_WEIGHT = 0.0` and the constant
+        # is now 0.125. Measured on the served board 2026-09-04T01:2xZ: 25,830
+        # rows carry a score breakdown and `sim_component` is **non-zero on
+        # 5,108** of them (min -1.5000, median 0.2737, max 1.5000, 448 flagged
+        # `sim_capped`). Anyone who read this line and concluded "the board is 0%
+        # sim" inherited a claim that stopped being true when the constant moved.
         #
         # `rows_with_sim_edge` is the honest version: how many rows carried a
         # probability-space `model_edge_pct` at all. Measured on the served
@@ -956,16 +966,35 @@ def stake_attribution(
     57.6%**. So the simulation is already the majority owner of the money in a
     committed position, while contributing exactly nothing to the ranking.
 
-    **`side_picked_by` is the other half, and it matters more than the split.**
-    At `_SCORE_SIM_WEIGHT = 0.0` the ranking provably cannot pick a side: the
-    same comment shows `blended_score` reduces to `ev_pct`, and EV against a
-    proportional de-vig is `1/overround - 1`, IDENTICAL for every side of a
-    market. So the shortlist orders markets by hold and breaks ties arbitrarily.
-    What actually chooses a side downstream is THIS module's refusals -- a row
-    whose sim edge points the other way sizes to zero and is dropped as
-    `zero_kelly_stake`. When the EV-only counterfactual would also have been
-    positive, price shopping picked the side; when it would not, the sim did,
-    and the position exists only because the model said so.
+    **`side_picked_by` is the other half, and READ ITS SCOPE BEFORE QUOTING IT.**
+
+    THE PREMISE THIS ARGUMENT WAS BUILT ON IS NO LONGER TRUE. It read: "at
+    `_SCORE_SIM_WEIGHT = 0.0` the ranking provably cannot pick a side", because
+    `blended_score` reduces to `ev_pct` and EV against a proportional de-vig is
+    `1/overround - 1`, identical for every side of a market. That was correct at
+    0.0. **The constant is 0.125, capped at 1.5 EV points** -- and the change was
+    made FOR this reason: `opportunity_signals.py` records that at 0.0 the board
+    "cannot pick a side at all" and that "any non-zero contribution makes the sim
+    the entire tiebreak between two sides. That is the single largest behavioural
+    change here and it is not a matter of degree." Measured on the served board
+    2026-09-04: `sim_component` non-zero on **5,108 of 25,830** rows.
+
+    **SO THE SIM NOW HAS TWO CHANNELS AND THIS FIELD SEES ONLY ONE.** The
+    counterfactual below re-sizes the row with `model_edge_pct = 0`, which
+    measures the SIZING channel. It does not model the RANKING channel at all.
+
+    Therefore:
+      * `side_picked_by == "simulation"` still means what it says -- the position
+        exists only because the model said so; price alone would have sized it
+        to zero.
+      * `side_picked_by == "price_shopping"` means ONLY "price alone would have
+        sized it too". It does NOT mean the sim had no hand in the row being
+        there, because the sim may have ranked it onto the board in the first
+        place. Do not read it as "the sim was not involved".
+
+    What chooses a side downstream is still THIS module's refusals -- a row whose
+    sim edge points the other way sizes to zero and is dropped as
+    `zero_kelly_stake`. That part is unchanged and does not depend on the weight.
     """
     ev_only_row = dict(row)
     ev_only_row["model_edge_pct"] = 0.0

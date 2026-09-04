@@ -14,7 +14,9 @@ that is not expressible in the grader's vocabulary.
 Both venues will simply tell us how a market we hold resolved. There is no
 join to get wrong, no alias to miss, and no feed to be late. That matters far
 beyond tidiness: **every stake on this board is sized at 1/16th Kelly and the
-sim carries zero weight, both because settled sample is zero everywhere.**
+sim carries a BOUNDED weight (`_SCORE_SIM_WEIGHT` 0.125, capped at 1.5 EV
+points as of 2026-08-2x; it was 0.0 when this was written), and the settled
+sample is still zero everywhere.**
 `settled > 0` is the gate the whole feedback loop is stuck behind, and this is
 the shortest path through it.
 

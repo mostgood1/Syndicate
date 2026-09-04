@@ -27,17 +27,34 @@ one side at a time, because that is the thing you can actually place. So each
 grid row fans out to at most one candidate per side.
 
 WHAT IS NOT SOLVED HERE, stated so nobody reads a ranked board as a validated
-one: **`_SCORE_SIM_WEIGHT` is 0.0**, so this board ranks on market EV and price
-shopping ALONE and the simulation contributes nothing to the ordering. It was
-deliberately zeroed (see the comment block at `opportunity_signals.py:352-390`)
-because the sim term dominated while `settled: 0` meant nobody had ever checked
-it against outcomes. Raising it is gated on S6, not on taste.
+one: **`_SCORE_SIM_WEIGHT` is 0.125, capped at 1.5 EV points**
+(`opportunity_signals.py`, env `SYNDICATE_SCORE_SIM_WEIGHT` /
+`SYNDICATE_SCORE_SIM_CAP_PCT`, neither set in production). The board is
+**price-led with the sim breaking ties** -- not "our model found these", and not
+"the sim contributes nothing" either. The cap is what makes it a screen rather
+than a validation: it proves the weight cannot repeat the 2026-08-08 arithmetic
+failure (`ev -5, model_edge +12` scored `+1.00` at 0.5 and scores `-3.50` at
+0.125-capped), and it proves nothing about whether the sim is RIGHT. That still
+needs `settled > 0` and CLV decomposed by component.
 
-**This line said `0.5` until 2026-08-16 and the constant had been 0.0 for some
-time.** A session brief and an audit both inherited `0.5` from here and built on
-it. Measured on the served shortlist 2026-08-16T16:20:21Z: 65 of 108 rows carry
-`model_edge_pct`, and `sim_component` is non-zero on **0** of them. If you change
-that constant, change this line in the same commit.
+**THIS LINE HAS NOW BEEN STALE IN BOTH DIRECTIONS, WHICH IS THE ACTUAL LESSON.**
+It said `0.5` while the constant was `0.0` until 2026-08-16, and a session brief
+and an audit both inherited `0.5` from here and built on it. The fix at the time
+was a note saying "if you change that constant, change this line in the same
+commit" -- and then the constant moved to `0.125` and this line went on saying
+`0.0` until 2026-09-04, when `portfolio_commit`'s copy of the same claim was
+found to be the entire basis of `side_picked_by`'s reasoning.
+
+Measured on the served board 2026-09-04T01:2xZ, 25,830 rows carrying a score
+breakdown: **`sim_component` is non-zero on 5,108**, min -1.5000, median 0.2737,
+max 1.5000, with 448 rows flagged `sim_capped`.
+
+**SO DO NOT REPAIR THIS BY EDITING THE NUMBER AGAIN.** A comment naming a
+constant's VALUE is a copy, and copies drift; the warning not to let them drift
+is not a mechanism that stops it. Read the assignment in
+`opportunity_signals.py`, then check for an env override on every service that
+runs the code. The one-query empirical check is better than either: a non-zero
+`sim_component` on any served row falsifies "the sim contributes nothing".
 
 INTEGRATION (not yet wired — deliberately):
     `_build_candidate_pool` in `pipeline/intelligence_state.py` is where these
@@ -2903,10 +2920,14 @@ def _layer2_board_columns(
     # fixes and different words.
     #
     # LABELLED, NOT SUPPRESSED, by decision 2026-08-16. Suppressing would let a
-    # model with `settled: 0` veto rows on EV grounds it has not earned --
-    # `_SCORE_SIM_WEIGHT` is 0.0 for exactly that reason, and a filter would be
-    # a weight of -infinity smuggled in as a rule. The EV is real even where the
-    # sim dissents; the reader is told and decides.
+    # model with `settled: 0` veto rows on EV grounds it has not earned, and a
+    # filter would be a weight of -infinity smuggled in as a rule. The EV is
+    # real even where the sim dissents; the reader is told and decides.
+    #
+    # `_SCORE_SIM_WEIGHT` was 0.0 when this was written and is now **0.125,
+    # capped at 1.5 EV points** -- so the sim has a BOUNDED say in the ordering,
+    # which is still a long way from the unbounded veto a filter would give it.
+    # The argument holds; only the constant it cited has moved.
     # SAY WHICH SIM IT IS. A live row's verdict comes from the LIVE re-sim, and
     # until now the board could not tell the reader that.
     #

@@ -916,11 +916,14 @@ def _bet_facts(row: dict[str, Any], *, artifact_as_of: Any = None) -> dict[str, 
 def _sim_terms(row: dict[str, Any]) -> dict[str, Any]:
     """The simulation's own output, and whether it has ever been checked.
 
-    **`score.sim_component` is deliberately NOT read here.** It is 0.0 on 108
-    of 108 served rows (`_SCORE_SIM_WEIGHT` is zeroed pending settlement), so
-    publishing it would report "the sim contributed nothing" as if it were a
-    measurement of this bet. `projection.projected` is the sim term that is
-    actually populated -- 86 of 108 rows.
+    **`score.sim_component` is deliberately NOT read here, and the REASON has
+    changed even though the decision has not.** It was 0.0 on 108 of 108 served
+    rows because `_SCORE_SIM_WEIGHT` was zeroed pending settlement; the weight is
+    now **0.125 capped at 1.5**, and on 2026-09-04 `sim_component` was non-zero on
+    5,108 of 25,830 served rows. So it is no longer a constant zero -- it is a
+    CONTRIBUTION TO A RANKING, bounded by the cap, and publishing it per bet would
+    still report a ranking term as if it were a measurement of THIS bet.
+    `projection.projected` remains the sim term that is actually populated.
 
     `model_skill` is carried because a user asked to trust a number is entitled
     to know that 88 of 108 rows say of themselves "model never backtested --
