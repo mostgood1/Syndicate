@@ -38,7 +38,7 @@ is worse than a large file:
 
     py -3 scripts/trim_lane_blocks.py                  # dry run, default
     py -3 scripts/trim_lane_blocks.py --apply
-    py -3 scripts/trim_lane_blocks.py --cap 120000     # report against a budget
+    py -3 scripts/trim_lane_blocks.py --cap 200000     # override the enforced cap
 
 Exit 0 = clean (or nothing to do), 1 = refused, 2 = could not read/verify.
 """
@@ -51,6 +51,22 @@ import pathlib
 import re
 import sys
 import types
+
+# THE CAP COMES FROM `session-start.sh`, the only component that ENFORCES it.
+# A local copy drifts silently in the worst direction: it keeps reporting a file
+# OVER budget after the budget was raised. That is exactly what the old
+# `default=120000` did between `5c3ad9c4` (which raised lanes.md to 240,000) and
+# 2026-09-03, when a session read this tool's "*** STILL OVER ***" line and
+# reported a non-existent constraint to their user. See ledger_caps.py.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent
+                       / ".claude" / "hooks"))
+try:
+    from ledger_caps import cap as _ledger_cap, cap_source as _ledger_cap_source
+except Exception:  # pragma: no cover - only if the shared module is gone
+    def _ledger_cap(name, root=None):
+        return 240000
+    def _ledger_cap_source(root=None):
+        return "hardcoded fallback (ledger_caps.py unavailable)"
 
 LANES = pathlib.Path(".syndicate/lanes.md")
 HISTORY = pathlib.Path(".syndicate/lanes_history.md")
@@ -82,8 +98,12 @@ def load_guard():
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--apply", action="store_true", help="write; default is a dry run")
-    ap.add_argument("--cap", type=int, default=120000, help="byte budget to report against")
+    ap.add_argument("--cap", type=int, default=None,
+                    help="byte budget to report against "
+                         "(default: whatever session-start.sh enforces)")
     args = ap.parse_args(argv)
+    if args.cap is None:
+        args.cap = _ledger_cap("lanes.md")
 
     g = load_guard()
     try:

@@ -1992,6 +1992,46 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 - Blocked by: none.
 
 
+### ledger-cap-single-source — CLOSED 2026-09-03 — the ledger cap now has ONE source, the enforcer, and a drift test keeps it that way — session f97ad5ab
+- Goal: two tools reported `lanes.md` OVER against a cap nothing enforces.
+- Files: `.claude/hooks/ledger_caps.py` (new),
+  `.claude/hooks/test_ledger_caps.py` (new), `scripts/trim_lane_blocks.py`,
+  `scripts/archive_released_lanes.py`. Collision check RUN via
+  `lane_claims._claims()`: CLEAR on all four.
+- **The finding, and it had already cost something.** `session-start.sh` enforces
+  `lanes.md:240000` (raised from 120,000 by `5c3ad9c4`). `trim_lane_blocks.py`
+  defaulted `--cap 120000` and `archive_released_lanes.py` hardcoded the same in
+  a print. So the tool a human runs said
+  `cap 120000  1.66x  *** STILL OVER ***` while the hook that actually gates was
+  SILENT — 203,061 B against 240,000 is **0.85x, UNDER**.
+- Session c38d3e5c read that line and reported "lanes.md sits at 1.61x its cap
+  with zero movable blocks" to their user as an unresolved constraint.
+  **They read the tool honestly; the tool was lying.** 1.61x is arithmetic
+  against the superseded constant.
+- Second half also false: the trim now reports **4 movable blocks**.
+  `session-start.sh`'s own comment predicted exactly this — *"do not read 'no
+  lever' here as permanent... its trimmability is a function of how many lanes
+  are CLOSED today, not of the tool."* Lanes closed; the lever reappeared.
+- **OUTCOME.** `ledger_caps.py` parses the cap out of `session-start.sh` and both
+  tools read it. All three agree:
+
+      trim_lane_blocks      cap 240000 : 0.85x -> 0.80x  UNDER
+      archive_released      cap 240000 (session-start.sh) -> 0.80x (under)
+      session-start.sh      reports learnings.md only; SILENT on lanes.md
+
+- **The fallback is VISIBLE, never silent** — `cap_source()` returns
+  `"session-start.sh"` or `"fallback"` and is printed. A silent fallback rebuilds
+  the same drift with extra steps.
+- **The drift test paid for itself inside a minute.** Its last case greps for any
+  OTHER file carrying a cap constant, and it immediately failed on a straggler I
+  had missed: `trim_lane_blocks.py:41`, a docstring example still reading
+  `--cap 120000`. Harmless to run, and exactly the copy the next reader would
+  have believed. 7/7 after.
+- Verification of the falsification test as written: change the number in
+  `session-start.sh` and every consumer follows with no edit, because none holds
+  one. The grep case keeps that true as consumers are added.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

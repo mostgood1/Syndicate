@@ -68,6 +68,22 @@ import re
 import sys
 import types
 
+# THE CAP COMES FROM `session-start.sh`, the only component that ENFORCES it.
+# A local copy drifts silently in the worst direction: it keeps reporting a file
+# OVER budget after the budget was raised. That is exactly what the old
+# `default=120000` did between `5c3ad9c4` (which raised lanes.md to 240,000) and
+# 2026-09-03, when a session read this tool's "*** STILL OVER ***" line and
+# reported a non-existent constraint to their user. See ledger_caps.py.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent
+                       / ".claude" / "hooks"))
+try:
+    from ledger_caps import cap as _ledger_cap, cap_source as _ledger_cap_source
+except Exception:  # pragma: no cover - only if the shared module is gone
+    def _ledger_cap(name, root=None):
+        return 240000
+    def _ledger_cap_source(root=None):
+        return "hardcoded fallback (ledger_caps.py unavailable)"
+
 LANES = pathlib.Path(".syndicate/lanes.md")
 HISTORY = pathlib.Path(".syndicate/lanes_history.md")
 # REPOINTED 2026-09-03 from `lane-guard.py` to `lane_claims.py`. The parser
@@ -178,7 +194,10 @@ def main(argv=None):
         print(f"{slug:<36} {n:>6}")
     print(f"\nlanes.md {len(text)} -> {len(kept)} bytes "
           f"({len(text) - len(kept)} reclaimed, {(len(text)-len(kept))*100//len(text)}%)")
-    print(f"cap 120000 -> {len(kept)/120000:.2f}x over")
+    _cap = _ledger_cap("lanes.md")
+    print(f"cap {_cap} ({_ledger_cap_source()}) -> "
+          f"{len(kept)/_cap:.2f}x"
+          f"{'  *** OVER ***' if len(kept) > _cap else '  (under)'}")
     print(f"claims unchanged: {len(after_claims)}")
 
     if not args.apply:
