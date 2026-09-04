@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import gc
 import json
 import os
 import re
@@ -2769,6 +2770,47 @@ _REQUEST_MEMORY_STATE: dict[str, Any] = {
 # call that window clean.
 _BACKGROUND_MEMORY_STATE: dict[str, Any] = {"inflight": 0, "seq": 0}
 
+# `#632`. IS THE GARBAGE COLLECTOR THE THIRD SOURCE? INSTRUMENTATION, NOT A GATE.
+#
+# Two explanations for the impossible attribution have now been eliminated by
+# measurement rather than argument: cross-worker contamination (fixed by moving
+# to per-process anon) and background loops (FALSIFIED -- neither loop runs on
+# web; `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP` and
+# `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` are both false and web
+# has logged zero loop lines).
+#
+# What remains is not concurrency at all. `note_request_start`/`end` DIFFERENCE
+# the process's anon, and in a garbage-collected runtime that window contains
+# whatever the collector happens to free -- garbage produced by REQUESTS THAT
+# ENDED EARLIER. A request that triggers a gen-2 pass is charged a large negative
+# it did not cause; one that runs while garbage accumulates is charged a positive
+# that is really deferred cost. That is the exact observed signature: route
+# totals going negative (-49.46 MB across 252 solo requests) and a solo-sample
+# sum EXCEEDING total process growth (175%).
+#
+# THIS ONLY RECORDS. It splits the attributed deltas by whether a generation-2
+# collection ran inside the window, and publishes both halves. If the negatives
+# concentrate in the collected half, the collector is the source and a gate is
+# justified; if they do not, this is cheap and I have not built the wrong thing
+# twice. `gc.get_stats()` is a list of per-generation dicts and reading it is a
+# few microseconds -- affordable on a request path, unlike anything that
+# allocates.
+_GC_SPLIT_STATE: dict[str, Any] = {
+    "with_gc2_n": 0, "with_gc2_mb": 0.0,
+    "no_gc2_n": 0, "no_gc2_mb": 0.0,
+}
+
+
+def _gc_gen2_collections() -> int:
+    """Cumulative generation-2 collection count, or -1 when unreadable."""
+    try:
+        stats = gc.get_stats()
+        if isinstance(stats, list) and len(stats) >= 3:
+            return int(stats[2].get("collections") or 0)
+    except Exception:
+        pass
+    return -1
+
 
 def _request_memory_lock() -> Any:
     global _REQUEST_MEMORY_LOCK
@@ -2928,7 +2970,7 @@ def note_request_start() -> dict[str, Any] | None:
             _REQUEST_MEMORY_STATE["unreadable"] += 1
         return {"attribute": False, "seq": seq}
     return {"attribute": True, "seq": seq, "anon_before_mb": before,
-            "background_seq": background_seq}
+            "background_seq": background_seq, "gc2_before": _gc_gen2_collections()}
 
 
 def note_request_end(token: dict[str, Any] | None, route: str,
@@ -2970,6 +3012,12 @@ def note_request_end(token: dict[str, Any] | None, route: str,
             _REQUEST_MEMORY_STATE["unreadable"] += 1
         return None
     delta = after - float(token.get("anon_before_mb") or 0.0)
+    # Split, do not exclude: the point is to find out whether the collector
+    # explains the negatives, and excluding them would hide the evidence.
+    gc2_before = token.get("gc2_before")
+    gc2_after = _gc_gen2_collections()
+    collected = (isinstance(gc2_before, int) and gc2_before >= 0
+                 and gc2_after >= 0 and gc2_after > gc2_before)
     key = str(route or "unknown")
     with _request_memory_lock():
         state = _REQUEST_MEMORY_STATE
@@ -2977,6 +3025,12 @@ def note_request_end(token: dict[str, Any] | None, route: str,
         row["solo_n"] += 1
         row["total_mb"] = round(row["total_mb"] + delta, 3)
         row["max_mb"] = round(max(row["max_mb"], delta), 3)
+        if collected:
+            _GC_SPLIT_STATE["with_gc2_n"] += 1
+            _GC_SPLIT_STATE["with_gc2_mb"] = round(_GC_SPLIT_STATE["with_gc2_mb"] + delta, 3)
+        else:
+            _GC_SPLIT_STATE["no_gc2_n"] += 1
+            _GC_SPLIT_STATE["no_gc2_mb"] = round(_GC_SPLIT_STATE["no_gc2_mb"] + delta, 3)
         state["since_emit"] += 1
         if state["since_emit"] < max(1, int(emit_every)):
             return None
@@ -3012,6 +3066,11 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         # with no denominator invites treating the solo sample as the whole
         # service, and there are now two ways to leave it.
         "skipped_background": state["skipped_background"],
+        # `#632`: the attributed deltas split by whether a gen-2 collection ran
+        # inside the window. If `with_gc2_mb` is strongly negative while
+        # `no_gc2_mb` is positive, the collector is the third source.
+        "gc2_split": dict(_GC_SPLIT_STATE),
+        "gc2_collections_total": _gc_gen2_collections(),
         "unreadable": state["unreadable"],
         # A reader must be able to see how much of the traffic this DECLINED to
         # attribute. A top-routes table with no denominator invites treating the
@@ -3028,3 +3087,5 @@ def reset_request_memory_attribution() -> None:
          "skipped_concurrent": 0, "skipped_background": 0, "unreadable": 0}
     )
     _BACKGROUND_MEMORY_STATE.update({"inflight": 0, "seq": 0})
+    _GC_SPLIT_STATE.update({"with_gc2_n": 0, "with_gc2_mb": 0.0,
+                            "no_gc2_n": 0, "no_gc2_mb": 0.0})
