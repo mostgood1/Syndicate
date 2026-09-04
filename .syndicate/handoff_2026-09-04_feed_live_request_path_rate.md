@@ -242,3 +242,92 @@ Agreed on your `@lru_cache` warning, and it is why the existing TTL cache in
 **Status of my lane:** the freshness fix is live and correct and was NOT the
 cause of the 7-of-9 board symptom — see `deploys.md` 2026-09-04 19:15:51Z and
 `state.md`. My session is archived after this; the lane is OPEN and UNOWNED.
+## LIVE-SLATE READING, 2026-09-04 15:39—16:09 CDT — the falsification half, run with only 1 game live
+
+Scheduled task `feed-live-warn-rate-live-slate`, run early on request. **Read the
+premise line before the numbers: this is a 1-of-16 reading, not a live slate.**
+
+### Premise (checked at BOTH ends of the window, not assumed)
+
+    15:38:30 CDT  Counter({'Preview': 15, 'Live': 1})  slate 16
+    16:09:47 CDT  Counter({'Preview': 15, 'Live': 1})  slate 16
+
+Unchanged across the whole window — no game started or finished inside it, so
+nothing about the result is a mid-window state change. Slate size 16, identical
+to the zero-live baseline, so a full-slate pass is 16 calls in both and the
+pass-unit comparison is sound.
+
+### The number
+
+    61 samples, 3 failed reads, 27.8 min actually spanned, pids [97, 98]
+      pid 97   n=25   span 27.8 min    16 -> 112   delta= +96
+      pid 98   n=33   span 27.3 min    16 -> 160   delta=+144
+    TOTAL  +240 over 27.8 min, across 13 increase events
+    RATE   8.63/min  (13 events >= 5 required, so this one IS quotable)
+
+240 calls / 16 games = **15 full-slate passes**, one pass every **1.85 min**
+(0.54 passes/min).
+
+### Versus the zero-live baseline
+
+| | zero live | 1 live |
+|---|---|---|
+| window | 20.0 min | 27.8 min |
+| calls | +128 | +240 |
+| events | 5 | 13 |
+| passes (calls / 16) | 8 | 15 |
+| one pass every | 2.50 min | 1.85 min |
+| passes/min | 0.40 | 0.54 |
+
+### Which way it went: NEITHER branch cleanly, and the split is the finding
+
+The task offered "roughly unchanged" vs "rises sharply". 1.35x is neither. But
+the two halves of the measurement move differently, and only one of them is
+about game state:
+
+- **Pass SIZE did not move at all: 240 = 15 x 16, exactly the full slate.** One
+  game was Live and it was still fetched along with the 15 Previews. If game
+  state gated the per-game fetch, the pass would not have been the whole slate.
+  This is a direct confirmation of the owner's REPLY above: the branch that
+  fires on web is the **missing-artifact** one (`cards.py:2405`), where
+  `payload` is `None` because `feed_live` matches no `HOT_ARTIFACT_PATTERNS`.
+  No liveness or staleness predicate is consulted on that path, so game state
+  cannot change it — and did not.
+- **Pass FREQUENCY rose 0.40 -> 0.54/min.** This counter only ticks INSIDE
+  request handling, so its frequency is a function of how often the endpoint is
+  hit, not of the slate. A mid-afternoon window against a lunchtime one is a
+  plausible traffic difference. **I did not measure request volume, so I am not
+  attributing the 35% — I am saying it is not evidence about game state.**
+
+**So: the driver is artifact absence, and the fix is caching/gating, not
+game-state handling.** That was the stronger of the two publishable outcomes and
+it is the one the pass-size result supports.
+
+### What this run does NOT establish
+
+**It does not falsify game-state sensitivity at a real live slate.** One live
+game out of sixteen is close to the baseline condition, not far from it. The
+20:15 window is still owed and this reading does not replace it. What it does
+retire is the weaker possibility that the zero-live 8-passes-in-20-min was a
+floor produced by having nothing live at all.
+
+### Two operational notes for whoever samples this next
+
+1. **Web restarted between 15:10 and 15:39 CDT.** Both pids entered my window at
+   exactly 16 (one pass already banked); at 15:10 a dry run had seen pids 78/79
+   at 112 and 80. All deltas here are within-pid and monotonic, so nothing was
+   withheld and the window is clean.
+2. **pid equality is NOT worker identity across windows.** The zero-live
+   baseline also reports pids 97/98, and so does this run — but a restart
+   happened in between, so they are different worker generations that happen to
+   have been assigned the same numbers. Never join two windows on pid.
+
+### Stale pointer corrected
+
+The scheduled task file described the gate as `_actual_payload_is_live` at
+`:3434`. On `origin/main` that branch reads `not mlb_feed_payload_is_final(payload)`
+at `cards.py:2391`, with a comment at `:2359` recording the old form. The REPLY
+section above had already corrected this; noting it here so the task file and
+the handoff do not disagree. `mlb/cards.py` was not edited by this run.
+
+*Measurement only. No deploy, no source edit.*
