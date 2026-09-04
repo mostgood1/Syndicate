@@ -2776,6 +2776,71 @@ def _anon_mb() -> float | None:
     return _bytes_to_mb(stat.get("anon"))
 
 
+_PROCESS_ANON_UNAVAILABLE = False
+
+
+def _process_anon_mb() -> float | None:
+    """THIS PROCESS's anonymous memory, from `/proc/self/smaps_rollup`.
+
+    WHY THIS EXISTS, measured 2026-09-03. `_anon_mb()` reads the CONTAINER
+    cgroup, but `_REQUEST_MEMORY_STATE["inflight"]` is module state and therefore
+    counts only requests in THIS gunicorn worker. At `WEB_CONCURRENCY=2` the
+    guarantee and the measurement covered different scopes, so a request that was
+    provably alone IN ITS OWN WORKER was still charged whatever the sibling
+    worker and every merge subprocess allocated during its window.
+
+    That is not a theoretical gap. It produced an attributed share of **61-150%**
+    depending on framing -- and a share above 100% is arithmetically impossible
+    for a true partition. Two direct sightings: a CUMULATIVE route total FELL
+    (`/api/ops/artifacts/publish` 211.59 -> 167.13 MB while its own `solo_n` rose
+    405 -> 502), and the two workers disagreed in SIGN on the same route one
+    minute apart (+102.50 vs -64.35 MB).
+
+    The obvious alternative was to run ONE worker so the cgroup matched the
+    counter. That was tried and it **evicted the container in 22 minutes**
+    (`server_failed`, `['evicted','unhealthy']`, 2026-09-03T23:37:08Z): one
+    worker x 4 threads is 4 concurrent slots, and `/healthz` queued behind slow
+    artifact requests. So the worker count is not available to us and the
+    INSTRUMENT is what has to change.
+
+    WHY `smaps_rollup` AND NOT `parse_smaps`. `parse_smaps` walks every mapping
+    in `/proc/self/smaps`, which is fine for a periodic census and far too
+    expensive on a per-request path. `smaps_rollup` is the kernel's own
+    pre-aggregated version -- a handful of lines, one read -- and reports the
+    SAME `Anonymous:` field, which is the accounting that decides an OOM kill.
+    `Rss` is deliberately not used: it counts file-backed pages the cgroup files
+    under `file`, and conflating the two is how a page-cache plateau once got
+    called a leak (`#566`).
+
+    Returns None when the file cannot be read, and the caller then declines to
+    attribute rather than silently falling back to the container reading --
+    falling back would quietly restore the very defect this removes.
+    """
+    global _PROCESS_ANON_UNAVAILABLE
+    if _PROCESS_ANON_UNAVAILABLE:
+        return None
+    try:
+        with open("/proc/self/smaps_rollup", encoding="utf-8", errors="ignore") as handle:
+            for line in handle:
+                if line.startswith("Anonymous:"):
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        return float(parts[1]) / 1024.0        # kB -> MB
+        return None
+    except FileNotFoundError:
+        # Pre-4.14 kernel or a platform without it. Say so ONCE and stop trying:
+        # this runs per request and a missing file must not cost a syscall each
+        # time. Attribution then reports every request as `unreadable`, which is
+        # visible in the payload -- unlike a silent fallback.
+        _PROCESS_ANON_UNAVAILABLE = True
+        print("[memory_observability] SMAPS_ROLLUP_UNAVAILABLE -- per-request "
+              "attribution disabled; it will not fall back to the container cgroup",
+              flush=True)
+        return None
+    except Exception:
+        return None
+
+
 def note_request_start() -> dict[str, Any] | None:
     """Call at request entry. Returns a token to hand back, or None.
 
@@ -2792,7 +2857,7 @@ def note_request_start() -> dict[str, Any] | None:
         if not solo:
             state["skipped_concurrent"] += 1
             return None
-    before = _anon_mb()
+    before = _process_anon_mb()
     if before is None:
         with _request_memory_lock():
             _REQUEST_MEMORY_STATE["unreadable"] += 1
@@ -2824,7 +2889,7 @@ def note_request_end(token: dict[str, Any] | None, route: str,
         with _request_memory_lock():
             _REQUEST_MEMORY_STATE["skipped_concurrent"] += 1
         return None
-    after = _anon_mb()
+    after = _process_anon_mb()
     if after is None:
         with _request_memory_lock():
             _REQUEST_MEMORY_STATE["unreadable"] += 1
@@ -2855,7 +2920,14 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
     state = _REQUEST_MEMORY_STATE
     rows = sorted(state["routes"].items(), key=lambda kv: -kv[1]["total_mb"])[: max(1, int(top))]
     return {
+        # `anon_mb_now` KEEPS ITS MEANING (the container cgroup) so emissions
+        # recorded before this change stay comparable. What changed is what
+        # `total_mb` is a delta OF, and that is stated outright rather than left
+        # for a reader to infer: `attribution_basis` distinguishes the two
+        # regimes in the log, where nothing else would.
+        "attribution_basis": "process_anon_smaps_rollup",
         "anon_mb_now": _anon_mb(),
+        "process_anon_mb_now": _process_anon_mb(),
         "routes": [dict(route=r, **vals) for r, vals in rows],
         "distinct_routes": len(state["routes"]),
         "skipped_concurrent": state["skipped_concurrent"],
