@@ -777,6 +777,25 @@ def api_ops_version() -> Any:
     return jsonify({"ok": True, "version": _build_version_payload()})
 
 
+@ops_bp.get("/api/ops/request-path-guard")
+def api_ops_request_path_guard() -> Any:
+    """How often this web worker REFUSED heavy compute inside a live request.
+
+    `#56/#98/#109`. The guard has always worked; nothing counted it. On
+    2026-08-27 it refused 348 times between 15:15Z and 22:19Z -- 348 silently
+    degraded responses -- and that was only discovered on 2026-09-04 by reading
+    the logs after the fact.
+
+    Read the `covers` field before quoting any number here: these counters are
+    per-PROCESS and web runs more than one gunicorn worker, so this is one
+    worker's share and not a service total. Protected endpoint: requires admin
+    token (enforced by before_request).
+    """
+    from syndicate.features.shared.request_path_guard import guard_counters
+
+    return jsonify({"ok": True, "request_path_guard": guard_counters()})
+
+
 @ops_bp.get("/api/ops/memory")
 def api_ops_memory() -> Any:
     # Read-only, same instrumentation the workers already use to diagnose OOMs

@@ -111,11 +111,44 @@ stopped calling. **Which of those it is, is NOT established here.**
 
 ---
 
-## What was NOT done
+## ALL THREE ADDRESSED, same day `[user decision 2026-09-04]`
 
-No code changed. No deploy. The remedies above are named, not applied — (a) in
-particular touches a load-bearing guard and deserves its own lane and its own
-falsification test (`off != on`, per the model-engine standard).
+- **(a) and (b) — `08d3fae5`.** The open question here ("which key arms it") was
+  SETTLED first: `/api/ops/version` on the live web dyno reports its own runtime
+  env, carrying `RENDER_SERVICE_NAME`, `RENDER_INSTANCE_ID`,
+  `RENDER_EXTERNAL_URL` and `RENDER_GIT_COMMIT` — **none of which are among the
+  76 user-defined vars**, so Render injects them and no dashboard edit can
+  delete them. The guard now arms on those as well, and a **second defect found
+  while reading** was fixed with it: the original chained the LOOKUPS, so
+  `RENDER=false` short-circuited the fallback and disarmed the hard gate even
+  with `SYNDICATE_REQUIRE_HOSTED_STORAGE=true`. The refusal message now names
+  the operation and the arming signal.
+- **(c) — this commit.** Refusals and warnings are counted per operation, with
+  first/last refusal timestamps, behind `GET /api/ops/request-path-guard`
+  (admin-gated). The payload **states its own scope**: the counters are
+  per-process and web runs `WEB_CONCURRENCY=2`, so a read covers one worker of
+  two and says so, with its pid. Pushing them to the keyvalue store would make
+  them service-wide at the cost of a network write on the request path — the
+  exact thing the guard exists to keep off it — so the counter is the always-on
+  signal and the log line remains the ledger.
+
+  One claim did NOT survive measurement and is recorded because it is the kind
+  that usually slips through: the counter's lock is **not** there to stop lost
+  increments. An unlocked counter lost **zero** of 80,000 increments across four
+  threads over five trials on CPython 3.11. The lock buys snapshot CONSISTENCY —
+  the total and the per-operation map are copied together, so they reconcile.
+
+## What is STILL not done
+
+**Nothing is deployed.** All three fixes are on `main` and inert until someone
+ships them; no deploy claim was taken by any of these lanes. When they do go
+out, the refusal line CHANGES SHAPE — anything grepping the old exact string
+`REFUSED: compute in request path on hosted web` needs the suffix allowed for.
+
+Still open from §5, and not answered by any of this: **the eight-day silence
+means either the cache stopped missing or the caller stopped calling, and which
+one is NOT established.** The new counter will distinguish them the next time it
+happens; it cannot answer it retroactively.
 
 Adjacent lanes, untouched: `render-web-request-path` (UNOWNED, claims released,
 "SHIPPED AND MEASURED; ONE ITEM OWED"), `web-oom-thread-gating` (OPEN, owned).

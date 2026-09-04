@@ -187,3 +187,121 @@ class RequestPathGuardArmingTests(unittest.TestCase):
         self.assertIn("_build_candidate_pool", rendered)
         self.assertIn("RENDER", rendered)
 
+
+class RequestPathGuardCounterTests(unittest.TestCase):
+    """`[user decision 2026-09-04]` -- item (c). 348 refusals on 2026-08-27 with
+    nothing counting them; the gap was discovered by reading logs a week later.
+    """
+
+    def setUp(self) -> None:
+        from syndicate.features.shared.request_path_guard import reset_guard_counters
+
+        reset_guard_counters()
+        self.addCleanup(reset_guard_counters)
+        env = patch.dict(os.environ, {}, clear=False)
+        env.start()
+        for key in _ALL_HOSTED_KEYS:
+            os.environ.pop(key, None)
+        self.addCleanup(env.stop)
+
+    def _refuse(self, operation: str) -> None:
+        app = Flask(__name__)
+        with app.test_request_context("/api/test", method="GET"):
+            with self.assertRaises(ComputeInRequestPathError):
+                refuse_if_compute_in_request_path(operation)
+
+    def test_refusals_are_counted_and_attributed_to_the_operation(self) -> None:
+        from syndicate.features.shared.request_path_guard import guard_counters
+
+        os.environ["RENDER"] = "true"
+        self._refuse("_compute_response")
+        self._refuse("_compute_response")
+        self._refuse("_build_candidate_pool")
+
+        snap = guard_counters()
+        self.assertEqual(snap["refused"], 3)
+        self.assertEqual(snap["by_operation"]["_compute_response"]["refused"], 2)
+        self.assertEqual(snap["by_operation"]["_build_candidate_pool"]["refused"], 1)
+        self.assertEqual(snap["last_refused_operation"], "_build_candidate_pool")
+        self.assertIsNotNone(snap["first_refusal_at"])
+        self.assertIsNotNone(snap["last_refusal_at"])
+
+    def test_the_snapshot_states_that_it_covers_one_worker(self) -> None:
+        """web runs WEB_CONCURRENCY=2. A per-process count presented as a
+        service total would halve the truth, which is the instrument defect this
+        repo keeps paying for -- so the scope travels WITH the number."""
+        from syndicate.features.shared.request_path_guard import guard_counters
+
+        snap = guard_counters()
+        self.assertEqual(snap["pid"], os.getpid())
+        self.assertIn("worker", snap["covers"])
+
+    def test_the_operation_map_is_bounded_and_overflow_is_visible(self) -> None:
+        """A caller passing dynamic names must not grow this without limit --
+        and the overflow must be COUNTED, not dropped, or the total stops
+        reconciling with the per-operation map."""
+        from syndicate.features.shared.request_path_guard import _MAX_TRACKED_OPERATIONS
+        from syndicate.features.shared.request_path_guard import _OVERFLOW_KEY
+        from syndicate.features.shared.request_path_guard import guard_counters
+
+        os.environ["RENDER"] = "true"
+        extra = 5
+        for index in range(_MAX_TRACKED_OPERATIONS + extra):
+            self._refuse(f"operation_{index}")
+
+        snap = guard_counters()
+        self.assertEqual(len(snap["by_operation"]), _MAX_TRACKED_OPERATIONS + 1)  # + the overflow bucket
+        self.assertEqual(snap["by_operation"][_OVERFLOW_KEY]["refused"], extra)
+        self.assertEqual(snap["refused"], _MAX_TRACKED_OPERATIONS + extra)
+        self.assertEqual(sum(v["refused"] for v in snap["by_operation"].values()), snap["refused"])
+
+    def test_warnings_are_counted_separately_from_refusals(self) -> None:
+        """Off Render the guard warns instead of refusing; conflating the two
+        would make a local dev run look like a production incident."""
+        from syndicate.features.shared.request_path_guard import guard_counters
+
+        app = Flask(__name__)
+        with app.test_request_context("/api/test", method="GET"):
+            refuse_if_compute_in_request_path("some_heavy_operation")  # not hosted -> warns
+
+        snap = guard_counters()
+        self.assertEqual(snap["refused"], 0)
+        self.assertEqual(snap["warned"], 1)
+        self.assertIsNone(snap["first_refusal_at"])
+
+    def test_counting_survives_concurrent_threads(self) -> None:
+        """GUNICORN_THREADS=4 share one process, so this has to hold under
+        concurrency.
+
+        NOT the reason for the lock, and the difference is worth writing down.
+        Measured 2026-09-04 on CPython 3.11: an UNLOCKED counter lost **zero** of
+        80,000 increments across four threads, five trials -- so "an unlocked
+        counter would drop counts" is a claim this repo cannot make. What the
+        lock actually buys is SNAPSHOT CONSISTENCY: `guard_counters()` copies the
+        total, the per-operation map and the timestamps together, and without the
+        lock a reader can catch `refused` already incremented while
+        `by_operation` is not, so the two stop reconciling. That is the invariant
+        `test_the_operation_map_is_bounded_and_overflow_is_visible` asserts."""
+        import threading as _threading
+
+        from syndicate.features.shared.request_path_guard import guard_counters
+
+        os.environ["RENDER"] = "true"
+        errors: list[BaseException] = []
+
+        def hammer() -> None:
+            try:
+                for _ in range(50):
+                    self._refuse("_compute_response")
+            except BaseException as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        threads = [_threading.Thread(target=hammer) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(errors, [])
+        self.assertEqual(guard_counters()["refused"], 200)
+

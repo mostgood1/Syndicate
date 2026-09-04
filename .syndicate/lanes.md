@@ -1082,6 +1082,54 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   refusal message names the operation and the signal that armed it.
 - Blocked by: none. Local code — **no deploy is being taken by this lane.**
 
+### request-path-guard-counter — CLOSED-VERIFIED 2026-09-04 — **refusals are counted per operation behind `GET /api/ops/request-path-guard`, and the payload states its own per-worker scope. 16/16 guard tests pass; endpoint verified end-to-end through the real app factory. One stated rationale was FALSIFIED by measurement and corrected. NOT DEPLOYED.** — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
+- Goal: a refusal is COUNTED and readable, so "348 degraded responses in seven
+  hours" cannot happen again with nothing watching. `[user decision 2026-09-04,
+  item (c) of findings_2026-09-04_web_request_path_intelligence.md]`
+- Files: `syndicate/features/shared/request_path_guard.py`,
+  `syndicate/blueprints/ops.py`, `tests/test_request_path_guard.py`. Claims
+  checked: `open-bet-live-status` RELEASED `blueprints/ops.py` and
+  `web-oom-profiler-steady` is CLOSED — no OPEN lane claims either file.
+- **The constraint, measured before designing.** web runs `WEB_CONCURRENCY=2`
+  and `GUNICORN_THREADS=4`. So (1) the counter MUST be thread-safe — four
+  threads share a process — and (2) an in-process counter covers **one worker of
+  two**, and an ops read hits whichever worker serves it. A count that silently
+  covered half the service is exactly the instrument defect this repo keeps
+  paying for, so the payload STATES its scope and its pid rather than presenting
+  a service-wide-looking number.
+- Rejected, and why: pushing each refusal to the keyvalue store would make it
+  service-wide, but that is a network write ON THE REQUEST PATH — adding I/O to
+  the very request the guard is refusing in order to protect. The cheap
+  always-on counter is the signal; the log line (which names the operation as of
+  `08d3fae5`) remains the ledger.
+- Hypothesis: refusals are countable with no measurable request-path cost —
+  a lock, two ints and a bounded dict.
+- Falsification test: the counter must NOT grow without bound if an unexpected
+  caller passes dynamic operation names — capped, with the overflow visible
+  rather than dropped.
+- Verification (RAN). `pytest tests/test_request_path_guard.py -q` → **16
+  passed** (was 11). Endpoint exercised through the REAL app factory, not a
+  stub: 401 without the admin token, 200 with it, `refused=4` split
+  `_compute_response` 3 / `_build_candidate_pool` 1, `hosted_signal='RENDER'`,
+  pid and `covers` present. Bound test: 32 tracked operations + 1 overflow
+  bucket, and `sum(by_operation) == refused` still reconciles, so overflow is
+  counted rather than dropped.
+- **A RATIONALE I WROTE WAS WRONG, and it is corrected in the test rather than
+  quietly dropped.** The concurrency test originally said an unlocked counter
+  "would lose increments". Measured: an UNLOCKED counter lost **zero** of 80,000
+  increments across 4 threads over 5 trials on CPython 3.11. The lock is NOT
+  about lost counts — it buys SNAPSHOT CONSISTENCY, so the total and the
+  per-operation map are copied together and reconcile. Kept, with the measured
+  reason written down.
+- Regression check: `tests/test_ops.py` + guard = **140 passed, 1 failed**, and
+  that one failure (`test_build_refresh_plan_uses_mlb_syndicate_runner_in_source_mode`)
+  reproduces IDENTICALLY on unmodified HEAD — pre-existing, and consistent with
+  this worktree having no `data/`. Not mine.
+- **NOT DEPLOYED.** No deploy claim taken. When it does ship, the refusal line
+  changes shape — anything grepping the old exact string needs updating.
+  payload names its own scope.
+- Blocked by: none. NOT deploying.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

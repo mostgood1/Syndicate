@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import os
+import threading
 
 from flask import has_request_context
 
@@ -32,6 +34,97 @@ _HOSTED_FLAGS = ("RENDER", "SYNDICATE_REQUIRE_HOSTED_STORAGE")
 _HOSTED_MARKERS = ("RENDER_SERVICE_ID", "RENDER_INSTANCE_ID", "RENDER_SERVICE_NAME", "RENDER_EXTERNAL_URL")
 
 
+# --------------------------------------------------------------------------
+# Counters. On 2026-08-27 this guard refused 348 times in seven hours and
+# nothing counted them -- every one a silently degraded response, discoverable
+# only by going and reading the logs afterwards. `[user decision 2026-09-04]`
+#
+# SCOPE, and it is stated in the payload rather than left to the reader: web
+# runs WEB_CONCURRENCY=2 gunicorn workers x GUNICORN_THREADS=4. These counters
+# live in ONE process, so a read covers one worker of two -- and four threads
+# share them, hence the lock. Making them service-wide would mean a keyvalue
+# write per refusal, i.e. network I/O added to the request path the guard exists
+# to keep work off. The counter is the always-on signal; the log line (which
+# names the operation as of `08d3fae5`) is the ledger.
+# --------------------------------------------------------------------------
+
+# Bounded so an unexpected caller passing a dynamic name cannot grow this
+# without limit. Overflow is VISIBLE under a single key, never dropped.
+_MAX_TRACKED_OPERATIONS = 32
+_OVERFLOW_KEY = "__other__"
+
+_counter_lock = threading.Lock()
+_counts = {"refused": 0, "warned": 0}
+_by_operation: dict[str, dict[str, int]] = {}
+_first_refusal_at: str | None = None
+_last_refusal_at: str | None = None
+_last_refused_operation: str | None = None
+
+
+def _utc_now_iso() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def _record(kind: str, operation: str) -> None:
+    """Never raises. A counter that can break the thing it measures is worse
+    than no counter."""
+    global _first_refusal_at, _last_refusal_at, _last_refused_operation
+    try:
+        with _counter_lock:
+            _counts[kind] = _counts.get(kind, 0) + 1
+            key = operation if (operation in _by_operation or len(_by_operation) < _MAX_TRACKED_OPERATIONS) else _OVERFLOW_KEY
+            bucket = _by_operation.setdefault(key, {"refused": 0, "warned": 0})
+            bucket[kind] = bucket.get(kind, 0) + 1
+            if kind == "refused":
+                stamp = _utc_now_iso()
+                if _first_refusal_at is None:
+                    _first_refusal_at = stamp
+                _last_refusal_at = stamp
+                _last_refused_operation = operation
+    except Exception:  # noqa: BLE001 -- see the docstring
+        pass
+
+
+def guard_counters() -> dict:
+    """A snapshot, carrying the scope that makes it readable.
+
+    `pid` and `covers` are not decoration: without them a caller reads a
+    one-worker number as a service total and halves the truth.
+    """
+    with _counter_lock:
+        by_operation = {k: dict(v) for k, v in _by_operation.items()}
+        counts = dict(_counts)
+        first, last, last_op = _first_refusal_at, _last_refusal_at, _last_refused_operation
+    concurrency = str(os.environ.get("WEB_CONCURRENCY") or "").strip() or None
+    return {
+        "refused": counts.get("refused", 0),
+        "warned": counts.get("warned", 0),
+        "by_operation": by_operation,
+        "first_refusal_at": first,
+        "last_refusal_at": last,
+        "last_refused_operation": last_op,
+        "hosted_signal": hosted_signal(),
+        "pid": os.getpid(),
+        "web_concurrency": concurrency,
+        "covers": (
+            f"THIS gunicorn worker only (pid {os.getpid()}); the service runs "
+            f"{concurrency or 'an unknown number of'} workers, so a service-wide total is "
+            "this times the worker count only if load is even -- read the logs for the real ledger"
+        ),
+        "tracked_operations_cap": _MAX_TRACKED_OPERATIONS,
+    }
+
+
+def reset_guard_counters() -> None:
+    """Tests only."""
+    global _first_refusal_at, _last_refusal_at, _last_refused_operation
+    with _counter_lock:
+        _counts.clear()
+        _counts.update({"refused": 0, "warned": 0})
+        _by_operation.clear()
+        _first_refusal_at = _last_refusal_at = _last_refused_operation = None
+
+
 def hosted_signal() -> str | None:
     """The NAME of the env var saying this is a hosted deployment, or None.
 
@@ -52,6 +145,7 @@ def warn_if_compute_in_request_path(operation: str) -> None:
     if not has_request_context():
         return
     name = str(operation or "").strip() or "unknown"
+    _record("warned", name)
     logger.warning("WARNING: compute in request path (operation=%s)", name, extra={"operation": name})
 
 
@@ -109,6 +203,7 @@ def refuse_if_compute_in_request_path(operation: str) -> None:
         warn_if_compute_in_request_path(operation)
         return
     name = str(operation or "").strip() or "unknown"
+    _record("refused", name)
     signal = hosted_signal()
     # The operation goes in the MESSAGE, not only in `extra`. The default
     # formatter drops `extra`, so all 348 refusals logged on 2026-08-27 were
