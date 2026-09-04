@@ -239,10 +239,23 @@ def cmd_acquire(args: argparse.Namespace) -> int:
         # `Get-Process 22884` really did report dead. The FIELD lied, not the
         # checker, and it turned `--force` from an escape hatch into the default.
         #
-        # `holder_session` outlives the CLI process and can actually be checked
-        # (`list_sessions`, `isRunning`). None when the env var is absent, and
-        # None must NOT be read as "gone": absent identity is UNKNOWN, and
-        # unknown is not permission to force.
+        # `holder_session` outlives the CLI process. **IT CANNOT BE CHECKED
+        # AGAINST `list_sessions`, AND THIS COMMENT USED TO SAY IT COULD.**
+        # That sentence was acted on and was wrong: this field records
+        # `CLAUDE_CODE_SESSION_ID`, a BARE uuid, while `list_sessions` returns
+        # ids of the form `local_<uuid>` from a DIFFERENT id space. They are
+        # not the same identifier and not a prefix of one another.
+        #
+        # Demonstrated 2026-09-04, not argued: the `web` claim recorded
+        # `b2b5b45b-...` while the roster knew that same, demonstrably ALIVE
+        # session (it replied to a message) as `local_05200b16-...`. One
+        # session, two ids. So NO claim's `holder_session` can ever appear in
+        # that roster, and "absent from the roster" reads exactly the same for
+        # a live holder as for a dead one -- it is INERT, not merely weak.
+        #
+        # Never cite a roster read as grounds to `--force`. None when the env
+        # var is absent, and None must NOT be read as "gone": absent identity
+        # is UNKNOWN, and unknown is not permission to force.
         #
         # NO `pid` IS WRITTEN ANY MORE. `deploy_preflight.py` never read it, so
         # its only consumer was a human deciding whether to break a lock, and it
@@ -329,8 +342,14 @@ def cmd_status(args: argparse.Namespace) -> int:
             f"{age/60:.1f} min  target={str(claim.get('target_commit') or '')[:8]}"
         )
         if claim.get("holder_session"):
+            # NOT a liveness hint. This id is in a different space from the
+            # one `list_sessions` returns (bare uuid vs `local_<uuid>`), so it
+            # can never be found there -- see the long note at `holder_session`.
+            # The line used to read "(liveness: list_sessions, NOT pid)" and
+            # that sent a reader to a test that cannot return "present".
             print(f"  {'':<17} session: {claim['holder_session']}"
-                  f"  (liveness: list_sessions, NOT pid)")
+                  f"  (breadcrumb only -- NOT checkable against list_sessions;"
+                  f" the TTL is the liveness bound)")
         if claim.get("reason"):
             print(f"  {'':<17} reason: {claim['reason']}")
     return 1 if held else 0
