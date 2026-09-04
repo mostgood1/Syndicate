@@ -6,7 +6,24 @@ files** — `syndicate/features/mlb/cards.py` is your claim and stayed yours.
 
 ---
 
-## The number
+## CORRECTION, same day, before you act on it — the per-minute figure was over-precise
+
+I first wrote **8.7/min** off a 7.4-minute window. Extending the same run to
+11.9 minutes moved it to **5.4/min**, and the reason is that the entire figure
+rests on **TWO burst events**. A per-minute rate from n=2 is not a rate; it is
+one number pretending to be a distribution, and my own standing rule ("a rate,
+not a count — state the denominator") is what I broke.
+
+**Quote this instead, which does not move:**
+
+    64 statsapi calls in 11.9 minutes, as 2 bursts of exactly 32
+    => roughly one 32-call burst every ~6 minutes, n=2 events
+
+The burst SIZE (32, always) is solid — it is a structural fact about the loop.
+The burst FREQUENCY is not yet characterised, and an evening slate will almost
+certainly change it. Everything below stands except the headline number.
+
+## The number (as first measured — see the correction above)
 
 `GET /api/ops/request-path-guard`, sampled every 30s, deltas computed **within a
 pid** (the counter is per-process and web runs `WEB_CONCURRENCY=2`, so

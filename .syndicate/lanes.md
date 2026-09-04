@@ -803,7 +803,9 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 
 - **HANDOFF IN 2026-09-04 from lane `feed-live-warn-rate` (session c4287631) —
   measurement only, none of your files touched.** `_fetch_current_feed_live` is
-  firing **8.7/min service-wide** on the REQUEST PATH with **zero live games**
+  firing on the REQUEST PATH with **zero live games** — **64 calls in 11.9 min as
+  2 bursts of exactly 32** (I first wrote "8.7/min" off a 7.4-min window; it fell
+  to 5.4/min at 11.9 min because n=2 events. Quote the burst count, not a rate)
   (16-game slate, all `Preview`). One warn = one synchronous statsapi call, 8s
   timeout, inside a web request, against a 5s health-check budget. Every
   non-zero increment observed was exactly **32** — the loop runs the full
@@ -1225,7 +1227,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - **Third attribution avoided.** Freshness and the lens overlay were both wrong on this symptom; this trace deliberately
   stops at a contradiction rather than proposing a cause for it.
 
-### feed-live-warn-rate — CLOSED-VERIFIED 2026-09-04 — **8.7/min service-wide with ZERO live games; the "tracks live games" hypothesis is FALSIFIED. Every burst is exactly 32 = the 16-game slate, twice. HANDED to `mlb-feed-live-terminal-refresh`; no code touched.** — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
+### feed-live-warn-rate — CLOSED-VERIFIED 2026-09-04 — **64 statsapi calls in 11.9 min as 2 bursts of exactly 32, with ZERO live games; the "tracks live games" hypothesis is FALSIFIED. My first "8.7/min" was over-precise off n=2 and is corrected below. HANDED to `mlb-feed-live-terminal-refresh`; no code touched.** — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
 - Goal: turn `mlb_cards_fetch_current_feed_live` from a COUNT into a RATE, with
   its denominator and scope stated. `[user instruction 2026-09-04]`
 - Files: `.syndicate/` write-up only. No code file claimed — observation is
@@ -1240,11 +1242,18 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   two reads that landed on different workers yields a fictional (possibly
   negative) rate. A DECREASING count for a pid means that worker restarted.
 - RESULT (19 samples, 2026-09-04T18:42:53Z..18:51:46Z, no restart in window):
-  pid 98 **176→240 = +64 over 7.1 min = 9.0/min**; pid 97 **192→192 = 0.0/min**;
-  service-wide **+64 / 7.4 min = 8.7/min**. Both workers observed, so coverage is
-  explicit rather than assumed.
+  pid 98 **176→240 = +64**; pid 97 **192→192 = +0**; service-wide **+64 over
+  11.9 min**. Both workers observed, so coverage is explicit rather than assumed.
+- **I QUOTED A RATE OFF n=2 AND IT MOVED.** "8.7/min" came from a 7.4-min window;
+  the same run at 11.9 min gives 5.4/min, because the whole figure rests on TWO
+  burst events. Corrected in the handoff before the owning lane could act on it.
+  **The durable statement is `64 calls in 11.9 min as 2 bursts of exactly 32`,
+  i.e. ~1 burst per 6 min at n=2** — the burst SIZE is structural and solid, the
+  FREQUENCY is not characterised, and an evening slate will likely change it.
+  This is the standing "a rate, not a count — state the denominator" rule, and I
+  broke it in my own handoff.
 - **HYPOTHESIS FALSIFIED, exactly as pre-registered.** 16-game slate, ALL
-  `Preview`, zero live — rate held at 8.7/min. The driver is artifact liveness,
+  `Preview`, zero live — the calls kept coming anyway. The driver is artifact liveness,
   not game state: `_actual_payload_is_live` (`cards.py:3434`) is false for
   `Preview` AND `Final`, so the re-fetch fires for most of the slate most of the
   day.
