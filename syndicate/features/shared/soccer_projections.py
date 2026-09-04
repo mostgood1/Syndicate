@@ -848,6 +848,13 @@ def attach_soccer_projections(
     # written from the board's spelling alone.
     player_miss_no_roster = 0
     player_miss_name = 0
+    # THE PLAYER IS KNOWN; THE RATE IS NOT. Distinct from a name failure and it
+    # calls for opposite work: a name miss wants a matching rule, a rate miss
+    # wants the producer to publish that market for a player it already lists.
+    # These were counted as `player_miss_name` because the scorer branch looked
+    # the player up in `race["by_player"]` and then reported the miss against
+    # the FULL roster -- so "no scoring rate" arrived on the name-failure pile.
+    player_miss_no_rate = 0
     # `#263` follow-up. TWO counters that did not exist, and the second is the
     # larger finding by an order of magnitude.
     #
@@ -1062,11 +1069,18 @@ def attach_soccer_projections(
                 player_alias_ambiguous += 1
             if prob is None:
                 unmatched_player += 1
-                # The scorer race is DERIVED from the same per-match player
-                # entries, so its absence is the same two states.
-                _note_player_miss(
-                    match, row, index.players_by_match.get(match_id) or {}
-                )
+                # THREE STATES, NOT TWO. The lookup above ran against
+                # `race["by_player"]`; reporting the miss against the FULL
+                # roster conflated "we cannot find this name" with "we know this
+                # player and have no scoring rate for them". The second is not a
+                # join failure at all, and counting it as one sends a reader
+                # looking for a matching bug that is not there.
+                pool = index.players_by_match.get(match_id) or {}
+                known, _known_state = _lookup_player(pool, row.get("player_name"))
+                if pool and known is not None:
+                    player_miss_no_rate += 1
+                else:
+                    _note_player_miss(match, row, pool)
                 continue
             projection = _probability_projection(
                 float(prob),
@@ -1204,6 +1218,9 @@ def attach_soccer_projections(
         # The player-level split, same contract as the league one above.
         "player_miss_no_roster": player_miss_no_roster,
         "player_miss_name": player_miss_name,
+        # Reported even at zero, so "no rate misses today" and "this counter was
+        # never wired" cannot share a reading.
+        "player_miss_no_rate": player_miss_no_rate,
         "player_alias_hits": player_alias_hits,
         "player_alias_ambiguous": player_alias_ambiguous,
         "unprojected_no_field": unprojected_no_field,

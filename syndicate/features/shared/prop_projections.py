@@ -109,6 +109,31 @@ _BATTER_K_MARKET = "batter_strikeouts"
 _HRR_COMPONENT_MEANS: tuple[str, ...] = ("h_mean", "r_mean", "rbi_mean")
 
 
+
+#: Letters NFD CANNOT decompose, and what the ASCII feeds spell them as.
+#:
+#: A stroke or ligature is ONE codepoint with no combining mark -- `ø` is not
+#: `o` + something -- so `unicodedata.normalize("NFD", ...)` leaves it intact and
+#: the `[^a-z ]` scrub below turns it into a SPACE. That splits `Højbjerg` into
+#: `h jbjerg` and makes the native spelling unjoinable to the ASCII one.
+#:
+#: `ss` for `ß` and `ae`/`oe` for the ligatures follow what the quote feeds
+#: actually write, which is the same standard the accent fold matched.
+_LIGATURE_FOLD = str.maketrans({
+    "ø": "o", "Ø": "o",
+    "æ": "ae", "Æ": "ae",
+    "œ": "oe", "Œ": "oe",
+    "ß": "ss", "ẞ": "ss",
+    "đ": "d", "Đ": "d",
+    "ð": "d", "Ð": "d",
+    "ł": "l", "Ł": "l",
+    "þ": "th", "Þ": "th",
+    "ı": "i", "İ": "i",
+    "ħ": "h", "Ħ": "h",
+    "ŋ": "n", "Ŋ": "n",
+})
+
+
 def _norm_name(value: Any) -> str:
     """Normalised player name for joining sim output to quote rows.
 
@@ -137,7 +162,13 @@ def _norm_name(value: Any) -> str:
     leaves the base letter. `ñ` -> `n` and `ü` -> `u` follow the same path,
     which is what the quote feeds actually do when they strip accents.
     """
-    text = unicodedata.normalize("NFD", str(value or "").strip().lower())
+    # LIGATURES AND STROKES FIRST, because NFD cannot decompose them and the
+    # `[^a-z ]` scrub below would turn each one into a SPACE -- splitting the
+    # name rather than folding it. Measured: `Hojbjerg` with the stroke became
+    # `h jbjerg`, and the native and ASCII spellings of the same player
+    # normalised to different keys.
+    text = str(value or "").strip().translate(_LIGATURE_FOLD).lower()
+    text = unicodedata.normalize("NFD", text)
     text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
     text = text.replace(".", " ").replace("'", "").replace("-", " ")
     text = re.sub(r"[^a-z ]", " ", text)
