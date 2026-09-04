@@ -3177,6 +3177,65 @@ def _proc_token() -> str:
         _PROC_TOKEN_STATE.update({"pid": pid, "token": uuid.uuid4().hex[:12]})
     return str(_PROC_TOKEN_STATE["token"])
 
+# `#632`: THE FLOOR IS THE LEAK; THE PEAK IS THE CHURN.
+#
+# Requests own ~82% of net anon movement (n=16) and no single route owns it, so
+# attribution has gone as far as it can. The question that remains is which
+# SHAPE kills the service: a floor that ratchets upward (retention -- bounding
+# concurrency cannot help) or a flat floor with peaks reaching the limit (churn
+# -- and the merge-child CAP, the one intervention that measurably worked all
+# session, bounds exactly that).
+#
+# Cheap by construction: every solo request already reads process anon for
+# attribution, so tracking a running min/max adds two comparisons and no syscall.
+_ANON_EXTREMES: dict[str, Any] = {
+    "floor_mb": None, "floor_seq": None, "floor_route": None,
+    "peak_mb": None, "peak_seq": None, "peak_route": None, "n": 0,
+}
+
+
+def _note_anon_extreme(value: float, route: str, seq: Any) -> None:
+    state = _ANON_EXTREMES
+    state["n"] += 1
+    if state["floor_mb"] is None or value < state["floor_mb"]:
+        state.update({"floor_mb": round(value, 3), "floor_seq": seq,
+                      "floor_route": str(route or "")[:60]})
+    if state["peak_mb"] is None or value > state["peak_mb"]:
+        state.update({"peak_mb": round(value, 3), "peak_seq": seq,
+                      "peak_route": str(route or "")[:60]})
+
+
+def _read_vm_highwater() -> dict[str, float]:
+    """The KERNEL's own high-water mark, from `/proc/self/status`.
+
+    `VmHWM` is peak resident set since process start -- it cannot be lowered by
+    a free, which is exactly the property wanted here: a process whose current
+    RSS is modest but whose HWM sits near the limit died of a PEAK, and no
+    sampling cadence of mine could have caught the moment.
+
+    Read through `_PROCFS_ROOT` so it is testable. `_process_anon_mb` hardcodes
+    its path and consequently cannot be exercised off Linux at all; not
+    repeating that.
+    """
+    out: dict[str, float] = {}
+    try:
+        path = _PROCFS_ROOT / "self" / "status"
+        if not path.exists():
+            return out
+        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            for key, label in (("VmHWM:", "vm_hwm_mb"), ("VmRSS:", "vm_rss_mb")):
+                if line.startswith(key):
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        try:
+                            out[label] = round(float(parts[1]) / 1024.0, 3)
+                        except ValueError:
+                            pass
+    except Exception:
+        return out
+    return out
+
+
 _PER_REQUEST_SMAPS_STATE: dict[str, Any] = {"count": 0, "routes": {}}
 _PER_REQUEST_SMAPS_MAX_DEFAULT = 120
 
@@ -3315,6 +3374,13 @@ def note_request_end(token: dict[str, Any] | None, route: str,
     collected = (isinstance(gc2_before, int) and gc2_before >= 0
                  and gc2_after >= 0 and gc2_after > gc2_before)
     key = str(route or "unknown")
+    # Running floor/peak of PROCESS anon. `after` is the reading this request
+    # ended at, so the extremes are over real observed states rather than over a
+    # separate sampling cadence that could miss the spike entirely.
+    try:
+        _note_anon_extreme(after, key, token.get("seq"))
+    except Exception:
+        pass
     # The AFTER sample, placed here deliberately: every early return above has
     # already fired, so a window that was not solo throughout, or whose anon was
     # unreadable, is DISCARDED by the code path rather than by a check I had to
@@ -3424,6 +3490,16 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         # `proc_token`, gives attributed vs the process's own climb -- and the
         # RESIDUAL, which is the number that was never recoverable before.
         "attributed_total_mb": round(float(_REQUEST_MEMORY_STATE.get("attributed_total_mb") or 0.0), 3),
+        # FLOOR vs PEAK. A rising floor is retention; a flat floor under a high
+        # peak is churn. `vm_hwm_mb` is the kernel's own high-water mark and
+        # cannot be lowered by a free.
+        "anon_extremes": {
+            **{k: v for k, v in _ANON_EXTREMES.items()},
+            "spread_mb": (round(_ANON_EXTREMES["peak_mb"] - _ANON_EXTREMES["floor_mb"], 3)
+                          if _ANON_EXTREMES["peak_mb"] is not None
+                          and _ANON_EXTREMES["floor_mb"] is not None else None),
+        },
+        **_read_vm_highwater(),
         "proc_token": _proc_token(),
         # WHICH WORKER. `#632`: gunicorn runs 2 workers and both emit into one
         # log stream, so a series read without this is TWO interleaved series.
@@ -3489,5 +3565,7 @@ def reset_request_memory_attribution() -> None:
     _GLOBAL_REASSIGN_STATE.clear()
     _PER_REQUEST_SMAPS_STATE.update({"count": 0, "routes": {}})
     _REQUEST_MEMORY_STATE["attributed_total_mb"] = 0.0
+    _ANON_EXTREMES.update({"floor_mb": None, "floor_seq": None, "floor_route": None,
+                           "peak_mb": None, "peak_seq": None, "peak_route": None, "n": 0})
     _ARENA_TREND_STATE.update({"count": 0, "last": None})
     _SMAPS_TREND_STATE.update({"count": 0, "last": None})

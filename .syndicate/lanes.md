@@ -111,6 +111,28 @@ death, never life — do not invert it.
   truncation, reporting attributed / residual / coverage that sum exactly.
 - Blocked by: none.
 
+### web-oom-highwater — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: decide whether `#632` kills web via a rising FLOOR (a genuine leak) or a
+  high PEAK over a flat floor (churn), by tracking both per process plus the
+  kernel's own `VmHWM`.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_anon_highwater.py` (NEW). No OPEN lane claims either.
+- Hypothesis: the FLOOR is flat and the PEAK approaches the 2 GB limit — i.e.
+  the service dies on concurrent transient allocations, not on retention. The
+  one intervention that measurably worked all session was the merge-child CAP,
+  which bounds a concurrent peak and does nothing about retention.
+- Falsification test: the floor RISES monotonically across a process lifetime —
+  then it is retention after all and bounding concurrency will not save it.
+- Verification: >= 20 solo requests on one `proc_token`, reporting floor, peak,
+  their spread, and `VmHWM` against `VmRSS`. The floor must be measured over a
+  window that EXCLUDES boot warm-up, which is a known confound
+  (`worker memory is boot-confounded` — every deploy reboots, so every fix looks
+  good for five minutes).
+- Why this and not another attribution probe: requests own ~82% of net anon
+  movement (measured, n=16) and NO single route owns it; per-request deltas do
+  not compose under munmap churn. Attribution has gone as far as it can.
+- Blocked by: none.
+
 ## OPEN
 ### gate-per-side-derived — CLOSED 2026-09-04 — opened 2026-09-04 — **THE CONSTANT IS GONE, THE POPULATION MISMATCH IS FIXED, AND THE GATE FAILS BOTH LEGS BY MORE THAN ANY EARLIER READING SAID.** `GATE_PER_SIDE_TODAY = 4.05` was `8.1% / 2`, an identity that holds only AT EVEN MONEY; the gate book's unders sit at fair 0.607 and carry ~61% of the hold. Re-verified on production shards 2026-09-01..09-04: per-side **4.198pp** (median 4.289), two-way hold **7.09%** — the brief's figures reproduce (my n=114,545 against its 114,517). Landed `29c9c92f` on `origin/main`. DEPLOYED NOTHING. — session 3492626c-1ec4-4366-9dbe-f194ae319c84
 - Files: `scripts/measure_exchange_prop_option_value.py`,
