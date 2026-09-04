@@ -1340,16 +1340,32 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 ### order-model-view — OPEN — opened 2026-09-03 — session 3492626c — **LIVE ON BOTH ORDER SERVICES (`04187cdf`); VERIFY STILL OWED after 100 min of polling produced ZERO orders written past 19:54:36Z — a null result about the board's PLACEMENT RATE, not evidence about the change. Ambiguous window 8.9 min.**
 - Goal: an order records WHY it was made, not only what and at what price, so the
   settled book can be split by whether a model view was involved.
-- Files: `tests/test_execute_portfolio.py`.
-  RELEASED `[2026-09-03, lane order-sim-view, session 37abeca0]`: `syndicate/features/shared/execution_ledger.py`
-  RELEASED `[2026-09-03, lane order-sim-view, session 37abeca0]`: `pipeline/execute_portfolio.py`
-  **Basis: session `3492626c` is absent from the session roster INCLUDING
-  ARCHIVED** (30 most recent, checked ~22:0xZ; this lane's own note above says
-  its watcher was still polling at 21:2xZ, so the absence is recent). The
-  successor lane extends the SAME two fields' plumbing one layer over and
-  re-states this lane's own verification contract verbatim. The `model_edge_pct`
-  reading this lane still owes is NOT discharged by that and is not claimed.
-  Take the files back by striking this note.
+- Files: `syndicate/features/shared/execution_ledger.py`,
+  `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`.
+  **RETURNED IN FULL 2026-09-04 00:0xZ by lane `order-sim-view` on closing.**
+  That lane borrowed the first two on 2026-09-03 ~22:0xZ, shipped its change,
+  and hands them back unchanged in claim terms.
+- **THE BASIS ON WHICH THEY WERE BORROWED WAS WRONG, and it is corrected here
+  rather than quietly dropped.** `order-sim-view` wrote that session `3492626c`
+  was gone because it was absent from `list_sessions` *including archived*.
+  **That session then acquired the `live-odds-worker` deploy claim at
+  23:10:51Z** and was STILL absent from the roster. The roster does not list
+  unattended or scheduled runs, so absence from it is not evidence a holder is
+  gone -- `deploy_claim.py`'s own refusal text says exactly that ("An unrecorded
+  session is UNKNOWN, not gone"). No harm resulted: the edits were disjoint by
+  function, are landed, and are recorded in `deploys.md`. The RULE is what
+  matters -- do not infer a session is gone from the roster alone.
+- **THIS LANE'S OWED `model_edge_pct` READING IS PROBABLY NOW DISCHARGED, BY
+  INFERENCE, AND IT IS OFFERED RATHER THAN TAKEN.** At 2026-09-04 00:03:26Z the
+  `sim_view_roi` cut showed a bucket `mlb | game_line | agrees` on a
+  post-deploy order. `sim_view` is `agrees` **iff** `model_edge_pct > 0`
+  (`_layer2_board_columns`: `elif model_edge > 0`), and the position carries
+  `model_edge_pct` from that same row, which `04187cdf` persists. So that order
+  necessarily carried a NON-NULL `model_edge_pct` -- which is this lane's stated
+  verification. **It is an INFERENCE from the code, not a direct read of the
+  field**, because no endpoint serves `model_edge_pct` per order. Whoever owns
+  this lane should decide whether that satisfies them; `order-sim-view` did not
+  close it on their behalf.
 - Verification: a NON-NULL `model_edge_pct` on an order whose `submitted_at` is
   after 2026-09-03T19:54:36Z, from `/api/portfolio/live` or `/api/portfolio/paper`.
   **A null does not count in either direction** — the two positions read at 19:5xZ

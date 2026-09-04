@@ -20532,3 +20532,47 @@ waiting, is the contradiction question the lane was opened for.
 23:49:25Z), refresh-worker + live-odds-worker `1e5ae2b1` (write side, live
 23:46:43Z / 23:50:56Z). The verdict-bearing order was written after both, so it
 is outside the 4.2-minute ambiguous window recorded above.
+
+## 2026-09-04 00:0xZ — `order-sim-view` CLAIMS RELEASED, and a wrong basis corrected — lane `order-sim-view`
+
+**DEPLOY CLAIMS: all three released with their TOKENS, none forced.**
+
+    web               released (never held by this lane -- `web-oom-profiler-steady`
+                      held it throughout and I did not break it; the read side
+                      shipped on another lane's deploy instead)
+    refresh-worker    acquired 23:14:45Z, released after 1e5ae2b1 went live 23:46:43Z
+    live-odds-worker  acquired 23:42:27Z, released after 1e5ae2b1 went live 23:50:56Z
+
+Verified free at 00:08:32Z, and `.syndicate/deploy_claims/` is empty. The first
+`release` attempt was REFUSED for a token mismatch and the correct response was
+to pass `--token`, not `--force` -- `--force` is for a holder that is gone, and
+using it to work around my own missing argument would have written a false record
+that I had broken someone's claim.
+
+**FILE CLAIMS: the two borrowed from `order-model-view` are RETURNED.**
+`execution_ledger.py` and `execute_portfolio.py` are back on that lane's `Files:`
+line; `ops.py` reverts to `web-oom-profiler-steady` alone (my hold there was
+function-scoped to `api_ops_execution_ledger_summary` and its claim always stood).
+`portfolio_commit.py`, `paper_settlement.py` and the new test files are now
+unclaimed, which is correct for a closed lane.
+
+**THE BASIS ON WHICH I BORROWED THEM WAS WRONG, and the rule is worth more than
+the incident.** I recorded session `3492626c` as gone because it was absent from
+`list_sessions` INCLUDING ARCHIVED. It then acquired the live-odds-worker deploy
+claim at 23:10:51Z, still absent from the roster. **The roster does not list
+unattended or scheduled runs, so absence from it is not evidence a holder is
+gone** -- which `deploy_claim.py` states in its own refusal text ("An unrecorded
+session is UNKNOWN, not gone") and which I had read earlier the same session
+without applying. No harm resulted: the edits were disjoint by function, landed,
+and recorded. Corrected in that lane's block rather than left standing.
+
+**OFFERED TO `order-model-view`, NOT TAKEN ON ITS BEHALF:** its owed
+`model_edge_pct` reading is probably discharged by the same 00:03:26Z bucket.
+`sim_view == "agrees"` iff `model_edge_pct > 0`, and the position carries
+`model_edge_pct` from that same row, so that order necessarily held a non-null
+one. **That is an INFERENCE from the code, not a direct read** -- no endpoint
+serves `model_edge_pct` per order -- so the owning lane decides whether it counts.
+
+Session marker `.current-lane.37abeca0-…` emptied in both trees. The SHARED bare
+`.current-lane` was deliberately NOT written, per `/lane`'s own rule about the
+single contended slot.
