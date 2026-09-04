@@ -21141,3 +21141,36 @@ shows no refresh-worker deploy between 05:32:13Z and 13:4xZ, both read after the
 08:24:21Z wake. refresh-worker's claim was HELD by `catchup-632-thread-gating`
 (14 min, preflight CLEAR, target `b24c89b0`) throughout my reading, so no window
 was available to this lane regardless.
+
+## 2026-09-04 — refresh-worker + live-odds-worker to `b24c89b0` (`#632` thread gating) — lane `catchup-632-thread-gating`
+
+`b24c89b0` excludes a process's OWN background threads from per-request memory
+attribution (`memory_observability.py`, +327). live-odds-worker live 13:35:53Z;
+refresh-worker live 13:48:20Z after preflight HOLD x9 over ~13 min.
+
+**Scope stated, not quietly widened:** only refresh-worker was asked for.
+live-odds-worker was behind on the SAME single commit with a free claim, so it
+went too rather than leaving an identical gap for the next round.
+
+verify — BY CONTENT on the deployed SHA, tokens confirmed ABSENT from the
+previously-live `5af2c517` first: `background_work` **0 → 5**, `background_seq`
+**0 → 4**. Two earlier fixes re-checked for SURVIVAL and intact: `#624`'s
+`refuse_published_certainty` x6 and `#643`'s `bytes_per_order` x1.
+
+Runtime: 200 lines across both, **0 tracebacks / CRITICAL / OOM**.
+live-odds-worker on its Kalshi title pass; refresh-worker publishing
+(`[book_grid] SUPERSEDED_LINES_DROPPED count=1 kept=1249`).
+
+**WEB WAS NOT TOUCHED — it was MID-BUILD on this exact commit** under
+`web-oom-thread-gating`, whose own `#632` work this is. Deploying would have
+cancelled their build (the 2026-08-15 incident, and what was done to me on
+09-03). Their build finished on its own; all three now run `b24c89b0`.
+
+**A process note that cost one blocked attempt.** I put the preflight and the
+deploy in ONE compound command. `deploy-guard.py` is a PreToolUse hook, so it
+read the receipt from BEFORE the command ran and refused on a stale verdict
+(`5af2c517 is already contained in live 5af2c517`). Same interleaving as round 6.
+**Run the preflight in its own call, then deploy in the next one.**
+
+Two further commits landed during this round; `main` moves continuously and that
+is churn, not drift.

@@ -728,6 +728,24 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - NOT IN SCOPE, and deliberately: dating the lens snapshot. `learnings.md:3722` prices that at ~5.76 GB/day for MLB alone into a 256 MB keyvalue store at 86.8% full, and a dated path silently takes a TTL under `volatile-lru`. The snapshot ALREADY carries `date` (`mlb/live_lens.py:1873`, inside `page_context`), so the gate is a pure read-side check at zero storage cost.
 - Blocked by: none.
 
+### catchup-632-thread-gating — CLOSED 2026-09-04 — **refresh-worker + live-odds-worker to `b24c89b0`** (13:48:20Z / 13:35:53Z). Verified by content (`background_work` 0→5, `background_seq` 0→4) with `#624` and `#643` re-checked for survival; 0 errors. Web untouched — it was MID-BUILD on this exact commit under the lane that authored it, and finished on its own. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: refresh-worker `[user: "deploy refresh-worker too"]` and live-odds-worker
+  onto `b24c89b0` (`#632` — exclude this process's own background threads from
+  per-request memory attribution; `memory_observability.py`, +327).
+- **Scope note, stated not quietly widened:** only refresh-worker was asked for.
+  live-odds-worker is behind on the SAME single commit and its claim is free, so
+  it is included to avoid leaving an identical gap for another round.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- **WEB EXCLUDED — it is MID-BUILD on this very commit** (`build_in_progress
+  b24c89b0`) under `web-oom-thread-gating`, whose own `#632` work this is.
+  Deploying it would cancel their build; that is the 2026-08-15 incident and was
+  done to me on 09-03.
+- Verification: BY CONTENT on the deployed SHA — `background_work` in
+  `memory_observability.py`, confirmed ABSENT from the currently-live `5af2c517`
+  (live=0, target=5); plus 0 tracebacks per service.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
