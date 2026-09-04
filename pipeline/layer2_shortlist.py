@@ -602,6 +602,37 @@ def build_layer2_shortlist(
     """
     from syndicate.features.shared.layer2_board import build_layer2_rows, select_shortlist
 
+    # `#621` PHASE 4, THE LAST MILE. Install the MEASURED same-game correlation
+    # for this date before any candidate is scored or sized.
+    #
+    # HERE because this is the first point that knows the date and runs before
+    # every consumer: `compute_correlation` feeds the board badges, parlay
+    # pricing and `bankroll_manager` BET SIZING, and it reads a process-wide
+    # registry, so one install covers all ten of its call sites.
+    #
+    # Silent until the data exists -- the resolver answers `None` for every pair
+    # until a `sim_*.json` carries a `joint` block, and that needs a sim RUN, not
+    # just a deploy. `None` falls back to the hand-authored constant table, i.e.
+    # exactly today's behaviour. It starts working by itself when the artifact
+    # lands, which is why it is wired ahead of the data rather than after.
+    try:
+        from syndicate.features.shared.correlation_wiring import (
+            format_report,
+            install_measured_correlation,
+        )
+
+        # PRINTED UNCONDITIONALLY, including when nothing is installed. A
+        # resolver that answers `None` for everything is indistinguishable from
+        # one nobody wired up, and that ambiguity is the whole reason the
+        # counters exist.
+        print(format_report(install_measured_correlation(selected_date)), flush=True)
+    except Exception as exc:
+        print(
+            "[correlation_wiring] MEASURED_CORRELATION installed=False "
+            f"date={selected_date} error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
     # LOADED ONCE, BEFORE ANY SPORT IS PROCESSED. See `_movement_from_opening`
     # for why this is not read per row: `#372` stalled the whole build by doing
     # exactly that with a ~20MB shard. This reads one small JSONL of the rows
