@@ -42,6 +42,44 @@ counter is tested through the real pandas pipeline, not a source grep, so it is
 known to work — it is simply unobservable in production until there is a slate.
 **This is a scheduled defect, not a completed item**: it comes due on 09-17.
 
+**AMENDED 2026-09-04 02:0xZ — (b)'s BLOCKER IS GONE, AND A FIFTH MEASUREMENT
+JOINED THE LIST.**
+
+`008aca69` persists `side_picked_by`, `stake_fraction_ev_only` and
+`sim_share_of_stake` onto the order record and `_LEAN_FIELDS`, alongside
+`sim_view` from `#644` and `model_edge_pct`/`ev_pct` from `04187cdf`. Deploying
+to BOTH order-placing services (`run_execution` has two callers on two services;
+a half-deployed attribution column looks like data). **So (b) is no longer
+blocked on a missing field — it is blocked only on the board placing an order,
+which it has not done since 15:27:33Z.**
+
+**(e) NEW: `_SCORE_SIM_WEIGHT`'s OWN GATE HAS NEVER BEEN RUN, and for the first
+time it can be.** The constant is **0.125 capped at 1.5**, not the 0.0 that six
+comments asserted until `3777397d` (`sim_component` non-zero on 5,108 of 25,830
+served rows, 448 at the cap). It was raised on a SCREEN
+(`score_sim_weight_impact.py`: 0/286 negative-EV rows promoted, against 286/286
+at the 0.5 that failed on 2026-08-08) and NOT on its stated gate, which is
+"settled > 0 AND CLV decomposed by component".
+
+  * `settled > 0` — **now met**: 638 settled bets, against `settled: 0` when the
+    weight moved. The reason the gate has not run quietly changed from *cannot*
+    to *has not*, and nobody re-checked.
+  * *CLV decomposed by component* — impossible at ANY settled count until
+    `008aca69`, because the decomposition was computed on the plan position and
+    dropped at the order boundary.
+
+**IT RECOVERS NOTHING RETROSPECTIVELY.** The 638 settled bets cannot be
+decomposed; the dataset starts empty and starts at the next order. Whoever runs
+this must exclude orders written inside the gap between the two service deploys
+— those carry a null `side_picked_by` because of the deploy, not because the
+attribution was absent.
+
+**AND SEPARATE THE TWO KNOBS WHEN IT RUNS.** 448 of 25,830 rows sit AT the ±1.5
+cap while `_MODEL_EDGE_MAX_POINTS_HINT` is 15.0 — inputs routinely exceed the
+bound by ~10x, so any result measures the CAP's behaviour at least as much as
+the WEIGHT's. `SYNDICATE_SCORE_SIM_WEIGHT` and `SYNDICATE_SCORE_SIM_CAP_PCT` are
+independently overridable; evaluate them independently.
+
 **Why (a) and (b) matter more than they look.** The whole point of tonight's
 telemetry was to make the platform able to explain its own P&L. `sim_view:
 unpriced` (3,306 rows) and the MLB prop cause split (191 of 1,423 player rows
