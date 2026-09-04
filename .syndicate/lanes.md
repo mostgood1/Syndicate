@@ -830,6 +830,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `scripts/refresh_odds_sources.py` (mode-scoped step filter only),
   `tests/test_ncaaf_lines_autorun.py` (NEW),
   `tests/test_refresh_step_modes.py` (NEW).
+- Scope note (NOT claims -- this bullet exists so the prose below sits OUTSIDE the `- Files:` block):
   Render ENV on **live-odds-worker** via the single-key API only. The Render
   blueprint file is deliberately NOT named as a path here and is NOT claimed —
   `lane-guard` reads any backticked path inside a `- Files:` block as a CLAIM,
@@ -1927,6 +1928,64 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   with site 1 (`_simw_chunk`, multiprocessing) broken and site 2 intact, BOTH
   reachability tests still PASS — `workers=1` drives only the serial path. The
   `#334` drift is caught by the AST invariant and by nothing else.
+
+### lane-invariant-single-source — CLOSED 2026-09-04 — **the checker now USES `lane_claims.py` instead of copying it; 14 red tests green, landed on `origin/main` as `312c93a9`. NO DEPLOY — tooling only.** — session 0aef6a99-5b35-4e71-b532-d1d5c292c9c3
+- Goal: `scripts/check_lane_invariants.py` PARSES WITH `lane_claims.py` instead
+  of copying it, and the drift tests are green. **Met.**
+- Files: `scripts/check_lane_invariants.py`,
+  `tests/test_check_lane_invariants.py`,
+  `tests/test_lane_guard_prohibition_marker.py`,
+  `tests/test_lane_guard_dot_directory_claim.py`,
+  `.claude/hooks/lane_claims.py`,
+  `.claude/hooks/ledger_invariants.py`.
+  Collision check RUN with `lane_claims._claims()` itself: CLEAR on all six.
+  `.claude/hooks/lane-guard.py` read-only, unchanged.
+- **IT WAS 14 RED TESTS, NOT 5.** Three files, one root cause, all measured red
+  on `origin/main` `1516f362` before the fix: `test_check_lane_invariants.py`
+  (5, scraped `^HEADER_RE = re.compile(...)$` out of `lane-guard.py`),
+  `test_lane_guard_prohibition_marker.py` (1, scraped `_DISCLAIMER_MARKERS`,
+  got None, died on `AttributeError` before its assertion), and
+  `test_lane_guard_dot_directory_claim.py` (8, exec'd a slice of `lane-guard.py`
+  and reached for `_paths_in`). The parser had been extracted into
+  `lane_claims.py`; all three were bound to the hook's pre-extraction SHAPE.
+- WHICH SIDE DRIFTED: **the checker.** Its four regexes and 14-marker tuple were
+  still byte-identical -- the drift was everything the tests never pinned.
+  Worst: a `- Files:` line naming `scripts/archive_released_lanes.py` (a
+  filename CONTAINING "released") yielded the guard both paths and the checker
+  ZERO, so that lane could contest nothing and the invariant passed vacuously.
+- Verification (done): on one adversarial ledger with a contested file AND a
+  stray OPEN lane under `## Archived lanes`, the OLD checker printed
+  `INVARIANTS HOLD` exit 0 (1 lane, 1 claim); the new one reports both
+  violations, exit 1 (3 lanes, 4 claims). 70 passed across the five lane-family
+  files; hook suites 39/39, 10/10, 16/16, 7/7, 16/16. **Two mutations proved
+  the new tests can fail** -- re-pasting a copied regex, and reintroducing the
+  unmasked prefix cut.
+- **`is` DOES NOT PROVE A REGEX WAS NOT COPIED.** `re.compile` memoises, so a
+  re-pasted `re.compile(r"^###\s")` returns `lane_claims`' own object and
+  identity passes. Found by mutation: the copy went in and all 30 tests stayed
+  green. `test_the_checker_defines_none_of_them_itself` asks the AST instead.
+- **CORRECTION, mine.** I reported this lane's blocker as an UNOWNED lane
+  because session `3492626c` was absent from `list_sessions` including archived.
+  That reasoning is void: `45604b3e` (upstream, same day) measured that lane and
+  claim ids are bare UUIDs while the roster's are `local_<uuid>` -- disjoint
+  namespaces, so the test returns "absent" for every holder including live ones.
+  Two other sessions made the same error with this same id in the same hour.
+  **The decision did not rest on it** -- the phantom was established from the
+  lane's own text, and the user's call was to keep the lane OPEN either way.
+- **CORRECTION, process.** The first build of this fix sat on a primary tree
+  **194 commits behind `origin/main`**, where both edited files were stale --
+  upstream had added `orphaned_lane_markers` / `_ledger_text` (70 + 87 lines)
+  that a whole-file commit would have dropped. Caught by `ledger-commit-guard`
+  refusing the commit, then rebuilt in a session worktree on `1516f362`; the
+  upstream feature is preserved and green.
+- BLOCKED, NOT DONE: `docs/ai_context/todo.md` is claimed by OPEN lane
+  `accuracy-ledger-budget-raise` (a real `- Files:` declaration, not a phantom),
+  so no todo item was written. Upstream `84817721` hit the same wall and handed
+  off `#646` for the same reason.
+- Unblocked at open by splicing a top-level bullet before `ncaaf-live-cadence`'s
+  trailing prose `[user decision]`; its four declared paths were untouched and
+  are still guarded, verified with `_claims()`.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
