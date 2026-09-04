@@ -1774,6 +1774,53 @@ rather than re-derived. Three candidate sources were tested — cross-worker
 CASE) — and the honest state is that the symptom is absent, not that its cause
 is known.
 
+**`[2026-09-04]` `LAST_RESULT` IS EXCLUDED TOO — AND THE ZERO EXPLAINS WHY FOUR
+HYPOTHESES IN A ROW HAVE MISSED. Measured on `d525a80c`.**
+
+    LAST_RESULT reassignments   n=2
+      allocated                 0.0 MB   (largest single 0.0)
+      refunded                  0.0 MB   (largest single 0.0)
+    gc2 split   with n=2  +83.867 MB  |  without n=198  +31.974 MB
+    negative routes: 0
+
+The route had to be driven by hand — nothing calls `/api/intelligence/query`
+with no browser open, and it was absent from the route table entirely. Four
+calls at 28.74 MB each.
+
+**THE ZERO IS THE FINDING, NOT A FAILED PROBE. CPython returns freed objects to
+pymalloc's ARENAS, not to the OS.** `Anonymous:` in `smaps_rollup` does not drop
+when Python frees a 28 MB payload, so **no in-Python release can produce a
+negative anon delta**. The refcount-refund hypothesis was unsound at the
+mechanism level, not merely aimed at the wrong statement — and I should have
+reasoned that through before proposing it, because it is the same fact `#630`
+already records ("CPython does not return freed arenas to the OS").
+
+**WHAT THAT LEAVES.** A negative anon delta requires ARENA RELEASE to the OS,
+which happens only when an arena empties completely. That is not attributable to
+any statement, request or thread — it is an emergent property of the allocator's
+free-list state. **No per-statement probe will pin it down**, which is why
+cross-worker, background loops, GC and `LAST_RESULT` have each been tested and
+each missed.
+
+**FOUR CANDIDATES, FOUR VERDICTS, ALL MEASURED:**
+  * cross-worker cgroup scope — **CONFIRMED**, fixed by per-process anon.
+  * background loops — **FALSIFIED**, neither runs on web; the gate is inert.
+  * GC timing — **EXCLUDED**; the one gen-2-overlapping request read +32.344 MB
+    while the non-overlapping group swung to -30.108 MB.
+  * `LAST_RESULT` reassignment — **EXCLUDED**; 0.0 MB both halves.
+
+**WHAT WOULD ACTUALLY CATCH IT**, for whoever picks this up: not another
+attribution probe. `malloc_info` / `pymalloc` arena counts sampled around the
+negative windows — `memory_observability` already has `parse_smaps` and an
+arena-vs-anon comparison from `#435` (673 MB of a 1,607 MB floor was anon that
+pymalloc never allocated). The question is not "which request freed it" but
+"when does an arena empty", and those are different instruments.
+
+**AND THE SYMPTOM REMAINS INTERMITTENT.** Zero negative routes in this window and
+the last; the negatives appeared at `14:16` and `14:23`. Nothing has reproduced
+one with instrumentation in place, so no mechanism is confirmed — only four
+ruled out.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
