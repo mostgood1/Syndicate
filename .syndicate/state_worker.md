@@ -453,9 +453,18 @@ That story ended; do not re-open it from the archive.**
   odds-shard, ledger accumulation, prune). **WHAT IS OWED IS NOW A MEASUREMENT
   WINDOW, NOT ANOTHER CANDIDATE:** no deploy-free live-slate window on a full
   ~15-game slate has existed to judge any of them against — 34 refresh-worker
-  deploys since 2026-08-19T00:00Z. Zero `server_failed` in that whole span
-  (EVENTS API, fully paged), which is NOT evidence of a fix: the defect's own
-  best pre-fix run was 17h 51m clean. Kill switch
+  deploys since 2026-08-19T00:00Z. **The "zero `server_failed` in that whole
+  span" that stood here is STALE as of 2026-09-04 — re-measured, it is FIVE**
+  (EVENTS API, fully paged, 15 pages): four `{"evicted": false, "nonZeroExit":
+  1}` inside four minutes on 2026-08-22 (19:30:36 / 19:31:38 / 19:32:28 /
+  19:33:35Z) and one `oomKilled memoryLimit=4Gi` at 2026-09-02T15:32:56Z. It was
+  true when written and nothing re-read it; the instrument that reads it was
+  itself only fixed on 2026-09-04 (`ea4e3881`). The ORIGINAL point survives and
+  is why the line is kept: a null here would still not be evidence of a fix —
+  the defect's own best pre-fix run was 17h 51m clean — and a non-null is not
+  evidence of the defect either, since `nonZeroExit` is unbucketed and
+  unexplained. What is owed is still a deploy-free live-slate window.
+  Audit: `findings_2026-09-04_render_events_truncation_audit.md`. Kill switch
   without a deploy: `SYNDICATE_MLB_FEED_LIVE_PRUNE=0`.
 - **`#387`'s "one thing to fix" — turn overview peak from SUM into MAX — ALREADY
   SHIPPED.** `build_intelligence_overview` takes a `consumer=` and releases each

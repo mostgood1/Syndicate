@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 800 rules `[generated]`
+## Index — 801 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4896,3 +4896,28 @@ check: one `git show <live-sha>:<path> | grep`.
 owned or busy, where the content is money-, safety- or correctness-relevant.
 Record what it was, which service is the ONLY one that runs it, and then read
 that service's live SHA for the change before closing the lane.
+
+## 2026-09-04 CITE THE COMMAND YOU RAN, WITH ITS FLAGS — an abridged citation cannot be re-checked, and one day it will have to be. `[lane render-events-truncation-audit]`
+
+`log/2026-08-27.md` recorded a kill as coming from
+`scripts/render_events.py --service refresh-worker`, bare. When that reader
+turned out to crash mid-listing, clearing the finding should have been a
+one-command re-run. It could not be: **the command as written cannot have
+produced the output shown** — bare and unfiltered it dies six weeks before the
+quoted row — so the citation was abridged, and the cheapest check was gone. The
+conclusion was fine; re-deriving it took a full census (56 kills, both endpoints
+matching to the microsecond).
+
+The flags ARE the measurement. `--failures-only` versus bare was the difference
+between an invocation that could truncate and one that provably could not, and
+the brief had dropped exactly that word. Same family as the standing rule that a
+null result is scoped to the window it covered: **a reading is only as
+re-checkable as the command recorded next to it.**
+
+Corollary for auditing an instrument after you fix it: **enumerate the failure
+gates and measure each one against the PRE-FIX binary**, rather than reasoning
+from the diff. Three gates here — a bounded poison set, filtering that removed
+it before rendering, and a summary block computed before the first row — turned
+an unbounded "which conclusions are suspect?" into a single citation defect.
+Working: `findings_2026-09-04_render_events_truncation_audit.md`.
+

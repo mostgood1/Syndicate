@@ -827,6 +827,26 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none for web/live-odds.
 
 
+### render-events-truncation-audit — CLOSED-VERIFIED 2026-09-04 — **NO ledger conclusion was drawn from a truncated `render_events.py` run.** One citation is not reproducible as written; its finding re-derives exactly. Two unrelated defects surfaced and are fixed/recorded. Read-only audit — no code changed.
+- Goal: answer, with a measurement rather than an argument, whether the
+  mid-listing crash fixed in `ea4e3881` had already corrupted anything on record.
+- Files: `.syndicate/findings_2026-09-04_render_events_truncation_audit.md` (NEW),
+  `.syndicate/state_worker.md` (one stale line), `.syndicate/log/2026-09-04.md`.
+- Hypothesis (recorded on completion, not before — the audit is read-only and
+  claimed no files while it ran): the crash could only truncate a run whose
+  window reached the poison events, so the exposure is bounded and probably empty.
+- Falsification test: it would have been WRONG if any cited invocation were bare
+  unfiltered text over a July-reaching window AND its conclusion rested on the
+  row listing. 17 conclusion-bearing citations checked; that combination occurs
+  zero times.
+- Verification (RAN, against the PRE-FIX binary, not from source): poison set is
+  38 events on all 3 services, last `2026-07-17T19:52:29Z`, tool shipped 08-16.
+  `--failures-only` exit 0 / `--type` exit 0 / `--tail 20|500` exit 0 / `--json`
+  exit 1 with **no stdout at all** / bare text exit 1 after 288 rows. Crashed
+  run's first 25 lines `diff`-identical to the fixed tool's. `log/2026-08-27.md`
+  re-derived: 56 kills, both endpoints to the microsecond.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
