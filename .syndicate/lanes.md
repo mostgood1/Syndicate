@@ -986,6 +986,33 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none for web/live-odds.
 
 
+### web-request-path-intelligence-recheck — CLOSED-VERIFIED 2026-09-04 — **NO: web does not compute intelligence in a request — a hard guard refuses it. But the path is still WIRED and the guard fired 348 times in 7h on 2026-08-27, silent for the 8 days since. Three gaps named, none fixed.** — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
+- Goal: answer whether the request-path compute that the 137-SIGKILL cohort ran
+  under is still live on web. Read-only.
+- Files: `.syndicate/findings_2026-09-04_web_request_path_intelligence.md` (NEW).
+  No code touched. `render-web-request-path` is UNOWNED with claims RELEASED, so
+  no lane conflict; `web-oom-thread-gating` claims `pipeline/intelligence_state.py`
+  for the board-drain thread target only — this lane only READ that file.
+- Verification (RAN): live env, fully paged —
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is `false` on web and
+  live-odds-worker, `true` on refresh-worker ONLY (the correct split, and also
+  why web has no loop to fall back on). The guard fires at 3 sites, all AFTER
+  the cache check, so a hit serves and only a genuine miss is refused.
+  **Production proof it is armed and firing: 348 `REFUSED: compute in request
+  path on hosted web` over 2026-08-27T15:15..22:19Z, 5 pages, fully paged.**
+  **Zero since**, positive-controlled properly — same reader and filter returned
+  348 on 08-27, and `healthz` inside the empty period returned 70 in five
+  minutes. `ComputeInRequestPathError` appears nowhere in the logs even during
+  the storm, so all 348 were swallowed into degraded responses, not 500s.
+- **Named, NOT fixed** (each needs its own lane): (a) `RENDER` is ABSENT from
+  web's 76 env vars, so arming may rest solely on `SYNDICATE_REQUIRE_HOSTED_STORAGE`
+  — a key whose NAME is about storage; removing it would silently downgrade the
+  hard guard to warn-only. Arming is proven; WHICH key arms it is NOT.
+  (b) the guard passes `operation` via `extra=`, which the formatter drops — all
+  348 lines are identical and you cannot tell `_compute_response` from
+  `_build_candidate_pool`. (c) 348 silent degradations in 7h with no counter.
+- Blocked by: none. Read-only — no deploy.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
