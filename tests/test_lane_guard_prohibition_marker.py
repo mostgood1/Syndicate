@@ -88,19 +88,40 @@ def test_a_path_BEFORE_the_word_never_is_still_claimed() -> None:
     assert ("lane-c", "syndicate/features/c.py") in CHECKER.claims(text)
 
 
-def test_the_marker_tuples_stay_identical_between_script_and_hook() -> None:
-    """`_DISCLAIMER_MARKERS` is copied verbatim into `.claude/hooks/lane-guard.py`.
-    They drifted once before (the hook learned a fix the script never copied), so
-    a marker added to one must be added to both."""
+def test_the_marker_tuple_has_exactly_one_definition() -> None:
+    """There is nothing left to keep in sync: `_DISCLAIMER_MARKERS` is defined
+    once, in `.claude/hooks/lane_claims.py`, and both readers import it.
 
-    def markers(path: Path) -> tuple[str, ...]:
-        body = re.search(r"_DISCLAIMER_MARKERS = \((.*?)\n\)", path.read_text(encoding="utf-8"), re.S)
-        return tuple(re.findall(r'"([^"]+)"', body.group(1)))
+    THIS TEST USED TO SCRAPE TWO FILES FOR THE TUPLE AND COMPARE THEM, and it
+    had been failing on `origin/main` since the parser was extracted out of
+    `lane-guard.py` -- `re.search` returned None for the hook and the test died
+    on `AttributeError: 'NoneType' object has no attribute 'group'`, never
+    reaching its assertion. Measured 2026-09-04: red at HEAD, same line, before
+    any of this session's changes.
 
-    script = markers(ROOT / "scripts" / "check_lane_invariants.py")
-    hook = markers(ROOT / ".claude" / "hooks" / "lane-guard.py")
-    assert script == hook, "marker tuples drifted between the script and the hook"
-    assert "never" in script
+    That is the third instance of one failure mode. A test that compares two
+    copies of a definition depends on being able to FIND both copies, so
+    consolidating them -- the actual fix -- breaks the test in a way that reads
+    like an error rather than a pass. The durable form is to assert the
+    single-sourcing itself.
+    """
+    sys.path.insert(0, str(ROOT / ".claude" / "hooks"))
+    import lane_claims
+
+    assert CHECKER._DISCLAIMER_MARKERS is lane_claims._DISCLAIMER_MARKERS, (
+        "the checker has its own marker tuple again")
+    assert "never" in lane_claims._DISCLAIMER_MARKERS, (
+        "the prohibition marker this file exists for is gone")
+
+    # And no second definition anywhere on the enforcement path.
+    definition = re.compile(r"^_DISCLAIMER_MARKERS\s*=\s*\(", re.M)
+    definers = [p for p in (
+        ROOT / ".claude" / "hooks" / "lane_claims.py",
+        ROOT / ".claude" / "hooks" / "lane-guard.py",
+        ROOT / "scripts" / "check_lane_invariants.py",
+    ) if definition.search(p.read_text(encoding="utf-8", errors="replace"))]
+    assert definers == [ROOT / ".claude" / "hooks" / "lane_claims.py"], (
+        f"expected exactly one definition, in lane_claims.py; found {definers}")
 
 
 def test_a_claimed_path_must_not_contain_a_marker_word() -> None:

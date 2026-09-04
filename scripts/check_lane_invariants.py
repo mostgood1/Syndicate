@@ -25,25 +25,45 @@ another legitimately took the file. **Exactly one holder was true the whole
 time.** The roster turns over hourly here; a check naming a lane has a shelf life
 measured in hours, a check naming a property does not.
 
-PARSING IS COPIED FROM `lane-guard.py`, NOT IMPORTED. That module is a hook: it
-runs `main()` at import and, with stdin at EOF, calls `sys.exit()` -- which kills
-the importing script with **exit code 0 and no output**. Two attempts to reuse it
-died exactly that way and looked like "the parser returned nothing". If the four
-regexes or the disclaimer-marker tuple below ever drift from the hook's, this
-check silently measures something else; `tests/test_check_lane_invariants.py`
-pins all five against the hook's source.
+PARSING IS IMPORTED FROM `.claude/hooks/lane_claims.py`, NOT COPIED. That is the
+same module `lane-guard.py` imports, so this check and the guard that enforces
+claims per-edit cannot disagree: there is one definition, not two and a test.
 
-CONFIRMED DRIFT, 2026-08-19: `FILES_RE` here was missing the hook's bold-form
-(`\\*{0,2}`) and optional-colon (`:?`) support, and `claims()` never learned the
-hook's disclaimer-marker stripping at all (see `_claimable_prefix` below) -- so
-a lane that wrote "RELEASED, no longer claimed: `X`" under its `- Files:` block
-still read here as a live claim on `X`, and a second lane's genuine claim on the
-same file then reported as a false two-holder contest. `lane-guard.py` itself
-had already learned to strip that disclaimer; this file just hadn't copied the
-fix. Both are fixed now; `test_disclaimer_markers_match_the_hook_source` guards
-the marker tuple the same way `test_regex_matches_the_hook_source` guards the
-regexes, so this is the second drift caught, not the first, and should be the
-last for these two.
+WHY THIS FILE USED TO COPY, AND WHY THAT REASON EXPIRED. The parser once lived
+inside `lane-guard.py`, which is a hook -- it runs `main()` at import and, with
+stdin at EOF, calls `sys.exit()`, killing the importing script with **exit code
+0 and no output**. Two attempts to reuse it died exactly that way and looked
+like "the parser returned nothing", so this file copied four regexes and a
+marker tuple instead, and a test pinned the copies against the hook's SOURCE
+TEXT. `lane_claims.py` has since been extracted: a pure library, no
+module-level `main()`, no `__file__` dependency, no stdin read. Nothing here
+needs the `sys.exit`-neutralising hacks the copy existed to avoid.
+
+WHAT THE COPY ACTUALLY COST, measured 2026-09-04. **The source-scraping test had
+been silently broken since that extraction** -- it searched `lane-guard.py` for
+`^HEADER_RE = re.compile(...)$`, which had moved out, so all five drift tests
+asserted "the hook changed shape" while this script still exited 0 and printed
+INVARIANTS HOLD. The four regexes and the 14-marker tuple had NOT drifted.
+Everything the test never pinned had, because every guard fix since 2026-08-31
+landed in `lane_claims.py` and none was copied back:
+
+- A `- Files:` line naming `scripts/archive_released_lanes.py` -- a filename
+  CONTAINING the marker "released" -- yielded the guard both of its paths and
+  yielded this checker **ZERO**, because the copied `_claimable_prefix` did not
+  mask backticked spans, cut inside the filename, and dropped the rest of the
+  line with it. A lane whose entire claim set reads as empty cannot contest
+  anything, so the two-holder invariant passed vacuously.
+- An ASCII-hyphen lane header (`### slug - OPEN - ...`): guarded, invisible here.
+- A blank line inside a Files block: ends it for the guard, not for the copy.
+- A backslash path: normalised by the guard, left backslashed here, so it could
+  never match the path it named.
+
+The 2026-08-19 drift (`FILES_RE` missing the bold form and the optional colon)
+was the first instance, and it was fixed by copying harder. This is the second.
+It is the failure mode `learnings.md` already names for a sibling case -- a
+module may not hold its own copy of a definition another module enforces,
+because it WILL drift -- with the extra sting that a test comparing two copies
+only works for as long as it can still find both of them.
 
     py -3 scripts/check_lane_invariants.py [path]
     exit 0 = invariants hold, 1 = violated, 2 = could not read
@@ -61,42 +81,43 @@ import pathlib
 import re
 import sys
 
-# Copied verbatim from `.claude/hooks/lane-guard.py`. See the module docstring.
-HEADER_RE = re.compile(r"^###\s")
-LANE_RE = re.compile(r"^###\s+(\S+)\s+—\s*([^—]*)")
-OPEN_RE = re.compile(r"\bOPEN\b")
-FILES_RE = re.compile(r"^\s*-\s*\*{0,2}Files\b[^:]*:?(.*)$")
+# THE PARSER, IMPORTED FROM THE MODULE THE GUARD ENFORCES WITH. See the module
+# docstring for what the copies these names replace had quietly drifted into.
+sys.path.insert(
+    0, str(pathlib.Path(__file__).resolve().parents[1] / ".claude" / "hooks"))
+try:
+    from lane_claims import (  # noqa: E402
+        ASCII_LANE_RE,
+        FIELD_RE,
+        FILES_RE,
+        HEADER_RE,
+        LANE_RE,
+        OPEN_RE,
+        _claimable_prefix,
+        _claims,
+        _DISCLAIMER_MARKERS,
+        _paths_in,
+    )
+except Exception as exc:  # pragma: no cover - only when the module is missing
+    # DELIBERATELY NOT FAIL-OPEN, and that is the opposite of `lane-guard.py`'s
+    # contract on purpose. The guard fails open because a broken guard blocking
+    # every edit is worse than no guard. This is a CHECK: its entire output is a
+    # verdict, and the one thing it must never do is print a green one it did
+    # not compute. Exit 2 is what this file already returns for "could not read
+    # the input"; an unimportable parser is the same class of answer. Falling
+    # back to a private copy would silently reinstate the drift the import
+    # exists to end -- which is exactly how an unknown defaults permissive.
+    print("cannot import lane_claims (.claude/hooks/lane_claims.py): %s" % exc)
+    print("REFUSING TO CHECK -- the parser this must agree with is unavailable.")
+    sys.exit(2)
 
-# Also copied verbatim from lane-guard.py's `_DISCLAIMER_MARKERS`. A bullet
-# under `- Files:` that talks ABOUT a path ("released", "held by", "not
-# taken", ...) instead of claiming it. See the hook's own docstring for the
-# full incident history behind each entry -- this file only needs to
-# reproduce the list, not re-derive it, and `test_disclaimer_markers_match_
-# the_hook_source` keeps the two from drifting apart the way `FILES_RE` did.
-_DISCLAIMER_MARKERS = (
-    "not claimed",
-    "collision check",
-    "read-only dependency",
-    "read-only reference",
-    "not touched",
-    "not touch",
-    "not taken",
-    "released",
-    "held by",
-    "claimed by",
-    "ownership checked",
-    "zero mentions",
-    "no lane",
-    # 2026-09-03: `render.yaml` was reported CONTESTED by the two lanes most
-    # carefully avoiding it -- both wrote "**never `render.yaml`**", a
-    # PROHIBITION, and every marker above spells the same idea a different way
-    # ("not touch", "not taken", "released") while `never` was missing. On the
-    # repo's highest-blast-radius file, that is the worst place to cry wolf.
-    # Safe as a PREFIX cut: a path BEFORE the word is still claimed, so
-    # "`a.py` (never deployed)" keeps claiming `a.py`.
-    "never",
-)
+# `_DISCLAIMER_MARKERS` and `_claimable_prefix` are imported above, not restated.
+# The tuple lives in `lane_claims.py` alongside the incident history behind each
+# entry, and `_claimable_prefix` there masks backticked spans before looking for
+# a marker -- the fix this file spent from 2026-09-03 to 2026-09-04 without.
 
+# NOT a claim extractor -- `_paths_in` is. This only answers "does this line
+# mention something path-shaped at all", for the prose hint below.
 PATH_RE = re.compile(r"[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+")
 PROSE_HINT_RE = re.compile(r"\bnames?\b|\bDIFFERENT file\b|\bcandidate\b|\bclaimed by\b")
 
@@ -142,43 +163,16 @@ def conflict_markers(text: str) -> list[tuple[int, str]]:
     return found
 
 
-def _claimable_prefix(line: str) -> str:
-    """Everything in `line` before the first disclaimer marker -- copied from
-    lane-guard.py's function of the same name. A marker GOVERNS WHAT FOLLOWS
-    IT, so this is a prefix cut, not a whole-line veto: a claim that precedes
-    a disclaimer ("`a.py`, `b.py` (new). Collision check: CLEAR.") keeps its
-    real paths and only drops what the disclaimer talks about."""
-    low = line.lower()
-    positions = [low.find(m) for m in _DISCLAIMER_MARKERS]
-    positions = [p for p in positions if p != -1]
-    return line[:min(positions)] if positions else line
-
-
 def claims(text: str) -> set[tuple[str, str]]:
-    """(slug, path) for every OPEN lane, exactly as `lane-guard._claims` does."""
-    out: set[tuple[str, str]] = set()
-    slug, open_lane, in_files = None, False, False
-    for line in text.splitlines():
-        if HEADER_RE.match(line):
-            m = LANE_RE.match(line)
-            slug, open_lane = (m.group(1), bool(OPEN_RE.search(m.group(2)))) if m else (None, False)
-            in_files = False
-            continue
-        m = FILES_RE.match(line)
-        if m:
-            in_files = True
-            if open_lane:
-                out.update((slug, f) for f in PATH_RE.findall(_claimable_prefix(m.group(1))))
-            continue
-        if in_files and open_lane:
-            stripped = line.strip()
-            # A new top-level field ends the block; a continuation bullet
-            # (`- \`path\``) does not.
-            if stripped.startswith("- ") and not stripped.startswith("- `"):
-                in_files = False
-                continue
-            out.update((slug, f) for f in PATH_RE.findall(_claimable_prefix(line)))
-    return out
+    """(slug, path) for every OPEN lane -- `lane_claims._claims`, not a lookalike.
+
+    A set where the guard yields a generator, because every caller here does
+    membership and set arithmetic. That is the ONLY difference, and holding it
+    to that is the whole point: the moment this function decides anything about
+    what a claim IS, the guard and the check are answering different questions
+    again and nothing reports it.
+    """
+    return set(_claims(text))
 
 
 def contested_files(claim_set) -> dict[str, list[str]]:
@@ -219,8 +213,19 @@ def open_lanes_under_archived(text: str) -> list[str]:
     if not m0:
         return []
     arch = text[m0.start():]
-    return [m.group(1) for m in re.finditer(r"(?m)^### (\S+) —\s*([^—]*)", arch)
-            if OPEN_RE.search(m.group(2))]
+    # LANE_RE and its ASCII fallback, not a fifth inline copy of the header
+    # pattern. The em-dash-only version missed `### slug - OPEN - ...` headers
+    # entirely -- and those DO hold claims (`lane_claims._claims` falls back to
+    # ASCII_LANE_RE), so a stray lane written with hyphens was guarding files
+    # from inside the archive with nothing reporting it.
+    out = []
+    for line in arch.splitlines():
+        if not HEADER_RE.match(line):
+            continue
+        m = LANE_RE.match(line) or ASCII_LANE_RE.match(line)
+        if m and OPEN_RE.search(m.group(2)):
+            out.append(m.group(1))
+    return out
 
 
 def prose_paths_in_files_blocks(text, claim_set=None):
@@ -255,11 +260,20 @@ def prose_paths_in_files_blocks(text, claim_set=None):
             continue
         if in_files:
             stripped = line.strip()
-            if stripped.startswith("- ") and not stripped.startswith("- `"):
+            # Block termination copied from `lane_claims._claims`: a blank
+            # line or a new TOP-LEVEL field ends it. The old test here
+            # (`- ` and not `- ``) kept scanning past a blank line, so the
+            # hint reported prose from outside the block it was reading.
+            if not stripped or (FIELD_RE.match(line) and not line[:1].isspace()):
                 in_files = False
                 continue
             if PROSE_HINT_RE.search(line) and PATH_RE.search(line):
-                claims_it = any(p in claimed_paths for p in PATH_RE.findall(line))
+                # Membership is tested with the guard's own tokeniser, so a
+                # hit's `claims_it` flag agrees with `claims()` by
+                # construction rather than by two regexes happening to
+                # normalise a path the same way.
+                claims_it = any(
+                    p in claimed_paths for p in _paths_in(_claimable_prefix(line)))
                 hits.append((stripped[:100], claims_it))
     return hits
 

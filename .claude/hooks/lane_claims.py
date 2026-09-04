@@ -18,9 +18,23 @@ verbatim-identical". Two files, hand-synced, on a parser whose every line is a
 past incident. `lane-postwrite-check.py` and `scripts/check_lane_claims.py`
 were about to make that four. They import this instead.
 
-`scripts/check_lane_invariants.py` still holds its own copy and should be
-migrated when its OPEN lane (`ncaaf-live-cadence`) closes -- editing it now
-would be the cross-lane write these guards exist to prevent.
+`scripts/check_lane_invariants.py` HAS BEEN MIGRATED, 2026-09-04. This note used
+to say it "still holds its own copy and should be migrated when its OPEN lane
+(`ncaaf-live-cadence`) closes -- editing it now would be the cross-lane write
+these guards exist to prevent." That blocker was a PHANTOM: `ncaaf-live-cadence`
+never claimed the file, it mentioned it in prose inside its `- Files:` block
+("caught by `check_lane_invariants.py`"), which the parser below reads as a
+claim. So the deferral was real, correctly observed, and rested on nothing.
+Cleared by splicing a top-level bullet before that lane's trailing prose; its
+four declared paths were untouched and are still guarded.
+
+What the delay cost is worth recording, because it is the argument for this
+module: the copy had drifted in four ways by the time it was migrated, and the
+test that was supposed to catch drift had ITSELF been broken since this
+extraction -- it scraped `lane-guard.py` for definitions that had moved here.
+Worst case, a `- Files:` line naming `scripts/archive_released_lanes.py` yielded
+the checker ZERO claims, so its two-holder invariant passed vacuously and
+printed INVARIANTS HOLD.
 
 THE MOVE WAS VERBATIM. The functions below are byte-for-byte what
 `lane-guard.py` held, comments included, so this extraction changes no

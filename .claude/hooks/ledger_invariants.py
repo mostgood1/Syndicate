@@ -1,11 +1,19 @@
 """Ledger invariants, in one place, imported by the hooks that enforce them.
 
-WHY A SHARED MODULE HERE, when `check_lane_invariants.py` deliberately COPIES
-`lane-guard.py`'s regexes instead of importing them. That copy exists because
-`lane-guard.py` is a HOOK: it ends in a bare `sys.exit(main())`, so importing it
-kills the importer with exit 0 and no output. This file is not a hook -- it has
-no `main()` and no side effects on import -- so the reason for duplicating does
-not apply, and three copies of the same predicate would drift.
+WHY A SHARED MODULE HERE. `lane-guard.py` is a HOOK: it ends in a bare
+`sys.exit(main())`, so importing it kills the importer with exit 0 and no
+output. That is a real constraint on the HOOK, and it is why `lane_claims.py`
+exists -- the parser was lifted out of the hook into a plain library so every
+reader can import the one definition. This file is the same pattern for the
+ledger predicates: no `main()`, no side effects on import, nothing to duplicate.
+
+UPDATED 2026-09-04. This paragraph used to say `check_lane_invariants.py`
+"deliberately COPIES `lane-guard.py`'s regexes instead of importing them", and
+cited that as the contrast. It no longer does -- it imports from
+`lane_claims.py` like everything else. The copy is worth remembering as the
+argument FOR this shape rather than against it: it drifted four ways, and the
+test pinning it against the hook's source had been silently red since the
+parser moved, so nothing reported the drift.
 
 WHAT IS AND IS NOT AN INVARIANT HERE. Each predicate below is a failure that
 actually happened and that a reader cannot see by looking:

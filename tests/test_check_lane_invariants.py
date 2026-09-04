@@ -1,21 +1,44 @@
-"""The lane-invariant check must agree with the hook it copies from.
+"""The lane-invariant check must parse with the module the guard enforces with.
 
-The script parses `lanes.md` with regexes COPIED out of `.claude/hooks/lane-guard.py`
-because that module cannot be imported (it is a hook: it runs `main()` at import
-and `sys.exit()`s on EOF stdin, killing the caller with exit code 0 and no
-output). Copying is the only option, and drift is the risk it creates -- so the
-first test reads the hook's SOURCE and pins the four regexes against it.
+It no longer COPIES that parser, so these tests no longer compare two copies.
+They assert there is only one.
+
+WHAT THIS FILE USED TO DO, AND WHY IT STOPPED WORKING. `check_lane_invariants.py`
+held its own four regexes and its own `_DISCLAIMER_MARKERS`, copied out of
+`.claude/hooks/lane-guard.py` because that module is a hook and could not be
+imported. Five tests read the hook as TEXT and pinned the copies against a
+`re.search` for `^HEADER_RE = re.compile(...)$`.
+
+**Then the hook's parser was extracted into `.claude/hooks/lane_claims.py`, and
+all five tests went red on `assert m` -- "not found in lane-guard.py".** They
+stayed red on `origin/main` while `check_lane_invariants.py` exited 0 and printed
+INVARIANTS HOLD, so nothing surfaced it at session start. Measured 2026-09-04:
+the four regexes and the marker tuple had NOT drifted; four OTHER things had,
+because the test could only ever pin what it had been told to look for. The
+worst of them made a whole lane's claim set read as EMPTY -- see
+`test_the_four_divergences_the_old_pinning_could_not_see`.
+
+**A test that compares two copies is a worse instrument than one definition.**
+It can only fail when it can still FIND both copies, it can only cover what
+someone remembered to list, and its passing says nothing about the parts nobody
+listed. `check_lane_invariants.py` now imports from `lane_claims.py` -- the same
+import `lane-guard.py` does -- and section 1 below asserts the imported names
+are the SAME OBJECTS, which is a claim about identity that cannot be satisfied
+by a copy that happens to agree today.
 """
 from __future__ import annotations
 
+import ast
 import importlib.util
 import pathlib
-import re
+import sys
 
 import pytest
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-HOOK = REPO / ".claude" / "hooks" / "lane-guard.py"
+HOOKS = REPO / ".claude" / "hooks"
+sys.path.insert(0, str(HOOKS))
+import lane_claims  # noqa: E402 - needs the path insert above
 
 spec = importlib.util.spec_from_file_location(
     "check_lane_invariants", REPO / "scripts" / "check_lane_invariants.py")
@@ -24,36 +47,169 @@ spec.loader.exec_module(mod)
 
 
 # --------------------------------------------------------------------------
-# 1. The copied regexes must not drift from the hook's.
+# 1. There must be ONE definition, not two that agree.
 # --------------------------------------------------------------------------
 
-@pytest.mark.skipif(not HOOK.exists(), reason="lane-guard.py not present")
-@pytest.mark.parametrize("name", ["HEADER_RE", "LANE_RE", "OPEN_RE", "FILES_RE"])
-def test_regex_matches_the_hook_source(name):
-    """Read the hook as TEXT. Importing it would exit the test process."""
-    src = HOOK.read_text(encoding="utf-8", errors="replace")
-    m = re.search(rf"^{name}\s*=\s*re\.compile\((.+)\)$", src, re.MULTILINE)
-    assert m, f"{name} not found in lane-guard.py -- the hook changed shape"
-    hook_pattern = eval(m.group(1))  # noqa: S307 - our own repo file, literal only
-    assert getattr(mod, name).pattern == hook_pattern, (
-        f"{name} has DRIFTED from lane-guard.py; this check is now measuring "
-        f"something the guard does not"
-    )
+SHARED_NAMES = [
+    "HEADER_RE", "LANE_RE", "ASCII_LANE_RE", "OPEN_RE", "FILES_RE", "FIELD_RE",
+    "_DISCLAIMER_MARKERS", "_claimable_prefix", "_claims", "_paths_in",
+]
 
 
-def test_disclaimer_markers_match_the_hook_source():
-    """The copied `_DISCLAIMER_MARKERS` tuple must not drift from lane-guard.py's
-    either -- same failure mode as the regexes above, just a list instead of a
-    pattern. This is the sync check the FILES_RE drift (2026-08-19) showed was
-    missing: a test that pins REGEXES alone still let the marker list rot."""
-    src = HOOK.read_text(encoding="utf-8", errors="replace")
-    m = re.search(r"^_DISCLAIMER_MARKERS\s*=\s*\((.*?)\n\)", src, re.MULTILINE | re.DOTALL)
-    assert m, "_DISCLAIMER_MARKERS not found in lane-guard.py -- the hook changed shape"
-    hook_markers = eval("(" + m.group(1) + ")")  # noqa: S307 - our own repo file, literal only
-    assert mod._DISCLAIMER_MARKERS == hook_markers, (
-        "_DISCLAIMER_MARKERS has DRIFTED from lane-guard.py; this check is now "
-        "measuring something the guard does not"
-    )
+@pytest.mark.parametrize("name", SHARED_NAMES)
+def test_the_checker_shares_lane_claims_object_it_does_not_copy_it(name):
+    """`is`, not `==`. An equal copy is exactly what this file used to permit.
+
+    Equality passes for a copy that agrees TODAY, which is the state the repo
+    was in on 2026-09-04 while four real divergences were live.
+
+    THIS TEST IS NECESSARY AND NOT SUFFICIENT, and the reason is worth knowing
+    before trusting it: **`re.compile` memoises.** Re-pasting
+    `HEADER_RE = re.compile(r"^###\\s")` into `check_lane_invariants.py` hands
+    back the very object `lane_claims` already compiled, so `is` passes on a
+    genuine copy. Measured 2026-09-04 by mutation -- the copy was inserted, all
+    30 tests stayed green, and it took reading `re`'s cache to see why. The
+    identity check still binds the tuple and the four functions, where nothing
+    is interned; `test_the_checker_defines_none_of_them_itself` is what closes
+    the regex half, by asking the source instead of the object.
+    """
+    assert hasattr(mod, name), (
+        f"{name} is not exposed by check_lane_invariants -- if it was renamed, "
+        f"rename it here; if it was re-COPIED, that is the regression")
+    assert getattr(mod, name) is getattr(lane_claims, name), (
+        f"{name} is NOT lane_claims' object. A private copy has been "
+        f"reintroduced and this check will drift from the guard again")
+
+
+def test_the_checker_defines_none_of_them_itself():
+    """Every shared name must arrive by import and be assigned nowhere.
+
+    Asked of the AST, not of a regex over the text, so a definition cannot hide
+    behind formatting -- and asked about ABSENCE in the file under test, which
+    is what makes it survive the next refactor of the hook. The old drift tests
+    scraped a DIFFERENT file for the PRESENCE of a definition, so moving that
+    definition broke the test rather than failing it.
+    """
+    tree = ast.parse((REPO / "scripts" / "check_lane_invariants.py").read_text(
+        encoding="utf-8", errors="replace"))
+
+    # MODULE SCOPE, not `tree.body`: the import sits inside a `try:` (it has a
+    # refusal branch), and a re-pasted definition could just as easily land in
+    # an `if`. Recurse through those, and stop at `def`/`class` -- a local named
+    # `FILES_RE` inside some helper is not a second definition of the parser.
+    def module_scope(body):
+        for node in body:
+            yield node
+            if isinstance(node, ast.Try):
+                yield from module_scope(node.body + node.orelse + node.finalbody)
+                for handler in node.handlers:
+                    yield from module_scope(handler.body)
+            elif isinstance(node, (ast.If, ast.With)):
+                yield from module_scope(node.body + getattr(node, "orelse", []))
+
+    nodes = list(module_scope(tree.body))
+
+    imported = {alias.asname or alias.name
+                for node in nodes
+                if isinstance(node, ast.ImportFrom) and node.module == "lane_claims"
+                for alias in node.names}
+    missing = [n for n in SHARED_NAMES if n not in imported]
+    assert not missing, f"not imported from lane_claims: {missing}"
+
+    # An assignment OR a `def`. Re-copying `_claimable_prefix` would be the
+    # second, and it is the one that cost this repo a whole Files line.
+    defined = {t.id for node in nodes if isinstance(node, ast.Assign)
+               for t in node.targets if isinstance(t, ast.Name)}
+    defined |= {node.name for node in nodes
+                if isinstance(node, (ast.FunctionDef, ast.ClassDef))}
+    redefined = sorted(defined & set(SHARED_NAMES))
+    assert not redefined, (
+        f"{redefined} is BOTH imported from lane_claims and defined here. That "
+        f"is the two-copies state this module was rewritten to end -- and note "
+        f"`is` will NOT catch it for a regex, because re.compile memoises")
+
+
+def test_lane_guard_imports_the_same_module_so_the_chain_is_closed():
+    """Identity with `lane_claims` only matters because the GUARD uses it too.
+
+    Read as text: importing `lane-guard.py` runs `main()` and `sys.exit()`s.
+    That is a real constraint on the HOOK and the reason this indirection
+    exists -- but it is not a constraint on `lane_claims.py`, which is a pure
+    library. This assertion is what makes the identity above load-bearing
+    rather than two modules agreeing with each other about nothing.
+    """
+    src = (HOOKS / "lane-guard.py").read_text(encoding="utf-8", errors="replace")
+    assert "from lane_claims import" in src, (
+        "lane-guard.py no longer imports lane_claims -- the enforcement path "
+        "has moved and check_lane_invariants.py must follow it, not this test")
+    assert "_claims," in src, "lane-guard.py no longer imports the claim parser"
+
+
+def test_the_four_divergences_the_old_pinning_could_not_see():
+    """The regression corpus. Every case reproduced on `origin/main`, 2026-09-04.
+
+    All four passed the old five drift tests -- because those pinned four
+    regexes and a tuple, and none of these is any of those. Case B is the one
+    that mattered: the checker returned ZERO claims for the lane, and a lane
+    with no claims cannot contest a file, so `every claimed file has exactly one
+    OPEN holder` was satisfied vacuously and INVARIANTS HOLD printed green.
+    """
+    cases = {
+        "A. ASCII-hyphen lane header":
+            "## OPEN\n\n### alpha - OPEN - opened 2026-09-04\n- Files: `a/one.py`.\n",
+        "B. disclaimer marker INSIDE a backticked filename":
+            "## OPEN\n\n### alpha \u2014 OPEN \u2014 opened 2026-09-04\n"
+            "- Files: `scripts/archive_released_lanes.py`, `tests/t.py`.\n",
+        "C. blank line then indented prose":
+            "## OPEN\n\n### alpha \u2014 OPEN \u2014 opened 2026-09-04\n"
+            "- Files: `a/one.py`.\n\n  `b/two.py` mentioned in prose.\n",
+        "D. backslash path":
+            "## OPEN\n\n### alpha \u2014 OPEN \u2014 opened 2026-09-04\n"
+            "- Files: `scripts\\win.py`.\n",
+    }
+    for label, text in cases.items():
+        assert mod.claims(text) == set(lane_claims._claims(text)), label
+
+    # And the specific readings, so a future change that makes both sides wrong
+    # in the same way still fails here.
+    assert mod.claims(cases["A. ASCII-hyphen lane header"]) == {("alpha", "a/one.py")}
+    assert mod.claims(cases["B. disclaimer marker INSIDE a backticked filename"]) == {
+        ("alpha", "scripts/archive_released_lanes.py"), ("alpha", "tests/t.py")}, (
+        "the whole Files line was dropped -- `_claimable_prefix` is cutting "
+        "inside the filename again")
+    assert mod.claims(cases["C. blank line then indented prose"]) == {("alpha", "a/one.py")}
+    assert mod.claims(cases["D. backslash path"]) == {("alpha", "scripts/win.py")}
+
+
+def test_the_checker_and_the_guard_agree_on_the_LIVE_ledger():
+    """Synthetic corpora are built by whoever is looking. This one is not.
+
+    Skipped rather than failed when `lanes.md` is absent: a worktree checked out
+    without it is not a drift.
+    """
+    ledger = REPO / ".syndicate" / "lanes.md"
+    if not ledger.exists():
+        pytest.skip("no .syndicate/lanes.md in this tree")
+    text = ledger.read_text(encoding="utf-8", errors="replace")
+    assert mod.claims(text) == set(lane_claims._claims(text))
+
+
+def test_an_unimportable_parser_must_not_read_as_green():
+    """The refusal path. `lane-guard.py` fails OPEN on a missing `lane_claims`
+    -- a guard that blocks every edit is worse than no guard. This file is a
+    CHECK, and the inverse applies: its whole output is a verdict, so the one
+    thing it must never do is print a green one it did not compute.
+
+    Asserted on the source because triggering it for real means breaking the
+    import for the whole session.
+    """
+    src = (REPO / "scripts" / "check_lane_invariants.py").read_text(
+        encoding="utf-8", errors="replace")
+    head = src[:src.index("def conflict_markers")]
+    assert "from lane_claims import" in head
+    assert "sys.exit(2)" in head, (
+        "the import guard no longer refuses -- if it now falls back to a local "
+        "copy, that is the drift this whole file exists to prevent")
 
 
 # --------------------------------------------------------------------------
