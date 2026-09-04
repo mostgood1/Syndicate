@@ -622,7 +622,7 @@ def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
     return list(_stream_chunked_ledger_records(path))
 
 
-DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = 2_000_000_000
+DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = 4_000_000_000
 
 
 def _accuracy_summary_ledger_budget_bytes() -> int:
@@ -649,10 +649,37 @@ def _accuracy_summary_ledger_budget_bytes() -> int:
 
     So the budget's job changed. It no longer keeps the job alive; the
     projection does. It exists to stop an unbounded RECORD COUNT from
-    reconstituting the same failure years from now: at ~2.32 KiB/record,
-    2,000,000,000 accepted bytes implies roughly 100-200 MiB of peak and covers
-    several times the current ledger. Raise or disable it deliberately, with the
-    per-record figure re-measured, not by assuming this line is still true.
+    reconstituting the same failure years from now.
+
+    **RAISED AGAIN 2026-09-04, 2,000,000,000 -> 4,000,000,000, because the first
+    production run proved the 2GB line above had already gone stale.** That line
+    claimed 2GB "covers several times the current ledger". The first real run
+    measured the opposite:
+
+        LEDGER_CHUNKS_ACCEPTED count=8 bytes=1999970055 budget=2000000000
+                               records=46944 dates=8 partial=1 truncated=1
+                               skipped_budget=24
+
+    99.9985% of the cap spent, 24 chunks SKIPPED, 8 dates kept out of ~32
+    chunks. Meanwhile peak `memory_anon_mb` was **1,481.6 of a 4,096 ceiling** --
+    2,614 MiB unused, and BELOW the worker's ordinary ~1,877 MiB baseline peak.
+    So the budget, not memory, became what costs coverage: exactly the failure
+    the 90MB cap had, one order of magnitude up.
+
+    **Why 4GB and not the ~8.2GB that would admit all 32 chunks at the 256MB
+    per-chunk ceiling.** The marginal cost measured on 09-04 is AT MOST
+    350.6 MiB per 2GB accepted (run-window peak 1,481.6 minus min 1,131.0, a
+    spread that still includes concurrent worker activity, so it is an upper
+    bound, and it is ~3x worse than the 0.053 bytes/byte ratio predicts). At
+    that upper bound 8.2GB projects to ~2,566 MiB, which is too close to the
+    ceiling if it ever lands on the 1,877 MiB baseline peak. 4GB projects to
+    ~1,832 MiB. One step, then re-measure `skipped_budget` and peak anon before
+    going further.
+
+    Raise or disable it deliberately, with the per-record figure re-measured,
+    not by assuming this line is still true -- which is precisely what the
+    previous version of this paragraph asked for, and precisely what went
+    unchecked between 09-02 and 09-04.
 
     For the history: unbudgeted and unprojected, this load reached 3,181.1 MiB
     on top of a worker already peaking at anon ~1,877 MiB of a 4,096 MiB

@@ -187,3 +187,42 @@ def test_other_callers_are_unchanged(ledger, tmp_path):
     explicit_none = list(ie._stream_chunked_ledger_records(ledger, max_total_bytes=None))
     assert len(default_rows) == len(explicit_none) == 150
     assert list(ie._stream_record_payloads(ledger_path=ledger)) == default_rows
+
+
+def test_default_budget_admits_more_than_the_first_production_read():
+    """Regression guard tied to a MEASURED production number, not a round one.
+
+    The first real autorun (2026-09-04) spent 1,999,970,055 B of a 2,000,000,000 B
+    budget -- 99.9985% -- and SKIPPED 24 chunks, keeping 8 dates. Peak
+    `memory_anon_mb` that run was 1,481.6 of a 4,096 ceiling, so the cap, not
+    memory, was what cost coverage.
+
+    This asserts the default stays clear of that observed ceiling. It is not a
+    style rule: the 90MB budget failed the same way in 2026-09-02 and was raised
+    on the same evidence, so "the budget quietly became the binding constraint
+    again" is a repeat defect, not a hypothetical. A deliberate LOWERING must
+    update this test and say why.
+    """
+    observed_production_read_bytes = 1_999_970_055
+    assert ie.DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES > observed_production_read_bytes, (
+        "the default must admit strictly more than the read that was measured "
+        "truncating in production, or coverage is capped by the cap again"
+    )
+
+
+def test_truncation_is_visible_in_coverage_not_only_in_a_log_line(ledger, tmp_path, monkeypatch):
+    """A truncated read must SAY so in the published coverage dict.
+
+    The 09-04 truncation was discoverable only by reading LEDGER_CHUNKS_ACCEPTED
+    off the worker's stdout. `ledger_coverage` is the part that reaches the
+    artifact, so the skip count has to survive into it -- otherwise a summary
+    built on 8 of 32 chunks is indistinguishable from one built on all of them.
+    """
+    _write_chunks(tmp_path, {"2026-08-01": 200, "2026-08-02": 200, "2026-08-03": 200})
+    monkeypatch.setenv(ENV_KEY, "300")
+    coverage = ie.build_accuracy_summary(sport="mlb")["ledger_coverage"]
+    assert coverage["truncated"] is True
+    assert coverage["chunks_skipped_budget"] >= 1, (
+        "the number of chunks the budget REFUSED must be published, not just logged"
+    )
+    assert coverage["dates_covered"] < 3
