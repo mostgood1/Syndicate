@@ -5622,3 +5622,46 @@ half is answerable by a tool.
 **Corollary, also c38d3e5c's:** *"Committing a live session's in-progress edit to
 protect it is the shared-tree hazard wearing a helpful face."* Back it up outside
 the repo and tell the owner; do not land it for them.
+
+## 2026-09-04 — THE UNIFYING RULE: A COMPARISON PROTECTS ONLY AT THE GRANULARITY IT COUNTS
+
+`[lane order-sim-view, session 37abeca0; formulated by session c38d3e5c after
+the same mistake bit both of us at three different granularities in one night]`
+
+Three failures tonight, three granularities, one mechanism:
+
+    SET-vs-SET     a lanes.md trim certified by `claims()` before == after.
+                   My block's claims were never IN the set (REOPENED header),
+                   so both sides dropped them and agreed. I called the second
+                   pass "independent"; it used the same predicate family.
+
+    BLOCK-vs-BLOCK a compaction's safety checked by "does any lane BLOCK exist
+                   only in the shared tree". None did. The loss was INSIDE
+                   blocks, and the proposed remedy would have destroyed 20
+                   uncommitted lines that `git log --all -S` finds in ZERO
+                   commits anywhere.
+
+    BLOCK-vs-BLOCK `_resurrected` missing that same compaction, for the same
+                   reason: it asks whether a whole block is in history and gone
+                   from lanes.md. Narrative moved WITHIN blocks. 117,321
+                   characters, 0 violations.
+
+**The general form: a before/after comparison is blind to anything its
+extractor does not emit, and that blindness is SYMMETRIC — so both sides agree
+and the check reports success.** It is not that the comparison is wrong; it is
+that it answers a question one level coarser than the change.
+
+**The trigger, which is cheap and mechanical:** before trusting a
+before/after check, name the unit it counts (claims, blocks, sections, files),
+then ask *what would a change SMALLER than that unit look like to it?* If the
+answer is "identical", the check does not cover the operation you are about to
+perform. That question would have caught all three of tonight's instances, and
+none of them were caught by care.
+
+**Corollary for remedies, which is where this nearly did real damage.** A
+remedy inherits the granularity of the check that justified it. "No block is
+unique to this tree, therefore `git checkout origin/main -- lanes.md` is safe"
+is the block-level check licensing a FILE-level destructive action. The
+gap between those two levels is where uncommitted work lives.
+`git diff HEAD -- <path>` before any checkout of a shared ledger file, and a
+non-empty result means STOP, not "proceed carefully".
