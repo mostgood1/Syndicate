@@ -5364,3 +5364,44 @@ The gate is now n>=8 with the robustness tests built in.
 Related: `[2026-09-04]` "100% of what you sampled is not 100% of the thing" and
 "a broken identifier is worse than none" — the same session, the same instrument,
 three different ways of producing a confident wrong number.
+
+## 2026-09-04 — "THE CLAIM HOLDER IS NOT IN THE SESSION ROSTER" IS TRUE OF EVERY CLAIM. IT IS A CATEGORY ERROR, NOT A LIVENESS CHECK
+
+Two sessions in one hour reasoned that a `refresh-worker` deploy claim was
+stranded because its `holder_session` (`3492626c-...`) was absent from
+`list_sessions`, including archived. One was preparing to `acquire --force`.
+
+**The comparison cannot ever succeed, for anyone.** Measured:
+
+* `scripts/deploy_claim.py:251` records `os.environ.get("CLAUDE_CODE_SESSION_ID")`.
+* Every `sessionId` from `list_sessions` (100 pulled, `include_archived=true`)
+  has the form `local_<uuid>`.
+* **They are disjoint id spaces.** This session's claim file records
+  `b2b5b45b-e938-4cb5-81c2-c211ecc7c703`; the roster knows the SAME session as
+  `local_05200b16-4058-4539-95de-73d16ea34b3c`. Different UUIDs, not a prefix.
+
+So a live claim held by a session that is demonstrably running — mine, while
+writing this — ALSO fails the test. **A predicate that returns "absent" for a
+live holder returns it for 100% of claims and discriminates nothing.**
+
+This SUPERSEDES the softer rule already in this file (*"the roster does not list
+unattended or scheduled runs, so absence is not evidence a holder is gone"*).
+That framing implies the check works most of the time and has exceptions. It
+never works. Anything resting on it — including lane notes that justified taking
+a file claim with "session X is GONE — verified, not assumed" — rests on nothing.
+
+THE RULE: before comparing two identifiers, confirm they come from the same
+namespace. When a check returns the same answer for a case you KNOW is healthy,
+it is not a check. The cheapest test is to run it against yourself: if
+`deploy_claim.py status` reports your own live claim's holder as unfindable, the
+lookup is broken, not the holder.
+
+What IS evidence about a holder: `deploy_preflight.py` process output. The same
+hour, a peer found `build_soccer_artifacts.py --league eredivisie` (pid 2725)
+running under that exact claim. A running child proves liveness; a roster lookup
+proves nothing.
+
+AND: **TTL expiry frees the LOCK, not the WORK.** A claim that ages out while
+pid 2725 is still building is legal to take and will still kill the build --
+`#630`/2026-08-10, a deploy 61 seconds after a child started. Re-run preflight
+and deploy on CLEAR, not on the clock.
