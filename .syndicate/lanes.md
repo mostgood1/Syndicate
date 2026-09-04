@@ -134,6 +134,39 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ## OPEN
+### mlb-joint-correlation-producer — CLOSED 2026-09-04 — opened 2026-09-04 — **THE SIM NO LONGER DISCARDS ITS JOINT, AND THE CORRELATION IS MEASURED.** Landed `4558c0b7`, NOT DEPLOYED. Measured on production's own DET@CLE roster (pk824424, 2026-09-04), 1,000 sims: `home_runs x total_bases` **mean rho +0.610, range +0.227..+0.805 over 18/18 batters** — against ONE constant (`1.35`) serving all eighteen today, a 3.5x spread end to end. Cross-batter `total_bases x total_bases` reads **same team +0.097 / opposing +0.018** where the heuristic adds 0.25 + 0.14. Cost 0.433% of peak RSS. — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+- Goal: feed the `measured_lookup` seam that landed inert at `1bbcc246`, with a
+  correlation the sim actually computes instead of a table of flags.
+- Files (all landed): `vendor/mlb_bettingv2/sim_engine/joint_outcomes.py` (NEW),
+  `vendor/mlb_bettingv2/tools/daily_update.py` (additive, +145/-0),
+  `syndicate/features/mlb/sim_joint_correlation.py` (NEW),
+  `scripts/sim_input_checklist.py` (additive: `joint_site_problems()`),
+  `docs/ai_context/mlb_sim_engine_reference.md` (§8, the §2 pipeline trace),
+  `tests/test_mlb_sim_joint_outcomes.py`, `tests/test_mlb_sim_joint_correlation_resolver.py`,
+  `tests/test_mlb_sim_many_emits_joint.py` (all NEW).
+  **`correlation_engine.py` NOT TOUCHED** — claimed by `syndicate-a5`; the
+  resolver is a separate module and injects through the existing seam.
+- COLLISION HANDLED, NOT WORKED AROUND: `mlb-hitter-so-dead-field` held
+  `daily_update.py` and was aimed at the SAME TWO LINES. I messaged that session,
+  did the unclaimed work while blocked, and rebased after they closed. Their
+  `"SO": so` then let `strikeouts` join the matrix in this same commit.
+- **REACHABILITY IS NOT SUFFICIENT FOR THIS FILE, MEASURED.** With `_simw_chunk`
+  broken and `_sim_many` intact, BOTH `off != on` tests still PASS — `workers=1`
+  never enters `_simw_chunk`, and `--workers` DEFAULTS TO 4, so the tests take
+  the path production does not. All 3 single-site breaks tried were caught by
+  the AST invariant and by nothing else. `model_engine_standard` §4.3 needs this
+  corollary for any duplicated site.
+- Mutation results: 8/8 shape mutations killed by a named test (one survivor
+  first time — a determinism test that was a tautology for int sets, fixed);
+  3/3 single-site breaks caught by `joint_site_problems()`.
+- OWED: a deploy + a sim RUN. Shipping this does not rewrite an existing
+  `sim_*.json`, so no production artifact carries `joint` yet and the resolver
+  reports `joint_field_absent`. Nothing reads the resolver in production until
+  a caller passes it to `compute_correlation` — that wiring is DELIBERATELY not
+  done here, because it changes parlay pricing and bet sizing and belongs to
+  whoever owns that decision.
+- Blocked by: none.
+
 ### gate-per-side-derived — CLOSED 2026-09-04 — opened 2026-09-04 — **THE CONSTANT IS GONE, THE POPULATION MISMATCH IS FIXED, AND THE GATE FAILS BOTH LEGS BY MORE THAN ANY EARLIER READING SAID.** `GATE_PER_SIDE_TODAY = 4.05` was `8.1% / 2`, an identity that holds only AT EVEN MONEY; the gate book's unders sit at fair 0.607 and carry ~61% of the hold. Re-verified on production shards 2026-09-01..09-04: per-side **4.198pp** (median 4.289), two-way hold **7.09%** — the brief's figures reproduce (my n=114,545 against its 114,517). Landed `29c9c92f` on `origin/main`. DEPLOYED NOTHING. — session 3492626c-1ec4-4366-9dbe-f194ae319c84
 - Files: `scripts/measure_exchange_prop_option_value.py`,
   `tests/test_exchange_prop_option_value.py`. **CLAIMS RELEASED at close** — the
