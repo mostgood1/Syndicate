@@ -21809,3 +21809,68 @@ leave empty. That risk is bounded by the fixed field list (`_PROJECTED_TOP_LEVEL
 computed there and thrown away, so this measures the real thing at zero extra
 work and turns the inference into a reading on the next autorun. Not built; it
 needs a worker deploy.
+
+## 2026-09-04 — `projected_bytes` INSTRUMENTATION: WRITTEN, TESTED, **NOT APPLIED — the file belongs to another OPEN lane.** `[user: "add the projected_bytes instrumentation"; NO CODE IN THE REPO CHANGED, NO DEPLOY]`
+
+**BLOCKED BY LANE CLAIM, DELIBERATELY.** `accuracy-ledger-budget-raise` (OPEN,
+session `82fe0160`) lists BOTH files this needs — `intelligence_evaluation.py`
+and `test_accuracy_summary_ledger_budget.py`. CLAUDE.md: *"If another OPEN lane
+lists a file you need, stop and surface the conflict. Do not edit across lanes."*
+So the work was done against a SCRATCH COPY and handed over; **the repo file was
+never modified.** Handoff note is on their lane block; artifacts are
+`.syndicate/handoff/projected_bytes.diff` and `...
+projected_bytes_test.py.txt`.
+
+**Liveness of that lane's session could NOT be determined, which is why the rule
+was followed rather than judged.** Lane blocks carry `CLAUDE_CODE_SESSION_ID`s
+and `list_sessions` returns CCD `sessionId`s — **the two id spaces do not
+match**, the documented trap that produced two false "session is dead"
+conclusions on 2026-09-03. Unknown liveness therefore means ASSUME LIVE.
+
+**WHAT THE CHANGE IS.** In `build_accuracy_summary`, wrap the existing
+`_project_evaluation_record` call in a counting closure and put the total into
+`ledger_stats` AFTER the stream drains:
+
+    ledger_coverage["projected_bytes"] = <serialised bytes of the projected records>
+
+It goes in `ledger_coverage` (**published**) rather than on the
+`LEDGER_CHUNKS_ACCEPTED` log line, for a reason: `_stream_chunked_ledger_records`
+cannot see the projection — that happens in the consumer — and the 09-04
+truncation being discoverable only off the worker's stdout is a failure already
+paid for once.
+
+**VERIFIED BY EXECUTION, not by reading the diff.** The patched module was
+loaded under the real module name and run:
+
+    ledger_coverage: bytes_accepted 10,596,942  projected_bytes 544,056
+                     ratio 0.0513 -> 19.5x        (checkout substrate)
+
+    4 new tests   PASS patched / FAIL 4-of-4 unpatched   <- off != on
+    40 existing   test_accuracy_summary_ledger_budget, test_build_accuracy_summary,
+                  test_accuracy_summary_projection, test_bounded_accuracy_summary
+                  ALL PASS with the patch applied
+    git apply --check   CLEAN against origin/main, verified twice
+
+**COST MEASURED BEFORE WRITING IT,** because it adds a `json.dumps` inside a
+46,953-record loop and that is not self-evidently free: **7.7 us/record = +0.36 s
+on the 669.4 s production run = +0.054%.** The projection itself costs 11.6
+us/record, so the instrument is ~2/3 the price of the thing it measures.
+
+**ONE FIXTURE BUG FOUND AND FIXED IN MY OWN TEST, worth stating because it fails
+DECEPTIVELY.** `_is_chunked_ledger_path` compares against `DEFAULT_LEDGER_PATH`,
+so a `tmp_path` ledger is not recognised as chunked unless the test
+monkeypatches that constant — the existing suite does. Without it the chunk dir
+is never read and `ledger_coverage` comes back with the stream's keys **MISSING
+rather than zero**, which reads as an ordering bug in the patch. One of my four
+tests also PASSED for the wrong reason under that fixture (it asserted
+`projected_bytes == 0` and got zero because nothing ran at all). Both fixed;
+`absent != zero` is now asserted explicitly.
+
+**WHY IT MATTERS TO THE LANE THAT HOLDS IT.** Their falsification criterion is
+*"if peak anon rises faster than ~0.18 MiB per accepted MB, the projection ratio
+has drifted"* — and that ratio is currently **unmeasurable in production**. This
+field measures it directly, and also closes the 76x mirror estimate above, which
+is an inference across two substrates rather than a reading.
+
+**Owed:** nothing from me. The change needs either that lane to take it or the
+file to be released.
