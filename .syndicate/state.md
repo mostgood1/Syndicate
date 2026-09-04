@@ -823,3 +823,22 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   question was `VmHWM` vs `VmRSS`, added as a secondary reading. A WINDOWED
   minimum (last N) is the correct design.
 * **`unexplained_memory_mb` is 385.5 MB** and is not yet investigated.
+
+### `[web-oom-leak]` UPDATE 11 — merge caps lowered and **UNTESTED**; growth is NOT merges; the restart buys ~15 min, 2026-09-04T23:0xZ `[session b2b5b45b]`
+
+* `SYNDICATE_ARTIFACT_MERGE_CHILD_CAP` **2 -> 1** (`e3a5154f`) and
+  `SYNDICATE_ARTIFACT_MERGE_INFLIGHT_MB` **-> 16** (`3a9153f4`), both deployed on
+  CLEAR preflights. **verify: UNTESTED — 0 merge children in 75 polls / ~20 min.**
+* **The container ramped `1066.8 -> 1988.5 MB` (52% -> 97%) with NO merge child
+  running.** Merges are not the driver of the current growth; both changes bound
+  a path that is not firing.
+* **The restart bought ~15 MINUTES, not hours:** `1888.5 (92.2%) -> 1133.4
+  (55.3%)` at go-live, back to `1871.4` within 20 min.
+* **CORRECTS my own earlier estimate.** I said "a few hours", carrying the
+  `+173 MB/h` plateau rate from a quiet period into a much busier regime.
+  Measured: `52% -> 96.7% in 11 minutes`. Stale baseline, different regime.
+* Merge children are INTERMITTENT (two in flight at 22:29Z, pids 281/284, which
+  delayed the first deploy) — so the caps may be exercised in a later window.
+* **`#632` STILL HAS NO FIX.** Retention is the dominant mechanism (`VmHWM -
+  VmRSS` ~29 MB both workers; every polled series floor == first reading), it has
+  no identified owner, and neither env change touches it.

@@ -22598,3 +22598,47 @@ partly DEFINITIONAL — `residual = process - attributed`.
 coefficients:** `r=-0.999` "FALSIFIED" at n=3, `r=+0.870` "tracks" (on merged
 workers), `r=+0.710` "tracks" at n=8 collapsing to -0.297 without one window.
 The gate is now n>=8 with leave-one-out and Spearman reported beside Pearson.
+
+
+---
+
+## 2026-09-04T22:40:29Z and 22:59:41Z — web — `e3a5154f`, `3a9153f4` — merge caps lowered — **BOTH UNTESTED**
+
+`[lane web-oom-highwater, session b2b5b45b]` — user-directed: *"lower the merge
+child cap"*, then *"lower the inflight mb"*. Both on CLEAR preflights under a
+claim held by this lane; `e3a5154f` waited out two in-flight merge jobs
+(`HOLD: 2 job(s) in flight`) rather than killing them.
+
+* `SYNDICATE_ARTIFACT_MERGE_CHILD_CAP` **2 -> 1** (before value confirmed by the
+  set echo).
+* `SYNDICATE_ARTIFACT_MERGE_INFLIGHT_MB` **-> 16**. **The before value was NOT
+  captured** — I truncated the echo with my own `Select-Object -Last 5`. It was
+  32 per earlier tuning in this session; recorded as unverified rather than
+  asserted.
+
+verify: **UNTESTED, both of them. 0 merge children in 75 polls over ~20 minutes**
+(`/api/ops/memory`, 16 s cadence). Max concurrent 0, max summed child RSS 0.0 MB.
+A cap that never had to refuse anything has not been shown to work, and the
+verifier was built to say so rather than report a pass.
+
+**AND THE SAME WINDOW CARRIES A REAL FINDING: the container ramped
+`1066.8 -> 1988.5 MB` (52% -> 97%) with NO merge child running at any point.**
+So merges are not the driver of the current growth. Both changes bound a path
+that is not firing. They remain reasonable guards; they are not a fix, and
+nothing here should be read as one.
+
+**THE RESTART IS THE ONLY THING THAT MOVED MEMORY, and it is not a fix either:**
+`1888.5 MB (92.2%) -> 1133.4 MB (55.3%)` at go-live, back to `1871.4 MB` within
+~20 minutes. **The restart bought roughly 15 minutes, not hours.**
+
+**CORRECTION TO MY OWN ESTIMATE EARLIER THIS SESSION.** I said web would climb
+back over "a few hours", carrying forward the `+173 MB/h` plateau rate measured
+in a quiet period much earlier. Measured in this regime: `52% -> 96.7% in ELEVEN
+MINUTES`. That is roughly an order of magnitude faster, and applying the old
+baseline to a different traffic regime was a stale-baseline error I should have
+flagged instead of repeating.
+
+Merge children DO run — two were in flight at 22:29Z (pids 281, 284) and delayed
+the first deploy. They are intermittent, so the caps may yet be exercised; a
+later window could test them. Until then the honest status is UNTESTED, not
+working-as-intended.
