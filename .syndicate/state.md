@@ -331,6 +331,30 @@ for that pattern. **It does NOT carry the five MLB sim patterns**, which are
 still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
 /api/ops/artifacts/publish` still 403s.
 
+### Soccer / MLB / NCAAF join + cadence — MEASURED 2026-09-03..04 `[lane prop-join-yield]`
+
+- **Soccer projection coverage is 57.0%, not 19.0%.** `_attach_projections_over_window`
+  looped soccer per date while `board_enrichment` already resolves its 7-day slate
+  window inside each call. Fixed `ac735931`. `considered` 146,034 -> ~21,000
+  (**6.9x**), `unmatched_match` 67.4% -> **0.6%**. Counts quoted off the windowed
+  line before 2026-09-03 22:19Z are inflated ~7x.
+- **82% of unprojected MLB PLAYER prop rows are a name-join miss**, not an honest
+  blank: `player_unmatched_name 191` of `player_rows_considered 1423` (13.4%)
+  against `player_no_projection 43`. Counter shipped `c5e78549`.
+- **`sim_view: none` conflated two states.** 3,306 rows carry a model number with
+  no priced edge; they are `unpriced` since `36161e83`. Read `unpriced` before
+  treating `none` as "the sim had no view".
+- **NCAAF pregame quote cadence is ~640s, not ~12,948s.** Autorun `a9247011` +
+  `SYNDICATE_ENABLE_NCAAF_LINES_REFRESH_AUTORUN=1` on live-odds-worker, 300s,
+  game-day gated, 9 credits/run. **Measure on `quote_seen_age_seconds` (time since
+  we LOOKED), never `book_age_seconds` (time since the price MOVED).**
+- **live-odds-worker has NEVER been evicted.** `evicted: false` on all 23
+  `server_failed` since 2026-08-26; 20 are a scheduled self-recycle
+  (`SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS`, default 21600) that exits at
+  ~82% of max. Nine days at 95-100% of 2GB, zero platform kills. The autorun costs
+  10.4% -> 19.0% of samples within 50MB of the limit, with excursions NOT timed to
+  its runs (median 154s into a 300s loop).
+
 ## [subject-index] SUBJECT INDEX — every subject, and which file holds it
 
 One subject, one section, ACROSS ALL FILES. `state_key_check.py` checks
