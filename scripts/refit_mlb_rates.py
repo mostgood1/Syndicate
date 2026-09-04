@@ -70,6 +70,24 @@ STATS = {
 }
 
 
+
+# rate name -> the `PitchModelConfig` knob that ships it, and that knob's CURRENT
+# default. The correction multiplies the BASELINE rather than replacing it: hr
+# and inplay already carry a fitted 1.03, so a correction of 1.80 must ship as
+# 1.03 * 1.80, not as 1.80. k and bb start neutral at 1.0.
+_RATE_TO_KNOB = {
+    "hr_rate": "hr_rate_mult",
+    "inplay_hit_rate": "inplay_hit_rate_mult",
+    "k_rate": "k_rate_mult",
+    "bb_rate": "bb_rate_mult",
+}
+_KNOB_BASELINE = {
+    "hr_rate_mult": 1.03,
+    "inplay_hit_rate_mult": 1.03,
+    "k_rate_mult": 1.0,
+    "bb_rate_mult": 1.0,
+}
+
 def load_actual_rates(dates: "set[str] | None" = None) -> tuple:
     """League aggregate counting stats, OPTIONALLY restricted to `dates`.
 
@@ -173,17 +191,41 @@ def sim_aggregates(jobs, cfg_kwargs, sims, seed, corrections, season, weight):
                 # therefore stale by construction.
                 apply_arsenal_to_pitcher(p, season=season)
                 apply_quality(p, season=season, side="pitchers")
+            # BATTERS, at ROSTER scope -- deliberately NOT inside the pitcher
+            # loop above. A patch of mine re-indented this by four spaces on
+            # 2026-09-04 and it ran once per PITCHER instead of once per roster,
+            # applying the batted-ball, arsenal and quality blends repeatedly.
+            # It moved the UNCORRECTED baseline hr_rate 0.01873 -> 0.02732, a 46%
+            # shift in a pass that is supposed to be identical between runs, and
+            # every correction derived from it was wrong. Caught only because the
+            # two runs' PASS 1 disagreed and PASS 1 takes no corrections at all.
             for b in list(r.lineup.batters) + list(r.lineup.bench or []):
                 apply_batted_ball_to_batter(b, season=season, weight=weight)
                 apply_arsenal_to_batter(b, season=season)
                 apply_quality(b, season=season, side="batters")
-                # apply the refit corrections on top of every other source
-                for rate, mult in (corrections or {}).items():
-                    try:
-                        setattr(b, rate, float(getattr(b, rate)) * float(mult))
-                    except Exception:
-                        pass
-        cfg = GameConfig(rng_seed=seed, manager_pitching="v2", **cfg_kwargs)
+        # CORRECTIONS APPLIED THROUGH THE SHIPPING KNOB, not the batter profile.
+        #
+        # They used to be `setattr(b, rate, ...)` on every batter, which is a
+        # different transformation from the one that would ship:
+        # `PitchModelConfig`'s multipliers act on the COMBINED target, after the
+        # batter and pitcher rates are blended and after `clamp01`. A correction
+        # fitted by scaling the batter and then applied at the combined target is
+        # not the correction that was measured -- so the harness now measures the
+        # configuration that would actually be deployed.
+        #
+        # `pitch_model_overrides` is the existing seam: `simulate_game` filters it
+        # against `PitchModelConfig.__dataclass_fields__` and builds the config
+        # from it (simulate.py:2255-2263).
+        overrides = dict(cfg_kwargs.pop("pitch_model_overrides", {}) or {})
+        for rate, mult in (corrections or {}).items():
+            knob = _RATE_TO_KNOB.get(rate)
+            if not knob:
+                continue
+            overrides[knob] = float(_KNOB_BASELINE[knob]) * float(mult)
+        cfg = GameConfig(
+            rng_seed=seed, manager_pitching="v2",
+            pitch_model_overrides=overrides, **cfg_kwargs,
+        )
         for i in range(sims):
             try:
                 res = simulate_game(away, home, replace(cfg, rng_seed=seed + i))
@@ -212,6 +254,10 @@ def main() -> int:
     ap.add_argument("--spread", action="store_true", default=True,
                     help="sample --games evenly across the window (default), not the first N")
     ap.add_argument("--no-spread", dest="spread", action="store_false")
+    ap.add_argument("--holdout-dates", type=int, default=0,
+                    help="fit on all but the LAST N dates, then validate on "
+                         "those N. learnings.md 2026-08-31 FORBIDS shipping a "
+                         "calibration validated only in-sample.")
     args = ap.parse_args()
 
     jobs = []
@@ -285,6 +331,76 @@ def main() -> int:
         c = (a / s) if s > 0 else 1.0
         corr[k] = c
         print(f"  {k:18s} {s:10.5f} {a:10.5f} {(s - a) / a:+9.1%} {c:11.4f}")
+
+    # ------------------------------------------------------------------
+    # OUT-OF-SAMPLE VALIDATION.
+    #
+    # `learnings.md` 2026-08-31 marks shipping a calibration validated ONLY
+    # in-sample as FORBIDDEN: a WNBA sigma refit was tuned to 18.25 on a pooled
+    # residual, looked good in-sample, and was worse out of it. PASS 2 below is
+    # in-sample BY CONSTRUCTION -- same games, same seeds, corrections fitted on
+    # exactly the rows they are then scored against.
+    #
+    # So this re-fits on the TRAIN dates alone and scores on dates the fit never
+    # saw. A correction that shrinks the residual here has earned something PASS
+    # 2 cannot demonstrate at any sample size.
+    # ------------------------------------------------------------------
+    if args.holdout_dates > 0:
+        held = sorted(sim_dates)[-args.holdout_dates:]
+        held_set = set(held)
+        train = [j for j in jobs if j[0] not in held_set]
+        test = [j for j in jobs if j[0] in held_set]
+        print(f"HELD-OUT VALIDATION  train {len(train)} game(s) / "
+              f"{len(sim_dates) - len(held)} date(s)   "
+              f"test {len(test)} game(s) / {len(held)} date(s) "
+              f"{held[0]}..{held[-1]}")
+        if not train or not test:
+            print("  the split leaves one side empty -- refusing to report a number")
+            return 1
+        tr_actual, _, _, _ = load_actual_rates({d for d, _ in train})
+        te_actual, _, _, _ = load_actual_rates({d for d, _ in test})
+        if not tr_actual.get("pa") or not te_actual.get("pa"):
+            print("  no actual rows on one side of the split -- refusing")
+            return 1
+
+        def _rates(agg, pa_key="PA", ab_key="AB"):
+            return {"hr_rate": agg["HR"] / agg[pa_key],
+                    "inplay_hit_rate": agg["H"] / agg[ab_key],
+                    "k_rate": agg["SO"] / agg[pa_key],
+                    "bb_rate": agg["BB"] / agg[pa_key]}
+
+        def _act(tot):
+            return {"hr_rate": tot["hr"] / tot["pa"],
+                    "inplay_hit_rate": tot["h"] / tot["ab"],
+                    "k_rate": tot["so"] / tot["pa"],
+                    "bb_rate": tot["bb"] / tot["pa"]}
+
+        tr_act, te_act = _act(tr_actual), _act(te_actual)
+        tr_sim = _rates(sim_aggregates(train, on, args.sims, args.seed, None,
+                                       args.season, args.bb_weight))
+        oos_corr = {k: (tr_act[k] / tr_sim[k]) if tr_sim[k] > 0 else 1.0 for k in STATS}
+        before = _rates(sim_aggregates(test, on, args.sims, args.seed, None,
+                                       args.season, args.bb_weight))
+        after = _rates(sim_aggregates(test, on, args.sims, args.seed, oos_corr,
+                                      args.season, args.bb_weight))
+        print()
+        print(f"  {'rate':18} {'fitted':>9} {'oos before':>11} {'oos after':>10} "
+              f"{'oos actual':>11}   residual")
+        print("  " + "-" * 82)
+        oos_improved = 0
+        for k in STATS:
+            r1 = abs(before[k] - te_act[k]) / te_act[k]
+            r2 = abs(after[k] - te_act[k]) / te_act[k]
+            if r2 < r1:
+                oos_improved += 1
+            print(f"  {k:18} {oos_corr[k]:9.4f} {before[k]:11.5f} {after[k]:10.5f} "
+                  f"{te_act[k]:11.5f}   {r1:+7.1%} -> {r2:+7.1%}")
+        print()
+        print(f"  OUT-OF-SAMPLE: residual shrank on {oos_improved} of {len(STATS)} rates")
+        if oos_improved < len(STATS):
+            print("  DO NOT SHIP -- `learnings.md` 2026-08-31 forbids shipping a refit")
+            print("  validated only in-sample, and THIS is the out-of-sample answer.")
+        print()
 
     print("\nPASS 2 — corrections applied, same seeds")
     s2 = sim_aggregates(jobs, on, args.sims, args.seed, corr, args.season, args.bb_weight)

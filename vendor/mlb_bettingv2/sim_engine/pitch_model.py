@@ -280,6 +280,12 @@ class PitchModelConfig:
     # without injecting extra variance.
     hr_rate_mult: float = 1.03
     inplay_hit_rate_mult: float = 1.03
+    # K AND BB, added 2026-09-04 so a four-rate refit has four knobs. NEUTRAL by
+    # default (1.0) rather than 1.03: hr/inplay carry a previously fitted value,
+    # these carry none yet, and starting at exactly no-op keeps `off != on`
+    # measurable and this commit behaviour-preserving.
+    k_rate_mult: float = 1.0
+    bb_rate_mult: float = 1.0
     xb_share_mult: float = 0.94
 
     # Optional: per-game run environment multiplier (latent).
@@ -624,6 +630,12 @@ def simulate_pitch(
     # Deterministic run environment tuning.
     hr_tgt = clamp01(hr_tgt * float(getattr(cfg, "hr_rate_mult", 1.0) or 1.0))
     inplay_hit = clamp01(inplay_hit * float(getattr(cfg, "inplay_hit_rate_mult", 1.0) or 1.0))
+    # Same hook, same stage, for the other two rates a refit corrects. Applied
+    # AFTER the k-logit calibration above deliberately: that transform shapes the
+    # curve, this scales the level, and folding a level correction into a logit
+    # mult would make the two inseparable.
+    k_tgt = clamp01(k_tgt * float(getattr(cfg, "k_rate_mult", 1.0) or 1.0))
+    bb_tgt = clamp01(bb_tgt * float(getattr(cfg, "bb_rate_mult", 1.0) or 1.0))
 
     # Weather adjustments (kept intentionally conservative).
     hr_tgt = clamp01(hr_tgt * float(weather_hr_mult) * float(park_hr_mult))
