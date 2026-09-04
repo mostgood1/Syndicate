@@ -18,6 +18,14 @@ being edited". Measured 2026-09-04, settlement carried **1,594 settled orders**
 `test_deriving_the_map_changes_the_stake` is the reachability test and it comes
 first on purpose: a wired hook that does not move the number is inert, and
 inertness is what this whole file exists to catch.
+
+CORRECTION 2026-09-04, SAME DAY: wiring it was right, the UNIT was not. The map
+counted settled ORDER ROWS, and the same bet placed at Kalshi and at Polymarket
+is two rows and one Bernoulli trial. NFL's 18 settled rows are 12 distinct
+decisions, which is BELOW the 0.25 credibility floor (12/50 = 0.24) rather than
+at 0.36. See the RECONCILIATION block below -- it recomputes both of this
+system's "settled by sport" numbers from one ledger and pins the identity
+between them.
 """
 from __future__ import annotations
 
@@ -95,35 +103,264 @@ def test_credibility_ramps_and_caps():
     assert 0.49 < half < 0.51, "the ramp is linear in the sample size"
 
 
+# ---------------------------------------------------------------------------
+# THE RECONCILIATION. Two settlement numbers disagreed about NFL in production
+# on 2026-09-04 and the disagreement sized real money:
+#
+#   /portfolio/paper  settlement_all_time.by_sport   nfl: orders=1, settled=0
+#   refresh-worker    [portfolio_commit] SETTLED_SAMPLE          nfl: 18
+#
+# BOTH PRODUCERS WERE RIGHT AND THEY COUNT DIFFERENT POPULATIONS:
+#
+#   paper page   settled ORDER ROWS, portfolio book, MODE != LIVE. That filter
+#                is load-bearing -- the page's banner says "no money moves" and
+#                a live position rendered under it is a real wager wearing a
+#                disclaimer that it is not one.
+#   credibility  distinct settled DECISIONS, portfolio book, EVERY MODE. The
+#                live book is 315 of the ledger's 979 settled rows and ALL 18
+#                of the NFL, so paper-only is not a sample of our NFL edge.
+#
+# AND THE CONSUMER'S UNIT WAS WRONG. It counted rows. The same bet placed at
+# Kalshi and at Polymarket is two rows and ONE Bernoulli trial -- the game
+# resolves once, so the pair cannot disagree, and on production all six NFL
+# pairs settled identically. 18 rows -> 12 decisions -> credibility 0.36 ->
+# 0.25, the floor.
+#
+# These tests recompute BOTH numbers from ONE fixture ledger and pin the
+# identity between them, so a future change to either side that breaks the
+# reconciliation fails here rather than in a stake.
+# ---------------------------------------------------------------------------
+
+from syndicate.features.shared.paper_settlement import (  # noqa: E402
+    settled_decisions_by_sport,
+    settlement_summary,
+)
+
+
+def _order(
+    *,
+    sport,
+    event_id,
+    venue,
+    mode="live",
+    outcome="won",
+    market="totals",
+    side="over",
+    line=37.5,
+    player="",
+    segment="full",
+    stake=5.0,
+    pnl=1.0,
+    idem=None,
+    opening_key=None,
+    date="2026-08-28",
+):
+    """One ledger row, shaped the way `execution_ledger` writes it.
+
+    `opening_key` carries the bookmaker, exactly as production does -- that is
+    what makes the two-venue duplicate two ROWS with two distinct
+    `position_key`s and one decision. Measured on a real pair 2026-09-04:
+
+        ...|side=over|line=34.5|bookmaker=polymarket
+        ...|side=over|line=34.5|bookmaker=kalshi
+    """
+    key = opening_key
+    if key is None:
+        key = (
+            f"event_id={event_id}|market={market}|player={player}"
+            f"|segment={segment}|side={side}|line={line}|bookmaker={venue}"
+        )
+    return {
+        "sport": sport,
+        "event_id": event_id,
+        "market": market,
+        "side": side,
+        "line": line,
+        "player_name": player or None,
+        "segment": segment,
+        "venue": venue,
+        "book": venue,
+        "mode": mode,
+        "status": "filled",
+        "outcome": outcome,
+        "opening_key": key,
+        "idempotency_key": idem or f"{venue}-{event_id}-{side}-{line}-{mode}",
+        "selected_date": date,
+        "fill_stake_dollars": stake,
+        "pnl_dollars": pnl,
+    }
+
+
+# The fixture is the production SHAPE, scaled down so every number in the
+# assertions can be counted by eye.
+#
+#   nfl     one preseason total, taken at BOTH venues, both won -> 2 rows, 1
+#           decision. Plus one unsettled paper row, which is what made the paper
+#           page read `orders=1, settled=0`.
+#   mlb     two distinct live decisions and one paper decision, no overlap.
+#   soccer  one decision taken in BOTH BOOKS -- paper and live -- which is the
+#           other duplication class and the one `book_of` does not catch.
+LEDGER = [
+    # --- nfl: the reported symptom, in miniature ---------------------------
+    _order(sport="nfl", event_id="nfl-1", venue="kalshi", line=34.5),
+    _order(sport="nfl", event_id="nfl-1", venue="polymarket", line=34.5),
+    _order(sport="nfl", event_id="nfl-2", venue="paper", mode="paper", outcome=""),
+    # --- mlb: no duplication at all ----------------------------------------
+    _order(sport="mlb", event_id="mlb-1", venue="kalshi", market="h2h", side="home", line=None),
+    _order(sport="mlb", event_id="mlb-2", venue="polymarket", market="h2h", side="home", line=None),
+    _order(sport="mlb", event_id="mlb-3", venue="paper", mode="paper", market="h2h", side="home", line=None),
+    # --- soccer: the SAME decision in the paper book and the live book -----
+    _order(sport="soccer", event_id="soc-1", venue="paper", mode="paper", market="h2h", side="home", line=None),
+    _order(sport="soccer", event_id="soc-1", venue="kalshi", market="h2h", side="home", line=None),
+    # --- the venue-scoped SHADOW book, which belongs to neither number -----
+    _order(sport="nfl", event_id="nfl-1", venue="paper:kalshi", mode="paper", line=34.5),
+    _order(sport="mlb", event_id="mlb-9", venue="paper:novig", mode="paper", market="h2h", side="home", line=None),
+]
+
+
+def _paper_page_by_sport(ledger):
+    """What `/portfolio/paper` computes: the payload's own `mode != LIVE` filter
+    (`intelligence.py`, `_paper_portfolio_payload`) and then `by_sport`."""
+    paper_rows = [o for o in ledger if str(o.get("mode") or "paper") != "live"]
+    summary = settlement_summary(None, orders=paper_rows)
+    return {b["key"]: b["settled"] for b in summary["by_sport"]}
+
+
+def test_the_two_numbers_disagree_about_nfl_exactly_as_production_did():
+    """The symptom, reproduced from one ledger. If this ever stops reproducing,
+    the fixture has drifted away from the bug it was written for."""
+    page = _paper_page_by_sport(LEDGER)
+    credibility = settled_decisions_by_sport(LEDGER)
+
+    assert page.get("nfl", 0) == 0, "the paper page sees no settled NFL"
+    assert credibility["nfl"] == 1, "the credibility sample does, and it is not zero"
+
+
+def test_the_gap_is_fully_explained_and_nothing_is_left_over():
+    """THE PIN. Every sport's credibility count must equal
+
+        distinct decisions in the paper book
+      + distinct decisions in the live book
+      - decisions present in BOTH
+
+    computed independently of the function under test. A drift on either side
+    breaks this with the sport named, rather than moving a stake in silence.
+    """
+    from syndicate.features.shared.clv_position_join import market_key
+    from syndicate.features.shared.paper_settlement import BOOK_PORTFOLIO, book_of
+
+    expected = {}
+    for row in LEDGER:
+        if book_of(row) != BOOK_PORTFOLIO or not row.get("outcome"):
+            continue
+        sport = row["sport"]
+        book = "live" if row.get("mode") == "live" else "paper"
+        expected.setdefault(sport, {"paper": set(), "live": set()})
+        expected[sport][book].add(market_key(row["opening_key"]))
+
+    reconciled = {
+        sport: len(b["paper"]) + len(b["live"]) - len(b["paper"] & b["live"])
+        for sport, b in expected.items()
+    }
+    assert reconciled == {"nfl": 1, "mlb": 3, "soccer": 1}
+    assert settled_decisions_by_sport(LEDGER) == reconciled
+
+
+def test_one_bet_at_two_venues_is_one_piece_of_evidence():
+    """The correction that moved NFL to the floor. Two rows, two position keys,
+    one game -- and the pair CANNOT disagree, which is the whole reason it is
+    one trial. Measured on production: 6 such NFL pairs, 6 identical outcomes."""
+    two_venues = [r for r in LEDGER if r["event_id"] == "nfl-1" and r["venue"] in ("kalshi", "polymarket")]
+    assert len(two_venues) == 2
+    assert len({r["opening_key"] for r in two_venues}) == 2, "two distinct rows"
+    assert len({r["outcome"] for r in two_venues}) == 1, "one outcome, necessarily"
+    assert settled_decisions_by_sport(two_venues) == {"nfl": 1}
+
+
+def test_the_same_decision_in_both_books_is_also_counted_once():
+    """The paper book and the live book overlap -- measured 2026-09-04, 27
+    settled decisions appear in both. `book_of` does not catch this: both rows
+    are in the PORTFOLIO book, one just has `venue="paper"`."""
+    both_books = [r for r in LEDGER if r["event_id"] == "soc-1"]
+    assert {r["mode"] for r in both_books} == {"paper", "live"}
+    assert settled_decisions_by_sport(both_books) == {"soccer": 1}
+
+
+def test_the_row_count_and_the_decision_count_are_different_numbers():
+    """The mutation this file exists to catch. If someone reinstates the row
+    count, `nfl` reads 2 rather than 1 and this goes red."""
+    summary = settlement_summary(None, orders=LEDGER)
+    rows_by_sport = {b["key"]: b["settled"] for b in summary["by_sport"]}
+    decisions = settled_decisions_by_sport(LEDGER)
+
+    assert rows_by_sport["nfl"] == 2, "the ledger really does hold two NFL rows"
+    assert decisions["nfl"] == 1, "and they are one decision"
+    assert rows_by_sport != decisions, (
+        "a settled-ROW count is not a sample size; if these are equal the dedupe "
+        "is inert and NFL is being sized on duplicates"
+    )
+
+
+def test_the_shadow_books_are_in_neither_number():
+    """`paper:kalshi` and friends are the venue-scoped comparison book. Counting
+    them would restore the double-count `book_of` was written to remove."""
+    shadow_only = [r for r in LEDGER if str(r["venue"]).startswith("paper:")]
+    assert shadow_only, "fixture must actually contain shadow rows"
+    assert settled_decisions_by_sport(shadow_only) == {}
+
+
 # --- the derivation ----------------------------------------------------------
 
 
-def test_it_derives_from_settlement_and_lowercases_the_key(monkeypatch):
+def test_it_lowercases_the_sport_and_SUMS_a_case_collision():
     """The consumption site looks the sport up as
     `str(row.get("sport") or "").strip().lower()`. A key that does not match is
-    silently 0 -- which is the floor again, i.e. the exact bug, re-created."""
-    monkeypatch.setattr(
-        "syndicate.features.shared.paper_settlement.settlement_summary",
-        lambda *a, **k: {"by_sport": [
-            {"key": "MLB", "settled": 616},
-            {"key": "Soccer", "settled": 34},
-        ]},
-    )
-    got = runner._settled_sample_size_by_sport()
-    assert got == {"mlb": 616, "soccer": 34}
+    silently 0 -- which is the floor again, i.e. the exact bug, re-created.
+
+    AND A COLLISION MERGES RATHER THAN OVERWRITING. Every ledger row measured
+    2026-09-04 was already lowercase (596 live + 1,847 paper), so this is
+    latent; the previous implementation ASSIGNED into the map, so a future
+    `"NFL"` beside an `"nfl"` would have discarded one of them silently.
+    """
+    mixed = [
+        _order(sport="NFL", event_id="a", venue="kalshi", line=1.5),
+        _order(sport="nfl", event_id="b", venue="kalshi", line=2.5),
+        _order(sport=" Soccer ", event_id="c", venue="kalshi", market="h2h", side="home", line=None),
+    ]
+    assert settled_decisions_by_sport(mixed) == {"nfl": 2, "soccer": 1}
 
 
-def test_it_drops_unknown_and_zero_buckets(monkeypatch):
-    """`unknown` is not a sport, and a 0 contributes nothing but noise."""
+def test_it_drops_unknown_and_unsettled_rows():
+    """`unknown` is not a sport, it is a failed sport join. An ungraded row is
+    not evidence yet."""
+    rows = [
+        _order(sport="unknown", event_id="u", venue="kalshi"),
+        _order(sport="", event_id="v", venue="kalshi", line=1.5),
+        _order(sport="nhl", event_id="w", venue="kalshi", outcome="", line=2.5),
+        _order(sport="mlb", event_id="x", venue="kalshi", line=3.5),
+    ]
+    assert settled_decisions_by_sport(rows) == {"mlb": 1}
+
+
+def test_an_unkeyable_row_counts_as_its_own_decision():
+    """Dropping it would UNDERSTATE the sample, and understating is the
+    direction that silently re-floors a sport. It cannot be deduped, so it is
+    its own decision -- never merged with another unkeyable row."""
+    rows = [
+        _order(sport="mlb", event_id="", venue="kalshi", opening_key="", idem="one"),
+        _order(sport="mlb", event_id="", venue="kalshi", opening_key="", idem="two"),
+    ]
+    assert settled_decisions_by_sport(rows) == {"mlb": 2}
+
+
+def test_it_reads_the_whole_ledger_when_no_orders_are_passed(monkeypatch):
+    """`settled_sample_size_by_sport=None` means "work it out" -- from the
+    ledger, both modes, not from whatever a page happened to filter."""
     monkeypatch.setattr(
-        "syndicate.features.shared.paper_settlement.settlement_summary",
-        lambda *a, **k: {"by_sport": [
-            {"key": "unknown", "settled": 900},
-            {"key": "nhl", "settled": 0},
-            {"key": "mlb", "settled": 12},
-        ]},
+        "syndicate.features.shared.execution_ledger._load",
+        lambda *a, **k: {"orders": LEDGER},
     )
-    assert runner._settled_sample_size_by_sport() == {"mlb": 12}
+    assert runner._settled_sample_size_by_sport() == {"nfl": 1, "mlb": 3, "soccer": 1}
 
 
 def test_a_settlement_failure_reverts_rather_than_breaking_the_commit(monkeypatch):
@@ -132,27 +369,26 @@ def test_a_settlement_failure_reverts_rather_than_breaking_the_commit(monkeypatc
     def boom(*a, **k):
         raise RuntimeError("ledger unreadable")
 
-    monkeypatch.setattr(
-        "syndicate.features.shared.paper_settlement.settlement_summary", boom)
+    monkeypatch.setattr("syndicate.features.shared.execution_ledger._load", boom)
     assert runner._settled_sample_size_by_sport() == {}
 
 
-def test_malformed_buckets_do_not_break_the_derivation(monkeypatch):
+def test_malformed_rows_do_not_break_the_derivation(monkeypatch):
     monkeypatch.setattr(
-        "syndicate.features.shared.paper_settlement.settlement_summary",
-        lambda *a, **k: {"by_sport": [
+        "syndicate.features.shared.execution_ledger._load",
+        lambda *a, **k: {"orders": [
             "not-a-mapping",
-            {"key": "mlb", "settled": "not-a-number"},
-            {"key": "nfl", "settled": 77},
+            None,
+            _order(sport="nfl", event_id="ok", venue="kalshi"),
         ]},
     )
-    assert runner._settled_sample_size_by_sport() == {"nfl": 77}
+    assert runner._settled_sample_size_by_sport() == {"nfl": 1}
 
 
-def test_an_absent_by_sport_key_yields_an_empty_map(monkeypatch):
+def test_an_empty_ledger_yields_an_empty_map(monkeypatch):
     monkeypatch.setattr(
-        "syndicate.features.shared.paper_settlement.settlement_summary",
-        lambda *a, **k: {"by_venue": [{"venue": "kalshi", "settled": 474}]},
+        "syndicate.features.shared.execution_ledger._load",
+        lambda *a, **k: {"orders": []},
     )
     assert runner._settled_sample_size_by_sport() == {}
 
@@ -194,8 +430,12 @@ def test_run_portfolio_commit_ACTUALLY_PASSES_the_derived_map(tmp_path, monkeypa
         lambda date: {"rows": [_row()]},
     )
     monkeypatch.setattr(
-        "syndicate.features.shared.paper_settlement.settlement_summary",
-        lambda *a, **k: {"by_sport": [{"key": "mlb", "settled": 616}]},
+        "syndicate.features.shared.execution_ledger._load",
+        lambda *a, **k: {"orders": [
+            _order(sport="mlb", event_id=f"e{i}", venue="kalshi",
+                   market="h2h", side="home", line=None)
+            for i in range(616)
+        ]},
     )
 
     seen = {}
@@ -223,8 +463,12 @@ def test_an_explicit_map_is_not_overwritten_by_the_derivation(tmp_path, monkeypa
         lambda date: {"rows": [_row()]},
     )
     monkeypatch.setattr(
-        "syndicate.features.shared.paper_settlement.settlement_summary",
-        lambda *a, **k: {"by_sport": [{"key": "mlb", "settled": 616}]},
+        "syndicate.features.shared.execution_ledger._load",
+        lambda *a, **k: {"orders": [
+            _order(sport="mlb", event_id=f"e{i}", venue="kalshi",
+                   market="h2h", side="home", line=None)
+            for i in range(616)
+        ]},
     )
 
     seen = {}

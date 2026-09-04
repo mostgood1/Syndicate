@@ -822,44 +822,62 @@ def _settled_sample_size_by_sport() -> dict[str, int]:
     1.00, four times what it was being sized at. The whole board wanted $19.64
     of a $1,000 bankroll.
 
+    *(Those two figures are kept as written because they are the reading that
+    motivated the fix, but label them: 1,594 is every book including the
+    venue-scoped shadow copies, and MLB's 616 is the PAPER book alone. The
+    portfolio book over the same ledger is 979 settled rows / **783 distinct
+    decisions**, MLB 616 -> 865 rows -> 684 decisions. See the correction below
+    -- none of those moves MLB off credibility 1.00, which is exactly why the
+    error survived a first reading: it was invisible in the sport that was
+    looked at.)*
+
     **DERIVED HERE RATHER THAN PASSED BY THE CALLER, deliberately.** There is
     exactly one production caller (`intelligence_state.py`) and it did not pass
     it; making the fix depend on a caller remembering is how it was lost the
     first time. A default of `None` now means "work it out", not "size
     everything at the floor".
 
-    `by_sport` is scoped to PORTFOLIO rows, so each decision is counted once
-    rather than pooled with its own venue-scoped copies -- the double-count
-    `settlement_summary` documents at its own `by_sport` line.
+    -----------------------------------------------------------------------
+    IT COUNTS DECISIONS, NOT ORDER ROWS, AND THAT IS A CORRECTION [2026-09-04]
+    -----------------------------------------------------------------------
 
-    Keys are lowercased to match the consumption site, which looks the sport up
-    as `str(row.get("sport") or "").strip().lower()`. A key that does not match
-    is silently 0, which is the floor again -- the exact failure this repairs.
+    This first shipped reading `settlement_summary()["by_sport"]["settled"]`,
+    which is a count of settled ORDER ROWS. Two settlement numbers then
+    disagreed about NFL in production on 2026-09-04 -- `settlement_all_time.
+    by_sport` said `orders=1, settled=0` while this line printed `nfl: 18` --
+    and running both down produced two separate facts:
+
+      1. THE PRODUCERS ARE BOTH RIGHT. `settlement_all_time` is rendered on
+         `/portfolio/paper`, whose banner says "no money moves", so its payload
+         is filtered to `mode != live` before the summary ever sees it. It is
+         the PAPER book. This function reads the whole ledger, paper AND live,
+         which is the right population for "what do we know about our edge" --
+         the live book is 315 of the 979 settled rows and all 18 of the NFL.
+
+      2. THE UNIT WAS WRONG HERE. A row count is not a sample size. The same
+         bet placed at Kalshi and at Polymarket is two rows and ONE trial; the
+         game resolves once. Measured over the production ledger the same day,
+         NFL's 18 settled rows are **12 distinct decisions** -- six pairs, and
+         all six pairs settled identically, as they must.
+
+    So this delegates to `paper_settlement.settled_decisions_by_sport`, which
+    owns the definition and the dedupe, rather than deriving a second one here.
+    The measured effect on sizing is stated where it belongs, in that
+    function's docstring: **NFL credibility 0.360 -> 0.250, the floor.**
 
     Returns `{}` on any failure, which reverts to the old behaviour rather than
     breaking the commit. The reason is printed, because a silent revert here is
     indistinguishable from the bug.
     """
     try:
-        from syndicate.features.shared.paper_settlement import settlement_summary
+        from syndicate.features.shared.paper_settlement import (
+            settled_decisions_by_sport,
+        )
 
-        summary = settlement_summary()  # no date -> ALL TIME
+        return settled_decisions_by_sport()  # whole ledger -> ALL TIME
     except Exception as exc:  # noqa: BLE001
         print(f"[portfolio_commit] SETTLED_SAMPLE_UNAVAILABLE error={exc}", flush=True)
         return {}
-
-    out: dict[str, int] = {}
-    for bucket in (summary.get("by_sport") or []):
-        if not isinstance(bucket, Mapping):
-            continue
-        key = str(bucket.get("key") or "").strip().lower()
-        try:
-            settled = int(bucket.get("settled") or 0)
-        except (TypeError, ValueError):
-            continue
-        if key and key != "unknown" and settled > 0:
-            out[key] = settled
-    return out
 
 
 def run_portfolio_commit(

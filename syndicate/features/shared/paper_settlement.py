@@ -56,6 +56,7 @@ __all__ = [
     "dates_needing_settlement",
     "grade_order",
     "settle_orders",
+    "settled_decisions_by_sport",
     "settlement_summary",
     "OUTCOME_WON",
     "OUTCOME_LOST",
@@ -1182,6 +1183,123 @@ def settlement_summary(
         # available, so a reader can attribute it. See `_settlement_authority`.
         "by_settled_by": _grouped(portfolio_rows, _settlement_authority),
     }
+
+
+# ---------------------------------------------------------------------------
+# HOW MUCH SETTLED EVIDENCE, WHICH IS NOT HOW MANY SETTLED ORDER ROWS
+# ---------------------------------------------------------------------------
+
+
+def settled_decisions_by_sport(
+    orders: Sequence[Mapping[str, Any]] | None = None,
+) -> dict[str, int]:
+    """Distinct settled DECISIONS per sport. The credibility sample size.
+
+    THE POPULATION, stated because two numbers in this system are both called
+    "settled by sport" and they are not the same number:
+
+        every mode (paper AND live), every venue in the PORTFOLIO book,
+        every date, counted once per DECISION -- not once per order row.
+
+    `settlement_summary(...)["by_sport"]` is the other one. It is a row count,
+    which is right for a P&L page and wrong here, and on `/portfolio/paper` it
+    is additionally scoped to paper-mode rows by that page's own live-order
+    filter. Reading it as this number is what this function exists to stop.
+    Both facts are pinned by `tests/test_settled_sample_credibility.py`.
+
+    -----------------------------------------------------------------------
+    WHY ROWS ARE THE WRONG UNIT, MEASURED
+    -----------------------------------------------------------------------
+
+    `_sample_credibility` asks "how much settled evidence do we have about this
+    sport's edge" and divides by 50. Evidence means independent trials. The
+    same bet placed at Kalshi AND at Polymarket is TWO ORDER ROWS and ONE
+    Bernoulli trial -- the game resolves once, so the two rows cannot disagree.
+
+    Measured on the production ledger 2026-09-04, 979 settled portfolio-book
+    rows, all dates:
+
+        sport    settled rows    distinct decisions
+        mlb      865             684
+        wnba      66              59
+        soccer    30              28
+        nfl       18              12   <- 6 pairs, every pair identical W/L
+
+    NFL is why this matters and it is not a rounding argument: 18 rows put
+    credibility at 0.36, and 12 decisions put it at the 0.25 FLOOR (12/50 =
+    0.24). The row count was buying a 44% larger NFL stake with duplicates.
+
+    This is the same doctrine `book_of` already encodes one level up -- summing
+    `paper` with `paper:kalshi` and friends "counted the same decision up to
+    five times and reported it as one portfolio". The venue-scoped shadow books
+    were the visible case; two live venues quoting one market is the same error
+    inside the portfolio book, and no venue label separates them.
+
+    -----------------------------------------------------------------------
+    THE IDENTITY IS BORROWED, NOT REBUILT
+    -----------------------------------------------------------------------
+
+    `clv_position_join.market_key` already strips the bookmaker component off
+    an `opening_key`, and its own comment gives the reason to reuse it: "a
+    hand-rebuilt market key is how you get two functions that agree on every
+    row you tested and disagree on the one you did not." So the decision
+    identity here IS that key -- `event_id|market|player|segment|side|line`.
+
+    A row with no `opening_key` is re-derived through `opening_key_for_position`
+    rather than dropped. A row that cannot be keyed AT ALL falls back to its own
+    `idempotency_key`, i.e. it counts as its own decision: an unkeyable row is
+    evidence we cannot dedupe, and dropping it would UNDERSTATE the sample,
+    which is the direction that silently re-floors a sport.
+
+    -----------------------------------------------------------------------
+    SUMMED ON COLLISION, NEVER OVERWRITTEN
+    -----------------------------------------------------------------------
+
+    Sport labels are lowercased to match the consumption site
+    (`str(row.get("sport")).strip().lower()`). Every ledger row measured
+    2026-09-04 was already lowercase (596 live + 1,847 paper), so this is
+    latent rather than live -- but the previous implementation assigned rather
+    than merged, so a future `"NFL"` beside an `"nfl"` would have silently
+    DISCARDED one of them. A sport is free text; it will happen eventually.
+
+    `unknown` is excluded: it is a failed sport join, not a sport, and letting
+    it collect rows would credential nothing at all.
+    """
+    from syndicate.features.shared.clv_position_join import (
+        market_key,
+        opening_key_for_position,
+    )
+    from syndicate.features.shared.execution_ledger import _load
+
+    rows = list(orders) if orders is not None else (_load().get("orders") or [])
+
+    def _decision(order: Mapping[str, Any]) -> str:
+        raw = order.get("opening_key")
+        if not (isinstance(raw, str) and raw.strip()):
+            try:
+                raw = opening_key_for_position(order)
+            except Exception:  # noqa: BLE001
+                raw = None
+        key = market_key(raw) if raw else None
+        if key:
+            return key
+        # Unkeyable. Its own identity, so it counts once and is never merged
+        # with an unrelated row that is also unkeyable.
+        return "idempotency_key=%s" % str(order.get("idempotency_key") or id(order))
+
+    seen: dict[str, set[str]] = {}
+    for order in rows:
+        if not isinstance(order, Mapping):
+            continue
+        if book_of(order) != BOOK_PORTFOLIO:
+            continue
+        if not str(order.get("outcome") or ""):
+            continue
+        sport = str(order.get("sport") or "").strip().lower()
+        if not sport or sport == "unknown":
+            continue
+        seen.setdefault(sport, set()).add(_decision(order))
+    return {sport: len(keys) for sport, keys in seen.items() if keys}
 
 
 # ---------------------------------------------------------------------------

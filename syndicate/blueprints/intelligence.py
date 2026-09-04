@@ -3882,6 +3882,18 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # "is this working", which is the question that actually matters -- and
         # clicking through days one at a time to add them up by eye is not an
         # answer, it is a chore that produces a guess.
+        #
+        # AND IT IS THE PAPER BOOK, WHICH IS NOT THE SAME POPULATION AS THE
+        # CREDIBILITY SAMPLE [2026-09-04]. `all_orders` was filtered to
+        # `mode != LIVE` twenty lines up, deliberately and load-bearingly. So
+        # this number is settled paper ORDER ROWS. It said NFL `orders=1,
+        # settled=0` on the same day `portfolio_commit`'s SETTLED_SAMPLE line
+        # printed `nfl: 18` -- and both were right, about different things.
+        # The credibility sample is
+        # `paper_settlement.settled_decisions_by_sport`: every mode, deduped to
+        # one row per DECISION. Do not substitute one for the other; the
+        # identity between them is pinned in
+        # `tests/test_settled_sample_credibility.py`.
         settlement_all_time = settlement_summary(None, orders=all_orders)
     except Exception as exc:
         # Named, never swallowed into an empty record.
@@ -3980,6 +3992,13 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         "settlement": settlement,
         # Every date this ledger holds, not just the one being viewed.
         "settlement_all_time": settlement_all_time,
+        # WHAT `settlement_all_time` IS A COUNT OF, said in the payload rather
+        # than only in a comment, because the confusion it prevents happened to
+        # a reader of the JSON and not to a reader of this file. See the note at
+        # the `settlement_summary` call above.
+        "settlement_all_time_population": (
+            "paper_mode_order_rows_portfolio_book_all_dates"
+        ),
         "settlement_error": settlement_error,
         # DATE NAVIGATION, computed here rather than in Jinja: date arithmetic
         # in a template is where off-by-one-day bugs live, and this page is
