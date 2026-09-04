@@ -3070,6 +3070,25 @@ that are actually written, in the SAME change that splits them.
 
 ## [08-31 FORBIDDEN: trusting `git cherry` alone. It gives FALSE POSITIVES, and they push DUPLICATES]
 
+**THE GENERAL FORM, so this entry is findable from whichever instrument you
+happen to be holding** `[widened 2026-09-03, handed over by f97ad5ab who found
+the framing too narrow; three instruments, three sessions, one day]`: **any
+IDENTITY-based check — patch-id, SHA ancestry, object existence — answers a
+different question than REACHABILITY, and after a rebase identity is exactly
+what does not survive. Only a content match on the upstream blob answers this
+one.** Same failure with three faces:
+
+    git cherry                       patch-ids stop matching when upstream context moves
+    git merge-base --is-ancestor     the SHA is rewritten by the rebase
+    git log -1 <sha> / show --stat   answers "exists locally", never "reachable"
+
+The remedy below is unchanged and covers all three. It is written up as its own
+rule at `2026-09-03 — FORBIDDEN: reporting a commit as PUSHED on the strength of
+a command that also succeeds when it is not`; this pointer exists because a
+reader arriving with a different instrument would not otherwise recognise that
+this entry applies to them — the same way a scope-less rule gets discarded by
+one counter-example (see the dot-prefixed `rev:path` entry).
+
 **Refines the standing "remote-absent ≠ content-absent" rule, which said to run
 `git cherry` FIRST. That is still right, and it is not sufficient.**
 
