@@ -22362,6 +22362,53 @@ only. The guard was right and the fix was to correct the marker, not the claim.
 
 ---
 
+## 2026-09-04 23:19:34Z — **VERIFIED IN PRODUCTION. `unmatched_game_rows` 78 → 0, Rams 0/78 → 78/78 projected. THE OWED READING IS DISCHARGED — AND THE DEPLOY THAT DID IT WAS NOT MINE.** `[lane nfl-projection-deploy]`
+
+`verify:` **served `/api/board/book-grid?sport=nfl&limit=5000`, artifact
+`generated_at 2026-09-04T23:19:34.577636+00:00` — 29 min AFTER the deploy, so a
+REBUILT artifact and not the pre-deploy one: `unmatched_game_rows 0` of 1,251 game
+rows, and all 78 Rams rows carry a projection.**
+
+    refresh-worker  6c8672b7 → ea1e3ac0   dep-dadkk3f40ujc73bs90qg  trigger=api
+                    created 22:45:33Z   live 22:50:57Z
+    ea1e3ac0 contains fb7a1f96 (ancestor check) and the tree at that SHA carries
+    `"la": "los angeles rams"` — checked, not inferred from the commit graph alone.
+
+**ATTRIBUTION: I did not perform this deploy.** Another session created it at
+22:45:33Z. My watcher had logged `jobs=0` at 22:45:13Z with the claim still held and
+~30s from its TTL; by my next poll at 22:46:16Z the claim was free and jobs were back
+to 2. **My exit condition required claim-free AND idle SIMULTANEOUSLY, and that
+conjunction never held on a 60s poll of a window shorter than 60s.** They took the
+idle instant at the TTL boundary instead. Recorded because the ledger should not
+read as though the waiting lane produced the result.
+
+### the whole chain, three commits and two services
+
+    299  baseline (production, 2026-09-04T20:56:12Z)
+     78  after 52870f57  -- projection join compared a UTC day against an ET day
+      0  after fb7a1f96  -- nflverse writes the Rams `LA`; the map knew only `LAR`
+
+Both numbers were predicted from a replay of production's own rows BEFORE either
+deploy, and both landed exactly. The replay was evidence about the CODE and it held.
+
+### the correction this entry closes
+
+My 21:37Z web deploy predicted `299 → 0` and measured 78, because
+`/api/board/book-grid` serves `source: "precomputed_artifact"` — refresh-worker's
+output, not web's request path. **That diagnosis is now confirmed by the positive
+case, which is the stronger form:** the number moved only when refresh-worker got the
+commit AND rebuilt. Web was necessary for the inline path and never sufficient for
+this reading. A deploy target must be chosen from the service that SERVES the reading.
+
+### owed
+
+**Nothing.** Web `f6340007` (live 21:40:39Z, since superseded by other sessions) and
+refresh-worker `ea1e3ac0` both carry the fix; the artifact has rebuilt and the reading
+is 0. No claim held by this lane — `web` was released at ~21:59Z and
+refresh-worker was never acquired by me.
+
+---
+
 ## 2026-09-04 21:37:24-21:40:39Z — web `b36d993f` → `f6340007` — **DEPLOYED, LIVE, AND THE PREDICTION FAILED. `unmatched_game_rows` IS STILL 78, NOT 0. The web deploy was NECESSARY AND NOT SUFFICIENT — THIS ENDPOINT SERVES A PRECOMPUTED ARTIFACT BUILT BY refresh-worker, WHICH IS ON PRE-ALIAS CODE.** `[lane nfl-projection-deploy, user: "deploy web once the current claim frees up"]`
 
 `verify:` **`unmatched_game_rows` on the SERVED `/api/board/book-grid?sport=nfl&limit=5000`
