@@ -65,7 +65,7 @@ id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
 markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
-### web-oom-per-request-smaps — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-per-request-smaps — CLOSED 2026-09-04 — opened 2026-09-04 — **FALSIFICATION TEST FIRED; THE VERDICT WAS WITHDRAWN.** The sampler works and caught three real events — one `/api/ops/artifacts/export` call growing anon by **39.9 / 56.9 / 48.3 MB** in the 8-64MB bucket, two of them one second apart, against 16 of 19 calls costing exactly 0.00. But its headline (`+145.10 of +145.10 MB`, 100%) was **100% by construction** — `sum(sampled)/sum(sampled)`, over a denominator of two routes I chose. The share check against each process's OWN climb gave **pid 79 = 0.0%** (process +90.30, attributed +0.00) and **pid 80 = 175.0%** — failing in OPPOSITE directions. The lane's pre-registered falsification test named pid 79's case exactly. Instrument cost measured at **64.93 ms mean / 150.50 ms max** per sampled request (28-64x the synthetic); allowlist set to sentinel `__off__`. NEXT: attribution over ALL requests, with process readings dense enough to divide by. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: attribute `#632`'s 8-64MB anon growth to a REQUEST, by sampling the
   smaps size buckets around individual requests on a named route — the coarse
   correlation could not do it (emissions every 200 requests give 3-9 min

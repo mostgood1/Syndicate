@@ -5153,3 +5153,61 @@ data you just saw.
 This session also supplies the contrast case for what a gate is FOR: an earlier
 verdict in the same investigation was called on a 12-minute window with two
 interleaved workers, and it was WRONG in a way a 35-minute window caught.
+
+## 2026-09-04 — 100% OF WHAT YOU SAMPLED IS NOT 100% OF THE THING. THE DENOMINATOR MUST COME FROM OUTSIDE THE INSTRUMENT
+
+`#632`. A per-request sampler measured the smaps size-bucket delta across
+individual requests on an allowlist of two routes, and reported:
+`/api/ops/artifacts/export` accounts for **+145.10 of +145.10 MB — 100%**.
+
+It is 100% by construction. `sum(sampled) / sum(sampled)` cannot be anything
+else. Export was the only sampled route with non-zero deltas, so the denominator
+was **a set of routes I chose**, and the number said nothing whatever about the
+process.
+
+The check that caught it compared the attributed total against each process's
+OWN 8-64MB climb over the same window:
+
+    pid 79   process +90.30 MB   attributed  +0.00 MB     0.0%
+    pid 80   process +23.20 MB   attributed +40.60 MB   175.0%
+
+**Failing in OPPOSITE directions is the tell that it is not a scale error.** One
+worker climbed 90 MB with every sampled request reading zero; the other
+attributed nearly twice what its process gained.
+
+THE RULE: an attribution's denominator must be measured INDEPENDENTLY of the
+instrument doing the attributing. If the only quantity you have is what your
+sampler saw, you can report the events it caught — never a share, a percentage,
+or a "this accounts for". Write the share check before the collector, and make
+it a gate rather than a note: this collector PRINTED a warning about exactly this
+failure mode and the warning did not stop the verdict being computed. **A caveat
+in the output is not a check.**
+
+Related: `[2026-09-04]` "a flat reading from an instrument that cannot see the
+suspect is not evidence" — the same error in the other direction, and both are
+about knowing what fraction of the world an instrument can see.
+
+
+## 2026-09-04 — A PRE-REGISTERED FALSIFICATION TEST IS WORTH WRITING, BECAUSE IT FIRES
+
+`#632`, and this is the counter-example to the entry above rather than another
+failure. The lane `web-oom-per-request-smaps` was opened with this line written
+BEFORE any data existed:
+
+> Falsification test: sampled routes show a per-request delta of ~0 while the
+> process still climbs — then no request owns it and the growth is between
+> requests.
+
+pid 79 then did exactly that: **+90.30 MB of process climb, +0.00 MB across 12
+sampled requests.** The condition had been named in advance, so it was
+recognised immediately as the falsification rather than argued away as thin
+sampling or an unlucky window.
+
+The same session supplies the other half: a stopping rule pre-registered for the
+smaps trend (>= 5 readings over >= 35 min) withheld a verdict at **34.6 minutes**
+— 24 seconds short — with the data pointing where I wanted. Collecting more was
+cheaper than the argument for relaxing it would have been worth.
+
+THE RULE: write the falsification condition into the lane before the first
+measurement, in terms concrete enough to recognise on sight. Its value is
+precisely that it costs something when it fires.

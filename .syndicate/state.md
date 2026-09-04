@@ -724,3 +724,31 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   every 200 solo requests, giving 3-9 minute intervals and n=13. That is coarse
   enough to hide a real per-call effect. **This null bounds the effect size; it
   does not prove independence.**
+
+### `[web-oom-leak]` UPDATE 7 — per-request attribution **FAILED ITS SHARE CHECK**, 2026-09-04T19:3xZ `[session b2b5b45b]`
+
+* **A per-request smaps sampler was built, deployed (`5314e85b`, live 19:11:55Z)
+  and its verdict WITHDRAWN.** It reported `/api/ops/artifacts/export` at
+  **+145.10 of +145.10 MB** (100%); the share check against each process's own
+  8-64MB climb gave **pid 79 = 0.0%** (process +90.30 MB, sampled requests
+  +0.00) and **pid 80 = 175.0%** (process +23.20, attributed +40.60).
+* **`sum(sampled)/sum(sampled)` is 100% by construction.** The denominator was a
+  set of routes I chose, not the process's climb. Failing in BOTH directions
+  rules out a scale error.
+* **WHAT STANDS:** three events where ONE `/api/ops/artifacts/export` call grew
+  anon by **39.9 / 56.9 / 48.3 MB** in the 8-64MB bucket and had not released it
+  at teardown; two fired **one second apart**. 16 of 19 export calls cost
+  **exactly 0.00**. The bimodality explains why five earlier probes read flat and
+  why the route correlation was `r=+0.037`: a rare ~50 MB event averaged over
+  3-9 minute intervals disappears.
+* **WHAT DOES NOT STAND:** any claim about the FRACTION of `#632` those events
+  represent.
+* **WHY, hypothesised not established:** the sampler covers SOLO requests on an
+  allowlist of two routes, and `skipped_concurrent` was **285** — most export
+  calls are never sampled. pid 80's >100% additionally implies memory released
+  after the window, consistent with the observed `-43.4 MB` interval.
+* **INSTRUMENT COST: 64.93 ms mean / 150.50 ms max per sampled request**, 28-64x
+  the synthetic estimate. Allowlist set to the sentinel `__off__`.
+* **NEXT:** attribution must cover ALL requests, not an allowlist, and needs
+  process readings dense enough to divide by — an emission every 200 solo
+  requests cannot verify a 10-minute window.

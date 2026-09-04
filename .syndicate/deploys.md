@@ -22231,3 +22231,67 @@ vs inline-built, the `one endpoint, two code paths` trap — which is where the
 next lane should start and where NO measurement has been taken yet.
 
 **Cost of the counter: it has now killed two wrong causes and located a third.**
+
+
+---
+
+## 2026-09-04T19:11:55Z — web — `5314e85b` — `#632` per-request sampler — **VERIFICATION FAILED, VERDICT WITHDRAWN**
+
+`[lane web-oom-per-request-smaps, session b2b5b45b]`
+
+**The collector reported a clean answer and it did not survive its own sanity
+check. Recording the withdrawal, because a retracted number that is not written
+down comes back.**
+
+The reported verdict was: `/api/ops/artifacts/export` accounts for
+**+145.10 of +145.10 MB** across 20 sampled requests, 3 of 19 export calls
+growing the 8-64MB bucket (+39.90 / +56.90 / +48.30 MB), 16 reading exactly 0.00.
+
+verify: **FAILED — attributed vs the process's OWN 8-64MB climb, same window,
+same pid:**
+
+    pid 79   process +90.30 MB   attributed  +0.00 MB (12 samples, all zero)     0.0%
+    pid 80   process +23.20 MB   attributed +40.60 MB                          175.0%
+
+**Both directions are disqualifying**, and they fail in OPPOSITE directions,
+which is what rules out a simple scale error. pid 79 climbed 90 MB while every
+sampled request attributed zero; pid 80 attributed nearly twice what the process
+gained. `175.0%` is the SAME figure this investigation produced during the
+earlier contamination episode.
+
+**Why the 100% was an artifact.** `sum(sampled) / sum(sampled)` is 100% by
+construction. Export was the only route with non-zero deltas AMONG THE TWO
+ROUTES I CHOSE TO SAMPLE, so the denominator was one I picked rather than the
+process's actual climb. The collector even printed a warning about this and I
+still had to run the check to catch it — the warning was not the check.
+
+**Most likely mechanism, stated as a hypothesis and not a finding:**
+* The sampler measures SOLO requests on an ALLOWLIST of two routes.
+  `skipped_concurrent` was **285** on this container, so most export calls are
+  never sampled at all — which fits pid 79's 0%.
+* pid 80's >100% implies allocations RELEASED after the sample window, which fits
+  the independently observed `-43.4 MB` interval: these large mappings are
+  `munmap`ped back to the OS.
+
+**WHAT STILL STANDS:** three timestamped events in which ONE
+`/api/ops/artifacts/export` call grew process anon by 39.9 / 56.9 / 48.3 MB in
+the 8-64MB bucket and had not released it by teardown. Two fired **one second
+apart** (19:19:11, 19:19:12), i.e. concurrent large exports. Those observations
+are sound. **Any claim about what FRACTION of `#632` they represent is not.**
+
+**THE LANE'S OWN FALSIFICATION TEST FIRED.** It was written before the data as:
+*"sampled routes show a per-request delta of ~0 while the process still climbs —
+then no request owns it and the growth is between requests."* pid 79 is exactly
+that. The pre-registered test did its job.
+
+**INSTRUMENT COST, measured rather than assumed: 64.93 ms mean, 150.50 ms max**
+per sampled request — **28-64x** the 2.35 ms measured on a 2-region synthetic,
+because web's smaps has hundreds of regions. This is why the sampler times
+itself. `SYNDICATE_SMAPS_PER_REQUEST_ROUTES` is now set to the sentinel
+`__off__`, which cannot match a Flask rule (they all start with `/`); it takes
+effect at the next deploy and the 120-sample cap bounds the cost until then.
+
+**Build note:** this deploy's build took **~11 minutes** against a ~1.6 minute
+norm for web. It succeeded. Not diagnosed; recorded because a slow build was
+briefly indistinguishable from a stuck one, and cancelling is documented in this
+repo as having CAUSED the restart it was meant to avoid.
