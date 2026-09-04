@@ -253,3 +253,90 @@ def test_a_clean_ledger_still_passes():
     """The guard must not have made everything red."""
     assert mod.conflict_markers(ONE_HOLDER) == []
     assert mod.main([_write(ONE_HOLDER)]) == 0
+
+
+# --------------------------------------------------------------------------
+# Orphaned lane markers: the check that would have caught 2026-09-04.
+#
+# A session rebuilt `lanes.md` from `git show origin/main:.syndicate/lanes.md`
+# and another session's block -- uncommitted, primary-tree-only -- was dropped.
+# No git guard fired: a rebuild is a plain file write, and `discard-guard.py`
+# watches git operations. The check that WAS run, "0 deletions vs origin/main",
+# cannot see this by construction, because upstream never had the block.
+#
+# `.current-lane.<session>` survives, because it is a different file.
+# --------------------------------------------------------------------------
+
+def _lane_dir(tmp_path, *, lanes="", closed=None, markers=None):
+    d = tmp_path / ".syndicate"
+    d.mkdir()
+    (d / "lanes.md").write_text(lanes, encoding="utf-8")
+    if closed is not None:
+        (d / "lanes_closed.md").write_text(closed, encoding="utf-8")
+    for session, slug in (markers or {}).items():
+        (d / f".current-lane.{session}").write_text(slug, encoding="utf-8")
+    return d / "lanes.md"
+
+
+def test_a_marker_whose_block_exists_nowhere_fails(tmp_path):
+    """THE 2026-09-04 CASE, reproduced: the block is gone, the marker remains."""
+    path = _lane_dir(
+        tmp_path,
+        lanes="## OPEN\n\n### some-other-lane — OPEN\n- Files: a.py\n",
+        markers={"c4287631": "render-events-nondict-reason"},
+    )
+    missing, stale = mod.orphaned_lane_markers(path.read_text(encoding="utf-8"), str(path))
+    assert [slug for slug, _ in missing] == ["render-events-nondict-reason"]
+    assert stale == []
+
+
+def test_a_marker_for_an_archived_lane_is_only_a_hint(tmp_path):
+    """A FAIL here would be noise -- the lane was closed and the marker was
+    never emptied -- and a noisy check is one people learn to skip."""
+    path = _lane_dir(
+        tmp_path,
+        lanes="## OPEN\n",
+        closed="### done-lane — CLOSED\n",
+        markers={"abc": "done-lane"},
+    )
+    missing, stale = mod.orphaned_lane_markers(path.read_text(encoding="utf-8"), str(path))
+    assert missing == []
+    assert [slug for slug, _ in stale] == ["done-lane"]
+
+
+def test_an_emptied_marker_is_not_a_lane(tmp_path):
+    """`/lane close` empties the marker; that is success, not an orphan."""
+    path = _lane_dir(tmp_path, lanes="## OPEN\n", markers={"abc": "   \n"})
+    missing, stale = mod.orphaned_lane_markers(path.read_text(encoding="utf-8"), str(path))
+    assert missing == [] and stale == []
+
+
+def test_a_live_block_satisfies_its_marker(tmp_path):
+    path = _lane_dir(
+        tmp_path,
+        lanes="## OPEN\n\n### held-lane — OPEN\n- Files: a.py\n",
+        markers={"abc": "held-lane"},
+    )
+    missing, stale = mod.orphaned_lane_markers(path.read_text(encoding="utf-8"), str(path))
+    assert missing == [] and stale == []
+
+
+def test_a_bom_does_not_hide_a_block(tmp_path):
+    """A UTF-8 BOM survives errors="replace" and glues itself to the first
+    heading, which would report a lane that is present as destroyed."""
+    path = _lane_dir(tmp_path, lanes="\ufeff### held-lane — OPEN\n", markers={"abc": "held-lane"})
+    missing, stale = mod.orphaned_lane_markers(
+        path.read_text(encoding="utf-8").lstrip("\ufeff"), str(path))
+    assert missing == [] and stale == []
+
+
+def test_main_exits_nonzero_on_an_orphan(tmp_path, capsys):
+    """The check must FAIL the run, not merely mention it."""
+    path = _lane_dir(
+        tmp_path,
+        lanes="## OPEN\n\n### kept — OPEN\n- Files: a.py\n",
+        markers={"c4287631": "destroyed-lane"},
+    )
+    assert mod.main([str(path), "--quiet"]) == 1
+    out = capsys.readouterr().out
+    assert "destroyed-lane" in out and "in NO ledger file" in out

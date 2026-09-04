@@ -264,6 +264,65 @@ def prose_paths_in_files_blocks(text, claim_set=None):
     return hits
 
 
+def _ledger_text(root: pathlib.Path, name: str) -> str:
+    """One ledger file's text, BOM-stripped. A UTF-8 BOM survives
+    `errors="replace"` and would otherwise glue itself to the first heading."""
+    try:
+        return (root / name).read_text(encoding="utf-8", errors="replace").lstrip("﻿")
+    except OSError:
+        return ""
+
+
+def orphaned_lane_markers(text: str, path: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """Lane slugs a live per-session marker names that no ledger file carries.
+
+    WHY THIS EXISTS. `.syndicate/.current-lane.<session>` is written by
+    `/lane open` and is the ONE artefact that survives when a lane block is
+    destroyed -- it is a separate file, so nothing that rewrites `lanes.md`
+    can take it with them.
+
+    THE FAILURE IT CATCHES `[2026-09-04, session b9013cf2]`. A session
+    REBUILT `lanes.md` from `git show origin/main:.syndicate/lanes.md` to
+    avoid committing a stale copy, and another session's block -- an
+    uncommitted edit living only in the primary tree -- was not on
+    origin/main, so the rebuild dropped it. No git guard fired, because a
+    rebuild is a plain file WRITE and `discard-guard.py` watches git
+    operations. The check that was run, "0 deletions vs origin/main", is
+    blind to this BY CONSTRUCTION: comparing against upstream cannot see
+    content that was never on upstream. Cross-checking against the markers
+    can, because the marker is not in the file being rewritten.
+
+    TWO OUTCOMES, kept apart. A slug missing from `lanes.md` but present in
+    `lanes_closed.md`/`lanes_history.md` is a STALE MARKER -- the lane was
+    archived and the marker was never emptied. Harmless, and a FAIL on it
+    would train people to ignore this check. A slug in NO ledger file at all
+    is a block that exists nowhere: either destroyed, or opened as a marker
+    and never written down. That one fails.
+    """
+    root = pathlib.Path(path).resolve().parent
+    live = set(re.findall(r"(?m)^###\s+([A-Za-z0-9._-]+)", text))
+    archived = set(
+        re.findall(
+            r"(?m)^###\s+([A-Za-z0-9._-]+)",
+            _ledger_text(root, "lanes_closed.md")
+            + _ledger_text(root, "lanes_closed_archive.md")
+            + _ledger_text(root, "lanes_history.md"),
+        )
+    )
+    missing: list[tuple[str, str]] = []
+    stale: list[tuple[str, str]] = []
+    for marker in sorted(root.glob(".current-lane.*")):
+        try:
+            slug = marker.read_text(encoding="utf-8", errors="replace").lstrip("﻿").strip()
+        except OSError:
+            continue
+        # An EMPTY marker is `/lane close` having done its job, not a lane.
+        if not slug or slug in live:
+            continue
+        (stale if slug in archived else missing).append((slug, marker.name))
+    return missing, stale
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("path", nargs="?", default=".syndicate/lanes.md")
@@ -292,6 +351,7 @@ def main(argv=None) -> int:
     claim_set = claims(text)
     contested = contested_files(claim_set)
     stray = open_lanes_under_archived(text)
+    orphaned, stale_markers = orphaned_lane_markers(text, args.path)
     prose = prose_paths_in_files_blocks(text, claim_set)
 
     if not args.quiet:
@@ -308,6 +368,14 @@ def main(argv=None) -> int:
     for slug in stray:
         print(f"        {slug}  (its claims survive, but archiving it would drop them)")
 
+    print(f"[{'FAIL' if orphaned else 'ok  '}] every live lane marker still has a block somewhere")
+    for slug, marker in orphaned:
+        print(f"        {slug}  (named by {marker}, in NO ledger file)")
+        print(f"          a block that exists nowhere: destroyed, or never written down.")
+        print(f"          RESTORE it from the owning session -- upstream cannot have it.")
+    for slug, marker in stale_markers:
+        print(f"        [hint] {slug} is archived but {marker} still names it -- empty the marker")
+
     really = [line for line, claims_it in prose if claims_it]
     disclaimed = [line for line, claims_it in prose if not claims_it]
     print(f"[hint] {len(prose)} prose line(s) inside a '- Files:' block name a path: "
@@ -322,6 +390,8 @@ def main(argv=None) -> int:
         failures.append(f"{len(contested)} contested file(s)")
     if stray:
         failures.append(f"{len(stray)} OPEN lane(s) under Archived")
+    if orphaned:
+        failures.append(f"{len(orphaned)} lane marker(s) with no block anywhere")
     print()
     print("INVARIANTS HOLD" if not failures else "VIOLATED: " + "; ".join(failures))
     return 1 if failures else 0
