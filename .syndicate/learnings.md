@@ -5278,3 +5278,43 @@ The recovery is the guard's own printed remedy and it works: take upstream's cop
 then verify the peer's blocks stayed archived — `lanes.md` count 0 AND
 `lanes_history.md` count >= 1, checked on `origin/main` after pushing. Do not
 verify by re-reading your own working file; it cannot see what upstream holds.
+
+## 2026-09-03 — FORBIDDEN: choosing a REMEDY from a checker's finding without reading the owning block's INTENT. A true finding can carry a false fix, and the fix is the part that does damage. `[session c38d3e5c, caught by f97ad5ab]`
+
+`check_lane_claims.py` correctly reported four tokens in
+`wnba-accuracy-assessment` that name no file —
+`scripts/{build_wnba_recon`, `scripts/{run_refresh_worker` and two more, written
+with shell brace syntax the parser reads literally. Every word of that finding
+is true.
+
+**I then triaged them as "the substantive ones — real files, unguarded" and told
+two sessions and a user that `run_refresh_worker.py` was the one to look at.**
+The block says, twice, in the same `- Files:` line I was reading tokens out of:
+
+    Files (all landed on `origin/main`, nothing held): ALL RELEASED --
+    this list is a RECORD of what the lane touched, not a claim
+    ...
+    ALL CLAIMS RELEASED; all four services free.
+
+Free BY INTENT. There was no gap. And the remedy I sent that lane's owner —
+**"write the paths out in full"** — would have MINTED four claims the lane
+disclaims, including on `run_refresh_worker.py`, blocking the several lanes
+holding legitimate scoped claims on it. It failed to deliver only because that
+session was archived. **A lucky bounce, not a caught error.**
+
+**The general form.** A checker reports STRUCTURE — *this token cannot resolve*.
+That is true whether or not resolution was ever wanted. Only the owner's prose
+carries INTENT, and intent decides which of two opposite fixes is correct:
+
+    expand the braces into real paths  -> invents ownership   (wrong here)
+    mark the block as a record         -> removes the tokens  (what landed)
+
+Both make the checker green. They are opposites. **The finding cannot choose
+between them, and a green checker afterwards cannot tell you which you did.**
+
+**How to apply.** Read the whole owning block before proposing a fix to anything
+a linter, guard or checker flags in someone's ledger — the disclaimer is
+routinely in the same line as the token. And when the fix would CREATE an
+obligation for someone else (a claim, a lock, an owner), that is the case to
+route to the owner rather than remedy yourself, because a wrong fix in that
+direction is silent and lands on a third party.
