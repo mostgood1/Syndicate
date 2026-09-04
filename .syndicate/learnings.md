@@ -4912,3 +4912,43 @@ watching headroom.
 - **Do not file a non-bug.** A 2.99 MB `todo.md` costs every future session that
   reads it, and an item that sends someone chasing a working mechanism is worse
   than no item.
+## 2026-09-04 — FORBIDDEN: verifying a ledger mutation with a BEFORE/AFTER set comparison computed by the parser that is blind to the thing at risk
+
+`[lane order-sim-view, session 37abeca0; found by session c38d3e5c]`
+
+I ran `trim_lane_blocks.py --apply` on an over-cap `lanes.md` and certified it
+twice: the tool reported `claims unchanged : 45`, and I then re-derived the set
+myself and reported *"claim set verified unchanged TWICE ... independently by
+re-parsing HEAD's copy against the written one ... (37 -> 37, identical)"*.
+
+**Neither check could have detected the failure it was standing in for, and the
+second was not independent.** Both sides of my comparison came from
+`check_lane_invariants.claims()`, which skips any block whose header fails
+`OPEN_RE = OPEN`. My own block's header read `**REOPENED 2026-09-03 for the
+READ side**` — and `OPEN` correctly rejects `REOPENED`, there being no word
+boundary inside it. So the six files that block declared were **never in the
+claim set at all**, and a block holding six unenforced claims moved out of
+`lanes.md` reporting `claims unchanged`.
+
+**A SET COMPARISON CANNOT PROTECT AN ELEMENT THE PARSER NEVER PRODUCED.** Before
+and after were equal because the parser dropped the same rows on both sides.
+That is not evidence of safety; it is the same blindness, twice, agreeing with
+itself. Calling my second pass "independent" made it worse: it used the same
+predicate family as the tool, so it added confidence without adding information.
+
+The outcome here was fine by luck — the block was genuinely CLOSED and
+claim-free by the time it moved, because I had closed the lane and returned the
+borrowed files first. **Right outcome, unsound verification**, and those look
+identical in a log.
+
+**How to apply.** When verifying that a mutation preserved something, the
+witness must be independent of the machinery under test. For claims that means
+counting DECLARED paths straight out of the `- Files:` text, regardless of
+header status, and comparing that to the ENFORCED set — a mismatch is the whole
+signal. More generally: if X is computed by the component whose correctness is
+in question, `X_before == X_after` proves only that the component is
+consistently wrong.
+
+`scripts/check_lane_claims.py::_near_miss_open` (session f97ad5ab) now fails on
+a block that declares files under a header containing `OPEN` but failing
+`OPEN` — REOPENED, OPENED — which is the emitter-side fix for this class.
