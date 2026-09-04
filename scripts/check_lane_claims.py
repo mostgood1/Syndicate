@@ -26,12 +26,29 @@ is claimed by the OPEN lane `ncaaf-live-cadence`. Editing it would be the exact
 cross-lane write this repo's guards exist to prevent, so the check lands here
 instead. Fold it in when that lane closes.
 
-THREE SEVERITIES, ON PURPOSE.
+FOUR SEVERITIES, AND THE SPLIT BETWEEN THE FIRST TWO IS THE WHOLE DESIGN.
 
-  BROKEN (exit 1) -- the claim names no file in the repo. Always wrong, always
-  the owning lane's to fix, and it goes away when they fix it. That is what
-  makes it safe to fail on: a check that can never go green is one people learn
-  to scroll past, and this repo has lost guards that way.
+The first version failed on every claim that named no file -- all nine it found
+on the live ledger. Session c38d3e5c pointed out that three of those needed no
+action from anyone, and this runs at EVERY SESSION START.
+`check_lane_invariants.py` set the precedent in its own docstring: its phantom
+scan is a HINT that never fails, because a check that cries wolf gets ignored.
+
+So the question is not "does this path exist" but **"can this token EVER
+resolve"**:
+
+  BROKEN (exit 1) -- structurally impossible, or a typo. A brace list, a glob,
+  or prose can never match however the repo changes, because claims are
+  compared literally. A well-formed path that is absent ALSO fails when a
+  close-named tracked file exists, because that is a typo -- and the message
+  names the neighbour. The worked example is `ncaaf-live-cadence` claiming
+  `tests/test_ncaaf_live_autorun.py` while the file it created was
+  `tests/test_ncaaf_lines_autorun.py`.
+
+  NOT WRITTEN YET (reported, exit 0) -- a well-formed path, absent, with
+  nothing close to it. A lane legitimately claims a file it is about to create,
+  and such a claim starts guarding the moment the file lands. Reported so it is
+  visible, never failed, because failing on it is the wolf-crying case.
 
   NEAR-MISS HEADER (exit 1) -- the block declares files, but its header status
   is REOPENED/OPENED rather than a standalone OPEN, so `\\bOPEN\\b` rejects it
@@ -51,6 +68,7 @@ Run it directly for the detail. Fails open (exit 0) if git is unavailable or
 the ledger cannot be read -- a checker that blocks a session because it could
 not answer is worse than one that says nothing.
 """
+import difflib
 import os
 import subprocess
 import sys
@@ -175,6 +193,56 @@ def _near_miss_open(text):
     return out
 
 
+def _impossible(claim):
+    """True when this token can NEVER resolve to a path, however the repo changes.
+
+    THE DISCRIMINATOR IS NOT "DOES THE PATH EXIST", IT IS "CAN IT EVER". Raised
+    2026-09-03 by session c38d3e5c against the first version, which failed on all
+    nine broken shapes: three of them needed no action from anyone, and this
+    check runs at every session start. `check_lane_invariants.py` set the
+    precedent in its own docstring -- its phantom scan is a HINT that never
+    fails, because a check that cries wolf gets ignored, and this repo has lost
+    guards that way.
+
+    Brace lists, globs and prose are structurally impossible: no file will ever
+    be created that makes `scripts/{build_wnba_recon` or
+    `live_player_box_*.json` match, because claims are compared literally. Those
+    are defects today and tomorrow. A well-formed path that is merely ABSENT is
+    ambiguous -- a lane legitimately claims a file it is about to create -- and
+    is handled by `_near_miss` instead.
+    """
+    return ("{" in claim or "}" in claim or "*" in claim or "?" in claim
+            or "`" in claim or ("/" not in claim and "." not in claim))
+
+
+def _near_miss(claim, by_base):
+    """A tracked file this claim was probably MEANT to name, or None.
+
+    This is what keeps the severity split from being too blunt. Demoting every
+    absent-but-well-formed path to a warning would have let through the worked
+    example this repo already paid for: `ncaaf-live-cadence` claimed
+    `tests/test_ncaaf_live_autorun.py` while the file it created was
+    `tests/test_ncaaf_lines_autorun.py` (live -> lines). That is a typo, it can
+    never self-resolve, and the lane could not tell from reading the ledger.
+
+    So an absent path FAILS when a near neighbour exists (and the message names
+    it), and only REPORTS when nothing close is there -- which is the shape of a
+    file genuinely not written yet. Matching is on the BASENAME, since that is
+    where these typos land and a directory rename is a different animal.
+    """
+    base = claim.rsplit("/", 1)[-1]
+    if not base:
+        return None
+    close = difflib.get_close_matches(base, list(by_base), n=1, cutoff=0.85)
+    if not close or close[0] == base:
+        return None
+    for p in by_base[close[0]]:
+        # Prefer a neighbour sitting in the same directory as the claim.
+        if p.rsplit("/", 1)[0] == claim.rsplit("/", 1)[0]:
+            return p
+    return by_base[close[0]][0]
+
+
 def _why(claim):
     """The shape of the breakage, because the fix differs by shape."""
     if "{" in claim or "}" in claim:
@@ -252,29 +320,33 @@ def main():
               "all.")
         return 1
 
-    near = _near_miss_open(text)
+    near_headers = _near_miss_open(text)
 
-    broken, inert = [], []
+    broken, unwritten, inert = [], [], []
     for slug, claim in claims:
         if not _resolves(claim, paths, by_base, root):
-            broken.append((slug, claim))
+            neighbour = _near_miss(claim, by_base)
+            if _impossible(claim) or neighbour:
+                broken.append((slug, claim, neighbour))
+            else:
+                unwritten.append((slug, claim))
         elif is_exempt(claim):
             inert.append((slug, claim))
 
     total = len(claims)
-    if not broken and not inert and not near:
+    if not broken and not unwritten and not inert and not near_headers:
         print("[ok  ] all %d lane claim(s) name a real, guardable file" % total)
         return 0
 
-    if near:
+    if near_headers:
         print("[BAD ] %d block(s) DECLARE files under a header that is not OPEN, so "
-              "none of" % len(near))
+              "none of" % len(near_headers))
         print("       those claims is in any claim set and lane-guard does not "
               "enforce them:")
-        for slug, status, paths in near:
+        for slug, status, declared in near_headers:
             print()
             print("       %s   header status: %s" % (slug, status[:70]))
-            for p in paths:
+            for p in declared:
                 print("         %s" % p)
         print()
         print("       `OPEN_RE` is \\bOPEN\\b, which rejects REOPENED and OPENED on "
@@ -309,23 +381,44 @@ def main():
         print("       their lane's owner has no way to tell from reading the "
               "ledger:")
         by_lane = {}
-        for slug, claim in broken:
-            by_lane.setdefault(slug, []).append(claim)
+        for slug, claim, neighbour in broken:
+            by_lane.setdefault(slug, []).append((claim, neighbour))
         for slug in sorted(by_lane):
             print()
             print("       %s" % slug)
-            for claim in by_lane[slug]:
+            for claim, neighbour in by_lane[slug]:
                 print("         %s" % claim)
-                print("           -> %s" % _why(claim))
+                if neighbour:
+                    print("           -> almost certainly a TYPO for `%s`, which exists."
+                          % neighbour)
+                else:
+                    print("           -> %s" % _why(claim))
         print()
         print("       Fix in .syndicate/lanes.md, in the owning lane's Files "
               "block. If a lane")
         print("       is not yours, tell its owner rather than editing across "
               "lanes.")
         return 1
-    # A near-miss header is the same failure as a broken claim -- files
+    if unwritten:
+        print()
+        print("[note] %d claim(s) name a well-formed path that does not exist "
+              "YET." % len(unwritten))
+        for slug, claim in unwritten:
+            print("         %-52s (%s)" % (claim, slug))
+        print("       REPORTED, NOT FAILED. A lane legitimately claims a file "
+              "it is about to")
+        print("       create, and such a claim starts guarding the moment the "
+              "file lands, so")
+        print("       failing on it would be a check that cries wolf at every "
+              "session start.")
+        print("       Nothing close to these names exists -- if one did, it "
+              "would be a typo and")
+        print("       would be listed as BAD above with the neighbour named.")
+
+    # A near-miss HEADER is the same failure as a broken claim -- files
     # declared, nothing enforced -- so it fails the check on its own.
-    return 1 if near else 0
+    # `unwritten` deliberately does NOT.
+    return 1 if near_headers else 0
 
 
 if __name__ == "__main__":

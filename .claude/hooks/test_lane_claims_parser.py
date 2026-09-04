@@ -175,5 +175,75 @@ check("a worktree path is exempt too (not root-relative)",
 check("ordinary source is not exempt", is_exempt("syndicate/blueprints/ops.py"), False)
 
 print()
+print("check_lane_claims SEVERITY: fail on what can never resolve, report the rest")
+
+# These drive `scripts/check_lane_claims.py` end to end against throwaway repos.
+# The split exists because the first version failed on all nine broken shapes it
+# found, three of which needed no action -- and this runs at every session start,
+# where a check that cries wolf gets ignored. Raised by session c38d3e5c.
+import json
+import shutil
+import subprocess
+import tempfile
+
+# .../Syndicate/.claude/hooks/<this file>  -> three levels up is the repo.
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CHECKER = os.path.join(REPO, "scripts", "check_lane_claims.py")
+_TMP = []
+
+
+def run_checker(files_line, extra_files=()):
+    """(exit_code, stdout) for a one-lane ledger claiming `files_line`."""
+    d = tempfile.mkdtemp(prefix="claimcheck-")
+    _TMP.append(d)
+    shutil.copytree(os.path.join(REPO, ".claude", "hooks"),
+                    os.path.join(d, ".claude", "hooks"),
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    os.makedirs(os.path.join(d, "scripts"))
+    shutil.copy(CHECKER, os.path.join(d, "scripts", "check_lane_claims.py"))
+    os.makedirs(os.path.join(d, ".syndicate"))
+    with open(os.path.join(d, ".syndicate", "lanes.md"), "w", encoding="utf-8") as fh:
+        fh.write("## OPEN\n\n### a — OPEN — x\n- Files: %s\n" % files_line)
+    for rel in extra_files:
+        p = os.path.join(d, *rel.split("/"))
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        open(p, "w").write("x\n")
+    subprocess.run(["git", "init", "-q", d], capture_output=True)
+    subprocess.run(["git", "-C", d, "add", "-A"], capture_output=True)
+    env = dict(os.environ, CLAUDE_PROJECT_DIR=d)
+    r = subprocess.run([sys.executable, os.path.join(d, "scripts", "check_lane_claims.py")],
+                       capture_output=True, text=True, env=env)
+    return r.returncode, r.stdout
+
+
+rc, out = run_checker("`a/real.py`", extra_files=["a/real.py"])
+check("a claim on a file that exists -> clean", (rc, "[ok" in out), (0, True))
+
+rc, out = run_checker("`scripts/{build_recon,verify_gate}.py`", extra_files=["scripts/build_recon.py"])
+check("brace expansion FAILS (can never resolve)", rc, 1)
+
+rc, out = run_checker("`data/live/box_*.json`", extra_files=["data/live/box_1.json"])
+check("a glob FAILS (claims match literally)", rc, 1)
+
+rc, out = run_checker("`away_key`/`home_key` stamping", extra_files=["a/real.py"])
+check("prose read as a path FAILS", rc, 1)
+
+# The worked example from this repo: live -> lines. Demoting every absent path to
+# a warning would have let this through, which is why the neighbour check exists.
+rc, out = run_checker("`tests/test_ncaaf_live_autorun.py`",
+                      extra_files=["tests/test_ncaaf_lines_autorun.py"])
+check("absent path WITH a near neighbour FAILS (a typo)", rc, 1)
+check("  ^ and the message names the neighbour",
+      "test_ncaaf_lines_autorun.py" in out and "TYPO" in out, True)
+
+rc, out = run_checker("`tests/test_something_entirely_new.py`", extra_files=["a/real.py"])
+check("absent path with NO neighbour is REPORTED, not failed", rc, 0)
+check("  ^ but it is still printed", "does not exist" in out, True)
+check("  ^ and named", "test_something_entirely_new.py" in out, True)
+
+for d in _TMP:
+    shutil.rmtree(d, ignore_errors=True)
+
+print()
 print("%d/%d passed" % (PASS, PASS + FAIL))
 sys.exit(1 if FAIL else 0)

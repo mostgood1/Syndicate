@@ -1830,6 +1830,60 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   `.syndicate/deploys.md`.
 - Blocked by: none for the workers; web is owner-held by design.
 
+### claim-check-severity-split — CLOSED 2026-09-03 — FAIL only on what can never resolve; a typo still fails, a not-yet-written file only reports — session f97ad5ab
+- Goal: `check_lane_claims.py` fails on all nine broken shapes, including ones
+  nobody can act on. Split FAIL from REPORT so the teeth stay where they bite.
+- Files (exclusive): `scripts/check_lane_claims.py`,
+  `.claude/hooks/test_lane_claims_parser.py`. Collision check RUN 2026-09-03 via
+  `lane_claims._claims()`: CLEAR on both.
+- Reported by session c38d3e5c against `origin/main`: 3 of 9 `[BAD]` rows exit
+  non-zero for things needing no action — two prose tokens and one test file the
+  lane has not created yet. `check_lane_invariants.py`'s docstring is the
+  precedent: its phantom scan is a HINT that never fails, because a check that
+  cries wolf gets ignored.
+- Hypothesis: the discriminator is not "does the path exist" but **"can this
+  token EVER resolve"**. A brace/glob/prose token is structurally impossible and
+  is always a defect. A well-formed path that is merely absent is ambiguous — a
+  lane legitimately claims a file it is about to create.
+- Falsification test: the ambiguous case must still be CAUGHT when it is really a
+  typo. `tests/test_ncaaf_live_autorun.py` vs the real
+  `tests/test_ncaaf_lines_autorun.py` is the worked example from this repo, and a
+  severity split that lets THAT through is too blunt.
+- Verification: fixtures in `test_lane_claims_parser.py` — brace/glob/prose exit
+  1; absent-with-a-near-neighbour exits 1 AND names the neighbour; absent-with-no-
+  neighbour exits 0 and is still printed.
+- Blocked by: none.
+- **OUTCOME.** The discriminator moved from "does the path exist" to "can this
+  token EVER resolve".
+  - **FAIL (exit 1):** brace lists, globs, prose — structurally impossible,
+    since claims are compared literally. **AND** a well-formed absent path when a
+    close-named tracked file exists, because that is a typo; the message names
+    the neighbour.
+  - **REPORT (exit 0):** a well-formed absent path with nothing close to it — a
+    lane legitimately claims a file it is about to create, and the claim starts
+    guarding the moment the file lands.
+  - The falsification test held: `tests/test_ncaaf_live_autorun.py` against the
+    real `tests/test_ncaaf_lines_autorun.py` still FAILS and names the
+    neighbour, so the split is not too blunt.
+- **Verified:** 9 new fixtures driving the checker end-to-end against throwaway
+  repos, 39/39 in `test_lane_claims_parser.py`; every other suite and checker
+  green; the four scripts repaired earlier today still run.
+- **A BUG I INTRODUCED AND CAUGHT:** the new per-claim `near` shadowed the
+  `near = _near_miss_open(text)` header findings, so the loop destroyed them.
+  Renamed to `neighbour` / `near_headers`. It would have silently disabled the
+  REOPENED check I added hours earlier — a check that reads as passing.
+- **FIRST LIVE FIRE of `lane-postwrite-check`, and it is worth recording as a
+  NOISE data point rather than a success.** It fired during a read-only test
+  sweep of mine: `docs/ai_context/todo.md` (claimed by `web-oom-profiler-steady`)
+  grew 2,970 B inside the window. Not mine — another session was mid-write and
+  committed straight after (HEAD `2292f027` → `1f26d053`, and `git diff` on the
+  file is now clean). **The HEAD-move suppression could not help:** at post time
+  HEAD had NOT yet moved, because their write was still uncommitted.
+  So the residual class is concrete: **a concurrent session's UNCOMMITTED write
+  to a claimed file reads exactly like yours.** The message already refuses to
+  name an author, which is the only honest handling — but in a tree this busy
+  the hook will fire on other sessions' work, and that rate is the thing to
+  watch before trusting it as a signal.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
