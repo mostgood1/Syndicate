@@ -645,3 +645,28 @@ being OOM-killed.
 of day (02:40Z vs 22:30Z), and the alias half of the payload cut is OPT-IN so it
 only applies when a browser drives the page — meaning **-66% is most plausibly the
 self-mirror half alone**. Consistent with the fix; not proof of it.
+
+### `[web-oom-leak]` UPDATE 4 — rate down 66%, four mechanisms ruled out, 2026-09-04T14:5xZ `[session b2b5b45b]`
+
+* **Growth rate re-measured after the payload cut: `+503 -> +173 MB/h`** (fitted,
+  R^2 0.90, n=81 merge-child-free plateau samples). Time to the 2,048 MB limit
+  **2.0 h -> 5.7 h**, past the 2.45-3.13 h uptimes at which web was being killed.
+  Confounded by time of day, and the alias half of the cut is opt-in — so this is
+  consistent with the fix, not proof of it.
+* **The attributed SHARE is still not recoverable, and four candidates are now
+  eliminated by measurement:** cross-worker cgroup scope (CONFIRMED, fixed by
+  per-process anon); background loops (FALSIFIED — neither runs on web, and the
+  gate built for them is INERT); GC timing (EXCLUDED — the one gen-2-overlapping
+  request was POSITIVE while the non-overlapping group went negative);
+  `LAST_RESULT` reassignment (EXCLUDED — 0.0 MB both halves).
+* **THE CONSTRAINT THAT KILLS PER-STATEMENT PROBES:** CPython returns freed
+  objects to pymalloc's ARENAS, not to the OS. An in-Python free cannot reduce
+  `Anonymous:`. A negative anon delta therefore requires ARENA RELEASE — an
+  emergent property of allocator free-list state, attributable to no statement,
+  request or thread.
+* **NEXT INSTRUMENT, if the symptom returns:** `malloc_info` / pymalloc arena
+  counts around the negative windows, not another attribution probe.
+  `memory_observability` already carries `parse_smaps` and `#435`'s arena-vs-anon
+  comparison. The question is "when does an arena empty".
+* The symptom is INTERMITTENT — zero negative routes in the last two windows.
+  Nothing is confirmed; four things are ruled out.

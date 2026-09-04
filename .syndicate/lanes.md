@@ -66,7 +66,7 @@ markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
 ## OPEN
-### web-oom-thread-gating — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-thread-gating — CLOSED 2026-09-04 — opened 2026-09-04 — **FALSIFICATION TEST ANSWERED, AND THE ANSWER WAS NO.** The gate is correct, tested and **INERT**: neither loop runs on web. Three further candidates were then measured — GC timing EXCLUDED (the sole gen-2-overlapping request read +32.344 MB while the non-overlapping group swung to -30.108 MB) and `LAST_RESULT` EXCLUDED (0.0 MB both halves). **The constraint that ends this line of attack: CPython frees to pymalloc ARENAS, not the OS, so an in-Python free cannot move `Anonymous:` at all** — a negative anon delta requires arena release, which belongs to no statement, request or thread. Rate separately re-measured at **+173 MB/h, down 66%**. NEXT: `malloc_info`/arena counts, not another attribution probe. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: close `#632`'s LAST contamination source so the attributed SHARE becomes
   recoverable. `inflight` proves no other REQUEST overlapped a window; it says
   nothing about this process's own background loops, and that residue was large

@@ -4807,3 +4807,33 @@ MYSELF minutes earlier, and my own commit cannot be absent from upstream. Same
 family as *read the field you already have*. **When a guard reports an impossible
 scale of loss, suspect the guard before the file.** 308 of 308 missing is not a
 ledger problem, it is a join problem.
+
+## 2026-09-04 — AN IN-PYTHON FREE CANNOT MOVE PROCESS ANON. CHECK THE ALLOCATOR BEFORE HYPOTHESISING ABOUT FREES
+
+`#632`. Per-request attribution kept producing NEGATIVE retained totals (a route
+at -49.46 MB). I hypothesised that a statement releasing a large object allocated
+by an earlier request was refunding memory inside the current request's window,
+picked the obvious candidate (`LAST_RESULT`, a module-level global holding a copy
+of the intelligence payload, reassigned on every query), instrumented it, shipped
+it and measured.
+
+**Allocated 0.0 MB. Refunded 0.0 MB.**
+
+CPython returns freed objects to **pymalloc's arenas, not to the OS**. Freeing a
+28 MB payload does not reduce `Anonymous:` in `smaps_rollup` at all. The
+hypothesis was not merely aimed at the wrong statement — **it was unsound at the
+mechanism level**, and no choice of statement could have made it true.
+
+`#630` states this fact in its own comment — *"CPython does not return freed
+arenas to the OS"* — and I had read and quoted it hours earlier while working on
+the merge.
+
+THE RULE: before hypothesising that some code FREED memory, confirm the runtime
+can express that as a drop in the metric you are reading. For CPython + anon, it
+usually cannot. A negative anon delta means ARENA RELEASE, which is a property of
+allocator free-list state and belongs to no statement, request or thread — so no
+per-statement probe will ever find it, however well built.
+
+Related: `[2026-09-04]` "check that the thing you are gating actually runs",
+which is the same error one level up — both are cases of building a correct
+instrument for a mechanism that was never there.
