@@ -20690,3 +20690,35 @@ BEHAVIOUR. The verdict is file-level by design; a diff-level "is this
 comment-only" test is a different and riskier judgement (a docstring and a
 constant live in the same file). Recorded as a known limit, not a defect: the
 tool narrowed the question correctly and a human read the diff.
+
+## 2026-09-04 — live-odds-worker `ab42b221` → `e713939f` `[user: "deploy 4ead66c3"]` — lane `live-odds-deploy-4ead66c3`
+
+`4ead66c3` (soccer corners get a model view from the CORNERS mean) is genuinely
+behavioural — 53 added lines of real code, checked against the docstring-only
+case that `3777397d` turned out to be. `e713939f` contains it and adds nothing
+else any service executes.
+
+Preflight HOLD x8 over ~11 min, CLEAR 03:18:29Z, live 03:23:55Z.
+
+verify — BY CONTENT on the deployed SHA, all three tokens confirmed ABSENT from
+the previously-live `ab42b221` first:
+
+    corners_mean              0 -> 1
+    alternate_totals_corners  0 -> 3
+    away_corners              0 -> 2
+
+Two earlier fixes re-checked for SURVIVAL and intact: `#643`'s `bytes_per_order`
+x1 and `008aca69`'s `price_shopping` x2.
+
+Runtime: 100 lines since boot, **0 tracebacks**, 10 soccer-related — the worker
+writing `live_state` for mls/eredivisie and running
+`MONEYLINE_YES_LEG_POPULATION moneylines=1270`.
+
+**refresh-worker needed nothing** — a peer had already put it on `4ead66c3`.
+
+**WEB EXCLUDED, and this is the fourth time the same check decided a round.**
+`web-oom-rate-remeasure` had held web's claim 25 minutes and is re-measuring web
+memory; a deploy reboots the process and resets the accumulator its method
+depends on — the round-9 situation exactly. Not forced. Web remains 1 commit
+behind on `4ead66c3` and the VERDICT still reads "deploy warranted for web",
+which is correct and is that lane's to discharge.

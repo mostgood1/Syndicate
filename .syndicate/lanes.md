@@ -608,6 +608,22 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Files: `.claude/hooks/test_ledger_invariants_resurrection.py`.
 - Blocked by: none.
 
+### live-odds-deploy-4ead66c3 — CLOSED 2026-09-04 — **live-odds-worker `ab42b221`→`e713939f`, live 03:23:55Z.** Verified by content (`corners_mean` 0→1, `alternate_totals_corners` 0→3, `away_corners` 0→2) with `#643` and `008aca69` re-checked for survival; 0 errors. refresh-worker already had it; **web excluded — owner mid memory-remeasure**, and remains 1 behind by design. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: live-odds-worker off `ab42b221` onto `e713939f` `[user: "deploy
+  4ead66c3"]`. `4ead66c3` (soccer corners get a model view from the CORNERS
+  mean) is genuinely behavioural — 53 added lines of real code, not docstrings —
+  and `e713939f` contains it while adding nothing else a service executes.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- **refresh-worker ALREADY ON `4ead66c3`** (a peer shipped it; 0 pending).
+- **WEB EXCLUDED.** `web-oom-rate-remeasure` has held its claim 25 min and is
+  re-measuring web memory; a deploy reboots the process and resets the
+  accumulator its method depends on. Same call as round 9. Not forced.
+- Verification: BY CONTENT on the deployed SHA — `corners_mean` and
+  `alternate_totals_corners` in `soccer_projections.py`, both confirmed ABSENT
+  from the currently-live `ab42b221`; plus 0 tracebacks.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
