@@ -58,8 +58,13 @@ account for. Measured on this repo 2026-09-04:
     .syndicate/learnings.md   660 commits /   654 blobs / 177 MB
     an ordinary code file       3-4 commits
 
-    exhaustive worst case (line really is nowhere)  11.7s
+    exhaustive worst case (line really is nowhere)  11.6s / 13.4s
+    both big ledger files in ONE command            18.7s, both exhaustive
     early exit (line found in history)               3.9s, 120 of 1301 blobs
+
+The 30s budget is a REAL ceiling, not a soft one: every git call inside the
+sweep takes its timeout from the time left on the shared deadline, so a slow
+`rev-list` cannot push the total past it.
 
 That is why the sweep is NOT unconditional: it runs only once the cheap revs
 have failed, i.e. only when this hook is about to BLOCK anyway. The allow-path
@@ -101,12 +106,13 @@ DEEP_BUDGET_ENV = "SYNDICATE_DISCARD_DEEP_BUDGET"
 # path. Per-path would let `git checkout HEAD -- a b c` cost three budgets; a
 # hook that can stall a shell for an unbounded multiple of its own limit has no
 # limit. Measured on this repo 2026-09-04, lanes.md (1,302 versions, 246 MB)
-# exhaustive: 11.6s and 13.4s on two runs. 20 keeps that answer EXHAUSTIVE with
-# room for the file to grow; past it the sweep truncates and says so, which
-# degrades honestly rather than silently. Only ever spent on a command that is
-# otherwise about to be BLOCKED -- the allow-path never enters here (measured
-# 0.59s, unchanged).
-DEEP_BUDGET_S = 20.0
+# exhaustive: 11.6s and 13.4s on two runs; both big ledger files in ONE command,
+# 18.7s. 30 keeps this repo's worst real case EXHAUSTIVE with genuine headroom
+# for growth -- at 20 it cleared by 1.3s, which is not headroom. Past the budget
+# the sweep truncates and SAYS so, degrading honestly rather than silently.
+# Only ever spent on a command otherwise about to be BLOCKED; the allow-path
+# never enters here (measured 0.59s -> 0.60s across this whole change).
+DEEP_BUDGET_S = 30.0
 _CHUNK = 40                     # blobs per `cat-file --batch` round
 
 # Only the discarding forms. `git checkout -b`, `git checkout <branch>` (no
@@ -125,7 +131,7 @@ _RESTORE = re.compile(r"\bgit\s+(?:-[CcS]\s+\S+\s+)*restore\b")
 _RESET_HARD = re.compile(r"\bgit\s+(?:-[CcS]\s+\S+\s+)*reset\b[^\n]*--hard\b")
 
 
-def _git(root, *args, stdin=None, tolerant=False):
+def _git(root, *args, stdin=None, tolerant=False, timeout=30):
     """git stdout as UTF-8 text, or None.
 
     NO `text=True`. On Windows that decodes with the LOCALE codepage (cp1252
@@ -136,8 +142,10 @@ def _git(root, *args, stdin=None, tolerant=False):
     `learnings.md` carries this as FORBIDDEN; the guard had it anyway.
     """
     try:
+        if timeout is not None and timeout <= 0:
+            return None                 # deadline already gone; do not start
         r = subprocess.run(["git", "-C", root] + list(args),
-                           capture_output=True, timeout=30,
+                           capture_output=True, timeout=timeout,
                            input=(stdin.encode("utf-8") if stdin else None))
         # `cat-file --batch*` exits non-zero when ANY spec is missing (a commit
         # where the path did not exist), while still emitting every line that
@@ -249,7 +257,7 @@ def _looks_like_rev(tok):
         or tok.startswith("origin/") or tok in ("HEAD",)
 
 
-def _blob_ids(root, rel):
+def _blob_ids(root, rel, deadline=None):
     """Distinct blob ids for `rel` across ALL refs, newest commit first.
 
     Two git processes, not one per ref: `rev-list --all -- <path>` gives the
@@ -258,12 +266,20 @@ def _blob_ids(root, rel):
     matters -- lanes.md has 1,322 commits but 1,301 distinct blobs, and the
     ledger files barely change in most of them.
     """
-    commits = (_git(root, "rev-list", "--all", "--", rel) or "").split()
+    # THE PER-CALL TIMEOUT MUST COME OFF THE SHARED DEADLINE, not be a fixed 30.
+    # `rev-list --all` is the slowest single call here (3-5s measured, and it
+    # grows with history), and it runs BEFORE the chunk loop's deadline check.
+    # With a fixed timeout the true ceiling was budget + timeout, i.e. 60s for a
+    # 30s budget -- exactly the "unbounded multiple of its own limit" this
+    # module rejects one comment above. Now the deadline is the ceiling.
+    left = (lambda: None) if deadline is None else (lambda: deadline - time.time())
+    commits = (_git(root, "rev-list", "--all", "--", rel,
+                    timeout=left()) or "").split()
     if not commits:
         return []
     out = _git(root, "cat-file", "--batch-check=%(objectname) %(objecttype)",
                stdin="".join("%s:%s\n" % (c, rel) for c in commits),
-               tolerant=True) or ""
+               tolerant=True, timeout=left()) or ""
     seen, ids = set(), []
     for line in out.splitlines():
         f = line.split()
@@ -285,16 +301,20 @@ def _deep_lines(root, rel, needed, deadline):
     """
     if time.time() >= deadline:
         return set(needed), 0, 0, False
-    ids = _blob_ids(root, rel)
+    ids = _blob_ids(root, rel, deadline)
     if not ids:
-        return set(needed), 0, 0, True
+        # No versions found -- or the deadline killed the listing. Those are not
+        # the same answer, and the permissive one must not stand in for the
+        # unknown, so an expired deadline reports INCOMPLETE.
+        return set(needed), 0, 0, time.time() < deadline
     missing, scanned = set(needed), 0
     for i in range(0, len(ids), _CHUNK):
         if time.time() >= deadline:
             return missing, scanned, len(ids), False
         part = ids[i:i + _CHUNK]
         body = _git(root, "cat-file", "--batch",
-                    stdin="".join(b + "\n" for b in part), tolerant=True)
+                    stdin="".join(b + "\n" for b in part), tolerant=True,
+                    timeout=deadline - time.time())
         missing -= _lines(body)
         scanned += len(part)
         if not missing:

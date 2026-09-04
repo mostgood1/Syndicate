@@ -264,6 +264,35 @@ check("two doomed paths share ONE budget, not one each", _el < 8, True)
 check("  ^ and it still blocks", _rc, 2)
 
 print()
+print("THE DEADLINE IS A REAL CEILING, AND AN EXPIRED ONE IS 'UNKNOWN'")
+# Every git call in the sweep takes its timeout from the time LEFT on the shared
+# deadline. With a fixed per-call timeout the true ceiling was budget + timeout
+# -- 60s for a 30s budget -- because `rev-list --all` (the slowest call, 3-5s
+# and growing with history) runs before the chunk loop's deadline check.
+#
+# The subtle half: when the deadline kills the blob LISTING, `_blob_ids` returns
+# empty, which is indistinguishable from "this path has no committed versions".
+# The first means UNKNOWN and the second means NOWHERE, and the permissive
+# reading must not stand in for the unknown.
+_t0 = time.time()
+_rc, _err = drive(repo_side_branch(), "git checkout HEAD -- .syndicate/lanes.md",
+                  {"SYNDICATE_DISCARD_DEEP_BUDGET": "0"})
+_el = time.time() - _t0
+check("an expired deadline returns promptly", _el < 8, True)
+check("  ^ blocks rather than assuming recoverable", _rc, 2)
+check("  ^ and is reported as TRUNCATED, not as an exhaustive 'nowhere'",
+      "SEARCH TRUNCATED" in _err and "across every ref" not in _err, True)
+
+# The same must hold for a path with NO committed history at all, which is a
+# genuine "nowhere" and must NOT be mislabelled truncated.
+_d = repo_side_branch()
+with open(os.path.join(_d, ".syndicate", "brand_new.md"), "w", encoding="utf-8") as _fh:
+    _fh.write("# never committed anywhere" + chr(10))
+_rc, _err = drive(_d, "git checkout HEAD -- .syndicate/brand_new.md")
+check("a path with no committed version at all is not 'truncated'",
+      "SEARCH TRUNCATED" not in _err, True)
+
+print()
 print("THE DEEP SWEEP CAN BE TURNED OFF, AND SAYS WHEN IT IS")
 _rc, _err = drive(repo_side_branch(), "git checkout HEAD -- .syndicate/lanes.md",
                   {"SYNDICATE_DISCARD_DEEP": "off"})
