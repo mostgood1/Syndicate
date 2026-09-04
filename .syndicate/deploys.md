@@ -7,6 +7,45 @@
 
 
 
+## 2026-09-04 04:28-04:39Z — VERIFIED — `99479bd4` (`f1508e78`) refresh-worker — `#624` step 1's certainty refusal — lane `mlb-prop-phase1`
+
+`dep-dad4hkgn74is73d81lv0`, fired 04:28:02Z into a job-free instant (preflight
+held twice on an in-flight odds refresh; the gap at 04:27:49Z was watched for,
+not waited out blind). Live 04:30:44Z.
+
+**verify: EXACT 1.0 falls to zero on the first rebuilt board artifact WITHOUT a
+fall in `model_prob_over` coverage.** Both halves matter — the pre-deploy board
+had exactly ONE certainty, so a bare "0 certainties" is indistinguishable from a
+board that lost the field entirely. Read on `/api/board/book-grid?sport=mlb`,
+`source=precomputed_artifact` both times (the inline join is fallback only, so a
+web read would not have tested the producer):
+
+    artifact 04:28:48Z (pre, live=4ead66c3)   1,867 rows   1,451 w/ prob (77.7%)   EXACT 1.0 = 1   EXACT 0.0 = 16
+    artifact 04:39:08Z (post, live=99479bd4)  1,869 rows   1,461 w/ prob (78.2%)   EXACT 1.0 = 0   EXACT 0.0 = 16
+
+**PASSED, and the SECOND number is the more useful one.** The 1.0 is gone and
+coverage did not fall — it rose slightly, tracking the row count. The 16 zeros
+are UNCHANGED, and that is the change behaving exactly as diagnosed rather than
+a partial failure: `f1508e78` refuses inside `_dist_prob_over`, and 16 of the 17
+certainties **never touch a distribution**. They are threshold rungs read
+straight out of `p_hr_Nplus_cal` (`basis` `hr_2plus` / `hr_3plus`), a producer
+that helper cannot see.
+
+**So the shipped fix covered 1 of 17.** I found that only because the
+verification printed the denominator and the near-miss bands beside the count,
+which is the whole reason this row's `verify:` was written with two clauses. The
+follow-up moves the refusal to the choke point both public entries share
+(`project()` / `project_game_market()`); it is a separate commit and a separate
+deploy, measured on its own.
+
+**0.0 IS THE DANGEROUS SIGN.** `model_prob_over = 0.0` says the OVER is
+impossible, which makes the UNDER a 100%-confidence bet against whatever the
+book pays. All 16 are unpriced today only because `market_fair_prob_over` is
+None on those rows — the same accident that spared the one at 1.0, whose
++59.4-point edge was suppressed by an unrelated "game is final" guard.
+
+---
+
 ## 2026-09-01 16:11–16:26Z — VERIFIED — `c2f3efe4` item 05 capture — the `verify: owed` above is DISCHARGED, with ONE BULLET FAILED — lane `mlb-accuracy-assessment`
 
 Discharges the three-bullet `verify:` on the 16:0xZ row. Two passed, **one
