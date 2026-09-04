@@ -4952,3 +4952,45 @@ consistently wrong.
 `scripts/check_lane_claims.py::_near_miss_open` (session f97ad5ab) now fails on
 a block that declares files under a header containing `OPEN` but failing
 `OPEN` — REOPENED, OPENED — which is the emitter-side fix for this class.
+## 2026-09-03 — FORBIDDEN: reporting a commit as PUSHED on the strength of a command that also succeeds when it is not. And after a rebase, `--is-ancestor` on the old SHA is not evidence it is absent. `[session c38d3e5c with f97ad5ab]`
+
+Two failures, opposite directions, same root: **a SHA is an identity, and the
+question is almost always about REACHABILITY or CONTENT.**
+
+**Direction 1 — existence read as reachability (mine).** I ran `git fetch
+origin`, then `git log --oneline -1 <sha>` and `git show <sha> --stat`, and
+reported "confirmed on origin". Both commands return identical output whether or
+not the commit is reachable from `origin/main`; they answer *does this object
+exist locally*. `git merge-base --is-ancestor <sha> origin/main` returned **exit
+1** and the content was absent from the upstream blob. **The `git fetch`
+immediately before is what made it feel like an origin check** — it updates the
+ref, then the next command never consults it.
+
+**Direction 2 — a rewritten SHA read as absence (the trap this sets).** After I
+rebased and pushed, that same rule WAS on origin, as `55ed6568`. But
+`--is-ancestor 259da523 origin/main` still returns exit 1, because the rebase
+rewrote the commit. Its author re-running their own (correct, careful) check
+would read a rewrite as an absence and file the rule a second time.
+
+**How to apply.** Name which of the three you are asking, and use the matching
+instrument:
+
+    exists locally      git cat-file -e <sha>        (rarely the question)
+    reachable upstream  git merge-base --is-ancestor <sha> origin/main
+    content upstream    git log origin/main --grep=…   or a match in the blob
+
+**After any rebase, only the content question survives** — every SHA you wrote
+down beforehand is stale, including your own. This is the same asymmetry as
+`FORBIDDEN: verifying a deploy by ANCESTRY`: there, ancestry was too weak
+because content can be equal across different SHAs; here, ancestry is too strong
+because content can be equal across different SHAs. One fact, and it cuts both
+ways depending on which direction you are arguing.
+
+**The general form, and it is the third instance in this exchange:** a check
+whose output is the same under the hypothesis and its negation is not a check.
+`git log -1 <sha>` has no failing branch for "is it pushed", so it could only
+ever say yes.
+- *(sibling: `2026-09-03 FORBIDDEN: reporting a census result as a property of
+  the POPULATION when it is a property of your PROBE` — that one is about the
+  probe being too narrow; this one is about the probe answering a different
+  question entirely.)*
