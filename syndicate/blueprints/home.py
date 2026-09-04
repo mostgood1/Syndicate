@@ -23,8 +23,10 @@ from urllib.request import urlopen
 
 import json
 
-from flask import Blueprint, current_app, has_app_context, jsonify, render_template, request
+from flask import Blueprint, current_app, has_app_context, has_request_context, jsonify, render_template, request
 
+from syndicate.features.mlb.game_state import mlb_feed_live_is_refreshable
+from syndicate.features.mlb.game_state import mlb_feed_payload_is_final
 from syndicate.features.mlb.game_state import mlb_status_is_final as _mlb_status_is_final
 from syndicate.features.mlb.game_state import mlb_status_is_live as _mlb_status_is_live
 from syndicate.features.mlb.ladders_common import build_module_links as build_mlb_module_links
@@ -3558,10 +3560,39 @@ def _fetch_mlb_feed_live(game_pk: int) -> dict[str, Any] | None:
 
 
 def _mlb_feed_live_payload(selected_date: str, game_pk: int) -> dict[str, Any] | None:
+    """The cached `feed/live` document, refreshed unless it is already final.
+
+    PRESENCE WAS BEING USED WHERE FRESHNESS WAS MEANT. This returned the file
+    whenever it EXISTED, so whenever a game's feed was first captured became
+    that game's state for the rest of the day -- one captured in the 1st
+    inning read `BOT 1` forever, one captured in the 9th read `TOP 9` through
+    the final out. `board_enrichment.attach_live_game_state_from_lens` was
+    built in 2026-08 to overlay a correction on top of this, and its own
+    docstring names fixing the reader as the deeper fix and defers it. This
+    is that fix; the overlay stays, because it also covers a chip that never
+    had a cached payload at all.
+
+    Final is terminal, so a final document is returned untouched and costs no
+    call. Anything else is a moment in time and is re-fetched when the date is
+    still resolvable -- which, off the request path, includes yesterday, so a
+    game that ended after the midnight-Central roll is still recorded. See
+    `mlb_feed_live_is_refreshable`; the request path deliberately keeps the
+    old today-only window, because every miss there is an uncached HTTPS call
+    on a service that has been SIGTERM'd for exactly that.
+
+    A refresh that fails falls back to the cached document rather than to
+    None: a stale state is worse than a fresh one and better than none.
+    """
+    refreshable = mlb_feed_live_is_refreshable(
+        selected_date, central_today_iso(), in_request_context=has_request_context()
+    )
     payload = load_json_or_gz_file(raw_feed_live_path(selected_date, int(game_pk)))
     if isinstance(payload, dict):
-        return payload
-    if selected_date == central_today_iso():
+        if mlb_feed_payload_is_final(payload) or not refreshable:
+            return payload
+        refreshed = _fetch_mlb_feed_live(game_pk)
+        return refreshed if isinstance(refreshed, dict) else payload
+    if refreshable:
         return _fetch_mlb_feed_live(game_pk)
     return None
 

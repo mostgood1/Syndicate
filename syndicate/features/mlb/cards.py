@@ -19,6 +19,10 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from flask import has_request_context
+
+from syndicate.features.mlb.game_state import mlb_feed_live_is_refreshable
+from syndicate.features.mlb.game_state import mlb_feed_payload_is_final
 from syndicate.features.mlb.game_state import mlb_status_is_final as _mlb_status_is_final
 from syndicate.features.mlb.game_state import mlb_status_is_live as _mlb_status_is_live
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
@@ -2341,11 +2345,29 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
     for game_pk in game_pks:
         feed_path = raw_feed_live_path(selected_date, int(game_pk))
         payload = load_json_or_gz_file(feed_path)
-        if selected_date == today_iso and isinstance(payload, dict) and not _actual_payload_is_live(payload):
+        # FINAL IS THE TERMINAL STATE, AND IT IS THE ONLY ONE WORTH KEEPING.
+        #
+        # This read was `not _actual_payload_is_live(payload)`, which is the
+        # inverse of the rule it needed: it re-fetched a cached PREGAME or
+        # FINAL document and left a cached LIVE one alone. Live -> final is
+        # the one transition that matters here and it was the one transition
+        # never picked up, so a game whose feed was captured in the 7th read
+        # `live` with a 7th-inning score for the rest of the slate's life.
+        # (It also spent a call per already-final game, every build, to learn
+        # a thing that cannot change.)
+        #
+        # `refreshable` also carries the DATE window -- see
+        # `mlb_feed_live_is_refreshable` for why "today only" permanently
+        # loses every game that ends after the midnight-Central roll, and
+        # why the extra day is withheld on the request path.
+        refreshable = mlb_feed_live_is_refreshable(
+            selected_date, today_iso, in_request_context=has_request_context()
+        )
+        if refreshable and isinstance(payload, dict) and not mlb_feed_payload_is_final(payload):
             live_payload = _fetch_current_feed_live(int(game_pk))
             if isinstance(live_payload, dict):
                 payload = live_payload
-        if not isinstance(payload, dict) and selected_date == today_iso:
+        if not isinstance(payload, dict) and refreshable:
             payload = _fetch_current_feed_live(int(game_pk))
         if isinstance(payload, dict):
             # Pruned at the point of RETENTION, after every branch above has had
