@@ -112,6 +112,63 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ## OPEN
+### settled-sample-nfl-reconcile — OPEN — opened 2026-09-04 — two settlement ledgers disagreed about NFL, and the disagreement sizes real money
+- Goal: reconcile `settlement_all_time.by_sport` (NFL `orders=1, settled=0`) against
+  the `SETTLED_SAMPLE` line (`nfl: 18`), decide which is right for
+  `_sample_credibility`, fix the wrong side, and pin the reconciliation in a test.
+- Files (collision-checked 2026-09-04 with `lane_claims.claims_by_path` over
+  `origin/main:.syndicate/lanes.md` — the guard's OWN parser, not
+  `check_lane_invariants`; ZERO of these has a holder):
+  `syndicate/features/shared/paper_settlement.py`,
+  `pipeline/portfolio_commit.py`,
+  `tests/test_settled_sample_credibility.py`,
+  `syndicate/blueprints/intelligence.py` (the two-line population label beside
+  `settlement_all_time` ONLY — nothing else in that 5,000-line file).
+  NOT claimed and NOT edited: `syndicate/features/shared/execution_ledger.py`
+  (held by `order-model-view`).
+- Hypothesis, written before testing: the two count different POPULATIONS, not
+  the same population wrongly.
+- Falsification test: they count the same population and one has a filter bug.
+- Verification: a test that recomputes both numbers from one fixture ledger and
+  asserts the identity between them; plus a mutation check (back the fix out,
+  the test goes red).
+- **ANSWER — both producers are correct for their own purpose; the CONSUMER's
+  unit was wrong.** `settlement_all_time` on `/portfolio/paper` is PAPER-MODE
+  order rows (the live-order filter there is deliberate and load-bearing — that
+  page's banner says "no money moves"). `_settled_sample_size_by_sport` reads
+  the WHOLE ledger, paper + live, which is right in KIND. It was wrong in UNIT:
+  it counted ORDER ROWS, and the same bet placed at Kalshi *and* Polymarket is
+  two rows and **one** Bernoulli trial. Measured on production 2026-09-04 over
+  979 settled portfolio-book rows: NFL 18 rows → **12 distinct decisions**;
+  every one of the 6 duplicate pairs resolved identically, as it must.
+- **CONSEQUENCE, and it is the whole point of the lane: NFL credibility
+  0.360 → 0.250, the floor.** 12/50 = 0.24 < the 0.25 floor, so on the honest
+  denominator NFL gets NO evidence lift at all. Not a rounding artefact.
+- **AND THE 12 ARE NOT NFL AS IT WILL BE PLAYED TODAY.** All 12 are PRESEASON
+  totals — 2026-08-27..29, every one an `over`, 8 distinct games, 9W-9L across
+  the 18 rows, **-4.06% ROI on $70.62 of settled stake**. Zero regular-season
+  NFL decisions have ever been graded, and today is the opener. The floor is
+  the right answer for a reason beyond arithmetic.
+- Full-ledger effect, the shipped function run over the real production ledger
+  (2,443 rows pulled from `/api/portfolio/live?on=all` + 15 dates of
+  `/api/portfolio/paper`, covering **664/664** paper and **315/315** live
+  settled rows — no sampling): 979 settled rows → **783 distinct decisions**.
+  mlb 865→684, wnba 66→59, soccer 30→28, nfl 18→12. Only NFL and soccer move
+  credibility at all; mlb and wnba are ≥50 either way, which is precisely why
+  the defect survived the first reading.
+- RULED OUT, with evidence, so nobody re-checks it: sport-label case. All 596
+  live and 1,847 paper rows carry a lowercase `sport`. The overwrite-vs-sum
+  hazard in the old code was real but LATENT; it is fixed anyway.
+- Landed `53d8f9c9`. **MUTATION CHECK RUN, both directions:** disabling the
+  dedupe turns 6 tests red; restoring the row-count consumer turns 2 red,
+  including the one that asserts the value reaching the sizer. 19/19 green
+  restored; 212/212 across the five related test files.
+- Blocked by: nothing. **NO DEPLOY TAKEN** — another session is mid-deploy on
+  this fleet [instruction 2026-09-04]. OWED: refresh-worker is the only service
+  that runs `pipeline/portfolio_commit.py`, so until it deploys, production
+  keeps sizing NFL at 0.36 on duplicated rows. The reading that closes this is
+  the next `SETTLED_SAMPLE` line printing `nfl: 12` with `credibility 0.25`.
+
 ### web-oom-arena-trend — CLOSED 2026-09-04 — opened 2026-09-04 — **FIRST POSITIVE IDENTIFICATION IN `#632`.** The arena hypothesis was FALSIFIED (arenas flat, fragmentation 56.6 MB and stable) and the falsification exposed the instrument: pymalloc sees ~40% of worker RSS and cannot register an allocation over 512 bytes. The smaps trend, split by pid with a gate pre-registered before the data, found it — **the growth is 8-64MB ANONYMOUS MAPPINGS**: pid 79 `+148.70 MB / 37.3 min`, 80.5% in that bucket; pid 78 `+54.10 MB / 34.6 min`, 85.4%. `UNNAMED 0.00` on both. NOT established: what allocates them, and the rates are early-life so they are NOT comparable to the +173 MB/h plateau. NEXT: does the climb track the worker serving `/api/intelligence/query`? — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: answer whether `#632`'s ~173 MB/h is FRAGMENTATION or RETENTION, by
   sampling pymalloc's `arena_mb` against `bytes_in_allocated_blocks_mb` over
