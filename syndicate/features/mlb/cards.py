@@ -2445,6 +2445,40 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
             + " ".join(f"{k}={v}" for k, v in refresh.items()),
             flush=True,
         )
+        # PER-GAME STATUS, read back off `out` THE WAY THE CONSUMER READS IT.
+        #
+        # Resolving a contradiction, not adding colour. Measured 2026-09-04
+        # 18:16:22Z on ONE bulk call (`games=9`): this function's own counter
+        # said `skipped_final=9` -- `mlb_feed_payload_is_final()` true for all
+        # nine -- while `_source_status`, which is fed from THIS map
+        # (`cards.py` -> `actual_games.get(game_pk)` -> `"status":
+        # _source_status(actual_payload)`), published ATH @ SEA and STL @ LAD
+        # as `{"abstract": "Live", "detailed": "In Progress"}`. Both predicates
+        # read the same two fields of the same dict, so they cannot both be
+        # right, and `_source_status(None)` would have said Pregame/Scheduled
+        # so it is not reading a missing payload.
+        #
+        # So this prints BOTH readers against the SAME key, inside one
+        # function: what `_source_status` computes, and what
+        # `mlb_feed_payload_is_final` decides. If they disagree here the fault
+        # is between the two predicates; if they AGREE here (both final) then
+        # the map this returns is not the map the caller reads, and the keying
+        # is the suspect -- `cards.py` uses `.get(int(game_pk))` at one call
+        # site and `.get(game_pk)` at another.
+        #
+        # `key_types` is printed for the same reason: an int/str mismatch is
+        # invisible in every other line on this path.
+        for _pk in game_pks:
+            _doc = out.get(int(_pk))
+            _st = _source_status(_doc)
+            print(
+                f"[mlb_cards] FEED_LIVE_STATUS date={selected_date} game_pk={_pk} "
+                f"present={_doc is not None} source_status_abstract={_st['abstract']!r} "
+                f"source_status_detailed={_st['detailed']!r} "
+                f"is_final_predicate={mlb_feed_payload_is_final(_doc)} "
+                f"key_types={sorted({type(k).__name__ for k in out})}",
+                flush=True,
+            )
     return out
 
 

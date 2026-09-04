@@ -211,3 +211,54 @@ class TestRefreshCounter:
         f = run(LIVE)
         assert f["date"] == "2026-09-03" and f["today"] == "2026-09-04"
         assert f["in_request"] == "False" and f["games"] == "1"
+
+
+class TestPerGameStatusLine:
+    """The line that resolves the counter-vs-`_source_status` contradiction.
+
+    It must print BOTH readers against the SAME key, or it cannot tell
+    "the predicates disagree" from "the caller reads a different map".
+    """
+
+    @pytest.fixture
+    def run(self, monkeypatch, capsys):
+        from pathlib import Path
+        from syndicate.features.mlb import cards
+
+        def _go(cached, *, date="2026-09-03", today="2026-09-04"):
+            monkeypatch.setattr(cards, "raw_feed_live_path", lambda *_a, **_k: Path("unused"))
+            monkeypatch.setattr(cards, "load_json_or_gz_file", lambda *_a, **_k: cached)
+            monkeypatch.setattr(cards, "central_today_iso", lambda: today)
+            monkeypatch.setattr(cards, "_fetch_current_feed_live", lambda _pk: None)
+            monkeypatch.setattr(cards, "_render_web_dyno", lambda: False)
+            monkeypatch.setenv("SYNDICATE_MLB_FEED_LIVE_PRUNE", "0")
+            cards._daily_actual_by_game(date, [776])
+            rows = [l for l in capsys.readouterr().out.splitlines() if "FEED_LIVE_STATUS" in l]
+            assert len(rows) == 1, rows
+            return dict(t.split("=", 1) for t in rows[0].split() if "=" in t and not t.startswith("["))
+
+        return _go
+
+    def test_a_final_payload_agrees_across_both_readers(self, run):
+        f = run(FINAL)
+        assert f["source_status_abstract"] == "'Final'"
+        assert f["is_final_predicate"] == "True"
+        assert f["present"] == "True"
+
+    def test_a_live_payload_agrees_across_both_readers(self, run):
+        """The production case: if the two ever disagree, THIS is the line
+        that shows it, because both are computed off one `out.get(pk)`."""
+        f = run(LIVE)
+        assert f["source_status_abstract"] == "'Live'"
+        assert f["is_final_predicate"] == "False"
+
+    def test_a_missing_payload_is_named_rather_than_defaulted_silently(self, run):
+        f = run(None)
+        assert f["present"] == "False"
+        # `_source_status(None)` yields the Pregame/Scheduled DEFAULT -- which
+        # is exactly why production reading "Live" proves a payload was there.
+        assert f["source_status_abstract"] == "'Pregame'"
+
+    def test_the_key_type_is_reported(self, run):
+        f = run(FINAL)
+        assert f["key_types"] == "['int']"
