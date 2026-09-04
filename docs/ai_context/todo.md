@@ -1821,6 +1821,41 @@ the last; the negatives appeared at `14:16` and `14:23`. Nothing has reproduced
 one with instrumentation in place, so no mechanism is confirmed — only four
 ruled out.
 
+**`[2026-09-04]` ARENA TREND: PYMALLOC IS ONLY 40% OF THE PROCESS, AND IT DID NOT
+MOVE. The growth is in memory pymalloc never sees.** Measured on `25fdd659`.
+
+    worker A  15:35:17  arenas 144  arena_mb 144.0  live 102.116  frag 41.884
+    worker B  15:37:21  arenas 117  arena_mb 117.0  live 102.295  frag 14.705
+    worker B  15:39:59  arenas 117  arena_mb 117.0  live 102.308  frag 14.692
+    worker A  15:40:12  arenas 144  arena_mb 144.0  live 102.142  frag 41.858
+
+    workers RSS total      649.0 MB
+    pymalloc arenas (A+B)  261.0 MB   -> arenas are 40% of worker RSS
+
+**WITHIN EACH WORKER NOTHING MOVED** over ~5 min: arenas identical, live bytes
+within 0.03 MB, fragmentation within 0.03 MB. **Two workers alternate in the
+series and my first pass compared across them** — the per-worker split is what
+makes the stability visible.
+
+**THE SCALE IS THE FINDING, AND THE WINDOW IS TOO SHORT FOR THE RATE.** 5 minutes
+at 173 MB/h would be ~14 MB; arenas moved 0.0. But 5 minutes cannot prove arenas
+stay flat while anon climbs, so this is a NARROWING, not a verdict.
+
+**WHAT IT NARROWS TO.** Anything over 512 bytes bypasses pymalloc and goes to
+malloc/mmap directly — a 28 MB JSON payload is exactly that. So 60% of worker RSS
+is invisible to arena accounting, and that is where the growth must be.
+**`#435` already found `malloc_info` blind to it too** (`arena_coverage_pct`
+13.9%, self-labelled `arena_not_representative`, 673 MB of a 1,607 MB floor
+unaccounted). Two allocator-level instruments, both structurally unable to see it.
+
+**NEXT INSTRUMENT, and it already exists:** `log_smaps_anon_breakdown` buckets
+anon mmap REGIONS by size and is the only one of the three that can see a large
+direct mmap. `#632`'s question is now "which size bucket grows", not "which
+request allocated" and not "which arena leaked".
+
+**FRAGMENTATION IS REAL BUT SMALL:** 56.6 MB across both workers (41.9 + 14.7),
+22% of arena bytes, and stable. It is not the ~173 MB/h.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
