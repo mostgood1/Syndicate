@@ -111,7 +111,7 @@ death, never life — do not invert it.
   truncation, reporting attributed / residual / coverage that sum exactly.
 - Blocked by: none.
 
-### web-oom-highwater — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-highwater — CLOSED 2026-09-04 — opened 2026-09-04 — **THE FALSIFICATION TEST WAS UNANSWERABLE AS POSED, AND THAT IS THE RESULT.** The lane asked floor-vs-peak; `floor_mb` is a running minimum and cannot rise, so it could never have detected the rising floor it was built for. What the lane DID establish, from `VmHWM`: **both mechanisms are present** — pid 97 reached 766.8 MB and returned ~155 MB (churn), pid 98 held HWM flat while RSS climbed to meet it (retention) — and an interim "RETENTION, not churn" verdict is WITHDRAWN because it rested on a single time point. Container facts stand: ramp `1066.8 -> 1988.5 MB` with **zero merge children**, so merges are not the driver; the restart buys **~15 minutes**. Both env changes (`MERGE_CHILD_CAP` 2->1, `MERGE_INFLIGHT_MB` ->16) are deployed and **UNTESTED** — 0 merge children across 155 polls. Plateau came in 262.7 MB below control and is recorded as UNATTRIBUTED. `#632` HAS NO FIX. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: decide whether `#632` kills web via a rising FLOOR (a genuine leak) or a
   high PEAK over a flat floor (churn), by tracking both per process plus the
   kernel's own `VmHWM`.

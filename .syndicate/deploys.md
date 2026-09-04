@@ -22689,3 +22689,24 @@ Merge children DO run — two were in flight at 22:29Z (pids 281, 284) and delay
 the first deploy. They are intermittent, so the caps may yet be exercised; a
 later window could test them. Until then the honest status is UNTESTED, not
 working-as-intended.
+
+
+### ADDENDUM to the merge-cap entry above — the plateau moved and it CANNOT be credited
+
+`3a9153f4` restart at 23:03:13Z, 80 samples over 26.8 min, against the 22:41
+restart as control (same service, same day, ~20 min apart):
+
+    first   1016.1 MB      control 1066.8
+    peak    1866.9 MB      control 1980.9      delta  -114.0 MB
+    settled 1593.3 MB      control ~1856.0     delta  -262.7 MB
+
+**A 262.7 MB lower plateau, and it is NOT evidence for the inflight-MB change.
+0 merge children in 80/80 polls** — the ceiling never had to refuse anything, so
+it cannot have produced this. The difference is traffic or timing between two
+windows.
+
+This is the exact case the verifier was built for: **a favourable number with the
+attribution unavailable.** Two env changes had been deployed in the preceding 20
+minutes, so there was an easy and wrong story ready to be told. Recorded as
+UNTESTED, and the plateau delta is recorded as UNATTRIBUTED rather than dropped —
+it is real, it is just not ours.
