@@ -7,6 +7,70 @@
 
 
 
+## 2026-09-04 05:27-05:43Z — VERIFIED (MLB OWED) — `5af2c517` refresh-worker — the certainty refusal on EVERY sport — lane `mlb-prop-phase1`
+
+`dep-dad5d9ijnfac73eh0190`, fired 05:27:02Z into a CLEAR preflight, live
+05:32:13Z. Two MLB full-slate sims were waited out rather than killed (17 min of
+watching); the claim expired mid-wait and was re-acquired, which the tool logged
+as replacing my own expired claim.
+
+**verify: EXACT 0.0 and EXACT 1.0 both reach zero platform-wide, WITHOUT a fall
+in `model_prob_over` coverage AND WITHOUT the near-zero band disappearing.** The
+third clause is the one that makes this a real test: soccer carried **204 rows in
+(0, 0.01)**, and a refusal that took those too would be a band, not an exact
+rule, and would be destroying signal the sim genuinely has.
+
+Read with one instrument before and after (`verify_platform.py`), artifacts
+stamped after the deploy went live:
+
+    BEFORE (05:0xZ)            rows   w/prob    cov   EXACT0.0  EXACT1.0  (0,.01)
+      soccer                   2000     1122  56.1%         17         0      204
+      nfl                      1253      599  47.8%          0         0        0
+      ncaaf                      77        3   3.9%          0         0        0
+
+    AFTER (artifacts 05:43:26-05:43:40Z, all > 05:32:13Z live)
+      soccer                   2000     1080  54.0%          0         0      182
+      nfl                      1253      599  47.8%          0         0        0
+      ncaaf                      67        3   4.5%          0         0        0
+
+    PLATFORM   EXACT 0.0 = 0    EXACT 1.0 = 0    rows labelled refused = 14
+
+**PASSED on all three clauses.** The certainties are gone, coverage held, and
+the 182-row near-zero band survived — so the rule is EXACT, not a range.
+
+**THE 14 LABELLED ROWS ARE WHAT MAKE THIS A MEASUREMENT RATHER THAN AN ABSENCE.**
+Every one carries `model_prob_over_refused: "exact_certainty"` and
+`model_prob_over_refused_value: 0.0`, on bases `anytime_scorer_probability` (12)
+and `assists_over_probabilities` (2). Without that label, "zero certainties" and
+"the field vanished" would read identically — the failure mode this ledger has
+recorded twice already.
+
+**The designed reason-precedence held in production:** those rows kept their own
+more specific `edge_unavailable_reason` ("one-sided market: no two-sided fair to
+price against") rather than being overwritten by the generic refusal text,
+because no edge was actually taken away from them.
+
+**MLB IS NOT VERIFIED AND IS OWED.** Its board reads `returned: 0,
+generated_at: null` for date `2026-09-04` — 16 chips, `rows_matched: 0`. **This
+predates the deploy** (the 05:0xZ baseline above already showed MLB at 0 rows),
+so it is a date rollover with no odds joined yet, not damage from this change.
+But it means the 16 MLB `EXACT 0.0` rung rows could not be re-read here. What IS
+verified for MLB is the earlier half-fix at 04:39Z (EXACT 1.0 1 -> 0). **Owed:
+re-read MLB on the first board build of the 09-04 slate and confirm the 16
+`hr_2plus`/`hr_3plus` zeros are refused.**
+
+Five test failures seen in the wide run (`test_nfl_props_board`,
+`test_prop_player_keying`, `test_soccer_board_mlb_parity`,
+`test_soccersim_player_props` x2) were checked against the PARENT commit
+`5f6dd64f` in a throwaway worktree and fail identically there. **Pre-existing,
+not caused by this change** — attribution settled by running them, not by
+reading them and judging them unrelated.
+
+Still pending: `web` and `live-odds-worker` both execute this code and both have
+it pending.
+
+---
+
 ## 2026-09-04 04:28-04:39Z — VERIFIED — `99479bd4` (`f1508e78`) refresh-worker — `#624` step 1's certainty refusal — lane `mlb-prop-phase1`
 
 `dep-dad4hkgn74is73d81lv0`, fired 04:28:02Z into a job-free instant (preflight
