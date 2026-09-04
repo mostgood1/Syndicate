@@ -489,7 +489,7 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
     MLB ONLY, because the live lens' status is MLB StatsAPI-derived. Other sports
     keep the chip and get a stated reason rather than a silent no-op.
 
-    TWO GUARDS, both of which matter:
+    THREE GUARDS, all of which matter:
 
     - A STALE SNAPSHOT MAY NOT OVERRIDE A FRESH CHIP. The snapshot carries its
       own `generatedAt`; past `_LENS_STATE_MAX_AGE_SECONDS` this refuses to touch
@@ -499,6 +499,13 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
       to live, whatever the snapshot says. Final only ever becomes wrong in one
       direction, and an un-finaled game re-opens edges on a settled market --
       exactly what `live_edge_policy` refuses.
+    - A LENS FOR ANOTHER SLATE MAY NOT CORRECT THIS ONE. There is one snapshot
+      per sport, always for `central_today_iso()`, and the join is by team pair
+      only -- so on a past date it applied TOMORROW's states to yesterday's
+      rows, and MLB series make that match rather than no-op. See the block at
+      the gate itself for the 2026-09-03 measurement (2 of 9 finals lost).
+      FINAL IS TERMINAL does not cover it: a row still reading `live` from a
+      frozen chip is unprotected, which is exactly the row that got moved.
     """
     if sport not in _LIVE_GAME_STATE_SPORTS:
         return {"supported": False, "reason": f"no live status source wired for {sport}", "rows_corrected": 0}
@@ -536,6 +543,63 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
             if not isinstance(snapshot, dict):
                 return {"supported": True, "reason": "no published live-lens snapshot", "rows_corrected": 0}
             page = snapshot.get("page_context") if isinstance(snapshot.get("page_context"), dict) else snapshot
+
+            # THIRD GUARD: A LENS FOR ANOTHER SLATE MAY NOT CORRECT THIS ONE.
+            #
+            # There is exactly ONE snapshot key per sport -- `live/<sport>_
+            # live_lens.json`, rewritten every 60s for `central_today_iso()`
+            # -- and the join below is by TEAM PAIR only. So serving a PAST
+            # date used to apply TODAY's states to yesterday's rows. It could
+            # not no-op, because MLB series repeat a matchup on consecutive
+            # days, which is the case that matches.
+            #
+            # MEASURED 2026-09-03, and it cost real outcomes. The slate was 9
+            # games and StatsAPI says all 9 went Final; the board scored 7.
+            # `lens_games: 16` (the 09-04 slate), `rows_corrected: 187`,
+            # `transitions: {"live->pregame": 187}` -- and 187 is exactly the
+            # ATH @ SEA row count, the one 09-03 matchup that plays again on
+            # 09-04. Its Final 7-4 was driven back to `pregame` by tomorrow's
+            # lens, so `live_gameline_score` never saw it. (The other loss,
+            # STL @ LAD, is the mirror image: it does NOT repeat, so it went
+            # unmatched and kept its frozen `live 2-1` chip. Both games were
+            # final ~25 min BEFORE the artifact was built -- 05:05Z/05:09Z vs
+            # a 05:33:14Z build -- so neither is late-game lag.)
+            #
+            # `selected_date` was already a parameter of this function. It
+            # reached only the log line in the `except` below, which is the
+            # worst place for it: the argument LOOKS honoured at the call site.
+            #
+            # DATING THE SNAPSHOT IS THE WRONG FIX and is explicitly out of
+            # scope -- `learnings.md:3722` prices it at ~5.76 GB/day for MLB
+            # alone into a 256 MB keyvalue store already at 86.8%, and a dated
+            # path silently takes a TTL under `volatile-lru`, so the archive
+            # would be the first thing evicted. The snapshot already CARRIES
+            # its slate date (`mlb/live_lens.py`, inside `page_context`, and
+            # `apply_game_board_contract` preserves it), so the gate is a pure
+            # read-side comparison at zero storage cost.
+            #
+            # ABSENT IS REFUSED, NOT WAVED THROUGH. An undated snapshot cannot
+            # be shown to describe this slate, and the permissive branch is the
+            # one that just lost two finals. It gets its OWN reason so the two
+            # refusals never read as one: "no date" is a snapshot-shape defect
+            # worth chasing, "wrong date" is this guard working as intended.
+            lens_date = str(page.get("date") or snapshot.get("date") or "").strip()
+            if not lens_date:
+                return {
+                    "supported": True,
+                    "reason": "live-lens snapshot carries no slate date to check against",
+                    "requested_date": selected_date,
+                    "rows_corrected": 0,
+                }
+            if lens_date != str(selected_date):
+                return {
+                    "supported": True,
+                    "reason": "live-lens snapshot is for a different slate date",
+                    "lens_date": lens_date,
+                    "requested_date": selected_date,
+                    "rows_corrected": 0,
+                }
+
             games = page.get("games") if isinstance(page.get("games"), list) else []
             if not games:
                 return {"supported": True, "reason": "snapshot carries no games", "rows_corrected": 0}
