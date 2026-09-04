@@ -474,6 +474,28 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # `record_openings` calls `publish_hot_artifact` itself, and only when it
     # actually wrote something.
     "reports/intelligence/clv_openings/*.jsonl",
+    # The PROJECTED evaluation ledger (`evaluation_ledger_projection.py`). This
+    # is the only form of the ledger that can cross to web at all: the RAW
+    # chunks are 95-332 MB/day against the 12 MiB `_PUBLISH_MAX_BYTES` below,
+    # 8-27x over, and refresh-worker serves no HTTP of its own, so nothing else
+    # can carry them. Allowlisting the raw chunks instead would 404 forever --
+    # `/api/ops/artifacts/stream` gates on `target.is_file()` against WEB's
+    # disk, which never holds them.
+    #
+    # Bounded by the PROJECTION, not by hope: `_project_evaluation_record`
+    # keeps ~20 scalars, and that cost SATURATES at ~560 B/record regardless of
+    # how fat the source record is (measured over 1,463 records: raw quartiles
+    # 11,397 -> 566 B, 12,336 -> 563 B, 13,226 -> 558 B). Against production's
+    # 42,595 B/record density a typical 250 MB chunk projects to ~3.3 MB and
+    # the largest 332 MB one to ~4.4 MB -- under `_PUBLISH_STREAM_MIN_BYTES`
+    # (4 MiB), so the ordinary JSON envelope carries them, and a 3.6x margin
+    # under the sweep ceiling.
+    #
+    # This is the `clv_openings` case above, not the `odds_events` case it
+    # refuses: bounded by DISTINCT RECORDS PER DAY through a fixed field list,
+    # not by ticks. The producer prints `PROJECTION_OVER_CEILING` if a
+    # projection ever lands near 12 MiB, which is the falsifier for that sizing.
+    "reports/intelligence/evaluation_ledger_projected/*.jsonl",
     # #83's bounded per-date steam record. capture_phase and steam detection
     # are otherwise only observable through the raw per-observation lifecycle
     # log (odds_events/<date>.jsonl), which reached 1.2GB in a single day

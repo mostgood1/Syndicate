@@ -108,7 +108,7 @@ class ClaimBeforeWorkTests(unittest.TestCase):
     a crash loop: the process dies mid-pass, the epoch never advances, the next
     boot runs it again, forever."""
 
-    def _run(self, *, last_status, summary_side_effect=None):
+    def _run(self, *, last_status, summary_side_effect=None, projection_side_effect=None):
         writes: list[dict] = []
         store = {
             "read_json_file": lambda _path: dict(last_status),
@@ -123,10 +123,48 @@ class ClaimBeforeWorkTests(unittest.TestCase):
                         side_effect=summary_side_effect
                         or (lambda **kwargs: {"sport": kwargs.get("sport"), "sample_size": 3, "settled_count": 1}),
                     ):
-                        fired = WORKER._launch_autorun_accuracy_summary(
-                            latest_manifest_path=Path("x"), worker_status_path=Path("y"), refresh_cycle={}
-                        )
+                        # MUST be patched, not merely tolerated. The autorun now
+                        # also writes the projected ledger mirror, and its
+                        # defaults resolve to the REAL reports root -- an
+                        # unpatched run wrote
+                        # `reports/intelligence/evaluation_ledger_projected/<date>.jsonl`
+                        # into the working tree from a unit test, where it is
+                        # untracked, un-gitignored, and one `git add -A` away
+                        # from being committed by somebody else.
+                        with patch(
+                            "syndicate.features.shared.evaluation_ledger_projection.project_ledger_chunks",
+                            side_effect=projection_side_effect
+                            or (lambda **kwargs: {"chunks_written": 0, "ratio": 0.0}),
+                        ):
+                            fired = WORKER._launch_autorun_accuracy_summary(
+                                latest_manifest_path=Path("x"), worker_status_path=Path("y"), refresh_cycle={}
+                            )
         return fired, writes
+
+    def test_a_failing_mirror_does_not_mark_the_SUMMARY_errored(self) -> None:
+        """The mirror and the summary are different products. Conflating them
+        would hide a perfectly good accuracy artifact behind a failed publish,
+        and the summary is the one anything downstream reads."""
+        def _boom(**kwargs):
+            raise RuntimeError("disk full")
+
+        fired, writes = self._run(last_status={}, projection_side_effect=_boom)
+
+        self.assertTrue(fired)
+        terminal = writes[-1]
+        self.assertEqual(terminal.get("state"), "ok", "a mirror failure is not a summary failure")
+        self.assertIsNone(terminal.get("error"))
+        self.assertIn("error", terminal.get("ledger_projection") or {})
+
+    def test_the_projection_result_is_PUBLISHED_not_only_logged(self) -> None:
+        """stdout is the one surface nobody can read from web -- the 2026-09-04
+        ledger truncation was discoverable only there."""
+        fired, writes = self._run(
+            last_status={}, projection_side_effect=lambda **kwargs: {"chunks_written": 2, "ratio": 0.05}
+        )
+
+        self.assertTrue(fired)
+        self.assertEqual((writes[-1].get("ledger_projection") or {}).get("chunks_written"), 2)
 
     def test_the_run_is_claimed_before_the_work(self) -> None:
         fired, writes = self._run(last_status={})

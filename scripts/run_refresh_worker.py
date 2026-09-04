@@ -2359,6 +2359,36 @@ def _launch_autorun_accuracy_summary(
     except Exception as exc:
         error_text = f"{type(exc).__name__}: {exc}"
 
+    # `#626`(h) FOLLOW-ON: persist the PROJECTED ledger, so it can leave this
+    # box at all. The raw chunks are 95-332 MB/day against a 12 MiB publish
+    # ceiling and this service serves no HTTP, so the projected copy is the
+    # ONLY form of the ledger that can reach web -- and therefore the only way
+    # the summary can ever be computed off a 4 GB worker that is also running
+    # board builds and sims.
+    #
+    # Placed here ON PURPOSE, on three counts. It rides the once-per-day
+    # autorun rather than adding a loop ("worker periodic work is never free"
+    # -- `#241` cost a production restart loop). It runs AFTER the summaries,
+    # so the artifact that was just computed is never at risk. And its own
+    # `try` keeps a mirror failure from marking the SUMMARY run errored: these
+    # are different products and conflating them would hide a good summary
+    # behind a bad mirror.
+    #
+    # Bounded to `DEFAULT_MAX_CHUNKS_PER_RUN` newest-first, so the first pass
+    # does not stream the whole ~8 GB history inside a job that already takes
+    # ~669 s. It converges over a few days; the steady state is one chunk.
+    projection_stats = {}
+    try:
+        from syndicate.features.shared.evaluation_ledger_projection import project_ledger_chunks
+
+        projection_stats = project_ledger_chunks() or {}
+    except Exception as exc:
+        projection_stats = {"error": f"{type(exc).__name__}: {exc}"}
+        print(
+            f"[ledger_projection] AUTORUN_FAILED error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
     elapsed = round(time.time() - started_at, 3)
     print(
         f"[accuracy_summary] AUTORUN_DONE sports={len(summaries)} "
@@ -2373,6 +2403,10 @@ def _launch_autorun_accuracy_summary(
             "elapsed_seconds": elapsed,
             "error": error_text,
             "sports": summaries,
+            # PUBLISHED, not just logged. The 2026-09-04 truncation was
+            # discoverable only off this worker's stdout, and stdout is the one
+            # surface nobody can read from web.
+            "ledger_projection": projection_stats,
         },
     )
     return True
