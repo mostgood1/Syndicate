@@ -578,6 +578,8 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `.claude/hooks/test_ledger_invariants_resurrection.py`,
   `.claude/hooks/ledger-commit-guard.py`.
 - Blocked by: none.
+- Also, from the same thread: `.claude/hooks/discard-guard.py` (new) +
+  `.claude/hooks/test_discard_guard.py` (new) + `.claude/settings.json`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

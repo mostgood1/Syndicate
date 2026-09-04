@@ -51,6 +51,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/discard-guard.py",
+            "timeout": 15,
+            "statusMessage": "Checking for content that exists nowhere else..."
+          },
+          {
+            "type": "command",
             "shell": "bash",
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deploy-guard.py",
             "timeout": 15,
