@@ -3091,6 +3091,35 @@ not Git Bash: `origin/main:path` is mangled to `origin\main;path` and the comman
 fails, which — with a `|| echo 0` fallback — reads as **"content absent"** and
 argues for pushing MORE. That happened here, in the same check.
 
+**SCOPE, MEASURED 2026-09-03 — it breaks ONLY on DOT-PREFIXED trees, which is
+worse than "it breaks", not better** `[session c38d3e5c; refinement from
+f97ad5ab, who hit it the same day]`:
+
+    works    origin/main:README.md
+    works    origin/main:scripts/check_lane_invariants.py
+    works    origin/main:docs/ai_context/todo.md
+    BREAKS   origin/main:.syndicate/lanes.md
+    BREAKS   origin/main:.claude/hooks/lane_claims.py
+
+**Why stating it generally is dangerous.** As an unqualified claim this rule is
+falsifiable by one counter-example — anyone who tests it on `scripts/foo.py`
+sees it work, concludes the rule is stale, and goes back to Git Bash. Then the
+next `.syndicate/` check returns a silent 0. A true rule that looks false on the
+first probe gets discarded, so the scope has to travel with it.
+
+**And the at-risk set is exactly the verification surface.** The only two
+dot-prefixed trees here are `.syndicate/` (the ledger — every claim about what
+we know) and `.claude/` (the hooks — every claim about what is enforced). So the
+failure lands precisely on the reads that decide whether something is true,
+never on ordinary source reads where a wrong answer would be caught by the next
+compile.
+
+Three instances now, all on `.syndicate/**` blobs: the `git cherry` push
+decision above; a `grep -c` that returned a confident 0 for a file git never
+opened while checking whether two lanes' disclaimers were upstream; and
+f97ad5ab's near-miss "confirmation" that a peer report was wrong. Note the
+direction is always the same — a null that argues for acting.
+
 ## [08-31 FORBIDDEN: running a long test sweep while editing the files under test]
 
 A 72-minute sweep (`-k "layer2 or shard or intelligence_state or shortlist"`)
