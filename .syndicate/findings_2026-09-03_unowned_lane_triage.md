@@ -174,3 +174,43 @@ session `1f76348c` · marker last seen - · claims: **none** · 4517 B of narrat
 
 - TWO READINGS OWED, BOTH BLOCKED ON A LIVE SLATE. DO NOT report either as
 - reason — treat exit 3 as "not measured", never as a pass.
+
+---
+
+## CORRECTION `[2026-09-03, session c38d3e5c]` — **NONE of these 25 is archivable. The "0 owed items" column was a PROBE ARTIFACT.**
+
+Asked to archive the 7 showing zero owed items, I read them instead of trusting
+the count. **All 7 have owed work**, in wording my regex
+(`OWED|NOT verified|UNPROVEN|UNFIXED|BLOCKED UNTIL|not measured|still owed`)
+did not match:
+
+| lane | what the regex missed |
+|---|---|
+| `kalshi-line-aware-rungs` | "**BLOCKED ON TWO MEASUREMENTS**, do not resume the original goal first"; "real work remains" |
+| `mlb-resolver-write-side-effect` | "**WHAT REMAINS, and it is the part worth fixing:** any BACKFILL or EVALUATION…" |
+| `ncaaf-pace-block` | "production read of the profile still…"; "**owes a re-fit** before any deploy" |
+| `soccer-model-dispersion` | "**DISCRIMINATION is the remaining defect** … that is the next thread" |
+| `wnba-live-odds-capture-gap` | "**UNVERIFIED:** the 2h bound is the CODE DEFAULT" (I matched `NOT verified`, not `UNVERIFIED`) |
+| `polymarket-pregame-price-gate` | "**NOT DONE** — the POSITIVE soccer case … has never been observed"; "**OPEN, NOT FIXABLE BY DEPLOY:** `atc-sea-ata-bol` is a live position on the WRONG side (Bologna, not Atalanta). Manual closure…" |
+| `accuracy-autorun-rearm` | **NOT UNOWNED AT ALL** — see below |
+
+**Two of these would have done real damage.**
+
+`polymarket-pregame-price-gate` carries an **open money position on the wrong
+side awaiting manual closure**. Archiving it buries a live financial exposure in
+`lanes_closed.md`.
+
+`accuracy-autorun-rearm` is **not unowned**: its header reads *"RECLAIMED
+2026-09-03 ~20:2xZ by session 82fe0160, WHICH IS ALIVE — treat the UNOWNED note
+below as withdrawn"*, and it has a scheduled task **armed for 2026-09-04 03:00
+CT**. My `UNOWNED` regex matched the *withdrawn* note it was told to ignore.
+Archiving it would have removed a live lane with pending automation.
+
+**The lesson is the one this ledger already carries, applied to my own list:** a
+census result is a property of the PROBE, not the population. "0 owed items"
+meant "0 matches for my seven patterns", and I published it as a
+recommendation. The table above stands as a NAVIGATION aid; the counts in it are
+not a verdict, and no lane should be archived on them without reading its body.
+
+**Revised position: 0 of 25 are archivable today.** Every one either records
+owed work or is live. The honest options remain ADOPT or leave OPEN.
