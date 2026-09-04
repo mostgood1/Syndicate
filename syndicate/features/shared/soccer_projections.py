@@ -64,6 +64,16 @@ _PLAYER_FIELDS: dict[str, tuple[str, str]] = {
 # Falls back to `_PLAYER_FIELDS` when the dict is absent -- an artifact built
 # before these were allowlisted degrades to exactly the previous behaviour
 # rather than to a wrong number, and `#170`-style rebuild lag is the norm here.
+#: Corners totals, priced from `volume_projection` and NEVER from the goals
+#: model -- see the branch in `attach_soccer_projections` for the recorded
+#: near-miss that separation exists to prevent. Both spellings are listed
+#: because the board carries `alternate_totals_corners` today and a plain
+#: `totals_corners` is the obvious sibling; an absent key simply never matches.
+_CORNERS_MARKETS: frozenset[str] = frozenset({
+    "alternate_totals_corners",
+    "totals_corners",
+})
+
 _PLAYER_PROB_BY_LINE: dict[str, str] = {
     "player_shots": "shots_over_probabilities",
     "player_shots_on_target": "shots_on_target_over_probabilities",
@@ -990,6 +1000,49 @@ def attach_soccer_projections(
                 )
                 if mean is not None:
                     projection = _mean_projection(mean, row.get("line"), basis="total_mean")
+        elif market in _CORNERS_MARKETS:
+            # CORNERS, PRICED FROM THE CORNERS MEAN -- never from the goals model.
+            #
+            # `market_keys.py` records the near-miss this pairing exists to avoid:
+            # Kalshi words a corners market "Over 4.5 corners?", soccer boards
+            # carry a GOALS total at 4.5, and a grammar that threw the unit away
+            # "would have priced a corners market [with] our goals model and the
+            # join would have looked clean". `_TOTAL_UNIT["soccer"]` keeps that
+            # separation upstream; this branch keeps it here by reading
+            # `volume_projection`, the block the sim fills with corners, and
+            # nothing else.
+            #
+            # WHY IT WAS UNMODELLED AND WHY THAT WAS A DEFECT. Measured on the
+            # served board 2026-09-04: `alternate_totals_corners` was **186 rows,
+            # 0 with a model, 0 with an edge** -- the single largest unmodelled
+            # market in soccer's candidate pool -- while `soccer/cards.py` has
+            # rendered `Proj {total:.1f} | Line {market:g}` for corners all along.
+            # The sim had the number and the board was the surface that could not
+            # see it.
+            #
+            # A MEAN, AND ONLY A MEAN. `distribution.py` accumulates
+            # `mean_home_corners` / `mean_away_corners` across simulations and
+            # divides; there is no corners DISTRIBUTION, no SD, no per-line
+            # over-probability -- unlike goals, which has `scoreline_probabilities`
+            # and `over_2_5_probability`. So this publishes `edge_vs_line` in
+            # CORNER UNITS and nothing else, exactly the contract WNBA uses and
+            # `_PLAYER_PROB_BY_LINE`'s comment states: "a mean presented as a
+            # probability is a fabricated edge".
+            #
+            # **THESE ROWS THEREFORE REMAIN UNBUYABLE, AND THAT IS THE POINT.**
+            # `_model_edge_for` refuses to add a stat-unit edge to an EV
+            # percentage, so they will read `sim_view: unpriced` rather than
+            # `none` -- the sim has a view, it cannot be priced against this
+            # market, and the board now says which. Making them buyable needs a
+            # corners distribution the engine does not produce; inventing a
+            # variance here would be the fabricated edge the file forbids.
+            volume = match.get("volume_projection") or {}
+            home_c = _as_float(volume.get("home_corners"))
+            away_c = _as_float(volume.get("away_corners"))
+            if home_c is not None and away_c is not None:
+                projection = _mean_projection(
+                    home_c + away_c, row.get("line"), basis="corners_mean"
+                )
         elif market in {"spreads", "spreads_alt"}:
             margin = _as_float((match.get("spread_distribution") or {}).get("home"))
             if margin is None:
