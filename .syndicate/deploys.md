@@ -21527,3 +21527,64 @@ the fix failed.
 **Still owed, now stated precisely:** deploy refresh-worker to `60afda80` or
 later, then read `doubleheader_resolved=` from its `portfolio_commit` line. Zero
 is a valid answer there ("no doubleheader today"); absence of the FIELD is not.
+
+## 2026-09-04 16:2xZ — LEDGER BUDGET 2GB -> 4GB IS **LIVE AND UNEXERCISED**. No deploy taken; one was not needed. `[user: "raise the ledger budget"]`
+
+**The raise was already done and already deployed by someone else.** `b55fa165`
+(another lane, 09:55 CT) raised `DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES`
+2,000,000,000 -> 4,000,000,000, and it went live on refresh-worker inside
+`8518a662` at **15:43:45Z** — carried by an unrelated lane's deploy, which is
+the on-`main` cumulative rule doing its job.
+
+**verify (BY CONTENT, the only test that settles it):**
+
+    git show 8518a662:syndicate/features/shared/intelligence_evaluation.py
+      -> DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = 4_000_000_000
+
+**NO DEPLOY WAS TAKEN, deliberately.** A claim was acquired
+(`accuracy-ledger-budget-deploy`, token released) and preflight returned **CLEAR**
+against `c24f1167` — and the deploy was then abandoned, because reading the LIVE
+service showed the change already there. Deploying would have killed in-flight
+work to ship a byte-identical constant. **Preflight's own output is what caught
+it:** it prints `deployed commit per service`, and refresh-worker had moved
+`7f44f5eb` -> `8518a662` since the earlier reading in this session.
+
+**REACHABILITY CONFIRMED INDEPENDENTLY, AND MY FIRST READ OF IT WAS NOT VALID.**
+A default is inert if an env var overrides it, so this had to be checked:
+
+    2 pages, 153 keys enumerated
+    SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES   ABSENT
+    only *BUDGET* key present: SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET=21474836480
+
+This agrees with `b55fa165`'s claim. **My own first attempt asked for a single
+`limit=100` page against a 153-key service and would have missed a key on page
+2** — the trap CLAUDE.md names explicitly. A one-page read is not evidence of
+absence; this entry rests on the paginated one.
+
+**IT HAS NOT RUN AT 4GB YET, AND WILL NOT UNTIL TOMORROW.** Zero
+`LEDGER_CHUNKS_ACCEPTED` since 15:44:00Z (a genuine null — the log tool printed
+its coverage header, so the query ran). The autorun's gate is `hour >= 7 Central`
+AND `last_run_date < today`, and **today's run already completed at 14:34:27Z**,
+so `last_run_date` is today. The first read under the new budget is
+**2026-09-05, first tick after 07:00 CT**.
+
+**PRE-REGISTERED PREDICTIONS, so tomorrow's read can falsify rather than
+rationalise.** Today's run at 2GB gave `bytes=1,999,976,768 records=46,953
+dates=8 partial=1 truncated=1 skipped_budget=24`, peak `memory_anon_mb` 1,481.6.
+At 4GB expect:
+
+    bytes             > 2,000,000,000   (else the raise is inert -- check the env again)
+    skipped_budget    < 24
+    dates             > 8
+    peak anon         ~1,832 MiB        (b55fa165's projection from a 350.6 MiB/2GB
+                                         upper bound; today's was 1,481.6)
+    ceiling            4,096 MiB        -- an anon peak near ~2,600 is the abort signal
+
+**If `partial=1` and `truncated=1` persist at 4GB the cap is still binding**, and
+the next step is the ~8.2GB that would admit all 32 chunks — which `b55fa165`
+declined on purpose, projecting ~2,566 MiB against a 1,877 MiB baseline peak. Do
+not take that step on today's numbers; take it on tomorrow's.
+
+**Owed:** scheduled task `verify-ledger-budget-4gb` (2026-09-05 07:45 CT).
+Nothing here is a fix that has been shown to work — it is a change that has been
+shown to be LIVE.
