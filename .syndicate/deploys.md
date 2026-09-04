@@ -21983,3 +21983,68 @@ open in an editor or an unlanded worktree, this lands under them and their next
 rebase carries a conflict in `build_accuracy_summary`. It is two hunks and one
 line, so the conflict is small and legible — but it is a real cost of the
 override and belongs on the record, not in a footnote.
+
+## 2026-09-04 18:17-18:20Z — web `76c0e174` → `ee20c522` — lane `web-deploy-guard-counter`
+
+`[user instruction: "deploy web"]`. Claim held, preflight **CLEAR** (only
+gunicorn infra processes; 4 defunct children already dead). Live SHA was an
+**ancestor** of the target, so a clean fast-forward — no revert risk.
+
+**WHAT SHIPPED.** 11 commits, but only three files that execute on Render:
+`request_path_guard.py` (+166, mine — `08d3fae5` arming + `58ecba3a` counters),
+`blueprints/ops.py` (+19, mine — the new endpoint), and
+**`features/mlb/cards.py` (+54, NOT mine — `141e9c74`, lane
+`mlb-feed-live-terminal-refresh`)**. Everything else is `.syndicate/` ledger and
+tests, neither of which runs in production.
+
+**A correction I owe on my own process:** I enumerated the payload at
+`origin/main = 1f84b310` and deployed `ee20c522` three minutes later, because a
+peer pushed in between. The runtime delta was unchanged (the extra commit was
+ledger-only) — but I verified that *after* the POST, not before. `render_deploy`'s
+own docstring warns about exactly this window.
+
+### verify: `/api/ops/request-path-guard` returns 200 — AN ENDPOINT THAT DID NOT EXIST BEFORE THIS DEPLOY
+
+Deployment alone proves nothing runs. Two readings, taken 18:2xZ:
+
+    /api/ops/version            commit=ee20c522da   MATCH
+                                render_instance_id=srv-...-6cdcb445c8-qgnhb
+    /api/ops/request-path-guard 200  refused=0  warned=25  pid=98  web_concurrency=2
+
+A 200 from the second is only possible on the new code; before this deploy that
+route was a 404.
+
+### THE OPEN QUESTION IS SETTLED, AND MY (a) SCENARIO WAS NOT THE ACTUAL STATE
+
+`hosted_signal = 'RENDER'`. So **`RENDER` IS injected into the web runtime** —
+it is absent from all 76 user-defined env vars, which is why the env-vars API
+could not see it, and `findings_2026-09-04_web_request_path_intelligence.md`
+correctly refused to guess. The guard was armed by `RENDER`, **not** by
+`SYNDICATE_REQUIRE_HOSTED_STORAGE`, so deleting that storage key would NOT have
+disarmed it. My (a) fragility was a real possibility and was **not** the real
+situation; the hardening is still right (it fixed the `RENDER=false`
+short-circuit and made arming multi-source) but the danger was hypothetical.
+Recorded because a warning that turned out not to apply must be walked back as
+plainly as one that did.
+
+### AND THE COUNTER PAID FOR ITSELF IN FOUR MINUTES — a finding, not a fix
+
+`warned=25` on ONE worker within ~4 minutes of boot, all from the warn-only
+sites, all of them network fetches on the request path:
+
+    mlb_cards_fetch_current_feed_live          16
+    ncaaf_espn_game_state_fetch                 4
+    wnba_has_games_for_date_espn_fetch          4
+    wnba_public_scoreboard_live_state_fetch     1
+
+**Not intelligence compute** — `refused=0`, so the answer in the findings file
+stands. But this is request-path I/O that nothing was counting, and
+`mlb_cards_fetch_current_feed_live` corroborates the `live-lens-date-gate` lane's
+note that a feed_live miss on the request path is an HTTPS call and was the
+measured cause of `/healthz` timing out. **Scope: one worker of two, ~4 minutes,
+one boot.** Not a rate yet, and not mine to chase — flagged for
+`mlb-feed-live-terminal-refresh` and `render-web-request-path`.
+
+**Not a fix.** No behaviour changed for users. `refused=0` since boot is
+consistent with the 8-day quiet, and still does not distinguish "cache stopped
+missing" from "caller stopped calling".

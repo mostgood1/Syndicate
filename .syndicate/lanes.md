@@ -1135,6 +1135,29 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   payload names its own scope.
 - Blocked by: none. NOT deploying.
 
+### web-deploy-guard-counter — CLOSED-VERIFIED 2026-09-04 — **web `76c0e174` → `ee20c522`, live 18:20:29Z. Verified by a reading, not by the deploy status: `/api/ops/request-path-guard` returns 200, a route that 404'd before this deploy. Claim released.** — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
+- Goal: ship the request-path-guard hardening (`08d3fae5`) and counter
+  (`58ecba3a`) to web. `[user instruction 2026-09-04: "deploy web"]`
+- Claim + preflight both taken and passed (CLEAR, only gunicorn infra); live SHA
+  was an ANCESTOR of the target, so a clean fast-forward with no revert risk.
+- Runtime code shipped: `request_path_guard.py` (+166) and `blueprints/ops.py`
+  (+19), both mine, plus **`features/mlb/cards.py` (+54) belonging to
+  `mlb-feed-live-terminal-refresh`** — flagged in `deploys.md`, not silently.
+- **`hosted_signal='RENDER'` SETTLES the open (a) question and walks back my own
+  warning**: `RENDER` IS injected into the web runtime (absent from all 76
+  user-defined vars, which is why the API could not see it), so the guard was
+  armed by it and deleting `SYNDICATE_REQUIRE_HOSTED_STORAGE` would NOT have
+  disarmed it. The hardening remains right; the specific danger was hypothetical.
+- **New finding, handed off not chased:** `warned=25` on one worker in ~4
+  minutes — `mlb_cards_fetch_current_feed_live` x16, `ncaaf_espn_game_state_fetch`
+  x4, `wnba_has_games_for_date_espn_fetch` x4, `wnba_public_scoreboard_live_state_fetch`
+  x1. Request-path network I/O nobody was counting. `refused=0`, so the
+  intelligence answer is unchanged. Full record in `deploys.md`.
+- Process correction on myself: I enumerated the payload at `1f84b310` and
+  deployed `ee20c522` three minutes later after a peer pushed; the runtime delta
+  was unchanged but I confirmed that AFTER the POST, not before.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

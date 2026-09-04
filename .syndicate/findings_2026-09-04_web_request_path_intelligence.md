@@ -138,12 +138,48 @@ stopped calling. **Which of those it is, is NOT established here.**
   threads over five trials on CPython 3.11. The lock buys snapshot CONSISTENCY —
   the total and the per-operation map are copied together, so they reconcile.
 
+## (a) IS NOW SETTLED, AND IT WENT THE OTHER WAY — `[deployed 2026-09-04 18:20:29Z, ee20c522]`
+
+`/api/ops/request-path-guard` on the live web dyno reports
+**`hosted_signal = 'RENDER'`**. So `RENDER` **is** injected into the runtime —
+absent from all 76 user-defined env vars, which is exactly why the env-vars API
+could not see it and why this document refused to guess. The guard was armed by
+`RENDER`, **not** by `SYNDICATE_REQUIRE_HOSTED_STORAGE`, and deleting that
+storage key would **not** have disarmed it.
+
+**So the (a) danger above was real as a possibility and was not the real
+situation.** Recorded plainly rather than quietly dropped: a warning that turns
+out not to apply has to be walked back as clearly as one that does. The
+hardening in `08d3fae5` still earns its place — it fixed the `RENDER=false`
+short-circuit, which was a live defect, and made arming multi-source so the
+question cannot reopen.
+
+## AND THE COUNTER FOUND SOMETHING IN FOUR MINUTES
+
+First read after the deploy, one worker, ~4 minutes since boot: **`refused=0`,
+`warned=25`** — every one a warn-only site doing NETWORK I/O on the request path.
+
+    mlb_cards_fetch_current_feed_live          16
+    ncaaf_espn_game_state_fetch                 4
+    wnba_has_games_for_date_espn_fetch          4
+    wnba_public_scoreboard_live_state_fetch     1
+
+`refused=0` means **this document's answer is unchanged** — web still is not
+computing intelligence in a request. But `mlb_cards_fetch_current_feed_live`
+corroborates the `live-lens-date-gate` lane's note that a feed_live miss on the
+request path is an HTTPS call, and was the measured cause of `/healthz` timing
+out and gunicorn being SIGTERM'd. **One worker of two, one boot, ~4 minutes —
+that is not a rate.** Handed to `mlb-feed-live-terminal-refresh` and
+`render-web-request-path`, not chased here.
+
 ## What is STILL not done
 
-**Nothing is deployed.** All three fixes are on `main` and inert until someone
-ships them; no deploy claim was taken by any of these lanes. When they do go
-out, the refusal line CHANGES SHAPE — anything grepping the old exact string
-`REFUSED: compute in request path on hosted web` needs the suffix allowed for.
+**All three are now LIVE on web** as of `ee20c522`, 2026-09-04T18:20:29Z
+(`deploys.md`). refresh-worker and live-odds-worker still run older SHAs, so the
+guard there is the old code — harmless, since it can only fire inside a request
+context and neither serves one. The refusal line has CHANGED SHAPE on web:
+anything grepping the exact string `REFUSED: compute in request path on hosted
+web` now needs the `(operation=..., hosted_signal=...)` suffix allowed for.
 
 Still open from §5, and not answered by any of this: **the eight-day silence
 means either the cache stopped missing or the caller stopped calling, and which
