@@ -207,9 +207,64 @@ class FleetCommitTests(unittest.TestCase):
 # was correctly claimed and released, and on main. The board was frozen all
 # evening anyway. Serialisation is not spacing.
 # --------------------------------------------------------------------------
+import contextlib
 import os
+import sys
+import types
 from datetime import datetime, timedelta, timezone
 from unittest import mock
+
+
+@contextlib.contextmanager
+def _claim(active=None):
+    """Pin what `main()` sees for the deploy claim. `None` = nobody holds it.
+
+    THIS FILE READ THE DEVELOPER'S REAL CLAIM FILE, and which answer it got
+    depended on TEST ORDERING. `main()` resolves the lookup lazily --
+    `from deploy_claim import active_claim`, inside a bare
+    `except Exception: claim = None` -- and the `CLAIMED` branch sits
+    immediately BEFORE `TOO_SOON`. This module loads `deploy_preflight` by FILE
+    PATH via `importlib`, which does NOT put `scripts/` on `sys.path`, so run
+    alone that import RAISED and the claim read was silently swallowed. Run
+    inside the full suite, an earlier test file had already inserted `scripts/`,
+    the import SUCCEEDED, and `main()` read whatever claim was live on the
+    machine at that instant.
+
+    MEASURED 2026-09-04: 6 of the 8 `TooSoonVerdictTests` failed in a
+    full-suite run and passed in isolation, because a parallel session held the
+    `refresh-worker` claim -- `CLAIMED` (exit 3) where the test asserted
+    `TOO_SOON` (exit 5). Reproduced on demand with `PYTHONPATH=scripts`: the
+    same 6 failures and the same 2 survivors, and the two survivors are exactly
+    the two that never assert a verdict for a claimed service.
+
+    Injecting the MODULE rather than patching an attribute is deliberate: the
+    import is BY NAME and happens inside the call, so `sys.modules` is the only
+    seam that works in both states of `sys.path`. Whatever was there is
+    restored, including nothing.
+    """
+    stub = types.ModuleType("deploy_claim")
+    stub.calls = []
+
+    def active_claim(service, *args, **kwargs):
+        stub.calls.append(service)
+        return active
+
+    stub.active_claim = active_claim
+    sentinel = object()
+    saved = sys.modules.get("deploy_claim", sentinel)
+    sys.modules["deploy_claim"] = stub
+    try:
+        yield stub
+    finally:
+        if saved is sentinel:
+            sys.modules.pop("deploy_claim", None)
+        else:
+            sys.modules["deploy_claim"] = saved
+
+
+def _foreign_claim(service="refresh-worker", holder="another-lane"):
+    return {"service": service, "holder": holder, "token": "t0",
+            "target_commit": "a" * 40, "acquired_at_iso": "2026-09-04T20:00:00Z"}
 
 
 def _deploy(status="live", minutes_ago=30.0, deploy_id="dep-x", trigger="api", field="finishedAt"):
@@ -352,7 +407,7 @@ class TooSoonVerdictTests(unittest.TestCase):
     reads.
     """
 
-    def _run(self, argv, *, last_deploy_minutes_ago, jobs=(), env=None):
+    def _run(self, argv, *, last_deploy_minutes_ago, jobs=(), env=None, claim=None):
         receipts = {}
 
         def fake_write_receipt(args, report, verdict, reason, live_commit):
@@ -376,8 +431,10 @@ class TooSoonVerdictTests(unittest.TestCase):
                                              if last_deploy_minutes_ago is not None else {})), \
              mock.patch.object(deploy_preflight, "_write_receipt", side_effect=fake_write_receipt), \
              mock.patch.object(deploy_preflight.sys, "argv", ["deploy_preflight.py", *argv]), \
-             mock.patch.dict(os.environ, env or {}):
+             mock.patch.dict(os.environ, env or {}), \
+             _claim(claim) as claim_stub:
             code = deploy_preflight.main()
+        receipts["claim_lookups"] = list(claim_stub.calls)
         return code, receipts
 
     def test_a_deploy_three_minutes_after_the_last_one_is_refused(self) -> None:
@@ -437,7 +494,8 @@ class TooSoonVerdictTests(unittest.TestCase):
                                return_value=_deploy(minutes_ago=2)["deploy"]), \
              mock.patch.object(deploy_preflight, "_write_receipt"), \
              mock.patch.object(deploy_preflight.sys, "argv",
-                               ["deploy_preflight.py", "--service", "refresh-worker"]):
+                               ["deploy_preflight.py", "--service", "refresh-worker"]), \
+             _claim():
             code = deploy_preflight.main()
         self.assertEqual(code, deploy_preflight.EXIT_TOO_SOON,
                          "a stale sample must not mask the real blocker")
@@ -448,6 +506,44 @@ class TooSoonVerdictTests(unittest.TestCase):
         self.assertEqual(report["min_deploy_interval_seconds"], 1500)
         self.assertAlmostEqual(report["last_deploy"]["age_seconds"], 180, delta=30)
         self.assertEqual(report["last_deploy"]["trigger"], "api")
+
+    def test_main_ACTUALLY_CONSULTS_the_claim_and_does_not_swallow_the_lookup(self) -> None:
+        """REACHABILITY, and it is the assertion the whole class was missing.
+
+        `main()` wraps the claim lookup in `except Exception: claim = None`, so
+        an import that never resolves is INDISTINGUISHABLE from a service
+        nobody has claimed. Every claim-shaped assertion below is vacuous
+        unless the lookup is reached, which is why this is asserted rather than
+        assumed -- the same `off != on` rule `model_engine_standard.md` states
+        for anything behind a gate.
+        """
+        _code, receipt = self._run(["--service", "refresh-worker"], last_deploy_minutes_ago=3)
+        self.assertEqual(receipt["claim_lookups"], ["refresh-worker"])
+
+    def test_a_foreign_claim_preempts_TOO_SOON(self) -> None:
+        """The ordering `CLAIMED` -> `TOO_SOON`, pinned deliberately.
+
+        It was real behaviour the whole time and NOTHING pinned it: it was
+        exercised only by accident, whenever the machine running the suite
+        happened to hold a claim. That is what made 6 of these tests fail on
+        2026-09-04. Both refuse the deploy, so the gate is unchanged either
+        way -- but the REASON decides what the operator does next, and
+        "coordinate with the holder" and "wait 22 more minutes" are different
+        instructions.
+        """
+        code, receipt = self._run(["--service", "refresh-worker"],
+                                  last_deploy_minutes_ago=3, claim=_foreign_claim())
+        self.assertEqual(code, deploy_preflight.EXIT_CLAIMED)
+        self.assertIn("another-lane", receipt["reason"])
+
+    def test_your_OWN_claim_is_not_foreign_so_the_spacing_verdict_still_lands(self) -> None:
+        """`off != on` for the branch above: holding the claim YOURSELF must not
+        preempt anything. Without this, `_claim()` returning None everywhere
+        would make the new pin untestable in one direction."""
+        code, _receipt = self._run(["--service", "refresh-worker", "--holder", "mine"],
+                                   last_deploy_minutes_ago=3,
+                                   claim=_foreign_claim(holder="mine"))
+        self.assertEqual(code, deploy_preflight.EXIT_TOO_SOON)
 
 
 class WouldItHavePreventedTheIncidentTests(unittest.TestCase):

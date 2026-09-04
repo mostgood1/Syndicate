@@ -1748,6 +1748,16 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `deploy_claim.py status` reports it "does not block"; that session is not in
   the running roster.
 
+
+### preflight-test-claim-leak — OPEN — opened 2026-09-04 — session b9bc926d-f167-4923-9344-eac7e86a5761
+- Goal: `tests/test_deploy_preflight.py` returns the same verdict whether or not `scripts/` is on `sys.path` and whether or not any session holds a live deploy claim — i.e. `PYTHONPATH=scripts python -m pytest tests/test_deploy_preflight.py` and the bare form agree, while `soccer-player-producer` holds `refresh-worker`.
+- Files: `tests/test_deploy_preflight.py`.
+  Collision check: `deploy_preflight` appears once in `lanes.md` (line ~683) and that is PROSE about the script, not a `- Files:` claim; the test file appears nowhere. `scripts/deploy_preflight.py` is NOT being edited — the production behaviour is correct and stays untouched.
+- Hypothesis, WRITTEN BEFORE THE FIX AND ALREADY CONFIRMED: `main()` reads the REAL claim via `from deploy_claim import active_claim` inside a bare `except Exception: claim = None` (`scripts/deploy_preflight.py:823` region), and the `CLAIMED` branch sits immediately BEFORE `TOO_SOON`. The test loads `deploy_preflight` by FILE PATH via `importlib`, which does not put `scripts/` on `sys.path` — so in isolation that import RAISES, the claim read is silently swallowed, and the tests pass. In a full-suite run an earlier test file has already inserted `scripts/`, the import succeeds, it reads this machine's live claim file, and the verdict becomes `CLAIMED` (exit 3) instead of `TOO_SOON` (exit 5).
+- Falsification test: if `PYTHONPATH=scripts` did NOT reproduce the failure, the cause is test ORDERING pollution of some other kind and this hypothesis is wrong. RESULT: reproduced exactly — same 6 failures, same 2 survivors, reason line `deploy claim on refresh-worker is held by soccer-player-producer`. An earlier hypothesis that the live claim alone was sufficient was FALSIFIED first (8 passed with the claim held), which is what pointed at `sys.path`.
+- Verification: (a) both invocations agree, claim held; (b) a NEW test pins `CLAIMED` preempting `TOO_SOON` deliberately, since that ordering was until now exercised only by accident via the real claim file; (c) a REACHABILITY test asserts `main()` actually CALLS the claim lookup — without it a silent `ImportError` makes every claim assertion in this file vacuously true.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
