@@ -5502,3 +5502,38 @@ direction. **A comment that names a constant's VALUE is a copy, and copies drift
   seconds of the push. Two blocks for one slug means two sessions can each read
   themselves as holder of the same files.
 - *(evidence in `learnings_evidence.md`)*
+
+
+## 2026-09-03 — FORBIDDEN: retracting a claim you re-checked, without first asking whether the CODE MOVED between the claim and the check. Re-derivation cannot see this
+
+- **The rule.** When you verify someone's finding and it comes back false,
+  date the claim and date the code. One line answers it:
+
+      git log --oneline -S "<symbol from the claim>" -- <file under test>
+
+  If a commit lands between the two, you are not checking their claim — you are
+  checking a different system, and very possibly one that changed BECAUSE of
+  their claim.
+- **Why it is worth its own entry.** This is invisible to the defence everyone
+  reaches for. I re-derived instead of accepting, ran the check correctly, and
+  got the correct CURRENT answer. **Nothing in a correct measurement tells you
+  the ground moved under it.** That makes it distinct from the same-blind-spot
+  failure filed beside it: there the instrument was wrong, here the instrument
+  was right and the QUESTION had expired.
+- **Measured.** c38d3e5c reported `.syndicate/deploys.md` had no ledger-guard
+  coverage at any stage. TRUE when written: at `dbe0f3b4^` it was absent from
+  `TRACKED`, absent from `CHECKS`, and had no predicate. `dbe0f3b4` (19:42:33)
+  added all three, and **its own comment quotes the finding as its
+  justification**. I checked at ~20:2x, found `_deploys` alive and firing, and
+  filed the whole thing as a false alarm.
+- **The cost direction is the dangerous one, and it is reassurance.** A
+  retraction of a TRUE finding does not merely lose a fact: it deletes the
+  stated reason a guard exists. Left standing, the next reader concludes
+  `deploys.md` was never unguarded and removing `_deploys` reads as tidying.
+  Compare the retraction rule already here — withdrawing a bad attribution buys
+  "not proven guilty", never "proven innocent"; this is the same asymmetry
+  pointed at a live guard.
+- **How it was caught:** not by me. c38d3e5c amended the entry rather than
+  messaging, on the grounds that the wrong version was the one being read. That
+  is the right call for a correction whose damage is what a passer-by concludes.
+- *(evidence in `learnings_evidence.md`)*
