@@ -112,6 +112,65 @@ death, never life — do not invert it.
 - Blocked by: none.
 
 ## OPEN
+### gate-per-side-derived — CLOSED 2026-09-04 — opened 2026-09-04 — **THE CONSTANT IS GONE, THE POPULATION MISMATCH IS FIXED, AND THE GATE FAILS BOTH LEGS BY MORE THAN ANY EARLIER READING SAID.** `GATE_PER_SIDE_TODAY = 4.05` was `8.1% / 2`, an identity that holds only AT EVEN MONEY; the gate book's unders sit at fair 0.607 and carry ~61% of the hold. Re-verified on production shards 2026-09-01..09-04: per-side **4.198pp** (median 4.289), two-way hold **7.09%** — the brief's figures reproduce (my n=114,545 against its 114,517). Landed `29c9c92f` on `origin/main`. DEPLOYED NOTHING. — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+- Files: `scripts/measure_exchange_prop_option_value.py`,
+  `tests/test_exchange_prop_option_value.py`. **CLAIMS RELEASED at close** — the
+  work is landed and what remains is measurement, not edits.
+- Hypothesis, written before testing: the measured cost exceeds 4.05 and flips
+  the ROI leg. **CONFIRMED.** 4.05 - 1.172 = 2.88pp -> +3.05% (clears +3%);
+  4.198 - 1.172 = 3.03pp -> +2.79% (does not). An unmeasured constant was the
+  difference between a ship and a don't.
+- **THE SECOND, LARGER DEFECT — FIXED, and its sign resolves AGAINST the guess
+  the brief carried.** The gain was a BEST-book number on the cells an exchange
+  happens to quote, subtracted from an AVERAGE-book cost over every cell.
+  Matched, the baseline is **3.391pp** — a -0.807pp mismatch, twice the constant
+  error it hid behind. It decomposes **67% cell-set / 33% book**: price shopping
+  across sportsbooks buys only -0.27pp, while the exchange SELECTING cheaper
+  props buys -0.54pp. The brief expected a best-price baseline near 3.16pp; a
+  best-price baseline over the whole book measures **4.260pp — ABOVE the
+  average, not below it.** The effect is real, and it is selection, not shopping.
+- **VERDICT at the corrected numbers, n=85,591 gate cells over 4 dates.**
+  THE BOOK: 4.233 -> 3.956pp, hold 7.01% -> 6.52%, ROI **+1.14%**.
+  **ROI NOT MET** (needs >= +3%). **HOLD NOT MET** (needs <= 5%). GATE NOT MET.
+  Exchange coverage is **7,731/85,591 = 9.0% of cells**; on that subset alone
+  3.861 -> 0.792pp, hold 1.44%, ROI +6.92%, both legs pass — a DIFFERENT
+  question, printed beside the book and never instead of it.
+- **`+1.14%` IS A FLOOR, NOT A READING.** Item 07's table ends at 4.05pp and
+  today's 4.233pp is outside it, so every ROI at or above that point is CLAMPED.
+  The script now flags that instead of clamping quietly. Extending the table
+  means re-pricing item 07's 2,569 rows, which this script does not hold.
+- Also fixed: `2 x side_cost` as the two-way hold. `side_cost = fair x hold`, so
+  the transform is `side_cost / fair` — which reproduces the measured overround
+  to **0.034pp** where the doubling is out by **1.45 points**, always in the
+  direction that flatters the gate.
+- OUT OF SAMPLE (nothing was fitted, so this is stability, not validation):
+  in 09-01..09-02 per-side 4.284pp, cost/fair 6.991; out 09-03..09-04 4.068pp,
+  cost/fair 6.933. The LEVEL swings 4.327 -> 3.776 across four days (13%), which
+  is why the value is derived per run rather than re-hard-coded at 4.198.
+- MUTATION CHECK, four back-outs: reintroduce the literal -> 7 red; restore the
+  doubling -> 5 red; drop uncovered cells -> 11 red; cheapest-in-window instead
+  of the latest exchange quote -> 1 red. **The fourth PASSED on the first
+  attempt** — my fixture used -400 as the "cheap" stale price, which is q=0.8 and
+  the DEAREST quote on the board. Only the mutation check caught it.
+- OWED, and not mine to take: (a) a week-long re-run — exchange prop capture
+  starts 09-01, so a 7-day window closes 2026-09-08; (b) extending item 07's
+  table past 4.05pp, which needs its 2,569 rows; (c) the exchange leg may be up
+  to `--window-minutes` stale while the sportsbook legs are one refresh cycle —
+  at 1/5/15/30 min the subset gain reads +2.130/+2.323/+2.661/+3.292pp on
+  1.1/2.6/7.2/12.0% coverage, so BOTH VERDICTS hold at every window and only the
+  margin moves.
+- **HAZARD FOUND, not fixed, and not in this lane's files.** The per-session lane
+  marker `.syndicate/.current-lane.<session_id>` is NOT per-agent. Three slugs
+  (`nfl-projection-et-datekey`, `sim-clv-decomposition`, `soccer-player-producer`)
+  were written into THIS session's slot inside ~20 minutes, and each time
+  `lane-guard` then blocked me from my OWN claimed files. `lane_marker.py` says
+  the per-session slot fixes the collision the bare `.current-lane` had; it does
+  so ACROSS sessions, not across concurrent subagents of ONE session, whose ids
+  are identical. The guard's remediation text — "that slot is yours alone and
+  nothing else rewrites it" — is false in a multi-subagent session.
+- Blocked by: none. Nothing deployed; no env var, stored setting or
+  `render.yaml` touched.
+
 ### settled-sample-nfl-reconcile — OPEN — opened 2026-09-04 — two settlement ledgers disagreed about NFL, and the disagreement sizes real money
 - Goal: reconcile `settlement_all_time.by_sport` (NFL `orders=1, settled=0`) against
   the `SETTLED_SAMPLE` line (`nfl: 18`), decide which is right for
