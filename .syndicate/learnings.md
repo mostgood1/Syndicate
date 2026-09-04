@@ -5701,3 +5701,36 @@ it is non-empty.
 
 Sibling: `a false REASSURANCE is worse than a false WARNING` — these are its
 mechanism. A too-coarse unit is how a check manufactures the reassuring answer.
+
+## 2026-09-03 — FORBIDDEN: pushing a REBUILT file without asserting the EXPECTED diff shape first. A stale base produces correct-looking content and a silently wrong delta. `[session c38d3e5c]`
+
+I rebuilt a destroyed 14-line edit onto `origin/main`'s file and committed it.
+The commit read:
+
+    12 insertions, 10 deletions      expected: 14 insertions, 0 deletions
+
+`origin/main` had moved between the read that built the file and the
+`commit-tree` that recorded it. **The content was exactly right** — the 14 lines
+were present, correct, and verbatim — and pushing it would have reverted 10
+unrelated lines that landed in the gap. Nothing in the file could show that,
+because the file is correct *relative to a base that no longer exists*.
+
+**Reviewing the artifact cannot detect this; only the delta against the CURRENT
+base can.** That makes it invisible to every check aimed at content: a diff of
+the text, a grep for the restored lines, a byte count, reading it.
+
+**How to apply.** Whenever you construct a file rather than edit one in place —
+blob-level commits, `merge-tree`, a script that regenerates — state the numstat
+you expect BEFORE you look, and refuse on mismatch:
+
+    stat = git diff --numstat <base> <commit>
+    if not stat.startswith("14\t0"): refuse
+
+And read the base ONCE, inside the same operation that commits it. My second
+attempt did both and its own precondition then caught that the work had already
+been restored upstream — so the same discipline prevented a revert and a
+duplicate within five minutes.
+
+Sibling: `a comparison protects only at the granularity it counts` — this is the
+case where the right granularity is not the file at all, but the file's delta
+against a base you must re-read to know.
