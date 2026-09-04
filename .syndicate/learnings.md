@@ -5257,3 +5257,31 @@ where a check confirmed a property the defect also satisfied.
 
 - **The rule going forward.** A guard's docstring is part of the change that narrows it, not documentation of it. Left behind, it does not read as stale — it reads as a SECOND SOURCE agreeing with whichever test still encodes the old rule, and the pair is an instruction to revert a change that was made on a production measurement. **Before committing a narrowed predicate, grep the whole enclosing docstring for the rule you just edited.** `28e55d86` rewrote the branch and its inline comment and left the docstring twenty lines above it stating the opposite; the contradiction sat red for two weeks and pointed the wrong way.
 - *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-04 FORBIDDEN: editing a scheduled task's prompt while a session of that task is still ALIVE — it can fire the new prompt IMMEDIATELY. `[lane feed-live-warn-rate, session c4287631]`
+
+I re-armed a one-time task two minutes out with a short DRY-RUN prompt to
+pre-approve its tools, let it run, then restored the real prompt for 20:15 CDT.
+**The dry run's session was still alive.** It picked up the restored prompt and
+began executing the REAL 30-minute measurement at 15:42 — 4.5 hours early, with
+**1 game live instead of the ~12** the window was chosen for, holding the
+worktree the 20:15 run was going to want.
+
+`lastRunAt` and `enabled:false` both said the task had finished. Neither is a
+statement about the SESSION. The task object and the session that ran it have
+separate lifetimes, and only the second one executes a prompt.
+
+**Before updating a task's prompt, check `list_sessions` for a RUNNING session
+whose title matches that task** (the runner names the session after the task —
+here, "Feed live warn rate live slate"). If one is alive, either wait for it or
+accept that it may run whatever you write next, now.
+
+Two things that limited the damage and are worth copying: the prompt made the
+run VERIFY its own premise (it records the live-game count and is told to report
+INCONCLUSIVE rather than fake it), so an early firing self-labels instead of
+masquerading as the designed measurement; and giving the rescheduled run a
+DIFFERENT lane name (`...-peak`) removed the worktree collision outright rather
+than hoping the early run cleaned up. The mistimed run is now a third data point
+(0 live / 1 live / ~12 live), which is a better experiment than the two-point
+one I had planned — but that is luck, not design.
+
