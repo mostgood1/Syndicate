@@ -4859,3 +4859,56 @@ which is what caught this one.
   NAMES ITS OWN PRECONDITION IS A CHECKABLE CLAIM`), which is about doing a
   census at all; this one is about the census being narrower than its claim.
 - *(evidence in `learnings_evidence.md`)*
+
+
+## 2026-09-03 — FORBIDDEN: reporting a worker's `server_failed` as an incident without reading the log AT THE EXIT. On live-odds-worker, 20 of 23 are a SCHEDULED SELF-RECYCLE. `[lane prop-join-yield]`
+
+I was one command away from filing "live-odds-worker exits early ~2.4x/day,
+nobody owns it" into `todo.md`. It is a designed mechanism doing its job.
+
+**THE EVENTS API CANNOT TELL YOU THIS.** Render's `/events` for the service:
+
+    live-odds-worker   22 x server_failed + 1 x server_restarted   since 08-26
+    refresh-worker      1 x server_failed
+    web                29 x server_failed
+
+    {"earlyExit": true, "evicted": false}     <- 20 of 23
+    {"nonZeroExit": 1,  "evicted": false}     <- 6, one crashloop 08-27 16:41-16:52
+
+A worker service is not expected to exit at all, so Render files a CLEAN
+VOLUNTARY exit under `server_failed`. The name is about the shape, not the
+cause.
+
+**THE LOG AT THE EXIT SAYS IT PLAINLY** (2026-09-03T13:59:04Z, today's most
+recent "failure"):
+
+    LIVE ODDS REFRESH WORKER RECYCLING after 23720s uptime to reset accumulated page cache
+    PROCESS_TREE_MEMORY {"stage": "before_exit", "tree_rss_mb": 969.402}
+    CONTAINER_MEMORY {"memory_pct_of_max": 82.0, "memory_headroom_mb": 368.098}
+    ==> Instance srv-d91dpertqb8s73co8lt0-tch2x restarted
+
+`SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS`, default **21600**
+(`run_live_odds_refresh_worker.py:670`, fires at `:2187-2189`). 24h / 6.6h =
+3.6/day against ~2.4 observed, the difference being deploys resetting the
+uptime clock. **It recycled at 82% of max with 368 MB headroom — on UPTIME, not
+under pressure.**
+
+**THE FINDING THAT SURVIVES, and it is the one that mattered:** `evicted: false`
+on every one of the 23. **In nine days of running at 95-100% of a 2GB limit —
+including a 0.0 MB headroom touch at 22:36:41Z and a 0.7 MB touch at 23:37:24Z —
+memory pressure has NEVER evicted this service.** That is what makes the
+alarming headroom numbers survivable, and I would not have learned it by
+watching headroom.
+
+**How to apply:**
+- Before calling any `server_failed` an incident, read the service log for the
+  60s BEFORE the event timestamp. A deliberate exit announces itself.
+- `earlyExit: true, evicted: false` is a voluntary exit. `evicted: true` is the
+  platform killing you. They are different problems and only one is yours.
+- A count from `/events?limit=25` is a window, not a history — I gave a clean
+  bill of health from 25 events that held only tonight's deploys, then found 22
+  failures at `limit=100` x 6 pages. See
+  [[feedback-absence-in-a-window-is-not-absence]].
+- **Do not file a non-bug.** A 2.99 MB `todo.md` costs every future session that
+  reads it, and an item that sends someone chasing a working mechanism is worse
+  than no item.
