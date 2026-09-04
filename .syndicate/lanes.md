@@ -1951,6 +1951,92 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
 
 
 
+### lane-guard-refactor-fallout — CLOSED 2026-09-03 — five scripts repaired, the rebase false positive fixed, and two silent-unenforcement classes now checked — session f97ad5ab
+- Goal: repair what the parser extraction broke, and close the two holes a peer
+  session found in it. Five scripts, one false-positive class, one unenforced
+  lane.
+- Files (exclusive to this lane): `scripts/archive_released_lanes.py`,
+  `scripts/audit_lane_unguarding.py`, `scripts/release_phantom_lane_claims.py`,
+  `scripts/trim_lane_blocks.py`, `scripts/lane_claim_audit.py`,
+  `scripts/check_lane_claims.py`, `.claude/hooks/lane-postwrite-check.py`,
+  `.claude/hooks/test_lane_postwrite_check.py`,
+  `.claude/hooks/test_lane_claims_parser.py` (new).
+  Collision check RUN 2026-09-03 via `lane_claims._claims()` against every OPEN
+  lane: CLEAR on all nine.
+- **NOT claimed, deliberately:** `scripts/check_lane_invariants.py` — still held
+  by OPEN lane `ncaaf-live-cadence`. It survived the refactor (it keeps its own
+  parser copy) so it needs nothing here.
+- REGRESSION I CAUSED, found by session c38d3e5c and then widened by me:
+  `lane-guard.py` line 38 now uses `__file__`, and five scripts load the hook by
+  `exec(compile(src, ...))` into a namespace that has none. FOUR die on
+  `NameError: __file__` (`archive_released_lanes`, `audit_lane_unguarding`,
+  `release_phantom_lane_claims`, `trim_lane_blocks`) and a FIFTH refuses
+  correctly (`lane_claim_audit`, exit 2, "lane-guard.py has no _claims — parser
+  changed"). **My own earlier census called all of these "prose only"** because
+  it grepped for `spec_from_file_location|exec_module|import_module` and they
+  use `exec(compile(`. A census is only as good as its pattern; the empirical
+  check (run them, look for the error) found five where the grep found one.
+- Falsification test for the fix: each of the five runs to a normal exit AND
+  returns a NON-EMPTY claim set. Exit 0 alone is not enough here — that is the
+  exact vacuous-pass this lane already recorded once.
+- Second defect, reported by c38d3e5c and REPRODUCED: `lane-postwrite-check`
+  fires on `git rebase`/`checkout`/`pull`, because those move a claimed file's
+  (mtime,size) inside the pre/post window. In this tree that is constant, so it
+  is the cry-wolf failure the hook's own docstring argues against.
+- Third defect, reported by c38d3e5c and VERIFIED: `order-sim-view`'s header
+  reads `**REOPENED ...**`, and `OPEN_RE` is `\bOPEN\b`, which correctly rejects
+  REOPENED. So its SIX declared files plus a function-scoped `ops.py` claim are
+  in no claim set and `lane-guard` has never enforced them. Not caused by the
+  refactor; surfaced by it.
+- Verification: named per item in the OUTCOME when closed. Every parser change
+  re-runs the pathological-fixture suite, not the live ledger.
+- Blocked by: none.
+- **OUTCOME `[commit 28a0ac59 — NO DEPLOY, harness only]`.** Every item verified
+  red-then-green; suites: parser 30/30, postwrite 28/28, lane-guard 10/10, four
+  ledger suites, three ledger checkers.
+  - **Five scripts repaired**, repointed at `lane_claims.py` (pure library: no
+    `__file__`, no `sys.exit(main())`, no stdin), which also retires each one's
+    sys.exit-neutralising hack. Falsification test met: each runs AND reports a
+    non-empty claim set.
+  - **`git rebase` false positive fixed.** `hook_trees.head_sig()` — file reads
+    only, no git subprocess — and a root whose HEAD moved is skipped silently.
+    Red/green on the identical scenario: committed hook `exit 2 OUT-OF-LANE
+    WRITE`, this one `exit 0`. A write with HEAD unmoved still reports; `git add`
+    still reports; a non-git tree is unaffected. **Known cost:** a write in the
+    same command as a rebase is missed.
+  - **`order-sim-view` declares NINE paths and holds none** — `**REOPENED**`
+    is correctly rejected by `\bOPEN\b`. Includes `syndicate/blueprints/ops.py`,
+    the file in the report that started this whole line of work. **Not fixed
+    here: the header is session 37abeca0's to change.** `check_lane_claims.py`
+    now reports near-miss headers and fails on them.
+  - **A FILENAME IS NOT A DISCLAIMER.** `scripts/archive_released_lanes.py`
+    contains the marker "released", so `_claimable_prefix` cut inside the
+    filename — and being a PREFIX cut, dropped every path after it on the line.
+    Markers are now found in a backtick-masked copy. Live effect: one claim
+    changes, this lane's own.
+  - `PATHISH_RE` accepted `15.0`; extensions must now start with a letter.
+  - `_is_disclaimer` has no callers; a comment claimed `_claims` used it. Comment
+    corrected, function kept (`archive_released_lanes.py` documents it).
+- **THREE THINGS I GOT WRONG, all found by review rather than by me:**
+  - My consumer census said "prose only" for five scripts I had broken. It
+    grepped `spec_from_file_location|exec_module|import_module`; they use
+    `exec(compile(`. **Running them found five where the grep found one.**
+  - Commit `1d6b2f13` swept a peer's `lanes.md` trim (263 lines) and
+    `lanes_history.md` move into it. I DID check `git diff --cached --stat` and
+    it showed exactly my 11 paths — but that was a SEPARATE tool call, and an
+    autostash re-staged their work between the check and the commit. This is
+    `learnings.md`'s "a reading of shared mutable state expires at the instant
+    it is taken", and the recipe is `git commit -- <pathspec>`, which bounds the
+    commit at commit time instead of trusting an index read. Used for `28a0ac59`:
+    11 files, nothing swept.
+  - The differential-against-live-`lanes.md` check is calibrated on a corpus
+    that shrinks as phantom rows get repaired. Pinned synthetic fixtures now.
+- **Peer claim NOT confirmed:** that `lane-guard.py` cannot be imported for
+  testing because it blocks on stdin. It imports fine with `sys.stdin` stubbed
+  to a `StringIO`, which is how the differential ran all day. Moot now — the
+  parser is importable — but the reason to prefer `lane_claims` is `__file__`
+  and `sys.exit`, not a stdin block.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
