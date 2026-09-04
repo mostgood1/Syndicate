@@ -5013,3 +5013,53 @@ ever say yes.
   the POPULATION when it is a property of your PROBE` — that one is about the
   probe being too narrow; this one is about the probe answering a different
   question entirely.)*
+
+
+## 2026-09-03 — FORBIDDEN: comparing a CONTROL window sampled differently from the treatment window. The rate ratio is an artefact of the sampling, and it will flatter whichever side you sampled less. `[lane prop-join-yield]`
+
+Enabling the NCAAF autorun on live-odds-worker, I asked whether it caused the
+container's memory excursions. First attempt, one `render_logs --tail 400` per
+window:
+
+    CONTROL (1 hour before)   n=27    min 36.2 MB   37.0% of samples below 50MB
+    AFTER   (50 min after)    n=389   min  0.0 MB   20.6% of samples below 50MB
+
+I reported that the minimum was **worse after** (0.0 vs 36.2) and that the rate
+comparison could not be trusted. **The first half was WRONG and the second half
+was right for the wrong reason.**
+
+`render_logs.py` returns the NEWEST N lines inside a window — its own docstring
+says so, and prints the span it ACTUALLY covered. One `--tail 400` across a busy
+hour covers a fraction of it. n=27 against n=389 over comparable spans is a ~25x
+difference in sampling density; the control had simply not looked at most of its
+own hour.
+
+**RE-RUN, both windows sliced into IDENTICAL 10-minute chunks with per-chunk
+coverage printed:**
+
+    CONTROL  n=499  coverage 91.6%  min 0.0 MB  10.4% below 50MB
+    AFTER    n=421  coverage 86.5%  min 0.0 MB  19.0% below 50MB
+
+**The control window hit 0.0 MB TWICE.** The extreme I had attributed to my own
+change predated it. The real effect is a 1.8x higher excursion RATE — smaller,
+and in the opposite direction from what the broken control implied about the
+minimum.
+
+**The direction of the error is the danger.** The under-sampled window was the
+CONTROL, so the artefact made my change look worse on one axis and better on the
+other, and I published the flattering half of that as a caveat while stating the
+damning half as fact. An asymmetric sample does not fail loudly; it produces two
+plausible numbers.
+
+**How to apply:**
+- Slice BOTH windows the same way, query each slice separately, and print
+  coverage per slice. Symmetric truncation is survivable; one-sided is not.
+- Refuse the rate ratio outright when either window's coverage is thin, rather
+  than quoting it with a caveat. A caveat does not stop the number being quoted.
+- Prefer a test that does not depend on cross-window sampling at all. Here that
+  was the delta from each excursion to the preceding autorun launch — median
+  154s against a 300s loop's uniform expectation of 150s, computed entirely
+  inside one window.
+- See [[feedback-a-rate-not-a-count]] and
+  [[feedback-absence-in-a-window-is-not-absence]]: same family, but this one is
+  about two windows that must MATCH, not one window that must be stated.
