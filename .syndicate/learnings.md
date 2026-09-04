@@ -5665,3 +5665,39 @@ is the block-level check licensing a FILE-level destructive action. The
 gap between those two levels is where uncommitted work lives.
 `git diff HEAD -- <path>` before any checkout of a shared ledger file, and a
 non-empty result means STOP, not "proceed carefully".
+
+## 2026-09-03 — A comparison protects only at the GRANULARITY IT COUNTS. Three instances in one night, and the finest-grained one destroyed work. `[session c38d3e5c with 37abeca0, cfcce46d]`
+
+Every safety check in this repo compares two states and passes when they match.
+**Each is blind to any loss smaller than its unit**, and the blindness is silent,
+because "no difference at my granularity" and "no difference" print identically.
+
+    unit compared     what it protected        what walked past it
+    claim SET         claims that were counted a claim never counted at all
+                                               (order-sim-view's REOPENED header:
+                                               moving it reported "claims unchanged")
+    lane BLOCK        whole blocks             narrative moved WITHIN blocks
+                                               (`_resurrected` vs the compaction:
+                                               0 violations on a 118KB revert)
+    lane BLOCK again  blocks only in the tree  14 uncommitted LINES inside a block
+                                               (my `git checkout` remedy: would have
+                                               destroyed a live claim transfer;
+                                               cfcce46d ran the same command earlier
+                                               and lost a whole uncommitted block)
+
+**The third is the one to learn from, because it was the REMEDY for the second.**
+I moved narrative inside blocks, `_resurrected` missed it for being block-grained,
+and then I proposed a fix whose safety I established at block granularity — the
+identical error, one level down, inside the correction for the first one. A
+`0 deletions` stat agreed with me both times.
+
+**How to apply.** Name your comparison's unit out loud before trusting it, and
+ask what is one level finer. If the thing you are protecting can change without
+changing your unit, you have a check that cannot fail in exactly the case you
+built it for. For git specifically: a block/section comparison does not see line
+edits, and **nothing** sees an uncommitted line — so before any `checkout`,
+`reset` or `stash` against a shared tree, `git diff HEAD -- <path>` and stop if
+it is non-empty.
+
+Sibling: `a false REASSURANCE is worse than a false WARNING` — these are its
+mechanism. A too-coarse unit is how a check manufactures the reassuring answer.
