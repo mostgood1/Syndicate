@@ -48,6 +48,31 @@ silence. So `HEAD` is only one entry in `_safe_revs`.
 NOTE the check stays PER PATH (`<rev>:<path>`), so a line is only excused by a
 copy of the SAME file elsewhere, never by a coincidental match in another one.
 
+AND `_safe_revs` IS STILL ONLY FOUR REVS, SO A DEEP SWEEP BACKS IT. Content can
+sit on a branch nobody named -- this repo has **610 refs**, ~170 of them stale
+`origin/deploy/*`. `_deep_lines` searches EVERY committed version of the path
+across ALL refs, newest first, and only for the lines `_safe_revs` could not
+account for. Measured on this repo 2026-09-04:
+
+    .syndicate/lanes.md    1,322 commits / 1,301 distinct blobs / 246 MB
+    .syndicate/learnings.md   660 commits /   654 blobs / 177 MB
+    an ordinary code file       3-4 commits
+
+    exhaustive worst case (line really is nowhere)  11.7s
+    early exit (line found in history)               3.9s, 120 of 1301 blobs
+
+That is why the sweep is NOT unconditional: it runs only once the cheap revs
+have failed, i.e. only when this hook is about to BLOCK anyway. The allow-path
+costs exactly what it did before. Three git processes regardless of ref count --
+`rev-list`, one `cat-file --batch-check` to map commits to blobs, then chunked
+`cat-file --batch` reads that stop the moment every line is accounted for.
+
+WHEN THE BUDGET RUNS OUT, IT BLOCKS AND SAYS THE SEARCH WAS TRUNCATED. It does
+not silently downgrade to "nowhere else". `learnings.md`: an unknown must not
+default onto the permissive branch -- and equally, a guard must not report a
+partial search as an exhaustive one. The message says "all N committed
+versions" only when it really read all of them.
+
 WHY BLOCKING IS DEFENSIBLE HERE, when `lane-postwrite-check` deliberately only
 warns: this command is precisely parseable. There is no guessing what
 `git checkout -- <path>` does, unlike predicting a write from an arbitrary shell
@@ -56,15 +81,33 @@ unlucky one. It also fails OPEN on every ambiguity, and the override is printed.
 
 Override: `SYNDICATE_ALLOW_DISCARD=1 git checkout ...` (as a prefix on the
 command itself), or `SYNDICATE_DISCARD_GUARD=off` to disable entirely.
+`SYNDICATE_DISCARD_DEEP=off` skips the all-refs sweep (the guard then falls back
+to `_safe_revs` alone and says so); `SYNDICATE_DISCARD_DEEP_BUDGET=<seconds>`
+retunes it.
 """
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 
 OFF_ENV = "SYNDICATE_DISCARD_GUARD"
 ALLOW_ENV = "SYNDICATE_ALLOW_DISCARD"
+DEEP_ENV = "SYNDICATE_DISCARD_DEEP"
+DEEP_BUDGET_ENV = "SYNDICATE_DISCARD_DEEP_BUDGET"
+
+# Seconds for the all-refs sweep -- a TOTAL for the whole invocation, not per
+# path. Per-path would let `git checkout HEAD -- a b c` cost three budgets; a
+# hook that can stall a shell for an unbounded multiple of its own limit has no
+# limit. Measured on this repo 2026-09-04, lanes.md (1,302 versions, 246 MB)
+# exhaustive: 11.6s and 13.4s on two runs. 20 keeps that answer EXHAUSTIVE with
+# room for the file to grow; past it the sweep truncates and says so, which
+# degrades honestly rather than silently. Only ever spent on a command that is
+# otherwise about to be BLOCKED -- the allow-path never enters here (measured
+# 0.59s, unchanged).
+DEEP_BUDGET_S = 20.0
+_CHUNK = 40                     # blobs per `cat-file --batch` round
 
 # Only the discarding forms. `git checkout -b`, `git checkout <branch>` (no
 # pathspec) and `git restore --staged` touch no working file content and are not
@@ -82,7 +125,7 @@ _RESTORE = re.compile(r"\bgit\s+(?:-[CcS]\s+\S+\s+)*restore\b")
 _RESET_HARD = re.compile(r"\bgit\s+(?:-[CcS]\s+\S+\s+)*reset\b[^\n]*--hard\b")
 
 
-def _git(root, *args):
+def _git(root, *args, stdin=None, tolerant=False):
     """git stdout as UTF-8 text, or None.
 
     NO `text=True`. On Windows that decodes with the LOCALE codepage (cp1252
@@ -94,8 +137,12 @@ def _git(root, *args):
     """
     try:
         r = subprocess.run(["git", "-C", root] + list(args),
-                           capture_output=True, timeout=20)
-        if r.returncode != 0:
+                           capture_output=True, timeout=30,
+                           input=(stdin.encode("utf-8") if stdin else None))
+        # `cat-file --batch*` exits non-zero when ANY spec is missing (a commit
+        # where the path did not exist), while still emitting every line that
+        # did resolve. Dropping that output would silently shrink the search.
+        if r.returncode != 0 and not tolerant:
             return None
         return r.stdout.decode("utf-8", "replace")
     except Exception:
@@ -202,6 +249,59 @@ def _looks_like_rev(tok):
         or tok.startswith("origin/") or tok in ("HEAD",)
 
 
+def _blob_ids(root, rel):
+    """Distinct blob ids for `rel` across ALL refs, newest commit first.
+
+    Two git processes, not one per ref: `rev-list --all -- <path>` gives the
+    commits that touched it in reverse-chronological order, and a single
+    `cat-file --batch-check` maps every `<commit>:<path>` to its blob. Dedup
+    matters -- lanes.md has 1,322 commits but 1,301 distinct blobs, and the
+    ledger files barely change in most of them.
+    """
+    commits = (_git(root, "rev-list", "--all", "--", rel) or "").split()
+    if not commits:
+        return []
+    out = _git(root, "cat-file", "--batch-check=%(objectname) %(objecttype)",
+               stdin="".join("%s:%s\n" % (c, rel) for c in commits),
+               tolerant=True) or ""
+    seen, ids = set(), []
+    for line in out.splitlines():
+        f = line.split()
+        if len(f) == 2 and f[1] == "blob" and f[0] not in seen:
+            seen.add(f[0])
+            ids.append(f[0])
+    return ids
+
+
+def _deep_lines(root, rel, needed, deadline):
+    """Account for `needed` against EVERY committed version of `rel`, all refs.
+
+    `deadline` is an absolute time shared by every path in one invocation, so
+    the whole hook is bounded rather than each path separately.
+
+    Returns (still_missing, scanned, total, complete). `complete` is False when
+    the deadline cut the search short -- the caller must not then claim the
+    lines exist nowhere, only that it did not find them there.
+    """
+    if time.time() >= deadline:
+        return set(needed), 0, 0, False
+    ids = _blob_ids(root, rel)
+    if not ids:
+        return set(needed), 0, 0, True
+    missing, scanned = set(needed), 0
+    for i in range(0, len(ids), _CHUNK):
+        if time.time() >= deadline:
+            return missing, scanned, len(ids), False
+        part = ids[i:i + _CHUNK]
+        body = _git(root, "cat-file", "--batch",
+                    stdin="".join(b + "\n" for b in part), tolerant=True)
+        missing -= _lines(body)
+        scanned += len(part)
+        if not missing:
+            break
+    return missing, scanned, len(ids), True
+
+
 def main():
     if os.environ.get(OFF_ENV, "").lower() == "off":
         return 0
@@ -232,7 +332,14 @@ def main():
         return 0
 
     revs = _safe_revs(root, src)
-    doomed = {}
+    deep_on = os.environ.get(DEEP_ENV, "").lower() != "off"
+    try:
+        budget = float(os.environ.get(DEEP_BUDGET_ENV) or DEEP_BUDGET_S)
+    except ValueError:
+        budget = DEEP_BUDGET_S
+
+    deadline = time.time() + budget
+    doomed, scope = {}, {}
     for rel in paths:
         full = os.path.join(root, *rel.replace("\\", "/").split("/"))
         if not os.path.isfile(full):
@@ -247,6 +354,18 @@ def main():
             gone -= _lines(_git(root, "show", "%s:%s" % (rev, rel)))
             if not gone:
                 break
+        if not gone:
+            continue
+        # Cheap revs could not account for these. Only NOW is the all-refs
+        # sweep worth its seconds: we are otherwise about to block.
+        if deep_on:
+            gone, scanned, total, complete = _deep_lines(root, rel, gone, deadline)
+            scope[rel] = ("all %d committed version(s) across every ref" % total
+                          if complete else
+                          "%d of %d committed version(s) -- SEARCH TRUNCATED, "
+                          "raise %s" % (scanned, total, DEEP_BUDGET_ENV))
+        else:
+            scope[rel] = "%s only (%s=off)" % (", ".join(revs), DEEP_ENV)
         if gone:
             doomed[rel] = sorted(gone)
 
@@ -257,8 +376,8 @@ def main():
     sys.stderr.write(
         "BLOCKED: this would DISCARD content that exists nowhere else." + nl + nl)
     for rel, gone in doomed.items():
-        sys.stderr.write("%s  --  %d uncommitted line(s), on none of %s:%s"
-                         % (rel, len(gone), ", ".join(revs), nl))
+        sys.stderr.write("%s  --  %d line(s) found in NO commit; searched %s:%s"
+                         % (rel, len(gone), scope.get(rel, ", ".join(revs)), nl))
         for l in gone[:4]:
             sys.stderr.write("    " + l[:100] + nl)
         if len(gone) > 4:
@@ -266,9 +385,9 @@ def main():
         sys.stderr.write(nl)
     sys.stderr.write(nl.join([
         "This tree is SHARED. Those lines may be another session's mid-edit work.",
-        "They are on none of the revs listed above -- including origin/main, so",
-        "being merely BEHIND does not explain them -- and a checkout does not",
-        "archive them, it deletes them.",
+        "Unless a search above says TRUNCATED, they are in no commit on any ref",
+        "at all -- so being merely BEHIND origin/main does not explain them --",
+        "and a checkout does not archive them, it deletes them.",
         "",
         "A DELETIONS COUNT WILL NOT SHOW THIS. The lines above are ADDITIONS; a",
         "diff reading '0 deletions, all mine' is the exact check that failed when",
