@@ -626,6 +626,22 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 
 
+### web-deploy-4ead66c3 — CLOSED 2026-09-04 — **web `b3966bf1`→`906f9537`, live 03:44:48Z; FLEET NOW 0 PENDING ON ALL THREE.** Verified by content (`corners_mean` 0→1) with `#643` re-checked; 9 MLB cards, portfolio 1458/1457/1, 0 errors. The withheld-last-round concern was re-checked not assumed: claim released, no build in flight, 85 min uptime. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: web off `b3966bf1` onto `906f9537` `[user: "deploy web too", after I
+  flagged the tradeoff and they reaffirmed]`. Carries `4ead66c3` (soccer corners
+  model view), the same behavioural commit the workers already run.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- **THE CONCERN I RAISED, AND ITS RESOLUTION.** I withheld web last round because
+  `web-oom-rate-remeasure` held the claim and a reboot resets the memory
+  accumulator its method depends on. Since then: that claim is RELEASED, no build
+  is in flight, and web has been up **85 minutes** — well past the 25-min window
+  the method needs. The user reaffirmed after the tradeoff was stated.
+- Verification: BY CONTENT on the deployed SHA — `corners_mean` in
+  `soccer_projections.py`, confirmed ABSENT from the currently-live `b3966bf1`;
+  plus web serving MLB cards and `/api/portfolio/summary`; plus 0 tracebacks.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

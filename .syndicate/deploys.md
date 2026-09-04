@@ -20722,3 +20722,28 @@ memory; a deploy reboots the process and resets the accumulator its method
 depends on — the round-9 situation exactly. Not forced. Web remains 1 commit
 behind on `4ead66c3` and the VERDICT still reads "deploy warranted for web",
 which is correct and is that lane's to discharge.
+
+## 2026-09-04 — web `b3966bf1` → `906f9537` — lane `web-deploy-4ead66c3` — **FLEET AT 0 PENDING**
+
+Carries `4ead66c3` (soccer corners model view), the behavioural commit both
+workers already ran. Preflight CLEAR first try; live 03:44:48Z.
+
+**The concern I raised last round, and why it no longer applied.** I withheld web
+because `web-oom-rate-remeasure` held the claim and a reboot resets the memory
+accumulator its method depends on. Before deploying I re-checked rather than
+assuming the objection had expired: the claim was RELEASED, **no build was in
+flight** (which is the hazard a released claim does not cover — a deploy over one
+cancels it), and web had been up **85 minutes**, well past the 25-min window that
+method needs. The user reaffirmed after the tradeoff was stated.
+
+verify: web `906f9537` at 03:45:09Z.
+- `/api/ops/version` → `906f9537`
+- BY CONTENT on the deployed SHA: `corners_mean` **0 → 1** in
+  `soccer_projections.py` (absence from `b3966bf1` confirmed first); `#643`'s
+  `bytes_per_order` re-checked and intact
+- `/mlb/api/cards` → 9 cards; `/api/portfolio/summary` → `1458 / 1457 / 1`,
+  still showing the `#642` provenance fields discriminating
+- 100 log lines since boot, **0 tracebacks / 500s / CRITICAL**
+
+**Fleet: web `906f9537` · refresh-worker `4ead66c3` · live-odds-worker
+`e713939f` — 0 pending on all three, VERDICT: NO DEPLOY WARRANTED.**
