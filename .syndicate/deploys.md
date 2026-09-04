@@ -21707,3 +21707,46 @@ entries plus a deploy, on the service with this job's OOM history. **Not taken
 unilaterally — it needs a decision.** The alternative levers are unchanged and
 cheaper: compact the ledger, fix `#505`, or lower `baseline_days` to the window
 the budget actually buys.
+
+## 2026-09-04 17:5xZ — refresh-worker `8518a662` — lanes `live-lens-date-gate` + `mlb-feed-live-terminal-refresh` — NO DEPLOY TAKEN BY ME
+
+**A deploy was requested and is NOT NEEDED: both fixes were already live.**
+refresh-worker has run `8518a662` since 15:43:45Z (trigger `api`, another
+lane's deploy). Verified BY CONTENT in the deployed SHA, not by ancestry alone:
+`board_enrichment.py` carries the date-gate reason string, `game_state.py`
+carries `mlb_feed_live_is_refreshable`, and `cards.py`/`home.py` reference it.
+No claim acquired, no preflight run, nothing deployed — there was nothing to
+deploy.
+
+**verify (date gate): PASS.** The 09-03 board artifact was rebuilt at
+`15:44:53Z`, 68s after that deploy finished. Served
+`/api/board/book-grid?sport=mlb&date=2026-09-03`:
+`live_game_state.rows_corrected` **187 -> 0**,
+`reason="live-lens snapshot is for a different slate date"`,
+`lens_date=2026-09-04`, `requested_date=2026-09-03`. The visible consequence:
+ATH @ SEA was being published as `pregame 0-0` and now reads its real
+`7-4`. **off != on IN PRODUCTION** — the same-date board (09-04, built
+17:49:36Z) still reports `rows_corrected: 292` with no reason, so the gate is
+refusing the wrong slate rather than refusing everything.
+
+**verify (frozen chip): FAIL — LIVE BUT NOT WORKING. Do not score this as
+shipped.** `games_with_outcome` for 09-03 is **still 7 of 9**. Both unfinished
+games remain non-final on the rebuilt artifact (ATH @ SEA `live 7-4`,
+STL @ LAD `live 2-1` against a real final of 2-3). The refetch did not happen:
+`[mlb_cards] FEED_LIVE_PRUNE ... date=2026-09-03 games=9 pruned=9
+plays_dropped=669` is **byte-identical at 15:01:29Z (pre-deploy, old code) and
+15:44:52Z (post-deploy, new code)**. A refetch that returned the final
+documents would have changed the play count.
+
+**I CANNOT ATTRIBUTE THE NULL, AND THAT IS A DEFECT IN THE FIX.** The change
+emits NO counter — nothing says whether the refetch was skipped, attempted, or
+attempted-and-failed. Candidates, none eliminated: `_fetch_current_feed_live`
+returning None and silently falling back to the cached document; the board's
+`game.state` for a past date not flowing through the reader I changed; or a
+cards/chip cache serving the pre-deploy context. Each predicts the same
+observable, which is exactly what an instrument would separate.
+
+**NEXT: instrument before iterating.** A per-build line naming
+`refresh_skipped_final / attempted / succeeded / failed` on
+`_daily_actual_by_game`, then re-read. Guessing between three causes that share
+one observable is how four inert features shipped in one session on this repo.
