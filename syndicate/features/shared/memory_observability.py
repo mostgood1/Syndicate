@@ -1473,7 +1473,11 @@ def parse_smaps(text: str) -> dict[str, Any]:
     }
 
 
-def log_smaps_anon_breakdown(reason: str) -> dict[str, Any] | None:
+_SMAPS_UNAVAILABLE: dict[str, bool] = {"logged": False}
+
+
+def log_smaps_anon_breakdown(reason: str, *, budget: tuple[dict, int] | None = None,
+                             quiet: bool = False) -> dict[str, Any] | None:
     """Read `/proc/self/smaps` and report where the anon actually lives.
 
     Cost: the kernel walks page tables to answer this, so it is not free -- but
@@ -1481,27 +1485,39 @@ def log_smaps_anon_breakdown(reason: str) -> dict[str, Any] | None:
     `tracemalloc` lacked when it silenced the sampler at both nframe=3 and 2.
     Capped per process like the other censuses, and run off the sampler thread.
     """
-    if _SMAPS_STATE["count"] >= _SMAPS_MAX_PER_PROCESS:
+    # `#632`: a caller may bring its own budget. The alarm census's 8 are for
+    # a memory emergency and must not be spent by routine trend sampling.
+    budget_state, budget_max = (budget if budget is not None
+                                else (_SMAPS_STATE, _SMAPS_MAX_PER_PROCESS))
+    if budget_state["count"] >= budget_max:
         # SAY SO. This used to `return None` in silence, which makes a capped-out
         # instrument indistinguishable from one that ran and found nothing --
         # the exact shape of "never record a detector's zero as a pass when the
         # data gave it no chance to fire". A missing SMAPS_ANON must be
         # attributable to the cap, not left for a reader to infer.
-        print(
-            f"SMAPS_SKIPPED_CAPPED reason={str(reason or '')[:60]} "
-            f"count={_SMAPS_STATE['count']} max={_SMAPS_MAX_PER_PROCESS}",
-            flush=True,
-        )
+        if not quiet:
+            print(
+                f"SMAPS_SKIPPED_CAPPED reason={str(reason or '')[:60]} "
+                f"count={budget_state['count']} max={budget_max}",
+                flush=True,
+            )
         return None
     try:
         path = _PROCFS_ROOT / "self" / "smaps"
         if not path.exists():
-            print("[memory_observability] SMAPS_UNAVAILABLE (not a Linux procfs)", flush=True)
+            # LATCHED, and silent for a `quiet` caller. This print sits BEFORE the
+            # budget increment, so on a host without procfs nothing ever caps it
+            # -- a trend sampling every 200 requests would say this forever. The
+            # emission-count test caught it as 4 lines where 2 were expected,
+            # which is the same duplication the arena trend was caught by twice.
+            if not quiet and not _SMAPS_UNAVAILABLE["logged"]:
+                _SMAPS_UNAVAILABLE["logged"] = True
+                print("[memory_observability] SMAPS_UNAVAILABLE (not a Linux procfs)", flush=True)
             return None
-        _SMAPS_STATE["count"] += 1
+        budget_state["count"] += 1
         payload = parse_smaps(path.read_text(encoding="utf-8", errors="ignore"))
         payload["reason"] = str(reason or "")[:80]
-        payload["smaps_index"] = _SMAPS_STATE["count"]
+        payload["smaps_index"] = budget_state["count"]
 
         # RECONCILIATION, and it is the point rather than a nicety. smaps and the
         # cgroup are INDEPENDENT kernel accountings of the same bytes. If they
@@ -1515,7 +1531,11 @@ def log_smaps_anon_breakdown(reason: str) -> dict[str, Any] | None:
             delta = payload["total_anon_mb"] - cgroup_anon_mb
             payload["reconciles_within_pct"] = round(100.0 * abs(delta) / cgroup_anon_mb, 1)
             payload["reconciles"] = abs(delta) <= max(64.0, 0.10 * cgroup_anon_mb)
-        print(f"SMAPS_ANON {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
+        # `quiet` for TREND sampling: the reading rides inside the attribution
+        # emission as `smaps_trend`, and a second full line per emission is the
+        # duplication `test_it_emits_only_every_nth_request` counts.
+        if not quiet:
+            print(f"SMAPS_ANON {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
         return payload
     except Exception as exc:
         print(f"SMAPS_ANON_FAILED {type(exc).__name__}: {exc}", flush=True)
@@ -1708,6 +1728,57 @@ def sample_arena_trend(reason: str) -> dict[str, Any] | None:
         if isinstance(arena_mb, (int, float)) and isinstance(live_mb, (int, float)):
             # THE number: what the OS has given us that Python is not using.
             _ARENA_TREND_STATE["last"]["fragmentation_mb"] = round(arena_mb - live_mb, 3)
+    return payload
+
+
+_SMAPS_TREND_STATE: dict[str, Any] = {"count": 0, "last": None}
+_SMAPS_TREND_MAX_DEFAULT = 60
+
+
+def _smaps_trend_budget() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_SMAPS_TREND_SAMPLES") or "").strip()
+    if not raw_value:
+        return _SMAPS_TREND_MAX_DEFAULT
+    try:
+        return int(raw_value)
+    except ValueError:
+        return _SMAPS_TREND_MAX_DEFAULT
+
+
+def sample_smaps_trend(reason: str) -> dict[str, Any] | None:
+    """One anon-by-REGION-SIZE reading for a time series.
+
+    `#632`, and this is the only instrument left that can see the memory.
+    Measured: **pymalloc arenas are 40% of worker RSS and did not move**, and
+    `#435` found glibc `malloc_info` blind too (13.9% coverage,
+    `arena_not_representative`). Both are structurally incapable of seeing a
+    large DIRECT mmap -- and anything over 512 bytes bypasses pymalloc entirely,
+    which a 28 MB JSON payload certainly does.
+
+    `parse_smaps` buckets anon by mapping SIZE (`<64KB`, `64KB-1MB`, `1-8MB`,
+    `8-64MB`, `>64MB`). A payload-shaped allocation lands in `8-64MB`, so the
+    question `#632` has been circling for four probes finally has a form the data
+    can answer: **which bucket grows?**
+
+    It also reconciles against the cgroup's own anon and publishes
+    `reconciles_within_pct`. That matters more than it sounds: smaps and the
+    cgroup are INDEPENDENT accountings of the same bytes, so a breakdown that
+    does not add up must not be read as attribution. This investigation has twice
+    acted on a number that was internally consistent and wrong.
+
+    Budgeted separately from the alarm census, capped, and sampled off the
+    emission path -- the kernel walks page tables for this, so it is not free.
+    """
+    payload = log_smaps_anon_breakdown(
+        reason, budget=(_SMAPS_TREND_STATE, _smaps_trend_budget()), quiet=True)
+    if payload is not None:
+        _SMAPS_TREND_STATE["last"] = {
+            "total_anon_mb": payload.get("total_anon_mb"),
+            "by_size_mb": payload.get("anon_mmap_by_size_mb"),
+            "cgroup_anon_mb": payload.get("cgroup_anon_mb"),
+            "reconciles": payload.get("reconciles"),
+            "reconciles_within_pct": payload.get("reconciles_within_pct"),
+        }
     return payload
 
 
@@ -3170,6 +3241,10 @@ def note_request_end(token: dict[str, Any] | None, route: str,
         sample_arena_trend("attribution_emit")
     except Exception:
         pass
+    try:
+        sample_smaps_trend("attribution_emit")
+    except Exception:
+        pass
     with _request_memory_lock():
         payload = request_memory_attribution_payload()
     print(f"REQUEST_MEMORY_ATTRIBUTION {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
@@ -3211,6 +3286,10 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         # difference is fragmentation -- memory no free() can return.
         "arena_trend": dict(_ARENA_TREND_STATE.get("last") or {}),
         "arena_trend_samples": _ARENA_TREND_STATE["count"],
+        # `#632`: anon by mapping SIZE. The only view that can see a large direct
+        # mmap, which is where the growth has to be if pymalloc cannot see it.
+        "smaps_trend": dict(_SMAPS_TREND_STATE.get("last") or {}),
+        "smaps_trend_samples": _SMAPS_TREND_STATE["count"],
         # `#632`: what reassigning long-lived globals allocated and refunded.
         # A large `free_mb` here means the negatives belong to a PREVIOUS
         # request's object being released inside this one's window.
@@ -3234,3 +3313,5 @@ def reset_request_memory_attribution() -> None:
     _GC_SPLIT_STATE.update({"with_gc2_n": 0, "with_gc2_mb": 0.0,
                             "no_gc2_n": 0, "no_gc2_mb": 0.0})
     _GLOBAL_REASSIGN_STATE.clear()
+    _ARENA_TREND_STATE.update({"count": 0, "last": None})
+    _SMAPS_TREND_STATE.update({"count": 0, "last": None})
