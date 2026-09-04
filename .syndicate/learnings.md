@@ -5537,3 +5537,47 @@ direction. **A comment that names a constant's VALUE is a copy, and copies drift
   messaging, on the grounds that the wrong version was the one being read. That
   is the right call for a correction whose damage is what a passer-by concludes.
 - *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-04 — THE LEDGER COMMIT GUARD CANNOT SEE A WITHIN-BLOCK REVERT, measured at 117,321 characters
+
+`[lane order-sim-view, session 37abeca0; hazard created and disclosed by session c38d3e5c]`
+
+`lanes.md` was compacted on `origin/main` (`a8000faf`): every OPEN block keeps
+its header, `- Files:` and `- Blocked by:`, and the narrative moved verbatim to
+`lanes_history.md`. The shared PRIMARY tree still holds the pre-compaction copy.
+
+**Measured, not argued:**
+
+    stale primary copy                     203,874 chars
+    compacted copy on origin/main           86,553 chars
+    a commit from the primary tree reverts 117,321 chars
+    `violations(".syndicate/lanes.md", stale, root)`        -> 0
+    `resurrected_blocks(stale, upstream, history)`          -> 0
+
+**The predicate is silent BY DESIGN and at the wrong GRANULARITY.**
+`resurrected_blocks` asks "is a whole block verbatim in history and gone from
+lanes.md" -- the signature of an archive pass being reverted. A COMPACTION moves
+narrative *inside* blocks that stay in place, so no block satisfies that, and a
+commit reverting 118 KB looks like whatever else it touches. The 2026-09-02
+incident it was built from (a kalshi commit reverting a trim from ~90 commits
+behind) is the block-granularity case; this is the line-granularity one, and the
+guard covers exactly one of them.
+
+**What makes it dangerous rather than merely incomplete:** the commit that does
+this looks TINY. The primary tree currently carries a 14-line addition from
+`web-oom-profiler-steady`; committing `lanes.md` from there is a `+14` diff in
+the summary and a 118 KB revert in the tree. Nobody reviewing the numbers would
+look twice.
+
+**NOT FIXED HERE, deliberately.** The obvious predicate -- lines present in
+upstream's `lanes_history.md` AND in the committed `lanes.md` -- is roughly ten
+lines, and I did not write it at 02:0x on a guard that blocks every session's
+commits without working the false-positive cases first. A legitimate append, a
+second compaction, or a block quoted verbatim from history would all need to
+stay green, and `learnings.md` already records that a guard which blocks correct
+work is one people route around. Handed to the session that owns the compaction.
+
+**Generalises past this file:** a diff-size or file-size heuristic would have
+caught it where a structural predicate did not. When a guard's predicate is
+structural, ask what a change of a DIFFERENT SHAPE at the same location looks
+like to it -- here, same file, same direction, different granularity, invisible.
