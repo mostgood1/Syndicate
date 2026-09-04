@@ -186,6 +186,21 @@ _NFL_ALIAS_TO_NAME: dict[str, str] = {
     "wsh": "washington commanders", "jac": "jacksonville jaguars",
     "lvr": "las vegas raiders", "oak": "las vegas raiders",
     "sd": "los angeles chargers", "stl": "los angeles rams",
+    # nflverse spells the RAMS "LA" in current rows -- not "LAR", which never
+    # appears. Measured over all of `data/nfl_source/schedule_2026.csv`: 32
+    # distinct codes, LA and LAC present, LAR absent. `nfl_game_projections`
+    # keys its index on that value, so without this the Rams' whole season is
+    # unjoinable -- 78 of 1,252 rows on production's board grid 2026-09-04, and
+    # 17 of 17 distinct residual fixtures were Rams games.
+    #
+    # UNAMBIGUOUS WITHIN THE SPORT, which is the bar a map entry has to clear:
+    # the other Los Angeles club is LAC above, and `teams_match` is sport-scoped
+    # so the basketball LA (Lakers/Clippers/Sparks) is unreachable from here.
+    # This entry REMOVES a wrong match rather than risking one -- the initials
+    # heuristic already resolved "la" against "los angeles chargers" (the
+    # leading-run rule over ["los","angeles",...]), and a resolvable pair now
+    # returns the map's verdict before any heuristic runs.
+    "la": "los angeles rams",
 }
 
 # WNBA gaps. The vendored `_WNBA_TEAM_ALIASES_LOCAL` resolves SEA and LVA but

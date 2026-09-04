@@ -183,3 +183,69 @@ def test_soccer_tricodes_that_collide_across_leagues_resolve_to_nothing():
 
     assert canonical_team("soccer", "STL") is None
     assert teams_match("soccer", "Standard Liege", "Standard Liege") is True
+
+
+def test_nflverse_writes_the_rams_as_la():
+    """nflverse -- the vocabulary `nfl_game_projections` keys its index on --
+    spells the Rams `LA`, not `LAR`. Measured over the whole 2026 schedule
+    (`data/nfl_source/schedule_2026.csv`): 32 distinct codes, `LA` present,
+    `LAR` absent entirely.
+
+    The gap was PREDICTED IN PLACE by `nfl_game_projections`'s own
+    `_is_degenerate_rating_source` docstring -- "production carries exactly that
+    case for two clubs (WSH, LAR) whose nflverse abbreviations do not resolve".
+    WSH was fixed; this half was not. Measured on production's board grid
+    2026-09-04: 78 of 1,252 rows carried no projection, and 17 of 17 distinct
+    residual fixtures were Rams games.
+    """
+    assert teams_match("nfl", "los angeles rams", "la") is True
+    assert teams_match("nfl", "la", "los angeles rams") is True
+    assert canonical_team("nfl", "la") == "los angeles rams"
+
+
+def test_la_does_not_also_claim_the_chargers():
+    """The reason this alias is safe to add, and the reason it had to be added
+    to the MAP rather than left to the heuristics.
+
+    `LA` and `LAC` are the two codes nflverse uses for the two Los Angeles
+    clubs, so `LA` is unambiguous WITHIN the sport -- and `teams_match` is
+    sport-scoped, so the NBA/WNBA `LA` (Lakers/Clippers/Sparks) is unreachable
+    from here.
+
+    Without the map entry the INITIALS heuristic already matched `la` against
+    "los angeles chargers" -- `"".join(w[0] for w in words[:2])` over
+    ["los","angeles","chargers"] is exactly "la". So this entry REMOVES a
+    live wrong-club match rather than risking one: with both sides resolvable
+    the map is authoritative and `teams_match` returns before the heuristics
+    (`team_aliases.py`, the "Both resolved" branch).
+    """
+    assert teams_match("nfl", "la", "los angeles chargers") is False
+    assert teams_match("nfl", "los angeles chargers", "la") is False
+    assert canonical_team("nfl", "lac") == "los angeles chargers"
+    # The relocated-club history keys still point where they always did.
+    assert canonical_team("nfl", "stl") == "los angeles rams"
+    assert canonical_team("nfl", "sd") == "los angeles chargers"
+
+
+def test_adding_la_leaves_the_derived_maps_untouched():
+    """FORBIDDEN 2026-08-29(b): a map addition is not strictly additive -- it
+    flips lookups from heuristic-fallback to map-authoritative, so the delta
+    has to be enumerated rather than assumed.
+
+    `_nickname_alias_map` and `unambiguous_club_tokens` both derive from the
+    map's VALUES, and `la` adds a key whose value ("los angeles rams") was
+    already present via `lar`/`stl`. So neither derived map moves. Enumerated
+    exhaustively over the sport's whole vocabulary (71 tokens, 5,041 ordered
+    pairs): exactly 6 `teams_match` verdicts change, every one of them a
+    Rams/LA pair, and 0 map-resolvable pairs disagree with the map afterwards.
+    """
+    from syndicate.features.shared.team_aliases import (
+        _nickname_alias_map,
+        unambiguous_club_tokens,
+    )
+
+    assert len(_nickname_alias_map("nfl")) == 32
+    assert len(unambiguous_club_tokens("nfl")) == 95
+    # `la` must NOT become a bare-nickname key or an "unambiguous word".
+    assert "la" not in _nickname_alias_map("nfl")
+    assert "la" not in unambiguous_club_tokens("nfl")
