@@ -887,6 +887,53 @@ def _splits(blob: str) -> list[tuple[str, str]]:
     ]
 
 
+
+# KALSHI'S DOUBLEHEADER SUFFIX. `KXMLBF5SPREAD-26SEP041915DETCLEG2-DET3` has the
+# event blob `DETCLEG2`: the pair plus the game number. Our matcher builds
+# `AWAY+HOME` from our own schedule, which for a doubleheader produces `DETCLE`
+# TWICE -- so the pair alone is `ambiguous` and refused, while the blob carrying
+# the answer is `no_match` because nothing parses the suffix.
+#
+# MEASURED 2026-09-04, live:
+#     DETCLE -> ambiguous | DETCLEG1 -> no_match | DETCLEG2 -> no_match
+#
+# Both halves of every doubleheader are therefore invisible to the order path,
+# in September, which is makeup-game season.
+_DOUBLEHEADER_SUFFIX = re.compile(r"^(?P<base>[A-Z]{4,})G(?P<number>[1-9])$")
+
+
+def _split_doubleheader(blob: str) -> tuple[str | None, int | None]:
+    """`("DETCLE", 2)` for `DETCLEG2`, else `(None, None)`.
+
+    Requires at least four leading letters so a short code cannot be shortened
+    into a false pair, and a single digit 1-9 because Kalshi numbers games
+    within a day, not within a season.
+    """
+    match = _DOUBLEHEADER_SUFFIX.match(str(blob or ""))
+    if not match:
+        return (None, None)
+    return (match.group("base"), int(match.group("number")))
+
+
+def _game_number_of(game) -> int | None:
+    """Our side's game number, under either spelling, or None.
+
+    `None` is NOT 1. A feed that omits the field is telling us it does not know,
+    and treating that as game one would pair a doubleheader's second game with
+    the first game's contract -- a confidently-priced bet on the wrong game,
+    which is the exact failure `ambiguous` exists to prevent.
+    """
+    for key in ("game_number", "gameNumber", "doubleheader_game", "game_num"):
+        raw = game.get(key) if hasattr(game, "get") else None
+        if raw is None or isinstance(raw, bool):
+            continue
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def match_event_blob(
     blob: Any,
     games: Sequence[Mapping[str, Any]],
@@ -1029,6 +1076,43 @@ def match_event_blob(
                             matched_here = True
                             break
     if not hits:
+        # THE DOUBLEHEADER RETRY, and it runs ONLY here -- after the blob has
+        # been matched as-is and found nothing. Sited this way it can only ADD
+        # resolutions: a blob that already matched never reaches this branch, so
+        # no existing pairing can change.
+        base, game_number = _split_doubleheader(wanted)
+        if base and game_number is not None:
+            retry = match_event_blob(base, games, sport=sport, code_names=code_names)
+            # `ambiguous` is the EXPECTED verdict here and the one worth having:
+            # it means both halves of the doubleheader are on our board and the
+            # suffix is exactly what tells them apart.
+            candidates = [
+                game
+                for game in (games or [])
+                if _game_number_of(game) == game_number
+                and match_event_blob(
+                    base, [game], sport=sport, code_names=code_names
+                ).get("status") == "ok"
+            ]
+            if len(candidates) == 1:
+                game = candidates[0]
+                return {
+                    "status": "ok",
+                    "blob": wanted,
+                    "event_id": game.get("event_id"),
+                    "home_team": game.get("home_team"),
+                    "away_team": game.get("away_team"),
+                    "doubleheader_game": game_number,
+                }
+            # Nothing our side numbers this way. REFUSED rather than guessed --
+            # `retry` may well be `ok` on a single game, but accepting it would
+            # pair "game 2" with whichever game we happen to hold.
+            return {
+                "status": "no_match",
+                "blob": wanted,
+                "reason": "doubleheader_game_%d_not_on_our_board" % game_number,
+                "base_status": retry.get("status"),
+            }
         return {"status": "no_match", "blob": wanted}
     if len(hits) > 1:
         return {"status": "ambiguous", "blob": wanted, "count": len(hits)}
