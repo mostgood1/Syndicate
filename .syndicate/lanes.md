@@ -753,6 +753,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 
 
+### mlb-feed-live-terminal-refresh — OPEN — opened 2026-09-04 — session b9013cf2-9ea8-431f-9700-f4aac4794582
+- Goal: a cached `feed_live` payload that is NOT final must be refreshed rather than reused, and that refresh must remain reachable for a slate that ended after the Central date roll — so a game final at 05:05Z is marked `final` by a 05:33Z build.
+- Files: `syndicate/features/mlb/cards.py`, `syndicate/blueprints/home.py`, `tests/test_mlb_feed_live_terminal_refresh.py` (new).
+- Hypothesis: TWO defects compose. (1) INVERTED PREDICATE — `cards.py:2345` refetches when `not _actual_payload_is_live(payload)`, so a cached PREGAME or FINAL payload is refreshed while a cached LIVE one never is; live->final is exactly the transition that is never picked up. `home.py:_mlb_feed_live_payload` has no freshness rule at all — it returns the file whenever it EXISTS. (2) WINDOW — both refetches are gated `selected_date == today_iso`, and a game that ends after the Central roll can only be recorded by a build for YESTERDAY's slate, which that gate refuses.
+- Falsification test: if the chip state were not coming from a frozen cached payload, the 09-03 grid could not have carried a mid-game SCORE. It carried STL@LAD `live 2-1` (actual final 2-3) — a real in-progress snapshot, which only a cached feed payload supplies. Hypothesis NOT falsified.
+- Verification: (a) unit — a cached LIVE payload triggers a refetch and a cached FINAL one does not (the inversion, both directions); a yesterday-slate build still refetches while an older date does not; (b) served payload — on the next post-roll build, `/api/board/book-grid?sport=mlb&date=<yesterday>` shows `games_with_outcome` equal to the real finals count, and no game reads `live` with a stale score.
+- Cost of the bug (measured): 2026-09-03, ATH@SEA final 05:05Z and STL@LAD final 05:09Z, artifact built 05:33:14Z — 24-28 min later — and BOTH were still `live`/`pregame`. `live_gameline_score` scored 7 of 9. The 09-03 artifact has not been rebuilt since, so the loss is permanent for that date.
+- WEB MUST NOT GAIN NETWORK. `home.py`'s reader is on the request path, where the feed_live file always misses (it matches no `HOT_ARTIFACT_PATTERNS`) and every miss is an HTTPS call — the measured cause of `/healthz` timing out and gunicorn being SIGTERM'd three times in five minutes. The widened window is therefore worker-only, gated on the existing `_render_web_dyno()`.
+- Blocked by: none. Follow-on from `live-lens-date-gate` (that lane stops the wrong-day OVERWRITE; this one is why the finals were missing in the first place).
+- OUTCOME: fix landed on `main` (`20221619`, tests `f3f4c13c`). NOT DEPLOYED -- `.py` only, `autoDeploy = no`.
+- REACHABILITY TRAP CAUGHT BEFORE SHIPPING: the obvious gate, `_render_web_dyno()`, would have been INERT on refresh-worker. `SYNDICATE_WEB_DYNO` is declared `false` for both workers in `render.yaml` but is **ABSENT from the LIVE refresh-worker** (read from the Render API 2026-09-04) -- so it falls through to its `RENDER` heuristic and returns True there. Gated on `flask.has_request_context()` instead, which is intrinsic and cannot drift.
+- SIDE FINDING, NOT FIXED HERE: that same drift makes every other `not _render_web_dyno()` gate in `mlb/cards.py` inert on refresh-worker -- including the `FEED_LIVE_PRUNE` diagnostic print and `_log_cards_context_memory`. If those lines have never appeared in refresh-worker's logs, this is why. Worth its own lane; the remedy is a `render.yaml` push, which is a production change.
+- Tests: 24 new (`tests/test_mlb_feed_live_terminal_refresh.py`); 3 of the 6 reader tests fail against unmodified code (off != on). `tests/test_mlb_cards_worker_hydration_cost.py` was pinned outside the window -- its "today" was one day off its slate, so under the new window it made a REAL statsapi call and graded a live 79-play document against a 500-play fixture.
+- Regression: 256 + 213 passed across the directly-affected files. `tests/test_archives.py` shows 31 failed / 350 passed -- IDENTICAL on unmodified code (this worktree has no `data/`), so none are from this change.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
