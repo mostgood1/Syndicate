@@ -5427,3 +5427,45 @@ assert both directions are empty — nothing of yours that upstream archived
   regression in a real commit, in the same minute. **A guard reported as dead
   is not dead; it is a guard nobody has made angry yet.**
 - *(evidence in `learnings_evidence.md`)*
+
+
+## 2026-09-04 — OVERTURNED: `_SCORE_SIM_WEIGHT` is **0.125**, not 0.0. Two load-bearing comments say 0.0, and one of them is the entire basis of `side_picked_by`. `[lane prop-join-yield]`
+
+    opportunity_signals.py:481   _SCORE_SIM_WEIGHT = _env_float("SYNDICATE_SCORE_SIM_WEIGHT", 0.125)
+    SYNDICATE_SCORE_SIM_WEIGHT   NOT SET on refresh-worker or live-odds-worker
+
+Measured on the served board, 25,830 rows carrying a score breakdown:
+**`sim_component` is NON-ZERO on 5,108**, min −1.5000, median 0.2737, max 1.5000,
+with 448 rows flagged `sim_capped`. The sim IS in the ranking, on ~20% of rows,
+and the served board's own explainer agrees ("capped at 1.5 EV points").
+
+**The stale claims:**
+
+  * `layer2_board.py:30` — "**`_SCORE_SIM_WEIGHT` is 0.0**, so this board ranks on
+    market EV and price shopping ALONE and the simulation contributes nothing to
+    the ordering."
+  * `portfolio_commit.py:864` — "At `_SCORE_SIM_WEIGHT = 0.0` the ranking
+    **provably cannot pick a side**..."
+
+The second is the whole justification for `side_picked_by`, whose counterfactual
+("would this row be staked with `model_edge_pct = 0`?") models only the SIZING
+channel. At 0.125 the sim also has a RANKING channel the counterfactual does not
+see, so `price_picked_by: price_shopping` means "price alone would have sized it
+too", NOT "the sim had no hand in it".
+
+**THE FILE PREDICTED THIS EXACT FAILURE, two paragraphs below the stale line:**
+*"This line said `0.5` until 2026-08-16 and the constant had been 0.0 for some
+time. A session brief and an audit both inherited `0.5` from here and built on
+it... If you change that constant, change this line in the same commit."* The
+warning survived; the constant moved anyway; the prose is now stale in the other
+direction. **A comment that names a constant's VALUE is a copy, and copies drift
+— the warning not to let them drift is not a mechanism that stops it.**
+
+**How to apply:**
+- Never quote a tuning constant from prose. Read the assignment, then check for
+  an env override on every service that runs the code — both, here, were needed.
+- When a claim REDUCES to "and therefore X is structurally impossible", re-verify
+  the premise before building on X. `side_picked_by`, `#426`'s framing, and my own
+  reasoning tonight all rest on this one.
+- A cheap empirical check beats reading either: `sim_component` non-zero on any
+  served row falsifies "the sim contributes nothing" in one query.

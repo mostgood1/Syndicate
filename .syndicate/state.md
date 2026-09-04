@@ -355,6 +355,21 @@ still genuinely absent — `conditional_mix` etc. return `count: 0` and `POST
   10.4% -> 19.0% of samples within 50MB of the limit, with excursions NOT timed to
   its runs (median 154s into a 300s loop).
 
+### NCAAF live lanes + the buy funnel — MEASURED 2026-09-04 01:2xZ `[lane prop-join-yield]`
+
+- **NCAAF live rows reach the board.** `(live, live) 236`, `(live, pregame) 0`,
+  after `9d106d11`. MLB rose 104 -> 1,272 on the same change.
+- **`_refresh_layer2_live_state` RUNS ON WEB, NOT ON A WORKER.**
+  `LAYER2_LIVE_RESTATED` fired 99 times on web in two hours and ZERO times on
+  refresh-worker or live-odds-worker. Deploy the lane restatement to WEB.
+- **Kalshi and Polymarket size ZERO positions, and it is not the venue.**
+  `venue_priced` 276/534 and 264/383, balances funded, caps not binding. Every
+  row is refused by `market_family_excluded` (274/180) or `no_model_edge_pct`
+  (252/180). NCAAF is 173 of Kalshi's; it can NEVER buy, because
+  `ncaaf/game_projections.py` nulls `edge_vs_market_pct` by design.
+- **`SYNDICATE_PORTFOLIO_EXCLUDED_FAMILIES` is UNSET** (default `mlb:player_prop`
+  only) and **`SYNDICATE_PORTFOLIO_MIN_EV_PCT=0`**. Neither is a hidden throttle.
+
 ## [subject-index] SUBJECT INDEX — every subject, and which file holds it
 
 One subject, one section, ACROSS ALL FILES. `state_key_check.py` checks
