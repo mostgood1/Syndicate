@@ -166,6 +166,28 @@ _LEAN_FIELDS = (
     "sim_view",
     "sim_line_gap",
     "sim_probability_railed",
+    # WHICH CHANNEL PUT THE MONEY HERE. `sim_view` says what the sim THOUGHT;
+    # these say what it DID. They are the decomposition `_SCORE_SIM_WEIGHT`'s own
+    # gate asks for -- "settled > 0 AND CLV decomposed by component" -- and
+    # without them that gate cannot be run at any settled count, because the
+    # numbers are computed on the plan position and were dropped at this
+    # boundary. `settled` is 638 as of 2026-09-04, so the gate's first
+    # precondition is met and only this one was missing.
+    #
+    # `side_picked_by` is `"simulation"` when the EV-only counterfactual would
+    # have staked ZERO -- the position exists only because the model said so --
+    # and `"price_shopping"` when price alone would have sized it too. READ ITS
+    # SCOPE at `stake_attribution`: since `_SCORE_SIM_WEIGHT` is 0.125 and not
+    # 0.0, `"price_shopping"` does NOT mean the sim was uninvolved, only that it
+    # was not load-bearing for the SIZE.
+    #
+    # SIZE COST, because per-order bytes is the only number that can reach the
+    # store's refusal ceiling: measured 1,094 B/order, cap 5,000 -> ~5.47MB, 65%
+    # of the 8MB ceiling. These three add ~90 B/order -> ~1,184 B/order ->
+    # ~5.92MB, 70%. Still BOUNDED by the record cap, +5pp of headroom spent.
+    "side_picked_by",
+    "stake_fraction_ev_only",
+    "sim_share_of_stake",
     # The sport's own game id (MLB `gamePk`), needed to look up a live feed and
     # answer "is this bet winning". `event_id` is the odds-feed id and is not
     # interchangeable with it.
@@ -365,6 +387,20 @@ class OrderRequest:
     # because the two are orthogonal: a row can be `agrees` AND railed, and
     # folding them would throw away whichever half was written second.
     sim_probability_railed: bool | None = None
+    # ------------------------------------------------------------------
+    # WHICH CHANNEL PUT THE MONEY HERE -- the sim's ACTION, not its opinion.
+    #
+    # `stake_attribution` computes these by re-sizing the row with
+    # `model_edge_pct = 0` and comparing: `stake_fraction_ev_only` is what price
+    # alone would have staked, `sim_share_of_stake` is the sim's share of what
+    # was actually staked, and `side_picked_by` is `"simulation"` exactly when
+    # the EV-only counterfactual is zero.
+    #
+    # NOT IN `idempotency_key`, same rule as every attribution field above: a
+    # re-sized row is the same bet.
+    side_picked_by: str | None = None
+    stake_fraction_ev_only: float | None = None
+    sim_share_of_stake: float | None = None
 
 
 def execution_mode() -> str:
@@ -1094,6 +1130,9 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "sim_view": request.sim_view,
         "sim_line_gap": request.sim_line_gap,
         "sim_probability_railed": request.sim_probability_railed,
+        "side_picked_by": request.side_picked_by,
+        "stake_fraction_ev_only": request.stake_fraction_ev_only,
+        "sim_share_of_stake": request.sim_share_of_stake,
         # Ungraded until something grades it. `None` rather than absent so the
         # field is present on every record and a summary cannot mistake "no such
         # key" for "not settled yet".

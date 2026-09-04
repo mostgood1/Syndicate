@@ -203,6 +203,26 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
         sim_view=_as_optional_str(position.get("sim_view")),
         sim_line_gap=_as_optional_float(position.get("sim_line_gap")),
         sim_probability_railed=_as_optional_bool(position.get("sim_probability_railed")),
+        # NESTED, unlike every field above it. `portfolio_commit` puts these
+        # under `position["attribution"]`, so a flat `position.get(...)` reads
+        # None forever and the column ships inert -- the failure mode this repo
+        # calls "presence is not reachability". The flat read is kept as a
+        # fallback for a producer that ever promotes them.
+        side_picked_by=_as_optional_str(
+            (position.get("attribution") or {}).get("side_picked_by")
+            if isinstance(position.get("attribution"), dict)
+            else position.get("side_picked_by")
+        ),
+        stake_fraction_ev_only=_as_optional_float(
+            (position.get("attribution") or {}).get("stake_fraction_ev_only")
+            if isinstance(position.get("attribution"), dict)
+            else position.get("stake_fraction_ev_only")
+        ),
+        sim_share_of_stake=_as_optional_float(
+            (position.get("attribution") or {}).get("sim_share_of_stake")
+            if isinstance(position.get("attribution"), dict)
+            else position.get("sim_share_of_stake")
+        ),
         # THE PRE-2026-08-30 KEY, and WITHOUT THIS LINE THE MIGRATION GUARD IS
         # INERT. `portfolio_commit` emits it and `record_order` checks it, but
         # the request in between never carried it -- so `_legacy_idempotency_key`
