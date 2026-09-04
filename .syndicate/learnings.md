@@ -3849,11 +3849,12 @@ resets it, so a post-deploy reading always looks healthy.
 
 ## 2026-09-03 — FORBIDDEN: verifying a deploy by ANCESTRY. Check the deployed file's CONTENT.
 
-- **Measured.** `#643`'s fix (`8add1bbe`) was on `main`. live-odds-worker deployed `48c68546`, and `git merge-base --is-ancestor 8add1bbe 48c68546` answers **YES**. The fix was still absent: `git show 48c68546:syndicate/features/shared/execution_ledger.py
+- **Measured.** `#643`'s fix (`8add1bbe`) was on `main`. live-odds-worker deployed `48c68546`, and `git merge-base --is-ancestor 8add1bbe 48c68546` answers **YES**. The fix was still absent: `git show 48c68546:syndicate/features/shared/execution_ledger.py | grep -c bytes_per_order` answers **0**. Ancestry proves a commit was APPLIED, never that it SURVIVED — a later commit to the same file can overwrite it with no conflict and no signal. Verify by asking the deployed tree for the CONTENT.
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-03 — a deploy CLAIM can be force-broken while live, and spacing will not catch it
 
+- **The rule.** The second lock does not compensate: a preflight measures from the last FINISHED deploy, so **a build in flight is invisible to the spacing rule**. Serialisation rests on the claim alone and `--force` is one command away — so record the force in `deploys.md`, and before forcing, establish the holder is actually gone.
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-03 — RULE: before you compact a file, measure whether it is BLOATED or merely BIG. They look identical from the size alone and take opposite fixes. `[lane none — ledger structure pass]`
@@ -3878,10 +3879,12 @@ resets it, so a post-deploy reading always looks healthy.
 
 ## 2026-09-03 — CONFIRMED BY DEMONSTRATION: a lane id absent from the roster can be a LIVE session
 
+- **The rule.** `b2b5b45b` held a LIVE deploy claim on web for 27 minutes while appearing in **no row of a 200-entry `list_sessions` including archived**. Absent from the roster, provably alive — so roster evidence must **never** justify `deploy_claim.py --force`. Wait for the TTL, or leave the service to its owner.
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-03 — FORBIDDEN: taking an exit code through a pipe
 
+- **The rule.** `RC=$(cmd 2>&1 | tail -1); if [ $? -eq 0 ]` reads **`tail`'s** status, not the command's, and the wrong answer is always the PERMISSIVE one — `tail` essentially always succeeds, so every guard written this way degrades to "proceed". Capture first, then test: `OUT=$(cmd 2>&1); RC=$?`.
 - *(evidence in `learnings_evidence.md`)*
 
 ## 2026-09-03 — check SURVIVAL in the TARGET before deploying, not in the deployed tree after
