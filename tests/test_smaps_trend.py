@@ -222,6 +222,21 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(payload["smaps_trend"], {})
         self.assertEqual(payload["smaps_trend_samples"], 0)
 
+    def test_the_payload_says_WHICH_WORKER_emitted_it(self) -> None:
+        """Two gunicorn workers emit into one log stream, so a series read
+        without a pid is TWO interleaved series.
+
+        Measured 2026-09-04: five consecutive emissions alternated between
+        processes, and only luck put the same worker at both ends of the
+        first-vs-last comparison. This is the cross-worker error that the
+        per-process anon fix already corrected at the cgroup level, returning
+        one level up at the time series. Splitting on a bucket value that
+        happens to differ per worker is an inference; a pid is an identifier.
+        """
+        payload = MOD.request_memory_attribution_payload()
+
+        self.assertEqual(payload["pid"], os.getpid())
+
     def test_reset_clears_the_trend_so_a_test_cannot_read_the_PREVIOUS_case(self) -> None:
         MOD._SMAPS_TREND_STATE.update({"count": 7, "last": {"total_anon_mb": 1.0}})
 

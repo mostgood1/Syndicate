@@ -3266,6 +3266,15 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         # for a reader to infer: `attribution_basis` distinguishes the two
         # regimes in the log, where nothing else would.
         "attribution_basis": "process_anon_smaps_rollup",
+        # WHICH WORKER. `#632`: gunicorn runs 2 workers and both emit into one
+        # log stream, so a series read without this is TWO interleaved series.
+        # Measured 2026-09-04: five consecutive emissions alternated between
+        # processes, and only luck put the same worker at both ends of the
+        # comparison. This is the same cross-worker error that the per-process
+        # anon fix already corrected once at the cgroup level -- it came back
+        # one level up, at the TIME SERIES, and a bucket value that happens to
+        # differ per worker is an inference, not an identifier.
+        "pid": os.getpid(),
         "anon_mb_now": _anon_mb(),
         "process_anon_mb_now": _process_anon_mb(),
         "routes": [dict(route=r, **vals) for r, vals in rows],

@@ -21588,6 +21588,7 @@ not take that step on today's numbers; take it on tomorrow's.
 **Owed:** scheduled task `verify-ledger-budget-4gb` (2026-09-05 07:45 CT).
 Nothing here is a fix that has been shown to work — it is a change that has been
 shown to be LIVE.
+
 ---
 
 ## 2026-09-04T16:19:55Z — web — `08ca5ff2` — `#632` smaps anon-by-region-size trend
