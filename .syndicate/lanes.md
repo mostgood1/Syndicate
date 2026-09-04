@@ -966,6 +966,25 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   (10,000 events, oldest 2026-06-05), so "38" and "first 2026-06-15" are LOWER
   BOUNDS until older windows are read explicitly with `--end`. Do that first.
 - Blocked by: none. Read-only — no deploy.
+### catchup-doubleheader-selfverify — CLOSED 2026-09-04 — **web + live-odds-worker to `60afda80`** (16:10:35Z / 16:13:40Z), verified by content with a token proven to discriminate (`doubleheader_resolved` 0→4). **THE OWED ITEM IS NOT DISCHARGED AND THIS DEPLOY COULD NOT DISCHARGE IT:** the counter is printed at exactly one place, `pipeline/portfolio_commit.py:665`, and `pipeline/` runs on refresh-worker ALONE — which is on `8518a662` and claim-held. web/live-odds compute it and discard it. — opened 2026-09-04 — session cfcce46d-8ad8-4978-9992-5848cba4122a
+- Goal: web and live-odds-worker onto `60afda80`. **This discharges the OWED item
+  I recorded in `catchup-kalshi-doubleheader`**: `60afda80` makes the
+  doubleheader fix SELF-VERIFYING rather than watched, so reachability stops
+  depending on a human catching a real doubleheader on the board. Also
+  `e08a3a0f` (RETRACT the `SYNDICATE_WEB_DYNO` drift — it was an unpaginated
+  read).
+- **refresh-worker EXCLUDED** — `mlb-rate-refit` has held the claim 44 min. It is
+  on `8518a662` and still lacks BOTH the doubleheader fixes and this one; named,
+  not skipped silently.
+- Files: NONE — deploy only. Does not claim the shared ledger.
+- Verification: BY CONTENT with the token taken FROM THE DIFF and PROVEN to
+  discriminate (yesterday's rule): `doubleheader_resolved` = 0 on both live SHAs
+  (`de53e367`, `25fdd659`), 4 on the target. `unmatched_events` was REJECTED as a
+  token — 1 on live, 2 on target, so a pass would have meant nothing.
+  Then the real prize: **look for the self-verifying emission in the log stream**,
+  which is the reachability reading `catchup-kalshi-doubleheader` said was owed.
+- Blocked by: none for web/live-odds.
+
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

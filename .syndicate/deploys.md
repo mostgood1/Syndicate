@@ -21482,3 +21482,48 @@ verified.**
 
 **refresh-worker EXCLUDED** — `mlb-rate-refit` held the claim; it needs
 `e00c4cbb`/`18bb3031` and stays behind. web current (`25fdd659`).
+
+## 2026-09-04 — web + live-odds-worker to `60afda80` — lane `catchup-doubleheader-selfverify`
+
+`60afda80` (make the Kalshi doubleheader fix SELF-VERIFYING rather than watched)
+and `e08a3a0f` (RETRACT the `SYNDICATE_WEB_DYNO` drift — it was an unpaginated
+read). Both preflights CLEAR first try; web live 16:10:35Z, live-odds-worker
+16:13:40Z.
+
+verify — BY CONTENT, token taken FROM THE DIFF and PROVEN to discriminate before
+use: `doubleheader_resolved` = **0** on both previously-live SHAs (`de53e367`,
+`25fdd659`) and **4** on the target. `unmatched_events` was REJECTED as a token —
+1 on live, 2 on target, so a pass would have meant nothing. `_split_doubleheader`
+x2 and `#643`'s `bytes_per_order` x1 re-checked for survival. 200 log lines,
+**0 tracebacks**.
+
+### THE OWED ITEM IS **NOT** DISCHARGED, AND THIS DEPLOY CANNOT DISCHARGE IT
+
+`catchup-kalshi-doubleheader` owed a reachability reading. `60afda80`'s own
+comment says the counter is *"counted so the fix can be VERIFIED FROM THE LOGS"*.
+Traced where it is actually emitted, rather than assuming a deploy of the commit
+delivers it:
+
+    doubleheader_resolved is PRINTED at exactly one place, repo-wide:
+        pipeline/portfolio_commit.py:665
+    pipeline/ is owned by refresh-worker ALONE (`_owners` -> ('refresh-worker',))
+
+So:
+- **web and live-odds-worker now COMPUTE the counter and discard it.**
+  `kalshi_odds_refresh.py`'s `[kalshi_odds] BOARD_JOIN` line carries
+  `kalshi_markets`, `board_rows`, `matched`, `reasons` — and NOT
+  `doubleheader_resolved`.
+- **The only service that can emit it is refresh-worker**, which is on
+  `8518a662` (`doubleheader_resolved` count: **0**) and has been claim-held by
+  `mlb-rate-refit` for 45+ minutes.
+
+**I deployed the self-verifying fix to the two services that cannot emit it, and
+the one that can is the one I could not take.** Searching the live-odds-worker log
+stream for `doubleheader` returns 0 lines — and that is the CORRECT and expected
+result, not evidence of failure. Recorded explicitly because the next reader who
+greps the trading service's logs will find nothing and would reasonably conclude
+the fix failed.
+
+**Still owed, now stated precisely:** deploy refresh-worker to `60afda80` or
+later, then read `doubleheader_resolved=` from its `portfolio_commit` line. Zero
+is a valid answer there ("no doubleheader today"); absence of the FIELD is not.
