@@ -252,7 +252,20 @@ def normalize_understat_players(
     return rows
 
 
-def fetch_asa_mls_players(season_name: str | int, *, minimum_minutes: int = 180, timeout: int = 30) -> list[dict[str, Any]]:
+#: MLS's minutes floor is applied SERVER-SIDE by ASA, as a request parameter --
+#: which is why lowering the local `normalize_*` threshold in `3355d621` did
+#: nothing here: thin rows never arrived to be shrunk. Lowered to match the
+#: Understat path now that `normalize_asa_players` shrinks toward the positional
+#: prior (`6ec3c99d`) instead of publishing raw 90-shots/90 rates.
+_ASA_MINIMUM_MINUTES = 1
+
+
+def fetch_asa_mls_players(
+    season_name: str | int,
+    *,
+    minimum_minutes: int = _ASA_MINIMUM_MINUTES,
+    timeout: int = 30,
+) -> list[dict[str, Any]]:
     """Fetch MLS player xgoals rows joined with the ASA player directory."""
     xgoals = requests.get(
         f"{_ASA_BASE}/players/xgoals",
@@ -325,7 +338,9 @@ def normalize_asa_players(
     raw_players: list[dict[str, Any]],
     *,
     season: int,
-    minimum_minutes: float = 180.0,
+    # 1.0, matching the Understat path: a player with minutes has a rate worth
+    # estimating and shrinking; a player with none has nothing to shrink.
+    minimum_minutes: float = 1.0,
 ) -> list[dict[str, Any]]:
     # ASA rows lack games-played; approximate each player's minutes share
     # as minutes relative to the team's most-used player (a proxy for the

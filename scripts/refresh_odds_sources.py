@@ -1395,6 +1395,94 @@ def _soccer_history_step(league: str, soccer_root: Path, python_exe: str) -> Ref
     )
 
 
+
+#: Leagues whose player history `fetch_soccer_history_local.py --kind players`
+#: can actually fetch: MLS via ASA, and the five Understat leagues. The other
+#: four raise SystemExit without `--espn-date-windows` (`fetch_players`), so
+#: including them would turn every refresh tick into a FAILING step rather than
+#: a fetch. The ESPN path is separate work.
+_SOCCER_PLAYER_FETCH_LEAGUES = frozenset({
+    "mls", "epl", "la_liga", "bundesliga", "serie_a", "ligue_1",
+})
+
+#: How stale a CURRENT-season roster may be before it is refetched. Weekly,
+#: because the file only changes when a match is played or a transfer registers,
+#: and rewriting it mid-slate churns every projection built from it. Cost is not
+#: the driver: this is one GET per league.
+_SOCCER_PLAYER_REFRESH_DAYS = 7.0
+
+
+def _soccer_players_step(league: str, soccer_root: Path, python_exe: str) -> RefreshStep | None:
+    """Refetch this league's CURRENT-season player rates once they go stale.
+
+    A SIBLING OF `_soccer_history_step`, DELIBERATELY NOT A BRANCH INSIDE IT.
+    That function returns None for MLS and fetches only when files are MISSING.
+    Both are right for a completed-season ratings file and wrong here: a
+    current-season roster starts nearly empty and fills week by week, so
+    "already present" is not "already correct".
+
+    WHY THIS EXISTS. The player CSVs had no producer at all -- every roster on
+    disk is a hand-run, git-committed seed, and the newest European file is
+    `players_2025.csv`, i.e. the COMPLETED 2025-26 season. Every summer-2026
+    signing and both promoted clubs are therefore absent from the sim, which is
+    a large share of the soccer prop rows that go unmatched because the sim
+    never published that player for that match at all.
+
+    GATED ON MTIME, not existence: absent or stale refetches, fresh is a no-op,
+    so this is not a per-tick network call.
+    """
+    if league not in _SOCCER_PLAYER_FETCH_LEAGUES:
+        return None
+    try:
+        season = int(soccer_default_season(league))
+    except Exception:
+        return None
+    target_dir = soccer_root / league / "players"
+    target = target_dir / f"players_{season}.csv"
+    try:
+        age_days = (time.time() - target.stat().st_mtime) / 86400.0
+    except FileNotFoundError:
+        age_days = None
+    except Exception:
+        # Unreadable is not stale. Refetching over a path we merely failed to
+        # stat would turn a transient IO error into a weekly network call.
+        return None
+    if age_days is not None and age_days < _SOCCER_PLAYER_REFRESH_DAYS:
+        return None
+    print(
+        f"SOCCER_PLAYERS_STALE league={league} season={season} file={target} "
+        f"age_days={'absent' if age_days is None else round(age_days, 1)} "
+        f"(refetching; the sim's squad would otherwise be last season's)",
+        file=sys.stderr,
+        flush=True,
+    )
+    return RefreshStep(
+        name=f"soccer_{league}_players",
+        # Both phases, matching the history step: the autorun launches with
+        # --phase live, so a pregame-only prerequisite would never run there.
+        phases=("pregame", "live"),
+        cwd=REPO_ROOT,
+        command=(
+            python_exe,
+            "scripts/fetch_soccer_history_local.py",
+            "--league",
+            league,
+            "--kind",
+            "players",
+            # CURRENT season only. Past seasons are already on disk and do not
+            # change; refetching them would rewrite the very files the dedupe
+            # reads to find each player's biggest sample.
+            "--seasons",
+            str(season),
+            # Explicit: the fetcher defaults --out-dir to the REPO tree, which
+            # on Render is not the root the sim reads.
+            "--out-dir",
+            str(target_dir),
+        ),
+        description=f"Refresh {league}'s current-season player rates for the prop sim.",
+    )
+
+
 def _soccer_live_scope(date_str: str) -> dict[str, list[str]]:
     """{league: [espn_event_id, ...]} for matches ACTUALLY IN PLAY right now.
 
@@ -1593,6 +1681,13 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
         history_step = _soccer_history_step(league, soccer_root, python_exe)
         if history_step is not None:
             steps.append(history_step)
+    # BEFORE the schedule/sim steps below, because those READ the roster this
+    # writes. A refetch that lands after the sim has already run is a refetch
+    # that takes a day to matter.
+    for league in league_slugs:
+        players_step = _soccer_players_step(league, soccer_root, python_exe)
+        if players_step is not None:
+            steps.append(players_step)
     for league in league_slugs:
         steps.append(
             RefreshStep(

@@ -179,6 +179,40 @@ def _current_roster_names(league: str, source_root: Path | None = None) -> set[s
     return names
 
 
+#: How many minutes the BUSIEST player in the newest season file must have
+#: before that file is trusted to define "the current squad". 450 is five full
+#: matches: enough that an ever-present starter is unmistakable, while a file
+#: one or two matchweeks old still refuses.
+#:
+#: This was ADDED ALONGSIDE the pre-existing row-count floor, which `3355d621`
+#: silently disarmed -- not in place of it; the two catch different failures.
+#: See the comment at the guard itself. Stated as an absolute rather than a
+#: fraction of last season on purpose: the quantity being tested is "has enough
+#: football been played to know who is in the squad", which does not depend on
+#: how many names last season's file happened to list.
+_MIN_LATEST_SEASON_MINUTES = 450.0
+
+
+def _busiest_player_minutes(frame: "pd.DataFrame") -> float:
+    """Minutes played by the most-used player in `frame`, or 0.0 if unknowable.
+
+    0.0 on ANY failure is deliberate, and is the conservative direction: the
+    caller treats a low value as "too early in the season to trust this file",
+    so a missing or unparseable `minutes` column makes the guard REFUSE to
+    filter rather than quietly permitting it. A guard whose unknown case falls
+    through to its permissive branch is not a guard.
+    """
+    if "minutes" not in getattr(frame, "columns", []):
+        return 0.0
+    try:
+        value = pd.to_numeric(frame["minutes"], errors="coerce").max()
+    except Exception:
+        return 0.0
+    if value is None or pd.isna(value):
+        return 0.0
+    return float(value)
+
+
 def _drop_departed_players(
     league: str,
     deduped: "pd.DataFrame",
@@ -274,15 +308,37 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     # each row as a distinct squad member, so a duplicated player dilutes
     # every teammate's allocated shot/prop share and inflates the effective
     # squad size (verified: 293 of ~600 EPL players were duplicated this
-    # way before this fix). Keep only the most recent season's row per
-    # player_id; `sorted(glob(...))` above already orders frames oldest to
-    # newest, so `keep="last"` picks the latest. Rows with no id can't be
-    # identified as duplicates, so they're left alone rather than dropped.
+    # way before this fix). Keep exactly one row per player_id, and make it
+    # THE ROW WITH THE MOST MINUTES rather than the newest season's.
+    #
+    # This used to sort by season (`sorted(glob(...))` orders frames oldest to
+    # newest, so `keep="last"` took the latest file), which was right while
+    # every file on disk was a COMPLETED season. It stops being right the
+    # moment a current-season file lands: a returning player's 2,000-minute
+    # rate would be replaced by a 90-minute one shrunk almost entirely to the
+    # positional prior, and would stay that way for months. The intent was
+    # always "trust the better sample" -- minutes is the quantity that actually
+    # carries that, and it degrades gracefully, since a current-season row
+    # overtakes last season's only once it really has more evidence behind it.
+    #
+    # Rows with no id can't be identified as duplicates, so they're left alone
+    # rather than dropped.
     has_id = combined["player_id"].astype(str).str.strip() != ""
-    deduped = pd.concat(
-        [combined[has_id].drop_duplicates(subset="player_id", keep="last"), combined[~has_id]],
-        ignore_index=True,
+    with_id = combined[has_id].copy()
+    if "minutes" in with_id.columns:
+        # A non-numeric or missing value sorts FIRST, i.e. loses to any row
+        # with real minutes -- an unreadable sample is not a better one.
+        with_id["_dedupe_minutes"] = pd.to_numeric(
+            with_id["minutes"], errors="coerce"
+        ).fillna(-1.0)
+    else:
+        with_id["_dedupe_minutes"] = -1.0
+    with_id = (
+        with_id.sort_values("_dedupe_minutes", kind="stable")
+        .drop_duplicates(subset="player_id", keep="last")
+        .drop(columns=["_dedupe_minutes"])
     )
+    deduped = pd.concat([with_id, combined[~has_id]], ignore_index=True)
     if len(frames) < 2:
         # One season on disk means no stale population is possible, and
         # nothing to compare a thin file against. Leagues in this state
@@ -292,17 +348,45 @@ def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
     latest_frame, previous_frame = frames[-1], frames[-2]
     # A NEW SEASON'S FILE STARTS EMPTY AND FILLS UP. Filtering against a file
     # that is still being populated would delete most of the league on the
-    # first build of a season -- the failure would look exactly like this fix
-    # working. Require the newest file to be at least half the previous one
-    # before trusting it to define "current", and say so when it is not
-    # rather than silently skipping.
-    if len(latest_frame) < 0.5 * max(len(previous_frame), 1):
+    # first build of a season -- and the failure would look exactly like this
+    # fix working. So refuse to treat the newest file as "the current squad"
+    # until enough season has actually been played, and say so rather than
+    # silently skipping.
+    #
+    # TWO CONDITIONS, TRIPPING ON EITHER, because they detect different
+    # failures and only one of them was disarmed:
+    #
+    #   MINUTES -- "barely any of the season has been played". This is the test
+    #     `3355d621` silently broke. It lowered the ingestion floor from 180
+    #     minutes to 1 and shrinks thin rates toward a prior instead of dropping
+    #     the player, so the same early-season fixtures that produced 100 rows
+    #     now produce ~364 -- sailing over the 220-row floor that a 440-row
+    #     previous season implies, in roughly matchweek 3. Row count stopped
+    #     measuring season progress. Minutes did not.
+    #
+    #   ROWS -- "this file is missing players it should have": a truncated
+    #     write, a partial fetch, a scrape that half-failed. Minutes says
+    #     NOTHING about this; one complete-looking 900-minute row satisfies it
+    #     while nine players are missing. So the row test is kept, not replaced.
+    #
+    # The failure direction is safe either way: refusing means departed players
+    # linger for one build, while a wrong pass deletes most of a league.
+    latest_minutes = _busiest_player_minutes(latest_frame)
+    too_early = latest_minutes < _MIN_LATEST_SEASON_MINUTES
+    too_few = len(latest_frame) < 0.5 * max(len(previous_frame), 1)
+    if too_early or too_few:
         print(
             f"[build_soccer_artifacts] SOCCER_LATEST_SEASON_FILE_THIN league={league} "
             f"latest={len(latest_frame)} previous={len(previous_frame)} "
-            "(under half the previous season; NOT filtering departed players "
-            "this build, because a partially-populated file cannot define the "
-            "current squad)",
+            f"latest_max_minutes={latest_minutes:.0f} "
+            f"floor={_MIN_LATEST_SEASON_MINUTES:.0f} "
+            # WHICH condition tripped, because they mean different things and
+            # call for different responses: too_early resolves itself as the
+            # season proceeds, too_few means a file failed to write and will
+            # not resolve on its own.
+            f"too_early={too_early} too_few={too_few} "
+            "(NOT filtering departed players this build, because a "
+            "partially-populated file cannot define the current squad)",
             flush=True,
         )
         return deduped.to_dict("records")

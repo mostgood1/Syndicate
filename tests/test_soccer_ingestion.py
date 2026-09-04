@@ -74,13 +74,37 @@ class SoccerPlayerHistoryTests(unittest.TestCase):
         ]
         rows = normalize_understat_players(raw, league="epl", season=2025)
 
-        self.assertEqual(len(rows), 1)  # bench player under minimum minutes
-        row = rows[0]
-        self.assertEqual(row["player_name"], "Erling Haaland")
+        # BOTH players. This read `len(rows) == 1` with the comment "bench
+        # player under minimum minutes", which was the contract until
+        # `3355d621`: `minimum_minutes` was 180.0 and acted as a ROSTER FILTER,
+        # deleting 41 of 288 production fixture-sides' worth of players
+        # outright. It is now 1.0, and a thin sample is ESTIMATED rather than
+        # deleted -- shrunk toward its positional prior with weight
+        # `minutes / (minutes + 180)`. The 180 survives as the stabilisation
+        # constant, which is why the number looks unchanged while the meaning
+        # inverted. This assertion was left stale by that commit.
+        self.assertEqual(len(rows), 2)
+        by_name = {row["player_name"]: row for row in rows}
+        self.assertEqual(set(by_name), {"Erling Haaland", "Bench Player"})
+
+        row = by_name["Erling Haaland"]
+        # Rates are unchanged HERE for a specific reason worth stating, so that
+        # a future edit which breaks it is not mistaken for noise: 'F S' and
+        # 'M' are different position buckets, so each player is the only member
+        # of his own, the prior equals his own rate, and the blend is
+        # value-neutral. Shrinkage bites when a bucket has several players --
+        # covered in tests/test_soccer_player_minutes_shrinkage.py.
         self.assertAlmostEqual(row["shots_per90"], 125 / 2979 * 90, places=3)
         self.assertAlmostEqual(row["xg_per90"], 28.795 / 2979 * 90, places=3)
         self.assertAlmostEqual(row["expected_minutes_share"], 2979 / (35 * 90), places=3)
         self.assertFalse(row["is_goalkeeper"])
+
+        # The weight is what says how much of each rate is the player's own
+        # evidence: a near-full season keeps ~94%, one appearance keeps a third.
+        self.assertAlmostEqual(row["rate_own_weight"], 2979 / (2979 + 180), places=4)
+        self.assertAlmostEqual(
+            by_name["Bench Player"]["rate_own_weight"], 90 / (90 + 180), places=4
+        )
 
     def test_normalize_understat_team_history(self) -> None:
         league_data = {

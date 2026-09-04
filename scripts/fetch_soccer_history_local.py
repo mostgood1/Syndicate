@@ -39,8 +39,41 @@ from syndicate.features.soccer.ingestion.player_history import normalize_underst
 
 
 def _write_csv(rows: list[dict], out_path: Path) -> None:
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    """Write `rows` to `out_path`, REFUSING to publish an empty result.
+
+    `pd.DataFrame([]).to_csv(index=False)` is a bare newline -- 3 bytes, no
+    header, no columns -- so an empty fetch used to leave a file behind that
+    LOOKS written and parses as nothing. Every reader of these CSVs goes through
+    `pd.read_csv`, which raises `EmptyDataError: No columns to parse from file`
+    on it (measured), so one rate-limited or shape-changed upstream response
+    took out the whole league's artifact build, every cycle, until a human
+    noticed.
+
+    This was harmless while nothing ever called `--kind players`: the roster
+    CSVs were hand-run committed seeds. The producer step in
+    `refresh_odds_sources.py` makes it a WEEKLY opportunity, and the failure
+    would land on a file that already had good data in it.
+
+    So: fail loudly and leave the previous file alone. The caller is a refresh
+    step, which records STEP_FAIL and moves on -- a visible failed step with
+    last week's roster still in place, rather than a silent zero-byte file that
+    breaks the reader.
+    """
     frame = pd.DataFrame(rows)
+    if frame.empty:
+        existing = ""
+        try:
+            if out_path.exists():
+                existing = f" ({out_path.stat().st_size} bytes already there, KEPT)"
+        except OSError:
+            pass
+        raise SystemExit(
+            f"REFUSING to write 0 rows to {out_path}{existing}. An empty frame "
+            "serialises to a bare newline with no header, which every reader of "
+            "these CSVs hits as pandas EmptyDataError. Treat this as an upstream "
+            "fetch failure, not as a season with no players."
+        )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = out_path.with_suffix(out_path.suffix + ".tmp")
     tmp.write_text(frame.to_csv(index=False), encoding="utf-8")
     tmp.replace(out_path)

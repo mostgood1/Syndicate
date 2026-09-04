@@ -1376,6 +1376,28 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   than faking the premise if the slate is over or the app was closed.
 - Blocked by: none.
 
+### soccer-player-producer — OPEN — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+- Goal: the soccer player rosters get a PRODUCER. `--kind players` existed and
+  nothing called it, so every `players_*.csv` was a hand-run committed seed and
+  the newest European roster was the COMPLETED 2025-26 season.
+- Files: `scripts/refresh_odds_sources.py` (soccer player step only — the
+  `ncaaf-live-cadence` claim on this file is THIS SAME SESSION's and is scoped to
+  the mode-scoped step filter; regions are disjoint),
+  `scripts/build_soccer_artifacts.py`,
+  `syndicate/features/soccer/ingestion/player_history.py`,
+  `tests/test_soccer_player_producer_step.py` (NEW),
+  `tests/test_soccer_ingestion.py` (stale assertion left by `3355d621`),
+  `scripts/fetch_soccer_history_local.py` (refuse to publish an empty fetch).
+  Collision-checked 2026-09-04: `soccer-model-dispersion` names
+  `build_soccer_artifacts.py` and `syndicate/features/soccer/` but RELEASED its
+  claims 2026-08-29 (phantom sweep, owning session gone).
+- Verification: MEASURED on a live EPL fetch, not asserted. Roster 440 -> 544
+  players (+104 no 2025 file knows, incl. all three promoted clubs); returning
+  players keep a median 1,639 minutes instead of <=180; the staleness guard
+  fires `too_early=True too_few=False` on the real 364-row file. 24 new tests,
+  10/10 mutants caught.
+- Blocked by: none. NOT DEPLOYED — the step is inert until refresh-worker runs it.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
