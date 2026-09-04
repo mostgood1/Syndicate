@@ -199,3 +199,26 @@ def test_a_segment_series_is_still_unmapped_and_that_is_KNOWN():
             "should be updated ALONG WITH a decision about segment pricing, "
             "not deleted" % series)
     assert kc.sport_for_series("KXMLBGAME") == "mlb", "the full-game series still works"
+
+
+def test_identical_commence_stamps_refuse_rather_than_pick_one():
+    """THE PLACEHOLDER CASE, asserted rather than implied.
+
+    A board that stamped both halves of a doubleheader with the SAME time --
+    because the second game's start is not yet known and something wrote a
+    placeholder -- gives the disambiguator two candidates at zero distance. The
+    margin rule already covers it (0 < 60), but "covered by a 20-minute test" and
+    "asserted at exactly equal" are different claims, and this is the one that
+    matters: equal-and-synthetic is the shape a real feed produces.
+
+    Raised by lane `phase0-accuracy-autorun` as the residual risk after the
+    live-board check found the only doubleheader 305 minutes apart.
+    """
+    same = [
+        dict(_games()[0], event_id="early", commence_time="2026-09-04T18:11:00Z"),
+        dict(_games()[1], event_id="late", commence_time="2026-09-04T18:11:00Z"),
+    ]
+    got = match_event_blob("DETCLEG2", same, sport="mlb",
+                           commence_hint=event_start_from_ticker(G2))
+    assert got["status"] == "ambiguous", got
+    assert got.get("event_id") is None, "no game may be chosen from identical stamps"
