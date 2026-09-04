@@ -142,3 +142,72 @@ def test_expected_minutes_share_is_deliberately_NOT_shrunk():
 
 def test_an_empty_population_does_not_raise():
     assert normalize_understat_players([], league="epl", season=2026) == []
+
+
+# ---------------------------------------------------------------------------
+# TWO DEFECTS IN THE FIRST VERSION OF THIS FIX, both found by the producer-step
+# scoping pass rather than by these tests. Pinned so they cannot return.
+# ---------------------------------------------------------------------------
+
+
+def test_multi_position_strings_share_ONE_prior():
+    """The bucket key was `position.upper()[:2]`, which turned Understat's
+    multi-position strings into SEPARATE buckets:
+
+        'D'      -> 'D'
+        'D M'    -> 'D '     <- a different bucket
+        'D M S'  -> 'D '
+
+    Measured on real EPL data: 154 rows in one and 26 in the other. A fragmented
+    bucket gives a noisier prior, and the prior is exactly what a thin-minute
+    player is shrunk toward -- so the defect landed hardest on the rows this
+    whole change exists to rescue.
+    """
+    rows = normalize_understat_players([
+        _p(1, "Pure Defender", 2000, 23, 20, 1, position="D"),
+        _p(2, "Def Mid", 1800, 21, 25, 2, position="D M"),
+        _p(3, "Def Mid Sub", 1500, 20, 18, 1, position="D M S"),
+        _p(4, "Thin Defender", 30, 3, 1, 1, position="D"),
+    ], league="epl", season=2026)
+    thin = next(r for r in rows if r["player_name"] == "Thin Defender")
+    # 1 shot in 30 minutes is 3.0/90 raw. Shrunk toward the COMBINED defender
+    # prior it lands near the squad's real defender rate.
+    assert thin["shots_per90"] < 2.0, thin["shots_per90"]
+    assert thin["rate_own_weight"] < 0.2
+
+
+def test_goalkeeper_spellings_do_not_split():
+    """`'GK'` and `'GK '` both keyed to `'GK'` by luck of the slice; a token
+    split makes that true by construction rather than by coincidence."""
+    rows = normalize_understat_players([
+        _p(1, "Keeper A", 2000, 23, 0, 0, position="GK"),
+        _p(2, "Keeper B", 1800, 20, 0, 0, position="GK "),
+    ], league="epl", season=2026)
+    assert len(rows) == 2
+    assert all(r["rate_own_weight"] > 0.85 for r in rows)
+
+
+def test_a_blank_position_still_buckets_without_raising():
+    rows = normalize_understat_players([
+        _p(1, "No Position", 900, 10, 9, 1, position=""),
+    ], league="epl", season=2026)
+    assert len(rows) == 1 and "rate_own_weight" in rows[0]
+
+
+def test_the_MLS_path_shrinks_too():
+    """`normalize_asa_players` builds the same per-90 fields and returned them
+    RAW. It is not producing bad rows today only because ASA applies
+    `minimum_minutes` SERVER-SIDE as a request parameter, so thin rows never
+    arrive -- which also means lowering the local threshold does nothing there.
+
+    That left a loaded gun: the moment the `--kind players` producer step lowers
+    that request parameter, MLS would publish raw 90-shots/90 rows into a share
+    that normalises to ~1.0. This asserts the shrinkage is in the path.
+    """
+    from syndicate.features.soccer.ingestion import player_history as ph
+    import inspect
+
+    src = inspect.getsource(ph.normalize_asa_players)
+    assert "_shrink_toward_prior" in src, (
+        "the MLS normaliser must shrink like the Understat one, or lowering "
+        "ASA's server-side minimum_minutes becomes a fabricated-rate bug")

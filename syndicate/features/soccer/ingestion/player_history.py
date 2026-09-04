@@ -166,7 +166,13 @@ def _shrink_toward_prior(rows: list[dict[str, Any]]) -> None:
         return
     buckets: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
-        key = str(row.get("position") or "?").upper()[:2]
+        # THE FIRST TOKEN, not the first two characters. Understat writes
+        # multi-position strings, so `[:2]` turned 'D' and 'D M' into the
+        # separate keys 'D' and 'D ' -- measured at 154 rows against 26 on real
+        # EPL data. Two priors where there should be one, each noisier, and the
+        # prior is what a thin-minute player is shrunk TOWARD.
+        position = str(row.get("position") or "").upper().split()
+        key = position[0] if position else "?"
         buckets.setdefault(key, []).append(row)
     for key, bucket in buckets.items():
         total_minutes = sum(float(r.get("minutes") or 0.0) for r in bucket)
@@ -373,6 +379,12 @@ def normalize_asa_players(
                 "source": "asa",
             }
         )
+    # SAME SHRINKAGE AS THE UNDERSTAT PATH. Inert today -- ASA applies
+    # `minimum_minutes` SERVER-SIDE as a request parameter, so thin rows do
+    # not arrive -- but wiring it now means lowering that parameter (which
+    # the `--kind players` producer step will want) cannot start publishing
+    # raw 90-shots/90 rows into a share that normalises to ~1.0.
+    _shrink_toward_prior(rows)
     return rows
 
 
