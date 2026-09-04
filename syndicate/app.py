@@ -491,10 +491,16 @@ def create_app() -> Flask:
     # stopped. `#241` is why the WORK is gated rather than the registration.
     @app.before_request
     def _note_request_memory_start() -> None:
-        from flask import g
+        from flask import g, request
 
         try:
-            g._syndicate_memory_token = memory_observability.note_request_start()
+            # The ROUTE is passed at ENTRY because this layer is the only one
+            # that knows it in time. `note_request_end` learns the rule at
+            # teardown, which is too late to decide whether to take a BEFORE
+            # reading -- and a per-request bucket delta needs both halves.
+            # Same RULE, not raw path, for the same reason as at teardown.
+            rule = getattr(request.url_rule, "rule", None) or "<unmatched>"
+            g._syndicate_memory_token = memory_observability.note_request_start(rule)
         except Exception:
             g._syndicate_memory_token = None
 

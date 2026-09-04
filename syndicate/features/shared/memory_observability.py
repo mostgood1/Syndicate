@@ -3150,7 +3150,57 @@ def _process_anon_mb() -> float | None:
         return None
 
 
-def note_request_start() -> dict[str, Any] | None:
+_PER_REQUEST_SMAPS_STATE: dict[str, Any] = {"count": 0, "routes": {}}
+_PER_REQUEST_SMAPS_MAX_DEFAULT = 120
+
+
+def _per_request_smaps_routes() -> frozenset[str]:
+    """Which routes to sample. EMPTY BY DEFAULT, and that is the safety model.
+
+    `#632`. The kernel walks page tables to answer smaps, so this cannot run on
+    every request -- `#241` is the precedent for periodic work assumed free that
+    put a production service into a restart loop. An explicit allowlist means
+    the instrument is inert until someone names a route, and the blast radius is
+    that route only.
+    """
+    raw_value = str(os.environ.get("SYNDICATE_SMAPS_PER_REQUEST_ROUTES") or "").strip()
+    if not raw_value:
+        return frozenset()
+    return frozenset(part.strip() for part in raw_value.split(",") if part.strip())
+
+
+def _per_request_smaps_budget() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_SMAPS_PER_REQUEST_SAMPLES") or "").strip()
+    if not raw_value:
+        return _PER_REQUEST_SMAPS_MAX_DEFAULT
+    try:
+        return int(raw_value)
+    except ValueError:
+        return _PER_REQUEST_SMAPS_MAX_DEFAULT
+
+
+def _sample_request_buckets() -> tuple[dict[str, float], float] | None:
+    """One size-bucket reading plus what it COST, in ms.
+
+    The cost is returned rather than assumed. Every guess about the price of
+    periodic work in this repo has been wrong in the expensive direction, so the
+    instrument reports its own overhead and the ledger can carry a number.
+    """
+    try:
+        path = _PROCFS_ROOT / "self" / "smaps"
+        if not path.exists():
+            return None
+        started = time.perf_counter()
+        parsed = parse_smaps(path.read_text(encoding="utf-8", errors="ignore"))
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+    except Exception:
+        return None
+    buckets = dict(parsed.get("anon_mmap_by_size_mb") or {})
+    buckets["__total__"] = float(parsed.get("total_anon_mb") or 0.0)
+    return buckets, elapsed_ms
+
+
+def note_request_start(route: str | None = None) -> dict[str, Any] | None:
     """Call at request entry. Returns a token to hand back, or None.
 
     None means "do not attribute this request" -- either the profile is off, or
@@ -3177,8 +3227,19 @@ def note_request_start() -> dict[str, Any] | None:
         with _request_memory_lock():
             _REQUEST_MEMORY_STATE["unreadable"] += 1
         return {"attribute": False, "seq": seq}
-    return {"attribute": True, "seq": seq, "anon_before_mb": before,
-            "background_seq": background_seq, "gc2_before": _gc_gen2_collections()}
+    token = {"attribute": True, "seq": seq, "anon_before_mb": before,
+             "background_seq": background_seq, "gc2_before": _gc_gen2_collections()}
+    # PER-REQUEST BUCKETS, only for an explicitly named route and only while
+    # budget remains. `route` is passed in because the caller is the only layer
+    # that knows it at ENTRY -- the attribution table learns it at teardown,
+    # which is too late to decide whether to take a BEFORE reading.
+    if route and route in _per_request_smaps_routes():
+        if _PER_REQUEST_SMAPS_STATE["count"] < _per_request_smaps_budget():
+            sampled = _sample_request_buckets()
+            if sampled is not None:
+                token["buckets_before"], token["sample_ms_before"] = sampled
+                token["sampled_route"] = route
+    return token
 
 
 def note_request_end(token: dict[str, Any] | None, route: str,
@@ -3227,6 +3288,16 @@ def note_request_end(token: dict[str, Any] | None, route: str,
     collected = (isinstance(gc2_before, int) and gc2_before >= 0
                  and gc2_after >= 0 and gc2_after > gc2_before)
     key = str(route or "unknown")
+    # The AFTER sample, placed here deliberately: every early return above has
+    # already fired, so a window that was not solo throughout, or whose anon was
+    # unreadable, is DISCARDED by the code path rather than by a check I had to
+    # remember to write. And outside `_request_memory_lock` -- this read walks
+    # page tables and must never hold the lock every request takes twice.
+    if token.get("buckets_before") is not None:
+        try:
+            _finish_per_request_smaps(token, key)
+        except Exception:
+            pass
     with _request_memory_lock():
         state = _REQUEST_MEMORY_STATE
         row = state["routes"].setdefault(key, {"solo_n": 0, "total_mb": 0.0, "max_mb": 0.0})
@@ -3257,6 +3328,47 @@ def note_request_end(token: dict[str, Any] | None, route: str,
         payload = request_memory_attribution_payload()
     print(f"REQUEST_MEMORY_ATTRIBUTION {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
     return payload
+
+
+def _finish_per_request_smaps(token: dict[str, Any], route: str) -> None:
+    """AFTER reading, delta per bucket, recorded against the route.
+
+    Reports both the delta and the instrument's own cost. A sampled request that
+    is not solo throughout is DISCARDED rather than recorded: another request
+    overlapping the window makes the delta unattributable, and recording it
+    anyway is how a number that means nothing enters a ledger.
+    """
+    before = token.get("buckets_before")
+    if not isinstance(before, dict):
+        return
+    sampled = _sample_request_buckets()
+    if sampled is None:
+        return
+    after, ms_after = sampled
+    keys = set(before) | set(after)
+    deltas = {k: round(after.get(k, 0.0) - before.get(k, 0.0), 3) for k in keys}
+    entry = _PER_REQUEST_SMAPS_STATE["routes"].setdefault(
+        route, {"n": 0, "sum_8_64mb": 0.0, "max_8_64mb": 0.0,
+                "sum_total_mb": 0.0, "sum_ms": 0.0})
+    entry["n"] += 1
+    big = float(deltas.get("8-64MB", 0.0))
+    entry["sum_8_64mb"] = round(entry["sum_8_64mb"] + big, 3)
+    entry["max_8_64mb"] = round(max(entry["max_8_64mb"], big), 3)
+    entry["sum_total_mb"] = round(entry["sum_total_mb"] + float(deltas.get("__total__", 0.0)), 3)
+    entry["sum_ms"] = round(entry["sum_ms"] + float(token.get("sample_ms_before") or 0.0) + ms_after, 2)
+    _PER_REQUEST_SMAPS_STATE["count"] += 1
+    print(
+        "PER_REQUEST_SMAPS " + json.dumps({
+            "route": route[:80],
+            "pid": os.getpid(),
+            "d_8_64mb": big,
+            "d_total_mb": deltas.get("__total__", 0.0),
+            "d_1_8mb": deltas.get("1-8MB", 0.0),
+            "sample_ms": round(float(token.get("sample_ms_before") or 0.0) + ms_after, 2),
+            "index": _PER_REQUEST_SMAPS_STATE["count"],
+        }, sort_keys=True),
+        flush=True,
+    )
 
 
 def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
@@ -3305,6 +3417,12 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         "arena_trend_samples": _ARENA_TREND_STATE["count"],
         # `#632`: anon by mapping SIZE. The only view that can see a large direct
         # mmap, which is where the growth has to be if pymalloc cannot see it.
+        # Per-request sampling on named routes. `{}` unless a route allowlist
+        # is set, which is the default.
+        "per_request_smaps": {
+            k: dict(v) for k, v in (_PER_REQUEST_SMAPS_STATE["routes"] or {}).items()
+        },
+        "per_request_smaps_samples": _PER_REQUEST_SMAPS_STATE["count"],
         "smaps_trend": dict(_SMAPS_TREND_STATE.get("last") or {}),
         "smaps_trend_samples": _SMAPS_TREND_STATE["count"],
         # `#632`: what reassigning long-lived globals allocated and refunded.
@@ -3330,5 +3448,6 @@ def reset_request_memory_attribution() -> None:
     _GC_SPLIT_STATE.update({"with_gc2_n": 0, "with_gc2_mb": 0.0,
                             "no_gc2_n": 0, "no_gc2_mb": 0.0})
     _GLOBAL_REASSIGN_STATE.clear()
+    _PER_REQUEST_SMAPS_STATE.update({"count": 0, "routes": {}})
     _ARENA_TREND_STATE.update({"count": 0, "last": None})
     _SMAPS_TREND_STATE.update({"count": 0, "last": None})
