@@ -667,6 +667,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   (live=0, target=6); plus web serving cards; plus 0 tracebacks per service.
 - Blocked by: none.
 
+### mlb-rate-refit — OPEN — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **`#624` step 3's ESTIMATOR half. THE HARNESS COMPARES TWO DIFFERENT POPULATIONS AND MUST BE FIXED BEFORE IT IS RUN.**
+- Goal: derive rate corrections for the sim's `hr_rate` / `inplay_hit_rate` / `k_rate` / `bb_rate` that are valid for the input set they were fitted against, and ship them only if the residual shrinks on all four.
+- Why now: `e3bdbc8b` turned position substitution ON and it is verified in production (starter `ab_mean` -4.41% vs a predicted -4.43%). That is the MECHANISM. Per the model-engine standard §4.4 a mechanism added to a calibrated engine displaces the rates that were absorbing it, so the ESTIMATOR must follow. Substitution UNDER-corrects (opportunity bias still ~+4.4%), so it cannot overshoot what the rates absorbed — but the ~12% per-PA RATE bias is untouched and is what this lane is for.
+- Files: scripts/refit_mlb_rates.py
+  tests/test_refit_mlb_rates.py (new)
+  (no OPEN lane claims either path, nor `vendor/mlb_bettingv2/sim_engine/models.py`, checked against origin/main)
+- Hypothesis, MEASURED BEFORE ANY RUN and the reason this lane opens with a fix rather than a sweep: **`load_actual_rates()` reads the WHOLE `mlb_batter_game_log.csv` with no date filter while the sim runs over whichever `roster_objs` exist.** Coverage on this checkout:
+
+      simulated side  roster_objs/          13 dates, 186 games   2026-06-15 .. 06-27
+      actual side     mlb_batter_game_log   47 dates, 12,185 rows 2026-05-28 .. 07-14
+
+  and `--games 30` (the documented usage) takes the FIRST 30 jobs in sort order — about **three dates**. So `correction = actual / simulated` would be 47 dates of real outcomes over ~3 dates of simulated ones, and would absorb the difference between two POPULATIONS as if it were mechanism bias. This is `CLAUDE.md`'s named trap: an analysis that joins across artifact families silently collapses to their intersection, and looks like it ran on months of data.
+- Falsification test: if the date windows are already equivalent, matching them changes the corrections by ~nothing and the hypothesis is wrong. Run it BOTH ways and report both sets — a matched-window correction that equals the unmatched one costs nothing and settles it.
+- Verification: (1) actual and simulated cover the SAME dates, printed, with the game count the result rests on; (2) `residual shrank on 4 of 4` in PASS 2, which the script already gates on and refuses to recommend below 4; (3) the corrections are held OUT of the engine until (1) and (2) both hold — the script only writes a JSON report, so shipping is a separate, deliberate step and is NOT part of this lane's goal.
+- Blocked by: none. Compute-heavy and LOCAL — nothing here deploys, and the mirror is not evidence about production, so no claim from this lane may be stated as a production fact.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
