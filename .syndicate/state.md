@@ -632,3 +632,16 @@ two are gone.
   So the route RANKING is trustworthy and the exact SHARE is not.
 * **NOT re-measured:** whether the ~74% cut moves the ~500 MB/h growth rate. That
   needs a fresh uninterrupted window.
+
+### `[web-oom-leak]` UPDATE 3 — the rate is re-measured: +173 MB/h, down 66%, 2026-09-04T03:2xZ `[session b2b5b45b]`
+
+**Supersedes the "NOT re-measured" line in UPDATE 2.** Fitted on 81 merge-child-free
+plateau samples (25.5-62.7 min uptime) on web `b3966bf1`: **+173 MB/h, R^2 0.90**,
+against the pre-cut **+503 MB/h, R^2 0.75, n=32**. Time to the 2,048 MB limit goes
+**2.0 h -> 5.7 h**, i.e. past the 2.45-3.13 h uptimes at which this service was
+being OOM-killed.
+
+**Confounded in two ways, both registered before the measurement:** different time
+of day (02:40Z vs 22:30Z), and the alias half of the payload cut is OPT-IN so it
+only applies when a browser drives the page — meaning **-66% is most plausibly the
+self-mirror half alone**. Consistent with the fix; not proof of it.

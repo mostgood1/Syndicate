@@ -1670,6 +1670,38 @@ with only the pre-existing `test_intelligence_steam_candidates` failure, and the
 client rebuild exercised under node for both `_response_aliases` and
 `_embed_aliases` plus a no-alias no-op.
 
+**`[2026-09-04]` THE GROWTH RATE IS RE-MEASURED AFTER THE PAYLOAD CUT: **+173 MB/h,
+DOWN 66% FROM +503**. Fitted on merge-child-free plateau samples, web `b3966bf1`.
+
+    child-free plateau  n=81, 25.5-62.7 min uptime, level 980.3 -> 1062.8 MB
+    FITTED              +2.89 MB/min = +173 MB/h    R^2 = 0.90
+    baseline before     +503 MB/h                   R^2 = 0.75, n=32
+    change              -66%
+
+    time to the 2,048 MB limit from 1,062.8 MB:  2.0 h -> 5.7 h
+
+**THIS IS THE READING THE LANE HANDED ON AS NOT-DONE.** R^2 0.90 is a cleaner
+linear trend than the baseline's 0.75, and the 9 samples excluded for a live
+merge child average 1,085.3 MB against 1,028.6 for the child-free set — the
+filter is separating the excursion from the baseline, as intended.
+
+**WHY THIS MATTERS AGAINST THE KILLS.** `#632`'s escalation lane recorded OOM
+kills at **2.45, 3.09 and 3.13 h of uptime**, which the old +503 MB/h explains
+(2.0 h to the limit) and the recorded 32-75 MB/h never could. At +173 MB/h the
+horizon is **5.7 h**, i.e. past the uptimes at which this service was dying.
+
+**TWO CONFOUNDS, REGISTERED BEFORE THE NUMBER WAS TAKEN, NOT AFTER:**
+  1. **Time of day.** Baseline ~22:30Z, this ~02:40-03:20Z. The rate is a
+     function of what the service is asked to do and traffic differs.
+  2. **Half the fix may not be exercised.** The alias slimming is OPT-IN and only
+     the page sends `slim_aliases`; with no browser driving it those calls do not
+     happen. The self-mirror fix is NOT opt-in and applies to every caller — so
+     **-66% is most plausibly the mirror half alone**, with the alias half as
+     additional headroom whenever the page is live.
+
+So: consistent with the fix, not proof of it, and the direction and magnitude are
+both large enough to act on.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
