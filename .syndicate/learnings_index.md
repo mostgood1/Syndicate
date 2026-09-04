@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 788 rules `[generated]`
+## Index — 797 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 289**
+**FORBIDDEN — 290**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -225,6 +225,7 @@
 - [2026-09-03 — FORBIDDEN: treating an env key as INERT because the process has not been r…](#2026-09-03-forbidden-treating-an-env-key-as-inert-because-the-process-has-not-been-restarted-inertness-is-about-the-deploy-the-damage-is-decided-by-the-hour-you-set-it-in-lane-accuracy-autorun-rearm)
 - [2026-09-04 — FORBIDDEN: calling an env key "inert until a deploy" without reading the g…](#2026-09-04-forbidden-calling-an-env-key-inert-until-a-deploy-without-reading-the-gate-it-feeds-if-the-gates-conditions-are-already-true-the-key-is-a-primed-charge-waiting-for-someone-elses-deploy-lane-prop-join-yield)
 - [2026-09-04 — FORBIDDEN: treating absence from `list_sessions` as evidence a session is…](#2026-09-04-forbidden-treating-absence-from-list_sessions-as-evidence-a-session-is-gone-lanesmd-carries-claude_code_session_ids-list_sessions-returns-ccd-sessionids-the-two-id-spaces-do-not-match-so-the-test-has-never-been-valid-lane-accuracy-autorun-rearm)
+- [2026-09-04 — FORBIDDEN: acting on a comparison guard whose inputs are not NORMALIZED](#2026-09-04-forbidden-acting-on-a-comparison-guard-whose-inputs-are-not-normalized)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -309,7 +310,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 493**
+**Rules and corrections — 501**
 
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -498,6 +499,7 @@
 - [2026-09-03 — A comparison protects only at the GRANULARITY IT COUNTS. Three instances i…](#2026-09-03-a-comparison-protects-only-at-the-granularity-it-counts-three-instances-in-one-night-and-the-finest-grained-one-destroyed-work-session-c38d3e5c-with-37abeca0-cfcce46d)
 - [2026-09-04 — A DEPLOY THAT SUCCEEDS, TESTS THAT PASS, AND A SMALLER RESPONSE CAN ALL BE…](#2026-09-04-a-deploy-that-succeeds-tests-that-pass-and-a-smaller-response-can-all-be-true-while-the-change-does-nothing)
 - [2026-09-04 — THE TWO THINGS ROSTER-ABSENCE ALREADY COST, and what to check before the N…](#2026-09-04-the-two-things-roster-absence-already-cost-and-what-to-check-before-the-next-force-lane-prop-join-yield)
+- [2026-09-04 — CHECK THAT THE THING YOU ARE GATING ACTUALLY RUNS, BEFORE YOU BUILD THE GA…](#2026-09-04-check-that-the-thing-you-are-gating-actually-runs-before-you-build-the-gate)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
@@ -804,5 +806,12 @@
 - [2026-09-03 — `subprocess(text=True)` on Windows silently mojibakes the ledger's em-dash…](learnings_evidence.md#2026-09-03-subprocesstexttrue-on-windows-silently-mojibakes-the-ledgers-em-dashes-and-it-made-lane-guard-inert) `[evidence]`
 - [2026-09-03 — the Bash bypass in `lane-guard`: the census, and why the ledger never show…](learnings_evidence.md#2026-09-03-the-bash-bypass-in-lane-guard-the-census-and-why-the-ledger-never-showed-the-damage) `[evidence]`
 - [2026-09-03 — a census is only as wide as its pattern: "prose only" for five scripts my…](learnings_evidence.md#2026-09-03-a-census-is-only-as-wide-as-its-pattern-prose-only-for-five-scripts-my-own-refactor-had-just-broken) `[evidence]`
+- [2026-08-12 — Do not batch changes during a diagnosis](learnings_archive.md#2026-08-12-do-not-batch-changes-during-a-diagnosis) `[evidence]`
+- [2026-08-12 — A rate ceiling is not a fix](learnings_archive.md#2026-08-12-a-rate-ceiling-is-not-a-fix) `[evidence]`
+- [2026-08-12 — Parallel sessions on one problem need lane discipline](learnings_archive.md#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline) `[evidence]`
+- [2026-08-13 — A grep excerpt is not the file](learnings_archive.md#2026-08-13-a-grep-excerpt-is-not-the-file) `[evidence]`
+- [2026-08-10 — a briefed premise is a hypothesis, not a starting condition](learnings_archive.md#2026-08-10-a-briefed-premise-is-a-hypothesis-not-a-starting-condition) `[evidence]`
+- [2026-08-19 — a disclaimer marker must PRECEDE the path it disclaims, not follow it](learnings_archive.md#2026-08-19-a-disclaimer-marker-must-precede-the-path-it-disclaims-not-follow-it) `[evidence]`
+- [2026-08-19 — NEAR-MISS: an object-database merge updates the REF, not the working tree,…](learnings_archive.md#2026-08-19-near-miss-an-object-database-merge-updates-the-ref-not-the-working-tree-and-a-later-working-tree-write-can-silently-revert-real-content) `[evidence]`
 
 <!-- LEARNINGS-INDEX:END -->

@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 787 rules `[generated]`
+## Index — 797 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4780,3 +4780,30 @@ exists.
 
 Related: `[2026-09-04]` "a deploy that succeeds, tests that pass, and a smaller
 response can all be true while the change does nothing."
+
+## 2026-09-04 — FORBIDDEN: acting on a comparison guard whose inputs are not NORMALIZED
+
+My pre-commit check on `deploys.md` reported **"308 upstream measurement sections
+would be dropped"**. The true answer was **0**. Same file, same moment; the
+difference was that the working copy is CRLF and `git show origin/main:<path>`
+returns LF, so every `^## ...` title carried a trailing `\r` on one side and none
+on the other. **No** title matched, so **every** upstream section looked missing.
+
+**Why this is worse than an ordinary bug.** A comparison guard exists to answer
+"will I destroy something", and unnormalized it reports CATASTROPHE and
+CORRECTNESS with the same confidence and the same shape. Worse, the remedy it
+triggers — `git checkout origin/main -- <path>` — is the destructive command, the
+one that already destroyed a peer's lane block on 09-03. A miscalibrated guard
+does not merely fail to help; it points at the loaded gun.
+
+**The rule.** Normalize both sides before comparing anything read from two
+sources — `.replace("\r\n", "\n")` at minimum, on Windows always. Compare
+`git show` output to `git show` output where possible, rather than a working file
+to a git blob.
+
+**What actually caught it**, and it was not the tooling: the output contradicted
+something I already knew — the "missing" list included entries I had pushed
+MYSELF minutes earlier, and my own commit cannot be absent from upstream. Same
+family as *read the field you already have*. **When a guard reports an impossible
+scale of loss, suspect the guard before the file.** 308 of 308 missing is not a
+ledger problem, it is a join problem.
