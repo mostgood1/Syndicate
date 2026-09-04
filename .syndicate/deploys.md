@@ -22295,3 +22295,67 @@ effect at the next deploy and the 120-sample cap bounds the cost until then.
 norm for web. It succeeded. Not diagnosed; recorded because a slow build was
 briefly indistinguishable from a stuck one, and cancelling is documented in this
 repo as having CAUSED the restart it was meant to avoid.
+
+## 2026-09-04 19:45:45Z / 19:56:39Z — **web AND refresh-worker both to `c49d47fa`: the projected ledger mirror is LIVE, and the allowlist is PROVEN ON PRODUCTION.** `[user: "deploy it"; lane evaluation-ledger-projected-mirror]`
+
+**TWO SERVICES BY NECESSITY, NOT BY CAUTION — a worker-only deploy would have
+403'd every publish.** `_write_published_artifact` (`ops.py:2214`) gates the
+RECEIVE side on `is_hot_artifact_relative_path`, and that code runs on **web**.
+Shipping the producer without shipping web's allowlist reproduces the
+CLV-openings incident exactly: worker had the pattern, web did not,
+`PUBLISH_FAILED` x8 over 16h. Web was deployed FIRST for that reason.
+
+    web              c49d47fa   live 19:45:45Z   dep-dadhuau7bikc73atkru0
+    refresh-worker   c49d47fa   live 19:56:39Z   dep-dadi3m9594qs73bne56g
+
+**verify (1) — BY CONTENT on the deployed commit:** allowlist pattern
+`reports/intelligence/evaluation_ledger_projected/*.jsonl` x1;
+`project_ledger_chunks` referenced x2 in `run_refresh_worker.py`;
+`evaluation_ledger_projection.py` present, 251 lines.
+
+**verify (2) — THE ALLOWLIST, PROBED LIVE, AND THIS IS THE READING THAT
+MATTERS.** Both halves of the design's highest-consequence property, against
+production web at 19:5xZ:
+
+    GET /api/ops/artifacts/export?path=reports/intelligence/evaluation_ledger_projected/2026-09-04.jsonl
+      -> HTTP 200  {"ok": true, "count": 0, "artifacts": {}}   <- ADMITTED, not yet produced
+    GET /api/ops/artifacts/export?path=reports/intelligence/evaluation_ledger_chunks/2026-09-04.jsonl
+      -> HTTP 403  "path is not an allowed hot or export-only artifact."   <- STILL REFUSED
+
+**403 and "200 with count 0" are completely different facts** and collapsing them
+is the error `mirror_pull.py`'s docstring says cost the WNBA grader lane an
+evening. The projected path is now permitted and empty; the RAW chunks remain
+unpublishable, which is the whole point — a glob loose enough to match both
+would hand the sweep a 332 MB file every cycle.
+
+**verify (3) — clean boot:** `MALLOC_ARENA_INIT {"applied": true, "pid": 39}` at
+19:57:09Z, ONE boot rather than a restart loop, and zero `Traceback` since.
+Both claims released.
+
+**IT HAS NOT PRODUCED ANYTHING YET, AND CANNOT UNTIL TOMORROW.** The producer
+rides the once-per-Central-day accuracy autorun, and **today's already completed
+at 14:34:27Z**, so `last_run_date` is today. `PROJECTION_DONE` has therefore NOT
+appeared and its absence right now is EXPECTED — it is a fact about the gate,
+not about the code. First run: 2026-09-05 after 07:00 CT.
+
+**WHAT TOMORROW MUST SHOW, and what falsifies it:**
+
+    PROJECTION_DONE seen=N written=<=8 deferred=... failed=0 over_ceiling=0
+    then the SAME export probe returns count=1 with content
+
+    over_ceiling>0        -> the ~3.3 MB sizing is WRONG; answer with compression
+                             or splitting, NEVER by raising _PUBLISH_MAX_BYTES
+    failed>0              -> a chunk cannot be streamed on the real corpus
+    published=0 with written>0 -> the publish hop is refused; check web's allowlist
+                             by CONTENT on ITS live SHA, not on main
+    deferred never 0      -> the 8-chunk bound is too tight to converge
+
+**TWO INSTRUMENT FAILURES OF MINE IN THIS DEPLOY, both caught, both worth the
+line.** (1) I polled the web deploy with a GUESSED service id and got HTTP 404
+on every tick; the watcher exited "TERMINAL" having learned nothing, and I
+nearly read that as a result. The real ids are in `render_deploy.py:46-48` —
+**web is `srv-d88ahvrbc2fs73eodu30`**. (2) The deploy guard BLOCKED the first
+web attempt because my lane marker in the PRIMARY tree still read
+`accuracy-autorun-rearm` while the claim was held by
+`evaluation-ledger-projected-mirror` — I had updated the marker in the WORKTREE
+only. The guard was right and the fix was to correct the marker, not the claim.
