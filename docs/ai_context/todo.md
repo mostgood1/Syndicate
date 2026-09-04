@@ -1503,6 +1503,54 @@ MATERIALISES AND HYDRATES a large precomputed payload
 which fits ~95 MB a call with no rule broken. Note also
 `intelligence.py:1600`: slimming that payload "would change an API contract".
 
+**`[2026-09-04]` THE SUSPECT ROUTE IS SLIMMED: `/api/intelligence/query` NO
+LONGER SERVES A COPY OF ITSELF. ~50% OF THE PAYLOAD, VERIFIED LIVE (`53a1052b`).**
+
+Measured on the live endpoint before the change, one call:
+
+    served response                                 67.19 MB
+      response.response  (the mirror)                 36.42 MB   <- 50%
+      top_opportunities == recommendations             6.44 MB each
+      board_contract    == boardContract               5.86 MB each
+
+All 17 mirror keys were VALUE-EQUAL to the outer payload, and its only reader is
+`LAST_RESULT` two lines after it is created. **VERIFIED LIVE: `response keys 26 ->
+25`, `self-nested response present: False`.**
+
+**THE HEADLINE SAVING IS 50.0%, NOT THE 68.9% THE WIRE SHOWED.** Live bytes went
+67.19 -> 20.88 MB, but the slate moved 1901 -> 1075 rows in between, so that
+comparison is confounded. 50.0% is the controlled figure: the SAME captured
+payload differenced with and without the mirror (72.85 -> 36.42 MB serialised).
+
+**THE FIRST ATTEMPT SHIPPED AND SAVED NOTHING, AND THAT IS THE REUSABLE LESSON.**
+`f9c4733d` dropped the mirror only when `outer[key] is inner[key]`, reasoning
+that `dict()` is a shallow copy so the values are the same objects. Correct in
+isolation; INERT in production, because `_attach_intelligence_response_aliases`
+runs in between and `_normalize_opportunity_item` rebuilds every item with
+`dict(item)`. **Deploy succeeded, tests passed, and the response came back 32.5%
+smaller — which was a SMALLER SLATE, not the change.** Three signals all read as
+success. Only asking whether the KEY WAS ACTUALLY GONE exposed it.
+
+`53a1052b` needs no comparison: `setdefault` creates the mirror only when the key
+is ABSENT, so "did we create it" is the exact question, is free, and can never
+remove a `response` a caller supplied. Applied at all three sites in
+`intelligence_query_api`; the inert helper was deleted, not left dormant.
+
+**NOT DONE, and deliberately so:** the alias duplication (`top_opportunities` ==
+`recommendations`, `board_contract` == `boardContract`, ~17%) is untouched. That
+one needs the client to rebuild from `_embed_aliases` the way the HTML embed
+already does, which IS a contract change. This one was not.
+
+**CONSUMERS SURVEYED** — the survey the earlier lane deferred for lack of one:
+`intelligence.html` already falls back (`:1517` reads `boardResponse.response ||
+boardResponse`; `normalizeIntelligenceResponse` prefers top-level keys, and
+replaying the real 67 MB payload through the page's own merge with and without
+the mirror gave identical keys); `watch_clamp_trigger.py` computes its verdict on
+`_dedupe`d rows, so only a telemetry occurrence count moves — which the script
+itself calls "NOT counts of broken markets"; `ask_the_syndicate*` calls
+`read_combined_intelligence_response` directly, not the route; `ask_bar.js` and
+`syndicate.html` do not call this endpoint.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
