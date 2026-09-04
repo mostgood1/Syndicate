@@ -157,6 +157,45 @@ def _git_show(root, rev_path):
         return None
 
 
+# A resurrected LINE, for content that moved WITHIN blocks rather than as a block.
+#
+# `resurrected_blocks` above was built for the stale-tree revert and catches it
+# when a whole block comes back. It is blind to the other shape, measured
+# 2026-09-04: `a8000faf` COMPACTED all 39 OPEN blocks -- header, `- Files:` and
+# `- Blocked by:` kept in place, narrative moved verbatim to `lanes_history.md`.
+# lanes.md went 203,047 -> 84,956 B. No block was archived, no header changed, no
+# claim moved, so nothing reads as a resurrected BLOCK and `violations()` returned
+# **0 on a 208 KB stale working copy** whose commit would have put 1,412 lines /
+# 111,496 B of archived narrative straight back.
+#
+# That is the same hazard `_deploys` already refuses on its own file, and the
+# same reason: the damage is invisible in the diff's shape (a big ADDITION, which
+# reads as ordinary work) and only visible against upstream.
+#
+# TWO FILTERS, both to keep this from crying wolf:
+#   * length >= 40 -- short lines ("- Blocked by: none.") legitimately appear in
+#     both files and in every new block; only substantial prose is evidence.
+#   * a floor of 25 -- quoting an archived line or two while writing a new block
+#     is normal. Re-adding dozens is not something legitimate work does, and the
+#     real event re-adds hundreds.
+_RESURRECT_MIN_LEN = 40
+_RESURRECT_FLOOR = 25
+
+
+def resurrected_lines(text, upstream_lanes, upstream_history):
+    """(count, sample) of substantial lines upstream ARCHIVED that are coming back.
+
+    A line counts only if it is absent from upstream's `lanes.md` AND present in
+    upstream's `lanes_history.md` -- i.e. upstream deliberately moved it out and
+    this text is putting it back.
+    """
+    def sig(s):
+        return set(l.strip() for l in (s or "").splitlines()
+                   if len(l.strip()) >= _RESURRECT_MIN_LEN)
+    back = (sig(text) - sig(upstream_lanes)) & sig(upstream_history)
+    return len(back), sorted(back)[:3]
+
+
 def _resurrected(text, root):
     """Fails OPEN: no root, no git, no ref -> no opinion."""
     if not root:
@@ -166,6 +205,44 @@ def _resurrected(text, root):
     if up_lanes is None or up_hist is None:
         return []
     return resurrected_blocks(text, up_lanes, up_hist)
+
+
+def _resurrected_narrative(text, root):
+    """[(what, how)] when upstream-ARCHIVED narrative is coming back.
+
+    Separate from `_resurrected` ON PURPOSE. That function's contract is a
+    list of SLUGS and `_lanes` joins it as strings; returning a tuple from it
+    made `_lanes` raise TypeError, which `violations()` catches and turns into
+    an empty result -- the guard reporting CLEAN while inert. Caught here by a
+    positive case that stayed at 0 after the change. Fails open like its
+    sibling: no root, no git, no ref -> no opinion.
+    """
+    if not root:
+        return []
+    up_lanes = _git_show(root, "origin/main:.syndicate/lanes.md")
+    up_hist = _git_show(root, "origin/main:.syndicate/lanes_history.md")
+    if up_lanes is None or up_hist is None:
+        return []
+    n, sample = resurrected_lines(text, up_lanes, up_hist)
+    if n < _RESURRECT_FLOOR:
+        return []
+    nl = chr(10)
+    shown = nl.join('    ' + s[:100] for s in sample)
+    what = ('%d archived line(s) are coming BACK into lanes.md -- content '
+            'upstream moved to lanes_history.md:%s%s' % (n, nl, shown))
+    how = nl.join([
+        'Your lanes.md is BEHIND origin/main and this commit would REVERT a',
+        'compaction or trim. Nothing is DELETED, so the diff reads as an',
+        'ordinary addition -- which is why this check exists and why the block',
+        'check stays silent: the narrative moved WITHIN blocks, so no block',
+        'reads as resurrected.',
+        '  git fetch origin main',
+        '  git checkout origin/main -- .syndicate/lanes.md',
+        'then re-apply YOUR edit on top. READ `git diff -- .syndicate/lanes.md`',
+        'FIRST: an uncommitted ADDITION in that file is destroyed by the',
+        'checkout, and a deletions count cannot see it.',
+    ])
+    return [(what, how)]
 
 
 def dropped_sections(text, upstream_deploys, upstream_history):
@@ -252,6 +329,7 @@ def _lanes(text, root=None):
                         "lane-guard reads lanes.md and NOTHING else, so the next archive pass\n"
                         "moves these out and their file claims stop being enforced SILENTLY.\n"
                         "  py -3 scripts/hoist_open_lanes.py --apply"))
+    out.extend(_resurrected_narrative(text, root))
     back = _resurrected(text, root)
     if back:
         out.append(("block(s) already ARCHIVED upstream, coming BACK: " + ", ".join(back[:6]),

@@ -573,6 +573,12 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 
 
+### lanes-whole-file-staleness — CLOSED 2026-09-04 — a compaction revert is now refused; the guard's path match no longer reads the commit MESSAGE — session f97ad5ab
+- Files: `.claude/hooks/ledger_invariants.py`,
+  `.claude/hooks/test_ledger_invariants_resurrection.py`,
+  `.claude/hooks/ledger-commit-guard.py`.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

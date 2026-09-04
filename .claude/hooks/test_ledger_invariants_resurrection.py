@@ -90,6 +90,40 @@ def main():
     check("a duplicate slug still blocks (via the new signature)",
           bool(li.violations(".syndicate/lanes.md", two)), True)
 
+    # --- narrative resurrection: content moved WITHIN blocks -----------------
+    #
+    # `resurrected_blocks` keys on a whole block and is blind to a COMPACTION,
+    # which keeps every header in place and moves only the prose. Measured
+    # 2026-09-04 on `a8000faf`: lanes.md 203,047 -> 84,956 B, no block archived,
+    # and `violations()` returned 0 on a stale 208 KB working copy whose commit
+    # would have put 1,308 archived lines back.
+    prose = [('line %02d ' % k) + 'x' * 44 for k in range(40)]
+    kept = '### a — OPEN — x' + chr(10) + '- Files: `a/b.py`' + chr(10)
+    up_lanes = kept
+    up_hist = chr(10).join(prose)
+    stale = kept + chr(10) + chr(10).join(prose)
+
+    n, _s = li.resurrected_lines(stale, up_lanes, up_hist)
+    check('a compaction revert is COUNTED (block check cannot see it)', n, 40)
+    check('the block check itself stays silent on it',
+          li.resurrected_blocks(stale, up_lanes, up_hist), [])
+    check('upstream own copy counts ZERO',
+          li.resurrected_lines(up_lanes, up_lanes, up_hist)[0], 0)
+    check('short lines are not evidence (< 40 chars)',
+          li.resurrected_lines(kept + chr(10) + '- Blocked by: none.',
+                               up_lanes, '- Blocked by: none.')[0], 0)
+    few = kept + chr(10) + chr(10).join(prose[:5])
+    check('a handful of quoted lines is UNDER the floor',
+          li.resurrected_lines(few, up_lanes, up_hist)[0] >= li._RESURRECT_FLOOR,
+          False)
+
+    # THE CONTRACT. `_resurrected` returns SLUGS and `_lanes` joins them as
+    # strings; returning a tuple made `_lanes` raise TypeError, which
+    # `violations()` swallows -- the guard reading CLEAN while inert. That is why
+    # the narrative check lives in its own function.
+    check('_resurrected still yields strings, never tuples',
+          all(isinstance(x, str) for x in li._resurrected(stale, None)), True)
+
     failed = 0
     for label, got, want in RESULTS:
         ok = got == want

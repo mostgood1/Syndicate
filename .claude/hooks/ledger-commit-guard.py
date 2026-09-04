@@ -110,8 +110,25 @@ def _content_to_be_committed(root, command, rel):
       - `-a` / `--all` with lanes.md modified -> the WORKING TREE file
       - otherwise, if lanes.md is staged      -> the STAGED blob (`:path`)
     """
-    names_path = os.path.basename(rel) in command
-    all_flag = bool(re.search(r"\s-(?:[a-zA-Z]*a[a-zA-Z]*)\b|\s--all\b", command))
+    # MATCH THE GIT INVOCATION, NOT THE COMMIT MESSAGE. `command` is the whole
+    # Bash string, heredoc body included, so a substring test against all of it
+    # made any commit whose MESSAGE mentions `lanes.md` read as a pathspec commit
+    # naming lanes.md -- and then checked the working file the commit never
+    # records. Latent since this guard was written; invisible while lanes.md had
+    # no predicate that could fire, and it surfaced 2026-09-04 the moment one did,
+    # as a HARD BLOCK on every commit in the tree. The first line is the git
+    # invocation; everything after the first newline is heredoc payload.
+    head = command.split(chr(10))[0]
+    # Within that line, prefer the EXPLICIT pathspec separator. `git commit -m
+    # 'see .syndicate/lanes.md'` names the path in its MESSAGE, not its pathspec,
+    # and must not pull the working file in. With no `--`, drop quoted arguments
+    # (which is where a message lives) before looking.
+    if ' -- ' in head:
+        region = head.split(' -- ', 1)[1]
+    else:
+        region = re.sub(r"'[^']*'|\"[^\"]*\"", ' ', head)
+    names_path = os.path.basename(rel) in region
+    all_flag = bool(re.search(r"\s-(?:[a-zA-Z]*a[a-zA-Z]*)\b|\s--all\b", head))
 
     if names_path or all_flag:
         modified = _git(root, "status", "--porcelain", "--", rel)
