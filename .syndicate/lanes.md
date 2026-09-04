@@ -460,6 +460,13 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `tests/test_layer2_projection_window.py`.
 
 ### web-oom-profiler-steady — OPEN — opened 2026-09-03 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- **`syndicate/templates/intelligence.html` CLAIM TAKEN from `layer2-sim-disagrees` `[2026-09-04, checked line-by-line first]`.** Its work on that file is LANDED; its
+  edits are the row-badge renderer (`sim_view` tags ~3168-3258 across
+  `939a8c00`/`9987c545`/`36161e83`) plus ~114-135 and ~2182-2224. Mine are
+  `rehydrateAliases` ~716, `intelligenceQueryPayload` ~3657, the fetch handler ~3697
+  — **disjoint by function**, the same standard that lane applied when it took
+  `layer2_board.py`. Their `board_sim_view_display` JS test passes. Notice left in
+  their block.
 - Files: `docs/ai_context/todo.md`
   (`#632`), `syndicate/blueprints/ops.py`,
   `syndicate/features/shared/artifact_merge.py`,
@@ -490,6 +497,11 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   coordinating lane `order-model-view`.
 
 ### layer2-sim-disagrees — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **ANSWERED, FIXED, LANDED, NOT DEPLOYED. The tag's RULE is fine; its INPUT is null on 100% of NCAAF rows. Two further defects found on the same served payload, both of which make the board state a number it does not have.**
+- **NOTICE from `web-oom-profiler-steady` `[2026-09-04]`: I TOOK THE CLAIM ON `syndicate/templates/intelligence.html`.** `#632` needed the alias-rebuild helper and
+  the query fetch payload; your edits there are the row-badge renderer and are LANDED.
+  Ranges checked line-by-line first — yours ~114-135, ~2182-2224, ~3168-3258; mine
+  ~716, ~3657, ~3697. Disjoint by function. Your `board_sim_view_display` JS test
+  passes. If you still need the file, say so and I will coordinate rather than assume.
 - Files: `syndicate/features/shared/layer2_board.py`
   (**`_projection_side_in_row_frame` / `_model_edge_for` / `_model_prob_for_side`
   / `_publication_columns` ONLY** — the OPEN lane `ncaaf-chip-compact` lists this

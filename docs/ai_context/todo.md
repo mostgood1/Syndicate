@@ -1589,6 +1589,52 @@ itself calls "NOT counts of broken markets"; `ask_the_syndicate*` calls
 `read_combined_intelligence_response` directly, not the route; `ask_bar.js` and
 `syndicate.html` do not call this endpoint.
 
+**`[2026-09-04]` THE ALIAS DUPLICATION IS DONE TOO — OPT-IN, AND VERIFIED BY A
+SAME-SLATE A/B ON ONE DEPLOY (`b3966bf1`). 47.9% ON TOP OF THE MIRROR FIX.**
+
+    WITHOUT slim_aliases : 17.13 MB  25 keys   all three alias keys PRESENT
+    WITH    slim_aliases :  8.92 MB  23 keys   all three ABSENT
+    same slate: 870 vs 870 rows  ->  like-for-like saving 47.9%
+
+**BOTH CALLS RAN MINUTES APART AGAINST THE SAME DEPLOY, AND THE ROW COUNTS ARE
+ASSERTED EQUAL BEFORE ANY PERCENTAGE IS QUOTED.** That check exists because a
+smaller slate already masqueraded as a saving once on this item — the first
+mirror attempt read 32.5% smaller while changing nothing.
+
+Dropped: `recommendations` -> `top_opportunities`, `boardContract` ->
+`board_contract`, `by_sport` -> regrouped from `ranked_all`, described in
+`_response_aliases`. **Combined with the self-mirror fix the route is down ~74%
+from where it started (67.19 MB).**
+
+**OPT-IN IS THE CONTRACT.** Dropping keys is a contract change and this
+endpoint's consumers are not all in this repo, so a caller that does not send
+`slim_aliases` gets byte-for-byte what it got before — verified in the same A/B,
+and there is a test whose only job is to fail if opt-in ever becomes opt-out.
+`watch_clamp_trigger.py` does not opt in and is untouched.
+
+**TWO THINGS THAT WOULD HAVE GONE WRONG BY REUSING THE EMBED SLIMMER.** It
+aliases the opportunity pair to `ranked_all`, which does NOT match here
+(`recommendations` == `top_opportunities` at 6,441,138 B; `ranked_all` is
+5,859,516 B) — reuse would have saved 6.4 MB less and looked correct. And it
+proves redundancy with `json.dumps`, which is fine once per page render and wrong
+on a request path: at 5.9-6.4 MB a side that adds ~13 MB of transient strings to
+the very peak this reduces. `_provably_same` proves deep equality by RECURSIVE
+SHALLOW IDENTITY instead — 15 of a row's 19 fields are literally the same object,
+the rest are cheap scalars — allocating nothing, and keeping anything unproven.
+
+**CROSS-LANE:** `intelligence.html` was claimed by OPEN lane
+`layer2-sim-disagrees` (work there LANDED). Ranges checked line-by-line before
+taking the claim — theirs the row-badge renderer ~114-135 / ~2182-2224 /
+~3168-3258, mine `rehydrateAliases` ~716, `intelligenceQueryPayload` ~3657, the
+fetch handler ~3697. Disjoint by function; claim recorded and a notice left in
+their block. Their `board_sim_view_display` JS test passes.
+
+Tests: 16 new (incl. a round-trip that rebuilds the slimmed payload and asserts
+equality with the unslimmed one), 755 passed on the full `-k intelligence` sweep
+with only the pre-existing `test_intelligence_steam_candidates` failure, and the
+client rebuild exercised under node for both `_response_aliases` and
+`_embed_aliases` plus a no-alias no-op.
+
 ### `#631` — **SOCCER BOARD STALENESS: a soccer-only date never becomes eligible to build, so its rows age forever** — lane `game-market-entry-roi-curve` (handed over on closing `soccer-overview-cost`), 2026-09-01 — **OPEN**
 
 Inherited on closing lane `soccer-overview-cost`, whose GOAL (find and remove
