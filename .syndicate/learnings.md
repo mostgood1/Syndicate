@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 812 rules `[generated]`
+## Index — 816 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -35,6 +35,55 @@
 <!-- LEARNINGS-INDEX:END -->
 
 ---
+
+### 2026-09-04 — A SPEC THAT NAMES A KEY IS NOT A GUARANTEE THE KEY IS FED — check the JOIN, not the two sides `[lane mlb-hitter-so-dead-field, commit 0b9a03e7, NO DEPLOY]`
+
+`_HITTER_PROP_DIST_SPECS` named `("strikeouts", "SO", "so_mean")` and the sim
+computed `so` correctly three lines away. Both halves were right. **The defect
+was the JOIN between them** — the curated `hitter_stat_values` dict handed to
+the spec never set `"SO"`, and the read is `.get(row_key, 0)`. Every review of
+either side passes. `strikeouts_dist` was `{0: n_sims}` and `so_mean` `0.0` for
+every hitter of every game since at least 2026-05-25, confirmed on the SERVED
+production payload 2026-09-04: the published ladder said every MLB hitter
+strikes out exactly zero times with probability **1.000**.
+
+**RULE — when a spec table drives a lookup, assert the containment.** `set(spec
+row_keys) <= set(the dict that feeds it)` is one line. It is now enforced in
+`scripts/sim_input_checklist.py`, which `run_mlb_daily_sim_job.py` executes, so
+it fails the DAILY JOB and not merely pytest. The checklist could NOT have
+caught this before and this is worth stating precisely: it enumerates INPUT
+dataclass fields via `dataclasses.fields()`, and this is an OUTPUT spec/dict
+mismatch. **`model_engine_standard` §4.1's "audit fields, don't grep names" has
+a blind spot: a field audit sees the two sides, never the join.**
+
+**THIRD INSTANCE of the same two-copy failure.** `daily_update.py` carries the
+hitter accumulation TWICE (`_simw_chunk`, multiprocessing; `_sim_many`, serial).
+`#334` changed one and not the other; `#429` wrote the warning comments at both
+sites; `#621` is the same file, same dict, same mechanism. The comments did not
+prevent it — **a comment asking a human to remember is not a control.** The AST
+drift check is.
+
+**AND THE REACHABILITY TEST DOES NOT COVER THE DRIFT.** Measured: with site 1
+broken and site 2 intact, both reachability tests PASS, because `workers=1`
+exercises only the serial path. §4.3's `run(off) != run(on)` is necessary and
+here it was not sufficient — a duplicated code path needs a SOURCE-level
+identity check as well.
+
+**SEVERITY LESSON, and it is the sharper one: the loss was prevented by an
+unrelated accident.** No priced recommendation was ever emitted — not because
+any guard held, but because the market feed returns ZERO `batter_strikeouts`
+quotes (production, 2026-09-04: requested in `meta.markets`, absent from
+`meta.counts.markets`, 0 of 289 players, against 270-283 for the other six).
+A dead model field was masked by an equally dead market feed. Had the quotes
+arrived, a P=1.000 UNDER would have priced against a real line.
+`probability_refusal.py`'s own docstring names this exact trap — *a healthy
+reading that survives for a reason unconnected to the rule you are relying on
+is not evidence that the rule exists* — and it applied to my own investigation:
+the handoff's mirror sample (2026-07-12) showed `marketLine: null` and looked
+exonerating, but it PREDATES the odds wiring (`#440`, 2026-08-19) by three
+months, so it could not have shown anything else. **Check that your exonerating
+evidence was capable of returning the other answer.**
+
 
 
 

@@ -1758,6 +1758,88 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: (a) both invocations agree, claim held; (b) a NEW test pins `CLAIMED` preempting `TOO_SOON` deliberately, since that ordering was until now exercised only by accident via the real claim file; (c) a REACHABILITY test asserts `main()` actually CALLS the claim lookup — without it a silent `ImportError` makes every claim assertion in this file vacuously true.
 - Blocked by: none.
 
+### mlb-hitter-so-dead-field — CLOSED 2026-09-04 — **FIXED AT BOTH SITES, LANDED ON `main` AS `0b9a03e7`, NOT DEPLOYED. The defect is REAL and CONFIRMED IN PRODUCTION; the money risk is NOT, and the reason it is not is an ACCIDENT.** — opened 2026-09-04 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+- Goal: `strikeouts_dist` has more than one bin, and `so_mean` > 0, for at least
+  one lineup batter in a real sim run — currently `{0: n_sims}` / `0.0` for
+  EVERY hitter in EVERY game, permanently and silently.
+- Files: vendor/mlb_bettingv2/tools/daily_update.py,
+  scripts/sim_input_checklist.py, tests/test_mlb_hitter_prop_dist_specs.py
+- Hypothesis: `_HITTER_PROP_DIST_SPECS` (line 294) carries
+  `("strikeouts", "SO", "so_mean")`, but the per-sim `hitter_stat_values` dict —
+  duplicated at BOTH line 709 (`_simw_chunk`, multiprocessing) and line 4429
+  (`_sim_many`, serial) — has keys H, HR, TB, R, RBI, H+R+RBI, 2B, 3B, SB and NO
+  "SO". `value = int(hitter_stat_values.get(str(row_key), 0))` therefore reads 0
+  every sim. `so = int(row.get("SO") or 0)` is already in scope at both sites and
+  is already passed to `_inc_sum(pid, "SO", so)` — only the dict entry is absent.
+- Falsification test: if a sim run on current main produces any hitter with a
+  `strikeouts_dist` having >1 bin, the hypothesis is wrong.
+- Verification: a reachability test (model_engine_standard §4.3) that FAILS on
+  current main and PASSES after — asserting >1 bin over a real sim, not a
+  fixture. Plus the two sites confirmed identical by diff, per the `#334`/`#429`
+  two-copy rule recorded in the comments at both sites.
+- SEVERITY — NOT cosmetic, and the handoff's own substrate understated it:
+  `batter_strikeouts` IS fetched and paid for (`DEFAULT_HITTER_MARKETS`,
+  scripts/fetch_mlb_oddsapi_local.py:34) and IS joined
+  (`ladders_build.py:116`, wired by `#440` in `6a213156`, **2026-08-19**). The
+  handoff's mirror sample is **2026-07-12 — three months BEFORE that wiring** —
+  so its null `marketLine` is a pre-wiring artifact and exonerates nothing about
+  production today. Substrate `checkout`; production re-measure owed.
+- Blocked by: none.
+- OUTCOME — measured, not asserted:
+  - **PRODUCTION (substrate `render`, served payload, 2026-09-04T16:27:56-05:00
+    artifact):** `/mlb/api/hitter-ladders?prop=hitter_strikeouts` featured row
+    reads `mean 0.0, mode 0, modeProb 1.0, maxTotal 0`, a SINGLE ladder rung
+    `{total: 0, exactProb: 1.0}`. Control on the SAME player, same request
+    family, `prop=hits`: `mean 1.252`, 6 rungs, `marketLine 0.5`. The pipeline
+    is healthy; strikeouts alone is dead. (n=1 player — `featuredRow` is not
+    filterable by `hitter`, and `rows` is prop-independent, so the API cannot
+    yield a per-row denominator. The all-rows claim rests on the MECHANISM plus
+    18/18 local and 404/404 on the 07-12 mirror, not on a production count.)
+  - **LOCAL, before/after (substrate `checkout`, real `_sim_many`, 40 sims):**
+    `strikeouts_dist` 1 bin on 18/18 rows and `so_mean` 0.0 on all → multi-bin
+    (3-5) and `so_mean` up to 1.300. Control `hits_dist` was 3-5 bins on 18/18
+    THROUGHOUT, which is what makes the before-reading a defect and not a
+    quiet sim.
+- **SEVERITY — NO PRICED RECOMMENDATION WAS EVER EMITTED, AND THAT IS LUCK, NOT
+  DESIGN.** The handoff asked me to determine this. `batter_strikeouts` IS
+  requested and paid for — `meta.markets` on production's
+  `oddsapi_hitter_props_2026_09_04.json` lists all 7 — but `meta.counts.markets`
+  returns only SIX, and across **289 players `batter_strikeouts` appears for 0**
+  while the other six appear for 270-283 each. So the market feed returns no
+  quotes, the ladder join finds no line (`marketLine: None` on every strikeouts
+  row I read), and nothing was priceable. **A dead model field was masked by an
+  equally dead market feed.** If those quotes ever start arriving — another
+  region, another book — the model side would immediately publish P(0 K)=1.000
+  against a real 0.5 line, i.e. a 100%-confidence UNDER. `probability_refusal.py`
+  (shipped TODAY for `#624`) would refuse `p=0.0`, and its own docstring names
+  this trap: *a healthy reading that survives for a reason unconnected to the
+  rule you are relying on is not evidence that the rule exists.* I did NOT
+  verify that guard is applied on the MLB ladder path.
+- NOTHING DOWNSTREAM WAS CONTAMINATED (`#621` item 4, production-measured):
+  there is NO fitted hitter-props calibration artifact at all (`export
+  *hitter_props_calibration*` → count 0), and the 1,373-row graded ledger
+  `props_actuals_2026-09-04.csv` carries no hitter-strikeouts market (the six
+  with odds, plus five PITCHER markets). So no recalibration is owed — this is
+  a populate-a-dead-field fix, standard §4.4, not a new mechanism.
+- SIBLING AUDIT, so this is not fixed one field at a time: all 17 specs driven
+  through a real sim. **All 7 PITCHER dists multi-bin** — that side reads the
+  boxscore row directly rather than a curated dict, so it cannot carry this
+  defect. All 10 hitter dists now multi-bin. `stolen_bases` read single-bin and
+  is NOT a defect — my synthetic batters left `sb_attempt_rate` at its 0.0
+  default; set to 0.25 it returns 2-3 bins. Checked rather than reported.
+- THE GATE, and why the test suite alone was not enough: the invariant
+  `set(spec row_keys) <= set(hitter_stat_values)` now runs inside
+  `scripts/sim_input_checklist.py`, which `scripts/run_mlb_daily_sim_job.py`
+  executes — so a regression fails the DAILY JOB, not just pytest. It runs
+  BEFORE the roster glob (it needs no artifacts, so it still speaks on a box
+  that would otherwise exit `REFUSED: no roster artifacts`) and is not gated on
+  `--warn-only`. Verified both directions: exit 1 naming the missing key AND the
+  drift; exit 0 when correct.
+- ONE THING THE REACHABILITY TEST CANNOT DO, recorded because it surprised me:
+  with site 1 (`_simw_chunk`, multiprocessing) broken and site 2 intact, BOTH
+  reachability tests still PASS — `workers=1` drives only the serial path. The
+  `#334` drift is caught by the AST invariant and by nothing else.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

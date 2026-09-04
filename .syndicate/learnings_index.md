@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 812 rules `[generated]`
+## Index — 816 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -314,9 +314,9 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 513**
-**Rules and corrections — 512**
+**Rules and corrections — 516**
 
+- [2026-09-04 — A SPEC THAT NAMES A KEY IS NOT A GUARANTEE THE KEY IS FED — check the JOIN…](#2026-09-04-a-spec-that-names-a-key-is-not-a-guarantee-the-key-is-fed-check-the-join-not-the-two-sides-lane-mlb-hitter-so-dead-field-commit-0b9a03e7-no-deploy)
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
 - [2026-08-20 — OVERTURNED: I reported "CI is green" and closed the lane on a 16-run green…](#2026-08-20-overturned-i-reported-ci-is-green-and-closed-the-lane-on-a-16-run-green-streak-that-did-not-span-the-hours-ci-actually-fails-a-streak-is-a-sample-check-whether-it-covers-the-condition-that-breaks-the-thing)
@@ -515,8 +515,9 @@
 - [2026-09-04 — PRE-REGISTER THE GATE, AND LET IT BIND WHEN THE DATA IS POINTING WHERE YOU…](#2026-09-04-pre-register-the-gate-and-let-it-bind-when-the-data-is-pointing-where-you-hope)
 - [2026-09-04 — 100% OF WHAT YOU SAMPLED IS NOT 100% OF THE THING. THE DENOMINATOR MUST CO…](#2026-09-04-100-of-what-you-sampled-is-not-100-of-the-thing-the-denominator-must-come-from-outside-the-instrument)
 - [2026-09-04 — A PRE-REGISTERED FALSIFICATION TEST IS WORTH WRITING, BECAUSE IT FIRES](#2026-09-04-a-pre-registered-falsification-test-is-worth-writing-because-it-fires)
-- [2026-09-04 WHEN A COMMIT NARROWS A PREDICATE, THE DOCSTRING IS PART OF THE PREDICATE —…](#2026-09-04-when-a-commit-narrows-a-predicate-the-docstring-is-part-of-the-predicate-a-stale-contract-line-does-not-read-as-stale-it-reads-as-corroboration-for-whichever-test-still-encodes-the-old-rule)
 - [2026-09-04 — A BROKEN IDENTIFIER IS WORSE THAN NO IDENTIFIER, BECAUSE IT MANUFACTURES F…](#2026-09-04-a-broken-identifier-is-worse-than-no-identifier-because-it-manufactures-false-continuity)
+- [2026-09-04 WHEN A COMMIT NARROWS A PREDICATE, THE DOCSTRING IS PART OF THE PREDICATE —…](#2026-09-04-when-a-commit-narrows-a-predicate-the-docstring-is-part-of-the-predicate-a-stale-contract-line-does-not-read-as-stale-it-reads-as-corroboration-for-whichever-test-still-encodes-the-old-rule)
+- [2026-09-04 — A COEFFICIENT IS NOT A FINDING UNTIL IT SURVIVES LEAVE-ONE-OUT AND A RANK…](#2026-09-04-a-coefficient-is-not-a-finding-until-it-survives-leave-one-out-and-a-rank-test)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
