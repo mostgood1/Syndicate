@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -2746,8 +2747,27 @@ _REQUEST_MEMORY_STATE: dict[str, Any] = {
     "since_emit": 0,
     "routes": {},
     "skipped_concurrent": 0,
+    "skipped_background": 0,
     "unreadable": 0,
 }
+
+# `#632`. THE LAST CONTAMINATION SOURCE: THIS PROCESS'S OWN BACKGROUND THREADS.
+#
+# `inflight` proves no other REQUEST overlapped a window. It says nothing about
+# `syndicate/app.py`'s live-refresh and intelligence-state loops, which run in
+# the SAME process and allocate and free on their own schedule. Measured
+# 2026-09-04 with per-process attribution already in place, that residue was
+# large enough to be the whole answer: one worker attributed **+395.8 MB against
+# +225.9 MB of actual process growth (175%)** while the other read 37%, and a
+# route went **-49.46 MB across 252 solo requests**. A negative retained total is
+# not a small error, it is a different quantity.
+#
+# So background work gets the SAME treatment requests already get, for the same
+# reason: a counter that must be zero at both ends, and a sequence that must not
+# have moved in between. `seq` is what catches an iteration that started AND
+# finished inside one request -- `inflight` alone would read 0 at both ends and
+# call that window clean.
+_BACKGROUND_MEMORY_STATE: dict[str, Any] = {"inflight": 0, "seq": 0}
 
 
 def _request_memory_lock() -> Any:
@@ -2765,6 +2785,45 @@ def request_memory_profile_enabled() -> bool:
     per-request work on a 2GB service that is already dying."""
     raw = str(os.environ.get("SYNDICATE_REQUEST_MEMORY_PROFILE") or "").strip().lower()
     return raw in {"on", "1", "true", "yes"}
+
+
+def note_background_work_start() -> None:
+    """Mark the start of a background-loop iteration.
+
+    Cheap enough to call unconditionally: two integer updates under a lock the
+    request path already holds microseconds at a time, against loop iterations
+    that are seconds apart. It is NOT gated on
+    `request_memory_profile_enabled()` on purpose -- the flag can be turned on
+    between a loop's start and its end, and a gated pair would then decrement a
+    counter it never incremented and strand `inflight` at a negative value that
+    `max(0, ...)` would silently absorb into "always contended".
+    """
+    with _request_memory_lock():
+        _BACKGROUND_MEMORY_STATE["inflight"] += 1
+        _BACKGROUND_MEMORY_STATE["seq"] += 1
+
+
+def note_background_work_end() -> None:
+    """Mark the end of a background-loop iteration. Always paired in a finally."""
+    with _request_memory_lock():
+        _BACKGROUND_MEMORY_STATE["inflight"] = max(
+            0, int(_BACKGROUND_MEMORY_STATE["inflight"]) - 1)
+
+
+@contextlib.contextmanager
+def background_work():
+    """Wrap a background-loop iteration so per-request attribution can exclude it.
+
+    Wrap the WORKING part of an iteration and leave the sleep outside it: a loop
+    that marked itself busy while sleeping would exclude every request on a
+    service whose loops are mostly idle, and attribution would go to zero without
+    saying so.
+    """
+    note_background_work_start()
+    try:
+        yield
+    finally:
+        note_background_work_end()
 
 
 def _anon_mb() -> float | None:
@@ -2854,15 +2913,22 @@ def note_request_start() -> dict[str, Any] | None:
         state["inflight"] += 1
         state["seq"] += 1
         seq = state["seq"]
+        background_busy = _BACKGROUND_MEMORY_STATE["inflight"] != 0
+        background_seq = _BACKGROUND_MEMORY_STATE["seq"]
         if not solo:
             state["skipped_concurrent"] += 1
+            return None
+        if background_busy:
+            # A loop iteration is running right now; this window is its window too.
+            state["skipped_background"] += 1
             return None
     before = _process_anon_mb()
     if before is None:
         with _request_memory_lock():
             _REQUEST_MEMORY_STATE["unreadable"] += 1
         return {"attribute": False, "seq": seq}
-    return {"attribute": True, "seq": seq, "anon_before_mb": before}
+    return {"attribute": True, "seq": seq, "anon_before_mb": before,
+            "background_seq": background_seq}
 
 
 def note_request_end(token: dict[str, Any] | None, route: str,
@@ -2882,7 +2948,16 @@ def note_request_end(token: dict[str, Any] | None, route: str,
             and bool(token.get("attribute"))
             and state["inflight"] == 0
             and state["seq"] == token.get("seq")
+            # Both halves are needed. `inflight == 0` catches an iteration still
+            # running; the `seq` comparison catches one that started AND finished
+            # inside this request, which `inflight` alone reads as clean.
+            and _BACKGROUND_MEMORY_STATE["inflight"] == 0
+            and _BACKGROUND_MEMORY_STATE["seq"] == token.get("background_seq")
         )
+        if token is not None and bool(token.get("attribute")) and not alone_throughout:
+            if (_BACKGROUND_MEMORY_STATE["inflight"] != 0
+                    or _BACKGROUND_MEMORY_STATE["seq"] != token.get("background_seq")):
+                state["skipped_background"] += 1
     if token is None:
         return None
     if not alone_throughout:
@@ -2931,6 +3006,12 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         "routes": [dict(route=r, **vals) for r, vals in rows],
         "distinct_routes": len(state["routes"]),
         "skipped_concurrent": state["skipped_concurrent"],
+        # Requests declined because a background loop iteration overlapped them.
+        # Published beside `skipped_concurrent` so a reader can see how much of
+        # the traffic each exclusion is responsible for -- a top-routes table
+        # with no denominator invites treating the solo sample as the whole
+        # service, and there are now two ways to leave it.
+        "skipped_background": state["skipped_background"],
         "unreadable": state["unreadable"],
         # A reader must be able to see how much of the traffic this DECLINED to
         # attribute. A top-routes table with no denominator invites treating the
@@ -2944,5 +3025,6 @@ def reset_request_memory_attribution() -> None:
     second test reads the first one's numbers."""
     _REQUEST_MEMORY_STATE.update(
         {"inflight": 0, "seq": 0, "since_emit": 0, "routes": {},
-         "skipped_concurrent": 0, "unreadable": 0}
+         "skipped_concurrent": 0, "skipped_background": 0, "unreadable": 0}
     )
+    _BACKGROUND_MEMORY_STATE.update({"inflight": 0, "seq": 0})

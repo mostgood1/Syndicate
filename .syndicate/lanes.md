@@ -66,6 +66,30 @@ markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
 ## OPEN
+### web-oom-thread-gating — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: close `#632`'s LAST contamination source so the attributed SHARE becomes
+  recoverable. `inflight` proves no other REQUEST overlapped a window; it says
+  nothing about this process's own background loops, and that residue was large
+  enough to be the whole answer — one worker attributed **+395.8 MB against
+  +225.9 MB of actual growth (175%)**, another 37%, and a route read **-49.46 MB
+  across 252 solo requests**.
+- Files: `syndicate/features/shared/memory_observability.py` (unclaimed),
+  `syndicate/features/shared/live_refresh_loop.py` (unclaimed; the only lane
+  naming it is ORPHANED-CLAIMS-RELEASED), `pipeline/intelligence_state.py`
+  (**~7776, the board-drain THREAD TARGET only** — `layer2-sim-disagrees` claims
+  this file for *"the `confidence` backfill at ~1888 ONLY"*, so the two are
+  disjoint by that lane's own stated scope; notice left in their block),
+  `tests/test_background_thread_gating.py` (NEW).
+- Opened AFTER `web-oom-profiler-steady` closed, because this is new work and
+  reopening a closed lane would hide that.
+- Hypothesis: excluding background-overlapped windows removes the >100% and the
+  negative route totals, leaving an apportionment that can be believed.
+- Falsification test: the share stays impossible (>100%, or routes going
+  negative) after the gate ships — which would mean a THIRD source, not this one.
+- Verification: emissions carrying `skipped_background > 0`, and a late-window
+  share inside 0-100% with no negative route totals.
+- Blocked by: none.
+
 ### open-bet-live-status — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-26 — session syndicate-27 (749848)
 - Files: released: `blueprints/intelligence.py`,
   **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
@@ -500,6 +524,11 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   coordinating lane `order-model-view`.
 
 ### layer2-sim-disagrees — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **ANSWERED, FIXED, LANDED, NOT DEPLOYED. The tag's RULE is fine; its INPUT is null on 100% of NCAAF rows. Two further defects found on the same served payload, both of which make the board state a number it does not have.**
+- **NOTICE from `web-oom-thread-gating` `[2026-09-04]`: I edited `pipeline/intelligence_state.py` at ~7776** (the board-drain THREAD TARGET, so
+  `#632`'s per-request attribution can exclude the build that runs on it). Your
+  block scopes this file to *"the `confidence` backfill at ~1888 ONLY"*, so we are
+  disjoint by your own definition — I changed no line near 1888. Say so if you
+  disagree and I will back it out.
 - **NOTICE from `web-oom-profiler-steady` `[2026-09-04]`: I TOOK THE CLAIM ON `syndicate/templates/intelligence.html`.** `#632` needed the alias-rebuild helper and
   the query fetch payload; your edits there are the row-badge renderer and are LANDED.
   Ranges checked line-by-line first — yours ~114-135, ~2182-2224, ~3168-3258; mine

@@ -5837,7 +5837,15 @@ def _live_refresh_background_loop() -> None:
 				"threadAlive": True,
 			},
 		)
-		meta = _run_live_refresh_tick()
+		# `#632`: mark the tick so per-request memory attribution can exclude any
+		# request it overlapped. THE TICK ONLY, never the whole iteration -- the
+		# wait at the bottom must stay outside, or a loop that is mostly idle
+		# would exclude every request and attribution would fall to zero without
+		# saying so. The status writes either side are a few hundred bytes of
+		# JSON; this call is the allocation.
+		from syndicate.features.shared.memory_observability import background_work
+		with background_work():
+			meta = _run_live_refresh_tick()
 		interval_seconds = _live_refresh_loop_interval_for_meta(meta)
 		write_json_file(
 			status_path,

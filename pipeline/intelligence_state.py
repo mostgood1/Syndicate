@@ -7773,12 +7773,32 @@ class IntelligenceStateService:
             if existing_thread is not None and existing_thread.is_alive():
                 return
             thread = threading.Thread(
-                target=self._drain_one_watched_board_date,
+                target=self._drain_one_watched_board_date_marked,
                 name="syndicate-board-state-drain",
                 daemon=True,
             )
             self._board_state_drain_thread = thread
             thread.start()
+
+    def _drain_one_watched_board_date_marked(self) -> None:
+        """`#632`: the drain, marked so per-request memory attribution excludes it.
+
+        THIS is where the intelligence-state work allocates -- the loop itself
+        only decides whether to launch it, and the build runs on this separate
+        `syndicate-board-state-drain` thread. Marking the loop would have marked
+        the wrong thread.
+
+        Wrapped at the THREAD TARGET rather than inside the function so the
+        marking cannot be skipped by an early return, and so a raise still clears
+        the counter through `background_work`'s `finally`. A leaked counter would
+        make every later request read as background-contended and attribution
+        would fall silently to zero -- the instrument would go blind while still
+        emitting.
+        """
+        from syndicate.features.shared.memory_observability import background_work
+
+        with background_work():
+            self._drain_one_watched_board_date()
 
     def _drain_one_watched_board_date(self) -> None:
         selected_date: str | None = None
