@@ -1857,6 +1857,17 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   that would otherwise exit `REFUSED: no roster artifacts`) and is not gated on
   `--warn-only`. Verified both directions: exit 1 naming the missing key AND the
   drift; exit 0 when correct.
+- **`todo.md` NOT EDITED — CROSS-LANE CONFLICT SURFACED, NOT WORKED AROUND.**
+  `docs/ai_context/todo.md` is claimed by OPEN lane `accuracy-ledger-budget-raise`
+  (session 82fe0160), so I reverted my edit rather than edit across lanes — the
+  same courtesy that lane's own block extends to `accuracy-autorun-rearm`. The
+  entry is written and ready at
+  `.syndicate/handoff/todo_646_mlb_hitter_strikeouts.md`; paste it above `#645`.
+  Id **646 is ALLOCATED** (`todo_id_alloc.py`, claim file present) so it cannot
+  be reused. **`#646` is where the DEPLOY is tracked, and the deploy is the whole
+  remaining item** — plus a roster/sim REBUILD, because shipping the code does
+  not rewrite an existing artifact, and a verification that
+  `probability_refusal.py` actually covers the MLB ladder path.
 - ONE THING THE REACHABILITY TEST CANNOT DO, recorded because it surprised me:
   with site 1 (`_simw_chunk`, multiprocessing) broken and site 2 intact, BOTH
   reachability tests still PASS — `workers=1` drives only the serial path. The
