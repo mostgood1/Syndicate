@@ -22125,3 +22125,60 @@ been claim-held by `mlb-rate-refit` across every round today; it is still on
 `8518a662` and lacks `60afda80`. The emitter runs ONLY there
 (`pipeline/portfolio_commit.py:665`), so no amount of live-odds-worker or web
 deploying can produce that reading. web is current at `76c0e174`.
+
+## 2026-09-04 18:44:18Z — refresh-worker `58ecba3a` -> **`95bdffda`**: `projected_bytes` IS LIVE. `[user: "deploy it"; lane accuracy-autorun-rearm]`
+
+**verify — BY CONTENT on the live SHA, not by ancestry:**
+
+    git show 95bdffda:syndicate/features/shared/intelligence_evaluation.py
+      _projected_and_counted                      x2   (def + call)
+      ledger_stats["projected_bytes"]             x1
+      DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = 4_000_000_000   x1
+    git show 95bdffda:tests/test_accuracy_summary_projected_bytes.py   126 lines
+
+**The worker came back clean:** `MALLOC_ARENA_INIT {"applied": true, "pid": 39}`
+at 18:44:49Z — **one** boot, not a restart loop — and **zero** `Traceback` since.
+`deploy=dep-dadh1nvqj5pc73928mp0`, build->live in 2m43s.
+
+**Both locks were taken and both were CONTENDED, which is worth recording
+because it is the normal case now, not an incident.**
+
+    18:25:42Z  claim HELD by mlb-rate-refit 36.5 min      -> NOT forced. It expires on its own.
+    18:34:32Z  claim EXPIRED (45.4 min)
+    18:34:44Z  claim taken by mlb-feed-live-terminal-refresh, 12s later   <- lost the race
+    18:41:07Z  claim free again; 18:40:20Z spacing floor also passed
+    18:41:2xZ  ACQUIRED by accuracy-autorun-rearm, token 5a3f357b
+    18:41:20Z  preflight CLEAR -- "only infrastructure processes running"
+               (1 defunct child awaiting reap; rss 1434.4 MB on pid 39)
+    18:41:35Z  deploy triggered      18:44:18Z live      claim RELEASED, reads `free`
+
+**Two things that stopped this being a wasted deploy.** The live SHA was checked
+BY CONTENT immediately before triggering — `58ecba3a` had **zero** occurrences
+of `_projected_and_counted`, so the change was genuinely absent rather than
+already carried by a peer's deploy. That check is not ceremony: the 4 GB budget
+raise earlier today went live inside ANOTHER lane's deploy and a second one
+would have been redundant. And the waiter matched **both `free` and `EXPIRED`**,
+the three-state trap that cost 25 minutes on 09-03.
+
+**DEPLOYED IS NOT EXERCISED, and this one cannot be until tomorrow.** The autorun
+is once-per-Central-day and **today's run already completed at 14:34:27Z**, so
+`last_run_date` is today and nothing will call `build_accuracy_summary` again
+before 07:00 CT. `projected_bytes` is therefore LIVE and has produced NO
+production reading. The first is scheduled: `verify-ledger-budget-4gb`,
+2026-09-05 07:45 CT.
+
+**What that reading now settles in one shot, where it previously settled one:**
+
+    skipped_budget / dates   -> did 4 GB actually buy coverage (was 24 / 8)
+    projected_bytes          -> the 76x mirror estimate, currently an INFERENCE
+                                joining a checkout per-record cost (~560 B) to a
+                                render raw density (42,595 B/rec). It becomes a
+                                measurement.
+    peak memory_anon_mb      -> the owning lane's "projection ratio has drifted"
+                                criterion, which was UNCHECKABLE when written.
+
+Predicted from the checkout substrate, recorded so tomorrow can falsify it:
+**projected_bytes ~26 MB** against `bytes_accepted` near 4 GB (~150x at 4 GB
+coverage; ~76x is the per-record figure against production density). **If it
+comes back above ~120 MB the projected-mirror design is off** and the 12 MiB
+publish ceiling stops being comfortably clearable.
