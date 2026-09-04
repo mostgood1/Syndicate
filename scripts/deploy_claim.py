@@ -253,6 +253,23 @@ def cmd_acquire(args: argparse.Namespace) -> int:
         # that roster, and "absent from the roster" reads exactly the same for
         # a live holder as for a dead one -- it is INERT, not merely weak.
         #
+        # THE SELF-TEST, so nobody has to take this on faith: run the check
+        # against YOUR OWN live claim. Your `$CLAUDE_CODE_SESSION_ID` has no
+        # `local_` prefix and your own session is not findable in the roster by
+        # it either. One call, no history needed, and it fails for a session
+        # that is provably alive -- because it is the one running the test.
+        #
+        # WHAT IS ACTUALLY EVIDENCE: `deploy_preflight.py`'s process output. A
+        # running child under the claim PROVES the holder is alive. A roster
+        # lookup proves nothing in either direction.
+        #
+        # AND THE TRAP THAT OUTLIVES THIS ONE: **a free claim is not an idle
+        # box.** The TTL expiring frees the LOCK, not the WORK -- a job the
+        # holder started keeps running, and a deploy restarts the service and
+        # kills it. Measured 2026-09-04: at TTL expiry an eredivisie
+        # `build_soccer_artifacts` and an MLB `run_mlb_daily_sim_job` were both
+        # still in flight. Gate on the PROCESS LIST, not just the claim.
+        #
         # Never cite a roster read as grounds to `--force`. None when the env
         # var is absent, and None must NOT be read as "gone": absent identity
         # is UNKNOWN, and unknown is not permission to force.
