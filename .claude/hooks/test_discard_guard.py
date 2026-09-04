@@ -126,6 +126,74 @@ rc, err = drive(d, "git checkout HEAD -- .syndicate/lanes.md")
 check("an em-dash file counts ONE, not the whole file", "1 uncommitted line(s)" in err, True)
 check("  ^ and still refuses", rc, 2)
 
+print()
+print("BEHIND origin/main IS NOT 'NOWHERE ELSE'")
+# Measured 2026-09-04: the primary tree sat 183 commits behind origin/main, and
+# `git restore --staged scripts/split_state.py` was BLOCKED with "201
+# uncommitted line(s) in neither HEAD nor HEAD" -- while the working file was
+# the SAME BLOB as origin/main (363b5528), i.e. in a pushed commit. Nothing
+# could have been lost. Over-reporting is not a safe direction: it is exactly
+# what teaches sessions to override the guard reflexively.
+PUSHED = ("def old():\n    pass\n\n\ndef table_span(lines, start):\n"
+          "    THE_FIXED_LINE_THAT_IS_PUSHED = 1\n    return 0, 0\n")
+
+
+def repo_behind(extra=None):
+    """A clone whose HEAD is BEHIND origin/main, working file == origin/main.
+
+    Built with a real remote because that is the only way to get a genuine
+    `origin/main` ref -- the shape every long-lived shared tree is actually in.
+    """
+    up = tempfile.mkdtemp(prefix="dg-up-"); TMP.append(up)
+    os.makedirs(os.path.join(up, "scripts"))
+    f = os.path.join(up, "scripts", "tool.py")
+    with open(f, "w", encoding="utf-8") as fh:
+        fh.write("def old():\n    pass\n")
+    gg = lambda d, *a: subprocess.run(["git", "-C", d] + list(a), capture_output=True)
+    gg(up, "init", "-q", "-b", "main"); gg(up, "config", "user.email", "t@t")
+    gg(up, "config", "user.name", "t"); gg(up, "add", "-A"); gg(up, "commit", "-q", "-m", "base")
+
+    dn = tempfile.mkdtemp(prefix="dg-clone-"); TMP.append(dn); shutil.rmtree(dn)
+    subprocess.run(["git", "clone", "-q", up, dn], capture_output=True)
+    gg(dn, "config", "user.email", "t@t"); gg(dn, "config", "user.name", "t")
+    with open(f, "w", encoding="utf-8") as fh:      # advance upstream ...
+        fh.write(PUSHED)
+    gg(up, "add", "-A"); gg(up, "commit", "-q", "-m", "the fix")
+    gg(dn, "fetch", "-q", "origin", "main")          # ... fetch but never merge
+    with open(os.path.join(dn, "scripts", "tool.py"), "w", encoding="utf-8") as fh:
+        fh.write(PUSHED + (extra or ""))
+    return dn
+
+
+check("content that IS on origin/main is not 'nowhere else'",
+      drive(repo_behind(), "git checkout HEAD -- scripts/tool.py")[0], 0)
+
+NOWHERE = "\n# A MID-EDIT LINE THAT IS IN NO COMMIT ANYWHERE\n"
+_d = repo_behind(NOWHERE)
+_rc, _err = drive(_d, "git checkout HEAD -- scripts/tool.py")
+check("a genuinely nowhere-else line STILL refuses", _rc, 2)
+check("  ^ counts only that line, not the pushed ones",
+      "1 uncommitted line(s)" in _err, True)
+check("  ^ names the revs it actually checked", "origin/main" in _err, True)
+
+print()
+print("`git restore --staged` WRITES THE INDEX, NOT THE WORKING FILE")
+# The module docstring listed this as "not matched" from the day it was
+# written; `_RESTORE` matched it anyway. A docstring promising a behaviour the
+# code lacks is worse than none -- it reads as evidence the case was handled.
+check("--staged is allowed even over a nowhere-else line",
+      drive(repo_behind(NOWHERE), "git restore --staged scripts/tool.py")[0], 0)
+check("-S (short form) likewise",
+      drive(repo_behind(NOWHERE), "git restore -S scripts/tool.py")[0], 0)
+check("--worktree DOES reach the file, so it refuses",
+      drive(repo_behind(NOWHERE), "git restore --worktree scripts/tool.py")[0], 2)
+check("-SW writes BOTH, so it refuses",
+      drive(repo_behind(NOWHERE), "git restore -SW scripts/tool.py")[0], 2)
+check("a bare restore defaults to --worktree, so it refuses",
+      drive(repo_behind(NOWHERE), "git restore scripts/tool.py")[0], 2)
+check("a plain `checkout -- <path>` is unaffected by the --staged carve-out",
+      drive(repo(LOSS), "git checkout -- .syndicate/lanes.md")[0], 2)
+
 for d in TMP:
     shutil.rmtree(d, ignore_errors=True)
 

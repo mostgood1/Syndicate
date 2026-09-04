@@ -31,8 +31,22 @@ THE PREDICATE IS "EXISTS NOWHERE ELSE", NOT "HAS DELETIONS". A deletions count
 answers "am I removing someone's existing lines" and is structurally blind to an
 uncommitted ADDITION, which is what both incidents actually lost. So for every
 path the command would overwrite, this compares the WORKING file against the
-version the command installs AND against `HEAD`, and refuses when a non-blank
-line is in the working file and in neither. That is content with no other copy.
+version the command installs AND against every rev in `_safe_revs`, and refuses
+when a non-blank line is in the working file and in none of them.
+
+"NOWHERE ELSE" MUST INCLUDE `origin/*`, NOT JUST `HEAD` -- a tree can be far
+behind. Measured 2026-09-04 in the primary tree: it sat **183 commits behind
+origin/main**, and `git restore --staged scripts/split_state.py` was BLOCKED
+with "201 uncommitted line(s) in neither HEAD nor HEAD", while the working file
+was the SAME BLOB as `origin/main` (`363b5528`) -- i.e. in a pushed commit that
+had been verified an ancestor of origin/main minutes earlier. Nothing could have
+been lost. This is the same over-reporting failure the `reset --hard` comment
+below already records, and the same consequence: a guard that cries wolf on a
+stale tree teaches sessions to override it reflexively, which is worse than
+silence. So `HEAD` is only one entry in `_safe_revs`.
+
+NOTE the check stays PER PATH (`<rev>:<path>`), so a line is only excused by a
+copy of the SAME file elsewhere, never by a coincidental match in another one.
 
 WHY BLOCKING IS DEFENSIBLE HERE, when `lane-postwrite-check` deliberately only
 warns: this command is precisely parseable. There is no guessing what
@@ -55,6 +69,14 @@ ALLOW_ENV = "SYNDICATE_ALLOW_DISCARD"
 # Only the discarding forms. `git checkout -b`, `git checkout <branch>` (no
 # pathspec) and `git restore --staged` touch no working file content and are not
 # matched.
+#
+# THAT LAST EXEMPTION USED TO BE DOCUMENTED AND NOT IMPLEMENTED. `_RESTORE`
+# matched `git restore --staged` like any other restore, so an index-only
+# command -- which cannot touch a working file at all -- was blocked as a
+# discard. Measured 2026-09-04 in the primary tree. A docstring promising a
+# behaviour the code lacks is worse than no docstring: it is read as evidence
+# the case was handled. `_index_only()` implements it, and a test now makes it
+# fire.
 _CHECKOUT = re.compile(r"\bgit\s+(?:-[CcS]\s+\S+\s+)*checkout\b")
 _RESTORE = re.compile(r"\bgit\s+(?:-[CcS]\s+\S+\s+)*restore\b")
 _RESET_HARD = re.compile(r"\bgit\s+(?:-[CcS]\s+\S+\s+)*reset\b[^\n]*--hard\b")
@@ -84,6 +106,49 @@ def _lines(text):
     return set(l.strip() for l in (text or "").splitlines() if l.strip())
 
 
+# `git restore -S` / `-SW`; `-W` (or neither flag) means the working tree is
+# touched and the command CAN discard.
+_SHORT = re.compile(r"(?<!\S)-([A-Za-z]+)")
+
+
+def _index_only(head):
+    """True for a `git restore` that writes the INDEX and not the working tree.
+
+    `--staged` alone is index-only. `--worktree`, `-W`, or neither flag given
+    (restore defaults to --worktree) all reach the working file.
+    """
+    if not _RESTORE.search(head) or _CHECKOUT.search(head):
+        return False
+    body = head.split(" -- ", 1)[0]
+    shorts = "".join(_SHORT.findall(body))
+    staged = "--staged" in body or "S" in shorts
+    worktree = "--worktree" in body or "W" in shorts
+    return staged and not worktree
+
+
+def _safe_revs(root, src):
+    """Revs a line may live on and still not be "nowhere else", in order.
+
+    `src` and `HEAD` are the minimum. `origin/main` and the branch's upstream
+    are added because a shared tree runs BEHIND them routinely -- 183 commits
+    behind, measured -- and content that is already pushed cannot be lost by
+    overwriting a working file. Unresolvable revs are dropped, so this is
+    offline-safe and never fetches; a hook must not touch the network.
+    """
+    out = []
+    cands = [src, "HEAD", "origin/main"]
+    up = _git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+    if up and up.strip():
+        cands.append(up.strip())
+    for rev in cands:
+        if not rev or rev in out:
+            continue
+        if _git(root, "rev-parse", "--verify", "--quiet", rev + "^{commit}") is None:
+            continue
+        out.append(rev)
+    return out
+
+
 def _targets(head):
     """(source_rev, [paths]) the command would overwrite, or (None, []).
 
@@ -91,6 +156,8 @@ def _targets(head):
     heredoc body attached, and matching a path inside a commit message is a real
     bug this repo already paid for in `ledger-commit-guard`.
     """
+    if _index_only(head):
+        return (None, [])               # writes the index; no working file
     if _RESET_HARD.search(head):
         # THE SOURCE IS THE NAMED REV, NOT `HEAD`. `git reset --hard origin/main`
         # installs origin/main; comparing against HEAD instead made the message
@@ -164,6 +231,7 @@ def main():
     if not paths:
         return 0
 
+    revs = _safe_revs(root, src)
     doomed = {}
     for rel in paths:
         full = os.path.join(root, *rel.replace("\\", "/").split("/"))
@@ -174,9 +242,11 @@ def main():
                 working = _lines(fh.read())
         except OSError:
             continue
-        incoming = _lines(_git(root, "show", "%s:%s" % (src, rel)))
-        at_head = _lines(_git(root, "show", "HEAD:%s" % rel))
-        gone = working - incoming - at_head
+        gone = set(working)
+        for rev in revs:
+            gone -= _lines(_git(root, "show", "%s:%s" % (rev, rel)))
+            if not gone:
+                break
         if gone:
             doomed[rel] = sorted(gone)
 
@@ -187,17 +257,18 @@ def main():
     sys.stderr.write(
         "BLOCKED: this would DISCARD content that exists nowhere else." + nl + nl)
     for rel, gone in doomed.items():
-        sys.stderr.write("%s  --  %d uncommitted line(s) in neither %s nor HEAD:%s"
-                         % (rel, len(gone), src, nl))
+        sys.stderr.write("%s  --  %d uncommitted line(s), on none of %s:%s"
+                         % (rel, len(gone), ", ".join(revs), nl))
         for l in gone[:4]:
             sys.stderr.write("    " + l[:100] + nl)
         if len(gone) > 4:
             sys.stderr.write("    ... and %d more%s" % (len(gone) - 4, nl))
         sys.stderr.write(nl)
     sys.stderr.write(nl.join([
-        "This tree is SHARED. Those lines may be another session's mid-edit work,",
-        "and they are in no commit on any branch -- a checkout does not archive",
-        "them, it deletes them.",
+        "This tree is SHARED. Those lines may be another session's mid-edit work.",
+        "They are on none of the revs listed above -- including origin/main, so",
+        "being merely BEHIND does not explain them -- and a checkout does not",
+        "archive them, it deletes them.",
         "",
         "A DELETIONS COUNT WILL NOT SHOW THIS. The lines above are ADDITIONS; a",
         "diff reading '0 deletions, all mine' is the exact check that failed when",
