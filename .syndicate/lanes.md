@@ -1289,6 +1289,31 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   left inside the owning lane's block.
 - Blocked by: none.
 
+### request-path-guard-sampler — CLOSED-VERIFIED 2026-09-04 — **`scripts/sample_request_path_guard.py` + 6 tests. Turns the per-worker counters into a rate WITHOUT the two errors that already produced bad numbers here. NOT deployed — local tooling.** — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
+- Goal: make tonight's re-run (and any future one) reproducible, and stop the
+  measurement mistakes being re-made by hand each time.
+- Files: `scripts/sample_request_path_guard.py` (NEW),
+  `tests/test_sample_request_path_guard.py` (NEW). Neither claimed by any OPEN
+  lane. Runs on a laptop only — it never executes on Render.
+- **It encodes two failures rather than documenting them.** (1) Deltas are
+  computed WITHIN a pid, because the counters are per-process and web runs
+  >1 worker — a cross-worker difference is fiction and can be negative. A
+  DECREASING count is a restart, so the delta is WITHHELD, never reported as
+  negative work and never zeroed (zeroing would show a crash loop as a quiet
+  window). (2) **It refuses to quote a per-minute rate below `--min-events`
+  (default 5)** and prints the count instead — because I quoted 8.7/min off a
+  7.4-min window this session and the same run gave 5.4/min at 11.9 min, on
+  TWO events.
+- Verification (RAN): `pytest tests/test_sample_request_path_guard.py -q` →
+  **6 passed**, covering the cross-worker series, the rate floor in both
+  directions, restart withholding, failed reads not reading as zero activity,
+  and the all-warnings mode. Live smoke against production, 1.0 min: both pids
+  seen, `RATE NOT QUOTABLE -- only 0 increase event(s)` — it refused to report
+  `0.0/min`, which is the behaviour under test.
+- Blocked by: none. Feeds the scheduled re-run at 20:15 CDT tonight, when ~12
+  games are in progress, to test whether the driver really is artifact liveness
+  rather than game state (`handoff_2026-09-04_feed_live_request_path_rate.md`).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
