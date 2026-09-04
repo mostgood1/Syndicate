@@ -5357,3 +5357,44 @@ Cheap pre-check that beats waiting for `ledger-commit-guard`: compare your
 `lanes.md` block headings against `git show origin/main:.syndicate/lanes.md` and
 assert both directions are empty — nothing of yours that upstream archived
 (would un-archive), nothing of upstream's that you lack (would drop).
+
+## 2026-09-03 — EXONERATED: `deploys.md` and `learnings.md` ARE guarded. Two sessions filed the same false gap, and the second re-derived it with the SAME blind spot
+
+- **The claim, twice:** that `.syndicate/deploys.md` has no ledger-guard
+  coverage at any stage (session c38d3e5c, at close), and — after I "verified"
+  it — that **2 of 18 `TRACKED` files have no predicate that can ever fire**.
+  Both are wrong. `_deploys` and `_learnings` are registered in `CHECKS` and
+  both fire.
+- **How the false reading was manufactured.** I drove every tracked file with
+  empty/garbage text and `root=None`, and read the nulls as absence.
+  `_deploys`' own first line is *"Fails OPEN: no root, no git, no ref -> no
+  opinion"* — I passed exactly the argument that makes it silent, then reported
+  the silence. `_learnings` needs its `- *(evidence in ...)*` marker, which my
+  inputs never contained. **Driven, not grepped** is better than grepping and
+  still not enough: a probe is only evidence once it can produce the other
+  value.
+- **Demonstrated, which is what the first pass owed:** `_deploys` with a real
+  root reports **1** missing measurement section on the live file (this tree is
+  behind origin) and **294** on a file truncated to 200 lines. It diffs against
+  `origin/main:.syndicate/deploys.md` and refuses a commit that would DROP
+  measurements — *"a lost entry makes an unverified deploy look verified"*. It
+  is one of the STRONGER predicates in the module.
+- **The rule, and it is not "check harder".** RE-DERIVING A PEER'S FINDING WITH
+  THE SAME BLIND SPOT IS NOT CORROBORATION. I set out to verify their claim
+  rather than accept it, which is the defence — and reproduced their error,
+  because I chose an instrument that fails silent in the same direction. Two
+  agreeing readings are one reading unless the instruments can fail
+  independently. Same shape as the two-checks-one-parser case filed the same
+  day, one layer up.
+- **What actually stopped it:** reading `CHECKS` before writing code. A lane was
+  open to add an `UNCHECKED` set and a coverage test — machinery guarding a gap
+  that does not exist, in the file whose own comment says silence "fails
+  PERMISSIVE", while the real predicates sat 30 lines below the dispatch I had
+  already read. Nothing was built.
+- **IT THEN BLOCKED THE COMMIT THAT RETRACTS THIS.** `ledger-commit-guard`
+  refused it: *"1 measurement section(s) on origin/main are MISSING from this
+  commit's deploys.md"* — a real entry (`## 2026-09-04 round 10`) this stale
+  tree had not fetched. The predicate I had written off caught a real
+  regression in a real commit, in the same minute. **A guard reported as dead
+  is not dead; it is a guard nobody has made angry yet.**
+- *(evidence in `learnings_evidence.md`)*

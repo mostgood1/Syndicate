@@ -1901,6 +1901,70 @@ Quote quality: **books_quoting <= 1 on 1,511 rows (57.6%)**; book_age median 4,4
   log stream with 0 tracebacks.
 - Blocked by: none.
 
+### ledger-coverage-declared — CLOSED 2026-09-03, **NOT A DEFECT — the gap does not exist and I nearly built machinery for it** — session f97ad5ab
+- Goal: a file listed in `TRACKED` with no predicate reads as GUARDED and is
+  worth nothing. Make the gap DECLARED so it cannot grow silently.
+- Files (exclusive): `.claude/hooks/ledger_invariants.py`,
+  `.claude/hooks/test_ledger_invariants_resurrection.py`. Collision check RUN
+  2026-09-03 via `lane_claims._claims()`: CLEAR on both.
+- ~~Finding: **2 of 18 `TRACKED` files have no predicate that can ever fire**~~
+  **RETRACTED, AND THE RETRACTION IS THE POINT.** Both files DO have live
+  predicates, registered in `CHECKS` as `_deploys` and `_learnings`. My probe
+  fed them empty/garbage text with `root=None` and read the resulting nulls as
+  "no predicate". `_deploys`' own first line is *"Fails OPEN: no root, no git,
+  no ref -> no opinion"* — I supplied exactly the argument that makes it
+  silent, then reported the silence as absence. `_learnings` needs its
+  `- *(evidence in ...)*` marker, which my inputs never contained.
+- Raised by session c38d3e5c at close as "`deploys.md` has no ledger-guard
+  coverage at any stage". **Half right and understated:** it is TWO files, and
+  `commit-guard.py` does cover both at commit time (its stale-blob predicate is
+  over all staged paths). The gap is the INVARIANT layer, and being LISTED is
+  worse than being absent — absence prompts a question, a `TRACKED` entry reads
+  as an answer.
+- `violations()` already names this exact hazard for state PARTS and fixed it
+  there: *"that silence is the failure mode the glob above exists to prevent,
+  and it fails PERMISSIVE."* These two fall through the same silence.
+- Hypothesis: the fix is NOT to invent predicates. A guard encoding a guess at
+  how an append-only measurement ledger "should" look is theatre, and
+  `learnings.md` forbids exactly that shape. The fix is to make the gap
+  DECLARED: an explicit `UNCHECKED` set with reasons, plus a test asserting
+  `TRACKED == CHECKS | UNCHECKED`.
+- Falsification test: adding a new file to `TRACKED` without a predicate must
+  FAIL that test. Today's two are explicit and pass, so the check is not
+  permanently red — which is the wolf-crying failure this repo keeps paying for.
+- Blocked by: none.
+- **DEMONSTRATED FIRING, which is what the first pass owed and skipped:**
+
+      _deploys, root=None (my probe)      no opinion -- fails open BY DESIGN
+      _deploys, live file + real root     1 missing measurement section
+      _deploys, truncated to 200 lines    294 missing measurement sections
+      _learnings, live file               clean
+      _learnings, stub cut mid-clause     1 compacted stub caught
+
+  `_deploys` is one of the STRONGER predicates in the module: it diffs against
+  `origin/main:.syndicate/deploys.md` and refuses a commit that would DROP
+  measurement sections — the exact failure its message names, *"a lost entry
+  makes an unverified deploy look verified."* Reporting it as unguarded was
+  backwards.
+- **c38d3e5c's closing note ("`deploys.md` has no ledger-guard coverage at any
+  stage") is therefore WRONG, and so was my sharper-sounding version of it.**
+  Two sessions, same error, and mine came from re-deriving theirs — which is
+  supposed to be the defence. Re-deriving with the SAME BLIND SPOT is not
+  corroboration, it is the two-checks-one-parser failure from earlier tonight
+  wearing a different hat.
+- **NOTHING WAS BUILT.** The `UNCHECKED` set and its coverage test would have
+  been machinery guarding a gap that does not exist, added to the file whose
+  own comment says silence "fails PERMISSIVE" — while the real predicates sat
+  30 lines below the dispatch I had already read. What stopped it was reading
+  `CHECKS` before writing code, not any check.
+- **AND THEN IT BLOCKED THIS VERY COMMIT.** The predicate I had just declared
+  incapable of firing refused the commit that retracts the claim:
+  *"1 measurement section(s) on origin/main are MISSING from this commit's
+  deploys.md"* — `## 2026-09-04 round 10`, which this stale tree had not
+  fetched. Not a contrived probe, not a fixture: the guard caught a real
+  regression in a real commit, in the same minute I was writing that it could
+  not. Cleared by `git checkout origin/main -- .syndicate/deploys.md` (the
+  remedy its own message prints), verified CLEAN afterwards.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
