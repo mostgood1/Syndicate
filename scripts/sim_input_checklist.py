@@ -238,6 +238,92 @@ def populated(value, default) -> bool:
     return True
 
 
+# --------------------------------------------------------------------------
+# OUTPUT-SIDE INVARIANT  `#621`
+#
+# Everything else in this file audits INPUT dataclass fields: is a field the
+# engine READS actually POPULATED. That framing is structurally blind to the
+# defect that motivated this block, which sits on the OUTPUT side --
+# `_HITTER_PROP_DIST_SPECS` names a row_key ("SO") that the per-sim
+# `hitter_stat_values` dict never sets, and the read is
+# `.get(row_key, 0)`. A neutral default (standard 4.2) turns that into
+# `strikeouts_dist == {0: n_sims}` and `so_mean == 0.0` for every hitter in
+# every game, with passing tests and no log line.
+#
+# It is a ONE-LINE invariant -- `set(spec row_keys) <= set(dict keys)` -- and
+# it is checked here rather than only in the test suite because this script is
+# what `scripts/run_mlb_daily_sim_job.py` runs, so a regression fails the
+# actual daily job.
+#
+# It runs BEFORE the roster glob on purpose. It needs no artifacts, so it must
+# still report on a box where the checklist would otherwise exit "REFUSED: no
+# roster artifacts" -- the state in which a fresh checkout sits.
+#
+# THE PITCHER SPEC IS DELIBERATELY NOT CHECKED HERE. `_PITCHER_PROP_DIST_SPECS`
+# is read straight off the boxscore row (`row.get(str(row_key))`), not out of a
+# curated dict, so there is no key set to compare against and no equivalent way
+# to silently drop one. Audited empirically 2026-09-04: all 7 pitcher dists
+# multi-bin. If a curated pitcher dict is ever introduced, add it here.
+# --------------------------------------------------------------------------
+DAILY_UPDATE_PY = REPO / "vendor" / "mlb_bettingv2" / "tools" / "daily_update.py"
+
+
+def output_spec_problems() -> list:
+    """Return human-readable problems with the hitter prop OUTPUT specs.
+
+    Parsed with `ast`, never a regex: the fix's own comment contains a literal
+    `{0: n_sims}` whose brace truncates a non-greedy match, which made the dict
+    look SHORTER than it is -- a false PASS shaped like the bug being tested.
+    """
+    import ast
+
+    problems: list = []
+    try:
+        tree = ast.parse(DAILY_UPDATE_PY.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [f"could not parse {DAILY_UPDATE_PY}: {exc}"]
+
+    sites: list = []
+    specs: list = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        if isinstance(node.value, ast.Dict) and "hitter_stat_values" in names:
+            sites.append([k.value for k in node.value.keys if isinstance(k, ast.Constant)])
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)                 and node.target.id == "_HITTER_PROP_DIST_SPECS" and node.value is not None:
+            for elt in getattr(node.value, "elts", []):
+                parts = [e.value for e in getattr(elt, "elts", []) if isinstance(e, ast.Constant)]
+                if len(parts) == 3:
+                    specs.append(parts)
+
+    if not specs:
+        return ["could not read _HITTER_PROP_DIST_SPECS -- the invariant did NOT run"]
+    if len(sites) != 2:
+        problems.append(
+            f"expected 2 hitter_stat_values sites (_simw_chunk + _sim_many), found {len(sites)}"
+        )
+    if not sites:
+        return problems + ["could not read hitter_stat_values -- the invariant did NOT run"]
+
+    required = {row_key for _d, row_key, _m in specs}
+    for i, keys in enumerate(sites, start=1):
+        missing = sorted(required - set(keys))
+        if missing:
+            problems.append(
+                f"hitter_stat_values site #{i} never sets {missing}, which "
+                f"_HITTER_PROP_DIST_SPECS reads via .get(row_key, 0) -- "
+                f"those dists are {{0: n_sims}} and their means 0.0 on EVERY row"
+            )
+    if len(sites) == 2 and sites[0] != sites[1]:
+        problems.append(
+            f"the two hitter_stat_values dicts have DRIFTED: {sites[0]} vs {sites[1]} "
+            f"(this is the `#334` failure mode -- fixing one copy and not the other)"
+        )
+    return problems
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--games", type=int, default=40)
@@ -252,6 +338,20 @@ def main() -> int:
     ap.add_argument("--publish", action="store_true",
                     help="write the report into the artifact tree so PRODUCTION can be audited. Roster objects are not allowlisted (hundreds of large files per date); the worker runs this and publishes the bounded result instead -- the book_grid pattern.")
     args = ap.parse_args()
+
+    # OUTPUT-SIDE INVARIANT first: it needs no rosters, so it must still speak
+    # on a box where the roster glob below exits REFUSED. `#621`.
+    spec_problems = output_spec_problems()
+    if spec_problems:
+        print("=" * 88)
+        print("FAIL: hitter prop OUTPUT spec/dict mismatch -- silently zeroed distributions")
+        for problem in spec_problems:
+            print(f"    {problem}")
+        print("=" * 88)
+        print("")
+    else:
+        print("ok: every _HITTER_PROP_DIST_SPECS row_key is set at both "
+              "hitter_stat_values sites, and the two sites match")
 
     from sim_engine.data.roster_artifact import read_game_roster_artifact
     from sim_engine.models import BatterProfile, PitcherProfile
@@ -443,6 +543,10 @@ def main() -> int:
         print("  artifacts endpoint gates on HOT_ARTIFACT_PATTERNS and roster_objs")
         print("  is deliberately not on it.")
 
+    # `spec_problems` is NOT gated on --warn-only: it is a source-level
+    # contradiction, not a population rate that a thin day can excuse.
+    if spec_problems:
+        return 1
     return 1 if (failures and not args.warn_only) else 0
 
 
