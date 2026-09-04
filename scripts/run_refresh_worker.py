@@ -2412,6 +2412,94 @@ def _launch_autorun_accuracy_summary(
     return True
 
 
+def _ledger_projection_interval_seconds() -> int:
+    """Seconds between projected-ledger mirror passes. **0 or absent = OFF.**
+
+    Absent means OFF here, and that is the conservative direction rather than
+    the permissive one: this is NEW PERIODIC WORK on a 4 GB worker that also
+    runs board builds, MLB sims and odds refreshes, and `#241` turned exactly
+    that into a production restart loop. Nothing runs until someone sets this.
+
+    The mirror ALSO runs from the once-daily accuracy autorun, and the two
+    compose safely because the producer is incremental -- whichever fires first
+    writes the chunk, and the other finds it fresh and does nothing. This knob
+    exists because the daily gate is `last_run_date < today`, so on the day the
+    producer ships there is no way to exercise it at all.
+    """
+    raw = str(os.environ.get("SYNDICATE_LEDGER_PROJECTION_INTERVAL_SECONDS") or "").strip()
+    if not raw:
+        return 0
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 0
+
+
+def _ledger_projection_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "ledger_projection_status.json"
+
+
+def _launch_autorun_ledger_projection() -> bool:
+    """Refresh the projected ledger mirror on its own cadence.
+
+    Returns True when it did work, so the tick chain treats it like every other
+    autorun and does not also fire a later one in the same tick.
+    """
+    interval = _ledger_projection_interval_seconds()
+    if interval <= 0:
+        return False
+
+    status_path = _ledger_projection_status_path()
+    last_status = _refresh_state_store()["read_json_file"](status_path) or {}
+    last_epoch = float((last_status or {}).get("epoch") or 0.0)
+    now_epoch = time.time()
+    # `last_epoch <= 0` runs IMMEDIATELY: a freshly armed worker should produce
+    # the mirror on its first tick rather than waiting a full interval for a
+    # job whose whole point is that it has never run.
+    if last_epoch > 0 and (now_epoch - last_epoch) < interval:
+        return False
+
+    # `#256`: CLAIM THE RUN BEFORE DOING THE WORK. The status is written with
+    # the epoch FIRST, so a process that dies mid-pass has still advanced the
+    # clock and the next boot waits an interval instead of hot-looping on a
+    # pass that kills it. That defect turned an expensive job into an
+    # eleven-hour outage once already.
+    _refresh_state_store()["write_json_file"](
+        status_path, {"epoch": now_epoch, "state": "started", "interval_seconds": interval}
+    )
+
+    started_at = time.time()
+    stats: dict[str, Any] = {}
+    error_text = None
+    try:
+        from syndicate.features.shared.evaluation_ledger_projection import project_ledger_chunks
+
+        stats = project_ledger_chunks() or {}
+    except Exception as exc:
+        error_text = f"{type(exc).__name__}: {exc}"
+        print(f"[ledger_projection] AUTORUN_FAILED error={error_text}", flush=True)
+
+    elapsed = round(time.time() - started_at, 3)
+    _refresh_state_store()["write_json_file"](
+        status_path,
+        {
+            "epoch": now_epoch,
+            "state": "error" if error_text else "ok",
+            "elapsed_seconds": elapsed,
+            "error": error_text,
+            "interval_seconds": interval,
+            "stats": stats,
+        },
+    )
+    print(
+        f"[ledger_projection] AUTORUN_DONE elapsed_s={elapsed} "
+        f"written={stats.get('chunks_written')} published={stats.get('published')} "
+        f"error={error_text or 'none'}",
+        flush=True,
+    )
+    return True
+
+
 def _launch_autorun_evaluation_settlement(
     *,
     latest_manifest_path: Path,
@@ -5679,6 +5767,17 @@ def main() -> int:
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,
         ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_ledger_projection():
+            # DIRECTLY BEHIND THE ACCURACY SUMMARY, because it mirrors the same
+            # ledger and the summary is the product while this is the transport.
+            # Stated as a RELATIONSHIP rather than an ordinal: four comments in
+            # this chain went stale by claiming a position, two of them claiming
+            # the same one as each other.
+            #
+            # OFF unless `SYNDICATE_LEDGER_PROJECTION_INTERVAL_SECONDS` is set,
+            # so inserting it here changes nothing until someone arms it.
             if args.run_once:
                 return 0
         elif _launch_autorun_nfl_pbp_fetch(
