@@ -3110,6 +3110,30 @@ not Git Bash: `origin/main:path` is mangled to `origin\main;path` and the comman
 fails, which — with a `|| echo 0` fallback — reads as **"content absent"** and
 argues for pushing MORE. That happened here, in the same check.
 
+**THE DEFINITIVE CHECK IS `merge-tree`, NOT A HAND-PICKED STRING**
+`[added 2026-09-03; technique from session c38d3e5c, negative control by f97ad5ab]`.
+The grep above still works and stays as the cheap read, but it depends on
+choosing a phrase that is distinctive AND survived rewording, which is a second
+judgement call in a check that exists because judgement failed once already:
+
+    git merge-tree --write-tree origin/main <sha>     # -> a tree object
+    git diff --stat origin/main <that tree>           # EMPTY => already upstream
+
+It answers the WHOLE commit rather than one line of it, needs no phrase, and is
+immune to the dot-path mangling below because it takes no `rev:path` argument.
+
+**MEASURED WITH A NEGATIVE CONTROL, because an EMPTY result is only evidence
+once you know the tool can return a non-empty one.** Both readings on the same
+pair of commits:
+
+    caab9344 / 2292f027 (rebased upstream)   diff EMPTY      content IS upstream
+    a throwaway README edit                  diff 1 file     content is NOT
+    `merge-base --is-ancestor` on both       "NOT upstream"  <- FALSE NEGATIVE
+
+That last row is the whole entry in one line: the identity check is confidently
+wrong about commits whose content is already there, and it is wrong in the
+direction that makes you push a duplicate.
+
 **SCOPE, MEASURED 2026-09-03 — it breaks ONLY on DOT-PREFIXED trees, which is
 worse than "it breaks", not better** `[session c38d3e5c; refinement from
 f97ad5ab, who hit it the same day]`:
