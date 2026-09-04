@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 758 rules `[generated]`
+## Index — 766 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4707,3 +4707,36 @@ the failing test.
   from a shell string needs seven regex families and still misses cases, and a
   guard that blocks on a guess is one people route around.
 - *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-03 — WHICH TREE: locks/markers/receipts to the PRIMARY tree, ledger/code to the worktree
+
+Four separate defects in one session, all the same root cause — a `cd` inside a
+Bash call silently changes which tree a write lands in, and the two trees are
+read by different things:
+
+1. **Deploy claims** written to the worktree; `deploy-guard.py` reads
+   `CLAUDE_PROJECT_DIR` (the primary tree) and answered `claim NOT HELD by
+   anyone` seconds after a successful `acquire`. Three times.
+2. **Preflight receipts** likewise — `the CLEAR preflight is for <a different
+   sha>`.
+3. **A `git rebase` run against the SHARED primary branch** because the shell
+   cwd had persisted from an earlier `cd`. Benign only because `git cherry` was
+   empty and it fast-forwarded.
+4. **A stale per-session lane marker** left in the worktree
+   (`live-odds-catchup-round4`) for hours. I cleared the primary tree's marker
+   after every lane and never the worktree's, so `lane-postwrite-check.py` —
+   which runs against the worktree — attributed writes to a closed lane.
+
+**The rule.** Locks, markers and receipts are read by the GUARDS, which run
+against the primary tree: take and clear them there. Ledger and code are
+committed, so they belong in the worktree. `deploy_claim.py` and
+`deploy_preflight.py` now resolve this themselves via `--git-common-dir`
+(2026-09-03), but the MARKER files still do not — clear
+`.syndicate/.current-lane.<session>` in **both** trees when closing a lane, or
+check with `ls .syndicate/.current-lane.*` in each.
+
+**Corollary on guard warnings during a rebase.** `lane-postwrite-check.py` fired
+OUT-OF-LANE WRITE on two files that were not mine: a `git rebase` pulls PEERS'
+commits into the worktree, and the hook compares `(mtime, size)` with no author.
+Expect false positives around a rebase and check authorship before acting —
+reverting on that signal would have destroyed a peer's landed work.
