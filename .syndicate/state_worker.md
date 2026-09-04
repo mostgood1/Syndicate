@@ -376,6 +376,23 @@ a schedule.**
 **Render labels a voluntary process exit `server_failed`.** That is a platform
 naming artifact. Any audit that counts the events without the reason inflates.
 
+**A THIRD meaning, and this one makes a census UNDERCOUNT rather than inflate
+`[2026-09-04, lane web-sigkill-137-cohort]`.** `reason.nonZeroExit` — the
+process returned a code — was unnamed by `classify()` until 2026-09-04 and fell
+into `failed:unknown` with no label. **67 events carry it**: refresh-worker 12
+and live-odds-worker 17 (all code `1`), and **web 38, every one code `137` =
+128+9 = SIGKILL**, confined to 2026-06-15 .. 2026-07-09. So web's kill count for
+that era is **202, not the 164 an `oomKilled`-only census returns — 19% low**.
+The 38 die 70–830s after every boot (median 162s, 97% under 10 min, none over 14
+minutes) and interleave with labelled `oomKilled` in the same storms, so they
+are NOT a relabelling: web's first `oomKilled` predates the first 137 by five
+days. Deploy, restart and relabelling hypotheses were each tested and killed.
+**That they were OOMs is NOT established** — Render labelled 164 container OOMs
+correctly in the same period, so this SIGKILL probably came from somewhere other
+than the cgroup killer on PID 1. Logs cannot settle it: retention is ~30 days
+(bisected — 08-21 covered, 08-05 HTTP 400). Zero 137s in the 57 days since.
+Full working: `findings_2026-09-04_web_sigkill_137_cohort.md`.
+
 ## [refresh-worker-memory] MEMORY — refresh-worker: THE OOM IS FIXED; A SLOW RATCHET REMAINS `[verified 2026-08-17, superseding four earlier sections]`
 
 **This section replaces the 08-16 "allocator still unnamed" narrative entirely.

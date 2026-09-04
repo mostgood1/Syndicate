@@ -923,6 +923,50 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   now shows `nonZeroExit=1`.
 - Blocked by: none. Local tooling — no deploy.
 
+### web-sigkill-137-cohort — CLOSED-VERIFIED 2026-09-04 — **the 38 are a bounded CRASH LOOP: not a deploy artifact, not a relabelling, not a restart — all three hypotheses tested and KILLED. web's kill count for 2026-06-15..07-09 was UNDERCOUNTED BY 38 (202, not 164 — 19% low). That they were OOMs is NOT established, and logs cannot settle it (~30d retention).** — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
+- Goal: say what web's 38 `nonZeroExit=137` events ARE, with a measurement, and
+  say plainly if the answer is "not determinable from the events API".
+- Files: read-only investigation. `.syndicate/*` for the write-up.
+- The observation, from lane `render-events-nonzeroexit-bucket`: web carries 38
+  `server_failed` with `reason.nonZeroExit = 137` (128+9 = SIGKILL), ALL between
+  2026-06-15T20:09:10Z and 2026-07-09T03:48:19Z, and web's value is ONLY ever
+  137 while both workers' is ONLY ever 1. Render did not label any of them
+  `oomKilled`, and web's recent kills (4 since 2026-09-02) ARE so labelled, at
+  `memoryLimit=2Gi`.
+- **HYPOTHESES, written before testing (H1 and H2 are not exclusive):**
+  - **H1 — deploy shutdown.** 137 is the old instance being SIGKILLed after it
+    failed to exit within the grace period following a deploy. Predicts: each
+    137 sits a short, TIGHTLY CLUSTERED interval after a `deploy_started`, and
+    the distribution of that delta is much narrower than chance.
+  - **H2 — a labelling change.** Render began classifying the same underlying
+    kill as `oomKilled` at some point. Predicts: a clean changeover date, with
+    137s stopping as `oomKilled` starts, and NO overlap.
+  - **H3 — a genuine OOM the platform did not attribute.** Predicts: no deploy
+    correlation, and interleaving with `unhealthy` in the way a memory-pressure
+    regime does.
+- **Falsification, stated per hypothesis:** H1 dies if the 137→preceding-deploy
+  deltas are broad or absent. H2 dies if web has `oomKilled` events INSIDE the
+  137 window, or 137s after the first `oomKilled`. H3 dies if H1 holds.
+- **RESULTS.** H1 DEAD: 13% within 120s, median 1,381s — and the `unhealthy`
+  control clusters TIGHTER (31%, median 205s). H2 DEAD: web's first `oomKilled`
+  is 2026-06-10, five days BEFORE the first 137, and **77 `oomKilled` sit inside
+  the window**; on 2026-07-03 a 137 at 03:33:05Z is followed by `oomKilled` at
+  04:05:34Z. H5 (added mid-investigation — the 75 user restarts) DEAD: **0 of
+  38** within 300s, median gap 26 hours. What survives is a boot-kill signature:
+  70..830s uptime, median 162s, 97% under 10 min, **none over 14 minutes** —
+  near-identical to `earlyExit`, unlike `oomKilled` (median 489s, tail 7.9 days).
+  Live-commit mapping over 1,900 deploys (19 pages, fully paged): 9 of the 38 ran
+  under "compute intelligence … on empty cache" / "surface intelligence
+  candidates synchronously", 2 under "Reduce Render Gunicorn concurrency". The
+  cohort ends **92s before** `9d259f857 Move intelligence publication to shared
+  state` went live. Cause remains INFERRED — logs aged out (~30d; bisected 08-21
+  covered / 08-05 HTTP 400, which is a READER failure, not an absence).
+  Write-up: `findings_2026-09-04_web_sigkill_137_cohort.md`.
+- **METHOD NOTE, load-bearing:** web's unfiltered read HIT THE 100-PAGE CAP
+  (10,000 events, oldest 2026-06-05), so "38" and "first 2026-06-15" are LOWER
+  BOUNDS until older windows are read explicitly with `--end`. Do that first.
+- Blocked by: none. Read-only — no deploy.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
