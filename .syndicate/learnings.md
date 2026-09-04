@@ -5084,3 +5084,59 @@ logs for the token returns **0 lines, correctly** — indistinguishable from "th
 fix is broken". A null result on the wrong service is not evidence about the fix
 at all. Same family as *absent signal ≠ absent path* and *presence is not
 reachability*; the new axis is that the EMITTER has its own deployment identity.
+
+## 2026-09-04 — A FLAT READING FROM AN INSTRUMENT THAT CANNOT SEE THE SUSPECT IS NOT EVIDENCE
+
+`#632`. Five mechanisms were excluded and the memory growth stayed unattributed.
+Two of those exclusions rested on allocator introspection: pymalloc arena counts
+came back flat, and `#435` had already found glibc `malloc_info` flat. I recorded
+fragmentation as EXCLUDED on that basis.
+
+**Both instruments are structurally incapable of seeing the allocation that
+turned out to be responsible.** CPython routes anything over 512 bytes past
+pymalloc to malloc/mmap; pymalloc arenas were ~40% of worker RSS and
+`malloc_info` reached 13.9% coverage. The growth is in 8-64MB anonymous
+mappings — a region class neither can report. A third instrument
+(`/proc/self/smaps`, the kernel's own accounting) found it in one window.
+
+THE RULE: before recording a null result, state what fraction of the quantity
+the instrument can see. A flat reading over 40% of the mass excludes the
+hypothesis over 40% of the mass and says NOTHING about the other 60%. Write the
+coverage next to the verdict, or the verdict will later be read as stronger than
+it was — I recorded "fragmentation excluded" and had to walk it back to
+"excluded within the 40% pymalloc can see".
+
+Corollary, and it is the cheaper check: **a breakdown that does not sum to its
+own total is not attribution.** Every earlier probe in this investigation left a
+residual I reached by subtraction and then narrated. When `by_kind_mb` was
+finally recorded alongside the size buckets, the residual went to `0.00` and one
+narration — "65-70% is heap, so it is glibc's main arena" — turned out to be
+wrong: heap was 7.4%. Name the residual the first time it appears.
+
+Related: `[2026-09-04]` "an in-Python free cannot move process anon", which is
+the same failure a level down — reasoning about a mechanism the instrument in
+hand could not have registered.
+
+
+## 2026-09-04 — PRE-REGISTER THE GATE, AND LET IT BIND WHEN THE DATA IS POINTING WHERE YOU HOPE
+
+`#632`. The smaps collector was written with its stopping rule fixed BEFORE any
+data: at least 5 readings per worker over at least 35 minutes with a material
+climb. It then withheld its verdict because the worker in question reached
+**34.6 minutes — 24 seconds short** — with the data pointing exactly where I
+wanted it to.
+
+Twenty-four seconds is not a meaningful difference, and that is precisely what
+makes it the dangerous case: every argument for relaxing the threshold was
+available only AFTER seeing the result. I collected more instead; the second
+worker crossed at 37.3 min honestly and both agreed.
+
+THE RULE: a threshold set in advance is only worth something if it also binds
+when it is inconvenient. If a gate is missed by a margin you would have called
+irrelevant beforehand, collect more data — do not edit the gate. The tell that
+you are about to rationalise: the justification for the change refers to the
+data you just saw.
+
+This session also supplies the contrast case for what a gate is FOR: an earlier
+verdict in the same investigation was called on a 12-minute window with two
+interleaved workers, and it was WRONG in a way a 35-minute window caught.

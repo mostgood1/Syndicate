@@ -66,7 +66,7 @@ markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
 ## OPEN
-### web-oom-arena-trend — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-arena-trend — CLOSED 2026-09-04 — opened 2026-09-04 — **FIRST POSITIVE IDENTIFICATION IN `#632`.** The arena hypothesis was FALSIFIED (arenas flat, fragmentation 56.6 MB and stable) and the falsification exposed the instrument: pymalloc sees ~40% of worker RSS and cannot register an allocation over 512 bytes. The smaps trend, split by pid with a gate pre-registered before the data, found it — **the growth is 8-64MB ANONYMOUS MAPPINGS**: pid 79 `+148.70 MB / 37.3 min`, 80.5% in that bucket; pid 78 `+54.10 MB / 34.6 min`, 85.4%. `UNNAMED 0.00` on both. NOT established: what allocates them, and the rates are early-life so they are NOT comparable to the +173 MB/h plateau. NEXT: does the climb track the worker serving `/api/intelligence/query`? — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: answer whether `#632`'s ~173 MB/h is FRAGMENTATION or RETENTION, by
   sampling pymalloc's `arena_mb` against `bytes_in_allocated_blocks_mb` over
   time. Four per-request explanations are already ruled out, and the last ruled

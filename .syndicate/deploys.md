@@ -21874,3 +21874,65 @@ is an inference across two substrates rather than a reading.
 
 **Owed:** nothing from me. The change needs either that lane to take it or the
 file to be released.
+
+
+---
+
+## 2026-09-04T18:09Z — web — `76c0e174` — `#632` **VERDICT: the growth is 8-64MB ANONYMOUS MAPPINGS**
+
+`[lane web-oom-arena-trend, session b2b5b45b]` — this DISCHARGES the
+`verify: PENDING` left on the `08ca5ff2` entry above.
+
+verify: **`smaps_trend`, split by pid, both web workers, gate pre-registered
+BEFORE the data (>= 5 readings, >= 35 min, material climb):**
+
+    pid 79   n=6   37.3 min   +148.70 MB   ->  +239.4 MB/h
+               size    8-64MB  +119.70 MB   (80.5% of the move)
+               size     1-8MB   +17.90 MB   (12.0%)
+               kind      heap   +11.00 MB   ( 7.4%)
+               UNNAMED    -0.00 MB
+
+    pid 78   n=6   34.6 min    +54.10 MB   ->   +93.7 MB/h
+               size    8-64MB   +46.20 MB   (85.4% of the move)
+               kind      heap    +7.90 MB   (14.6%)
+               UNNAMED    +0.00 MB
+
+**This is `#632`'s first POSITIVE identification. Every prior finding was an
+exclusion.** Five mechanisms were ruled out (cross-worker scope, background
+loops, GC timing, `LAST_RESULT`, pymalloc fragmentation) and the growth stayed
+unattributed. It is in **large anonymous mappings, 8-64MB regions** — the
+allocation class that pymalloc arenas and glibc `malloc_info` are both
+STRUCTURALLY blind to, which is why five probes read flat and why that flatness
+was never the reassurance it looked like.
+
+**Why this reading is trustworthy where the earlier ones were not:**
+* `UNNAMED` is `0.00` on both workers — the breakdown SUMS TO ITS OWN TOTAL.
+  Every earlier attribution in this investigation left a residual I reached by
+  subtraction and then explained.
+* `<64KB` and `64KB-1MB` are frozen at 0.3 and 0.2 across all 12 readings. Not
+  small-and-noisy: unchanged to the decimal, so the instrument is not drifting.
+* TWO INDEPENDENT PROCESSES agree (80.5% and 85.4%), which is worth more than
+  either crossing a threshold alone.
+* Split by `pid`, not by an inferred signature. The first pass read two
+  interleaved workers as one series and only luck put the same worker at both
+  ends.
+
+**WHAT IS NOT ESTABLISHED, and must not be quoted as if it were:**
+* **The rates are NOT comparable to the +173 MB/h plateau figure.** Both
+  processes booted at 17:26 and these windows are early life, with warm-up
+  allocation mixed in. Quoting +239.4 MB/h as a regression against +173 MB/h
+  compares a cold process to a steady-state one.
+* **The two workers differ by 2.6x on the same container over the same window**
+  (239.4 vs 93.7 MB/h) and nothing explains that yet. If growth tracks the
+  worker receiving intelligence queries, that supports the payload story; if it
+  does not, something else drives it. **That is the next measurement.**
+* WHAT allocates the 8-64MB regions is still unidentified. The bucket is
+  consistent with a payload-sized allocation; it does not name one.
+
+**A gate held that I wanted to relax.** The first run withheld its verdict
+because pid 78 reached 34.6 min against a pre-registered 35.0 — short by 24
+SECONDS, with the data pointing where I hoped. I collected more rather than
+loosening the threshold. pid 79 then crossed it honestly at 37.3 min.
+
+**Not a fix — an identification.** Nothing about web's memory behaviour changed
+in this deploy; it is instrumentation only. `#632` remains open.

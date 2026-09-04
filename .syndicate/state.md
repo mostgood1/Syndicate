@@ -673,3 +673,28 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   comparison. The question is "when does an arena empty".
 * The symptom is INTERMITTENT — zero negative routes in the last two windows.
   Nothing is confirmed; four things are ruled out.
+
+### `[web-oom-leak]` UPDATE 5 — **POSITIVELY IDENTIFIED: 8-64MB anon mappings**, 2026-09-04T18:09Z `[session b2b5b45b]`
+
+* **The growth is in LARGE ANONYMOUS MAPPINGS (8-64MB regions).** Measured on
+  `76c0e174` via `smaps_trend` split by pid, gate pre-registered before the data:
+  pid 79 `+148.70 MB / 37.3 min` with **80.5% in `8-64MB`**; pid 78
+  `+54.10 MB / 34.6 min` with **85.4%** there. `UNNAMED` `0.00` on both — the
+  breakdown sums to its own total. `<64KB` and `64KB-1MB` unchanged to the
+  decimal across all 12 readings.
+* **This is the first POSITIVE finding in `#632`; the previous five were
+  exclusions.** It also explains WHY they were: pymalloc arenas cover ~40% of
+  worker RSS and glibc `malloc_info` reached 13.9% coverage in `#435`. **Both are
+  structurally blind to an allocation over 512 bytes**, so their flat readings
+  were never evidence of a flat process.
+* **CORRECTS an intermediate claim made the same session.** With only the size
+  buckets recorded, the residual computed by subtraction read as 65-70%
+  "non-mmap" and I proposed glibc's main arena. Recording `by_kind_mb` retired
+  that: heap is **7.4% / 14.6%**, a minority term.
+* **NOT ESTABLISHED:** what allocates those regions; and the rates
+  (`+239.4` vs `+93.7 MB/h`) are EARLY-LIFE and not comparable to the `+173 MB/h`
+  plateau figure. **The two workers differ 2.6x on one container in one window,
+  unexplained.**
+* **NEXT MEASUREMENT:** does the climb track which worker serves
+  `/api/intelligence/query`? That discriminates the payload story from
+  everything else, and it is answerable with the instrument already deployed.
