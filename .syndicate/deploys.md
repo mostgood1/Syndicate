@@ -22048,3 +22048,52 @@ one boot.** Not a rate yet, and not mine to chase — flagged for
 **Not a fix.** No behaviour changed for users. `refused=0` since boot is
 consistent with the 8-day quiet, and still does not distinguish "cache stopped
 missing" from "caller stopped calling".
+
+## 2026-09-04 18:3xZ — refresh-worker `58ecba3a` — lane `mlb-feed-live-terminal-refresh` — NO DEPLOY TAKEN (claim acquired, then RELEASED)
+
+**The counter answered without needing my deploy, and it OVERTURNS the diagnosis.**
+
+Sequence: polled the claim (`status` only, never re-`acquire`) until it EXPIRED
+on its own at 45.2 min — the holder `mlb-rate-refit` never released it.
+Acquired legitimately (expired claims do not block; no `--force`). Preflight
+then refused with **TOO_SOON** (redeployed 20 min earlier, inside the 25 min
+spacing) and, more importantly, showed **an MLB sim IN FLIGHT**:
+`run_mlb_daily_sim_job.py` pid 380 with five child processes. A deploy would
+have killed it. While polling, another lane had shipped `58ecba3a` at
+18:15:15Z — which CONTAINS `141e9c74` by ancestry AND by content, so the
+counter was already live. Claim released, nothing deployed, sim untouched.
+
+**verify: the reading, from the 18:16:22Z rebuild (that restart's one-shot
+previous-day build — `_BOOK_GRID_LAST_RUN` is an in-process dict, so yesterday
+is rebuilt once per process and a restart is the only trigger):**
+
+    FEED_LIVE_REFRESH date=2026-09-03 today=2026-09-04 in_request=False games=9
+      no_cached_payload=0 skipped_final=9 skipped_window=0
+      attempted=0 succeeded=0 failed=0 became_final=0
+
+**`skipped_final=9`. ALL NINE cached feed payloads for 09-03 ALREADY READ
+FINAL** — including ATH @ SEA and STL @ LAD. The window fired correctly
+(`skipped_window=0`, both inputs on the row), nothing failed, and no fetch was
+needed. **THE FRESHNESS FIX IS CORRECT AND CORRECTLY DOES NOTHING HERE.**
+
+**REACHABILITY, same line, other date:** `date=2026-09-04 ... games=16
+no_cached_payload=16 attempted=16 succeeded=16 became_final=0` — today's cache
+is empty by design (it is written by the vendor's PRIOR-DAY reconciliation), so
+the fix fetches all 16 and none are final yet. off != on in production.
+
+**SO THE DIAGNOSIS WAS WRONG, AND "FROZEN CHIP" IS THE WRONG NAME.** The chip
+is not frozen: the payload says Final and the board says `live`. On the
+18:16:22Z board, ATH @ SEA reads `live 7-4` (7-4 IS the true final) and
+STL @ LAD reads `live 2-1` against a true final of 2-3, with
+`games_with_outcome` still **7 of 9**. Status and score also disagree with each
+other, which matches the standing note that `is_final` and `_side_score`'s
+candidates are unrelated fields.
+
+**The loss is in the mapping from a FINAL payload to `game.state`, downstream
+of everything this lane changed.** That is the next lane's question, and it is
+now a narrow one: `gameData.status` says Final, `build_game_chip` publishes
+`live`.
+
+**Cost of not having had the counter: two wrong attributions in one day** — the
+lens overlay first, then freshness. Both were plausible, both were wrong, and
+one log line settled it.
