@@ -1732,7 +1732,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   unreachable from here.
 - Blocked by: none.
 
-### nfl-projection-deploy — OPEN — opened 2026-09-04 — session ff257687-e3c6-48e0-b92a-e6e494211885
+### nfl-projection-deploy — OPEN — opened 2026-09-04 — session ff257687-e3c6-48e0-b92a-e6e494211885 — **WEB DEPLOYED AND LIVE (`f6340007`, 21:40:39Z). THE PREDICTION FAILED AND THE FALSIFICATION TEST FIRED AS WRITTEN: served `unmatched_game_rows` is **78**, not 0, Rams 78 rows / 0 projected. NOT the alias — `/api/board/book-grid` serves `source: "precomputed_artifact"`, so the web request-path join never runs for it; the board is built by **refresh-worker**, which is on `6c8672b7` — HAS `52870f57` (why it is already 78 and not 299), LACKS `fb7a1f96`. Two corroborating tells on the same payload: no `projection_coverage` key (the web attach adds it) and Rams rows carry no `projection` key at all. **A DEPLOY OF refresh-worker IS STILL OWED, and was NOT taken: its claim is HELD (28.3 min of 45) by `soccer-player-producer`, with an MLB sim (pid 4854) and a board build in flight that a restart would kill.** Web claim released. Full working in `deploys.md` 21:37:24Z.**
 - Goal: discharge the `web` deploy OWED since `52870f57` (NFL projection ET
   date key) and now also carrying `fb7a1f96` (the `LA` Rams alias). `[user: "deploy web once the current claim frees up"]`
 - Files: none — deploy only, no code change. `render.yaml` NOT touched, so no

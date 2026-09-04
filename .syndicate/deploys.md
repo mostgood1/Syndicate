@@ -22362,6 +22362,73 @@ only. The guard was right and the fix was to correct the marker, not the claim.
 
 ---
 
+## 2026-09-04 21:37:24-21:40:39Z — web `b36d993f` → `f6340007` — **DEPLOYED, LIVE, AND THE PREDICTION FAILED. `unmatched_game_rows` IS STILL 78, NOT 0. The web deploy was NECESSARY AND NOT SUFFICIENT — THIS ENDPOINT SERVES A PRECOMPUTED ARTIFACT BUILT BY refresh-worker, WHICH IS ON PRE-ALIAS CODE.** `[lane nfl-projection-deploy, user: "deploy web once the current claim frees up"]`
+
+`verify:` **`unmatched_game_rows` on the SERVED `/api/board/book-grid?sport=nfl&limit=5000`
+= 78 of 1,252, Rams 78 rows / 0 projected. Predicted 0. FAILED.**
+
+### what was deployed
+
+    deploy   dep-dadjk52d0e5s73d7gjkg   trigger=api
+    web      b36d993f → f6340007   live 2026-09-04T21:40:39.494643Z
+    23 commits, fast-forward (b36d993f IS an ancestor of f6340007 — not a rollback)
+    render.yaml untouched in the range, so NO blueprint_sync; blast radius one service
+
+Gates: web claim was EXPIRED (82.4 min against a 45-min TTL, holder
+`web-oom-allrequest-reconcile` / session `b2b5b45b`, not in the running roster), so it
+was replaced rather than forced. `deploy_preflight --service web` returned **CLEAR**:
+only infrastructure processes, plus 2 defunct children already dead.
+`check_deploy_safety` said NOT CLEAR, and that is FLEET-WIDE, not service-scoped —
+the MLB sim (pid 4854) and the board build were on refresh-worker, which a web deploy
+does not restart. Live games were in progress; the accepted cost was one restart of
+live-lens ticks and live prop hydration.
+
+### why the prediction failed, and it is NOT the alias
+
+**The served payload carries `source: "precomputed_artifact"`.** Read at 21:42:16Z,
+AFTER the deploy went live, `generated_at 2026-09-04T21:42:16Z` — fresh, not cached.
+Two more tells on the same payload, both of which say the web request-path join never
+ran for it:
+
+  * the response has **no `projection_coverage` key**, and
+    `_attach_book_grid_projections` (`blueprints/intelligence.py:2837`) is what adds it;
+  * a Rams row has **no `projection` key at all** — not `projection: null`, absent.
+
+So `/api/board/book-grid` is the artifact-backed path, and the projection stamping
+happened on **refresh-worker** when it built the board. Ancestry closes it:
+
+    refresh-worker  6c8672b7   HAS 52870f57 (date key)   LACKS fb7a1f96 (alias)
+    web             f6340007   HAS 52870f57              HAS   fb7a1f96
+
+That predicts 78 exactly: the date-key fix is what already took the artifact from 299
+to 78, and the alias fix is the part refresh-worker has never run. **The measurement
+is fully accounted for, and nothing about it contradicts the alias fix** — which
+remains verified against production's own rows in the replay under `fb7a1f96`.
+
+### the prediction was wrong in its PREMISE, and the warning was in this file
+
+The `299 → 0` I wrote onto the owed entry assumed web was the serving path. The owed
+entry's own item 1 said, in its second sentence: *"The workers rebuild the board, so
+they want it too."* I read that as an optimisation and it was the load-bearing half.
+**A deploy target must be chosen from the path that SERVES the reading you predicted,
+not from the path that contains the code.** Both services contain
+`attach_nfl_game_projections`; only one of them produced this payload.
+
+### owed
+
+1. **A deploy of `fb7a1f96`-or-later to `refresh-worker`.** That is the service whose
+   rebuild moves this number. NOT TAKEN: its claim is HELD (not expired) by
+   `soccer-player-producer` at 28.3 min of 45, and an **MLB sim was in flight there**
+   (pid 4854, started 21:32:11Z) plus a board build — a refresh-worker deploy kills
+   both. This is a real wait, not a formality.
+2. **The reading, again, after that deploy AND after the next board rebuild.** The
+   artifact is what carries the number, so a deploy alone does not move it — the
+   rebuild does. Predict **78 → 0** on the same endpoint; 78 still means the rebuild
+   has not run yet, and anything else is a third defect.
+3. Web needs nothing further. `f6340007` is live and correct for the inline path.
+
+---
+
 ## 2026-09-04 ~21:1xZ — NFL projection date-key: LANDED ON `origin/main`, **DEPLOYED NOWHERE. A DEPLOY IS OWED AND IS NOT MINE.** `[lane nfl-projection-et-datekey, commit 52870f57]`
 
 **NO DEPLOY WAS RUN, no claim was taken, no preflight.** Lane
