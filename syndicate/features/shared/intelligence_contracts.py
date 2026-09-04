@@ -6,6 +6,7 @@ from datetime import datetime as _datetime
 from typing import Any, Mapping
 
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
+from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
 
 def _copy_mapping(value: Any) -> dict[str, Any]:
@@ -490,7 +491,7 @@ class UniversalCandidate(MutableMapping[str, Any]):
         if self.odds is not None and not payload.get("odds"):
             payload["odds"] = self.odds
         if self.projection is not None:
-            payload["projection"] = self.projection
+            payload["projection"] = refuse_published_certainty(self.projection)
         if self.model_probability is not None:
             payload["model_probability"] = self.model_probability
         if self.implied_probability is not None:

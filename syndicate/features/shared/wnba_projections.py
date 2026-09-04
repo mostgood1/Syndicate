@@ -60,6 +60,7 @@ from syndicate.features.shared.prop_projections import _norm_name
 # projection dict, the row, and a probability, and does the SAME
 # fair-vs-model comparison every sport's game/prop join goes through.
 from syndicate.features.shared.wnba_game_projections import _attach_sim_probability_edge
+from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
 # Board market key -> key inside the CSV's `model` dict.
 #
@@ -382,7 +383,7 @@ def attach_wnba_projections(
                 if probability_reason
                 else "this projection carries no probability, so no edge was priced"
             )
-        row["projection"] = projection  # type: ignore[index]
+        row["projection"] = refuse_published_certainty(projection)  # type: ignore[index]
         rows_with_projection += 1
 
     return {

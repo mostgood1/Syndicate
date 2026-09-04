@@ -36,6 +36,10 @@ from syndicate.features.shared.book_margin_model import (
     EDGE_FIELD as MODELLED_EDGE_FIELD,
     modelled_fair_edge,
 )
+from syndicate.features.shared.probability_refusal import (
+    CERTAINTY_REFUSED,
+    refuse_published_certainty,
+)
 
 # market (as it appears in book_quotes) -> the pitcher distribution that scores it
 _PITCHER_DISTS: dict[str, tuple[str, str]] = {
@@ -183,63 +187,12 @@ def _dist_mean(dist: Mapping[str, Any]) -> float | None:
     return round(weighted / total, 3) if total > 0 else None
 
 
-#: A simulated frequency of exactly 0 or exactly 1 is a SAMPLE-SIZE ARTEFACT,
-#: not a probability, and `#624` step 1 asks for it by name: "hard refusal of
-#: p in {0.0, 1.0}". A finite simulation cannot establish impossibility.
-_CERTAINTY_REFUSED = frozenset({0.0, 1.0})
-
-
-def _refuse_published_certainty(payload: Any) -> Any:
-    """Blank `model_prob_over` when it is EXACTLY 0.0 or 1.0, at the exit.
-
-    **THE REFUSAL IN `_dist_prob_over` COVERED ONE PRODUCER OF FOUR.** Measured
-    on the served board 2026-09-04T04:28:48Z, 1,451 MLB rows carrying
-    `model_prob_over`: **17 certainties, and 16 of them never touch a
-    distribution.** They come from the threshold rungs -- `basis` `hr_2plus` /
-    `hr_3plus`, read straight out of `p_hr_Nplus_cal` on the hitter artifact --
-    so a refusal sited in the distribution helper is blind to 94% of them:
-
-        Lake Bachar    outs               6.5   p=1.0   basis=outs_dist   <- caught
-        Andrew Vaughn  batter_home_runs   1.5   p=0.0   basis=hr_2plus    <- missed
-        Pete Alonso    batter_home_runs   2.5   p=0.0   basis=hr_3plus    <- missed
-
-    So the refusal belongs at the CHOKE POINT EVERY CALLER SHARES, which is the
-    public exit of `project()` and `project_game_market()`, not at the one
-    producer that happened to be visible when the row was found.
-
-    **0.0 IS THE DANGEROUS SIGN, not 1.0.** `model_prob_over = 0.0` says the
-    OVER is impossible, which makes the UNDER a 100%-confidence bet against
-    whatever the market pays. The 16 are unpriced today only because
-    `market_fair_prob_over` is None on those rows -- the same accident that
-    spared the Bachar row, and not a property of the rule.
-
-    **THE FILE ALREADY MAKES THIS ARGUMENT, one branch away.** The rung reader
-    refuses a MISSING probability with "Absent, not zero -- a 0.0 here would be
-    indistinguishable from 'the model says it will not happen' and would price
-    against it." That is exactly the hazard, and it was applied to `None` while
-    an actual 0.0 went through untouched.
-
-    Mutates and returns the payload; a non-dict passes through so `None` (the
-    honest "no projection") stays `None`.
-    """
-    if not isinstance(payload, dict):
-        return payload
-    value = payload.get("model_prob_over")
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        if float(value) in _CERTAINTY_REFUSED:
-            payload["model_prob_over"] = None
-            # SAY WHY IT IS BLANK. `test_a_genuine_zero_is_still_a_projection`
-            # (hr ladder) exists because absence and zero must not collapse into
-            # each other, and blanking the field is exactly that collapse unless
-            # the reason travels with it. The row-level distinction does survive
-            # on its own -- an UNCOUNTED rung returns None for the whole
-            # projection, a COUNTED 0.0 returns this dict with its `projected`
-            # and `basis` intact -- but a consumer should not have to infer that
-            # from the shape. Same rule as `projected_derived_from` and
-            # `edge_unavailable_reason`: a labelled blank beats a bare one.
-            payload["model_prob_over_refused"] = "exact_certainty"
-            payload["model_prob_over_refused_value"] = float(value)
-    return payload
+#: Kept as a module-local alias: this rule now lives in ONE place
+#: (`probability_refusal`) because eight modules write `row["projection"]` and a
+#: second copy of a rule is how the two drift apart. The MLB-only version that
+#: shipped first caught 1 of 17 certainties on a real board.
+_CERTAINTY_REFUSED = CERTAINTY_REFUSED
+_refuse_published_certainty = refuse_published_certainty
 
 
 def _dist_prob_over(dist: Mapping[str, Any], line: float) -> float | None:
@@ -1237,7 +1190,7 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
                         f"(see {MODELLED_EDGE_FIELD})"
                     )
                 projection["edge_unavailable_reason"] = reason
-        row["projection"] = projection
+        row["projection"] = refuse_published_certainty(projection)
         attached += 1
         if projection["edge_vs_market_pct"] is not None:
             with_edge += 1

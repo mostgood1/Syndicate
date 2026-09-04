@@ -124,6 +124,7 @@ _THREE_WAY_GAME_MARKETS = {"h2h", "h2h_3_way", "totals_3_way", "spreads_3_way"}
 
 
 from syndicate.features.shared.team_aliases import teams_match  # noqa: E402
+from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
 
 def _norm_team(value: Any) -> str:
@@ -1130,7 +1131,7 @@ def attach_soccer_projections(
         # #263: a model probability that is never priced against the market
         # cannot rank anything.
         _price_against_market(row, projection)
-        row["projection"] = projection  # type: ignore[index]
+        row["projection"] = refuse_published_certainty(projection)  # type: ignore[index]
         # `#350`: STAMP THE SIM'S AGE ONTO THE ROW.
         #
         # A projection is a claim about a fixture made at a moment, and the

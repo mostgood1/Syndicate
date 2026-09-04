@@ -57,6 +57,7 @@ from syndicate.features.shared.nfl_preseason_calibration import (
     is_preseason_profile,
     skill_note,
 )
+from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
 
 def _as_float(value: Any) -> float | None:
@@ -555,7 +556,7 @@ def attach_nfl_game_projections(
 
         if projection is None:
             continue
-        row["projection"] = projection  # type: ignore[index]
+        row["projection"] = refuse_published_certainty(projection)  # type: ignore[index]
 
         # `#340`, and NFL is the sport the centralisation was supposed to catch.
         #

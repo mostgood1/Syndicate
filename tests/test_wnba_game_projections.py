@@ -380,13 +380,33 @@ def test_h2h_sim_probability_of_zero_is_not_mistaken_for_absent():
     # `is not None`, not truthiness, is what the join must test on. A naive
     # `if sim_prob_home:` would silently fall back to the margin transform
     # here and this test would catch it.
+    #
+    # AMENDED 2026-09-04 for the platform-wide certainty refusal. **The thing
+    # this test protects is the JOIN, and the join is unchanged** -- `basis`
+    # is literally `"sim_win_probability" if sim_prob_home is not None else
+    # "margin_win_prob"`, so it IS the `is not None` check, and it still reads
+    # `sim_win_probability` below. What changed is downstream of the join: an
+    # exact 0.0 is not PUBLISHED as a probability, because a finite sim cannot
+    # establish impossibility and a 0.0 here would price the UNDER at 100%
+    # confidence against any book. Refused, labelled, and the original value
+    # kept -- so "real, not missing" is still exactly what the row says.
     row = _row("h2h")
     index = _index(margin=-25.0, p_home_win=0.0)
     attach_wnba_game_projections([row], index)
     projection = row["projection"]
 
-    assert projection["model_prob_over"] == 0.0
-    assert projection["basis"] == "sim_win_probability"
+    assert projection["basis"] == "sim_win_probability", (
+        "the join must still READ the sim's 0.0 rather than falling back to "
+        "the margin transform -- this is the assertion the test exists for")
+    assert projection["model_prob_over"] is None, "no certainty is published"
+    assert projection["model_prob_over_refused"] == "exact_certainty"
+    assert projection["model_prob_over_refused_value"] == 0.0
+
+    # ...and a truthiness fallback would still be caught: it would change the
+    # BASIS, which the refusal does not touch.
+    fallback = _row("h2h")
+    attach_wnba_game_projections([fallback], _index(margin=-25.0, p_home_win=None))
+    assert fallback["projection"]["basis"] == "margin_win_prob"
 
 
 # --- load_wnba_game_projections: reads the REAL game_cards column names ----

@@ -82,6 +82,7 @@ from syndicate.features.shared.opportunity_signals import (
     devig,
     expected_value_pct,
 )
+from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
 # Identity carried from the market row onto every candidate. Kept explicit
 # rather than copying the whole row: the grid row holds `cells` (every book x
@@ -1847,7 +1848,7 @@ def build_layer2_rows(
             # "no projection" from "projection of 0".
             projection = row.get("projection")
             if projection is not None:
-                candidate["projection"] = projection
+                candidate["projection"] = refuse_published_certainty(projection)
 
             # THE LIVE RE-SIM'S BLOCK, carried for the same reason `#270`
             # carried `projection`: the enrichment stamps it on the GRID row and

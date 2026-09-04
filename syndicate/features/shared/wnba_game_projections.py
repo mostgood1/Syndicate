@@ -81,6 +81,7 @@ from typing import Any, Iterable, Mapping
 from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
 from syndicate.features.shared.prop_projections import _edge_unavailable_reason, _no_vig_over_probability
 from syndicate.features.shared.team_aliases import teams_match
+from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
 # Tolerance for comparing a board row's `line` against the sim's own market
 # line. Both travel through `round(x, 3)` at their respective writers
@@ -577,7 +578,7 @@ def attach_wnba_game_projections(
                 if probability_reason
                 else "this projection carries no probability, so no edge was priced"
             )
-        row["projection"] = projection  # type: ignore[index]
+        row["projection"] = refuse_published_certainty(projection)  # type: ignore[index]
         attached += 1
         if is_alternate:
             alternate_attached += 1

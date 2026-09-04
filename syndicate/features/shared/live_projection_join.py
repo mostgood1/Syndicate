@@ -58,6 +58,7 @@ from syndicate.features.shared.book_margin_model import (
     EDGE_FIELD as MODELLED_EDGE_FIELD,
     modelled_fair_edge,
 )
+from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
 
 # Board market key -> the live lens' own market family. The board speaks
@@ -650,7 +651,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         else:
             projection.pop("model_prob_over_unavailable_reason", None)
         # `row` is a live dict in the grid; the caller owns persistence.
-        row["projection"] = projection  # type: ignore[index]
+        row["projection"] = refuse_published_certainty(projection)  # type: ignore[index]
         matched += 1
 
         # NO LIVE EDGE, AND THE REASON IS MEASURED RATHER THAN ASSUMED.

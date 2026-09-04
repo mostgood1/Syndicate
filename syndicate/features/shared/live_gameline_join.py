@@ -61,6 +61,7 @@ import math
 import os
 from collections.abc import Mapping
 from typing import Any
+from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
 # How many standard errors an edge must clear before it is published. 2.0 is a
 # ~95% one-sided statement that the edge is not the estimator's own noise.
@@ -1192,6 +1193,6 @@ def _apply_verdict(
         else:
             updated["edge_vs_market_pct"] = None
             updated["edge_unavailable_reason"] = verdict.get("withheld_reason")
-        row["projection"] = updated
+        row["projection"] = refuse_published_certainty(updated)
 
     record(coverage, verdict, projected=True)

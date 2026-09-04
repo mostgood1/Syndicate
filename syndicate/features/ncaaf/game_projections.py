@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.ncaaf.oddsapi_lines import resolve_team
+from syndicate.features.shared.probability_refusal import refuse_published_certainty
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -507,7 +508,7 @@ def attach_ncaaf_game_projections(
                     projection["edge_vs_line"] = round(float(mean) - line, 3)
 
         if projection is not None:
-            row["projection"] = projection  # type: ignore[index]
+            row["projection"] = refuse_published_certainty(projection)  # type: ignore[index]
             attached += 1
 
     return {
