@@ -124,6 +124,43 @@ def main():
     check('_resurrected still yields strings, never tuples',
           all(isinstance(x, str) for x in li._resurrected(stale, None)), True)
 
+    # --- THE REAL CORPUS ------------------------------------------------------
+    #
+    # Everything above is synthetic: inputs BUILT to trip the check. `a8000faf`
+    # is an input that tripped it BY ACCIDENT, IN PRODUCTION, at 118 KB -- the
+    # commit that compacted 39 OPEN blocks (205,306 -> 86,678 B) and left a stale
+    # working copy that `violations()` scored 0 while carrying the whole revert.
+    #
+    # PINNED AS A SELF-CONTAINED PAIR, deliberately: pre vs `a8000faf`'s OWN
+    # lanes.md and lanes_history.md, never vs `origin/main`. Both sides are
+    # immutable objects, so the numbers below cannot drift as upstream moves --
+    # which is the defect that makes a live-ledger differential worthless.
+    #
+    # SKIPS LOUDLY rather than failing when the object is unreachable (a shallow
+    # clone, a throwaway repo), because an environment gap is not a regression.
+    import subprocess
+
+    def _show(rev_path):
+        try:
+            r = subprocess.run(['git', 'show', rev_path], capture_output=True, timeout=60)
+        except Exception:
+            return None
+        return r.stdout.decode('utf-8', 'replace') if r.returncode == 0 else None
+
+    pre = _show('a8000faf^:.syndicate/lanes.md')
+    post = _show('a8000faf:.syndicate/lanes.md')
+    hist = _show('a8000faf:.syndicate/lanes_history.md')
+    if not (pre and post and hist):
+        print('  SKIP  a8000faf unreachable here -- real-corpus case not run')
+    else:
+        n, _s = li.resurrected_lines(pre, post, hist)
+        check('REAL: the pre-compaction ledger trips the check', n, 1308)
+        check('REAL: the compacted ledger does not',
+              li.resurrected_lines(post, post, hist)[0], 0)
+        # The whole reason the line check exists: the block check cannot see it.
+        check('REAL: the BLOCK check is blind to the same input',
+              li.resurrected_blocks(pre, post, hist), [])
+
     failed = 0
     for label, got, want in RESULTS:
         ok = got == want

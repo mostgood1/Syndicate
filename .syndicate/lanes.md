@@ -604,6 +604,10 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Files: `.claude/settings.json`.
 - Blocked by: none.
 
+### resurrection-real-corpus — CLOSED 2026-09-04 — the compaction commit pinned as a permanent fixture; the check was proven only against inputs built to trip it — session f97ad5ab
+- Files: `.claude/hooks/test_ledger_invariants_resurrection.py`.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
