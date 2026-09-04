@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import statistics
 import sys
@@ -49,7 +50,14 @@ for p in (str(REPO_ROOT), str(VENDOR)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-DATA = REPO_ROOT / "data/mlb_source/source_artifacts/data"
+# `SYNDICATE_MLB_DATA_ROOT` overrides where the artifacts are read from. A
+# worktree carries only the families it was created with -- this one has 13 of
+# them and NOT `processed/`, where the ACTUAL game log lives -- so without an
+# override the harness can only run in whichever tree happens to be complete.
+# The mirror is still a MIRROR: nothing read through here is evidence about
+# production, whichever tree it comes from.
+DATA = Path(os.environ.get("SYNDICATE_MLB_DATA_ROOT")
+            or (REPO_ROOT / "data/mlb_source/source_artifacts/data"))
 SNAPSHOTS = DATA / "daily_pitcher_props/snapshots"
 PK_RE = re.compile(r"_pk(\d+)_")
 
@@ -62,10 +70,41 @@ STATS = {
 }
 
 
-def load_actual_rates() -> dict:
+def load_actual_rates(dates: "set[str] | None" = None) -> tuple:
+    """League aggregate counting stats, OPTIONALLY restricted to `dates`.
+
+    **THE DATE FILTER IS THE POINT, and its absence was a real defect.** This
+    function used to read the WHOLE game log while `sim_aggregates` ran over
+    whichever `roster_objs` happened to exist, so `correction = actual /
+    simulated` compared two different POPULATIONS. Measured on this checkout,
+    2026-09-04:
+
+        simulated side   roster_objs/           13 dates, 186 games   06-15..06-27
+        actual side      mlb_batter_game_log    47 dates, 12,185 rows 05-28..07-14
+
+    and the documented `--games 30` takes the FIRST 30 jobs in sort order, which
+    is about THREE dates. A correction fitted that way absorbs the difference
+    between three June days and seven weeks of baseball as if it were mechanism
+    bias -- and it would look like it had 12,185 rows behind it.
+
+    This is `CLAUDE.md`'s named trap: an analysis joining across artifact
+    families silently collapses to their intersection. So the caller passes the
+    dates it actually simulated, and the row count backing the answer is
+    returned rather than assumed.
+    """
     tot = defaultdict(float)
+    matched = skipped = 0
+    seen: set[str] = set()
     with (DATA / "processed/mlb_batter_game_log.csv").open(encoding="utf-8", newline="") as fh:
         for r in csv.DictReader(fh):
+            day = str(r.get("date") or "")[:10]
+            if dates is not None and day not in dates:
+                skipped += 1
+                continue
+            matched += 1
+            if day:
+                seen.add(day)
+
             def f(k):
                 try:
                     return float(r.get(k) or 0)
@@ -78,7 +117,7 @@ def load_actual_rates() -> dict:
             tot["h"] += f("h")
             tot["hr"] += f("hr")
             tot["so"] += f("so")
-    return tot
+    return tot, matched, skipped, seen
 
 
 def sim_aggregates(jobs, cfg_kwargs, sims, seed, corrections, season, weight):
@@ -166,6 +205,13 @@ def main() -> int:
     ap.add_argument("--season", type=int, default=2026)
     ap.add_argument("--bb-weight", type=float, default=0.35)
     ap.add_argument("--json", type=Path, default=None)
+    ap.add_argument("--match-dates", dest="match_dates", action="store_true", default=True,
+                    help="restrict ACTUAL rates to the dates actually simulated (default)")
+    ap.add_argument("--no-match-dates", dest="match_dates", action="store_false",
+                    help="the old behaviour: compare against the whole game log")
+    ap.add_argument("--spread", action="store_true", default=True,
+                    help="sample --games evenly across the window (default), not the first N")
+    ap.add_argument("--no-spread", dest="spread", action="store_false")
     args = ap.parse_args()
 
     jobs = []
@@ -173,9 +219,27 @@ def main() -> int:
         for path in sorted((snap / "roster_objs").glob("roster_obj_*.json")):
             if PK_RE.search(path.name):
                 jobs.append((snap.name, path))
-    jobs = jobs[:args.games]
+    all_dates = sorted({d for d, _ in jobs})
+    if args.spread and args.games and args.games < len(jobs):
+        # SPREAD ACROSS THE WINDOW rather than taking the first N. `jobs` is
+        # sorted by date, so `jobs[:30]` is the three EARLIEST dates -- a
+        # correction fitted on one long weekend, presented as a league rate.
+        step = len(jobs) / float(args.games)
+        jobs = [jobs[int(i * step)] for i in range(args.games)]
+    else:
+        jobs = jobs[:args.games]
+    sim_dates = {d for d, _ in jobs}
 
-    actual = load_actual_rates()
+    if args.match_dates:
+        actual, matched, skipped, act_dates = load_actual_rates(sim_dates)
+        scope = "MATCHED to the %d simulated date(s)" % len(sim_dates)
+    else:
+        actual, matched, skipped, act_dates = load_actual_rates(None)
+        scope = "UNMATCHED -- the whole game log"
+    missing = sorted(sim_dates - act_dates)
+    if not actual.get("pa"):
+        print("  no actual rows matched the simulated dates -- refusing to divide by zero")
+        return 1
     act = {
         "hr_rate": actual["hr"] / actual["pa"],
         "inplay_hit_rate": actual["h"] / actual["ab"],
@@ -188,6 +252,20 @@ def main() -> int:
     print("=" * 88)
     print(f"\n  games {len(jobs)}   sims/game {args.sims}   batted-ball weight {args.bb_weight}")
     print("  mechanisms: position substitutions ON, pitch splits ON, batted-ball blend ON\n")
+    # COVERAGE FIRST. `CLAUDE.md`: report the number of dates a result actually
+    # rests on, because a cross-family join silently collapses to the
+    # intersection and still looks like it ran on everything.
+    print(f"  ACTUAL scope    {scope}")
+    print(f"  actual rows     {matched} matched, {skipped} skipped, "
+          f"{len(act_dates)} date(s) {min(act_dates) if act_dates else 'n/a'}"
+          f" .. {max(act_dates) if act_dates else 'n/a'}")
+    print(f"  simulated       {len(jobs)} game(s) over {len(sim_dates)} date(s) "
+          f"{min(sim_dates)} .. {max(sim_dates)}   (of {len(all_dates)} available)")
+    if missing:
+        print(f"  !! {len(missing)} simulated date(s) have NO actual rows: {missing[:6]}")
+    if not args.match_dates:
+        print("  !! UNMATCHED: the correction absorbs the difference between two")
+        print("     populations as if it were mechanism bias.")
 
     on = {"position_substitutions": True}
 
@@ -232,7 +310,16 @@ def main() -> int:
     out = {"season": args.season, "games": len(jobs), "sims": args.sims,
            "bb_weight": args.bb_weight, "corrections": corr,
            "actual": act, "sim_before": sim1, "sim_after": sim2,
-           "improved": improved, "of": len(STATS)}
+           "improved": improved, "of": len(STATS),
+           # PROVENANCE travels with the numbers. A corrections blob whose
+           # population cannot be reconstructed is one nobody can re-fit or
+           # refute later.
+           "match_dates": bool(args.match_dates),
+           "spread": bool(args.spread),
+           "sim_dates": sorted(sim_dates),
+           "actual_dates": sorted(act_dates),
+           "actual_rows_matched": matched,
+           "actual_rows_skipped": skipped}
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(out, indent=2), encoding="utf-8")
