@@ -7,6 +7,35 @@
 
 
 
+## 2026-09-04 06:04Z — CORRECTION to the 05:27-05:43Z row — all three services were ALREADY live
+
+That row ends "Still pending: `web` and `live-odds-worker` both execute this code
+and both have it pending." **That was already false when I wrote it.** Same-instant
+read, one call:
+
+    web                5af2c517  finished 2026-09-04T05:11:33.506953Z
+    refresh-worker     5af2c517  finished 2026-09-04T05:32:13.622932Z
+    live-odds-worker   5af2c517  finished 2026-09-04T05:11:31.781257Z
+
+A peer session deployed web and live-odds-worker at 05:11:3xZ (`trigger=api`,
+`dep-dad54g5g1s2s73f3dg50` and `dep-dad54im7bikc739nbt60`) — **sixteen minutes
+BEFORE my own refresh-worker deploy**, and entirely legitimately: the claim is
+per-service and I held only refresh-worker's.
+
+**HOW THE ERROR HAPPENED, because the shape repeats.** I ran
+`pending_deploys.py` at ~05:05Z, where "web live=906f9537, 3 pending" was TRUE.
+I then restated it as current at ~05:57Z without re-reading. A deployed-SHA
+reading goes stale in minutes on a tree with concurrent sessions — `state.md`
+says exactly that — and fifty minutes is not minutes. The fix is not "check more
+often", it is: **never carry a service's live SHA forward from an earlier read
+into a claim about now.**
+
+Nothing about the 05:27-05:43Z row's MEASUREMENT changes: it was taken on
+artifacts stamped after refresh-worker went live, and refresh-worker is the
+producer. The MLB verification remains genuinely owed.
+
+---
+
 ## 2026-09-04 05:27-05:43Z — VERIFIED (MLB OWED) — `5af2c517` refresh-worker — the certainty refusal on EVERY sport — lane `mlb-prop-phase1`
 
 `dep-dad5d9ijnfac73eh0190`, fired 05:27:02Z into a CLEAR preflight, live
