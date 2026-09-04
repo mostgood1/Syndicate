@@ -825,9 +825,12 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 
 - **HANDOFF IN 2026-09-04 from lane `feed-live-warn-rate` (session c4287631) —
   measurement only, none of your files touched.** `_fetch_current_feed_live` is
-  firing on the REQUEST PATH with **zero live games** — **64 calls in 11.9 min as
-  2 bursts of exactly 32** (I first wrote "8.7/min" off a 7.4-min window; it fell
-  to 5.4/min at 11.9 min because n=2 events. Quote the burst count, not a rate)
+  firing on the REQUEST PATH with **zero live games** — FINAL 20-min baseline:
+  **128 calls in 20.0 min = 8 full-slate passes = one every ~2.5 min** (6.4/min,
+  n=5 events, which just clears the quotability floor). Two of my own numbers
+  were corrected getting here: "8.7/min" off n=2, and "every burst is 32" —
+  the real increments are `[16, 32]`, 16 = one slate pass, 32 = two passes
+  aliased into one 30s sample
   (16-game slate, all `Preview`). One warn = one synchronous statsapi call, 8s
   timeout, inside a web request, against a 5s health-check budget. Every
   non-zero increment observed was exactly **32** — the loop runs the full
@@ -1321,6 +1324,31 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Falsification test: `PROJECTION_OVER_CEILING` firing in production means the ~3.3 MB sizing is wrong and the design needs compression or per-chunk splitting — NOT a raised ceiling, whose own comment forbids that. Equally, if `chunks_deferred` never reaches 0 across successive days the bound is too tight to converge.
 - Verification: **NONE YET IN PRODUCTION — it is not deployed.** Local, on real records: `seen=13 written=8 deferred=5 failed=0 reduction=21.8x over_ceiling=0`, and a second run `written=5 fresh=8 deferred=0`, i.e. it converges and does not re-stream what it has. 153 tests pass (`test_evaluation_ledger_projection` 13 new, plus `test_export_only_patterns`, `test_artifact_publisher`, `test_accuracy_summary_autorun` unbroken).
 - Blocked by: nothing. A deploy is the next step and has not been taken.
+
+### feed-live-baseline-final — CLOSED-VERIFIED 2026-09-04 — **full 20-min baseline: 128 calls = 8 full-slate passes = one every ~2.5 min, with ZERO live games. Corrected TWO of my own claims in the handoff. Scheduled re-run armed for 20:15 CDT on a live slate.** — opened 2026-09-04 — session c4287631-e9e4-4031-a339-70ab087aeabd
+- Files: `.syndicate/handoff_2026-09-04_feed_live_request_path_rate.md`,
+  `.syndicate/lanes.md`. No code claimed; the emitting file remains
+  `mlb-feed-live-terminal-refresh`'s and was not touched.
+- RESULT (41 samples, 18:42:53Z..19:02:53Z, 20.0 min, no restart): pid 97
+  192→208 (+16, 1 event); pid 98 176→288 (+112, 4 events). **+128 over 20.0 min
+  in 5 events** = 6.4/min, better stated as **8 full-slate passes, one every
+  ~2.5 min**. n=5 just clears the tool's quotability floor.
+- **CORRECTION 1 — "every increment is exactly 32" was a SAMPLING ARTIFACT.**
+  The full window gives `[16, 32]`. The unit is **16 = one pass over the 16-game
+  slate**; a 32 is two passes inside one 30s sampling interval. My "traverses the
+  slate twice per event" was an alias I inferred, not a property of the code.
+  Corrected in the handoff before the owning lane acted on it.
+- **CORRECTION 2 — the rate.** 8.7/min (n=2, 7.4 min) → 5.4/min (n=2, 11.9 min)
+  → 6.4/min (n=5, 20.0 min). The first two were never quotable.
+  `scripts/sample_request_path_guard.py` now enforces the floor so this stops
+  depending on me remembering.
+- Both superseded numbers are KEPT in the handoff, below the final one, so the
+  correction is auditable rather than tidied away.
+- Follow-up ARMED: one-time scheduled task `feed-live-warn-rate-live-slate`
+  fires 2026-09-04 20:15 CDT (~12 games in progress) and re-runs the sampler for
+  30 min. It verifies the live-game count FIRST and reports inconclusive rather
+  than faking the premise if the slate is over or the app was closed.
+- Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

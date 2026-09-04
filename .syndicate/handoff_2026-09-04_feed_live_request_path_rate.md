@@ -6,6 +6,46 @@ files** — `syndicate/features/mlb/cards.py` is your claim and stayed yours.
 
 ---
 
+## FINAL BASELINE — the full 20-minute window, and it corrects me TWICE
+
+**This supersedes both earlier numbers in this file. Read this section and skip
+the two below it, which are kept only so the corrections are auditable.**
+
+    41 samples, 2026-09-04T18:42:53Z .. 19:02:53Z, 20.0 min, no restart
+    pid 97:  192 -> 208  (+16,  1 event)
+    pid 98:  176 -> 288  (+112, 4 events)
+    TOTAL:   +128 calls over 20.0 min, in 5 increase events
+
+**128 statsapi calls in 20 minutes, with ZERO live games.** At n=5 events this
+finally clears the quotability floor, so: **6.4 calls/min**, or more usefully
+**8 full-slate passes in 20 min = one pass every 2.5 minutes**.
+
+### Correction 1 — "every increment is exactly 32" was a SAMPLING ARTIFACT
+
+I told you the increments were always 32 and concluded "the loop traverses the
+16-game slate TWICE per event". **Wrong.** With the full window the increments
+are **`[16, 32]`**. The base unit is **16 = one pass over the 16-game slate**;
+a 32 is simply two passes landing inside one 30-second sampling interval.
+
+Nothing about the mechanism changes — it is still one synchronous statsapi call
+per game per pass — but the "twice per event" inference was mine and it was an
+alias, not a property of the code. 128 calls / 16 per pass = **8 passes**.
+
+### Correction 2 — the per-minute rate, restated honestly
+
+I first wrote **8.7/min** off 7.4 minutes and two events; at 11.9 minutes the
+same run gave **5.4/min**; the full 20 minutes gives **6.4/min** on five events.
+The first two were not quotable and the third is, barely. The stable statement
+is the pass count: **one full-slate pass every ~2.5 min**.
+
+`scripts/sample_request_path_guard.py` now enforces this floor rather than
+relying on me to remember it — it refuses to print a rate below 5 increase
+events and prints the count instead.
+
+---
+
+## The two earlier, superseded numbers — kept so the correction is auditable
+
 ## CORRECTION, same day, before you act on it — the per-minute figure was over-precise
 
 I first wrote **8.7/min** off a 7.4-minute window. Extending the same run to
