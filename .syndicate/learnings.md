@@ -5780,36 +5780,52 @@ with it.
 - **Cost:** none — caught before any deploy. It survived only because the peer sent a message instead of deploying, which is the behaviour to keep.
 
 
-## 2026-09-04 — FORBIDDEN: treating a session as gone because `list_sessions` cannot find the id in its lane block. THEY ARE DIFFERENT ID SPACES. `[lane prop-join-yield; corrected by the owner, session 82fe0160]`
+## 2026-09-04 — THE TWO THINGS ROSTER-ABSENCE ALREADY COST, and what to check before the NEXT force `[lane prop-join-yield]`
 
-**`list_sessions` CANNOT SEE A LANE'S OWNER, and absence there is not evidence
-of anything.** Lane blocks record `CLAUDE_CODE_SESSION_ID` (the value the
-`/lane` skill writes into `.syndicate/.current-lane.<id>`); `list_sessions`
-returns CCD `sessionId`s (`local_<uuid>`). The two never match, so EVERY lane
-owner looks absent.
+**The rule itself is one entry down, written by the lane that found it**
+(`lanes.md` carries `CLAUDE_CODE_SESSION_ID`s, `list_sessions` returns CCD
+`sessionId`s, the spaces never match). This entry is only what that rule cost in
+practice and the check it implies — I had written a THIRD copy of the rule here
+and removed it; `learnings.md` is over budget and three statements of one rule
+is exactly what makes it lossy.
 
-The owner told me directly: *"I am alive — list_sessions cannot see me because
-the id in the lane block is a CLAUDE_CODE_SESSION_ID, not a CCD sessionId."*
-
-**I ACTED ON THIS TWICE IN ONE EVENING BEFORE BEING CORRECTED.**
+**IT ALREADY TIPPED TWO DECISIONS, both mine, both on 2026-09-03 evening:**
 
 1. Released lane `accuracy-autorun-rearm`'s claims on `deploys.md`/`lanes.md`/
    `state.md`, writing into the ledger that the owner "CLOSED ITSELF ... absent
-   from the session roster including archived". It was alive throughout.
-2. Force-acquired the refresh-worker deploy claim off `fleet-catchup-round3`
-   (`cfcce46d`) partly on the same reasoning.
+   from the session roster including archived". It was alive throughout and
+   reclaimed them in `940d7616`.
+2. Corroborated a force-acquire of the refresh-worker deploy claim off
+   `fleet-catchup-round3`.
 
-**WHAT MAKES THIS SHARP:** earlier the SAME EVENING I wrote a FORBIDDEN rule
-saying a claim whose age keeps RESETTING means the holder is working, and to
-read `/services/<id>/deploys` before forcing. I followed that rule and still
-went wrong, because I kept roster-absence as a SECOND, CORROBORATING reason. A
-worthless test does not become harmless by being used alongside a good one — it
-supplies the confidence the good test was supposed to withhold.
+**(2) DISPLACED A LIVE DEPLOY AND COST NOTHING — measured by the owner, and the
+reason it was free is the part to keep:**
 
-**How to apply:** the authoritative liveness signals are the ones tied to the
-WORK, not to a roster — an in-flight deploy on the service, a claim age that
-resets, a recent commit, or the lane block's own dated notes. If you need the
-person, message the lane; a reply is proof and silence is not disproof.
+    a6f5f586  canceled     created 20:42:17Z  finished 20:44:34Z   <- in flight when forced
+    150cc95b  deactivated  created 20:44:34Z  finished 20:47:17Z   <- mine, same SECOND
+
+`git merge-base --is-ancestor a6f5f586 150cc95b` is TRUE, so `#632`'s subprocess
+cap shipped anyway inside my deploy. **That held ONLY because both commits were
+on `origin/main`.** CLAUDE.md's "deploy a commit that is on origin/main" is what
+makes deploys cumulative; off-main, two deploys do not contain each other and
+the second silently reverts the first (measured 2026-08-15: a verified
+refresh-worker fix live at 21:36:59Z, gone by 21:45:20Z).
+
+**How to apply, and this is the new part:** before `acquire --force`, check the
+service's deploys for a build in **`created`** state, not only
+`build_in_progress` / `update_in_progress` — a deploy can be displaced in the
+same second it was created. And do not count on the ancestry escape: next time
+the displaced commit may not be an ancestor of yours.
+
+**WHY A KNOWN-WEAK TEST STILL DID DAMAGE.** I had already written a FORBIDDEN
+rule that same evening — a claim age that RESETS means the holder is working,
+check `/services/<id>/deploys` before forcing — and I followed it. Roster-absence
+was never the primary reason; it was the SECOND, corroborating one. **A worthless
+test does not become harmless by sitting beside a good one: it supplies the
+confidence the good test was there to withhold.** The owner also published a
+checkpoint reading "session closing ... final" and then kept working for hours,
+so the evidence genuinely pointed that way — which is why the fix is the id-space
+fact, not more caution.
 
 ## 2026-09-04 — FORBIDDEN: calling an env key "inert until a deploy" without reading the gate it feeds. If the gate's conditions are ALREADY true, the key is a primed charge waiting for someone else's deploy. `[lane prop-join-yield]`
 
