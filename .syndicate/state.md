@@ -698,3 +698,29 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
 * **NEXT MEASUREMENT:** does the climb track which worker serves
   `/api/intelligence/query`? That discriminates the payload story from
   everything else, and it is answerable with the instrument already deployed.
+
+### `[web-oom-leak]` UPDATE 6 — **query correlation is NULL, and `/api/intelligence/query` was never called**, 2026-09-04T18:2xZ `[session b2b5b45b]`
+
+* **NO ROUTE'S CALL RATE EXPLAINS THE 8-64MB GROWTH.** Per-worker, per-interval,
+  every quantity as a PER-MINUTE RATE (n=13 intervals, 2 workers): after
+  dropping one high-leverage point every `|r| < 0.45`, and Pearson disagrees
+  with Spearman in SIGN on three of five routes.
+* **The `/api/intelligence/query` payload hypothesis is FALSIFIED for this
+  window — the route received ZERO calls on either worker** while anon climbed
+  +54.1 and +148.7 MB. The growth does not need an intelligence query to happen.
+* **Two correlations that looked real and were not:**
+  - Unnormalised, `/healthz` ranked TOP at `r=+0.682` — a route with
+    `max_mb 0.00`. Differencing over UNEQUAL intervals let duration drive both
+    sides. `/api/ops/artifacts/export` fell from `+0.348` to **`+0.037`** once
+    normalised; the export hypothesis died there.
+  - `/api/ops/artifacts/publish` at `r=-0.882` collapsed to **`-0.271`** when one
+    3.1-minute interval was dropped. That was a claim about one point.
+* **NEW AND POSITIVE: the 8-64MB memory IS RETURNED TO THE OS.** One interval
+  (pid 79, 18:09:52->18:13:00) fell **-43.4 MB**. Large mappings are `munmap`ped
+  back, unlike pymalloc arenas. **So this is not monotonic retention** — it is
+  churn with a high-water mark, which is a different defect and admits different
+  fixes (bounding concurrent peak, not finding a "leak").
+* **INSTRUMENT LIMIT, stated so the null is read correctly:** emissions fire
+  every 200 solo requests, giving 3-9 minute intervals and n=13. That is coarse
+  enough to hide a real per-call effect. **This null bounds the effect size; it
+  does not prove independence.**
