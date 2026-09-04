@@ -5405,3 +5405,37 @@ AND: **TTL expiry frees the LOCK, not the WORK.** A claim that ages out while
 pid 2725 is still building is legal to take and will still kill the build --
 `#630`/2026-08-10, a deploy 61 seconds after a child started. Re-run preflight
 and deploy on CLEAR, not on the clock.
+
+## 2026-09-04 — A RUNNING MINIMUM CANNOT DETECT A RISING FLOOR. CHECK THAT THE STATISTIC CAN EXPRESS THE ANSWER
+
+`#632`. The question was which shape kills the web service: a rising FLOOR
+(retention) or a flat floor under high PEAKS (churn). I built an instrument that
+tracks a running min and a running max of process anon and shipped it.
+
+**The running minimum is the first reading, always, for any non-decreasing
+series.** It can only move DOWN, so on a process that never returns memory it is
+pinned at the boot value forever. The metric I chose to answer "does the floor
+rise" is mathematically incapable of rising. Both workers duly reported
+`floor_mb` fixed at their boot values, which looks like a flat floor -- the CHURN
+signature -- when the truth was the opposite.
+
+What actually answered it was `VmHWM` vs `VmRSS`, which I had added as a
+secondary reading almost in passing: ~29 MB apart on both workers, i.e. each
+process sitting at its own all-time peak, which is retention. An independent
+60-sample RSS poll agreed: in every series the floor equalled the FIRST reading.
+
+THE RULE: before building a statistic, check that it can EXPRESS both answers.
+Write down what the metric would read under each hypothesis; if one hypothesis
+produces a reading the metric cannot distinguish from the other, the metric is
+wrong before any data exists. A running min under retention and a running min
+under churn both read "equal to the first value" -- no data could have separated
+them.
+
+The correct design for a floor that can rise is a WINDOWED minimum (min over the
+last N readings), which is free to move in both directions.
+
+Related: `[2026-09-04]` "a flat reading from an instrument that cannot see the
+suspect is not evidence". Same family: there the instrument could not see the
+memory, here it could not express the shape. **Both are answered by asking what
+the instrument would read if the hypothesis were TRUE, before trusting it when
+it reads negative.**

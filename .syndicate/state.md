@@ -795,3 +795,31 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   of the movement, but no single route owns it and per-request attribution
   cannot be made to compose. The open question is the remaining ~18% and whether
   the churn HIGH-WATER MARK — not a leak — is what OOMs the service.
+
+### `[web-oom-leak]` UPDATE 10 — **RETENTION, not churn. Two independent instruments agree**, 2026-09-04T22:4xZ `[session b2b5b45b]`
+
+* **`VmHWM - VmRSS` is ~29 MB on BOTH workers** (pid 98: 682.98 vs 654.28; pid 97:
+  640.88 vs 612.09), and `process_anon_mb_now` EQUALS the running peak on both.
+  A process sitting at its own all-time high-water mark has not returned memory.
+  **Churn would show a large HWM-RSS gap. It does not.**
+* **Independent confirmation from a 60-sample RSS poll of `/api/ops/memory`**
+  (20 min, 20 s cadence): in EVERY series the floor equals the FIRST reading —
+  worker 97 `380.8 -> 612.1`, worker 98 `434.8 -> 811.0 peak`, container
+  `1248.0 -> 2037.0 peak`, unreclaimable `793.4 -> 1403.3 peak`. **Nothing ever
+  returned below where it started.**
+* **The container touched `2037.0 MB` — 99.5% of the 2048 MB limit**, ~11 MB of
+  headroom, at a moment when a transient merge child (pid 198, 94 MB) was
+  present. Steady state at the time of writing: **1888.5 MB, 92.2%, 159.5 MB
+  headroom**.
+* **THE SYNTHESIS, and it corrects an earlier reading in this same session:**
+  worker retention is the DOMINANT term and transient children are a small
+  additive one. An earlier note called them roughly equal partners; the
+  `VmHWM-VmRSS` reading settles it. The children matter only because they land
+  on a floor that retention has already raised.
+* **INSTRUMENT DEFECT, mine:** `anon_extremes.floor_mb` is a RUNNING MINIMUM,
+  and a running minimum over a rising series is always the FIRST reading — it
+  can never rise, so it cannot detect a rising floor, which is the question it
+  was built for. Both floors are pinned at their boot values. What answered the
+  question was `VmHWM` vs `VmRSS`, added as a secondary reading. A WINDOWED
+  minimum (last N) is the correct design.
+* **`unexplained_memory_mb` is 385.5 MB** and is not yet investigated.
