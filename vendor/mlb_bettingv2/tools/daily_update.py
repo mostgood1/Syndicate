@@ -713,6 +713,17 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
                     "R": rr,
                     "RBI": rbi,
                     "H+R+RBI": hrr,
+                    # `#621`. WITHOUT THIS LINE `strikeouts_dist` IS {0: n_sims} AND
+                    # `so_mean` IS 0.0 FOR EVERY HITTER, FOREVER. The spec entry
+                    # ("strikeouts", "SO", "so_mean") in `_HITTER_PROP_DIST_SPECS`
+                    # reads this dict via `.get(row_key, 0)` -- a NEUTRAL DEFAULT, so
+                    # an absent key is indistinguishable from a real zero at every
+                    # level except the data. `batter_strikeouts` is a FETCHED and
+                    # JOINED market (ladders_build.py `hitter_strikeouts`), so the
+                    # published ladder claimed P(0 K) = 1.000 for every hitter.
+                    # THIS FILE CARRIES TWO COPIES OF THIS DICT -- see the `#334`
+                    # note below; fixing one and not the other is that same bug.
+                    "SO": so,
                     "2B": d2,
                     "3B": d3,
                     "SB": sb,
@@ -4433,6 +4444,17 @@ def _sim_many(
                         "R": rr,
                         "RBI": rbi,
                         "H+R+RBI": hrr,
+                        # `#621`. WITHOUT THIS LINE `strikeouts_dist` IS {0: n_sims} AND
+                        # `so_mean` IS 0.0 FOR EVERY HITTER, FOREVER. The spec entry
+                        # ("strikeouts", "SO", "so_mean") in `_HITTER_PROP_DIST_SPECS`
+                        # reads this dict via `.get(row_key, 0)` -- a NEUTRAL DEFAULT, so
+                        # an absent key is indistinguishable from a real zero at every
+                        # level except the data. `batter_strikeouts` is a FETCHED and
+                        # JOINED market (ladders_build.py `hitter_strikeouts`), so the
+                        # published ladder claimed P(0 K) = 1.000 for every hitter.
+                        # THIS FILE CARRIES TWO COPIES OF THIS DICT -- see the `#334`
+                        # note below; fixing one and not the other is that same bug.
+                        "SO": so,
                         "2B": d2,
                         "3B": d3,
                         "SB": sb,
