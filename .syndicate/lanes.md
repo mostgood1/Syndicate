@@ -1178,6 +1178,40 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none for live-odds-worker.
 
 
+### mlb-final-state-mapping — OPEN — opened 2026-09-04 — session b9013cf2-9ea8-431f-9700-f4aac4794582
+- Goal: explain, with a file:line trace, why a 09-03 game whose feed payload reads **Final** is published on the board as `state=live`, and name the single place that decides it.
+- Files: **NONE — this lane CLAIMS NOTHING and writes no code.** It is a read-only trace; a claim is for editing.
+  Collision found and respected: `game_chip_scoreboard.py` is held by OPEN lane `ncaaf-chip-compact`, and `mlb/cards.py` + `blueprints/home.py` are held by `mlb-feed-live-terminal-refresh`. My first collision check was a line-based grep of `- Files:` lines and MISSED the scoreboard claim because it sits on a CONTINUATION line — `scripts/check_lane_invariants.py` caught it and is the authority. When the trace names an owner, the fix goes to whichever lane already holds that file; I will not edit across lanes.
+- **HYPOTHESIS, WRITTEN BEFORE TESTING.** The chip's state for a PAST date does not come from the feed payload at all. It comes from a precomputed per-date artifact — `[mlb_cards] BETTING_PAYLOAD_READ date=2026-09-03 exists=True size=98857` is read at the top of that build — which was last written BEFORE those two games ended and is never rewritten for a past date. **The 7/2 split is the tell and it falls on the SAME midnight-Central boundary as everything else in this thread:** the 7 games that read `final` all finished BEFORE 05:00Z; the 2 that read `live` finished at 05:05Z and 05:09Z, AFTER the roll.
+- Falsification test: read that artifact's OWN per-game status for 09-03. If it records ATH@SEA as in-progress, the SOURCE is stale and the mapping is innocent. If it records Final and the board still publishes `live`, the hypothesis is WRONG and the fault is in the mapping (`build_game_chip` / `_side_score` / the state precedence), which is where I would otherwise have looked first.
+- ESTABLISHED, not to be re-derived (`deploys.md` 2026-09-04 18:3xZ): the feed payloads for ALL NINE 09-03 games read Final — `FEED_LIVE_REFRESH ... skipped_final=9 attempted=0 failed=0`. So freshness is EXONERATED as a cause here, and so is the live-lens overlay (gated since `d77695ef`, `rows_corrected: 0`). Two attributions already died on this symptom; do not spend a third guess before reading the artifact.
+- Verification: a file:line trace from the artifact/field that supplies `game.state` through to the served row, plus a test pinning the Final-payload case. A FIX is out of scope until the trace names the owner.
+- Blocked by: none.
+- **TRACE COMPLETE (file:line). HYPOTHESIS FALSIFIED.** State does NOT come from a stale precomputed artifact:
+  `game_chip_scoreboard.py:441 build_game_chip` -> `:194 _game_flags` reads `game["status"]` -> that dict is set at
+  `mlb/cards.py:5644 "status": _source_status(actual_payload)` -> `:5623 actual_payload = actual_games.get(game_pk)`
+  -> `:5883 actual_games = _daily_actual_by_game(resolved_date, game_pks)` -> `:1460 _source_status` returns
+  `gameData.status.abstractGameState/detailedState` **verbatim from the FEED payload**. `_game_flags` then needs only
+  `"final" in status_texts` to set `is_final` (and `is_final` forces `is_live=False`). So the mapping is a straight
+  pass-through of the feed's own status, and `_daily_actual_by_game` — the function I already instrumented — is its
+  ONLY source. The `BETTING_PAYLOAD_READ` artifact supplies `game["markets"]`, not state (`cards.py:1985`).
+- **AND THAT CREATES A DIRECT CONTRADICTION, which is the finding.** At 18:16:22Z on refresh-worker, from the SAME
+  bulk call (`games=9`): the counter reported `skipped_final=9 attempted=0`, i.e. `mlb_feed_payload_is_final()` was
+  TRUE for all nine. Yet `/mlb/api/cards?date=2026-09-03` publishes
+  `ATH@SEA status={"abstract": "Live", "detailed": "In Progress"}` and the same for STL@LAD (BOS@BAL correctly reads
+  `Final`). Both predicates read the SAME two fields of the SAME dict —
+  `mlb_feed_payload_is_final` -> `mlb_status_is_final(abstractGameState, detailedState)`, `_source_status` -> those
+  two strings raw — so they cannot both be right about one payload. `_source_status(None)` would yield
+  `Pregame/Scheduled`, so it is NOT reading a missing payload; it is reading a payload that says Live.
+- **NEXT MEASUREMENT, and do not guess before taking it:** print `game_pk`, `abstractGameState` and `detailedState`
+  per game inside the `_daily_actual_by_game` loop for one build. That is a one-line change in `mlb/cards.py`, which
+  lane `mlb-feed-live-terminal-refresh` holds — so it goes THERE, not here. Two candidates it separates: the counter
+  and `_source_status` are reading different objects (a keying or pruning divergence between `out[int(game_pk)]` and
+  `actual_games.get(game_pk)` — note `cards.py:5573` uses `.get(int(game_pk))` while `:5623` uses `.get(game_pk)`),
+  or `mlb_status_is_final` is returning True on a status that reads "Live"/"In Progress".
+- **Third attribution avoided.** Freshness and the lens overlay were both wrong on this symptom; this trace deliberately
+  stops at a contradiction rather than proposing a cause for it.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
