@@ -658,6 +658,11 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
     print(
         f"[portfolio_commit] KALSHI_BOARD_JOIN markets={joined.get('kalshi_markets')}"
         f" board_rows={len(board_rows)} matched={len(matches)}"
+        # THE DOUBLEHEADER VERIFICATION, printed even when zero. The
+        # commence-time split shipped unverified on 2026-09-04 because the only
+        # doubleheader contracts that day were on a series with no sport
+        # mapping; `> 0` on any later slate settles it from the logs alone.
+        f" doubleheader_resolved={joined.get('doubleheader_resolved')}"
         f" reasons={reasons}",
         flush=True,
     )

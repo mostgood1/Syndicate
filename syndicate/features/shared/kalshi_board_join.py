@@ -732,6 +732,19 @@ def join_kalshi_to_board(
     # Complete, not sampled: which series refuse and how many each.
     unreadable_by_series: dict[str, int] = {}
 
+    # DOUBLEHEADER RESOLUTIONS, counted so the fix can be VERIFIED FROM THE LOGS.
+    #
+    # The commence-time split shipped 2026-09-04 and could not be verified that
+    # day: the only doubleheader contracts on the board were `KXMLBF5SPREAD`,
+    # a series with no sport mapping, so they could never have resolved and
+    # their disappearance from `unmatched_events` was them SETTLING, not
+    # matching. A previous version of the same fix had already shipped INERT, so
+    # "deployed and plausible" is specifically not good enough here.
+    #
+    # `> 0` on any future slate is the verification. `0` alongside a board that
+    # HAS a duplicate team-pair is the fix still not working.
+    doubleheader_resolved = 0
+
     def _refuse(reason: str) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
 
@@ -950,6 +963,11 @@ def join_kalshi_to_board(
 
             resolution = _resolve_event(market, board_rows, club_code_names)
             status = str(resolution.get("status") or "")
+            if resolution.get("matched_by") == "commence_time":
+                # A doubleheader half that was separated on start time. Counted
+                # here rather than inferred from `matched`, because `matched`
+                # moves for a dozen unrelated reasons every slate.
+                doubleheader_resolved += 1
             if status == "no_match":
                 # THE ALIAS LIST, WRITTEN FROM DATA. `event_not_on_our_board`
                 # is a count; it cannot say WHICH code we failed to recognise,
@@ -1262,6 +1280,10 @@ def join_kalshi_to_board(
         "board_rows": len(board_rows),
         "matched": len(matches),
         "reasons": dict(sorted(reasons.items())),
+        # See `doubleheader_resolved` above: this is the field that verifies the
+        # commence-time split, and it is reported even when zero so that "no
+        # doubleheader today" and "the fix did nothing" stay distinguishable.
+        "doubleheader_resolved": doubleheader_resolved,
         "kalshi_key_sample": kalshi_keys,
         # One refused title per series: what grammar is missing, not how many.
         "unreadable_titles": unreadable_titles,
