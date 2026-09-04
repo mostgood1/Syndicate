@@ -1775,6 +1775,14 @@ def sample_smaps_trend(reason: str) -> dict[str, Any] | None:
         _SMAPS_TREND_STATE["last"] = {
             "total_anon_mb": payload.get("total_anon_mb"),
             "by_size_mb": payload.get("anon_mmap_by_size_mb"),
+            # BY KIND, and the first clean series is why. Split by pid over
+            # ~27 min, 65-70% of each worker's climb was in anon that is NOT an
+            # anonymous mmap at all -- so the size buckets, which only cover
+            # anon_mmap, could see barely a third of the growth and the rest was
+            # a residual I had to compute by subtraction. `parse_smaps` already
+            # returns this; recording only the buckets threw the majority term
+            # away. heap vs stack vs file_backed answers WHERE the other 2/3 is.
+            "by_kind_mb": payload.get("by_kind_mb"),
             "cgroup_anon_mb": payload.get("cgroup_anon_mb"),
             "reconciles": payload.get("reconciles"),
             "reconciles_within_pct": payload.get("reconciles_within_pct"),

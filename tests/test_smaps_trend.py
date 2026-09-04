@@ -222,6 +222,30 @@ class PayloadTests(unittest.TestCase):
         self.assertEqual(payload["smaps_trend"], {})
         self.assertEqual(payload["smaps_trend_samples"], 0)
 
+    def test_the_trend_records_BY_KIND_because_the_buckets_miss_most_of_it(self) -> None:
+        """The size buckets cover anon_mmap ONLY, and the first clean series
+        showed 65-70% of each worker's climb was somewhere else.
+
+        Recording only `by_size_mb` threw the majority term away and left it as
+        a residual computed by subtraction -- a number with no name on it.
+        `parse_smaps` already returns `by_kind_mb`; this asserts the trend keeps
+        it, and that the two views disagree exactly as they must when non-mmap
+        anon is present.
+        """
+        text = (_region(0x100000000000, 28 * MB, 28 * MB)
+                + _region(0x200000000000, 16 * MB, 16 * MB, "[heap]"))
+        with _fake_procfs(text):
+            MOD.sample_smaps_trend("check")
+
+        last = MOD._SMAPS_TREND_STATE["last"]
+
+        self.assertAlmostEqual(last["by_kind_mb"]["heap"], 16.0, places=1)
+        self.assertAlmostEqual(last["by_kind_mb"]["anon_mmap"], 28.0, places=1)
+        self.assertNotIn("heap", last["by_size_mb"],
+                         "size buckets cover anon_mmap only -- that is the point")
+        self.assertAlmostEqual(sum(last["by_size_mb"].values()), 28.0, places=1)
+        self.assertAlmostEqual(last["total_anon_mb"], 44.0, places=1)
+
     def test_the_payload_says_WHICH_WORKER_emitted_it(self) -> None:
         """Two gunicorn workers emit into one log stream, so a series read
         without a pid is TWO interleaved series.
