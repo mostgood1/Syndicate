@@ -183,12 +183,49 @@ def _dist_mean(dist: Mapping[str, Any]) -> float | None:
     return round(weighted / total, 3) if total > 0 else None
 
 
+#: A simulated frequency of exactly 0 or exactly 1 is a SAMPLE-SIZE ARTEFACT,
+#: not a probability, and `#624` step 1 asks for it by name: "hard refusal of
+#: p in {0.0, 1.0}". A finite simulation cannot establish impossibility.
+_CERTAINTY_REFUSED = frozenset({0.0, 1.0})
+
+
 def _dist_prob_over(dist: Mapping[str, Any], line: float) -> float | None:
     """P(outcome > line) straight off the simulated distribution.
 
     Exact, not a normal approximation. A whole-number line is a push on the
     line itself, so strictly-greater is the right comparison and the push mass
     is deliberately excluded from BOTH sides rather than split.
+
+    **REFUSES A CERTAINTY, and that is `#624` step 1's other half.** If every
+    simulated outcome falls on one side of the line the ratio is exactly 0.0 or
+    1.0, and that is a statement about the SAMPLE, not about the world: N sims
+    can bound a probability, never zero it. Published as a probability it is
+    unbounded downstream -- LogLoss is infinite when it is wrong, and the edge
+    against any quoted price is whatever the price implies.
+
+    MEASURED ON THE SERVED BOARD 2026-09-04Z (local 09-03 evening), 872 MLB rows carrying
+    `model_prob_over`: **one row at exactly 1.0** -- Lake Bachar, `outs`, line
+    6.5, against `market_fair_prob_over` 0.4061. That is a **+59.4 point** edge
+    by construction, and it would have ranked at the top of the board.
+
+    **IT CAUSED NO HARM ONLY BY ACCIDENT.** The edge was suppressed by an
+    unrelated guard -- `edge_unavailable_reason: "game is final: the market is
+    settled"`. A pregame row of the same shape is priced. A healthy reading that
+    survives for a reason unconnected to the rule you are relying on is not
+    evidence the rule exists.
+
+    NOT A CLAMP. Clamping to 0.001/0.999 would keep the row and publish a number
+    the sim did not produce, which is the fabricated-edge failure this file
+    forbids elsewhere ("a mean presented as a probability is a fabricated
+    edge"). Refusing returns None, the row keeps its projection fields where it
+    has them, and `attach_projections` counts it exactly like any other
+    unprojectable row rather than inventing coverage.
+
+    DISTINCT FROM `sim_probability_railed`, which `layer2_board` stamps at the
+    0.01/0.99 rails. That LABELS a near-certainty for a reader; this REFUSES an
+    exact one at the producer. The platform had the detector and not the
+    refusal, so it could say a probability was off-scale while still pricing one
+    at exactly 1.0.
     """
     total = 0.0
     over = 0.0
@@ -203,7 +240,12 @@ def _dist_prob_over(dist: Mapping[str, Any], line: float) -> float | None:
         total += count
         if value > line:
             over += count
-    return round(over / total, 4) if total > 0 else None
+    if total <= 0:
+        return None
+    probability = round(over / total, 4)
+    if probability in _CERTAINTY_REFUSED:
+        return None
+    return probability
 
 
 def _bucket_for_line(prefix: str, line: float) -> str | None:
