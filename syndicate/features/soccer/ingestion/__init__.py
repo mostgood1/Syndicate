@@ -9,6 +9,7 @@ from syndicate.features.soccer.ingestion.espn_live_state import build_live_state
 from syndicate.features.soccer.ingestion.espn_match_events import compute_minutes_played
 from syndicate.features.soccer.ingestion.espn_match_events import extract_key_events
 from syndicate.features.soccer.ingestion.espn_player_stats import aggregate_season_player_stats
+from syndicate.features.soccer.ingestion.espn_player_stats import season_date_windows
 from syndicate.features.soccer.ingestion.espn_shot_events import aggregate_season_shot_events
 from syndicate.features.soccer.ingestion.espn_shot_events import extract_shot_events
 from syndicate.features.soccer.ingestion.match_history import LEAGUE_HISTORY_CODES
@@ -34,6 +35,7 @@ __all__ = [
     "LEAGUE_HISTORY_CODES",
     "UNDERSTAT_LEAGUES",
     "aggregate_season_player_stats",
+    "season_date_windows",
     "aggregate_season_shot_events",
     "build_live_state",
     "compute_minutes_played",

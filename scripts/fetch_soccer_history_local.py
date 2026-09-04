@@ -3,15 +3,26 @@
 Match history: football-data.co.uk season CSVs (big five + Eredivisie,
 Primeira Liga, Championship, Belgian Pro League). Player history: Understat
 league tables (big five), American Soccer Analysis (MLS), or ESPN
-season-aggregated appearance rates (any other league with a
-LEAGUE_ESPN_SLUGS entry -- see espn_player_stats.py for the appearance-
-rate-vs-per-90 caveat).
+match-summary aggregation (any other league with a LEAGUE_ESPN_SLUGS
+entry).
+
+All three emit TRUE per-90 rates over real minutes. The "ESPN gives
+season-aggregated appearance rates" caveat this docstring used to carry
+describes a version of `espn_player_stats.py` that predates
+`compute_minutes_played`; its rows have been tagged `espn_true_per90`
+since, and that module's docstring now states the comparison to
+Understat/ASA in full.
+
+For an ESPN league, `--espn-date-windows` is OPTIONAL: omitted, the windows
+covering the already-played part of the season are derived from the season
+calendar. Pass it only to backfill a season other than the current one.
 
 Usage:
     python scripts/fetch_soccer_history_local.py --league epl --kind matches --seasons 2023,2024,2025
     python scripts/fetch_soccer_history_local.py --league epl --kind players --seasons 2025
     python scripts/fetch_soccer_history_local.py --league mls --kind players --seasons 2026
-    python scripts/fetch_soccer_history_local.py --league eredivisie --kind players --espn-date-windows 20250801-20250831,20250901-20250930,...
+    python scripts/fetch_soccer_history_local.py --league eredivisie --kind players --seasons 2026
+    python scripts/fetch_soccer_history_local.py --league eredivisie --kind players --seasons 2025 --espn-date-windows 20250801-20250815,...
 """
 
 from __future__ import annotations
@@ -25,7 +36,9 @@ import pandas as pd
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
 from syndicate.features.soccer.ingestion.espn_player_stats import aggregate_season_player_stats
+from syndicate.features.soccer.ingestion.espn_player_stats import season_date_windows
 from syndicate.features.soccer.ingestion.match_history import LEAGUE_HISTORY_CODES
 from syndicate.features.soccer.ingestion.match_history import fetch_match_history_csv
 from syndicate.features.soccer.ingestion.match_history import normalize_match_history
@@ -90,6 +103,25 @@ def fetch_matches(league: str, seasons: list[int], out_dir: Path) -> None:
 
 
 def fetch_players(league: str, seasons: list[int], out_dir: Path, *, espn_date_windows: list[str] | None = None) -> None:
+    """Write `players_{season}.csv` for each season, from whichever source
+    covers this league.
+
+    THE ESPN BRANCH USED TO BE UNREACHABLE FROM A PRODUCER. It required
+    `--espn-date-windows` and raised `SystemExit` without it, so the weekly
+    `--kind players` step in `refresh_odds_sources.py` had to exclude
+    eredivisie, primeira_liga, championship and belgian_pro_league outright --
+    including them would have made every refresh tick a FAILING step. Those
+    four leagues therefore ran the sim against a hand-committed
+    `players_2025.csv` seed, i.e. the COMPLETED 2025-26 season, with every
+    summer-2026 signing and both promoted clubs absent.
+
+    The windows are now DERIVED (`season_date_windows`) when the caller does
+    not supply them. They could never have been hard-coded into the step: it
+    runs weekly and forever, and a stale literal window list would keep
+    producing a correct-looking roster built from the wrong season. An
+    explicit `--espn-date-windows` still overrides, for backfilling a season
+    that is not the current one.
+    """
     for season in seasons:
         if league == "mls":
             raw = fetch_asa_mls_players(season)
@@ -99,10 +131,29 @@ def fetch_players(league: str, seasons: list[int], out_dir: Path, *, espn_date_w
             rows = normalize_understat_players(raw, league=league, season=season)
         elif espn_date_windows:
             rows = aggregate_season_player_stats(league, date_windows=espn_date_windows)
+        elif league in LEAGUE_ESPN_SLUGS:
+            windows = season_date_windows(league, season)
+            if not windows:
+                # A real answer, not a failure to compute one: nothing has been
+                # played. Still an exit, because a caller that asked for this
+                # season's players by name asked for something that cannot
+                # exist yet -- the weekly step declines EARLIER, so it never
+                # reaches here (`_soccer_players_step`'s season-elapsed gate).
+                raise SystemExit(
+                    f"season {season} has not started for league '{league}' "
+                    "(no completed matches to aggregate); refusing to write an "
+                    "empty roster over the previous season's"
+                )
+            print(
+                f"ESPN_PLAYER_WINDOWS league={league} season={season} "
+                f"windows={len(windows)} span={windows[0]}..{windows[-1]}",
+                flush=True,
+            )
+            rows = aggregate_season_player_stats(league, date_windows=windows)
         else:
             raise SystemExit(
-                f"player history not available for league '{league}' via Understat/ASA; "
-                "pass --espn-date-windows to use ESPN's season-aggregated appearance rates instead"
+                f"player history not available for league '{league}': no Understat/ASA "
+                f"coverage and no ESPN slug (supported ESPN leagues: {sorted(LEAGUE_ESPN_SLUGS)})"
             )
         _write_csv(rows, out_dir / f"players_{season}.csv")
 
@@ -129,7 +180,12 @@ def main() -> int:
         "--espn-date-windows",
         type=str,
         default=None,
-        help="Comma-separated YYYYMMDD-YYYYMMDD windows for --kind players on leagues without Understat/ASA coverage",
+        help=(
+            "Comma-separated YYYYMMDD-YYYYMMDD windows for --kind players on leagues "
+            "without Understat/ASA coverage. OPTIONAL: omitted, the windows covering "
+            "the already-played part of --seasons are derived from the season calendar. "
+            "Pass it to backfill a season other than the current one."
+        ),
     )
     args = parser.parse_args()
 
