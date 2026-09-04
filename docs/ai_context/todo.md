@@ -53,6 +53,41 @@ a half-deployed attribution column looks like data). **So (b) is no longer
 blocked on a missing field — it is blocked only on the board placing an order,
 which it has not done since 15:27:33Z.**
 
+**(b) DISCHARGED 2026-09-04 03:1xZ.** The board resumed buying at 01:07:05Z
+after ~10 hours idle, and the three orders on `/api/portfolio/live` read as a
+timeline of the night's deploys:
+
+    15:27:33Z  mlb totals under  model_edge=None  side_picked_by=None   (pre-attribution)
+    01:07:05Z  mlb h2h away      model_edge=7.55  side_picked_by=None   (after 04187cdf)
+    02:57:58Z  mlb h2h away      model_edge=8.67  side_picked_by=price_shopping  (after 008aca69)
+
+The stated discharge was "a NON-NULL `model_edge_pct` on an order submitted after
+2026-09-03T19:54:36Z". There are two, and the later one carries the COMPLETE
+chain. **The dataset that was empty at 02:2xZ has its first fully-attributed
+row.** `(e)` is still open and now has something to accumulate against.
+
+**READ `side_picked_by: price_shopping` WITH ITS SCOPE** (`portfolio_commit`,
+corrected in `3777397d`): it means price alone would have sized this too, NOT
+that the sim was uninvolved. At `_SCORE_SIM_WEIGHT = 0.125` the sim also ranks,
+and the counterfactual only models sizing.
+
+**WHY IT LOOKED DEAD FOR TEN HOURS, measured on the 09-04 plan (581 rows, 3
+sized, 2 positions):** two blockers, only one of which is about the model.
+
+  1. **NCAAF is 429 of 465 `no_model_edge_pct` refusals — 92%**, structurally and
+     by design (`ncaaf/game_projections.py` nulls `edge_vs_market_pct`; margins
+     lose to the close by 3.563 MAE, n=2,233).
+  2. **Three of four venues price NOTHING on a forward slate.**
+     `venue_priced` = polymarket 29/31, **kalshi 0/189, novig 0/334, prophetx
+     0/397**. Kalshi holds a real position it cannot place
+     (`placeable_committed=0/1`) — no venue price to bet against. Polymarket is
+     the only venue buying, which is exactly the one that prices the slate.
+
+**So "the board is not buying" was two different facts wearing one symptom**, and
+neither was a defect in the plan: an unbuyable sport, and venues that have not
+posted tomorrow's markets yet. `share_with_sim_edge` is **0.1997** — the model
+has a priced view on a fifth of candidates and NCAAF is nearly all of the rest.
+
 **(e) NEW: `_SCORE_SIM_WEIGHT`'s OWN GATE HAS NEVER BEEN RUN, and for the first
 time it can be.** The constant is **0.125 capped at 1.5**, not the 0.0 that six
 comments asserted until `3777397d` (`sim_component` non-zero on 5,108 of 25,830
