@@ -543,3 +543,33 @@ once this index exists: re-splitting would orphan the parts.
 | [web-preflight-dead-sample] | WEB'S PREFLIGHT SAMPLE HAS BEEN DEAD SINCE 2026-08-14 — CAUSE STILL UNKNOWN AFTER FOUR WRONG ANSWERS `[2026-08 | `state_worker.md` |
 | [refresh-worker-deploy-hold] | refresh-worker: THE OOM DEPLOY HOLD IS ORPHANED. Branch READY, NOT DEPLOYED. `[2026-08-18]` — **ARCHIVED 2026- | `state_worker.md` |
 | [test-intelligence-runtime] | `tests/test_intelligence.py` IS SLOW, NOT STALLED — and the "warm state" finding is RETRACTED `[2026-09-03, la | `state_worker.md` |
+
+### `[web-oom-leak]` UPDATE — the instrument is fixed and the growth has a SUSPECT, 2026-09-04T00:4xZ `[session b2b5b45b]`
+
+**Supersedes the "needs an INSTRUMENT change" line in the entry above — that
+change shipped (`442f82fe`) and is verified REACHED**, not merely deployed:
+emissions carry `attribution_basis = process_anon_smaps_rollup` with a non-null
+`process_anon_mb_now` and `unreadable = 0`. Attribution now differences THIS
+PROCESS's anon (`/proc/self/smaps_rollup`), so its scope matches the per-worker
+`inflight` guarantee.
+
+**THE PREVIOUS CULPRIT WAS AN ARTEFACT.** `/api/ops/artifacts/publish` read
+**211 MB** container-scoped and reads **1.15 MB across 81 solo requests**
+per-process. A publish spawns a merge CHILD; the container-scoped instrument
+charged the child to the parent's request. **Any earlier conclusion pointing at
+publish came from measuring the wrong scope.**
+
+**THE SUSPECT: `/api/intelligence/query`, ~82 MB PER CALL** — 408.0 MB over 5
+calls, replicated on both workers. Infrequent and very expensive; nothing else is
+within an order of magnitude (publish moves tens of MB across HUNDREDS of calls).
+It does NOT recompute — `read_combined_intelligence_response` only reads what the
+background loop already built — it MATERIALISES AND HYDRATES a large precomputed
+payload, and CPython does not return freed arenas. `intelligence.py:1600` notes
+slimming that payload would change an API contract, so the fix is not free.
+
+**THE RANKING IS TRUSTWORTHY; THE SHARE IS NOT.** Attributed 408 MB against
+342 MB of actual process growth. One contamination source remains and it is
+named: `syndicate/app.py` runs the live-refresh and intelligence-state loops IN
+THE SAME PROCESS, and `inflight` guarantees no other REQUEST, not no other
+THREAD. Of three sources — cross-worker, merge children, same-process threads —
+two are gone.
