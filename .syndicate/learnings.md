@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 804 rules `[generated]`
+## Index — 805 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5012,3 +5012,45 @@ the safer direction than the reverse — but only if the token is checked.
 Same family as the CRLF misfire the day before: the tool was fine, the INPUT was
 wrong, and the wrong answer was the alarming one. Both were caught by noticing
 the output contradicted something already known.
+
+## 2026-09-04 — FORBIDDEN: reporting a key as ABSENT from a paginated API without paginating. An unpaginated list read manufactures FALSE ABSENCE, and absence is the finding people act on. `[lane mlb-feed-live-terminal-refresh]`
+
+- **What we believed.** That `SYNDICATE_WEB_DYNO` was ABSENT from the live
+  refresh-worker while `render.yaml` declared it `false` — a blueprint/live
+  drift making `_render_web_dyno()` fall through to its `RENDER` heuristic and
+  call refresh-worker a web dyno, so every gate behind `not _render_web_dyno()`
+  would be inert on the one service that builds the board. I wrote that into a
+  code docstring, a lane block, a `state.md` row, a pushed commit message and
+  a session log, and reported it to the user as a caught trap. The user then
+  asked me to FIX it, which is the cost: a false finding had become a work item.
+- **What was actually true.** The key is present and correct on all three
+  services — web `true`, live-odds-worker `false`, refresh-worker `false`,
+  exactly matching `render.yaml`. My read was **one `limit=100` page of
+  refresh-worker's 153 keys.** `CLAUDE.md` warns to paginate this exact
+  endpoint (*"paginate — `limit` > 100 returns HTTP 400"*), and that warning is
+  loaded into every session in this repo. I read it at session start and made
+  the error anyway, because I was reading the response for ONE key rather than
+  auditing the response's completeness.
+- **How we found out.** Not by re-reading the API — by asking whether the GATED
+  CODE RAN. `[mlb_cards] FEED_LIVE_PRUNE` sits behind `not _render_web_dyno()`;
+  it is in refresh-worker's logs at 15:57:55Z and 15:59:32Z, along with the
+  `board_contract_*` and `cards_context_*` memory samples behind the same gate,
+  while the web service emits none of the three. That is **positive proof the
+  branch is live**, not the weaker "I could not reproduce the problem" — see
+  *retraction is not innocence*; this one clears the bar that rule sets.
+- **The rule going forward.** **A list endpoint answers "what is on this page",
+  never "what exists".** Absence is only a finding once the listing is known to
+  be COMPLETE: paginate to exhaustion and report the total you enumerated
+  (`keys=153`) next to the absence, so the denominator is visible and a short
+  read is obvious to the next reader. And when a config read implies that
+  deployed code is INERT, **check the code's own output before believing it** —
+  a log line, a counter, an emitted stamp. A gate that is really inert is
+  silent, and silence is directly observable. Sibling of *presence is not
+  reachability* pointed the other way: this is ABSENCE is not INERTNESS.
+- **Cost.** No production change was made — the error was caught on the way to
+  making one, when investigating the blast radius of a config write the user had
+  authorised. Had I acted on it instead, I would have "fixed" a correct service
+  and taken a needless refresh-worker deploy. Ledger cost: one code docstring,
+  one lane block, one `state.md` row, one log section and one commit message
+  carrying a false fact, all now corrected in place except the pushed commit
+  message, which cannot be.

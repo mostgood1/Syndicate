@@ -98,12 +98,20 @@ def mlb_feed_live_is_refreshable(
     correctness fix with an outage, so the caller passes
     `has_request_context()` and the extra day exists only for workers.
 
-    NOT `_render_web_dyno()`, deliberately. `SYNDICATE_WEB_DYNO` is declared
-    `false` for both workers in `render.yaml` and is ABSENT from the LIVE
-    refresh-worker (read from the Render API 2026-09-04) -- so that helper
-    falls through to its `RENDER` heuristic and calls refresh-worker a web
-    dyno. A gate built on it would have been inert on the one service that
-    builds the board. `has_request_context()` is intrinsic and cannot drift.
+    NOT `_render_web_dyno()` -- but not for the reason first written here.
+    That helper is CORRECT: `SYNDICATE_WEB_DYNO` is `true` on web and `false`
+    on BOTH workers, live and in `render.yaml` alike (re-read 2026-09-04 WITH
+    PAGINATION; the first read was one 100-key page of refresh-worker's 153
+    and reported a drift that does not exist). Independently confirmed from
+    refresh-worker's own logs: `[mlb_cards] FEED_LIVE_PRUNE`, which sits
+    behind `not _render_web_dyno()`, emits there every build.
+
+    `has_request_context()` is preferred on the merits instead. The
+    constraint is *"do not add network to a REQUEST path"*, and that is what
+    this asks; service identity is a proxy for it. `_mlb_feed_live_payload`
+    is called from both the web request path and worker code, so the precise
+    question is which of those two is calling right now -- not which service
+    the process belongs to.
     """
     selected = str(selected_date or "").strip()
     today = str(today_iso or "").strip()

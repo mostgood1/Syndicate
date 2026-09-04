@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 804 rules `[generated]`
+## Index — 805 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 292**
+**FORBIDDEN — 293**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -228,6 +228,7 @@
 - [2026-09-04 — FORBIDDEN: acting on a comparison guard whose inputs are not NORMALIZED](#2026-09-04-forbidden-acting-on-a-comparison-guard-whose-inputs-are-not-normalized)
 - [2026-09-04 FORBIDDEN: an instrument whose partial output is indistinguishable from its…](#2026-09-04-forbidden-an-instrument-whose-partial-output-is-indistinguishable-from-its-complete-output-lane-render-events-nondict-reason)
 - [2026-09-04 — FORBIDDEN: REBUILDING a shared ledger file from `origin/main`. Every git d…](#2026-09-04-forbidden-rebuilding-a-shared-ledger-file-from-originmain-every-git-discard-guard-watches-git-a-rebuild-is-a-plain-write-and-none-of-them-fire-lane-mlb-feed-live-terminal-refresh)
+- [2026-09-04 — FORBIDDEN: reporting a key as ABSENT from a paginated API without paginati…](#2026-09-04-forbidden-reporting-a-key-as-absent-from-a-paginated-api-without-paginating-an-unpaginated-list-read-manufactures-false-absence-and-absence-is-the-finding-people-act-on-lane-mlb-feed-live-terminal-refresh)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
