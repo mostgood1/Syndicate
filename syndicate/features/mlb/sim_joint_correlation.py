@@ -334,20 +334,30 @@ class JointCorrelationIndex:
         if value is None:
             self._bump("undefined_pair")
             return None
-        # UNIT CONVERSION, and it is the difference between beating the guess
-        # and losing to independence. `value` is a SPEARMAN RANK CORRELATION OF
-        # COUNTS; the consumer prices a THRESHOLDED bet (`hits > 0.5`), and
-        # thresholding attenuates dependence to 54-68% of the rank figure.
-        # Measured 2026-09-05 over 6,396 realised leg pairs: passing the raw
-        # value through made the joint LOSE to plain independence
-        # (+0.101 log-loss same-player), monotonically worse the more the
-        # estimator was allowed to move. See `threshold_correlation`.
-        p_a = candidate_probability(candidate_a)
-        p_b = candidate_probability(candidate_b)
-        converted = threshold_correlation(float(value), p_a, p_b)
-        self._bump("measured" if (p_a is not None and p_b is not None)
-                   else "measured_fallback_attenuation")
-        return converted
+        # THE RAW COEFFICIENT, DELIBERATELY -- and this reverts a conversion I
+        # shipped on 2026-09-05 and then measured out again the same night.
+        #
+        # `value` is a Spearman rank correlation of COUNTS while the consumer
+        # prices a THRESHOLDED bet, and under a Gaussian copula phi(indicator)
+        # is only 54-68% of rho(counts). That argument is correct in theory and
+        # `threshold_correlation` implements it. IT DOES NOT PAY. Measured over
+        # 162,491 realised leg pairs, 151 games, 13 dates (2026-06-29..07-11):
+        #
+        #     same-player   RAW 0.52216   CONVERTED 0.52371
+        #                   converted is WORSE by +0.00156, CI [+0.00100, +0.00219]
+        #     pooled        RAW 0.37086   CONVERTED 0.37091   (null)
+        #
+        # A Gaussian copula over-attenuates for discrete, zero-inflated counts,
+        # so the raw rank figure already sits closer to the true indicator
+        # correlation than the conversion predicts.
+        #
+        # THE FINDING THAT MOTIVATED THE CONVERSION DID NOT REPLICATE. It came
+        # from SIX game clusters on one date, where measured appeared to LOSE to
+        # independence; across 149 clusters it BEATS independence by -0.02353,
+        # CI [-0.02849, -0.01854]. Do not re-derive the conversion from a small
+        # sample -- re-run `scripts/measure_joint_pair_pricing.py` first.
+        self._bump("measured")
+        return float(value)
 
     def _lookup_for_test(self, game_pk: int, label_a: str, label_b: str) -> Optional[float]:
         """Raw pair read, bypassing candidate keying.
@@ -362,12 +372,6 @@ class JointCorrelationIndex:
     def as_lookup(self) -> Callable[[Dict[str, Any], Dict[str, Any]], Optional[float]]:
         """The callable to hand to `compute_correlation(measured_lookup=...)`."""
         return self.measured
-
-
-from syndicate.features.mlb.threshold_correlation import (
-    candidate_probability,
-    threshold_correlation,
-)
 
 
 def _subject_from_display_name(value: Any) -> str:
