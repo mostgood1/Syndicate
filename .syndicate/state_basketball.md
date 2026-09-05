@@ -5,7 +5,7 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
-## [nba-betting-card-assets-404] THE NBA BETTING-CARD CSS AND JS HAVE BEEN 404 IN PRODUCTION -- fixed and landed, NOT DEPLOYED `[measured + fixed 2026-09-05, lane ci-archives-nba-card-js, commit ba84b331]`
+## [nba-betting-card-assets-404] THE NBA BETTING-CARD CSS AND JS WERE 404 IN PRODUCTION -- FIXED, DEPLOYED AND VERIFIED ON THE SERVED PAYLOAD `[2026-09-05, lane ci-archives-nba-card-js, commit ba84b331, web 337facdc live 20:35:00Z]`
 
 **Measured on production, `syndicate-an21.onrender.com`, 2026-09-05:**
 
@@ -59,13 +59,21 @@ The pre-fix column reproduces production's numbers EXACTLY, including the
 `/betting-card?date=` form. Mutation-checked, 3 mutations, each red exactly
 where predicted.
 
-**OWED: A WEB DEPLOY.** This is a `web`-only change (asset routes are served
-by web). The verification that discharges it is one reading:
-`GET /nba/assets/betting-card-v2.js` **404 -> 200**, with `?v=` on the page
-no longer `1`. **A LOCAL RUN IS EVIDENCE ABOUT THE CODE, NEVER ABOUT THE
-DEPLOYMENT** -- if it stays 404 after the deploy, the assets are on no
-candidate root on Render and the next move is to vendor them the way WNBA
-does, not to add a fourth root.
+**DEPLOYED AND VERIFIED -- NOTHING OWED `[web `337facdc`, live 2026-09-05
+20:35:00Z, `dep-dae7napt0dsc739580c0`]`.** Same probe before and after:
+
+    before   404      0 bytes  .js      404     30 bytes  .css   ?v=1
+    after    200 63,536 bytes  .js      200 17,881 bytes  .css   ?v=1788640200000000000
+
+**Checked that it is the REWRITTEN asset, not merely some file** -- a root fix
+could plausibly serve the un-rewritten source and a byte count would not tell:
+`/nba/api/season/` and `/nba/cards?date=` present; bare `/api/season/`,
+`/betting-card?date=` and `/live-player-props-audit?date=` all absent.
+
+The failure branch was pre-registered here BEFORE the deploy -- *if it stays
+404 the assets are on no candidate root on Render and the move is to vendor
+them the way WNBA does, not to add a fourth root* -- and did NOT fire. Kept
+because it is still the right next move if this ever regresses.
 
 **SIDE EFFECT WORTH NAMING.** These assets now honour `SYNDICATE_DATA_ROOT`,
 which they never did -- removing

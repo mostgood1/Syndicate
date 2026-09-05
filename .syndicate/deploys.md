@@ -7,6 +7,37 @@
 
 
 
+## 2026-09-05 20:29:31-20:35:00Z — web `50b266da` -> `337facdc` — **DEPLOYED, LIVE, VERIFIED ON THE SERVED PAYLOAD. The NBA betting-card CSS and JS serve for the first time; both had been 404.** — lane `ci-archives-nba-card-js`
+
+`deploy=dep-dae7napt0dsc739580c0 trigger=api`. Carried `ba84b331` (mine) plus
+whatever else was on the `origin/main` tip. Claim held 9.4 min of 45 and
+RELEASED with its token; preflight `CLEAR` at 20:27:27Z for this exact SHA.
+One earlier preflight returned **HOLD -- 1 job in flight** (`merge_published_
+artifacts`, pid 6803); I waited for it rather than forcing, and the next poll
+was clear.
+
+**verify:** `GET /nba/assets/betting-card-v2.js` and `.css` on
+`syndicate-an21.onrender.com`, same probe before and after:
+
+    before   404      0 bytes  .js      404     30 bytes  .css   ?v=1
+    after    200 63,536 bytes  .js      200 17,881 bytes  .css   ?v=1788640200000000000
+
+**IT IS THE REWRITTEN ASSET, NOT MERELY SOME FILE** — checked on the served
+body, because a root fix could plausibly serve the un-rewritten source and a
+byte count alone would not tell: `/nba/api/season/` present, `/nba/cards?date=`
+present, bare `/api/season/` ABSENT, `/betting-card?date=` ABSENT,
+`/live-player-props-audit?date=` ABSENT.
+
+The `?v=` moved off `1`, which is the discriminating half of the version
+check: `1` is `source_betting_card_asset_version`'s literal both-files-missing
+fallback, so the page had been publishing the defect in its own HTML.
+
+**PREDICTED BEFORE THE DEPLOY AND RECORDED FIRST** (`state_basketball.md
+[nba-betting-card-assets-404]`, written while it was still 404): 404 -> 200,
+and *"if it stays 404 the assets are on no candidate root on Render and the
+move is to vendor them as WNBA does, not to add a fourth root."* That branch
+did not fire.
+
 ## 2026-09-05 05:13:08Z — **OWED READING DISCHARGED: the 2026-09-05 board cleared on its first POST-DEPLOY rebuild.** No deploy taken — this is a verification row. — lane `mlb-hitter-so-dead-field`
 
 The last open thread from `#646`. 2026-09-05 had been reading

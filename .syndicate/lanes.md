@@ -2381,7 +2381,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: nothing. **NO DEPLOY TAKEN, no env var changed** [instruction
   2026-09-05].
 
-### ci-archives-nba-card-js — OPEN — opened 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **HYPOTHESIS CONFIRMED EXACTLY AS PRE-REGISTERED: NOT a rewriter defect and NOT a red CI gate. Diagnosing why the test could not load its input found a REAL PRODUCTION OUTAGE in the same code path — `/nba/assets/betting-card-v2.{js,css}` have been serving 404 while the page that references them serves 200. FIXED, MUTATION-CHECKED, LANDED (`ba84b331`). ONE WEB DEPLOY OWED.**
+### ci-archives-nba-card-js — CLOSED-VERIFIED 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **HYPOTHESIS CONFIRMED EXACTLY AS PRE-REGISTERED: NOT a rewriter defect and NOT a red CI gate. Diagnosing why the test could not load its input found a REAL PRODUCTION OUTAGE in the same code path. FIXED (`ba84b331`), DEPLOYED (web `337facdc`, live 20:35:00Z) AND VERIFIED ON THE SERVED PAYLOAD: `/nba/assets/betting-card-v2.js` 404/0 -> 200/63,536 bytes and `.css` 404/30 -> 200/17,881, `?v=1` -> `?v=1788640200000000000`, with the rewritten routes present and the stale forms absent. NOTHING OWED; claim released.**
 - Goal: `tests/test_archives.py::ArchiveRouteTests::test_nba_betting_card_js_rewrites_source_routes_to_syndicate_paths`
   passes in a session worktree under the documented data-root control, and
   still passes with `data/` present. **MET** — and the goal turned out to be
@@ -2418,11 +2418,16 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   B order reversed -> ordering guard RED only; C single-root version stamp ->
   version RED only). `tests/test_archives.py` 1 failed / 380 passed -> **384
   passed, 2 skipped, 0 failed**; NBA suite 139 passed.
-  **OWED, and it is one reading:** after a `web` deploy,
-  `GET /nba/assets/betting-card-v2.js` **404 -> 200** and the page's `?v=` no
-  longer `1`. A local run is evidence about the code, never about the
-  deployment — if it stays 404 the assets are on no candidate root on Render
-  and the move is to vendor them as WNBA does, not to add a fourth root.
+  **DISCHARGED 2026-09-05 20:35:00Z.** Deployed web `337facdc`
+  (`dep-dae7napt0dsc739580c0`), preflight CLEAR for that exact SHA after one
+  HOLD on an in-flight `merge_published_artifacts` job that I waited out rather
+  than forcing. Served payload: `.js` **404/0 -> 200/63,536**, `.css` **404/30
+  -> 200/17,881**, `?v=1` -> `?v=1788640200000000000`. Checked that it is the
+  REWRITTEN asset and not merely some file: `/nba/api/season/` and
+  `/nba/cards?date=` present; bare `/api/season/`, `/betting-card?date=` and
+  `/live-player-props-audit?date=` all absent. The pre-registered failure
+  branch — stays 404, therefore vendor as WNBA does — did NOT fire. Working in
+  `deploys.md` 20:29:31-20:35:00Z.
 - Also corrected: `state_ledger.md [ci-suite-red-test]`, which claimed CI's own
   gate had a red test. It does not and did not.
 - **`docs/ai_context/todo.md` NOT FILED — it is CLAIMED by OPEN lane
