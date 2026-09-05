@@ -7,6 +7,63 @@
 
 
 
+## 2026-09-05 01:47-02:1xZ — MLB HITTER STRIKEOUTS VERIFIED CLEARED — `0350dbd2` reached refresh-worker inside someone else's deploy `3a9153f4`; **I DID NOT DEPLOY**
+
+**verify:** the served `/mlb/api/hitter-ladders?date=2026-09-04&prop=hitter_strikeouts`
+featured row, PAIRED against `prop=hits` on the SAME player and endpoint.
+
+    reading                     BEFORE (artifact 16:27:56-05:00)   AFTER (artifact 20:47:42-05:00)
+    hitter_strikeouts mean      0.0                                1.088
+    hitter_strikeouts mode      0                                  1
+    hitter_strikeouts modeProb  1.000                              0.406
+    hitter_strikeouts maxTotal  0                                  4
+    hitter_strikeouts rungs     1  ({total:0, exactProb:1.0})      5
+    CONTROL hits rungs          6                                  6
+    CONTROL hits marketLine     0.5                                0.5
+
+The control is what makes this a defect reading and not a quiet sim: `hits` was
+healthy in BOTH states on the same player, so only the strikeouts dimension
+moved.
+
+**I DID NOT PERFORM THIS DEPLOY AND MUST NOT BE RECORDED AS HAVING DONE SO.**
+refresh-worker went to `3a9153f4` at **2026-09-04T23:26:26Z**, `trigger=api`,
+by another session while lane `soccer-player-producer` held the claim. It
+carried `0350dbd2` because it was cut from the TIP. I had asked (via a relay
+through lane `web-oom-highwater`) for exactly that — deploy from the tip rather
+than a pinned older commit — after their earlier 22:50:57Z deploy to `ea1e3ac0`
+went in OLDER than my fix and therefore did not contain it.
+
+**Deployment confirmed BY CONTENT, not ancestry:** `git show
+3a9153f4:vendor/mlb_bettingv2/tools/daily_update.py | grep -c '"SO": so,'` = **2**
+(both duplicated sites). Ancestry agreed as a cross-check, but content is the
+test that survives a deploy branch cut off main.
+
+**n=1 PLAYER, AND THAT IS A CEILING OF THE INSTRUMENT, NOT A SAMPLE CHOICE.**
+`featuredRow` is not filterable — neither `?hitter=` nor `?game=` changes it (I
+sampled 8 games and got Henry Bolte 8 times), and `rows` is prop-independent
+(it returns the `hits` rows whatever `prop` is set to). So production cannot
+yield a per-row denominator through this endpoint. The all-rows claim rests on
+the MECHANISM plus 18/18 rows in a local `_sim_many` run, NOT on a production
+count. The 19.7 MB ladders artifact would give the real denominator; I did not
+pull it, because `/api/ops/artifacts/export` reads it whole into memory on the
+2 GB web box and `#632` has web climbing toward its limit on retention.
+
+**2026-09-05 STILL READS `mean 0.0`, AND THAT IS NOT A FAILURE.** Its artifact
+is stamped `18:19:32-05:00` = **23:19:32Z**, which is **~7 minutes BEFORE** the
+23:26:26Z deploy — built by the old code. Stale artifact, not an inert fix. It
+clears on that date's next rebuild. Recorded explicitly because "one date fixed,
+the next still zero" is exactly the shape that gets misread as a partial fix.
+
+**NO CLAIM WAS TAKEN AND NONE WAS FORCED.** The claim was held and RENEWED at
+22:56:09Z (the file carried a `replaced` record), which is positive proof the
+holder was alive — a dead session does not renew. It is now free; the work
+landed without anyone breaking a live lock.
+
+Related: `#646` (deploy + rebuild + reading) is DISCHARGED by this row.
+Still open on that item: verify `probability_refusal.py` covers the MLB ladder
+path, so that "no priced recommendation" stops depending on the market feed
+returning zero `batter_strikeouts` quotes (0 of 289 players, 2026-09-04).
+
 ## 2026-09-04 06:15Z — MLB VERIFIED — the owed reading on the 05:27-05:43Z row is DISCHARGED
 
 MLB's board built for the rolled-over 09-04 date at **06:14:15Z**, after the
