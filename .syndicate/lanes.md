@@ -887,7 +887,9 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   ~716, ~3657, ~3697. Disjoint by function. Your `board_sim_view_display` JS test
   passes. If you still need the file, say so and I will coordinate rather than assume.
 - **RELEASED 2026-09-05 ~22:0xZ to lane `edge-basis-moneyline`, ON AN EXPLICIT
-  USER OVERRIDE, and handed straight back in the same session** — `layer2_board.py`.
+  USER OVERRIDE — **AND HANDED BACK the same session, `fda5c28a` landed, the
+  `Files:` line below restored and re-verified with `claims_by_path`. This lane
+  holds `layer2_board.py` again; nothing is owed.** The file —
   Lane claims are per PATH and cannot be scoped to a function, so taking a
   four-line COMMENT fix in `_live_projection_columns` (~:2181) meant taking the
   whole file. The edit is comment-only and touches none of the functions this
@@ -897,8 +899,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `_apply_verdict` is called with `live_projected=verdict["model_prob"]` for
   "EVERY game market (h2h, totals AND spreads)", which is false for h2h, and
   that belief is what hid the `edge_basis` mislabel for three weeks.
-- Files: **per the bullet above, handed straight back —**
-  released: `syndicate/features/shared/layer2_board.py`
+- Files: `syndicate/features/shared/layer2_board.py`
   (**`_projection_side_in_row_frame` / `_model_edge_for` / `_model_prob_for_side`
   / `_publication_columns`, and `[2026-09-04]` the `value_ev` assignment in
   `build_layer2_rows` where the model edge becomes the RANKING value — same
@@ -2812,8 +2813,9 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `tests/test_ncaaf_live_gameline_registration.py` from `ncaaf-live-resim`
   (that session is RUNNING; it was messaged twice, for scope and then with the
   finished branch, and did not answer);
-  `syndicate/features/shared/layer2_board.py` from `layer2-sim-disagrees`
-  (comment-only, and handed straight back — see that block);
+  released back 2026-09-05, nothing owed: `syndicate/features/shared/layer2_board.py`
+  was taken from `layer2-sim-disagrees` for a comment-only edit and returned in
+  the same session once `fda5c28a` landed — see that block;
   `tests/test_live_gameline_edge_basis.py`, which no lane held.
   Both releases are recorded in the OTHER lane's own block, so neither owner has
   to read this one to find out.
