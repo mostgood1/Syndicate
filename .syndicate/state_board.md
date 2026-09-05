@@ -782,3 +782,30 @@ and both verified here before being accepted.**
    **mlb, wnba AND soccer** in the same directory. So the path resolves, the
    web/worker transport is not the confound, and the absence is NCAAF-specific.
    Owed by `ncaaf-live-resim-wire`, NOT `ncaaf-live-resim` as written above.
+
+4. **CORRECTION TO (3), AND IT IS THE SAME ERROR AS (2) COMMITTED TWICE INSIDE
+   ONE HOUR.** "The producer is deployed and not writing" was a STALE READ. The
+   first tick wrote at **23:15:29Z**; my window was 23:13–23:15Z. I read the
+   consumer before the producer had run once, having caught myself doing exactly
+   that ninety seconds earlier. At 23:28Z: `snapshot_present: true`,
+   `snapshot_generated_at 2026-09-05T18:26:33-05:00`, 51 games,
+   `sources_seen {live_resim: 6, pregame: 45}`.
+   **AND MY CONTROL WAS SOUND BUT NOT A DISCRIMINATOR.** mlb/wnba/soccer being
+   present did eliminate the disk split — and I then treated "the confound I
+   thought of is eliminated" as "my hypothesis is confirmed", while a third
+   explanation was live the whole time: the tick had not run. Both produce
+   `no_snapshot_at_path`. **The discriminator existed and was the PRODUCER'S OWN
+   SIGNAL** — refresh-worker's `NCAAF_LIVE_RESIM {... "written": true ...}` line
+   at 23:15:51Z. Asking "did the producer run" from the consumer's absence is the
+   standing error `[absent signal is about the emitter]`; a null on the consumer
+   needs the producer's emission and an elapsed-time denominator before it means
+   anything.
+   **THE REAL DEFECT WAS ONE HOP FURTHER ON, AND IT WAS BIGGER:** 257 of 257 rows
+   missed at 23:17:39Z with a PERFECT index (`index_size 8`,
+   `skipped_no_team_names 0`) — the lens keyed from the CFBD projections artifact
+   and the grid from the odds source spell teams differently,
+   `('baylor','auburn')` vs `('baylor bears','auburn tigers')`. Fixed by that lane
+   as `933e9beb`. **So live NCAAF h2h rows were WITHHELD before the join, never
+   mislabelled**, and this lane's `edge_basis` fix gets its first NCAAF population
+   when `933e9beb` deploys. The fixture shape that hid it is now pinned by
+   `test_a_naming_convention_mismatch_is_VISIBLE_and_never_a_silent_zero`.

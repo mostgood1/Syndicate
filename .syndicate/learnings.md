@@ -6061,3 +6061,37 @@ nothing else moved**. I had written "assert the full expected map including the
 paths that must NOT move" and then, two paragraphs later, prescribed an edit that
 violates it. A rule and its worked example must be checked against each other;
 the example is what people copy.
+
+## [2026-09-05] A CONTROL THAT KILLS ONE ALTERNATIVE IS NOT A DISCRIMINATOR — and "did the producer run" is never answerable from the consumer
+
+Lane `edge-basis-moneyline`, and the sharp part is that I made this error **ninety
+seconds after writing up the same one**. At ~23:10Z I recorded that a
+`supported: false` reading had come off an artifact built 20 seconds before the
+deploy. At 23:13–23:15Z I then concluded "the producer is deployed and NOT
+writing" from a window that ended **before the first tick ran at 23:15:29Z**.
+Vigilance did not survive one turn. The check has to be mechanical.
+
+**The control was good and it still did not license the conclusion.** I checked
+that the same endpoint on the same service read `snapshot_present: true` for the
+three other sports in the same directory, which really does eliminate the
+web/worker disk split. I then treated *the confound I thought of is eliminated*
+as *my hypothesis is confirmed* — while a third explanation was live the whole
+time. `no_snapshot_at_path` is produced BOTH by "NCAAF-specific defect" and by
+"the tick has not run yet", so the reading could not separate them, and I never
+established the tick interval to know which window I was in.
+
+THE RULE, and it is mechanical rather than attentional:
+
+- **Enumerate what else produces this exact reading before the reading means
+  anything.** A control eliminates the alternative it was designed against and
+  says nothing about the ones you did not list. Two hypotheses that share an
+  observable are one hypothesis until you find an observable they do not share.
+- **Ask the EMITTER, not the absence.** "Did the producer run" is answerable only
+  from the producer's own signal. It existed the whole time and I never looked:
+  `NCAAF_LIVE_RESIM {... "written": true, "elapsed_seconds": 21.741 ...}` on
+  refresh-worker at 23:15:51Z. Same family as
+  *absent signal is about the emitter* and *gate verification on artifact mtime*
+  — this is the third instance in one session, which is the argument for making it
+  a checklist item rather than a thing to remember.
+- **A null needs a denominator IN TIME.** Before reporting "X has not happened",
+  state how long since it could have and what its period is. I had neither.
