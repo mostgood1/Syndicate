@@ -7,6 +7,205 @@
 
 
 
+## 2026-09-05 20:29:31-20:35:00Z — web `50b266da` -> `337facdc` — **DEPLOYED, LIVE, VERIFIED ON THE SERVED PAYLOAD. The NBA betting-card CSS and JS serve for the first time; both had been 404.** — lane `ci-archives-nba-card-js`
+
+`deploy=dep-dae7napt0dsc739580c0 trigger=api`. Carried `ba84b331` (mine) plus
+whatever else was on the `origin/main` tip. Claim held 9.4 min of 45 and
+RELEASED with its token; preflight `CLEAR` at 20:27:27Z for this exact SHA.
+One earlier preflight returned **HOLD -- 1 job in flight** (`merge_published_
+artifacts`, pid 6803); I waited for it rather than forcing, and the next poll
+was clear.
+
+**verify:** `GET /nba/assets/betting-card-v2.js` and `.css` on
+`syndicate-an21.onrender.com`, same probe before and after:
+
+    before   404      0 bytes  .js      404     30 bytes  .css   ?v=1
+    after    200 63,536 bytes  .js      200 17,881 bytes  .css   ?v=1788640200000000000
+
+**IT IS THE REWRITTEN ASSET, NOT MERELY SOME FILE** — checked on the served
+body, because a root fix could plausibly serve the un-rewritten source and a
+byte count alone would not tell: `/nba/api/season/` present, `/nba/cards?date=`
+present, bare `/api/season/` ABSENT, `/betting-card?date=` ABSENT,
+`/live-player-props-audit?date=` ABSENT.
+
+The `?v=` moved off `1`, which is the discriminating half of the version
+check: `1` is `source_betting_card_asset_version`'s literal both-files-missing
+fallback, so the page had been publishing the defect in its own HTML.
+
+**PREDICTED BEFORE THE DEPLOY AND RECORDED FIRST** (`state_basketball.md
+[nba-betting-card-assets-404]`, written while it was still 404): 404 -> 200,
+and *"if it stays 404 the assets are on no candidate root on Render and the
+move is to vendor them as WNBA does, not to add a fourth root."* That branch
+did not fire.
+
+## 2026-09-05 05:13:08Z — **OWED READING DISCHARGED: the 2026-09-05 board cleared on its first POST-DEPLOY rebuild.** No deploy taken — this is a verification row. — lane `mlb-hitter-so-dead-field`
+
+The last open thread from `#646`. 2026-09-05 had been reading
+`mean 0.0 / modeProb 1.0 / maxTotal 0 / 1 rung` on a board where 2026-09-04 read
+healthy, which is the shape that looks like a PARTIAL fix. It was not.
+
+**WHY IT LOOKED BROKEN — the margin is 106 seconds.** The 09-05 sims (15 files)
+and its ladders artifact were written **23:24:40Z / 23:20:30Z**;
+`0350dbd2` went live on refresh-worker at **23:26:26Z**. The date was built
+under the old code with under two minutes to spare, and nothing rebuilt it for
+5h49m.
+
+**verify — the SAME featured row, before and after its first post-deploy build:**
+
+| field | 23:24:40Z artifact | 05:13:08Z artifact |
+|---|---|---|
+| `mean` | 0.0 | **1.042** |
+| `mode` | 0 | 1 |
+| `modeProb` | **1.000** | 0.428 |
+| `maxTotal` | 0 | 4 |
+| ladder rungs | 1 | 5 |
+| `marketLine` | null | null (unchanged — still no quotes) |
+
+2026-09-04 independently corroborates across THREE post-deploy rebuilds
+(22:51:30Z, 04:53:01Z, and healthy throughout): `mean 1.087-1.095`,
+`modeProb 0.402-0.447`, 5-6 rungs.
+
+**THE GATE THAT MADE THIS READABLE, and it is the transferable part.** The
+watcher keyed on the ARTIFACT'S OWN mtime crossing the deploy epoch — not wall
+clock, not "the deploy is live". Two of its four polls read `mean 0.0` on the
+stale artifact; reporting either would have been a false negative against a fix
+that was already correct and deployed. **A deploy going live and the thing it
+changes taking effect are different events, here 5h49m apart.**
+
+`#646` is now fully discharged: fix landed, gated, deployed to both services,
+and verified on two independently rebuilt dates.
+## 2026-09-05 03:53:47-03:59:01Z — refresh-worker `3a9153f4` → `50b266da` — **DEPLOYED, LIVE, VERIFIED BY CONTENT. The pair from the 03:09Z web row is now complete on both services.** — lane `mlb-ladder-refusal-deploy`
+
+Second half of the ladder certainty refusal (`fe519fff` + `9b660beb`). Both
+locks: claim held by this lane, preflight **CLEAR** for the exact SHA at
+03:53:15Z with **jobs=0**, deploy triggered **32 s later** at 03:53:47Z.
+
+**CATCHING THE WINDOW WAS THE WHOLE DIFFICULTY, and the number is worth keeping:
+refresh-worker idle windows are ~90 s, roughly one per 40 min** (figure from
+lane `web-oom-highwater`, confirmed here). Six consecutive preflights over
+~50 min returned HOLD with 7-10 jobs — MLB `daily_update` with live
+`spawn_main` children, soccer builds, odds refreshes. A **150 s poll steps
+straight over a 90 s window**; re-tuning to 45 s caught it on the 4th attempt.
+
+**verify (BY CONTENT of the deployed SHA, not by ancestry):**
+
+    ladders_build  overLineProbRefused          2
+    ladders_build  CERTAINTY_REFUSED import     1
+    ladders_common over_prob_metric             3
+    daily_update   `"SO": so,`                  2   <- 0350dbd2 SURVIVED this deploy
+
+That last line is the one that is easy to skip and is the reason this table
+exists: a later deploy silently reverting an earlier fix is the documented
+failure here, and serialisation does not prevent it — containment does.
+
+**Served payload, 2026-09-04 (artifact 22:51:30-05:00):** featured row
+`mean 1.095 / modeProb 0.402 / 5 rungs`; cards render `Over='66.3%'` and
+`'3.9%'` with matching list items. **The healthy path is untouched, which is
+the control and is the only positive reading available here.**
+
+**THE REFUSAL BRANCH IS STILL UNOBSERVABLE, AND THE REASON IS NARROWER THAN I
+FIRST WROTE.** It needs BOTH a degenerate histogram AND a market line —
+`_dist_stats` computes `over` only when `line is not None`, so a degenerate
+dist with no line returns the ABSENT branch, not the refusal. On 2026-09-05 the
+board shows `mean 0.0 / modeProb 1.0` with `marketLine None`, and its
+`Over='-'` is therefore the absent-line case. `batter_strikeouts` has no quotes
+(0 of 289 players), so the required combination does not currently exist
+anywhere. **Seeing no refused row is EXPECTED and is not evidence.** That
+branch is covered by 6 unit tests (3 fail unfixed, 3 controls pass in both
+states) and by nothing in production.
+## 2026-09-05 03:06:57-03:09:57Z — web `c18116e7` → `50b266da` — **DEPLOYED, LIVE, HEALTHY PATH VERIFIED ON THE SERVED PAYLOAD. HALF THE PAIR; refresh-worker STILL OWED.** — lane `mlb-ladder-refusal-deploy`
+
+Carries `fe519fff` (ladders_build: refuse an exact `overLineProb`) and
+`9b660beb` (ladders_common: say WHY on the card). Both locks taken:
+claim held by this lane, preflight **CLEAR** for `50b266da` (web had only
+infra processes, 2 defunct children already dead).
+
+**verify:** the served `/mlb/api/hitter-ladders?date=2026-09-04` cards read
+`Over='66.3%'` with list item `Over probability: 66.3%` (Henry Bolte) and
+`Over='3.9%'` / `Over probability: 3.9%` (Jeff McNeil), against an artifact
+stamped 2026-09-04T22:10:40-05:00. **That is the CONTROL, and the control is
+the whole reading here** — the change must leave a real probability untouched,
+and it does.
+
+**WHAT THIS DEPLOY DOES NOT AND CANNOT PROVE, stated so nobody reads the row as
+more than it is.** The REFUSED branch is unobservable in production: it needs a
+degenerate histogram, and the only known one — MLB hitter `strikeouts`,
+`{0: n_sims}` — was fixed by `0350dbd2` and has read healthy since. There is no
+production row that should render `refused` right now, so seeing none is
+EXPECTED and is not evidence the branch works. That evidence is the 6 unit
+tests (3 fail on the unfixed code, 3 are controls that pass in both states).
+
+**HALF-DEPLOYED ON PURPOSE, and it is safe in this order.** refresh-worker
+returned **HOLD: 10 job(s) in flight** — an MLB `daily_update` with live
+`spawn_main` multiprocessing children (pids 9888/9891), a ligue_1
+`build_soccer_artifacts`, and an odds refresh. A deploy kills them, so it was
+not taken. The pair is independent in BOTH directions: `ladders_common` (web)
+only renders `refused` when the row carries `overLineProbRefused`, and
+`ladders_build` (refresh-worker) is what writes that field. With web ahead, no
+row carries it and the helper falls through to `format_pct` — byte-identical to
+before. Neither order can produce a wrong number.
+
+**OWED:** refresh-worker to a commit containing `fe519fff`, verified BY CONTENT
+(`overLineProbRefused` present in the deployed SHA), on a CLEAR preflight.
+Until then the artifact side is inert, which currently costs nothing because no
+distribution is degenerate.
+## 2026-09-05 01:47-02:1xZ — MLB HITTER STRIKEOUTS VERIFIED CLEARED — `0350dbd2` reached refresh-worker inside someone else's deploy `3a9153f4`; **I DID NOT DEPLOY**
+
+**verify:** the served `/mlb/api/hitter-ladders?date=2026-09-04&prop=hitter_strikeouts`
+featured row, PAIRED against `prop=hits` on the SAME player and endpoint.
+
+    reading                     BEFORE (artifact 16:27:56-05:00)   AFTER (artifact 20:47:42-05:00)
+    hitter_strikeouts mean      0.0                                1.088
+    hitter_strikeouts mode      0                                  1
+    hitter_strikeouts modeProb  1.000                              0.406
+    hitter_strikeouts maxTotal  0                                  4
+    hitter_strikeouts rungs     1  ({total:0, exactProb:1.0})      5
+    CONTROL hits rungs          6                                  6
+    CONTROL hits marketLine     0.5                                0.5
+
+The control is what makes this a defect reading and not a quiet sim: `hits` was
+healthy in BOTH states on the same player, so only the strikeouts dimension
+moved.
+
+**I DID NOT PERFORM THIS DEPLOY AND MUST NOT BE RECORDED AS HAVING DONE SO.**
+refresh-worker went to `3a9153f4` at **2026-09-04T23:26:26Z**, `trigger=api`,
+by another session while lane `soccer-player-producer` held the claim. It
+carried `0350dbd2` because it was cut from the TIP. I had asked (via a relay
+through lane `web-oom-highwater`) for exactly that — deploy from the tip rather
+than a pinned older commit — after their earlier 22:50:57Z deploy to `ea1e3ac0`
+went in OLDER than my fix and therefore did not contain it.
+
+**Deployment confirmed BY CONTENT, not ancestry:** `git show
+3a9153f4:vendor/mlb_bettingv2/tools/daily_update.py | grep -c '"SO": so,'` = **2**
+(both duplicated sites). Ancestry agreed as a cross-check, but content is the
+test that survives a deploy branch cut off main.
+
+**n=1 PLAYER, AND THAT IS A CEILING OF THE INSTRUMENT, NOT A SAMPLE CHOICE.**
+`featuredRow` is not filterable — neither `?hitter=` nor `?game=` changes it (I
+sampled 8 games and got Henry Bolte 8 times), and `rows` is prop-independent
+(it returns the `hits` rows whatever `prop` is set to). So production cannot
+yield a per-row denominator through this endpoint. The all-rows claim rests on
+the MECHANISM plus 18/18 rows in a local `_sim_many` run, NOT on a production
+count. The 19.7 MB ladders artifact would give the real denominator; I did not
+pull it, because `/api/ops/artifacts/export` reads it whole into memory on the
+2 GB web box and `#632` has web climbing toward its limit on retention.
+
+**2026-09-05 STILL READS `mean 0.0`, AND THAT IS NOT A FAILURE.** Its artifact
+is stamped `18:19:32-05:00` = **23:19:32Z**, which is **~7 minutes BEFORE** the
+23:26:26Z deploy — built by the old code. Stale artifact, not an inert fix. It
+clears on that date's next rebuild. Recorded explicitly because "one date fixed,
+the next still zero" is exactly the shape that gets misread as a partial fix.
+
+**NO CLAIM WAS TAKEN AND NONE WAS FORCED.** The claim was held and RENEWED at
+22:56:09Z (the file carried a `replaced` record), which is positive proof the
+holder was alive — a dead session does not renew. It is now free; the work
+landed without anyone breaking a live lock.
+
+Related: `#646` (deploy + rebuild + reading) is DISCHARGED by this row.
+Still open on that item: verify `probability_refusal.py` covers the MLB ladder
+path, so that "no priced recommendation" stops depending on the market feed
+returning zero `batter_strikeouts` quotes (0 of 289 players, 2026-09-04).
+
 ## 2026-09-04 06:15Z — MLB VERIFIED — the owed reading on the 05:27-05:43Z row is DISCHARGED
 
 MLB's board built for the rolled-over 09-04 date at **06:14:15Z**, after the
@@ -22710,3 +22909,390 @@ attribution unavailable.** Two env changes had been deployed in the preceding 20
 minutes, so there was an easy and wrong story ready to be told. Recorded as
 UNTESTED, and the plateau delta is recorded as UNATTRIBUTED rather than dropped —
 it is real, it is just not ours.
+
+
+## 2026-09-04 evening — lane `soccer-player-producer` — FOUR DEPLOYS, each verified on a READING
+
+**THE OPERATIONAL FACT WORTH MORE THAN THE DEPLOYS: refresh-worker's idle
+windows are ~90 SECONDS WIDE AND ARRIVE ROUGHLY ONCE PER 40 MINUTES.** Measured
+across three waits tonight (75, 43 and 55 poll ticks at 30-35s). A hand-run
+"wait for CLEAR, read it, then deploy" loop MISSED the window twice — by the
+time preflight was re-read a new `run_mlb_daily_sim_job` had started. What
+worked was a poller that re-checks every 30s and POSTs inside the same tick that
+sees `CLEAR`, having re-verified ancestry at that moment. Treat "wait for idle"
+as a scheduling constraint, not a pause.
+
+**live-odds-worker `3223baa1`, live 20:37:36Z** — soccer roster producer.
+verify: all six supported leagues wrote `players_2026.csv` at 20:43:30Z, and the
+staleness guard fired on real data — `epl latest=364 previous=440
+latest_max_minutes=180 floor=450 too_early=True too_few=False`. `too_few=False`
+is the finding: the OLD row-count guard would have PASSED (364 > 220 floor) and
+filtered the squad against a season with 180 minutes played.
+
+**refresh-worker `6c8672b7`, live 21:36:35Z** — credibility unit + soccer
+producer + NFL date-key.
+verify: `SETTLED_SAMPLE date=2026-09-04 samples={'mlb': 684, 'nfl': 12,
+'soccer': 30, 'wnba': 59} credibility={'mlb': 1.0, 'nfl': 0.25, ...}` at
+**21:48:41Z**, twelve minutes AFTER go-live. Was `nfl: 18 / 0.36`. NFL stakes
+fall ~30.6%.
+**A NEAR-MISS WORTH RECORDING:** my first verifier matched a `SETTLED_SAMPLE`
+line from 21:32:48Z — four minutes BEFORE the deploy finished — and would have
+confirmed the fix off the OLD code. Gate every post-deploy log assertion on a
+timestamp strictly greater than `finishedAt`.
+
+**refresh-worker `ea1e3ac0`, live 22:50:57Z** — NFL `LA` (Rams) alias.
+verify: served `/api/board/book-grid?sport=nfl` — **unmatched 78 -> 0**, rows
+1251 unchanged, and the last non-zero reading was **100% Rams**, so zero is the
+alias landing rather than rows vanishing.
+**THE BOARD IS REBUILT, NOT SERVED FRESH.** At 22:51:10Z the deploy was already
+`live` and the board still read 78; at 22:52:41Z it read 0. A single reading at
+go-live would have reported failure. An earlier `299 -> 0` prediction failed for
+the mirror-image reason — it was verified against WEB, which SERVES the board,
+while refresh-worker REBUILDS it.
+
+**refresh-worker `3a9153f4`, live 23:26:26Z** — layer-2 model-edge value cap,
+measured-correlation wiring, the sim's joint producer, and a peer's dead
+hitter-strikeouts fix riding along.
+verify, served layer-2 shortlist:
+
+    model_edge  ev_component max  14.99 -> 4.97   (cap 5.0)
+    market_fair ev_component max   5.14 -> 5.20   CONTROL, uncompressed
+    batter_home_runs in top 50        25 -> 0
+    top-50 markets now: totals 34, spreads 15, h2h 1
+
+The `market_fair` control is what makes this trustworthy: only the model branch
+moved. USER-REPORTED symptom ("a lot of long shots at the top") is gone.
+Also verified: `[correlation_wiring] MEASURED_CORRELATION installed=True
+date=2026-09-04 games_with_joint=16` at 23:43:15Z, and independently
+`record["sim"]["joint"]` present on the published artifact — n=1000, 148 labels,
+28 players, 10,878 lower-triangle entries.
+**I PREDICTED `installed=False` AND WAS WRONG.** I said a sim RUN was owed
+before the joint could exist; refresh-worker runs them continuously and one had
+already produced joint-carrying artifacts. Wrong in the safe direction, but
+wrong. Related trap, live and pointing the OTHER way — **MEASURED BY SESSION
+`56718983` (lane `mlb-hitter-so-dead-field`), recorded by them as `cb98a638`;
+relayed to me by session `b2b5b45b`, and ATTRIBUTED HERE TO THE MEASURER at
+their joint request.** The 2026-09-05 ladders artifact is stamped 23:19:32Z,
+~7 minutes BEFORE this deploy, and still reads pre-fix values — a build that
+predates the code, not an inert fix. They had already pinned their verify line
+to the artifact's `generated_at` rather than to go-live BEFORE meeting this
+case, which is why they caught it.
+**Pin artifact verification to the artifact's own `generated_at`, never to
+deploy go-live.**
+The decision to skip pulling the 19.7 MB ladders artifact — accepting a weaker
+n=1 reading rather than risk the 2 GB web box — is also theirs, not the
+relaying session's. The `#632` retention finding underneath it IS
+`b2b5b45b`'s. Recorded separately because a ledger that misattributes a
+measurement sends the next reader to ask the wrong session about it.
+
+
+---
+
+## 2026-09-05T02:23:55Z — web — `c18116e7` — `#632` retainer census — **THE RETAINER IS NOT A MODULE-LEVEL PYTHON CONTAINER**
+
+`[lane web-oom-retainer-census, session b2b5b45b]` — read-only census endpoint,
+admin-gated, on demand only.
+
+verify: **two readings on ONE worker (`proc_token bede3b5293`), 13.7 min apart,
+node budget NOT exhausted on either:**
+
+    census total    59.0 -> 64.9 MB   (+5.9)
+    process anon   389.3 -> 486.1 MB  (+96.8)
+    CENSUS EXPLAINS 6.1% OF THE GROWTH
+
+Level coverage on two workers: **15.6%** and **12.5%** of process anon. Growth
+coverage: **6.1%**. **The lane's falsification test fires** — it was written
+before the data as *"the census accounts for only a small share, then the
+retained bytes are NOT in module-level Python containers"*.
+
+**WHAT IS NAMED, and it is worth having even though it is not the leak:**
+
+        19.99-21.39 MB   len 1    pipeline.intelligence_state._COMBINED_INTELLIGENCE_RESPONSE_CACHE
+        14.45 MB         len 29   syndicate.features.soccer.cards._CARDS_CONTEXT_CACHE
+         5.98-10.39 MB   len 4    syndicate.features.mlb.cards._MLB_CARDS_CONTEXT_CACHE
+         7.64-9.97 MB    len 1-2  syndicate.features.mlb.cards._MLB_TODAY_CACHE
+         5.07-5.59 MB    len 17   syndicate.blueprints.intelligence.LAST_RESULT
+
+**A SINGLE cache entry holds ~20 MB** (`_COMBINED_INTELLIGENCE_RESPONSE_CACHE`,
+`len 1`), and `_MLB_CARDS_CONTEXT_CACHE` grew **+11.21 MB on ONE added entry**.
+That is 8-64MB-bucket-shaped, so these caches are the right ORDER of magnitude
+even though they are the wrong ANSWER for the growth.
+
+`LAST_RESULT` at ~5 MB reconciles with the earlier per-request probe that read
+**0.0 MB both halves**: it HOLDS 5 MB and does not grow per request. Both
+readings were right.
+
+**THE LIMIT OF THIS INSTRUMENT, and it must be read before the 6.1% is quoted as
+"the memory is not in Python":** the walk's ROOTS are module globals that are
+ALREADY `dict`/`list`/`set`/`tuple`. A module-level OBJECT holding caches in its
+`__dict__` is skipped entirely, as is anything reachable only from a class
+attribute, a closure, or thread-local state. So the correct statement is
+**"not in container-typed module globals"**, which is narrower than "not in
+Python". Widening the root set is the next step and is cheap.
+
+**COST, measured rather than assumed:** 1.2 s and ~10 MB transient at
+`node_cap=2,000,000` (463k-492k nodes, walk COMPLETES). The 502 on the first call
+was the container still starting at go-live, confirmed by re-testing at
+escalating budgets with memory read either side.
+
+**A TRAP IN MY OWN FIRST RUNS:** at `node_cap` 20k/100k/400k the budget was
+EXHAUSTED and coverage read 0.8% / 2.9% / 15.8%. With the budget exhausted the
+"top by bytes" ranking is only *biggest among whatever module iteration order
+reached first* — meaningless. Only the completed 2M-node walk is quotable.
+
+## 2026-09-05 13:04Z -- LEDGER BUDGET 4GB: FIRST RUN MEASURED. **STILL-BINDING.** No deploy taken.
+
+Owed reading from the 2026-09-04 16:2xZ entry, discharged. `[scheduled task
+verify-ledger-budget-4gb]`
+
+**IT IS LIVE AND UNOVERRIDDEN, verified BY CONTENT and by a PAGINATED env read.**
+
+    refresh-worker live = 50b266da   (deploy_ended 2026-09-05T03:59:01Z)
+    git show 50b266da:syndicate/features/shared/intelligence_evaluation.py
+      -> DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = 4_000_000_000
+    env-vars: 2 pages, 154 keys enumerated
+      SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES   ABSENT
+      only *BUDGET* key: SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET
+
+**THE RUN.** First autorun under 4GB, gated `hour >= 7 CT` AND `last_run_date <
+today`; it opened at 12:00Z and the run started ~12:35:39Z.
+
+    2026-09-05T13:04:20.340Z  AUTORUN_DONE sports=8 elapsed_s=1721.552 error=none
+    2026-09-05T12:58:34.052Z  LEDGER_CHUNKS_ACCEPTED count=21 bytes=3999973424
+                              ceiling=256000000 records=92791 streamed=1
+                              budget=4000000000 partial=1 skipped_budget=12
+                              dates=21 truncated=1
+
+8 `LEDGER_CHUNKS_ACCEPTED` emissions 12:41:40Z..12:58:34Z, all `count=21
+dates=21 skipped_budget=12 partial=1 truncated=1`; only `bytes`/`records`
+drifted (3,999,914,706..3,999,973,424 / 92,675..92,791) as the day's ledger grew.
+
+**PRE-REGISTERED PREDICTIONS, judged. THREE HELD, ONE MISSED HIGH.**
+
+    | prediction                | 09-04 (2GB)   | 09-05 (4GB)   | verdict      |
+    | bytes > 2,000,000,000     | 1,999,976,768 | 3,999,973,424 | HELD         |
+    | skipped_budget < 24       | 24            | 12            | HELD         |
+    | dates > 8                 | 8             | 21            | HELD         |
+    | peak anon ~1,832 MiB      | 1,481.6       | 2,212.6       | MISSED HIGH  |
+
+Coverage is the headline: **dates 8 -> 21, records 46,953 -> 92,791 (+97.6%),
+chunks skipped for budget 24 -> 12.** The raise is NOT inert. Cost: elapsed
+669.4s -> 1,721.6s (+157%).
+
+**THE MISS IS THE USEFUL RESULT.** The 1,832 MiB projection was ~380.9 MiB low
+(+20.8%). Measured peak anon in the run window (12:30..13:10Z, 1,111 samples,
+13 pages, window fully COVERED) was **2,212.562 MiB at 12:41:20.75Z** -- below
+the ~2,600 abort signal, so no revert is indicated. **Read the confounder before
+using this number:** that sample's `last_stage` is `board_contract_end`, not an
+accuracy-summary stage, so it is the PROCESS-WIDE peak during the run, not the
+ledger's alone. It is the right number for the ceiling question and an
+upper bound for attributing cost to the ledger.
+
+**NO OOM, NO RESTART.** `render_events.py` printed OUTPUT COMPLETE (7,568 of
+7,568 rows -- not a fragment). Nothing after `deploy_ended 03:59:01Z`; last
+`oomKilled` on this service was 2026-09-02T15:32:56Z.
+
+**VERDICT: STILL-BINDING.** `partial=1` and `truncated=1` persist and 12 chunks
+are still refused, so the cap continues to truncate the accuracy summary.
+
+**RECOMMENDATION ON THE ~8.2GB NEXT STEP: DO NOT TAKE IT. Needs a user
+decision, and the number it was declined on is now stale in the WRONG
+direction.**
+
+- Measured incremental cost of this raise: +2,000,000,000 bytes of budget bought
+  **+731.0 MiB of anon peak** (1,481.6 -> 2,212.6), ~0.38 MiB anon per MiB of
+  budget. Applying that to a further +4.2GB projects **~3,783 MiB** against a
+  **4,096 MiB** ceiling -- ~313 MiB of headroom, on a job that already ran 28.7
+  minutes.
+- `b55fa165` declined 8.2GB projecting ~2,566 MiB against a ~1,877 MiB baseline
+  peak. **That baseline no longer holds.** Outside the accuracy run today
+  (13:10..15:57Z, 4,492 samples, 46 pages) refresh-worker peaked at
+  **2,984.41 MiB anon at 15:29:08Z** -- above the ~2,600 abort threshold and
+  above the whole 8.2GB projection, from work that has nothing to do with the
+  ledger. The service's own floor is what would eat the headroom.
+- So the honest framing is: at the current 4GB instance size the remaining 12
+  chunks are not affordable. Admitting them is an INSTANCE-SIZE decision, not a
+  constant edit.
+
+**Nothing here is a fix. It is a change that has now been MEASURED**, and the
+measurement says the coverage win is real (2.6x the dates) and the cap is still
+the binding constraint.
+
+## 2026-09-05 16:1xZ -- SECOND, INDEPENDENT READ OF THE SAME AUTORUN. **EVERY RAW NUMBER AGREES with the entry above. ONE LOAD-BEARING DISAGREEMENT, and the PRE-REGISTERED "~12" RULE WAS NOT APPLIED.** No deploy taken. `[scheduled task verify-accuracy-autorun-626h -- the BACKSTOP]`
+
+**WHY TWO READS EXIST, AND WHY THAT IS WORTH SOMETHING RATHER THAN NOISE.** The
+backstop's first job is to check whether the primary already recorded. It had
+not: at **15:49Z** `origin/main`'s newest commit was `0fa7c3e3`
+(2026-09-05 01:00:24 -0500) and `origin/main:.syndicate/deploys.md` still carried
+`skipped_budget=24` as the standing number, so the full reading was taken.
+`verify-ledger-budget-4gb` landed as `1da1a58a` at **16:03Z** -- ~3h20m after its
+07:45 CT slot, the same late-fire pattern as 09-04 -- while this read was in
+flight. **Neither read saw the other**, which is what makes the agreement below
+evidence rather than an echo. Caught by `ledger-commit-guard.py`, which refused
+the commit because it would have dropped their section; the guard did exactly
+its job.
+
+**AGREEMENT, FIELD BY FIELD, FROM AN INDEPENDENT QUERY:**
+
+    field                         mine              theirs            
+    live refresh-worker SHA       50b266da          50b266da          AGREE
+    deploy finishedAt             03:59:01Z         03:59:01Z         AGREE
+    env override                  ABSENT / 154 keys ABSENT / 154 keys AGREE (both paginated)
+    LEDGER_CHUNKS_ACCEPTED lines  8, 12:41:40..12:58:34Z              AGREE
+    count / skipped_budget        21 / 12           21 / 12           AGREE
+    dates                         21                21                AGREE
+    bytes (last line)             3,999,973,424     3,999,973,424     AGREE
+    records (last line)           92,791            92,791            AGREE
+    truncated / partial           1 / 1             1 / 1             AGREE
+    AUTORUN_DONE                  1721.552s, error=none               AGREE
+    peak anon in run window       2,212.562 @ 12:41:20Z               AGREE (to 3 dp)
+
+Also checked independently and agreeing: no `LEDGER_CHUNKS_ACCEPTED` earlier than
+12:41:40Z (11:00Z..12:41:40Z returns `nothing matched`, with the reader confirmed
+to be emitting lines rather than a swallowed usage error).
+
+**A BASELINE NIT, NOT A DISAGREEMENT, worth one line so nobody re-derives it:**
+they quote 09-04 as `records=46,953 / bytes=1,999,976,768`; the lane block quotes
+`46,944 / 1,999,970,055`. Both are real emissions from that day's eight sport
+lines, which drift as the ledger grows. The ratio (**1.97x records**) is
+unaffected. Say which line you are quoting.
+
+**THE ONE DISAGREEMENT, AND IT IS THE NUMBER THE RECOMMENDATION RESTS ON.** The
+entry above computes *"+2,000,000,000 bytes of budget bought +731.0 MiB of anon
+peak, ~0.38 MiB anon per MiB of budget"* and projects **~3,783 MiB** for a
+further +4.2 GB. **That rate is not a measured cost of the ledger, and it should
+not be reused as a coefficient.**
+
+    12:05:00..12:35:00Z  (PRE-RUN, 1,592 samples)   peak anon  2,694.852  @ 12:06:02Z
+    12:35:39..13:04:20Z  (the run, 1,550 samples)   peak anon  2,212.562  @ 12:41:20Z
+    -> the run's own peak is 482.3 MB BELOW the worker's ambient peak
+
+The same shape holds on the baseline day, so it is not a one-off: **09-04 pre-run
+(13:53..14:23Z) peak 1,672.098 against that day's in-run 1,481.6.** On BOTH days
+the accuracy-summary window was **not** the worker's peak. So each day's in-run
+peak is an upper bound on the WORKER, not on the ledger, and the difference
+between two such upper bounds is not a cost of anything. Day over day the
+**AMBIENT peak moved +1,022.8 MB while the in-run peak moved +730.9 MB** -- the
+ambient moved MORE.
+
+**THE CONCLUSION ABOVE SURVIVES; ONLY ITS ARITHMETIC DOES NOT — and their own
+later reading is the better support for it.** `2,984.41 MiB at 15:29:08Z, from
+work that has nothing to do with the ledger` is this same finding from the other
+side: the service's floor is what consumes the headroom. **Do not take 8.2 GB**
+stands. Drop the 0.38 MiB-per-MiB rate; it reads like a measured coefficient and
+is an artefact of comparing two process-wide maxima. The entry above half-caught
+this itself -- it notes the peak sample's `last_stage` is `board_contract_end`
+and calls the number "an upper bound for attributing cost to the ledger" -- and
+then uses the delta of two such upper bounds as a rate anyway.
+
+**THE PRE-REGISTERED `~12` RULE WAS NOT APPLIED, AND IT NAMES A DIFFERENT NEXT
+STEP.** Written on 09-04 before the data existed (`lanes.md`,
+`accuracy-ledger-budget-raise`): *"0 = the cap is no longer binding; ~12 = the
+byte budget is no longer the right instrument, and the next step is a CHUNK-COUNT
+bound rather than another byte doubling."* It came back **12**. The entry above
+judges a different four-prediction set and lands on "an INSTANCE-SIZE decision,
+not a constant edit". Both readings can hold, but the pre-registered one is the
+cheaper and does not need a bigger box, so it should not be lost.
+
+**AND ITS MECHANISM IS NOW MEASURED, which is why the branch is right rather than
+merely matched.** 21 accepted + 12 skipped = **33 chunks**, corroborated
+independently by `PROJECTION_DONE seen=33` from a different code path in the same
+job. Average accepted chunk is **190.5 MB against the 256 MB per-chunk ceiling**
+-- bytes and chunks have stopped being separate quantities, so a byte budget now
+simply buys chunks at ~190 MB each (2x bytes bought 2.63x chunks). Full history at
+that density is **~6.29 GB**.
+
+**A THIRD CONFOUND NEITHER PRE-REGISTRATION NAMED: A NEW STAGE NOW RUNS INSIDE
+THIS SAME AUTORUN.** `[ledger_projection]` (lane
+`evaluation-ledger-projected-mirror`) was wired in AFTER the 09-04 baseline and
+streams ~2.1 GB in the same job -- it is most of why `elapsed_s` went 669.4 ->
+1,721.552 (+157%), so that figure is not a cost of the budget raise either.
+**It did NOT set the memory peak, and that was checked rather than assumed:** max
+anon over its sub-window (12:58:30..13:04:58Z) is **2,126.59**, below the run peak.
+A TIME cost here, not a memory one.
+
+**BONUS -- THE SIBLING LANE'S FALSIFICATION TEST PASSES ON ITS FIRST PRODUCTION
+RUN**, and it is not recorded anywhere else:
+
+    [ledger_projection] PROJECTION_DONE seen=33 written=8 fresh=0 deferred=25
+      failed=0 records=49393 bytes_in=2104570375 bytes_out=30719010
+      ratio=0.014596 reduction=68.5x published=8 over_ceiling=0
+
+`over_ceiling=0` is exactly the criterion `evaluation-ledger-projected-mirror`
+named; `deferred=25` is the bounded first pass converging as designed.
+
+**AND THE 09-04 `projected_bytes` PREDICTION IS NOT YET FALSIFIABLE AT THE FIELD
+IT NAMED.** `ledger_coverage.projected_bytes` lands in
+`reports/refresh_status/latest/accuracy_summary_autorun_status.json` in the
+keyvalue store, and `ops.py` carries per-subject status routes (odds refresh,
+settlement, live-lens, opportunity contract) but **none for the accuracy
+autorun**, so it cannot be read off the worker. The producer-side counter is the
+closest available: `bytes_out=30,719,010 / records=49,393` = **622 B/record**
+against the ~560 B/record the design was sized on; carried onto the summary's
+92,675 records that **infers ~57.6 MB**, under the 120 MB failure line -- but an
+INFERENCE, not the reading that was predicted. Adding that route is the cheapest
+way to make it checkable.
+
+**LANE `accuracy-ledger-budget-raise` IS NOT CLOSED.** Its stated single testable
+outcome is `skipped_budget=0 truncated=0` with `dates` materially above 8.
+`dates` 8 -> 21 clears; `skipped_budget=12` and `truncated=1` do not. Its memory
+criterion is confounded rather than passed. **A partial win that reclassifies the
+instrument** -- next step is the chunk-count bound, or making the summary
+computable off-worker at `budget=0` via the projected mirror, which dissolves the
+bound instead of re-tuning it.
+
+
+---
+
+## 2026-09-05T20:42:08Z — web — `a2afc7f1` — `#632` **THE BYTES ARE NOT PYTHON OBJECTS. The object-graph line is CLOSED.**
+
+`[lane web-oom-heap-roots, session b2b5b45b]` deploy `dep-dae7rgeq1p3s7389rhcg`,
+CLEAR preflight pinned to the target SHA, claim held by this lane.
+
+verify: **`/api/ops/python-heap`, escalating the node cap until the walk
+CONVERGED (`node_budget_exhausted: False` at 891,276 nodes) — a truncated walk
+under-reports, and an under-report reads as "not Python", which is the exact
+wrong conclusion, so a truncated result was refused by construction.**
+
+    pid 98, one process, one instant
+      process anon                373.17 MB   100.0%
+      live Python objects         105.56 MB    28.3%
+      NOT Python objects          267.61 MB    71.7%
+
+    truncated readings, shown to prove convergence mattered:
+      cap   200,000  ->  20.55 MB   7.2%   exhausted
+      cap   800,000  ->  97.75 MB  28.5%   exhausted
+      cap 2,000,000  -> 105.56 MB  28.3%   CONVERGED
+
+**Threshold was pre-registered BEFORE the reading: `>=70%` Python, `<=35%` not
+Python, in between explicitly a weaker result. 28.3% lands in the "not Python"
+band.**
+
+**CROSS-CHECK, and it is striking — but NOT paired, so it is corroboration and
+not proof.** An arena reading from a DIFFERENT worker HOURS earlier reported
+`bytes_in_allocated_blocks = 105.731 MB` against this walk's `105.56 MB` — two
+methodologically independent instruments (allocator bookkeeping vs an object
+graph traversal) agreeing to **0.17 MB, 0.16%**. Same process and instant would
+make it evidence; different epochs make it suggestive.
+
+Taking that older arena reading at face value, the decomposition is:
+`105.6 MB` live Python objects, `44.3 MB` pymalloc fragmentation, and
+`223.2 MB` **outside pymalloc arenas entirely** — which is exactly where the
+8-64MB anonymous mappings identified earlier must live.
+
+**WHAT THIS CLOSES.** Every remaining Python-level probe is a dead end for the
+71.7%: no root set, no retainer census, no per-request attribution can see bytes
+that are not Python objects. `#632` has spent this session narrowing an object
+graph that holds **28.3%** of the memory. The remaining candidates are
+C-extension buffers, allocator behaviour below CPython, and per-thread state.
+
+**WHAT IT DOES NOT CLOSE.** The census is still useful for the 28.3%, and its
+top row is real: `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` at **37.50 MB** and
+`_CARDS_CONTEXT_CACHE` at **12.67 MB** are genuine, bounded, nameable retainers.
+Capping them is worth doing on its own merits; it will not fix the OOM.
+
+**CAVEAT ON THE TABLE BELOW IT: the census ran on pid 99 while the heap ratio is
+pid 98.** The endpoint round-robins across workers, so the two are DIFFERENT
+processes — the ratio is internally consistent (anon and heap come from one
+call), but the root table must not be read as a breakdown OF that ratio. Pairing
+them would need a `proc_token` filter the endpoint does not offer.
