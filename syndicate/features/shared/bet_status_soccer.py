@@ -99,6 +99,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from syndicate.features.shared.bet_status import segment_refusal
+
 __all__ = ["soccer_status_resolver"]
 
 REASON_NOT_SOCCER = "not_a_soccer_order"
@@ -165,6 +167,15 @@ def soccer_status_resolver(selected_date: str):
             # This resolver is handed every order; a non-soccer one is not a
             # defect in anything and must not be reported as a soccer failure.
             return {"unavailable_reason": REASON_NOT_SOCCER}
+
+        # SEGMENT BEFORE MARKET, same ordering and same reason as the market
+        # check below. `market_segments` gives soccer `h1`/`h2`, and
+        # `fetch_soccer_oddsapi_odds_local` already asks for both -- so a
+        # first-half goals bet is a shape this ledger can receive, and the
+        # artifact read below carries the full-time score only.
+        refusal = segment_refusal(order)
+        if refusal is not None:
+            return refusal
 
         # THE MARKET CHECK COMES FIRST, before the artifact read -- the rule
         # `bet_status_wnba` states and paid for: "we cannot grade this market"

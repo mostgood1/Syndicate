@@ -66,6 +66,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from syndicate.features.shared.bet_status import segment_refusal
+
 __all__ = ["nfl_status_resolver"]
 
 REASON_NOT_NFL = "not_an_nfl_order"
@@ -167,6 +169,18 @@ def nfl_status_resolver(selected_date: str):
             # This resolver is handed every order; a non-NFL one is not a
             # defect in anything and must not be reported as an NFL failure.
             return {"unavailable_reason": REASON_NOT_NFL}
+
+        # SEGMENT BEFORE MARKET -- the more permanent of the two. The scoreboard
+        # this resolver reads carries whole-game team scores, so a 1H or 1Q bet
+        # is unanswerable from it for the entire life of the game, while an
+        # unsupported market might yet become supported. NFL is the sport most
+        # exposed to this: `fetch_nfl_team_odds_local` already REQUESTS 36
+        # segment market keys, so the day that capture starts returning rows is
+        # the day these orders appear -- and without this they would grade
+        # against the full-game score.
+        refusal = segment_refusal(order)
+        if refusal is not None:
+            return refusal
 
         # THE MARKET CHECK COMES FIRST, before the artifact read: "we cannot
         # grade this market" is permanent, "the capture is not there yet" is

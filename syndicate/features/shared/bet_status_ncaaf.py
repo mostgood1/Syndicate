@@ -45,6 +45,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from syndicate.features.shared.bet_status import segment_refusal
+
 __all__ = ["ncaaf_status_resolver"]
 
 REASON_NOT_NCAAF = "not_an_ncaaf_order"
@@ -141,6 +143,16 @@ def ncaaf_status_resolver(selected_date: str):
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         if _norm(order.get("sport")) != "ncaaf":
             return {"unavailable_reason": REASON_NOT_NCAAF}
+
+        # SEGMENT BEFORE MARKET, because it is the more permanent of the two.
+        # `home_score + away_score` below is the WHOLE-GAME total; a 1H or 1Q
+        # bet asks a question this scoreboard cannot answer at any point in the
+        # game's life, whereas an unsupported market might yet be supported.
+        # Without this, `segment="h1"` + `market="totals"` grades a first-half
+        # under against the full-game score and settles it LOST with confidence.
+        refusal = segment_refusal(order)
+        if refusal is not None:
+            return refusal
 
         # Market check FIRST: permanent before transient, so a structural gap is
         # not hidden behind a reason that looks like it will fix itself.
