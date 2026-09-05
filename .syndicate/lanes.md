@@ -1958,6 +1958,40 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   that would otherwise exit `REFUSED: no roster artifacts`) and is not gated on
   `--warn-only`. Verified both directions: exit 1 naming the missing key AND the
   drift; exit 0 when correct.
+- **`#646`(d) DISCHARGED — `probability_refusal` and the MLB ladder path, verified
+  BY TEST 2026-09-05.** The answer is TWO answers, and the headline one is that
+  the original severity worry is gone for a reason better than the guard.
+  - **THE PRICED PATH IS COVERED, AND THE GUARD IS NOT INERT.**
+    `PropProjectionIndex.project()` wraps `_project_uncensored` in
+    `_refuse_published_certainty`. Proven reachable with a POSITIVE CONTROL, not
+    by reading: a degenerate `batter_hits` row came back
+    `model_prob_over: None` + `model_prob_over_refused: 'exact_certainty'` +
+    `model_prob_over_refused_value: 0.0` + the reason string. A guard I had only
+    read would have been worth nothing.
+  - **AND `batter_strikeouts` NEVER REACHES IT ANYWAY.** `_HITTER_BUCKETS` has
+    8 entries and strikeouts is not one, so `project()` returns **None** for a
+    batter at 0.5 AND 1.5 (tested both). The pitcher alias at
+    `prop_projections.py:555` only fires when the subject is a pitcher in THIS
+    slate's sim. **So "no priced recommendation was ever emitted" no longer
+    depends on the market feed returning zero quotes — it is a code-level
+    guarantee.** That was the exact thing I said was NOT established when I
+    closed this lane, and it is now established.
+  - **THE LADDER PATH IS NOT COVERED — and does not need to be, because it is
+    DISPLAY-ONLY.** `ladders_build._dist_stats` computes `overLineProb` with no
+    refusal: fed `{0: 1000}` at line 0.5 it returns exactly `0.0`, the value in
+    `CERTAINTY_REFUSED` and the sign that module's docstring calls the dangerous
+    one. But `overLineProb`'s ONLY consumers are `ladders_common.py:81/88/113/120`,
+    which render it through `format_pct` as an "Over" metric and an "Over
+    probability:" string. It feeds no edge, no candidate and no order. So a
+    degenerate dist there produces a wrong NUMBER ON A CARD, never a priced bet.
+  - **NOT FIXED, DELIBERATELY, AND THIS IS A JUDGEMENT CALL SOMEONE MAY WANT TO
+    OVERTURN.** A blanket refusal on this surface would be WRONG: `_dist_ladder`
+    emits `{total: 0, hitProb: 1.0}` and that 1.0 is P(X >= 0), trivially and
+    correctly certain. Only `overLineProb` — the one joined against a market
+    line — is the candidate, and showing "Over probability: 0%" for a genuinely
+    degenerate distribution is arguably the honest display. The residual is a
+    HUMAN-READER risk (a false 0% beside a real line), not an automated-pricing
+    one. Left for a decision rather than changed unilaterally.
 - **`todo.md` NOT EDITED — CROSS-LANE CONFLICT SURFACED, NOT WORKED AROUND.**
   `docs/ai_context/todo.md` is claimed by OPEN lane `accuracy-ledger-budget-raise`
   (session 82fe0160), so I reverted my edit rather than edit across lanes — the
