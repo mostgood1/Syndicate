@@ -207,7 +207,19 @@ def cmd_acquire(args: argparse.Namespace) -> int:
                 f"(target {str(existing.get('target_commit'))[:8] or '?'}). "
                 f"Not acquiring. "
                 f"holder session: {existing.get('holder_session') or 'unrecorded'} "
-                f"-- check it with list_sessions (isRunning). "
+                # NOT checkable. This used to say "check it with list_sessions
+                # (isRunning)" and that is FALSE: the id recorded here is a bare
+                # `CLAUDE_CODE_SESSION_ID`, while `list_sessions` returns
+                # `local_<uuid>` from a different space, so the lookup reads
+                # "absent" for a LIVE holder as readily as a dead one. This is
+                # the THIRD site that said it and by far the worst, because it
+                # is printed at the exact moment a reader is deciding whether to
+                # `--force`. See the long note at `holder_session`.
+                f"-- a BREADCRUMB ONLY: it is NOT checkable against "
+                f"list_sessions (different id space), so do not read its "
+                f"absence as 'gone'. To tell whether the holder is alive, run "
+                f"deploy_preflight.py and look for a RUNNING CHILD under this "
+                f"service -- that is evidence; a roster lookup is not. "
                 f"THIS CLAIM RECORDS NO PID: the one it used to record was the "
                 f"acquire CLI's own and always read dead. An unrecorded session "
                 f"is UNKNOWN, not gone. TTL is the real bound -- this expires on "

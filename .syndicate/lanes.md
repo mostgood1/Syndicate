@@ -2244,7 +2244,8 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   testable outcome: the deployed SHA on web AND refresh-worker contains
   `overLineProbRefused` BY CONTENT, and the served hitter-ladders payload still
   renders a healthy `overLineProb` unchanged.
-- Files: none — deploy only. No code change in this lane.
+- Files: `scripts/deploy_claim.py` (the acquire-refusal message; see below).
+
 - Hypothesis: n/a.
 - Falsification test: n/a (deploy verification, not a diagnosis).
 - **TWO SERVICES, AND THEY ARE NOT INTERCHANGEABLE.** `ladders_build._dist_stats`
