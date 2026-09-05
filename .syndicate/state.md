@@ -954,3 +954,27 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   85.8%, 291 MB headroom.**
 * Nothing changes about the `#632` conclusion except its strength: no
   Python-level probe can find the growing bytes.
+
+### `[web-oom-leak]` UPDATE 15 — **CORRECTION: I quoted page cache as OOM pressure. Real pressure is 54%, not 86%.**, 2026-09-05T21:2xZ `[session b2b5b45b]`
+
+* **`container_memory_mb` INCLUDES RECLAIMABLE PAGE CACHE and is NOT the OOM
+  metric.** I quoted `1756.6 MB / 85.8% / 291 MB headroom` and projected an OOM
+  in ~20 minutes. Minutes later the same figure had FALLEN to `1509.1 MB` while
+  both workers' RSS went slightly UP — a ~247 MB move that no process made.
+* Split over 5.1 min (7 samples, 50 s apart):
+
+        total           +151.2 MB   -> +1786 MB/h   (cache swung 469 -> 588 MB)
+        UNRECLAIMABLE    +98.8 MB   -> +1167 MB/h
+        pid 98 rss       +53.9 MB
+        pid 97 rss       +44.2 MB   (sum 98.1 ~= unreclaimable 98.8: consistent)
+
+* **Standing pressure is `1103.7 MB` unreclaimable of 2048 = 54%**, not the 86%
+  I reported. The difference is ~570 MB of file cache the kernel evicts under
+  pressure before it OOMs anything.
+* **GROWTH IS BURSTY, so no rate from a short window is trustworthy — including
+  the ones above.** Both workers rose ~98 MB between 16:17:43 and 16:19:25 and
+  were then FLAT to the decimal (`595.3` / `509.4`) for the remaining 3.5 min.
+  Extrapolating `+1167 MB/h` across a window containing one burst is exactly the
+  error that produced the "~20 minutes to OOM" claim.
+* This is the standing `memory.current is page cache` rule, which I had recorded
+  and did not apply: **split anon from file before calling anything pressure.**
