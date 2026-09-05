@@ -25,9 +25,21 @@ import pytest
 
 from syndicate.features.shared import live_gameline_join as mod
 
+_UNSET = object()
 
-def _apply(*, live_projected, priceable=True, edge_pp=-39.93):
-    """Run `_apply_verdict` over a row shaped like the served ones."""
+
+def _apply(*, live_projected, priceable=True, edge_pp=-39.93, model_prob=_UNSET):
+    """Run `_apply_verdict` over a row shaped like the served ones.
+
+    `model_prob` DEFAULTS TO `live_projected` RATHER THAN BEING ABSENT, because
+    a verdict without it does not exist: all three pricers set `model_prob`
+    before they can set `priceable` (pinned by
+    `test_every_priceable_verdict_carries_the_probability_it_priced`). The old
+    fixture omitted the key entirely, which is why every assertion here stayed
+    green while the moneyline path shipped the wrong label -- the fixture could
+    not represent the failing case. Pass it explicitly to build a verdict the
+    pricers would not produce.
+    """
     row = {
         "market": "totals",
         "projection": {
@@ -43,6 +55,7 @@ def _apply(*, live_projected, priceable=True, edge_pp=-39.93):
         "priceable": priceable,
         "edge_pp": edge_pp if priceable else None,
         "withheld_reason": None if priceable else "sigma",
+        "model_prob": live_projected if model_prob is _UNSET else model_prob,
     }
     hit = {"game_pk": "abc", "home_win_prob": 0.52, "sims_run": 120,
            "total_mean": 8.95, "as_of": "2026-08-16T22:00:00Z", "carried_forward": False}
@@ -62,10 +75,57 @@ def test_a_live_joined_row_says_its_edge_is_live():
     assert p["model_prob_over"] == 0.8656
 
 
-def test_a_row_with_no_live_projection_says_pregame():
-    p = _apply(live_projected=None)
-    assert p["edge_basis"] == "pregame"
+def test_the_moneyline_shape_says_live_even_though_it_publishes_nothing():
+    """**THE DEFECT THIS FILE ORIGINALLY MISSED**, fixed 2026-09-05.
+
+    The moneyline branch of `attach_live_gamelines` calls `_apply_verdict` with
+    NO `live_projected` -- it deliberately does not publish
+    `live_model_prob_over`, because `layer2_board._live_projection_columns`
+    would render that home-framed probability in the Live column of away rows.
+    But its edge is priced from `hit["home_win_prob"]`, the LIVE number, so the
+    row's edge is live and only its publication is absent.
+
+    This test replaces `test_a_row_with_no_live_projection_says_pregame`, which
+    asserted `"pregame"` for this exact shape and was the assertion that made
+    the mislabel look intended. `"pregame"` is not a reachable answer here:
+    `_apply_verdict` is called only from `attach_live_gamelines`, only on a row
+    matched to a live `hit`.
+    """
+    p = _apply(live_projected=None, model_prob=0.1917)
+    assert p["edge_basis"] == "live"
+    # publication is still withheld -- that half was correct and stays
     assert "live_model_prob_over" not in p
+    assert "live_projected" not in p
+
+
+def test_every_priceable_verdict_carries_the_probability_it_priced():
+    """The implication `edge_basis` now rests on, over the REAL pricers.
+
+    `priceable is True` must imply `model_prob is not None`, or the label falls
+    back to `"pregame"` on a row that was priced live. Asserted against all
+    three pricing functions rather than against a fixture, because a fixture is
+    what hid the original defect.
+    """
+    dist = {8.0: 0.2, 9.0: 0.3, 10.0: 0.5}
+
+    verdicts = [
+        mod.price_moneyline(model_prob=0.62, market_prob=0.40, sims=1200),
+        mod.price_distribution_market(dist=dist, line=8.5, side="over",
+                                      market="totals", market_prob=0.35, sims=1200),
+        mod.price_analytic_line_market(
+            analytic={"spread": {"p_home_cover": 0.71, "line": -3.5}},
+            market="spreads", line=-3.5, market_prob=0.45,
+            analytic_std_err=0.02, sport="wnba",
+        ),
+    ]
+    priceable = [v for v in verdicts if v and v.get("priceable")]
+    assert len(priceable) == 3, f"fixture stopped exercising the pricers: {verdicts}"
+    for verdict in priceable:
+        assert verdict["model_prob"] is not None
+        # and the edge really is that probability minus the market's
+        assert verdict["edge_pp"] == pytest.approx(
+            (verdict["model_prob"] - verdict["market_prob"]) * 100, abs=0.01
+        )
 
 
 def test_the_live_edge_reconciles_against_the_live_probability_not_the_pregame_one():

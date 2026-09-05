@@ -1161,6 +1161,20 @@ def _apply_verdict(
             # sim's number and stays readable; a reader comparing the two is a
             # legitimate thing to want, and silently replacing it is how a live
             # board loses its own provenance.
+            #
+            # **A PUBLICATION SWITCH, AND NOTHING ELSE** `[2026-09-05]`. It used
+            # to double as the source of `edge_basis` below, which is why the
+            # moneyline branch -- which does not publish here -- mislabelled
+            # every live h2h edge. The two are now independent, and the
+            # moneyline branch STILL does not publish, deliberately:
+            # `layer2_board._live_projection_columns` maps
+            # `live_model_prob_over` straight onto `live_model_probability`
+            # with no side awareness, and on an h2h row that value is the HOME
+            # win probability. Publishing it would render the home number in
+            # the Live column of every AWAY moneyline row -- the exact defect
+            # `layer2_board._model_prob_for_side` was written to fix, on the
+            # exact field it was written about. Fixing the label must not
+            # reintroduce it.
             updated["live_model_prob_over"] = live_projected
             updated["live_projected"] = live_projected
         if verdict.get("priceable"):
@@ -1195,7 +1209,40 @@ def _apply_verdict(
             # edge to a differently-named field would make the board price LIVE
             # rows off a PREGAME edge -- worse than the defect it fixes. That was
             # the first proposal here and it was withdrawn for exactly that.
-            updated["edge_basis"] = "live" if live_projected is not None else "pregame"
+            #
+            # **READ OFF THE VERDICT THAT COMPUTED THE EDGE, NOT OFF
+            # `live_projected`** `[2026-09-05]`. Those are two different
+            # questions and this line conflated them for three weeks.
+            # `live_projected` is a PUBLICATION switch -- it decides whether the
+            # live probability is ALSO written to `live_model_prob_over` for a
+            # reader to see. The MONEYLINE branch deliberately does not publish
+            # it (see `attach_live_gamelines`), so every live h2h row was
+            # labelled `pregame` while its edge came from `hit["home_win_prob"]`
+            # -- the live number. Measured 2026-09-05 with the real functions on
+            # a decided NCAAF game: live probability 1.0 against
+            # `market_fair_prob_over` 0.310 published `edge_vs_market_pct 69.0`,
+            # which is `(1.0 - 0.310) * 100`; the pregame pairing
+            # `(0.977 - 0.310)` gives 66.7 and is NOT what came out. The row
+            # said `pregame`.
+            #
+            # That is the exact confusion the key was ADDED to end, so on the
+            # one market family where the label mattered most it asserted the
+            # opposite of the truth. The 7/7 separation quoted above could not
+            # have caught it: every one of those 7 rows carried
+            # `live_model_prob_over`, so all 7 were DISTRIBUTION rows and the
+            # founding measurement never contained an h2h row at all.
+            #
+            # `verdict["edge_pp"]` IS `(model_prob - market_prob) * 100` in all
+            # three pricers (`price_moneyline`, `price_distribution_market`,
+            # `price_analytic_line_market`, which delegates to the first), and
+            # every verdict reaching this function was priced from a LIVE `hit`
+            # -- `_apply_verdict` has no other caller. So the probability this
+            # edge is paired against is the verdict's own `model_prob`, and
+            # reading it there makes the label a restatement of the arithmetic
+            # instead of a claim about what the caller remembered to pass.
+            # `test_every_priceable_verdict_carries_the_probability_it_priced`
+            # pins the implication this relies on.
+            updated["edge_basis"] = "live" if verdict.get("model_prob") is not None else "pregame"
             updated["edge_unavailable_reason"] = None
         else:
             updated["edge_vs_market_pct"] = None

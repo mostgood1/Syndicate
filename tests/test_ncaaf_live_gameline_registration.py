@@ -112,15 +112,20 @@ def test_a_live_resim_lane_indexes_prices_and_releases_the_edge():
     assert row["live_gameline"]["home_win_prob"] == 1.0
     assert projection["model_prob_over"] == 0.977, "the pregame number stays readable"
 
-    # PRE-EXISTING MISLABEL, PINNED RATHER THAN FIXED. `_apply_verdict` sets
+    # **FIXED 2026-09-05, and this assertion is the mutation check.** It used to
+    # read `== "pregame"` and said so: `_apply_verdict` set
     # `edge_basis = "live" if live_projected is not None else "pregame"`, and the
-    # MONEYLINE branch calls it without `live_projected` -- so an edge computed
-    # from the live probability is labelled `pregame`. That is true for MLB and
-    # WNBA today, not something this registration introduced, and correcting it
-    # would change the label on every live moneyline row on three sports'
-    # boards. Asserted as-is so the label cannot drift unnoticed and so the next
-    # reader finds the discrepancy stated instead of discovering it.
-    assert projection["edge_basis"] == "pregame"
+    # MONEYLINE branch calls it WITHOUT `live_projected`, so the edge computed
+    # from the live probability three lines up was labelled `pregame`.
+    #
+    # The label now comes from `verdict["model_prob"]` -- the probability the
+    # edge was actually computed from -- rather than from `live_projected`,
+    # which only ever decided whether to PUBLISH that probability. The moneyline
+    # branch still publishes nothing (see the comment there), so this row
+    # carries no `live_model_prob_over`; that is deliberate and is asserted
+    # below rather than left as an accident.
+    assert projection["edge_basis"] == "live"
+    assert "live_model_prob_over" not in projection
 
     # And only now does the policy allow the edge through at all.
     assert live_edge_unavailable_reason(row) is None
