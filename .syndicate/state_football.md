@@ -1539,3 +1539,87 @@ with no local substitute" — the same argument applies to `/ppa/games`, which
 `load_ppa_ratings_asof` calls once per prior week (~15 per season). Caching it
 would make backtests repeatable and quota-independent after one fetch. It does
 not help before the roll: the cache is empty and cannot be filled.
+
+## [ncaaf-live-resim] SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim]`
+
+**THE DEFECT, measured on production mid-slate.** `/ncaaf/api/live-lens` served
+**51 games, 8 live, 26 final** while every live card's win probability, predicted
+final, spread and total was the PREGAME number. Boise State led Oregon **17-7 in
+Q2** beside a published **"Oregon 97.7%"**. The board suppressing an edge on
+those rows is CORRECT (`#340`); what was missing was a probability that knows
+the score.
+
+**THE ENGINE ALWAYS COULD.** `possession_state.build_initial_possession_state`
+has always taken `quarter`, `clock_remaining`, `score_home`, `score_away`, and
+`drive_simulator` already branches on `state.quarter` / `state.clock_remaining`
+for the two-minute drill and end-of-half. `game_simulator.simulate_game`
+hard-coded `quarter=1`, `clock_remaining=quarter_seconds`, no score, and looped
+`range(1, quarters + 1)`. Four defaulted fields and a loop bound — landed
+`ca5be54b`.
+
+**PREGAME OUTPUT IS BIT-IDENTICAL.** 40 shared seeds, the two edited files
+stashed and restored in ONE worktree: sha256 `3281e358...` both ways. A first
+attempt compared two working trees and reported a DIFFERENCE — it was wrong, and
+the reason is worth keeping: the trees loaded different NCAAF calibration
+profiles (`source=default` in a `--no-data` worktree vs the promoted
+`ncaaf-goal-line-refit-1` artifact in the primary tree). A cross-tree A/B of a
+sim engine measures the profile, not the diff.
+
+**WHAT THE RE-SIM SAYS ON REAL LIVE STATE**, ratings held NEUTRAL so the number
+is the state's contribution alone (n=120/game):
+
+| game | state | board pregame | live re-sim |
+|---|---|---|---|
+| Boise State @ Oregon | Q2 2:48, 17-7 away | **97.7%** | **0.2500** |
+| Oklahoma State @ Tulsa | Q2 2:43, 0-3 home | 18.3% | 0.6458 |
+| Texas State @ Texas | Q2 0:27, 7-28 home | 93.0% | 1.0000 |
+| Northern Illinois @ Iowa | Q1 2:35, 0-20 home | 100.0% | 0.9667 |
+
+**COVERAGE, with denominators `[2026-09-05, production cards + ESPN, same
+minute]`:** 51 board games; 30 matched to today's ESPN slate (the other 21 kick
+off on other dates — the ESPN-id key and an ESPN-`location`-name key matched the
+SAME 30, so the producer needs no id map); 8 live on both sides; **7 of 8
+(87.5%) carry a resumable state** and would publish a live-aware probability.
+The 8th refuses `no_period` (kickoff not taken). Over all 30 matched:
+`game_final 9, game_not_in_progress 13, no_period 1`.
+
+**COST FALLS AS THE GAME RUNS** — 154 ms/sim pregame, 85 ms at Q2, 7.9 ms at
+Q4 2:00, 0.7 ms at Q4 0:15. The 7 live games above took ~4-7 s each at 120 sims,
+~35 s for the slate, inside the 90 s tick budget. **A live re-sim is always
+cheaper than the pregame sim it updates.** The 2-sigma edge bar at n=120 came
+out 2.26 / 6.98 / 8.62 pp (min/median/max).
+
+**THE INTERLOCK.** Every unpriceable path returns a named `NcaafResimRefusal`
+and publishes a lane stamped `pregame` carrying **no `modelHomeWinProb` key at
+all** — not the pregame value, not zero, not a null an `or` could rescue.
+`LIVE_LENS_SOURCES_BY_SPORT["ncaaf"] = ("live_resim",)` accepts only the priced
+stamp, so the join withholds while `sources_seen` still shows the reason. That
+is `#414`'s rule enforced by the stamp instead of by convention.
+
+**ONE MARKET FAMILY, DELIBERATELY.** The lane carries `modelHomeWinProb` and
+`simsRun` and NO `marginDist` / `totalRunsDist`, because `live_gameline_join`
+would price totals and spreads off those the moment they appeared and no NCAAF
+live totals estimator has ever been graded (`#499` is the precedent in the other
+direction: WNBA totals only priced after a 249-game backtest gave a measured
+0.150 interval).
+
+**THE PRODUCER MUST RUN ON refresh-worker, NOT ON THE LIVE-LENS LOOP.** Read
+from `render.yaml`: `SYNDICATE_ENABLE_LIVE_LENS_LOOP=true` appears ONLY in the
+live-odds-worker block. The re-sim's two inputs are on refresh-worker's disk —
+`ncaaf_source/data/smartsim2_projections_*_wk*.csv` (allowlisted, but carrying
+`wk1` and no DATE token, so `pull_hot_artifacts`' `*<date>*` glob would never
+carry it) and `ncaaf_source/historical_truth/sp_ratings_<season>.json` (**not in
+`HOT_ARTIFACT_PATTERNS` at all**). Wiring this into `live_lens_loop` would put
+the compute on the one service that cannot read its inputs. The OUTPUT has no
+such problem: `data/live/ncaaf_live_lens.json` is keyvalue-backed by
+`refresh_state_store`, which is how `mlb_live_lens.json` already reaches web.
+
+**OWED, none of it taken this session (no deploy, no env change, by
+instruction):** (1) call `build_live_lens_snapshot` from refresh-worker's tick
+and write it through `write_json_file`; (2) add `sp_ratings_*.json` to
+`HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py` is held by
+`evaluation-ledger-projected-mirror`); (3) a deploy of web + refresh-worker.
+The reading that closes it: `/api/ops/live-lens/snapshot-index?sport=ncaaf`
+showing `sources_seen {live_resim: N}` with N equal to the live-and-resumable
+count, and a live NCAAF row on the board carrying an edge whose
+`projection.live_aware` is true.

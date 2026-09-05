@@ -2361,6 +2361,28 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `Q4 0:15, home +21` -> 1.0000; `Q4 0:15, home -21` -> 0.0000. Cost FALLS as
   the game runs: 154 ms/sim pregame, 85 ms at Q2, 7.9 ms at Q4 2:00, 0.7 ms at
   Q4 0:15. A live re-sim is cheaper than the pregame sim it replaces.
+- **OUTCOME: the hypothesis held, the increment is landed at `ca5be54b`, and the
+  producer is NOT wired to a worker — deliberately.** `simulate_game` now resumes
+  from `initial_quarter` / `initial_clock_seconds` / `initial_score_*` with the old
+  hard-coded values as defaults; pregame output is BIT-IDENTICAL over 40 shared
+  seeds (sha256 `3281e358...` with the change stashed and restored in one worktree).
+  `ncaaf/live_resim.py` publishes ONE market family (moneyline) with nine named
+  refusals and no path back to the pregame probability.
+- **Measured on the live slate, with denominators:** 51 board games, 30 matched to
+  today's ESPN events, 8 live on both sides, **7 of 8 (87.5%) resumable**; the 8th
+  refuses `no_period`. Boise State led Oregon 17-7 in Q2 while the board published
+  "Oregon 97.7%"; the re-sim on neutral ratings says 0.2500.
+- **OWED (no deploy, no env change taken):** wire `build_live_lens_snapshot` into
+  refresh-worker's tick — NOT `live_lens_loop`, which runs on live-odds-worker
+  (`SYNDICATE_ENABLE_LIVE_LENS_LOOP=true` appears only in that block of
+  `render.yaml`) and cannot read `sp_ratings_<season>.json` or the week's
+  projections CSV off refresh-worker's disk; add `sp_ratings_*.json` to
+  `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py` is held by
+  `evaluation-ledger-projected-mirror`); then deploy web + refresh-worker.
+  Closing reading: `/api/ops/live-lens/snapshot-index?sport=ncaaf` showing
+  `sources_seen {live_resim: N}` for N == the live-and-resumable count.
+- Full narrative and every number: `state_football.md [ncaaf-live-resim]`,
+  `log/2026-09-05.md`.
   NOT claimed and NOT edited: `run_live_odds_refresh_worker.py`
   (held by `ncaaf-live-cadence`), `generate_smartsim2_ncaaf_projections.py` and
   `ncaaf/sources.py` (held by `ncaaf-games-cache-refresh`),

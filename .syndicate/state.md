@@ -438,6 +438,7 @@ once this index exists: re-splitting would orphan the parts.
 | [board-model-edge-coverage] | 2026-08-30 — 82% of the board is UNSIZABLE, and every `_alt` market is 0% | `state_board.md` |
 | [nfl-board-projection-coverage] | NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-project | `state_football.md` |
 | [ncaaf-zero-orders-is-two-gates] | NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry | `state_football.md` |
+| [ncaaf-live-resim] | SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim]` | `state_football.md` |
 | [ncaaf-team-registry-two-files] | THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]` | `state_football.md` |
 | [football-smartsim2] | FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]` | `state_football.md` |
 | [nfl-archived] | NFL — earlier closed work, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.** | `state_football.md` |
