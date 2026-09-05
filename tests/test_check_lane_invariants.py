@@ -496,3 +496,107 @@ def test_main_exits_nonzero_on_an_orphan(tmp_path, capsys):
     assert mod.main([str(path), "--quiet"]) == 1
     out = capsys.readouterr().out
     assert "destroyed-lane" in out and "in NO ledger file" in out
+
+
+# ---------------------------------------------------------------------------
+# 2026-09-05: "in NO ledger file" was ALSO reported for a block that exists on
+# origin/main and merely has not been pulled. The marker set is CURRENT (it is
+# written into the primary tree the moment a lane opens) while `lanes.md` in
+# that tree is a working copy that runs behind -- measured that day at 58
+# commits and 45 headers against 101 upstream. The remedies are opposite:
+# PULL, versus restore a block that genuinely exists nowhere. The old message
+# named the wrong one and asserted "upstream cannot have it" about a case where
+# upstream demonstrably did.
+# ---------------------------------------------------------------------------
+
+
+def _fake_git(monkeypatch, mapping, *, fail=False):
+    """Stand in for `git show <ref>:.syndicate/<file>`.
+
+    `mapping` is {filename: text}; anything absent returns rc=1, which is what
+    git does for a path that is not in the ref.
+    """
+    import subprocess as _sp
+
+    class _R:
+        def __init__(self, rc, out):
+            self.returncode, self.stdout = rc, out
+
+    def run(cmd, **kw):
+        if fail:
+            raise OSError("git not available")
+        name = cmd[-1].rsplit("/", 1)[-1]
+        if name not in mapping:
+            return _R(1, b"")
+        return _R(0, mapping[name].encode("utf-8"))
+
+    monkeypatch.setattr(mod.subprocess, "run", run)
+    return _sp
+
+
+def test_upstream_lane_slugs_reads_every_ledger_file(monkeypatch):
+    _fake_git(monkeypatch, {
+        "lanes.md": "### live-one — OPEN\n",
+        "lanes_history.md": "### trimmed-one — CLOSED\n",
+    })
+    got = mod.upstream_lane_slugs(pathlib.Path(".syndicate"))
+    assert got == {"live-one", "trimmed-one"}
+
+
+def test_upstream_unknown_is_none_not_empty(monkeypatch):
+    """An unknown that defaults to the PERMISSIVE branch turns a failed lookup
+    into a relaxed rule. None keeps the strict verdict; a set() would silently
+    assert that upstream has nothing."""
+    _fake_git(monkeypatch, {}, fail=True)
+    assert mod.upstream_lane_slugs(pathlib.Path(".syndicate")) is None
+    # No ledger file present in the ref at all is also UNKNOWN, not "empty".
+    _fake_git(monkeypatch, {})
+    assert mod.upstream_lane_slugs(pathlib.Path(".syndicate")) is None
+
+
+def test_a_block_that_is_only_upstream_is_a_pull_hint_not_a_failure(tmp_path, monkeypatch, capsys):
+    """THE 2026-09-05 CASE: `web-oom-burst-source`'s marker was in the primary
+    tree and its block was on origin/main. This must not fail, and must not
+    tell anyone to rewrite the block."""
+    path = _lane_dir(
+        tmp_path,
+        lanes="## OPEN\n\n### kept — OPEN\n- Files: a.py\n",
+        markers={"b2b5b45b": "web-oom-burst-source"},
+    )
+    _fake_git(monkeypatch, {"lanes.md": "### web-oom-burst-source — OPEN\n"})
+    assert mod.main([str(path), "--quiet"]) == 0
+    out = capsys.readouterr().out
+    assert "IS on origin/main" in out and "PULL, do not restore" in out
+    assert "upstream cannot have it" not in out
+
+
+def test_a_block_upstream_does_not_have_still_fails(tmp_path, monkeypatch, capsys):
+    """The reachability half: with git answering and the slug absent upstream,
+    the verdict must still be FAIL. Without this, the new branch could swallow
+    every orphan and the test above would pass for the wrong reason."""
+    path = _lane_dir(
+        tmp_path,
+        lanes="## OPEN\n\n### kept — OPEN\n- Files: a.py\n",
+        markers={"c4287631": "destroyed-lane"},
+    )
+    _fake_git(monkeypatch, {"lanes.md": "### something-else — OPEN\n"})
+    assert mod.main([str(path), "--quiet"]) == 1
+    out = capsys.readouterr().out
+    assert "destroyed-lane" in out
+    assert "origin/main does not carry it either" in out
+
+
+def test_when_git_cannot_answer_the_message_does_not_claim_it_checked(tmp_path, monkeypatch, capsys):
+    """A healthy-looking reading is evidence only once you know what makes it
+    read unhealthy. With no git answer the check must stay a FAIL AND must say
+    upstream was not consulted, rather than asserting anything about it."""
+    path = _lane_dir(
+        tmp_path,
+        lanes="## OPEN\n\n### kept — OPEN\n- Files: a.py\n",
+        markers={"c4287631": "destroyed-lane"},
+    )
+    _fake_git(monkeypatch, {}, fail=True)
+    assert mod.main([str(path), "--quiet"]) == 1
+    out = capsys.readouterr().out
+    assert "upstream NOT CHECKED" in out
+    assert "upstream cannot have it" not in out
