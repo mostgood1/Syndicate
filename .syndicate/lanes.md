@@ -189,6 +189,29 @@ death, never life — do not invert it.
   the cap is the control and exhaustion must be reported, not silent.
 - Blocked by: none.
 
+### web-oom-burst-source — OPEN — opened 2026-09-05 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: identify what causes `#632`'s memory BURSTS. Growth is episodic, not
+  steady — both workers rose ~98 MB between 16:17:43 and 16:19:25 and were then
+  flat to the decimal (`595.3`/`509.4`) for 3.5 min.
+- Files: scratchpad only (a detector script); no repo code unless the answer
+  needs an instrument. No lane conflict.
+- Hypothesis: it is a SCHEDULED or FAN-OUT event, not user traffic. **Both
+  workers rose in the same ~100 s window, and one request cannot do that** — a
+  single request lands on one worker.
+- Falsification test: bursts are UNCORRELATED between workers and land at
+  irregular intervals — then it is ordinary traffic hitting whichever worker,
+  and the fan-out/schedule story is wrong.
+- Verification: >= 3 bursts detected at 10 s cadence, reporting for each its
+  magnitude per worker, whether the workers moved TOGETHER, and the gap between
+  bursts. Periodicity is the discriminator: a fixed interval means a job, not
+  users.
+- METHOD NOTE: sample WORKER RSS, never `container_memory_mb` — the container
+  figure includes reclaimable page cache and moved 247 MB with no process
+  behind it, which is how I mis-reported pressure as 86% when it was 54%.
+- Blocked by: none.
+
+## OPEN
+
 ## OPEN
 ### mlb-joint-correlation-producer — CLOSED 2026-09-04 — opened 2026-09-04 — **THE SIM NO LONGER DISCARDS ITS JOINT, AND THE CORRELATION IS MEASURED.** Landed `4558c0b7`, NOT DEPLOYED. Measured on production's own DET@CLE roster (pk824424, 2026-09-04), 1,000 sims: `home_runs x total_bases` **mean rho +0.610, range +0.227..+0.805 over 18/18 batters** — against ONE constant (`1.35`) serving all eighteen today, a 3.5x spread end to end. Cross-batter `total_bases x total_bases` reads **same team +0.097 / opposing +0.018** where the heuristic adds 0.25 + 0.14. Cost 0.433% of peak RSS. — session 3492626c-1ec4-4366-9dbe-f194ae319c84
 - Goal: feed the `measured_lookup` seam that landed inert at `1bbcc246`, with a
