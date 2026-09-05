@@ -5,6 +5,67 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [stale-test-triage] "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit 63c10ed5]`
+
+All 18 red-standalone tests from `[full-suite-completes]` are now green, CI's
+gate is **386 tests, OK (2 skipped)**, and 132 pass across the 12 touched
+files. The durable part is not the repairs, it is the rule that governed them.
+
+**THE RULE, pre-registered in the lane before any edit:** *name the COMMIT
+that moved the behaviour, or the test is presumed RIGHT and the code presumed
+WRONG.* Editing an assertion to match whatever the code now does is how a real
+regression gets erased, and it looks exactly like success. **The rule fired 4
+times out of 18.**
+
+**THREE FAILURE SHAPES THAT ARE NOT STALENESS, and each is reusable:**
+
+1. **A FIXTURE SEAM THAT MOVED.** `test_ncaaf_picks_local`'s `setUp` forces
+   the serving gate OPEN, and wrote 2-tuple keys into `_SERVING_REGISTRY`
+   after its key gained a `basis` dimension `(sport, market, basis)`. With
+   `clear=True` it also removed the genuine entries, so the lookup fell to
+   default-deny: **the fixture that exists to force the gate open was forcing
+   it shut**, and every assertion was testing the suppressed board. This is
+   the `learnings.md` "pinned copy" family with a new face — the test did not
+   copy a definition, it copied a KEY SHAPE.
+
+2. **TIME ROT.** `test_market_gone_drop` and `test_soccer_read_scope` both
+   pinned one end of an age/date comparison to a calendar date while the code
+   reads the wall clock. They passed the day they were written and expired
+   silently. **Write AGES, not DATES:** anchor fixtures to `now` whenever the
+   code under test calls `datetime.now()`. The tell is a test that fails with
+   no commit anywhere near it.
+
+3. **AN UNACHIEVABLE PREMISE.** `test_no_roster_artifact_degrades_to_empty`
+   could not create the absence it names: `SYNDICATE_NFL_SOURCE_ROOT` does not
+   suppress the REPO-MIRROR candidate, and the git-tracked roster really does
+   contain the player. **An env var that does not cover every candidate root
+   cannot manufacture absence** — the same fact behind that day's NBA
+   betting-card 404. Empty the seam directly instead.
+
+**A REAL PRODUCTION BUG CAME OUT OF SHAPE 1.** `pick_gate.registry_snapshot()`
+unpacks `for (sport, market), verdict` from the 3-tuple key and raises
+`ValueError: too many values to unpack`. ZERO callers, so nothing broke and
+nothing reported it. Fixed, `basis` surfaced. **The same incomplete migration
+produced one broken test and one latent landmine; only the test was visible.**
+
+**MUTATION-CHECKING CAUGHT A VACUOUS REPAIR OF MY OWN, and this is the part
+most worth keeping.** To avoid hardcoding a value documented as drifting, the
+Polymarket price assertion was DERIVED from `_polymarket_cross_ticks()` — the
+same function the code calls. That is a TAUTOLOGY: flip the default and both
+sides move together, so it can never fail on the thing it names. The mutation
+ran GREEN and said so. **A test whose expectation is computed from the code
+under test asserts nothing about that code.** Pin the arms explicitly instead
+(0->0.55, 1->0.56, 2->0.57).
+
+Second mutation lesson: a mutant that renames a function produces import
+ERRORS, which prove only that the test imports the module. Kill the MECHANISM
+(make the memo always miss), not the symbol.
+
+**AND MUTATE AT RUNTIME, NOT ON DISK.** The first mutation script wrote to
+`pipeline/execute_portfolio.py`, which OPEN lane `order-model-view` holds; the
+lane guard caught it. Bytes were restored and the file verified clean, but a
+runtime monkeypatch via a `-p` plugin does the same job and touches nobody
+else's file.
 ## [full-suite-completes] THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 parallel artefacts + 21 stale tests `[2026-09-05, lane full-suite-xdist-run]`
 
 `pytest-xdist` was ALREADY declared in `requirements-dev.txt` (2026-08-25) and

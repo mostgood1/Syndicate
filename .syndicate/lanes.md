@@ -1625,6 +1625,64 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: after deploy, re-run `scripts/render_bandwidth_report.py` over a slate hour and compare against the 09-04 17:00Z and 09-01 22:00Z baselines recorded above, and record the reading in `deploys.md`.
 - Blocked by: none.
 
+### stale-test-repair — CLOSED-VERIFIED 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **ALL 18 GREEN (`63c10ed5`). THE LANE'S OWN HYPOTHESIS WAS WRONG FOR 4 OF THEM, AND THE FALSIFICATION RULE IS WHAT CAUGHT IT — plus one REAL production bug fixed on the way.** `[user: "fix the 18 stale tests"]`
+- Goal: each of the 18 that FAIL ALONE on `origin/main` either passes or is
+  recorded as a code defect. **MET**: 18/18 pass; 132 passed across the 12
+  touched files; CI's own gate `python -m unittest tests.test_archives` **386
+  tests, OK (2 skipped)**.
+- Files: 11 test files + `syndicate/features/football/pick_gate.py`. All
+  claim-checked against every OPEN lane before editing; none was held. **ALL
+  RELEASED** — landed on `origin/main`, nothing held.
+- Hypothesis: "stale assertions left by deliberate changes, so the fix is in
+  the test." **TRUE FOR 14, FALSE FOR 4.**
+- Falsification test (pre-registered): *for EACH test I must name the COMMIT
+  that moved the behaviour; if I cannot, the test is presumed RIGHT and the
+  code presumed WRONG.* **IT FIRED FOUR TIMES AND IT IS THE WHOLE VALUE OF
+  THIS LANE.** Without it those four would have been edited green and the
+  things they were reporting would have been erased:
+  - `test_ncaaf_picks_local` (x4): its `setUp` FORCES THE SERVING GATE OPEN
+    and wrote 2-tuple keys into `_SERVING_REGISTRY`, whose key gained a
+    `basis` dimension and is now `(sport, market, basis)`. With `clear=True`
+    that ALSO removed the real entries, so the lookup fell to default-deny and
+    the gate the fixture exists to force OPEN was forced SHUT — the exact
+    inversion its own class docstring warns about. Tell: `NCAAF_PICKS_
+    SUPPRESSED moneyline=1` on stdout.
+  - `test_market_gone_drop` (x2) + `test_soccer_read_scope`: **TIME-ROTTED.**
+    Both pin one end of an age/date comparison to a calendar date while the
+    code reads the wall clock. A "FRESH" sidecar read as SIX DAYS old and every
+    row classified `as_fresh_as_sweep` (`MARKET_GONE_DROPPED none of 1`);
+    `week_games` legitimately reads dates derived from TODAY, so the pass
+    touches 4 distinct dates against a hardcoded 2. **In both the CODE WAS
+    RIGHT** — a genuinely 6-day-old sidecar SHOULD protect its rows, which is
+    this file's own documented NCAAF nine-hour case.
+  - `test_nfl_props_board`: premise unachievable. `two_roots` cannot build a
+    "no roster" world because the resolver also offers the REPO MIRROR, and
+    `data/nfl_source/.../roster_2026_snapshot.csv` is git-tracked and really
+    contains A.J. Brown. Same shape as the NBA betting-card asset bug fixed
+    the same day.
+- **REAL PRODUCTION BUG FOUND AND FIXED:** `pick_gate.registry_snapshot()`
+  unpacks `for (sport, market), verdict` from that same 3-tuple key and raises
+  `ValueError: too many values to unpack`. ZERO callers, which is why nothing
+  broke — a latent landmine from the same incomplete migration. Now returns 3
+  rows with `basis` surfaced.
+- Verification: **mutation-checked, and it caught one of my own repairs being
+  VACUOUS.** Deriving the Polymarket price from `_polymarket_cross_ticks()`
+  was a TAUTOLOGY — flip the default and both sides of the comparison move
+  together — and the mutation ran GREEN. Rewritten to pin three arms
+  explicitly (0->0.55, 1->0.56, 2->0.57). A first mutant for the read scope
+  renamed `picks_rows` and produced import ERRORS, proving only that the test
+  imports the module; the sharper one makes the memo always miss. Final: 5 of
+  5 RED for the right reason.
+- **I TRIPPED THE LANE GUARD AND IT WAS RIGHT.** The mutation script wrote to
+  `pipeline/execute_portfolio.py`, claimed by OPEN lane `order-model-view`. It
+  restores original bytes and the file is verified clean against HEAD, but
+  mutating another lane's file was not mine to do. Both remaining mutations
+  were redone as RUNTIME patches — no file writes at all, which is the better
+  technique regardless.
+- `test_soccer_read_scope` now asserts DEDUPLICATION rather than a count
+  bound: strictly stronger, since a per-fixture regression repeats a key 9
+  times and fails even if the total stays under the old limit.
+- No deploy: tests plus one unreachable function. Blocked by: none.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
