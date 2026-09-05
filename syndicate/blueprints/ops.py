@@ -1081,7 +1081,17 @@ def api_ops_live_lens_snapshot_index() -> Any:
             ],
         })
 
-    index = build_live_gameline_index(snapshot, sources=sources)
+    # `diagnostics` PASSED, and it was not before. `build_live_gameline_index`
+    # fills it with `sources_seen` -- EVERY lens stamp in the snapshot, accepted
+    # or refused -- and this endpoint was building the index and throwing that
+    # away, so the one field that separates "no producer" from "a producer that
+    # declines to call this state live" was unreadable from outside the worker.
+    # That distinction is the whole reason `sources_seen` exists (its own
+    # docstring records WNBA's `index=0 considered=184` being read as "no live
+    # model wired", which was false), and it is the closing reading for the
+    # NCAAF live re-sim: `{live_resim: N}` against `{pregame: M}`.
+    index_diag: dict[str, Any] = {}
+    index = build_live_gameline_index(snapshot, sources=sources, diagnostics=index_diag)
     # THE PROP INDEX, through the SAME function the board's join calls. The
     # gameline index above cannot stand in for it: they read different keys and,
     # on 2026-08-21, disagreed.
@@ -1115,6 +1125,15 @@ def api_ops_live_lens_snapshot_index() -> Any:
         "snapshot_game_count": len(snapshot.get("games") or []),
         "index_size": len(index),
         "indexed_keys": [list(k) for k in index],
+        # WHY THE INDEX IS THE SIZE IT IS, not just what size it is.
+        "index_diagnostics": index_diag,
+        # THE PRODUCER'S OWN COVERAGE BLOCK, verbatim. `sources_seen` above is
+        # the JOIN's view (what reached it, by stamp); this is the PRODUCER's
+        # (what it refused, by reason). A reading that has one and not the other
+        # cannot tell a quiet slate from a broken input -- `refusals_by_reason`
+        # naming `no_pregame_ratings` and naming `game_not_in_progress` are
+        # opposite conclusions from the same `live_resim: 0`.
+        "producer_coverage": snapshot.get("coverage"),
         "prop_index": prop_summary,
         "games": games_out,
     })
