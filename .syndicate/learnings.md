@@ -5932,3 +5932,103 @@ onto, and say which you checked.
   post-deploy state rather than testing the happy path. `presence != reachability`
   applies to a FALLBACK too: a working fallback hides whether the primary path
   ever ran.
+
+## 2026-09-04 FORBIDDEN: a tool that updates a REGION of a shared file rebuilding that file from the region's start. Splice the region; carry the remainder through untouched, and REFUSE if you cannot classify it
+
+- **The rule going forward.** When a tool rewrites one region of a file other sessions also write, it must locate the region's END, not just its start, and splice. `split_state.py --reindex` computed `head + regenerated_rows` and stopped — correct for every byte it knew about, and it silently deleted everything it did not. **The tell is a rebuild expressed as a prefix plus new content with no suffix term.** Two things make it worse than an ordinary bug: the region's end was defined by a FILTER (`[l for l in lines if not l.startswith("| [")]`) that has no notion of where a table ends, and the result was reported as success — `WROTE state.md (index rebuilt)`, exit 0. Add the conservation check as a RUNTIME guard, not only a test: every non-blank input line outside the rewritten region must appear in the output, or refuse. Verified 2026-09-04: `origin/main` carried 171 non-blank lines below that table, and the fix preserves 171 of 171. Fixed in `29ab5bfb`.
+
+## 2026-09-04 FORBIDDEN: calling a merge lossy from a SAME-FILE line comparison. Content that "vanished" may have MOVED to a sibling file, and the panic fix is to restore stale content over good
+
+- **The rule going forward.** When checking whether a merge, sync or rebuild
+  lost content, diff the working file against the WHOLE sibling corpus, not only
+  against its own previous version. Measured 2026-09-04 syncing the shared
+  primary tree 201 commits forward: a same-file check reported **1,059 lines
+  lost from `learnings.md`**. Against every `.syndicate/**.md` the true number
+  was **3** — upstream had run `compact_learnings.py`, which moves rule bodies
+  into `learnings_archive.md` BY DESIGN. A 350x overstatement, and in the
+  alarming direction, which is the dangerous one here: the obvious response to
+  "the sync ate a thousand lines" is to restore the pre-sync copy, which in this
+  case would have reverted 201 commits of other sessions' work to fix nothing.
+  The same pass also over-reported 113 upstream lines as lost purely because
+  `origin/main` had moved 3 commits past the sync target while the sync ran —
+  **compare against the SHA you actually merged, never against a moving ref.**
+  This is the exact inverse of the same day's rule about rebuilding a shared
+  ledger from `origin/main`: there a check said "0 deletions" and content was
+  genuinely gone; here a check screamed and nothing was. Both come from asking
+  one file a question that is about the tree.
+- **Corollary: 0 deletions is necessary, not sufficient, and a stacked HEADING
+  is how a "clean" merge still corrupts.** The same sync produced 3 duplicated
+  lane blocks and a `learnings_index.md` carrying TWO `## Index — N rules`
+  headers, all with `git diff --numstat` showing zero deletions, because a
+  3-way merge that keeps both sides of a rewritten header line is pure
+  insertion. Check STRUCTURE (one slug one block, one heading one section) after
+  any merge of an append-shaped file, not just the line counts.
+
+## 2026-09-05 FORBIDDEN: overriding the pre-commit ledger guard when it names a file you did not stage - it is reporting a STALE BASE, and the fix is to change the base. `[scheduled task live-gameline-accuracy-snapshot]`
+
+Staged exactly one file (`reports/live_gameline_accuracy/history.jsonl`). The
+guard rejected the commit over `.syndicate/deploys.md`, naming 8 measurement
+sections present on `origin/main` and absent from the commit. Nothing about
+`deploys.md` had been touched.
+
+**It was correct.** The guard checks the whole STAGED TREE, not the diff, and
+local `main` was **32 commits behind** `origin/main` - so HEAD's `deploys.md`
+genuinely was missing those 8 measurements, and the commit would have recorded
+that stale copy. `SYNDICATE_ALLOW_LEDGER_COMMIT=1` or `--no-verify` would have
+made an unverified deploy look verified, which is the precise harm the guard
+exists to prevent.
+
+**How to apply:** when the guard names a file outside your change set, read it
+as "your BASE is stale", never as "the guard is confused about scope". Check
+`git rev-list --left-right --count HEAD...origin/main` first. Then either
+fast-forward, or - if the shared tree cannot safely move - build the commit on
+top of `origin/main` directly.
+
+**The safe recipe when the primary tree must not move** (it was 32 behind, and
+`state.md` + `log/2026-09-04.md` had BOTH changed upstream and carried other
+sessions' uncommitted edits, so a fast-forward there was a cross-session action
+with real blast radius):
+
+    BLOB=$(git hash-object -w <content>)
+    export GIT_INDEX_FILE=<temp>           # never the shared index
+    git read-tree origin/main
+    git update-index --cacheinfo 100644,$BLOB,<path>
+    TREE=$(git write-tree)
+    C=$(git commit-tree $TREE -p origin/main -F -)
+    git diff --numstat origin/main $C      # MUST be your file(s) only, 0 deletions
+    git push origin $C:refs/heads/main
+
+This satisfies the guard's invariant by CONSTRUCTION rather than bypassing it:
+every ledger file in the pushed tree is `origin/main`'s own copy.
+
+**Second trap in the same pass - a local append-only file is not necessarily an
+append of upstream's.** The primary tree's `history.jsonl` held the same 32
+upstream rows in a **different order** plus 4 new ones. `diff` said `1,32c1,32`;
+a set comparison said **0 upstream rows missing**. Committing the local copy
+would have rewritten 32 lines of a file whose standing rule is *never rewrite in
+place* - and a line diff would have called that a rewrite while a row-set check
+would have called it clean. **Reconcile append-only files as SETS, then emit
+upstream-bytes + the new rows in order.** Both checks were needed; either alone
+gives the wrong verdict.
+
+## 2026-09-05 FORBIDDEN: attributing a hazard to the change you just made without measuring the tree WITHOUT it. And `ledger_invariants` does NOT catch a stale tree that is merely MISSING newer blocks
+
+- **The guard gap, measured 2026-09-05 and still open.** The primary tree sat 36
+  commits behind `origin/main`. Committing its `.syndicate/lanes.md` from there
+  would drop **210 non-blank lines and 7 whole lane blocks**, one of them an
+  **OPEN** lane. `ledger_invariants.violations()` returns **0** on that file -
+  called directly, not inferred from a hook exit code - so `ledger-commit-guard`
+  allows it. The staleness arm (`ledger_invariants.py:211-248`) models a stale
+  tree RESURRECTING archived content, which is addition; a stale tree missing
+  newer blocks is SUBTRACTION, and nothing keys on it. The file's own docstring
+  already flagged a sibling case reading "0 on a 208 KB stale working copy", so
+  this is the second instance of the same shape, not the first.
+- **The rule going forward.** Before undoing your own change to remove a hazard,
+  measure the hazard **with the change and without it**. I read the 210-line
+  exposure, attributed it to a 116 KB lane trim I had just applied, and reverted
+  the trim. The restored tree measured **210 lines / 7 blocks - identical**: the
+  exposure was the 36 commits, not the trim, and the revert destroyed a verified
+  reclamation while removing no risk at all. **A number measured only in the
+  present state cannot tell you what caused it.** This is the same error shape
+  as banking a success against the wrong cause, run in reverse - a cost paid
+  against a cause that was never there.
