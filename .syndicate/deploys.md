@@ -7,6 +7,84 @@
 
 
 
+## 2026-09-05 23:13:09-23:18:27Z — refresh-worker `ffe8714b` — **HALF ONE VERIFIED IN PRODUCTION; HALF TWO FOUND A REAL DEFECT AND IT IS MINE.** The NCAAF live re-sim produces; the board join missed 257 of 257 rows on a key I published. — lane `ncaaf-live-resim-wire`
+
+`deploy=dep-daea18f40ujc73edp0vg trigger=api`. Boot `[refresh_worker] BOOTED`
+23:13:09.878Z. Claim held by this lane throughout; web went to `3cb5b4ba`
+separately at 22:57-23:00Z (lane `render-egress-transport`, their row).
+
+**verify, HALF 1 — the producer. MET.** `/api/ops/live-lens/snapshot-index?sport=ncaaf`,
+read 23:15:59Z:
+
+    snapshot_present   true   /opt/render/project/data/live/ncaaf_live_lens.json
+    sources_seen       {"live_resim": 8, "pregame": 43}
+    index_size 8   indexed 8   skipped_no_accepted_lane 43   skipped_no_team_names 0
+    producer coverage  games 51, live_resimmed 8, refused 43
+                       refusals_by_reason {game_final 14, game_not_in_progress 8, no_live_state 21}
+
+All 8 `join_accepts: true`: Wyoming @ Colorado State **0.6875**, Arkansas State @
+Memphis 0.7625, Florida International @ South Florida 0.90, Tulane @ Duke 0.9667,
+Baylor @ Auburn 0.9917, and three at 1.0. **Denominator at the same instant: 20
+ESPN games in progress**, of which 8 are FBS-vs-FBS and therefore in the week's
+projections artifact; the other 12 are FCS opponents the artifact never carries.
+
+The worker's own line, an independent reading of the same tick:
+
+    23:15:51.380Z [refresh_worker] NCAAF_LIVE_RESIM {"coverage": {...}, "elapsed_seconds": 21.741,
+      "espn": {"dates": ["2026-09-05"], "events": 68, "fetch_failures": 0, "in_progress": 20, "keyed": 68},
+      "projections": 51, "ratings_teams": 94, "sp_ratings_source": "loader",
+      "sp_ratings_teams": 138, "week": 1, "written": true}
+
+`sp_ratings_source: loader` is the PREDICTED first-boot value — the durable
+mirror did not exist yet, so it went to CFBD once and wrote it. **The
+discriminating follow-up is the NEXT boot: it must read `durable_mirror`.** If it
+reads `loader` again the mirror is not surviving and the post-deploy gap is back.
+21.7 s against a 90 s budget, no `tick_budget_exhausted`.
+
+**verify, HALF 2 — the board. NOT MET, and the failure is diagnostic rather than
+silent.** First read at 23:15:59Z showed `"no published live-lens snapshot"`, which
+was a TIMESTAMP: the book grid was built 23:13:50Z and the snapshot written
+23:15:29Z, so the board was 99 s older than the thing it was looking for
+(`gate verification on artifact mtime`). I waited for a rebuild rather than
+concluding. The rebuild at **23:17:39Z**, comfortably after the snapshot, is the
+real reading:
+
+    index_size 8   sources_seen {"live_resim": 8, "pregame": 43}   skipped_no_team_names 0
+    rows_live_gameline_considered 257
+    rows_live_gameline_edged      0
+    withheld_by_reason  {"no_live_gameline_projection": 257}
+
+**THE INDEX WAS PERFECT AND EVERY ROW STILL MISSED, because the two key sets do
+not intersect at all — 0 of 8.** The lens is keyed from the projections artifact
+(CFBD) and the grid from the ODDS source:
+
+    ('baylor', 'auburn')            vs  ('baylor bears', 'auburn tigers')
+    ('tulane', 'duke')              vs  ('tulane green wave', 'duke blue devils')
+    ('wyoming', 'colorado state')   vs  ('wyoming cowboys', 'colorado state rams')
+
+`live_gameline_join._norm_team` has no alias table ON PURPOSE — its docstring
+records that MLB's two sides match exactly because both come from one source, and
+that copying the prop join's alias machinery would import a 91% miss. NCAAF's two
+sides have different owners, so the producer has to publish the grid's spelling.
+
+**FIXED AND LANDED AS `933e9beb`, NOT YET DEPLOYED** (rate-limited: 25 min minimum
+spacing from 23:13). ESPN's `displayName` is stamped as `matchup`, which
+`build_live_gameline_index` reads first. Measured against the 61 live grid keys:
+`displayName` **7/8**, `location` 0/8, `shortDisplayName` 0/8, `name` 0/8. Re-run
+end to end against the LIVE production grid after the fix: **6 of 7 index keys
+hit**. The residual is named, not aliased away — ESPN says `sam houston bearkats`,
+the grid says `sam houston state bearkats`.
+
+**WHAT I GOT WRONG, AND IT IS THE REUSABLE PART.** `test_the_tick_publishes_a_
+snapshot_the_board_join_accepts` asserted `("baylor", "auburn")` and PASSED, while
+production missed 257 of 257 rows. The fixture built the grid row and the
+projection from the SAME names, so the two sides agreed by construction — **a
+fixture that cannot express the disagreement cannot test the join.** Mutation
+checks did not help either: the mutation I would have needed was to the FIXTURE,
+not to the code. Same shape as `learnings.md` 2026-08-27, *"a test whose FIXTURE
+cannot violate the property it asserts is not weak coverage, it is zero coverage
+that reads as strong"*. Corrected in place with the reason inline.
+
 ## 2026-09-05 23:07:14Z — **AMENDMENT: refresh-worker deployed to the `origin/main` tip `ffe8714b`, not the `6320fe91` the PENDING row below names.** `deploy=dep-daea18f40ujc73edp0vg trigger=api`. — lane `ncaaf-live-resim-wire`
 
 Not a correction of a measurement — a change to a stated blast radius, and the
