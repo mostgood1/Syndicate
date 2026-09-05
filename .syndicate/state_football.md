@@ -14,8 +14,16 @@ all 78 Los Angeles Rams rows carry a projection. Two defects, two commits:
      78  `52870f57`  the projection join compared a UTC day against an ET day
       0  `fb7a1f96`  nflverse writes the Rams `LA`; `_NFL_ALIAS_TO_NAME` knew only `LAR`
 
-Live: web + refresh-worker both carry `fb7a1f96` (refresh-worker `ea1e3ac0`, live
-2026-09-04T22:50:57Z). The reading is on a REBUILT artifact, 29 min after that deploy.
+**CONFIRMED TWICE, on two different deployed commits and two different rebuilt
+artifacts** — so this is not a one-artifact fluke:
+
+    2026-09-04T23:19:34Z  refresh-worker `ea1e3ac0`   unmatched 0 / 1,251, Rams 78/78
+    2026-09-05T02:18:14Z  refresh-worker `3a9153f4`   unmatched 0 / 1,251, Rams 78/78
+
+web is ALSO on `3a9153f4` (live 2026-09-04T23:02:47Z). Verified by CONTENT, not only
+ancestry: `git show 3a9153f4:.../team_aliases.py` carries the `"la"` entry, and both
+`fb7a1f96` and `52870f57` are ancestors. Several sessions have deployed both services
+since, and the fix has survived each — it is on `main`, so it rides along.
 
 **THIS ENDPOINT SERVES `source: "precomputed_artifact"` — refresh-worker's output,
 NOT web's request path.** A web deploy of the same commit moved the number by ZERO;
