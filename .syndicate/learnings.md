@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 823 rules `[generated]`
+## Index — 826 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -35,6 +35,42 @@
 <!-- LEARNINGS-INDEX:END -->
 
 ---
+### 2026-09-05 — FORBIDDEN: a per-item guard implemented as an `A or B` search over a CONCATENATION of every item's source. Whichever item supplies B satisfies it for EVERY value of A, so the check has no failing input at all `[lane ncaaf-segment-capture, commits 7f197639 / 7dfabcf4, NO DEPLOY]`
+
+- **What we believed:** `tests/test_all_sports_segment_wiring.py` guarded the
+  gap it was written for — *"a sport with declared segments and NO wiring
+  anywhere"*. It had been green since the day it was written.
+- **What was actually true:** it read every wired fetcher into ONE string and
+  asked, for each sport, whether `segment_market_keys("<sport>")` **or** the
+  literal `segment_market_keys(league)` appeared in that string. The basketball
+  fetcher always supplies the second token. **So the disjunction was true for
+  every sport in `SPORT_SEGMENTS`, and `unwired` was unconditionally `[]`.**
+  Behind it: NCAAF had never captured a single half or quarter price —
+  `segment == "full"` on **153,723 of 153,723** production rows.
+  Its sibling assertion was wrong in a second, different way: it checked that
+  the token `segment_market_keys("nfl")` appeared in the NFL fetcher. It does —
+  in a map that `main()` never passes to `markets=`, so the 36 keys reached the
+  TAGGER and never the request. **Both halves of the guard were green, and both
+  were measuring something other than what they claimed.**
+- **How we found out:** looking for NFL's supposed 422 and finding there could
+  never have been one, because no segment request was ever sent. Then reading
+  the guard that should have said so.
+- **The rule going forward:** **when a guard is per-item, the search corpus must
+  be per-item too.** Flattening N sources into one string turns "does item i
+  have property P" into "does ANY source have property P", and the two are
+  indistinguishable while every source is healthy. Join on an explicit column
+  instead — the fix here adds a `sport` field to the table and diffs
+  `set(declared) - set(wired)`. And **ship the guard's own falsifier beside it**:
+  a companion test that removes one row and asserts the expression goes
+  non-empty. That test is what converts "it passes" into evidence.
+  This is `instrument blindness` (a healthy reading is evidence only once you
+  know what makes it read unhealthy) with a specific, greppable shape: an `or`
+  over a corpus.
+- **Cost:** NCAAF ran an entire season opener with zero segment capture and a
+  green test asserting the opposite; NFL's regular-season segment map has been
+  dead code with a docstring claiming it was live. Both found only because
+  someone went looking for a vendor error that did not exist.
+
 
 ### 2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFERENT EVENTS — gate the check on the ARTIFACT'S mtime `[lane mlb-hitter-so-dead-field, commit bc82090f, no deploy]`
 
