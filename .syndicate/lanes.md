@@ -2282,6 +2282,17 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   — 39 additions, 0 deletions, one file. Do not stash-pop across a rebase of a
   shared ledger.
 
+
+### suite-order-pollution — OPEN — opened 2026-09-04 — session b9bc926d-f167-4923-9344-eac7e86a5761
+- Goal: the 12 order-dependent failures pass in a FULL-SUITE run, not only in isolation. Measured baseline `84817721`: 49 failed / 15,043 passed; 37 of those 49 fail identically in isolation at `b36d993f` and at HEAD (pre-existing, NOT this lane), and 12 fail ONLY in-suite.
+- Files: `tests/test_kalshi_catalogue.py`, `tests/test_live_refresh_loop.py`, `tests/test_memory_watchdog.py`, `tests/test_mlb_sim_run_reconcile.py`, `tests/test_refresh_odds_sources.py`, `tests/test_refresh_state_store.py`, `tests/test_wnba_grader_root_per_file.py`, `tests/conftest.py`.
+  Collision check: none of the seven, nor `conftest.py`, appears anywhere in `lanes.md`. No production code is claimed — if a fix turns out to need one, this lane stops and re-claims.
+- Hypothesis: every one is a test depending on PROCESS-GLOBAL state it does not pin — env vars, module-level caches/registries, or the keyvalue-backed refresh state store — left behind by an earlier test in the same process. Same class as `preflight-test-claim-leak` closed earlier today. `conftest.py` already carries four autouse isolation fixtures added one incident at a time, and its own docstrings say "three rounds of the same fix"; this is the fifth round and should be fixed by state, not by file.
+- Falsification test: for each, a reproduction that is NOT the full suite — a named predecessor, or the file itself. If a test fails in-suite but no bounded reproduction exists, the cause is not pollution and the hypothesis is wrong for that one; say so rather than assuming.
+- CONFIRMED SO FAR: `test_live_refresh_loop.py` self-pollutes — running that ONE FILE reproduces 3 failures, of which `test_run_live_odds_refresh_worker_sleeps_for_adaptive_idle_interval` is one of the 12. `test_mlb_sim_run_reconcile` is NOT polluted by `test_live_refresh_loop`, `test_ops`, `test_nfl_refresh_runner`, `test_artifact_publisher` or `test_refresh_state_store` — all five paired clean, so that guess is spent.
+- Verification: a full `pytest tests/` run ends with the 12 passing and the pre-existing 37 unchanged — no new failures, none of the 37 masked.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
