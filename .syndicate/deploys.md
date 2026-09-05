@@ -7,6 +7,42 @@
 
 
 
+## 2026-09-05 03:06:57-03:09:57Z — web `c18116e7` → `50b266da` — **DEPLOYED, LIVE, HEALTHY PATH VERIFIED ON THE SERVED PAYLOAD. HALF THE PAIR; refresh-worker STILL OWED.** — lane `mlb-ladder-refusal-deploy`
+
+Carries `fe519fff` (ladders_build: refuse an exact `overLineProb`) and
+`9b660beb` (ladders_common: say WHY on the card). Both locks taken:
+claim held by this lane, preflight **CLEAR** for `50b266da` (web had only
+infra processes, 2 defunct children already dead).
+
+**verify:** the served `/mlb/api/hitter-ladders?date=2026-09-04` cards read
+`Over='66.3%'` with list item `Over probability: 66.3%` (Henry Bolte) and
+`Over='3.9%'` / `Over probability: 3.9%` (Jeff McNeil), against an artifact
+stamped 2026-09-04T22:10:40-05:00. **That is the CONTROL, and the control is
+the whole reading here** — the change must leave a real probability untouched,
+and it does.
+
+**WHAT THIS DEPLOY DOES NOT AND CANNOT PROVE, stated so nobody reads the row as
+more than it is.** The REFUSED branch is unobservable in production: it needs a
+degenerate histogram, and the only known one — MLB hitter `strikeouts`,
+`{0: n_sims}` — was fixed by `0350dbd2` and has read healthy since. There is no
+production row that should render `refused` right now, so seeing none is
+EXPECTED and is not evidence the branch works. That evidence is the 6 unit
+tests (3 fail on the unfixed code, 3 are controls that pass in both states).
+
+**HALF-DEPLOYED ON PURPOSE, and it is safe in this order.** refresh-worker
+returned **HOLD: 10 job(s) in flight** — an MLB `daily_update` with live
+`spawn_main` multiprocessing children (pids 9888/9891), a ligue_1
+`build_soccer_artifacts`, and an odds refresh. A deploy kills them, so it was
+not taken. The pair is independent in BOTH directions: `ladders_common` (web)
+only renders `refused` when the row carries `overLineProbRefused`, and
+`ladders_build` (refresh-worker) is what writes that field. With web ahead, no
+row carries it and the helper falls through to `format_pct` — byte-identical to
+before. Neither order can produce a wrong number.
+
+**OWED:** refresh-worker to a commit containing `fe519fff`, verified BY CONTENT
+(`overLineProbRefused` present in the deployed SHA), on a CLEAR preflight.
+Until then the artifact side is inert, which currently costs nothing because no
+distribution is degenerate.
 ## 2026-09-05 01:47-02:1xZ — MLB HITTER STRIKEOUTS VERIFIED CLEARED — `0350dbd2` reached refresh-worker inside someone else's deploy `3a9153f4`; **I DID NOT DEPLOY**
 
 **verify:** the served `/mlb/api/hitter-ladders?date=2026-09-04&prop=hitter_strikeouts`

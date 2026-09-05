@@ -2239,6 +2239,24 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   since `0350dbd2` went live. Covered by unit tests at both sites instead; there
   is no production reading to be had, and I am not going to imply one.
 
+### mlb-ladder-refusal-deploy — OPEN — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+- Goal: `fe519fff` + `9b660beb` live on BOTH services that execute them. One
+  testable outcome: the deployed SHA on web AND refresh-worker contains
+  `overLineProbRefused` BY CONTENT, and the served hitter-ladders payload still
+  renders a healthy `overLineProb` unchanged.
+- Files: none — deploy only. No code change in this lane.
+- Hypothesis: n/a.
+- Falsification test: n/a (deploy verification, not a diagnosis).
+- **TWO SERVICES, AND THEY ARE NOT INTERCHANGEABLE.** `ladders_build._dist_stats`
+  runs at ARTIFACT BUILD time (`build_ladders_artifact` -> `write_ladders_artifact`)
+  = refresh-worker. `ladders_common.over_prob_metric` runs at CARD RENDER time =
+  web. Deploying only one leaves the pair half-live.
+- Verification: content grep of each deployed SHA, plus a served-payload read
+  proving the healthy path is unchanged. The REFUSED branch is NOT provable in
+  production — it needs a degenerate histogram and MLB strikeouts has been
+  healthy since `0350dbd2`. Do not claim a reading that cannot exist.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
