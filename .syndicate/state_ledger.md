@@ -5,6 +5,30 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [ci-suite-red-test] CI's OWN SUITE HAS ONE RED TEST, WITH DATA PRESENT `[measured 2026-09-05, session ff257687]`
+
+    tests/test_archives.py::ArchiveRouteTests::
+      test_nba_betting_card_js_rewrites_source_routes_to_syndicate_paths
+
+**This is the file CI runs** — CLAUDE.md: `python -m unittest tests.test_archives`.
+
+CONTROLLED, not assumed. Same file, same worktree, only `SYNDICATE_DATA_ROOT` moved:
+
+    without data   31 failed
+    with data       1 failed, 380 passed, 2 skipped, 5 subtests passed
+
+So 30 of the 31 were `data/` absence (a session worktree excludes `data/` by design)
+and **one survives with data present** — it is not a worktree artifact.
+
+NOT diagnosed, and NOT established as pre-existing: it was not run against an older
+commit. It is unrelated to the session that found it, whose only code change was one
+key in `_NFL_ALIAS_TO_NAME`.
+
+**Read this before trusting a green local run:** a worktree without `data/` fails ~31
+tests in this file alone, which is enough noise to hide the one that matters. Control
+with `SYNDICATE_DATA_ROOT` before calling any archive failure real — and before
+calling the suite clean.
+
 ## [state-file-split] state.md IS AN INDEX PLUS NINE PARTS `[2026-09-03, scripts/split_state.py, commit 23bf6bc7]`
 
 **Read `state.md` first, then open only the part your work touches.** It holds
