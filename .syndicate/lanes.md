@@ -1648,7 +1648,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   than faking the premise if the slate is over or the app was closed.
 - Blocked by: none.
 
-### soccer-player-producer — OPEN — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+### soccer-player-producer — CLOSED 2026-09-05 — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **soccer roster PRODUCER shipped, deployed and verified** (six leagues fetched `players_2026.csv`; guard fires `too_early=True too_few=False` on the real 364-row file, where the OLD row-count guard would have PASSED). Also carried: the minutes/dedupe guards, the ESPN-column blindness fix, and `_write_csv` refusing an empty publish. **`#621` PHASE 4 CLOSED in the same session** — the sim's joint beats independence by -0.02353 [-0.02849, -0.01854] on same-player pairs (n=8,205, 149 games) and the heuristic it replaced was WORSE than assuming nothing on 95% of the board. A threshold conversion was shipped on 6 clusters and REVERTED on 149 (`862b5ccf`); never live. Full narrative in `log/2026-09-05.md`.
 - **RELAYED NOTICE (not from this lane's owner; left here because a claim holder
   cannot be ADDRESSED — see below).** From the lane fixing MLB hitter
   `strikeouts`, via `web-oom-highwater` 2026-09-04T23:1xZ:
