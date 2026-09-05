@@ -287,6 +287,97 @@ Re-check in-season with `scripts/probe_ncaaf_injury_feed.py`.
 - Stage 0 ledger: `syndicate/features/football/pick_ledger.py` +
   `build_ncaaf_pick_ledger.py` / `build_nfl_preseason_pick_ledger.py`.
 
+## [ncaaf-calibration-profile-live] THE PROMOTED NCAAF PROFILE IS LIVE, AND PROMOTING ONE IS A **CODE DEPLOY** `[verified 2026-09-05, render]`
+
+The production read `ncaaf-pace-block` left owed is DISCHARGED. refresh-worker
+(`eb7951fe`) emits `[calibration] ncaaf profile source=artifact
+version=ncaaf-goal-line-refit-1 goal_line_touchdown=True
+drive_yardage_multiplier=0.95` — `source=artifact`, and BOTH discriminating
+fields disagree with the in-source defaults (`False` / `1.15`), so this
+distinguishes the promoted fit from the default rather than merely reporting a
+healthy-looking string. All **51/51** rows of
+`smartsim2_projections_2026_wk1.csv` carry `profile_source=artifact` +
+`profile_version=ncaaf-goal-line-refit-1`, and all **51/51** served
+`/ncaaf/api/cards` join back to that CSV by team pair with projected
+total/spread equal to 1dp. Every NCAAF number on the board came from the
+promoted fit. **Nothing is owed and there is no env var to set.**
+
+**THE OPERATIONAL FACT, and it is the reusable one: a calibration profile is
+selected by the CODE DEPLOY, not by configuration.**
+`SYNDICATE_CALIBRATION_PROFILE_DIR` and
+`SYNDICATE_CALIBRATION_PROFILE_PATH_NCAAF`/`_NFL` are **absent from all three
+services** (enumerated live, paginated: web 77 keys, refresh-worker 154,
+live-odds-worker 129). `calibration_profile_dir()` therefore falls through to
+`repo_root_from(__file__)/data/calibration` — path arithmetic on the module's
+own location, **with no `SYNDICATE_DATA_ROOT` term**. So the artifact publisher
+CANNOT deliver a profile: it is not in `HOT_ARTIFACT_PATTERNS`, and
+`export?pattern=ncaaf_source/historical_truth/*&names_only=1` returns
+`count=0`. Promoting a re-fit means deploying every service that runs that sim.
+
+**Only refresh-worker runs an NCAAF sim** (as a subprocess). web and
+live-odds-worker never import the module, so `[calibration] ncaaf` matching
+nothing in their logs is NOT evidence about them — they have no emitter to be
+silent. (`learnings.md`: absent signal is a fact about the emitter.)
+
+### Three corrections to the headline this lane promoted on
+
+The `15.00% -> 7.24%, impossible drives 159 -> 0` framing is wrong in shape,
+though the decision it justified stands.
+
+- **`15.00% -> 7.24%` is the MEAN NORMALIZED ERROR over 7 scored metrics — NOT
+  an impossible-drive rate.** The two were conflated.
+- **`159 -> 0` is a COUNT at 120 games, and a count is not a rate.** State it as
+  **~6.5–7.3% of all drives -> 0.00%**; the engine docstring independently says
+  6.60%.
+- **`-7.76 pts` is the TOP of the range, not the centre.** Out-of-sample
+  replication over three seed blocks (200 games, neutral ratings): promoted
+  **7.24 / 7.33 / 7.00** — stable, so the fit is NOT in-sample-only — but the
+  DEFAULT arm ranges **15.00 / 13.94 / 12.72**, and the fit's own block is the
+  default's WORST. Block mean is **13.89 -> 7.19, −6.70 pts.**
+
+### On a REAL slate the composite gain mostly evaporates — the impossible-drive rate is the metric that survives
+
+30 games kicking off 2026-09-05, 300 seeds, real SP+ ratings. The local run
+reproduced production's served per-game score means **exactly (60/60 values,
+max |diff| 0.0000)**, so these are production's own drives, not an analogue.
+
+| | promoted (what ran) | shipped default (counterfactual) |
+|---|---|---|
+| impossible drives (>100 yd) | **1 / 221,557 = 0.0005%** | 18,647 / 190,850 = **9.77%** |
+| longest drive | 103 yd | **528 yd** |
+| scored mean abs err | 9.78% | 10.55% |
+
+The composite improves only **0.77 pts** here, not 7.76. The default's
+`yards_per_drive` (44.37 vs truth 42.49) even looks BETTER than the promoted
+profile's 32.50 — bought by 9.77% of drives being physically impossible. **The
+default's estimator is right for the wrong reason.** A single-slate composite is
+confounded by slate composition; the impossible-drive rate is the
+slate-independent, interpretable number. Judge future football re-fits on it.
+
+### Two traps left standing
+
+- **`smartsim2_projections_2026_wk2.csv` on production is a PRE-REFIT July
+  artifact** — 49 rows, `generated_at` 2026-07-21, PPA-rated, and **no
+  `profile_source`/`profile_version` columns at all**. Nothing serves it because
+  the resolver pins week 1. **If the week resolver is ever fixed without
+  regenerating wk2, the board silently moves onto a pre-refit artifact** — and
+  the absent stamp columns mean it would not announce itself.
+- **NFL's resolution is UNOBSERVABLE from production.** No `[calibration] nfl`
+  print, and `nfl/smartsim2_projection.py` carries `profile_name` but not
+  `profile_source`/`profile_version`. NFL running its in-source default (the
+  deliberate decision) rests on inference-from-absence: file absent at the
+  deployed SHA, no env override. NCAAF has an emitter AND an output stamp; NFL
+  has neither. One line + two columns closes it.
+- `calibration_profile_store.py`'s docstring — *"Nothing calls this yet from a
+  live sim path"* — **is FALSE** for NCAAF since `600a753a` (2026-08-27) and for
+  NFL since `#440` Phase 5. It is the first thing a future session reads here.
+
+**Method note that cost a wrong first read:** `render_logs.py` returns the
+NEWEST `limit` matches in a window, so a wide `--text calibration` window
+returns 40 lines of `INTEL_TRACE {"calibration_error": ...}` and **hides** the
+one line that matters. Narrow the window and quote the bracket: `--text
+"[calibration]"`.
+
 ## [nfl-archived] NFL — earlier closed work, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.**
 
 ## [football-model-leaks] FOOTBALL — TWO MODEL LEAKS, BOTH FIXED `[verified 2026-08-19, lane football-model-owner]`
