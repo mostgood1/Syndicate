@@ -2239,7 +2239,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   since `0350dbd2` went live. Covered by unit tests at both sites instead; there
   is no production reading to be had, and I am not going to imply one.
 
-### mlb-ladder-refusal-deploy — OPEN — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+### mlb-ladder-refusal-deploy — CLOSED 2026-09-05 — **BOTH SERVICES LIVE AT `50b266da`, VERIFIED BY CONTENT. ALL CLAIMS RELEASED.** web 03:09:57Z, refresh-worker 03:59:01Z; measurements in `deploys.md`. — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
 - Goal: `fe519fff` + `9b660beb` live on BOTH services that execute them. One
   testable outcome: the deployed SHA on web AND refresh-worker contains
   `overLineProbRefused` BY CONTENT, and the served hitter-ladders payload still
@@ -2257,6 +2257,30 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   production — it needs a degenerate histogram and MLB strikeouts has been
   healthy since `0350dbd2`. Do not claim a reading that cannot exist.
 - Blocked by: none.
+- OUTCOME: both halves live and content-verified (`overLineProbRefused` 2,
+  `CERTAINTY_REFUSED` import 1, `over_prob_metric` 3), and `0350dbd2`'s
+  `"SO": so,` confirmed SURVIVING at 2 — a later deploy reverting an earlier fix
+  is the failure serialisation does not prevent.
+- **THE NUMBER WORTH KEEPING: refresh-worker idle windows are ~90 s, about one
+  per 40 min.** Six preflights over ~50 min all returned HOLD (7-10 jobs). A
+  150 s poll steps over a 90 s window; 45 s caught it on attempt 4, and the
+  deploy fired 32 s after the CLEAR reading.
+- Control verified on the served payload: healthy cards still read `Over='66.3%'`
+  / `'3.9%'` with matching list items. That is the only positive reading
+  available and it is a CONTROL, not proof of the new branch.
+- **CLAIM CORRECTED MID-LANE, recorded because it nearly went unnoticed:** I ran
+  `deploy_claim.py acquire` intending only to READ the refusal message, but my
+  own claim had just expired, so it ACQUIRED under the throwaway holder
+  `probe-only`. Released and re-acquired under this lane within the minute.
+  **`acquire` is not a read-only probe** — it only behaves like one while an
+  unexpired claim already exists.
+- **LEDGER NEAR-MISS, and the guard caught it:** a `git stash`/`rebase`/`stash
+  pop` around the ledger write re-applied content already on `origin/main`,
+  producing TWO blocks for each of four lanes plus a `UU` conflict. Verified the
+  duplication against `origin/main` (1 block each there, 2 here) BEFORE
+  discarding, reset to `origin/main`, and re-applied only my `deploys.md` entry
+  — 39 additions, 0 deletions, one file. Do not stash-pop across a rebase of a
+  shared ledger.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
