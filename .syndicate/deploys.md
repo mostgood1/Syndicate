@@ -23008,3 +23008,81 @@ escalating budgets with memory read either side.
 EXHAUSTED and coverage read 0.8% / 2.9% / 15.8%. With the budget exhausted the
 "top by bytes" ranking is only *biggest among whatever module iteration order
 reached first* — meaningless. Only the completed 2M-node walk is quotable.
+
+## 2026-09-05 13:04Z -- LEDGER BUDGET 4GB: FIRST RUN MEASURED. **STILL-BINDING.** No deploy taken.
+
+Owed reading from the 2026-09-04 16:2xZ entry, discharged. `[scheduled task
+verify-ledger-budget-4gb]`
+
+**IT IS LIVE AND UNOVERRIDDEN, verified BY CONTENT and by a PAGINATED env read.**
+
+    refresh-worker live = 50b266da   (deploy_ended 2026-09-05T03:59:01Z)
+    git show 50b266da:syndicate/features/shared/intelligence_evaluation.py
+      -> DEFAULT_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES = 4_000_000_000
+    env-vars: 2 pages, 154 keys enumerated
+      SYNDICATE_ACCURACY_SUMMARY_LEDGER_BUDGET_BYTES   ABSENT
+      only *BUDGET* key: SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET
+
+**THE RUN.** First autorun under 4GB, gated `hour >= 7 CT` AND `last_run_date <
+today`; it opened at 12:00Z and the run started ~12:35:39Z.
+
+    2026-09-05T13:04:20.340Z  AUTORUN_DONE sports=8 elapsed_s=1721.552 error=none
+    2026-09-05T12:58:34.052Z  LEDGER_CHUNKS_ACCEPTED count=21 bytes=3999973424
+                              ceiling=256000000 records=92791 streamed=1
+                              budget=4000000000 partial=1 skipped_budget=12
+                              dates=21 truncated=1
+
+8 `LEDGER_CHUNKS_ACCEPTED` emissions 12:41:40Z..12:58:34Z, all `count=21
+dates=21 skipped_budget=12 partial=1 truncated=1`; only `bytes`/`records`
+drifted (3,999,914,706..3,999,973,424 / 92,675..92,791) as the day's ledger grew.
+
+**PRE-REGISTERED PREDICTIONS, judged. THREE HELD, ONE MISSED HIGH.**
+
+    | prediction                | 09-04 (2GB)   | 09-05 (4GB)   | verdict      |
+    | bytes > 2,000,000,000     | 1,999,976,768 | 3,999,973,424 | HELD         |
+    | skipped_budget < 24       | 24            | 12            | HELD         |
+    | dates > 8                 | 8             | 21            | HELD         |
+    | peak anon ~1,832 MiB      | 1,481.6       | 2,212.6       | MISSED HIGH  |
+
+Coverage is the headline: **dates 8 -> 21, records 46,953 -> 92,791 (+97.6%),
+chunks skipped for budget 24 -> 12.** The raise is NOT inert. Cost: elapsed
+669.4s -> 1,721.6s (+157%).
+
+**THE MISS IS THE USEFUL RESULT.** The 1,832 MiB projection was ~380.9 MiB low
+(+20.8%). Measured peak anon in the run window (12:30..13:10Z, 1,111 samples,
+13 pages, window fully COVERED) was **2,212.562 MiB at 12:41:20.75Z** -- below
+the ~2,600 abort signal, so no revert is indicated. **Read the confounder before
+using this number:** that sample's `last_stage` is `board_contract_end`, not an
+accuracy-summary stage, so it is the PROCESS-WIDE peak during the run, not the
+ledger's alone. It is the right number for the ceiling question and an
+upper bound for attributing cost to the ledger.
+
+**NO OOM, NO RESTART.** `render_events.py` printed OUTPUT COMPLETE (7,568 of
+7,568 rows -- not a fragment). Nothing after `deploy_ended 03:59:01Z`; last
+`oomKilled` on this service was 2026-09-02T15:32:56Z.
+
+**VERDICT: STILL-BINDING.** `partial=1` and `truncated=1` persist and 12 chunks
+are still refused, so the cap continues to truncate the accuracy summary.
+
+**RECOMMENDATION ON THE ~8.2GB NEXT STEP: DO NOT TAKE IT. Needs a user
+decision, and the number it was declined on is now stale in the WRONG
+direction.**
+
+- Measured incremental cost of this raise: +2,000,000,000 bytes of budget bought
+  **+731.0 MiB of anon peak** (1,481.6 -> 2,212.6), ~0.38 MiB anon per MiB of
+  budget. Applying that to a further +4.2GB projects **~3,783 MiB** against a
+  **4,096 MiB** ceiling -- ~313 MiB of headroom, on a job that already ran 28.7
+  minutes.
+- `b55fa165` declined 8.2GB projecting ~2,566 MiB against a ~1,877 MiB baseline
+  peak. **That baseline no longer holds.** Outside the accuracy run today
+  (13:10..15:57Z, 4,492 samples, 46 pages) refresh-worker peaked at
+  **2,984.41 MiB anon at 15:29:08Z** -- above the ~2,600 abort threshold and
+  above the whole 8.2GB projection, from work that has nothing to do with the
+  ledger. The service's own floor is what would eat the headroom.
+- So the honest framing is: at the current 4GB instance size the remaining 12
+  chunks are not affordable. Admitting them is an INSTANCE-SIZE decision, not a
+  constant edit.
+
+**Nothing here is a fix. It is a change that has now been MEASURED**, and the
+measurement says the coverage win is real (2.6x the dates) and the cap is still
+the binding constraint.
