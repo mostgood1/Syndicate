@@ -2196,6 +2196,49 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   them; the UI does not. Surfacing the reason (the prop path has
   `edge_unavailable_reason` for this) is a copy decision, not a correctness one.
 
+### mlb-ladder-refusal-on-card — CLOSED 2026-09-05 — **GOAL MET, LANDED `9b660beb`, NOT DEPLOYED (display-only).** — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+- Goal: a REFUSED `overLineProb` reads differently on the card from an ABSENT
+  market line. One testable outcome: a refused row's "Over" metric and its
+  "Over probability:" list item both say so, while an absent-line row still
+  renders `-` exactly as today.
+- Files: `syndicate/features/mlb/ladders_common.py`,
+  `tests/test_mlb_ladder_refusal_on_card.py` (NEW)
+- Hypothesis: n/a — `462d8d6c` made the DATA distinguish refused from absent
+  (`overLineProbRefused`), but every consumer renders both through
+  `format_pct`, which returns `-` for each. The label is currently unread.
+- Falsification test: if a refused row already renders differently from an
+  absent-line row on current main, there is nothing to do.
+- **DO NOT ADD A THIRD AND FOURTH COPY.** `ladders_common.py` duplicates the
+  render for pitcher and hitter — `metrics[].Over` and the `list_items`
+  "Over probability:" line, twice each. Inlining the refusal at all four points
+  is the `#334` two-copy failure with more copies. ONE helper, used by both.
+- Verification: reachability both directions, plus a control that the
+  absent-line and healthy renderings are byte-identical to today's.
+- Blocked by: none.
+- OUTCOME — three states where there were two:
+      state     tile        bullet
+      refused   `refused`   "Over probability: refused — the sim returned an exact 0.0%, and a finite simulation cannot establish certainty"
+      absent    `-`         "Over probability: -"          (UNCHANGED)
+      healthy   `73.6%`     "Over probability: 73.6%"      (UNCHANGED)
+- **THE TRAP THIS LANE NAMED WAS AVOIDED.** Both render sites go through ONE
+  helper pair (`over_prob_metric` / `over_prob_list_item`); the four inline
+  `format_pct(row.get("overLineProb"))` copies are gone, and a test asserts the
+  pitcher AND hitter cards, not whichever one I happened to open.
+- 6 tests: 3 FAIL on the unfixed code, 3 are CONTROLS passing before and after.
+- **THE CONTROLS PAID FOR THEMSELVES IMMEDIATELY, and this is the lesson worth
+  keeping:** my first fixture fed the PITCHER builder `groups.pitcher.hits`
+  when it reads `groups.pitcher.strikeouts`, so it produced no cards and ALL SIX
+  tests failed. A control that fails BEFORE the change is not a control — it is
+  a broken instrument, and it looked exactly like "the feature is missing". Only
+  the fact that the two controls were SUPPOSED to pass pre-fix made the fixture
+  bug visible instead of being read as more evidence for the fix.
+- 266 MLB ladder/prop tests pass. Both values stay `str`, so no template
+  contract changed. Em-dash verified U+2014 in the file, not console mojibake.
+- **STATED LIMIT:** the refused branch is NOT exercisable on a live page today —
+  it needs a degenerate histogram and the MLB strikeouts dist has been healthy
+  since `0350dbd2` went live. Covered by unit tests at both sites instead; there
+  is no production reading to be had, and I am not going to imply one.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
