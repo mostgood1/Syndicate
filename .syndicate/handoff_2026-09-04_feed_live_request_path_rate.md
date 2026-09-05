@@ -331,3 +331,125 @@ section above had already corrected this; noting it here so the task file and
 the handoff do not disagree. `mlb/cards.py` was not edited by this run.
 
 *Measurement only. No deploy, no source edit.*
+
+## LIVE-SLATE READING #2, 2026-09-04 21:42—22:03 CDT — the THIRD point, and the pass-size invariant now survives 11 FINAL games
+
+Scheduled task `feed-live-warn-rate-live-slate`, the run this task was actually
+armed for. Lane `feed-live-live-slate-peak`. **Read the premise before the
+numbers, and read the FIRST-ATTEMPT note — the 30-minute window that spanned the
+day's live peak was lost to worker restarts and is NOT the reading below.**
+
+### Premise (checked at BOTH ends of the quotable window, ~30s outside each edge)
+
+    21:41:51 CDT  Counter({'Final': 10, 'Live': 6})   slate 16   (window opens 21:42:24)
+    22:02:57 CDT  Counter({'Final': 11, 'Live': 5})   slate 16   (window closed 22:02:43)
+
+One game went Final inside the window. Slate size 16 throughout, identical to
+both prior points, so a full-slate pass is 16 calls in all three and the
+pass-unit comparison is sound.
+
+**This is NOT the ~12-live reading the task asked for, and the task's premise
+never held on this slate.** The day PEAKED at 9 Live / 7 Final (checked 21:0x
+and 21:12 CDT); it never reached 12. The quotable window ran at 6→5 Live.
+
+**What it is instead, and why it is the stronger test of the same question:**
+11 of 16 games were FINAL. `Final` is the ONE state that has a dedicated skip
+branch — `skipped_final` at `cards.py:2386` — so if game state gated the fetch
+at all, this is the slate where it would show. It did not.
+
+### FIRST ATTEMPT, 21:10—21:40 CDT — DISCARDED, and NOT as zero
+
+    61 samples, 3 failed reads, 29.8 min spanned, pids [97, 98]
+      pid 97   131 -> 80    delta=None  <-- RESTARTED mid-window, withheld
+      pid 98   176 -> 128   delta=None  <-- RESTARTED mid-window, withheld
+    TOTAL  +0 over 29.8 min, across 16 increase events
+    RATE   0.0/min
+
+**`+0` and `0.0/min` here mean "both deltas withheld", NOT "no work".** Sixteen
+increase events fired inside that window; the counters reset under them. This is
+exactly the trap the task file warns about, and the tool refused to lie about it.
+That window covered the day's live peak (9→6 Live) and is unrecoverable. Two web
+restarts in 30 minutes is itself worth someone's attention.
+
+The retry below used `--out` to keep raw per-sample JSONL, so a restart would
+have cost a segment rather than the whole window. **Recommend `--out` always.**
+
+### The number (clean window, no restarts)
+
+    61 samples, 0 failed reads, 20.3 min spanned, pids [97, 98]
+      pid 97   n=30   span 20.3 min    96 -> 224   delta=+128
+      pid 98   n=31   span 18.3 min   160 -> 272   delta=+112
+    TOTAL  +240 over 20.3 min, across 14 increase events
+    RATE   11.81/min  (14 events >= 5 required, so this one IS quotable)
+
+240 calls / 16 games = **15 full-slate passes**, one pass every **1.35 min**
+(0.74 passes/min).
+
+### The increment structure is the evidence, not the total
+
+    +16 x10   +32 x2   +11 x1   +5 x1
+    12 of 14 increments are EXACT multiples of 16.
+
+The two exceptions are `+11` at 02:52:34Z and `+5` at 02:53:14Z — 40 seconds
+apart, **summing to exactly 16**. That is one pass caught mid-flight by a sample
+that landed between game 11 and game 12 of it, not a partial pass. So the window
+is 13 whole passes + 2 double passes + 1 split pass = **240 = 15 x 16, exactly.**
+
+**Every pass covered all 16 games while 11 of them were FINAL.**
+
+### The three points side by side
+
+| | zero live | 1 live | 5–6 live (this run) |
+|---|---|---|---|
+| window | 20.0 min | 27.8 min | 20.3 min |
+| live / slate | 0/16 | 1/16 | 6→5 of 16 (**11 Final**) |
+| calls | +128 | +240 | +240 |
+| events | 5 | 13 | 14 |
+| passes (calls / 16) | 8 | 15 | **15** |
+| **pass SIZE** | **16** | **16** | **16** |
+| one pass every | 2.50 min | 1.85 min | 1.35 min |
+| passes/min | 0.40 | 0.54 | 0.74 |
+
+### Verdict: the driver is the MISSING ARTIFACT. Game state does not gate it.
+
+The task offered "roughly flat" vs "rises materially". The two halves answer
+differently, and only one of them is about game state — same split the 1-live run
+found, now with a much harder discriminator underneath it:
+
+- **Pass SIZE is invariant at 16 across all three points: 0, 1, and 5–6 live.**
+  On this slate that is not a soft result. Eleven games were Final and every one
+  was fetched anyway. Reading `cards.py:2384-2412`, that is forced: the
+  missing-file branch is
+
+      if not isinstance(payload, dict) and refreshable:   # :2403
+          refresh["attempted"] += 1
+          payload = _fetch_current_feed_live(int(game_pk))
+
+  and it consults **no state predicate whatsoever**. `skipped_final` (`:2386`)
+  and the live branch (`:2391`) both sit behind `isinstance(payload, dict)`,
+  which on web is never true because `feed_live` matches no
+  `HOT_ARTIFACT_PATTERNS`. **A cached FINAL payload would be skipped; an ABSENT
+  one is fetched. Web only ever has the absent case.** This CONFIRMS the owning
+  lane's REPLY above, on the state it predicted hardest.
+- **Pass FREQUENCY rose again: 0.40 -> 0.54 -> 0.74/min.** This counter ticks
+  only INSIDE request handling, so its frequency is a function of how often the
+  endpoint is hit, not of the slate. Three windows at three times of day, rising
+  monotonically into the evening, is consistent with traffic. **I did not measure
+  request volume, so I am NOT attributing it — I am saying it is not evidence
+  about game state.** Nobody has claimed a game-state-dependent driver, and this
+  run does not supply one.
+
+**So the fix is unchanged and now rests on three points instead of two:**
+allowlist `raw/statsapi/feed_live/**` so web's local read HITS (`home.py` calls
+this "the architecturally correct fix"), or stop fetching on the request path via
+the `in_request_context` flag `mlb_feed_live_is_refreshable` already takes.
+Tuning any staleness or liveness predicate cannot move this number.
+
+### What this run does NOT establish
+
+It does not measure a 12-live slate — **no such slate existed today** (peak 9).
+It does not explain the frequency rise; that needs request-volume data this
+counter cannot provide. And pid equality across windows is still meaningless:
+all three runs report pids 97/98 with restarts in between.
+
+*Measurement only. No deploy, no source edit. `mlb/cards.py` was read, not touched.*
