@@ -3569,3 +3569,135 @@ def reset_request_memory_attribution() -> None:
                            "peak_mb": None, "peak_seq": None, "peak_route": None, "n": 0})
     _ARENA_TREND_STATE.update({"count": 0, "last": None})
     _SMAPS_TREND_STATE.update({"count": 0, "last": None})
+
+
+# --- `#632`: WHICH MODULE-LEVEL CONTAINER HOLDS THE BYTES -------------------
+#
+# Everything upstream of this narrowed WHERE the memory lives (8-64MB anonymous
+# mappings) and ruled out WHO allocates it per request (no single route; merges
+# absent; per-request deltas do not compose). What is left is the object graph
+# the workers keep BETWEEN requests, and that is answerable by walking module
+# globals rather than by reading the source and picking a likely-looking cache.
+#
+# Static analysis got as far as "no `lru_cache(maxsize=None)`, but many plain
+# `dict` caches with no eviction". That is a list of suspects, not a measurement.
+
+_CENSUS_NODE_CAP_DEFAULT = 400_000
+
+
+def _deep_size(obj: Any, budget: list[int], seen: set[int]) -> int:
+    """Bytes reachable from `obj`, with a shared node budget.
+
+    NOT `sys.getsizeof`, which is shallow: a dict of 200 payloads reports ~9 KB
+    while holding hundreds of MB. The budget is shared across the whole census
+    so one pathological container cannot spend the entire walk, and exhausting
+    it is REPORTED rather than silently returning a small number -- an
+    under-count that looked like a clean result would send the next reader off
+    to hunt C extensions for no reason.
+    """
+    stack = [obj]
+    total = 0
+    while stack:
+        if budget[0] <= 0:
+            return total
+        item = stack.pop()
+        marker = id(item)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        budget[0] -= 1
+        try:
+            total += sys.getsizeof(item)
+        except Exception:
+            continue
+        if isinstance(item, (str, bytes, bytearray, int, float, bool, type(None))):
+            continue
+        try:
+            if isinstance(item, dict):
+                stack.extend(item.keys())
+                stack.extend(item.values())
+            elif isinstance(item, (list, tuple, set, frozenset)):
+                stack.extend(item)
+            elif hasattr(item, "__dict__"):
+                stack.append(vars(item))
+            elif hasattr(item, "__slots__"):
+                for slot in getattr(item, "__slots__", ()) or ():
+                    try:
+                        stack.append(getattr(item, slot))
+                    except Exception:
+                        pass
+        except Exception:
+            continue
+    return total
+
+
+def module_retainer_census(top: int = 25, node_cap: int | None = None) -> dict[str, Any]:
+    """Deep size of every module-level container in `syndicate.*` / `pipeline.*`.
+
+    ON DEMAND ONLY. A deep object walk on a 600 MB worker is not free, and `#241`
+    is this repo's precedent for periodic work assumed to be cheap putting a
+    service into a restart loop. Nothing calls this on a timer.
+
+    Reports its own coverage against `process_anon_mb_now`, because the
+    interesting outcome may well be that module globals account for very little
+    -- in which case the retained bytes are in C-extension or per-thread state
+    that a Python walk cannot see, and that is a RESULT rather than a failure.
+    """
+    budget = [int(node_cap or _CENSUS_NODE_CAP_DEFAULT)]
+    seen: set[int] = set()
+    rows: list[dict[str, Any]] = []
+    scanned_modules = 0
+
+    for name, module in list(sys.modules.items()):
+        if not (name.startswith("syndicate") or name.startswith("pipeline")):
+            continue
+        namespace = getattr(module, "__dict__", None)
+        if not isinstance(namespace, dict):
+            continue
+        scanned_modules += 1
+        for attr, value in list(namespace.items()):
+            if attr.startswith("__"):
+                continue
+            if not isinstance(value, (dict, list, set, frozenset, tuple)):
+                continue
+            try:
+                length = len(value)
+            except Exception:
+                continue
+            if length <= 0:
+                continue
+            before = budget[0]
+            size = _deep_size(value, budget, seen)
+            rows.append({
+                "module": name,
+                "name": attr,
+                "type": type(value).__name__,
+                "len": length,
+                "bytes": size,
+                "mb": round(size / _BYTES_PER_MB, 3),
+                "nodes": before - budget[0],
+            })
+            if budget[0] <= 0:
+                break
+        if budget[0] <= 0:
+            break
+
+    rows.sort(key=lambda r: -r["bytes"])
+    total_mb = round(sum(r["bytes"] for r in rows) / _BYTES_PER_MB, 3)
+    anon = _process_anon_mb()
+    payload: dict[str, Any] = {
+        "pid": os.getpid(),
+        "proc_token": _proc_token(),
+        "modules_scanned": scanned_modules,
+        "containers": len(rows),
+        "census_total_mb": total_mb,
+        "process_anon_mb": round(anon, 3) if anon is not None else None,
+        # THE number to read first: a low coverage means the retainer is not a
+        # module-level Python container at all.
+        "coverage_pct": (round(100.0 * total_mb / anon, 1)
+                         if anon and anon > 0 else None),
+        "node_budget_exhausted": budget[0] <= 0,
+        "nodes_used": int(node_cap or _CENSUS_NODE_CAP_DEFAULT) - budget[0],
+        "top": rows[: max(1, int(top))],
+    }
+    return payload

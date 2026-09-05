@@ -133,6 +133,31 @@ death, never life — do not invert it.
   not compose under munmap churn. Attribution has gone as far as it can.
 - Blocked by: none.
 
+### web-oom-retainer-census — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: NAME the object graph the web workers retain across requests, by
+  measuring the deep size of every module-level container in `syndicate.*` and
+  `pipeline.*` on a live worker — not by reading the source and guessing.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `syndicate/blueprints/ops.py` (a read-only census endpoint),
+  `tests/test_retainer_census.py` (NEW). No OPEN lane claims these.
+- Hypothesis: one or a few UNBOUNDED module-level dicts hold the 8-64MB
+  mappings. Static grep finds no `lru_cache(maxsize=None)`, but many plain
+  `dict` caches with no eviction (`_BVP_CACHE`, `_ROSTER_PAYLOAD_CACHE`,
+  `_MLB_LIVE_LENS_STATES_CACHE`, `_PLAYER_LOGS_CACHE`, the
+  `basketball_props_smart_sim` family, `_ROW_CACHE`).
+- Falsification test: the census accounts for only a small share of the worker's
+  anon — then the retained bytes are NOT in module-level Python containers, and
+  the next suspect is C-extension or per-thread state that a Python object walk
+  cannot see. **This is the important branch: a census that finds little is a
+  RESULT, and must not be read as "nothing is retained".**
+- Verification: census total compared against `process_anon_mb_now` on the SAME
+  worker at the SAME instant, with the coverage fraction stated. Repeated twice
+  >= 10 min apart so the GROWTH is attributable, not just the level.
+- SAFETY: on-demand only, never periodic; node-capped with truncation reported;
+  behind the existing admin gate. A deep object walk on a 600 MB worker is not
+  free and `#241` is the precedent for assuming otherwise.
+- Blocked by: none.
+
 ## OPEN
 ### mlb-joint-correlation-producer — CLOSED 2026-09-04 — opened 2026-09-04 — **THE SIM NO LONGER DISCARDS ITS JOINT, AND THE CORRELATION IS MEASURED.** Landed `4558c0b7`, NOT DEPLOYED. Measured on production's own DET@CLE roster (pk824424, 2026-09-04), 1,000 sims: `home_runs x total_bases` **mean rho +0.610, range +0.227..+0.805 over 18/18 batters** — against ONE constant (`1.35`) serving all eighteen today, a 3.5x spread end to end. Cross-batter `total_bases x total_bases` reads **same team +0.097 / opposing +0.018** where the heuristic adds 0.25 + 0.14. Cost 0.433% of peak RSS. — session 3492626c-1ec4-4366-9dbe-f194ae319c84
 - Goal: feed the `measured_lookup` seam that landed inert at `1bbcc246`, with a

@@ -808,6 +808,30 @@ def api_ops_memory() -> Any:
     return jsonify({"ok": True, "memory": get_all_process_memory_snapshot()})
 
 
+@ops_bp.get("/api/ops/retainer-census")
+def api_ops_retainer_census() -> Any:
+    # `#632`: which module-level container holds the bytes the workers keep
+    # between requests. Read-only, ON DEMAND ONLY, and never on a timer -- the
+    # walk is a deep object traversal and `#241` is the precedent for periodic
+    # work assumed cheap taking a service down.
+    #
+    # It reports its own coverage against process anon, because the informative
+    # outcome may be that module globals account for very little: that would say
+    # the retained bytes are in C-extension or per-thread state a Python walk
+    # cannot see, which is a RESULT and not a failed measurement.
+    from syndicate.features.shared.memory_observability import module_retainer_census
+
+    try:
+        top = max(1, min(100, int(request.args.get("top", 25))))
+    except (TypeError, ValueError):
+        top = 25
+    try:
+        node_cap = max(1000, min(2_000_000, int(request.args.get("node_cap", 400000))))
+    except (TypeError, ValueError):
+        node_cap = 400000
+    return jsonify({"ok": True, "census": module_retainer_census(top=top, node_cap=node_cap)})
+
+
 @ops_bp.get("/api/ops/keyvalue/diagnostics")
 def api_ops_keyvalue_diagnostics() -> Any:
     # Board audit follow-up, 2026-07-31: read-only Redis INFO stats for the
