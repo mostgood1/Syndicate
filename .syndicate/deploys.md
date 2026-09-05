@@ -7,6 +7,45 @@
 
 
 
+## 2026-09-05 03:53:47-03:59:01Z — refresh-worker `3a9153f4` → `50b266da` — **DEPLOYED, LIVE, VERIFIED BY CONTENT. The pair from the 03:09Z web row is now complete on both services.** — lane `mlb-ladder-refusal-deploy`
+
+Second half of the ladder certainty refusal (`fe519fff` + `9b660beb`). Both
+locks: claim held by this lane, preflight **CLEAR** for the exact SHA at
+03:53:15Z with **jobs=0**, deploy triggered **32 s later** at 03:53:47Z.
+
+**CATCHING THE WINDOW WAS THE WHOLE DIFFICULTY, and the number is worth keeping:
+refresh-worker idle windows are ~90 s, roughly one per 40 min** (figure from
+lane `web-oom-highwater`, confirmed here). Six consecutive preflights over
+~50 min returned HOLD with 7-10 jobs — MLB `daily_update` with live
+`spawn_main` children, soccer builds, odds refreshes. A **150 s poll steps
+straight over a 90 s window**; re-tuning to 45 s caught it on the 4th attempt.
+
+**verify (BY CONTENT of the deployed SHA, not by ancestry):**
+
+    ladders_build  overLineProbRefused          2
+    ladders_build  CERTAINTY_REFUSED import     1
+    ladders_common over_prob_metric             3
+    daily_update   `"SO": so,`                  2   <- 0350dbd2 SURVIVED this deploy
+
+That last line is the one that is easy to skip and is the reason this table
+exists: a later deploy silently reverting an earlier fix is the documented
+failure here, and serialisation does not prevent it — containment does.
+
+**Served payload, 2026-09-04 (artifact 22:51:30-05:00):** featured row
+`mean 1.095 / modeProb 0.402 / 5 rungs`; cards render `Over='66.3%'` and
+`'3.9%'` with matching list items. **The healthy path is untouched, which is
+the control and is the only positive reading available here.**
+
+**THE REFUSAL BRANCH IS STILL UNOBSERVABLE, AND THE REASON IS NARROWER THAN I
+FIRST WROTE.** It needs BOTH a degenerate histogram AND a market line —
+`_dist_stats` computes `over` only when `line is not None`, so a degenerate
+dist with no line returns the ABSENT branch, not the refusal. On 2026-09-05 the
+board shows `mean 0.0 / modeProb 1.0` with `marketLine None`, and its
+`Over='-'` is therefore the absent-line case. `batter_strikeouts` has no quotes
+(0 of 289 players), so the required combination does not currently exist
+anywhere. **Seeing no refused row is EXPECTED and is not evidence.** That
+branch is covered by 6 unit tests (3 fail unfixed, 3 controls pass in both
+states) and by nothing in production.
 ## 2026-09-05 03:06:57-03:09:57Z — web `c18116e7` → `50b266da` — **DEPLOYED, LIVE, HEALTHY PATH VERIFIED ON THE SERVED PAYLOAD. HALF THE PAIR; refresh-worker STILL OWED.** — lane `mlb-ladder-refusal-deploy`
 
 Carries `fe519fff` (ladders_build: refuse an exact `overLineProb`) and
