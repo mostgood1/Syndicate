@@ -2130,6 +2130,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   sessions to override it reflexively.
 - Blocked by: none.
 
+### nfl-schedule-code-coverage-test — OPEN — opened 2026-09-05 — session ff257687-e3c6-48e0-b92a-e6e494211885
+- Goal: close the one risk left standing by `nfl-la-rams-alias` — a future slate
+  carrying an nflverse club code the alias map does not know regresses SILENTLY.
+  `[user: "add the test"]`
+- Files: `tests/test_team_aliases.py` (collision-checked against every OPEN lane:
+  no lane claims it or `team_aliases.py`).
+- Hypothesis: n/a — this is a guard, not a diagnosis.
+- Falsification test: the guard must FAIL when the map loses a code the real
+  schedules contain. Mutation: drop `la` and confirm red naming `LA`.
+- Verification: enumerate distinct `home_team`/`away_team` over EVERY
+  `schedule*.csv` the module's own `_source_roots()` resolves, and assert each
+  resolves. Must not pass VACUOUSLY — a floor on the code count, so an empty or
+  mis-parsed read fails instead of reporting success on zero rows.
+- Blocked by: none. NO DEPLOY — test-only, ships nothing.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
