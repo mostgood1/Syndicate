@@ -158,6 +158,37 @@ death, never life — do not invert it.
   free and `#241` is the precedent for assuming otherwise.
 - Blocked by: none.
 
+### web-oom-heap-roots — OPEN — opened 2026-09-05 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: settle whether `#632`'s retained bytes are in the PYTHON HEAP AT ALL, and
+  if so under which root. The census explains only 6.1% of growth, but its roots
+  are container-typed module globals ONLY — so "elsewhere in Python" and "not in
+  Python" are currently indistinguishable, and they lead to opposite next steps.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `syndicate/blueprints/ops.py`, `tests/test_heap_roots.py` (NEW). No OPEN lane
+  claims these.
+- Two additions:
+  1. WIDER ROOTS — module-level OBJECTS with a `__dict__`, and CLASS attributes,
+     walked AFTER the specific container roots so the shared `seen` set gives
+     each object to the most specific root that reaches it. Broad roots then
+     report only the residual, which is the informative part.
+  2. A WHOLE-HEAP DENOMINATOR — deep size from `gc.get_objects()` as roots.
+     **`gc.get_objects()` alone would undercount badly** because plain `str` and
+     `bytes` are NOT gc-tracked; walking referents from tracked objects is what
+     catches them, which is why this reuses the deep walk rather than summing
+     `getsizeof` over the list.
+- Hypothesis: `python_heap_mb` is close to `process_anon_mb`, i.e. the memory IS
+  in Python and my roots were simply too narrow.
+- Falsification test: `python_heap_mb` is a small fraction of anon — then the
+  bytes are NOT Python objects at all (C extension buffers, arena fragmentation,
+  or per-thread state), and every remaining Python-level probe is a dead end.
+- Verification: `python_heap_mb` vs `process_anon_mb` on one worker, with the
+  walk NOT budget-exhausted, plus the widened root table showing which root owns
+  the residual.
+- SAFETY: on demand only, node-capped, truncation reported. The completed
+  narrow walk cost 1.2 s / ~10 MB at 2M nodes; a whole-heap walk is larger, so
+  the cap is the control and exhaustion must be reported, not silent.
+- Blocked by: none.
+
 ## OPEN
 ### mlb-joint-correlation-producer — CLOSED 2026-09-04 — opened 2026-09-04 — **THE SIM NO LONGER DISCARDS ITS JOINT, AND THE CORRELATION IS MEASURED.** Landed `4558c0b7`, NOT DEPLOYED. Measured on production's own DET@CLE roster (pk824424, 2026-09-04), 1,000 sims: `home_runs x total_bases` **mean rho +0.610, range +0.227..+0.805 over 18/18 batters** — against ONE constant (`1.35`) serving all eighteen today, a 3.5x spread end to end. Cross-batter `total_bases x total_bases` reads **same team +0.097 / opposing +0.018** where the heuristic adds 0.25 + 0.14. Cost 0.433% of peak RSS. — session 3492626c-1ec4-4366-9dbe-f194ae319c84
 - Goal: feed the `measured_lookup` seam that landed inert at `1bbcc246`, with a

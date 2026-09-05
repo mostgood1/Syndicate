@@ -832,6 +832,24 @@ def api_ops_retainer_census() -> Any:
     return jsonify({"ok": True, "census": module_retainer_census(top=top, node_cap=node_cap)})
 
 
+@ops_bp.get("/api/ops/python-heap")
+def api_ops_python_heap() -> Any:
+    # `#632`, and this is the deciding measurement rather than another probe.
+    # The retainer census explains 6.1% of a worker's anon growth, but its roots
+    # are container-typed module globals only -- so "elsewhere in Python" and
+    # "not in Python at all" read identically from it, and they lead to opposite
+    # next steps. This walks from `gc.get_objects()` and reports the ratio.
+    #
+    # Heavier than the census. On demand only, node-capped, truncation reported.
+    from syndicate.features.shared.memory_observability import python_heap_total
+
+    try:
+        node_cap = max(10000, min(8_000_000, int(request.args.get("node_cap", 4000000))))
+    except (TypeError, ValueError):
+        node_cap = 4000000
+    return jsonify({"ok": True, "heap": python_heap_total(node_cap=node_cap)})
+
+
 @ops_bp.get("/api/ops/keyvalue/diagnostics")
 def api_ops_keyvalue_diagnostics() -> Any:
     # Board audit follow-up, 2026-07-31: read-only Redis INFO stats for the

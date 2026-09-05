@@ -110,8 +110,13 @@ class CensusTests(unittest.TestCase):
 
         names = [(r["module"], r["name"]) for r in census["top"]]
         self.assertIn((self._name, "_BIG_CACHE"), names)
-        self.assertEqual(census["top"][0]["name"], "_BIG_CACHE",
-                         "the biggest retainer must rank first")
+        # Scoped to THIS module. The census now also walks class attributes and
+        # module-level objects, so the global rank-1 row is the Flask `app`
+        # (1.98 MB) rather than a test fixture. Asserting on global rank would be
+        # asserting that the app is small, which is not this test's claim.
+        mine = [r for r in census["top"] if r["module"] == self._name]
+        self.assertEqual(mine[0]["name"], "_BIG_CACHE",
+                         "the biggest retainer IN THIS MODULE must rank first")
         self.assertGreater(census["top"][0]["mb"], 0.5)
 
     def test_it_skips_EMPTY_containers_and_non_containers(self) -> None:
