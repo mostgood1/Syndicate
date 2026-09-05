@@ -5,6 +5,29 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [nfl-board-projection-coverage] NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-projection-et-datekey + nfl-la-rams-alias]`
+
+`/api/board/book-grid?sport=nfl` reads **`unmatched_game_rows` 0** of 1,251 game rows;
+all 78 Los Angeles Rams rows carry a projection. Two defects, two commits:
+
+    299  baseline
+     78  `52870f57`  the projection join compared a UTC day against an ET day
+      0  `fb7a1f96`  nflverse writes the Rams `LA`; `_NFL_ALIAS_TO_NAME` knew only `LAR`
+
+Live: web + refresh-worker both carry `fb7a1f96` (refresh-worker `ea1e3ac0`, live
+2026-09-04T22:50:57Z). The reading is on a REBUILT artifact, 29 min after that deploy.
+
+**THIS ENDPOINT SERVES `source: "precomputed_artifact"` — refresh-worker's output,
+NOT web's request path.** A web deploy of the same commit moved the number by ZERO;
+it moved only once refresh-worker had the commit AND rebuilt. Anyone changing
+`attach_nfl_game_projections` or `team_aliases` must deploy **refresh-worker** and wait
+for a rebuild before reading. Tells that the request path did not run: no
+`projection_coverage` key in the response, and `projection` ABSENT (not null) on rows.
+
+**nflverse vocabulary, enumerated over all of `data/nfl_source/schedule_2026.csv`:**
+32 distinct codes, `LA` (Rams) and `LAC` (Chargers) present, **`LAR` absent entirely**,
+`WAS` not `WSH`. `_NFL_ALIAS_TO_NAME` now resolves all 32.
+
 ## [ncaaf-zero-orders-is-two-gates] NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry-roi-curve]`
 
 The board is alive: `/api/board/layer2-shortlist?sport=ncaaf` serves **480 rows**,

@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 819 rules `[generated]`
+## Index — 820 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 295**
+**FORBIDDEN — 296**
 
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
@@ -231,6 +231,7 @@
 - [2026-09-04 — FORBIDDEN: reporting a key as ABSENT from a paginated API without paginati…](#2026-09-04-forbidden-reporting-a-key-as-absent-from-a-paginated-api-without-paginating-an-unpaginated-list-read-manufactures-false-absence-and-absence-is-the-finding-people-act-on-lane-mlb-feed-live-terminal-refresh)
 - [2026-09-04 FORBIDDEN: editing a scheduled task's prompt while a session of that task is…](#2026-09-04-forbidden-editing-a-scheduled-tasks-prompt-while-a-session-of-that-task-is-still-alive-it-can-fire-the-new-prompt-immediately-lane-feed-live-warn-rate-session-c4287631)
 - [2026-09-04 FORBIDDEN: pinning a copied definition against ANOTHER FILE'S SOURCE TEXT. W…](#2026-09-04-forbidden-pinning-a-copied-definition-against-another-files-source-text-when-the-definition-moves-the-test-stops-existing-instead-of-failing-lane-lane-invariant-single-source)
+- [2026-09-04 — FORBIDDEN: choosing a DEPLOY TARGET by which service CONTAINS the code. Ch…](#2026-09-04-forbidden-choosing-a-deploy-target-by-which-service-contains-the-code-choose-it-by-which-service-serves-the-reading-you-predicted-lane-nfl-projection-deploy)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`

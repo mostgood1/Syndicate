@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 819 rules `[generated]`
+## Index — 820 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5488,3 +5488,37 @@ it reads negative.**
   the object the other module already compiled and an identity assertion passes.
   Verified by mutation: the copy went in, all 30 tests stayed green. Identity
   still binds tuples and functions; for a regex, ask the AST.
+
+---
+
+## 2026-09-04 — FORBIDDEN: choosing a DEPLOY TARGET by which service CONTAINS the code. Choose it by which service SERVES the reading you predicted. `[lane nfl-projection-deploy]`
+
+- **What we believed:** deploying `web` would take NFL `unmatched_game_rows` from 78
+  to 0. `_attach_book_grid_projections` runs in web's request path, web serves
+  `/api/board/book-grid`, and web had the fix. Every one of those is TRUE.
+- **What was actually true:** the endpoint returned `source: "precomputed_artifact"`.
+  The board is built by **refresh-worker**, which was on a commit with the earlier
+  date-key fix and WITHOUT the alias fix — which predicts 78 exactly. Web deployed,
+  went live, and moved the number by **zero**.
+- **How we found out:** the payload's own provenance. Three tells, cheapest first, any
+  one decisive: `source: "precomputed_artifact"`; **a key the request-path code would
+  have ADDED was missing** (no `projection_coverage`); and the field was **ABSENT, not
+  null** (`projection` was not a key on Rams rows at all — absent means nothing tried,
+  `null` would mean something tried and failed).
+- **The warning was in the file I wrote the prediction into.** `deploys.md`'s owed
+  entry said, in its second sentence: *"The workers rebuild the board, so they want it
+  too."* I read it as an optimisation; it was the load-bearing half.
+- **The rules going forward:**
+  1. **"Which service has the code" and "which service made this response" are
+     different questions, and only the second predicts the number.** Settle the second
+     BEFORE deploying, from a provenance field on a real payload.
+  2. **An artifact-backed number does not move on the DEPLOY — it moves on the next
+     REBUILD.** Read only once the artifact's `generated_at` has advanced past the
+     deploy, or you reproduce the old number and misread it as a second failure.
+  3. A prediction that fails is only useful if its PREMISE is stated. Mine named a
+     service, so the failure localised in one step. "It didn't work" would not have.
+- **Confirmed by the positive case, which is the stronger form:** the number went to 0
+  when refresh-worker got the commit and rebuilt. Web was necessary for the inline
+  path and never sufficient for this reading.
+- **Cost:** one unnecessary web deploy (harmless, fast-forward, no `render.yaml`), one
+  wrong prediction published to `deploys.md` and then superseded in place.
