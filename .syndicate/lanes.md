@@ -1237,13 +1237,44 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   count today is indistinguishable from an inert feature, so do not report the
   capture as working on the strength of this block.**
 
-- **WHAT IS OWED, in order:**
-  1. Confirm `bet_status.segment_refusal` is LIVE on web AND refresh-worker.
-     Until then a segment order inherits the whole-game actual.
-  2. Deploy (`.py` only, so `autoDeploy = no` means the push shipped nothing).
-  3. Set `SYNDICATE_NCAAF_SEGMENT_MARKETS=h1` on **live-odds-worker** via the
-     single-key API. **NEVER `render.yaml`** — it fires `blueprint_sync` across
-     all three services.
+- **DEPLOY STATE READ 2026-09-05 ~21:1xZ — the grading gate is SATISFIED, and
+  a NEW blocker appears that inverts the order of the next two steps.** Live
+  commit per service (`/api/ops/version` for web; Render `/deploys` for the
+  workers, which serve no HTTP), each checked by CONTENT — `segment_refusal`
+  hits in `bet_status.py` — and not by ancestry alone:
+
+  | service | live commit | `segment_refusal` | finished |
+  |---|---|---|---|
+  | web `syndicate-an21` | `94c8ac13` | **2 hits — YES** | — |
+  | `refresh-worker` | `eb7951fe` | **2 hits — YES** | 2026-09-05T21:02:51Z |
+  | `live-odds-worker` | `3223baa1` | **0 hits — NO** | 2026-09-04T20:37:36Z |
+
+  **The hard constraint is DISCHARGED**: grading runs on refresh-worker, which
+  has the fix, so a captured segment row can no longer inherit the whole-game
+  actual. `22b82428` is on `origin/main` and lane `ncaaf-segment-markets` still
+  says "NOT DEPLOYED" — that is now STALE, and landed-vs-live is exactly the
+  distinction that sentence loses.
+
+- **NEW BLOCKER, and it would have produced an INERT change that reads as
+  configured: `live-odds-worker` is a day behind and does not carry this
+  lane's code at all.** It is the service the capture runs on and the service
+  `SYNDICATE_NCAAF_SEGMENT_MARKETS` would be set on. Setting that key today
+  reaches a build with no `segment_odds_fetch.py` in it — the env var would sit
+  there looking configured while nothing read it, the same shape as the
+  `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` "one reader" trap the NCAAF fetcher's
+  own regions comment records. **Deploy live-odds-worker BEFORE setting the
+  key, not after.**
+
+- **WHAT IS OWED, in order (REORDERED by the reading above):**
+  1. ~~Confirm the grading fix~~ — **DONE**, see the table. Web and
+     refresh-worker both carry it, verified by content.
+  2. Deploy **live-odds-worker** to a tip containing `d4704be1`. It is the
+     capture host and is currently 24h stale. (`.py` only, so the push itself
+     shipped nothing — `autoDeploy = no`.)
+  3. THEN set `SYNDICATE_NCAAF_SEGMENT_MARKETS=h1` on **live-odds-worker** via
+     the single-key API. **NEVER `render.yaml`** — it fires `blueprint_sync`
+     across all three services. The key needs a deploy to take effect: a
+     restart does not re-inject env vars.
   4. The reading that closes this: `segment != "full"` on the NCAAF shard goes
      0 -> non-zero **with its denominator**, and `[ncaaf_odds] SEGMENT_PLAN` /
      `SEGMENT_FETCH` counters showing `est_credits` in the modelled band.
