@@ -7,6 +7,87 @@
 
 
 
+## 2026-09-05 22:4xZ — web + refresh-worker -> `744689c9` — **PENDING, measurement column EMPTY.** The NCAAF live re-sim producer. — lane `ncaaf-live-resim-wire`
+
+**1. SCOPE — this is NOT a one-change deploy and saying otherwise would be
+false.** Deploying the `origin/main` tip is the rule (`[2026-08-18, user
+decision]`; a branch cut from the live SHA is FORBIDDEN and silently reverts its
+predecessor), so this carries 22 commits. Mine are `262fd2cf` (the wiring) and
+`744689c9` (the ledger). Also riding, named rather than discovered later:
+`5ce75195`+`fda5c28a` (`edge-basis-moneyline`, `live_gameline_join.py` +49 — the
+live moneyline `edge_basis` label), `7dfabcf4`/`d955e445`/`7f197639`
+(`ncaaf-segment-capture` + NFL segment keys, `segment_odds_fetch.py` NEW 406,
+**default OFF**), `a31fb870`-era `layer2_board.py` +24, `oddsapi_quota.py` +9,
+and `check_lane_invariants.py` tooling. Not diagnosing, so the one-change rule
+does not bind; the blast radius is stated instead.
+
+**2. EXPECTED EFFECT, as a number and a window.** Within ONE 180 s tick of
+refresh-worker going live: `/api/ops/live-lens/snapshot-index?sport=ncaaf`
+returns `snapshot_present: true` and
+`index_diagnostics.sources_seen {live_resim: N, pregame: 51-N}` where **N equals
+the count of games that are both in the week's projections artifact and ESPN-live
+at that instant**. Locally against this same slate that was 8 of 51 at ~22:0xZ.
+On the next book-grid rebuild, `/api/board/book-grid?sport=ncaaf` stops returning
+`live_gamelines {"supported": false, "reason": "no live re-sim wired for ncaaf"}`
+and at least one live row carries `projection.live_aware: true`.
+
+**A ZERO IS NOT A FAILURE BY ITSELF AND MUST NOT BE READ AS ONE.** N falls to 0
+when the slate goes final, which it will tonight. The discriminating field is
+`producer_coverage.refusals_by_reason`: `game_final` on every row means the
+producer ran and the slate ended; `no_pregame_ratings` means the SP+ mirror did
+not populate; `no_live_state` on everything means the ESPN name join broke; an
+ABSENT snapshot means the tick never ran.
+
+**3. MEASUREMENT — who reads it.** This lane, from this session, on the
+production endpoints above. Refresh-worker's own line
+`[refresh_worker] NCAAF_LIVE_RESIM {...}` carries the same coverage block and is
+readable via `scripts/render_logs.py --service refresh-worker --text
+NCAAF_LIVE_RESIM`; the artifact and the log line are independent readings of the
+same tick and both are recorded.
+
+**4. BLAST RADIUS.** web (2 GB, request path) and refresh-worker (4 GB,
+persistent disk — stop-then-start, instances cannot overlap). live-odds-worker is
+NOT deployed and needs nothing here. `render.yaml` is NOT touched, so no
+`blueprint_sync` and no env rewrite. New per-tick cost on refresh-worker: one to
+two ESPN scoreboard GETs (1,441,192 bytes each, measured by
+`render-egress-transport` today) plus a re-sim bounded by
+`NCAAF_LIVE_RESIM_BUDGET_SECONDS`, default 90 s, on a 180 s interval — a ~50%
+worst-case duty cycle during a live slate, and the first lever if that is too
+much is `SYNDICATE_NCAAF_LIVE_RESIM_INTERVAL_SECONDS`, with
+`SYNDICATE_NCAAF_LIVE_RESIM=off` as the kill switch. Neither needs a code change.
+
+**5. ROLLBACK.** `SYNDICATE_NCAAF_LIVE_RESIM=off` disables the producer without a
+deploy path change; a full revert is `git revert 262fd2cf` and a redeploy. The
+producer only WRITES `data/live/ncaaf_live_lens.json`; with it off, the join
+returns `no published live-lens snapshot` and the board is exactly what it is
+today.
+
+**6. LEDGER CHECK.** `learnings.md` 2026-08-27 forbids allowlisting a
+KEYVALUE-backed path and calling it readable — the entry added here is
+`ncaaf_source/historical_truth/sp_ratings_*.json`, a real FILE on the mounted
+disk, not a keyvalue path. `learnings.md` 2026-08-20 (`HOT_ARTIFACT_PATTERNS` is
+about worker->web) is why that entry is NOT load-bearing for the feature and is
+recorded as auditability only. No EXONERATED or FORBIDDEN rule is reverted.
+OPEN lanes on the same files: `artifact_publisher.py`'s stale claim was a parser
+artefact and is resolved in `744689c9`; `render-egress-transport` holds the
+publish/pull transport region of that file and was messaged first.
+
+**7. VERDICT: PASS for web, HOLD for refresh-worker at 22:37Z.** Preflight
+`refresh-worker` returned **HOLD — 10 jobs in flight**, including
+`run_mlb_daily_sim_job.py --sims 1000 --reason tip_off_window` (pid 2814) and a
+soccer artifact build. A deploy kills them. Waiting, not forcing.
+
+**PROVENANCE CORRECTION, MADE BEFORE DEPLOYING AND WORTH THE SPACE.**
+`/api/board/book-grid?sport=ncaaf` returning "no live re-sim wired for ncaaf" was
+read as a fact about WEB. It is not: web's live `94c8ac13` **does** contain
+`7d9ec94e`, which put `ncaaf` in `_LIVE_GAMELINE_SPORTS`. That string is
+refresh-worker's, because `book_grid_artifact.py` calls
+`attach_live_gamelines_for_sport` when it BUILDS the artifact, and refresh-worker
+is on `eb7951fe`, which does not contain `7d9ec94e`. Ancestry said web had the
+fix and the payload said otherwise; the producer of the payload is the answer.
+
+**verify:** _(empty — this row is an open obligation)_
+
 ## 2026-09-05 20:29:31-20:35:00Z — web `50b266da` -> `337facdc` — **DEPLOYED, LIVE, VERIFIED ON THE SERVED PAYLOAD. The NBA betting-card CSS and JS serve for the first time; both had been 404.** — lane `ci-archives-nba-card-js`
 
 `deploy=dep-dae7napt0dsc739580c0 trigger=api`. Carried `ba84b331` (mine) plus
