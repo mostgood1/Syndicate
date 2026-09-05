@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 820 rules `[generated]`
+## Index — 822 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -35,6 +35,45 @@
 <!-- LEARNINGS-INDEX:END -->
 
 ---
+
+### 2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEASURES NOTHING `[lanes mlb-ladder-refusal-deploy, commits 2e555b2c / ccb053c7, DEPLOYED]`
+
+Three things went wrong while deploying behind another lane's claim. None cost
+production; all three are cheap to repeat.
+
+**1. `deploy_claim.py acquire` IS NOT A READ-ONLY PROBE.** I ran it to READ the
+refusal message. My own claim had expired seconds earlier, so it ACQUIRED —
+under the throwaway `--holder probe-only` I had passed as a label. Released and
+re-acquired within the minute, but for that minute the lock was recorded to a
+holder that does not exist. **It only behaves like a probe while an unexpired
+claim already exists**, which is exactly the state you cannot assume when you
+are checking. To read the message safely, check `status` first.
+
+**2. A POLL INTERVAL LONGER THAN THE WINDOW IS NOT A SLOW MEASUREMENT, IT IS NO
+MEASUREMENT.** refresh-worker's idle windows are **~90 s, about one per 40 min**.
+I polled at 150 s and returned six consecutive `HOLD`s over ~50 min — which
+reads exactly like "permanently busy" and would have justified either giving up
+or forcing. At 45 s the window appeared on the 4th attempt. **Before concluding
+a resource is never free, check the poll is finer than the thing you are
+hunting.**
+
+**3. PARSE FAILURE MUST NOT WEAR THE SHAPE OF A GOOD READING.** The same waiter
+printed `jobs=0 live=` on a truncated preflight — `jobs=0` is the IDLE signal I
+was waiting for, produced by a read that failed. It defaulted to HOLD (the safe
+branch) by luck of ordering, not design. The rewrite requires an explicit
+`CLEAR`/`HOLD` line and treats anything else as UNKNOWN. Same family as the
+09-04 rule about instruments whose partial output is indistinguishable from
+their success output.
+
+**FORBIDDEN: `git stash` / `rebase` / `stash pop` around a shared-ledger write.**
+Measured: the pop re-applied content already on `origin/main`, producing TWO
+blocks for each of four lanes plus a `UU` conflict, and left the INDEX holding
+eleven files I never staged. `git add <my file>` then `git diff --cached` showed
+all eleven — the index, not my edit. Recovery that worked: verify the
+duplication against `origin/main` (1 block there vs 2 locally) BEFORE discarding
+anything, reset to `origin/main`, re-apply only your own entry, confirm
+`N additions / 0 deletions` on ONE file.
+
 
 ### 2026-09-04 — A SPEC THAT NAMES A KEY IS NOT A GUARANTEE THE KEY IS FED — check the JOIN, not the two sides `[lane mlb-hitter-so-dead-field, commit 0b9a03e7, NO DEPLOY]`
 
