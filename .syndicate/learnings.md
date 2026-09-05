@@ -5626,3 +5626,38 @@ Related: `[2026-09-04]` "a flat reading from an instrument that cannot see the
 suspect is not evidence" and "a running minimum cannot detect a rising floor".
 Three forms of one discipline: know what your instrument CANNOT show before you
 believe what it does.
+
+## 2026-09-05 FORBIDDEN: shipping a fix whose motivating measurement YOU labelled inconclusive. A caveat you wrote is an instruction to yourself, not a disclaimer to the reader
+
+- **What happened.** A one-date run (6 game clusters, 6,396 pairs) showed the
+  MLB sim's measured joint LOSING to plain independence, monotonically worse the
+  further the estimator was allowed to move. I diagnosed a unit error -- the
+  joint publishes Spearman rank correlation of COUNTS while a parlay bets
+  THRESHOLDS, and under a Gaussian copula phi(indicator) is only 54-68% of
+  rho(counts) -- wrote the correction, shipped it (`c6027e1f`), and reported it
+  as explaining every number. I had written "6 clusters, one date; suggestive,
+  not conclusive" onto that finding **in the same session**, then reasoned from
+  it as though it were settled.
+- **What the replication said.** Backfilled 177 games from git-tracked rosters
+  and re-scored: 162,491 pairs, 151 games, 13 dates. **The motivating finding
+  INVERTED.** The joint BEATS independence on same-player pairs by -0.02353
+  log-loss, 95% CI [-0.02849, -0.01854]. And the correction was measurably WORSE
+  than the raw coefficient: +0.00156, CI [+0.00100, +0.00219]. A Gaussian copula
+  over-attenuates for discrete, zero-inflated counts. Reverted in `862b5ccf`.
+- **The rule.** A caveat does not discharge the risk it names. If a finding is
+  too thin to publish it is too thin to BUILD ON -- replicate first, at a sample
+  that can actually separate the arms, or do nothing. The tell is writing a
+  hedge and a fix in the same session.
+- **The second half, and it is what made it invisible.** The conversion shipped
+  with NO TEST referencing it. ADDING it was silently green and REVERTING it was
+  silently green -- a behaviour change on a live pricing path that no test could
+  see, in either direction. **A revert that passes cleanly is not reassurance;
+  it is evidence the change was never covered.** Guard added
+  (`tests/test_joint_resolver_returns_raw.py`), source-level so it needs no
+  fixture, mutation-checked by re-adding the call.
+- **Cost:** none in production -- `c6027e1f` landed after the last deploy
+  (`3a9153f4`), so the conversion was never live. Luck, not process.
+- **Instruments:** `scripts/backfill_mlb_sim_joint.py` (resumable, git-tracked
+  rosters, no export and no StatsAPI) and
+  `scripts/score_joint_pair_pricing.py` (four arms on identical marginals,
+  bootstrap over GAMES).
