@@ -2314,6 +2314,22 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `syndicate/features/ncaaf/live_resim.py` (NEW),
   `tests/test_ncaaf_live_resim.py` (NEW),
   `tests/test_smartsim2_resume_state.py` (NEW).
+- Files (ADDED 2026-09-05 after the feasibility probe came back POSITIVE and the
+  join hop was traced; re-checked with `claims_by_path`, all FREE):
+  `syndicate/features/shared/live_gameline_join.py`,
+  `syndicate/features/shared/board_enrichment.py`,
+  `syndicate/features/shared/live_lens_loop.py`,
+  `tests/test_ncaaf_live_gameline_registration.py` (NEW).
+  `live_gameline_join.py` was named as SOLELY held by `live-edge-basis` in the
+  2026-08-18 orphan sweep; that block's claims were released in the 2026-08-29
+  phantom sweep and the guard's own parser now returns FREE for it.
+- **PROBE RESULT, measured 2026-09-05 before any code was written:** the drive
+  loop run directly from a mid-game `PossessionState` reproduces
+  `simulate_game` EXACTLY at game start (p(home)=0.6000 on both, n=200 shared
+  seeds) and moves correctly off real state: `Q2 15:00, away +7` -> 0.4250;
+  `Q4 0:15, home +21` -> 1.0000; `Q4 0:15, home -21` -> 0.0000. Cost FALLS as
+  the game runs: 154 ms/sim pregame, 85 ms at Q2, 7.9 ms at Q4 2:00, 0.7 ms at
+  Q4 0:15. A live re-sim is cheaper than the pregame sim it replaces.
   NOT claimed and NOT edited: `run_live_odds_refresh_worker.py`
   (held by `ncaaf-live-cadence`), `generate_smartsim2_ncaaf_projections.py` and
   `ncaaf/sources.py` (held by `ncaaf-games-cache-refresh`),
