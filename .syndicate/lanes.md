@@ -1396,6 +1396,66 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   two silent release failures: `log/2026-09-05.md`, `state_board.md
   [live-edge-basis-label]`, and two new rules in `learnings.md`.
 - Blocked by: none.
+### full-suite-xdist-run — CLOSED-VERIFIED 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **THE FULL SUITE COMPLETED FOR THE FIRST TIME: 15,307 collected, 32 failed / 15,224 passed / 51 skipped, 3666.33s (1:01:06). The gate's `27 NEW` is NOT 27 regressions — re-run standalone, 6 PASS ALONE (parallel-only artefacts) and 21 fail alone, of which 2 are already-documented pre-existing, 1 is data-shaped and 18 are tests left stale by deliberately shipped changes. NOTHING is caused by this session's code. Falsification test resolved: peak RSS 7.05 GB and a FLAT pagefile, so the earlier `MemoryError` was the 4,864 MB pagefile, not the suite.** — `[user: "install pytest-xdist and run the full suite"]`
+- Goal: ONE testable outcome — `scripts/pytest_baseline.py` completes a full
+  `tests/` run under `pytest-xdist` and prints its verdict against
+  `tests/pytest_baseline.json` (11,745 testcases / 19 known failures). The
+  deliverable is the VERDICT plus the named diff, not "it passed".
+- Files: NONE claimed in the repo. `pytest-xdist>=3.6,<4.0` was ALREADY
+  declared in `requirements-dev.txt` (added 2026-08-25 by the scope note) and
+  merely absent from this machine — installing it edits no file. **I will NOT
+  run `--update`**: that would overwrite a CI-relevant baseline with
+  Windows-local results.
+- **THIS SERVES ANOTHER LANE'S OWED READING. `suite-order-pollution` (OPEN,
+  session b9bc926d) needs exactly this** — its 12 fixes landed in `324ef0d8`
+  and its stated verification is a full `pytest tests/` run that HAS NEVER
+  COMPLETED. Its attempt died with `INTERNALERROR> MemoryError` at 26 GB RSS
+  and `WinError 1455 paging file is too small`, emitting ZERO test-status
+  lines. I am not claiming that lane or its files; if this run completes, the
+  result is offered to it.
+- Hypothesis: the earlier death was ENVIRONMENTAL and one of its two named
+  causes has since changed. That lane measured the pagefile at **4,864 MB on a
+  32 GB box**; it now reads **19,406 MB, auto-managed** — 4.0x — against
+  `test_heap_roots`/`test_retainer_census` legitimately allocating ~20 GB.
+- **DELIBERATELY NOT `-n auto`.** `auto` is 12 workers here, and the other
+  named cause has NOT changed: measured 2026-09-05 15:49 CDT, **six peer
+  python jobs are actively burning CPU** — a full `pytest tests/` 34.9 min in
+  at 1,654 MB (pid 19596), three scoped/chunked runs, and two
+  `score_joint_pair_pricing.py` jobs — with **10.9 GB of 31.6 GB free**. None
+  are stale: every one is accumulating CPU seconds. `suite-order-pollution`
+  declined to start a third suite "rather than degrade theirs" and that
+  judgement still holds, so this run is bounded at `-n 6 --dist=loadscope`.
+  `loadscope` keeps one file's tests in one worker, which is what the scope
+  note recommends against this suite's module-level-state sensitivity.
+- Falsification test: if the run dies with `MemoryError`/`WinError 1455`
+  again, the pagefile was NOT the binding constraint and concurrency is — the
+  next step is then a lower `-n`, or waiting for the peers, NOT a bigger
+  pagefile.
+- Verification: the gate prints `total_testcases` and the failing-set diff.
+  **A diff is EXPECTED and is not by itself a regression**: the baseline was
+  recorded on a 4-core Linux CI sandbox with a different, lossier `data/`
+  mirror, and this worktree is `--with-test-data` on Windows. Any difference
+  must be attributed to environment or to code before it is reported as
+  either.
+- **RESULT.** 6 of the 27 PASS ALONE — all four `test_heap_roots::WiderRootTests`
+  plus `test_quote_join_index_equivalence` and
+  `test_ncaaf_returning_production_builder`. `test_heap_roots` measures every
+  object in the interpreter, so concurrent workers contaminate it by
+  construction: **`--dist=loadscope` does NOT protect process-wide-measurement
+  tests**, which the scope note's §2 predicted and this measures.
+  The other 21 fail alone and, triaged by REASON, contain **zero missing-data
+  errors** — contradicting the expectation going in. 2 are the
+  `Working outside of application context` pair already documented as
+  pre-existing; 1 is data-shaped (`[6, 22] != [6]`); 18 are tests stale against
+  deliberately shipped changes, clustered by subsystem (NCAAF calibration
+  re-fit, soccer live-gate keys, team-qualified totals keys, soccersim numbers).
+  `test_mlb_position_substitutions::test_absent_flag_is_a_no_op` reads like
+  CLAUDE.md's "absent != off" trap and is NOT one — `models.py:576` declares
+  `position_substitutions: bool = True` and `e3bdbc8b` flipped it on purpose.
+- **I did NOT run `--update`** and no repo file was edited by this lane.
+- Offered to `suite-order-pollution`, whose owed reading this is; its block was
+  NOT edited. Full working: `state_ledger.md [full-suite-completes]`.
+- Blocked by: none.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

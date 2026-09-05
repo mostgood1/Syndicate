@@ -408,7 +408,7 @@ once this index exists: re-splitting would orphan the parts.
 | [open-problems] | OPEN PROBLEMS | `state.md` |
 | [shipped-verified] | SHIPPED / VERIFIED — current status by item `[2026-08-18; replaces a dozen dated snapshot sections]` | `state.md` |
 | [live-sha-authority] | LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]` | `state.md` |
-| [nba-betting-card-assets-404] | THE NBA BETTING-CARD CSS AND JS HAVE BEEN 404 IN PRODUCTION -- fixed and landed, NOT DEPLOYED `[measured + fix | `state_basketball.md` |
+| [nba-betting-card-assets-404] | THE NBA BETTING-CARD CSS AND JS WERE 404 IN PRODUCTION -- FIXED, DEPLOYED AND VERIFIED ON THE SERVED PAYLOAD ` | `state_basketball.md` |
 | [wnba-live-lens-directory] | THE WNBA LIVE-LENS READERS OPENED THE WRONG DIRECTORY — fixed and verified locally, NOT DEPLOYED `[verified 20 | `state_basketball.md` |
 | [wnba-recon-producer] | `recon_games` WAS WRITTEN PREGAME AND NEVER REWRITTEN; the producer now exists `[2026-08-31, lane wnba-accurac | `state_basketball.md` |
 | [wnba-consensus-price] | BOOK PRICES WERE AVERAGED ON THE AMERICAN SCALE; 43% OF CARD PRICES WERE IMPOSSIBLE `[2026-08-31, lane wnba-ac | `state_basketball.md` |
@@ -436,12 +436,12 @@ once this index exists: re-splitting would orphan the parts.
 | [board-window-staleness] | — **CAUSE FOUND AND VERIFIED 2026-08-29. It is neither the queue NOR build cost — see `[week-scoped-board-wind | `state_board.md` |
 | [week-scoped-board-window] | SCOPED, NOT BUILT `[2026-08-29]` | `state_board.md` |
 | [board-model-edge-coverage] | 2026-08-30 — 82% of the board is UNSIZABLE, and every `_alt` market is 0% | `state_board.md` |
-| [live-edge-basis-label] | `edge_basis` WAS WRONG ON EVERY LIVE MONEYLINE ROW, AND THE MEASUREMENT THAT CERTIFIED IT COULD NOT HAVE SEEN THEM — fixed and landed `[2026-09-05, lane edge-basis-moneyline, NO DEPLOY]` | `state_board.md` |
+| [live-edge-basis-label] | `edge_basis` WAS WRONG ON EVERY LIVE MONEYLINE ROW, AND THE MEASUREMENT THAT CERTIFIED IT COULD NOT HAVE SEEN  | `state_board.md` |
 | [nfl-board-projection-coverage] | NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-project | `state_football.md` |
 | [ncaaf-zero-orders-is-two-gates] | NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry | `state_football.md` |
-| [ncaaf-live-resim] | SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim]` | `state_football.md` |
 | [ncaaf-team-registry-two-files] | THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]` | `state_football.md` |
 | [football-smartsim2] | FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]` | `state_football.md` |
+| [ncaaf-calibration-profile-live] | THE PROMOTED NCAAF PROFILE IS LIVE, AND PROMOTING ONE IS A **CODE DEPLOY** `[verified 2026-09-05, render]` | `state_football.md` |
 | [nfl-archived] | NFL — earlier closed work, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.** | `state_football.md` |
 | [football-model-leaks] | FOOTBALL — TWO MODEL LEAKS, BOTH FIXED `[verified 2026-08-19, lane football-model-owner]` | `state_football.md` |
 | [football-board-defects] | FOOTBALL BOARDS — THREE DEFECTS SHIPPED AND MEASURED `[2026-08-18/19]` — **ARCHIVED 2026-08-19 to `state_archi | `state_football.md` |
@@ -466,6 +466,7 @@ once this index exists: re-splitting would orphan the parts.
 | [nfl-player-props] | NFL player props: capture fixed, model priced and BEATEN by the market | `state_football.md` |
 | [nfl-game-context] | Game context is built and measured, and INERT in production | `state_football.md` |
 | [cfbd-monthly-quota-exhausted] | 2026-08-30 — LIVE: NCAAF projections are FAILING in production, on opener weekend | `state_football.md` |
+| [ncaaf-live-resim] | SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim] | `state_football.md` |
 | [kalshi-in-play-and-real-fees] | KALSHI TRADES IN-PLAY AND PUBLISHES ITS OWN FEE PARAMETERS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE  | `state_kalshi.md` |
 | [kalshi-segment-on-full-game] | KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS: the join key had no `segment` `[verified 2026-08-28, lane p | `state_kalshi.md` |
 | [kalshi-venue-execution] | KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lan | `state_kalshi.md` |
@@ -479,6 +480,7 @@ once this index exists: re-splitting would orphan the parts.
 | [layer1-board-date-scoping] | THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED `[verified 2026-08-30 05:0x-05:5xZ, web+refres | `state_layer2.md` |
 | [board-chip-coverage] | Layer 2 compact game cards — FULL chip coverage, verified 2026-08-26 | `state_layer2.md` |
 | [chip-artifact-content-age] | A chip artifact's TIMESTAMP and its CONTENT age are different numbers — verified 2026-08-27 (lane `mlb-chip-li | `state_layer2.md` |
+| [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |
 | [ci-suite-red-test] | CI'S OWN SUITE IS GREEN. THE "ONE RED TEST" WAS THE 31st DATA-ABSENCE FAILURE, NOT A SURVIVOR OF THEM `[correc | `state_ledger.md` |
 | [state-file-split] | state.md IS AN INDEX PLUS NINE PARTS `[2026-09-03, scripts/split_state.py, commit 23bf6bc7]` | `state_ledger.md` |
 | [session-harness] | SESSION HARNESS — what the hooks actually enforce | `state_ledger.md` |

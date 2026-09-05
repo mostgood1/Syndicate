@@ -5,6 +5,112 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [full-suite-completes] THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 parallel artefacts + 21 stale tests `[2026-09-05, lane full-suite-xdist-run]`
+
+`pytest-xdist` was ALREADY declared in `requirements-dev.txt` (2026-08-25) and
+merely absent from this machine. Installed 3.8.0; no file changed.
+
+    py -3 scripts/pytest_baseline.py -- tests/ -n 6 --dist=loadscope
+    32 failed, 15,224 passed, 51 skipped, 1 xfailed, 458 subtests passed
+    in 3666.33s (1:01:06)      collected=15307  failing=31
+
+**NOT `-n auto`, ON PURPOSE.** `auto` is 12 workers here. `suite-order-pollution`
+named two causes for its own `MemoryError` death at 26 GB RSS; only one had
+changed. Pagefile **4,864 MB -> 19,406 MB** (4.0x) -- changed. Peer load -- NOT
+changed: at 15:49 CDT six peer python jobs were actively burning CPU (including
+someone else's full `pytest tests/` 34.9 min in) with 10.9 of 31.6 GB free.
+That lane declined to start a third suite "rather than degrade theirs"; `-n 6`
+honours that and still finished.
+
+**THE MEMORY RISK DID NOT MATERIALISE, and the number says which cause it was:**
+peak python RSS across the WHOLE machine **7.05 GB**, and pagefile usage FLAT at
+1,056-1,228 MB for the entire hour -- it never climbed once. So the earlier death
+was the PAGEFILE, not the suite's intrinsic need. The heaviest single worker hit
+2,112 MB, nowhere near the ~20 GB `test_heap_roots`/`test_retainer_census`
+allocate serially.
+
+**THE 3.7x SPEEDUP DID NOT TRANSFER. 61 minutes, not the ~12 the scope note
+predicted.** Three reasons, and the third is the durable one: 6 workers not 12;
+15,307 tests not 11,745; and **the machine only ever turned ~1.5 cores of Python
+work across ten processes** -- 7.2s of worker CPU per 8s wall across SIX workers.
+**This suite is I/O bound here, not CPU bound**, so adding workers buys much less
+than the scope note's 4-core Linux sandbox measured. Do not quote 3.7x for this
+machine.
+
+**THE GATE SAID `27 NEW FAILURE(S)`. THAT IS A RAW SET DIFF AND IT IS NOT 27
+REGRESSIONS.** Every failure was re-run STANDALONE, one test per process with
+xdist absent -- the discriminating method the scope note used:
+
+    6 of 27  PASS ALONE -> parallel-only artefact, NOT a code regression
+   21 of 27  FAIL ALONE -> real in this environment, and then triaged by REASON
+
+The 6 are all four `test_heap_roots::WiderRootTests` cases plus
+`test_quote_join_index_equivalence` and `test_ncaaf_returning_production_builder`.
+`test_heap_roots` measures every object in the interpreter, so six concurrent
+workers contaminate it BY CONSTRUCTION. **`--dist=loadscope` does not protect
+process-wide-measurement tests** -- the scope note's own §2 said it would not,
+and this is the first measurement of that.
+
+**OF THE 21 THAT FAIL ALONE, ZERO ARE MISSING-DATA ERRORS.** That contradicted
+the expectation going in (the scope note's NFL-PBP class), and the reasons say
+so plainly -- they are assertion mismatches about BEHAVIOUR:
+
+- **2 pre-existing test-harness**: `test_live_refresh_loop` x2,
+  `RuntimeError: Working outside of application context` -- verbatim what
+  `suite-order-pollution` already recorded as pre-existing and unrelated to
+  ordering. CONFIRMED standalone here, not inferred.
+- **1 data-shaped**: `test_nfl_props` `[6, 22] != [6]` -- this tree's mirror
+  carries a week 22.
+- **18 tests left STALE by deliberately shipped changes**, clustered by
+  subsystem, which is the tell: 4 `test_ncaaf_picks_local` + 1
+  `test_smartsim2_calibration_profile` (NCAAF calibration was re-fitted and
+  PROMOTED by `ncaaf-pace-block`); 3 `test_soccer_live_gates_wiring`
+  (`KeyError: 'live_gameline'`); 2 `test_soccersim_player_props` (numeric,
+  9.3324 vs 13.0); 2 `test_market_gone_drop` (soccer now included);
+  `test_prop_player_keying` (the totals key is now TEAM-QUALIFIED, which is
+  `venue-quote-line-join`'s recorded fix for "a TOTALS key names no GAME");
+  plus polymarket, nfl_props_board and soccer_read_scope.
+
+**THE ONE THAT LOOKED LIKE A LIVE RISK IS NOT ONE, AND WAS CHECKED RATHER THAN
+REPORTED.** `test_mlb_position_substitutions::test_absent_flag_is_a_no_op` fails
+with *"True is not false : the feature must be dark-launched OFF"*, which reads
+exactly like CLAUDE.md's "absent != off" trap. It is not:
+`models.py:576` declares `position_substitutions: bool = True` and `e3bdbc8b`
+(`#624 step 3: enable in-sim position-player substitution`) flipped it
+deliberately. The TEST is stale against an intentional promotion.
+
+**`--update` WAS NOT RUN, deliberately.** It would overwrite a CI-relevant
+baseline with Windows-local results. Note also that the baseline is already
+stale as a comparand: it records `total_testcases: 11745` against this tree's
+**15,307** (~3,500 tests newer) and was recorded on 4-core Linux CI with a
+different `data/` mirror. Its 19-failure set is NOT like-for-like, which is
+most of why the raw diff read as 27.
+
+**THE SUITE IS NOT HERMETIC: IT MAKES LIVE NETWORK CALLS AND WRITES TRACKED
+FILES.** Found by `git status` after the run, not looked for. Four tracked
+files were modified and one untracked directory created:
+
+    reports/intelligence/kalshi_markets.json      +65,028 / -12
+    vendor/wnba_betting_repo/.../schedule_2026.csv    104 / 104
+    vendor/wnba_betting_repo/.../schedule_2026.json     1 / 1
+    data/mlb_source/.../live_lens_2026_06_02.jsonl     +1 / 0
+    data/settlement_inputs/                        NEW, untracked
+
+`kalshi_markets.json` gained `count`, `fetched_at` and `staleness_seconds`, and
+its `fetched_at` reads **2026-09-05T21:53:38Z** -- 16:53 CDT, DURING the run that
+ended 16:54:41. So a test reached the live Kalshi API and persisted the result.
+
+**WHY THIS MATTERS BEYOND TIDINESS: the protocol tells sessions to run tests,
+and the PRIMARY tree is shared.** A full run there silently rewrites those files
+under every other session -- a 65,000-line change to a tracked artifact that
+nobody edited and that `git add -A` would sweep straight into someone's commit.
+In a per-session worktree it is contained, which is one more reason the worktree
+protocol is load-bearing rather than hygiene. Reverted here; nothing committed.
+
+**OFFERED TO `suite-order-pollution` (OPEN), WHOSE OWED READING THIS IS.** Its
+verification is "a full `pytest tests/` run ends with the 12 passing and the
+pre-existing 37 unchanged". This run completed and **none of its 12 files'
+fixed tests appear in any failure list**. I did not edit that lane's block.
 ## [ci-suite-red-test] CI'S OWN SUITE IS GREEN. THE "ONE RED TEST" WAS THE 31st DATA-ABSENCE FAILURE, NOT A SURVIVOR OF THEM `[corrected 2026-09-05, lane ci-archives-nba-card-js, commit ba84b331]`
 
 **The claim this section used to make was WRONG, and it is preserved here
