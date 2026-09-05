@@ -10,6 +10,7 @@ import threading
 import subprocess
 import time
 import uuid
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -2189,6 +2190,30 @@ def _publish_streamed_body() -> Any:
     temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
     digest = hashlib.sha256()
     written = 0
+    # `render-egress-transport`, 2026-09-05: the sender may gzip the WIRE body.
+    #
+    # Inbound publishes were 3,461 MB in one hour on this service (2026-09-04
+    # 17:00-18:00Z) -- soccer `odds_history`/`book_quotes` shards at 11-35 MB
+    # apiece, and a real `book_quotes` shard gzips to 3.5% of itself. This is
+    # NOT a bandwidth-bill fix and was built believing it was: internal
+    # traffic is not billed (5,243 MB of it metered 33.9 MB in the control
+    # hour). It buys memory and time on a 2 GB service, which `#632` says is
+    # the scarce resource here. Retraction: `lanes.md`, `render-egress-transport`.
+    #
+    # DECOMPRESS BEFORE HASHING. `X-Artifact-Checksum` is, and stays, the
+    # sha256 of the UNCOMPRESSED artifact -- so this stays byte-identical in
+    # meaning to the uncompressed form, `written` still counts real artifact
+    # bytes (the divergence guard below compares it against the existing file
+    # on disk and would refuse every publish if it saw compressed sizes), and
+    # a receiver that did NOT understand the header would fail the checksum
+    # loudly rather than store gzip bytes under a `.json` name. The sender
+    # relies on exactly that 400 to detect an old web and turn gzip off.
+    #
+    # One chunk resident at a time on both sides of the decompressor, which is
+    # the whole point of this handler.
+    body_encoding = str(request.headers.get("Content-Encoding") or "").strip().lower()
+    decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS) if body_encoding == "gzip" else None
+    compressed_bytes = 0
     try:
         target_path.parent.mkdir(parents=True, exist_ok=True)
         stream = request.stream
@@ -2197,9 +2222,20 @@ def _publish_streamed_body() -> Any:
                 chunk = stream.read(_PUBLISH_STREAM_CHUNK_BYTES)
                 if not chunk:
                     break
+                if decompressor is not None:
+                    compressed_bytes += len(chunk)
+                    chunk = decompressor.decompress(chunk)
+                    if not chunk:
+                        continue
                 digest.update(chunk)
                 written += len(chunk)
                 handle.write(chunk)
+            if decompressor is not None:
+                tail = decompressor.flush()
+                if tail:
+                    digest.update(tail)
+                    written += len(tail)
+                    handle.write(tail)
         if expected_checksum and digest.hexdigest() != expected_checksum:
             temp_path.unlink(missing_ok=True)
             return (
@@ -2306,7 +2342,23 @@ def _publish_streamed_body() -> Any:
             pass
         return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 
-    return jsonify({"ok": True, "relative_path": relative_path, "bytes": written, "transport": "stream"}), 200
+    # `wire_bytes` is reported next to `bytes` so the saving is READABLE from
+    # the receiver, not only inferable from a bandwidth graph an hour later.
+    # `bytes` keeps its existing meaning (artifact bytes) -- every caller and
+    # every log-reading tool depends on that.
+    return (
+        jsonify(
+            {
+                "ok": True,
+                "relative_path": relative_path,
+                "bytes": written,
+                "wire_bytes": compressed_bytes if decompressor is not None else written,
+                "encoding": body_encoding or "identity",
+                "transport": "stream",
+            }
+        ),
+        200,
+    )
 
 
 # Encoding a whole `content` str in one call is a second full copy of the

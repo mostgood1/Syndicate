@@ -35,6 +35,7 @@ from syndicate.blueprints.soccer import soccer_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
 from syndicate.features.shared.json_safety import json_safe_value
+from syndicate.features.shared.response_compression import install_response_compression
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
 from pipeline.intelligence_state import start_intelligence_state_background_loop
 
@@ -503,6 +504,14 @@ def create_app() -> Flask:
             g._syndicate_memory_token = memory_observability.note_request_start(rule)
         except Exception:
             g._syndicate_memory_token = None
+
+    # `render-egress-transport`, 2026-09-05: gzip outbound JSON. The workspace
+    # was at 24.4 GB of 25 GB included bandwidth on day 5 of the month and the
+    # public edge carried 2.6 MB of the single largest hour -- the bill is
+    # whole uncompressed artifacts crossing this service in both directions.
+    # `response_compression.py` carries the measurement and the exclusions
+    # (notably: `send_file` passthrough bodies are NOT touched).
+    install_response_compression(app)
 
     @app.teardown_request
     def _note_request_memory_end(_exc: BaseException | None = None) -> None:

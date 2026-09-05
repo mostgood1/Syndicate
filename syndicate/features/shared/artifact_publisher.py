@@ -1383,6 +1383,112 @@ def _file_checksum(file_path: Path) -> str:
     return digest.hexdigest()
 
 
+# gzip on the PUBLISH side (worker -> web). Flipped to False in-process by
+# `_disable_publish_gzip` when the receiver proves it cannot decode it, and
+# re-armed by a restart -- exactly like `_LAST_PUBLISHED_CHECKSUM` above and
+# for the same reason: this is a negotiation cache, not a config store, and
+# the correct failure direction is "try again after a deploy".
+_PUBLISH_GZIP_ENABLED = True
+
+# Below this the gzip envelope and the temp file are not worth it. It is set to
+# the streamed-publish threshold on purpose: everything that reaches
+# `_publish_streamed` is already >= 4 MiB, so this bound only ever fires for a
+# caller that routed a small file here deliberately.
+_PUBLISH_GZIP_MIN_BYTES = 256 * 1024
+
+_PUBLISH_GZIP_CHUNK_BYTES = 1024 * 1024
+
+
+def _gzip_publish_enabled(size_bytes: int) -> bool:
+    """Whether to gzip this streamed publish body.
+
+    THE MEASUREMENT, 2026-09-05, lane `render-egress-transport`. **The volume
+    is real; the BILLING claim originally written here was wrong and is
+    retracted** -- internal traffic is not billed, and the hour below happens
+    to match the metered figure by coincidence (the control hour, 09-05
+    04:00-05:00Z, carried 5,243 MB of the same transport and metered 33.9 MB).
+    What this saves is web's memory and both services' time.
+
+    Web served the hour 2026-09-04 17:00-18:00Z with **3,461 MB of INBOUND
+    publishes** in it -- soccer `tracking/odds_history`
+    1,274 MB over 117 uploads (avg 11.2 MB), `artifacts/soccer` 1,038 MB over
+    97, soccer `tracking/book_quotes` 850 MB over 25 (**avg 34.8 MB**), ncaaf
+    book_quotes 244 MB, mlb book_quotes 56 MB. Every one of those is
+    materialised whole on both sides of the wire.
+
+    These are append-heavy JSONL/JSON odds captures, which is gzip's best
+    case: `mlb_source/tracking/book_quotes/2026-07-07.jsonl`, 13.92 MB on
+    disk, compresses to **0.49 MB at level 1 in 0.20s** (3.5%); level 6 gives
+    0.33 MB for 0.41s. Level 1 is chosen because the publisher runs on the
+    workers alongside sims and board builds and 3.5% is already a 28x cut.
+
+    The env key is a kill switch, not a feature flag: ABSENT MEANS ON, so a
+    service nobody has configured still stops paying for the uncompressed
+    transport. `#284`'s rule -- check what absent means -- applies here and
+    the answer is deliberate.
+    """
+    if not _PUBLISH_GZIP_ENABLED:
+        return False
+    if str(os.environ.get("SYNDICATE_PUBLISH_GZIP") or "on").strip().lower() in {"0", "off", "false", "no"}:
+        return False
+    return int(size_bytes) >= _PUBLISH_GZIP_MIN_BYTES
+
+
+def _gzip_to_tempfile(file_path: Path) -> tuple[Path | None, int]:
+    """gzip `file_path` to a temp file. Returns (path, size) or (None, 0).
+
+    A TEMP FILE RATHER THAN A BUFFER, on purpose. `_publish_streamed`'s whole
+    reason for existing is that urllib streams a file-like body in blocks so
+    the sender never holds the artifact in memory (see its docstring: the JSON
+    envelope held FOUR copies, and that is what put web at its 2Gi ceiling).
+    Compressing into a `bytes` would give that property straight back for the
+    34.8 MB shards this fires on. Writing to a temp file keeps peak memory at
+    one chunk and lets `Content-Length` be exact, which is what makes urllib
+    stream rather than buffer.
+    """
+    import gzip as _gzip
+    import tempfile
+
+    try:
+        fd, temp_name = tempfile.mkstemp(prefix="syndicate-publish-", suffix=".gz")
+        os.close(fd)
+        temp_path = Path(temp_name)
+        with file_path.open("rb") as source, _gzip.open(temp_path, "wb", compresslevel=1) as sink:
+            while True:
+                chunk = source.read(_PUBLISH_GZIP_CHUNK_BYTES)
+                if not chunk:
+                    break
+                sink.write(chunk)
+        return temp_path, int(temp_path.stat().st_size)
+    except Exception as exc:
+        # Compression is an optimisation. Failing to compress must degrade to
+        # publishing uncompressed, never to not publishing.
+        print(f"[artifact_publisher] PUBLISH_GZIP_FAILED path={file_path} error={exc}", flush=True)
+        return None, 0
+
+
+def _discard_temp(temp_path: Path | None) -> None:
+    if temp_path is None:
+        return
+    try:
+        temp_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _disable_publish_gzip(relative_path: str, exc: Exception) -> None:
+    global _PUBLISH_GZIP_ENABLED
+
+    _PUBLISH_GZIP_ENABLED = False
+    print(
+        f"[artifact_publisher] PUBLISH_GZIP_UNSUPPORTED path={relative_path} error={exc} "
+        "disabled_for_process=1 -- the receiver rejected a gzip body (an older web deploy "
+        "stores the compressed bytes and then fails the checksum). Next sweep publishes "
+        "uncompressed; a restart re-arms this.",
+        flush=True,
+    )
+
+
 def _publish_streamed(
     file_path: Path,
     *,
@@ -1419,41 +1525,83 @@ def _publish_streamed(
             flush=True,
         )
         return True
-    if _publish_budget_blocks(relative_path, size):
+    # gzip the WIRE body. See `_gzip_publish_enabled` for the measurement:
+    # inbound publishes were 3,461 MB of one 4,050 MB hour, and 2,124 MB of
+    # that was soccer `odds_history` + `book_quotes` at 11-35 MB apiece.
+    body_path = file_path
+    wire_bytes = size
+    encoding = ""
+    temp_gz: Path | None = None
+    if _gzip_publish_enabled(size):
+        temp_gz, gz_size = _gzip_to_tempfile(file_path)
+        if temp_gz is not None:
+            body_path, wire_bytes, encoding = temp_gz, gz_size, "gzip"
+
+    # `#395`'s budget counts the bytes that CROSS THE WIRE -- its own comment
+    # says "the bill counts" the request body, and after this change the
+    # request body is the compressed one. That does mean the same budget now
+    # admits ~28x more artifacts, which is the intended effect and not a
+    # loosened brake: the brake exists to bound the BILL, and the bill fell.
+    if _publish_budget_blocks(relative_path, wire_bytes):
+        _discard_temp(temp_gz)
         return False
 
     try:
-        with file_path.open("rb") as handle:
+        with body_path.open("rb") as handle:
+            headers = {
+                "Content-Type": "application/octet-stream",
+                "Content-Length": str(wire_bytes),
+                "X-Artifact-Path": relative_path,
+                # STILL the checksum of the UNCOMPRESSED file. The receiver
+                # decompresses first and then hashes, so this header means
+                # exactly what it always meant and an old receiver that
+                # ignores `Content-Encoding` fails LOUDLY (checksum mismatch,
+                # HTTP 400) instead of silently storing gzip bytes under a
+                # `.json` name.
+                "X-Artifact-Checksum": checksum,
+                # `#488`: lets the receiver detect two services alternately
+                # overwriting one path. Absent on older senders, which the
+                # receiver handles as UNKNOWN rather than as "same sender".
+                "X-Artifact-Publisher": _publisher_identity(),
+                "Authorization": f"Bearer {token}",
+            }
+            if encoding:
+                headers["Content-Encoding"] = encoding
             request_obj = urllib_request.Request(
                 url,
                 data=handle,
                 method="POST",
-                headers={
-                    "Content-Type": "application/octet-stream",
-                    "Content-Length": str(size),
-                    "X-Artifact-Path": relative_path,
-                    "X-Artifact-Checksum": checksum,
-                    # `#488`: lets the receiver detect two services alternately
-                    # overwriting one path. Absent on older senders, which the
-                    # receiver handles as UNKNOWN rather than as "same sender".
-                    "X-Artifact-Publisher": _publisher_identity(),
-                    "Authorization": f"Bearer {token}",
-                },
+                headers=headers,
             )
             with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
                 response.read()
+        _discard_temp(temp_gz)
         # Recorded only after the upload is acknowledged, same rule as the JSON
         # path: a failed publish must retry next sweep, not be suppressed by its
         # own attempt.
         _LAST_PUBLISHED_CHECKSUM[relative_path] = checksum
         _note_direct_publish_succeeded(relative_path)
-        _publish_budget_record(size)
+        _publish_budget_record(wire_bytes)
         print(
-            f"[artifact_publisher] PUBLISH_OK path={relative_path} url={url} transport=stream bytes={size}",
+            f"[artifact_publisher] PUBLISH_OK path={relative_path} url={url} transport=stream "
+            f"bytes={wire_bytes} raw_bytes={size} encoding={encoding or 'identity'}",
             flush=True,
         )
         return True
     except urllib_error.HTTPError as exc:
+        _discard_temp(temp_gz)
+        # AN OLD RECEIVER IS DETECTED BY ITS ANSWER, NOT BY A VERSION NUMBER.
+        # A web deploy that predates the `Content-Encoding` support writes the
+        # gzip bytes straight to the staged file and then compares their
+        # sha256 against the header, which is the hash of the DECOMPRESSED
+        # file -- so it answers HTTP 400. That is the whole negotiation: on
+        # that specific failure, turn gzip off for this process, and let the
+        # ordinary next-sweep retry send it uncompressed. It re-arms on the
+        # next restart, so a real truncated transfer costs one cycle of
+        # compression rather than permanently disabling it.
+        if encoding and int(getattr(exc, "code", 0) or 0) == 400:
+            _disable_publish_gzip(relative_path, exc)
+            return False
         if int(getattr(exc, "code", 0) or 0) in _PUBLISH_STREAM_UNSUPPORTED_STATUSES:
             print(
                 f"[artifact_publisher] PUBLISH_STREAM_UNSUPPORTED path={relative_path} "
@@ -1468,6 +1616,7 @@ def _publish_streamed(
         )
         return False
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
+        _discard_temp(temp_gz)
         _note_direct_publish_failed(relative_path)
         print(
             f"[artifact_publisher] PUBLISH_FAILED path={relative_path} url={url} transport=stream error={exc}",
@@ -1475,6 +1624,7 @@ def _publish_streamed(
         )
         return False
     except Exception as exc:  # pragma: no cover - defensive, must never raise
+        _discard_temp(temp_gz)
         _note_direct_publish_failed(relative_path)
         print(
             f"[artifact_publisher] PUBLISH_UNEXPECTED_ERROR path={relative_path} url={url} transport=stream error={exc}",
@@ -1887,6 +2037,23 @@ def _export_url(pattern: str | None = None, *, since_epoch: float | None = None,
     return url
 
 
+def _read_possibly_gzipped(response: Any) -> bytes:
+    """Read a urllib response body, gunzipping it when the server encoded it.
+
+    urllib does NOT do this for you. Unlike `requests`, it hands back the raw
+    encoded bytes and leaves `Content-Encoding` in the headers, so a caller
+    that sends `Accept-Encoding: gzip` and then decodes the body as UTF-8 gets
+    a UnicodeDecodeError on the gzip magic bytes -- which reads as "the
+    endpoint is broken" rather than "I asked for this".
+    """
+    raw = response.read()
+    if str(response.headers.get("Content-Encoding") or "").strip().lower() != "gzip":
+        return raw
+    import gzip as _gzip
+
+    return _gzip.decompress(raw)
+
+
 def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -> tuple[bool, int]:
     """Returns (succeeded, files_written). succeeded distinguishes a genuine
     request failure from a successful-but-empty response (e.g. nothing
@@ -1898,11 +2065,45 @@ def _pull_hot_artifacts_request(url: str, token: str, *, timeout_seconds: int) -
     request_obj = urllib_request.Request(
         url,
         method="GET",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            # `render-egress-transport`, 2026-09-05.
+            #
+            # NOT A BANDWIDTH-BILL FIX, and it was built believing it was.
+            # Internal traffic is NOT billed -- measured, 5,243 MB of this
+            # transport in one hour against 33.9 MB metered -- so what this
+            # buys is web's memory and both services' time, not money. The
+            # retraction and the three eliminated hypotheses are in
+            # `lanes.md`, lane `render-egress-transport`. The volume below is
+            # still real and still worth removing.
+            #
+            # Measured on web's gunicorn access log: this exact request,
+            # `/api/ops/artifacts/export?pattern=*<date>*`, returned
+            # **15.4 MB on average, 38 times in one hour** (2026-09-04
+            # 17:00-18:00Z) and **11.4 MB, 50 times** in another (09-01
+            # 22:00-23:00Z) -- BOTH workers pull it, every ~90s, all slate.
+            # A month's included bandwidth is 25 GB and the workspace was at
+            # 24.4 GB on day 5.
+            #
+            # The payload is an envelope of JSON artifact bodies, and JSON
+            # odds data is the best case gzip has: a real 13.92 MB
+            # `book_quotes` shard compresses to 0.49 MB at level 1 (3.5%).
+            # The watermark is NOT the problem and was checked -- `since=`
+            # advances every cycle and the chain across that hour is
+            # unbroken. 17.7 MB genuinely changes every 90 seconds, because
+            # odds capture rewrites whole shards. So the fix is the
+            # TRANSPORT, not the filter.
+            #
+            # Safe against an OLD web: a receiver that does not compress
+            # simply answers uncompressed and `_read_possibly_gzipped` reads
+            # the `Content-Encoding` it actually got rather than the one it
+            # asked for. No deploy order is load-bearing.
+            "Accept-Encoding": "gzip",
+        },
     )
     try:
         with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            payload = json.loads(_read_possibly_gzipped(response).decode("utf-8"))
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
         print(f"[artifact_publisher] PULL_FAILED url={url} error={exc}", flush=True)
         return False, 0
