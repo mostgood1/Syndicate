@@ -353,6 +353,13 @@ def api_ops_execution_ledger_summary() -> Any:
     property of the construction rather than of remembering to strip fields:
     there is nothing to strip.
 
+    `by_segment` answers "how many segment bets exist, and how many were
+    GRADED" -- the question `bet_status.segment_refusal` made urgent and that
+    this endpoint could not previously answer, because it grouped by
+    `mode:venue` and dropped `segment`. A non-`full` entry with `settled > 0` is
+    an order that was graded while the resolvers still ignored its segment, i.e.
+    scored against the whole-game actual.
+
     `?days=` bounds the window (default 7, max 60). `?mode=` filters
     live/paper; absent means both, split out rather than summed, since a paper
     order and a live order are not the same event and adding them is how a
@@ -408,9 +415,31 @@ def api_ops_execution_ledger_summary() -> Any:
 
         bucket = summary.setdefault(date, {}).setdefault(f"{mode}:{venue}", {
             "orders": 0, "filled": 0, "staked_dollars": 0.0, "by_status": {},
+            "by_segment": {},
         })
         bucket["orders"] += 1
         bucket["by_status"][status] = bucket["by_status"].get(status, 0) + 1
+
+        # SEGMENT, counted because nothing else counts it. `bet_status
+        # .segment_refusal` now stops a segment order being graded against the
+        # whole-game actual, and the immediate follow-up -- how many were
+        # mis-settled before that landed -- was unanswerable from this endpoint:
+        # `segment` is on every order and was dropped here.
+        #
+        # `settled` is the number that answers it. An order carrying an
+        # `outcome` has been GRADED, so a non-`full` segment with an outcome is
+        # exactly the exposed population.
+        #
+        # ABSENT IS `(unset)`, NOT `full`. The grader maps absent onto full on
+        # purpose; a counter that did the same would make "no segment was ever
+        # recorded" and "this is a whole-game bet" indistinguishable, which is
+        # the distinction being asked for.
+        raw_segment = order.get("segment")
+        segment = str(raw_segment or "").strip().lower() or "(unset)"
+        seg_bucket = bucket["by_segment"].setdefault(segment, {"orders": 0, "settled": 0})
+        seg_bucket["orders"] += 1
+        if str(order.get("outcome") or "").strip():
+            seg_bucket["settled"] += 1
         if status == "filled":
             bucket["filled"] += 1
             try:
@@ -425,6 +454,7 @@ def api_ops_execution_ledger_summary() -> Any:
         for bucket in day.values():
             bucket["staked_dollars"] = round(bucket["staked_dollars"], 2)
             bucket["by_status"] = dict(sorted(bucket["by_status"].items()))
+            bucket["by_segment"] = dict(sorted(bucket["by_segment"].items()))
 
     # SETTLED ROI SPLIT BY THE SIM'S OWN VERDICT, within sport x market family.
     #
