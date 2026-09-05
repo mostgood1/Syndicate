@@ -7,6 +7,14 @@
 
 
 
+## 2026-09-05 23:1xZ — **CORRECTION to the row below: the duplicate `Vary` is real, but the CAUSE I recorded for it is wrong, and so is the fix.** — lane `render-egress-transport`
+
+- **What I wrote:** "`compress_response` appends when `"accept-encoding" not in response.headers.get("Vary", "")`, and `.get` reads only the FIRST of a repeated header. Fix is `headers.set`, not append."
+- **Why that is wrong.** Inside the app there is only ever ONE `Vary` — werkzeug's `Headers.__setitem__` replaces rather than appends, so my hook cannot produce a pair on its own, and `headers.set` would change nothing.
+- **What it actually is, isolated by testing routes my hook provably never reaches.** `image/png` (returns before `Vary` on content-type) — **no `Vary` at all**. A 404 (returns before `Vary` on status) — **exactly one `Vary`**. So **RENDER'S EDGE adds `Vary: Accept-Encoding` itself** on text-ish responses, after my hook has already added the app's. Two layers, one header each, and neither is duplicating internally.
+- **Consequence: it is cosmetic and stays.** Repeated `Vary: Accept-Encoding` is semantically identical to one under RFC 9110 field-list combination. Nothing to fix in `response_compression.py`; the app's header is still required, because the edge's presence is not something the app can depend on.
+- **The reason this correction exists at all:** I diagnosed a defect from its symptom and wrote the diagnosis into an append-only ledger in the same breath. The symptom was real; the cause was a guess that read like a finding. Corrected by appending, never by editing the row below.
+
 ## 2026-09-05 22:57:42-23:00:51Z — web `6320fe91` -> `3cb5b4ba` — **DEPLOYED, LIVE, VERIFIED ON THE SERVED PAYLOAD.** Response gzip is on; the OUTBOUND half is deployed and NOT yet demonstrated. — lane `render-egress-transport`
 
 - **verify (the reading that proves it worked): a same-instant A/B against production, one path, two requests differing only in `Accept-Encoding`.**
