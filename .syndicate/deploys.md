@@ -22827,8 +22827,18 @@ date=2026-09-04 games_with_joint=16` at 23:43:15Z, and independently
 **I PREDICTED `installed=False` AND WAS WRONG.** I said a sim RUN was owed
 before the joint could exist; refresh-worker runs them continuously and one had
 already produced joint-carrying artifacts. Wrong in the safe direction, but
-wrong. Related trap, live and pointing the OTHER way (peer-measured): the
-2026-09-05 ladders artifact is stamped 23:19:32Z, ~7 minutes BEFORE this deploy,
-and still reads pre-fix values — a build that predates the code, not an inert
-fix. **Pin artifact verification to the artifact's own `generated_at`, never to
+wrong. Related trap, live and pointing the OTHER way — **MEASURED BY SESSION
+`56718983` (lane `mlb-hitter-so-dead-field`), recorded by them as `cb98a638`;
+relayed to me by session `b2b5b45b`, and ATTRIBUTED HERE TO THE MEASURER at
+their joint request.** The 2026-09-05 ladders artifact is stamped 23:19:32Z,
+~7 minutes BEFORE this deploy, and still reads pre-fix values — a build that
+predates the code, not an inert fix. They had already pinned their verify line
+to the artifact's `generated_at` rather than to go-live BEFORE meeting this
+case, which is why they caught it.
+**Pin artifact verification to the artifact's own `generated_at`, never to
 deploy go-live.**
+The decision to skip pulling the 19.7 MB ladders artifact — accepting a weaker
+n=1 reading rather than risk the 2 GB web box — is also theirs, not the
+relaying session's. The `#632` retention finding underneath it IS
+`b2b5b45b`'s. Recorded separately because a ledger that misattributes a
+measurement sends the next reader to ask the wrong session about it.
