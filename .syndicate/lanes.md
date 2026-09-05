@@ -1456,6 +1456,104 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Offered to `suite-order-pollution`, whose owed reading this is; its block was
   NOT edited. Full working: `state_ledger.md [full-suite-completes]`.
 - Blocked by: none.
+### ncaaf-live-resim-wire — OPEN — opened 2026-09-05 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — the NCAAF live re-sim is BUILT AND INERT; nothing calls the producer
+- **RESTORED VERBATIM 2026-09-05 ~22:4xZ by lane `edge-basis-moneyline`, not
+  written from scratch.** `check_lane_invariants.py` reported this slug as a
+  live marker (`.current-lane.520cd594-...`) whose block was "in NO ledger file"
+  — destroyed, or never written down. It was neither: the block existed, complete,
+  in this lane's OWN worktree `C:	mp\syndicate-sessions
+caaf-live-resim-wire`,
+  in an UNCOMMITTED `.syndicate/lanes.md`. Every line from `- Goal:` down is that
+  block unedited. Two things were changed and both are named here: the header's
+  ASCII hyphens became U+2014 (lane-guard BLOCKS a lane whose own header uses
+  hyphens, so the owner would have been locked out of its own files), and the
+  `Files:` line is re-stated below against a ledger that MOVED since the original
+  collision check.
+- **THIS LANE HAS STAGED, UNCOMMITTED WORK AND NO COMMITS.** Its worktree is at
+  `c27e9c04` with `origin/main..HEAD` EMPTY and four paths in its index:
+  `scripts/run_refresh_worker.py`, `syndicate/blueprints/ops.py`,
+  `syndicate/features/shared/artifact_publisher.py` (all M, staged) and
+  `tests/test_ncaaf_live_resim_wiring.py` (A, staged). Nothing is pushed. If that
+  worktree is removed the work is gone — commit it before anything else.
+- Goal: `build_live_lens_snapshot` runs on refresh-worker's tick and writes
+  `data/live/ncaaf_live_lens.json`, so a live NCAAF board row carries an edge
+  priced off a probability that knows the score. ONE testable outcome:
+  `/api/ops/live-lens/snapshot-index?sport=ncaaf` reports
+  `sources_seen {live_resim: N}` with N equal to the live-and-resumable count,
+  AND a live NCAAF row whose `projection.live_aware` is true.
+- Files: `tests/test_ncaaf_live_resim_wiring.py` (NEW).
+  **THAT IS THE ONLY PATH THIS BLOCK CLAIMS, AND THE OTHER THREE ARE SURFACED
+  RATHER THAN TAKEN.** The original block claimed all four on a collision check
+  that returned FREE; re-run 2026-09-05 ~22:4xZ with the guard's own
+  `claims_by_path` over THREE ledger copies, they no longer agree with each
+  other:
+
+        path                              origin/main    primary tree     this
+                                                         (lane-guard)     lane's wt
+        run_refresh_worker.py             FREE           evaluation-...   FREE
+        blueprints/ops.py                 FREE           render-egress-   FREE
+        artifact_publisher.py             evaluation-... render-egress-   evaluation-...
+        test_ncaaf_live_resim_wiring.py   FREE           FREE             FREE
+
+  contested, NOT claimed here: `scripts/run_refresh_worker.py`,
+  `syndicate/blueprints/ops.py`, `syndicate/features/shared/artifact_publisher.py`.
+  A second claim would break "every claimed file has exactly one OPEN holder" and
+  would guard nothing anyway. `render-egress-transport` has NO block on
+  `origin/main` at all — it exists only in the primary tree's working copy — which
+  is why the two views differ.
+- **AND THE `artifact_publisher.py` COLLISION MAY BE A PARSER ARTEFACT, NOT A
+  DISPUTE — DO NOT RESOLVE IT BY READING.** `evaluation-ledger-projected-mirror`'s
+  own Files line says `artifact_publisher.py` "(one allowlist entry — the file is
+  explicitly RELEASED and NOT CLAIMED)" and `run_refresh_worker.py` "(the autorun
+  call site only)". The parser reads BOTH BACKWARDS: `_claimable_prefix` cuts a
+  line at its FIRST disclaimer marker and keeps what precedes it, so `RELEASED`
+  sitting AFTER `artifact_publisher.py` leaves that path claimed, and drops
+  `run_refresh_worker.py` — which the same sentence intends to KEEP. Both lanes
+  want the same one-line `HOT_ARTIFACT_PATTERNS` addition, so the overlap is real
+  and needs a message, not a re-read. See `learnings.md` 2026-09-05, *"in
+  `lanes.md` a disclaimer AFTER a path does not disclaim it"*.
+- **SCOPED CLAIM ON `artifact_publisher.py`, and the region split is the point.**
+  ONE additive `HOT_ARTIFACT_PATTERNS` entry plus its comment; nothing else in
+  the file -- not the publish path, not `pull_hot_artifacts`, not the size
+  constants, not `EXPORT_ONLY_ARTIFACT_PATTERNS`. `render-egress-transport`
+  holds the same file for "publish + pull transport" and has already released it
+  from `evaluation-ledger-projected-mirror`; I messaged that session before
+  touching it and its own block uses this same region-split convention for
+  `blueprints/ops.py`. My scope in `ops.py` is likewise ONE endpoint,
+  `/api/ops/live-lens/snapshot-index`, which their claim does not name.
+- Ops scope: `snapshot-index` gains `sources_seen` (it already builds the index
+  the diagnostic comes from and threw it away) and the producer's `coverage`
+  block. Read-only; no other route touched.
+- NOT claimed and NOT edited: `syndicate/features/ncaaf/live_resim.py`,
+  `live_gameline_join.py`, `board_enrichment.py`, `live_lens_loop.py` (all held
+  by `ncaaf-live-resim`); `scripts/generate_smartsim2_ncaaf_projections.py`,
+  `syndicate/features/ncaaf/sources.py` (held by `ncaaf-games-cache-refresh`);
+  `scripts/poll_ncaaf_live_state.py`. Every one of those is imported READ-ONLY,
+  the precedent being `ncaaf/live_game_state.py` importing `poll_ncaaf_live_state`.
+- **STALE SINCE THIS BLOCK WAS WRITTEN:** `live_gameline_join.py` is no longer
+  held by `ncaaf-live-resim` — lane `edge-basis-moneyline` took it on a user
+  override, landed `5ce75195` + `fda5c28a`, and released it; it is FREE now. The
+  `edge_basis` label on live moneyline rows changed from `pregame` to `live`.
+  Read-only here either way, so this lane's scope is unaffected.
+- Hypothesis (diagnostic half, written before testing): the re-sim's two inputs
+  are NOT both durably present on refresh-worker, so a naive wiring publishes an
+  all-refusal snapshot after every deploy and the closing reading is a zero that
+  cannot be told from an inert feature.
+- Falsification test: both inputs resolve under `SYNDICATE_DATA_ROOT` (the
+  mounted disk) and survive a deploy, in which case no mirroring is owed.
+- Verification: the closing reading above, plus the refusal breakdown from
+  `snapshot["coverage"]["refusals_by_reason"]` recorded beside it -- a zero with
+  no breakdown is not a result.
+- **CORROBORATED INDEPENDENTLY, substrate `render` 2026-09-05T21:26Z:**
+  `/api/board/book-grid?sport=ncaaf` returned
+  `live_gamelines: {"supported": false, "reason": "no live re-sim wired for ncaaf"}`
+  with 118 live NCAAF rows on the shortlist and 0 carrying a `live_gameline`
+  block. The premise of this lane holds.
+- Blocked by: nothing technical. **Owner action required:** commit the staged
+  work, then settle the three contested paths with
+  `evaluation-ledger-projected-mirror` and `render-egress-transport` before
+  landing.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
