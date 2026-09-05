@@ -11,6 +11,7 @@ from typing import Any
 from syndicate.features.nba.sources import load_json
 from syndicate.features.nba.sources import season_betting_card_day_path
 from syndicate.features.nba.sources import season_betting_card_manifest_path
+from syndicate.features.shared.source_roots import preferred_source_roots
 
 
 def _safe_float(value: Any) -> float | None:
@@ -69,26 +70,94 @@ def _enrich_recommendation_like_payload(payload: Any) -> Any:
     return payload
 
 
-def _artifact_root() -> Path:
+def _artifact_roots() -> list[Path]:
+    """Candidate roots for NBA `web/` assets, in preference order.
+
+    `SYNDICATE_NBA_ARTIFACT_ROOT` stays FIRST, so every path that resolves
+    today resolves to exactly the same file. What changes is that it is no
+    longer the ONLY root -- and a single-root lookup was structurally unable
+    to serve these two files at all.
+
+    `betting-card-v2.{css,js}` are git-tracked under `data/nba_source/web/`
+    and appear in NO publish allowlist, so nothing ever copies them onto a
+    Render disk; on Render they exist only inside the ephemeral checkout.
+    Production points `SYNDICATE_NBA_ARTIFACT_ROOT` at the DISK
+    (`/opt/render/project/data/nba_source/source_artifacts`), so the old
+    lookup asked the one location the assets can never be in and had no
+    second candidate to fall through to.
+
+    MEASURED IN PRODUCTION 2026-09-05, before the fix:
+
+        404      0 bytes  /nba/assets/betting-card-v2.js
+        404     30 bytes  /nba/assets/betting-card-v2.css
+        200 57,864 bytes  /wnba/assets/betting-card-v2.js
+        200 17,881 bytes  /wnba/assets/betting-card-v2.css
+
+    while `/nba/season/2026/betting-card` (HTTP 200) referenced both of the
+    404s. WNBA served because its copy is VENDORED into the code tree at
+    `syndicate/static/wnba/` -- it never depended on a root at all. The
+    `?v=1` in that page's asset URLs was the same defect showing through
+    `source_betting_card_asset_version`: `1` is its both-files-missing
+    fallback, so the page had been announcing the breakage all along.
+
+    `preferred_source_roots` supplies the remaining candidates and is what
+    `nba/sources.py` in this same package already uses -- this function was
+    the package's lone hand-rolled resolver. It also means these assets now
+    honour `SYNDICATE_DATA_ROOT`, which they never did.
+    """
+    roots: list[Path] = []
+
+    def _append(candidate: Path) -> None:
+        resolved = candidate.resolve()
+        if resolved not in roots:
+            roots.append(resolved)
+
     env_value = str(os.environ.get("SYNDICATE_NBA_ARTIFACT_ROOT") or "").strip()
     if env_value:
-        return Path(env_value).resolve()
-    return (Path(__file__).resolve().parents[3] / "data" / "nba_source").resolve()
+        _append(Path(env_value))
+
+    try:
+        for root in preferred_source_roots(
+            __file__,
+            env_var="SYNDICATE_NBA_SOURCE_ROOT",
+            local_dir_name="nba_source",
+        ):
+            _append(root)
+    except Exception:
+        # `preferred_source_roots` raises when strict hosted storage is on and
+        # no data root is set. An asset route must still answer 404, not 500.
+        pass
+
+    # Unconditional last resort. These assets are git-tracked, so the checkout
+    # is the one root that is present wherever this code is.
+    _append(Path(__file__).resolve().parents[3] / "data" / "nba_source")
+    return roots
+
+
+def _web_asset_paths(filename: str) -> list[Path]:
+    return [(root / "web" / filename).resolve() for root in _artifact_roots()]
 
 
 def source_web_text(filename: str) -> str | None:
-    path = (_artifact_root() / "web" / filename).resolve()
-    try:
-        return path.read_text(encoding="utf-8")
-    except Exception:
-        return None
+    # Resolve PER REQUESTED FILE across the candidate list rather than picking
+    # a root up front -- `source_roots.py` says so in its own comment, and
+    # "does this directory exist" is not "does it hold the file you asked for".
+    for path in _web_asset_paths(filename):
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        except Exception:
+            return None
+    return None
 
 
 @lru_cache(maxsize=1)
 def source_betting_card_asset_version() -> str:
     paths = [
-        _artifact_root() / "web" / name
+        path
         for name in ("betting-card-v2.css", "betting-card-v2.js")
+        for path in _web_asset_paths(name)
     ]
     mtimes: list[int] = []
     for path in paths:
