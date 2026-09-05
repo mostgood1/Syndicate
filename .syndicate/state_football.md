@@ -1804,6 +1804,17 @@ count, and a live NCAAF row on the board carrying an edge whose
 
 **FOUND ON THE WAY, AND IT IS NOT NCAAF'S: A LIVE MONEYLINE EDGE IS LABELLED
 `edge_basis: "pregame"` `[measured 2026-09-05, affects mlb and wnba equally]`.**
+**SCOPE CORRECTION, 2026-09-05 ~23:5xZ, by lane `edge-basis-moneyline` after
+this lane repeated the line above to them unmeasured: "mlb and wnba" is ONE
+SPORT SHORT, and the missing one is the LARGEST.** Priceable live h2h ledger
+records with a final: **soccer 191** (substrate `render`,
+`/api/board/book-grid` `live_gameline_score`), mlb 110 (substrate `checkout`,
+36 captures 08-20..09-05), wnba 14. Soccer only surfaced because they
+MEASURED instead of taking this line's framing; I had quoted it forward as
+fact in a cross-session message, which is how an unmeasured scope
+propagates. Full three-sport version, and the label fix itself (landed
+`5ce75195`): `state_board.md [live-edge-basis-label]`. Kept rather than
+rewritten because the original sentence is what was believed and repeated.
 `live_gameline_join._apply_verdict` sets
 `edge_basis = "live" if live_projected is not None else "pregame"`; the
 DISTRIBUTION branch passes `live_projected`, the MONEYLINE branch does not — yet
