@@ -2052,6 +2052,68 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
         live_index=live_index,
         ratings=ratings,
     )
+    # ####################################################################
+    # THE JOIN KEY IS THE GRID'S SPELLING, AND IT IS NOT THE ARTIFACT'S.
+    # ####################################################################
+    # MEASURED IN PRODUCTION 2026-09-05T23:17:39Z, the first board rebuild after
+    # the first snapshot: the index BUILT correctly -- `index_size 8`,
+    # `sources_seen {live_resim: 8, pregame: 43}` -- and then
+    # `rows_live_gameline_considered 257`, `rows_live_gameline_edged 0`,
+    # `withheld_by_reason {no_live_gameline_projection: 257}`. Every row missed.
+    # Intersection of the two key sets: **ZERO of 8**.
+    #
+    #   lens key, from the projections artifact   grid key, from the odds source
+    #   ('baylor', 'auburn')                      ('baylor bears', 'auburn tigers')
+    #   ('tulane', 'duke')                        ('tulane green wave', 'duke blue devils')
+    #   ('wyoming', 'colorado state')             ('wyoming cowboys', 'colorado state rams')
+    #
+    # `live_gameline_join._norm_team` is a plain lowercase with NO alias table,
+    # deliberately -- its own docstring records that MLB's two sides match
+    # exactly and that reproducing the prop join's alias machinery would import
+    # a 91% miss rate. That is true of MLB because both sides come from one
+    # source. NCAAF's do not: the board grid is named by the ODDS source and the
+    # projections artifact by CFBD.
+    #
+    # SO THE FIX IS TO PUBLISH THE GRID'S SPELLING, and ESPN already has it.
+    # Measured against the 61 live grid keys, over the 8 re-simmed games:
+    #
+    #   ESPN `displayName`        7 / 8      <- this one
+    #   ESPN `location`           0 / 8      (what the artifact uses)
+    #   ESPN `shortDisplayName`   0 / 8
+    #   ESPN `name`               0 / 8
+    #
+    # `build_live_gameline_index` reads `matchup.away.name` / `matchup.home.name`
+    # FIRST and falls through to `away_name`/`home_name`, taking the first shape
+    # that yields both -- so stamping `matchup` here changes the key without
+    # touching that function and without disturbing `away_name`/`home_name`,
+    # which stay the artifact's own spelling for anyone reading the payload.
+    #
+    # THE 8th IS NAMED, NOT PAPERED OVER: ESPN says `sam houston bearkats` and
+    # the grid says `sam houston state bearkats`. One alias would fix tonight's
+    # miss and would be a guess about the odds source's naming everywhere else;
+    # the counter reports it as `no_live_gameline_projection` by name, which is
+    # what a residual should look like. 7 of 8 is the honest number.
+    #
+    # Games with no ESPN row get NO `matchup` and fall through to the artifact
+    # spelling -- they are refused (`no_live_state`) either way, and inventing a
+    # key for them would only make a miss harder to attribute.
+    for game_entry in snapshot.get("games") or ():
+        if not isinstance(game_entry, dict):
+            continue
+        state_row = live_index.get(
+            f"{_norm_name(game_entry.get('away_name'))}@{_norm_name(game_entry.get('home_name'))}"
+        )
+        if not isinstance(state_row, Mapping):
+            continue
+        # `_game_from_event` returns ESPN's `displayName` under these two keys.
+        away_display = str(state_row.get("away_team") or "").strip()
+        home_display = str(state_row.get("home_team") or "").strip()
+        if away_display and home_display:
+            game_entry["matchup"] = {
+                "away": {"name": away_display},
+                "home": {"name": home_display},
+            }
+
     # PROVENANCE ON THE OUTPUT, not in a log line. `smartsim2_projection.py`'s
     # own `profile_source` comment is the precedent: a boot-time print is weakly
     # reachable, and the question "which ratings produced this probability" has

@@ -406,10 +406,16 @@ def test_the_tick_publishes_a_snapshot_the_board_join_accepts(tmp_path, monkeypa
     # compared against something.
     assert diagnostics["sources_seen"] == {"live_resim": 1}
     assert diagnostics["accepted_sources"] == ["live_resim"]
-    assert list(index) == [("baylor", "auburn")]
+    # THE GRID'S SPELLING, not the artifact's. This assertion originally read
+    # `("baylor", "auburn")` and PASSED, because this fixture builds both sides
+    # from the same names -- so it could not express the disagreement that
+    # production has between the odds source and CFBD. See
+    # `test_the_snapshot_is_keyed_on_the_GRID_spelling_not_the_artifacts`.
+    key = ("baylor mascots", "auburn mascots")
+    assert list(index) == [key]
     # Auburn up 28 with 15 seconds left in the 4th. If this is not ~1.0 the
     # resumed state never reached the engine.
-    assert index[("baylor", "auburn")]["home_win_prob"] == pytest.approx(1.0)
+    assert index[key]["home_win_prob"] == pytest.approx(1.0)
 
 
 def test_a_game_with_no_rating_refuses_by_name_and_the_join_withholds(tmp_path, monkeypatch):
@@ -525,3 +531,78 @@ def test_the_snapshot_carries_its_own_ratings_provenance(tmp_path, monkeypatch):
     assert snapshot["spRatingsTeams"] == 2
     assert snapshot["week"] == 1
     assert snapshot["espnFetch"]["fetch_failures"] == 0
+
+
+def test_the_snapshot_is_keyed_on_the_GRID_spelling_not_the_artifacts(tmp_path, monkeypatch):
+    """THE DEFECT PRODUCTION FOUND, pinned. 0 of 8 became 7 of 8.
+
+    Measured 2026-09-05T23:17:39Z on the first board rebuild after the first
+    snapshot: the index built perfectly -- `index_size 8`, `sources_seen
+    {live_resim: 8, pregame: 43}` -- and every one of 257 considered rows was
+    withheld as `no_live_gameline_projection`. The two key sets did not
+    intersect at all:
+
+        lens, from the projections artifact   grid, from the odds source
+        ('baylor', 'auburn')                  ('baylor bears', 'auburn tigers')
+        ('tulane', 'duke')                    ('tulane green wave', 'duke blue devils')
+
+    `_norm_team` has no alias table on purpose, so the producer has to publish
+    the spelling the grid uses. ESPN's `displayName` matched 7 of 8 live grid
+    keys; `location`, `shortDisplayName` and `name` each matched 0.
+
+    THIS TEST WOULD HAVE CAUGHT IT AND THE ORIGINAL SUITE COULD NOT, which is
+    the part worth keeping: every earlier test built the grid row from the same
+    names as the projection, so the two sides agreed by construction. A fixture
+    that cannot express the disagreement cannot test the join.
+    """
+    _wire_tick(
+        monkeypatch, tmp_path,
+        events=[_espn_event(
+            away_loc="Baylor", home_loc="Auburn", away_id="239", home_id="2",
+            period=4, clock="0:15", away_score="7", home_score="35",
+        )],
+        projections=[_FakeProjection("Baylor", "Auburn")],
+        ratings_teams={"baylor": (25.0, 20.0), "auburn": (28.0, 18.0)},
+    )
+    rw._run_ncaaf_live_resim_tick()
+
+    from syndicate.features.ncaaf.live_resim import live_lens_snapshot_path
+    from syndicate.features.shared.live_gameline_join import (
+        build_live_gameline_index, lens_sources_for_sport,
+    )
+    from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+    snapshot = read_json_file(live_lens_snapshot_path(data_root()))
+    game = snapshot["games"][0]
+    # The artifact's own spelling is PRESERVED for a human reading the payload.
+    assert (game["away_name"], game["home_name"]) == ("Baylor", "Auburn")
+    # The GRID's spelling is what the join keys on. `_espn_event` builds
+    # `displayName` as "<location> Mascots", standing in for "Baylor Bears".
+    assert game["matchup"] == {"away": {"name": "Baylor Mascots"},
+                               "home": {"name": "Auburn Mascots"}}
+
+    index = build_live_gameline_index(snapshot, sources=lens_sources_for_sport("ncaaf"))
+    assert list(index) == [("baylor mascots", "auburn mascots")]
+    # And NOT the artifact spelling -- asserting the negative too, because a key
+    # that happened to carry both would pass the positive and still be ambiguous.
+    assert ("baylor", "auburn") not in index
+
+
+def test_a_game_with_no_espn_row_gets_no_matchup_key(tmp_path, monkeypatch):
+    """Absence stays absent. Inventing a key for an unmatched game would turn a
+    named `no_live_state` refusal into an unattributable join miss."""
+    _wire_tick(
+        monkeypatch, tmp_path,
+        events=[],
+        projections=[_FakeProjection("Baylor", "Auburn")],
+        ratings_teams={"baylor": (25.0, 20.0), "auburn": (28.0, 18.0)},
+    )
+    rw._run_ncaaf_live_resim_tick()
+
+    from syndicate.features.ncaaf.live_resim import live_lens_snapshot_path
+    from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+    snapshot = read_json_file(live_lens_snapshot_path(data_root()))
+    game = snapshot["games"][0]
+    assert "matchup" not in game
+    assert game["gameLens"][0]["liveResimRefusal"] == "no_live_state"
