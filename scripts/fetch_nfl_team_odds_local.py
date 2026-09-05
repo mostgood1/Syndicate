@@ -294,11 +294,54 @@ def _append_nfl_team_book_quotes(events: list[dict[str, Any]]) -> None:
 
 
 def _nfl_segment_market_map() -> dict[str, tuple[str, str]]:
-    """`#343`: full-game + Q1-Q4/H1-H2 from the shared vocabulary, used both to
-    REQUEST the keys and to TAG the returned quotes so the two cannot drift."""
+    """Full-game + Q1-Q4/H1-H2 from the shared vocabulary, for TAGGING.
+
+    **THE DOCSTRING THIS REPLACES WAS FALSE, and it is worth saying how.** It
+    claimed these keys were used *"both to REQUEST the keys and to TAG the
+    returned quotes so the two cannot drift"*. They were only ever tagged with.
+    `main()` calls `fetch_odds(api_key=..., region=...)` and never passes
+    `markets=`, so the literal default `"h2h,spreads,totals"` went out and the
+    36 segment keys reached `quote_rows_from_oddsapi_events` alone -- where a
+    key that never arrived can never be tagged.
+
+    The result was dead code that read as alive at every level: the map is
+    built, it is passed, `tests/test_all_sports_segment_wiring.py` asserted the
+    token `segment_market_keys("nfl")` was present in this file and PASSED, and
+    production NFL shards carried zero segment rows. A token is not a request --
+    `learnings.md`: presence is not reachability.
+
+    Requesting is now `_fetch_nfl_segments()` below, on the PER-EVENT endpoint,
+    because the bulk route this function's map was aimed at 422s
+    `INVALID_MARKET` on every one of these keys.
+    """
     from syndicate.features.shared.market_segments import full_game_market_keys, segment_market_keys
 
     return {**full_game_market_keys(), **segment_market_keys("nfl")}
+
+
+def _fetch_nfl_segments(api_key: str, events: list[dict[str, Any]], *, sport_key: str = "americanfootball_nfl") -> list[dict[str, Any]]:
+    """Half/quarter prices for the in-window events, via the PER-EVENT route.
+
+    Same shared implementation NCAAF uses (`shared/segment_odds_fetch.py`), on
+    purpose: this file and the preseason one already carried two near-identical
+    copies of the segment map, and `learnings.md` records a THIRD instance of
+    the same two-copy failure -- *"a comment asking a human to remember is not a
+    control"*.
+
+    **Absent means OFF.** With `SYNDICATE_NFL_SEGMENT_MARKETS` unset this makes
+    no call and spends no credit.
+    """
+    from syndicate.features.shared.segment_odds_fetch import fetch_event_segments
+
+    payloads, _stats = fetch_event_segments(
+        api_key=api_key,
+        sport="nfl",
+        sport_key=sport_key,
+        base_url=get_base_url(),
+        events=events,
+        log_prefix="[nfl_odds]",
+    )
+    return payloads
 
 
 def main(*, data_dir: Path | None = None) -> Path:
@@ -307,11 +350,16 @@ def main(*, data_dir: Path | None = None) -> Path:
         raise RuntimeError("Missing ODDS_API_KEY environment variable")
     region = _env("ODDS_API_REGION", "us") or "us"
     events = fetch_odds(api_key=api_key, region=region)
+    # The segment pass, on the per-event endpoint. Default OFF; see
+    # `_fetch_nfl_segments`. Concatenated rather than merged: `_KEY_FIELDS` in
+    # `odds_book_quotes` carries `segment`, so a full-game row and an `h1` row
+    # on the same event/book/market are distinct keys.
+    segment_payloads = _fetch_nfl_segments(api_key, events)
     # #209 Class A: build_unified_lines keeps ONE book per event
     # (choose_bookmaker) out of a response that already carries several. The
     # unified single-book payload below is unchanged -- the quote log keeps the
     # rest, which is what CLV and best-price grading need.
-    _append_nfl_team_book_quotes(events)
+    _append_nfl_team_book_quotes(events + segment_payloads)
     payload = build_unified_lines(events)
     return write_daily_lines(payload, data_dir=data_dir or Path(__file__).resolve().parents[1] / "data")
 
