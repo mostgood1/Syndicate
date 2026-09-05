@@ -2301,6 +2301,39 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: a full `pytest tests/` run ends with the 12 passing and the pre-existing 37 unchanged — no new failures, none of the 37 masked.
 - Blocked by: none.
 
+### ncaaf-live-resim — OPEN — opened 2026-09-05 — session 3492626c — NCAAF has a full live slate and produces NO live-aware model edge
+- Goal: establish whether smartsim2 can be re-run from mid-game state, and if it
+  can, ship the SMALLEST live-aware path — one market family (moneyline / h2h),
+  one worker-published artifact, one join, and a refusal that never falls back to
+  the pregame probability.
+- Files (collision-checked 2026-09-05 with `.claude/hooks/lane_claims.py`'s own
+  `claims_by_path` over `.syndicate/lanes.md` — the guard's parser, not
+  `check_lane_invariants`; every path below returned FREE):
+  `syndicate/features/football/sim_engine/smartsim2/game_simulator.py`,
+  `syndicate/features/football/sim_engine/smartsim2/contracts.py`,
+  `syndicate/features/ncaaf/live_resim.py` (NEW),
+  `tests/test_ncaaf_live_resim.py` (NEW),
+  `tests/test_smartsim2_resume_state.py` (NEW).
+  NOT claimed and NOT edited: `run_live_odds_refresh_worker.py`
+  (held by `ncaaf-live-cadence`), `generate_smartsim2_ncaaf_projections.py` and
+  `ncaaf/sources.py` (held by `ncaaf-games-cache-refresh`),
+  `test_ncaaf_chip_join_key.py` (held by `ncaaf-chip-compact`).
+- **HYPOTHESIS (written before testing): smartsim2's STATE MACHINE can resume from
+  mid-game while its ENTRYPOINT cannot.** `build_initial_possession_state` already
+  takes `quarter`, `clock_remaining`, `score_home` and `score_away`;
+  `simulate_game` hard-codes `quarter=1`, `clock_remaining=quarter_seconds`, passes
+  no score at all, and loops `for quarter in range(1, quarters + 1)`. If that is
+  right, a rest-of-game re-sim is a contract change, not a modelling rebuild.
+- Falsification test: the drive/play layer depends on being at game start in some
+  way a resumed state cannot express (a prior keyed on drive_index, a clock
+  assumption, an opening-possession assumption).
+- Verification: (a) a resume test — a rest-of-game sim at `Q4 0:15, home +21`
+  returns home win prob ≈ 1.0 while the same teams at `Q1 15:00` return the
+  pregame rate; (b) a refusal test — a game the re-sim could not price carries a
+  NAMED blank and never the pregame probability.
+- Blocked by: nothing. **NO DEPLOY TAKEN, no env var changed** [instruction
+  2026-09-05].
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
