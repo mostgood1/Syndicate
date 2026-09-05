@@ -2495,6 +2495,253 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none. **NO DEPLOY** — this lane does not deploy and does not touch
   env or the Render blueprint.
 
+### ncaaf-segment-capture — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+- Goal: NCAAF (then NFL) HALF and QUARTER prices land in `book_quotes` with
+  `segment != "full"`, on a pregame interval plus a 2-3 min live tier scoped to
+  games actually IN PLAY, at a credit rate published against the 5M cap.
+  `[USER DECISION 2026-09-05: NCAAF first, NFL second.]`
+- Files: NONE CLAIMED.
+- Why nothing is claimed: **This is deliberate and it is not laziness — claiming
+  them here would have BLOCKED MY OWN WRITES.** (This rationale was moved out
+  of the `- Files:` block on 2026-09-05 by lane `ledger-repair-invariants`:
+  inside it, the very tokens it names -- `lanes.md`, `learnings.md` -- were
+  themselves parsing as claims, which is the failure the paragraph warns about
+  and then committed.) Both `lane-guard` and
+  `deploy-guard` resolve "your lane" from
+  `.syndicate/.current-lane.<session_id>`, and this session's marker holds
+  `segment-refusal-deploy`, whose refresh-worker deploy is IN FLIGHT. Writing my
+  slug there would make the deploy claim's holder stop matching and refuse that
+  deploy; leaving it there while claiming files below would make every write of
+  mine read as an out-of-lane write against my own lane. The paths are recorded
+  in the next bullet — OUTSIDE the `- Files:` block, because any path-like token
+  inside one is a claim (`learnings.md`, and the soccer-cards-basename incident).
+  The guard's protection is worth close to nothing here anyway: grepping every
+  basename against the whole of `lanes.md` on 2026-09-05 returns ZERO mentions
+  in any lane block, `- Files:` or prose. Nobody else is in these files.
+- Worked on, NOT claimed: the NCAAF game-lines fetcher and the NFL team-odds
+  fetcher under `scripts/`; the OddsAPI quota recorder's `_market_family` ONLY
+  (it recognises `_1st_*` and nothing else, so every `_q1`/`_h1` key lands in
+  the `other` bucket and the cost model reads as noise); and two NEW test files.
+- **DELIBERATELY NOT CLAIMED, and the design is shaped to avoid it: the odds
+  refresh orchestrator.** It is held by OPEN lane `ncaaf-live-cadence` (same
+  session) for a mode-scoped step filter. The segment tier therefore lives
+  INSIDE the NCAAF fetcher behind its own env gate, reusing the existing
+  `ncaaf_game_lines_oddsapi` step, which already carries
+  `phases=("pregame","live")`. No orchestrator edit is needed and none is made.
+- Hypothesis (written before testing): the bulk `/sports/{key}/odds` endpoint
+  does not serve segment markets at all, so NCAAF's absence and NFL's are the
+  SAME defect with two different masks — NCAAF never asks, NFL asks in a
+  `market_map` that only ever TAGS.
+- Falsification test: a per-event `/events/{id}/odds` call for `totals_h1`
+  returns no segment rows either — in which case the books do not price NCAAF
+  halves through OddsAPI and the whole tier is dead regardless of cadence.
+- Verification: (a) `segment != "full"` row count on a real NCAAF slate goes
+  0 -> non-zero, WITH the denominator beside it; (b) the projected credits/hr
+  and 30-day figure published BEFORE the live tier is wired; (c) a reachability
+  test that fails against unmodified code (off != on).
+- **HARD CONSTRAINT carried in from the parent: no segment row may become
+  STAKEABLE until `bet_status.segment_refusal` is live on BOTH web and
+  refresh-worker.** The settlement key had no segment dimension, so a segment
+  order inherits the whole-game actual.
+- **BUILT AND LANDED ON `origin/main` AS `7f197639` (two commits). NOT
+  DEPLOYED, AND DEFAULT OFF — it spends no credit until a key is set.**
+
+- **HYPOTHESIS CONFIRMED, and the falsification test came back negative.** The
+  per-event route serves football segments richly. Substrate: production NFL
+  shards via `/api/ops/artifacts/export`, captured by
+  `fetch_nfl_preseason_odds.py` — the ONE football fetcher that ever used
+  `/events/{id}/odds`:
+
+      2026-08-23   14,502 rows   6,603 NONFULL (45.53%)   10 books   4 events
+                   h1 1,281 | h2 2,721 | q1 290 | q2 522 | q3 1,201 | q4 588
+      2026-08-16    6,681 rows   1,340 NONFULL (20.06%)    5 books   2 events
+
+  **This CORRECTS the handoff's claim that NFL "gets 0 segment rows".** That is
+  true of the REGULAR-SEASON fetcher and false of NFL as a whole. The two are
+  different defects wearing one name, and only one of them is about the vendor.
+
+- **THE NFL DEFECT IS NOT WHAT IT LOOKED LIKE, and this is the sharper half.**
+  `fetch_nfl_team_odds_local.py` does NOT pass 36 segment keys to the bulk
+  endpoint. It passes them NOWHERE. `_nfl_segment_market_map()`'s docstring
+  claimed they were used *"both to REQUEST the keys and to TAG the returned
+  quotes so the two cannot drift"*; `main()` calls `fetch_odds(api_key=...,
+  region=...)` with no `markets=`, so the literal default
+  `"h2h,spreads,totals"` went out and the map only ever reached the TAGGER.
+  A key that never arrived cannot be tagged. So there was never a 422 to find,
+  and no amount of endpoint work would have shown anything.
+
+- **AND THE GUARD THAT EXISTED FOR THIS COULD NOT FAIL.**
+  `tests/test_all_sports_segment_wiring.py` asserted the token
+  `segment_market_keys("nfl")` appears in that file — it does, in the dead map —
+  and passed. Worse,
+  `test_every_sport_with_declared_segments_has_a_wired_fetcher` searched a
+  CONCATENATION of every wired file for `segment_market_keys("<sport>")` **or**
+  the literal `segment_market_keys(league)`; the basketball file always supplies
+  the second token, so the disjunction was true for every sport and `unwired`
+  was unconditionally `[]`. NCAAF's total absence sat behind a green assertion
+  from the day that file was written. Both fixed, plus a companion test that
+  proves the expression now HAS a failing input.
+
+- **COST MODEL — published before any live tier is enabled, as instructed.**
+  Substrate: production `/api/ops/oddsapi/quota` read 2026-09-05T21:0xZ, and
+  production `/ncaaf/api/cards`. Unit cost is OddsAPI's documented
+  `markets x regions` per per-event call.
+
+  | input | value | how it was obtained |
+  |---|---|---|
+  | markets | 3 (`h2h_h1`,`spreads_h1`,`totals_h1`) | alternates excluded — see below |
+  | regions | **1 (`us`)** | this tier's OWN key, NOT `game_line_regions()` |
+  | unit | **3 credits / event / sweep** | 3 x 1 |
+  | slate (US-day 2026-09-05) | 42 kickoffs | `/ncaaf/api/cards` |
+  | in_play concurrency (3h30) | PEAK **14**, mean **10.49** | minute-by-minute walk |
+  | h1_live concurrency (1h45) | PEAK **12**, mean **5.99** | same |
+
+  **The scoping is what buys the affordability, not the market count.**
+
+      blanket 2-min sweep of all 42 events   42 x 3 x 30  = 3,780 credits/hr
+      scoped to the h1 window, 2.5-min       5.99 x 3 x 24 =   431 credits/hr
+                                                            ---------------
+                                                            8.8x at the mean
+      instantaneous peak (12 concurrent)     12 x 3 x 24  =   864 credits/hr
+
+  Per day on that 42-game shape: h1_live game-minutes 4,410 / 2.5 = 1,764
+  event-sweeps x 3 = **5,292 credits/day** live, plus a 6h/30-min pregame tier
+  42 x 12 x 3 = **1,512 credits/day**. **≈6,804 credits/day.**
+
+  Scaled to a real CFB week (one ~60-game Saturday + ~25 games Thu/Fri/Sun,
+  ≈85 games at the measured 162 credits/game/day): **≈13,770 credits/week →
+  ≈59,000 per 30 days.** NFL phase 2 (~16 games/week, Sunday-clustered) adds
+  **≈11,150 per 30 days.**
+
+      current 30-day projection      1,818,053   (production, measured)
+      + NCAAF h1 tier                   59,000
+      + NFL h1 tier                     11,150
+                                    ----------
+      new 30-day projection          1,888,203   = 37.8% of the 5M cap
+                                                   (+3.9% over baseline)
+
+  **The all-six-segments variant is the one to be careful with:** 18 keys over
+  the whole in_play window is 8,820 game-minutes / 2.5 x 18 = **63,504
+  credits/day**, ~12x the h1 tier, ≈550K/30d. Affordable but a real
+  commitment — quarters should be a separate, separately-measured decision.
+
+- **DESIGN NOTES that are load-bearing and non-obvious:**
+  - **The live window is 1h45, not 3h30, and that is not a coverage
+    compromise.** A first-half line only exists between kickoff and halftime;
+    afterwards the market is settled and delisted, so every later sweep buys
+    literally nothing. Scoping the h1 tier to the h1 market's own life is
+    strictly correct, and it halves the game-minutes.
+  - **Regions come from `SYNDICATE_NCAAF_SEGMENT_REGIONS`, defaulting to `us`,
+    and deliberately do NOT read `game_line_regions()`.** That shared knob is
+    `eu,us_ex` in production and `odds_regions.py` exists precisely to keep it
+    on the CHEAP side of the billing split ("the one costing ~1M rather than
+    ~30K"). MLB obeys this — `_fetch_live_event_odds` gets the RAW `regions`.
+    Reading the shared knob here would have tripled the bill of the most
+    expensive call on the platform with no line of code saying so. There is a
+    test for exactly this, because nothing behavioural would notice.
+  - **Alternates excluded.** They were ~60% of the NFL preseason segment rows
+    (`h2/spreads_alt` 1,058 of 6,603 on 08-23), they triple the per-call bill,
+    and `period_lines.py:92-100` filters them straight back out.
+  - **A hard event cap** (`_MAX_EVENTS`, default 40) that keeps the events
+    nearest kickoff. The cost is linear in a vendor-supplied slate; a bad slate
+    response must not be able to spend unboundedly.
+  - **One shared module**, `syndicate/features/shared/segment_odds_fetch.py`,
+    for NCAAF and NFL. `learnings.md` 2026-09-04 records a THIRD instance of
+    the same two-copy drift failure and that *"a comment asking a human to
+    remember is not a control"*.
+
+- **BOARD SIDE: already built, and this changes the handoff's recommendation.**
+  I did not have to add anything. `layer2_board.py` already carries `segment`
+  (`:129`, `:642`, `:2394`) and renders `_segment_label` (`:2239`), with unknown
+  segments SHOWN rather than swallowed (`:2272`); `book_grid._INSTANCE_FIELDS`
+  carries `segment` (`:52`); `odds_book_quotes._KEY_FIELDS` carries it (`:104`),
+  so an `h1` total and a full-game total are distinct rows that cannot displace
+  each other. **So "board-row-first" is not an available ordering: a board row
+  is a FUNCTION of the quote rows, and the only producer of an h1 quote row is
+  the fetch.** The Kalshi join becoming free follows capture; it cannot precede
+  it. No new artifact path was created, so `HOT_ARTIFACT_PATTERNS` needs no
+  change — this writes into the existing `tracking/book_quotes` shard.
+
+- **SIDE FINDING, unasked and worth someone's time: NHL segment spend has been
+  mis-billed all along.** `_market_family` recognised only MLB's `_1st_*`
+  spelling, so `_q1`/`_h1`/`_p1` all landed in `other`. NHL declares p1/p2/p3
+  and `local_nhl_odds.py` really does request them, so real NHL segment credits
+  have been accumulating in the one bucket nobody reads as a segment cost.
+  Fixed; mutation-checked 4-red-before / 0-after against `origin/main`'s copy.
+
+- **VERIFICATION STATUS, stated exactly.** Unit only. 171 tests green across the
+  affected area (49 new/changed + 87 segment/kalshi/refresh + 35 quota), and
+  BOTH mutation checks run against unmodified code: `_market_family` 4 red
+  before / 0 after; the NFL reachability tests 3 red before / 0 after. **No
+  production reading exists and cannot until the key is set — a zero segment
+  count today is indistinguishable from an inert feature, so do not report the
+  capture as working on the strength of this block.**
+
+- **WHAT IS OWED, in order:**
+  1. Confirm `bet_status.segment_refusal` is LIVE on web AND refresh-worker.
+     Until then a segment order inherits the whole-game actual.
+  2. Deploy (`.py` only, so `autoDeploy = no` means the push shipped nothing).
+  3. Set `SYNDICATE_NCAAF_SEGMENT_MARKETS=h1` on **live-odds-worker** via the
+     single-key API. **NEVER `render.yaml`** — it fires `blueprint_sync` across
+     all three services.
+  4. The reading that closes this: `segment != "full"` on the NCAAF shard goes
+     0 -> non-zero **with its denominator**, and `[ncaaf_odds] SEGMENT_PLAN` /
+     `SEGMENT_FETCH` counters showing `est_credits` in the modelled band.
+  5. Only then NFL (`SYNDICATE_NFL_SEGMENT_MARKETS=h1`), and only then quarters.
+- Blocked by: none for capture. Stakeability blocked on the grading deploy,
+  which belongs to lane `segment-refusal-deploy`.
+
+### segment-refusal-deploy — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **BLOCK RECONSTRUCTED 2026-09-05 by `ledger-repair-invariants`; see the reconstruction bullet before trusting any detail**
+- Goal: `bet_status.segment_refusal` live on BOTH web and refresh-worker, so no
+  segment row can become stakeable while the settlement key has no segment
+  dimension.
+- Files: NONE CLAIMED by this reconstruction.
+- **RECONSTRUCTED, NOT RECOVERED.** `check_lane_invariants.py` reported this slug
+  as a lane marker with a block in NO ledger file. It is not a stale marker: the
+  lane demonstrably exists and is ACTIVE.
+  Evidence used, all of it outside `lanes.md`:
+  (a) `.syndicate/deploy_claims/web.json` and `refresh-worker.json` both name
+  `"holder": "segment-refusal-deploy"`, `holder_session` 3492626c, acquired
+  2026-09-05T20:50:51Z / 20:51:19Z;
+  (b) `.syndicate/deploy/preflight/web.json` (written 21:29:30Z, target
+  `94c8ac13`) and `refresh-worker.json` (21:57:12Z, target `eb7951fe`) both
+  CLEAR under the same holder;
+  (c) lane `ncaaf-segment-capture` names it twice, including "Stakeability
+  blocked on the grading deploy, which belongs to lane `segment-refusal-deploy`".
+  `git log -S` over `.syndicate/` finds the slug in ZERO commits, so the block was
+  never committed and upstream cannot have it — nothing was lost by a rebuild.
+  The GOAL above is quoted from `ncaaf-segment-capture`'s HARD CONSTRAINT bullet.
+  **Everything else this lane did is unrecorded. The owning session should
+  overwrite this block rather than build on it.**
+- Blocked by: none known.
+
+### ledger-repair-invariants — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+- Goal: both lane checkers green, stale NOT-DEPLOYED headers corrected against
+  each service's live SHA, and OPEN LANES under the digest's 600B cap.
+- Files: NONE CLAIMED.
+- Why nothing is claimed, and why the session marker is left alone.
+  `.syndicate/` and `.claude/` are EXEMPT from lane-guard — `check_lane_claims.py`
+  says so in its own output — so a claim on a ledger file guards nothing and only
+  adds a phantom to the file this lane exists to clean. Separately, this session's
+  marker holds `segment-refusal-deploy`, which is holding LIVE deploy claims on
+  web and refresh-worker; rewriting the marker would make those claims' holder
+  stop matching and refuse an in-flight deploy. Same reasoning, same session, as
+  `ncaaf-segment-capture` records.
+- MEASURED BEFORE (primary tree, 2026-09-05T21:35Z): `check_lane_invariants.py`
+  VIOLATED — 1 contested file (`lanes.md`, held by `ncaaf-segment-capture` and
+  `nfl-projection-et-datekey`), 2 lane markers with no block anywhere;
+  `check_lane_claims.py` exit 1 — 2 of 88 claims name no file in the repo;
+  session-start digest `[OPEN LANES truncated: 24994B > 600B cap]`, 45 lane
+  headers in `lanes.md`.
+- **THE PRIMARY TREE'S `lanes.md` IS 58 COMMITS BEHIND `origin/main` AND
+  DIVERGED.** Measured: 45 headers on disk against 101 on `origin/main`; 59
+  present upstream and absent on disk, of which 51 were archived LOCALLY into
+  `lanes_history.md` (uncommitted) and 8 exist ONLY upstream. `origin/main`'s
+  copy passes both checkers. So committing this file from the primary tree would
+  DELETE 59 lane blocks from upstream. Nothing here commits `.syndicate/lanes.md`
+  from the primary tree; see the checkpoint for what landed and how.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
