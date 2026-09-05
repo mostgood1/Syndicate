@@ -62,6 +62,20 @@ same expected effect, same measurement, same reader.
 
 **verify:** _(empty — this row is an open obligation)_
 
+## 2026-09-05 23:07:13-23:12:36Z — refresh-worker `eb7951fe` -> `ffe8714b` — **DEPLOYED BY LANE `ncaaf-live-resim-wire` FROM THE TIP, carrying this lane's change. THE OWED ESPN VERIFICATION IS DISCHARGED, POSITIVE.** — lane `render-egress-transport`
+
+- **I did not take this deploy and I did not take a lock.** `ncaaf-live-resim-wire` held `refresh-worker`, retargeted its poller to the tip and shipped it, which is why this landed at all. The readings below are MINE — that lane explicitly declined to report them as my verification, which was the right call, and I re-derived every one from the Render logs API rather than recording what was relayed.
+- **verify (1) — THE ONE MY DEV-BOX NUMBERS COULD NOT TEST. ESPN ACCEPTS `Accept-Encoding: gzip` FROM RENDER'S OUTBOUND IP.**
+  `2026-09-05T23:15:51.380Z [refresh_worker] NCAAF_LIVE_RESIM ... "espn": {"dates": ["2026-09-05"], "events": 68, "fetch_failures": 0, "in_progress": 20, "keyed": 68}`
+  That is `poll_ncaaf_live_state._fetch_scoreboard` — **the exact function whose docstring pins "no custom headers: urllib's own default User-Agent is what ESPN accepts from Render"** — running through the global opener. A 403 would read `fetch_failures: 1` and an empty index. `schedule_adapter.py:377-386`'s hazard is real and this header does not trip it.
+- **verify (2) — `ACCEPT_ENCODING_REFUSED`: ZERO, and this null IS readable.** The emitter exists at `http_compression.py:345`; checked before drawing anything from its absence. No host has refused, ESPN included.
+- **verify (3) — THE PUBLISH-SIDE GZIP IS WORKING IN PRODUCTION, measured on the wire.** Over 42 `PUBLISH_OK` lines in the 10 minutes after boot:
+  **12 streamed publishes, `raw_bytes` 138,272,659 -> `bytes` 10,660,391 on the wire — 13.0x, 122 MB removed.** Per file: soccer book_grid 18,774,103 -> 1,369,013 (13.7x); mlb 13,677,409 -> 1,132,154 (12.1x); ncaaf 4,696,474 -> 499,719 (9.4x).
+- **NOT READABLE, AND MUST NOT BE PUT IN A ROW AS EVIDENCE: `HTTP_COMPRESSION` silence.** `_bump` gates on `responses_gzip % _LOG_EVERY == 0` with `_LOG_EVERY = 200` (`http_compression.py:99,133`), so ~10 min post-boot the counter has not reached 200. Silence is indistinguishable from an unreachable emitter — the one thing it exists to distinguish.
+- **INSTRUMENT DEFECT, mine, found by trying to use it: an instrument whose FIRST reading requires 200 events cannot verify its own deploy.** The counter is correct for steady state and useless for the moment anyone actually needs it. Fix is to emit the first line early (n=1, then every 200) or on a time basis. Recorded, not yet fixed.
+- **GAP FOUND, quantified, NOT fixed: the JSON-envelope publish path is still uncompressed.** gzip was scoped to the streamed path (>4 MiB) only. In the same window **30 of 42 publishes took the envelope path and shipped 26,806,498 bytes uncompressed**, largest single body **4,417,620 B**. That is the next obvious win on this transport and it is a one-line threshold decision, not a redesign.
+- **DO NOT read any of this as a bandwidth saving.** Every byte above is INTERNAL worker->web traffic, which is not billed (2026-09-05 04:00-05:00Z: 5,243 MB of it metered 33.9 MB). What 122 MB/10 min buys is **memory and time on the 2 GB web receiver**, which `#632` says is the scarce resource. The BILLED win from this change is the outbound ESPN/feed fetches, and verify (1) is what proves that path works at all.
+
 ## 2026-09-05 23:1xZ — **CORRECTION to the row below: the duplicate `Vary` is real, but the CAUSE I recorded for it is wrong, and so is the fix.** — lane `render-egress-transport`
 
 - **What I wrote:** "`compress_response` appends when `"accept-encoding" not in response.headers.get("Vary", "")`, and `.get` reads only the FIRST of a repeated header. Fix is `headers.set`, not append."
