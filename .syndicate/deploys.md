@@ -7,6 +7,61 @@
 
 
 
+## 2026-09-05 23:07:14Z — **AMENDMENT: refresh-worker deployed to the `origin/main` tip `ffe8714b`, not the `6320fe91` the PENDING row below names.** `deploy=dep-daea18f40ujc73edp0vg trigger=api`. — lane `ncaaf-live-resim-wire`
+
+Not a correction of a measurement — a change to a stated blast radius, and the
+row that stated it is append-only, so this is the amendment rather than an edit.
+**HONEST ABOUT ITS OWN TIMING, because the wording nearly claimed more than it
+earned:** the decision and this text were settled at ~23:0xZ, before the deploy;
+the row reached the ledger a few minutes AFTER it fired, because the clear window
+opened at 23:07:12Z and had closed within seconds twice already tonight. Read it
+as a stated intent, not as a pre-registration.
+
+**WHY.** Lane `render-egress-transport` landed `3cb5b4ba` while refresh-worker
+sat on preflight HOLD, and asked for a tip deploy rather than taking its own
+lock on a service that has had no clear window since 22:37Z. Standing rule:
+deploy a commit that is ON `origin/main` (`[2026-08-18, user decision]`); a tip
+is as compliant as a pinned SHA and saves that service a second restart it
+would otherwise need on the same scarce window.
+
+**WHAT THE TARGET NOW ALSO CARRIES, and it is bigger than one more commit.**
+`3cb5b4ba` installs a **global `urllib` opener from `syndicate/__init__.py`** that
+adds `Accept-Encoding: gzip` and gunzips the reply. That is not scoped to my
+fetch — it changes EVERY outbound HTTP call in the worker process: OddsAPI,
+ESPN, StatsAPI, Polymarket, Kalshi. Its author measured 42 new tests, CI's own
+suite green (`tests.test_archives`, 386 OK), a kill switch
+`SYNDICATE_HTTP_GZIP=off` (absent means ON), and a 403/406/415 fallback that
+retries once bare and pins the host uncompressed for the process.
+
+**WHY I TOOK IT ANYWAY, stated as a judgement and not as a fact.** It removes
+the one cost I flagged against my own change in the row below: the ESPN CFB
+scoreboard at 1,441,192 bytes uncompressed, which set my 180 s interval.
+Measured through my actual caller: **948,450 -> 70,155 bytes, 13.5x**. And their
+correction to me is the part that decides it — I had written that a worker's
+inbound fetch "may not be billed at all", generalising their control hour past
+what it measured. Their arithmetic settles it: Sep 1-5, refresh-worker 1.07 GB +
+live-odds-worker 3.91 GB = **4.98 GB against the dashboard's Service-Initiated
+5.06 GB**. A worker fetching the public internet IS billed. My ESPN bytes are in
+that bucket.
+
+**THE ONE OUTCOME NEITHER OF US HAS TESTED, and it breaks MY input if it fires.**
+`poll_ncaaf_live_state._fetch_scoreboard`'s docstring pins "no custom headers:
+urllib's own default User-Agent is what ESPN accepts from Render" — ESPN
+demonstrably discriminates on request headers *specifically from Render's
+outbound IP*. `Accept-Encoding` is a different and far safer header, and the
+opener falls back on 403, but every measurement of it so far was taken from a
+dev box. **After this deploy:** `render_logs.py --service refresh-worker --text
+ACCEPT_ENCODING_REFUSED` naming `site.api.espn.com` means ESPN rejects it from
+Render, 180 s is load-bearing again, and my tick's ESPN join is the thing to
+check first. Silence plus a real `ratio=` on `HTTP_COMPRESSION` means the
+opposite. **That reading belongs in `render-egress-transport`'s row, not mine** —
+I will read it because it gates my input, and send it to them to record.
+
+Everything else in the row below stands unchanged: same claim, same rollback,
+same expected effect, same measurement, same reader.
+
+**verify:** _(empty — this row is an open obligation)_
+
 ## 2026-09-05 23:1xZ — **CORRECTION to the row below: the duplicate `Vary` is real, but the CAUSE I recorded for it is wrong, and so is the fix.** — lane `render-egress-transport`
 
 - **What I wrote:** "`compress_response` appends when `"accept-encoding" not in response.headers.get("Vary", "")`, and `.get` reads only the FIRST of a repeated header. Fix is `headers.set`, not append."
