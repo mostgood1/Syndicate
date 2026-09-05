@@ -1881,7 +1881,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: (a) both invocations agree, claim held; (b) a NEW test pins `CLAIMED` preempting `TOO_SOON` deliberately, since that ordering was until now exercised only by accident via the real claim file; (c) a REACHABILITY test asserts `main()` actually CALLS the claim lookup — without it a silent `ImportError` makes every claim assertion in this file vacuously true.
 - Blocked by: none.
 
-### mlb-hitter-so-dead-field — CLOSED 2026-09-04 — **FIXED AT BOTH SITES, LANDED ON `main` AS `0b9a03e7`, NOT DEPLOYED. The defect is REAL and CONFIRMED IN PRODUCTION; the money risk is NOT, and the reason it is not is an ACCIDENT.** — opened 2026-09-04 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+### mlb-hitter-so-dead-field — CLOSED 2026-09-04, **FULLY DISCHARGED 2026-09-05** — **FIXED, GATED, DEPLOYED AND VERIFIED ON TWO INDEPENDENTLY REBUILT DATES. NOTHING OWED.** `0350dbd2` (both accumulation sites) + `0b9a03e7` (containment gate in `sim_input_checklist.py`, so a regression fails the DAILY JOB). Live on refresh-worker `3a9153f4` 2026-09-04T23:26:26Z. Served board, same featured row: 09-04 `mean 0.0 -> 1.087-1.095` over three post-deploy rebuilds; 09-05 `mean 0.0 -> 1.042 / modeProb 1.000 -> 0.428 / 1 -> 5 rungs` on its first post-deploy build (05:13:08Z) — it had lagged 5h49m because its artifacts were written **106 s BEFORE** the deploy. **No priced recommendation was ever possible and that is now a CODE-LEVEL guarantee** (`project()` returns None for `batter_strikeouts` on a batter), not the market-feed accident it first appeared to be. Detail: `deploys.md` 2026-09-05, `log/2026-09-04.md`, `state_mlb.md [mlb-hitter-strikeouts-prop]`. — opened 2026-09-04 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
 - Goal: `strikeouts_dist` has more than one bin, and `so_mean` > 0, for at least
   one lineup batter in a real sim run — currently `{0: n_sims}` / `0.0` for
   EVERY hitter in EVERY game, permanently and silently.
@@ -2144,7 +2144,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   resolves. Must not pass VACUOUSLY — a floor on the code count, so an empty or
   mis-parsed read fails instead of reporting success on zero rows.
 - Blocked by: none. NO DEPLOY — test-only, ships nothing.
-### mlb-ladder-certainty-refusal — CLOSED 2026-09-05 — **GOAL MET, LANDED `462d8d6c`, NOT DEPLOYED (display-only surface, no urgency).** — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+### mlb-ladder-certainty-refusal — CLOSED 2026-09-05 — **GOAL MET, LANDED `fe519fff`, DEPLOYED AND LIVE on both services at `50b266da` (web 03:09:57Z, refresh-worker 03:59:01Z), verified by content.** The REFUSED branch has still never fired in production and currently cannot — it needs a degenerate histogram AND a market line — so its evidence is 6 unit tests, and an absence of refused rows is EXPECTED, not confirmation. — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
 - Goal: the MLB ladder stops publishing an EXACT `overLineProb` of 0.0/1.0 next
   to a real market line. One testable outcome: `_dist_stats({0: 1000}, 0.5)`
   returns `overLineProb=None` labelled as refused, while a healthy dist and the
@@ -2196,7 +2196,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   them; the UI does not. Surfacing the reason (the prop path has
   `edge_unavailable_reason` for this) is a copy decision, not a correctness one.
 
-### mlb-ladder-refusal-on-card — CLOSED 2026-09-05 — **GOAL MET, LANDED `9b660beb`, NOT DEPLOYED (display-only).** — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+### mlb-ladder-refusal-on-card — CLOSED 2026-09-05 — **GOAL MET, LANDED `9b660beb`, DEPLOYED AND LIVE at `50b266da` (web 03:09:57Z).** Healthy rendering verified unchanged on the served payload (`Over='66.3%'` / `'3.9%'` with matching list items); the refused rendering is unit-tested only, for the same reason as the lane above. — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
 - Goal: a REFUSED `overLineProb` reads differently on the card from an ABSENT
   market line. One testable outcome: a refused row's "Over" metric and its
   "Over probability:" list item both say so, while an absent-line row still
