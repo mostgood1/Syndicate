@@ -334,8 +334,20 @@ class JointCorrelationIndex:
         if value is None:
             self._bump("undefined_pair")
             return None
-        self._bump("measured")
-        return float(value)
+        # UNIT CONVERSION, and it is the difference between beating the guess
+        # and losing to independence. `value` is a SPEARMAN RANK CORRELATION OF
+        # COUNTS; the consumer prices a THRESHOLDED bet (`hits > 0.5`), and
+        # thresholding attenuates dependence to 54-68% of the rank figure.
+        # Measured 2026-09-05 over 6,396 realised leg pairs: passing the raw
+        # value through made the joint LOSE to plain independence
+        # (+0.101 log-loss same-player), monotonically worse the more the
+        # estimator was allowed to move. See `threshold_correlation`.
+        p_a = candidate_probability(candidate_a)
+        p_b = candidate_probability(candidate_b)
+        converted = threshold_correlation(float(value), p_a, p_b)
+        self._bump("measured" if (p_a is not None and p_b is not None)
+                   else "measured_fallback_attenuation")
+        return converted
 
     def _lookup_for_test(self, game_pk: int, label_a: str, label_b: str) -> Optional[float]:
         """Raw pair read, bypassing candidate keying.
@@ -350,6 +362,12 @@ class JointCorrelationIndex:
     def as_lookup(self) -> Callable[[Dict[str, Any], Dict[str, Any]], Optional[float]]:
         """The callable to hand to `compute_correlation(measured_lookup=...)`."""
         return self.measured
+
+
+from syndicate.features.mlb.threshold_correlation import (
+    candidate_probability,
+    threshold_correlation,
+)
 
 
 def _subject_from_display_name(value: Any) -> str:
