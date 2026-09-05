@@ -2439,6 +2439,40 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   it. **No id was reserved**, so whoever files it should take the next free
   one rather than assume `#647`. Text to lift is in this block verbatim.
 - Blocked by: none. Claims: NONE held.
+
+### ncaaf-segment-markets — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+- Goal: NCAAF quarter/half markets priced on the board. **REORDERED BY
+  MEASUREMENT**: the capture is not the binding constraint, the GRADER is. A
+  segment row that reaches the board today is graded off the FULL-GAME actual.
+  So the single testable outcome is: a non-`full` segment order REFUSES in every
+  sport's status resolver instead of inheriting the whole-game score.
+- Files: `syndicate/features/shared/bet_status.py` (the shared refusal),
+  `syndicate/features/shared/bet_status_ncaaf.py`,
+  `syndicate/features/shared/bet_status_mlb.py`,
+  `syndicate/features/shared/bet_status_nfl.py`,
+  `syndicate/features/shared/bet_status_soccer.py`,
+  `tests/test_segment_settlement_guard.py` (NEW).
+  Collision-checked 2026-09-05 with `lane_claims._claims()` over `lanes.md`:
+  all CLEAR. **`paper_settlement.py` is NOT claimed here and is deliberately
+  untouched** — `settled-sample-nfl-reconcile` holds it. Its `resolve()`
+  dispatch at ~916 is the natural choke point and I am NOT using it; the
+  per-sport resolvers it calls are each entered through the same shared helper
+  instead, which fixes the same set of callers without the contested file.
+- Hypothesis: `segment` reaches the order row intact and is dropped by the
+  grader, so the defect is a missing READ, not a missing field.
+- Falsification test: a per-sport resolver already reads `order["segment"]` and
+  refuses — then there is nothing to fix and the hazard report is wrong.
+  (Measured: `bet_status_wnba.py:502` DOES refuse. It is the only one. The
+  hypothesis survives for mlb/ncaaf/nfl/soccer and is FALSIFIED for wnba,
+  which is why wnba is not in the Files list.)
+- Verification: `test_segment_settlement_guard.py` asserts, per sport, that a
+  `segment="h1"` totals order returns an `unavailable_reason` rather than a
+  graded status — and MUTATION-CHECKED: reverting the guard must turn those
+  tests red. Plus the existing `full`-segment tests stay green, because a false
+  positive here refuses the whole book.
+- Blocked by: none. **NO DEPLOY** — this lane does not deploy and does not touch
+  env or the Render blueprint.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
