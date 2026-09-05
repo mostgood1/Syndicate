@@ -216,17 +216,32 @@ def main() -> int:
             a = sum(ll(x[arm], x["y"]) for _, p in sub for x in p) / m
             b = sum((x[arm] - x["y"]) ** 2 for _, p in sub for x in p) / m
             print("  %-16s %10.5f %10.5f" % (nm, a, b))
+        # PER-GAME SUMS, COMPUTED ONCE. The bootstrap statistic is
+        # sum(ll over picked games) / sum(n over picked games), and a game's
+        # contribution does not change between resamples -- so this is exact,
+        # not an approximation, and removes 325M ll() calls per comparison.
+        arms = ("indep", "heur", "raw", "conv")
+        pre = []
+        for _, pp in sub:
+            acc = dict.fromkeys(arms, 0.0)
+            for x in pp:
+                for a in arms:
+                    acc[a] += ll(x[a], x["y"])
+            pre.append((len(pp), acc))
         rng = random.Random(99)
         for base in ("heur", "indep", "raw"):
             d = []
             for _ in range(2000):
-                pick = [sub[rng.randrange(len(sub))] for _ in sub]
-                k = sum(len(p) for _, p in pick)
+                k = 0
+                c = o = 0.0
+                for _ in pre:
+                    n_i, acc_i = pre[rng.randrange(len(pre))]
+                    k += n_i
+                    c += acc_i["conv"]
+                    o += acc_i[base]
                 if not k:
                     continue
-                c = sum(ll(x["conv"], x["y"]) for _, p in pick for x in p) / k
-                o = sum(ll(x[base], x["y"]) for _, p in pick for x in p) / k
-                d.append(c - o)
+                d.append((c - o) / k)
             d.sort()
             if d:
                 print("  CONV vs %-9s %+0.5f  95%% CI [%+0.5f, %+0.5f]" % (
