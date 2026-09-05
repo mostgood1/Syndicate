@@ -5522,3 +5522,35 @@ it reads negative.**
   path and never sufficient for this reading.
 - **Cost:** one unnecessary web deploy (harmless, fast-forward, no `render.yaml`), one
   wrong prediction published to `deploys.md` and then superseded in place.
+
+## 2026-09-05 — A CENSUS IS BOUNDED BY ITS ROOTS, AND THE ROOT SET IS THE FIRST THING TO STATE
+
+`#632`. A retainer census walked module globals in `syndicate.*` / `pipeline.*`
+and found that named containers explain **6.1% of a worker's anon GROWTH**. The
+tempting headline is "the memory is not in Python, go look at C extensions".
+
+That headline would be wrong, and the reason is in my own code: the walk's ROOTS
+are module globals **that are already `dict`/`list`/`set`/`tuple`**. A
+module-level OBJECT holding caches in its `__dict__` is skipped before the walk
+starts. So are class attributes, closure cells, and thread-local state. The
+supported claim is *"not in container-typed module globals"* — a strictly
+narrower statement, and the difference is exactly where a lot of real caches live.
+
+THE RULE: a reachability census answers "how much is reachable FROM THESE ROOTS",
+never "how much exists". State the root set beside the coverage number, every
+time, because a low coverage has two very different causes — the memory is
+elsewhere in the process, or the roots were too narrow — and they lead to
+opposite next steps.
+
+The same run supplies a second, sharper instance. At `node_cap` 20k/100k/400k the
+budget EXHAUSTED and coverage read 0.8% / 2.9% / 15.8%. **With the budget
+exhausted, "top N by bytes" is only "biggest among whatever module iteration
+order happened to reach first"** — an arbitrary sample presented as a ranking.
+Only the completed 2M-node walk is quotable, and the census reports
+`node_budget_exhausted` precisely so that a truncated run cannot be read as a
+finished one.
+
+Related: `[2026-09-04]` "a flat reading from an instrument that cannot see the
+suspect is not evidence" and "a running minimum cannot detect a rising floor".
+Three forms of one discipline: know what your instrument CANNOT show before you
+believe what it does.

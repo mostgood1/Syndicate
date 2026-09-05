@@ -876,3 +876,27 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   distinguish these mechanisms — the gap is near zero whenever a process happens
   to be AT its peak, regardless of whether it returns memory later. It needs a
   SERIES, and UPDATE 10 did not have one.
+
+### `[web-oom-leak]` UPDATE 13 — **the retainer is NOT a module-level container: census explains 6.1% of growth**, 2026-09-05T02:5xZ `[session b2b5b45b]`
+
+* **Two readings, one worker, 13.7 min apart, budget not exhausted:** census
+  `59.0 -> 64.9 MB` (+5.9) while process anon went `389.3 -> 486.1 MB` (+96.8).
+  **The census explains 6.1% of the growth.** Level coverage 15.6% / 12.5% on the
+  two workers.
+* **NAMED RETAINERS (level, not growth):**
+  `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` **~20 MB in ONE entry**;
+  `soccer.cards._CARDS_CONTEXT_CACHE` 14.45 MB / 29;
+  `mlb.cards._MLB_CARDS_CONTEXT_CACHE` 6-10 MB / 4 (**+11.21 MB on one added
+  entry**); `_MLB_TODAY_CACHE` 7.6-10 MB; `LAST_RESULT` ~5 MB.
+* **`LAST_RESULT` reconciles two earlier readings:** it HOLDS ~5 MB and grows
+  0.0 MB per request. The per-request probe was right and so is this.
+* **READ THE LIMIT BEFORE QUOTING THE 6.1%:** the walk's ROOTS are module globals
+  that are already containers. A module-level OBJECT with caches in its
+  `__dict__`, a class attribute, a closure, or thread-local state is never
+  reached. The claim is **"not in container-typed module globals"**, NOT "not in
+  Python". Widening the roots is the next step.
+* **Instrument cost:** 1.2 s, ~10 MB transient, walk completes at 2M nodes. At
+  lower caps the budget exhausts and the ranking becomes *biggest among whatever
+  was reached first* — the 20k/100k/400k runs are NOT quotable.
+* Worker anon grew **+96.8 MB in 13.7 min (~424 MB/h)** during this window,
+  consistent with the fast regime measured earlier tonight.

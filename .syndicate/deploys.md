@@ -22842,3 +22842,58 @@ n=1 reading rather than risk the 2 GB web box — is also theirs, not the
 relaying session's. The `#632` retention finding underneath it IS
 `b2b5b45b`'s. Recorded separately because a ledger that misattributes a
 measurement sends the next reader to ask the wrong session about it.
+
+
+---
+
+## 2026-09-05T02:23:55Z — web — `c18116e7` — `#632` retainer census — **THE RETAINER IS NOT A MODULE-LEVEL PYTHON CONTAINER**
+
+`[lane web-oom-retainer-census, session b2b5b45b]` — read-only census endpoint,
+admin-gated, on demand only.
+
+verify: **two readings on ONE worker (`proc_token bede3b5293`), 13.7 min apart,
+node budget NOT exhausted on either:**
+
+    census total    59.0 -> 64.9 MB   (+5.9)
+    process anon   389.3 -> 486.1 MB  (+96.8)
+    CENSUS EXPLAINS 6.1% OF THE GROWTH
+
+Level coverage on two workers: **15.6%** and **12.5%** of process anon. Growth
+coverage: **6.1%**. **The lane's falsification test fires** — it was written
+before the data as *"the census accounts for only a small share, then the
+retained bytes are NOT in module-level Python containers"*.
+
+**WHAT IS NAMED, and it is worth having even though it is not the leak:**
+
+        19.99-21.39 MB   len 1    pipeline.intelligence_state._COMBINED_INTELLIGENCE_RESPONSE_CACHE
+        14.45 MB         len 29   syndicate.features.soccer.cards._CARDS_CONTEXT_CACHE
+         5.98-10.39 MB   len 4    syndicate.features.mlb.cards._MLB_CARDS_CONTEXT_CACHE
+         7.64-9.97 MB    len 1-2  syndicate.features.mlb.cards._MLB_TODAY_CACHE
+         5.07-5.59 MB    len 17   syndicate.blueprints.intelligence.LAST_RESULT
+
+**A SINGLE cache entry holds ~20 MB** (`_COMBINED_INTELLIGENCE_RESPONSE_CACHE`,
+`len 1`), and `_MLB_CARDS_CONTEXT_CACHE` grew **+11.21 MB on ONE added entry**.
+That is 8-64MB-bucket-shaped, so these caches are the right ORDER of magnitude
+even though they are the wrong ANSWER for the growth.
+
+`LAST_RESULT` at ~5 MB reconciles with the earlier per-request probe that read
+**0.0 MB both halves**: it HOLDS 5 MB and does not grow per request. Both
+readings were right.
+
+**THE LIMIT OF THIS INSTRUMENT, and it must be read before the 6.1% is quoted as
+"the memory is not in Python":** the walk's ROOTS are module globals that are
+ALREADY `dict`/`list`/`set`/`tuple`. A module-level OBJECT holding caches in its
+`__dict__` is skipped entirely, as is anything reachable only from a class
+attribute, a closure, or thread-local state. So the correct statement is
+**"not in container-typed module globals"**, which is narrower than "not in
+Python". Widening the root set is the next step and is cheap.
+
+**COST, measured rather than assumed:** 1.2 s and ~10 MB transient at
+`node_cap=2,000,000` (463k-492k nodes, walk COMPLETES). The 502 on the first call
+was the container still starting at go-live, confirmed by re-testing at
+escalating budgets with memory read either side.
+
+**A TRAP IN MY OWN FIRST RUNS:** at `node_cap` 20k/100k/400k the budget was
+EXHAUSTED and coverage read 0.8% / 2.9% / 15.8%. With the budget exhausted the
+"top by bytes" ranking is only *biggest among whatever module iteration order
+reached first* — meaningless. Only the completed 2M-node walk is quotable.

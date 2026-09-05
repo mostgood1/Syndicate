@@ -133,7 +133,7 @@ death, never life — do not invert it.
   not compose under munmap churn. Attribution has gone as far as it can.
 - Blocked by: none.
 
-### web-oom-retainer-census — OPEN — opened 2026-09-04 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-retainer-census — CLOSED 2026-09-05 — opened 2026-09-04 — **FALSIFICATION TEST FIRED: the retainer is NOT a module-level container.** Two readings on one worker 13.7 min apart, budget not exhausted: census `59.0 -> 64.9 MB` while process anon went `389.3 -> 486.1 MB` — **the census explains 6.1% of the growth** (level coverage 15.6% / 12.5%). It DID name the largest module-level retainers, which are 8-64MB-bucket-shaped and worth knowing: `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` **~20 MB in ONE entry**, `soccer.cards._CARDS_CONTEXT_CACHE` 14.45 MB, `mlb.cards._MLB_CARDS_CONTEXT_CACHE` **+11.21 MB on one added entry**. `LAST_RESULT` at ~5 MB reconciles with the earlier per-request probe reading 0.0 MB — it holds, it does not grow. **LIMIT: the roots are container-typed module globals only**, so a module-level object, class attribute, closure or thread-local is never reached — the claim is "not in container-typed module globals", not "not in Python". Widening the root set is the next step and is cheap. Endpoint `/api/ops/retainer-census`, admin-gated, 1.2 s and ~10 MB at 2M nodes. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: NAME the object graph the web workers retain across requests, by
   measuring the deep size of every module-level container in `syndicate.*` and
   `pipeline.*` on a live worker — not by reading the source and guessing.
