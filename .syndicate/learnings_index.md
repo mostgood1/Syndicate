@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 828 rules `[generated]`
+## Index — 834 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 299**
+**FORBIDDEN — 305**
 
 - [2026-09-05 — FORBIDDEN: a per-item guard implemented as an `A or B` search over a CONCA…](#2026-09-05-forbidden-a-per-item-guard-implemented-as-an-a-or-b-search-over-a-concatenation-of-every-items-source-whichever-item-supplies-b-satisfies-it-for-every-value-of-a-so-the-check-has-no-failing-input-at-all-lane-ncaaf-segment-capture-commits-7f197639-7dfabcf4-no-deploy)
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
@@ -234,7 +234,13 @@
 - [2026-09-04 FORBIDDEN: pinning a copied definition against ANOTHER FILE'S SOURCE TEXT. W…](#2026-09-04-forbidden-pinning-a-copied-definition-against-another-files-source-text-when-the-definition-moves-the-test-stops-existing-instead-of-failing-lane-lane-invariant-single-source)
 - [2026-09-04 — FORBIDDEN: choosing a DEPLOY TARGET by which service CONTAINS the code. Ch…](#2026-09-04-forbidden-choosing-a-deploy-target-by-which-service-contains-the-code-choose-it-by-which-service-serves-the-reading-you-predicted-lane-nfl-projection-deploy)
 - [2026-09-05 FORBIDDEN: shipping a fix whose motivating measurement YOU labelled inconclu…](#2026-09-05-forbidden-shipping-a-fix-whose-motivating-measurement-you-labelled-inconclusive-a-caveat-you-wrote-is-an-instruction-to-yourself-not-a-disclaimer-to-the-reader)
+- [2026-09-05 — FORBIDDEN: running the ledger guard's own remedy, `git checkout origin/mai…](#2026-09-05-forbidden-running-the-ledger-guards-own-remedy-git-checkout-originmain----ledger-file-without-first-reading-git-diff-on-that-file-it-destroys-uncommitted-work-and-a-deletions-count-cannot-see-what-it-destroyed-lane-render-egress-transport)
 - [2026-09-05 — FORBIDDEN: treating a cache path resolved off `__file__` as durable on Ren…](#2026-09-05-forbidden-treating-a-cache-path-resolved-off-__file__-as-durable-on-render-it-is-in-the-ephemeral-checkout-so-every-deploy-erases-it-and-the-erasure-is-invisible-because-the-code-refetches-lane-ncaaf-live-resim-wire)
+- [2026-09-04 FORBIDDEN: a tool that updates a REGION of a shared file rebuilding that fil…](#2026-09-04-forbidden-a-tool-that-updates-a-region-of-a-shared-file-rebuilding-that-file-from-the-regions-start-splice-the-region-carry-the-remainder-through-untouched-and-refuse-if-you-cannot-classify-it)
+- [2026-09-04 FORBIDDEN: calling a merge lossy from a SAME-FILE line comparison. Content t…](#2026-09-04-forbidden-calling-a-merge-lossy-from-a-same-file-line-comparison-content-that-vanished-may-have-moved-to-a-sibling-file-and-the-panic-fix-is-to-restore-stale-content-over-good)
+- [2026-09-05 FORBIDDEN: overriding the pre-commit ledger guard when it names a file you d…](#2026-09-05-forbidden-overriding-the-pre-commit-ledger-guard-when-it-names-a-file-you-did-not-stage---it-is-reporting-a-stale-base-and-the-fix-is-to-change-the-base-scheduled-task-live-gameline-accuracy-snapshot)
+- [2026-09-05 FORBIDDEN: attributing a hazard to the change you just made without measurin…](#2026-09-05-forbidden-attributing-a-hazard-to-the-change-you-just-made-without-measuring-the-tree-without-it-and-ledger_invariants-does-not-catch-a-stale-tree-that-is-merely-missing-newer-blocks)
+- [2026-09-05 — FORBIDDEN: a JOIN test whose fixture builds BOTH SIDES from one set of nam…](#2026-09-05-forbidden-a-join-test-whose-fixture-builds-both-sides-from-one-set-of-names-the-key-match-is-then-a-tautology-and-it-reads-as-end-to-end-coverage-lane-ncaaf-live-resim-wire)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`

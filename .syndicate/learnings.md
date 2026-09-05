@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 828 rules `[generated]`
+## Index — 834 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -6105,3 +6105,49 @@ sessions, same reading, same hour; one wrote the wrong conclusion and one did
 not, and the difference was not method.** That is the argument against "be more
 careful" as a remedy -- an error that catches the person who has just finished
 writing the rule about it needs a mechanical check, not attention.
+
+## 2026-09-05 — FORBIDDEN: a JOIN test whose fixture builds BOTH SIDES from one set of names. The key match is then a tautology, and it reads as end-to-end coverage. `[lane ncaaf-live-resim-wire]`
+
+- **18 green tests, a five-way mutation check, and production missed 257 of 257
+  rows.** The NCAAF live re-sim published a lens keyed from the projections
+  artifact (CFBD names) while the board grid is keyed by the ODDS source. First
+  board rebuild past the first snapshot, 2026-09-05T23:17:39Z: `index_size 8`,
+  `sources_seen {live_resim: 8, pregame: 43}`, `skipped_no_team_names 0` — a
+  PERFECT index — and `rows_live_gameline_considered 257`,
+  `rows_live_gameline_edged 0`, `withheld_by_reason
+  {no_live_gameline_projection: 257}`. The two key sets intersected **zero**
+  times: `('baylor', 'auburn')` against `('baylor bears', 'auburn tigers')`.
+- **THE TEST ASSERTED THE BROKEN KEY AND PASSED.** `_wire_tick` built the ESPN
+  event and the projection row from the same `"Baylor"` / `"Auburn"` strings, so
+  both sides of the join agreed BY CONSTRUCTION. The assertion
+  `assert list(index) == [("baylor", "auburn")]` was true of the fixture and
+  false of production, and no amount of running it could tell.
+- **AND THE MUTATION CHECK DID NOT SAVE IT, which is the part I did not expect.**
+  Five mutations, each red exactly where predicted. Mutating the CODE cannot
+  expose this, because the defect is not in the code the test runs — it is in the
+  fixture's assumption that one name space exists. **The mutation you need is to
+  the FIXTURE.** A mutation suite over code is blind to a fixture that cannot
+  express the failure.
+- **This is the join-specific form of the 2026-08-27 rule** ("a test whose FIXTURE
+  cannot violate the property it asserts is not weak coverage, it is zero coverage
+  that reads as strong"), and it is worth stating separately because a JOIN has an
+  obvious tell the general rule does not name: **two producers, one string.** If a
+  join test constructs both sides from a single literal, it is testing `dict.get`.
+- **The rule going forward.** A join test must spell the two sides DIFFERENTLY —
+  the way the two real producers do — and assert the outcome in both directions:
+  one lens spelled like the grid (joins), one spelled like the other producer
+  (does not), with the SAME grid row. `index_size` must be identical across that
+  pair; that is the whole signature, and it is what a perfect index over a failed
+  join looks like. Peer lane `edge-basis-moneyline` built exactly that pair for
+  its own file after this was reported (`c45ad022`) and found the same shape
+  there; a defect of this class is rarely in one file only.
+- **Corollary for the PRODUCER side.** When two systems name the same entity and
+  one of them is an odds feed, do not assume a canonical spelling exists — MEASURE
+  which field matches. Here: ESPN `displayName` **7/8** against the live grid keys,
+  `location` **0/8**, `shortDisplayName` **0/8**, `name` **0/8**. `location` is
+  what the artifact used and it never matched once. And leave the residual NAMED
+  (`sam houston bearkats` vs the grid's `sam houston state bearkats`) rather than
+  aliasing it: one alias fixes one night and is a guess about the feed's naming
+  everywhere else. `live_gameline_join._norm_team` has no alias table on purpose,
+  and its docstring records why — the prop join's alias machinery carries a 91%
+  miss.
