@@ -23086,3 +23086,126 @@ direction.**
 **Nothing here is a fix. It is a change that has now been MEASURED**, and the
 measurement says the coverage win is real (2.6x the dates) and the cap is still
 the binding constraint.
+
+## 2026-09-05 16:1xZ -- SECOND, INDEPENDENT READ OF THE SAME AUTORUN. **EVERY RAW NUMBER AGREES with the entry above. ONE LOAD-BEARING DISAGREEMENT, and the PRE-REGISTERED "~12" RULE WAS NOT APPLIED.** No deploy taken. `[scheduled task verify-accuracy-autorun-626h -- the BACKSTOP]`
+
+**WHY TWO READS EXIST, AND WHY THAT IS WORTH SOMETHING RATHER THAN NOISE.** The
+backstop's first job is to check whether the primary already recorded. It had
+not: at **15:49Z** `origin/main`'s newest commit was `0fa7c3e3`
+(2026-09-05 01:00:24 -0500) and `origin/main:.syndicate/deploys.md` still carried
+`skipped_budget=24` as the standing number, so the full reading was taken.
+`verify-ledger-budget-4gb` landed as `1da1a58a` at **16:03Z** -- ~3h20m after its
+07:45 CT slot, the same late-fire pattern as 09-04 -- while this read was in
+flight. **Neither read saw the other**, which is what makes the agreement below
+evidence rather than an echo. Caught by `ledger-commit-guard.py`, which refused
+the commit because it would have dropped their section; the guard did exactly
+its job.
+
+**AGREEMENT, FIELD BY FIELD, FROM AN INDEPENDENT QUERY:**
+
+    field                         mine              theirs            
+    live refresh-worker SHA       50b266da          50b266da          AGREE
+    deploy finishedAt             03:59:01Z         03:59:01Z         AGREE
+    env override                  ABSENT / 154 keys ABSENT / 154 keys AGREE (both paginated)
+    LEDGER_CHUNKS_ACCEPTED lines  8, 12:41:40..12:58:34Z              AGREE
+    count / skipped_budget        21 / 12           21 / 12           AGREE
+    dates                         21                21                AGREE
+    bytes (last line)             3,999,973,424     3,999,973,424     AGREE
+    records (last line)           92,791            92,791            AGREE
+    truncated / partial           1 / 1             1 / 1             AGREE
+    AUTORUN_DONE                  1721.552s, error=none               AGREE
+    peak anon in run window       2,212.562 @ 12:41:20Z               AGREE (to 3 dp)
+
+Also checked independently and agreeing: no `LEDGER_CHUNKS_ACCEPTED` earlier than
+12:41:40Z (11:00Z..12:41:40Z returns `nothing matched`, with the reader confirmed
+to be emitting lines rather than a swallowed usage error).
+
+**A BASELINE NIT, NOT A DISAGREEMENT, worth one line so nobody re-derives it:**
+they quote 09-04 as `records=46,953 / bytes=1,999,976,768`; the lane block quotes
+`46,944 / 1,999,970,055`. Both are real emissions from that day's eight sport
+lines, which drift as the ledger grows. The ratio (**1.97x records**) is
+unaffected. Say which line you are quoting.
+
+**THE ONE DISAGREEMENT, AND IT IS THE NUMBER THE RECOMMENDATION RESTS ON.** The
+entry above computes *"+2,000,000,000 bytes of budget bought +731.0 MiB of anon
+peak, ~0.38 MiB anon per MiB of budget"* and projects **~3,783 MiB** for a
+further +4.2 GB. **That rate is not a measured cost of the ledger, and it should
+not be reused as a coefficient.**
+
+    12:05:00..12:35:00Z  (PRE-RUN, 1,592 samples)   peak anon  2,694.852  @ 12:06:02Z
+    12:35:39..13:04:20Z  (the run, 1,550 samples)   peak anon  2,212.562  @ 12:41:20Z
+    -> the run's own peak is 482.3 MB BELOW the worker's ambient peak
+
+The same shape holds on the baseline day, so it is not a one-off: **09-04 pre-run
+(13:53..14:23Z) peak 1,672.098 against that day's in-run 1,481.6.** On BOTH days
+the accuracy-summary window was **not** the worker's peak. So each day's in-run
+peak is an upper bound on the WORKER, not on the ledger, and the difference
+between two such upper bounds is not a cost of anything. Day over day the
+**AMBIENT peak moved +1,022.8 MB while the in-run peak moved +730.9 MB** -- the
+ambient moved MORE.
+
+**THE CONCLUSION ABOVE SURVIVES; ONLY ITS ARITHMETIC DOES NOT — and their own
+later reading is the better support for it.** `2,984.41 MiB at 15:29:08Z, from
+work that has nothing to do with the ledger` is this same finding from the other
+side: the service's floor is what consumes the headroom. **Do not take 8.2 GB**
+stands. Drop the 0.38 MiB-per-MiB rate; it reads like a measured coefficient and
+is an artefact of comparing two process-wide maxima. The entry above half-caught
+this itself -- it notes the peak sample's `last_stage` is `board_contract_end`
+and calls the number "an upper bound for attributing cost to the ledger" -- and
+then uses the delta of two such upper bounds as a rate anyway.
+
+**THE PRE-REGISTERED `~12` RULE WAS NOT APPLIED, AND IT NAMES A DIFFERENT NEXT
+STEP.** Written on 09-04 before the data existed (`lanes.md`,
+`accuracy-ledger-budget-raise`): *"0 = the cap is no longer binding; ~12 = the
+byte budget is no longer the right instrument, and the next step is a CHUNK-COUNT
+bound rather than another byte doubling."* It came back **12**. The entry above
+judges a different four-prediction set and lands on "an INSTANCE-SIZE decision,
+not a constant edit". Both readings can hold, but the pre-registered one is the
+cheaper and does not need a bigger box, so it should not be lost.
+
+**AND ITS MECHANISM IS NOW MEASURED, which is why the branch is right rather than
+merely matched.** 21 accepted + 12 skipped = **33 chunks**, corroborated
+independently by `PROJECTION_DONE seen=33` from a different code path in the same
+job. Average accepted chunk is **190.5 MB against the 256 MB per-chunk ceiling**
+-- bytes and chunks have stopped being separate quantities, so a byte budget now
+simply buys chunks at ~190 MB each (2x bytes bought 2.63x chunks). Full history at
+that density is **~6.29 GB**.
+
+**A THIRD CONFOUND NEITHER PRE-REGISTRATION NAMED: A NEW STAGE NOW RUNS INSIDE
+THIS SAME AUTORUN.** `[ledger_projection]` (lane
+`evaluation-ledger-projected-mirror`) was wired in AFTER the 09-04 baseline and
+streams ~2.1 GB in the same job -- it is most of why `elapsed_s` went 669.4 ->
+1,721.552 (+157%), so that figure is not a cost of the budget raise either.
+**It did NOT set the memory peak, and that was checked rather than assumed:** max
+anon over its sub-window (12:58:30..13:04:58Z) is **2,126.59**, below the run peak.
+A TIME cost here, not a memory one.
+
+**BONUS -- THE SIBLING LANE'S FALSIFICATION TEST PASSES ON ITS FIRST PRODUCTION
+RUN**, and it is not recorded anywhere else:
+
+    [ledger_projection] PROJECTION_DONE seen=33 written=8 fresh=0 deferred=25
+      failed=0 records=49393 bytes_in=2104570375 bytes_out=30719010
+      ratio=0.014596 reduction=68.5x published=8 over_ceiling=0
+
+`over_ceiling=0` is exactly the criterion `evaluation-ledger-projected-mirror`
+named; `deferred=25` is the bounded first pass converging as designed.
+
+**AND THE 09-04 `projected_bytes` PREDICTION IS NOT YET FALSIFIABLE AT THE FIELD
+IT NAMED.** `ledger_coverage.projected_bytes` lands in
+`reports/refresh_status/latest/accuracy_summary_autorun_status.json` in the
+keyvalue store, and `ops.py` carries per-subject status routes (odds refresh,
+settlement, live-lens, opportunity contract) but **none for the accuracy
+autorun**, so it cannot be read off the worker. The producer-side counter is the
+closest available: `bytes_out=30,719,010 / records=49,393` = **622 B/record**
+against the ~560 B/record the design was sized on; carried onto the summary's
+92,675 records that **infers ~57.6 MB**, under the 120 MB failure line -- but an
+INFERENCE, not the reading that was predicted. Adding that route is the cheapest
+way to make it checkable.
+
+**LANE `accuracy-ledger-budget-raise` IS NOT CLOSED.** Its stated single testable
+outcome is `skipped_budget=0 truncated=0` with `dates` materially above 8.
+`dates` 8 -> 21 clears; `skipped_budget=12` and `truncated=1` do not. Its memory
+criterion is confounded rather than passed. **A partial win that reclassifies the
+instrument** -- next step is the chunk-count bound, or making the summary
+computable off-worker at `budget=0` via the projected mirror, which dissolves the
+bound instead of re-tuning it.
