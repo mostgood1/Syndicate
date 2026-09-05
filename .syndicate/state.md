@@ -932,3 +932,25 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
 * The census table and the heap ratio came from DIFFERENT workers (pid 99 vs
   98) — the endpoint round-robins. The ratio is self-consistent; the table is
   not a breakdown of it.
+
+### `[web-oom-leak]` UPDATE 14 — **the GROWTH is non-Python too, not just the standing total**, 2026-09-05T21:0xZ `[session b2b5b45b]`
+
+* UPDATE 13 measured a STOCK ratio at one instant (28.3%). That does not answer a
+  GROWTH question — a heap could hold 28% of anon and still be the entire
+  growing term. **Measured over 10.9 min, per worker, every walk CONVERGED (0
+  truncated readings discarded):**
+
+        pid 97   anon  +56.26 MB   heap  +0.19 MB   =  0.3% of the growth
+        pid 98   anon +107.06 MB   heap +24.50 MB   = 22.9% of the growth
+
+* **pid 97 is the decisive case: its Python heap sat at `104.68 -> 104.87 MB`,
+  flat to 0.2 MB, while anon climbed 56 MB.** The verdict is upgraded from a
+  snapshot to a trend: the growth itself is non-Python.
+* **pid 98's 22.9% is an UPPER BOUND, not a measurement.** Consecutive walks on
+  that worker swung `184.23 -> 167.18 MB` (~17 MB), so its `+24.50 MB` delta is
+  only modestly above the instrument's own noise. Quote pid 97's `0.3%`.
+* **RATE, measured in the same window and it is steep:** pid 97 `~307 MB/h`,
+  pid 98 `~590 MB/h`, ~900 MB/h combined. Container at the end: **1756.6 MB,
+  85.8%, 291 MB headroom.**
+* Nothing changes about the `#632` conclusion except its strength: no
+  Python-level probe can find the growing bytes.
