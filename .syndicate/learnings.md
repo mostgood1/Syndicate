@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 822 rules `[generated]`
+## Index — 823 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -35,6 +35,39 @@
 <!-- LEARNINGS-INDEX:END -->
 
 ---
+
+### 2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFERENT EVENTS — gate the check on the ARTIFACT'S mtime `[lane mlb-hitter-so-dead-field, commit bc82090f, no deploy]`
+
+The MLB hitter-strikeouts fix was live on refresh-worker at 23:26:26Z. The
+2026-09-05 board went on reading `mean 0.0 / modeProb 1.000 / 1 rung` for
+**5 h 49 m** afterwards, sitting next to a healthy 2026-09-04. That is the shape
+of a PARTIAL fix, and it is the most dangerous shape there is: it invites the
+next person to "finish" work that is already complete, or to revert it.
+
+The cause was vintage, and the margin was **106 seconds** — the 09-05 sims were
+written 23:24:40Z, the deploy went live 23:26:26Z, and nothing rebuilt that date
+until 05:13:08Z. On its first post-deploy build it read `mean 1.042`.
+
+**RULE: when verifying a fix that a JOB writes into an artifact, gate on the
+artifact's own `generated_at`/mtime crossing the deploy, never on wall clock and
+never on "the deploy is live".** A watcher built that way read `mean 0.0` on two
+of four polls; reporting either would have been a false negative against a
+correct, deployed fix. Publishing the fix is one event, the job re-running is a
+second, and here they were most of a working day apart.
+
+**Corollary, and it is the cheap half: state the expected lag BEFORE you look.**
+Saying "this needs a rebuild, so a zero right after the deploy means nothing"
+costs one sentence and converts a scary reading into an expected one. Two peer
+sessions hit the same confound the same night in opposite directions — one saw
+NFL 78-unmatched persist past a live deploy and clear ninety seconds later on
+the next rebuild.
+
+**And a durability reading is not the same as a verification reading.** The
+09-05 board was re-checked ~14 h and many rebuilds later (`mean 1.077`,
+5 rungs). The first post-deploy read proves the code ran; the later one proves
+it keeps running. A single post-deploy read cannot distinguish "fixed" from
+"fixed once".
+
 
 ### 2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEASURES NOTHING `[lanes mlb-ladder-refusal-deploy, commits 2e555b2c / ccb053c7, DEPLOYED]`
 
