@@ -1,5 +1,21 @@
 """Does the MEASURED same-game correlation price co-occurrence better than the guess?
 
+SUPERSEDED FOR NEW WORK -- USE THE LOCAL PAIR INSTEAD:
+
+    scripts/backfill_mlb_sim_joint.py     writes joints from GIT-TRACKED rosters
+    scripts/score_joint_pair_pricing.py   scores them, four arms
+
+Those need NO HTTP. This file reads a cache of full `sim_*.json` artifacts that
+was populated through `/api/ops/artifacts/export`, and that pull is exactly the
+traffic a live lane is trying to eliminate: Render bandwidth hit 24.4 of 25 GB
+on day 5 of the month, attributed to worker<->web artifact transport. The same
+endpoint also reads each artifact WHOLE into a 2 GB web process and returned 502
+under this very workload.
+
+So do not re-run the export step to feed this. It is kept because its RESULT is
+a record worth having -- a one-date, six-cluster finding that did NOT replicate
+at 149 clusters, which is why the resolver returns the raw coefficient.
+
 FIRST RESULT, 2026-09-04, 6,396 pairs / 6 games (substrate `render`):
 
     arm             log-loss    brier
