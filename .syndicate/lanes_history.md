@@ -26192,6 +26192,62 @@ lost no protection and no open lane left the session-start digest.
   not compose under munmap churn. Attribution has gone as far as it can.
 - Blocked by: none.
 
+### web-oom-retainer-census — CLOSED 2026-09-05 — opened 2026-09-04 — **FALSIFICATION TEST FIRED: the retainer is NOT a module-level container.** Two readings on one worker 13.7 min apart, budget not exhausted: census `59.0 -> 64.9 MB` while process anon went `389.3 -> 486.1 MB` — **the census explains 6.1% of the growth** (level coverage 15.6% / 12.5%). It DID name the largest module-level retainers, which are 8-64MB-bucket-shaped and worth knowing: `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` **~20 MB in ONE entry**, `soccer.cards._CARDS_CONTEXT_CACHE` 14.45 MB, `mlb.cards._MLB_CARDS_CONTEXT_CACHE` **+11.21 MB on one added entry**. `LAST_RESULT` at ~5 MB reconciles with the earlier per-request probe reading 0.0 MB — it holds, it does not grow. **LIMIT: the roots are container-typed module globals only**, so a module-level object, class attribute, closure or thread-local is never reached — the claim is "not in container-typed module globals", not "not in Python". Widening the root set is the next step and is cheap. Endpoint `/api/ops/retainer-census`, admin-gated, 1.2 s and ~10 MB at 2M nodes. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: NAME the object graph the web workers retain across requests, by
+  measuring the deep size of every module-level container in `syndicate.*` and
+  `pipeline.*` on a live worker — not by reading the source and guessing.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `syndicate/blueprints/ops.py` (a read-only census endpoint),
+  `tests/test_retainer_census.py` (NEW). No OPEN lane claims these.
+- Hypothesis: one or a few UNBOUNDED module-level dicts hold the 8-64MB
+  mappings. Static grep finds no `lru_cache(maxsize=None)`, but many plain
+  `dict` caches with no eviction (`_BVP_CACHE`, `_ROSTER_PAYLOAD_CACHE`,
+  `_MLB_LIVE_LENS_STATES_CACHE`, `_PLAYER_LOGS_CACHE`, the
+  `basketball_props_smart_sim` family, `_ROW_CACHE`).
+- Falsification test: the census accounts for only a small share of the worker's
+  anon — then the retained bytes are NOT in module-level Python containers, and
+  the next suspect is C-extension or per-thread state that a Python object walk
+  cannot see. **This is the important branch: a census that finds little is a
+  RESULT, and must not be read as "nothing is retained".**
+- Verification: census total compared against `process_anon_mb_now` on the SAME
+  worker at the SAME instant, with the coverage fraction stated. Repeated twice
+  >= 10 min apart so the GROWTH is attributable, not just the level.
+- SAFETY: on-demand only, never periodic; node-capped with truncation reported;
+  behind the existing admin gate. A deep object walk on a 600 MB worker is not
+  free and `#241` is the precedent for assuming otherwise.
+- Blocked by: none.
+
+### web-oom-heap-roots — CLOSED 2026-09-05 — opened 2026-09-05 — **FALSIFICATION TEST FIRED: the bytes are NOT Python objects.** Converged walk (891,276 nodes, not truncated) on pid 98: anon `373.17 MB`, live Python objects `105.56 MB` = **28.3%**, against a threshold pre-registered before the reading (`>=70%` Python / `<=35%` not). Corroborated to **0.16%** by pymalloc's `bytes_in_allocated_blocks` (`105.731 MB`) from an independent instrument — different process and hour, so suggestive not paired. **This CLOSES the object-graph line for the other 71.7%:** no root set, census or per-request attribution can see non-object bytes. Widening the roots first was still necessary and exposed three real bugs (proxy/mock attribute access executing code, `id()` reuse silently dropping subtrees, an imported class absorbing 27.0 MB as a world-root). Still worth capping on their own merits, NOT as an OOM fix: `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` 37.50 MB, `_CARDS_CONTEXT_CACHE` 12.67 MB. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: settle whether `#632`'s retained bytes are in the PYTHON HEAP AT ALL, and
+  if so under which root. The census explains only 6.1% of growth, but its roots
+  are container-typed module globals ONLY — so "elsewhere in Python" and "not in
+  Python" are currently indistinguishable, and they lead to opposite next steps.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `syndicate/blueprints/ops.py`, `tests/test_heap_roots.py` (NEW). No OPEN lane
+  claims these.
+- Two additions:
+  1. WIDER ROOTS — module-level OBJECTS with a `__dict__`, and CLASS attributes,
+     walked AFTER the specific container roots so the shared `seen` set gives
+     each object to the most specific root that reaches it. Broad roots then
+     report only the residual, which is the informative part.
+  2. A WHOLE-HEAP DENOMINATOR — deep size from `gc.get_objects()` as roots.
+     **`gc.get_objects()` alone would undercount badly** because plain `str` and
+     `bytes` are NOT gc-tracked; walking referents from tracked objects is what
+     catches them, which is why this reuses the deep walk rather than summing
+     `getsizeof` over the list.
+- Hypothesis: `python_heap_mb` is close to `process_anon_mb`, i.e. the memory IS
+  in Python and my roots were simply too narrow.
+- Falsification test: `python_heap_mb` is a small fraction of anon — then the
+  bytes are NOT Python objects at all (C extension buffers, arena fragmentation,
+  or per-thread state), and every remaining Python-level probe is a dead end.
+- Verification: `python_heap_mb` vs `process_anon_mb` on one worker, with the
+  walk NOT budget-exhausted, plus the widened root table showing which root owns
+  the residual.
+- SAFETY: on demand only, node-capped, truncation reported. The completed
+  narrow walk cost 1.2 s / ~10 MB at 2M nodes; a whole-heap walk is larger, so
+  the cap is the control and exhaustion must be reported, not silent.
+- Blocked by: none.
+
 ### mlb-joint-correlation-producer — CLOSED 2026-09-04 — opened 2026-09-04 — **THE SIM NO LONGER DISCARDS ITS JOINT, AND THE CORRELATION IS MEASURED.** Landed `4558c0b7`, NOT DEPLOYED. Measured on production's own DET@CLE roster (pk824424, 2026-09-04), 1,000 sims: `home_runs x total_bases` **mean rho +0.610, range +0.227..+0.805 over 18/18 batters** — against ONE constant (`1.35`) serving all eighteen today, a 3.5x spread end to end. Cross-batter `total_bases x total_bases` reads **same team +0.097 / opposing +0.018** where the heuristic adds 0.25 + 0.14. Cost 0.433% of peak RSS. — session 3492626c-1ec4-4366-9dbe-f194ae319c84
 - Goal: feed the `measured_lookup` seam that landed inert at `1bbcc246`, with a
   correlation the sim actually computes instead of a table of flags.
@@ -26313,23 +26369,6 @@ lost no protection and no open lane left the session-start digest.
   anon by mapping SIZE from the kernel's own accounting, which CAN see a large
   direct mmap. A payload-shaped allocation lands in `8-64MB`. Question: WHICH
   BUCKET GROWS.
-- **REOPENED AND EXTENDED 2026-09-04 `[user: "widen it to all refs anyway"]`.**
-  I had closed this lane calling the four-rev set a bounded approximation,
-  "rejected on cost, not correctness". The cost was then MEASURED rather than
-  assumed: lanes.md is 1,322 commits / 1,301 distinct blobs / 246 MB, 11.6-13.4s
-  exhaustive; pickaxe (`git log --all -S`) is 5.9s PER LINE and loses on any
-  multi-line residual. `_deep_lines` now searches every committed version across
-  every ref, in three git processes regardless of ref count, and ONLY after the
-  cheap revs fail — so the allow-path is unchanged (0.59s -> 0.60s measured).
-  The budget became ONE deadline for the invocation, not one per path, because
-  per-path let `checkout -- a b c` cost three budgets. A truncated search BLOCKS
-  and says TRUNCATED; it never downgrades to "nowhere else".
-  Verified same-instant on the live tree: 147 flagged -> 143, the four excused
-  genuinely present in the 1,302 versions but on neither HEAD nor origin/main.
-  Then verified end-to-end: installing the new hook was itself BLOCKED by the
-  old one over 6 lines that were all in pushed commit `e3a5154f` — and the same
-  command under the new hook exits 0 in 0.58s, while `lanes.md` with 143 truly
-  unreachable lines still refuses. 40/40; 8 new cases fail on `e3a5154f`.
 - Blocked by: none. Deploy queued behind another session's `web` claim
   (`catchup-doubleheader-selfverify`, TTL ~44 min from 2026-09-04) — polling
   `status`, not `acquire`, and not forcing.
@@ -26995,6 +27034,62 @@ lost no protection and no open lane left the session-start digest.
   than faking the premise if the slate is over or the app was closed.
 - Blocked by: none.
 
+### soccer-player-producer — CLOSED 2026-09-05 — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **soccer roster PRODUCER shipped, deployed and verified** (six leagues fetched `players_2026.csv`; guard fires `too_early=True too_few=False` on the real 364-row file, where the OLD row-count guard would have PASSED). Also carried: the minutes/dedupe guards, the ESPN-column blindness fix, and `_write_csv` refusing an empty publish. **`#621` PHASE 4 CLOSED in the same session** — the sim's joint beats independence by -0.02353 [-0.02849, -0.01854] on same-player pairs (n=8,205, 149 games) and the heuristic it replaced was WORSE than assuming nothing on 95% of the board. A threshold conversion was shipped on 6 clusters and REVERTED on 149 (`862b5ccf`); never live. Full narrative in `log/2026-09-05.md`.
+- **RELAYED NOTICE (not from this lane's owner; left here because a claim holder
+  cannot be ADDRESSED — see below).** From the lane fixing MLB hitter
+  `strikeouts`, via `web-oom-highwater` 2026-09-04T23:1xZ:
+  **when you next deploy refresh-worker, deploy from the TIP rather than a pinned
+  older commit.** You deployed `ea1e3ac0` at 22:50:57Z; ordering on main is
+  `ea1e3ac0` -> `29ab5bfb` -> `0350dbd2` -> `0b9a03e7` -> ... so that deploy did
+  NOT carry `0350dbd2`. Consequence for YOUR work, not only theirs: MLB hitter
+  `strikeouts` is dead on the served board (`strikeouts_dist == {0: n_sims}`,
+  `so_mean == 0.0` for every hitter in every game, so the ladder publishes
+  P(0 K) = 1.000), and every sim run on `ea1e3ac0` regenerates artifacts
+  containing that known-false prop family. Alternatively release refresh-worker
+  when your MLB work is done and they will take it. **Nobody is forcing your
+  claim** — your 22:56:09Z re-acquire is on record as proof you are alive.
+- **WHY THIS IS IN THE LEDGER RATHER THAN A MESSAGE, and it is a real gap:** a
+  deploy claim records `CLAUDE_CODE_SESSION_ID`, which cannot be mapped to a
+  messageable roster address (`local_<uuid>`) — the same disjointness now
+  documented in `scripts/deploy_claim.py`. **You cannot contact a claim holder
+  FROM the claim.** I tried `search_session_transcripts` and got two conflicting
+  candidates, so I did not guess. The ledger is the only channel that reaches a
+  holder identified solely by a claim.
+- Goal: the soccer player rosters get a PRODUCER. `--kind players` existed and
+  nothing called it, so every `players_*.csv` was a hand-run committed seed and
+  the newest European roster was the COMPLETED 2025-26 season.
+- Files: `scripts/build_soccer_artifacts.py`,
+  `syndicate/features/soccer/ingestion/player_history.py`,
+  `tests/test_soccer_player_producer_step.py` (NEW),
+  `tests/test_soccer_ingestion.py` (stale assertion left by `3355d621`),
+  `scripts/fetch_soccer_history_local.py` (refuse to publish an empty fetch).
+  Collision-checked 2026-09-04: `soccer-model-dispersion` names
+  `build_soccer_artifacts.py` and `syndicate/features/soccer/` but RELEASED its
+  claims 2026-08-29 (phantom sweep, owning session gone).
+- Odds-refresh entrypoint: the soccer player STEP lives in the shared odds
+  refresh entrypoint, which is CLAIMED BY `ncaaf-live-cadence` (opened a day
+  earlier, same session `3492626c`, scoped to the mode-scoped step filter).
+  Regions are disjoint and that lane holds the claim; this lane does not compete
+  for it. **The path is deliberately not spelled inside `- Files:` above** —
+  `check_lane_invariants` reads any backticked path there as a CLAIM, so naming
+  it even to disclaim it made these two lanes CONTEST each other and the checker
+  failed at every session start. `ncaaf-live-cadence` documents this exact idiom
+  for the Render blueprint file, for the same reason.
+  `[collision resolved 2026-09-04 by session c4287631 — wording only: no
+  ownership, no scope and no code changed. The author's original parenthetical
+  read "(soccer player step only — the `ncaaf-live-cadence` claim on this file is
+  THIS SAME SESSION's and is scoped to the mode-scoped step filter; regions are
+  disjoint)"; it is RESTATED above rather than quoted, because leaving the
+  backticked path in place is what tripped the checker. Owning session
+  `3492626c` was absent from the session roster (incl. archived) when this was
+  done, so neither lane was mid-edit.]`
+- Verification: MEASURED on a live EPL fetch, not asserted. Roster 440 -> 544
+  players (+104 no 2025 file knows, incl. all three promoted clubs); returning
+  players keep a median 1,639 minutes instead of <=180; the staleness guard
+  fires `too_early=True too_few=False` on the real 364-row file. 24 new tests,
+  10/10 mutants caught.
+- Blocked by: none. NOT DEPLOYED — the step is inert until refresh-worker runs it.
+
 ### soccer-card-final-state — CLOSED 2026-09-04 — opened 2026-09-04 — session b9bc926d-f167-4923-9344-eac7e86a5761 — **THE TEST WAS THE STALE SIDE, AND THE FUNCTION'S OWN DOCSTRING WAS TOO.** `28e55d86` (2026-08-22) narrowed the early return from `{in, post}` to `post` alone on a production measurement (8 of 15 cards rendering a LIVE head were FINISHED matches, clocks frozen at `90'+7'`) and pinned the new contract in a NEW file — leaving the duplicate assertion in `test_soccer_board_mlb_parity.py` asserting the rule it had just replaced. Landed `ee430379` (2 commits). Verified: 78 pass; and `off != on` — deleting the surviving `post`-is-terminal guard fails 2 tests including the amended one, which the ORIGINAL assertion would NOT have caught (with `match_box=None` the function returns early on the `isinstance` check regardless). NO BEHAVIOUR CHANGE, NOTHING DEPLOYED.
 - Goal: `tests/test_soccer_board_mlb_parity.py::StaleArtifactStateTests::test_it_cannot_downgrade_a_started_match` passes on a pristine `origin/main`, with the surviving assertion matching the contract the code actually enforces.
 - Files: `tests/test_soccer_board_mlb_parity.py`, `syndicate/features/soccer/cards.py` (docstring only, no behaviour change).
@@ -27055,78 +27150,6 @@ lost no protection and no open lane left the session-start digest.
   `deploy_claim.py status` reports it "does not block"; that session is not in
   the running roster.
 
-### sim-clv-decomposition — **CLOSED 2026-09-04 — THE GATE WAS RUN AND THE ANSWER IS NO. RECOMMENDATION: LEAVE `(0.125, 1.5)` ALONE.** A non-zero `sim_component` does NOT predict better CLV; in the direction the board rewards it predicts WORSE, stratified `-0.113 [-0.253,+0.027]` on props and `-0.186 [-0.340,-0.033]` on game lines over 14,111 pregame-close rows. **Falsification, not an underpowered null** — powered to 0.25pp on props with >2,400/arm, so any props effect above +0.03pp is excluded. The order-side join is STRUCTURALLY dead (`sim_view` on 13 of 667 settled, all `agrees`; `disagrees` never placed once; a 10pp ROI gap needs 3,796 settled attributed orders). **Held out, the sign does not replicate** and the two book scopes disagree about tail calibration. **AND THE SCREEN CANNOT GATE THIS:** `score_sim_weight_impact.py` returns the identical PASS at weight 0.125/0.25/0.5/**1.0** — it screens the CAP, not the weight, with 3.9x headroom. Full record: `state_layer2.md [sim-weight-clv-decomposition]`. — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
-- Verification RAN: 17,714 rows harvested from `/api/ops/clv/report?rows=1`
-  across 21 dates x 5 sports (2026-08-15..09-04 — the openings ledger starts
-  08-15, so the HRR-poisoned 06-04..07-08 window **cannot** contaminate it);
-  rates with denominators at every cut; PRE/POST 2026-09-01 split reported;
-  `score_sim_weight_impact.py` swept over (weight, cap). NO DEPLOY, NO ENV VAR,
-  no order touched — the weight is the operator's call and the evidence is filed
-  for it.
-- Prior header, for the record:
-- Goal: answer `_SCORE_SIM_WEIGHT`'s OWN unblock condition — *"settled > 0 and
-  CLV decomposed by component"* — as a falsifiable claim, and return a
-  recommendation on `(_SCORE_SIM_WEIGHT, _SCORE_SIM_CAP_PCT)` that INCLUDES
-  "leave them alone". **READ-ONLY against production. NO DEPLOY, NO ENV VAR** —
-  changing `SYNDICATE_SCORE_SIM_WEIGHT` re-ranks every bet and is the operator's
-  call, not this lane's.
-- Files: `scripts/decompose_sim_clv.py` (NEW). Collision-checked 2026-09-04
-  against every OPEN lane: nothing claims it (new path). This lane makes NO
-  code change to `opportunity_signals.py`, `layer2_board.py` or
-  `score_sim_weight_impact.py` — the last is RUN, not edited.
-- Hypothesis: a non-zero `sim_component` predicts better realised CLV than a
-  zero one, out of sample.
-- Falsification test: bucketed by `sim_component` (zero / negative / positive,
-  and by magnitude), realised CLV does not separate — or separates the wrong
-  way — at a sample size large enough to detect the effect. **An underpowered
-  null is NOT a falsification and must not be reported as one**; if n is too
-  small, report the n required and when it accrues.
-- Verification: rates with denominators at every cut, a PRE/POST 2026-09-01
-  split (tail calibration shipped that day), the 2026-06-04..07-08 HRR-poisoned
-  window excluded or segmented, and — only if the recommendation is to RAISE —
-  `scripts/score_sim_weight_impact.py` run at the proposed (weight, cap) with
-  its DOMINATION / SIDE-PICKING / REORDERING numbers reported. A weight that
-  fails that screen is not shippable whatever the CLV says (2026-08-08: 286 of
-  300 rows negative-EV, and at 0.5 the blend promoted every one of them).
-- Blocked by: none.
-
-### split-state-reindex-truncation — CLOSED 2026-09-04 — opened 2026-09-04 — session 4b1b66a3 — **FIXED AND LANDED ON MAIN (`29ab5bfb`). `--reindex --apply` deleted EVERYTHING below the `[subject-index]` table, silently, exit 0. Exposure was live: `origin/main`'s `state.md` carried **171 non-blank lines** below the table at the time of the fix. Now spliced in place — measured on that same corpus, **171 of 171 preserved**. 8 new tests FAIL on the pre-fix code; the load-bearing two fail for the RIGHT reason (index rebuilt correctly while the tail vanishes; unclassifiable case returns 0 instead of refusing). No deploy — tooling only.**
-- Goal: `py -3 scripts/split_state.py --reindex --apply` must leave every byte
-  BELOW the `[subject-index]` table untouched, and must exit non-zero rather
-  than write when the post-table region cannot be classified.
-- Files: scripts/split_state.py, tests/test_split_state.py
-- Hypothesis: `reindex()` rebuilds state.md as `head + body[:hdr+1] + rows +
-  [""]` and never re-emits `body[hdr+1:]`, so ALL trailing content below the
-  table is dropped — silently, reporting success and exiting 0.
-- Falsification test: run `--reindex` (dry) against a state.md carrying a
-  trailing block and diff the computed output against the input. If the trailing
-  block survives, the hypothesis is wrong.
-- Verification: DONE, all three.
-  (a) `test_reindex_PRESERVES_content_below_the_table` + 7 more FAIL on pre-fix
-      code and pass after; 31/31 green in `tests/test_split_state.py`.
-  (b) `test_reindex_REFUSES_stray_rows_below_the_table` — pre-fix returns 0 and
-      WRITES; fixed returns 1 and the file is byte-unchanged. Plus
-      `test_reindex_line_guard_FIRES_on_a_reintroduced_truncation`, which
-      monkeypatches `table_span` to re-create the old truncation and asserts the
-      runtime guard catches it.
-  (c) REAL CORPUS: ran the fixed tool on a copy of `origin/main`'s `.syndicate/`
-      — "post-table region: 192 line(s) PRESERVED (171 non-blank)", and 171 of
-      171 tail lines verified still present. `state_key_check.py` reports
-      "coherent — one subject, one section" afterwards.
-- FINDING BEYOND THE BRIEF: preservation is of CONTENT, not BYTES, because the
-  live `state.md` is MIXED-ending — measured 2026-09-04, lines 1-580 CRLF and
-  the 55 appended tail lines bare LF (the appending session's tool wrote LF).
-  `load()` + the write have ALWAYS normalised endings whole-file; this is not
-  new, but it makes a reindex show the whole tail in a diff. Documented in the
-  docstring and pinned by `test_reindex_normalises_a_MIXED_ending_tail` so it is
-  never misread as a content loss.
-- ALSO FOUND, NOT MINE TO FIX: `tests/test_check_lane_invariants.py` has 5
-  failing tests on clean `origin/main` (confirmed by stashing and running at
-  HEAD) — the lane-invariant regexes no longer match the lane-guard hook source.
-  `check_lane_invariants.py` still exits 0 / "INVARIANTS HOLD", so nothing
-  surfaces it. Not claimed by this lane; filed for a separate lane.
-- Blocked by: none.
-
 ### preflight-test-claim-leak — CLOSED 2026-09-04 — opened 2026-09-04 — **A UNIT TEST'S VERDICT DEPENDED ON WHETHER A PARALLEL SESSION HELD A DEPLOY CLAIM.** `main()` resolves the claim lazily by NAME inside a bare `except Exception: claim = None`, and `CLAIMED` is checked immediately BEFORE `TOO_SOON`; the test loads `deploy_preflight` by FILE PATH, so `scripts/` is off `sys.path` in isolation and the lookup silently RAISED. In a full-suite run an earlier file had already inserted `scripts/`, so it read the live claim file. Fixed by injecting a `deploy_claim` MODULE into `sys.modules` (the only seam that works in both `sys.path` states), applied to both `main()` drivers. Landed `bd6f8fb8`. VERIFIED with `soccer-player-producer` still holding `refresh-worker`: bare 42 passed, `PYTHONPATH=scripts` 42 passed — the exact condition that was red. Mutation check: make the lookup unreachable again and the 2 new claim tests fail while the other 9 pass. `scripts/deploy_preflight.py` untouched; production behaviour was correct. NOTHING DEPLOYED. — session b9bc926d-f167-4923-9344-eac7e86a5761
 - Goal: `tests/test_deploy_preflight.py` returns the same verdict whether or not `scripts/` is on `sys.path` and whether or not any session holds a live deploy claim — i.e. `PYTHONPATH=scripts python -m pytest tests/test_deploy_preflight.py` and the bare form agree, while `soccer-player-producer` holds `refresh-worker`.
 - Files: `tests/test_deploy_preflight.py`.
@@ -27136,7 +27159,7 @@ lost no protection and no open lane left the session-start digest.
 - Verification: (a) both invocations agree, claim held; (b) a NEW test pins `CLAIMED` preempting `TOO_SOON` deliberately, since that ordering was until now exercised only by accident via the real claim file; (c) a REACHABILITY test asserts `main()` actually CALLS the claim lookup — without it a silent `ImportError` makes every claim assertion in this file vacuously true.
 - Blocked by: none.
 
-### mlb-hitter-so-dead-field — CLOSED 2026-09-04 — **FIXED AT BOTH SITES, LANDED ON `main` AS `0b9a03e7`, NOT DEPLOYED. The defect is REAL and CONFIRMED IN PRODUCTION; the money risk is NOT, and the reason it is not is an ACCIDENT.** — opened 2026-09-04 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+### mlb-hitter-so-dead-field — CLOSED 2026-09-04, **FULLY DISCHARGED 2026-09-05** — **FIXED, GATED, DEPLOYED AND VERIFIED ON TWO INDEPENDENTLY REBUILT DATES. NOTHING OWED.** `0350dbd2` (both accumulation sites) + `0b9a03e7` (containment gate in `sim_input_checklist.py`, so a regression fails the DAILY JOB). Live on refresh-worker `3a9153f4` 2026-09-04T23:26:26Z. Served board, same featured row: 09-04 `mean 0.0 -> 1.087-1.095` over three post-deploy rebuilds; 09-05 `mean 0.0 -> 1.042 / modeProb 1.000 -> 0.428 / 1 -> 5 rungs` on its first post-deploy build (05:13:08Z) — it had lagged 5h49m because its artifacts were written **106 s BEFORE** the deploy. **No priced recommendation was ever possible and that is now a CODE-LEVEL guarantee** (`project()` returns None for `batter_strikeouts` on a batter), not the market-feed accident it first appeared to be. Detail: `deploys.md` 2026-09-05, `log/2026-09-04.md`, `state_mlb.md [mlb-hitter-strikeouts-prop]`. — opened 2026-09-04 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
 - Goal: `strikeouts_dist` has more than one bin, and `so_mean` > 0, for at least
   one lineup batter in a real sim run — currently `{0: n_sims}` / `0.0` for
   EVERY hitter in EVERY game, permanently and silently.
@@ -27213,6 +27236,40 @@ lost no protection and no open lane left the session-start digest.
   that would otherwise exit `REFUSED: no roster artifacts`) and is not gated on
   `--warn-only`. Verified both directions: exit 1 naming the missing key AND the
   drift; exit 0 when correct.
+- **`#646`(d) DISCHARGED — `probability_refusal` and the MLB ladder path, verified
+  BY TEST 2026-09-05.** The answer is TWO answers, and the headline one is that
+  the original severity worry is gone for a reason better than the guard.
+  - **THE PRICED PATH IS COVERED, AND THE GUARD IS NOT INERT.**
+    `PropProjectionIndex.project()` wraps `_project_uncensored` in
+    `_refuse_published_certainty`. Proven reachable with a POSITIVE CONTROL, not
+    by reading: a degenerate `batter_hits` row came back
+    `model_prob_over: None` + `model_prob_over_refused: 'exact_certainty'` +
+    `model_prob_over_refused_value: 0.0` + the reason string. A guard I had only
+    read would have been worth nothing.
+  - **AND `batter_strikeouts` NEVER REACHES IT ANYWAY.** `_HITTER_BUCKETS` has
+    8 entries and strikeouts is not one, so `project()` returns **None** for a
+    batter at 0.5 AND 1.5 (tested both). The pitcher alias at
+    `prop_projections.py:555` only fires when the subject is a pitcher in THIS
+    slate's sim. **So "no priced recommendation was ever emitted" no longer
+    depends on the market feed returning zero quotes — it is a code-level
+    guarantee.** That was the exact thing I said was NOT established when I
+    closed this lane, and it is now established.
+  - **THE LADDER PATH IS NOT COVERED — and does not need to be, because it is
+    DISPLAY-ONLY.** `ladders_build._dist_stats` computes `overLineProb` with no
+    refusal: fed `{0: 1000}` at line 0.5 it returns exactly `0.0`, the value in
+    `CERTAINTY_REFUSED` and the sign that module's docstring calls the dangerous
+    one. But `overLineProb`'s ONLY consumers are `ladders_common.py:81/88/113/120`,
+    which render it through `format_pct` as an "Over" metric and an "Over
+    probability:" string. It feeds no edge, no candidate and no order. So a
+    degenerate dist there produces a wrong NUMBER ON A CARD, never a priced bet.
+  - **NOT FIXED, DELIBERATELY, AND THIS IS A JUDGEMENT CALL SOMEONE MAY WANT TO
+    OVERTURN.** A blanket refusal on this surface would be WRONG: `_dist_ladder`
+    emits `{total: 0, hitProb: 1.0}` and that 1.0 is P(X >= 0), trivially and
+    correctly certain. Only `overLineProb` — the one joined against a market
+    line — is the candidate, and showing "Over probability: 0%" for a genuinely
+    degenerate distribution is arguably the honest display. The residual is a
+    HUMAN-READER risk (a false 0% beside a real line), not an automated-pricing
+    one. Left for a decision rather than changed unilaterally.
 - **`todo.md` NOT EDITED — CROSS-LANE CONFLICT SURFACED, NOT WORKED AROUND.**
   `docs/ai_context/todo.md` is claimed by OPEN lane `accuracy-ledger-budget-raise`
   (session 82fe0160), so I reverted my edit rather than edit across lanes — the
@@ -27287,6 +27344,43 @@ lost no protection and no open lane left the session-start digest.
   are still guarded, verified with `_claims()`.
 - Blocked by: none.
 
+### split-state-reindex-truncation — CLOSED 2026-09-04 — opened 2026-09-04 — session 4b1b66a3 — **FIXED AND LANDED ON MAIN (`29ab5bfb`). `--reindex --apply` deleted EVERYTHING below the `[subject-index]` table, silently, exit 0. Exposure was live: `origin/main`'s `state.md` carried **171 non-blank lines** below the table at the time of the fix. Now spliced in place — measured on that same corpus, **171 of 171 preserved**. 8 new tests FAIL on the pre-fix code; the load-bearing two fail for the RIGHT reason (index rebuilt correctly while the tail vanishes; unclassifiable case returns 0 instead of refusing). No deploy — tooling only.**
+- Goal: `py -3 scripts/split_state.py --reindex --apply` must leave every byte
+  BELOW the `[subject-index]` table untouched, and must exit non-zero rather
+  than write when the post-table region cannot be classified.
+- Files: scripts/split_state.py, tests/test_split_state.py
+- Hypothesis: `reindex()` rebuilds state.md as `head + body[:hdr+1] + rows +
+  [""]` and never re-emits `body[hdr+1:]`, so ALL trailing content below the
+  table is dropped — silently, reporting success and exiting 0.
+- Falsification test: run `--reindex` (dry) against a state.md carrying a
+  trailing block and diff the computed output against the input. If the trailing
+  block survives, the hypothesis is wrong.
+- Verification: DONE, all three.
+  (a) `test_reindex_PRESERVES_content_below_the_table` + 7 more FAIL on pre-fix
+      code and pass after; 31/31 green in `tests/test_split_state.py`.
+  (b) `test_reindex_REFUSES_stray_rows_below_the_table` — pre-fix returns 0 and
+      WRITES; fixed returns 1 and the file is byte-unchanged. Plus
+      `test_reindex_line_guard_FIRES_on_a_reintroduced_truncation`, which
+      monkeypatches `table_span` to re-create the old truncation and asserts the
+      runtime guard catches it.
+  (c) REAL CORPUS: ran the fixed tool on a copy of `origin/main`'s `.syndicate/`
+      — "post-table region: 192 line(s) PRESERVED (171 non-blank)", and 171 of
+      171 tail lines verified still present. `state_key_check.py` reports
+      "coherent — one subject, one section" afterwards.
+- FINDING BEYOND THE BRIEF: preservation is of CONTENT, not BYTES, because the
+  live `state.md` is MIXED-ending — measured 2026-09-04, lines 1-580 CRLF and
+  the 55 appended tail lines bare LF (the appending session's tool wrote LF).
+  `load()` + the write have ALWAYS normalised endings whole-file; this is not
+  new, but it makes a reindex show the whole tail in a diff. Documented in the
+  docstring and pinned by `test_reindex_normalises_a_MIXED_ending_tail` so it is
+  never misread as a content loss.
+- ALSO FOUND, NOT MINE TO FIX: `tests/test_check_lane_invariants.py` has 5
+  failing tests on clean `origin/main` (confirmed by stashing and running at
+  HEAD) — the lane-invariant regexes no longer match the lane-guard hook source.
+  `check_lane_invariants.py` still exits 0 / "INVARIANTS HOLD", so nothing
+  surfaces it. Not claimed by this lane; filed for a separate lane.
+- Blocked by: none.
+
 ### discard-guard-sees-origin — CLOSED 2026-09-04 — opened 2026-09-04 — session 4b1b66a3 — **BOTH DEFECTS FIXED (`e3a5154f`) AND THEN WIDENED TO ALL 610 REFS (`5641ca08`) AT USER REQUEST; BOTH LIVE IN THE PRIMARY TREE. Verified on the REAL tree: `git checkout HEAD -- scripts/split_state.py` (HEAD 183 behind, working copy on origin/main) went 2 → 0, while `.syndicate/lanes.md` with 128 genuinely uncommitted lines still refuses. 5 new tests FAIL on the pre-fix hook, ALL of them over-blocking; every must-refuse case passes on BOTH versions, so the guard was not weakened. 29/29.**
 - Goal: `discard-guard.py` must stop reporting PUSHED content as existing
   nowhere else, and must stop blocking `git restore --staged`, which its own
@@ -27314,17 +27408,214 @@ lost no protection and no open lane left the session-start digest.
   sessions to override it reflexively.
 - Blocked by: none.
 
-### primary-tree-sync-110d92f0 — CLOSED 2026-09-04 — **SHARED TREE `5f54bce5` -> `110d92f0`, 201 commits, fast-forward. NOTHING LOST: 0 upstream lines and 0 local content, measured both directions against the sync target.** The 5 local lines that did not survive are all accounted for (3 stale lane headers + 1 collision note upstream deliberately rewrote, 1 claim upstream deliberately released). — opened 2026-09-04 — session 0aef6a99-5b35-4e71-b532-d1d5c292c9c3
-- Goal: `[user: "sync the primary tree to origin/main"]`. **Met.**
-- Files: NONE — tree operation only. Does not claim the shared ledger.
-- **THIS MOVED EVERY SESSION'S HEAD.** 13 of 25 modified files held nothing
-  absent upstream and were reset; the other 12 were stashed, fast-forwarded and
-  3-way merged back. Recoverable from `refs/backup/pre-sync-2026-09-04`, `-04b`
-  and `stash@{0}` — deliberately retained, not dropped.
-- Verification (done): `lane_identity_check` and `state_key_check` coherent;
-  `check_lane_invariants` 58 claims / 14 OPEN / none contested; 70 tests pass;
-  index reset to HEAD; 545 untracked files untouched, 0 collisions. Working in
-  `.syndicate/log/2026-09-04.md`.
-- **A SYNC IS AN EVENT, NOT A STATE** — the tree was 17 commits behind within
-  the hour. Do not read this block as "the primary tree is at origin/main".
+### nfl-schedule-code-coverage-test — CLOSED 2026-09-05 — opened 2026-09-05 — session ff257687-e3c6-48e0-b92a-e6e494211885 — **GUARD LANDED (`176d1063`), MUTATION-CHECKED BOTH ARMS.** Reads every `schedule*.csv` the module's own `_source_roots()` resolves: 34 distinct codes over 5 files, all resolve. A hand-written list of the 32 franchises would NOT have caught the Rams bug — that was a second VOCABULARY for a club already in the map (`schedule_2026.csv` says `LA`/`WAS`, the 2023-2025 preseason files say `LAR`/`WSH`). Mutation A (drop `la`) red, naming `{'LA': ['schedule_2026.csv']}`; mutation B (1-row schedule) red on the vacuity floor — **B is the one that matters: `SF` and `LA` both RESOLVE, so the unresolved check passes green and only the floor catches a broken read.** Skips with an explicit reason where `data/` is absent; verified PASSED with data and SKIPPED without. Test-only, NO DEPLOY. `[the first close of this lane, c32fb301, was written through a shell that command-substituted every backtick and lost the identifiers; this restores them.]`
+- Goal: close the one risk left standing by `nfl-la-rams-alias` — a future slate
+  carrying an nflverse club code the alias map does not know regresses SILENTLY.
+  `[user: "add the test"]`
+- Files: `tests/test_team_aliases.py` (collision-checked against every OPEN lane:
+  no lane claims it or `team_aliases.py`).
+- Hypothesis: n/a — this is a guard, not a diagnosis.
+- Falsification test: the guard must FAIL when the map loses a code the real
+  schedules contain. Mutation: drop `la` and confirm red naming `LA`.
+- Verification: enumerate distinct `home_team`/`away_team` over EVERY
+  `schedule*.csv` the module's own `_source_roots()` resolves, and assert each
+  resolves. Must not pass VACUOUSLY — a floor on the code count, so an empty or
+  mis-parsed read fails instead of reporting success on zero rows.
+- Blocked by: none. NO DEPLOY — test-only, ships nothing.
+
+### mlb-ladder-certainty-refusal — CLOSED 2026-09-05 — **GOAL MET, LANDED `fe519fff`, DEPLOYED AND LIVE on both services at `50b266da` (web 03:09:57Z, refresh-worker 03:59:01Z), verified by content.** The REFUSED branch has still never fired in production and currently cannot — it needs a degenerate histogram AND a market line — so its evidence is 6 unit tests, and an absence of refused rows is EXPECTED, not confirmation. — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+- Goal: the MLB ladder stops publishing an EXACT `overLineProb` of 0.0/1.0 next
+  to a real market line. One testable outcome: `_dist_stats({0: 1000}, 0.5)`
+  returns `overLineProb=None` labelled as refused, while a healthy dist and the
+  no-line case are both unchanged.
+- Files: `syndicate/features/mlb/ladders_build.py`,
+  `tests/test_mlb_ladder_certainty_refusal.py` (NEW)
+- Hypothesis: n/a — this is a known gap, verified by test 2026-09-05 under
+  `#646`(d): `_dist_stats` computes `overLineProb` with no refusal, so a
+  degenerate histogram at line 0.5 publishes exactly `0.0`.
+- Falsification test: if `_dist_stats` already returns None-or-labelled for a
+  degenerate dist on current main, there is nothing to fix.
+- **THE TRAP THIS MUST NOT FALL INTO:** `_dist_stats` ALREADY returns
+  `overLineProb: None` for "no market line", and its own docstring says a zero
+  probability and an absent market are DIFFERENT FACTS the card renders
+  differently. Blanking to a bare None COLLAPSES that distinction. The refusal
+  must be LABELLED, mirroring `probability_refusal.refuse_published_certainty`
+  (`_refused` + `_refused_value`), not silently nulled.
+- **AND WHAT MUST NOT CHANGE:** `_dist_ladder` emits `{total: 0, hitProb: 1.0}`
+  and that 1.0 is P(X >= 0) — trivially and CORRECTLY certain. Only
+  `overLineProb`, the value joined against a market line, is in scope. A blanket
+  certainty refusal on this surface would blank a true value.
+- Verification: reachability both directions (off != on) plus a control that the
+  healthy and no-line cases are untouched.
 - Blocked by: none.
+- OUTCOME: `_dist_stats({0: 1000}, 0.5)` returned exactly `0.0` before and
+  returns `overLineProb=None` + `overLineProbRefused="exact_certainty"` +
+  `overLineProbRefusedValue=0.0` after. `1.0` refused at the other end too.
+- **BOTH TRAPS NAMED IN THIS LANE WERE AVOIDED, and both are pinned by tests:**
+  the refusal is LABELLED so "no market line" and "refused certainty" stay
+  distinguishable in the data (they were both bare `None` otherwise), and
+  `_dist_ladder`'s `{total: 0, hitProb: 1.0}` is untouched because that 1.0 is
+  P(X >= 0) and is CORRECTLY certain.
+- 8 tests, reachability-first: **3 FAIL on the unfixed code; the other 5 are
+  CONTROLS that pass BEFORE and after** — healthy dist still 0.736, no-line
+  unlabelled, empty histogram not faked into a refusal, ladder rung preserved.
+  A control that only passes after the change measures the change instead of
+  guarding it.
+- 260 MLB ladder/prop tests pass. `format_pct(None)` renders `-`, identical to
+  the existing no-line rendering, so no card breaks.
+- **PRE-EXISTING FAILURES RULED OUT, NOT ASSUMED:** 4 `test_nba_prop_ladders_*`
+  tests fail in this worktree. Verified they fail IDENTICALLY with this change
+  reverted — they need NBA artifacts, and `data/` is excluded from session
+  worktrees by design. Not mine.
+- NOT DEPLOYED and no urgency: `overLineProb`'s only consumers are
+  `ladders_common.py:81/88/113/120`, which render it as display text. It feeds
+  no edge, candidate or order. It ships with whatever deploy comes next.
+- LEFT FOR A DECISION, not silently taken: the card now renders `-` for a
+  REFUSED certainty and `-` for an ABSENT market line. The data distinguishes
+  them; the UI does not. Surfacing the reason (the prop path has
+  `edge_unavailable_reason` for this) is a copy decision, not a correctness one.
+
+### mlb-ladder-refusal-on-card — CLOSED 2026-09-05 — **GOAL MET, LANDED `9b660beb`, DEPLOYED AND LIVE at `50b266da` (web 03:09:57Z).** Healthy rendering verified unchanged on the served payload (`Over='66.3%'` / `'3.9%'` with matching list items); the refused rendering is unit-tested only, for the same reason as the lane above. — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+- Goal: a REFUSED `overLineProb` reads differently on the card from an ABSENT
+  market line. One testable outcome: a refused row's "Over" metric and its
+  "Over probability:" list item both say so, while an absent-line row still
+  renders `-` exactly as today.
+- Files: `syndicate/features/mlb/ladders_common.py`,
+  `tests/test_mlb_ladder_refusal_on_card.py` (NEW)
+- Hypothesis: n/a — `462d8d6c` made the DATA distinguish refused from absent
+  (`overLineProbRefused`), but every consumer renders both through
+  `format_pct`, which returns `-` for each. The label is currently unread.
+- Falsification test: if a refused row already renders differently from an
+  absent-line row on current main, there is nothing to do.
+- **DO NOT ADD A THIRD AND FOURTH COPY.** `ladders_common.py` duplicates the
+  render for pitcher and hitter — `metrics[].Over` and the `list_items`
+  "Over probability:" line, twice each. Inlining the refusal at all four points
+  is the `#334` two-copy failure with more copies. ONE helper, used by both.
+- Verification: reachability both directions, plus a control that the
+  absent-line and healthy renderings are byte-identical to today's.
+- Blocked by: none.
+- OUTCOME — three states where there were two:
+      state     tile        bullet
+      refused   `refused`   "Over probability: refused — the sim returned an exact 0.0%, and a finite simulation cannot establish certainty"
+      absent    `-`         "Over probability: -"          (UNCHANGED)
+      healthy   `73.6%`     "Over probability: 73.6%"      (UNCHANGED)
+- **THE TRAP THIS LANE NAMED WAS AVOIDED.** Both render sites go through ONE
+  helper pair (`over_prob_metric` / `over_prob_list_item`); the four inline
+  `format_pct(row.get("overLineProb"))` copies are gone, and a test asserts the
+  pitcher AND hitter cards, not whichever one I happened to open.
+- 6 tests: 3 FAIL on the unfixed code, 3 are CONTROLS passing before and after.
+- **THE CONTROLS PAID FOR THEMSELVES IMMEDIATELY, and this is the lesson worth
+  keeping:** my first fixture fed the PITCHER builder `groups.pitcher.hits`
+  when it reads `groups.pitcher.strikeouts`, so it produced no cards and ALL SIX
+  tests failed. A control that fails BEFORE the change is not a control — it is
+  a broken instrument, and it looked exactly like "the feature is missing". Only
+  the fact that the two controls were SUPPOSED to pass pre-fix made the fixture
+  bug visible instead of being read as more evidence for the fix.
+- 266 MLB ladder/prop tests pass. Both values stay `str`, so no template
+  contract changed. Em-dash verified U+2014 in the file, not console mojibake.
+- **STATED LIMIT:** the refused branch is NOT exercisable on a live page today —
+  it needs a degenerate histogram and the MLB strikeouts dist has been healthy
+  since `0350dbd2` went live. Covered by unit tests at both sites instead; there
+  is no production reading to be had, and I am not going to imply one.
+
+### mlb-ladder-refusal-deploy — CLOSED 2026-09-05 — **BOTH SERVICES LIVE AT `50b266da`, VERIFIED BY CONTENT. ALL CLAIMS RELEASED.** web 03:09:57Z, refresh-worker 03:59:01Z; measurements in `deploys.md`. — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+- Goal: `fe519fff` + `9b660beb` live on BOTH services that execute them. One
+  testable outcome: the deployed SHA on web AND refresh-worker contains
+  `overLineProbRefused` BY CONTENT, and the served hitter-ladders payload still
+  renders a healthy `overLineProb` unchanged.
+- Files: `scripts/deploy_claim.py` (the acquire-refusal message; see below).
+
+- Hypothesis: n/a.
+- Falsification test: n/a (deploy verification, not a diagnosis).
+- **TWO SERVICES, AND THEY ARE NOT INTERCHANGEABLE.** `ladders_build._dist_stats`
+  runs at ARTIFACT BUILD time (`build_ladders_artifact` -> `write_ladders_artifact`)
+  = refresh-worker. `ladders_common.over_prob_metric` runs at CARD RENDER time =
+  web. Deploying only one leaves the pair half-live.
+- Verification: content grep of each deployed SHA, plus a served-payload read
+  proving the healthy path is unchanged. The REFUSED branch is NOT provable in
+  production — it needs a degenerate histogram and MLB strikeouts has been
+  healthy since `0350dbd2`. Do not claim a reading that cannot exist.
+- Blocked by: none.
+- OUTCOME: both halves live and content-verified (`overLineProbRefused` 2,
+  `CERTAINTY_REFUSED` import 1, `over_prob_metric` 3), and `0350dbd2`'s
+  `"SO": so,` confirmed SURVIVING at 2 — a later deploy reverting an earlier fix
+  is the failure serialisation does not prevent.
+- **THE NUMBER WORTH KEEPING: refresh-worker idle windows are ~90 s, about one
+  per 40 min.** Six preflights over ~50 min all returned HOLD (7-10 jobs). A
+  150 s poll steps over a 90 s window; 45 s caught it on attempt 4, and the
+  deploy fired 32 s after the CLEAR reading.
+- Control verified on the served payload: healthy cards still read `Over='66.3%'`
+  / `'3.9%'` with matching list items. That is the only positive reading
+  available and it is a CONTROL, not proof of the new branch.
+- **CLAIM CORRECTED MID-LANE, recorded because it nearly went unnoticed:** I ran
+  `deploy_claim.py acquire` intending only to READ the refusal message, but my
+  own claim had just expired, so it ACQUIRED under the throwaway holder
+  `probe-only`. Released and re-acquired under this lane within the minute.
+  **`acquire` is not a read-only probe** — it only behaves like one while an
+  unexpired claim already exists.
+- **LEDGER NEAR-MISS, and the guard caught it:** a `git stash`/`rebase`/`stash
+  pop` around the ledger write re-applied content already on `origin/main`,
+  producing TWO blocks for each of four lanes plus a `UU` conflict. Verified the
+  duplication against `origin/main` (1 block each there, 2 here) BEFORE
+  discarding, reset to `origin/main`, and re-applied only my `deploys.md` entry
+  — 39 additions, 0 deletions, one file. Do not stash-pop across a rebase of a
+  shared ledger.
+
+### ci-archives-nba-card-js — CLOSED-VERIFIED 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **HYPOTHESIS CONFIRMED EXACTLY AS PRE-REGISTERED: NOT a rewriter defect and NOT a red CI gate. Diagnosing why the test could not load its input found a REAL PRODUCTION OUTAGE in the same code path. FIXED (`ba84b331`), DEPLOYED (web `337facdc`, live 20:35:00Z) AND VERIFIED ON THE SERVED PAYLOAD: `/nba/assets/betting-card-v2.js` 404/0 -> 200/63,536 bytes and `.css` 404/30 -> 200/17,881, `?v=1` -> `?v=1788640200000000000`, with the rewritten routes present and the stale forms absent. NOTHING OWED; claim released.**
+- Goal: `tests/test_archives.py::ArchiveRouteTests::test_nba_betting_card_js_rewrites_source_routes_to_syndicate_paths`
+  passes in a session worktree under the documented data-root control, and
+  still passes with `data/` present. **MET** — and the goal turned out to be
+  the smaller half of what the lane found.
+- Files: `syndicate/features/nba/betting_card.py`, `tests/test_archives.py`.
+  Checked against every OPEN lane before opening: no lane held either. **BOTH
+  RELEASED** — landed on `origin/main`, nothing held.
+- Hypothesis (written before testing): not a code defect in the rewriter.
+  `_artifact_root()` reads `SYNDICATE_NBA_ARTIFACT_ROOT` else
+  `<repo>/data/nba_source` and does NOT read `SYNDICATE_DATA_ROOT`, so the
+  control never reached this test and `source_web_text` returned `None`.
+- Falsification test (written before testing): the failure message must be the
+  `assertIsInstance(content, str)` line. **If it were instead an `assertIn`
+  route assertion over a non-`None` string, the hypothesis was WRONG.**
+  RESULT: `AssertionError: None is not an instance of <class 'str'>` at
+  `tests/test_archives.py:7019`. Confirmed. Corroborated by three more
+  readings — primary tree (has `data/`) 1 passed; worktree +
+  `SYNDICATE_NBA_ARTIFACT_ROOT` 1 passed in 5.67s; worktree +
+  `SYNDICATE_DATA_ROOT` after the fix 1 passed.
+- **WHAT THE LANE ACTUALLY FOUND.** Production, 2026-09-05: `404 / 0 bytes`
+  for `/nba/assets/betting-card-v2.js` and `404 / 30 bytes` for the `.css`,
+  while `/wnba/assets/betting-card-v2.{js,css}` serve `200 / 57,864` and
+  `200 / 17,881`, and `/nba/season/2026/betting-card` serves 200 referencing
+  both 404s with `?v=1` — the literal both-files-missing version fallback.
+  Production points `SYNDICATE_NBA_ARTIFACT_ROOT` at the DISK while the two
+  assets are git-tracked and in no publish allowlist, so on Render they exist
+  ONLY in the checkout, which a single-root lookup could never reach. Full
+  working: `state_basketball.md [nba-betting-card-assets-404]`.
+- Verification: **DONE for the code, OWED for the deployment.** Local A/B
+  under production's env shape, same process, only the resolver varying:
+  `404 0 / 404 30, ?v=1` -> `200 63,549 / 200 17,881, ?v=1781897524631551600`,
+  the pre-fix column reproducing production exactly. 3 mutations, each red
+  exactly where predicted (A pre-fix resolver -> fall-through + version RED;
+  B order reversed -> ordering guard RED only; C single-root version stamp ->
+  version RED only). `tests/test_archives.py` 1 failed / 380 passed -> **384
+  passed, 2 skipped, 0 failed**; NBA suite 139 passed.
+  **DISCHARGED 2026-09-05 20:35:00Z.** Deployed web `337facdc`
+  (`dep-dae7napt0dsc739580c0`), preflight CLEAR for that exact SHA after one
+  HOLD on an in-flight `merge_published_artifacts` job that I waited out rather
+  than forcing. Served payload: `.js` **404/0 -> 200/63,536**, `.css` **404/30
+  -> 200/17,881**, `?v=1` -> `?v=1788640200000000000`. Checked that it is the
+  REWRITTEN asset and not merely some file: `/nba/api/season/` and
+  `/nba/cards?date=` present; bare `/api/season/`, `/betting-card?date=` and
+  `/live-player-props-audit?date=` all absent. The pre-registered failure
+  branch — stays 404, therefore vendor as WNBA does — did NOT fire. Working in
+  `deploys.md` 20:29:31-20:35:00Z.
+- Also corrected: `state_ledger.md [ci-suite-red-test]`, which claimed CI's own
+  gate had a red test. It does not and did not.
+- **`docs/ai_context/todo.md` NOT FILED — it is CLAIMED by OPEN lane
+  `accuracy-ledger-budget-raise`, so I reverted my edit rather than edit
+  across lanes** (`lane-postwrite-check.py` caught it; the shell write was not
+  blocked, only reported). The owed deploy and its one reading are recorded in
+  this block and in `state_basketball.md [nba-betting-card-assets-404]`, so
+  nothing is lost operationally — but the CANONICAL todo list does not carry
+  it. **No id was reserved**, so whoever files it should take the next free
+  one rather than assume `#647`. Text to lift is in this block verbatim.
+- Blocked by: none. Claims: NONE held.

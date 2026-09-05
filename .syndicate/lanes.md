@@ -65,6 +65,29 @@ id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
 markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
+### web-oom-burst-source — CLOSED 2026-09-05 — opened 2026-09-05 — **FALSIFICATION TEST FIRED, AND THE FOUNDING OBSERVATION WAS AN ARTIFACT.** 7 settled bursts at 10 s cadence: **0/7 hit both workers**, sizes 17.6-41.8 MB (mean 28.0), gaps irregular (spread/mean **1.79** vs a 0.35 periodicity bar). Not simultaneous, not periodic -> ordinary demand-driven traffic on one worker at a time; the scheduled-job/fan-out hypothesis is dead. The lane was opened on "both workers rose ~98 MB in ~100 s", which came from **50-second sampling** — a grid too coarse to distinguish "one then the other" from "both at once". A first run was DISCARDED whole: a peer deployed mid-window and the detector, lacking a restart guard, read warm-up as bursts (+570 MB, +284 MB) with pids reused across the restart. Rebuilt with restart inference and a 10-min settle window. Weak signals recorded as weak: pid 98 took 6/7 bursts (n=7), and one burst coincided with a 98 MB child. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: identify what causes `#632`'s memory BURSTS. Growth is episodic, not
+  steady — both workers rose ~98 MB between 16:17:43 and 16:19:25 and were then
+  flat to the decimal (`595.3`/`509.4`) for 3.5 min.
+- Files: scratchpad only (a detector script); no repo code unless the answer
+  needs an instrument. No lane conflict.
+- Hypothesis: it is a SCHEDULED or FAN-OUT event, not user traffic. **Both
+  workers rose in the same ~100 s window, and one request cannot do that** — a
+  single request lands on one worker.
+- Falsification test: bursts are UNCORRELATED between workers and land at
+  irregular intervals — then it is ordinary traffic hitting whichever worker,
+  and the fan-out/schedule story is wrong.
+- Verification: >= 3 bursts detected at 10 s cadence, reporting for each its
+  magnitude per worker, whether the workers moved TOGETHER, and the gap between
+  bursts. Periodicity is the discriminator: a fixed interval means a job, not
+  users.
+- METHOD NOTE: sample WORKER RSS, never `container_memory_mb` — the container
+  figure includes reclaimable page cache and moved 247 MB with no process
+  behind it, which is how I mis-reported pressure as 86% when it was 54%.
+- Blocked by: none.
+
+## OPEN
+
 ## OPEN
 ### settled-sample-nfl-reconcile — OPEN — opened 2026-09-04 — two settlement ledgers disagreed about NFL, and the disagreement sizes real money
 - Goal: reconcile `settlement_all_time.by_sport` (NFL `orders=1, settled=0`) against
@@ -305,7 +328,7 @@ death, never life — do not invert it.
   released: `syndicate/blueprints/wnba.py` and their tests. **ALL CLAIMS RELEASED.**
 - Blocked by: none
 
-### wnba-chip-live-token — OPEN, **UNOWNED** (session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 checkpointed and ARCHIVED 2026-08-27) — opened 2026-08-27 — **CLOCK FIXED AND VERIFIED IN PRODUCTION (web `e3dceb68`): `LIVE` -> `Q3 20.5`, control and after on the same game against ESPN. TWO THINGS OWED — refresh-worker is not deployed, and the projection guard is UNIT-TESTED ONLY. `todo.md #586`.** **CHECKPOINT 2026-08-27T01:2xZ: refresh-worker reached `070f452a` and DOES carry the fix; the WNBA half is owed on a MISSING SUBJECT, not a missing deploy — `WNBA live=0` when the artifact landed. Next window TOR @ SEA `02:00Z`. Session archived; lane UNOWNED.**
+### wnba-chip-live-token — OPEN, **UNOWNED** (session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 checkpointed and ARCHIVED 2026-08-27) — opened 2026-08-27 — **CLOCK FIXED AND VERIFIED IN PRODUCTION (web `e3dceb68`): `LIVE` -> `Q3 20.5`, control and after on the same game against ESPN. TWO THINGS OWED — refresh-worker IS deployed (`070f452a` is inside its live SHA `eb7951fe`, checked 2026-09-05T21:45Z by `ledger-repair-invariants`; this header's own CHECKPOINT below already said so), and the projection guard is UNIT-TESTED ONLY. `todo.md #586`.** **CHECKPOINT 2026-08-27T01:2xZ: refresh-worker reached `070f452a` and DOES carry the fix; the WNBA half is owed on a MISSING SUBJECT, not a missing deploy — `WNBA live=0` when the artifact landed. Next window TOR @ SEA `02:00Z`. Session archived; lane UNOWNED.**
 - Files: released: `tests/test_home_wnba_live_state.py`
   **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
 released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[2026-08-28,
@@ -464,7 +487,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
 - Blocked by: none
 
-### layer2-accuracy-audit — OPEN, UNOWNED, SESSION ARCHIVED 2026-08-31 ~23:5xZ — **CLAIMS: NONE HELD, all four services free.** Handoff armed: scheduled task `check-mlb-pregame-freeze-611` fires 2026-09-01 08:30 CT (needs a manual Run-now for tool approval). **`#611`'s deployed log line is UNREADABLE — do not plan around it; read the artifact + run history instead.** 7-day board accuracy DELIVERED; MLB game-line join FIXED, DEPLOYED and VERIFIED (`13 -> 0` misses, `(pregame-freeze, 14 games)`, 20:33:17Z) — but it did NOT raise graded rows, which falsified my own causal claim. Two follow-ups opened as `todo #610` (caps: ml 12 candidates -> cap 1) and `todo #611` (prop seal dead since 08-16; cadence is the lead). **ONE THING OWED: `5be4381d` is on main and NOT DEPLOYED** — preflight HOLD, 3 jobs in flight on live-odds-worker. **AT RISK: 18 local commits incl. all ledger writes are NOT on origin/main.** — opened 2026-08-31 — session ef7e22fc-d592-43f7-b326-31ddea9258ef
+### layer2-accuracy-audit — OPEN, UNOWNED, SESSION ARCHIVED 2026-08-31 ~23:5xZ — **CLAIMS: NONE HELD, all four services free.** Handoff armed: scheduled task `check-mlb-pregame-freeze-611` fires 2026-09-01 08:30 CT (needs a manual Run-now for tool approval). **`#611`'s deployed log line is UNREADABLE — do not plan around it; read the artifact + run history instead.** 7-day board accuracy DELIVERED; MLB game-line join FIXED, DEPLOYED and VERIFIED (`13 -> 0` misses, `(pregame-freeze, 14 games)`, 20:33:17Z) — but it did NOT raise graded rows, which falsified my own causal claim. Two follow-ups opened as `todo #610` (caps: ml 12 candidates -> cap 1) and `todo #611` (prop seal dead since 08-16; cadence is the lead). **THAT OWED DEPLOY IS DISCHARGED: `5be4381d` is inside all three live SHAs (web `94c8ac13`, refresh-worker `eb7951fe`, live-odds-worker `3223baa1`), checked 2026-09-05T21:45Z by `ledger-repair-invariants`. Shipped is not verified -- no reading was taken here.** — preflight HOLD, 3 jobs in flight on live-odds-worker. **AT RISK: 18 local commits incl. all ledger writes are NOT on origin/main.** — opened 2026-08-31 — session ef7e22fc-d592-43f7-b326-31ddea9258ef
 - Files: released: **CLAIMED 2026-08-31 ~18:3xZ, user asked for the MLB join fix:** `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py` (`_odds_paths` + helpers only), `tests/test_season_betting_cards_odds_paths.py`. **EXTENDED ~18:4xZ, user asked for the backlog regrade:** `scripts/run_refresh_worker.py` (`_mlb_betting_day_backfill_*` only — NOT `_season_projection_should_launch`, which lanes.md flags as contended), `tests/test_refresh_worker.py`. Every OPEN-lane reference to `run_refresh_worker.py` is RELEASED; checked. Checked against every OPEN lane: no lane holds either. Still NOT editing `graded_outcomes.py`, `evaluation_settlement.py`, `layer2_shortlist.py`, `layer2_board.py`, `refresh_mlb_oddsapi.py`.
   **CLAIMS RELEASED 2026-08-31 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
 - Files: released: **CLAIMED 2026-08-31 ~18:3xZ, user asked for the MLB join fix:** `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py` (`_odds_paths` + helpers only), `tests/test_season_betting_cards_odds_paths.py`. **EXTENDED ~18:4xZ, user asked for the backlog regrade:** `scripts/run_refresh_worker.py` (`_mlb_betting_day_backfill_*` only — NOT `_season_projection_should_launch`, which lanes.md flags as contended), `tests/test_refresh_worker.py`. Every OPEN-lane reference to `run_refresh_worker.py` is RELEASED; checked. Checked against every OPEN lane: no lane holds either. Still NOT editing `graded_outcomes.py`, `evaluation_settlement.py`, `layer2_shortlist.py`, `layer2_board.py`, `refresh_mlb_oddsapi.py`.
@@ -500,7 +523,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   That lane borrowed the first two on 2026-09-03 ~22:0xZ, shipped its change,
   and hands them back unchanged in claim terms.
 
-### ncaaf-chip-compact — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, FIXED, LANDED. NOT DEPLOYED. The reported symptom is a JOIN failure, not a missing abbreviation — the chip already carried `MAS`/`RUT`.**
+### ncaaf-chip-compact — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, FIXED, LANDED, AND SHIPPED: the fix is `9e106397`, inside all three live SHAs (web `94c8ac13`, refresh-worker `eb7951fe`, live-odds-worker `3223baa1`), checked 2026-09-05T21:45Z by `ledger-repair-invariants`. Shipped is not verified. The reported symptom is a JOIN failure, not a missing abbreviation — the chip already carried `MAS`/`RUT`.**
 - Files: RELEASED `[2026-09-04, TAKEN by lane nfl-la-rams-alias, session ff257687]`: `syndicate/features/shared/team_aliases.py`
   **CORRECTION `[2026-09-04 22:1xZ, same lane]`: the reason first written here was
   WRONG, and the claim-take now rests on DISJOINTNESS ALONE.** It said session
@@ -541,7 +564,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: nothing. **Deploy deliberately NOT taken** — handed to the
   coordinating lane `order-model-view`.
 
-### layer2-sim-disagrees — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **ANSWERED, FIXED, LANDED, NOT DEPLOYED. The tag's RULE is fine; its INPUT is null on 100% of NCAAF rows. Two further defects found on the same served payload, both of which make the board state a number it does not have.**
+### layer2-sim-disagrees — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **ANSWERED, FIXED, LANDED, AND SHIPPED: the fix is `939a8c00`, inside all three live SHAs, checked 2026-09-05T21:45Z by `ledger-repair-invariants`. Shipped is not verified. The tag's RULE is fine; its INPUT is null on 100% of NCAAF rows. Two further defects found on the same served payload, both of which make the board state a number it does not have.**
 - **NOTICE from `web-oom-thread-gating` `[2026-09-04]`: I edited `pipeline/intelligence_state.py` at ~7776** (the board-drain THREAD TARGET, so
   `#632`'s per-request attribution can exclude the build that runs on it). Your
   block scopes this file to *"the `confidence` backfill at ~1888 ONLY"*, so we are
@@ -552,6 +575,19 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   Ranges checked line-by-line first — yours ~114-135, ~2182-2224, ~3168-3258; mine
   ~716, ~3657, ~3697. Disjoint by function. Your `board_sim_view_display` JS test
   passes. If you still need the file, say so and I will coordinate rather than assume.
+- **RELEASED 2026-09-05 ~22:0xZ to lane `edge-basis-moneyline`, ON AN EXPLICIT
+  USER OVERRIDE — **AND HANDED BACK the same session, `fda5c28a` landed, the
+  `Files:` line below restored and re-verified with `claims_by_path`. This lane
+  holds `layer2_board.py` again; nothing is owed.** The file —
+  Lane claims are per PATH and cannot be scoped to a function, so taking a
+  four-line COMMENT fix in `_live_projection_columns` (~:2181) meant taking the
+  whole file. The edit is comment-only and touches none of the functions this
+  lane names below; the ranges are disjoint. If you are reading this and the
+  file is still not back on this lane's `Files:` line, take it — the hand-back
+  was meant to be minutes, not hours. What was wrong: that comment asserted
+  `_apply_verdict` is called with `live_projected=verdict["model_prob"]` for
+  "EVERY game market (h2h, totals AND spreads)", which is false for h2h, and
+  that belief is what hid the `edge_basis` mislabel for three weeks.
 - Files: `syndicate/features/shared/layer2_board.py`
   (**`_projection_side_in_row_frame` / `_model_edge_for` / `_model_prob_for_side`
   / `_publication_columns`, and `[2026-09-04]` the `value_ev` assignment in
@@ -560,11 +596,6 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `ncaaf-chip-compact`'s chip join, checked line-by-line. USER-REPORTED:
   longshots at the top; `model_edge` reached 14.99 as a ranking value while
   market EV maxed at 5.14** ONLY — the OPEN lane `ncaaf-chip-compact` lists this
-  `build_layer2_rows` (~:1890) where the model edge becomes the RANKING value
-  — same subject as this lane, disjoint from the four functions above and from
-  `ncaaf-chip-compact`'s chip join, checked line-by-line. USER-REPORTED: longshots
-  at the top of the board; `model_edge` reaches 14.99 as a ranking value while
-  market EV maxes at 5.14, so every top row is a model disagreement.** ONLY — the OPEN lane `ncaaf-chip-compact` lists this
   file for the CHIP JOIN (`away_key` / `home_key` stamping) and is the SAME session
   id, `3492626c`; the two edits are disjoint by function and were checked
   line-by-line before taking this),
@@ -575,7 +606,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `tests/test_layer2_sim_view.py` (NEW).
 - Blocked by: none.
 
-### ncaaf-live-cadence — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, BUILT, LANDED ON `origin/main` AS `a9247011`. NOT DEPLOYED; THE CADENCE IMPROVEMENT IS UNMEASURED AND THIS LANE CANNOT MEASURE IT.**
+### ncaaf-live-cadence — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, BUILT, LANDED ON `origin/main` AS `a9247011`, AND SHIPPED -- inside all three live SHAs, checked 2026-09-05T21:45Z by `ledger-repair-invariants`. THE CADENCE IMPROVEMENT IS STILL UNMEASURED AND THIS LANE CANNOT MEASURE IT.**
 - Files: `scripts/run_live_odds_refresh_worker.py`,
   `scripts/refresh_odds_sources.py` (mode-scoped step filter only),
   `tests/test_ncaaf_lines_autorun.py` (NEW),
@@ -646,7 +677,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   ~60s beat — smells like a poller, unproven) and whether latency is actually
   harmed. Beware `@lru_cache` — see `scope_2026-08-21_home_request_path_compute.md`
   §3. Full working: `handoff_2026-09-04_feed_live_request_path_rate.md`.
-### accuracy-ledger-budget-raise — OPEN — opened 2026-09-04 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
+### accuracy-ledger-budget-raise — OPEN — **READING TAKEN 2026-09-05 AND CONFIRMED BY A SECOND INDEPENDENT READ: skipped_budget 24 -> 12, the pre-registered “byte budget is the wrong instrument” branch. NOT CLOSED — next step is a CHUNK-COUNT bound, not 8 GB.** — opened 2026-09-04 — session 82fe0160-00b0-4b4b-bd63-2ff14849f885
 - Goal: `build_accuracy_summary` stops truncating its ledger read. ONE testable outcome: the next autorun logs `LEDGER_CHUNKS_ACCEPTED ... skipped_budget=0 truncated=0` with `dates` materially above 8, and peak `memory_anon_mb` stays under 2,600 MiB.
 - Files: `syndicate/features/shared/intelligence_evaluation.py`, `tests/test_accuracy_summary_ledger_budget.py`, `docs/ai_context/todo.md`, `.syndicate/*`.
 - Hypothesis: the 2 GB budget, not memory, is what caps coverage. **Measured 2026-09-04, not assumed:** `bytes=1999970055` against `budget=2000000000` (99.9985% of cap), `skipped_budget=24`, `truncated=1`, `dates=8` — while peak anon was **1481.6 MiB of a 4096 ceiling**, i.e. ~2,614 MiB unused.
@@ -686,6 +717,14 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - **OWNING SESSION `82fe0160` IS DELIBERATELY ARCHIVED `[2026-09-04 13:3xZ, user decision "close it"]` — THIS LANE IS NOT ABANDONED, IT IS HANDED OFF.** Do not release its ledger claims, do not force any deploy claim on its behalf, and do not treat its absence from `list_sessions` as evidence of anything: **lane blocks carry `CLAUDE_CODE_SESSION_ID`s and `list_sessions` returns CCD `sessionId`s — the two id spaces do not match**, which on 2026-09-03/04 caused this lane's claims to be released and a live peer's deploy claim to be force-broken. See `learnings.md` 2026-09-04.
 - **NOTHING IS OWED BY A HUMAN OR A SESSION. The lane is waiting on a CLOCK.** Its one testable outcome cannot exist until the accuracy autorun fires at >= 07:00 CT on 2026-09-05, because the job is once per Central day and 09-04's run already went at 14:34:27Z under the OLD 2 GB budget. Two scheduled tasks will take the reading: `verify-ledger-budget-4gb` (07:45 CT, primary) and `verify-accuracy-autorun-626h` (08:15 CT, backstop — it checks whether the primary already recorded, and reports disagreement rather than duplicating).
 - **IF BOTH TASKS FAIL TO FIRE** (this machine slept through the 03:00 slot on 09-04 and executed it 5h24m late), the reading is two commands and any session can take it: `render_logs.py --service refresh-worker --text "LEDGER_CHUNKS_ACCEPTED" --start "<today>T11:00:00Z"`, then compare `skipped_budget` against the pre-registered rule in this block. **Close this lane on the reading, never on the deploy** — the raise has been live since 15:00:12Z and that fact alone proves nothing.
+- **THE READING EXISTS. IT WAS TAKEN TWICE, INDEPENDENTLY, AND THE TWO READS AGREE ON EVERY RAW NUMBER.** `verify-ledger-budget-4gb` recorded it as `1da1a58a` at 16:03Z (~3h20m after its 07:45 CT slot — the same late-fire pattern as 09-04); the backstop `verify-accuracy-autorun-626h` had already started its own read at 15:49Z, when `origin/main` was still `0fa7c3e3` and `deploys.md` still carried `skipped_budget=24`. **Neither read saw the other**, which is what makes the agreement evidence rather than an echo. Entries: `deploys.md` **2026-09-05 13:04Z** (primary) and **2026-09-05 16:1xZ** (backstop, agreement table + the disagreement below).
+- **THE NUMBERS.** `count=21 bytes=3999973424 records=92791 dates=21 truncated=1 partial=1 skipped_budget=12 budget=4000000000`; `AUTORUN_DONE sports=8 elapsed_s=1721.552 error=none`; peak `memory_anon_mb` **2212.562** @ 12:41:20Z; no oomKilled, no restart. Raise reachable BY CONTENT on live `50b266da` (`finishedAt` 03:59:01Z, before the run), env override absent across all **154** keys, paginated — verified independently by both reads.
+- **THE PRE-REGISTERED RULE LANDS ON ITS MIDDLE BRANCH: `~12` = THE BYTE BUDGET IS NO LONGER THE RIGHT INSTRUMENT, and the next step is a CHUNK-COUNT bound rather than another byte doubling.** Reported as 12, not rounded up to "halved, therefore better". `dates` 8 -> 21 and `records` 1.97x mean the raise is genuinely NOT inert, but `bytes` came back **pinned at 99.999% of the cap on both days** and `truncated` is still 1. **The primary entry did not apply this rule** — it judged a different four-prediction set and concluded "an INSTANCE-SIZE decision, not a constant edit". Both can hold; the pre-registered one is cheaper and needs no bigger box, so do not let it be lost.
+- **AND THE MECHANISM THE PRE-REGISTRATION PREDICTED IS NOW MEASURED, not merely matched.** 21 accepted + 12 skipped = **33 chunks**, corroborated independently by `PROJECTION_DONE seen=33` from a different code path in the same job. Average accepted chunk **190.5 MB against the 256 MB per-chunk ceiling** — bytes and chunks have stopped being separate quantities, which is exactly the condition named. Full history at that density is **~6.29 GB**.
+- **THE LANE'S OWN REVERT CRITERION NOMINALLY TRIPS AND IS CONFOUNDED — DO NOT REVERT ON IT, AND DO NOT REUSE THE RATE BUILT FROM IT.** In-run peak 1,481.6 -> 2,212.562 = +730.9 MiB over +2,000 MB accepted = 0.365 MiB/MB against the 0.18 threshold. But the worker's **PRE-RUN peak was 2,694.852** (12:05..12:35Z, 1,592 samples) — **482.3 MB HIGHER than anything the run reached** — and the same shape holds on the baseline day (09-04 pre-run 1,672.098 vs in-run 1,481.6). On BOTH days the accuracy-summary window was not the worker's peak, so each day's in-run peak bounds the WORKER, not the ledger, and the delta of two such bounds is not a cost. Ambient moved **+1,022.8 MB** day over day, MORE than the +730.9 in-run delta. **This is the one place the two reads disagree:** the primary derives "~0.38 MiB anon per MiB of budget" from that delta and projects ~3,783 MiB for 8.2 GB. Its CONCLUSION (do not take 8.2 GB; the service's own floor eats the headroom — their 2,984.41 MiB at 15:29:08Z outside the run) survives and is strengthened; the coefficient does not.
+- **A THIRD CONFOUND NEITHER PRE-REGISTRATION NAMED: a NEW stage now runs inside this same autorun.** `[ledger_projection]` (lane `evaluation-ledger-projected-mirror`) streams ~2.1 GB in the same job and is most of why `elapsed_s` went 669.4 -> 1,721.552 (+157%) — so that figure is not a cost of the budget raise either. **It did NOT set the memory peak**: max anon over its sub-window (12:58:30..13:04:58Z) is 2,126.59, below the run peak. A TIME cost, not a memory one. Any future comparison against the 09-04 baseline must state all three confounds.
+- **LANE STAYS OPEN.** Its single testable outcome (`skipped_budget=0 truncated=0`, `dates` materially above 8) is only one-third met: `dates` clears, `skipped_budget=12` and `truncated=1` do not, and the memory criterion is confounded rather than passed. **A partial win that reclassifies the instrument.** Next step is the chunk-count bound — or making the summary computable off-worker at `budget=0` via the projected mirror, which dissolves the bound instead of re-tuning it (`PROJECTION_DONE ... reduction=68.5x over_ceiling=0 published=8` on its first production run).
+- **THE 09-04 `projected_bytes` PREDICTION IS NOT YET FALSIFIABLE AT THE FIELD IT NAMED.** `ledger_coverage.projected_bytes` lands in `reports/refresh_status/latest/accuracy_summary_autorun_status.json` in the keyvalue store, and `ops.py` has per-subject status routes (odds refresh, settlement, live-lens, opportunity contract) but **none for the accuracy autorun**. Closest available reading is the producer's own counter: `bytes_out=30,719,010 / records=49,393` = **622 B/record** against the ~560 B/record the design was sized on, which carried onto 92,675 records **infers ~57.6 MB** — under the 120 MB failure line, but an inference. Adding that route is the cheapest way to make the prediction checkable.
 ### mlb-final-state-mapping — OPEN, **UNOWNED** (session b9013cf2 ended 2026-09-04) — **TRACE DONE, BOTH CANDIDATES ELIMINATED BY MEASUREMENT. START HERE: `build_cards_page_context`'s source for a PAST date (artifact-backed vs inline-built), UNMEASURED.** — opened 2026-09-04 — session b9013cf2-9ea8-431f-9700-f4aac4794582
 - Goal: explain, with a file:line trace, why a 09-03 game whose feed payload reads **Final** is published on the board as `state=live`, and name the single place that decides it.
 - Files: **NONE — this lane CLAIMS NOTHING and writes no code.** It is a read-only trace; a claim is for editing.
@@ -722,7 +761,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - **Third attribution avoided.** Freshness and the lens overlay were both wrong on this symptom; this trace deliberately
   stops at a contradiction rather than proposing a cause for it.
 
-### evaluation-ledger-projected-mirror — OPEN — opened 2026-09-04 — session 5959f891-a9e4-4904-a2f0-486a008278d9 — **BUILT AND TESTED, NOT DEPLOYED. The projected ledger is the only form that can leave refresh-worker.** `[user: "build the projected ledger producer"]`
+### evaluation-ledger-projected-mirror — OPEN — opened 2026-09-04 — session 5959f891-a9e4-4904-a2f0-486a008278d9 — **BUILT, TESTED AND SHIPPED: deploy commit `d452ece1` reads "web + refresh-worker to c49d47fa: the projected ledger mirror is live, allowlist proven", and `c49d47fa` is inside both live SHAs, checked 2026-09-05T21:45Z by `ledger-repair-invariants`. The projected ledger is the only form that can leave refresh-worker.** `[user: "build the projected ledger producer"]`
 - Goal: the evaluation ledger becomes readable OFF refresh-worker, so `build_accuracy_summary` can be run unbounded (`budget=0`) against a local mirror instead of rationed inside a 4 GB box that is also running board builds and sims. ONE testable outcome: after a deploy, `PROJECTION_DONE ... over_ceiling=0` appears on the worker AND `reports/intelligence/evaluation_ledger_projected/<date>.jsonl` is fetchable from web via `/api/ops/artifacts/stream`.
 - Files: `syndicate/features/shared/evaluation_ledger_projection.py` (NEW), `tests/test_evaluation_ledger_projection.py` (NEW), `scripts/run_refresh_worker.py` (the autorun call site only — every OPEN-lane reference to this file is RELEASED; checked).
 - released: `syndicate/features/shared/artifact_publisher.py` — **moved OUT of the `- Files:` line above on 2026-09-05 by lane `render-egress-transport` (session 9e40eb04).** That line already read "one allowlist entry — the file is explicitly RELEASED and NOT CLAIMED", and it still enforced as a claim: `_claimable_prefix` cuts a Files line at the FIRST disclaimer marker and reads paths only from what PRECEDES it, so a path written BEFORE its own release note is claimed anyway — `lane-guard.py` refused the edit. That is the identical trap the next bullet documents for `intelligence_evaluation.py`, one path later in the same line. Owning session `5959f891-a9e4-4904-a2f0-486a008278d9` is absent from the session roster **including archived** (60 rows, back to 2026-08-31), so the claim was being held on behalf of nobody. Nothing else in this lane is touched, and the allowlist entry it describes is a different region of the file from the publish/pull transport `render-egress-transport` edits.
@@ -732,63 +771,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: **DEPLOYED 2026-09-04 — web `c49d47fa` 19:45:45Z, refresh-worker `c49d47fa` 19:56:39Z. TWO services, because the publish RECEIVER (`_write_published_artifact`, `ops.py:2214`) gates on web; a worker-only deploy would have 403'd every publish, which is the CLV-openings incident.** Allowlist PROVEN live on production: the projected path answers **HTTP 200 `count 0`** (admitted, not yet produced) while a RAW chunk still answers **HTTP 403** — permitted-and-empty vs refused are different facts and both were checked. Clean boot (`MALLOC_ARENA_INIT` pid 39, one boot), zero tracebacks, both claims released. **THE PRODUCER HAS NOT RUN: it rides the once-per-Central-day autorun and today's completed at 14:34:27Z, so the first `PROJECTION_DONE` is 2026-09-05 after 07:00 CT — its absence now is a fact about the GATE, not the code.** Prior state: Local, on real records: `seen=13 written=8 deferred=5 failed=0 reduction=21.8x over_ceiling=0`, and a second run `written=5 fresh=8 deferred=0`, i.e. it converges and does not re-stream what it has. **155** tests pass (`test_evaluation_ledger_projection` 13 new, plus 2 added to `test_accuracy_summary_autorun` pinning the wiring's contract, plus `test_export_only_patterns` and `test_artifact_publisher` unbroken).
 - Blocked by: nothing. A deploy is the next step and has not been taken.
 
-### soccer-player-producer — OPEN — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
-- **RELAYED NOTICE (not from this lane's owner; left here because a claim holder
-  cannot be ADDRESSED — see below).** From the lane fixing MLB hitter
-  `strikeouts`, via `web-oom-highwater` 2026-09-04T23:1xZ:
-  **when you next deploy refresh-worker, deploy from the TIP rather than a pinned
-  older commit.** You deployed `ea1e3ac0` at 22:50:57Z; ordering on main is
-  `ea1e3ac0` -> `29ab5bfb` -> `0350dbd2` -> `0b9a03e7` -> ... so that deploy did
-  NOT carry `0350dbd2`. Consequence for YOUR work, not only theirs: MLB hitter
-  `strikeouts` is dead on the served board (`strikeouts_dist == {0: n_sims}`,
-  `so_mean == 0.0` for every hitter in every game, so the ladder publishes
-  P(0 K) = 1.000), and every sim run on `ea1e3ac0` regenerates artifacts
-  containing that known-false prop family. Alternatively release refresh-worker
-  when your MLB work is done and they will take it. **Nobody is forcing your
-  claim** — your 22:56:09Z re-acquire is on record as proof you are alive.
-- **WHY THIS IS IN THE LEDGER RATHER THAN A MESSAGE, and it is a real gap:** a
-  deploy claim records `CLAUDE_CODE_SESSION_ID`, which cannot be mapped to a
-  messageable roster address (`local_<uuid>`) — the same disjointness now
-  documented in `scripts/deploy_claim.py`. **You cannot contact a claim holder
-  FROM the claim.** I tried `search_session_transcripts` and got two conflicting
-  candidates, so I did not guess. The ledger is the only channel that reaches a
-  holder identified solely by a claim.
-- Goal: the soccer player rosters get a PRODUCER. `--kind players` existed and
-  nothing called it, so every `players_*.csv` was a hand-run committed seed and
-  the newest European roster was the COMPLETED 2025-26 season.
-- Files: `scripts/build_soccer_artifacts.py`,
-  `syndicate/features/soccer/ingestion/player_history.py`,
-  `tests/test_soccer_player_producer_step.py` (NEW),
-  `tests/test_soccer_ingestion.py` (stale assertion left by `3355d621`),
-  `scripts/fetch_soccer_history_local.py` (refuse to publish an empty fetch).
-  Collision-checked 2026-09-04: `soccer-model-dispersion` names
-  `build_soccer_artifacts.py` and `syndicate/features/soccer/` but RELEASED its
-  claims 2026-08-29 (phantom sweep, owning session gone).
-- Odds-refresh entrypoint: the soccer player STEP lives in the shared odds
-  refresh entrypoint, which is CLAIMED BY `ncaaf-live-cadence` (opened a day
-  earlier, same session `3492626c`, scoped to the mode-scoped step filter).
-  Regions are disjoint and that lane holds the claim; this lane does not compete
-  for it. **The path is deliberately not spelled inside `- Files:` above** —
-  `check_lane_invariants` reads any backticked path there as a CLAIM, so naming
-  it even to disclaim it made these two lanes CONTEST each other and the checker
-  failed at every session start. `ncaaf-live-cadence` documents this exact idiom
-  for the Render blueprint file, for the same reason.
-  `[collision resolved 2026-09-04 by session c4287631 — wording only: no
-  ownership, no scope and no code changed. The author's original parenthetical
-  read "(soccer player step only — the `ncaaf-live-cadence` claim on this file is
-  THIS SAME SESSION's and is scoped to the mode-scoped step filter; regions are
-  disjoint)"; it is RESTATED above rather than quoted, because leaving the
-  backticked path in place is what tripped the checker. Owning session
-  `3492626c` was absent from the session roster (incl. archived) when this was
-  done, so neither lane was mid-edit.]`
-- Verification: MEASURED on a live EPL fetch, not asserted. Roster 440 -> 544
-  players (+104 no 2025 file knows, incl. all three promoted clubs); returning
-  players keep a median 1,639 minutes instead of <=180; the staleness guard
-  fires `too_early=True too_few=False` on the real 364-row file. 24 new tests,
-  10/10 mutants caught.
-- Blocked by: none. NOT DEPLOYED — the step is inert until refresh-worker runs it.
-
-### nfl-projection-et-datekey — OPEN — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DEFECT CONFIRMED ON `origin/main`, FIXED, MUTATION-CHECKED AND LANDED (`52870f57`). DEPLOYED NOWHERE — A DEPLOY IS OWED AND IS NOT MINE.** Production `render` 2026-09-04T20:56:12Z: `unmatched_game_rows 299` of `1252` (23.9%), afternoon UTC dates 74/74 and 57/57 projected while EVERY prime-time UTC date reads 0. Replaying production's own rows through both versions on an identical index (`games_in_index 321`, matching production's 321): pre-fix reproduces production **EXACTLY** (953 projected / 299 unmatched, 4 of 4 counters) and the fix gives **1174 / 78, -73.9%**. Mutation check, 4 mutations, each red exactly where predicted — the discriminating one (B: UTC-slice join restored, helper still exported) turns **the 3 defect tests red and leaves the other 8 green**. Scoped suite 176 passed / 23 subtests; `test_ncaaf_game_projections.py`'s 7 failures are PRE-EXISTING, re-baselined against pristine `origin/main` in the same worktree. **THE ENTIRE 78-ROW RESIDUAL IS ONE TEAM** — 17 of 17 fixtures are the Rams, `teams_match("nfl","los angeles rams","la")` is False while `"lar"` is True and the schedule writes `LA`; separate defect, separate file, spawned as its own task. Full working: `deploys.md` 2026-09-04 ~21:1xZ.
+### nfl-projection-et-datekey — OPEN — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DEFECT CONFIRMED ON `origin/main`, FIXED, MUTATION-CHECKED AND LANDED (`52870f57`) AND SHIPPED — THE OWED DEPLOY IS DONE: `52870f57` is inside web `94c8ac13` and refresh-worker `eb7951fe`, and commit `020e709b` records `unmatched_game_rows 78 -> 0` VERIFIED in production. checked 2026-09-05T21:45Z by `ledger-repair-invariants`.** Production `render` 2026-09-04T20:56:12Z: `unmatched_game_rows 299` of `1252` (23.9%), afternoon UTC dates 74/74 and 57/57 projected while EVERY prime-time UTC date reads 0. Replaying production's own rows through both versions on an identical index (`games_in_index 321`, matching production's 321): pre-fix reproduces production **EXACTLY** (953 projected / 299 unmatched, 4 of 4 counters) and the fix gives **1174 / 78, -73.9%**. Mutation check, 4 mutations, each red exactly where predicted — the discriminating one (B: UTC-slice join restored, helper still exported) turns **the 3 defect tests red and leaves the other 8 green**. Scoped suite 176 passed / 23 subtests; `test_ncaaf_game_projections.py`'s 7 failures are PRE-EXISTING, re-baselined against pristine `origin/main` in the same worktree. **THE ENTIRE 78-ROW RESIDUAL IS ONE TEAM** — 17 of 17 fixtures are the Rams, `teams_match("nfl","los angeles rams","la")` is False while `"lar"` is True and the schedule writes `LA`; separate defect, separate file, spawned as its own task. Full working: `deploys.md` 2026-09-04 ~21:1xZ.
 - Goal: every NFL prime-time game row on the board carries a projection —
   `NflGameProjectionIndex.lookup` joins on the SAME quantity on both sides.
   Today it does not: `lookup` slices `commence_time[:10]`, which is **UTC**
@@ -944,42 +927,103 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: a full `pytest tests/` run ends with the 12 passing and the pre-existing 37 unchanged — no new failures, none of the 37 masked.
 - Blocked by: none.
 
-### measured-correlation-pays-off — OPEN — opened 2026-09-04 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
-- Goal: a runnable harness that decides whether `#621`'s MEASURED same-game
-  correlation prices better than the heuristic it replaced, scored on realised
-  CO-OCCURRENCE of settled single legs (no parlay need ever have been placed),
-  plus a feasibility verdict with the date intersection stated in numbers.
-- **Files — NOT claimed, deliberately, and the reason is structural.** Two files
-  are created by this lane. NOT claimed: `scripts/measure_correlation_arm_value.py`.
-  NOT claimed: `tests/test_correlation_arm_value.py`. Both are NEW and both are
-  absent from every other lane block. They are recorded here and left UNCLAIMED
-  because this lane
-  **cannot hold an enforceable claim**: `lane-guard` resolves identity from
-  `.syndicate/.current-lane.<session id>`, that file is a single slot, and
-  concurrent agents in this session share it — it holds `layer2-sim-disagrees`,
-  a live sibling agent's slug. Writing my slug there would misattribute the
-  sibling's lane, which is the exact failure `/lane`'s own step 6 documents.
-  Claiming the paths while the marker names someone else does not protect them;
-  it only blocks ME from my own new files, which is what happened on the first
-  write attempt. An honest non-claim beats an unenforceable one.
-  Read-only dependency, never edited: `intelligence_parlay_runtime.py`,
-  `correlation_engine.py`, `sim_joint_correlation.py` — the harness imports the
-  production estimator rather than reimplementing it.
-- Hypothesis, written BEFORE testing: the intersection of (dates with a sim
-  `joint`) x (dates with realised prop outcomes) is too small to separate the
-  arms today, so the deliverable is the harness plus a dated accrual estimate,
-  not a verdict.
-- Falsification test: the intersection is large enough that the three arms
-  separate at conventional power under game-clustered inference — then a verdict
-  is owed today and the "not yet" answer is wrong.
-- Verification: the harness runs end to end and prints per-arm log-loss and
-  Brier with GAME-CLUSTERED bootstrap CIs, a calibration table, the pair count
-  WITH its denominator, and the cluster count. An underpowered null is reported
-  as underpowered, never as evidence of no effect.
-- Production reads ONLY. No orders. No deploy. No env var.
-- Blocked by: none.
+### ncaaf-live-resim — OPEN — opened 2026-09-05 — session 3492626c — NCAAF has a full live slate and produces NO live-aware model edge
+- Goal: establish whether smartsim2 can be re-run from mid-game state, and if it
+  can, ship the SMALLEST live-aware path — one market family (moneyline / h2h),
+  one worker-published artifact, one join, and a refusal that never falls back to
+  the pregame probability.
+- Files (collision-checked 2026-09-05 with `.claude/hooks/lane_claims.py`'s own
+  `claims_by_path` over `.syndicate/lanes.md` — the guard's parser, not
+  `check_lane_invariants`; every path below returned FREE):
+  `syndicate/features/football/sim_engine/smartsim2/game_simulator.py`,
+  `syndicate/features/football/sim_engine/smartsim2/contracts.py`,
+  `syndicate/features/ncaaf/live_resim.py` (NEW),
+  `tests/test_ncaaf_live_resim.py` (NEW),
+  `tests/test_smartsim2_resume_state.py` (NEW).
+- Files (ADDED 2026-09-05 after the feasibility probe came back POSITIVE and the
+  join hop was traced; re-checked with `claims_by_path`, all FREE):
+  **2026-09-05 ~22:0xZ, on an explicit user override, after this session was
+  asked TWICE for the claim and did not answer, these two moved to lane
+  `edge-basis-moneyline`:**
+  released: `syndicate/features/shared/live_gameline_join.py`
+  released: `tests/test_ncaaf_live_gameline_registration.py`
+  STILL HELD BY THIS LANE:
+  `syndicate/features/shared/board_enrichment.py`,
+  `syndicate/features/shared/live_lens_loop.py`.
+  released, history only: `live_gameline_join.py` was named as SOLELY held by
+  `live-edge-basis` in the 2026-08-18 orphan sweep; that block's claims were
+  released in the 2026-08-29 phantom sweep and the guard's own parser returned
+  FREE for it. (This sentence USED to re-claim the path all by itself: the
+  disclaimer markers `held by` / `released` in it sat AFTER the backticked path,
+  and `_claimable_prefix` cuts at the marker and keeps everything BEFORE it. So
+  the release two bullets up did not take until this line was reworded, which
+  the parser confirmed. Check with `claims_by_path`, never by reading.)
+- **WHAT THE RELEASED FILES CARRY NOW, so this lane is not surprised by its own
+  test** `[2026-09-05, lane edge-basis-moneyline, commit on origin/main]`:
+  `test_ncaaf_live_gameline_registration.py:123` had deliberately PINNED
+  `edge_basis == "pregame"` with a comment calling it a pre-existing mislabel.
+  It now reads `== "live"`, because `_apply_verdict` reads the label off
+  `verdict["model_prob"]` — the probability the edge was actually priced from —
+  instead of off `live_projected`, which only ever decided whether to PUBLISH
+  that probability. The moneyline branch still publishes nothing, deliberately:
+  `layer2_board._live_projection_columns` maps `live_model_prob_over` onto
+  `live_model_probability` with no side awareness, so publishing it would render
+  the HOME win probability in the Live column of every AWAY h2h row. **Nothing
+  else in this lane's scope changed**, and the wiring this lane still owes
+  (`build_live_lens_snapshot` into a worker) is untouched — production still
+  reported `live_gamelines: {"supported": false, "reason": "no live re-sim wired
+  for ncaaf"}` at 2026-09-05T21:26Z with 118 live NCAAF rows on the shortlist,
+  so on NCAAF this fix is inert until that lands.
+- **PROBE RESULT, measured 2026-09-05 before any code was written:** the drive
+  loop run directly from a mid-game `PossessionState` reproduces
+  `simulate_game` EXACTLY at game start (p(home)=0.6000 on both, n=200 shared
+  seeds) and moves correctly off real state: `Q2 15:00, away +7` -> 0.4250;
+  `Q4 0:15, home +21` -> 1.0000; `Q4 0:15, home -21` -> 0.0000. Cost FALLS as
+  the game runs: 154 ms/sim pregame, 85 ms at Q2, 7.9 ms at Q4 2:00, 0.7 ms at
+  Q4 0:15. A live re-sim is cheaper than the pregame sim it replaces.
+- **OUTCOME: the hypothesis held, the increment is landed at `ca5be54b`, and the
+  producer is NOT wired to a worker — deliberately.** `simulate_game` now resumes
+  from `initial_quarter` / `initial_clock_seconds` / `initial_score_*` with the old
+  hard-coded values as defaults; pregame output is BIT-IDENTICAL over 40 shared
+  seeds (sha256 `3281e358...` with the change stashed and restored in one worktree).
+  `ncaaf/live_resim.py` publishes ONE market family (moneyline) with nine named
+  refusals and no path back to the pregame probability.
+- **Measured on the live slate, with denominators:** 51 board games, 30 matched to
+  today's ESPN events, 8 live on both sides, **7 of 8 (87.5%) resumable**; the 8th
+  refuses `no_period`. Boise State led Oregon 17-7 in Q2 while the board published
+  "Oregon 97.7%"; the re-sim on neutral ratings says 0.2500.
+- **OWED (no deploy, no env change taken):** wire `build_live_lens_snapshot` into
+  refresh-worker's tick — NOT `live_lens_loop`, which runs on live-odds-worker
+  (`SYNDICATE_ENABLE_LIVE_LENS_LOOP=true` appears only in that block of
+  `render.yaml`) and cannot read `sp_ratings_<season>.json` or the week's
+  projections CSV off refresh-worker's disk; add `sp_ratings_*.json` to
+  `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py` is held by
+  `evaluation-ledger-projected-mirror`); then deploy web + refresh-worker.
+  Closing reading: `/api/ops/live-lens/snapshot-index?sport=ncaaf` showing
+  `sources_seen {live_resim: N}` for N == the live-and-resumable count.
+- Full narrative and every number: `state_football.md [ncaaf-live-resim]`,
+  `log/2026-09-05.md`.
+  NOT claimed and NOT edited: `run_live_odds_refresh_worker.py`
+  (held by `ncaaf-live-cadence`), `generate_smartsim2_ncaaf_projections.py` and
+  `ncaaf/sources.py` (held by `ncaaf-games-cache-refresh`),
+  `test_ncaaf_chip_join_key.py` (held by `ncaaf-chip-compact`).
+- **HYPOTHESIS (written before testing): smartsim2's STATE MACHINE can resume from
+  mid-game while its ENTRYPOINT cannot.** `build_initial_possession_state` already
+  takes `quarter`, `clock_remaining`, `score_home` and `score_away`;
+  `simulate_game` hard-codes `quarter=1`, `clock_remaining=quarter_seconds`, passes
+  no score at all, and loops `for quarter in range(1, quarters + 1)`. If that is
+  right, a rest-of-game re-sim is a contract change, not a modelling rebuild.
+- Falsification test: the drive/play layer depends on being at game start in some
+  way a resumed state cannot express (a prior keyed on drive_index, a clock
+  assumption, an opening-possession assumption).
+- Verification: (a) a resume test — a rest-of-game sim at `Q4 0:15, home +21`
+  returns home win prob ≈ 1.0 while the same teams at `Q1 15:00` return the
+  pregame rate; (b) a refusal test — a game the re-sim could not price carries a
+  NAMED blank and never the pregame probability.
+- Blocked by: nothing. **NO DEPLOY TAKEN, no env var changed** [instruction
+  2026-09-05].
 
-### ncaaf-segment-markets — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+### ncaaf-segment-markets — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **SETTLEMENT HAZARD CONFIRMED, FIXED AND LANDED (`22b82428`, NOT DEPLOYED). NO SEGMENT CAPTURE ADDED, DELIBERATELY.** The grader read `market` and never `segment`, so a segment bet took the whole-game actual in 4 of 5 sports (wnba refused, and only on the game-line path -- a segment PLAYER PROP walked past it too). Live on MLB today, not hypothetical: 21,714 `first5` + 5,549 `first3` + 3,343 `first1` rows in production `book_quotes` for 09-04. 35 tests incl. a per-sport mutation check; regression control 21F/251P identical with and without the guard. **CAPTURE IS STILL OWED AND THE CHEAP ROUTE DOES NOT EXIST**: the bulk `/sports/{key}/odds` endpoint returns NO segments -- NFL has requested 36 segment keys on it and captured 0 rows in 25,567 over 5 days -- so NCAAF segments need the PER-EVENT endpoint, ~3 markets x R regions x 61 events per sweep (MLB's measured per-event segment call is 16.08 credits). Kalshi already quotes `KXNCAAF1H`/`1Q-4Q` on a signed quota costing 0 OddsAPI credits, but admitting them is NOT free either: `kalshi_board_join._match_key` carries `segment`, so an exchange contract needs a BOARD row with the same segment to land on, and there are 3 segment rows platform-wide. NEXT: a board-side h1 row (sim projection or per-event capture), THEN register the Kalshi series.
 - Goal: NCAAF quarter/half markets priced on the board. **REORDERED BY
   MEASUREMENT**: the capture is not the binding constraint, the GRADER is. A
   segment row that reaches the board today is graded off the FULL-GAME actual.
@@ -1012,7 +1056,306 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none. **NO DEPLOY** — this lane does not deploy and does not touch
   env or the Render blueprint.
 
+### ncaaf-segment-capture — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+- Goal: NCAAF (then NFL) HALF and QUARTER prices land in `book_quotes` with
+  `segment != "full"`, on a pregame interval plus a 2-3 min live tier scoped to
+  games actually IN PLAY, at a credit rate published against the 5M cap.
+  `[USER DECISION 2026-09-05: NCAAF first, NFL second.]`
+- Files: NONE CLAIMED.
+- Why nothing is claimed: **This is deliberate and it is not laziness — claiming
+  them here would have BLOCKED MY OWN WRITES.** (This rationale was moved out
+  of the `- Files:` block on 2026-09-05 by lane `ledger-repair-invariants`:
+  inside it, the very tokens it names -- `lanes.md`, `learnings.md` -- were
+  themselves parsing as claims, which is the failure the paragraph warns about
+  and then committed.) Both `lane-guard` and
+  `deploy-guard` resolve "your lane" from
+  `.syndicate/.current-lane.<session_id>`, and this session's marker holds
+  `segment-refusal-deploy`, whose refresh-worker deploy is IN FLIGHT. Writing my
+  slug there would make the deploy claim's holder stop matching and refuse that
+  deploy; leaving it there while claiming files below would make every write of
+  mine read as an out-of-lane write against my own lane. The paths are recorded
+  in the next bullet — OUTSIDE the `- Files:` block, because any path-like token
+  inside one is a claim (`learnings.md`, and the soccer-cards-basename incident).
+  The guard's protection is worth close to nothing here anyway: grepping every
+  basename against the whole of `lanes.md` on 2026-09-05 returns ZERO mentions
+  in any lane block, `- Files:` or prose. Nobody else is in these files.
+- Worked on, NOT claimed: the NCAAF game-lines fetcher and the NFL team-odds
+  fetcher under `scripts/`; the OddsAPI quota recorder's `_market_family` ONLY
+  (it recognises `_1st_*` and nothing else, so every `_q1`/`_h1` key lands in
+  the `other` bucket and the cost model reads as noise); and two NEW test files.
+- **DELIBERATELY NOT CLAIMED, and the design is shaped to avoid it: the odds
+  refresh orchestrator.** It is held by OPEN lane `ncaaf-live-cadence` (same
+  session) for a mode-scoped step filter. The segment tier therefore lives
+  INSIDE the NCAAF fetcher behind its own env gate, reusing the existing
+  `ncaaf_game_lines_oddsapi` step, which already carries
+  `phases=("pregame","live")`. No orchestrator edit is needed and none is made.
+- Hypothesis (written before testing): the bulk `/sports/{key}/odds` endpoint
+  does not serve segment markets at all, so NCAAF's absence and NFL's are the
+  SAME defect with two different masks — NCAAF never asks, NFL asks in a
+  `market_map` that only ever TAGS.
+- Falsification test: a per-event `/events/{id}/odds` call for `totals_h1`
+  returns no segment rows either — in which case the books do not price NCAAF
+  halves through OddsAPI and the whole tier is dead regardless of cadence.
+- Verification: (a) `segment != "full"` row count on a real NCAAF slate goes
+  0 -> non-zero, WITH the denominator beside it; (b) the projected credits/hr
+  and 30-day figure published BEFORE the live tier is wired; (c) a reachability
+  test that fails against unmodified code (off != on).
+- **HARD CONSTRAINT carried in from the parent: no segment row may become
+  STAKEABLE until `bet_status.segment_refusal` is live on BOTH web and
+  refresh-worker.** The settlement key had no segment dimension, so a segment
+  order inherits the whole-game actual.
+- **BUILT AND LANDED ON `origin/main` AS `7f197639` (two commits). NOT
+  DEPLOYED, AND DEFAULT OFF — it spends no credit until a key is set.**
 
+- **HYPOTHESIS CONFIRMED, and the falsification test came back negative.** The
+  per-event route serves football segments richly. Substrate: production NFL
+  shards via `/api/ops/artifacts/export`, captured by
+  `fetch_nfl_preseason_odds.py` — the ONE football fetcher that ever used
+  `/events/{id}/odds`:
+
+      2026-08-23   14,502 rows   6,603 NONFULL (45.53%)   10 books   4 events
+                   h1 1,281 | h2 2,721 | q1 290 | q2 522 | q3 1,201 | q4 588
+      2026-08-16    6,681 rows   1,340 NONFULL (20.06%)    5 books   2 events
+
+  **This CORRECTS the handoff's claim that NFL "gets 0 segment rows".** That is
+  true of the REGULAR-SEASON fetcher and false of NFL as a whole. The two are
+  different defects wearing one name, and only one of them is about the vendor.
+
+- **THE NFL DEFECT IS NOT WHAT IT LOOKED LIKE, and this is the sharper half.**
+  `fetch_nfl_team_odds_local.py` does NOT pass 36 segment keys to the bulk
+  endpoint. It passes them NOWHERE. `_nfl_segment_market_map()`'s docstring
+  claimed they were used *"both to REQUEST the keys and to TAG the returned
+  quotes so the two cannot drift"*; `main()` calls `fetch_odds(api_key=...,
+  region=...)` with no `markets=`, so the literal default
+  `"h2h,spreads,totals"` went out and the map only ever reached the TAGGER.
+  A key that never arrived cannot be tagged. So there was never a 422 to find,
+  and no amount of endpoint work would have shown anything.
+
+- **AND THE GUARD THAT EXISTED FOR THIS COULD NOT FAIL.**
+  `tests/test_all_sports_segment_wiring.py` asserted the token
+  `segment_market_keys("nfl")` appears in that file — it does, in the dead map —
+  and passed. Worse,
+  `test_every_sport_with_declared_segments_has_a_wired_fetcher` searched a
+  CONCATENATION of every wired file for `segment_market_keys("<sport>")` **or**
+  the literal `segment_market_keys(league)`; the basketball file always supplies
+  the second token, so the disjunction was true for every sport and `unwired`
+  was unconditionally `[]`. NCAAF's total absence sat behind a green assertion
+  from the day that file was written. Both fixed, plus a companion test that
+  proves the expression now HAS a failing input.
+
+- **COST MODEL — published before any live tier is enabled, as instructed.**
+  Substrate: production `/api/ops/oddsapi/quota` read 2026-09-05T21:0xZ, and
+  production `/ncaaf/api/cards`. Unit cost is OddsAPI's documented
+  `markets x regions` per per-event call.
+
+  | input | value | how it was obtained |
+  |---|---|---|
+  | markets | 3 (`h2h_h1`,`spreads_h1`,`totals_h1`) | alternates excluded — see below |
+  | regions | **1 (`us`)** | this tier's OWN key, NOT `game_line_regions()` |
+  | unit | **3 credits / event / sweep** | 3 x 1 |
+  | slate (US-day 2026-09-05) | 42 kickoffs | `/ncaaf/api/cards` |
+  | in_play concurrency (3h30) | PEAK **14**, mean **10.49** | minute-by-minute walk |
+  | h1_live concurrency (1h45) | PEAK **12**, mean **5.99** | same |
+
+  **The scoping is what buys the affordability, not the market count.**
+
+      blanket 2-min sweep of all 42 events   42 x 3 x 30  = 3,780 credits/hr
+      scoped to the h1 window, 2.5-min       5.99 x 3 x 24 =   431 credits/hr
+                                                            ---------------
+                                                            8.8x at the mean
+      instantaneous peak (12 concurrent)     12 x 3 x 24  =   864 credits/hr
+
+  Per day on that 42-game shape: h1_live game-minutes 4,410 / 2.5 = 1,764
+  event-sweeps x 3 = **5,292 credits/day** live, plus a 6h/30-min pregame tier
+  42 x 12 x 3 = **1,512 credits/day**. **≈6,804 credits/day.**
+
+  Scaled to a real CFB week (one ~60-game Saturday + ~25 games Thu/Fri/Sun,
+  ≈85 games at the measured 162 credits/game/day): **≈13,770 credits/week →
+  ≈59,000 per 30 days.** NFL phase 2 (~16 games/week, Sunday-clustered) adds
+  **≈11,150 per 30 days.**
+
+      current 30-day projection      1,818,053   (production, measured)
+      + NCAAF h1 tier                   59,000
+      + NFL h1 tier                     11,150
+                                    ----------
+      new 30-day projection          1,888,203   = 37.8% of the 5M cap
+                                                   (+3.9% over baseline)
+
+  **The all-six-segments variant is the one to be careful with:** 18 keys over
+  the whole in_play window is 8,820 game-minutes / 2.5 x 18 = **63,504
+  credits/day**, ~12x the h1 tier, ≈550K/30d. Affordable but a real
+  commitment — quarters should be a separate, separately-measured decision.
+
+- **DESIGN NOTES that are load-bearing and non-obvious:**
+  - **The live window is 1h45, not 3h30, and that is not a coverage
+    compromise.** A first-half line only exists between kickoff and halftime;
+    afterwards the market is settled and delisted, so every later sweep buys
+    literally nothing. Scoping the h1 tier to the h1 market's own life is
+    strictly correct, and it halves the game-minutes.
+  - **Regions come from `SYNDICATE_NCAAF_SEGMENT_REGIONS`, defaulting to `us`,
+    and deliberately do NOT read `game_line_regions()`.** That shared knob is
+    `eu,us_ex` in production and `odds_regions.py` exists precisely to keep it
+    on the CHEAP side of the billing split ("the one costing ~1M rather than
+    ~30K"). MLB obeys this — `_fetch_live_event_odds` gets the RAW `regions`.
+    Reading the shared knob here would have tripled the bill of the most
+    expensive call on the platform with no line of code saying so. There is a
+    test for exactly this, because nothing behavioural would notice.
+  - **Alternates excluded.** They were ~60% of the NFL preseason segment rows
+    (`h2/spreads_alt` 1,058 of 6,603 on 08-23), they triple the per-call bill,
+    and `period_lines.py:92-100` filters them straight back out.
+  - **A hard event cap** (`_MAX_EVENTS`, default 40) that keeps the events
+    nearest kickoff. The cost is linear in a vendor-supplied slate; a bad slate
+    response must not be able to spend unboundedly.
+  - **One shared module**, `syndicate/features/shared/segment_odds_fetch.py`,
+    for NCAAF and NFL. `learnings.md` 2026-09-04 records a THIRD instance of
+    the same two-copy drift failure and that *"a comment asking a human to
+    remember is not a control"*.
+
+- **BOARD SIDE: already built, and this changes the handoff's recommendation.**
+  I did not have to add anything. `layer2_board.py` already carries `segment`
+  (`:129`, `:642`, `:2394`) and renders `_segment_label` (`:2239`), with unknown
+  segments SHOWN rather than swallowed (`:2272`); `book_grid._INSTANCE_FIELDS`
+  carries `segment` (`:52`); `odds_book_quotes._KEY_FIELDS` carries it (`:104`),
+  so an `h1` total and a full-game total are distinct rows that cannot displace
+  each other. **So "board-row-first" is not an available ordering: a board row
+  is a FUNCTION of the quote rows, and the only producer of an h1 quote row is
+  the fetch.** The Kalshi join becoming free follows capture; it cannot precede
+  it. No new artifact path was created, so `HOT_ARTIFACT_PATTERNS` needs no
+  change — this writes into the existing `tracking/book_quotes` shard.
+
+- **SIDE FINDING, unasked and worth someone's time: NHL segment spend has been
+  mis-billed all along.** `_market_family` recognised only MLB's `_1st_*`
+  spelling, so `_q1`/`_h1`/`_p1` all landed in `other`. NHL declares p1/p2/p3
+  and `local_nhl_odds.py` really does request them, so real NHL segment credits
+  have been accumulating in the one bucket nobody reads as a segment cost.
+  Fixed; mutation-checked 4-red-before / 0-after against `origin/main`'s copy.
+
+- **VERIFICATION STATUS, stated exactly.** Unit only. 171 tests green across the
+  affected area (49 new/changed + 87 segment/kalshi/refresh + 35 quota), and
+  BOTH mutation checks run against unmodified code: `_market_family` 4 red
+  before / 0 after; the NFL reachability tests 3 red before / 0 after. **No
+  production reading exists and cannot until the key is set — a zero segment
+  count today is indistinguishable from an inert feature, so do not report the
+  capture as working on the strength of this block.**
+
+- **DEPLOY STATE READ 2026-09-05 ~21:1xZ — the grading gate is SATISFIED, and
+  a NEW blocker appears that inverts the order of the next two steps.** Live
+  commit per service (`/api/ops/version` for web; Render `/deploys` for the
+  workers, which serve no HTTP), each checked by CONTENT — `segment_refusal`
+  hits in `bet_status.py` — and not by ancestry alone:
+
+  | service | live commit | `segment_refusal` | finished |
+  |---|---|---|---|
+  | web `syndicate-an21` | `94c8ac13` | **2 hits — YES** | — |
+  | `refresh-worker` | `eb7951fe` | **2 hits — YES** | 2026-09-05T21:02:51Z |
+  | `live-odds-worker` | `3223baa1` | **0 hits — NO** | 2026-09-04T20:37:36Z |
+
+  **The hard constraint is DISCHARGED**: grading runs on refresh-worker, which
+  has the fix, so a captured segment row can no longer inherit the whole-game
+  actual. `22b82428` is on `origin/main` and lane `ncaaf-segment-markets` still
+  says "NOT DEPLOYED" — that is now STALE, and landed-vs-live is exactly the
+  distinction that sentence loses.
+
+- **NEW BLOCKER, and it would have produced an INERT change that reads as
+  configured: `live-odds-worker` is a day behind and does not carry this
+  lane's code at all.** It is the service the capture runs on and the service
+  `SYNDICATE_NCAAF_SEGMENT_MARKETS` would be set on. Setting that key today
+  reaches a build with no `segment_odds_fetch.py` in it — the env var would sit
+  there looking configured while nothing read it, the same shape as the
+  `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` "one reader" trap the NCAAF fetcher's
+  own regions comment records. **Deploy live-odds-worker BEFORE setting the
+  key, not after.**
+
+- **WHAT IS OWED, in order (REORDERED by the reading above):**
+  1. ~~Confirm the grading fix~~ — **DONE**, see the table. Web and
+     refresh-worker both carry it, verified by content.
+  2. Deploy **live-odds-worker** to a tip containing `d4704be1`. It is the
+     capture host and is currently 24h stale. (`.py` only, so the push itself
+     shipped nothing — `autoDeploy = no`.)
+  3. THEN set `SYNDICATE_NCAAF_SEGMENT_MARKETS=h1` on **live-odds-worker** via
+     the single-key API. **NEVER `render.yaml`** — it fires `blueprint_sync`
+     across all three services. The key needs a deploy to take effect: a
+     restart does not re-inject env vars.
+  4. The reading that closes this: `segment != "full"` on the NCAAF shard goes
+     0 -> non-zero **with its denominator**, and `[ncaaf_odds] SEGMENT_PLAN` /
+     `SEGMENT_FETCH` counters showing `est_credits` in the modelled band.
+  5. Only then NFL (`SYNDICATE_NFL_SEGMENT_MARKETS=h1`), and only then quarters.
+- Blocked by: none for capture. Stakeability blocked on the grading deploy,
+  which belongs to lane `segment-refusal-deploy`.
+
+### segment-refusal-deploy — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **BLOCK RECONSTRUCTED 2026-09-05 by `ledger-repair-invariants`; see the reconstruction bullet before trusting any detail**
+- Goal: `bet_status.segment_refusal` live on BOTH web and refresh-worker, so no
+  segment row can become stakeable while the settlement key has no segment
+  dimension.
+- Files: NONE CLAIMED by this reconstruction.
+- **RECONSTRUCTED, NOT RECOVERED.** `check_lane_invariants.py` reported this slug
+  as a lane marker with a block in NO ledger file. It is not a stale marker: the
+  lane demonstrably exists and is ACTIVE.
+  Evidence used, all of it outside `lanes.md`:
+  (a) `.syndicate/deploy_claims/web.json` and `refresh-worker.json` both name
+  `"holder": "segment-refusal-deploy"`, `holder_session` 3492626c, acquired
+  2026-09-05T20:50:51Z / 20:51:19Z;
+  (b) `.syndicate/deploy/preflight/web.json` (written 21:29:30Z, target
+  `94c8ac13`) and `refresh-worker.json` (21:57:12Z, target `eb7951fe`) both
+  CLEAR under the same holder;
+  (c) lane `ncaaf-segment-capture` names it twice, including "Stakeability
+  blocked on the grading deploy, which belongs to lane `segment-refusal-deploy`".
+  `git log -S` over `.syndicate/` finds the slug in ZERO commits, so the block was
+  never committed and upstream cannot have it — nothing was lost by a rebuild.
+  The GOAL above is quoted from `ncaaf-segment-capture`'s HARD CONSTRAINT bullet.
+  **Everything else this lane did is unrecorded. The owning session should
+  overwrite this block rather than build on it.**
+- Blocked by: none known.
+
+### ledger-repair-invariants — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
+- Goal: both lane checkers green, stale NOT-DEPLOYED headers corrected against
+  each service's live SHA, and OPEN LANES under the digest's 600B cap.
+- Files: NONE CLAIMED.
+- Why nothing is claimed, and why the session marker is left alone.
+  `.syndicate/` and `.claude/` are EXEMPT from lane-guard — `check_lane_claims.py`
+  says so in its own output — so a claim on a ledger file guards nothing and only
+  adds a phantom to the file this lane exists to clean. Separately, this session's
+  marker holds `segment-refusal-deploy`, which is holding LIVE deploy claims on
+  web and refresh-worker; rewriting the marker would make those claims' holder
+  stop matching and refuse an in-flight deploy. Same reasoning, same session, as
+  `ncaaf-segment-capture` records.
+- MEASURED BEFORE (primary tree, 2026-09-05T21:35Z): `check_lane_invariants.py`
+  VIOLATED — 1 contested file (`lanes.md`, held by `ncaaf-segment-capture` and
+  `nfl-projection-et-datekey`), 2 lane markers with no block anywhere;
+  `check_lane_claims.py` exit 1 — 2 of 88 claims name no file in the repo;
+  session-start digest `[OPEN LANES truncated: 24994B > 600B cap]`, 45 lane
+  headers in `lanes.md`.
+- **THE PRIMARY TREE'S `lanes.md` IS 58 COMMITS BEHIND `origin/main` AND
+  DIVERGED.** Measured: 45 headers on disk against 101 on `origin/main`; 59
+  present upstream and absent on disk, of which 51 were archived LOCALLY into
+  `lanes_history.md` (uncommitted) and 8 exist ONLY upstream. `origin/main`'s
+  copy passes both checkers. So committing this file from the primary tree would
+  DELETE 59 lane blocks from upstream. Nothing here commits `.syndicate/lanes.md`
+  from the primary tree; see the checkpoint for what landed and how.
+- Blocked by: none.
+### edge-basis-moneyline — CLOSED-VERIFIED 2026-09-05 — `edge_basis` said `pregame` on every live MONEYLINE row while the edge came from the LIVE probability; fixed, landed, mutation-checked
+- Outcome: `_apply_verdict` reads `edge_basis` off `verdict["model_prob"]` — the
+  probability the edge was priced from — instead of off `live_projected`, which
+  only decides whether to PUBLISH it. Label-only; the widening that would have
+  published `live_model_prob_over` on h2h rows was REJECTED, because
+  `layer2_board._live_projection_columns` maps that key with no side awareness.
+- Landed `5ce75195` + `fda5c28a`. **NO DEPLOY, and none needed** — `autoDeploy = no`,
+  no `render.yaml`, no env change. On NCAAF it is INERT until `ncaaf-live-resim`
+  wires the producer to a worker.
+- Verification: **MUTATION CHECK RUN** — restoring the old predicate turns exactly
+  2 tests red, one per file; 12 stay green. 14/14 with the fix, 413 passed across
+  the 17 related test files (the single failure reproduces on clean `origin/main`
+  in a `--no-data` worktree).
+- Files: **RELEASED — the work is landed, nothing is held.** The claims on
+  `live_gameline_join.py` + `test_ncaaf_live_gameline_registration.py` (from
+  `ncaaf-live-resim`) and `layer2_board.py` (from `layer2-sim-disagrees`) were
+  taken on an EXPLICIT USER OVERRIDE, recorded in each holder's own block;
+  `layer2_board.py` was handed back at `a31fb870` and re-verified with
+  `claims_by_path`.
+- Every measurement, the rejected widening, the two overturned beliefs and the
+  two silent release failures: `log/2026-09-05.md`, `state_board.md
+  [live-edge-basis-label]`, and two new rules in `learnings.md`.
+- Blocked by: none.
 ### render-egress-transport — OPEN — opened 2026-09-05 — session 9e40eb04-9f1c-464b-a6fb-5acac211e775
 - Goal: cut Render bandwidth below the 25 GB included allowance. **The month is at 24.4/25 GB on day 5.** ONE testable outcome: after the change, `/v1/metrics/bandwidth` for `web` over a comparable slate hour falls by >=5x against the pre-change hour, and the drop is attributable in the gunicorn access log (response bytes on `/api/ops/artifacts/export`) and in `[ops.publish]` `bytes=` totals.
 - **NOTICE from `segment-refusal-deploy` (session 3492626c) `[2026-09-05]`: THE
@@ -1060,7 +1403,11 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
     | ESPN NBA scoreboard | 9,467 | 2,095 | 4.5x |
 
   Every upstream already serves gzip; nothing asks. **This is the DASHBOARD'S OTHER BUCKET — "Service-Initiated", 5.06 GB of the month's 24.4 GB** — and unlike web's 19.5 GB it is both identified and fixable. Worked example from the coordinating lane: an ESPN CFB fetch on a 180 s tick is 691 MB/day at 1 fetch and **1.38 GB/day at 2** — more than refresh-worker's ENTIRE Sep 1-5 bandwidth (1.07 GB) — and the fix is one header, NOT a longer interval.
-- **FIX AT THE CHOKE POINT, NOT 122 CALL SITES** (`learnings.md`: fix the choke point all callers share). A shared opener/helper, so a new `urllib` caller inherits it. NOT DONE — flagged to the user, not started, and it touches files this lane does not claim.
+- **FIX AT THE CHOKE POINT, NOT 122 CALL SITES** (`learnings.md`: fix the choke point all callers share) — **BUILT, TESTED, LANDED IN THE TREE, NOT DEPLOYED `[2026-09-05, user: "do the accept-encoding fix"]`.** `syndicate/features/shared/http_compression.py` installs a global `urllib` opener (`install_opener`) from **`syndicate/__init__.py`** — the ONLY module all three services import (web via `wsgi:application` -> `syndicate.app`; both workers' `startCommand` scripts import `syndicate.features.shared.*`), and chosen over the three entrypoints because two of them are claimed by other OPEN lanes. Nothing in `syndicate/` builds its own opener (checked: zero `build_opener`/`install_opener`/`OpenerDirector`), so nothing bypasses or clobbers it. Kill switch `SYNDICATE_HTTP_GZIP=off`; absent means ON.
+- **THE DEFECT IS WORSE THAN "does not ask", and the control test found it.** `http.client.HTTPConnection.putrequest` sends **`Accept-Encoding: identity`** whenever the caller supplies none — an EXPLICIT REFUSAL on the wire. All 122 sites were actively telling every upstream *not* to compress. I wrote the control expecting an empty header; it asserted the real value and returned `identity`.
+- **VERIFIED LOCALLY ON THE REAL PRODUCTION CALLER, not a synthetic one:** `schedule_adapter._fetch_espn_football_schedule("ncaaf", "2026-09-05")` returns **68 rows** (parsed, correct) while pulling **70,155 bytes instead of 948,450 — 13.5x**, `hosts_refused=0`. NFL same call: 4.4x. 10 new tests in `tests/test_http_compression.py` drive a REAL local HTTP server through REAL `urlopen`, covering off!=on, streamed chunked reads, and the three declines (caller's own `Accept-Encoding`, `Range`, kill switch). **CI's own suite is green: `python -m unittest tests.test_archives`, 383 tests, OK.** Three `test_nfl_fantasy_artifact.py` failures are PRE-EXISTING — discriminated by re-running with `SYNDICATE_HTTP_GZIP=off`, identical 3 failures, so they are not this change.
+- **THE ESPN-403 HAZARD IS HANDLED IN CODE, NOT ASSUMED AWAY.** `_AcceptEncodingHandler.http_error_{403,406,415}` retries once WITHOUT the header and remembers the host for the process; a 403 that persists bare is NOT blamed on the header (the host is un-marked), so an unrelated permission error cannot silently cost compression. Tested both directions.
+- **OWED, AND IT CANNOT BE DISCHARGED FROM THIS MACHINE:** every ratio above was measured from a dev box. `schedule_adapter.py:377-386` records ESPN answering 403 to RENDER'S OUTBOUND IP for a header shape it disliked. After deploy, read `[http_compression] HTTP_COMPRESSION ...` and `ACCEPT_ENCODING_REFUSED ...` off the workers (`render_logs.py --text HTTP_COMPRESSION`) and confirm `refused_hosts=0` with a real `ratio`. A silent `hosts_refused=N` means the header is being rejected and the saving is not happening.
 - **CAVEAT ON THAT TABLE, and it is not pedantic:** measured from a dev machine, not from Render. `schedule_adapter.py:377-386` records that ESPN answers **HTTP 403 to Render's outbound IP** for a bare `User-Agent: Mozilla/5.0` while working with no custom UA at all — ESPN demonstrably discriminates on headers *from Render specifically*. Confirm a 200 from a worker before trusting the ratio in production.
 - **THE CODE IN THIS LANE IS CORRECT AND IS NOT A BANDWIDTH FIX.** gzip on the publish/pull transport, 22 tests green, cuts the internal transport ~28x. That is worth having for web's memory and the workers' time (`#632`, and the NOTICE above), and it must NOT be deployed or recorded as reducing the bill. NOT DEPLOYED.
 - **SUPERSEDED — the reasoning that produced the retracted claim, kept because the per-hour attribution numbers in it are still correct and still useful:** Per-service `/v1/metrics/bandwidth`, 09-01..09-05: web **19.50 GB**, live-odds-worker **3.88 GB**, refresh-worker **1.07 GB**, total **24.45 GB** (dashboard says 24.4 — the metric IS the billed number). The metric buckets are RIGHT-labelled (confirmed twice against request counts). Two hours attributed line by line:
@@ -1070,52 +1417,6 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - **Compression ratio MEASURED on a real shard**, `data/mlb_source/tracking/book_quotes/2026-07-07.jsonl` 13.92 MB: **gzip-1 → 0.49 MB (3.5%), 0.20 s**; gzip-6 → 0.33 MB (2.4%), 0.41 s. `.state.json` 1.40 MB → 0.13 MB (9.0%).
 - Verification: after deploy, re-run `scripts/render_bandwidth_report.py` over a slate hour and compare against the 09-04 17:00Z and 09-01 22:00Z baselines recorded above, and record the reading in `deploys.md`.
 - Blocked by: none.
-
-### ncaaf-segment-capture — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84
-- Goal: NCAAF (then NFL) HALF and QUARTER prices land in `book_quotes` with
-  `segment != "full"`, on a pregame interval plus a 2-3 min live tier scoped to
-  games actually IN PLAY, at a credit rate published against the 5M cap.
-  `[USER DECISION 2026-09-05: NCAAF first, NFL second.]`
-- Files: NONE CLAIMED. **This is deliberate and it is not laziness — claiming
-  them here would have BLOCKED MY OWN WRITES.** Both `lane-guard` and
-  `deploy-guard` resolve "your lane" from
-  `.syndicate/.current-lane.<session_id>`, and this session's marker holds
-  `segment-refusal-deploy`, whose refresh-worker deploy is IN FLIGHT. Writing my
-  slug there would make the deploy claim's holder stop matching and refuse that
-  deploy; leaving it there while claiming files below would make every write of
-  mine read as an out-of-lane write against my own lane. The paths are recorded
-  in the next bullet — OUTSIDE the `- Files:` block, because any path-like token
-  inside one is a claim (`learnings.md`, and the soccer-cards-basename incident).
-  The guard's protection is worth close to nothing here anyway: grepping every
-  basename against the whole of `lanes.md` on 2026-09-05 returns ZERO mentions
-  in any lane block, `- Files:` or prose. Nobody else is in these files.
-- Worked on, NOT claimed: the NCAAF game-lines fetcher and the NFL team-odds
-  fetcher under `scripts/`; the OddsAPI quota recorder's `_market_family` ONLY
-  (it recognises `_1st_*` and nothing else, so every `_q1`/`_h1` key lands in
-  the `other` bucket and the cost model reads as noise); and two NEW test files.
-- **DELIBERATELY NOT CLAIMED, and the design is shaped to avoid it: the odds
-  refresh orchestrator.** It is held by OPEN lane `ncaaf-live-cadence` (same
-  session) for a mode-scoped step filter. The segment tier therefore lives
-  INSIDE the NCAAF fetcher behind its own env gate, reusing the existing
-  `ncaaf_game_lines_oddsapi` step, which already carries
-  `phases=("pregame","live")`. No orchestrator edit is needed and none is made.
-- Hypothesis (written before testing): the bulk `/sports/{key}/odds` endpoint
-  does not serve segment markets at all, so NCAAF's absence and NFL's are the
-  SAME defect with two different masks — NCAAF never asks, NFL asks in a
-  `market_map` that only ever TAGS.
-- Falsification test: a per-event `/events/{id}/odds` call for `totals_h1`
-  returns no segment rows either — in which case the books do not price NCAAF
-  halves through OddsAPI and the whole tier is dead regardless of cadence.
-- Verification: (a) `segment != "full"` row count on a real NCAAF slate goes
-  0 -> non-zero, WITH the denominator beside it; (b) the projected credits/hr
-  and 30-day figure published BEFORE the live tier is wired; (c) a reachability
-  test that fails against unmodified code (off != on).
-- **HARD CONSTRAINT carried in from the parent: no segment row may become
-  STAKEABLE until `bet_status.segment_refusal` is live on BOTH web and
-  refresh-worker.** The settlement key had no segment dimension, so a segment
-  order inherits the whole-game actual.
-- Blocked by: none for capture. Stakeability blocked on the grading deploy,
-  which belongs to lane `segment-refusal-deploy`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
