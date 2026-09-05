@@ -22,21 +22,36 @@ import pytest
 from syndicate.features.soccer import sources as S
 
 
+class _Counts(dict):
+    """A counts dict that also remembers WHICH (league, date) each read was for.
+
+    A plain `dict` subclass on purpose: the tests above compare this against a
+    literal with `==`, and dict equality ignores attributes, so recording the
+    keys costs those assertions nothing.
+    """
+
+    keys_read: dict
+
+
 @pytest.fixture
 def counting_reads(monkeypatch):
     """Count calls to the UNCACHED impls, which is what a read actually costs."""
-    counts: dict[str, int] = {"live_state": 0, "picks": 0, "markets": 0}
+    counts = _Counts({"live_state": 0, "picks": 0, "markets": 0})
+    counts.keys_read = {"live_state": [], "picks": [], "markets": []}
 
     def fake_live(league, selected_date):
         counts["live_state"] += 1
+        counts.keys_read["live_state"].append((league, selected_date))
         return {"games": {}, "match_box": {}}
 
     def fake_picks(league, selected_date):
         counts["picks"] += 1
+        counts.keys_read["picks"].append((league, selected_date))
         return ()
 
     def fake_markets(league, selected_date):
         counts["markets"] += 1
+        counts.keys_read["markets"].append((league, selected_date))
         return ()
 
     monkeypatch.setattr(S, "_live_state_payload_uncached", fake_live)
@@ -206,10 +221,30 @@ def test_week_games_collapses_the_per_fixture_reads(fabricated_week):
     cards, counts = fabricated_week
     games = cards.week_games("epl", 3, 2026)
     assert len(games) == FIXTURE_COUNT, "fixtures must still all build"
-    # One read per (league, date) that the pass touches, NOT one per fixture.
-    assert counts["live_state"] <= len(_DATES), counts
-    assert counts["picks"] <= len(_DATES), counts
-    assert counts["markets"] <= len(_DATES), counts
+    # ONE READ PER (league, date) THE PASS TOUCHES, NOT ONE PER FIXTURE -- and
+    # "the pass touches" is NOT the same as "is in `_DATES`". That conflation is
+    # what made this test rot.
+    #
+    # `_DATES` is hardcoded to 2026-08-29/30. `week_games` also legitimately
+    # reads dates derived from TODAY, so as the wall clock moved away from those
+    # two the pass began touching four distinct dates -- measured 2026-09-05:
+    # 2026-08-30, 2026-08-29, 2026-08-31 and 2026-09-04, one read each. The
+    # collapse was working perfectly and the count-vs-`len(_DATES)` bound
+    # reported it as broken.
+    #
+    # The shipped invariant is DEDUPLICATION, so assert exactly that: no
+    # (league, date) is ever read twice in one pass. That is immune to which
+    # dates the pass decides to touch, and it is strictly STRONGER than the old
+    # bound -- a per-fixture regression would repeat a key 9 times and fail here
+    # even if the total happened to land under two.
+    for kind, seen in counts.keys_read.items():
+        assert len(seen) == len(set(seen)), (kind, seen)
+
+    # And the reads must still be per-DATE, not per-FIXTURE: 9 fixtures share
+    # one date, so any kind reading as many times as there are fixtures has lost
+    # the memo regardless of how many distinct dates exist.
+    for kind, count in counts.items():
+        assert count < FIXTURE_COUNT, (kind, counts, counts.keys_read)
 
 
 def test_week_games_without_the_scope_reads_per_fixture(fabricated_week, monkeypatch):

@@ -124,15 +124,35 @@ def test_the_team_name_is_used_when_description_is_absent(monkeypatch, capsys):
     assert "long_index=0" in out
 
 
-def test_three_markets_are_sampled_because_one_cannot_show_CONSISTENCY(monkeypatch, capsys):
-    """Whether `long` behaves the same way across markets is the actual question;
-    a single sample cannot show it."""
-    rows = [
+def test_sampling_is_ONE_PER_LEAGUE_because_one_league_cannot_show_CONSISTENCY(monkeypatch, capsys):
+    """Whether `long` behaves the same way is the actual question, and the unit
+    of that question is the LEAGUE, not the market.
+
+    This used to sample the first three MARKETS and assert 3. The sampler now
+    takes one per league (bettable leagues first, capped at 8) and the reason is
+    in its own comment: a constant `long_index=0` over an all-NFL window is a
+    NULL RESULT for the varying case, and reading it as an answer would restore
+    the positional rule on the strength of the one league that never disagreed.
+    Five MLB markets are one league seen five times, so ONE sample is now the
+    correct output for the old fixture -- the test was pinning the superseded
+    rule.
+
+    Both halves are asserted, because only the pair distinguishes "one per
+    league" from "at most one, ever".
+    """
+    same_league = [
         _row(["A", "B"], [_side("A", True), _side("B", False)], slug=f"aec-mlb-s{i}")
         for i in range(5)
     ]
-    out = _emit(monkeypatch, capsys, rows)
-    assert out.count("MONEYLINE_YES_LEG_SHAPE") == 3
+    out = _emit(monkeypatch, capsys, same_league)
+    assert out.count("MONEYLINE_YES_LEG_SHAPE") == 1, "five markets in ONE league are one sample"
+
+    across_leagues = [
+        _row(["A", "B"], [_side("A", True), _side("B", False)], slug=f"aec-{lg}-s{i}")
+        for i, lg in enumerate(("mlb", "nfl", "nba"))
+    ]
+    out = _emit(monkeypatch, capsys, across_leagues)
+    assert out.count("MONEYLINE_YES_LEG_SHAPE") == 3, "three leagues must give three samples"
 
 
 def test_no_moneyline_prints_a_NAMED_zero(monkeypatch, capsys):

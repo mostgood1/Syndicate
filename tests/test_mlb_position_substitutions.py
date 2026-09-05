@@ -85,10 +85,26 @@ def _play(enabled: bool, n: int = N_GAMES, seed: int = 2026, bench: int = 4):
 
 
 class OffByDefaultTests(unittest.TestCase):
-    def test_absent_flag_is_a_no_op(self) -> None:
+    def test_the_flag_is_ON_by_default_because_it_was_PROMOTED(self) -> None:
+        """This assertion was inverted on purpose, and the inversion is the point.
+
+        It used to read `assertFalse(...)  "the feature must be dark-launched
+        OFF"`, which is exactly the shape of CLAUDE.md's "absent != off" trap --
+        so a reader finding it red would reasonably suspect a feature had armed
+        itself. It had not. `e3bdbc8b` (`#624 step 3`) flipped
+        `models.py::GameConfig.position_substitutions` to `True` deliberately and
+        with measurement: without substitutions the nine listed starters bat all
+        game, every game, and starter AB ran +11.0% against an actual 3.495.
+
+        Kept as a PIN rather than deleted. The default is a real contract now: if
+        it silently returns to False the opportunity bias returns with it, and
+        nothing else in this file would notice -- the two tests below both pass an
+        explicit `enabled=False` and would stay green.
+        """
         cfg_default = GameConfig(rng_seed=7, manager_pitching="v2")
-        self.assertFalse(getattr(cfg_default, "position_substitutions", False),
-                         "the feature must be dark-launched OFF")
+        self.assertTrue(getattr(cfg_default, "position_substitutions", False),
+                        "position substitutions were PROMOTED in e3bdbc8b -- a "
+                        "default of False silently restores the +11.0% starter-AB bias")
 
     def test_disabled_matches_a_config_that_never_heard_of_the_flag(self) -> None:
         self.assertEqual(_play(False), _play(False))

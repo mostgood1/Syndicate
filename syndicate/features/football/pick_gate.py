@@ -430,6 +430,7 @@ def registry_snapshot() -> list[dict[str, Any]]:
         {
             "sport": sport,
             "market": market,
+            "basis": basis,
             "servable": verdict.servable,
             "reason": verdict.reason,
             "measured_on": verdict.measured_on,
@@ -439,5 +440,5 @@ def registry_snapshot() -> list[dict[str, Any]]:
             "sample_size": verdict.sample_size,
             "detail": verdict.detail,
         }
-        for (sport, market), verdict in sorted(_SERVING_REGISTRY.items())
+        for (sport, market, basis), verdict in sorted(_SERVING_REGISTRY.items())
     ]

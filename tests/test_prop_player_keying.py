@@ -102,13 +102,36 @@ def test_an_unnameable_player_yields_NO_key_rather_than_a_blind_one():
     assert _candidate_keys(row, "soccer") == []
 
 
-def test_a_game_line_row_is_completely_unchanged():
+def test_a_game_line_row_still_offers_the_ROLE_KEY_FIRST():
     """Game markets carry no entity (`market_inventory`: "None for game
-    markets"), so they must take the original path untouched."""
+    markets"), so the player-keying path must not touch them.
+
+    THIS USED TO ASSERT LIST EQUALITY AND THAT WAS ALWAYS TOO STRONG. `#603`
+    deliberately appends a GAME-QUALIFIED key after the role key, because
+    `quotes_for_sport` pools by sport and a key with no game term makes every
+    fixture sharing a line take the same answer -- measured on production
+    2026-08-29, 26 of 28 live Polymarket totals quotes were shared across
+    games, `over 7.5 @ -400` on four at once where one was worth ~2% and
+    another had already won.
+
+    The invariant this test actually protects is the one `#603` went out of
+    its way to keep: **the role key is tried FIRST and is unchanged**, so
+    every match that worked before still works. That is asserted directly
+    now. Equality asserted something stronger that the design never promised,
+    and it is what made this file rot rather than report.
+    """
     row = {"market": "totals", "side": "over", "line": 2.5, "home_team": "Strasbourg",
            "away_team": "RC Lens"}
 
-    assert _candidate_keys(row, "soccer") == [quote_key("soccer", "totals", "over", 2.5)]
+    keys = _candidate_keys(row, "soccer")
+
+    assert keys[0] == quote_key("soccer", "totals", "over", 2.5)
+    # Nothing here may take the PROP path: a game row has no player, and a
+    # player-blind prop key is exactly what this module exists to prevent.
+    assert all("player" not in key for key in keys)
+    # Any additional candidate must NARROW the role key, never replace it.
+    for extra in keys[1:]:
+        assert extra.startswith(keys[0]), extra
 
 
 def test_prop_quote_key_refuses_an_empty_player():

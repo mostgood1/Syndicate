@@ -185,8 +185,31 @@ def test_the_card_shows_the_best_price_across_books(two_roots, roster):
     assert rows[0]["book"] == "betonlineag"
 
 
-def test_no_roster_artifact_degrades_to_empty_rather_than_raising(two_roots):
+def test_no_roster_artifact_degrades_to_empty_rather_than_raising(two_roots, monkeypatch):
+    """THE ABSENCE HAS TO BE MADE, NOT ASSUMED. `two_roots` cannot create it.
+
+    `two_roots` points `SYNDICATE_NFL_SOURCE_ROOT` at a tmp dir and unsets
+    `SYNDICATE_DATA_ROOT`, and that used to be enough. It is not: the roster
+    resolver also offers the REPO MIRROR as a candidate, and
+    `data/nfl_source/source_artifacts/data/processed/rosters/roster_2026_snapshot.csv`
+    is git-tracked and really does contain A.J. Brown. So in any checkout that
+    has `data/`, this test was handing the code a roster and then asserting it
+    had none -- and the code was RIGHT to resolve him.
+
+    That is the same shape as the NBA betting-card asset bug fixed 2026-09-05:
+    an env var that does not cover every candidate root cannot suppress a
+    repo-mirror fallback. Emptying the index directly is the only way to build
+    the world this test names, and it makes the test independent of whether
+    the worktree carries `data/` at all.
+    """
     _write(two_roots / "oddsapi_player_props_2026_wk1.csv", _row("A.J. Brown"))
+    def _empty_index(season):
+        return {}
+
+    # The autouse cache fixture calls `.cache_clear()` on this name in
+    # teardown, so the stub has to keep that part of the contract.
+    _empty_index.cache_clear = lambda: None
+    monkeypatch.setattr(nfl_props, "nfl_player_team_index", _empty_index)
 
     assert _recs() == {"away": [], "home": []}
 

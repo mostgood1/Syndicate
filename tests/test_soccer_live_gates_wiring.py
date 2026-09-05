@@ -69,10 +69,27 @@ def root(tmp_path, monkeypatch):
 
 
 def _live_h2h_row():
+    # `age_seconds` IS REQUIRED, and its absence is a REFUSAL, not a default.
+    #
+    # This file predates the staleness gate at the join choke point
+    # (`quote_age_verdict`, shipped 2026-09-01): an age that is absent or
+    # non-numeric returns `REASON_QUOTE_AGE_ABSENT` and the row is counted and
+    # skipped. That is deliberate -- "unknown must not take the permissive
+    # branch" -- so a row with no age is CORRECTLY never priced, and these
+    # gate-3 tests were asserting the old contract.
+    #
+    # The failure was loud in the right way: `index_size == 1` passed while
+    # `rows[0]["live_gameline"]` stayed absent, i.e. the artifact LOADED and the
+    # JOIN refused -- which is what this file exists to tell apart.
+    #
+    # Fresh on purpose: the subject here is off-vs-on wiring, not staleness.
+    # The gate has its own tests; this one must not silently become a second,
+    # weaker copy of them.
     return {
         "sport": "soccer", "kind": "game", "market": "h2h", "segment": "full",
         "home_team": "Arsenal", "away_team": "Coventry City",
         "game": {"state": "live"},
+        "age_seconds": 30.0,
         "projection": {"market_fair_prob_over": 0.55, "side": "home"},
     }
 

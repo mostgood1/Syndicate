@@ -31,9 +31,35 @@ import pytest
 import pipeline.layer2_shortlist as L
 import syndicate.features.shared.odds_book_quotes as OBQ
 
-NOW = "2026-08-30T14:00:00Z"
-FRESH = "2026-08-30T13:59:00+00:00"     # seconds old
-OLD = "2026-08-30T04:00:00+00:00"       # 10h old
+# THESE ARE AGES, NOT DATES, AND WRITING THEM AS DATES MADE THIS FILE ROT.
+#
+# `_drop_market_gone_rows` reads the WALL CLOCK -- `datetime.now(timezone.utc)`
+# for `now_iso`, and again for `sidecar_age`. The stamps here were absolute
+# 2026-08-30 timestamps, so they aged with real time while the rows they are
+# compared against did not. By 2026-09-05 the "FRESH" sidecar read as SIX DAYS
+# old, every row satisfied `row_seen <= sidecar_age * 1.5 + 300`, and all of
+# them classified `as_fresh_as_sweep`. `MARKET_GONE_DROPPED none of 1`.
+#
+# **THE CODE WAS RIGHT AND THE TEST WAS WRONG.** A sidecar that really has not
+# advanced in six days SHOULD protect its rows -- that is the NCAAF nine-hour
+# case in this file's own docstring, and the whole reason there is no absolute
+# staleness threshold. The test asserted a relationship between two ages and
+# then pinned one end of it to a calendar date.
+#
+# Anchoring to `now` keeps the intent (seconds old / 10h old) true on every
+# day the suite is ever run. `test_a_slow_sweep_sport_keeps_every_row` is the
+# canary: it PASSED throughout the rot, because a sidecar being too old is
+# exactly what it wants.
+from datetime import datetime, timedelta, timezone
+
+
+def _ago(seconds: float) -> str:
+    return (datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat()
+
+
+NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+FRESH = _ago(60)        # seconds old
+OLD = _ago(10 * 3600)   # 10h old
 
 
 def _row(sport="soccer", event="e1", market="totals", line="8.5", seen=7200.0):

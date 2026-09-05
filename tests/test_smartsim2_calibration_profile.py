@@ -44,6 +44,17 @@ class SmartSim2CalibrationProfileTests(unittest.TestCase):
                 "fourth_down_conversion_multiplier",
                 "touchdown_weight_multiplier",
                 "red_zone_touchdown_weight_bonus",
+                # ADDED BY A PROMOTED RE-FIT, not by drift.
+                # `data/calibration/ncaaf_profile.json` (git-tracked) is loaded
+                # over the code constant at import, and its own metadata says
+                # what it did: version `ncaaf-goal-line-refit-1`, generated
+                # 2026-08-27, "goal-line touchdown mechanism enabled ON THIS
+                # PROFILE, plus a re-fit of the rates that were absorbing its
+                # absence", scoring 15.00%% -> 7.24%% against 53,548 real NCAAF
+                # drives. NFL was deliberately left alone ("NFL measures BEST as
+                # shipped"), which is precisely why these two now DIVERGE.
+                "goal_line_touchdown",
+                "field_goal_attempt_base_probability",
             },
         )
         # red_zone_gain_stiffening was measured and explicitly left at the
