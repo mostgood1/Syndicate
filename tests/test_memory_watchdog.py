@@ -349,20 +349,46 @@ def test_untracked_census_finds_strings_held_off_a_container():
         del holder
 
 
+def _list_holder_mb(out) -> float:
+    assert out is not None
+    return dict((name, mb) for name, mb, _c in out["top_holders_mb"]).get("list", 0.0)
+
+
 def test_untracked_census_deduplicates_shared_strings():
     # Interned and shared strings are referenced from many places. Counting each
     # reference would inflate the total past the container size -- which would
     # look like an answer and be arithmetic.
-    shared = "y" * 2_000_000
-    holder = [shared, shared, shared, shared, shared]  # one object, five refs
+    #
+    # MEASURED AS A DELTA, AND IT HAS TO BE. The "list" bucket sums EVERY list
+    # in the interpreter, so its absolute value is a fact about how much has
+    # been loaded, not about deduplication. Asserting `listed < 6` therefore
+    # held only while the process was nearly empty -- true for this file alone
+    # and false 3h into `pytest tests/`, where the same census read 13.0 MB.
+    # Reproduced in 3 seconds by holding twelve 1MB strings in an unrelated
+    # list before the test: 14.2 MB, same shape, no other test involved.
+    #
+    # The delta is the quantity the test was always about: five references to
+    # one ~2MB string must add ~2MB, not ~10MB.
+    saved = mo._UNTRACKED_CENSUS_STATE["count"]
     try:
-        out = mo.log_untracked_bytes_census("unit-test-dedupe")
-        assert out is not None
-        # 5 references to a single ~2MB string must contribute ~2MB, not ~10MB.
-        listed = dict((name, mb) for name, mb, _c in out["top_holders_mb"]).get("list", 0)
-        assert listed < 6, listed
+        before = _list_holder_mb(mo.log_untracked_bytes_census("unit-test-dedupe-baseline"))
+
+        shared = "y" * 2_000_000
+        holder = [shared, shared, shared, shared, shared]  # one object, five refs
+        try:
+            after = _list_holder_mb(mo.log_untracked_bytes_census("unit-test-dedupe"))
+        finally:
+            del holder, shared
+
+        grew_by = after - before
+        assert grew_by < 6, (before, after, grew_by)
+        # REACHABILITY, and without it the assertion above is vacuous: a census
+        # that saw nothing at all would report a delta of 0 and "pass". The
+        # string is ~1.9MB, so anything at or above ~1.5MB proves it was
+        # actually counted once.
+        assert grew_by >= 1.5, (before, after, grew_by)
     finally:
-        del holder, shared
+        mo._UNTRACKED_CENSUS_STATE["count"] = saved
 
 
 def test_untracked_census_reports_what_fraction_of_anon_it_explains():
