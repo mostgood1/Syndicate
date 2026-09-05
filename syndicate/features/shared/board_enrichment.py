@@ -1604,7 +1604,21 @@ def attach_modelled_fair_edges(grid: list) -> dict:
 # sport must fail closed and say so.
 _LIVE_PROP_SPORTS = frozenset({"mlb", "wnba", "soccer"})
 
-_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer"})
+# `ncaaf` JOINED 2026-09-05. Measured that day at 20:5xZ, mid-slate:
+# `/ncaaf/api/live-lens` served 51 games, 7 live, 26 final, 18 pregame, and every
+# live card's win probability was still the PREGAME number -- BOIS led ORE 7-0 in
+# Q2 beside "Oregon 97.7%". `ncaaf/live_resim.py` restarts smartsim2 from the
+# current quarter, clock and score and publishes `ncaaf_live_lens.json`.
+#
+# ENABLING THE SPORT CHANGES NO EDGE UNTIL THAT PRODUCER RUNS, and it is
+# deliberately enabled anyway. With no snapshot this returns `supported: True`
+# with `no published live-lens snapshot`, and `live_edge_policy` keeps
+# suppressing every live row because no projection is `live_aware` -- the same
+# board it serves today, with a reason that names the missing artifact instead
+# of naming the sport. The alternative (leave ncaaf out until the worker is
+# wired) makes the two failures read identically, which is the confusion
+# `build_live_gameline_index`'s `sources_seen` diagnostics exist to end.
+_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba", "soccer", "ncaaf"})
 
 
 def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: str) -> dict:

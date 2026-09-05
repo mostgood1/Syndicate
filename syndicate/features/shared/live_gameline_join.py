@@ -90,6 +90,13 @@ LIVE_STATE_LENS_SOURCE = "live_mc"
 LIVE_LENS_SOURCES_BY_SPORT: dict[str, tuple[str, ...]] = {
     "mlb": (LIVE_STATE_LENS_SOURCE,),
     "wnba": ("live_projection",),
+    # NCAAF's live re-sim restarts smartsim2 from the current quarter, clock and
+    # score (`ncaaf/live_resim.py`). Its own stamp, not MLB's `live_mc`, because
+    # the same module also publishes a lane stamped `pregame` for every game it
+    # REFUSED to price -- and that lane must be rejected here. A refusal is
+    # exactly the case where falling back to the pregame probability produces
+    # `#340` in a live label (`#414`), so the stamp is what keeps the two apart.
+    "ncaaf": ("live_resim",),
 }
 _DEFAULT_LENS_SOURCES: tuple[str, ...] = (LIVE_STATE_LENS_SOURCE,)
 
