@@ -5852,3 +5852,24 @@ Corollary for a session worktree: `lane-guard` reads
 nothing else. That copy was **57 commits behind `origin/main`** here, so a lane
 OPEN upstream guarded nothing locally and three paths read FREE. Landing a claim
 is not the same as enforcing it: check both files.
+
+**SECOND INSTANCE, SAME DAY, FOUND WHILE RESTORING ANOTHER LANE'S BLOCK.**
+`evaluation-ledger-projected-mirror`'s `- Files:` line reads, in one breath:
+
+    ... `artifact_publisher.py` (one allowlist entry -- the file is explicitly
+    RELEASED and NOT CLAIMED), `scripts/run_refresh_worker.py` (the autorun call
+    site only -- every OPEN-lane reference to this file is RELEASED; checked).
+
+The parser reads **both backwards**. The first marker is the `RELEASED` that sits
+AFTER `artifact_publisher.py`, so the prefix keeps that path (CLAIMED, though the
+sentence says released) and discards everything after it, including
+`run_refresh_worker.py` (FREE, though the sentence claims it). No human reads that
+line as ambiguous. Two lanes were then working from opposite beliefs about the
+same file, and a third lane's collision check inherited the error.
+
+Corollary, and it is the expensive half: **the ledger has more than one copy and
+they disagree.** For those four paths, `origin/main`, the primary tree's working
+copy (which is what `lane-guard` actually reads) and the owning lane's own
+worktree gave three different answers. A collision check names ONE substrate or it
+names nothing. Check the copy the guard reads AND the copy other sessions rebase
+onto, and say which you checked.
