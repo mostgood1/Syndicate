@@ -2007,6 +2007,70 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   are still guarded, verified with `_claims()`.
 - Blocked by: none.
 
+### split-state-reindex-truncation — CLOSED 2026-09-04 — opened 2026-09-04 — session 4b1b66a3 — **FIXED AND LANDED ON MAIN (`29ab5bfb`). `--reindex --apply` deleted EVERYTHING below the `[subject-index]` table, silently, exit 0. Exposure was live: `origin/main`'s `state.md` carried **171 non-blank lines** below the table at the time of the fix. Now spliced in place — measured on that same corpus, **171 of 171 preserved**. 8 new tests FAIL on the pre-fix code; the load-bearing two fail for the RIGHT reason (index rebuilt correctly while the tail vanishes; unclassifiable case returns 0 instead of refusing). No deploy — tooling only.**
+- Goal: `py -3 scripts/split_state.py --reindex --apply` must leave every byte
+  BELOW the `[subject-index]` table untouched, and must exit non-zero rather
+  than write when the post-table region cannot be classified.
+- Files: scripts/split_state.py, tests/test_split_state.py
+- Hypothesis: `reindex()` rebuilds state.md as `head + body[:hdr+1] + rows +
+  [""]` and never re-emits `body[hdr+1:]`, so ALL trailing content below the
+  table is dropped — silently, reporting success and exiting 0.
+- Falsification test: run `--reindex` (dry) against a state.md carrying a
+  trailing block and diff the computed output against the input. If the trailing
+  block survives, the hypothesis is wrong.
+- Verification: DONE, all three.
+  (a) `test_reindex_PRESERVES_content_below_the_table` + 7 more FAIL on pre-fix
+      code and pass after; 31/31 green in `tests/test_split_state.py`.
+  (b) `test_reindex_REFUSES_stray_rows_below_the_table` — pre-fix returns 0 and
+      WRITES; fixed returns 1 and the file is byte-unchanged. Plus
+      `test_reindex_line_guard_FIRES_on_a_reintroduced_truncation`, which
+      monkeypatches `table_span` to re-create the old truncation and asserts the
+      runtime guard catches it.
+  (c) REAL CORPUS: ran the fixed tool on a copy of `origin/main`'s `.syndicate/`
+      — "post-table region: 192 line(s) PRESERVED (171 non-blank)", and 171 of
+      171 tail lines verified still present. `state_key_check.py` reports
+      "coherent — one subject, one section" afterwards.
+- FINDING BEYOND THE BRIEF: preservation is of CONTENT, not BYTES, because the
+  live `state.md` is MIXED-ending — measured 2026-09-04, lines 1-580 CRLF and
+  the 55 appended tail lines bare LF (the appending session's tool wrote LF).
+  `load()` + the write have ALWAYS normalised endings whole-file; this is not
+  new, but it makes a reindex show the whole tail in a diff. Documented in the
+  docstring and pinned by `test_reindex_normalises_a_MIXED_ending_tail` so it is
+  never misread as a content loss.
+- ALSO FOUND, NOT MINE TO FIX: `tests/test_check_lane_invariants.py` has 5
+  failing tests on clean `origin/main` (confirmed by stashing and running at
+  HEAD) — the lane-invariant regexes no longer match the lane-guard hook source.
+  `check_lane_invariants.py` still exits 0 / "INVARIANTS HOLD", so nothing
+  surfaces it. Not claimed by this lane; filed for a separate lane.
+- Blocked by: none.
+
+### discard-guard-sees-origin — CLOSED 2026-09-04 — opened 2026-09-04 — session 4b1b66a3 — **BOTH DEFECTS FIXED (`e3a5154f`) AND THEN WIDENED TO ALL 610 REFS (`5641ca08`) AT USER REQUEST; BOTH LIVE IN THE PRIMARY TREE. Verified on the REAL tree: `git checkout HEAD -- scripts/split_state.py` (HEAD 183 behind, working copy on origin/main) went 2 → 0, while `.syndicate/lanes.md` with 128 genuinely uncommitted lines still refuses. 5 new tests FAIL on the pre-fix hook, ALL of them over-blocking; every must-refuse case passes on BOTH versions, so the guard was not weakened. 29/29.**
+- Goal: `discard-guard.py` must stop reporting PUSHED content as existing
+  nowhere else, and must stop blocking `git restore --staged`, which its own
+  docstring already says it does not match.
+- Files: .claude/hooks/discard-guard.py, .claude/hooks/test_discard_guard.py
+- Hypothesis: TWO defects. (1) `gone = working - incoming - at_head` consults
+  only `src` and `HEAD`; on a tree behind `origin/main` it flags content that
+  is in a pushed commit. (2) `_RESTORE` matches `git restore --staged`, which
+  touches no working file, though the docstring lists it as not matched.
+- Falsification test: on a repo whose HEAD lacks lines that origin/main has,
+  the guard exits 0 rather than 2. If it already exits 0, (1) is wrong.
+- Verification: DONE.
+  (a) 5 new tests FAIL on the pre-fix hook (`git show HEAD:` restore, not a
+      checkout), every one an OVER-BLOCK. 29/29 after.
+  (b) Every must-refuse case passes on BOTH the old and new hook — a genuinely
+      nowhere-else line, `restore --worktree`, `-SW`, and a bare `restore`.
+      That is what shows the fix removed false positives without weakening it.
+  (c) LIVE on the primary tree, hook driven directly so no real `checkout` ran:
+      `checkout HEAD -- scripts/split_state.py` → exit 0 (was 2);
+      `checkout HEAD -- .syndicate/lanes.md` → exit 2, "128 uncommitted
+      line(s), on none of HEAD, origin/main". And the real `git restore
+      --staged` on the two hook paths ran with NO override.
+- BOTH DEFECTS WERE OVER-BLOCKING, which this hook's own `reset --hard` comment
+  already named as the dangerous direction: a guard that cries wolf teaches
+  sessions to override it reflexively.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

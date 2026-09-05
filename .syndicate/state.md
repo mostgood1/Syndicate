@@ -580,6 +580,8 @@ once this index exists: re-splitting would orphan the parts.
 | [web-preflight-dead-sample] | WEB'S PREFLIGHT SAMPLE HAS BEEN DEAD SINCE 2026-08-14 — CAUSE STILL UNKNOWN AFTER FOUR WRONG ANSWERS `[2026-08 | `state_worker.md` |
 | [refresh-worker-deploy-hold] | refresh-worker: THE OOM DEPLOY HOLD IS ORPHANED. Branch READY, NOT DEPLOYED. `[2026-08-18]` — **ARCHIVED 2026- | `state_worker.md` |
 | [test-intelligence-runtime] | `tests/test_intelligence.py` IS SLOW, NOT STALLED — and the "warm state" finding is RETRACTED `[2026-09-03, la | `state_worker.md` |
+| [split-state-reindex-truncation] | `split_state.py --reindex --apply` DELETED EVERYTHING BELOW THE `[subject-index]` TABLE — **FIXED, ON MAIN (`2 | `state_ledger.md` |
+| [discard-guard-origin-blindness] | `discard-guard.py` CALLED PUSHED CONTENT "NOWHERE ELSE", AND BLOCKED `git restore --staged` — **FIXED (`e3a515 | `state_ledger.md` |
 
 ### `[web-oom-leak]` UPDATE — the instrument is fixed and the growth has a SUSPECT, 2026-09-04T00:4xZ `[session b2b5b45b]`
 

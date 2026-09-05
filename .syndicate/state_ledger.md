@@ -449,3 +449,156 @@ id.**
 ## [lane-state-carried] LANE STATE RECORDS CARRIED THROUGH THE 2026-08-18 COLLAPSE — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.**
 
 ## [lane-guard-disclaimer-and-worktree-exemption-bugs] TWO REAL BUGS FOUND IN `lane-guard.py`, NEITHER FIXED `[found 2026-08-18]` — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.**
+
+## [split-state-reindex-truncation] `split_state.py --reindex --apply` DELETED EVERYTHING BELOW THE `[subject-index]` TABLE — **FIXED, ON MAIN (`29ab5bfb`), AND NOW IN THE PRIMARY TREE TOO** `[2026-09-04, lane split-state-reindex-truncation]`
+
+`reindex()` rebuilt `state.md` as `head + body[:hdr+1] + rows + [""]` and never
+re-emitted `body[hdr+1:]`. Every byte below the table was dropped — silently:
+`reindex: 179 subject(s) across 15 file(s)` / `WROTE state.md (index rebuilt)`,
+exit **0**. Found by lane `sim-clv-decomposition` when it deleted 55 lines of a
+`### [web-oom-leak]` UPDATE block that existed in no commit on any branch.
+
+**The exposure was live and larger than the report.** `origin/main`'s `state.md`
+carried **171 non-blank lines** below the table when the fix landed.
+
+**FIXED.** `table_span()` bounds the table as the `|---` separator plus the
+CONTIGUOUS run of `| [` rows; the rows are spliced in place and head and tail
+carry through untouched. An unclassifiable post-table region — index-shaped rows
+separated from the table by other content — **REFUSES with exit 1 and writes
+nothing**. A runtime guard refuses if any non-blank, non-row input line would be
+lost. Measured on a copy of the real `origin/main` corpus: **171 of 171 tail
+lines preserved**, `state_key_check.py` "coherent". 9 new tests, 8 of which FAIL
+on the pre-fix code.
+
+**THE PRIMARY TREE NOW HAS THE FIX** `[2026-09-04, later the same day]`. A full
+`git pull` was NOT possible and was not forced: the tree is 183 commits behind
+and **11 of its 14 modified files collide** with upstream — other sessions' live
+uncommitted work (`deploys.md`, `lanes.md`, `learnings.md`, `state.md`,
+`render_events.py`, `intelligence_evaluation.py`, two test files, ...). Git
+refuses such a merge outright, and stashing a shared tree would yank four
+sessions' work mid-turn.
+
+Instead, only the two fixed paths were taken:
+`git checkout origin/main -- scripts/split_state.py tests/test_split_state.py`.
+Safe because both were byte-identical to HEAD first, so nothing uncommitted was
+discarded. **Verified in the primary tree:** 31/31 tests pass, and a DRY RUN on
+its real `state.md` reports `post-table region: 56 line(s) PRESERVED (48
+non-blank)` and wrote nothing. The rest of the tree is still 183 behind.
+
+**A worktree cut before `29ab5bfb` still has the old script.** Pull first.
+
+**THAT EXPOSED TWO REAL DEFECTS IN `discard-guard.py`, NOW FIXED (`e3a5154f`)
+AND LIVE IN THE PRIMARY TREE** — see `[discard-guard-origin-blindness]`.
+
+**Preservation is of CONTENT, not BYTES.** The live `state.md` is MIXED-ending —
+580 CRLF lines and a 55-line bare-LF tail written by the appending session's
+tool. `load()` + the write have always normalised endings whole-file, so a
+reindex shows the whole tail in a diff. That is not a content loss.
+
+
+
+## [discard-guard-origin-blindness] `discard-guard.py` CALLED PUSHED CONTENT "NOWHERE ELSE", AND BLOCKED `git restore --staged` — **FIXED (`e3a5154f`) THEN WIDENED TO ALL 610 REFS (`5641ca08`), BUDGET 30s WITH A REAL CEILING (`c56c48a2`); ALL LIVE** `[2026-09-04, lane discard-guard-sees-origin]`
+
+Two defects, both in the OVER-BLOCKING direction — which the hook's own
+`reset --hard` comment already names as the dangerous one, because a guard that
+cries wolf teaches sessions to override it reflexively.
+
+1. **The predicate consulted only `src` and `HEAD`.** A shared tree runs behind
+   routinely — the primary tree was **183 commits behind** — so pushed content
+   read as existing nowhere. `git restore --staged scripts/split_state.py` was
+   BLOCKED with *"201 uncommitted line(s) in neither HEAD nor HEAD"* while the
+   working file was the SAME BLOB as `origin/main` (`363b5528`). Nothing could
+   have been lost. `_safe_revs()` now yields src, HEAD, `origin/main` and the
+   branch upstream, dropping unresolvable ones so it never fetches. The
+   comparison stays PER PATH, so a line is only excused by a copy of the SAME
+   file. The message names the revs it checked.
+2. **`git restore --staged` was matched though the docstring said it was not.**
+   The exemption was documented from day one and never implemented — an
+   index-only command that cannot touch a working file was blocked as a
+   discard. `_index_only()` implements it: `--staged`/`-S` alone is index-only;
+   `--worktree`/`-W`, `-SW`, or neither flag (restore defaults to `--worktree`)
+   all reach the file and still refuse.
+
+**VERIFIED LIVE on the primary tree**, hook driven directly so no real checkout
+ran: `checkout HEAD -- scripts/split_state.py` → **exit 0 (was 2)**;
+`checkout HEAD -- .syndicate/lanes.md` → **exit 2**, "128 uncommitted line(s),
+on none of HEAD, origin/main". 5 new tests FAIL on the pre-fix hook, all
+over-blocks; **every must-refuse case passes on BOTH versions**, which is what
+shows the guard was not weakened. 29/29.
+
+
+**WIDENED TO ALL REFS `[user request, same day]`.** Four revs is still only four;
+content can sit on a branch nobody named, and this repo has **610 refs**, ~170
+of them stale `origin/deploy/*`. `_deep_lines` now searches EVERY committed
+version of the path across every ref.
+
+**The cost was MEASURED, not assumed** — it had been the stated reason to defer:
+
+| path | commits (all refs) | distinct blobs | unique bytes | exhaustive |
+|---|---|---|---|---|
+| `.syndicate/lanes.md` | 1,322 | 1,301 | 246 MB | 11.6s / 13.4s |
+| `.syndicate/learnings.md` | 660 | 654 | 177 MB | ~7s |
+| an ordinary code file | 3-4 | 3-4 | ~30 KB | <0.5s |
+
+Early exit when the line IS found: 3.9s, 120 of 1,301 blobs. `git log --all -S`
+(pickaxe) was rejected on measurement, not taste: **5.9s PER LINE**, so three
+residual lines cost ~18s where the chunked scan resolves all of them in one
+pass. Three git processes regardless of ref count — `rev-list`, one `cat-file
+--batch-check` mapping commits to blobs, then chunked `cat-file --batch`.
+
+**THE SWEEP IS NOT UNCONDITIONAL:** it runs only after the cheap revs fail, i.e.
+only when the hook is about to BLOCK anyway. Allow-path measured **0.59s ->
+0.60s**. **The budget is ONE deadline for the invocation, not one per path** —
+per-path let `checkout -- a b c` cost three budgets, and a hook that can stall a
+shell for an unbounded multiple of its own limit has no limit. 20s keeps this
+repo's worst real case exhaustive: both big ledger files in ONE command measured
+**18.7s, both answers complete**.
+
+**A TRUNCATED SEARCH BLOCKS AND SAYS SO.** It claims "all N committed version(s)
+across every ref" only when it read all of them; otherwise SEARCH TRUNCATED plus
+the knob to raise. A partial search must not be reported as an exhaustive one.
+
+**END-TO-END PROOF, unplanned and better than the tests:** installing the new
+hook was itself BLOCKED by the old one over 6 lines "on none of HEAD,
+origin/main" — every one of which was in pushed commit `e3a5154f`. The identical
+command under the new hook exits **0 in 0.58s**, while `.syndicate/lanes.md`
+with 143 truly unreachable lines still refuses in 11.2s. Same-instant A/B on the
+live tree: **147 flagged -> 143**. 40/40 tests; 8 fail on `e3a5154f`.
+
+
+**BUDGET RAISED TO 30s, AND MADE A REAL CEILING `[user request, c56c48a2]`.**
+Raising it exposed that it was not a ceiling at all: `_git` used a FIXED 30s
+per-call timeout, and `_blob_ids`' `rev-list --all` — the slowest call, 3-5s and
+growing with history — runs BEFORE the chunk loop's deadline check. True bound
+was budget + timeout, **60s for a 30s budget** — the "unbounded multiple of its
+own limit" the constant's own comment rejects one function above. Every git call
+in the sweep now takes its timeout from the time LEFT on the shared deadline.
+Measured same-instant on the live tree with the budget forced to 1s:
+
+| version | elapsed | multiple of budget |
+|---|---|---|
+| `5641ca08` fixed per-call timeout | 6.23s | **6.2x** |
+| `c56c48a2` deadline-derived | 1.30s | 1.3x |
+
+**The subtle half:** when the deadline kills the blob LISTING, `_blob_ids`
+returns empty — indistinguishable from "this path has no committed version at
+all". The first means UNKNOWN, the second NOWHERE. It now reports INCOMPLETE
+there, while a path that genuinely has no history is still NOT labelled
+truncated.
+
+**Why 30 and not 20:** worst real case (both big ledger files, one command,
+content genuinely nowhere) is **18.7s cold / 14.6s warm**. Against 20 that is a
+1.3s margin, which is not headroom; against 30 it is ~11s.
+
+**44 tests, and an HONEST NOTE: all 44 pass on `5641ca08` too.** They are
+REGRESSION GUARDS, not proof of this change — a fixed-vs-derived timeout cannot
+be distinguished in a throwaway repo where every git call is instant. The
+evidence for the ceiling is the measurement above, not the suite.
+
+**THE WIDENING PAID OFF TWICE IN REAL USE.** Installing `5641ca08` was BLOCKED
+by its predecessor and needed `SYNDICATE_ALLOW_DISCARD=1`; installing
+`c56c48a2` needed **no override**, because the deep sweep found the outgoing
+version in history by itself. Separately, a later run on `lanes.md` returned
+exit 0 in 7.2s with **122 lines still unaccounted for by the cheap revs** — all
+found in OLDER commits. A line can sit in an older `origin/main` commit and not
+at its tip; only the all-refs sweep sees that.
