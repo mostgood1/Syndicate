@@ -809,3 +809,16 @@ and both verified here before being accepted.**
    mislabelled**, and this lane's `edge_basis` fix gets its first NCAAF population
    when `933e9beb` deploys. The fixture shape that hid it is now pinned by
    `test_a_naming_convention_mismatch_is_VISIBLE_and_never_a_silent_zero`.
+
+   **SCOPE OF THAT SENTENCE, because it is the last line of a long section and a
+   skimmer will take it as the summary — it is NOT.** "Never mislabelled" is true
+   of NCAAF GAME-LINE rows ONLY, and NCAAF is the sport where the population
+   ARRIVES, not the sport where the bug lived. `_apply_verdict`'s moneyline branch
+   is SHARED, and mlb, wnba **and soccer** have had a live re-sim joining for
+   weeks: **every one of their priceable live h2h rows carried `pregame` on an
+   edge computed from the live probability, for the whole life of the key.** The
+   measured floor is in POPULATION above — soccer **191**, mlb **110**, wnba
+   **14** priceable h2h ledger records with a final. **Soccer is the largest and
+   is easy to drop from this list**: the framing this defect arrived under said
+   "MLB and WNBA", and soccer was found only by measuring. Read (4) as "NCAAF adds
+   a new population", never as "the label was never wrong".

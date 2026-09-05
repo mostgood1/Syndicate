@@ -6095,3 +6095,13 @@ THE RULE, and it is mechanical rather than attentional:
   a checklist item rather than a thing to remember.
 - **A null needs a denominator IN TIME.** Before reporting "X has not happened",
   state how long since it could have and what its period is. I had neither.
+
+CORROBORATION FROM THE OTHER SIDE, and it is what settles that this is structural
+rather than a lapse: the peer lane hit the identical trap on the identical data
+and escaped by luck. It read the board at 23:15:59Z, saw
+`"no published live-lens snapshot"`, and the ONLY thing that stopped it recording
+a defect was that it happened to compare two timestamps. **Two independent
+sessions, same reading, same hour; one wrote the wrong conclusion and one did
+not, and the difference was not method.** That is the argument against "be more
+careful" as a remedy -- an error that catches the person who has just finished
+writing the rule about it needs a mechanical check, not attention.
