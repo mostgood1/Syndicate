@@ -7,6 +7,42 @@
 
 
 
+## 2026-09-05 05:13:08Z — **OWED READING DISCHARGED: the 2026-09-05 board cleared on its first POST-DEPLOY rebuild.** No deploy taken — this is a verification row. — lane `mlb-hitter-so-dead-field`
+
+The last open thread from `#646`. 2026-09-05 had been reading
+`mean 0.0 / modeProb 1.0 / maxTotal 0 / 1 rung` on a board where 2026-09-04 read
+healthy, which is the shape that looks like a PARTIAL fix. It was not.
+
+**WHY IT LOOKED BROKEN — the margin is 106 seconds.** The 09-05 sims (15 files)
+and its ladders artifact were written **23:24:40Z / 23:20:30Z**;
+`0350dbd2` went live on refresh-worker at **23:26:26Z**. The date was built
+under the old code with under two minutes to spare, and nothing rebuilt it for
+5h49m.
+
+**verify — the SAME featured row, before and after its first post-deploy build:**
+
+| field | 23:24:40Z artifact | 05:13:08Z artifact |
+|---|---|---|
+| `mean` | 0.0 | **1.042** |
+| `mode` | 0 | 1 |
+| `modeProb` | **1.000** | 0.428 |
+| `maxTotal` | 0 | 4 |
+| ladder rungs | 1 | 5 |
+| `marketLine` | null | null (unchanged — still no quotes) |
+
+2026-09-04 independently corroborates across THREE post-deploy rebuilds
+(22:51:30Z, 04:53:01Z, and healthy throughout): `mean 1.087-1.095`,
+`modeProb 0.402-0.447`, 5-6 rungs.
+
+**THE GATE THAT MADE THIS READABLE, and it is the transferable part.** The
+watcher keyed on the ARTIFACT'S OWN mtime crossing the deploy epoch — not wall
+clock, not "the deploy is live". Two of its four polls read `mean 0.0` on the
+stale artifact; reporting either would have been a false negative against a fix
+that was already correct and deployed. **A deploy going live and the thing it
+changes taking effect are different events, here 5h49m apart.**
+
+`#646` is now fully discharged: fix landed, gated, deployed to both services,
+and verified on two independently rebuilt dates.
 ## 2026-09-05 03:53:47-03:59:01Z — refresh-worker `3a9153f4` → `50b266da` — **DEPLOYED, LIVE, VERIFIED BY CONTENT. The pair from the 03:09Z web row is now complete on both services.** — lane `mlb-ladder-refusal-deploy`
 
 Second half of the ladder certainty refusal (`fe519fff` + `9b660beb`). Both

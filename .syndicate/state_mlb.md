@@ -40,6 +40,16 @@ with a degenerate histogram AND a market line, so it has never fired in
 production and currently cannot — its evidence is 6 unit tests, and an absence
 of refused rows is EXPECTED, not confirmation.
 
+**VERIFIED ON TWO INDEPENDENTLY REBUILT DATES `[2026-09-05 05:13:08Z]`.**
+2026-09-05 read `mean 0.0 / modeProb 1.0 / 1 rung` for 5h49m after the fix was
+live, because its artifacts were written **106 seconds BEFORE** the deploy
+(sims 23:24:40Z, ladders 23:20:30Z, deploy live 23:26:26Z) and nothing rebuilt
+them. On its FIRST post-deploy build it read **`mean 1.042 / mode 1 /
+modeProb 0.428 / maxTotal 4 / 5 rungs`**. 2026-09-04 corroborates across three
+post-deploy rebuilds (`mean 1.087-1.095`, 5-6 rungs). **A deploy going live and
+the artifact it changes being rebuilt are different events — here 5h49m apart —
+so gate any such check on the ARTIFACT'S mtime, never on the deploy.**
+
 **NOT extended to `_dist_ladder`, deliberately:** its `{total: 0, hitProb: 1.0}`
 is P(X >= 0) and is correctly certain.
 
