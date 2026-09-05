@@ -2144,6 +2144,57 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   resolves. Must not pass VACUOUSLY — a floor on the code count, so an empty or
   mis-parsed read fails instead of reporting success on zero rows.
 - Blocked by: none. NO DEPLOY — test-only, ships nothing.
+### mlb-ladder-certainty-refusal — CLOSED 2026-09-05 — **GOAL MET, LANDED `462d8d6c`, NOT DEPLOYED (display-only surface, no urgency).** — opened 2026-09-05 — session d35a7d5c-1478-4575-a47c-7f3219bb1a49
+- Goal: the MLB ladder stops publishing an EXACT `overLineProb` of 0.0/1.0 next
+  to a real market line. One testable outcome: `_dist_stats({0: 1000}, 0.5)`
+  returns `overLineProb=None` labelled as refused, while a healthy dist and the
+  no-line case are both unchanged.
+- Files: `syndicate/features/mlb/ladders_build.py`,
+  `tests/test_mlb_ladder_certainty_refusal.py` (NEW)
+- Hypothesis: n/a — this is a known gap, verified by test 2026-09-05 under
+  `#646`(d): `_dist_stats` computes `overLineProb` with no refusal, so a
+  degenerate histogram at line 0.5 publishes exactly `0.0`.
+- Falsification test: if `_dist_stats` already returns None-or-labelled for a
+  degenerate dist on current main, there is nothing to fix.
+- **THE TRAP THIS MUST NOT FALL INTO:** `_dist_stats` ALREADY returns
+  `overLineProb: None` for "no market line", and its own docstring says a zero
+  probability and an absent market are DIFFERENT FACTS the card renders
+  differently. Blanking to a bare None COLLAPSES that distinction. The refusal
+  must be LABELLED, mirroring `probability_refusal.refuse_published_certainty`
+  (`_refused` + `_refused_value`), not silently nulled.
+- **AND WHAT MUST NOT CHANGE:** `_dist_ladder` emits `{total: 0, hitProb: 1.0}`
+  and that 1.0 is P(X >= 0) — trivially and CORRECTLY certain. Only
+  `overLineProb`, the value joined against a market line, is in scope. A blanket
+  certainty refusal on this surface would blank a true value.
+- Verification: reachability both directions (off != on) plus a control that the
+  healthy and no-line cases are untouched.
+- Blocked by: none.
+- OUTCOME: `_dist_stats({0: 1000}, 0.5)` returned exactly `0.0` before and
+  returns `overLineProb=None` + `overLineProbRefused="exact_certainty"` +
+  `overLineProbRefusedValue=0.0` after. `1.0` refused at the other end too.
+- **BOTH TRAPS NAMED IN THIS LANE WERE AVOIDED, and both are pinned by tests:**
+  the refusal is LABELLED so "no market line" and "refused certainty" stay
+  distinguishable in the data (they were both bare `None` otherwise), and
+  `_dist_ladder`'s `{total: 0, hitProb: 1.0}` is untouched because that 1.0 is
+  P(X >= 0) and is CORRECTLY certain.
+- 8 tests, reachability-first: **3 FAIL on the unfixed code; the other 5 are
+  CONTROLS that pass BEFORE and after** — healthy dist still 0.736, no-line
+  unlabelled, empty histogram not faked into a refusal, ladder rung preserved.
+  A control that only passes after the change measures the change instead of
+  guarding it.
+- 260 MLB ladder/prop tests pass. `format_pct(None)` renders `-`, identical to
+  the existing no-line rendering, so no card breaks.
+- **PRE-EXISTING FAILURES RULED OUT, NOT ASSUMED:** 4 `test_nba_prop_ladders_*`
+  tests fail in this worktree. Verified they fail IDENTICALLY with this change
+  reverted — they need NBA artifacts, and `data/` is excluded from session
+  worktrees by design. Not mine.
+- NOT DEPLOYED and no urgency: `overLineProb`'s only consumers are
+  `ladders_common.py:81/88/113/120`, which render it as display text. It feeds
+  no edge, candidate or order. It ships with whatever deploy comes next.
+- LEFT FOR A DECISION, not silently taken: the card now renders `-` for a
+  REFUSED certainty and `-` for an ABSENT market line. The data distinguishes
+  them; the UI does not. Surfacing the reason (the prop path has
+  `edge_unavailable_reason` for this) is a copy decision, not a correctness one.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
