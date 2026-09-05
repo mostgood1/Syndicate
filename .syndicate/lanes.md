@@ -1332,85 +1332,29 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   DELETE 59 lane blocks from upstream. Nothing here commits `.syndicate/lanes.md`
   from the primary tree; see the checkpoint for what landed and how.
 - Blocked by: none.
-### edge-basis-moneyline — OPEN — opened 2026-09-05 — session b4916e4e — `edge_basis` said `pregame` on every live MONEYLINE row while the edge came from the LIVE probability
-- Goal: the label that says WHICH probability `edge_vs_market_pct` was paired
-  against must be right on the h2h path, without starting to publish a
-  side-unaware probability to the board.
-- Files (**CLAIMS TAKEN OVER TWO OPEN LANES ON AN EXPLICIT USER OVERRIDE,
-  2026-09-05 — logged here because `learnings.md` requires an override to be
-  written down, not just obeyed**):
-  `syndicate/features/shared/live_gameline_join.py` and
-  `tests/test_ncaaf_live_gameline_registration.py` from `ncaaf-live-resim`
-  (that session is RUNNING; it was messaged twice, for scope and then with the
-  finished branch, and did not answer);
-  released back 2026-09-05, nothing owed: `syndicate/features/shared/layer2_board.py`
-  was taken from `layer2-sim-disagrees` for a comment-only edit and returned in
-  the same session once `fda5c28a` landed — see that block;
-  `tests/test_live_gameline_edge_basis.py`, which no lane held.
-  Both releases are recorded in the OTHER lane's own block, so neither owner has
-  to read this one to find out.
-- Hypothesis, written before testing: `_apply_verdict` conflates two different
-  questions in one parameter — `live_projected` decides whether to PUBLISH the
-  live probability, and was ALSO being read as the answer to which probability
-  the edge was priced against.
-- Falsification test: the moneyline branch does in fact price against a pregame
-  probability, i.e. `pregame` is the correct label and only the comment is wrong.
-- **FALSIFIED. MEASURED 2026-09-05 with the real functions** (decided NCAAF
-  game, `sims=200`): the moneyline verdict came back
-  `model_prob 1.0, market_prob 0.310, edge_pp 69.0, priceable true`, the row
-  published `edge_vs_market_pct 69.0` — which is `(1.0 - 0.310) * 100`, the LIVE
-  pairing; the pregame pairing `(0.977 - 0.310)` gives 66.7 and is not what came
-  out — and the row said `edge_basis: "pregame"`.
-- **WHY THE ORIGINAL FIX COULD NOT HAVE CAUGHT IT.** The 7/7 separation that
-  motivated the key (`28b03fef`, 2026-08-16) was measured over rows carrying
-  `live_model_prob_over`. Only the DISTRIBUTION branch writes that key, so all
-  7 were totals/spreads rows and **no h2h row was in the founding measurement
-  at all.** The key was added to end exactly this confusion and asserted the
-  opposite of the truth on the one market family where it mattered most.
-- **THE FIX IS THE LABEL ONLY, and the widening was considered and REJECTED.**
-  Passing `live_projected=hit["home_win_prob"]` on the moneyline branch would
-  also start writing `live_model_prob_over`, which
-  `layer2_board._live_projection_columns:2214` maps onto
-  `live_model_probability` with no side awareness — on an h2h row that value is
-  the HOME win probability, so it would render the home number in the Live
-  column of every AWAY moneyline row. That is the defect
-  `_model_prob_for_side` was written to fix, on the same field. So the label is
-  read off `verdict["model_prob"]` instead, which is what `edge_pp` is computed
-  from in all three pricers.
-- **BLAST RADIUS, measured before changing anything.** Readers of
-  `projection.edge_basis`: ONE, and it never sees these rows —
-  `football/pick_gate.filter_pick_rows` (default `basis_key="edge_basis"`),
-  whose only caller feeds it NCAAF recommendation-artifact rows and whose
-  vocabulary is `{"model","market"}`, disjoint from `{"live","pregame"}`. NOT
-  `layer2_board` (`_model_edge_for` reads `edge_vs_market_pct`), NOT
-  `live_gameline_ledger.build_records` (reads `lg["model_prob"]` off the
-  gameline block), NOT `live_edge_policy`, and no template or JS anywhere.
-  Served board at 2026-09-05T21:26Z (substrate `render`): 54 live rows across
-  all sports, `rows_live_gameline_edged: 0` on mlb AND soccer,
-  `supported: false` on ncaaf — so ZERO rows carried the label at that instant,
-  which is an instant and not a population. The population: soccer's h2h ledger
-  read 411 records / **191 priceable with a final** at 21:53Z (`render`), and
-  the capture history (`reports/live_gameline_accuracy/history.jsonl`,
-  36 captures 2026-08-20..09-05, substrate `checkout`) adds mlb **110** and
-  wnba **14**. Every one was labelled `pregame` by construction.
-- Verification: **MUTATION CHECK RUN.** Restoring the old predicate turns
-  exactly 2 tests red — one in each file — and leaves the other 12 green.
-  14/14 green with the fix; 413 passed across the 17 related test files. The one
-  failure in that sweep, `test_football_pick_gate::test_off_is_not_on`,
-  reproduces identically on clean `origin/main` in the same worktree: it needs
-  `data/`, which a session worktree excludes by design.
-- **A SECOND, QUIETER DEFECT FIXED IN THE SAME PASS.**
-  `test_a_row_with_no_live_projection_says_pregame` asserted the mislabel for
-  exactly the moneyline shape, and its fixture built a verdict with **no
-  `model_prob` key at all** — a verdict none of the three pricers can produce.
-  That is why the whole file stayed green over the defect: the fixture could not
-  represent the failing case. Replaced, with
-  `test_every_priceable_verdict_carries_the_probability_it_priced` pinning
-  `priceable is True => model_prob is not None` over the REAL pricers.
-- Blocked by: none. **NO DEPLOY, and none needed** — `autoDeploy = no`, this
-  touches no `.py` that ships without one and no `render.yaml`. On NCAAF the fix
-  is inert until `ncaaf-live-resim` wires the producer to a worker.
-
+### edge-basis-moneyline — CLOSED-VERIFIED 2026-09-05 — `edge_basis` said `pregame` on every live MONEYLINE row while the edge came from the LIVE probability; fixed, landed, mutation-checked
+- Outcome: `_apply_verdict` reads `edge_basis` off `verdict["model_prob"]` — the
+  probability the edge was priced from — instead of off `live_projected`, which
+  only decides whether to PUBLISH it. Label-only; the widening that would have
+  published `live_model_prob_over` on h2h rows was REJECTED, because
+  `layer2_board._live_projection_columns` maps that key with no side awareness.
+- Landed `5ce75195` + `fda5c28a`. **NO DEPLOY, and none needed** — `autoDeploy = no`,
+  no `render.yaml`, no env change. On NCAAF it is INERT until `ncaaf-live-resim`
+  wires the producer to a worker.
+- Verification: **MUTATION CHECK RUN** — restoring the old predicate turns exactly
+  2 tests red, one per file; 12 stay green. 14/14 with the fix, 413 passed across
+  the 17 related test files (the single failure reproduces on clean `origin/main`
+  in a `--no-data` worktree).
+- Files: **RELEASED — the work is landed, nothing is held.** The claims on
+  `live_gameline_join.py` + `test_ncaaf_live_gameline_registration.py` (from
+  `ncaaf-live-resim`) and `layer2_board.py` (from `layer2-sim-disagrees`) were
+  taken on an EXPLICIT USER OVERRIDE, recorded in each holder's own block;
+  `layer2_board.py` was handed back at `a31fb870` and re-verified with
+  `claims_by_path`.
+- Every measurement, the rejected widening, the two overturned beliefs and the
+  two silent release failures: `log/2026-09-05.md`, `state_board.md
+  [live-edge-basis-label]`, and two new rules in `learnings.md`.
+- Blocked by: none.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

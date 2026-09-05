@@ -5760,3 +5760,95 @@ first run reported warm-up as bursts, `+570 MB` and `+284 MB`, with pids REUSED
 across the restart so the process set looked continuous. Boot confounds are
 already in this file for making a fix look good; they make a defect look
 catastrophic just as easily.
+---
+
+## [2026-09-05] A MEASUREMENT THAT CAN ONLY SEE ONE BRANCH DOES NOT CERTIFY THE OTHER — and a fixture that cannot express the failure keeps a whole test file green over it
+
+Lane `edge-basis-moneyline`. `edge_basis` was added on 2026-08-16 to say WHICH
+probability `edge_vs_market_pct` is paired against, on a good measurement: 13
+served rows, the 7 whose edge could not be reproduced from the pregame pair were
+all `live_aware`, the 6 that reconciled were not. **7/7 separation.** It shipped,
+it was verified on served rows, and the lane closed CLOSED-VERIFIED.
+
+It was wrong on h2h from the first commit, for three weeks.
+
+**THE MEASUREMENT SELECTED ITS OWN POPULATION.** Those 13 rows were identified by
+carrying BOTH probabilities — and `live_model_prob_over` is written only by the
+DISTRIBUTION branch. So every row in the sample was totals or spreads, and the
+moneyline branch, which is the one that got the label wrong, could not appear in
+the evidence that certified the fix. The selection criterion and the defect were
+the same variable.
+
+    the label is derived from    `live_projected`   (a PUBLICATION switch)
+    the edge is computed from    `verdict["model_prob"]`
+    the moneyline branch passes   no `live_projected`, deliberately
+    => every live h2h row: edge from the LIVE probability, labelled "pregame"
+
+Measured 2026-09-05 with the real functions: live probability 1.0 against
+`market_fair_prob_over` 0.310 published `edge_vs_market_pct 69.0`, which is
+`(1.0 - 0.310) * 100`; the pregame pairing gives 66.7 and is not what came out.
+
+**AND THE UNIT TESTS COULD NOT HAVE CAUGHT IT.** `test_a_row_with_no_live_projection_says_pregame`
+called `_apply_verdict` directly with a hand-built verdict **carrying no
+`model_prob` key at all** — a verdict none of the three pricers can produce,
+because all three set `model_prob` before they can set `priceable`. The fixture
+was not a simplification of the real object; it was a different object, and the
+one field that discriminates the two branches was the field it omitted. Six tests
+passed over the defect, one of them asserting it by name.
+
+THE RULE, two halves:
+
+1. **State how a verification sample was SELECTED, and check whether the
+   selection can reach the failure mode.** "N of N separated" is a strong result
+   about the rows you looked at and says nothing about a branch that cannot
+   produce a row matching your filter. Where a function has branches, enumerate
+   them and say which ones the evidence covers — `presence != reachability`
+   applied to the MEASUREMENT rather than to the code.
+2. **A fixture must be able to fail.** Before trusting a green test over a
+   hand-built input, ask what the real producer always sets that the fixture
+   omits. Prefer building the input WITH the real producer; where a literal is
+   unavoidable, pin the producer's invariant separately — here,
+   `priceable is True => model_prob is not None`, asserted over all three real
+   pricers, which is what makes the corrected label falsifiable at all.
+
+Adjacent, same root: `layer2_board._live_projection_columns` carried a comment
+asserting `_apply_verdict` is called with `live_projected=verdict["model_prob"]`
+for "EVERY game market (h2h, totals AND spreads)". False, and harmless where it
+stood — it was making a claim about UNITS — while being the load-bearing belief
+one module over. **A comment is only checked where it is load-bearing, so it
+rots fastest exactly where it is quoted.**
+
+## [2026-09-05] IN `lanes.md`, A DISCLAIMER AFTER A PATH DOES NOT DISCLAIM IT — release lines must be MARKER-LED, and only `claims_by_path` can tell you
+
+Lane `edge-basis-moneyline`, releasing three files. **Two attempts changed
+nothing, and the file read correctly both times.**
+
+`_claimable_prefix` cuts a line at its FIRST disclaimer marker and keeps
+everything BEFORE it — deliberately, so "`a.py`, `b.py` (collision check CLEAR)"
+still claims both. Two consequences nobody had written down:
+
+- **A marker governs its own line only.** A `- Files:` line beginning
+  `**released to X:**` disclaims nothing on the wrapped continuation lines that
+  actually carry the paths.
+- **Prose re-claims.** `ncaaf-live-resim` contained the sentence
+  "`live_gameline_join.py` was named as SOLELY held by `live-edge-basis` ... those
+  claims were released" — every marker in it (`held by`, `released`) sits AFTER
+  the backticked path, so the claimable prefix keeps the path and the sentence
+  re-claimed the file all by itself, defeating a release two bullets above it.
+
+Both read, in English, as unambiguous releases. The parser disagreed with both.
+
+THE RULE: write every release as its own marker-led line —
+`  released: \`path/to/file.py\`` — one path per line, marker FIRST. Then
+**verify with `.claude/hooks/lane_claims.py`'s `claims_by_path` over the file you
+actually changed**, asserting the full expected map including the paths that must
+NOT move. Reading the ledger is not verification of the ledger; this is the same
+lesson as `[2026-08-2x] the commit-guard's own fix list can omit a path it just
+flagged`, and it applies to the lane parser for the same reason — the machine and
+the reader disagree about what a sentence means, and only one of them is enforcing.
+
+Corollary for a session worktree: `lane-guard` reads
+`$CLAUDE_PROJECT_DIR/.syndicate/lanes.md` — the PRIMARY tree's working copy — and
+nothing else. That copy was **57 commits behind `origin/main`** here, so a lane
+OPEN upstream guarded nothing locally and three paths read FREE. Landing a claim
+is not the same as enforcing it: check both files.
