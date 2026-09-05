@@ -2130,7 +2130,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   sessions to override it reflexively.
 - Blocked by: none.
 
-### nfl-schedule-code-coverage-test — OPEN — opened 2026-09-05 — session ff257687-e3c6-48e0-b92a-e6e494211885
+### nfl-schedule-code-coverage-test — CLOSED 2026-09-05 — **GUARD LANDED (), MUTATION-CHECKED BOTH ARMS. Reads every  via the module's own : 34 distinct codes over 5 files, all resolve. Mutation A (drop ) red naming ; mutation B (1-row schedule) red on the vacuity floor — and B is the one that matters, since / both resolve so the unresolved check passes green and only the floor catches it. Skips with a reason where  is absent; verified PASSED with data and SKIPPED without. No deploy (test-only).** — opened 2026-09-05 — session ff257687-e3c6-48e0-b92a-e6e494211885
 - Goal: close the one risk left standing by `nfl-la-rams-alias` — a future slate
   carrying an nflverse club code the alias map does not know regresses SILENTLY.
   `[user: "add the test"]`
