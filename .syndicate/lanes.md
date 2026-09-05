@@ -86,6 +86,33 @@ death, never life — do not invert it.
   behind it, which is how I mis-reported pressure as 86% when it was 54%.
 - Blocked by: none.
 
+### intelligence-cache-cap — OPEN — opened 2026-09-05 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: bound `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` by CONTENT, not by entry
+  count. It measured **37.50 MB** on a live worker WHILE CAPPED at 32 entries —
+  the cap is on the wrong dimension, because entry size varies by orders of
+  magnitude with slate size.
+- Files: `pipeline/intelligence_state.py` (**the cache at ~8416 and its eviction
+  at ~8789 ONLY**), `tests/test_intelligence_cache_cap.py` (NEW).
+  `layer2-sim-disagrees` claims this file for *"the `confidence` backfill at
+  ~1888 ONLY"*, so the two are disjoint by that lane's own stated scope; notice
+  left in their block.
+- NOT AN OOM FIX, and this is stated so nobody later reads it as one: `#632`'s
+  bytes are **not Python objects** (28.3% of anon; 0.3% of the growth). This
+  bounds a real unbounded cache on its own merits.
+- Hypothesis: eviction is also too weak — it pops exactly ONE entry per insert,
+  so a cache that gets over budget by more than one entry never catches up.
+- Falsification test: with the bound in place the cache still exceeds its row
+  budget in production — then size does not track row count and the proxy is
+  wrong.
+- Verification: `/api/ops/retainer-census` shows the cache materially below
+  37.50 MB on a settled worker, and the row budget holds.
+- MEASURED, so the design is not a guess: per-insert SIZING was rejected. An
+  accurate deep walk costs **228 ms** on a 3,000-row payload; a cheap truncated
+  walk under-reports **11.31 MB as 1.44 MB**; `json.dumps` costs **70-174 ms**
+  AND allocates a 9.44 MB transient string on a box that is OOMing. Row count is
+  O(1) and tracks the dominant term.
+- Blocked by: none.
+
 ## OPEN
 
 ## OPEN

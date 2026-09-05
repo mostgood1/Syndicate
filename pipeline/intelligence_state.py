@@ -8415,6 +8415,61 @@ def read_latest_intelligence_state_response(
 
 _COMBINED_INTELLIGENCE_RESPONSE_CACHE: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
 _COMBINED_INTELLIGENCE_RESPONSE_CACHE_MAX_ENTRIES = 32
+# `#632`: THE ENTRY COUNT WAS THE WRONG DIMENSION. This cache measured
+# **37.50 MB** on a live worker while obeying its 32-entry cap, because entry
+# size varies by orders of magnitude with slate size -- a cap that cannot see
+# bytes cannot bound them.
+#
+# Row count is the proxy, and it is O(1). Per-insert SIZING was measured and
+# rejected: an accurate deep walk costs 228 ms on a 3,000-row payload; a cheap
+# truncated walk reported 11.31 MB as 1.44 MB (an 8x under-report, which would
+# admit huge entries while believing them small); `json.dumps` costs 70-174 ms
+# AND allocates a multi-MB transient string on a service that is OOMing.
+_COMBINED_INTELLIGENCE_RESPONSE_CACHE_MAX_ROWS = 4000
+
+
+def _combined_intelligence_cache_limit(env_key: str, default: int) -> int:
+    raw_value = str(os.environ.get(env_key) or "").strip()
+    if not raw_value:
+        return default
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _combined_intelligence_cache_rows(payload: Any) -> int:
+    if not isinstance(payload, Mapping):
+        return 0
+    return len(payload.get("top_opportunities") or ())
+
+
+def _prune_combined_intelligence_response_cache() -> None:
+    """Evict oldest-first until BOTH bounds hold. `#632`.
+
+    A LOOP, because the previous eviction popped exactly ONE entry per insert:
+    a cache that got over budget by more than one entry could never catch up,
+    and nothing reported that it was over.
+
+    ALWAYS KEEPS ONE ENTRY. Without that floor a single slate larger than the
+    row budget would be evicted immediately after every insert, turning the
+    cache into a permanent miss and making every request rebuild the board --
+    which costs far more than the memory it saves.
+    """
+    cache = _COMBINED_INTELLIGENCE_RESPONSE_CACHE
+    max_entries = _combined_intelligence_cache_limit(
+        "SYNDICATE_INTELLIGENCE_CACHE_MAX_ENTRIES",
+        _COMBINED_INTELLIGENCE_RESPONSE_CACHE_MAX_ENTRIES)
+    max_rows = _combined_intelligence_cache_limit(
+        "SYNDICATE_INTELLIGENCE_CACHE_MAX_ROWS",
+        _COMBINED_INTELLIGENCE_RESPONSE_CACHE_MAX_ROWS)
+    while len(cache) > 1:
+        rows = sum(_combined_intelligence_cache_rows(value[1]) for value in cache.values())
+        if len(cache) <= max_entries and rows <= max_rows:
+            return
+        oldest_key = min(cache, key=lambda key: cache[key][0])
+        cache.pop(oldest_key, None)
 
 
 def _combined_board_response_cache_ttl_seconds() -> float:
@@ -8787,9 +8842,7 @@ def read_combined_intelligence_response(
     sliced["board_contract"] = board_contract
 
     _COMBINED_INTELLIGENCE_RESPONSE_CACHE[cache_key] = (time.time(), sliced)
-    if len(_COMBINED_INTELLIGENCE_RESPONSE_CACHE) > _COMBINED_INTELLIGENCE_RESPONSE_CACHE_MAX_ENTRIES:
-        oldest_key = min(_COMBINED_INTELLIGENCE_RESPONSE_CACHE, key=lambda k: _COMBINED_INTELLIGENCE_RESPONSE_CACHE[k][0])
-        _COMBINED_INTELLIGENCE_RESPONSE_CACHE.pop(oldest_key, None)
+    _prune_combined_intelligence_response_cache()
     return dict(sliced)
 
 
