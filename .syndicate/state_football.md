@@ -1705,6 +1705,93 @@ the compute on the one service that cannot read its inputs. The OUTPUT has no
 such problem: `data/live/ncaaf_live_lens.json` is keyvalue-backed by
 `refresh_state_store`, which is how `mlb_live_lens.json` already reaches web.
 
+**ALL THREE OWED ITEMS DISCHARGED, AND THE WIRING FOUND TWO THINGS THE ENGINE
+WORK COULD NOT** `[2026-09-05, lane ncaaf-live-resim-wire, commits 262fd2cf +
+933e9beb, refresh-worker ffe8714b]`. The OWED block below is answered rather than
+deleted, because what it predicted and what happened differ in a way worth
+keeping.
+
+**THE PRODUCER IS LIVE AND MEASURED, substrate `render`.**
+`/api/ops/live-lens/snapshot-index?sport=ncaaf` at 23:15:59Z:
+`sources_seen {live_resim: 8, pregame: 43}`, `index_size 8`,
+`skipped_no_team_names 0`, producer coverage `games 51, live_resimmed 8,
+refused 43` with `refusals_by_reason {game_final 14, game_not_in_progress 8,
+no_live_state 21}` — against **20 ESPN games in progress at the same instant**, 8
+of them FBS-vs-FBS and therefore in the week's artifact. Wyoming @ Colorado State
+**0.6875**, Tulane @ Duke 0.9667, Baylor @ Auburn 0.9917. The tick's own line:
+`elapsed_seconds 21.741` against a 90 s budget, `espn fetch_failures 0`,
+`ratings_teams 94`, `written true`.
+
+**(1) THE TICK RUNS ON refresh-worker, and the reason the OWED block gave was
+right for a reason it did not know.** It said `live_lens_loop` "cannot read
+`sp_ratings_<season>.json` off refresh-worker's disk". The sharper fact:
+**NOTHING can, after a deploy.** `sp_ratings_cache_path` and
+`ncaaf_historical_loader.DEFAULT_CACHE_DIR` both resolve off `__file__`, so on
+Render they write `/opt/render/project/`**`src`**`/...` — the EPHEMERAL CHECKOUT.
+Refresh-worker's own logs, 2026-09-04T01:03:29Z and 2026-09-05T01:15:49Z, BOTH
+`[sp_ratings] source=api ... cached=/opt/render/project/src/...`: `source=api`
+twice for a file the same process wrote the day before. A cache that never reads
+`source=cache` is not a cache. The tick mirrors to
+`$SYNDICATE_NCAAF_SOURCE_ROOT/historical_truth/` (the MOUNTED disk), trusts it
+24 h, and otherwise re-reads through the generator's own `load_sp_ratings` and
+rewrites it — so in-season SP+ keeps moving instead of freezing at week 1.
+Proven with **no `CFBD_API_KEY` in the environment at all**, which is the
+post-deploy state: `sp_ratings_source durable_mirror`, 138 teams, 7 live games
+still priced. **First production boot read `loader` as predicted (mirror absent,
+one CFBD call, mirror written). THE DISCRIMINATING FOLLOW-UP IS THE NEXT BOOT:
+it must read `durable_mirror`. `loader` again means the mirror is not surviving.**
+Full rule: `learnings.md` 2026-09-05.
+
+**(2) THE ALLOWLIST ENTRY IS IN, and the claim that blocked it was a parser
+artefact, not a dispute.** `ncaaf_source/historical_truth/sp_ratings_*.json` is in
+`HOT_ARTIFACT_PATTERNS`. It matches the MIRROR, which is the only copy under
+`data_root()` at all — an entry aimed at the checkout copy could never match, so
+it would have been the inert half of the same defect the
+`smartsim2_projections` entry records. `evaluation-ledger-projected-mirror` read
+as holding that file while its own prose said the opposite; `_claimable_prefix`
+cuts a Files line at its FIRST disclaimer marker, so a path written BEFORE its
+release note stays claimed. **Move the MARKER, not the PATH** — hoisting the path
+also moves the cut point and newly ENFORCES that lane's dormant claim on
+`run_refresh_worker.py`. Claim-set delta measured both ways.
+
+**(3) THE JOIN KEY WAS WRONG AND ONLY PRODUCTION COULD SAY SO.** The closing
+reading's second half failed at the first board rebuild past the snapshot
+(23:17:39Z): a PERFECT index — `index_size 8`, `sources_seen {live_resim: 8,
+pregame: 43}`, `skipped_no_team_names 0` — and `rows_live_gameline_considered
+257`, `rows_live_gameline_edged 0`, `withheld_by_reason
+{no_live_gameline_projection: 257}`. **The two key sets did not intersect at all,
+0 of 8.** The lens is keyed from the projections artifact (CFBD), the grid from
+the ODDS source:
+
+| lens key | grid key |
+|---|---|
+| `('baylor', 'auburn')` | `('baylor bears', 'auburn tigers')` |
+| `('tulane', 'duke')` | `('tulane green wave', 'duke blue devils')` |
+| `('wyoming', 'colorado state')` | `('wyoming cowboys', 'colorado state rams')` |
+
+`live_gameline_join._norm_team` has NO alias table on purpose — MLB's two sides
+match exactly because both come from one source. NCAAF's have two owners. Fixed
+by publishing ESPN's `displayName` as `matchup`, which
+`build_live_gameline_index` reads first: measured against the 61 live grid keys,
+`displayName` **7/8**, `location` **0/8**, `shortDisplayName` 0/8, `name` 0/8;
+re-run end to end against the live grid, **6 of 7 index keys hit**. The residual
+is NAMED, not aliased: ESPN `sam houston bearkats` vs the grid's `sam houston
+state bearkats`.
+
+**AND THE TEST THAT SHOULD HAVE CAUGHT IT ASSERTED THE BROKEN KEY AND PASSED.**
+The fixture built the grid row and the projection from the SAME names, so the two
+sides agreed by construction; a five-way mutation check did not help, because the
+mutation needed was to the FIXTURE. 18 green tests against 257 of 257 missing in
+production. That is `learnings.md` 2026-08-27 ("a fixture that cannot violate the
+property it asserts is zero coverage that reads as strong") met head-on with the
+rule already on file, and the join-specific form is: **a join test whose fixture
+builds BOTH SIDES from one set of names cannot test the join.**
+
+**STILL OWED:** the board half of the closing reading — a live NCAAF row carrying
+`projection.live_aware: true` — on the first board rebuild after `933e9beb` is
+live. `game_final` climbed 14 -> 16 within twelve minutes, so if tonight's slate
+closes first this moves to the next slate. It is not a claim until it is read.
+
 **OWED, none of it taken this session (no deploy, no env change, by
 instruction):** (1) call `build_live_lens_snapshot` from refresh-worker's tick
 and write it through `write_json_file`; (2) add `sp_ratings_*.json` to
