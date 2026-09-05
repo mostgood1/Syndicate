@@ -1331,6 +1331,47 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   copy passes both checkers. So committing this file from the primary tree would
   DELETE 59 lane blocks from upstream. Nothing here commits `.syndicate/lanes.md`
   from the primary tree; see the checkpoint for what landed and how.
+- **MEASURED AFTER, on `origin/main` `578bce89` (2026-09-05T22:2xZ): BOTH
+  CHECKERS PASS.** `check_lane_invariants.py` exit 0, INVARIANTS HOLD;
+  `check_lane_claims.py` exit 0. The digest's `DIGEST OVERFLOW: 1874B > 1800B`
+  line is gone. `lanes.md` 319,770 -> 185,962 B, 105 lane headers -> 50.
+- What was actually wrong, in the order it was found.
+  (a) CONTESTED `lanes.md`: not two lanes wanting one file, but PROSE inside two
+  `- Files:` blocks. `ncaaf-segment-capture`'s own paragraph explaining that any
+  path-like token in a Files block becomes a claim was ITSELF inside the Files
+  block, so it claimed `lanes.md` and `learnings.md`; `nfl-projection-et-datekey`'s
+  collision-check note claimed `lanes.md`, `369/373/379/383` and two files it
+  said it was NOT touching. Moved to their own bullets; not one word changed.
+  (b) `measured-correlation-pays-off` claimed ``lane`'s`` the same way.
+  (c) The two orphan markers needed OPPOSITE fixes and neither was guessed.
+  `verify-ledger-budget-4gb` is a SCHEDULED TASK id, not a lane -- `git log -S`
+  finds `### verify-ledger-budget-4gb` in ZERO commits, its work is recorded in
+  `accuracy-ledger-budget-raise` and `deploys.md`, and its session is gone; the
+  marker was emptied. `segment-refusal-deploy` was the opposite: an ACTIVE lane
+  holding live deploy claims on web and refresh-worker and named by two other
+  blocks, whose block was never written; it was reconstructed, and labelled
+  RECONSTRUCTED with its evidence.
+- **7 stale deploy headers corrected** (8 edits), each against the SHA the
+  service is running -- web `94c8ac13`, refresh-worker `eb7951fe`,
+  live-odds-worker `3223baa1`, read from `/v1/services/<id>/deploys` and tested
+  with `git merge-base --is-ancestor`. See commit `cab6138f`.
+- **THE 600 B `LANE_CAP` IS UNREACHABLE BY ARCHIVING, AND THE MEASUREMENT SAYS
+  SO.** The digest's OPEN LANES section is built ONLY from the `### ` header and
+  `- Goal:` line of lanes whose status reads OPEN, and `trim_lane_blocks.py`
+  moves only blocks that are neither OPEN nor claim-bearing -- so the 59-block
+  archive pass moved it 28,025 -> 27,840 B, which is noise. Composition on
+  `578bce89`: **46 OPEN header lines, 25,438 B**, the largest single header
+  2,347 B (`mlb-feed-live-terminal-refresh`) -- one header is 3.9x the whole
+  cap. Reduced to the minimal header form the `/lane` template prescribes,
+  46 lanes would still be ~3,588 B, i.e. **6x over cap with zero prose**. Two
+  levers, both bigger than one lane: CLOSE lanes (46 read OPEN, most UNOWNED
+  with dead sessions), or demote header status prose into a `- Status:` bullet
+  (lossless, 25,438 -> ~3,588 B, but it rewrites 46 other lanes' headers).
+  Raising `LANE_CAP` is the third option and is a user decision, not mine.
+- NOT DONE, and each is deliberate: `learnings.md` is 435,254 B against its
+  400,000 cap and `compact_learnings.py` REWRITES THE WHOLE SHARED FILE, so it
+  was left alone; one BAD claim (`export`) remains in `render-egress-transport`,
+  which belongs to session 9e40eb04 and was relayed, not edited.
 - Blocked by: none.
 ### edge-basis-moneyline — CLOSED-VERIFIED 2026-09-05 — `edge_basis` said `pregame` on every live MONEYLINE row while the edge came from the LIVE probability; fixed, landed, mutation-checked
 - Outcome: `_apply_verdict` reads `edge_basis` off `verdict["model_prob"]` — the
