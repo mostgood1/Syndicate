@@ -7,6 +7,30 @@
 
 
 
+## 2026-09-05 22:57:42-23:00:51Z — web `6320fe91` -> `3cb5b4ba` — **DEPLOYED, LIVE, VERIFIED ON THE SERVED PAYLOAD.** Response gzip is on; the OUTBOUND half is deployed and NOT yet demonstrated. — lane `render-egress-transport`
+
+- **verify (the reading that proves it worked): a same-instant A/B against production, one path, two requests differing only in `Accept-Encoding`.**
+  `/api/board/game-chips?date=2026-09-05&sports=mlb,ncaaf,soccer` — **130,894 bytes plain -> 17,261 gzipped, 7.6x**, response carrying
+  `Content-Encoding: gzip` and `Vary: Accept-Encoding`. `/api/portfolio/summary?limit=100` — 2,746 -> 941, 2.9x. Same instant on purpose:
+  a before/after across a deploy would have compared two different board states.
+- preflight **CLEAR** at 22:57:24Z (only gunicorn + 2 already-dead defunct children; no sim, no job to kill). Claim held by this lane, acquired 22:57:07Z.
+- **WHAT THIS DOES NOT SHOW, and must not be read as showing: the bandwidth bill.** Serving gzip to a client that asks changes little, because
+  **Render's edge already gzipped these responses** (measured: 198.8 MB at the origin vs 4.2 MB at the edge for the same request). The saving that
+  matters is OUTBOUND, and on web it is UNDEMONSTRATED: zero `[http_compression] HTTP_COMPRESSION` lines since 23:00:51Z — expected, since that
+  line prints every 200 gzip responses and web's fetch loops are disabled (`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`,
+  `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`). **The service that will exercise it is refresh-worker, which is held by another lane.**
+- **The one genuinely good null: zero `ACCEPT_ENCODING_REFUSED`.** That is the ESPN-403-from-Render hazard not firing so far. It is a WEAK null — web
+  barely fetches — and the real test is refresh-worker's ESPN calls.
+- **A bandwidth reading is NOT AVAILABLE YET and nobody should quote one before 2026-09-06T00:00Z.** `/v1/metrics/bandwidth` is hourly-only
+  (60/300/900s resolutions all return hourly) and RIGHT-labelled, so the first bucket containing only post-deploy time is `2026-09-06T00:00:00Z`.
+  Baseline to compare against, from `scripts/render_bandwidth_report.py`: web ran **~1 GB/day chronic** Aug 21-31 and 6.28/1.21/3.87/7.89 GB on
+  Sep 1-4, against 0.40 GB on Sep 5.
+- **DEFECT INTRODUCED, cosmetic, recorded rather than quietly fixed:** some routes now serve `Vary: Accept-Encoding` TWICE
+  (seen on `/api/portfolio/summary`). Legal HTTP, sloppy, and mine. `response_compression.compress_response` appends when
+  `"accept-encoding" not in response.headers.get("Vary", "")`, and `.get` reads only the FIRST of a repeated header. Fix is `headers.set`, not append.
+- **DO NOT credit this deploy with the 19.5 GB.** Web's share of the month is still unexplained — internal transport, public responses, public
+  ingress and deploys are each eliminated by measurement (`lanes.md`, lane `render-egress-transport`).
+
 ## 2026-09-05 22:4xZ — web + refresh-worker -> `744689c9` — **PENDING, measurement column EMPTY.** The NCAAF live re-sim producer. — lane `ncaaf-live-resim-wire`
 
 **1. SCOPE — this is NOT a one-change deploy and saying otherwise would be
