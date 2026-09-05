@@ -65,7 +65,7 @@ id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
 markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
-### web-oom-burst-source — OPEN — opened 2026-09-05 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-burst-source — CLOSED 2026-09-05 — opened 2026-09-05 — **FALSIFICATION TEST FIRED, AND THE FOUNDING OBSERVATION WAS AN ARTIFACT.** 7 settled bursts at 10 s cadence: **0/7 hit both workers**, sizes 17.6-41.8 MB (mean 28.0), gaps irregular (spread/mean **1.79** vs a 0.35 periodicity bar). Not simultaneous, not periodic -> ordinary demand-driven traffic on one worker at a time; the scheduled-job/fan-out hypothesis is dead. The lane was opened on "both workers rose ~98 MB in ~100 s", which came from **50-second sampling** — a grid too coarse to distinguish "one then the other" from "both at once". A first run was DISCARDED whole: a peer deployed mid-window and the detector, lacking a restart guard, read warm-up as bursts (+570 MB, +284 MB) with pids reused across the restart. Rebuilt with restart inference and a 10-min settle window. Weak signals recorded as weak: pid 98 took 6/7 bursts (n=7), and one burst coincided with a 98 MB child. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: identify what causes `#632`'s memory BURSTS. Growth is episodic, not
   steady — both workers rose ~98 MB between 16:17:43 and 16:19:25 and were then
   flat to the decimal (`595.3`/`509.4`) for 3.5 min.

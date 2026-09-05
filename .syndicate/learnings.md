@@ -5728,3 +5728,35 @@ arriving at the same number is the strongest evidence this investigation has
 produced — and it is still only SUGGESTIVE, because the readings came from
 different processes hours apart. Same-instant would have made it proof;
 saying so is the difference between corroboration and a coincidence.
+
+## 2026-09-05 — SAMPLE FASTER THAN THE THING YOU ARE DESCRIBING, OR THE SHAPE IS YOUR SAMPLING GRID
+
+`#632`. I opened a lane on a striking observation: both web workers gained ~98 MB
+inside ~100 seconds, and **a single request cannot raise two workers at once**,
+so it had to be a scheduled job or a fan-out. The reasoning was sound and the
+conclusion was wrong, because the observation was an artifact of the sampling
+interval.
+
+It came from samples **50 seconds apart**. At that spacing, "worker A grew, then
+worker B grew" and "A and B grew together" produce identical data. Re-measured at
+**10 seconds**: 7 of 7 bursts hit ONE worker, gaps irregular (spread/mean 1.79
+against a 0.35 bar), and the fan-out hypothesis died.
+
+THE RULE: before drawing a conclusion from the SHAPE of a time series, state what
+the sampling interval can and cannot distinguish. Simultaneity, periodicity and
+burstiness are all properties the grid can manufacture. If the claim is "these
+happened together", the interval must be shorter than the gap you are claiming
+is zero.
+
+The same session produced two more of these, which is what makes it a pattern
+rather than an incident: a correlation called on a 12-minute window that
+reversed at 35 minutes, and a retention-vs-churn verdict called on ONE time point
+that reversed at the next reading. **Coarse sampling does not add noise, it adds
+STRUCTURE** — and the structure looks like a finding.
+
+Corollary, learned the hard way in the same lane: a detector watching a
+production process needs a RESTART GUARD. A peer deployed mid-window and the
+first run reported warm-up as bursts, `+570 MB` and `+284 MB`, with pids REUSED
+across the restart so the process set looked continuous. Boot confounds are
+already in this file for making a fix look good; they make a defect look
+catastrophic just as easily.

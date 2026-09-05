@@ -978,3 +978,29 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   error that produced the "~20 minutes to OOM" claim.
 * This is the standing `memory.current is page cache` rule, which I had recorded
   and did not apply: **split anon from file before calling anything pressure.**
+
+### `[web-oom-leak]` UPDATE 16 — **bursts are ORDINARY TRAFFIC, and the "both workers" observation that started the lane was a SAMPLING ARTIFACT**, 2026-09-05T22:2xZ `[session b2b5b45b]`
+
+* **7 settled bursts at 10 s cadence, 0 restarts inside the window:**
+  `0/7 hit both workers`; sizes `17.6-41.8 MB` (mean `28.0`); gaps
+  `3.3, 0.2, 1.6, 4.0, 0.2, 3.4 min`, spread/mean `1.79` against a periodicity
+  bar of `<=0.35`. **Not simultaneous, not periodic — demand-driven request
+  traffic on one worker at a time.** The scheduled-job / fan-out hypothesis is
+  FALSIFIED.
+* **THE LANE'S FOUNDING OBSERVATION DOES NOT SURVIVE.** It was opened on "both
+  workers rose ~98 MB in ~100 s — one request cannot do that", taken from
+  **50-SECOND sampling** (pid 98 `+53.9`, pid 97 `+44.2` over 5.1 min). At 50 s
+  resolution *"one worker then the other"* is INDISTINGUISHABLE from *"both at
+  once"*. At 10 s resolution it resolves into single-worker bursts, 7 for 7.
+  **A conclusion drawn at a resolution coarser than the phenomenon.**
+* **A FIRST RUN WAS DISCARDED ENTIRELY.** A peer deployed web at
+  `16:29:52-16:32:58` and the detector had no restart guard, so it reported
+  warm-up as bursts — including `+570 MB` and `+284 MB`. Pids are REUSED across a
+  restart (97 and 98 both times), so the pid set looked continuous. Rebuilt with
+  restart inference (RSS drop or a run of failed fetches) and a 10-minute settle
+  window; the rerun excluded 3 warm-up bursts explicitly rather than silently.
+* Consistent with the rest of `#632`: ~28 MB increments match the 8-64MB
+  anonymous mappings already identified, and none of it is reachable from Python.
+* Weak signals, recorded as such: pid 98 took **6 of 7** bursts (lopsided for
+  round-robin, but n=7), and ONE burst coincided with a 98 MB child process
+  (`272:pro`, the only child all window) — an anecdote, not a mechanism.
