@@ -5,30 +5,54 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
-## [ci-suite-red-test] CI's OWN SUITE HAS ONE RED TEST, WITH DATA PRESENT `[measured 2026-09-05, session ff257687]`
+## [ci-suite-red-test] CI'S OWN SUITE IS GREEN. THE "ONE RED TEST" WAS THE 31st DATA-ABSENCE FAILURE, NOT A SURVIVOR OF THEM `[corrected 2026-09-05, lane ci-archives-nba-card-js, commit ba84b331]`
 
-    tests/test_archives.py::ArchiveRouteTests::
-      test_nba_betting_card_js_rewrites_source_routes_to_syndicate_paths
+**The claim this section used to make was WRONG, and it is preserved here
+because the way it went wrong is the reusable part:**
 
-**This is the file CI runs** — CLAUDE.md: `python -m unittest tests.test_archives`.
+> CI's own suite has one red test, with data present. [...] CONTROLLED, not
+> assumed. Same file, same worktree, only `SYNDICATE_DATA_ROOT` moved:
+> without data 31 failed / with data 1 failed, 380 passed. So 30 of the 31
+> were `data/` absence and **one survives with data present** -- it is not a
+> worktree artifact.
 
-CONTROLLED, not assumed. Same file, same worktree, only `SYNDICATE_DATA_ROOT` moved:
+**`SYNDICATE_DATA_ROOT` WAS THE WRONG KNOB, so the differential built on it
+could not separate the two populations it was built to separate.**
+`session_worktree.py` says so in its own source, written the day before that
+measurement: *"`SYNDICATE_DATA_ROOT` does NOT solve it. Nine of these read
+`REPO_ROOT/data/...` directly and ignore the variable entirely, which is why
+they stayed invisible to a differential built on that env var."*
+`test_nba_betting_card_js_rewrites_source_routes_to_syndicate_paths` was one
+of those nine. Its residual failure was not a survivor of the control; it was
+a test the control never reached.
 
-    without data   31 failed
-    with data       1 failed, 380 passed, 2 skipped, 5 subtests passed
+MEASURED, this lane, all four readings in the same worktree:
 
-So 30 of the 31 were `data/` absence (a session worktree excludes `data/` by design)
-and **one survives with data present** — it is not a worktree artifact.
+    primary tree (has `data/`)                        1 passed
+    worktree + SYNDICATE_DATA_ROOT     the assertion is `assertIsInstance(
+                                       content, str)` -- `content is None`
+    worktree + SYNDICATE_NBA_ARTIFACT_ROOT            1 passed
+    worktree + SYNDICATE_DATA_ROOT, after `ba84b331`  1 passed
 
-NOT diagnosed, and NOT established as pre-existing: it was not run against an older
-commit. It is unrelated to the session that found it, whose only code change was one
-key in `_NFL_ALIAS_TO_NAME`.
+The failing assertion was the FIRST line of the test -- the asset never
+loaded -- so no route-rewriting assertion was ever reached. **CI checks out
+the full repo, `data/nba_source/web/betting-card-v2.js` is git-tracked, and
+the file CI runs was green throughout.** Nothing was red in CI.
 
-**Read this before trusting a green local run:** a worktree without `data/` fails ~31
-tests in this file alone, which is enough noise to hide the one that matters. Control
-with `SYNDICATE_DATA_ROOT` before calling any archive failure real — and before
-calling the suite clean.
+**THE RULE, and it is the one that pays for this section.** A control is only
+a control over the population it actually reaches. A differential that
+resolves 30 of 31 cases is not thereby evidence about the 31st: the residual
+is the population the instrument was blind to, and reading it as "the one
+that survived" inverts what a null result means. Before calling any archive
+failure real, check the failing ASSERTION -- `assertIsInstance(content, str)`
+on line 1 of a test named `..._rewrites_source_routes_...` says "input",
+not "logic". `--with-test-data` is the documented control; `SYNDICATE_DATA_ROOT`
+is not, for these nine.
 
+**WHAT THE FALSE ALARM WAS WORTH ANYWAY: a real production outage, in the
+code path it pointed at.** See `[nba-betting-card-assets-404]` in
+`state_basketball.md`. Chasing why a test could not load that asset is what
+found that production could not load it either.
 ## [state-file-split] state.md IS AN INDEX PLUS NINE PARTS `[2026-09-03, scripts/split_state.py, commit 23bf6bc7]`
 
 **Read `state.md` first, then open only the part your work touches.** It holds

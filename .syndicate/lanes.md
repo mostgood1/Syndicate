@@ -2334,6 +2334,59 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: nothing. **NO DEPLOY TAKEN, no env var changed** [instruction
   2026-09-05].
 
+### ci-archives-nba-card-js — OPEN — opened 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **HYPOTHESIS CONFIRMED EXACTLY AS PRE-REGISTERED: NOT a rewriter defect and NOT a red CI gate. Diagnosing why the test could not load its input found a REAL PRODUCTION OUTAGE in the same code path — `/nba/assets/betting-card-v2.{js,css}` have been serving 404 while the page that references them serves 200. FIXED, MUTATION-CHECKED, LANDED (`ba84b331`). ONE WEB DEPLOY OWED.**
+- Goal: `tests/test_archives.py::ArchiveRouteTests::test_nba_betting_card_js_rewrites_source_routes_to_syndicate_paths`
+  passes in a session worktree under the documented data-root control, and
+  still passes with `data/` present. **MET** — and the goal turned out to be
+  the smaller half of what the lane found.
+- Files: `syndicate/features/nba/betting_card.py`, `tests/test_archives.py`.
+  Checked against every OPEN lane before opening: no lane held either. **BOTH
+  RELEASED** — landed on `origin/main`, nothing held.
+- Hypothesis (written before testing): not a code defect in the rewriter.
+  `_artifact_root()` reads `SYNDICATE_NBA_ARTIFACT_ROOT` else
+  `<repo>/data/nba_source` and does NOT read `SYNDICATE_DATA_ROOT`, so the
+  control never reached this test and `source_web_text` returned `None`.
+- Falsification test (written before testing): the failure message must be the
+  `assertIsInstance(content, str)` line. **If it were instead an `assertIn`
+  route assertion over a non-`None` string, the hypothesis was WRONG.**
+  RESULT: `AssertionError: None is not an instance of <class 'str'>` at
+  `tests/test_archives.py:7019`. Confirmed. Corroborated by three more
+  readings — primary tree (has `data/`) 1 passed; worktree +
+  `SYNDICATE_NBA_ARTIFACT_ROOT` 1 passed in 5.67s; worktree +
+  `SYNDICATE_DATA_ROOT` after the fix 1 passed.
+- **WHAT THE LANE ACTUALLY FOUND.** Production, 2026-09-05: `404 / 0 bytes`
+  for `/nba/assets/betting-card-v2.js` and `404 / 30 bytes` for the `.css`,
+  while `/wnba/assets/betting-card-v2.{js,css}` serve `200 / 57,864` and
+  `200 / 17,881`, and `/nba/season/2026/betting-card` serves 200 referencing
+  both 404s with `?v=1` — the literal both-files-missing version fallback.
+  Production points `SYNDICATE_NBA_ARTIFACT_ROOT` at the DISK while the two
+  assets are git-tracked and in no publish allowlist, so on Render they exist
+  ONLY in the checkout, which a single-root lookup could never reach. Full
+  working: `state_basketball.md [nba-betting-card-assets-404]`.
+- Verification: **DONE for the code, OWED for the deployment.** Local A/B
+  under production's env shape, same process, only the resolver varying:
+  `404 0 / 404 30, ?v=1` -> `200 63,549 / 200 17,881, ?v=1781897524631551600`,
+  the pre-fix column reproducing production exactly. 3 mutations, each red
+  exactly where predicted (A pre-fix resolver -> fall-through + version RED;
+  B order reversed -> ordering guard RED only; C single-root version stamp ->
+  version RED only). `tests/test_archives.py` 1 failed / 380 passed -> **384
+  passed, 2 skipped, 0 failed**; NBA suite 139 passed.
+  **OWED, and it is one reading:** after a `web` deploy,
+  `GET /nba/assets/betting-card-v2.js` **404 -> 200** and the page's `?v=` no
+  longer `1`. A local run is evidence about the code, never about the
+  deployment — if it stays 404 the assets are on no candidate root on Render
+  and the move is to vendor them as WNBA does, not to add a fourth root.
+- Also corrected: `state_ledger.md [ci-suite-red-test]`, which claimed CI's own
+  gate had a red test. It does not and did not.
+- **`docs/ai_context/todo.md` NOT FILED — it is CLAIMED by OPEN lane
+  `accuracy-ledger-budget-raise`, so I reverted my edit rather than edit
+  across lanes** (`lane-postwrite-check.py` caught it; the shell write was not
+  blocked, only reported). The owed deploy and its one reading are recorded in
+  this block and in `state_basketball.md [nba-betting-card-assets-404]`, so
+  nothing is lost operationally — but the CANONICAL todo list does not carry
+  it. **No id was reserved**, so whoever files it should take the next free
+  one rather than assume `#647`. Text to lift is in this block verbatim.
+- Blocked by: none. Claims: NONE held.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
