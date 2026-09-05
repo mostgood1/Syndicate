@@ -23240,3 +23240,59 @@ criterion is confounded rather than passed. **A partial win that reclassifies th
 instrument** -- next step is the chunk-count bound, or making the summary
 computable off-worker at `budget=0` via the projected mirror, which dissolves the
 bound instead of re-tuning it.
+
+
+---
+
+## 2026-09-05T20:42:08Z — web — `a2afc7f1` — `#632` **THE BYTES ARE NOT PYTHON OBJECTS. The object-graph line is CLOSED.**
+
+`[lane web-oom-heap-roots, session b2b5b45b]` deploy `dep-dae7rgeq1p3s7389rhcg`,
+CLEAR preflight pinned to the target SHA, claim held by this lane.
+
+verify: **`/api/ops/python-heap`, escalating the node cap until the walk
+CONVERGED (`node_budget_exhausted: False` at 891,276 nodes) — a truncated walk
+under-reports, and an under-report reads as "not Python", which is the exact
+wrong conclusion, so a truncated result was refused by construction.**
+
+    pid 98, one process, one instant
+      process anon                373.17 MB   100.0%
+      live Python objects         105.56 MB    28.3%
+      NOT Python objects          267.61 MB    71.7%
+
+    truncated readings, shown to prove convergence mattered:
+      cap   200,000  ->  20.55 MB   7.2%   exhausted
+      cap   800,000  ->  97.75 MB  28.5%   exhausted
+      cap 2,000,000  -> 105.56 MB  28.3%   CONVERGED
+
+**Threshold was pre-registered BEFORE the reading: `>=70%` Python, `<=35%` not
+Python, in between explicitly a weaker result. 28.3% lands in the "not Python"
+band.**
+
+**CROSS-CHECK, and it is striking — but NOT paired, so it is corroboration and
+not proof.** An arena reading from a DIFFERENT worker HOURS earlier reported
+`bytes_in_allocated_blocks = 105.731 MB` against this walk's `105.56 MB` — two
+methodologically independent instruments (allocator bookkeeping vs an object
+graph traversal) agreeing to **0.17 MB, 0.16%**. Same process and instant would
+make it evidence; different epochs make it suggestive.
+
+Taking that older arena reading at face value, the decomposition is:
+`105.6 MB` live Python objects, `44.3 MB` pymalloc fragmentation, and
+`223.2 MB` **outside pymalloc arenas entirely** — which is exactly where the
+8-64MB anonymous mappings identified earlier must live.
+
+**WHAT THIS CLOSES.** Every remaining Python-level probe is a dead end for the
+71.7%: no root set, no retainer census, no per-request attribution can see bytes
+that are not Python objects. `#632` has spent this session narrowing an object
+graph that holds **28.3%** of the memory. The remaining candidates are
+C-extension buffers, allocator behaviour below CPython, and per-thread state.
+
+**WHAT IT DOES NOT CLOSE.** The census is still useful for the 28.3%, and its
+top row is real: `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` at **37.50 MB** and
+`_CARDS_CONTEXT_CACHE` at **12.67 MB** are genuine, bounded, nameable retainers.
+Capping them is worth doing on its own merits; it will not fix the OOM.
+
+**CAVEAT ON THE TABLE BELOW IT: the census ran on pid 99 while the heap ratio is
+pid 98.** The endpoint round-robins across workers, so the two are DIFFERENT
+processes — the ratio is internally consistent (anon and heap come from one
+call), but the root table must not be read as a breakdown OF that ratio. Pairing
+them would need a `proc_token` filter the endpoint does not offer.

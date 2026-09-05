@@ -5661,3 +5661,34 @@ believe what it does.
   rosters, no export and no StatsAPI) and
   `scripts/score_joint_pair_pricing.py` (four arms on identical marginals,
   bootstrap over GAMES).
+
+## 2026-09-05 — A TRUNCATED MEASUREMENT CAN GIVE THE RIGHT ANSWER FOR THE WRONG REASON. CONVERGE, THEN READ.
+
+`#632`. The deciding question was whether the retained bytes were Python objects
+at all. The walk that answers it is budgeted, and the budget changes the answer:
+
+    cap   200,000  ->   20.55 MB    7.2%   TRUNCATED
+    cap   800,000  ->   97.75 MB   28.5%   TRUNCATED
+    cap 2,000,000  ->  105.56 MB   28.3%   CONVERGED
+
+Every reading pointed at the same conclusion ("not Python"). **Only the last one
+is entitled to it.** At a 200k cap the walk had seen 7.2% of anon and would have
+supported the verdict just as comfortably — and been wrong by a factor of five
+about the size of the Python heap, which is the number the FOLLOW-UP work
+depends on.
+
+THE RULE: when a measurement is budgeted, the budget is a parameter of the
+result. Escalate until the instrument reports it did NOT truncate, and refuse to
+report a ratio computed from a truncated walk — build the refusal into the tool,
+because the truncated number will usually agree with whatever you already
+believe. A tool that returns a plausible number when it ran out of budget is
+`[2026-09-04] an instrument whose partial output is indistinguishable from its
+complete output` in a new costume.
+
+The corroboration is worth recording too, including its limit: pymalloc's
+`bytes_in_allocated_blocks` (`105.731 MB`) and an independent object-graph walk
+(`105.56 MB`) agreed to **0.16%**. Two instruments with nothing in common
+arriving at the same number is the strongest evidence this investigation has
+produced — and it is still only SUGGESTIVE, because the readings came from
+different processes hours apart. Same-instant would have made it proof;
+saying so is the difference between corroboration and a coincidence.

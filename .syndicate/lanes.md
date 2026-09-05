@@ -158,7 +158,7 @@ death, never life — do not invert it.
   free and `#241` is the precedent for assuming otherwise.
 - Blocked by: none.
 
-### web-oom-heap-roots — OPEN — opened 2026-09-05 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-heap-roots — CLOSED 2026-09-05 — opened 2026-09-05 — **FALSIFICATION TEST FIRED: the bytes are NOT Python objects.** Converged walk (891,276 nodes, not truncated) on pid 98: anon `373.17 MB`, live Python objects `105.56 MB` = **28.3%**, against a threshold pre-registered before the reading (`>=70%` Python / `<=35%` not). Corroborated to **0.16%** by pymalloc's `bytes_in_allocated_blocks` (`105.731 MB`) from an independent instrument — different process and hour, so suggestive not paired. **This CLOSES the object-graph line for the other 71.7%:** no root set, census or per-request attribution can see non-object bytes. Widening the roots first was still necessary and exposed three real bugs (proxy/mock attribute access executing code, `id()` reuse silently dropping subtrees, an imported class absorbing 27.0 MB as a world-root). Still worth capping on their own merits, NOT as an OOM fix: `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` 37.50 MB, `_CARDS_CONTEXT_CACHE` 12.67 MB. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: settle whether `#632`'s retained bytes are in the PYTHON HEAP AT ALL, and
   if so under which root. The census explains only 6.1% of growth, but its roots
   are container-typed module globals ONLY — so "elsewhere in Python" and "not in

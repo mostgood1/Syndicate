@@ -904,3 +904,30 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   was reached first* — the 20k/100k/400k runs are NOT quotable.
 * Worker anon grew **+96.8 MB in 13.7 min (~424 MB/h)** during this window,
   consistent with the fast regime measured earlier tonight.
+
+### `[web-oom-leak]` UPDATE 13 — **the retained bytes are NOT Python objects (28.3%). The object-graph line is CLOSED.**, 2026-09-05T20:4xZ `[session b2b5b45b]`
+
+* **Measured on pid 98 with a CONVERGED walk (891,276 nodes, not truncated):
+  process anon `373.17 MB`, live Python objects `105.56 MB` — `28.3%`.
+  `267.61 MB` (71.7%) is not Python objects.** Threshold pre-registered before
+  the reading (`>=70%` Python / `<=35%` not).
+* Convergence was the whole point: the same call read `7.2%` at a 200k cap and
+  `28.5%` at 800k, both TRUNCATED. **A truncated walk reads as "not Python" —
+  the correct answer here, reached for the wrong reason at any smaller cap.**
+* **CORROBORATION, not proof:** an arena reading from a different worker hours
+  earlier gave `bytes_in_allocated_blocks = 105.731 MB` against this walk's
+  `105.56 MB` — independent methods agreeing to `0.16%`. Different epochs, so
+  suggestive only.
+* Implied decomposition (same caveat): `105.6 MB` live objects, `44.3 MB`
+  pymalloc fragmentation, `223.2 MB` **outside pymalloc arenas entirely** —
+  where the 8-64MB mappings identified earlier must live.
+* **CLOSED: no Python-level probe can reach the 71.7%.** Root sets, retainer
+  censuses and per-request attribution are all blind to non-object bytes.
+  Remaining candidates: C-extension buffers, allocator behaviour below CPython,
+  per-thread state.
+* **STILL WORTH DOING, on its own merits and not as an OOM fix:**
+  `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` **37.50 MB** and
+  `_CARDS_CONTEXT_CACHE` **12.67 MB** are real, nameable, unbounded caches.
+* The census table and the heap ratio came from DIFFERENT workers (pid 99 vs
+  98) — the endpoint round-robins. The ratio is self-consistent; the table is
+  not a breakdown of it.
