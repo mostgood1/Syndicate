@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 826 rules `[generated]`
+## Index — 828 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5873,3 +5873,54 @@ copy (which is what `lane-guard` actually reads) and the owning lane's own
 worktree gave three different answers. A collision check names ONE substrate or it
 names nothing. Check the copy the guard reads AND the copy other sessions rebase
 onto, and say which you checked.
+
+## 2026-09-05 — FORBIDDEN: treating a cache path resolved off `__file__` as durable on Render. It is in the EPHEMERAL CHECKOUT, so every deploy erases it — and the erasure is invisible because the code refetches. `[lane ncaaf-live-resim-wire]`
+
+- **What I nearly shipped.** The NCAAF live re-sim's rating input is
+  `sp_ratings_<season>.json`, read through
+  `generate_smartsim2_ncaaf_projections.load_sp_ratings`. Both of its cache
+  locations resolve off `__file__` —
+  `sp_ratings_cache_path` (`Path(__file__).resolve().parents[1] / "data" / ...`)
+  and `ncaaf_historical_loader.DEFAULT_CACHE_DIR` (`parents[6] / "data" / ...`)
+  — which on Render is `/opt/render/project/`**`src`**`/data/...`, the checkout,
+  not `/opt/render/project/data/...`, the mounted disk. Wiring the producer
+  without noticing would have made its FIRST reading after its own deploy
+  `no_pregame_ratings` on every game, for the ~24 h until the next projections
+  autorun. A zero that is indistinguishable from an inert feature, arriving in
+  the shape of the very bug the lane existed to fix.
+- **THE ERASURE IS INVISIBLE BECAUSE THE FALLBACK WORKS.** `load_sp_ratings`
+  falls through a cache miss to CFBD and succeeds, so nothing anywhere reports a
+  lost cache. The tell is in the log line it already prints and nobody read:
+  refresh-worker, `2026-09-04T01:03:29Z` and `2026-09-05T01:15:49Z`, **both**
+  `[sp_ratings] season=2026 source=api teams=138 cached=/opt/render/project/src/...`.
+  `source=api` twice in a row, for a file the same process wrote yesterday, IS
+  the measurement — a cache that never reads `source=cache` is not a cache.
+- **THIS IS THE SECOND INSTANCE OF THE SAME CLASS, and the first is already in
+  this repo.** `#389`, NFL: "the generator wrote to
+  /opt/render/project/src/data/nfl_source (the ephemeral repo checkout) while
+  this guard read /opt/render/project/data/nfl_source (the mounted disk), so the
+  artifact existed and was invisible here, and every deploy discarded it." The
+  fix there was to route BOTH sides through one function. The class predicts
+  more: any `Path(__file__).parents[N] / "data"` in a producer is on the wrong
+  disk on Render, and the sport-root env vars
+  (`SYNDICATE_<SPORT>_SOURCE_ROOT`, `SYNDICATE_DATA_ROOT`) exist precisely
+  because of it.
+- **The rule going forward.** Before treating any file as a model INPUT, resolve
+  its path on the DEPLOYED service and say which of the two roots it lands in.
+  `/opt/render/project/src/` is erased by every deploy;
+  `/opt/render/project/data/` is not. A `__file__`-relative default is the
+  signal. And when a producer and a consumer disagree about where a file lives,
+  do not repoint the producer if that changes ANOTHER lane's refresh cadence —
+  mirroring to the durable root and reading the mirror keeps the producer's
+  behaviour intact, which is what this lane did rather than setting
+  `SYNDICATE_SP_RATINGS_CACHE_DIR` and freezing in-season SP+ at week 1.
+- **The corollary that caught my own bug.** The mirror-freshness branch compared
+  `_parse_utc_timestamp`'s NAIVE datetime against an AWARE
+  `datetime.now(timezone.utc)`, raising TypeError inside a bare `except`, so the
+  mirror was never trusted and every boot fell through to the loader. **It failed
+  in the SAFE direction and was therefore silent**: the ratings were still
+  correct, merely refetched. The only run that could distinguish the two was one
+  with no `CFBD_API_KEY` in the environment at all — i.e. reproducing the
+  post-deploy state rather than testing the happy path. `presence != reachability`
+  applies to a FALLBACK too: a working fallback hides whether the primary path
+  ever ran.
