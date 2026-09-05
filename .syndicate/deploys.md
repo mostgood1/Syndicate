@@ -22767,3 +22767,68 @@ attribution unavailable.** Two env changes had been deployed in the preceding 20
 minutes, so there was an easy and wrong story ready to be told. Recorded as
 UNTESTED, and the plateau delta is recorded as UNATTRIBUTED rather than dropped —
 it is real, it is just not ours.
+
+
+## 2026-09-04 evening — lane `soccer-player-producer` — FOUR DEPLOYS, each verified on a READING
+
+**THE OPERATIONAL FACT WORTH MORE THAN THE DEPLOYS: refresh-worker's idle
+windows are ~90 SECONDS WIDE AND ARRIVE ROUGHLY ONCE PER 40 MINUTES.** Measured
+across three waits tonight (75, 43 and 55 poll ticks at 30-35s). A hand-run
+"wait for CLEAR, read it, then deploy" loop MISSED the window twice — by the
+time preflight was re-read a new `run_mlb_daily_sim_job` had started. What
+worked was a poller that re-checks every 30s and POSTs inside the same tick that
+sees `CLEAR`, having re-verified ancestry at that moment. Treat "wait for idle"
+as a scheduling constraint, not a pause.
+
+**live-odds-worker `3223baa1`, live 20:37:36Z** — soccer roster producer.
+verify: all six supported leagues wrote `players_2026.csv` at 20:43:30Z, and the
+staleness guard fired on real data — `epl latest=364 previous=440
+latest_max_minutes=180 floor=450 too_early=True too_few=False`. `too_few=False`
+is the finding: the OLD row-count guard would have PASSED (364 > 220 floor) and
+filtered the squad against a season with 180 minutes played.
+
+**refresh-worker `6c8672b7`, live 21:36:35Z** — credibility unit + soccer
+producer + NFL date-key.
+verify: `SETTLED_SAMPLE date=2026-09-04 samples={'mlb': 684, 'nfl': 12,
+'soccer': 30, 'wnba': 59} credibility={'mlb': 1.0, 'nfl': 0.25, ...}` at
+**21:48:41Z**, twelve minutes AFTER go-live. Was `nfl: 18 / 0.36`. NFL stakes
+fall ~30.6%.
+**A NEAR-MISS WORTH RECORDING:** my first verifier matched a `SETTLED_SAMPLE`
+line from 21:32:48Z — four minutes BEFORE the deploy finished — and would have
+confirmed the fix off the OLD code. Gate every post-deploy log assertion on a
+timestamp strictly greater than `finishedAt`.
+
+**refresh-worker `ea1e3ac0`, live 22:50:57Z** — NFL `LA` (Rams) alias.
+verify: served `/api/board/book-grid?sport=nfl` — **unmatched 78 -> 0**, rows
+1251 unchanged, and the last non-zero reading was **100% Rams**, so zero is the
+alias landing rather than rows vanishing.
+**THE BOARD IS REBUILT, NOT SERVED FRESH.** At 22:51:10Z the deploy was already
+`live` and the board still read 78; at 22:52:41Z it read 0. A single reading at
+go-live would have reported failure. An earlier `299 -> 0` prediction failed for
+the mirror-image reason — it was verified against WEB, which SERVES the board,
+while refresh-worker REBUILDS it.
+
+**refresh-worker `3a9153f4`, live 23:26:26Z** — layer-2 model-edge value cap,
+measured-correlation wiring, the sim's joint producer, and a peer's dead
+hitter-strikeouts fix riding along.
+verify, served layer-2 shortlist:
+
+    model_edge  ev_component max  14.99 -> 4.97   (cap 5.0)
+    market_fair ev_component max   5.14 -> 5.20   CONTROL, uncompressed
+    batter_home_runs in top 50        25 -> 0
+    top-50 markets now: totals 34, spreads 15, h2h 1
+
+The `market_fair` control is what makes this trustworthy: only the model branch
+moved. USER-REPORTED symptom ("a lot of long shots at the top") is gone.
+Also verified: `[correlation_wiring] MEASURED_CORRELATION installed=True
+date=2026-09-04 games_with_joint=16` at 23:43:15Z, and independently
+`record["sim"]["joint"]` present on the published artifact — n=1000, 148 labels,
+28 players, 10,878 lower-triangle entries.
+**I PREDICTED `installed=False` AND WAS WRONG.** I said a sim RUN was owed
+before the joint could exist; refresh-worker runs them continuously and one had
+already produced joint-carrying artifacts. Wrong in the safe direction, but
+wrong. Related trap, live and pointing the OTHER way (peer-measured): the
+2026-09-05 ladders artifact is stamped 23:19:32Z, ~7 minutes BEFORE this deploy,
+and still reads pre-fix values — a build that predates the code, not an inert
+fix. **Pin artifact verification to the artifact's own `generated_at`, never to
+deploy go-live.**
