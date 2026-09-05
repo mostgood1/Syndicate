@@ -189,3 +189,75 @@ def test_the_staleness_gate_applies_to_ncaaf_too():
     attach_live_gamelines([old_quote], index)
     assert "live_aware" not in old_quote["projection"]
     assert live_edge_unavailable_reason(old_quote) is not None
+
+
+# --- THE JOIN KEY ITSELF, which every test above takes on faith -----------------
+#
+# ADDED 2026-09-05 by lane `edge-basis-moneyline`, after lane `ncaaf-live-resim-wire`
+# pointed out the shape and PRODUCTION proved it. Every test above builds BOTH
+# sides of the join from the single `AWAY, HOME` pair (`_grid_row` at the
+# `away_team`/`home_team` keys, `_snapshot` at `away_name`/`home_name`), so the
+# key match is a tautology and this file's "end to end" claim never covered the
+# one hop where the two sides come from DIFFERENT producers.
+#
+# What that hid, measured on production 2026-09-05 23:17:39Z: **257 of 257 rows
+# missed** with a perfect index (`index_size 8`, `skipped_no_team_names 0`). The
+# lens is keyed from the CFBD projections artifact and the grid from the ODDS
+# source, and they spell teams differently -- `('baylor','auburn')` against
+# `('baylor bears','auburn tigers')`. 18 green tests and a five-way mutation
+# check did not see it, because no fixture ever let the two sides disagree.
+#
+# These two are a PAIR and only the pair means anything (`off != on`): the same
+# grid row, joined against two lenses that differ ONLY in naming convention.
+
+GRID_NAMES = ("Baylor Bears", "Auburn Tigers")   # how the ODDS source spells them
+LENS_SHORT = ("Baylor", "Auburn")                # how the CFBD artifact spelled them
+
+
+def _named_row(away, home):
+    row = _grid_row()
+    row["away_team"], row["home_team"] = away, home
+    return row
+
+
+def _named_index(away, home):
+    snapshot = {"games": [{"away_name": away, "home_name": home,
+                           "gameLens": _priced_lanes()}]}
+    return build_live_gameline_index(
+        snapshot, sources=lens_sources_for_sport("ncaaf"), sport="ncaaf"
+    )
+
+
+def test_a_naming_convention_mismatch_is_VISIBLE_and_never_a_silent_zero():
+    """The producer ran, the join missed, and the counters MUST separate the two.
+
+    This does not assert that short and long names match -- they must not, and
+    nothing here fuzzy-matches. It asserts the failure is DIAGNOSABLE: an index
+    that is non-empty next to zero edges and a named refusal is the signature
+    that distinguishes "no producer" from "producer fine, key wrong". That
+    distinction is what was missing while 257 of 257 rows missed in silence.
+    """
+    index = _named_index(*LENS_SHORT)
+    assert len(index) == 1, "the producer ran -- this is not an empty-index case"
+
+    row = _named_row(*GRID_NAMES)
+    coverage = attach_live_gamelines([row], index)
+
+    assert coverage["index_size"] == 1
+    assert coverage["rows_live_gameline_edged"] == 0
+    assert coverage["withheld_by_reason"]["no_live_gameline_projection"] == 1
+    assert "live_aware" not in row["projection"], "a key miss must not fabricate a live row"
+    assert "live_gameline" not in row
+
+
+def test_and_the_same_row_DOES_join_when_the_lens_uses_the_grids_convention():
+    """`off != on`. Without this the test above passes on a broken join too."""
+    index = _named_index(*GRID_NAMES)
+    row = _named_row(*GRID_NAMES)
+    coverage = attach_live_gamelines([row], index)
+
+    assert coverage["index_size"] == 1
+    assert coverage["rows_live_gameline_edged"] == 1
+    assert row["projection"]["live_aware"] is True
+    # and the label this lane fixed is correct on the joined row
+    assert row["projection"]["edge_basis"] == "live"
