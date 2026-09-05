@@ -739,3 +739,46 @@ and wnba **14**. All labelled `pregame` by construction.
 relaxing it — see `[board-model-edge-coverage]`. The bound is still the guard that
 drops the worst live rows; `edge_basis` being correct is a precondition for
 revisiting it, not a reason to.
+
+**TWO CORRECTIONS 2026-09-05 ~23:1xZ, both raised by lane `ncaaf-live-resim-wire`
+and both verified here before being accepted.**
+
+1. **`"no live re-sim wired for ncaaf"` IS REFRESH-WORKER'S COMMIT, NOT WEB'S,
+   and I attributed it to the wrong service twice.** `build_book_grid_artifact`
+   calls `attach_live_gamelines_for_sport` (`book_grid_artifact.py:318`) and
+   writes the `live_gamelines` block at `:425`; its only caller is
+   `run_refresh_worker.py:5371`. The route `board_book_grid_api`
+   (`intelligence.py:2676`) PREFERS `read_book_grid_artifact` and falls through to
+   a serve-time pivot only when the artifact is absent — so on mlb/soccer/ncaaf I
+   read a worker-built artifact, and on wnba (`live_gamelines: null`, a different
+   payload shape) I read the fallback. **What misled me was an accurate docstring
+   about the OTHER path**, on `board_layer2_shortlist_api`: "unlike
+   `/api/board/book-grid` above — which is a serve-time pivot and computes its own
+   grid". True of the fallback, false of what production served.
+   **The reading itself stands; only the service does not.** It decides which
+   deploy discharges it, so it is not a detail.
+2. **PROVEN BY THE STRING FLIPPING WHEN REFRESH-WORKER DEPLOYED, which is
+   stronger than either attribution argument — and my first attempt at this
+   proof was itself a stale-artifact reading.** At 23:09:37Z I read
+   `{"supported": false, "reason": "no live re-sim wired for ncaaf"}` and was
+   about to record "still inert". That artifact's `generated_at` was 23:06:54Z
+   and refresh-worker deployed `ffe8714b` at **23:07:14Z — 20 seconds later**, so
+   the reading described the OLD code. `[gate verification on artifact mtime]`
+   caught in the act. Re-read at 23:13:53Z against an artifact 3 seconds old:
+   **`supported: true`, the string GONE.** `262fd2cf` is inside `ffe8714b`. A
+   string that flips exactly when refresh-worker deploys, while web sat live and
+   unchanged throughout, settles the service.
+
+3. **THE REFUSAL MOVED ONE STAGE DOWN, AND THE FIX IS STILL INERT ON NCAAF —
+   for a different reason than either lane expected.** 23:13:50Z artifact:
+   `supported: true`, `reason: "no published live-lens snapshot"`,
+   `rows_live_gameline_edged: 0`, 97 live NCAAF rows, **0 carrying a
+   `live_gameline` block and 0 carrying `edge_basis`**. The sport is registered;
+   the producer is deployed; the snapshot is not being written.
+   `/api/ops/live-lens/snapshot-index?sport=ncaaf` → `snapshot_present: false`,
+   `no_snapshot_at_path`, `/opt/render/project/data/live/ncaaf_live_lens.json`.
+   **CONTROL RUN, and it is what makes that a finding rather than a null:** the
+   same endpoint on the same web service reports `snapshot_present: true` for
+   **mlb, wnba AND soccer** in the same directory. So the path resolves, the
+   web/worker transport is not the confound, and the absence is NCAAF-specific.
+   Owed by `ncaaf-live-resim-wire`, NOT `ncaaf-live-resim` as written above.

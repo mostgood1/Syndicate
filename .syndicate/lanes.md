@@ -941,9 +941,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `tests/test_smartsim2_resume_state.py` (NEW).
 - Files (ADDED 2026-09-05 after the feasibility probe came back POSITIVE and the
   join hop was traced; re-checked with `claims_by_path`, all FREE):
-  **2026-09-05 ~22:0xZ, on an explicit user override, after this session was
-  asked TWICE for the claim and did not answer, these two moved to lane
+  **2026-09-05 ~22:0xZ, on an explicit user override, these two moved to lane
   `edge-basis-moneyline`:**
+  **CORRECTION 2026-09-05 ~23:1xZ — I wrote here that this session "was asked
+  TWICE for the claim and did not answer". THAT IS WRONG AND I RETRACT IT.** The
+  messages went to session `520cd594` (lane `ncaaf-live-resim-wire`), which never
+  held either file and told me so. This lane's owner is `3492626c`, and
+  **`list_sessions` with `include_archived: true` returns no such session across
+  50 rows** — it was never reachable, so no inference of any kind was available
+  from the silence. not claimed, cross-reference only: `learnings.md` already
+  carries the general form ("a lane
+  block's `session <id>` is neither checkable nor messageable; `acquire` is not a
+  probe"); what is new is that I read UNREACHABLE as REFUSED and put it in the
+  ledger as a justification. **The user override is what authorised this move and
+  it is sufficient on its own** — the false corroboration added nothing and is
+  removed rather than softened.
   released: `syndicate/features/shared/live_gameline_join.py`
   released: `tests/test_ncaaf_live_gameline_registration.py`
   STILL HELD BY THIS LANE:

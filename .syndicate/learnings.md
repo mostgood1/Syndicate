@@ -6032,3 +6032,32 @@ gives the wrong verdict.
   present state cannot tell you what caused it.** This is the same error shape
   as banking a success against the wrong cause, run in reverse - a cost paid
   against a cause that was never there.
+**CORRECTED THE SAME DAY, BY MEASUREMENT, AFTER A PEER LANE TESTED THE
+PRESCRIPTION I HAD JUST LANDED.** The rule above says to write every release as
+"its own marker-led line". **The MARKER-LED half is right; the OWN-LINE half is
+actively harmful, and I am striking it.** Hoisting a path OUT of a Files line
+moves `_claimable_prefix`'s cut point for everything that followed it, so the
+edit that releases the path you meant to release can silently CLAIM one you did
+not. Run against the real parser on
+`evaluation-ledger-projected-mirror`'s actual line:
+
+    ORIGINAL                     claims artifact_publisher.py   (author says RELEASED)
+                                 leaves run_refresh_worker.py FREE (author says CLAIMED)
+    (a) hoist to its own bullet  releases artifact_publisher.py  <- what I prescribed
+                                 **and NEWLY CLAIMS run_refresh_worker.py**
+    (b) marker moved BEFORE the  releases artifact_publisher.py
+        path, line shape kept    run_refresh_worker.py stays FREE
+
+(a) was my advice and it would have taken a third lane's file
+(`ncaaf-live-resim-wire` had staged edits in `run_refresh_worker.py`) with nobody
+told. (b) removes exactly one pair and nothing else changes hands. Landed by that
+lane as `744689c9`.
+
+THE CORRECTED RULE: **move the MARKER in front of the path; do not move the PATH.**
+And the part that generalises past this parser — a ledger edit is a MUTATION OF A
+CLAIM SET, so diff the claim set, not the text: compute `claims_by_path` before
+and after and assert the delta is exactly the pair you intended, **including that
+nothing else moved**. I had written "assert the full expected map including the
+paths that must NOT move" and then, two paragraphs later, prescribed an edit that
+violates it. A rule and its worked example must be checked against each other;
+the example is what people copy.
