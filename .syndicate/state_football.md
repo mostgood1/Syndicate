@@ -1623,3 +1623,30 @@ The reading that closes it: `/api/ops/live-lens/snapshot-index?sport=ncaaf`
 showing `sources_seen {live_resim: N}` with N equal to the live-and-resumable
 count, and a live NCAAF row on the board carrying an edge whose
 `projection.live_aware` is true.
+
+**FOUND ON THE WAY, AND IT IS NOT NCAAF'S: A LIVE MONEYLINE EDGE IS LABELLED
+`edge_basis: "pregame"` `[measured 2026-09-05, affects mlb and wnba equally]`.**
+`live_gameline_join._apply_verdict` sets
+`edge_basis = "live" if live_projected is not None else "pregame"`; the
+DISTRIBUTION branch passes `live_projected`, the MONEYLINE branch does not — yet
+`price_moneyline` is called with `model_prob=hit["home_win_prob"]`, the live
+number. Measured with the real functions: a live probability of **1.0** against
+`market_fair_prob_over` **0.310** produced `edge_vs_market_pct` **69.0**, which
+is `(1.0 - 0.310) * 100`; the pregame pairing `(0.977 - 0.310)` gives 66.7 and is
+NOT what came out. The row was labelled `pregame`. That label exists precisely
+because "a reader cannot recover" the pairing (its own comment, measured 7/7 on
+the served shortlist 2026-08-16), so being wrong on the moneyline path defeats
+what it was added for. **PINNED, NOT FIXED** — `tests/test_ncaaf_live_gameline_
+registration.py` asserts the current value with the reason stated, because
+correcting it changes the label on every live moneyline row on three sports'
+boards and belongs to a change that can measure that.
+
+**THE JOIN HOP IS PROVEN END TO END** `[commit 7d9ec94e]`, not just the
+producer: `build_game_lens -> build_live_gameline_index -> attach_live_gamelines
+-> live_edge_policy`, with the OPPOSITE outcome asserted for a refused game (the
+index is empty, `live_aware` is never set, the pregame `model_prob_over` is
+untouched, the suppression reason stands). Two things the first draft of that
+test got wrong are kept as comments: the grid row had no `age_seconds`, so the
+staleness gate — which sits ABOVE the market branch, so a newly registered sport
+cannot route around it — refused every case before any model reached it, and the
+refusal tests "passed" for a reason unrelated to the re-sim.
