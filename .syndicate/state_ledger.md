@@ -336,6 +336,52 @@ stale as a comparand: it records `total_testcases: 11745` against this tree's
 different `data/` mirror. Its 19-failure set is NOT like-for-like, which is
 most of why the raw diff read as 27.
 
+**RUN 4 (2026-09-06 09:51-10:25, tree `58302f07`): 5 failing, AND THEY ARE NOT
+STALE — the first suite-SCALE defect this sequence has isolated.**
+
+    5 failed, 15,510 passed, 51 skipped, 1 xfailed, 459 subtests passed
+    in 2048.09s (0:34:08)      collected=15567  failing=5
+
+**THE REPRODUCTION, ALL AT ONE TREE — this is the whole finding:**
+
+    30 passed      the two files ALONE at `58302f07`
+    2,334 passed   192 files (`test_b*`+`test_n*`) under -n auto --dist=loadscope
+    5 failed       the full 15,567-test run, same SHA, same invocation
+
+Not order-within-a-file, not parallelism as such, and NOT the tree moving: the
+run's own header printed `tree 58302f07, clean` and the files had been run green
+at that SHA minutes before launch. **It requires full-suite SCALE** — 192 files
+in parallel does not trigger it.
+
+    3x tests/test_ncaaf_live_state_worker.py   (lane: session local_801e0e46)
+    2x tests/test_board_build_timing.py        (lane suite-order-pollution)
+
+**THE NCAAF THREE ARE THE SAME TESTS AS RUN 3 AND A DIFFERENT CAUSE.** In run 3
+they failed because the tree predated their producer (genuinely stale). Here the
+producer exists, they pass standalone, and only scale breaks them. Same names,
+opposite diagnosis — which is precisely why a failure list must be re-derived
+rather than remembered.
+
+**`test_board_build_timing` PASSED in run 3, then `51f60573` (23:18, "two
+clock/scheduler races") landed, and it fails at scale now.** Two readings, not
+separable from here: the fix is incomplete and a third race shows only at scale,
+or the fix introduced this. Surfaced to that lane as both, asserted as neither.
+
+**MECHANISM NOT ESTABLISHED, and recorded as a LEAD not a finding:** process AGE
+— a `--dist=loadscope` worker alive 34 minutes is not a fresh one, and that is the
+first of the five mechanisms `suite-order-pollution` already catalogues. A
+34-minute reproduction is expensive; nobody should treat this paragraph as a
+diagnosis.
+
+**THE PROVENANCE HEADER (`ad2ee32e`) EARNED ITSELF ON ITS FIRST REAL RUN.** Being
+able to say *same SHA, opposite result* in one step is the entire reason this is
+a real finding instead of a fourth staleness false alarm — which is exactly what
+it would have looked like the day before.
+
+**Non-hermetic writes: FOURTH observation, stable at 8 paths** (the 6 tracked
+plus `data/settlement_inputs/` and a date-stamped
+`reports/intelligence/game_chips_<date>.json`). Preserved, never discarded.
+
 **RUN 3 (2026-09-05 22:31-23:09, HEAD `0ad1480d`, idle, `-n auto`): 31 -> 12 -> 4.**
 
     4 failed, 15,455 passed, 51 skipped, 1 xfailed, 459 subtests passed
