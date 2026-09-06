@@ -1729,6 +1729,55 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   HEAD; they touch no file this lane changed.
 - **Not deployed and none needed:** `vendor/**` and a checker, no `render.yaml`.
 
+### web-oom-non-malloc-anon — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: NAME the `~150-205 MB` per web worker that is anonymous memory and is
+  **not `malloc`**, as a PARTITION of process anon that reconciles — not a list
+  of candidates.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_anon_partition.py`.
+  NOT claimed, deliberately: `syndicate/blueprints/ops.py` — held by lane
+  `ncaaf-live-resim-wire`; the reading rides the existing `/api/ops/memory`.
+- **WHAT IS ALREADY ESTABLISHED (`UPDATE 25`, measured today):** the glibc arena
+  fills to a **~390 MB ceiling in ~30 min** and then stops, reproducible across
+  three windows on pid 97 (`387.7`, `388.2->395.4`, `390.1`). `hblkhd` is
+  `0.4 MB`, so the rest is not glibc's mmap path either. At ~50 min: pid 97 anon
+  `595.6`, glibc `390.5` (65.6%), **NOT glibc `205.1` (34.4%)**; pid 98 anon
+  `515.7`, NOT glibc `142.1` (27.6%). That residual grows in BOTH phases
+  (`+55.2` over the ramp, `+35.2` over UPDATE 23's mature window), so once the
+  arena saturates it is the whole OOM trajectory.
+- **THE THREE AUTHORITIES ALREADY EXIST; NONE IS READ TOGETHER.** `parse_smaps`
+  (kernel, per-region `Anonymous:`), `glibc_mallinfo2` (arena + `hblkhd`),
+  `log_pymalloc_arena_stats` (CPython `_debugmallocstats`, real arena totals off
+  the line so the arena SIZE is never assumed). Nothing reads all three AT THE
+  SAME INSTANT and subtracts, which is the only way to get a residual that means
+  anything.
+- Hypothesis, written before measuring: **CPython's pymalloc arenas dominate the
+  residual.** On Linux CPython mmaps its arenas rather than `malloc`ing them, so
+  they are anon that no allocator metric in this investigation has counted.
+  Thread stacks (`GUNICORN_THREADS=4`) and `.so` private-dirty data are the other
+  named terms.
+- **THE OVERLAP TEST, and it is the load-bearing one.** If pymalloc were built
+  WITHOUT `ARENA_USE_MMAP` its arenas would come from `malloc` and already be
+  inside glibc's number — adding them would DOUBLE COUNT. So the partition is
+  refused when `glibc + pymalloc + file_backed + stack > anon`, and that
+  inequality is itself the test of which build this is. It must not be assumed
+  from the CPython version.
+- Falsification test: the residual stays large after every named term is
+  subtracted — then it is none of pymalloc, stacks or `.so` data, and the size
+  buckets in `anon_mmap_by_size_mb` are the next lead rather than a fourth guess.
+- Verification: a partition that reconciles against `smaps_rollup` anon with a
+  NAMED residual, on both workers, plus agreement between `parse_smaps`'s own
+  total and `_process_anon_mb()`. Every term reported with the instrument that
+  produced it.
+- COST (`#241`, and smaps is heavier than `mallinfo2`): own flag
+  `SYNDICATE_ANON_PARTITION`, default OFF, its own longer throttle, and it
+  reports its own `duration_ms`. `get_all_process_memory_snapshot()` is reached
+  from `log_all_process_memory()` at worker stage checkpoints.
+- **DENOMINATOR (`UPDATE 25`'s own mistake, one lane ago):** per-process anon
+  from `_process_anon_mb()`, NEVER the container cgroup. Pids reporting an
+  IDENTICAL anon is the tell that this went wrong.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
