@@ -25037,3 +25037,57 @@ so it is the same number, pinned by a test asserting
 the `board_rows` explanation was wrong. **The next reading should be taken on a
 tick after `922a68dc` deploys**; until then production still logs the old
 `board_rows` semantics on the odds emitter.
+
+
+## 2026-09-06 20:5xZ — **`verify: OWED` ON `1f032074` IS DISCHARGED. A first5 board row now takes a REAL first-five Kalshi contract, in production, and every one of the six arrived via the `_alt` collapse.** `[lanes mlb-first5-kalshi-execution + kalshi-alt-line-join, both closed]`
+
+The obligation opened 2026-09-06T02:59:27Z and could not be read that night (the
+slate carried no joinable row) or at 09:55 CDT (1,996 MLB rows, **all** `full`).
+Segments arrive near first pitch, which is what the timing hypothesis predicted.
+
+**THE MONEY-LEVEL READING, with its denominator:**
+
+    kalshi SEGMENT orders (live 597 + paper 218)      45
+    ...carrying a KXMLBF5* ticker                      6      <- was 0 of 2,853, ever
+
+    KXMLBF5TOTAL-26SEP061610ATHSEA-7      first5  totals_alt   6.5 over   filled
+    KXMLBF5TOTAL-26SEP061610NYYSD-7       first5  totals_alt   6.5 over   filled
+    KXMLBF5TOTAL-26SEP061410AZHOU-2       first5  totals_alt   1.5 under  filled
+    KXMLBF5TOTAL-26SEP061340CHCMIA-7      first5  totals_alt   6.5 over   filled
+    KXMLBF5SPREAD-26SEP061340SFNYM-SF2    first5  spreads_alt -1.5 away   filled
+    KXMLBF5SPREAD-26SEP061335BOSBAL-BAL3  first5  spreads_alt -2.5 home   filled
+
+**ALL SIX ARE `_alt` ROWS.** Not one is a main-line row. Without `21aac548`'s
+collapse none of them could exist, which is as direct an attribution as this
+platform usually gets: the population was 0 for the entire history of the
+ledger, and the six that appeared are exactly the shape the change admitted.
+
+**THE SPREAD ORIENTATION IS CORRECT ON BOTH**, checked rather than assumed —
+this is the defect that put 11 orders on the club they were fading.
+`-SF2` names SF at strike 1.5 on a row `line=-1.5 side=away`, and SF is the away
+club at SF@NYM. `-BAL3` names BAL at 2.5 on `line=-2.5 side=home`, BAL being
+home at BOS@BAL. **Named club at a NEGATIVE line in both cases.**
+
+**AND `KXMLBF5SPREAD` EXECUTES, WHICH I HAD CALLED STRUCTURALLY
+NEAR-UNMATCHABLE.** On 2026-09-06 I measured Kalshi listing F5 spreads at only
+1.5/2.5 against board main-line rows at 0.5/-0.5/-1.0 and concluded 0 matches
+was structural. True of MAIN-LINE rows and false of the board, because 6 of 8
+`spreads_alt` rows sat exactly on those two strikes. The join now reports
+`first5->KXMLBF5SPREAD: 22` on a single tick.
+
+**THE JOIN-SIDE COUNTERS, now readable because of `kalshi-join-counters-logged`:**
+
+    19:24:32 [kalshi_odds] BOARD_JOIN matched=433 alt_main_collisions=4
+             segment_matched_series={'first5->KXMLBF5SPREAD': 22, 'first5->KXMLBF5TOTAL': 41}
+    20:10:38 [portfolio_commit] KALSHI_BOARD_JOIN matched=331 alt_main_collisions=2
+             segment_matched_series={'first5->KXMLBF5SPREAD': 11, 'first5->KXMLBF5TOTAL': 25}
+
+`alt_main_collisions` reads 2-4 per tick, so the price tie-break I shipped is
+firing at roughly the ~1% rate the 553-row sample predicted (1 of 78). It is
+deciding real cases and it is now visible, which it was not when I shipped it.
+
+**WHAT THIS DOES NOT SAY.** All six are `paper:kalshi`. **No LIVE-money F5 order
+has been placed**, so the execution path beyond paper is still unexercised. The
+grading path is also untested for these: `bet_status.segment_refusal` refuses to
+grade a segment order, so these six will need the venue's own settlement or they
+sit ungraded. Neither is a defect found; both are unmeasured.
