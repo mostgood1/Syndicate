@@ -351,6 +351,41 @@ in the same hours), both real and settled.
   bootstrap lines; the 4,050 MB hour had **37**.
 - **platform-wide accounting events** — workers are flat during web's spikes.
 
+**THE SPIKES HAVE STOPPED AND HAVE NOT RECURRED — 44 hours, ZERO buckets over
+500 MB** (2026-09-05 00:00Z .. 09-06 19:00Z, 1.64 GB total, max bucket 311.8 MB).
+Ten such buckets occurred Sep 1-4. **The regime ended around 2026-09-04 20:00Z**
+and nothing I can find was changed to end it, which is unsatisfying rather than
+reassuring: an unexplained stop is not a fix.
+
+**THREE MORE MECHANISMS ELIMINATED `[2026-09-06, second pass]`:**
+
+- **The Key Value instance is not a hidden meter.** `red-d88bvljbc2fs73epfhhg`
+  (`syndicate-refresh-state`, starter, 236 MB, 4,541 keys) returns **404 for
+  `/v1/metrics/bandwidth`** — it has no bandwidth line of its own, so traffic to
+  it can only be attributed to its client. Current rate ~16-19 ops/sec, 12
+  clients.
+- **NOT the intelligence-state background loop on web.** The arithmetic fit
+  almost perfectly — a 30-60 s loop reading a ~17 MB blob, x2 gunicorn workers,
+  is ~4.1 GB/h against a 4,050 MB bucket — and it is **wrong**:
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is `false` on web and
+  has been **`true` only on refresh-worker since at least 2026-08-31**
+  (`deploys.md`, read off the live env-vars at the time, not inferred). **Web
+  never ran that loop.** A hypothesis matching the magnitude to two significant
+  figures was still false.
+- **No hidden fourth service.** The workspace has 16 services; the other 13,
+  including three cron jobs, are all `suspended`.
+
+**THE ONE CONTRADICTION THAT REMAINS UNRESOLVED, stated so the next attempt does
+not re-derive it:** served-bytes vs metered has no stable ratio.
+`09-01 22:00-23:00` served 2,707 MB / metered 2,809 (1.04). `09-04 17:00-18:00`
+served 699 / metered 4,050 (0.17). `09-05 04:00-05:00` served **969 / metered
+33.9** (0.035) — and that hour's served volume EXCEEDS the whole day's metered
+total, so internal traffic cannot be billed at 1:1. Two hours with the same
+dominant endpoint and the same internal URL, billed 30x apart. **Either the meter
+is measuring something none of these logs contain, or the log is materially
+incomplete in exactly the high-volume hours.** I could not separate those from
+outside.
+
 **INSTRUMENT FACTS LEARNED HERE, both of which produced wrong readings first:**
 buckets are **RIGHT-labelled** (bucket `15:00` covers 14:00-15:00; confirmed twice
 against request counts), and **values SETTLE UPWARD for hours** after a bucket
