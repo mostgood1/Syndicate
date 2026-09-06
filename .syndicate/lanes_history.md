@@ -28758,3 +28758,302 @@ lost no protection and no open lane left the session-start digest.
 - Blocked by: the claim above.
 
 
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-09-06
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### ncaaf-h1-kalshi-series — **CLOSED-VERIFIED 2026-09-06** — `KXNCAAF1HTOTAL` registered and live (`fd704135` in `58302f07`, 14:55:30Z); the real title 'Over 6.5 1H points scored' classifies `status=ok`. Winner and spread deliberately NOT registered — both are declined by name upstream and the spread is the margin-vs-handicap class. — opened 2026-09-06 — session 3492626c
+- Goal: NCAAF first-half board rows can resolve a Kalshi ticker. Today 24 of 200
+  Layer 2 shortlist rows are `segment=h1` (15 `totals`, 8 `spreads`, 1 `h2h`,
+  all ncaaf, EV up to 5.14%) and NONE can execute: `sport_for_series` and
+  `segment_for_series` both return None for every `KXNCAAF1H*` series, so
+  `classify_market` refuses at the first gate. Production reports
+  `GAP series=KXNCAAF1H count=400 reason=recognised_but_no_board_market`.
+- Files: `syndicate/features/shared/kalshi_catalogue.py`,
+  `tests/test_ncaaf_h1_kalshi_series.py` (NEW)
+- Hypothesis: this is the SAME two-gate defect `mlb-first5-kalshi-execution`
+  found for `KXMLBF5TOTAL` (`d2b060c8`, now CLOSED) — absent from `SERIES_SPORT`,
+  so the markets are fetched every tick and discarded. Kalshi lists
+  `KXNCAAF1H` (winner, 'TCU wins the 1st half'), `KXNCAAF1HTOTAL` and
+  `KXNCAAF1HSPREAD`; all three appear in production titles.
+- Falsification test: if `sport_for_series("KXNCAAF1HTOTAL")` is already
+  non-None on the DEPLOYED sha, the diagnosis is wrong and the blocker is
+  downstream in the board join, not the registry.
+- Verification: a replay of real production `KXNCAAF1HTOTAL` contracts against
+  real `segment=h1` shortlist rows going matched=0 -> matched>0, with
+  `segment_has_no_matching_series` still firing alongside. NOT a deploy in this
+  lane.
+- SCOPE DECISION, following the precedent this repo already set:
+  `KXNCAAF1HSPREAD` will be added to the SEGMENT table but **NOT** registered as
+  tradeable. `KXMLBF5SPREAD` was deliberately excluded for the same reason — a
+  Kalshi spread states a MARGIN where the board writes a HANDICAP, the defect
+  that once put 11 orders on the club they were fading. Separate risk class,
+  separate change. That leaves 16 of the 24 rows addressable (15 totals + 1
+  h2h), and the 8 spread rows deliberately unaddressed.
+- Blocked by: none. `mlb-first5-kalshi-execution` CLOSED 2026-09-06 and released
+  its claim on `kalshi_catalogue.py`.
+
+### prop-region-knob — **CLOSED-VERIFIED 2026-09-06** — the knob is shipped and DELIBERATELY OFF: probed on the vendor, `eu` buys ONE SOFT BOOK (2->3, onexbet) for ~1M credits/month, and `us_ex` buys NOTHING because novig/prophetx do not quote soccer player shots at all. Finding in `state_soccer.md [soccer-prop-book-coverage]`. — opened 2026-09-06 — session 3492626c
+- Goal: make prop-call region coverage EXPRESSIBLE per sport, so widening one
+  sport's books is a costed decision instead of an all-or-nothing global. No
+  behaviour change and no credit spend by default.
+- Files: `syndicate/features/shared/odds_regions.py`,
+  `scripts/fetch_soccer_oddsapi_props_local.py`,
+  `tests/test_prop_region_knob.py` (NEW)
+- Hypothesis: measured on the served board 2026-09-06 -- soccer rows carry 12
+  books overall, but `oddsapi_props` rows are **164 of 174 single-book**
+  (fanduel 135, betrivers 39). `us` is not thin in general; it is thin for
+  player props, where only those two US books quote. The blocker to widening is
+  CONFIG SHAPE: `ODDS_API_REGION` (singular) is read by SIX fetchers across four
+  sports and is UNSET in production, while `ODDS_API_REGIONS` (plural, set to
+  `us`) has exactly one reader. So there is no way to widen soccer props without
+  also widening NFL and NCAAF props.
+- Why that matters in money: `odds_regions.py` records the billing split --
+  a region on the GAME-LINE call costs ~30K/month, the same region on PROP calls
+  costs **~1M/month**, because OddsAPI bills props per EVENT. The single global
+  knob puts three sports on the expensive side at once, unpriced.
+- Falsification test: if `ODDS_API_REGION` turns out to be SET in production,
+  the "six fetchers silently default to us" premise is wrong and this is a
+  live-config question, not a shape one.
+- Verification: `prop_regions('soccer','us')` returns `us` when the knob is
+  unset (today's behaviour, asserted) and `us,eu` when set -- off != on -- plus
+  a test that the soccer props fetcher actually READS it, since an unread knob
+  is the exact defect `odds_regions.py` was written about (`ODDS_API_REGION` was
+  inert for NCAAF and nobody noticed).
+- NOT IN THIS LANE: turning `eu` on. That is a ~1M/month spend and its own
+  decision; this lane only makes it possible to take that decision for one sport.
+- **ACCEPTANCE CRITERIA FOR EVER TURNING THE KNOB ON, corrected by lane
+  `shortlist-prop-row-duplicates` `[2026-09-06]`.** My first version was
+  "widen one sport, then check `books_quoting` rises while ROW COUNTS STAY
+  FLAT". **Flat is too strong and would report a WORKING widen as a broken
+  merge**: a newly-reached book lists bets no current book lists -- a player, a
+  line, a market with no row before -- and those are genuine coverage, not
+  duplicates. The right instrument joins before/after on `_row_key`:
+
+      colliding `_row_key`s          stay 0     <- the merge held
+      books_quoting on keys in BOTH  rises      <- the real coverage number
+      keys only in AFTER             expected   <- new coverage, not a fault
+      keys only in BEFORE            regression <- the one to worry about
+
+  **An unfolded name spelling appears as a COLLISION, never as a new key** --
+  which is why the collision count is the alarm and the row count is not. That
+  belongs in the criteria permanently, not just for one before/after.
+- **ORDER MATTERS AND IT ALREADY WENT THE RIGHT WAY.** `player_name` folding
+  into the market-identity key (`odds_book_quotes.fold_market_identity_term`,
+  read by `book_grid._instance_key`) shipped FIRST. Unfolded, this knob would
+  have produced a **false negative**: more regions -> more books -> more
+  spellings -> extra ROWS instead of extra columns in `book_prices`, so
+  `books_quoting` stays ~2 while duplicates grow. The knob would have looked
+  inert while making things worse.
+- **`limit=2000` IS NOT OPTIONAL on any census here.** `/api/board/layer2-shortlist`
+  defaults to **200** and truncates silently: a peer's first census of the
+  duplicate defect returned 200 of 1,996 rows and reported **0 collisions** --
+  a clean bill of health for a defect that was present. Same trap bit me one
+  step earlier the same day: I read `h1=0` off the default and nearly called it
+  MOOT while the rows sat below the cut.
+- **STOPPING CONDITION:** soccer prop names are diacritic-dense (`Can Yılmaz
+  Uzun`, `Nicolò Casale` on the 2026-09-06 slate). Today the fold is untested
+  against divergent vocabularies because BOTH books share one; a third region's
+  books may not. So widen ONE sport, re-measure collisions globally (not just
+  the widened sport), and stop if they leave zero.
+- **Two instruments agree on the gap**: 164 of 174 single-book off the served
+  board (this lane), 199 prop rows / fanduel 193 / betrivers 39 off the
+  shortlist (`shortlist-prop-row-duplicates`). Different endpoints, same shape.
+- Blocked by: none. All four files unclaimed on origin/main.
+
+### kalshi-match-series-observable — **CLOSED-VERIFIED 2026-09-06** — which contract priced a row is now a READING on both emitters: `segment_matched_series` / `segment_refused_series` / `alt_main_collisions`, clean in production 20:10Z. It DISPROVED the alarm that built it — every segment match lands on `KXMLBF5*`, zero on `KXMLBTOTAL`, and the guard refused that pairing 59x in one join. — opened 2026-09-06 — session 3492626c
+- Goal: make the SERIES a board row matched observable, so "which contract did
+  this row price from" is a reading rather than an inference.
+- Files: `syndicate/features/shared/kalshi_board_join.py`,
+  `tests/test_kalshi_match_series_observable.py` (NEW)
+- Why: a live first5 row (MIL@CIN, over 4.5) showed `kalshi 0.870` against a
+  7-book consensus of `0.4926`. 0.87 is what a WHOLE-GAME over 4.5 is worth, and
+  Kalshi lists BOTH `KXMLBTOTAL-26SEP061210MILCIN-5` ("Over 4.5 runs scored")
+  and `KXMLBF5TOTAL-26SEP061210MILCIN-5` ("First 5 innings: Over 4.5 runs") --
+  same game, same strike. `_row_market()` strips the segment by design, so both
+  key as `(event,'totals',4.5)`. I could NOT tell which one priced the row:
+  board rows carry no `venue_ticker` (0 of 2000) and the join emits no match
+  record.
+- Hypothesis, REVISED DOWNWARD before building: probably NOT a mismatch. Both
+  paths are segment-aware -- `_segments_agree` computes `first5 == full` -> False
+  at both `matches.append` sites, and `book_grid._INSTANCE_FIELDS` carries
+  `segment`. The likely truth is a WIDE ASK on a thin first5 market, with
+  `edge_pct=-38.5` being the system correctly declining it.
+- Falsification test: if the emitted series for that row reads `KXMLBF5TOTAL`,
+  the mismatch hypothesis is dead and the wide-ask reading is confirmed. If it
+  reads `KXMLBTOTAL`, a guard that provably computes False is being bypassed and
+  that is a much bigger finding.
+- Verification: a log line naming, per segment board row, the series it matched;
+  plus refusal counts keyed by series so the guard's behaviour is visible when it
+  DOES fire. Reachability asserted on emitted content, not on a symbol.
+- NOT IN THIS LANE: any change to matching behaviour. This is instrumentation
+  only -- the join's decisions are unchanged.
+- Blocked by: none. `kalshi_board_join.py` unclaimed; `portfolio_commit.py` and
+  `ops.py` are claimed by others and are deliberately NOT touched.
+
+### web-oom-trim-ab — CLOSED 2026-09-06 (DEFERRED, harness committed) — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **NOT RUN: web takes a deploy every 20-30 min and the experiment needs ~84 uninterrupted minutes.** The first OFF arm died after **3.4 clean minutes** when a peer deployed at `18:22:36`; a restart resets every memory metric, so it was discarded rather than salvaged. Deferred to a quiet window by user decision rather than shortened — a short settle produces a FALSE NEGATIVE, because a fresh worker has not accumulated the free arena space the trim returns. **`scripts/malloc_trim_ab.py` is committed and runnable** (`arm OFF|ON <golive-ts>`, then `compare`): it discards an arm that sees a mid-window restart, refuses a verdict when the arms' request volumes differ by >25%, and judges on CONTAINER UNRECLAIMABLE rather than on the trim's own reported savings — the numbers that produced the retracted counterfactual. Flag is OFF in production; code live and inert.
+- Goal: settle whether automatic `malloc_trim` is NET-POSITIVE, by observing the
+  service with the flag OFF and ON over matched windows.
+- Files: `scripts/malloc_trim_ab.py` (NEW, committed). Env
+  `SYNDICATE_MALLOC_TRIM_AUTO` on web.
+- Falsification test: ON is equal or HIGHER than OFF on container unreclaimable.
+  Then the trim costs page faults and buys nothing, and the flag stays off — a
+  real finding that closes the question.
+- Verification owed by whoever runs it: two arms, identical treatment, no restart
+  inside either window, request volumes within 25%.
+- **LEDGER NOTE:** this block was re-added after I destroyed it myself with
+  `git checkout origin/main -- .syndicate/` while it was still uncommitted. The
+  marker then named a lane with no block anywhere — the same violation a peer
+  caught me on earlier the same day. Commit ledger edits BEFORE syncing.
+
+### web-oom-fragmentation — CLOSED 2026-09-06 — opened 2026-09-06 — **THE LANE'S TEST COULD NOT FIRE, AND THAT IS ITSELF THE FINDING.** Clean 31-min window on both workers, trim OFF, no restart, under a HELD claim: the main arena moved only `+7.2`/`+8.3 MB` while anon rose `+42.4`/`+26.9` — so ~80% of the growth is in arenas `mallinfo2` CANNOT SEE (it reports the main arena only; `GUNICORN_THREADS=4` means per-thread secondary arenas exist). With the main arena flat there was nothing to attribute, so the formal verdict is NOT a result. **What IS established, and it is robust across every reading today: `in_use` sits at 62-82 MB against 536-677 MB of process anon — live program data is under 12% of the process, and it FELL over this window while anon rose.** The program is not retaining more. Earlier hand-read segments (17%, 5%) describe the BOOT phase, when the main arena fills to ~330-390 MB with ~80% free. NEXT: `malloc_info` per-arena XML, re-read for the per-arena split rather than for total coverage. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: test whether `#632`'s growth is glibc ARENA FRAGMENTATION rather than
+  allocation volume — with the trim OFF, so nothing I did is in the measurement.
+- Files: scratchpad only (a poller against `/api/ops/glibc-malloc`). No code
+  changes, no file claims.
+- THE HINT IS ALREADY IN THE DATA. Across every `mallinfo2` reading taken today,
+  **`in_use` stayed between 54 and 72 MB while the arena ranged 148-275 MB**:
+
+        15:5x  arena 275.5   in_use 72.1   free 203.4
+        16:2x  arena 198.5   in_use 54.2   free 144.3
+        16:2x  arena 148.7   in_use 54.4   free  94.4
+
+  A live footprint that flat, under an arena that large, is the signature of
+  free space that cannot be reused.
+- Hypothesis: `in_use` stays flat while `arena` and `free_in_arena` climb
+  together. glibc extends the heap because free chunks cannot satisfy incoming
+  requests — not because the program is holding more.
+- Falsification test: `in_use` climbs WITH the arena. Then the program really is
+  retaining more, fragmentation is not the story, and the search goes back to
+  what holds it.
+- Verification: >= 25 readings over >= 30 min on both workers with the trim OFF,
+  reporting `in_use` trend against `arena` trend, and the ratio of one to the
+  other. A restart inside the window discards it.
+- WHY IT MATTERS: fragmentation and retention have DIFFERENT FIXES. Retention
+  means finding an owner. Fragmentation means the allocation SIZE MIX
+  (`M_MMAP_THRESHOLD`, arena count, a different allocator) — and no amount of
+  hunting for a Python object would ever have found it.
+- **LEDGER NOTE, two defects in this lane's own bookkeeping.** (1) The OPEN block
+  WAS committed at lane-open (`df83d8a0`, 29 insertions) but was **never
+  LANDED** — it sat unpushed in this session's worktree for the lane's entire
+  life, so `origin/main` carried no record of the lane at any point it was
+  running. **Committing is not what makes a lane visible to peers; landing is.**
+  A worktree has its own `lanes.md`, and every collision check a peer runs reads
+  `origin/main` — so an unlanded lane claims nothing, no matter how carefully
+  its block is written. The correction matters because the wrong version teaches
+  the wrong fix ("remember to commit") instead of the real one ("land it"). (2) It sat **ABOVE the `## OPEN` heading**, which is the `#466`
+  violation: `check_lane_invariants.py` reported `web-oom-fragmentation` **zero
+  times**, and I read that null as "my lane is not implicated in the contested
+  files" when it actually meant **the checker could not see the lane at all**.
+  The blast radius was nil only because this lane claimed no files. The block
+  below is re-added at close, from the staged blob, after taking upstream's file.
+- Blocked by: none.
+
+### segment-refusal-deploy — **CLOSED-VERIFIED 2026-09-06** — segment orders no longer grade against the whole-game actual; refusal live on web+refresh-worker, `by_segment` added to `/api/ops/execution/ledger-summary`, and the 173 already-mis-settled orders re-graded (53 wrong, 30.6%, control reproduces the ledger 172/173). — opened 2026-09-05 — session 3492626c
+- Goal: `bet_status.segment_refusal` live on BOTH web and refresh-worker, so no
+  segment row can become stakeable while the settlement key has no segment
+  dimension.
+- Files: NONE CLAIMED by this reconstruction.
+- **RECONSTRUCTED, NOT RECOVERED.** `check_lane_invariants.py` reported this slug
+  as a lane marker with a block in NO ledger file. It is not a stale marker: the
+  lane demonstrably exists and is ACTIVE.
+  Evidence used, all of it outside `lanes.md`:
+  (a) `.syndicate/deploy_claims/web.json` and `refresh-worker.json` both name
+  `"holder": "segment-refusal-deploy"`, `holder_session` 3492626c, acquired
+  2026-09-05T20:50:51Z / 20:51:19Z;
+  (b) `.syndicate/deploy/preflight/web.json` (written 21:29:30Z, target
+  `94c8ac13`) and `refresh-worker.json` (21:57:12Z, target `eb7951fe`) both
+  CLEAR under the same holder;
+  (c) lane `ncaaf-segment-capture` names it twice, including "Stakeability
+  blocked on the grading deploy, which belongs to lane `segment-refusal-deploy`".
+  `git log -S` over `.syndicate/` finds the slug in ZERO commits, so the block was
+  never committed and upstream cannot have it — nothing was lost by a rebuild.
+  The GOAL above is quoted from `ncaaf-segment-capture`'s HARD CONSTRAINT bullet.
+  **Everything else this lane did is unrecorded. The owning session should
+  overwrite this block rather than build on it.**
+- Blocked by: none known.
+
+### intelligence-query-payload-dedup — CLOSED 2026-09-06 — opened 2026-09-06 — **THE FLAG TAKES 32.8% OFF THE SERVED PAYLOAD OF WEB'S SINGLE LARGEST ENDPOINT, VERIFIED ON THE WIRE.**
+- **Outcome, measured on the served payload (same question, same minute, flag off vs on):** `1,323,150 -> 889,702 B gzipped` = **32.8%**, across two deploys (`2b3c1974` 9.0%, `56f80c4d` a further 22.9%). **~0.34 GB/day off** the endpoint that is 81% of web's chronic egress.
+- **What it removed, and it was three DIFFERENT kinds of waste needing three contracts:** unreferenced (`quote`'s `book_prices`/`other_sides`/`venue_basis`/`best_any_book`/`fair_method`/`quote_seen_age_seconds`, plus `trace`/`score_breakdown` — 16.1% from `quote` alone, which was 33.8% of every row); ALL-NULL (six `movement` keys, `null` on 1,497/1,497, dropped on the VALUE not the name); and BYTE-IDENTICAL duplicates (`market_key`/`game_pk`/`selection`) which ARE read and so became **rebuildable aliases**, declared and restored client-side.
+- **Correctness verified ON THE WIRE, all three lists, 1,082 rows each:** 11 dropped fields on **0** rows, 7 kept fields on **all 1,082**, **0** null `movement` values, `quote.fair_probability` on **1082/1082**. Page renders clean with the rebuild active (`run-syndicate`, exit 0). 18 tests; 779+233 in the surrounding suites.
+- **THE PROOF STANDARD IS THE DURABLE PART.** No field was dropped on a grep. Zero hits across BOTH consumers in every access form (`.name`, `["name"]`, bare word, string literal) AND nothing consuming the parent generically (`Object.keys`/`entries`/`for..in`/`JSON.stringify`/spread). **`fair_probability` forced that standard: it greps 0 in the HTML and is used 34 times in the other consumer.** A single grep would have "proved" it droppable.
+- **TWO THINGS I GOT WRONG, both recorded:** I pitched the lane at ~15.7% by projecting from UNCOMPRESSED bytes and shipped 9.0% — measure the quantity you are billed on. Then the second trim's gzipped saving EXCEEDED its raw one (22.9% vs 18.1%), because removing repetitive structures helps compression — so the first error was not even directionally reusable. And my original premise (collapse the three lists) would have **shipped wrong data**: they differ on 903 and 1,723 of 2,004 rows.
+- **DOES NOT put the workspace under 25 GB.** The ~68% of the bill sitting in ~10 unexplained spike buckets is untouched — `state_worker.md` `[render-egress-spikes]`.
+- Files taken by explicit user decision from two lanes with unreachable sessions; releases recorded in both blocks. Measurements: `deploys.md`. Narrative: `lanes_history.md`.
+- Blocked by: none.
+
+### kalshi-join-counters-logged — **CLOSED 2026-09-06 — VERIFIED IN PRODUCTION** — opened 2026-09-06 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
+- **Testable outcome MET.** Both emitters carry the counters on the deployed SHA
+  `bd658209`, read from the LINES rather than the source: `[kalshi_odds]
+  BOARD_JOIN ... alt_main_collisions=4 segment_matched_series={...}` at
+  19:24:32Z and `[portfolio_commit] KALSHI_BOARD_JOIN ... alt_main_collisions=2
+  ...` at 20:10:38Z. 22 tests green.
+- **It immediately paid for itself.** `segment_matched_series` is what showed
+  `first5->KXMLBF5TOTAL: 41` and `first5->KXMLBF5SPREAD: 22` matching in
+  production — the evidence that discharged the `verify: OWED` on `1f032074`
+  (`deploys.md`, this date). A counter nobody could read would have left that
+  question open another day.
+- `alt_main_collisions` reads 2-4 per tick, consistent with the ~1% collision
+  rate measured on a 553-row sample before shipping.
+- Files: `pipeline/kalshi_odds_refresh.py`, `pipeline/portfolio_commit.py`,
+  `tests/test_kalshi_join_counters_logged.py`. All landed on `origin/main`.
+- Nothing owed.
+
+### venue-fanin-segment-key — **CLOSED 2026-09-06, DUPLICATE — no code written** — opened 2026-09-06 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
+- **Another session had already found and fixed this, two hours earlier and with
+  a better measurement.** `e77be334` (18:24:03Z). They replayed MIL@CIN through
+  `apply_venue_quotes_to_grid` on byte-identical deployed code and reproduced all
+  four production numbers exactly, then showed the row takes NO price with only
+  the F5 contract present — ruling out "thin F5 market", which my reading did not.
+  I opened this lane at ~19:00Z without checking `origin/main` first.
+- **The diagnosis in my lane hypothesis was nonetheless independently correct**
+  (the two halves are asymmetric; the venue side is segment-qualified via
+  `classify_market`, the board side is not), and so was the danger I flagged:
+  adding `segment` to the board key alone would kill venue pricing platform-wide.
+  Their fix is symmetric and counts before it refuses.
+- **THE DEFECT IS STILL LIVE, AND THAT IS THE PART WORTH CARRYING FORWARD.**
+  `e77be334` is on `origin/main` and deployed NOWHERE — refresh-worker
+  `11a6a829` and web `2b3c1974` both lack `_segment_disagrees`, checked by
+  content — and `_SEGMENT_REFUSAL_ENABLED = False`, so even once deployed it
+  COUNTS without refusing. Their staging is deliberate (size the coverage cost
+  first); the consequence is that the board keeps taking full-game prices on
+  segment rows until someone measures and flips the flag.
+- Scope correction they established and I had left open: execution stays guarded
+  by the order path's `_segments_agree`, so this corrupts the BOARD, EV, the
+  shortlist and board-price grading — **not a fill**. Smaller than my framing.
+- Files: none touched. Evidence:
+  `.syndicate/findings_2026-09-06_venue_fanin_has_no_segment.md`, whose
+  correction header now leads with all of the above.
+- Blocked by: none. Nothing owed from this lane.
+
+### suite-leak-generator — CLOSED-FALSIFIED 2026-09-06 — opened 2026-09-06 — session b9bc926d-f167-4923-9344-eac7e86a5761 — **THE HYPOTHESIS WAS WRONG AND THIS LANE'S OWN FALSIFICATION CONDITION FIRED.** Measured over a full `-n auto` suite: **8 leak records across ~15,600 tests, 5 files, no dominant fixture, and ZERO env-var leaks.** Leaked threads are `syndicate-background-loop-bootstrap` x2, `syndicate-intelligence-state-loop` x2, `memory-watchdog` x2, `syndicate-venue-poll` x1, subprocess pipe readers x2 — mostly IDLE loops, not the CPU burners that poison `process_time`. **I RETRACT my own earlier claim that this suite "leaks CPU-burning daemon threads by fixture design"** — extrapolated from finding a few by hand; the rate does not support it. The ambient-root problem I expected to dominate is ABSENT at teardown: the existing isolation fixtures work. **NO cross-cutting change was made, because there is no generator to cut off.**
+- Goal (met, negatively): decide by MEASUREMENT whether the recurring scale-dependent failures share a fixable common source. They do not.
+- Files: none — the instrument (`leakdetect.py`) was deliberately never committed to `tests/`.
+- **INSTRUMENT NOTE, because it nearly produced a false finding.** v1 hooked `pytest_runtest_setup`/`teardown`, which snapshots INSIDE those phases — so conftest's autouse `_isolate_reports_root` read as leaking `SYNDICATE_REPORTS_ROOT` from **all 1,312 tests observed**, i.e. a detector indicting the fixture that protects you. Rewritten as a `pytest_runtest_protocol` hookwrapper (brackets setup + call + teardown) and validated BOTH WAYS against a canary — one clean test, one leaking — before any conclusion was drawn. The first canary was itself wrong (`target=lambda: None` finishes before teardown, so its thread was never leaked).
+- Verification: 8 records, listed above, from a full instrumented run (1 failed / 15,602 passed / 41m50s).
+- Blocked by: none.
+
+### ncaaf-live-state-fresh-record — CLOSED-VERIFIED 2026-09-06 — opened 2026-09-06 — **GOAL MET ON A FULL RUN THAT IS ITSELF THE HARD CASE.** `a9611409`, `-n auto --dist=loadscope`: **1 failed / 15,641 passed / 35m49s**, and the one failure is `test_malloc_trim_release` (`web-oom-malloc-trim`'s, handed over in `767c8f9a`). The three ncaaf tests are GREEN in a run lasting 35m49s — far past the 240 s staleness window that used to age the record out, which is the regime they failed in. A LONG run is the stronger test of this fix, not the weaker one. — session b9bc926d-f167-4923-9344-eac7e86a5761
+- Goal: the three `test_ncaaf_live_state_worker` failures stop recurring at full-suite scale. They pass alone, were "fixed" once by `34bcecc8`, and came back in the next full run.
+- Files: `tests/test_ncaaf_live_state_worker.py`.
+  Collision check: named by no OPEN lane's `- Files:` block — `ncaaf-live-state-to-worker` closed after `34bcecc8`.
+- **CAUSE FOUND AND REPRODUCED DETERMINISTICALLY.** `FRESH_RECORD["fetched_at"] = time.time()` was evaluated ONCE AT MODULE IMPORT. `live_game_state` refuses a worker record older than `_worker_record_max_age_seconds()` = **240 s** for a date still moving (`live_game_state.py:342`) — correctly. A full suite runs 18-42 min and under `--dist=loadscope` a worker imports the module long before reaching these tests, so the "fresh" record aged past the gate. The THREE that failed are exactly the three using the constant unmodified; the two that override `fetched_at` on purpose never failed. Sixth instance of this session's family.
+- **A FALSE REPRODUCTION CAME FIRST.** Ageing `tests.test_ncaaf_live_state_worker` changed nothing (23 passed) because `tests/` is NOT a package — pytest imports it as top-level `test_ncaaf_live_state_worker`, so I mutated a different module object. Against the real one: exactly those 3 fail, 20 pass.
+- Verification (done): `fresh_record()` factory stamps at CALL time. IMMUNE BY CONSTRUCTION — the ageing plugin now reports "no import-time timestamp left to age", 23 passed. AND the gate is still exercised: mutating `_worker_record_max_age_seconds` to 1e9 turns FOUR staleness tests red, so immunity was not bought by weakening the file.
+- Blocked by: none.
+
+### bandwidth-spike-tripwire — CLOSED 2026-09-06 — opened AND closed 2026-09-06 — session 9e40eb04 — **BUILT AND VALIDATED against the known 4,050 MB spike; it reproduces the hand measurements exactly.**
+- **Outcome:** `scripts/bandwidth_tripwire.py` (`9d4e487f`). Fed `2026-09-04T18:00` it returns **edge 2.63 MB / 131 requests, app served 698.84 MB / 4,126 access lines**, the 17:26 deploy in-window, and the other two services flat at 10.2 / 27.2 MB — matching every figure measured by hand during the investigation. Validation capture committed at `reports/bandwidth_spikes/web_20260904T180000Z.json`.
+- **IT DEMONSTRATED ITS OWN REASON FOR EXISTING.** Publish volume for that SAME window now reads **2,040.9 MB against the 2,737.7 MB measured two days earlier** — the logs aged out underneath. Capturing late loses evidence silently, which is what happened to every pass of this investigation.
+- **Four instrument traps baked in as CODE, not comments**, each having produced a wrong reading: right-labelled buckets; settle-before-judging (a bucket grows up to 39x over ~50 min, so a fresh LOW reading is INCOMPLETE, not low); edge-vs-app logs captured separately because **the gap between them IS the open question**; and 429 AND 5xx retried. It also reads publish REQUEST BODIES from the worker side, which no response-size count can see.
+- **14 tests, none touching the network.** One found its own flakiness — the unsettled-bucket case was built as `now-10min` then truncated, which yields the previous hour's label late in the hour; it failed at `:55` and passed at `:05`. Fixed, with the reason recorded in the test.
+- **WHAT IT DOES NOT DO, deliberately:** it does not claim what the meter counts. That contradiction is unresolved (`state_worker.md` `[render-egress-spikes]`); this is evidence-gathering, not an argument.
+- **THIS BLOCK WAS RECONSTRUCTED AT CLOSE, and that is the lesson.** The lane was opened in a WORKTREE and never committed; a later `git reset --hard origin/main` in that same worktree discarded it, so it existed on no ref while the code it governed shipped. **Open a lane and PUSH it before starting the work** — an uncommitted lane block is not a claim, it is a note in a scratch directory, and `check_lane_invariants` cannot see it to complain.
+- Usage: `--check`, `--watch --interval-minutes 20`, `--capture <bucket>`. Idempotent, so `--watch` can run indefinitely.
+- Blocked by: none.
