@@ -162,6 +162,46 @@ def split_segment_market_key(sport: str, market_key: object) -> tuple[str, str] 
     return segment_market_keys(sport).get(key)
 
 
+#: The ALTERNATE-LINE spelling of a market -> the main-line one. Derived from
+#: `_MARKET_BASES` rather than written out, so adding an `alternate_*` base
+#: there cannot leave a second table behind to drift.
+_ALT_TO_BASE: Mapping[str, str] = {
+    _MARKET_BASES[f"alternate_{base}"]: _MARKET_BASES[base]
+    for base in ("totals", "spreads")
+    if f"alternate_{base}" in _MARKET_BASES and base in _MARKET_BASES
+}
+
+
+def base_market_for_alternate(market: object) -> str | None:
+    """`totals_alt` -> `totals`. None when the market is not an alternate.
+
+    WHAT THE `_alt` SUFFIX MEANS, because the answer decides whether collapsing
+    it is a correction or a defect. `alternate_totals` is OddsAPI's market for
+    THE SAME BET AT NON-MAIN LINES. A row `totals_alt / 4.5 / over` and a row
+    `totals / 4.5 / over`, same event and same segment, are one wager priced by
+    two feeds. The suffix names WHICH FEED, not what was bet.
+
+    THAT IS NOT TRUE OF THE OTHER TWO DISTINCTIONS THIS JOIN GUARDS, and the
+    difference is the entire safety argument for collapsing here and nowhere
+    else. A `first3` row against a full-game contract is a different PORTION of
+    the game ($7.08, 2026-08-28). A Kalshi spread states a MARGIN where the
+    board writes a HANDICAP, so pairing on magnitude backs the opposite CLUB
+    (11 orders, 2026-08-26). Those pair genuinely different wagers and must keep
+    refusing. This one does not, so refusing it only costs coverage: measured
+    2026-09-06, 6 of 8 `first5` `spreads_alt` rows sat exactly on Kalshi's only
+    two F5 spread strikes while the 3 main-line rows sat at 0.5/0.5/1.0, so the
+    series could not execute at all.
+
+    `None` rather than echoing the input, so a caller can tell "not an
+    alternate" from "an alternate that collapsed to itself" and leave the former
+    exactly as it found it.
+    """
+    key = str(market or "").strip().lower()
+    if not key:
+        return None
+    return _ALT_TO_BASE.get(key)
+
+
 def normalize_segment(value: object) -> str:
     """Empty/None/unknown -> `full`.
 

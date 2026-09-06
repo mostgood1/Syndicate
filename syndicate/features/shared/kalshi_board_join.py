@@ -346,14 +346,29 @@ def _row_market(row: Mapping[str, Any]) -> str:
     that happened not to occur.
     """
     from syndicate.features.shared.market_keys import canonical_market_key
-    from syndicate.features.shared.market_segments import split_segment_market_key
+    from syndicate.features.shared.market_segments import (
+        base_market_for_alternate,
+        split_segment_market_key,
+    )
 
     raw = str(row.get("market") or "").strip().lower()
     sport = row.get("sport")
     split = split_segment_market_key(sport, raw)
     if split is not None:
-        return split[1]
-    return canonical_market_key(sport, raw) or raw
+        raw = split[1]
+    else:
+        raw = canonical_market_key(sport, raw) or raw
+    # THE ALTERNATE SUFFIX COMES OFF TOO, and for the same reason the segment
+    # suffix does: it is not part of the bet's identity. `totals_alt / 4.5 /
+    # over` and `totals / 4.5 / over` on one event and segment are one wager
+    # that two feeds priced -- see `base_market_for_alternate`, which carries
+    # the argument and the counter-examples that must KEEP refusing.
+    #
+    # Measured 2026-09-06: without this, Kalshi's F5 spread series could not
+    # execute at all. It lists exactly two strikes, 1.5 and 2.5; the board's
+    # main-line `first5` spread rows sat at 0.5/0.5/1.0 and every row at 1.5 or
+    # 2.5 was an `_alt` row the index refused to consider.
+    return base_market_for_alternate(raw) or raw
 
 
 def _event_key(row: Mapping[str, Any]) -> tuple[str, str, float] | None:
@@ -611,6 +626,119 @@ def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str, str] | 
     )
 
 
+def _row_price(row: Mapping[str, Any]) -> float | None:
+    """The best book price on a board row, or None. American odds.
+
+    `quote.best_any_book.price` -- NOT `quote.american`, which this row shape
+    does not carry: measured over 553 production shortlist rows, `american` was
+    absent on all 553 and `best_any_book` present. Keyed to the field the record
+    STORES, which is a rule this repo has already paid for twice.
+    """
+    quote = row.get("quote")
+    if not isinstance(quote, Mapping):
+        return None
+    best = quote.get("best_any_book")
+    if not isinstance(best, Mapping):
+        return None
+    try:
+        return float(best.get("price"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _collapse_duplicate_bets(
+    board_rows: Sequence[Mapping[str, Any]],
+) -> tuple[list[Mapping[str, Any]], int]:
+    """One row per BET, so a contract cannot pair with the same wager twice.
+
+    WHY THIS IS REQUIRED BY THE ALT COLLAPSE, and why it is not optional. Once
+    `_row_market` stops distinguishing `totals_alt` from `totals`, a main-line
+    row and an alternate row for the same event/line/side/segment become the
+    SAME KEY. `by_key`/`by_event` hold LISTS and the join iterates every
+    candidate, so without this the contract would produce TWO match records --
+    two board rows, both stakeable, both resolving to the same ticker. That is
+    DOUBLE EXPOSURE on one bet, not a cosmetic duplicate.
+
+    (The scope for this change described the hazard as "whichever row the index
+    happens to keep". That was wrong, and reading the iteration before writing
+    the code is what caught it. An arbitrary pick would have been the harmless
+    version.)
+
+    `_row_key` is used as the identity because it already IS the bet:
+    event, canonical market, player, line, side, segment. A row it cannot key
+    (no event id, no numeric line) is passed through untouched rather than
+    collapsed against something -- the same fail-safe direction `_match_key`
+    takes, since not-indexed means no order.
+
+    THE TIE-BREAK IS PRICE, AND IT IS DECLARED RATHER THAN INCIDENTAL. The
+    surviving row is the one with the better American price for that side --
+    real price shopping, worth `+0.74`/`+2.43` ROI points on this platform.
+    Measured 2026-09-06, the single collision on a 553-row slate held
+    `ev_pct` `+3.48` against `-0.37` for one bet, so "whichever came first"
+    would have decided a 3.85-point swing by list order. Missing price loses to
+    a present one; an exact tie keeps the MAIN line over the alternate, which is
+    deterministic and favours the deeper book.
+    """
+    seen: dict[tuple[str, str, str, float, str, str], int] = {}
+    out: list[Mapping[str, Any]] = []
+    collisions = 0
+    for row in board_rows:
+        key = _row_key(row)
+        if key is None:
+            out.append(row)
+            continue
+        prior = seen.get(key)
+        if prior is None:
+            seen[key] = len(out)
+            out.append(row)
+            continue
+        incumbent = out[prior]
+        # ONLY THE COLLISION THIS CHANGE CREATES, and this bound is deliberate.
+        #
+        # Rows whose RAW market names are already identical were colliding
+        # before the alt collapse existed and are a DIFFERENT, pre-existing
+        # condition -- measured 2026-09-06: 10 of them on a 553-row MLB slate,
+        # every one a full-game PLAYER PROP (`batter_rbis` x4,
+        # `batter_total_bases` x3, `batter_hits_runs_rbis` x2, `batter_hits`).
+        # Collapsing those would silently change the prop book, which is this
+        # venue's largest surface by order count, on the back of a change scoped
+        # to alternate LINES. They are left exactly as they were and reported
+        # separately; whoever picks that up needs to establish whether two rows
+        # for one prop are two BOOKS (keep both, price-shop) or a duplication
+        # defect (fix upstream), and that is not answerable from here.
+        if str(row.get("market") or "").strip().lower() == str(
+            incumbent.get("market") or ""
+        ).strip().lower():
+            out.append(row)
+            continue
+        collisions += 1
+        if _better_row(row, incumbent):
+            out[prior] = row
+    return out, collisions
+
+
+def _better_row(challenger: Mapping[str, Any], incumbent: Mapping[str, Any]) -> bool:
+    """Should `challenger` replace `incumbent` for the same bet? See the caller."""
+    from syndicate.features.shared.market_segments import base_market_for_alternate
+
+    a, b = _row_price(challenger), _row_price(incumbent)
+    if a is not None and b is not None:
+        if a != b:
+            # American odds: the larger number pays the bettor more, on both
+            # sides of zero (+150 beats -110 beats -550).
+            return a > b
+    elif a is not None or b is not None:
+        return a is not None
+    # Equal prices, or neither priced: keep the MAIN line.
+    challenger_is_alt = base_market_for_alternate(
+        str(challenger.get("market") or "").strip().lower()
+    ) is not None
+    incumbent_is_alt = base_market_for_alternate(
+        str(incumbent.get("market") or "").strip().lower()
+    ) is not None
+    return incumbent_is_alt and not challenger_is_alt
+
+
 def _segments_agree(row: Mapping[str, Any], verdict: Mapping[str, Any]) -> bool:
     """Does this board row cover the same portion of the game as this contract?
 
@@ -790,6 +918,7 @@ def join_kalshi_to_board(
     # player to key on, so `by_key`'s (market, player, line) cannot reach it --
     # the player slot would be empty for every row and every market.
     by_event: dict[tuple[str, str, float], list[Mapping[str, Any]]] = {}
+    board_rows, alt_main_collisions = _collapse_duplicate_bets(board_rows)
     for row in board_rows:
         key = _board_key(row)
         if key is not None:
@@ -1363,6 +1492,14 @@ def join_kalshi_to_board(
         # commence-time split, and it is reported even when zero so that "no
         # doubleheader today" and "the fix did nothing" stay distinguishable.
         "doubleheader_resolved": doubleheader_resolved,
+        # How many board rows described a bet another row already described --
+        # main line and alternate line for the same event/line/side/segment.
+        # Reported even when zero, for the same reason `doubleheader_resolved`
+        # is: it is the rate that says whether the price tie-break in
+        # `_collapse_duplicate_bets` is deciding anything, and a tie-break
+        # nobody can see the frequency of is one nobody will revisit. Measured
+        # 1 of 78 collapsed keys on a 553-row MLB slate.
+        "alt_main_collisions": alt_main_collisions,
         "kalshi_key_sample": kalshi_keys,
         # One refused title per series: what grammar is missing, not how many.
         "unreadable_titles": unreadable_titles,
