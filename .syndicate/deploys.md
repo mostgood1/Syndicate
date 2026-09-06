@@ -7,6 +7,99 @@
 
 
 
+## 2026-09-05 23:51:59Z - 2026-09-06 00:11Z — refresh-worker `933e9beb` — **BOTH OWED READINGS TAKEN. The durable mirror survived a deploy; the lens now reaches the board and 74-83 rows carry `live_aware`. THE EDGE IS STILL WITHHELD, and I found exactly why — it is one line, upstream of me, and it should NOT be applied without a decision.** — lane `ncaaf-live-resim-wire`
+
+`deploy=dep-daeam7vqj5pc73asjt5g trigger=api`, posted on a CLEAR window (0 jobs)
+past the 25-min spacing, so it discarded no board build (`#563`).
+
+**verify, READING A — the durable SP+ mirror survived a deploy. MET, and it is
+DISCRIMINATING.** The first boot read `sp_ratings_source: loader` (predicted: the
+mirror did not exist yet, so it went to CFBD once and wrote it). This boot:
+
+    2026-09-06T00:01:07.191Z [refresh_worker] NCAAF_LIVE_RESIM
+      {"coverage": {"games": 51, "live_resimmed": 9, "refused": 42,
+        "refusals_by_reason": {"game_final": 16, "game_not_in_progress": 7,
+                               "no_live_state": 18, "no_period": 1}},
+       "sp_ratings_source": "durable_mirror", ...}
+
+`loader` a second time would have meant the mirror is not surviving and the
+post-deploy ratings gap is still open. It read `durable_mirror`. **That closes the
+trap this lane's hypothesis was written about.**
+
+**verify, READING B — the board. THE JOIN IS PROVEN; THE EDGE IS NOT.** Do not
+read the first half as the second.
+
+    00:06:47Z build   live_aware 83   h2h 7   index_size 9   sources_seen {live_resim: 9, pregame: 42}
+    00:11:01Z build   live_aware 70   h2h 7   (REPRODUCED on a second, independent build)
+    `no_live_gameline_projection` fell 420 -> 297 the moment the key fix landed.
+
+One full row, Tulane @ Duke, Q4 2:19, 3-17:
+
+    live_gameline  home_win_prob 1.0  model_prob 1.0  sims_run 120
+                   prob_std_err 0.0113  as_of 2026-09-06T00:00:33Z  carried_forward false
+    projection     live_aware true  basis smartsim2_home_win_rate  model_prob_over 0.8533
+
+`as_of` matches the snapshot to the second, which a stale artifact cannot
+contain — this is the live re-sim reaching the board. The pregame 0.8533 sits
+beside the live 1.0 rather than overwriting it, as designed.
+
+**BUT `rows_live_gameline_edged` is 0, on every build, and I ran the diagnosis
+down rather than reporting the counter.** All 7 live-aware h2h rows refuse
+`no_two_sided_market_price`. My first guess — "the market pulled the line on a
+decided game" — was WRONG, and the data killed it: Arkansas State @ Memphis at
+**10-7 in Q2** carries `consensus {"away": 180, "home": -325}`, an ordinary
+two-sided live price, 27 books quoting, and still refuses. So does Wyoming @
+Colorado State at 6-14 (`{"away": 168, "home": -297}`, 25 books).
+
+**THE CAUSE, traced to the line.** `live_gameline_join.py:1109` calls
+`price_moneyline(market_prob=projection.get("market_fair_prob_over"))` — it reads
+the de-vigged price off the ROW'S PROJECTION, not off `consensus`. And
+`ncaaf/game_projections.py` writes that key in its **totals** branch (line 482)
+and **NOT in its h2h branch** (line 405-433). Measured across sports on the
+served board:
+
+| sport | h2h rows | with a projection dict | with `market_fair_prob_over` |
+|---|---|---|---|
+| soccer | 52 | 52 | **52** |
+| ncaaf | 79 | 30 | **0** |
+| mlb | 43 | 0 | 0 |
+
+So `price_moneyline` receives `None` for every NCAAF h2h row and refuses
+unconditionally. **This could not have been seen before**: no NCAAF row had ever
+been `live_aware`, so the moneyline branch was never reached. My re-sim supplies
+the model side; the market side has never been de-vigged onto an NCAAF h2h row.
+
+**I ALSO NEARLY RECORDED A WRONG CAUSE.** I wrote "the key is never written for
+ncaaf" off a grep that returned nothing for my search term, then re-grepped and
+found it at line 482 — written, but in the wrong branch. Absence of a grep hit is
+a fact about the search string.
+
+**WHY I AM NOT FIXING IT, and this is a decision rather than a deferral.**
+`_no_vig_over_probability` is already imported in that file and already used two
+branches down, so the change is ONE LINE. But NCAAF's h2h branch sets
+`edge_unavailable_reason` deliberately — its margin model *"loses to the closing
+line by 3.563 points of MAE over 2233 games (t=17.2)"*. Adding the market price
+would open pricing on that market. **My live probability is NOT that pregame
+margin model** — it is a rest-of-game sim from the real score — so the note
+condemning the pregame model does not automatically condemn it. **But nobody has
+graded the LIVE model against outcomes either.** Wiring the market side would
+release live NCAAF moneyline edges on the strength of an ungraded estimator,
+which is `#499`'s exact precedent in reverse (WNBA totals only became priceable
+after a 249-game backtest). That is a money decision, not a wiring one, and it
+belongs to a lane that can measure it.
+
+**WHAT IS TRUE, STATED WITHOUT INFLATION:** the NCAAF live re-sim produces in
+production, its output reaches the board, and a live NCAAF row now carries a
+live-aware projection with a probability that knows the score — where two hours
+ago it carried the pregame number. **No live NCAAF edge is published, and none
+should be until the live model is graded.** The board still suppresses, which
+`#340` says it should.
+
+**One thing I could not test and will not claim:** MLB has 0 h2h rows carrying a
+projection dict at all tonight, so I had no positive control for the pricing step
+on any sport. Soccer's 52/52 is evidence the FIELD is populated elsewhere, not
+that the pricing path is healthy elsewhere.
+
 ## 2026-09-05 23:13:09-23:18:27Z — refresh-worker `ffe8714b` — **HALF ONE VERIFIED IN PRODUCTION; HALF TWO FOUND A REAL DEFECT AND IT IS MINE.** The NCAAF live re-sim produces; the board join missed 257 of 257 rows on a key I published. — lane `ncaaf-live-resim-wire`
 
 `deploy=dep-daea18f40ujc73edp0vg trigger=api`. Boot `[refresh_worker] BOOTED`
