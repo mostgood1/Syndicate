@@ -25245,3 +25245,54 @@ rate on a live evening slate is ~0.4% of all-sport collapsed keys and ~0.8% of
 MLB collapsed keys, entirely attributable to segment `totals`/`totals_alt`
 pairs.** The tie-break is therefore deciding roughly one bet in 120 MLB keys, not
 one in 78 — and never on a full-game row.
+
+## 2026-09-06 22:0xZ — **RESOLVED: the tick input differed because the loop had ROLLED TO THE NEXT DATE. And the production COUNTER matches my independent recomputation exactly — `3 / 712 = 0.421%`.** `[lane kalshi-join-counters-logged, reading only — NO DEPLOY]`
+
+Closes the "NOT ESTABLISHED" item in the entry above, which said the tick's
+input (451 rows) and the served shortlist (715) differed for reasons I had not
+found. **They were different DATES.**
+
+    LAYER2_SHORTLIST date=2026-09-06 rows=715   21:39:00Z  -> join 21:39:40Z
+    LAYER2_SHORTLIST date=2026-09-07 rows=451   21:52:25Z  -> join 21:53:04Z
+    LAYER2_SHORTLIST date=2026-09-07 rows=357   22:02:35Z  -> join 22:03:13Z
+
+The intelligence-state loop rolls to the NEXT slate during the evening. I was
+fetching `/api/board/layer2-shortlist?date=2026-09-06` and comparing it against
+ticks that had already moved to **2026-09-07** — a slate with no `_alt` rows
+yet, hence `collisions=0`. Nothing was stale, filtered or truncated.
+
+**The mechanism, confirmed in code rather than inferred:** the join uses a
+FRESHLY BUILT in-memory shortlist — `build_layer2_shortlist(...)` at
+`intelligence_state.py:6346`, passed straight to `join_to_board` at `:6483` —
+while `/api/board/layer2-shortlist` is a PURE READ of the persisted artifact
+(`read_layer2_shortlist`). The two agree only when they are on the same date and
+the artifact is current; the artifact I polled sat at `written_at 21:39:00Z` for
+26 minutes because the builds after it were for a different date.
+
+### THE OWED RATIO, NOW READ OFF THE PRODUCTION COUNTER
+
+    21:39:45Z [kalshi_odds]       board_rows=715  collapsed_bet_keys=712  alt_main_collisions=3  = 0.421%
+    21:40:10Z [portfolio_commit]  board_rows=715  collapsed_bet_keys=712  alt_main_collisions=3  = 0.421%
+
+**Identical, to the row, to the figure I computed independently by running the
+real `_collapse_duplicate_bets` over the served artifact.** That is the
+instrument validated against an independent recomputation of the same
+population, not merely "the counter emitted a number". The previous entry's
+caveat — "measured on production DATA with production CODE, but not yet a
+reading of the production COUNTER" — **is discharged.**
+
+The mlb-only view of that same board remains `3 / 360 = 0.833%`, and the
+denominator warning in the entry above still stands: the LOG prints the
+all-sports figure (0.421%), the replay's `~1 per 78` was mlb-only (1.28%), and
+the comparable pair is 0.833% vs 1.28%.
+
+### What this leaves
+
+- **The rate is established**: ~0.42% of all-sport collapsed keys, ~0.83% of MLB
+  collapsed keys, on a live evening slate, all three collisions being MLB
+  segment `totals`/`totals_alt` pairs (`first1 0.5 over`, `first1 0.5 under`,
+  `first5 4.5 under`). The tie-break decides roughly one bet in 120 MLB keys and
+  never on a full-game row.
+- **A reading taken against `date=` on this endpoint must check which date the
+  loop is building.** Comparing a served artifact to a join tick without
+  matching the date compares two slates, and in the evening they will not match.
