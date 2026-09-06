@@ -284,7 +284,45 @@ were being pulled throughout the window and the 02:15:54Z health-check timeout
 coincides with a second run's assembly. Corroborates `#632` (web OOM at 2Gi,
 unowned) with a fresh instance.
 
-## [render-egress-cause] THE BANDWIDTH BILL IS `web` POLLING EXTERNAL FEEDS ITSELF, AND IT IS 100% BILLED `[verified 2026-09-06, lane render-egress-transport, web `67fd8c9d`]`
+## [render-egress-cause] **THE BILLING HALF IS RETRACTED — RENDER'S METER DOES NOT COUNT INBOUND EXTERNAL BYTES.** The mechanism is real; what web's 19.34 GB IS remains UNEXPLAINED `[retracted 2026-09-06 by me, BEFORE any row claimed a saving; lane render-egress-transport]`
+
+**RETRACTED: that web's 19.34 GB is its own outbound feed polling, and that
+compressing those fetches reduces the bill.** The measurements below are sound;
+the CAUSAL and BILLING conclusions drawn from them are not.
+
+**The contradiction is inside PRE-change data — no post-deploy bucket needed.**
+live-odds-worker after the change reports **235 MB/h of billed wire at 13.48x**.
+The workload did not change, only the encoding — so the identical content was on
+the wire **pre-change at ~3,173 MB/h**, against a pre-change meter of
+**25.4-38.1 MB/h over 19 buckets** (mean 30.3, sd 3.4). **~105x contradiction**;
+**~87x** even at the lowest observed plateau (196 MB/h).
+
+**BURST cannot rescue it.** The steady-state billed-wire rate would have to be
+`30.3 / 13.48 = 2.2 MB/h` — the plateau would have to fall ~100x. A burst decays
+TOWARD the baseline; this decayed `418 -> 196 -> 235 MB/h` and **flattened 6-9x
+ABOVE it**. Discriminator designed by lane `ledger-repair-invariants`; the ladder
+verified single-emitter by me (`gzip_responses` 1/200/400/600/800, strictly
+monotonic, no repeats — two per-process counters interleave, as they visibly do
+on web).
+
+**SO: `Accept-Encoding` compresses INBOUND bytes — real, 12-13x,
+`refused_hosts=0`, ESPN accepting the header from Render's IP — and inbound is
+not what Render meters. It buys MEMORY and RECEIVER TIME, not bill. DO NOT QUOTE
+A RATIO AS A BANDWIDTH SAVING.**
+
+**UNEXPLAINED AGAIN, and it must not be quietly re-assumed: what web's 19.34 GB
+actually is.** Served responses, internal transport, public ingress, deploys AND
+now inbound fetches are **each eliminated by measurement**. The web drop after
+compression (`311.8 -> 266.3 -> 49.6 MB/h`) is **NOT evidence** — the NCAAF slate
+decayed across the same buckets and I was generating measurement traffic against
+that service throughout.
+
+**Owed:** the `03:00Z` bucket on live-odds-worker against `< 25.4 MB/h`.
+**Prediction, recorded before reading it: it will NOT drop.**
+
+---
+
+**WHAT STILL STANDS FROM THE ORIGINAL SECTION (measurements, not conclusions):**
 
 **The month hit 24.4/25 GB on day 5.** `web` was 19.5 GB of the workspace's 24.45 GB
 (Sep 1-5), and Render's dashboard calls that bucket "HTTP Responses" — which is
