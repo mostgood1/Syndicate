@@ -29,6 +29,11 @@ VERIFICATION BEFORE WRITING, the same three as the lane tools:
 
     py -3 scripts/compact_learnings.py --keep-from 2026-08-18
     py -3 scripts/compact_learnings.py --keep-from 2026-08-18 --apply
+    py -3 scripts/compact_learnings.py --keep-from 2026-08-18 --cap 300000
+
+The "Nx of cap" line reports against the budget `session-start.sh` actually
+enforces, read through `ledger_caps`, and names its source. `--cap` overrides it
+for a what-if.
 
 Exit 0 = clean (or nothing to do), 1 = refused, 2 = could not read/verify.
 """
@@ -40,6 +45,25 @@ import datetime
 import pathlib
 import re
 import sys
+
+# THE CAP COMES FROM `session-start.sh`, NOT FROM A CONSTANT HERE. A tool that
+# hardcodes it goes on reporting "*** STILL OVER ***" after the budget is
+# raised, and a session acting on that reading compacts a shared ledger against
+# a constraint that does not exist. This file did exactly that: `default=280000`
+# while `session-start.sh` enforced 460000, so it reported 1.48x on a
+# learnings.md that was 39,366 B UNDER budget. `trim_lane_blocks.py` and
+# `archive_released_lanes.py` already read `ledger_caps` for this reason and
+# their comments record the same incident on lanes.md; `ledger_caps.py` calls a
+# fourth copy of the number "the problem restated".
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent
+                       / ".claude" / "hooks"))
+try:
+    from ledger_caps import cap as _ledger_cap, cap_source as _ledger_cap_source
+except Exception:  # pragma: no cover - only if the shared module is gone
+    def _ledger_cap(name, root=None):
+        return 460000
+    def _ledger_cap_source(root=None):
+        return "hardcoded fallback (ledger_caps.py unavailable)"
 
 LEARN = pathlib.Path(".syndicate/learnings.md")
 EVID = pathlib.Path(".syndicate/learnings_evidence.md")
@@ -111,8 +135,18 @@ def main(argv=None):
     ap.add_argument("--apply", action="store_true", help="write; default is a dry run")
     # Default tracks the digest budget in `.claude/hooks/session-start.sh`; both
     # were raised 2026-09-01. This only scales the "Nx of cap" line it prints.
-    ap.add_argument("--cap", type=int, default=280000)
+    ap.add_argument("--cap", type=int, default=None,
+                    help="byte budget to report against "
+                         "(default: whatever session-start.sh enforces)")
     args = ap.parse_args(argv)
+    # Report where the number CAME FROM, and do not claim session-start.sh when
+    # the operator overrode it -- a cap line that misattributes its own source is
+    # the same defect this change exists to remove, one level down.
+    if args.cap is None:
+        args.cap = _ledger_cap("learnings.md")
+        cap_source = _ledger_cap_source()
+    else:
+        cap_source = "--cap on the command line"
 
     try:
         text = LEARN.read_text(encoding="utf-8", errors="replace")
@@ -187,7 +221,8 @@ def main(argv=None):
               f"duplicates evidence and reclaims nothing)")
     print(f"learnings.md       : {len(text)} -> {len(new_text)} B  ({len(text)-len(new_text)} reclaimed)")
     print(f"cap {args.cap}       : {len(text)/args.cap:.2f}x -> {len(new_text)/args.cap:.2f}x  "
-          f"{'UNDER' if len(new_text) < args.cap else '*** STILL OVER ***'}")
+          f"{'UNDER' if len(new_text) < args.cap else '*** STILL OVER ***'}"
+          f"   [cap from {cap_source}]")
     print(f"evidence file      : {len(evid)} -> {len(evid)+len(moved_text)} B")
     if no_rule:
         print(f"\n{len(no_rule)} compacted with NO extractable rule line (heading still carries the rule):")
