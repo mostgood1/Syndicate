@@ -264,24 +264,71 @@ def poll_ncaaf_live_state(iso_date: str, *, persist: bool = True) -> dict[str, A
     return record
 
 
+def week_state_dates(season: int, week: int) -> tuple[str, ...]:
+    """The dates the BOARD will ask for -- resolved here, at run time.
+
+    THE PRODUCER MUST COVER THE READER'S DATE SET OR IT ONLY PARTLY WORKS.
+    `ncaaf/live_game_state.ncaaf_game_state_index` iterates
+    `past_or_current_dates(_ncaaf_week_kickoff_dates(season, week))`, and an
+    NCAAF week is not a calendar window -- 2026 week 1 spans 08-29..09-07.
+    Measured in production 2026-09-06: the board asked for **6 dates**
+    (`source=fetch=6`). A producer writing only `--date` would have covered one
+    of six and left web fetching the other five, which reads as "the fix
+    works" on any check that only looks at today.
+
+    Resolved in THIS subprocess rather than in `refresh_odds_sources`, so the
+    orchestrator does not import the (large) cards module just to build a step.
+    Returns `()` on any failure -- the caller then falls back to the single
+    date it was given, which is strictly better than polling nothing.
+    """
+    try:
+        from syndicate.features.ncaaf.cards import _ncaaf_week_kickoff_dates
+        from syndicate.features.ncaaf.live_game_state import past_or_current_dates
+
+        return tuple(past_or_current_dates(_ncaaf_week_kickoff_dates(int(season), int(week))))
+    except Exception as exc:  # noqa: BLE001 -- named, never fatal
+        print(
+            f"[poll_ncaaf_live_state] WEEK_DATES_UNAVAILABLE season={season} week={week} "
+            f"error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return ()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--date", required=True, help="ISO date, e.g. 2026-08-28")
+    parser.add_argument("--season", type=int, default=None,
+                        help="with --week, also poll every past-or-current kickoff date in that week")
+    parser.add_argument("--week", type=int, default=None,
+                        help="with --season, also poll every past-or-current kickoff date in that week")
     parser.add_argument("--no-persist", action="store_true", help="fetch and print, write nothing")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    result = poll_ncaaf_live_state(args.date, persist=not args.no_persist)
+    dates: list[str] = [args.date]
+    if args.season is not None and args.week is not None:
+        for iso in week_state_dates(args.season, args.week):
+            if iso not in dates:
+                dates.append(iso)
+
+    results = [poll_ncaaf_live_state(iso, persist=not args.no_persist) for iso in dates]
     if args.json:
-        print(json.dumps(result, indent=2))
+        print(json.dumps(results if len(results) > 1 else results[0], indent=2))
     else:
+        for result in results:
+            print(
+                f"[poll_ncaaf_live_state] date={result.get('date')} status={result.get('status')}"
+                f" games={result.get('count')} finals={result.get('finals')}"
+                f" reason={result.get('reason')} persist_error={result.get('persist_error')}",
+                flush=True,
+            )
         print(
-            f"[poll_ncaaf_live_state] date={result.get('date')} status={result.get('status')}"
-            f" games={result.get('count')} finals={result.get('finals')}"
-            f" reason={result.get('reason')} persist_error={result.get('persist_error')}",
+            f"[poll_ncaaf_live_state] COVERAGE dates={len(results)} "
+            f"ok={sum(1 for r in results if r.get('status') == 'ok')}",
             flush=True,
         )
-    return 0 if result.get("status") == "ok" else 1
+    return 0 if all(r.get("status") == "ok" for r in results) else 1
 
 
 if __name__ == "__main__":

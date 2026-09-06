@@ -262,3 +262,46 @@ def test_the_worker_producer_step_exists_and_runs_first_and_ungated():
     command = [str(part) for part in step.command]
     assert any("poll_ncaaf_live_state.py" in part for part in command)
     assert "--date" in command and "2026-09-06" in command
+
+
+def test_producer_covers_exactly_the_readers_date_set():
+    """THE PRODUCER MUST COVER THE READER'S DATES OR IT ONLY PARTLY WORKS.
+
+    The board asks for every past-or-current kickoff date in the week, and an
+    NCAAF week is not a calendar window (2026 week 1 spans 08-29..09-07).
+    Measured in production before this was fixed: the board requested SIX dates
+    (`source=fetch=6`). A `--date`-only producer covers one of six and leaves
+    web fetching the rest -- while looking correct to any check that only reads
+    today, which is precisely how this nearly shipped.
+    """
+    from scripts.poll_ncaaf_live_state import week_state_dates
+    from syndicate.features.ncaaf.cards import _ncaaf_week_kickoff_dates
+
+    reader = set(lgs.past_or_current_dates(_ncaaf_week_kickoff_dates(2026, 1)))
+    if not reader:
+        pytest.skip("no schedule available in this checkout")
+    assert set(week_state_dates(2026, 1)) == reader
+
+
+def test_week_dates_failure_degrades_to_the_single_date(monkeypatch):
+    """A schedule read that fails must not stop the producer polling today."""
+    import scripts.poll_ncaaf_live_state as poller
+
+    monkeypatch.setattr(
+        "syndicate.features.ncaaf.cards._ncaaf_week_kickoff_dates",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("schedule gone")),
+    )
+    assert poller.week_state_dates(2026, 1) == ()
+
+
+def test_the_step_passes_season_and_week_so_coverage_is_not_one_date():
+    import argparse
+    from scripts import refresh_odds_sources as ros
+
+    step = ros._build_ncaaf_steps(
+        argparse.Namespace(date="2026-09-06", season=2026, week=1)
+    )[0]
+    command = [str(c) for c in step.command]
+    assert "--season" in command and "--week" in command, (
+        "without these the producer covers ONE date and web keeps fetching the rest"
+    )

@@ -1136,7 +1136,17 @@ def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
             name="ncaaf_live_state",
             phases=("pregame", "live"),
             cwd=REPO_ROOT,
-            command=(python_exe, "scripts/poll_ncaaf_live_state.py", "--date", args.date),
+            # `--season/--week` makes the producer cover EVERY past-or-current
+            # kickoff date in the week, which is exactly the set the board asks
+            # for. Measured in production 2026-09-06 before this existed: the
+            # board requested 6 dates (`source=fetch=6`), so a `--date`-only
+            # producer would have covered ONE of six and left web fetching the
+            # rest -- while looking correct to any check that only reads today.
+            command=(
+                python_exe, "scripts/poll_ncaaf_live_state.py",
+                "--date", args.date,
+                "--season", str(int(ncaaf_season)), "--week", str(int(ncaaf_week)),
+            ),
             description="Capture NCAAF live game state so the board READS it instead of fetching ESPN in the request path.",
         ),
         # `#552`. THE MARKET CAPTURE GOES FIRST, and it is the step that gives
