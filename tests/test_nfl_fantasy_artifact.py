@@ -41,6 +41,36 @@ requires_artifact = pytest.mark.skipif(
 )
 
 
+def _isolate_source_root(monkeypatch, root):
+    """Point the NFL source root at *root* AND stop the repo mirror answering.
+
+    REPOINTING THE ENV VAR ALONE DOES NOT SIMULATE ABSENCE.
+    `source_roots.preferred_artifact_roots` appends the repo `data/nfl_source`
+    mirror as a candidate root unless strict hosted storage is enabled -- by
+    design, as `CLAUDE.md`'s cold-start safety net. And
+    `nfl_fantasy_projections_<season>.json` is UNTRACKED: absent from
+    `origin/main`, present only on a machine where someone has run the build.
+
+    So these three tests were machine-dependent. They passed on CI and on a
+    fresh dyno, where the file genuinely does not exist, and failed on any
+    developer box that had generated it -- the result turned on untracked local
+    state rather than on the behaviour under test.
+
+    Measured 2026-09-05 on a box that had the artifact: with the env repointed
+    at an empty tmp dir, `load_projection_artifact(2026)` still returned the
+    real checkout artifact; with the mirror fallback disabled it correctly
+    returned None. That is the whole defect.
+
+    `RENDER` is cleared as well because `preferred_artifact_roots` re-appends
+    the mirror when RENDER is set even under strict mode -- so setting strict
+    alone would leave the fallback live on exactly the substrate these tests
+    are modelling.
+    """
+    monkeypatch.setenv("SYNDICATE_NFL_SOURCE_ROOT", str(root))
+    monkeypatch.delenv("RENDER", raising=False)
+    monkeypatch.setenv("SYNDICATE_REQUIRE_HOSTED_STORAGE", "1")
+
+
 @requires_artifact
 def test_artifact_is_well_formed_and_within_the_publish_ceiling():
     artifact = load_projection_artifact(SEASON)
@@ -62,7 +92,7 @@ def test_version_mismatch_reads_as_absent_rather_than_as_garbage(tmp_path, monke
     (target / f"nfl_fantasy_projections_{SEASON}.json").write_text(
         json.dumps(payload), encoding="utf-8"
     )
-    monkeypatch.setenv("SYNDICATE_NFL_SOURCE_ROOT", str(tmp_path / "nfl_source"))
+    _isolate_source_root(monkeypatch, tmp_path / "nfl_source")
     load_projection_artifact.cache_clear()
     try:
         assert load_projection_artifact(SEASON) is None
@@ -141,7 +171,7 @@ def test_routes_degrade_to_empty_rather_than_raising(tmp_path, monkeypatch):
     """THE PRODUCTION CASE. The web dyno has no artifact and none of the raw
     nflverse inputs, and `CLAUDE.md` requires a degraded state there, not a
     backfill and not a 500."""
-    monkeypatch.setenv("SYNDICATE_NFL_SOURCE_ROOT", str(tmp_path / "nfl_source"))
+    _isolate_source_root(monkeypatch, tmp_path / "nfl_source")
     monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
     monkeypatch.delenv("SYNDICATE_NFL_FANTASY_ALLOW_REQUEST_COMPUTE", raising=False)
     (tmp_path / "nfl_source").mkdir(parents=True)
@@ -184,7 +214,7 @@ def test_a_newly_published_artifact_is_picked_up_without_a_restart(tmp_path, mon
     source = artifact_path(SEASON)  # resolved BEFORE the env is repointed
     root = tmp_path / "nfl_source"
     root.mkdir(parents=True)
-    monkeypatch.setenv("SYNDICATE_NFL_SOURCE_ROOT", str(root))
+    _isolate_source_root(monkeypatch, root)
     load_projection_artifact.cache_clear()
     try:
         assert load_projection_artifact(SEASON) is None, "expected absent to start"
