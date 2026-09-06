@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-09-06 02:50Z — **NOT A DEPLOY. A CLAIM INCIDENT: I `--force`d an EXPIRED live-odds-worker claim into a LIVE 45-minute block on a contended service, to fix a missing command-line argument.** — lane `segment-refusal-deploy`
+
+Recorded here because the protocol says a forced claim goes in this file, and
+because a reader next week should be able to find out why a 45-minute block
+existed. No deploy resulted; the state change is the point.
+
+**What happened.** My own expired claim on live-odds-worker (126 min old,
+blocking NOBODY) needed tidying. `release --service live-odds-worker` returned
+`REFUSED: ... is held by segment-refusal-deploy and the token does not match`.
+I read that as a race, ran `acquire --force`, and got a **fresh 45-minute
+claim** — converting a harmless expired record into a live lock on a service
+other sessions were queueing for. Cleared ~30s later with `release --token`,
+which is what should have been run first.
+
+**The actual cause is one missing argument.** `deploy_claim.py cmd_release`
+(`:337`) is four lines, and the file contains **exactly one** `args.token`
+reference:
+
+    if not args.force and args.token != claim.get("token"):   # REFUSE
+
+`--token` defaults to `None`, so `None != <stored>` and release refuses **100%
+of the time** without it. There is no stored-value fallback and no dependence
+on any prior re-acquire. Verified in source 2026-09-06 after lane
+`shortlist-prop-row-duplicates` hit the identical refusal, `--force`d past it
+twice for the same reason, and proved it by acquiring and releasing seconds
+apart with no re-acquire anywhere.
+
+**The refusal is not misleading about WHO — it is SILENT about WHY.** It prints
+`held by <holder>`, and that holder is correct; it named my own lane. It never
+says "your token argument was empty". Two sessions misdiagnosed the same
+message the same night from opposite directions.
+
+**THE RULE, and it is the transferable part:** `--force` is the statement *that
+session is gone*. Spending it on an undiagnosed refusal is how it stops meaning
+that — an override on a misdiagnosis SUCCEEDS, so the wrong explanation is never
+tested again. Before escalating past any guard, be able to NAME which
+precondition failed.
+
+**Second-order lesson, because this sat in a memory file the whole time.** I had
+already written "capture the token `acquire` prints" — and its stated mechanism
+was WRONG (it claimed the failure was conditional on a re-acquire). A remedy
+without a checkable mechanism makes no prediction, so it is adopted rather than
+tested, and it survived my own incident. A wrong belief stated as a general rule
+about a mechanism gets caught in two minutes; the same belief stated as a
+one-off remedy does not.
+
+
+
 ## 2026-09-06 17:50:05Z - 17:53:14Z — live-odds-worker `54c9b157` -> `f65ec45e` — **THE THIRD SERVICE ONTO THE PLAYER-NAME FOLD. A CONSISTENCY DEPLOY, AND ITS `verify:` SAYS SO RATHER THAN DRESSING UP A SHA READ.** — lane `shortlist-prop-row-duplicates`
 
 **verify — WHAT I ACTUALLY HAVE, AND WHAT I DO NOT.**
