@@ -953,6 +953,18 @@ def join_kalshi_to_board(
     # HAS a duplicate team-pair is the fix still not working.
     doubleheader_resolved = 0
 
+    # `segment_for_board_row` is imported here rather than at module scope to
+    # match how `_segments_agree` and `_row_key` already reach it -- this file
+    # keeps kalshi_catalogue imports local on purpose.
+    from syndicate.features.shared.kalshi_catalogue import segment_for_board_row
+
+    # WHICH SERIES A SEGMENT ROW ACTUALLY MET. Both are keyed by series so a
+    # zero in one has the other as its denominator -- `segment_has_no_matching
+    # _series: 0` was read three separate ways today precisely because it had
+    # none.
+    segment_matched_series: dict[str, int] = {}
+    segment_refused_series: dict[str, int] = {}
+
     def _refuse(reason: str) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
 
@@ -1336,8 +1348,16 @@ def join_kalshi_to_board(
                 #     3-tuples with no segment -- and builds a match record the
                 #     resolver can never price. `matched` counted a phantom.
                 if not _segments_agree(row, verdict):
+                    _seg_key = "%s->%s" % (
+                        segment_for_board_row(row) or "?", verdict.get("series") or "?")
+                    segment_refused_series[_seg_key] = (
+                        segment_refused_series.get(_seg_key, 0) + 1)
                     _refuse(REASON_SEGMENT_MISMATCH)
                     continue
+                _seg = segment_for_board_row(row)
+                if _seg and _seg != "full":
+                    _k = "%s->%s" % (_seg, verdict.get("series") or "?")
+                    segment_matched_series[_k] = segment_matched_series.get(_k, 0) + 1
                 matches.append(
                     {
                         "ticker": market.get("ticker"),
@@ -1433,8 +1453,16 @@ def join_kalshi_to_board(
             # ever fires is a guard nobody can calibrate, and one that never
             # fires here proves the prop book is not being reclassified.
             if not _segments_agree(row, verdict):
+                _seg_key = "%s->%s" % (
+                    segment_for_board_row(row) or "?", verdict.get("series") or "?")
+                segment_refused_series[_seg_key] = (
+                    segment_refused_series.get(_seg_key, 0) + 1)
                 _refuse(REASON_SEGMENT_MISMATCH)
                 continue
+            _seg = segment_for_board_row(row)
+            if _seg and _seg != "full":
+                _k = "%s->%s" % (_seg, series or "?")
+                segment_matched_series[_k] = segment_matched_series.get(_k, 0) + 1
             matches.append(
                 {
                     "ticker": market.get("ticker"),
@@ -1487,6 +1515,11 @@ def join_kalshi_to_board(
         "kalshi_markets": len(kalshi_markets),
         "board_rows": len(board_rows),
         "matched": len(matches),
+        # `<board segment>-><series>`, so "which contract priced this row" is a
+        # READING. Reported even when empty: an absent key and a zero count are
+        # the same silence that made this unanswerable in the first place.
+        "segment_matched_series": dict(sorted(segment_matched_series.items())),
+        "segment_refused_series": dict(sorted(segment_refused_series.items())),
         "reasons": dict(sorted(reasons.items())),
         # See `doubleheader_resolved` above: this is the field that verifies the
         # commence-time split, and it is reported even when zero so that "no
