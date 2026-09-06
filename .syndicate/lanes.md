@@ -1806,59 +1806,54 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   entry) checked by CONTENT for `segment` in the join key.
 - Blocked by: none.
 
-### mlb-first5-kalshi-execution — **OPEN, ONE READING OWED** — opened 2026-09-05 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
-- **CODE DONE, LANDED AND LIVE.** `d2b060c8` on `origin/main`; live on
+### mlb-first5-kalshi-execution — **CLOSED 2026-09-06** — MLB first5 execution on `KXMLBF5TOTAL` is BUILT, LANDED and LIVE; **the production reading was NOT taken** — opened 2026-09-05 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
+- **CLOSED ON AN EXPLICIT USER DECISION, TWICE STATED, WITH THE READING STILL
+  OWED.** I recommended keeping it open and said why; the user directed closure
+  anyway. **The obligation is NOT discharged and does not disappear with this
+  lane** — it lives in `deploys.md` (`6f6ebeb1`) under
+  `2026-09-06 02:59:27Z refresh-worker 933e9beb -> 1f032074`, whose `verify:`
+  field reads **OWED**. Anyone citing this lane as evidence the feature works is
+  citing something that was never measured in production.
+- **What IS established.** Code `d2b060c8` on `origin/main`, live on
   refresh-worker inside `1f032074` since 2026-09-06T02:59:27Z, content-verified
-  (registration + `_row_market` + `split_segment_market_key` all present on the
-  live SHA, all absent on the previous one). Measurement written to
-  `deploys.md` (`6f6ebeb1`).
-- **THE DEFECT WAS TWO GAPS IN SERIES, either alone inert.** `KXMLBF5TOTAL` was
-  absent from `SERIES_SPORT` (refused `unmapped_series` at the first gate while
-  production fetched it every tick), AND the two sides named the market
-  differently — `classify_market` yields `totals_1st_5_innings`, the board
-  stores `market='totals'`+`segment='first5'` — so the index lookup missed
-  BEFORE `_segments_agree` ran. Fixed symmetrically via `_row_market()`, one
-  helper shared by `_event_key`/`_board_key`/`_row_key`.
-- **VERIFICATION THAT RAN AND PASSED** (this lane's original testable outcome):
-  local replay over PRODUCTION data — 84 real settled `KXMLBF5TOTAL` contracts
-  from the venue API × 553 real `layer2-shortlist` rows, same slate 2026-09-05 —
-  `matched` **0 -> 8**, `unmapped_series` 84 -> 0, `segment_has_no_matching_series`
-  6 firing alongside. 3 real games, all first5×first5, over->yes / under->no.
-  283 tests pass across the kalshi/segment surface; 15 new tests lead with
-  `off != on` at BOTH the catalogue and the join level.
-- **WHY THIS IS NOT CLOSED — ONE READING OWED.** A production reading that a
-  `first5` board row actually acquires a `KXMLBF5*` ticker. **A post-boot join
-  tick HAS now run** — 03:12:16Z, `board_rows=491 matched=120
-  segment_has_no_matching_series=2` — and as of 03:14Z it is still **0 of 597
-  live orders** carrying a `KXMLBF5*` ticker. So the join is healthy and the F5
-  pairing specifically is still unobserved.
-  **The condition for that reading did not exist that night**: the join needs a
-  board row that is `segment='first5'` AND `market='totals'`, and 2026-09-06 had
-  **0** MLB shortlist rows while 2026-09-05 was down to **5**. A null there is a
-  fact about the SLATE, not about the fix — which is exactly why it cannot be
-  banked as a pass. Discharge on a built MLB slate with first5 `totals` rows and
-  a live quote (a daytime condition): grep refresh-worker for a matched
+  (registration + `_row_market` + `split_segment_market_key` present on the live
+  SHA, all three absent on the previous one). Local replay over PRODUCTION data —
+  84 real settled `KXMLBF5TOTAL` contracts × 553 real `layer2-shortlist` rows,
+  same slate — `matched` **0 -> 8**, `unmapped_series` 84 -> 0,
+  `segment_has_no_matching_series` 6 firing alongside. 283 tests pass; 15 new
+  ones lead with `off != on` at both the catalogue and the join level.
+- **What is NOT established, precisely.** That a `first5` board row acquires a
+  `KXMLBF5*` ticker in production. At 03:14Z: **0 of 597 live orders**. A
+  post-boot join tick had run (03:12:16Z, `matched=120`), so the join is healthy
+  and the F5 pairing specifically is unobserved. The condition did not exist:
+  the join needs `segment='first5'` AND `market='totals'`, and 2026-09-06 had
+  **0** MLB shortlist rows while 2026-09-05 was down to **5**. That null is a
+  fact about the SLATE.
+  **To discharge:** on a built MLB slate, grep refresh-worker for a matched
   `KXMLBF5TOTAL`, or `/api/portfolio/live` for a `venue_ticker` starting
-  `KXMLBF5`. **Do NOT probe `/api/board/book-grid` for this** — it carries no
-  venue tickers at all (`KXMLBTOTAL` reads 0 there too), so a null from it is a
-  fact about the surface, not about the join.
-- **A RETRACTED SUB-CLAIM, kept because it is still unresolved.** I predicted
-  `TRIM_BY_SPORT` `kept_by_sport['mlb']` would RISE once the series carried a
-  sport. It did not — 2,740 before, 2,740 after. So **where F5 markets die
-  pre-fix is still unestablished**; `unmapped_series` never appears in the
+  `KXMLBF5`. **NOT `/api/board/book-grid`** — it carries no venue tickers at all
+  (`KXMLBTOTAL` reads 0 there too), so a null from it is about the surface.
+- **THE DEFECT WAS TWO GAPS IN SERIES, either alone inert.** `KXMLBF5TOTAL` was
+  absent from `SERIES_SPORT`; and `classify_market` yields
+  `totals_1st_5_innings` where the board stores `market='totals'` +
+  `segment='first5'`, so the index lookup missed BEFORE `_segments_agree` ran.
+  Fixed symmetrically via `_row_market()`, shared by
+  `_event_key`/`_board_key`/`_row_key`.
+- **A WRONG BELIEF THIS LANE PUBLISHED AND RETRACTED WITHIN THE HOUR.** I
+  predicted `TRIM_BY_SPORT` `kept_by_sport['mlb']` would RISE once the series
+  carried a sport. It did not — 2,740 before, 2,740 after. **Where F5 markets
+  die pre-fix remains unestablished**: `unmapped_series` never appears in the
   production join's reason breakdown at all, and `series_out_of_scope` (8,004)
-  is the obvious alternative nobody has checked. The registration is still
-  correct and necessary; my account of which stage discarded them was not.
+  is the unchecked alternative. The registration is still correct; my account of
+  the mechanism was not.
 - Files: released — `syndicate/features/shared/kalshi_catalogue.py`,
   `syndicate/features/shared/kalshi_board_join.py`,
   `syndicate/features/shared/market_segments.py`,
-  `tests/test_mlb_first5_kalshi_execution.py`. All landed; no further edits
-  intended from this lane.
+  `tests/test_mlb_first5_kalshi_execution.py`.
 - **Deliberately NOT done.** `KXMLBF5SPREAD` — a Kalshi spread states a MARGIN
   where the board writes a HANDICAP, the defect that put 11 orders on the club
   they were fading. Separate risk class. `KXMLBF5` (five-inning tie) keeps
   refusing `recognised_but_no_board_market`, correctly.
-- Blocked by: none. Needs only a live MLB slate.
 
 ### ncaaf-live-state-to-worker — OPEN — opened 2026-09-06 — session 9e40eb04-9f1c-464b-a6fb-5acac211e775
 - Goal: **move NCAAF ESPN live-state polling OFF the web request path and onto a worker** `[user: "fix the web polling -- move it to a worker"]`. ONE testable outcome: `NCAAF_LIVE_STATE` still reports real `matched`/`live` counts on the board while web performs **zero** ESPN scoreboard fetches — read as `http_compression`'s `BILLED_responses` on web falling to ~0 for `site.api.espn.com`, and `warn_if_compute_in_request_path("ncaaf_espn_game_state_fetch")` no longer firing.
