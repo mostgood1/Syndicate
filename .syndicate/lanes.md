@@ -96,7 +96,7 @@ death, never life — do not invert it.
 - Blocked by: none. `mlb-first5-kalshi-execution` CLOSED 2026-09-06 and released
   its claim on `kalshi_catalogue.py`.
 
-### prop-region-knob — OPEN — opened 2026-09-06 — session 3492626c
+### prop-region-knob — **CLOSED-VERIFIED 2026-09-06** — the knob is shipped and DELIBERATELY OFF: probed on the vendor, `eu` buys ONE SOFT BOOK (2->3, onexbet) for ~1M credits/month, and `us_ex` buys NOTHING because novig/prophetx do not quote soccer player shots at all. Finding in `state_soccer.md [soccer-prop-book-coverage]`. — opened 2026-09-06 — session 3492626c
 - Goal: make prop-call region coverage EXPRESSIBLE per sport, so widening one
   sport's books is a costed decision instead of an all-or-nothing global. No
   behaviour change and no credit spend by default.
