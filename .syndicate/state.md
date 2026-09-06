@@ -512,7 +512,7 @@ once this index exists: re-splitting would orphan the parts.
 | [lane-guard-disclaimer-and-worktree-exemption-bugs] | TWO REAL BUGS FOUND IN `lane-guard.py`, NEITHER FIXED `[found 2026-08-18]` — **ARCHIVED 2026-08-19 to `state_a | `state_ledger.md` |
 | [split-state-reindex-truncation] | `split_state.py --reindex --apply` DELETED EVERYTHING BELOW THE `[subject-index]` TABLE — **FIXED, ON MAIN (`2 | `state_ledger.md` |
 | [discard-guard-origin-blindness] | `discard-guard.py` CALLED PUSHED CONTENT "NOWHERE ELSE", AND BLOCKED `git restore --staged` — **FIXED (`e3a515 | `state_ledger.md` |
-| [git-store-onedrive] | ONEDRIVE MANAGES `.git` AND `.syndicate`, AND IT SILENTLY BREAKS `git worktree remove` -- 36 dead registrations invisible to `list` | `state_ledger.md` |
+| [git-store-onedrive] | ONEDRIVE MANAGES `.git` AND `.syndicate`, AND IT SILENTLY BREAKS `git worktree remove` `[2026-09-06, lane git- | `state_ledger.md` |
 | [full-suite-run-method] | RUNNING THE FULL SUITE ON THIS MACHINE NEEDS BATCHING, AN ISOLATION RETRY AND A PINNED MANIFEST — and the fail | `state_ledger.md` |
 | [mlb-hitter-strikeouts-prop] | MLB HITTER `strikeouts` WAS A DEAD FIELD FOR MONTHS; FIXED, DEPLOYED AND VERIFIED — AND NO BET WAS EVER PRICED | `state_mlb.md` |
 | [mlb-sim-edge-is-anti-predictive] | THE MLB SIM'S CLAIMED EDGE IS ANTI-PREDICTIVE, AND THE PROP BOOK IS A REAL EDGE SPENT ON VIG `[verified 2026-0 | `state_mlb.md` |
@@ -597,6 +597,7 @@ once this index exists: re-splitting would orphan the parts.
 | [artifact-allowlist-split] | THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT  | `state_worker.md` |
 | [service-memory-saturation] | BOTH PRODUCTION SERVICES WERE MEMORY-SATURATED 2026-09-02/03 — MEASURED, and it BLOCKS analysis work `[lane so | `state_worker.md` |
 | [live-odds-worker-deploy-window] | `deploy_preflight` ALMOST NEVER CLEARS ON live-odds-worker DURING A LIVE SLATE, and the reason is a LONG-RUNNI | `state_worker.md` |
+| [render-egress-spikes] | WEB'S BILL IS ~10 ANOMALOUS HOUR-BUCKETS, NOT A LEAK — normal hours ARE explained, the spikes are NOT, and six | `state_worker.md` |
 | [render-egress-cause] | **THE BILLING HALF IS RETRACTED — RENDER'S METER DOES NOT COUNT INBOUND EXTERNAL BYTES.** The mechanism is rea | `state_worker.md` |
 | [web-anon-leak] | THE WEB SERVICE LEAKS ANONYMOUS MEMORY, ~75 MB/h, AND THE DEPLOY CADENCE HIDES IT `[verified 2026-09-01, lane  | `state_worker.md` |
 | [render-server-failed-is-three-events] | `server_failed` IS NOT A FAILURE COUNT — read `details.reason`, one of its meanings is a HEALTHY DELIBERATE EX | `state_worker.md` |

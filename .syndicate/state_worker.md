@@ -313,6 +313,56 @@ checking whether the child pids turn over.
 **The guard cannot be overridden from a Bash command.** `SYNDICATE_DEPLOY_GUARD=off`
 is read from the HOOK's environment, which an inline env prefix does not reach.
 
+## [render-egress-spikes] WEB'S BILL IS ~10 ANOMALOUS HOUR-BUCKETS, NOT A LEAK — normal hours ARE explained, the spikes are NOT, and six mechanisms are eliminated by measurement `[2026-09-06, lane render-egress-transport]`
+
+**Web is 20.55 GB of the workspace's 25.96 GB (79%), Sep 1-6.**
+
+**THE BASELINE IS NEAR ZERO.** Quiet hours meter **0.2-0.5 MB**, for many hours at a
+stretch. The daily pipeline, the background loops and the worker sync cost
+essentially nothing. **This is not a leak; it is episodic.**
+
+**NORMAL HOURS ARE FULLY EXPLAINED, and the rule is simple:**
+
+    meter ~= 1.7-2.2x the PUBLIC EDGE bytes;  INTERNAL traffic is NOT billed
+
+Measured: `09-06 08:00-09:00` served **58.5 MB internally** (95% of it
+`/api/ops/artifacts/export`) and metered **0.5 MB**. `09-05 04:00-05:00` edge
+20.0 -> meter 33.9. `09-06 14:00-15:00` edge 55.0 -> meter 123.2.
+
+**~68% OF THE TOTAL SITS IN ABOUT TEN SPIKE BUCKETS THAT NO MEASURABLE PATH
+EXPLAINS.** Top two: `09-04 18:00 = 4,050 MB` with **2.6 MB of edge traffic**, and
+`09-01 23:00 = 2,809 MB` with **61.1 MB**. Both web-only (workers flat at 7-27 MB
+in the same hours), both real and settled.
+
+**ELIMINATED BY MEASUREMENT — do not re-propose without new evidence:**
+
+- **public edge traffic** — the edge log is COMPLETE (its request count matches the
+  independent `http-requests` metric: 223 scanned vs 221 reported), and it carries
+  2.6-61 MB in the spike hours.
+- **internal worker<->web HTTP** — unbilled in quiet hours (58.5 -> 0.5 MB). Matches
+  the meter in ONE spike hour and contradicts it in two others, so the one match is
+  coincidence, not a rule.
+- **web's own outbound** — measured ~0 MB via the `HTTP_COMPRESSION` `BILLED_wire`
+  counter (the NCAAF producer move removed it).
+- **deploys / image pulls** — `refresh-worker` runs **2-17 deploys/day on the same
+  repo and image** with bandwidth FLAT at 0.20-0.23 GB/day. Deploy count correlates
+  with web's bandwidth only at `r = 0.54`, which is session activity, not causation.
+- **the `bootstrap_data_root` disk sync** — the QUIET 21.4 MB hour had **100**
+  bootstrap lines; the 4,050 MB hour had **37**.
+- **platform-wide accounting events** — workers are flat during web's spikes.
+
+**INSTRUMENT FACTS LEARNED HERE, both of which produced wrong readings first:**
+buckets are **RIGHT-labelled** (bucket `15:00` covers 14:00-15:00; confirmed twice
+against request counts), and **values SETTLE UPWARD for hours** after a bucket
+closes — one bucket read 74.9 MB and later 123.2 MB. **Never compare a fresh bucket
+to a complete log scan.**
+
+**WHAT IS ACTIONABLE WITHOUT KNOWING THE MECHANISM.** The spikes cluster in working
+hours (CT afternoon/evening) and track session/deploy activity, not the pipeline.
+Sep 5-6, with the system largely at rest, ran **0.42-0.75 GB/day on web**. The
+overage was produced by a four-day burst of heavy interactive work, not by
+production traffic.
+
 ## [render-egress-cause] **THE BILLING HALF IS RETRACTED — RENDER'S METER DOES NOT COUNT INBOUND EXTERNAL BYTES.** The mechanism is real; what web's 19.34 GB IS remains UNEXPLAINED `[retracted 2026-09-06 by me, BEFORE any row claimed a saving; lane render-egress-transport]`
 
 **RETRACTED: that web's 19.34 GB is its own outbound feed polling, and that
