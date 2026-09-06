@@ -181,9 +181,11 @@ def scan(roots: list[str], repo_root: Path | None = None) -> tuple[list[dict[str
                 # `utf-8-sig`, NOT `utf-8`: Python's own import machinery strips a
                 # BOM, and reading as plain utf-8 makes every BOM'd file raise
                 # `SyntaxError: invalid non-printable character U+FEFF` and be
-                # SKIPPED. That skipped 15 files under `vendor/` and hid 2 real
-                # findings -- a parse error that drops a file is the
-                # unknown-defaults-permissive shape, so it must not recur.
+                # SKIPPED. Measured over `vendor/`: `utf-8` skips 46 files and
+                # reports 10 duplicates; `utf-8-sig` skips 0 and reports 12. A
+                # parse error that drops a file is the unknown-defaults-permissive
+                # shape -- a findings-only summary cannot tell an unread file from
+                # a clean one -- so it must not recur.
                 source = path.read_text(encoding="utf-8-sig")
             except (OSError, UnicodeDecodeError) as exc:
                 errors.append({"path": rel, "error": "%s: %s" % (type(exc).__name__, exc)})

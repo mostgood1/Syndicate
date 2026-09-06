@@ -80,10 +80,12 @@ def test_a_conditional_definition_is_not_a_duplicate():
 def test_a_file_with_a_BOM_is_read_not_skipped(tmp_path):
     """REGRESSION. The scanner read sources as `utf-8`, so a BOM became
     `SyntaxError: invalid non-printable character U+FEFF` and the file was
-    SKIPPED -- 15 of them under `vendor/wnba_betting_repo/tools/`, hiding 2 real
-    findings. Python's own import machinery decodes with `utf-8-sig`. A parse
-    error that silently drops a file is the unknown-defaults-permissive shape,
-    so this is pinned rather than left to the next reader."""
+    SKIPPED. Measured over `vendor/`: `utf-8` skips 46 files and finds 10
+    duplicates; `utf-8-sig` skips 0 and finds 12. Python's own import machinery
+    decodes with `utf-8-sig`, so those files import fine -- only the checker
+    could not read them. A parse error that silently drops a file is the
+    unknown-defaults-permissive shape, so this is pinned rather than left to the
+    next reader."""
     (tmp_path / "bommed.py").write_text(SHADOWED, encoding="utf-8-sig")
     findings, errors = scan(["."], repo_root=tmp_path)
     assert errors == [], "a BOM must not read as a parse error: %r" % (errors,)
