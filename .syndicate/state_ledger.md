@@ -219,10 +219,30 @@ the payload has always carried and no test read. Every assertion there is
 40,000): **6 failed**, naming the truncation and `nodes_used=40000`, where the old
 code produced a silent `'Holder' not found` on only 2.
 
-**STILL CARRIES THE FICTION AND IS NOT MINE TO EDIT:** `suite-order-pollution`'s
-OPEN lane block still reads *"`test_heap_roots`/`test_retainer_census`
-legitimately allocate ~20 GB"*, and that sentence is load-bearing for its
-account of its own `MemoryError`. Surfaced, not edited.
+**AN OPEN INCIDENT NOW HAS NO CAUSE ATTACHED — this is the consequence, and it
+is bigger than a stale sentence.** `suite-order-pollution`'s OPEN block presents
+its own `MemoryError` as SOLVED: a 4,864 MB pagefile against tests that
+*"legitimately allocate ~20 GB"*. **Both halves are now gone** — the pagefile is
+auto-managed and was never a precondition (retracted above), and the ~20 GB is
+fiction (measured above). What remains is a full suite that died at **26 GB RSS
+emitting zero test-status lines, with no account of why.**
+
+**A LANE THAT BELIEVES IT KNOWS THE CAUSE WILL NOT INVESTIGATE.** The sentence is
+not merely wrong, it is load-bearing in the direction of NOT LOOKING: if that
+`MemoryError` recurs, the block tells the next reader it is understood. So the
+correction to carry is **not "the 20 GB was wrong" but "their 26 GB has no
+explanation any more"** — a correction versus an open question whose owner does
+not know it is open. `[framing from peer lane ncaaf-live-resim-wire]`
+
+The 26 GB itself is unexplained but not mysterious in kind: it was the PARALLEL
+suite's total across workers, and attributing it to these four tests was a step
+nobody took deliberately. What no longer exists is any reason to think those
+tests are the ones to look at.
+
+**NOT EDITED — their block, their lane.** Owner located by transcript search
+rather than by title guess: session `local_8498f6de` prints
+`=== lane marker === suite-order-pollution`, and a session whose `.current-lane`
+marker names the slug is the holder. Messaged there.
 
 **SO THE `test_heap_roots` MECHANISM IS STILL OPEN, AND MY "CONTAMINATION"
 READ IS NOT THE FAVOURITE ANY MORE.** Two hypotheses with DIFFERENT FIXES:
