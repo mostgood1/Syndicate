@@ -320,6 +320,42 @@ Kalshi totals match the MAIN line only, which is what full-game `KXMLBTOTAL`
 already does, so this changes first5 from *impossible* to *possible on the main
 total*, not to full coverage.
 
+**`KXMLBF5SPREAD` NEEDED NO CODE — THE SHIPPED BRIDGE ALREADY WIRES IT, AND IT
+YIELDS ZERO MATCHES FOR A STRUCTURAL REASON** `[verified 2026-09-06, lane
+mlb-first5-kalshi-execution]`. Asked to "wire up KXMLBF5SPREAD too", the answer
+is that `d2b060c8` already did: discovery maps the series (title
+`'First 5 Innings Spread'` -> `spreads`), `_row_market` normalises
+`spreads_1st_5_innings` -> `spreads`, and `_segments_agree` passes first5xfirst5.
+Measured over 60 REAL settled `KXMLBF5SPREAD` contracts (15 games) x 553
+production shortlist rows, 2026-09-05:
+
+| | matched | `no_matching_board_row` | `spread_line_orientation_mismatch` |
+|---|---|---|---|
+| pre-fix (discovery only) | 0 | 24 | **0** |
+| shipped (discovery + bridge) | 0 | 16 | **4** |
+
+**The orientation counter going 0 -> 4 is the proof it is wired**: pre-fix these
+contracts never reached the spread sign logic at all; now they do, and it
+REFUSES them rather than pairing with the club being faded. That is the
+2026-08-26 defect's guard working, and `matched=0` means no wrong fill is
+possible.
+
+**WHY ZERO, AND IT IS NOT A BUG: THE LINE LADDERS DO NOT OVERLAP.** Kalshi lists
+F5 spreads at exactly **two** strikes — `1.5` and `2.5` (30 contracts each, two
+per game; ticker suffix `2`/`3`) — while the board's first5 `spreads` rows on
+that slate sat at **0.5, -0.5, -1.0**. No common magnitude, so nothing can pair.
+For contrast `KXMLBF5TOTAL` offers a seven-rung ladder (0.5..6.5), which is why
+totals matched 8 and spreads matched 0 on the same slate from the same code.
+Compounding it, only **3 of 11** first5 spread rows are `spreads` at all; the
+other 8 are `spreads_alt`, which a main-line contract cannot match by design —
+the same rule full-game `KXMLBTOTAL` already follows.
+
+**DO NOT "FIX" THIS BY WIDENING THE MATCH.** Pairing a `spreads` contract with a
+`spreads_alt` row, or interpolating between strikes, is precisely the class of
+change that produced the $7.08 segment defect and the 11 faded-club orders. If
+F5 spread execution is wanted, the honest route is a BOARD row at 1.5/2.5 —
+capture or projection — not a looser join.
+
 **NOT DEPLOYED, and `KXMLBF5SPREAD` deliberately NOT registered** — a Kalshi
 spread states a MARGIN where the board writes a HANDICAP, the defect that put 11
 orders on the club they were fading. Separate risk class, separate change.
