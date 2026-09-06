@@ -1793,6 +1793,17 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   at all tonight, so there was no positive control for the pricing STEP on any
   sport. Soccer's 52/52 shows the FIELD is populated elsewhere; it does not show
   the pricing path is healthy elsewhere.
+- **THE LAST OWED READING IS ARMED, NOT DEFERRED** — scheduled task
+  `verify-ncaaf-record-path-live-game`, fires **2026-09-06T20:30Z**, 30 min after
+  WSU @ WASH kicks off at 20:00Z (the day's other two are 23:30Z). The record
+  path has NEVER run with a game in progress, so `situation` is untested end to
+  end. **Its discriminator is that `record_dates >= 1` and
+  `coverage.live_resimmed > 0` appear ON THE SAME TICK** — those come apart, and
+  the predicted failure is that they never co-occur because the ~514 s producer
+  cadence outruns the 180 s tick, i.e. the consolidation evaporates exactly when
+  the board needs it. That outcome is a CONFIRMED PREDICTION, not a reader bug.
+  A zero must be explained from `refusals_by_reason`, and `no_live_state` on a
+  visibly live game would be a join-key miss, which is worse.
 - **THE CADENCE QUESTION IS ANSWERED — 514 s median, not the 60 s reported
   (7.8x), 27 intervals reconstructed from 400 consumer log samples.** It PREDICTS
   my fallback rate (20.6% expected vs 25.0% observed), which is what makes it a
