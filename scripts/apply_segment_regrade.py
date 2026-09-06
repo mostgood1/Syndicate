@@ -46,6 +46,25 @@ running it against an older build would reintroduce exactly the lost-update the
 original author was protecting against.
 
 --------------------------------------------------------------------------
+IDEMPOTENT BY ROW MARKER, AND THAT IS LOAD-BEARING FOR ANY BOOT HOOK
+--------------------------------------------------------------------------
+A row already carrying `outcome_as_settled` is SKIPPED and counted as
+`already corrected`. This is not a nicety: the intended trigger is an
+env-gated `*_ON_BOOT` hook in `run_refresh_worker.py`, and a boot hook on THAT
+service is **not one-shot by construction**. refresh-worker restarts on every
+deploy and on OOM, and it has a documented OOM history. "Unset the flag after
+reading the result" is an operator remembering, which is not a guard. Without
+this marker a second boot would re-apply the corrections to already-corrected
+rows, flipping `outcome` a second time and overwriting the as-settled values
+that make the change reversible.
+
+So: the safety of wiring this to a boot hook rests on THIS property, not on the
+flag being unset promptly. Anyone wiring it somewhere else should check the
+marker survives their path.
+`[raised by lane ncaaf-live-resim-wire, who verified it in the source rather
+than taking the docstring's word]`
+
+--------------------------------------------------------------------------
 IT ONLY RUNS WHERE THE LEDGER LIVES
 --------------------------------------------------------------------------
 The ledger is keyvalue-backed on Render. A laptop has no
