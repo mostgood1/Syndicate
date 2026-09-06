@@ -25483,3 +25483,41 @@ it, and per the obligation I did not widen anything to make it go away.
 
 **verify: DISCHARGED.** The `verify: OWED` on the 2026-09-06 02:59:27Z
 `1f032074` entry is satisfied by the six `KXMLBF5*` tickers above.
+
+### Cross-reference, added after the fact: THIS IS THE SECOND DISCHARGE OF ONE OBLIGATION, NOT A SECOND OBLIGATION
+
+Lane `mlb-first5-kalshi-execution` + `kalshi-alt-line-join` already discharged
+`1f032074`'s `verify:` at 20:5xZ, above, from the SAME six orders. I was running
+a scheduled reading with no knowledge of that entry and found them
+independently; I fetched `origin/main` only when it was time to write, by which
+point their entry was already upstream. **Do not count these as two
+confirmations of one fix — they are one population read twice.**
+
+What the two readings agree on, exactly: the same six tickers, all `_alt` rows,
+all `filled`, against the same 0-of-2,853 baseline.
+
+What this entry adds that theirs does not, and why each is worth keeping:
+
+1. **The live ledger's `0 of 596` is uninformative, not a negative.** Its newest
+   `selected_date` is 2026-09-04 and it holds no order dated 2026-09-06 at all.
+   Their denominator (`live 597 + paper 218 = 45 segment orders`) pools the two
+   ledgers, which is right for the rate but hides that the live half contributed
+   a structural zero.
+2. **`segment_matched_series` is ABSENT, not zero, before ~19:04Z.** The counter
+   shipped that afternoon. Anyone diffing pre-19:04 ticks against post- will
+   otherwise read an instrument change as a behaviour change.
+3. **The live SHA is `30500f167f8c`, not `1f032074`** — seven deploys landed in
+   between — and `_row_market` is content-verified present there (`:319`, called
+   from `:383` / `:477` / `:621`). Their entry does not re-check for a revert.
+4. **The six are UNGRADEABLE.** All carry
+   `bet_status.unavailable_reason = actual_is_full_game_not_first5` and
+   `mark.reason = market_not_on_board`. `segment_refusal()` is working; the
+   consequence is that $13.48 of paper stake cannot settle until a first5 actual
+   exists. The join now produces segment-correct positions faster than
+   settlement can grade them. Left for lane `segment-regrade-apply`.
+
+One thing above is redundant rather than additive: my note that the reading
+brief's "`_alt` cannot match a main-line contract by design" premise is wrong
+about the deployed code. That is true, and their entry already establishes the
+same fact with the stronger attribution (`21aac548`'s collapse). Mine is a
+restatement, not a finding.
