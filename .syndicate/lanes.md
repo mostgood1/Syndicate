@@ -1495,7 +1495,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Offered to `suite-order-pollution`, whose owed reading this is; its block was
   NOT edited. Full working: `state_ledger.md [full-suite-completes]`.
 - Blocked by: none.
-### ncaaf-live-resim-wire — OPEN — opened 2026-09-05 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — **BUILT, TESTED, MEASURED ON THE LIVE SLATE, COMMITTED. DEPLOY OWED.** The producer existed and nothing called it.
+### ncaaf-live-resim-wire — OPEN — opened 2026-09-05 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — **TESTABLE OUTCOME MET IN PRODUCTION, BOTH HALVES. The re-sim produces (`sources_seen {live_resim: 9, pregame: 42}`) and its output reaches the board (74-83 rows `live_aware`, reproduced on two builds). NO LIVE EDGE IS PUBLISHED and none should be yet — the blocker is ONE LINE in `ncaaf/game_projections.py`'s h2h branch and it is a money decision, not a wiring one.**
 - Goal: `build_live_lens_snapshot` runs on refresh-worker's tick and writes
   `data/live/ncaaf_live_lens.json`, so a live NCAAF board row carries an edge
   priced off a probability that knows the score. ONE testable outcome:
@@ -1598,6 +1598,55 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   string is `board_enrichment`'s unlisted-sport branch, so **web must be deployed
   too** — `_LIVE_GAMELINE_SPORTS` gained `ncaaf` in `7d9ec94e`, which web is not
   running.
+- **CLOSING READING, TAKEN 2026-09-06 00:01-00:11Z, substrate `render`.** Both
+  halves of this lane's stated testable outcome are met.
+  **(A)** `sources_seen {live_resim: 9, pregame: 42}`, `index_size 9`, producer
+  coverage `games 51, live_resimmed 9, refused 42`,
+  `refusals_by_reason {game_final 16, game_not_in_progress 7, no_live_state 18,
+  no_period 1}` — the refusal breakdown recorded beside the count, because a
+  zero without it is not a result.
+  **(B)** 74-83 board rows carry `projection.live_aware: true`, 7 of them h2h,
+  **reproduced on two independent builds** (00:06:47Z and 00:11:01Z);
+  `no_live_gameline_projection` fell **420 -> 297** the moment the key fix landed.
+  Tulane @ Duke Q4 2:19, 3-17: `live_gameline model_prob 1.0, sims_run 120,
+  as_of 00:00:33Z` — matching the snapshot to the second, which a stale artifact
+  cannot contain.
+- **AND THE DURABLE-MIRROR HYPOTHESIS IS DISCHARGED DISCRIMINATINGLY.** First
+  boot read `sp_ratings_source: loader` (predicted — the mirror did not exist
+  yet); this boot reads **`durable_mirror`**. `loader` twice would have meant the
+  mirror does not survive a deploy and the post-deploy gap was still open.
+- **THE EDGE IS WITHHELD AND I FOUND THE LINE. NOT FIXED, ON PURPOSE.**
+  `rows_live_gameline_edged` is 0 on every build; all 7 live-aware h2h rows refuse
+  `no_two_sided_market_price`. My first guess (the market pulled the line on a
+  decided game) was WRONG — Arkansas State @ Memphis at **10-7 in Q2** carries
+  `consensus {away 180, home -325}`, 27 books quoting, and still refuses.
+  `live_gameline_join:1109` prices against
+  `projection.get("market_fair_prob_over")`, and `ncaaf/game_projections.py`
+  writes that key in its TOTALS branch (line 482) and **not in its h2h branch**.
+  Measured on the served board: **soccer 52/52 h2h rows carry it, ncaaf 0 of 30**.
+  Invisible until now because no NCAAF row had ever been `live_aware`, so the
+  moneyline branch was never reached.
+  **The fix is one line — the helper is already imported and used two branches
+  down — and it must not be taken casually.** That h2h branch withholds
+  deliberately: its margin model *"loses to the closing line by 3.563 points of
+  MAE over 2233 games (t=17.2)"*. The live re-sim is NOT that pregame model, so
+  the note does not automatically condemn it — but the LIVE model is ungraded
+  too, and opening the market side would publish live money edges on an ungraded
+  estimator. `#499` is the precedent in reverse. **A lane that can BACKTEST the
+  live probability owns this, not a wiring lane.** `ncaaf/game_projections.py` is
+  FREE as of this writing.
+- **NOT TESTED, NOT CLAIMED:** MLB had **0** h2h rows carrying a projection dict
+  at all tonight, so there was no positive control for the pricing STEP on any
+  sport. Soccer's 52/52 shows the FIELD is populated elsewhere; it does not show
+  the pricing path is healthy elsewhere.
+- **`todo.md #71` NOT SATISFIED FOR THIS LANE, deliberately and visibly.**
+  `docs/ai_context/todo.md` is claimed IN FULL by `accuracy-ledger-budget-raise`.
+  I wrote the `#119` update, the post-write guard caught it, I reverted it, and
+  the exact text is in
+  `.syndicate/handoff_2026-09-05_todo_119_ncaaf_live_resim.md` (`7abc5dcf`). That
+  session is unattended, so the file is the delivery. A whole-file claim on
+  `todo.md` and CLAUDE.md's "every lane updates it before finishing" cannot both
+  be honoured; flagged for the owner.
 - Blocked by: none. Landed on `origin/main`; deploy of web + refresh-worker owed,
   under `deploy_claim.py` + `deploy_preflight.py`.
 
