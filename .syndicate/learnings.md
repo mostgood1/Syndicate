@@ -5181,11 +5181,26 @@ not re-derive at launch. On this repo that window is not theoretical — ~22 pee
 commits landed between run 2 and run 3, and one of the four new failures
 (`ada53db5`) landed **11 minutes before the run began**.
 
+**THE SAME DEFECT IS IN THE RESULT, NOT ONLY THE PREDICTION, AND THAT IS THE
+SHARPER FORM:** a suite run reports the tree as of its **START**, so **a failure
+list is not a fact about `main` — it is a fact about a SHA nobody names.** Run 3
+took 37m54s and **3 of its 4 failures were already fixed before it finished**; it
+had photographed a real intermediate state (tests at 22:20, their producer at
+22:52 and 23:09, run started 22:31). `[framing from lane
+ncaaf-live-state-worker, whose commits those were]`
+
 **The rule.** A prediction that names specific tests, files or counts must be
-re-derived against `origin/main` AT THE MOMENT the measurement starts, and the
-prediction should record the SHA it was derived from. Without that, a wrong
-number cannot be told apart from a stale one — and those have opposite lessons:
-one says the model of the system is broken, the other says only the clock moved.
+re-derived against `origin/main` AT THE MOMENT the measurement starts, and must
+record the SHA it was derived from. Without that, a wrong number cannot be told
+apart from a stale one — and those have opposite lessons: one says the model of
+the system is broken, the other says only the clock moved.
+
+**FIXED IN THE TOOL, not left as a discipline.** `scripts/pytest_baseline.py`
+now prints `STARTED <local time> -- tree <sha>, <clean|N path(s) dirty>` plus a
+line saying the result describes THAT tree. A discipline only helps the person
+who ran the suite; the person judging a failure list is usually someone else, and
+to them the staleness was invisible. Before acting on suite output anyone hands
+you, check its start time against the commits in the area.
 
 **Corollary, and it cuts the other way too:** a peer acting on your own message
 is a state change you CAUSED. I sent `suite-order-pollution` the finding, they

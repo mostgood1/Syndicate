@@ -39,6 +39,7 @@ to be approximate precisely because nothing machine-readable depends on it.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import subprocess
 import sys
@@ -91,12 +92,47 @@ def _runnable(key: str) -> str:
     return key
 
 
+def _tree_provenance() -> str:
+    """The SHA this run describes, and whether the tree was clean.
+
+    **A FAILURE LIST IS NOT A FACT ABOUT `main`. It is a fact about the SHA the
+    run STARTED on, and nothing in the output used to name it.** Measured
+    2026-09-05: a full run took 37m54s and **3 of its 4 failures were already
+    fixed before it finished** -- it had photographed a genuine intermediate
+    state (tests landed at 22:20, their producer at 22:52 and 23:09, run started
+    22:31). ~22 commits landed on this repo between two consecutive full runs, so
+    a result is stale by up to one run length the moment it prints.
+
+    Printed in the run's own header rather than recorded by whoever launched it,
+    because the person who has to judge a failure list is usually NOT the person
+    who produced it -- and to them the staleness is otherwise invisible.
+    `[suggested by lane ncaaf-live-state-worker after being sent a stale list]`
+
+    Fails soft: a run must never die because git is unavailable.
+    """
+    try:
+        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT,
+                             capture_output=True, text=True, timeout=30).stdout.strip()
+        dirty = subprocess.run(["git", "status", "--porcelain"], cwd=REPO_ROOT,
+                              capture_output=True, text=True, timeout=60).stdout.strip()
+    except Exception:
+        return "provenance UNKNOWN (git unavailable)"
+    if not sha:
+        return "provenance UNKNOWN (not a git checkout)"
+    state = f"{len(dirty.splitlines())} path(s) dirty" if dirty else "clean"
+    return f"tree {sha}, {state}"
+
+
 def _run_pytest(pytest_args: list[str], junit_path: Path) -> int:
     command = [
         sys.executable, "-m", "pytest", *pytest_args,
         "-q", "--tb=no", "-p", "no:cacheprovider",
         f"--junitxml={junit_path}",
     ]
+    started = dt.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+    print(f"[pytest_baseline] STARTED {started} -- {_tree_provenance()}", flush=True)
+    print("[pytest_baseline] this result describes THAT tree, not whatever "
+          "`main` is when it finishes", flush=True)
     print(f"[pytest_baseline] {' '.join(command)}", flush=True)
     # Output is NOT captured: a 27-minute run with no visible progress is
     # indistinguishable from a hung one, and CI will kill it on that suspicion.
