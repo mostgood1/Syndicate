@@ -2669,3 +2669,32 @@ could not answer the question — here, against nothing at all.
   A stash's LABEL names the branch it was created on, not the work it holds --
   so the label is not evidence of ownership. Check `git stash show --numstat`
   before popping anything.
+
+## 2026-09-06 - COMMITTING A LANE BLOCK IS NOT CLAIMING IT. LANDING IS.
+
+Lane `web-oom-fragmentation` ran to completion with its OPEN block committed at
+lane-open (`df83d8a0`, 29 insertions to `lanes.md`) and NEVER PUSHED. For the
+lane's entire life `origin/main` carried no record of it, so:
+
+* every peer's collision check -- which reads `origin/main`, not your tree --
+  saw the lane's files as unheld;
+* `check_lane_invariants.py` reported the slug **zero times**, and I read that
+  null as *"my lane is not implicated in the contested files"* when it meant
+  **the checker could not see the lane at all**. A null from an instrument is
+  only exoneration once you know the instrument can see your subject.
+
+A worktree has its OWN `lanes.md`. That is the point of worktrees and it is also
+this trap: the block you can read is not the block anyone else can read.
+
+**How to apply.** After `/lane open`, LAND the block before doing the work -- a
+lane that is not on `origin/main` claims nothing, however carefully it is
+written. And when a checker returns nothing about your lane, confirm it can SEE
+your lane before treating the silence as a clean bill.
+
+Blast radius here was nil only because this lane claimed no files (scratchpad
+poller, no code changes). The same omission on a lane holding real paths is a
+silent invitation for a peer to edit underneath you.
+
+Related, same day and same root: the block ALSO sat above the `## OPEN` heading
+(the `#466` violation), which is a second way for a block to be present and
+still not count.
