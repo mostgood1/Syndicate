@@ -36,10 +36,6 @@ from syndicate.features.shared.refresh_state_store import should_recompute
 from syndicate.features.shared.refresh_state_store import write_json_file as _keyvalue_write_json_file
 from syndicate.features.shared.timezone import central_date_from_iso
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
 from syndicate.features.shared.atomic_artifact_write import atomic_write_csv
 
 

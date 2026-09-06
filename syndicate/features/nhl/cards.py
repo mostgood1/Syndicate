@@ -518,12 +518,6 @@ def _sim_boxscore_rows(selected_date: str) -> tuple[list[dict[str, str]], str]:
     return rows, str(path)
 
 
-def _sim_hist_rows(selected_date: str) -> tuple[list[dict[str, str]], str]:
-    path = processed_path(f"props_boxscores_sim_hist_{selected_date}.csv")
-    rows = _load_csv_rows(path) if path.exists() else []
-    return rows, str(path)
-
-
 def _schedule_rows_by_game(selected_date: str) -> dict[tuple[str, str], dict[str, str]]:
     path = scoreboard_snapshot_path(selected_date)
     rows = _load_csv_rows(path) if path.exists() else []

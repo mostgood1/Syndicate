@@ -466,7 +466,7 @@ def test_the_repair_ungrades_an_impossible_opposite_side_pair(ledger, monkeypatc
         assert "outcome" not in o and "settled_by" not in o and "pnl_dollars" not in o
 
 
-def test_the_repair_is_self_limiting(ledger):
+def test_the_multi_side_repair_is_self_limiting(ledger):
     """After one pass the rows are ungraded, so a second pass finds nothing.
     A repair that fired every tick would rewrite the ledger forever."""
     ledger["orders"] = [
@@ -477,7 +477,7 @@ def test_the_repair_is_self_limiting(ledger):
     assert vs.repair_multi_side_grades()["cleared"] == 0
 
 
-def test_the_repair_never_touches_an_INFERRED_grade(ledger):
+def test_the_multi_side_repair_never_touches_an_INFERRED_grade(ledger):
     """An inferred outcome is another module's record. Even on an opposite-side
     market it is not this repair's to remove."""
     ledger["orders"] = [
@@ -498,7 +498,7 @@ def test_the_repair_leaves_a_SAME_side_market_alone(ledger):
     assert vs.repair_multi_side_grades()["cleared"] == 0
 
 
-def test_the_repair_never_touches_paper(ledger):
+def test_the_multi_side_repair_never_touches_paper(ledger):
     ledger["orders"] = [
         _order(idempotency_key="a", side="home", mode="paper", outcome="won", settled_by="venue"),
         _order(idempotency_key="b", side="away", mode="paper", outcome="won", settled_by="venue"),

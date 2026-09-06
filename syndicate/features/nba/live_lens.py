@@ -444,8 +444,17 @@ def _empty_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
 
 
 def _compute_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
-    cards_context = _compute_cards_page_context(selected_date)
-    payload = build_rank_api_payload(_compute_live_lens_page_context(selected_date))
+    # Resolved through the module-level `build_*` names rather than the private
+    # `_compute_*` ones they alias, so this stays the SINGLE body behind both
+    # `build_live_lens_api_payload` below and the `api_payload` that
+    # `build_live_lens_snapshot` writes into the snapshot the route serves.
+    # There used to be two copies of this function, one of them shadowed and
+    # unreachable, and two copies is how a fix reaches one caller and not the
+    # other. `build_cards_page_context is _compute_cards_page_context` (the
+    # alias at the top of this module) and `build_live_lens_page_context`
+    # forwards with the same defaults, so this is the same computation.
+    cards_context = build_cards_page_context(selected_date)
+    payload = build_rank_api_payload(build_live_lens_page_context(selected_date))
     payload["requested_date"] = cards_context.get("requested_date")
     payload["lookahead_applied"] = bool(cards_context.get("lookahead_applied"))
     payload["players_included"] = False
@@ -744,10 +753,6 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
     return _compute_live_lens_page_context(selected_date, season=season, profile=profile)
 
 
-def build_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
-    return _compute_live_lens_api_payload(selected_date)
-
-
 def build_live_player_lens_payload(
     selected_date: str,
     event_ids: list[str],
@@ -805,11 +810,4 @@ def build_live_pbp_stats_payload(
 
 
 def build_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
-    cards_context = build_cards_page_context(selected_date)
-    payload = build_rank_api_payload(build_live_lens_page_context(selected_date))
-    payload["requested_date"] = cards_context.get("requested_date")
-    payload["lookahead_applied"] = bool(cards_context.get("lookahead_applied"))
-    payload["players_included"] = False
-    payload["pregame_portfolio"] = {"enabled": False, "selected": 0, "candidates": 0}
-    payload["games"] = [dict(game) for game in (cards_context.get("games") or []) if isinstance(game, dict)]
-    return payload
+    return _compute_live_lens_api_payload(selected_date)

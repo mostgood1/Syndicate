@@ -987,9 +987,6 @@ _EVENT_DATETIME = re.compile(
     r"^(?P<yy>\d{2})(?P<mon>[A-Z]{3})(?P<dd>\d{2})(?P<hh>\d{2})(?P<mi>\d{2})"
 )
 
-_MONTHS = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
-           "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
-
 
 def event_start_from_ticker(ticker: Any) -> "datetime | None":
     """UTC start time encoded in a Kalshi ticker's event segment, or None.

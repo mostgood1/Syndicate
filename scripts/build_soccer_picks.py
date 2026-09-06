@@ -48,10 +48,6 @@ if str(REPO_ROOT) not in sys.path:
 from syndicate.features.shared.atomic_artifact_write import atomic_write_csv
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT))
-
-
 def _safe_float(value: Any) -> float | None:
     try:
         if value is None or (isinstance(value, float) and value != value) or str(value).strip() == "":
