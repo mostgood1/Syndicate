@@ -44,15 +44,19 @@ from syndicate.features.shared.venue_quote_fanin import (
 def refusing(monkeypatch):
     """Turn the refusal ON for the tests that are about the refusal.
 
-    `_SEGMENT_REFUSAL_ENABLED` ships **False** by explicit user decision
-    ("instrument first, fix second", 2026-09-06): the first deploy MEASURES the
-    defect and changes no price, and a second flips the constant. So the
-    behaviour tests have to say which stage they are describing, and
-    `test_the_shipped_default_counts_without_refusing` pins the other one.
+    `_SEGMENT_REFUSAL_ENABLED` shipped **False** under the original staging
+    ("instrument first, fix second", 2026-09-06) and is now **True** by a second
+    user decision the same day, once the coverage cost was measured off the
+    served payload -- 17 rows, 1.51% of the board, 0 of them displayable or
+    servable. `test_the_shipped_default_now_REFUSES_and_still_counts` pins the
+    shipped state; this fixture is now redundant with it for the ON direction
+    and is KEPT anyway, deliberately.
 
-    Forced here rather than left implicit: a suite that passes only because a
-    flag happens to be on today is a suite that stops testing the day it is
-    turned off, and this one has to survive the flip in BOTH directions.
+    Kept because forcing the flag is what lets this suite survive the flip in
+    BOTH directions: a suite that passes only because a constant happens to hold
+    a value today is a suite that stops testing the day someone changes it.
+    `test_the_match_record_names_a_mis_binding_as_such` forces the OFF direction
+    for the same reason.
     """
     monkeypatch.setattr(fanin, "_SEGMENT_REFUSAL_ENABLED", True)
 
@@ -442,7 +446,7 @@ def test_a_row_whose_segment_lives_only_in_its_market_name_is_still_a_segment_ro
 # ---------------------------------------------------------------------------
 
 
-def test_the_shipped_default_counts_without_refusing(kalshi_artifact):
+def test_the_shipped_default_now_REFUSES_and_still_counts(kalshi_artifact):
     """`_SEGMENT_REFUSAL_ENABLED` is False as shipped, BY DECISION, and the
     counter must still fire.
 
@@ -453,30 +457,49 @@ def test_the_shipped_default_counts_without_refusing(kalshi_artifact):
     pinned apart here -- the price is UNCHANGED (still the venue's) and the
     count is NON-ZERO on the same call.
     """
-    assert fanin._SEGMENT_REFUSAL_ENABLED is False, (
-        "the refusal ships inert; flipping this constant is the SECOND deploy"
+    assert fanin._SEGMENT_REFUSAL_ENABLED is True, (
+        "the refusal is ON as shipped `[user decision 2026-09-06]`; turning it "
+        "back off is a decision to log, not a silent revert"
     )
     kalshi_artifact(F5_CONTRACT, FULL_GAME_CONTRACT)
 
     row = _grid_row("first5")
     result = _reprice([row])
 
-    # Still mis-priced -- this commit changes no price.
-    assert row["best"]["over"]["price_source"] == "kalshi"
-    assert row["best"]["over"]["price"] == -669
-    assert row["best"]["over"]["venue_ref"] == "KXMLBTOTAL-26SEP061340MILCIN-4"
-    # And now it is COUNTED, and the match record names the mis-binding.
+    # THE PRICE IS GONE -- a full-game contract no longer prices a first5 row.
+    assert row["best"]["over"].get("price_source") != "kalshi"
+    assert row["best"]["over"].get("venue_ref") != "KXMLBTOTAL-26SEP061340MILCIN-4"
+    # ...and it is still COUNTED, which is the half that must not go quiet.
     assert result["segment_mismatch_detected"] == 2
-    assert result["segment_refusal_enabled"] is False
-    assert result["matched_series"] == {"first5|kalshi|KXMLBTOTAL": 2}
+    assert result["segment_refusal_enabled"] is True
 
 
-def test_the_match_record_names_a_mis_binding_as_such(kalshi_artifact):
-    """`first5|kalshi|KXMLBTOTAL` is the whole finding in one token, and it is
-    what the production log will carry on the measuring deploy."""
+def test_the_match_record_names_a_mis_binding_as_such(kalshi_artifact, monkeypatch):
+    """`first5|kalshi|KXMLBTOTAL` is the whole finding in one token.
+
+    PINNED WITH THE REFUSAL OFF, deliberately. The shipped default now refuses,
+    so the mis-binding no longer REPRICES and cannot appear in `matched_series`
+    in the shipped configuration -- yet the record's naming is exactly what
+    someone re-reading a PRE-FLIP production log needs. Forcing the flag off
+    keeps this testing the instrument rather than testing the flag twice.
+    """
+    monkeypatch.setattr(fanin, "_SEGMENT_REFUSAL_ENABLED", False)
     kalshi_artifact(F5_CONTRACT, FULL_GAME_CONTRACT)
     result = _reprice([_grid_row("first5"), _grid_row("full")])
     assert result["matched_series"] == {
         "first5|kalshi|KXMLBTOTAL": 2,
         "full|kalshi|KXMLBTOTAL": 2,
     }
+
+
+def test_with_the_refusal_on_only_the_full_game_reprice_survives(kalshi_artifact):
+    """The shipped configuration as an OUTCOME, not a flag read.
+
+    The mis-binding leaves `matched_series` and the legitimate full-game pairing
+    does not -- the property separating "the guard works" from "the guard broke
+    venue pricing", which is the failure this change most needed to avoid.
+    """
+    kalshi_artifact(F5_CONTRACT, FULL_GAME_CONTRACT)
+    result = _reprice([_grid_row("first5"), _grid_row("full")])
+    assert result["matched_series"] == {"full|kalshi|KXMLBTOTAL": 2}
+    assert result["segment_mismatch_detected"] == 2

@@ -130,7 +130,49 @@ _DEFAULT_ENABLED: dict[str, bool] = {
 # venue-priced right now could not be read. A refusal whose coverage cost is
 # unmeasured is a change nobody can size, and `deploys.md` would have nothing
 # to record but an intention.
-_SEGMENT_REFUSAL_ENABLED = False
+#
+# --------------------------------------------------------------------------
+# THE DENOMINATOR WAS MEASURED, AND THIS IS NOW True
+# `[user decision, 2026-09-06: "measure the coverage cost and flip the flag"]`
+# --------------------------------------------------------------------------
+#
+# The paragraph above says the cost could not be read FROM THAT SESSION. It was
+# read from another one that reaches the host. Served payload,
+# `/api/board/layer2-shortlist` for 2026-09-06, two samples 60s apart
+# (19:00:20Z, 19:01:37Z), identical both times:
+#
+#     sport    rows   segment rows   would be refused
+#     mlb       734             18                 17
+#     ncaaf     270              8                  0
+#     soccer    119              0                  0
+#     TOTAL   1,124             26                 17
+#
+#     1.51% of all rows     65.4% of segment rows     venue: kalshi x17 (100%)
+#     of the 17: DISPLAYABLE 0, SERVABLE 0
+#
+# A row counts as refusable when `venue_basis.venue` is set AND that venue also
+# appears in `book_prices` -- it is actually WEARING a native venue price -- and
+# its segment is not a `_FULL_GAME_TOKENS` spelling.
+#
+# **NOT ONE OF THE 17 IS DISPLAYABLE OR SERVABLE**, so on this slate the refusal
+# removes no coverage a user can see or act on. It removes only prices for a
+# different portion of the game, which is what this guard is for.
+#
+# THE CAVEAT, because that zero is the load-bearing number: those 17 read
+# unservable because of the 45s staleness ceiling ("venue quote is 59s old
+# against a 45s ceiling"), NOT because of segment logic. A fresher quote makes
+# them servable. That is an argument FOR the refusal: the only thing keeping
+# them off the board today is a timing accident.
+#
+# WHAT THIS SKIPS, STATED PLAINLY. The staged plan was "deploy 1 counts, deploy
+# 2 flips". Deploy 1 never happened -- `e77be334` was deployed nowhere when this
+# was flipped (refresh-worker `11a6a829`, web `2b3c1974`, content-checked). So
+# `segment_mismatch_detected` has never produced a production number, and the
+# table above stands in its place: it reads the SERVED PAYLOAD rather than an
+# internal counter, which is the stronger substrate but is NOT the same
+# instrument. On deploy, `segment_mismatch_detected` and `refusing=` remain the
+# fields to read, and should land near 17 on a comparable MLB slate.
+_SEGMENT_REFUSAL_ENABLED = True
 
 # Novig's public CSV mirror is anonymized at the game/player/team level --
 # `reportTicker`/`contractSeries` name a CATEGORY, never a specific bet
