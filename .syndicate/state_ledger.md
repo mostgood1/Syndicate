@@ -5,6 +5,65 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [segment-misgrade-regrade] 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[measured 2026-09-05, substrate render + upstream:statsapi]`
+
+`bet_status.segment_refusal` stopped the bug going forward. This is the answer to
+"how many were already wrong", re-graded against each order's TRUE segment
+actual. Manifest: `reports/segment_regrade/manifest_2026-09-05.json`, 173 rows.
+
+**THE CONTROL IS WHAT MAKES THE NUMBER TRUSTWORTHY, and it ran first.** The
+harness re-grades each order the OLD way and compares to the shipped ledger:
+**172/173 (99.4%) reproduce**. So the flips below are the grading change, not
+reimplementation drift — without that arm, "53 rows differ" would be
+indistinguishable from a rewrite that disagrees with production about
+everything.
+
+    OUTCOME FLIPPED   53/173 = 30.6%
+      won  -> lost    28
+      lost -> won     22
+      lost -> push     2
+      lost -> None     1
+
+    segments: first5 124, first3 42, first1 7
+    settled_by: inferred 163, venue 10
+
+**WHY NOBODY NOTICED: THE ERRORS ARE NEARLY SYMMETRIC.** 28 wrong-wins against
+22 wrong-losses, so the P&L barely moved and no anomaly ever surfaced. Recorded
+P&L on these 173 was **$19.20**; corrected is **$12.17** on $419.76 staked
+(**+2.90% ROI**), a delta of **−$4.48**. A 30.6% grading error rate that costs
+~$7 is exactly the shape that survives indefinitely — **do not let a small P&L
+delta be read as a small defect.** Every downstream calibration, CLV and
+model-accuracy number computed off these rows was fitted to a 30.6% mislabelled
+target.
+
+Actuals came from `upstream:statsapi` schedule+linescore, 180 games over 13
+dates; all 70 games behind these orders are `status=Final` with >=9 complete
+innings, so no partial-game ambiguity.
+
+### THE VENUE ROWS ARE A DIFFERENT AND WORSE PROBLEM — DO NOT WRITE THESE BACK
+
+Of the 10 rows settled by the VENUE rather than inferred, **our correction
+disagrees with the venue on 4**. For those the venue's own settlement matched
+our WHOLE-GAME grade. Two readings, and they are not equally likely:
+
+1. our segment actual is wrong for those 4 — unlikely, the games are Final; or
+2. **the order was FILLED on a full-game contract**, so the venue settled the
+   instrument it actually sold us.
+
+Reading 2 is an EXECUTION defect, not a settlement one, and `segment_refusal`
+does **nothing** about it — that fix stops mis-GRADING, not mis-FILLING. Handed
+to its own session. **UNVERIFIED**: the supporting ticker claim (segment orders
+carrying `KXMLBTOTAL`, the full-game series) could NOT be reproduced — a walk of
+`/api/portfolio/live` returned 0 ticker-carrying rows, so the population still
+needs locating. Complicating context: `KXMLBTOTAL` was historically *absent*
+from the catalogue and was registered on 2026-08-25 to fix a different gap,
+which is a plausible mechanism for segment rows acquiring a full-game contract
+to join to.
+
+**IF ANY WRITE-BACK IS EVER DONE, EXCLUDE THE 10 VENUE-SETTLED ROWS.** For those
+the venue is authoritative; overwriting an actual settlement with our inference
+would repeat this exact class of bug one level down. The other 163 are safe.
+
 ## [stale-test-triage] "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit 63c10ed5]`
 
 All 18 red-standalone tests from `[full-suite-completes]` are now green, CI's
