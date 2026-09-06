@@ -1009,3 +1009,30 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
 * Weak signals, recorded as such: pid 98 took **6 of 7** bursts (lopsided for
   round-robin, but n=7), and ONE burst coincided with a 98 MB child process
   (`272:pro`, the only child all window) — an anecdote, not a mechanism.
+
+### `[web-oom-leak]` UPDATE 17 — intelligence response cache **BOUNDED and VERIFIED**: `22.503 -> ~13.1 MB` (-42%), 2026-09-06T02:3xZ `[session b2b5b45b]`
+
+* `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` now carries a **row budget** beside the
+  entry cap, **loop eviction** (the old code popped exactly ONE entry per insert,
+  so a cache over budget by more than one never caught up), and a **one-entry
+  floor** so an oversized slate cannot turn the cache into a permanent miss.
+  Deployed `814fda97`.
+* **Measured: `~13.1 MB` vs a `22.503 MB` control taken on the old code minutes
+  before the deploy — 58%, a 42% reduction, flat over 22.9 min (largest climb
+  `+0.477 MB`), both workers agreeing.**
+* **THE BOOT CONFOUND IS RULED OUT BY THE SAME WINDOW:** census total recovered
+  to `73.66`/`67.89 MB` against a `77.38`/`69.97` control (~95%) while the cache
+  stayed at 58%. The process matured; the cache did not. No cross-epoch
+  comparison was needed.
+* **The control had to be re-taken.** The lane quoted `37.50 MB` from hours
+  earlier on a bigger slate; the live value was `22.503 MB`. Against the stale
+  number, doing nothing would have passed.
+* Row count was chosen over byte-sizing on MEASUREMENT: an accurate deep walk
+  costs `228 ms` per insert; a truncated walk reported `11.31 MB as 1.44 MB`;
+  `json.dumps` costs `70-174 ms` and allocates a `9.44 MB` transient string.
+* **NOT AN OOM FIX** — `#632`'s bytes are not Python objects (28.3% of anon,
+  0.3% of the growth).
+* **NEXT, and NOT shipped:** `slice_intelligence_board_state_for_request` builds
+  `top_opportunities` and `recommendations` as two INDEPENDENT deep copies of the
+  same rows. Every use is a reassignment, never an in-place mutation, so sharing
+  the row dicts would roughly halve that term. Separate change, separate risk.

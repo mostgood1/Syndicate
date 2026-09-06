@@ -86,7 +86,7 @@ death, never life — do not invert it.
   behind it, which is how I mis-reported pressure as 86% when it was 54%.
 - Blocked by: none.
 
-### intelligence-cache-cap — OPEN — opened 2026-09-05 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### intelligence-cache-cap — CLOSED 2026-09-06 — opened 2026-09-05 — **BOUNDED AND VERIFIED IN PRODUCTION: `22.503 -> ~13.1 MB`, a 42% reduction**, flat over 22.9 min across 46 converged readings on both workers. The cache was ALREADY capped at 32 entries and reached that size anyway — the bound was on the wrong dimension. Fixed by adding a ROW budget, LOOP eviction (the old code popped one entry per insert, so a cache over budget by more than one never caught up), and a one-entry floor so an oversized slate cannot become a permanent cache miss. **The boot confound was ruled out inside the same window:** census total recovered to ~95% of control while the cache stayed at 58% — the process matured, the cache did not. The control was RE-TAKEN first: the lane goal quoted a stale 37.50 MB, against which doing nothing would have passed. Byte-sizing was rejected on measurement (228 ms accurate walk; a truncated walk reporting 11.31 MB as 1.44 MB; json.dumps at 70-174 ms plus a 9.44 MB transient). 11 new tests, 460 in the intelligence suite. **NOT an OOM fix** — `#632`'s bytes are not Python objects. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: bound `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` by CONTENT, not by entry
   count. It measured **37.50 MB** on a live worker WHILE CAPPED at 32 entries —
   the cap is on the wrong dimension, because entry size varies by orders of

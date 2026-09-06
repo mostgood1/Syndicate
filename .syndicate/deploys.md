@@ -23802,3 +23802,53 @@ pid 98.** The endpoint round-robins across workers, so the two are DIFFERENT
 processes — the ratio is internally consistent (anon and heap come from one
 call), but the root table must not be read as a breakdown OF that ratio. Pairing
 them would need a `proc_token` filter the endpoint does not offer.
+
+
+---
+
+## 2026-09-06T02:00:38Z — web — `814fda97` — **intelligence response cache BOUNDED: 22.503 -> 13.1 MB, and the boot confound is RULED OUT**
+
+`[lane intelligence-cache-cap, session b2b5b45b]` — carries `409d84fe`. CLEAR
+preflight pinned to the target; two earlier attempts waited out in-flight merge
+jobs rather than killing them.
+
+verify: **`/api/ops/retainer-census`, 46 converged readings over 22.9 min on both
+workers, against a control taken on the OLD code MINUTES BEFORE the deploy.**
+
+    CONTROL (old code, mature process)   pid 98  22.501 MB   pid 99  22.505 MB
+    AFTER  (22.9 min, both workers)      pid 97  12.73 -> 13.21 MB  (max 13.26)
+                                         pid 98  14.89 -> 13.15 MB  (max 14.89)
+    largest climb over the window        +0.477 MB
+    result                               ~13.1 MB = 58% of control, -42%
+
+**THE BOOT CONFOUND IS RULED OUT, and this is the part that makes it a
+verification rather than a hope.** The post-deploy process was 8 minutes old, so
+EVERY cache in it was small — census total had fallen `77.4 -> 51.5 MB`, a 25.8 MB
+drop the response cache explains only 7.5 MB of. Judging it there would have
+credited a young process to my change.
+
+Over the next 23 minutes the process MATURED: **census total climbed back to
+`73.66` / `67.89 MB`, ~95% of the `77.38` / `69.97` control — while the response
+cache stayed flat at ~13 MB, 58%.** The rest of the process refilled and the
+cache did not. That separates "bounded" from "not yet full" on the same process,
+in the same window, with no cross-epoch comparison.
+
+**The cache is still POPULATED (~13 MB, not zero), which was a stated failure
+mode:** a cap that empties the cache makes every request rebuild the board and
+costs far more than it saves. The one-entry floor exists for that and the
+verifier was written to report an empty cache as a REGRESSION, not a success.
+
+**A CONTROL CORRECTION worth recording.** The lane goal quoted **37.50 MB**, from
+hours earlier on a bigger slate. The live figure minutes before the deploy was
+**22.503 MB**. Verifying against 37.50 would have passed with NO CHANGE AT ALL —
+a stale baseline is the same error that produced this session's wrong
+"few hours to OOM" estimate.
+
+**NOT AN OOM FIX.** `#632`'s bytes are not Python objects — 28.3% of anon, 0.3%
+of the growth. This bounds a real unbounded cache and does not touch the leak.
+
+Incidental, not a verification: an earlier preflight HOLD showed two merge
+children under DIFFERENT parents (ppid 99, ppid 98) — one per worker, consistent
+with `SYNDICATE_ARTIFACT_MERGE_CHILD_CAP=1` being per-process. First sighting of
+merge children running at all since that cap shipped; the concurrency
+measurement it would need is still not taken.
