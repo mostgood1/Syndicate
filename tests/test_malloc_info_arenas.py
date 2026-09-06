@@ -247,8 +247,7 @@ def test_flag_parsing(monkeypatch, raw, expected):
 
 def test_detail_reports_its_own_cost_and_pairs_the_instruments(monkeypatch):
     monkeypatch.setattr(memory_observability, "_malloc_info_xml", lambda: WEB)
-    monkeypatch.setattr(memory_observability, "_read_container_memory_stat",
-                        lambda: {"anon": _mb(675.0)})
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: 675.0)
     monkeypatch.setattr(memory_observability, "glibc_mallinfo2",
                         lambda: {"available": True, "arena_mb": 390.0})
     got = memory_observability.malloc_arena_detail()
@@ -268,6 +267,7 @@ def test_second_call_inside_the_interval_is_served_from_cache_and_stamped(monkey
         return WEB
 
     monkeypatch.setattr(memory_observability, "_malloc_info_xml", _xml_once)
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: None)
     monkeypatch.setattr(memory_observability, "_read_container_memory_stat", lambda: None)
     monkeypatch.setattr(memory_observability, "glibc_mallinfo2", lambda: {"available": False})
     monkeypatch.setenv("SYNDICATE_MALLOC_ARENA_DETAIL_INTERVAL_SECONDS", "600")
@@ -284,6 +284,7 @@ def test_force_bypasses_the_throttle(monkeypatch):
     calls = []
     monkeypatch.setattr(memory_observability, "_malloc_info_xml",
                         lambda: (calls.append(1), WEB)[1])
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: None)
     monkeypatch.setattr(memory_observability, "_read_container_memory_stat", lambda: None)
     monkeypatch.setattr(memory_observability, "glibc_mallinfo2", lambda: {"available": False})
     monkeypatch.setenv("SYNDICATE_MALLOC_ARENA_DETAIL_INTERVAL_SECONDS", "600")
@@ -297,8 +298,7 @@ def test_a_broken_mallinfo2_crosscheck_does_not_lose_the_arena_split(monkeypatch
         raise RuntimeError("no glibc here")
 
     monkeypatch.setattr(memory_observability, "_malloc_info_xml", lambda: WEB)
-    monkeypatch.setattr(memory_observability, "_read_container_memory_stat",
-                        lambda: {"anon": _mb(675.0)})
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: 675.0)
     monkeypatch.setattr(memory_observability, "glibc_mallinfo2", _boom)
     got = memory_observability.malloc_arena_detail()
     assert got is not None
@@ -326,8 +326,7 @@ def test_detail_never_raises_out_of_the_snapshot(monkeypatch):
 
 def test_aggregate_snapshot_still_behaves_after_the_refactor(monkeypatch):
     monkeypatch.setattr(memory_observability, "_malloc_info_xml", lambda: WEB)
-    monkeypatch.setattr(memory_observability, "_read_container_memory_stat",
-                        lambda: {"anon": _mb(675.0)})
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: 675.0)
     got = memory_observability.malloc_arena_snapshot()
     assert got["arenas"] == 5
     assert got["system_current_mb"] == 646.0
@@ -376,3 +375,49 @@ def test_no_module_level_name_is_defined_twice():
             names.extend(t.id for t in node.targets if isinstance(t, ast.Name))
     dupes = {n: c for n, c in collections.Counter(names).items() if c > 1}
     assert not dupes, f"module-level names defined more than once: {dupes}"
+
+
+# --- the denominator ---------------------------------------------------------
+# Found in production, 2026-09-06, on this instrument's FIRST window: pids 97 and
+# 98 both reported `process_anon_mb` 701.6 -- identical, because it came from the
+# CONTAINER cgroup while the arena figures beside it were per-process. One
+# gunicorn worker's allocator was being measured against every process in the
+# container, understating coverage by roughly the worker count.
+#
+# `_process_anon_mb()` exists precisely because the same substitution produced an
+# attributed share of 61-150% on 2026-09-03. Its docstring says so. These pin it.
+
+def test_coverage_denominator_is_this_process_not_the_container(monkeypatch):
+    monkeypatch.setattr(memory_observability, "_malloc_info_xml", lambda: WEB)
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: 675.0)
+    # A container figure that would give a very different (and wrong) answer.
+    monkeypatch.setattr(memory_observability, "_read_container_memory_stat",
+                        lambda: {"anon": _mb(2000.0)})
+    monkeypatch.setattr(memory_observability, "glibc_mallinfo2", lambda: {"available": False})
+    got = memory_observability.malloc_arena_detail()
+    assert got["process_anon_mb"] == pytest.approx(675.0, abs=0.1)
+    assert got["arena_coverage_pct"] == pytest.approx(95.7, abs=0.2)
+    assert got["anon_source"] == "smaps_rollup/self"
+
+
+def test_container_fallback_is_labelled_as_such(monkeypatch):
+    # A fallback that cannot be told apart from the real thing is how the wrong
+    # denominator survived a whole measurement window unnoticed.
+    monkeypatch.setattr(memory_observability, "_malloc_info_xml", lambda: WEB)
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: None)
+    monkeypatch.setattr(memory_observability, "_read_container_memory_stat",
+                        lambda: {"anon": _mb(2000.0)})
+    monkeypatch.setattr(memory_observability, "glibc_mallinfo2", lambda: {"available": False})
+    got = memory_observability.malloc_arena_detail()
+    assert got["process_anon_mb"] == pytest.approx(2000.0, abs=0.1)
+    assert "FALLBACK" in got["anon_source"]
+    assert "every process" in got["anon_source"]
+
+
+def test_aggregate_snapshot_uses_the_per_process_denominator_too(monkeypatch):
+    monkeypatch.setattr(memory_observability, "_malloc_info_xml", lambda: WEB)
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: 675.0)
+    monkeypatch.setattr(memory_observability, "_read_container_memory_stat",
+                        lambda: {"anon": _mb(2000.0)})
+    got = memory_observability.malloc_arena_snapshot()
+    assert got["arena_coverage_pct"] == pytest.approx(95.7, abs=0.2)

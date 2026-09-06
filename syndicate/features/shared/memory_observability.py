@@ -2746,14 +2746,22 @@ def malloc_arena_snapshot() -> dict[str, Any] | None:
         xml_text = _malloc_info_xml()
         if xml_text is None:
             return None
-        # Pair the arena reading with the cgroup number it must be judged
+        # Pair the arena reading with the anon number it must be judged
         # against. Without this the verdict is computed over whatever slice of
         # memory glibc happens to own -- 11% of it, in the first production
         # reading.
-        anon_mb = None
-        stat = _read_container_memory_stat()
-        if stat and isinstance(stat.get("anon"), int):
-            anon_mb = stat["anon"] / 1024 / 1024
+        #
+        # PER-PROCESS, not the container. The arena totals are this process's,
+        # so the cgroup figure is the wrong denominator: it counts every sibling
+        # worker and every subprocess. That was nearly harmless on
+        # refresh-worker, which is one main process -- except when a sim child is
+        # alive, which is exactly when this gets read. Falls back to the cgroup
+        # only when the per-process read fails, and says so.
+        anon_mb = _process_anon_mb()
+        if anon_mb is None:
+            stat = _read_container_memory_stat()
+            if stat and isinstance(stat.get("anon"), int):
+                anon_mb = stat["anon"] / 1024 / 1024
         return parse_malloc_info_xml(xml_text, anon_mb=anon_mb)
     except Exception as exc:
         print(f"[memory_observability] MALLOC_INFO_FAILED {type(exc).__name__}: {exc}",
@@ -3087,10 +3095,21 @@ def malloc_arena_detail(*, force: bool = False) -> dict[str, Any] | None:
             return None
         duration_ms = round((time.time() - started) * 1000.0, 2)
 
-        anon_mb = None
-        stat = _read_container_memory_stat()
-        if stat and isinstance(stat.get("anon"), int):
-            anon_mb = stat["anon"] / 1024 / 1024
+        # THIS PROCESS's anon, NOT the container's. The arena figures above are
+        # per-process, so pairing them with the cgroup total compares ONE
+        # gunicorn worker's allocator against EVERY process in the container --
+        # at WEB_CONCURRENCY=2 that understates coverage by roughly the worker
+        # count, and it is why pids 97 and 98 both reported anon 701.6 in the
+        # first production window. `_process_anon_mb` exists precisely because
+        # this same substitution produced an attributed share of 61-150% on
+        # 2026-09-03; see its docstring. The source is REPORTED, not assumed.
+        anon_mb = _process_anon_mb()
+        anon_source = "smaps_rollup/self"
+        if anon_mb is None:
+            stat = _read_container_memory_stat()
+            if stat and isinstance(stat.get("anon"), int):
+                anon_mb = stat["anon"] / 1024 / 1024
+                anon_source = "cgroup/container (FALLBACK -- covers every process)"
 
         mallinfo2_arena_mb = None
         try:
@@ -3110,6 +3129,7 @@ def malloc_arena_detail(*, force: bool = False) -> dict[str, Any] | None:
             return None
         parsed["pid"] = os.getpid()
         parsed["process_anon_mb"] = round(anon_mb, 1) if anon_mb is not None else None
+        parsed["anon_source"] = anon_source if anon_mb is not None else None
         parsed["duration_ms"] = duration_ms
         parsed["xml_bytes"] = len(xml_text)
         parsed["cached"] = False
