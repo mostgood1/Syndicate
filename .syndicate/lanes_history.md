@@ -29057,3 +29057,95 @@ lost no protection and no open lane left the session-start digest.
 - **THIS BLOCK WAS RECONSTRUCTED AT CLOSE, and that is the lesson.** The lane was opened in a WORKTREE and never committed; a later `git reset --hard origin/main` in that same worktree discarded it, so it existed on no ref while the code it governed shipped. **Open a lane and PUSH it before starting the work** — an uncommitted lane block is not a claim, it is a note in a scratch directory, and `check_lane_invariants` cannot see it to complain.
 - Usage: `--check`, `--watch --interval-minutes 20`, `--capture <bucket>`. Idempotent, so `--watch` can run indefinitely.
 - Blocked by: none.
+
+
+<!-- moved from lanes.md at close, 2026-09-06, verbatim -->
+### mlb-first5-kalshi-fanin-mismatch — OPEN — opened 2026-09-06 — session 0203e22d-196b-5e32-98fe-f5aa8e8c43b3 — **HYPOTHESIS CONFIRMED, NOT EXONERATED. THE DEFECT IS REAL AND IT IS ON A SECOND JOIN.** The first5 row bound to `KXMLBTOTAL-26SEP061340MILCIN-4` (FULL GAME) through `venue_quote_fanin.apply_venue_quotes_to_grid`, which reads `market` and never `segment` — the word did not occur in the module. Replay on byte-identical deployed code reproduced ALL FOUR production numbers exactly (`-669`, consensus `0.492611`, `edge_pct -38.535`, the whole `venue_basis.reason` string). **Counterfactual kills the thin-market reading:** with only `KXMLBF5TOTAL` in the artifact the row takes NO venue price at all — a first5 row is structurally incapable of receiving a first5 Kalshi price here. `_segments_agree` guards the ORDER path only, so `segment_has_no_matching_series` (160/191 that hour) is another join's counter and no evidence either way. **The observed leg was the harmless one:** the UNDER of the same contract is `+590` / `edge_pct +33.899`. Spans Polymarket too. **FIXED as a refusal + match-record instrument, 18 tests, 3,078 green across the venue/board/portfolio surface. STAGED AND NOT DEPLOYED: `_SEGMENT_REFUSAL_ENABLED` ships False by user decision "instrument first, fix second" -- deploy 1 counts and changes no price, deploy 2 flips it.** Rate: numerator 0 by construction; denominator unmeasurable from this session (egress proxy denies `syndicate-an21.onrender.com`).
+- Goal: name the mechanism behind two `segment=first5 market=totals line=4.5`
+  board rows carrying `price_source=kalshi` at an implied ~0.870 against a
+  7-book consensus of 0.4926 (MIL@CIN live, ATL@PHI pregame; measured on
+  production 2026-09-06 ~16:20Z), and decide between DEFECT and a genuine thin
+  first5 quote. Report as a rate with a denominator.
+- Hypothesis (written BEFORE testing): **the board's kalshi price does not come
+  from `kalshi_board_join.py` at all.** `quote.venue_basis` and
+  `side_best.price_source` are written by
+  `venue_quote_fanin.apply_venue_quotes_to_grid`, whose key is
+  `quote_key(sport, row["market"], side, line[, game])` — `row["market"]` only.
+  The grid row carries `segment` (`book_grid._INSTANCE_FIELDS`) and this path
+  never reads it. On the venue side `venue_quote_adapters.kalshi_outcome` keys
+  from `classify_market(row)["market"]` verbatim, which for a full-game
+  `KXMLBTOTAL` is `totals` and for `KXMLBF5TOTAL` is the segment-suffixed
+  OddsAPI spelling. So a first5 board row keys IDENTICALLY to a full-game row
+  and can only ever bind to the FULL-GAME contract; a real F5 contract can
+  never bind here. `_segments_agree` lives in `kalshi_board_join.py` and is not
+  on this path — the 2026-09-05 audit's choke-point claim is true of the ORDER
+  path and does not cover the PRICING path.
+- Falsification test: if `classify_market` on a real `KXMLBF5TOTAL` row returns
+  `market == "totals"` (unsuffixed), then an F5 contract CAN produce the key
+  the board asks for, 0.870 could be a genuine thin F5 ask, and the hypothesis
+  is wrong. Equally falsifying: if `apply_venue_quotes_to_grid`/`_candidate_keys`
+  on the DEPLOYED SHA do read `segment`, or if `price_source`/`venue_basis` on a
+  shortlist row are written somewhere other than this module.
+- Verification: (a) deployed-SHA content check on all three services;
+  (b) `classify_market` run over real `KXMLBF5TOTAL`/`KXMLBTOTAL` rows showing
+  the two market spellings; (c) a replay of the deployed join over real Kalshi
+  markets + real board rows that reproduces a first5 row taking a `KXMLBTOTAL`
+  price; (d) the rate: segment board rows with `price_source=kalshi` over all
+  segment board rows, with the matched series named.
+- Files: `syndicate/features/shared/venue_quote_fanin.py`,
+  `syndicate/features/shared/venue_quote_adapters.py`,
+  `tests/test_venue_quote_segment_join.py` (NEW).
+  Collision-checked 2026-09-06 over the whole `## OPEN` section (44 open lanes,
+  block-level scan, not a one-line grep): **no OPEN lane names either
+  production file.**
+  Deliberately NOT claimed and NOT edited, each read-only and each line written
+  marker-first so the prefix cut disclaims the path rather than claiming it:
+  not claimed, held by `ncaaf-h1-kalshi-series` -- `syndicate/features/shared/kalshi_catalogue.py`
+  (imported for `segment_for_board_row`, unmodified).
+  not claimed, held by `shortlist-prop-row-duplicates` -- `syndicate/features/shared/book_grid.py`.
+  not claimed, held by `shortlist-prop-row-duplicates` -- `pipeline/layer2_shortlist.py`
+  (named in this lane's trace as the CALLER of the defective join; read only).
+  not claimed, held by `ncaaf-segment-markets` -- `syndicate/features/shared/kalshi_board_join.py`.
+  not claimed, held by `layer2-sim-disagrees` and three others -- `syndicate/features/shared/layer2_board.py`.
+- Constraint accepted from the user: read production, place/cancel/modify NO
+  order, no deploy without this lane's own claim + preflight.
+- Blocked by: none.
+- **RESULT (2026-09-06):** falsification test RAN and did not falsify —
+  `classify_market` on a real `KXMLBF5TOTAL` returns `totals_1st_5_innings`, not
+  `totals`, so the F5 contract publishes under a key no board row asks for.
+  Full working in `.syndicate/findings_2026-09-06_first5_kalshi_fanin_mismatch.md`.
+- **A GUARD THAT NEARLY WAS AN OUTAGE, recorded because the tests caught it and
+  I did not:** the first comparator used `normalize_segment(...) != "full"`,
+  which folds only the empty string, and it failed 10 tests across two suites
+  whose grid rows say `segment="full_game"` — it would have stripped the venue
+  price off every whole-game row spelled that way. Folded explicitly; production
+  writes `full`, established from the ORDER path matching 545-845 rows per join
+  with an unfolded comparator.
+- **DEPLOY 1 IS DONE AND THE RATE IS MEASURED.** `80d89986` LIVE on
+  refresh-worker 2026-09-06T19:04:54Z; reading 19:21:16-19:22:16Z on instance
+  `l4kdz`. **55 mis-bound sides of 311 venue-repriced, across TWO sports and
+  BOTH venues** -- mlb 43/118 (36.4%, including 12 `first3`), ncaaf 12/121 (10
+  kalshi + **2 polymarket**), nfl 0, soccer 0. Full working in `deploys.md`.
+  Held ~20 min across two full-slate MLB sims and triggered into a
+  `process_count=3` lull; no job killed. Claim released with `--token`.
+  **Preflight NOT run** -- no `RENDER_API_KEY` in that session -- and the deploy
+  went via the Render MCP, which the guard does not inspect; done on the user's
+  explicit instruction after the bypass was put to them. That gap is recorded in
+  the `deploys.md` row rather than glossed.
+- **DEPLOY 2 IS DONE AND VERIFIED.** `bd658209` LIVE on refresh-worker
+  2026-09-06T19:50:37Z (the flip landed on main as a peer's `90493e64`);
+  verify 20:07:09-20:07:58Z on instance `2httk`, every line `refusing=True` and
+  **`matched` carrying no segment entry on any sport** -- mlb
+  `{'full|kalshi|KXMLBTOTAL': 44}`, ncaaf `{'full|kalshi|KXNCAAFTOTAL': 13,
+  'full|polymarket_us|-': 84}`. `count=38` mlb / `14` ncaaf refused per build;
+  nfl and soccer untouched at 0 before and after. Replicated twice pre-fix
+  (43/118, then 40/90 with `first1` appearing). Claim released with `--token`.
+  **`SEGMENT_MISMATCH_ROWS count=39` also found segment MONEYLINE rows taking
+  whole-game prices on both venues** -- a third market family, not in the
+  original report. Full working in `deploys.md`.
+- **THE LANE'S GOAL IS MET.** Defect established, mechanism reproduced
+  bit-exactly, rate measured with denominators, fix deployed and verified, and
+  the competing "thin first5 market" reading falsified rather than left open.
+- **THE DENOMINATOR IS THE USER'S TO READ, by their decision** -- this session's
+  egress proxy denies `syndicate-an21.onrender.com`, and the one-liner that
+  prints it is in `findings_2026-09-06_first5_kalshi_fanin_mismatch.md` §6.
