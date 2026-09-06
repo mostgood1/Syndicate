@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 838 rules `[generated]`
+## Index — 844 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 309**
+**FORBIDDEN — 313**
 
 - [2026-09-05 — FORBIDDEN: a per-item guard implemented as an `A or B` search over a CONCA…](#2026-09-05-forbidden-a-per-item-guard-implemented-as-an-a-or-b-search-over-a-concatenation-of-every-items-source-whichever-item-supplies-b-satisfies-it-for-every-value-of-a-so-the-check-has-no-failing-input-at-all-lane-ncaaf-segment-capture-commits-7f197639-7dfabcf4-no-deploy)
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
@@ -234,6 +234,7 @@
 - [2026-09-04 FORBIDDEN: pinning a copied definition against ANOTHER FILE'S SOURCE TEXT. W…](#2026-09-04-forbidden-pinning-a-copied-definition-against-another-files-source-text-when-the-definition-moves-the-test-stops-existing-instead-of-failing-lane-lane-invariant-single-source)
 - [2026-09-04 — FORBIDDEN: choosing a DEPLOY TARGET by which service CONTAINS the code. Ch…](#2026-09-04-forbidden-choosing-a-deploy-target-by-which-service-contains-the-code-choose-it-by-which-service-serves-the-reading-you-predicted-lane-nfl-projection-deploy)
 - [2026-09-05 FORBIDDEN: shipping a fix whose motivating measurement YOU labelled inconclu…](#2026-09-05-forbidden-shipping-a-fix-whose-motivating-measurement-you-labelled-inconclusive-a-caveat-you-wrote-is-an-instruction-to-yourself-not-a-disclaimer-to-the-reader)
+- [2026-09-06 — FORBIDDEN: passing `--commit $(git rev-parse ...)` to `render_deploy.py`.…](#2026-09-06-forbidden-passing---commit-git-rev-parse-to-render_deploypy-a-command-substitution-makes-deploy-guard-skip-its-sha-check-entirely-and-says-nothing-lane-ncaaf-live-state-to-worker)
 - [2026-09-05 — FORBIDDEN: running the ledger guard's own remedy, `git checkout origin/mai…](#2026-09-05-forbidden-running-the-ledger-guards-own-remedy-git-checkout-originmain----ledger-file-without-first-reading-git-diff-on-that-file-it-destroys-uncommitted-work-and-a-deletions-count-cannot-see-what-it-destroyed-lane-render-egress-transport)
 - [2026-09-05 — FORBIDDEN: treating a cache path resolved off `__file__` as durable on Ren…](#2026-09-05-forbidden-treating-a-cache-path-resolved-off-__file__-as-durable-on-render-it-is-in-the-ephemeral-checkout-so-every-deploy-erases-it-and-the-erasure-is-invisible-because-the-code-refetches-lane-ncaaf-live-resim-wire)
 - [2026-09-04 FORBIDDEN: a tool that updates a REGION of a shared file rebuilding that fil…](#2026-09-04-forbidden-a-tool-that-updates-a-region-of-a-shared-file-rebuilding-that-file-from-the-regions-start-splice-the-region-carry-the-remainder-through-untouched-and-refuse-if-you-cannot-classify-it)
@@ -244,6 +245,8 @@
 - [2026-09-05 — FORBIDDEN: reading the RESIDUAL of a partial control as "the one that surv…](#2026-09-05-forbidden-reading-the-residual-of-a-partial-control-as-the-one-that-survived-a-control-is-only-a-control-over-the-population-it-actually-reaches-lane-nfl-la-rams-alias-corrected-by-ci-archives-nba-card-js)
 - [2026-09-05 — FORBIDDEN: inferring a workload's SHAPE from a reading taken on a CONTENDE…](#2026-09-05-forbidden-inferring-a-workloads-shape-from-a-reading-taken-on-a-contended-machine-a-saturated-machine-is-not-evidence-about-the-workload-lane-full-suite-xdist-run-self-retraction)
 - [2026-09-05 FORBIDDEN: attributing a workload to YOUR run because it appeared in a dump…](#2026-09-05-forbidden-attributing-a-workload-to-your-run-because-it-appeared-in-a-dump-your-run-emitted-a-machine-wide-process-dump-is-not-a-description-of-you)
+- [2026-09-05 — FORBIDDEN: simulating "the artifact is absent" by repointing its ROOT env…](#2026-09-05-forbidden-simulating-the-artifact-is-absent-by-repointing-its-root-env-var-alone-the-repo-mirror-is-still-a-candidate-so-the-test-measures-your-machine-lane-nfl-fantasy-artifact-root)
+- [2026-09-06 FORBIDDEN: asserting an ABSOLUTE threshold on a timing ratio in a test — it…](#2026-09-06-forbidden-asserting-an-absolute-threshold-on-a-timing-ratio-in-a-test-it-is-a-claim-about-the-machines-scheduler-and-the-instrument-reporting-otherwise-would-be-lying)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -319,6 +322,7 @@
 - [2026-08-29 — FORBIDDEN: closing a name-join gap by POPULATING an alias map, without fir…](learnings_evidence.md#2026-08-29-forbidden-closing-a-name-join-gap-by-populating-an-alias-map-without-first-checking-the-maps-source-carries-the-missing-name) `[evidence]`
 - [2026-08-29 — FORBIDDEN: never treat a `lanes.md` claim as evidence that anyone is holdi…](learnings_evidence.md#2026-08-29-forbidden-never-treat-a-lanesmd-claim-as-evidence-that-anyone-is-holding-the-file-lane-guardpy-has-no-liveness-notion-so-a-claim-outlives-its-session-forever) `[evidence]`
 - [2026-09-05 FORBIDDEN: attributing a workload to YOUR run because it appeared in a dump…](learnings_evidence.md#2026-09-05-forbidden-attributing-a-workload-to-your-run-because-it-appeared-in-a-dump-your-run-emitted-a-machine-wide-process-dump-is-not-a-description-of-you-lane-suite-order-pollution) `[evidence]`
+- [2026-09-06 FORBIDDEN: asserting an ABSOLUTE threshold on a timing ratio in a test — it…](learnings_evidence.md#2026-09-06-forbidden-asserting-an-absolute-threshold-on-a-timing-ratio-in-a-test-it-is-a-claim-about-the-machines-scheduler-and-the-instrument-reporting-otherwise-would-be-lying-lane-suite-clock-races) `[evidence]`
 
 **EXONERATED — 6**
 
@@ -329,7 +333,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 523**
+**Rules and corrections — 525**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -540,6 +544,8 @@
 - [2026-09-05 — A CENSUS IS BOUNDED BY ITS ROOTS, AND THE ROOT SET IS THE FIRST THING TO S…](#2026-09-05-a-census-is-bounded-by-its-roots-and-the-root-set-is-the-first-thing-to-state)
 - [2026-09-05 — A TRUNCATED MEASUREMENT CAN GIVE THE RIGHT ANSWER FOR THE WRONG REASON. CO…](#2026-09-05-a-truncated-measurement-can-give-the-right-answer-for-the-wrong-reason-converge-then-read)
 - [2026-09-05 — SAMPLE FASTER THAN THE THING YOU ARE DESCRIBING, OR THE SHAPE IS YOUR SAMP…](#2026-09-05-sample-faster-than-the-thing-you-are-describing-or-the-shape-is-your-sampling-grid)
+- [2026-09-06 — A CONTROL AND ITS TREATMENT MUST COVER THE SAME LENGTH OF TIME](#2026-09-06-a-control-and-its-treatment-must-cover-the-same-length-of-time)
+- [2026-09-05 — A PREDICTION NAMING SPECIFIC TESTS EXPIRES IN A REPO WITH LIVE PEERS. Re-d…](#2026-09-05-a-prediction-naming-specific-tests-expires-in-a-repo-with-live-peers-re-derive-it-at-launch-not-when-you-write-it-lane-full-suite-xdist-run)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

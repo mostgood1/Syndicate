@@ -494,6 +494,26 @@ protocol is load-bearing rather than hygiene. Reverted here; nothing committed.
 verification is "a full `pytest tests/` run ends with the 12 passing and the
 pre-existing 37 unchanged". This run completed and **none of its 12 files'
 fixed tests appear in any failure list**. I did not edit that lane's block.
+**SUPERSEDING MEASUREMENT `[2026-09-06, lane suite-clock-races]` -- THE SUITE IS
+NOW GREEN, AND FASTER THAN THIS SECTION'S HEADLINE.**
+
+    py -3 -m pytest tests/ -q -n auto --dist=loadscope     # at 58302f07
+    15,515 passed, 51 skipped, 1 xfailed, 459 subtests    2033.39s (0:33:53)
+    EXIT=0
+
+`-n auto` (12 workers) ran clean: **no `MemoryError`, zero failures**, and about
+HALF the 61m06s recorded above at `-n 6`. Two consecutive full `-n auto` runs
+completed; the earlier of them was 7 failed / 15,453 passed / 37m13s.
+
+**TWO CLAIMS IN THE BODY ABOVE ARE RETRACTED, and both were mine originally:**
+the pagefile "4,864 -> 19,406 MB (4.0x) -- changed" is not a change at all
+(`AutomaticManagedPagefile = True`, measured -- it grows and shrinks under load,
+so every reading is a snapshot of an EFFECT), and "the ~20 GB
+`test_heap_roots`/`test_retainer_census` allocate serially" has no source -- they
+allocate low single-digit MB, and that file was **not even in the tree that
+died** (`a2afc7f1` is not an ancestor of `24d0a50e`). **The cause of that
+`MemoryError` is UNKNOWN.** Full retraction: `a4a6c9f9`.
+
 ## [ci-suite-red-test] CI'S OWN SUITE IS GREEN. THE "ONE RED TEST" WAS THE 31st DATA-ABSENCE FAILURE, NOT A SURVIVOR OF THEM `[corrected 2026-09-05, lane ci-archives-nba-card-js, commit ba84b331]`
 
 **The claim this section used to make was WRONG, and it is preserved here

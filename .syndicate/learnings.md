@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 838 rules `[generated]`
+## Index — 844 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5302,3 +5302,8 @@ whoever created it" and declined to clear it, without reading
 `.git/worktrees/<name>/locked`. It said `initializing` — git's own automatic lock
 from an abandoned `worktree add`. **Intent is a thing you read, not infer from a
 flag being set.**
+
+## 2026-09-06 FORBIDDEN: asserting an ABSOLUTE threshold on a timing ratio in a test — it is a claim about the machine's scheduler, and the instrument reporting otherwise would be LYING
+
+- **The rule going forward.** `assertLess(off_cpu_pct, 40.0)` held only while a core was free. In a full `-n auto` suite it measured **79.7** — and the instrument was RIGHT: a build burning 0.25 s of CPU that waits a second to be scheduled genuinely did spend ~80% of its wall time off-CPU. **Do not "fix" the instrument to satisfy the threshold, and do not weaken the assertion — replace it with a COMPARISON taken in the same process**, so both readings see the same contention. Here: a busy build must read as more on-CPU than a SLEEPING one, which is sound by construction because a sleeping build's `off_cpu_pct` is exactly 100.0. Corollary, measured the same day: **a load test is not a reproduction.** 6x CPU oversubscription (72 burners) reached only 15.8%, where the old assertion still PASSES — so whatever descheduled that worker was not CPU contention, and a green load test would have been false comfort.
+- *(evidence in `learnings_evidence.md`)*

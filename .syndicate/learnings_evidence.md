@@ -25388,3 +25388,12 @@ it reads negative.**
   3-way merge that keeps both sides of a rewritten header line is pure
   insertion. Check STRUCTURE (one slug one block, one heading one section) after
   any merge of an append-shaped file, not just the line counts.
+
+## 2026-09-06 FORBIDDEN: asserting an ABSOLUTE threshold on a timing ratio in a test — it is a claim about the machine's scheduler, and the instrument reporting otherwise would be LYING `[lane suite-clock-races]`
+
+- **What we believed:** `off_cpu_pct < 40.0` pinned the instrument's ability to tell "computing" from "waiting"; the sibling test's comment says so — "without this the test above would pass on a timer that always reported waiting".
+- **What was actually true:** the threshold encoded an assumption about SCHEDULING, not about the timer. `off_cpu_pct = 100*(1 - cpu/wall)` (`pipeline/intelligence_state.py:3992`) is correct at 79.7 when the process is descheduled; the number the test called a failure was the instrument working.
+- **How we found out:** a full `-n auto --dist=loadscope` run, where it failed; it passes alone at ~4%.
+- **The rule going forward:** replace the absolute bound with a comparison measured in the SAME process, so contention cancels. `busy_off < sleeping_off` holds for any build accruing CPU because `sleeping_off` is exactly 100.0 (measured). And do not accept a load test as the verification — 6x oversubscription reached 15.8%, well inside the old bound, so it could not have reproduced the failure and a pass would have proved nothing.
+- **Also, and separately useful:** the identity `off_cpu_pct == (wall-cpu)/wall` is NOT checkable from the log line. It prints `wall_s`/`cpu_s` at one decimal while the percentage uses the unrounded values — 20.1 reported against 33.3 recomputed from the rounded pair. Anyone auditing a build from its log line alone will get a wrong answer. An `assertAlmostEqual` caught this, not a code read.
+- **Cost:** none — caught in the same session. The near-miss is that "relax the threshold to 80" was the obvious fix and would have deleted the distinction the test exists for.
