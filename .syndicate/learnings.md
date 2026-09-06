@@ -5166,6 +5166,17 @@ dissolved, and a 12-minute correlation window reversed at 35 minutes. Coarse or
 short windows do not merely add noise — they produce STRUCTURE that reads as a
 finding. The direction of the error is not predictable, only its presence.
 
+
+**THE REMEDY, and it needs no A/B.** When a matched baseline cannot be recovered
+— the old code is no longer live and reverting costs production restarts —
+measure the METRIC'S OWN DRIFT instead: two consecutive windows of the length you
+intend to quote, on unchanged code. Their difference is the noise floor, and an
+effect smaller than it is unmeasurable no matter how carefully the arms were
+collected. Measured here: `-8.2%` drift on identical code against a `-10.6%`
+claimed effect, which retired the claim. This costs polling time and nothing
+else, and it answers the question a mis-sampled control cannot.
+
+
 ## 2026-09-05 — A PREDICTION NAMING SPECIFIC TESTS EXPIRES IN A REPO WITH LIVE PEERS. Re-derive it at LAUNCH, not when you write it `[lane full-suite-xdist-run]`
 
 Before a 38-minute full-suite run I pre-registered the failing set as **2**, and

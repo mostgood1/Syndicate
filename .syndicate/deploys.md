@@ -24037,3 +24037,42 @@ conveys, and peaks are what OOM a service.
 
 **NOT AN OOM FIX** — `#632`'s bytes are not Python objects (28.3% of anon, 0.3%
 of the growth).
+
+
+### CORRECTION to the row-dedup entry above — the production reading is UNMEASURABLE, not suggestive
+
+`[lane intelligence-rows-dedup, session b2b5b45b, 2026-09-06T04:5xZ]`
+
+I recorded the production result as "suggestive and consistent" on a `-10.6%`
+median move. **A noise-floor experiment says it is worth nothing.**
+
+Two consecutive **31-minute** windows, **identical code**, same cadence, no
+deploy between them:
+
+    window A   n=61   min 4.369   median 4.760   max 8.866
+    window B   n=61   min 4.369   median 4.369   max 4.714
+    WINDOW-TO-WINDOW DRIFT ON UNCHANGED CODE   -8.2%
+    observed dedup effect                     -10.6%
+
+**Identical code drifts about as much as the change appeared to save.** The
+production comparison therefore says NOTHING about the dedup in either
+direction. Downgraded from SUGGESTIVE to **UNMEASURABLE at this sample size**.
+
+The metric is also plainly non-stationary across the evening: this same cache
+read `22.5`, then `8.5`, then `7.6`, and now `4.4-4.8 MB`, with window A alone
+spanning `4.369-8.866`. A "control" I earlier recorded with a spread of
+`0.003 MB` was sampling one minute of a quantity that wanders by a factor of
+five over hours.
+
+**WHAT STILL STANDS, unchanged:** the unit measurement. `0.120 -> 0.068 MB`,
+**43.8%** of the duplicated row term, on a fixed 300-row slate, deterministic and
+independent of production. The change is correct and it does save that memory on
+every response and every cache entry; what cannot be shown is its size against
+live noise.
+
+**Why no A/B was run instead:** recovering a matched pre-dedup window needs a
+revert plus a re-deploy — two production restarts on a service other sessions are
+actively deploying to, for a change that is already unit-verified and is NOT an
+OOM fix. The noise floor answers the question that actually mattered (is the
+effect bigger than the drift?) for the price of an hour of polling and no
+restarts.
