@@ -583,6 +583,22 @@ same expected effect, same measurement, same reader.
 - **WHAT THIS CHANGE IS ACTUALLY WORTH, stated so nobody quotes a ratio as money:** it removes inbound bytes, receiver memory and decode time — real and useful on 2 GB instances (`#632`) — and **does not reduce the metered bill through that path.** The publish-transport gzip (13.0x, 122 MB/10 min) is likewise internal and unbilled.
 - **STILL UNIDENTIFIED: what web's 19.34 GB is.** Served responses, internal transport, public ingress, deploys and now inbound fetches are each eliminated by measurement.
 
+## 2026-09-06 18:22:35-18:25:44Z — web `58302f07` -> `2b3c1974` — **MEASURED ON THE SERVED PAYLOAD: 9.0% off the wire on web's single largest endpoint.** — lane `intelligence-query-payload-dedup`
+
+- **verify — the SERVED payload, same question, same minute, flag off vs on:**
+
+    {"slim_aliases":true}                                 2,091,460 B gzipped
+    {"slim_aliases":true,"drop_row_diagnostics":true}     1,903,278 B gzipped
+                                                          -188,182 B = **9.0%**
+
+  Predicted 8.8% from the pre-deploy payload; served 9.0%.
+- **verify — CORRECTNESS on the wire, not in a fixture.** All three row lists, 1,497 rows each: `trace=0`, `score_breakdown=0`, and **`board_score_components=1497`, `quote=1497`** — every field either consumer actually reads survives on every row. `_dropped_row_fields: ['trace','score_breakdown']` is declared, so a missing key reads as "dropped on request" rather than "the server had no value".
+- **THE HEADLINE I PITCHED THIS LANE ON WAS WRONG BY HALF, AND THE ERROR IS THE REUSABLE PART.** I sized it at ~15.7% from UNCOMPRESSED bytes. The bill is charged on COMPRESSED bytes, and `trace`/`score_breakdown` are repetitive JSON gzip was already handling: raw -15.5%, wire -8.8%. **Measure the quantity you are billed on.** Told to the user before the deploy, not after.
+- **WHAT IT IS WORTH, stated plainly: ~0.09 GB/day, ~6% of the ~1.5 GB/day total. IT DOES NOT GET THE WORKSPACE UNDER THE 25 GB ALLOWANCE.** `/api/intelligence/query` is 81% of web's chronic egress and the remaining ~91% of it is genuine content.
+- **NOT ATTEMPTED, and the measurement is why:** collapsing the three 2,004-row lists. They are NOT interchangeable — `ranked_all` vs `board_contract.cards` differ in **903 of 2004** rows (`gate.book_age_seconds` 3.88 vs 19.70, different snapshot moments) and `top_opportunities` projected differs in **1,723**. A client-side rebuild would have shipped WRONG DATA. `_embed_aliases`' "provably redundant only" rule is what stopped me, and it was right.
+- **The next lever is a PRODUCT decision, not a transport fix:** fewer rows or fewer than three lists. The client pulls all 2,004 because it filters client-side across dates.
+- **Deployed before the broad `-k intelligence` suite finished** (still running at 25+ min; the 12 targeted tests passed). The server change is a **no-op without the flag**, so the blast radius is the UI only. Said here rather than implied.
+
 ## 2026-09-06 05:12:50-06:38:43Z — live-odds-worker `e78fe40a` -> `54c9b157`, web `b72ebcd6` -> `58302f07` — **VERIFIED: `source=worker=6`. WEB NO LONGER FETCHES ESPN FROM THE REQUEST PATH.** — lane `ncaaf-live-state-to-worker`
 
 - **verify — MEASURED OVER ~50 MINUTES OF REAL BOARD BUILDS, 2026-09-06 14:0x-14:5xZ:**
