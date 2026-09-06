@@ -24293,3 +24293,45 @@ plausible rather than wasteful.
 **THIS IS A MANUAL CALL, NOT A FIX.** Making it automatic is a separate decision:
 it needs a cadence, a trigger condition, and an answer to what a 14 ms lock hold
 costs under concurrent load rather than under my probe. `#632` remains open.
+
+
+---
+
+## 2026-09-06T16:24:41Z — web — `f6af42cf` + `SYNDICATE_MALLOC_TRIM_AUTO=1` — **AUTOMATIC TRIM VERIFIED: 1,481 MB returned in 34 min, and it is probably what keeps this service under its limit**
+
+`[lane web-oom-trim-auto, session b2b5b45b]` CLEAR preflight pinned to target.
+Env set separately (`before None -> after '1'`); the code shipped inert in
+`f6af42cf` and this deploy is what made it live.
+
+verify: **12 trims over 33.9 min across BOTH workers, every one with glibc
+returning 1 and `in_use` unmoved — and 12 independent falls in container
+unreclaimable. Two sources that share no code agree.**
+
+    returned per trim   mean -123.5 MB   range -80.2 .. -146.2
+    TOTAL RETURNED      1,481.4 MB
+    lock hold           median 12.3 ms   p75 62.5 ms   max 75.1 ms
+    over 50 ms          3 of 12  (67.6, 62.5, 75.1)
+
+**THE NUMBER THAT MATTERS MOST IS NOT THE 1,481 MB — IT IS THE NET.** Container
+unreclaimable went `676.6 -> 879.8 MB`, **+203.2 MB NET, still rising**, while
+1,481 MB was being handed back. So gross growth in that window was ~1,685 MB, or
+**~2,982 MB/h**.
+
+**Arithmetic worth stating plainly: without the trims the container would have
+reached ~2,361 MB against a 2,048 MB limit inside 34 minutes.** That is not a
+proof — traffic varies, and I did not run a no-trim control in the same window —
+but it is the first intervention in `#632` whose measured size is comparable to
+the problem.
+
+**IT IS NOT A FIX. It is a faster drain on a tap that is still running.** The
+growth mechanism is untouched; the trim only stops the freed-but-retained portion
+accumulating. If traffic rises, the drain is outpaced again.
+
+**COST, and it is not free.** 3 of 12 trims held the malloc lock for 62-75 ms —
+five times the 14.2 ms the manual measurement suggested. Those land on ONE
+request per interval per worker, so the blast radius is small, but a 75 ms stall
+is real and the median (12.3 ms) understates the tail. Worth revisiting if the
+interval is ever shortened.
+
+**Re-accumulation is fast:** pid 97 went `411 -> 331` at 16:29 and was back to
+`431` by 16:34 — ~100 MB regained in five minutes against ~120 returned.

@@ -268,7 +268,7 @@ death, never life — do not invert it.
   decision; this lane only makes it possible to take that decision for one sport.
 - Blocked by: none. All four files unclaimed on origin/main.
 
-### web-oom-trim-auto — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-trim-auto — CLOSED 2026-09-06 — opened 2026-09-06 — **LIVE AND VERIFIED.** `SYNDICATE_MALLOC_TRIM_AUTO=1` on web: **12 trims over 33.9 min across both workers, mean `-123.5 MB` each, `1,481.4 MB` total**, all with glibc returning 1 and `in_use` unmoved, and container unreclaimable falling in 12 separate intervals — two sources sharing no code. **But the NET is still +203.2 MB (`676.6 -> 879.8`), so gross growth was ~2,982 MB/h and this is a faster drain, NOT a fix.** Without the trims the container would have reached ~2,361 MB against a 2,048 limit inside 34 minutes. COST: 3 of 12 held the malloc lock 62-75 ms (median 12.3), on one request per interval per worker — the median understates the tail. Gated at 300 s / 64 MB on the existing teardown hook, no new thread (`#241`). — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: call `malloc_trim` automatically on web, returning the ~50 MB/worker that
   the manual measurement proved recoverable — **without** paying for it on every
   request.

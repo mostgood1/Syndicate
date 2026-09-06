@@ -1104,3 +1104,24 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   idempotent until free space re-accumulates.
 * **STILL NOT A FIX.** This is a manual call. Automating it needs a cadence, a
   trigger, and a cost measurement under concurrent load rather than under a probe.
+
+### `[web-oom-leak]` UPDATE 20 — **automatic `malloc_trim` is LIVE and VERIFIED: 1,481 MB returned in 34 min**, 2026-09-06T17:0xZ `[session b2b5b45b]`
+
+* `SYNDICATE_MALLOC_TRIM_AUTO=1` on web, code `f6af42cf`, gated at a 300 s
+  interval and a 64 MB free-arena threshold, riding the existing
+  `teardown_request` hook (no new thread).
+* **12 trims / 33.9 min across both workers, ALL with glibc returning 1 and
+  `in_use` unmoved. Mean `-123.5 MB` per trim, total `1,481.4 MB`.** Container
+  unreclaimable fell in 12 separate intervals — an independent source agreeing
+  with the log lines.
+* **NET STILL RISING: `676.6 -> 879.8 MB` (+203.2) in the same window**, so gross
+  growth was ~1,685 MB (~2,982 MB/h). **Without the trims the container would
+  have reached ~2,361 MB against a 2,048 limit inside 34 minutes** — not a
+  controlled proof, but the first `#632` intervention whose size is comparable to
+  the problem.
+* **NOT A FIX — a faster drain on a running tap.** The growth mechanism is
+  untouched; only the freed-but-retained portion is reclaimed.
+* **COST: 3 of 12 trims held the malloc lock 62-75 ms** (median 12.3). One
+  request per interval per worker pays it. The median understates the tail.
+* Re-accumulation is fast: ~100 MB per five minutes per worker against ~120
+  returned.
