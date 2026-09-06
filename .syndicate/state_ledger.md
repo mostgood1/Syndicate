@@ -90,13 +90,27 @@ was the PAGEFILE, not the suite's intrinsic need. The heaviest single worker hit
 2,112 MB, nowhere near the ~20 GB `test_heap_roots`/`test_retainer_census`
 allocate serially.
 
-**THE 3.7x SPEEDUP DID NOT TRANSFER. 61 minutes, not the ~12 the scope note
-predicted.** Three reasons, and the third is the durable one: 6 workers not 12;
-15,307 tests not 11,745; and **the machine only ever turned ~1.5 cores of Python
-work across ten processes** -- 7.2s of worker CPU per 8s wall across SIX workers.
-**This suite is I/O bound here, not CPU bound**, so adding workers buys much less
-than the scope note's 4-core Linux sandbox measured. Do not quote 3.7x for this
-machine.
+**~~THIS SUITE IS I/O BOUND HERE, NOT CPU BOUND~~ -- RETRACTED 2026-09-05 20:06Z,
+AND IT WAS MY OWN CLAIM.** Run 1 took 61m06s at `-n 6` on a machine carrying six
+peer jobs, and I inferred I/O-bound from "the machine only turned ~1.5 cores of
+Python work across ten processes" (7.2s of worker CPU per 8s wall). **A SECOND
+RUN ON AN IDLE MACHINE REFUTES IT:**
+
+    run 1   -n 6      6 peer jobs, 10.9 GB free    15,307 tests   3666.33s  (61m06s)
+    run 2   -n auto   idle, 18.9 GB free           15,468 tests   1166.83s  (19m26s)
+
+**3.1x faster.** The reading that produced "I/O bound" was taken WHILE SIX PEER
+JOBS CONTENDED FOR THE SAME DISK -- which is precisely the condition that makes
+any workload look I/O bound, so it could not have distinguished the two. **A
+saturated machine is not evidence about the workload's own shape.** The scope
+note's 3.7x is closer to right than my correction to it was; "do not quote 3.7x
+for this machine" was wrong and is withdrawn.
+
+**WHAT IS STILL NOT ESTABLISHED:** run 2 changed TWO variables at once (idle
+machine AND 12 workers instead of 6), so 3.1x cannot be split between them. Nobody
+should quote a worker-scaling factor from this pair. The one thing it does settle
+is that the suite finishes in ~20 minutes on an idle box, which makes a full run
+an ordinary thing to do rather than an event.
 
 **THE GATE SAID `27 NEW FAILURE(S)`. THAT IS A RAW SET DIFF AND IT IS NOT 27
 REGRESSIONS.** Every failure was re-run STANDALONE, one test per process with
@@ -146,6 +160,41 @@ stale as a comparand: it records `total_testcases: 11745` against this tree's
 **15,307** (~3,500 tests newer) and was recorded on 4-core Linux CI with a
 different `data/` mirror. Its 19-failure set is NOT like-for-like, which is
 most of why the raw diff read as 27.
+
+**RUN 2 CONFIRMS THE 18 REPAIRS AND THE PREDICTION WAS PRE-REGISTERED.** After
+`63c10ed5`, on an idle machine at `-n auto`:
+
+    12 failed, 15,404 passed, 51 skipped, 1 xfailed, 459 subtests passed
+    in 1166.83s (0:19:26)      collected=15468  failing=12
+
+Predicted **13** before the run (31 - 18) and named all thirteen. Got **12**, and
+the arithmetic reconciles exactly: 11 of the 13 appeared, **none of the 18
+repairs did**, and 1 unpredicted failure arrived. The two absent ones are
+`test_quote_join_index_equivalence` and `test_ncaaf_returning_production_builder`
+-- both from the parallel-only set, which **I flagged in advance as worker-count
+dependent by construction**; they passed at 12 workers having failed at 6. The
+four `test_heap_roots` cases still fail, so that subset is real but not stable.
+
+**THE UNPREDICTED ONE IS NOT MINE AND IS DATED, NOT ASSUMED.**
+`test_ops_execution_ledger_summary::test_the_bucket_carries_only_the_declared_fields`
+-- `by_segment` is in the bucket and not in `_LEDGER_SUMMARY_FIELDS`
+(`ops.py:331`). Commit `4ffba395` landed **16:03:00**, ten minutes AFTER run 1
+started (15:53:22) on a worktree pinned at provisioning-time `origin/main`, so
+run 1 could not have seen it. My commits touch neither that file nor its subject.
+
+**DO NOT SILENCE IT BY APPENDING THE FIELD.** That constant's own comment is the
+reason: *"the natural way to answer the next question is to add one more field,
+and three of those turn a counter into a money record over HTTP."* The guard
+fired for exactly the case it was written for, and appending `by_segment` is the
+decay it exists to stop -- it needs a decision, not a green test.
+**`syndicate/blueprints/ops.py` is held by OPEN lane `ncaaf-live-resim-wire`,**
+so it is theirs; surfaced here rather than edited.
+
+**THE NON-HERMETIC WRITES REPRODUCED EXACTLY** -- same four tracked files, same
+new `data/settlement_inputs/`, a fresh live Kalshi fetch. Second observation, so
+it is a property of the suite and not a one-off. This time the DISCARD GUARD
+blocked the revert (those lines exist in no commit on any ref) and it was right
+to: they were `git stash`ed instead, restorable, rather than destroyed.
 
 **THE SUITE IS NOT HERMETIC: IT MAKES LIVE NETWORK CALLS AND WRITES TRACKED
 FILES.** Found by `git status` after the run, not looked for. Four tracked
