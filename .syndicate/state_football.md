@@ -1787,10 +1787,35 @@ property it asserts is zero coverage that reads as strong") met head-on with the
 rule already on file, and the join-specific form is: **a join test whose fixture
 builds BOTH SIDES from one set of names cannot test the join.**
 
-**STILL OWED:** the board half of the closing reading — a live NCAAF row carrying
-`projection.live_aware: true` — on the first board rebuild after `933e9beb` is
-live. `game_final` climbed 14 -> 16 within twelve minutes, so if tonight's slate
-closes first this moves to the next slate. It is not a claim until it is read.
+**THE BOARD HALF IS NOW READ AND MET `[2026-09-06 00:01-00:11Z]`.** 74-83 rows
+carry `projection.live_aware: true`, 7 of them h2h, **reproduced on two
+independent builds**; `no_live_gameline_projection` fell **420 -> 297** when
+`933e9beb` landed. Tulane @ Duke Q4 2:19 3-17 carried `live_gameline model_prob
+1.0, sims_run 120, as_of 00:00:33Z`, matching the snapshot to the second — which
+a stale artifact cannot contain. The durable mirror also discharged
+discriminatingly: first boot `sp_ratings_source: loader` (predicted), second boot
+**`durable_mirror`**.
+
+**WHAT IS STILL WITHHELD, AND IT IS NOT THIS LANE'S TO OPEN.**
+`rows_live_gameline_edged` is **0** on every build; all 7 live-aware h2h rows
+refuse `no_two_sided_market_price`. NOT because the market is degenerate —
+Arkansas State @ Memphis at **10-7 in Q2** carries `consensus {away 180, home
+-325}` with 27 books quoting and still refuses. `live_gameline_join:1109` prices
+against `projection.market_fair_prob_over`, and `ncaaf/game_projections.py`
+writes that key in its TOTALS branch (line 482) and **not in its h2h branch**.
+Served board: **soccer 52/52 h2h rows carry it, ncaaf 0 of 30, mlb 0 of 0** (mlb
+had no h2h projection dict at all tonight, so there was NO positive control for
+the pricing step on any sport). Invisible until now because no NCAAF row had ever
+been `live_aware`.
+
+**The fix is one line — the helper is already imported and used two branches down
+— and it is a MONEY decision, not a wiring one.** That branch withholds because
+its margin model *"loses to the closing line by 3.563 points of MAE over 2233
+games (t=17.2)"*. The live re-sim is NOT that pregame model, so the note does not
+automatically condemn it; but the LIVE model is ungraded too, and opening the
+market side would publish live NCAAF money edges on an ungraded estimator —
+`#499` in reverse. **A lane that can BACKTEST the live probability owns this.**
+`ncaaf/game_projections.py` is FREE.
 
 **OWED, none of it taken this session (no deploy, no env change, by
 instruction):** (1) call `build_live_lens_snapshot` from refresh-worker's tick
