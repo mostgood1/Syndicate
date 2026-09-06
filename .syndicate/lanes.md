@@ -237,9 +237,14 @@ death, never life — do not invert it.
   (`M_MMAP_THRESHOLD`, arena count, a different allocator) — and no amount of
   hunting for a Python object would ever have found it.
 - **LEDGER NOTE, two defects in this lane's own bookkeeping.** (1) The OPEN block
-  was **never committed** while the lane was open — it existed only in this
-  session's worktree, so `origin/main` carried no record of the lane at any point
-  it was running. (2) It sat **ABOVE the `## OPEN` heading**, which is the `#466`
+  WAS committed at lane-open (`df83d8a0`, 29 insertions) but was **never
+  LANDED** — it sat unpushed in this session's worktree for the lane's entire
+  life, so `origin/main` carried no record of the lane at any point it was
+  running. **Committing is not what makes a lane visible to peers; landing is.**
+  A worktree has its own `lanes.md`, and every collision check a peer runs reads
+  `origin/main` — so an unlanded lane claims nothing, no matter how carefully
+  its block is written. The correction matters because the wrong version teaches
+  the wrong fix ("remember to commit") instead of the real one ("land it"). (2) It sat **ABOVE the `## OPEN` heading**, which is the `#466`
   violation: `check_lane_invariants.py` reported `web-oom-fragmentation` **zero
   times**, and I read that null as "my lane is not implicated in the contested
   files" when it actually meant **the checker could not see the lane at all**.
