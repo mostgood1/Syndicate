@@ -204,6 +204,18 @@ def _board_fields_from_event(event: Mapping[str, Any]) -> dict[str, Any]:
         if team_id:
             out[f"{side}_id"] = team_id
 
+        # `location`, ALONGSIDE the displayName `_game_from_event` already keeps,
+        # because the two are not interchangeable as a JOIN KEY. The NCAAF
+        # projections artifact carries no ESPN id -- only `home_team`/`away_team`
+        # -- and lane `ncaaf-live-resim-wire` measured the difference on the
+        # live 2026-09-05 slate: ESPN `team.location` matched **35 of 51** board
+        # games, `team.displayName` matched **0**. Verified here 2026-09-06:
+        # location `'Washington'` vs displayName `'Washington Huskies'`. Keying
+        # off displayName indexes NOTHING while looking perfectly healthy.
+        location = str(team.get("location") or "").strip()
+        if location:
+            out[f"{side}_location"] = location
+
     status = event.get("status") if isinstance(event.get("status"), Mapping) else {}
     period = status.get("period")
     if isinstance(period, (int, float)) and period:
@@ -211,6 +223,29 @@ def _board_fields_from_event(event: Mapping[str, Any]) -> dict[str, Any]:
     clock = str(status.get("displayClock") or "").strip()
     if clock:
         out["clock"] = clock
+
+    # `situation` RAW AND UNRESOLVED, ON PURPOSE. It is down / distance /
+    # yardLine / possession, and `live_resim.resim_live_game` needs it: without
+    # it every drive starts 1st-and-10 on the 25 with possession marginalised,
+    # which is not a lost diagnostic but a WORSE PROBABILITY -- and an unfed
+    # model input is indistinguishable from a working one at every level except
+    # the data (`model_engine_standard.md`).
+    #
+    # NOT RESOLVED HERE. ESPN names the possessing TEAM BY ID
+    # (`situation.possession = "2"`), never by side, and
+    # `live_resim.possession_side_from_espn` already owns that resolution --
+    # it takes a competition mapping and the two ids, both of which a consumer
+    # can rebuild from this record. Resolving it here would make a SECOND
+    # parser of the same field, which is the drift `_game_from_event`'s own
+    # docstring exists to prevent.
+    #
+    # ABSENT ON PREGAME EVENTS AND THAT IS CORRECT -- verified 2026-09-06, a
+    # `state="pre"` competition carries no `situation` at all. Consumers must
+    # gate on in-progress; requiring it of a pregame row would refuse a correct
+    # record forever.
+    situation = competition.get("situation")
+    if isinstance(situation, Mapping):
+        out["situation"] = dict(situation)
     return out
 
 
