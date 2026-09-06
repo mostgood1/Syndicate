@@ -229,6 +229,13 @@ death, never life — do not invert it.
   path. The duration measurement is a first-class output because a long lock hold
   on a live service is itself a defect.
 - Blocked by: none.
+- **HANDOFF IN `[2026-09-06, lane suite-clock-races, session b9bc926d]` — YOUR RED TEST IS A SHADOWED DEFINITION, AND THE PRODUCTION INSTRUMENT IS INERT.** `tests/test_malloc_trim_release.py::test_resolution_announces_which_branch_it_took` failed my full-suite run at `7a019c8b` (1 failed / 15,555 passed) **and fails in ISOLATION too** (1 failed / 6 passed), so it needs no scale to work on. `StopIteration` = the `MALLOC_TRIM_INIT` line was never emitted.
+  **CAUSE: `memory_observability.py` defines `_resolve_malloc_trim` TWICE** — the instrumented one at **line 2385** and a second at **line 3975**. Python binds the later, verified at runtime via `inspect.getsourcelines(mo._resolve_malloc_trim)` -> **3975**, with `MALLOC_TRIM_INIT` absent from its source.
+  **THIS IS NOT ONLY A TEST FAILURE. Two shipped fixes are silently inert:**
+  1. **`#632`'s proof-of-life is gone.** The 2385 docstring says the line exists because "this binding cannot be executed anywhere in this repo's development environment ... the first proof that it works at all is a production log line" and "Grep `MALLOC_TRIM_INIT` after the deploy and the branch is named." **Nothing emits it**, so that grep returns nothing on Render and a failed `dlopen` is once again indistinguishable from a trim that released nothing — the exact silence it was written to remove.
+  2. **`#285` is reverted.** `daed5d92` ("hold the CDLL, not just the function pointer") stores `_MALLOC_TRIM_STATE["libc"]` at 2385; the live definition at 3975 does not, so the function pointer's lifetime is unheld again.
+  Also divergent: 3975 writes `_MALLOC_TRIM_STATE["why"]` where 2385 writes `unavailable_reason` — the key the test asserts on.
+  Not fixed here: `memory_observability.py` is yours. I did not edit it.
 
 ### prop-region-knob — OPEN — opened 2026-09-06 — session 3492626c
 - Goal: make prop-call region coverage EXPRESSIBLE per sport, so widening one
