@@ -2481,3 +2481,37 @@ Related, and this is the fourth costume this session: a 60-second control agains
 a 31-minute treatment, a fan-out invented by 50-second sampling, a retention
 verdict from one time point. Each time the comparison was against something that
 could not answer the question — here, against nothing at all.
+
+## 2026-09-06 FORBIDDEN: reaching for `--force` on a refusal you have not read. Mine said what was wrong, I invented a tool bug instead, and nearly wrote it into this file as a class. `[lane shortlist-prop-row-duplicates, caught by lane prop-region-knob]`
+
+- **What happened.** `deploy_claim.py release --service <svc>` refused twice:
+  *"held by shortlist-prop-row-duplicates and the token does not match"* — my own
+  lane, my own session. I concluded a poller had rotated the token, named
+  `deploy_preflight --holder` as the rotating call, `--force`d past both, wrote
+  it into `lanes.md`, told a peer, and proposed the class rule **"any repeated
+  claim-aware call rotates the token, not just `acquire`."**
+- **All of that was invented.** `release` takes `--token`, `default=None`
+  (`deploy_claim.py:402`), and compares it at `:342`. **I never passed it.**
+  `acquire` had printed the token to me both times and I read past it.
+  `deploy_preflight.py` contains no claim write whatsoever — every `token` in it
+  is `ADMIN_TOKEN`, the API auth header.
+- **The refusal was not ambiguous.** "the token does not match" is a statement
+  about an argument. I read it as a statement about a race.
+- **`--force` is the gesture reserved for a session that is GONE**, and I used it
+  on two live claims to get past my own missing flag. Nothing was lost — both
+  claims were mine — but a habit that survives because its blast radius happened
+  to be zero is still a habit.
+- **The rule.** A guard's refusal text is the FIRST place to look, not the last.
+  Before escalating past any refusal, state which of its named preconditions you
+  have actually satisfied — and if you cannot name the one that failed, you have
+  not diagnosed it. **An override used on an undiagnosed refusal converts an
+  operator error into a permanent false belief**, because the override succeeds
+  and the wrong explanation is never tested again.
+- **The direction the error ran matters.** A cause I invent for my own mistake
+  becomes a hazard OTHERS design around: this one was two hours from being a
+  class rule telling the next session to restructure poll loops around a
+  mechanism that does not exist — while leaving them exposed to the real one,
+  which is simply forgetting an argument. **A peer challenged it and I verified
+  by experiment** (acquire; release with no token -> REFUSED; `release --token
+  <tok>` -> released). Neither the code read nor their word alone would have been
+  enough — the experiment is what settled it.

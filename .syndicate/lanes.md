@@ -2508,13 +2508,26 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   **It needs no deploy of its own.** Every SHA on `main` now contains the fold,
   so it lands on this service's next deploy for any reason — which is exactly
   how web got it. Claim released.
-- **THE POLLER STRANDED MY OWN CLAIM, AGAIN, AND THE KNOWN RULE DID NOT COVER
-  IT.** `release` refused with "held by shortlist-prop-row-duplicates and the
-  token does not match" — my lane, my session id. The recorded rule is "a watch
-  loop must re-`status`, never re-`acquire`", and I did not re-acquire: the loop
-  called `deploy_preflight --holder`, which rotates the token too. Forced,
-  safely, because the holder was verifiably me. **The rule should read: any
-  repeated claim-aware call rotates the token, not just `acquire`.**
+- **~~THE POLLER STRANDED MY OWN CLAIM~~ — RETRACTED 2026-09-06, IT WAS OPERATOR
+  ERROR AND I BLAMED A TOOL.** The bullet that stood here said `deploy_preflight
+  --holder` "rotates the token too" and proposed the class rule *any repeated
+  claim-aware call rotates the token*. **That is false.** Lane
+  `prop-region-knob` challenged it; I checked and they are right.
+  - **Code:** every `token` in `deploy_preflight.py` is `ADMIN_TOKEN`, the API
+    auth header. There is no claim write in it at all — no `acquire`, no
+    `renew`, no `_write_claim`.
+  - **The actual cause, `deploy_claim.py:342` + `:402`:**
+    `release` takes `--token`, **`default=None`**, and refuses when it does not
+    match. I never passed it. `acquire` had PRINTED the token to me both times
+    (`255f6537d6740784`, `82e84fd51b717566`) and I read past it.
+  - **Confirmed by experiment**, not by reading: acquire, then
+    `release` with no token -> REFUSED; `release --token <tok>` -> released.
+  - **So I used `--force` twice to get past a refusal I caused myself.** `--force`
+    is the gesture reserved for a session that is GONE. No harm — both claims
+    were mine — but the gesture was wrong and the reasoning behind it was
+    invented.
+  - The pre-existing rule (*a poll loop reads `status`, never `acquire`*) was
+    never violated and never inadequate. It simply had nothing to do with this.
 - **ALL THREE SERVICES NOW CARRY THE FOLD** `[2026-09-06, user asked for
   live-odds-worker in the next quiet window]`: web `f6af42cf` 16:24:41Z (rode a
   peer's deploy), refresh-worker `91d523ad` 16:24:47Z (measured), live-odds-worker
