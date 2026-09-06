@@ -230,6 +230,37 @@ death, never life — do not invert it.
   on a live service is itself a defect.
 - Blocked by: none.
 
+### prop-region-knob — OPEN — opened 2026-09-06 — session 3492626c
+- Goal: make prop-call region coverage EXPRESSIBLE per sport, so widening one
+  sport's books is a costed decision instead of an all-or-nothing global. No
+  behaviour change and no credit spend by default.
+- Files: `syndicate/features/shared/odds_regions.py`,
+  `scripts/fetch_soccer_oddsapi_props_local.py`,
+  `tests/test_prop_region_knob.py` (NEW)
+- Hypothesis: measured on the served board 2026-09-06 -- soccer rows carry 12
+  books overall, but `oddsapi_props` rows are **164 of 174 single-book**
+  (fanduel 135, betrivers 39). `us` is not thin in general; it is thin for
+  player props, where only those two US books quote. The blocker to widening is
+  CONFIG SHAPE: `ODDS_API_REGION` (singular) is read by SIX fetchers across four
+  sports and is UNSET in production, while `ODDS_API_REGIONS` (plural, set to
+  `us`) has exactly one reader. So there is no way to widen soccer props without
+  also widening NFL and NCAAF props.
+- Why that matters in money: `odds_regions.py` records the billing split --
+  a region on the GAME-LINE call costs ~30K/month, the same region on PROP calls
+  costs **~1M/month**, because OddsAPI bills props per EVENT. The single global
+  knob puts three sports on the expensive side at once, unpriced.
+- Falsification test: if `ODDS_API_REGION` turns out to be SET in production,
+  the "six fetchers silently default to us" premise is wrong and this is a
+  live-config question, not a shape one.
+- Verification: `prop_regions('soccer','us')` returns `us` when the knob is
+  unset (today's behaviour, asserted) and `us,eu` when set -- off != on -- plus
+  a test that the soccer props fetcher actually READS it, since an unread knob
+  is the exact defect `odds_regions.py` was written about (`ODDS_API_REGION` was
+  inert for NCAAF and nobody noticed).
+- NOT IN THIS LANE: turning `eu` on. That is a ~1M/month spend and its own
+  decision; this lane only makes it possible to take that decision for one sport.
+- Blocked by: none. All four files unclaimed on origin/main.
+
 ## OPEN
 
 ## OPEN
