@@ -134,6 +134,34 @@ def full_game_market_keys(bases: Iterable[str] | None = None) -> dict[str, tuple
     return {base: ("full", _MARKET_BASES[base]) for base in use_bases if base in _MARKET_BASES}
 
 
+def split_segment_market_key(sport: str, market_key: object) -> tuple[str, str] | None:
+    """`totals_1st_5_innings` -> `("first5", "totals")`. None if not segmented.
+
+    THE INVERSE OF `segment_market_keys`, AND BUILT FROM IT rather than from a
+    second table. `_SUFFIX` and `_MARKET_BASES` already encode the split; a
+    parallel parser here would be the drift `segment_market_keys`' own docstring
+    warns about ("a fetcher that requests `totals_q1` and then fails to
+    recognise it writes the quotes under `full`").
+
+    WHY IT EXISTS. Two vocabularies name the same bet and only one of them is
+    the board's. A fetcher REQUESTS `totals_1st_5_innings`; the board stores
+    what came back as `market='totals'` plus `segment='first5'`, because that is
+    the pair this function's forward twin returns. Anything that produces the
+    suffixed spelling and then has to meet a board row -- the Kalshi join does,
+    via `classify_market` -- needs the split, or it keys on a market name the
+    board has never used and the lookup misses BEFORE any segment check runs.
+
+    `None` means "not a segment key for this sport", which is different from
+    `("full", key)`: the caller must be able to leave a market it does not
+    recognise exactly as it found it. Returning `full` here would be the
+    papering-over `normalize_segment` explicitly refuses to do.
+    """
+    key = str(market_key or "").strip().lower()
+    if not key:
+        return None
+    return segment_market_keys(sport).get(key)
+
+
 def normalize_segment(value: object) -> str:
     """Empty/None/unknown -> `full`.
 
