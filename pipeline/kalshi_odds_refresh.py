@@ -1460,7 +1460,26 @@ def join_to_board(
         f" matched={report.get('matched')}"
         # Named refusals: "Kalshi has nothing we bet" and "our join is broken"
         # must never share a number. That confusion is #505.
-        f" reasons={report.get('reasons')}",
+        f" reasons={report.get('reasons')}"
+        # WHICH SERIES A SEGMENT ROW ACTUALLY MET, both directions. Kalshi lists
+        # `KXMLBF5TOTAL-...-5` ("First 5 innings: Over 4.5") and
+        # `KXMLBTOTAL-...-5` ("Over 4.5 runs scored") for the SAME game at the
+        # SAME strike, and `_row_market()` strips the segment on purpose so both
+        # key as (event,'totals',4.5). `_segments_agree` separates them -- but
+        # until these were printed, "which contract priced this row" was an
+        # inference. Refusals are printed BESIDE matches because
+        # `segment_has_no_matching_series: 0` was read three different ways in
+        # one day for want of a denominator.
+        f" segment_matched={report.get('segment_matched_series')}"
+        f" segment_refused={report.get('segment_refused_series')}"
+        # ALT/MAIN COLLAPSE RATE. `_row_market()` also strips the `_alt` suffix,
+        # so a main-line row and an alternate row for one bet now key
+        # identically and `_collapse_duplicate_bets` picks one. This is the rate
+        # that tie-break decides; it was returned in the report and printed
+        # NOWHERE, so the guard's frequency was unmeasurable in production.
+        # Replay measured ~1 per 78 collapsed keys -- a ZERO here is worth a
+        # second look, not a celebration.
+        f" alt_main_collisions={report.get('alt_main_collisions')}",
         flush=True,
     )
     # On a zero-match join, print BOTH SIDES' keys. A count of failures with no
