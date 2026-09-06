@@ -1813,6 +1813,40 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   is exactly the mistake being fixed.
 - Blocked by: none. NO DEPLOY in this lane.
 
+### venue-fanin-segment-key — OPEN — opened 2026-09-06 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
+- Goal: a venue quote for a DIFFERENT PORTION of the game can no longer be worn
+  by a board row. Single testable outcome: on a real slate, no `(game, market,
+  line, side)` pair carries the SAME venue price at two different segments —
+  today SF@NYM `totals/4.5/over` reads `kalshi=-213` at BOTH `first5` and
+  `full`.
+- Files: `syndicate/features/shared/venue_quote_fanin.py`,
+  `syndicate/features/shared/venue_quote_adapters.py`,
+  `tests/test_venue_fanin_segment_key.py` (NEW).
+- Evidence: `.syndicate/findings_2026-09-06_venue_fanin_has_no_segment.md` (`3bcb9f0e`).
+- Hypothesis: the two halves are ASYMMETRIC, not merely segment-blind.
+  `venue_quote_adapters` keys the venue side off `classify_market`'s market,
+  which is ALREADY segment-qualified (`totals_1st_5_innings`); the BOARD side
+  keys `row["market"]`, which is plain `totals` for every segment because the
+  board carries `segment` in a separate column. So a FULL-GAME contract keyed
+  `mlb|totals|over|4.5|@game` answers the full row and the first5 row alike,
+  while the F5 contract keyed `mlb|totals_1st_5_innings|...` answers neither.
+- **THE FAILURE MODE THAT MAKES THIS DANGEROUS, and the design that avoids it:**
+  adding `segment` to the BOARD key alone would stop every row matching and kill
+  Kalshi/Polymarket pricing platform-wide. The fix must be symmetric AND
+  byte-identical for `full`: segment is appended ONLY when non-`full`, and the
+  venue side splits the segment OUT of its market key onto the same axis. Every
+  existing full-game key string is then unchanged, which is what keeps this
+  additive rather than a rebuild.
+- Falsification test: if full-game venue match counts MOVE on a replayed slate,
+  the `full` keys are not byte-identical and the change is wrong.
+- Verification: (1) key-shape test — `full` produces exactly today's string,
+  asserted against a literal; (2) `off != on` — a first5 row stops matching a
+  full-game quote and starts matching an F5 quote; (3) the production reading
+  above inverts (no shared price across segments); (4) full-game counts
+  unchanged; (5) `#603`'s game-token behaviour preserved — it is on the same key
+  and must not regress.
+- Blocked by: none. NO DEPLOY in this lane without a separate decision.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
