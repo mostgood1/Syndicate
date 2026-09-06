@@ -720,6 +720,40 @@ def _status(live, elapsed):
     return {"last": {"coverage": {"live_resimmed": live}, "elapsed_seconds": elapsed}}
 
 
+def test_the_budget_clears_the_MEASURED_saturday_peak(monkeypatch):
+    """90 s was already exceeded at peak, so this is a repair not a loosening.
+
+    ESPN's real slate 2026-09-05: 68 FBS games, **30 concurrent at 02:00Z**. At
+    the measured ~3.1 s/game that is ~93 s against a 90 s budget -- the busiest
+    hour of the week already spilling into `tick_budget_exhausted`, dropping the
+    EARLY games because the builder simulates cheapest-first.
+    """
+    monkeypatch.delenv("NCAAF_LIVE_RESIM_BUDGET_SECONDS", raising=False)
+    budget = rw._ncaaf_live_resim_budget_seconds()
+    assert budget == 120.0
+    assert budget / 3.1 > 30, "must clear the measured 30-game peak, not sit on it"
+
+
+def test_an_operator_budget_override_still_wins(monkeypatch):
+    """The knob lives in `live_resim.default_budget_seconds`, which another lane
+    owns; setting the default from the caller must not cost the override."""
+    monkeypatch.setenv("NCAAF_LIVE_RESIM_BUDGET_SECONDS", "45")
+    assert rw._ncaaf_live_resim_budget_seconds() == 45.0
+    monkeypatch.setenv("NCAAF_LIVE_RESIM_BUDGET_SECONDS", "junk")
+    assert rw._ncaaf_live_resim_budget_seconds() == 120.0
+
+
+def test_a_budget_sized_tick_cannot_become_a_hot_loop(monkeypatch):
+    """The reason raising the ceiling is safe at all: cadence is derived FROM
+    cost, so the worst tick schedules the longest gap. `#241` raised periodic
+    work on this service without that coupling and restarted production."""
+    monkeypatch.delenv("SYNDICATE_NCAAF_LIVE_RESIM_INTERVAL_SECONDS", raising=False)
+    worst = rw._ncaaf_live_resim_budget_seconds()
+    interval = rw._ncaaf_live_resim_interval_seconds(_status(30, worst))
+    assert interval == 720.0
+    assert worst / interval < 0.20, "duty cycle must stay well under a fifth"
+
+
 def test_the_interval_shortens_ONLY_while_a_game_is_live(monkeypatch):
     """off != on. A quiet slate keeps 180 s; a live one gets 75 s.
 

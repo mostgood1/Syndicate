@@ -1727,6 +1727,38 @@ def _ncaaf_live_resim_enabled() -> bool:
 # measured 2026-09-05) -> 130 s. A budget-capped 90 s tick -> 540 s, i.e. it
 # backs OFF on a big Saturday instead of pinning the box. The cadence cannot
 # outrun the cost because it is derived from it.
+# THE 90 s BUDGET IS ALREADY EXCEEDED AT PEAK, measured rather than projected.
+# ESPN's real Saturday slate 2026-09-05: 68 FBS games, **30 concurrent at
+# 02:00Z** (25 at 00:00Z, 19 at 22:00Z). At the measured ~3.1 s/game
+# (21.7 s for 7 games, 2026-09-05) that is **~93 s against a 90 s budget** --
+# so the busiest hour of the week is already spilling into
+# `tick_budget_exhausted`, and the games dropped are the EARLY ones, since the
+# builder simulates cheapest-first and cost falls as a game runs.
+#
+# 120 s covers ~38 games at today's sim count, which clears the measured peak
+# with headroom rather than sitting on it. The budget is a REFUSAL, not a
+# timeout: it stops adding games, it does not interrupt one mid-simulation.
+#
+# SAFE BECAUSE THE CADENCE IS DERIVED FROM COST. `max(75, 6*elapsed)` turns a
+# 120 s tick into a 720 s interval -- ~17% duty -- so raising the ceiling cannot
+# turn into a hot loop on a service that OOMs. Raising the budget WITHOUT that
+# coupling would be `#241` again.
+#
+# Set HERE rather than in `live_resim.DEFAULT_BUDGET_SECONDS` because that file
+# belongs to lane `ncaaf-live-resim`. The env var it reads is honoured
+# identically, so an operator override still wins and no knob is lost.
+_NCAAF_LIVE_RESIM_BUDGET_DEFAULT_SECONDS = 120.0
+
+
+def _ncaaf_live_resim_budget_seconds() -> float:
+    raw = str(os.environ.get("NCAAF_LIVE_RESIM_BUDGET_SECONDS") or "").strip()
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return _NCAAF_LIVE_RESIM_BUDGET_DEFAULT_SECONDS
+    return value if value > 0 else _NCAAF_LIVE_RESIM_BUDGET_DEFAULT_SECONDS
+
+
 _NCAAF_LIVE_RESIM_LIVE_INTERVAL_SECONDS = 75.0
 _NCAAF_LIVE_RESIM_DUTY_DIVISOR = 6.0
 
@@ -2298,6 +2330,7 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
         games=games,
         live_index=live_index,
         ratings=ratings,
+        budget_seconds=_ncaaf_live_resim_budget_seconds(),
     )
     # ####################################################################
     # THE JOIN KEY IS THE GRID'S SPELLING, AND IT IS NOT THE ARTIFACT'S.
