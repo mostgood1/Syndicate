@@ -24763,3 +24763,75 @@ until that print exists.
 Other counters on the live SHA at 18:23:39Z: `matched=638`,
 `segment_has_no_matching_series=257`, `spread_line_orientation_mismatch=196` —
 both guards firing, which is correct behaviour, not a defect.
+
+## 2026-09-06 19:50:37Z — refresh-worker `80d89986` -> `bd658209` — **THE COUNTERS ARE READABLE IN PRODUCTION, AND THE FIRST TICK SHOWS THE F5 CAPABILITY WORKING AT SCALE.** `[lane kalshi-join-counters-logged]`
+
+**Both locks taken, and a sim waited out.** Claim acquired 19:46:20Z; preflight
+returned **CLEAR** for the exact target with only infrastructure processes
+running. `MLB_DAILY_SIM_TRIGGERED 20260906_192807` was in flight when I started
+— I held until `MLB_DAILY_SIM_END ... exit_code=0 duration_seconds=1045` at
+19:46, and confirmed no newer sim had started before triggering.
+
+**MY DEPLOY WAS CANCELLED 71s IN BY ANOTHER SESSION DEPLOYING THE SAME COMMIT,
+WHILE I HELD THE CLAIM.** `dep-daes690n74is73f93mrg` (mine, created 19:46:44)
+superseded by `dep-daes6qou01pc73fr1bt0` (19:47:55) — identical SHA
+`bd658209`, so nothing was lost and I did NOT re-trigger, which would have
+started a cancel loop. **The claim did not stop them.** Second coordination gap
+today after a lane marker of mine was overwritten with another lane's slug; both
+say the same thing — these locks are advisory against a session that does not
+consult them.
+
+**THIS DEPLOY ALSO REMOVED A DEFECT THAT WAS LIVE.** `80d89986` carried the
+mangled odds-side line: **10 fields, `alt_main_collisions` printed TWICE,
+`reasons` not last** — the product of two sessions appending to one f-string
+minutes apart. Content-verified on the live SHA after boot:
+
+| emitter | fields | duplicates | `reasons` last |
+|---|---|---|---|
+| `[kalshi_odds] BOARD_JOIN` | 7 | none | yes |
+| `[portfolio_commit] KALSHI_BOARD_JOIN` | 6 | none | yes |
+
+### The reading — first post-boot join tick, 20:10:14Z / 20:10:38Z
+
+Both emitters, 24 seconds apart, **identical counters** (`board_rows` 1100 vs
+1102 — the board moved between them, which is expected):
+
+    matched=331   alt_main_collisions=2
+
+    segment_matched_series = {'first5->KXMLBF5SPREAD': 11,
+                              'first5->KXMLBF5TOTAL': 25}
+
+    segment_refused_series = {'first5->KXMLBTOTAL': 34, 'first5->KXMLBSPREAD': 15,
+                              'first3->KXMLBSPREAD': 6, 'first1->KXMLBF5TOTAL': 6,
+                              'full->KXMLBF5SPREAD': 6, 'first3->KXMLBF5SPREAD': 4,
+                              'first3->KXMLBF5TOTAL': 3, 'first1->KXMLBTOTAL': 2,
+                              'first3->KXMLBTOTAL': 2, 'full->KXMLBF5TOTAL': 2,
+                              'first1->KXMLBF5SPREAD': 1, 'first1->KXMLBSPREAD': 1}
+
+**`alt_main_collisions=2` — NON-ZERO, so the price tie-break is deciding real
+cases in production.** Do not compare that 2 against the replay's "~1 per 78"
+without care: the replay denominator was COLLAPSED KEYS and this line's is 1,100
+BOARD ROWS. The log does not carry a collapsed-key count, so the rate per key is
+still unmeasured — what is now established is that the number is not zero.
+
+**`first5->KXMLBF5SPREAD: 11` IS THE CAPABILITY THE ALT COLLAPSE UNLOCKED.**
+Kalshi lists F5 spreads at only 1.5/2.5 and every board row at those strikes was
+an `_alt` row the index refused; the series could not execute at all before
+`21aac548`. Eleven matches on one tick.
+
+**`first5->KXMLBTOTAL: 34` REFUSED BESIDE `first5->KXMLBF5TOTAL: 25` MATCHED IS
+THE 2026-08-28 DEFECT'S GUARD, VISIBLE FOR THE FIRST TIME.** The join sees BOTH
+contracts for a first5 row at one strike and takes the five-inning one. That is
+a peer lane's synthetic MIL@CIN reproduction, now at production scale. The
+MIRROR direction is there too — `full->KXMLBF5TOTAL: 2`, `full->KXMLBF5SPREAD:
+6` — whole-game rows correctly refusing F5 contracts.
+
+**WHAT THIS REPLACES.** `segment_has_no_matching_series` was a bare count that
+was read three different ways in one day for want of a denominator. It now sits
+beside exactly which pairings matched and which refused, on both emitters, one
+of which is the ORDER path.
+
+**Still owed elsewhere, unchanged by this deploy:** lane
+`settled-sample-nfl-reconcile`'s reading (`SETTLED_SAMPLE` printing `nfl: 12`
+with `credibility 0.25`) — its code landed in `53d8f9c9` and rides this deploy,
+so that reading should now be takeable.
