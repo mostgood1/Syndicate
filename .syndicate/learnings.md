@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 857 rules `[generated]`
+## Index — 861 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2749,3 +2749,27 @@ still not count.
   theirs; we both edited anyway. Whoever notices the overlap first should take
   the whole thing rather than split it.
 - *(evidence: the merged line and its fix in `3d1d2173`)*
+
+## 2026-09-06 A DUPLICATE MODULE-LEVEL NAME IN A TEST FILE SILENTLY UN-RUNS TESTS. A GREEN SUITE IS NOT EVIDENCE THEY RAN -- COUNT COLLECTED, NOT PASSED
+
+- **The rule going forward.** Python keeps the LAST binding, so a second `def` of
+  an existing name deletes the first while it goes on looking like live code --
+  no error, no warning, and invisible in any diff that does not happen to show
+  both. In `tests/`, that means the shadowed tests are never COLLECTED, so they
+  can never fail and the suite is green *because* they are gone. Measured:
+  `tests/test_venue_settlement.py` had three `test_the_repair_*` names colliding
+  across two different repairs; the three covering `repair_multi_side_grades`
+  (self-limiting, never touches an INFERRED grade, never touches paper --
+  money-adjacent settlement invariants) had **never run once**. 75 collected
+  before the rename, 78 after. **The reading that shows this is the COLLECTED
+  count, not the passed count**, and nothing else in the suite would ever have
+  said so. Third instance of the family in the repo, after
+  `memory_observability.py` (`67af1276`, which cost `#285`'s `MALLOC_TRIM_INIT`
+  proof line) and `nba/live_lens.py` (benign) -- so it is now a check,
+  `scripts/check_duplicate_module_names.py`, not a thing to notice in review.
+  **The sweep is cheap and the false-positive load is near zero**: counting
+  module-level ASSIGNMENTS as well as `def`/`class` over
+  `syndicate/ pipeline/ scripts/ tests/` returned **8 files**, not dozens, which
+  is what made an EMPTY allowlist possible. Keep it empty -- an allowlist with
+  entries in it is where the next real one hides.
+- *(evidence in `learnings_evidence.md`)*

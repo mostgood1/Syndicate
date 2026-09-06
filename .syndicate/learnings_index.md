@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 857 rules `[generated]`
+## Index — 861 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 321**
+**FORBIDDEN — 323**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -141,6 +141,8 @@
 - [2026-09-06 FORBIDDEN: reaching for `--force` on a refusal you have not read. Mine said…](#2026-09-06-forbidden-reaching-for---force-on-a-refusal-you-have-not-read-mine-said-what-was-wrong-i-invented-a-tool-bug-instead-and-nearly-wrote-it-into-this-file-as-a-class-lane-shortlist-prop-row-duplicates-caught-by-lane-prop-region-knob)
 - [2026-09-06 — FORBIDDEN: `git stash` in this repo. The stash stack is SHARED across ever…](#2026-09-06-forbidden-git-stash-in-this-repo-the-stash-stack-is-shared-across-every-worktree-so-a-pushpop-pair-is-not-yours-and-can-swap-two-sessions-work-lane-venue-fanin-segment-key-kalshi-alt-line-join)
 - [2026-09-06 FORBIDDEN: concluding a hypothesis is WRONG from a simulation you did not co…](#2026-09-06-forbidden-concluding-a-hypothesis-is-wrong-from-a-simulation-you-did-not-confirm-reached-the-real-object-tests-is-not-a-package-so-pytests-module-is-not-yours)
+- [2026-09-06 — FORBIDDEN: adding a transform that REBINDS the name a reported field is de…](#2026-09-06-forbidden-adding-a-transform-that-rebinds-the-name-a-reported-field-is-derived-from-the-field-keeps-its-name-changes-its-meaning-and-every-existing-reader-keeps-working-while-answering-a-different-question-lane-kalshi-join-counters-logged)
+- [2026-09-06 — FORBIDDEN: asserting "the token is present" as the test for a log line oth…](#2026-09-06-forbidden-asserting-the-token-is-present-as-the-test-for-a-log-line-other-tools-parse-a-duplicate-is-present-twice-lane-kalshi-join-counters-logged)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -341,7 +343,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 530**
+**Rules and corrections — 532**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -426,6 +428,7 @@
 - [2026-09-06 — AN INTERVENTION'S OWN OUTPUT CANNOT SUPPLY ITS COUNTERFACTUAL](#2026-09-06-an-interventions-own-output-cannot-supply-its-counterfactual)
 - [2026-09-06 REQUIRED: write a belief in the form that makes a PREDICTION. A wrong rule a…](#2026-09-06-required-write-a-belief-in-the-form-that-makes-a-prediction-a-wrong-rule-about-a-mechanism-gets-caught-in-minutes-the-same-wrong-belief-as-a-one-off-remedy-is-simply-adopted-insight-from-lane-prop-region-knob-recorded-by-lane-shortlist-prop-row-duplicates)
 - [2026-09-06 - COMMITTING A LANE BLOCK IS NOT CLAIMING IT. LANDING IS.](#2026-09-06---committing-a-lane-block-is-not-claiming-it-landing-is)
+- [2026-09-06 A DUPLICATE MODULE-LEVEL NAME IN A TEST FILE SILENTLY UN-RUNS TESTS. A GREEN…](#2026-09-06-a-duplicate-module-level-name-in-a-test-file-silently-un-runs-tests-a-green-suite-is-not-evidence-they-ran----count-collected-not-passed)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
@@ -866,6 +869,7 @@
 - [2026-09-03 — the Bash bypass in `lane-guard`: the census, and why the ledger never show…](learnings_evidence.md#2026-09-03-the-bash-bypass-in-lane-guard-the-census-and-why-the-ledger-never-showed-the-damage) `[evidence]`
 - [2026-09-03 — a census is only as wide as its pattern: "prose only" for five scripts my…](learnings_evidence.md#2026-09-03-a-census-is-only-as-wide-as-its-pattern-prose-only-for-five-scripts-my-own-refactor-had-just-broken) `[evidence]`
 - [2026-09-04 WHEN A COMMIT NARROWS A PREDICATE, THE DOCSTRING IS PART OF THE PREDICATE —…](learnings_evidence.md#2026-09-04-when-a-commit-narrows-a-predicate-the-docstring-is-part-of-the-predicate-a-stale-contract-line-does-not-read-as-stale-it-reads-as-corroboration-for-whichever-test-still-encodes-the-old-rule-lane-soccer-card-final-state) `[evidence]`
+- [2026-09-06 A duplicate module-level name in a test file silently un-runs tests](learnings_evidence.md#2026-09-06-a-duplicate-module-level-name-in-a-test-file-silently-un-runs-tests) `[evidence]`
 - [2026-08-12 — Do not batch changes during a diagnosis](learnings_archive.md#2026-08-12-do-not-batch-changes-during-a-diagnosis) `[evidence]`
 - [2026-08-12 — A rate ceiling is not a fix](learnings_archive.md#2026-08-12-a-rate-ceiling-is-not-a-fix) `[evidence]`
 - [2026-08-12 — Parallel sessions on one problem need lane discipline](learnings_archive.md#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline) `[evidence]`

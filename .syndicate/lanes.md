@@ -1618,6 +1618,64 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   than assumed.
 - Blocked by: none.
 
+### dup-module-defs — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **LANDED `3fb66eb9` ON `origin/main`. Repo-wide duplicate module-level names: 8 files → 0, and the check exits 0 at the origin/main tip.** **THE ONE WITH TEETH WAS NOT EITHER OF THE TWO I WAS SENT FOR.** `tests/test_venue_settlement.py` had three `test_the_repair_*` names colliding across two DIFFERENT repairs: the survivors cover `repair_impossible_venue_pnl`, the shadowed three cover `repair_multi_side_grades` — self-limiting, never touches an INFERRED grade, never touches paper. Money-adjacent settlement invariants that had NEVER RUN once. Renamed; **75 tests collected before, 78 after**, 78 passed. The two assigned pairs were both benign: NBA `build_live_lens_api_payload` (live = the inline one at 807, dead = the delegate at 747) differed only in resolving the cards/page contexts through the private `_compute_*` names vs the public `build_*` aliases — and `build_cards_page_context IS _compute_cards_page_context` (asserted at runtime), so nothing was silently not running. NHL `_sim_hist_rows` was byte-identical. **THE FINDING WORTH KEEPING: the sweep that finds these is CHEAP AND THE FALSE-POSITIVE LOAD IS NEAR ZERO.** Counting module-level ASSIGNMENTS as well as `def`/`class`, over `syndicate/ pipeline/ scripts/ tests/`, returned **8 files** — not dozens. That is what made an EMPTY allowlist possible, and an allowlist with entries in it is a place for the next real one to hide. Five of the eight were exact-value duplicates (`_MONTHS`, and `REPO_ROOT` in four scripts as a redundant second `sys.path` bootstrap) and were simply deleted. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: no module-level name in `syndicate/`, `pipeline/`, `scripts/` or `tests/` is
+  defined twice, and a check makes a third instance impossible to land silently.
+  Third instance of the family: `memory_observability.py` (fixed `67af1276`) had
+  silently killed `#285`'s `MALLOC_TRIM_INIT` proof line and reverted `daed5d92`.
+- Files: `syndicate/features/nba/live_lens.py`, `syndicate/features/nhl/cards.py`,
+  `tests/test_venue_settlement.py`, `scripts/check_duplicate_module_names.py` (new),
+  `tests/test_duplicate_module_names.py` (new).
+  Collision check 2026-09-06 against `origin/main:.syndicate/lanes.md`: zero
+  mentions of any of these paths. `kalshi_catalogue.py` (`_MONTHS` x2) is
+  DELIBERATELY EXCLUDED — surfaced, not edited; see below.
+- Hypothesis: n/a for the two assigned pairs (they are a static fact, not a
+  diagnosis). For the sweep: an AST scan that also counts module-level ASSIGNMENTS
+  (the `test_malloc_info_arenas.py` pattern) is cheap enough to run repo-wide
+  without drowning in false positives.
+- Falsification test: if the assignment-inclusive scan returns dozens of benign
+  hits, the repo-wide check is not viable and the invariant stays per-file.
+  MEASURED: 8 files across `syndicate/ pipeline/ scripts/ tests/`. It is viable.
+- Verification: `scripts/check_duplicate_module_names.py` exits 0; the NBA and NHL
+  modules import and their surviving definitions are exercised by a real call, NOT
+  by grepping for the deleted string (2026-08-29 rule); `tests/test_venue_settlement.py`
+  runs its three previously-shadowed tests and they PASS or are recorded as failing.
+- Blocked by: none.
+- **Verification ran, and here is the reading.** `off != on` at both levels: the
+  unit control asserts the checker flags a synthetic duplicate, and end to end a
+  probe file dropped into `scripts/` makes the CLI exit 1 while removing it
+  returns exit 0. A check whose only evidence is that it reads clean has not been
+  shown able to read anything else.
+- **The NBA collapse is a proven no-op on the SERVED shape, not on the source
+  text.** `build_live_lens_api_payload`, `_compute_live_lens_api_payload` and the
+  snapshot's `api_payload` were dumped on HEAD and on the changed tree: identical
+  in 30 of 35 keys, differing only in wall-clock fields (`generatedAt`,
+  `generated_at`, `oddsRefreshedAt`, `odds_refreshed_at`, and the same stamps
+  nested in `live_lens_contract`). Normalised, all three are IDENTICAL. This
+  matters because `_compute_live_lens_api_payload` is what
+  `build_live_lens_snapshot` writes into `api_payload`, which is what
+  `read_latest_live_lens_api_payload` actually serves — the survivor was a second
+  copy of that body, so a fix would have reached one caller and not the other.
+- Suites: `test_venue_settlement` 78 passed; `test_nba_live_lens_routes` +
+  `test_nba_live_snapshots_local` + `test_live_lens_local` +
+  `test_status_text_word_boundaries` 75 passed; `test_kalshi_catalogue` +
+  `test_kalshi_doubleheader_event_match` 94 passed; `test_duplicate_module_names`
+  4 passed; `test_archives -k nhl` 55 passed; `-k live_lens` 56 passed, 2 failed.
+  **THE 2 ARE NOT MINE** — both `test_nfl_live_lens_api_*`, touching neither
+  changed module, and they fail identically on unmodified HEAD in the same
+  worktree. Re-baselined rather than assumed.
+- **Files actually touched** (the opening block said `kalshi_catalogue.py` was
+  excluded — that was written before I checked; `mlb-first5-kalshi-execution`
+  closed 2026-09-06 and no OPEN lane claims it on `origin/main`, so it was taken):
+  `syndicate/features/nba/live_lens.py`, `syndicate/features/nhl/cards.py`,
+  `syndicate/features/shared/kalshi_catalogue.py`, `tests/test_venue_settlement.py`,
+  `scripts/{build_soccer_picks,build_soccer_rosters,refresh_nba_oddsapi_props,refresh_wnba_oddsapi_props}.py`,
+  `scripts/check_duplicate_module_names.py` NEW, `tests/test_duplicate_module_names.py` NEW.
+- **Not deployed, and it does not need to be** — `.py` only, no `render.yaml`, so
+  `autoDeploy = no` means nothing shipped. The NBA/NHL changes are no-ops by
+  measurement; the value is the check and the three restored tests, which land in
+  CI (the `pytest-baseline` job runs `tests/`).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

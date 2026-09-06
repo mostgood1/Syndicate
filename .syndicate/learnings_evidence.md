@@ -25405,3 +25405,41 @@ it reads negative.**
 - **How we found out:** the null result was too clean. The gate is unambiguous (`still_moving and age > 240` -> return None) and the record had `in_progress: True`, so "aged 300 s and nothing changed" was not a possible outcome of the code as read. That contradiction is what sent me to check the instrument rather than the hypothesis.
 - **The rule going forward:** a simulation that produces NO effect is not evidence until you have confirmed it reached the target. Mutate through `sys.modules[<name>]` and raise when the key is missing, rather than `import`ing a path that may create a fresh object. Same family as the standing rule that a machine-wide process dump is not a description of your own run — both are "the instrument was pointed at the wrong thing", and both read exactly like a finding.
 - **Cost:** none — caught in the same session. The near-miss is that I would have recorded "age is not the cause" in the lane, and the next reader would have started from a false exoneration.
+
+## 2026-09-06 A duplicate module-level name in a test file silently un-runs tests
+
+- **What we believed:** that the two duplicate definitions flagged for cleanup
+  (`nba/live_lens.py`, `nhl/cards.py`) were the interesting cases, one of them
+  possibly hiding a fix that was silently not running -- and that the rest of the
+  repo was clean, since a sweep had named only those two files.
+- **What was actually true:** both flagged pairs were INERT. NBA's two bodies
+  computed the same payload (`build_cards_page_context IS
+  _compute_cards_page_context`, asserted at runtime; `build_live_lens_page_context`
+  forwards with the same defaults), and NHL's two `_sim_hist_rows` were
+  byte-identical. The damaging instance was one the original sweep did not report,
+  because that sweep did not look at `tests/`: `tests/test_venue_settlement.py`
+  had three `test_the_repair_*` names colliding across two DIFFERENT repairs.
+  The survivors cover `repair_impossible_venue_pnl`; the shadowed three cover
+  `repair_multi_side_grades` -- that it is self-limiting, that it never touches an
+  INFERRED grade, that it never touches paper. All three had never been collected.
+- **How we found out:** re-running the AST sweep with `tests/` in scope AND with
+  module-level assignments counted (the `memory_observability` instance was half
+  assignment, so a `def`-only scan misses that half). 8 files across
+  `syndicate/ pipeline/ scripts/ tests/`. Confirmed by pytest's COLLECTED count:
+  75 before the rename, 78 after -- `git show HEAD:tests/test_venue_settlement.py`
+  into a temp file and `--collect-only -q` on each. The passed count said nothing;
+  it was green both ways.
+- **The rule going forward:** a green suite is not evidence a test ran. When a
+  file may have colliding names, read the COLLECTED count. And keep the sweep's
+  allowlist empty -- the measured false-positive load was 8 files repo-wide, of
+  which 5 were exact-value duplicates that could simply be deleted (`_MONTHS`,
+  and `REPO_ROOT` in four scripts as a redundant second `sys.path` bootstrap), so
+  no exemption was needed by anything.
+- **Cost:** none realised. The three settlement tests pass now that they run, so
+  no defect was hiding behind them -- but they had been guarding money-adjacent
+  grading for however long the collision existed, and would not have fired.
+- **Also worth keeping:** the two flagged pairs are the argument FOR the check
+  rather than against it. One instance of this defect cost a production proof
+  line, one cost nothing, one disabled tests. The failure mode does not announce
+  which kind it is, and review cannot tell them apart at 1,000+ lines of
+  separation.
