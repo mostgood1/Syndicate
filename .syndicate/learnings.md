@@ -25,6 +25,7 @@
 <!-- LEARNINGS-INDEX:START -->
 
 ## Index — 866 rules `[generated]`
+## Index — 867 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2851,3 +2852,23 @@ still not count.
   written down as "derived, not verified" before the error was found. **Labelling
   a number's provenance is what makes a later invalidation cheap instead of
   contaminating.**
+## 2026-09-06 A PARTIAL CLONE THAT CHECKS OUT A WORKING TREE IS NOT A PARTIAL CLONE. `--filter=blob:none` WITHOUT `--no-checkout` FETCHES EVERY BLOB ANYWAY, ONE REQUEST AT A TIME
+
+- **The rule going forward.** `git clone --depth 1 --filter=blob:none <url>`
+  populates a working tree by default, and populating it requires every blob at
+  that commit -- so git dutifully refetches them all individually, each landing in
+  its own pack. **Measured: four caches totalling 3.8 GB, MLB-BettingV2 alone
+  2.6 GB against a repo GitHub reports as 354 MB — larger than a full clone.**
+  Adding `--no-checkout` took the same four to **950 KB** and a full report from
+  **5m29s to 8.9s**, with byte-identical results. The filter had been "working"
+  the whole time; the checkout undid it. **The general shape: an optimisation
+  flag is a claim about a code path, and a DEFAULT elsewhere can re-enter that
+  path and cancel it.** Verify the optimisation by MEASURING the resource it was
+  supposed to save -- I had already written a comment calling the filter
+  "load-bearing, not a micro-optimisation" before ever checking the cache size,
+  and that comment was false when written. Corollary from the same script, same
+  hour: comparing `ls-tree HEAD` instead of the working tree made an uncommitted
+  local edit invisible to a tool whose entire purpose was to not overwrite local
+  edits. **Both were found by RUNNING the thing against real data; the fixture
+  tests passed throughout.**
+- *(evidence in `learnings_evidence.md`)*

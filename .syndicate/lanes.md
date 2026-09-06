@@ -1842,6 +1842,61 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   IDENTICAL anon is the tell that this went wrong.
 - Blocked by: none.
 
+### vendor-upstream-sync — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`73ee3d2b`. `scripts/sync_vendor_upstream.py` + `vendor/upstream_sync.json` + 21 tests.** Six states from (local, upstream, baseline); **exactly one — `UPSTREAM_AHEAD` — is applied automatically**, and `UNCLASSIFIED` deliberately does NOT fall through to it. Seeded baseline: **IN_SYNC 569, LOCAL_ONLY 215, UNCLASSIFIED 53.** Seeding records IN_SYNC files ONLY, or the next run would call a pre-existing local patch `UPSTREAM_AHEAD` and overwrite it. **off != on PROVEN ON THE REAL nhl TREE, not just the fixture:** a file we edit reports `LOCAL_PATCH` and is left byte-identical to our edit; a file at the last-synced state whose upstream moved reports `UPSTREAM_AHEAD`, is updated to upstream, and its baseline advances. Tree and baseline restored afterwards, restore checked. **TWO REAL BUGS, both found by RUNNING it against the real tree rather than reading it — the hand-run demo failing is what exposed both.** (1) it read local hashes from `ls-tree HEAD`, so an UNCOMMITTED local edit was invisible, classified `IN_SYNC`, and `--apply` would have destroyed it — the working tree is what gets overwritten, so it is what must be hashed. (2) `--filter=blob:none` WITHOUT `--no-checkout` is WORSE than not filtering: `git clone` populates a worktree, needs every blob, and refetches them one request at a time into separate packs — **3.8 GB of cache, MLB-BettingV2 alone 2.6 GB against a 354 MB repo**. With `--no-checkout`: **950 KB, and 5m29s → 8.9s**, same totals. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: an upstream merge reaches `vendor/` by running one script, and that script
+  can NEVER silently revert a local patch. Single testable outcome: with a
+  recorded baseline, a file that upstream changed and we did not is applied, and a
+  file we changed and upstream did not is KEPT and reported — `off != on` on both.
+- Files: `scripts/sync_vendor_upstream.py` (new),
+  `vendor/upstream_sync.json` (new, the baseline),
+  `tests/test_sync_vendor_upstream.py` (new). Collision check 2026-09-06: zero
+  mentions of any of these names anywhere in the ledger.
+- **MEASURED FIRST, and the numbers drive the design.** Comparing git BLOB HASHES
+  (not worktree bytes, so CRLF cannot produce a false difference) between each
+  `vendor/` tree and its upstream default branch:
+  - the trees are heavily PARTIAL: 507 of upstream's 9,017 files for
+    `nba_betting_repo`, 425 of 4,185 for `wnba`, 89 of 3,000 for `nhl`. A sync
+    must be scoped to the subset we already vendor, never a full-tree copy.
+  - **541 local-only files** overall. A sync must never delete them.
+  - 48 files differ, but **only 24 are CODE** — the rest are `data/` artifacts
+    (dated CSVs, ESPN caches, `.logs/`), which are regenerated mirror output and
+    must be excluded by default.
+- **THE LOAD-BEARING PROBLEM: without a baseline, a difference is AMBIGUOUS.**
+  "upstream moved ahead" and "we patched locally" are the same observation. Right
+  now 4 of the 24 differing code files hold THIS SESSION's own deletions
+  (`nba/app.py`, `wnba/app.py`, `nhl/cli.py`, `nhl/shifts_api.py`) whose upstream
+  PRs are still OPEN — so a naive "take upstream" sync run today would silently
+  revert five fixes that were just verified. That is the failure mode the script
+  exists to prevent, not a caveat.
+- Hypothesis: n/a (measurement, not diagnosis).
+- Falsification test: if a recorded baseline cannot separate the three states —
+  local-patch, upstream-ahead, both-changed — then a 3-way manifest is the wrong
+  mechanism and the script should stay report-only.
+- Verification: unit tests over the classifier for all six states with synthetic
+  hash triples (no network); a seeded baseline that classifies the real tree; and
+  `off != on` demonstrated on a real file in each direction.
+- Blocked by: none.
+- **The design follows from measurements taken BEFORE writing anything**, by
+  blob hash so CRLF cannot fake a difference: the trees are deliberate SUBSETS
+  (507 of upstream's 9,017 for `nba_betting_repo`, 89 of 3,000 for `nhl`) so the
+  script never adds a file we do not vendor; **541 local-only files** so it never
+  deletes; and only 24 of the 48 differing files are CODE, so `data/` is excluded
+  unless asked.
+- **It also preserves each file's existing line endings on apply.** `cat-file
+  blob` returns git's LF-normalised form, and writing that into a CRLF checkout
+  flips one file while its neighbours keep theirs — invisible to git, since the
+  clean filter normalises it back, but a confusing artefact of the tool.
+- Report is the DEFAULT; nothing is written without `--apply`.
+- **The MLB tree is the most locally patched: 29 UNCLASSIFIED**, including
+  `tools/eval/build_season_betting_cards_manifest.py`, which this ledger records
+  as a deliberate user-authorised edit on 2026-08-31. The script correctly refuses
+  to touch it.
+- **OWED, and it is the real remaining gap:** the 53 UNCLASSIFIED files are
+  unresolved by construction — for each one, somebody has to diff and decide
+  whether it is ours or stale. Until that is done the sync only carries files that
+  were already in sync. The 4 nhl/nba/wnba entries among them are THIS SESSION's
+  own deletions and will resolve themselves when the upstream PRs merge.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

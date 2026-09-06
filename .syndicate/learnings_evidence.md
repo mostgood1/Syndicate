@@ -25521,3 +25521,42 @@ it reads negative.**
   definition removed" would have looked equally clean for the 7 deletions that
   were wrong.
 - **Cost:** none realised. 51 lines deleted, zero insertions, surface unchanged.
+
+## 2026-09-06 A partial clone that checks out a working tree is not a partial clone
+
+- **What we believed:** that switching `scripts/sync_vendor_upstream.py` from
+  full clones to `git clone --depth 1 --filter=blob:none` had solved the cost
+  problem, because comparison needs only blob hashes (which live in tree objects)
+  and content is needed only for the few files `--apply` writes. The code comment
+  said so, calling it "load-bearing, not a micro-optimisation".
+- **What was actually true:** the caches came to **3.8 GB** — MLB-BettingV2
+  alone **2.6 GB**, against a repo GitHub reports as **354 MB**, i.e. worse than
+  a full clone. `git config remote.origin.partialclonefilter` confirmed
+  `blob:none` was genuinely set, which is what made it confusing: the filter was
+  applied and the result was still enormous. `git clone` checks out a working
+  tree unless told not to, and the checkout needs every blob at that commit, so
+  the blobless clone refetched all of them lazily, one request per object, each
+  into its own pack.
+- **How we found out:** measuring the cache directory, only because the first
+  timing (5m29s for a report that writes nothing) looked wrong for the amount of
+  work described. `du -sh` per repo, compared against `gh repo view --json
+  diskUsage`.
+- **The fix and its measurement:** adding `--no-checkout`. Same four repos:
+  **950 KB** total, report **8.9s**, and the state totals identical both ways
+  (`IN_SYNC 569, LOCAL_ONLY 215, UNCLASSIFIED 53`) — so the cheaper path is
+  computing the same answer, which is the check that matters. `--apply` still
+  works, verified on the real nhl tree, because `cat-file blob` fetches lazily.
+- **The rule going forward:** an optimisation flag is a claim about a code path,
+  and a DEFAULT elsewhere can re-enter that path and cancel it. Measure the
+  resource the flag was supposed to save, not the flag's presence in the command
+  line — `partialclonefilter` was correctly set and told us nothing about the
+  outcome.
+- **Second bug in the same script, same shape:** local blob hashes were read from
+  `ls-tree HEAD`, so an UNCOMMITTED edit to a vendored file was invisible. It
+  classified as `IN_SYNC` and `--apply` would have overwritten it — in a script
+  written specifically to never overwrite local work. Fixed to hash the WORKING
+  TREE via `hash-object --stdin-paths`.
+- **Both were found by running the script against the real trees. The fixture
+  tests passed the entire time**, because a fixture commits everything it writes
+  and clones nothing. Regression tests were added for both afterwards.
+- **Cost:** none realised; caught before the first real sync.
