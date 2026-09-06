@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import statistics
 import sys
 import time
@@ -265,6 +266,156 @@ def _mean_epa(plays: list[tuple[int, str, str, str, float]], *, team: str, side:
     return statistics.fmean(values)
 
 
+# THE RATING MUST BE DENOMINATED IN POINTS PER GAME, NOT POINTS PER PLAY.
+#
+# MEASURED 2026-09-06, and the symptom was that this model could not tell NFL
+# teams apart at all:
+#
+#     across-game `margin_mean` stdev   NFL 2.16   vs   NCAAF 15.37
+#     games at P(home) 0.35..0.65       NFL 93.8%  vs   NCAAF 13.7%
+#     market `spread_line` stdev        5.69       (2023-2025 pooled, n=656)
+#
+# So the model differentiated 2.6x LESS than the market it is priced against.
+# Localised to the RATINGS INPUT rather than the shared engine, because the
+# WITHIN-game numbers are near-identical across the two sports (margin_stdev
+# 13.66 vs 13.14, total_stdev 11.87 vs 12.21) -- the same code shapes one game's
+# spread in both and does it consistently.
+#
+# THIS REPO ALREADY MADE THIS DIAGNOSIS FOR THE OTHER SPORT. `state_football.md`
+# records CFBD's `PPA overall` as "a PER-PLAY rate with SD 0.089 ... which the
+# engine rendered as margin SD 1.74 against a market SD of 14.46", and the fix
+# was SP+, "already denominated in points per game, which is the quantity a
+# margin model needs". NFL's 2.16 sits in that neighbourhood. NFL was one sport
+# behind a fix already made here.
+#
+# WHY THIS IS A UNITS CORRECTION AND NOT A TUNED MULTIPLIER, which is what makes
+# it shippable without a fitted backtest: EPA *is* expected points added. Summed
+# over a game's plays it IS points per game -- the same data, aggregated at the
+# level the margin model consumes, rather than a coefficient chosen to move a
+# number. Measured on 2025 pbp: 60.6 offensive plays/game, EPA/play stdev 0.0918
+# -> EPA/game stdev 5.47 POINTS. Best offense NE +9.52 pts/game, worst LV -11.93,
+# which are recognisable NFL magnitudes.
+#
+# CENTRED AND SCALED EXACTLY AS NCAAF IS. The engine treats 0.0 as a league
+# AVERAGE team, so an uncentred rating shifts every team the same way -- the bias
+# `[nfl-game-context]` already records as "the NFL payload's league-mean
+# offense_index at 0.405 against a neutral 0.500". `NFL_RATING_SCALE` mirrors
+# NCAAF's `SP_RATING_SCALE` deliberately: same engine, same units, so the same
+# divisor. It is NOT fitted to hit the market's 5.69 -- doing that would be
+# choosing a coefficient to match a target, which is the fit this change avoids.
+# Where the resulting spread actually lands is a MEASUREMENT, reported in the
+# lane, not a thing this constant was solved for.
+NFL_RATING_SCALE = 10.0
+
+
+def _points_per_game_ratings_enabled() -> bool:
+    """OFF BY DEFAULT, and the measurement is why.
+
+    The per-game conversion is dimensionally CORRECT -- EPA is expected points
+    added, so summed over a game it is points per game -- and it cures the
+    pathology it was built for. Measured on real 2025 week 10, 300 seeds:
+
+        margin_mean stdev   2.16 -> 11.44
+        games at P .35-.65  93.8% -> 3/14
+        exactly 0.0/1.0     0 -> 0
+
+    BUT THE MARKET'S OWN SPREAD IS 5.69 (`spread_line` stdev, 2023-2025 pooled,
+    n=656). So this trades a model that differentiates 2.6x TOO LITTLE for one
+    that differentiates 2.0x TOO MUCH, and an over-confident model that prices
+    is more dangerous than a flat one that cannot.
+
+    `NFL_RATING_SCALE = 20.0` would land it on 5.69 almost exactly. That number
+    is deliberately NOT used: choosing a coefficient so the output matches a
+    target is a FIT, and this ledger's soccer precedent is a re-fit that looked
+    better on the metric it was fitted to and still LOST to the market on a
+    leak-free backtest. A scale belongs to a lane that can validate it
+    out-of-sample, not to the lane that noticed the units were wrong.
+
+    So the correction ships INERT and testable:
+    `SYNDICATE_NFL_PPG_RATINGS=1` turns it on for a backtest run. Absent means
+    the OLD behaviour, stated explicitly because "absent != off" is a documented
+    trap here and the default is what decides.
+    """
+    raw = str(os.environ.get("SYNDICATE_NFL_PPG_RATINGS") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _epa_per_game(
+    plays: list[tuple[int, str, str, str, float]],
+    *,
+    team: str,
+    side: str,
+    before_week: int | None,
+) -> float | None:
+    """Expected points added PER GAME for one team, or None with no data.
+
+    Sibling of `_mean_epa`, which divides by PLAYS and is what produced a
+    per-play rate. Games are counted as DISTINCT WEEKS actually seen rather than
+    assumed, so a bye, a short season or a mid-season call sizes itself.
+    """
+    total = 0.0
+    weeks: set[int] = set()
+    for week, posteam, defteam, _play_type, epa in plays:
+        owner = posteam if side == "offense" else defteam
+        if owner != team:
+            continue
+        if before_week is not None and week >= before_week:
+            continue
+        total += epa
+        weeks.add(week)
+    if not weeks:
+        return None
+    return total / len(weeks)
+
+
+def _league_epa_per_game(
+    plays: list[tuple[int, str, str, str, float]],
+    *,
+    side: str,
+    before_week: int | None,
+) -> float:
+    """League mean of per-game EPA, for centring. 0.0 when there is no data.
+
+    Averaged over TEAMS, not over plays: the engine's neutral is an average
+    TEAM, and a play-weighted mean would let a high-volume offence pull the
+    centre it is being measured against.
+    """
+    totals: dict[str, float] = {}
+    weeks: dict[str, set[int]] = {}
+    for week, posteam, defteam, _play_type, epa in plays:
+        owner = posteam if side == "offense" else defteam
+        if not owner:
+            continue
+        if before_week is not None and week >= before_week:
+            continue
+        totals[owner] = totals.get(owner, 0.0) + epa
+        weeks.setdefault(owner, set()).add(week)
+    per_game = [totals[t] / len(weeks[t]) for t in totals if weeks.get(t)]
+    return sum(per_game) / len(per_game) if per_game else 0.0
+
+
+def _rating_pair(
+    plays: list[tuple[int, str, str, str, float]],
+    *,
+    team: str,
+    before_week: int | None,
+) -> tuple[float, float] | None:
+    """(offense, defense) in engine units, or None when this team has no plays.
+
+    `defense` is NEGATED: the raw figure is expected points ALLOWED per game, and
+    the engine's `defense_rating` means "how good this defence is". Getting that
+    backwards would rate the best defence as the worst, and the sign is the one
+    thing here no amount of scaling would reveal.
+    """
+    off = _epa_per_game(plays, team=team, side="offense", before_week=before_week)
+    dfn = _epa_per_game(plays, team=team, side="defense", before_week=before_week)
+    if off is None or dfn is None:
+        return None
+    off_mean = _league_epa_per_game(plays, side="offense", before_week=before_week)
+    def_mean = _league_epa_per_game(plays, side="defense", before_week=before_week)
+    return ((off - off_mean) / NFL_RATING_SCALE, -((dfn - def_mean) / NFL_RATING_SCALE))
+
+
 def team_rating(
     team: str,
     *,
@@ -283,15 +434,26 @@ def team_rating(
     downstream from a genuine data outage.
     """
     team = pbp_team_code(team)
-    offense = _mean_epa(current_plays, team=team, side="offense", before_week=week)
-    defense_allowed = _mean_epa(current_plays, team=team, side="defense", before_week=week)
-    if offense is not None and defense_allowed is not None:
-        return offense, -defense_allowed, "current_season_rolling"
+    if not _points_per_game_ratings_enabled():
+        # THE OLD PER-PLAY PATH, still the DEFAULT. See
+        # `_points_per_game_ratings_enabled` for why the fix is not on yet.
+        offense = _mean_epa(current_plays, team=team, side="offense", before_week=week)
+        defense_allowed = _mean_epa(current_plays, team=team, side="defense", before_week=week)
+        if offense is not None and defense_allowed is not None:
+            return offense, -defense_allowed, "current_season_rolling"
+        if prior_plays:
+            prior_offense = _mean_epa(prior_plays, team=team, side="offense", before_week=None)
+            prior_defense_allowed = _mean_epa(prior_plays, team=team, side="defense", before_week=None)
+            if prior_offense is not None and prior_defense_allowed is not None:
+                return prior_offense, -prior_defense_allowed, "prior_season_fallback"
+        return 0.0, 0.0, "neutral_no_data"
+    current = _rating_pair(current_plays, team=team, before_week=week)
+    if current is not None:
+        return current[0], current[1], "current_season_rolling"
     if prior_plays:
-        prior_offense = _mean_epa(prior_plays, team=team, side="offense", before_week=None)
-        prior_defense_allowed = _mean_epa(prior_plays, team=team, side="defense", before_week=None)
-        if prior_offense is not None and prior_defense_allowed is not None:
-            return prior_offense, -prior_defense_allowed, "prior_season_fallback"
+        prior = _rating_pair(prior_plays, team=team, before_week=None)
+        if prior is not None:
+            return prior[0], prior[1], "prior_season_fallback"
     return 0.0, 0.0, "neutral_no_data"
 
 
