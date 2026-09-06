@@ -1762,6 +1762,13 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   at all tonight, so there was no positive control for the pricing STEP on any
   sport. Soccer's 52/52 shows the FIELD is populated elsewhere; it does not show
   the pricing path is healthy elsewhere.
+- **THE CADENCE QUESTION IS ANSWERED — 514 s median, not the 60 s reported
+  (7.8x), 27 intervals reconstructed from 400 consumer log samples.** It PREDICTS
+  my fallback rate (20.6% expected vs 25.0% observed), which is what makes it a
+  finding. **I declined to raise my 400 s bound to 700 s** even though the same
+  data shows that would zero the fallback: mean record age is 251 s and a game
+  can score twice in four minutes. Fix belongs to the producer's step, handed
+  back with the numbers. `state_football.md [ncaaf-live-resim]`.
 - **THE SECOND ESPN FETCH IS GONE, MEASURED `[2026-09-06 15:02-15:31Z,
   refresh-worker `58302f07`]`.** The tick reads
   `ncaaf-live-state-to-worker`'s persisted record (`77abe822` + their

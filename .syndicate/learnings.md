@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 845 rules `[generated]`
+## Index — 846 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5333,3 +5333,31 @@ flag being set.**
   `grep` both silently landed in the PRIMARY tree, the first measuring another
   session's uncommitted edits to the file under test, the second reporting a file
   I had just written as missing. Use `git -C <path>`.
+
+## 2026-09-06 — A SCHEDULING INTERVAL IS NOT A COMPLETION INTERVAL, and the two share a name. Measured 7.8x apart. `[lane ncaaf-live-resim-wire]`
+
+- **A peer reported their live phase runs on a 60 s median and I sized a staleness
+  bound against it.** The step riding that phase actually completed every **514 s
+  median** (mean 469, range 319–672, n=27) — because it writes once per FULL PASS
+  of the phase, and a pass takes minutes. Both numbers are true; only one is the
+  interval at which the artifact changes.
+- **How to tell them apart cheaply: does every item move in lockstep?** All five
+  dates' write gaps matched to within 1 s. That is the signature of one pass
+  writing everything, and it identifies a per-pass cadence rather than a per-item
+  timer without reading any scheduler code.
+- **METHOD, and it is the reusable half. RECONSTRUCT the event time from an AGE
+  field; do not infer a period from the shape of a sawtooth.** Every consumer
+  log line carrying `age_seconds` yields an exact write timestamp as
+  `log_time - age_seconds`. 400 consumer samples gave 27 exact producer intervals
+  — from a service I cannot read the disk of, and without adding a single log
+  line to the producer.
+- **Then make it predict something.** `E[max(0, gap-bound)]/E[gap]` said 20.6% of
+  my ticks should find the record too old; the tick had independently observed
+  25.0%. A cadence that explains an already-measured rate is a finding; one that
+  merely sounds plausible is not.
+- **The trap it closes: "raise the bound until the fallback disappears."** The
+  same distribution says a 700 s bound gives 0.0% fallback — a clean number
+  bought by pricing live probabilities on state averaging 251 s old. **A
+  staleness threshold widened to make a counter look good is a silent downgrade
+  of the model's input**, and the counter it fixes is the one that would have
+  reported it.
