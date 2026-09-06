@@ -5,6 +5,55 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [live-odds-worker-memory-is-page-cache] live-odds-worker READS 96% AND IS NOT IN DANGER — THE FIELD EVERYONE REACHES FOR IS THE WRONG ONE `[measured 2026-09-06, 200 samples, 3.7h uptime with NCAAF segment capture live]`
+
+**The reading that looks like an emergency:**
+
+    container_memory_pct_of_max   min 81.7   median 93.8   max 100.0
+    container_memory_headroom_mb  min    0   median  129   max   374
+    samples >= 95%                93 of 200  (46%)
+
+**The same 200 samples, split:**
+
+    container_memory_mb        median 1996   max 2048
+    UNRECLAIMABLE (anon)       median 1358   max 1772   (43.5%-86.5% of max)
+    reclaimable (page cache)   median  617   max  783
+
+**`container_memory_mb` INCLUDES UP TO 783 MB OF RECLAIMABLE PAGE CACHE**, which
+the kernel evicts under pressure rather than OOM-killing over. Worst-case
+headroom against the ANON floor is **276 MB**, not the 0 MB the headroom field
+reports. The service has not OOM'd.
+
+**`container_memory_unreclaimable_mb` IS ON THE SAME LOG LINE AND ALWAYS WAS.**
+`ALL_PROCESS_MEMORY` carries `container_memory_mb`,
+`container_memory_headroom_mb`, `container_memory_pct_of_max`,
+`container_memory_unreclaimable_mb` and `container_memory_unreclaimable_pct_of_max`.
+The first three answer *"how close is the container to its limit, cache
+included"*; only the last two answer *"how close are we to an OOM"*. Those are
+different questions and the first is the one printed first.
+
+**I nearly filed this as a segment-capture regression.** The tell that stopped
+it: `accounted_rss_mb` moved **+20 MB** while `container_memory_mb` moved
+**+232 MB** in 75 seconds. Anonymous memory cannot appear and vanish like that;
+file cache can, and this service re-streams `book_quotes` shards whose
+2026-09-06 shard alone is ~22 MB.
+
+**A SINGLE SAMPLE CANNOT SEE THIS.** The container figure swings 84.6% -> 96.0%
+in 75 seconds, so any one reading lands somewhere arbitrary in a 19-point range.
+An earlier anchor of "87.0% / 286 MB" taken as ONE sample was not wrong so much
+as unfalsifiable. **Read the distribution, and read the unreclaimable half.**
+
+### What this does and does not clear
+
+**CLEARED:** enabling NCAAF `h1` segment capture on this service
+(`SYNDICATE_NCAAF_SEGMENT_MARKETS=h1`) has not moved it into OOM danger. That
+was the owed measurement and it is a pass.
+
+**NOT CLEARED:** 1,772 MB of anon on a 2,048 MB service is ~86% of the hard
+limit, and `#241`'s restart loop lived in that band. This is headroom, not
+comfort. Any NEW periodic work here still needs its own reading -- and it must
+be the unreclaimable one over a distribution, not a headroom snapshot.
+
 ## [603-cross-game-quote-keys] VENUE QUOTES NAMED NO GAME; FIXED ON EVERY PATH, DEPLOYED, AND STILL UNPROVEN AFTER THREE READINGS `[2026-08-30, lane live-venue-order-placement]`
 
 `quote_key` was `sport|market|side|line` and the fan-in resolves it against a
