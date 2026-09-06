@@ -24551,3 +24551,81 @@ enabling it in production.
 
 **Turned off pending that comparison.** Leaving it on would mean running a
 production behaviour change justified by an inference I have just invalidated.
+
+## 2026-09-06 14:55:30Z — refresh-worker `1f032074` -> `58302f07` — **THE `1f032074` READING IS DISCHARGED, AND ONE DEPLOY MEASURED BOTH CHANGES: 4 ORDERS CARRY A `KXMLBF5*` TICKER, ALL FOUR ON `_alt` ROWS.** `[lanes mlb-first5-kalshi-execution + kalshi-alt-line-join]`
+
+**I DID NOT TRIGGER THIS DEPLOY AND DID NOT HOLD THE CLAIM.** Lane
+`ncaaf-h1-kalshi-series` (session 3492626c) held it, acquired ~36s before I
+asked, and triggered `58302f07` at 14:53:39Z. It carries my `21aac548` because I
+had landed on `origin/main` first. Second time in two days that landing on main
+composed the change in rather than racing it — which is what the "deploy a commit
+that is on `origin/main`" rule buys. A second deploy would have been a redundant
+restart of a 4GB worker for code already in the build.
+
+Content-verified both sides before trusting it:
+
+| SHA | `_collapse_duplicate_bets` | `alt_main_collisions` | `base_market_for_alternate` | test file |
+|---|---|---|---|---|
+| `1f032074` (was live) | no | no | no | no |
+| `58302f07` (live 14:55:30Z) | **yes** | **yes** | **yes** | **yes** |
+
+### The reading — `verify: OWED` on the `1f032074` entry is now discharged
+
+`/api/portfolio/live?on=all&show=all` + `/api/portfolio/paper?date=2026-09-06`,
+read 2026-09-06 13:40 CDT. **4 orders carry a `KXMLBF5*` `venue_ticker`**, out of
+780 orders scanned and 40 `first5` orders:
+
+    KXMLBF5TOTAL-26SEP061410AZHOU-2       totals_alt    1.5  under  filled  $1.41
+    KXMLBF5TOTAL-26SEP061340CHCMIA-7      totals_alt    6.5  over   filled  $1.11
+    KXMLBF5SPREAD-26SEP061340SFNYM-SF2    spreads_alt  -1.5  away   filled  $1.69
+    KXMLBF5SPREAD-26SEP061335BOSBAL-BAL3  spreads_alt  -2.5  home   filled  $1.22
+
+**ALL FOUR SIT ON `_alt` ROWS, WHICH IS WHY ONE READING SETTLES TWO CHANGES.**
+The segment bridge (`1f032074`) is what let a `first5` row reach a `KXMLBF5*`
+series at all; the alt collapse (`58302f07`) is what made these particular rows
+eligible. Neither alone produces this list.
+
+**`KXMLBF5SPREAD` EXECUTED — 2 of the 4 — AND THAT WAS STRUCTURALLY IMPOSSIBLE
+BEFORE THE ALT COLLAPSE.** Kalshi lists F5 spreads at exactly two strikes (1.5,
+2.5); the board's MAIN-line first5 spread rows sat at 0.5/0.5/1.0, so every row
+at a Kalshi strike was an `_alt` row the index refused. Both orders here are at
+`-1.5` and `-2.5`.
+
+**SPREAD ORIENTATION: 0 VIOLATIONS OF 2** — the check that matters, because the
+2026-08-26 defect put 11 orders on the club being FADED. `SFNYM-SF2` names SF and
+the board picked San Francisco at `-1.5`; `BOSBAL-BAL3` names BAL and the board
+picked Baltimore at `-2.5`. Named club, negative line, same side. Verified by
+INSPECTION — my automated substring test was crude (`'SF' in 'SAN FRANCISCO
+GIANTS'` is False) and must not be cited as the evidence.
+
+**MODE: ALL FOUR ARE `paper:kalshi`. NO LIVE-MONEY F5 ORDER EXISTS YET.** The
+reading is discharged at the JOIN and ORDER level, in paper mode. That is the
+honest ceiling here; the live-money case remains unobserved.
+
+### The morning null was a fact about the clock, not the fix
+
+At 09:55 CDT the same query returned **0 of 689**, and the board carried **1,996
+MLB rows, every one `segment='full'`** — no joinable row existed. At 13:40 CDT:
+
+    MLB rows 1,145   full 780   first5 277   first3 61   first1 27
+    first5 by market: totals_alt 125, spreads_alt 102, spreads 23, totals 16, h2h 10
+    joinable KXMLBF5TOTAL  84      joinable KXMLBF5SPREAD  43
+
+Segment rows arrive near game time, not in the morning. **Anyone re-reading a
+past date will understate this**: the shortlist is LIVE state, not a snapshot —
+2026-09-05 read 553 rows with 44 `first5` at 02:45Z, and 27 rows with 0 `first5`
+by the next afternoon.
+
+### What this deploy did not give me, and it is my omission
+
+**`alt_main_collisions` is in the returned report but NOT in either printed log
+line**, so the collision rate the price tie-break decides is **unmeasurable in
+production**. I added the field to `join_kalshi_to_board`'s dict and did not add
+it to `[kalshi_odds] BOARD_JOIN` or `[portfolio_commit] KALSHI_BOARD_JOIN`. A
+counter nobody can read is the instrument-blindness pattern this ledger keeps
+recording. Replay measured 1 collision per 78 collapsed keys; production unknown
+until that print exists.
+
+Other counters on the live SHA at 18:23:39Z: `matched=638`,
+`segment_has_no_matching_series=257`, `spread_line_orientation_mismatch=196` —
+both guards firing, which is correct behaviour, not a defect.
