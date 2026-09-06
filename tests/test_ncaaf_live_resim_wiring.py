@@ -250,6 +250,213 @@ def _espn_event(*, away_loc, home_loc, away_id="1", home_id="2", state="in", per
     return event
 
 
+# ---------------------------------------------------------------------------
+# READING THE WORKER'S LIVE-STATE RECORD INSTEAD OF FETCHING ESPN A SECOND TIME
+#
+# `ncaaf-live-state-to-worker` (`fc7e7d74`) took web off the ESPN request path by
+# persisting a live-state record. This tick can ride the same record -- but a
+# re-sim needs two fields an eyebrow does not, so the gate is the point of these
+# tests, not the happy path.
+#
+# EVERY ONE OF THESE IS A REACHABILITY TEST FIRST. `model_engine_standard.md`
+# requires `off != on` before correctness for anything behind a branch, because
+# a reader that never fires is indistinguishable from one that fires and agrees.
+# ---------------------------------------------------------------------------
+
+def _record_game(*, away_loc="Boise State", home_loc="Oregon", in_progress=True,
+                 situation=None, period=2, clock="12:34", drop=()):
+    """One persisted game, in the shape `poll_ncaaf_live_state` writes.
+
+    `drop` removes keys, which is how the CURRENT producer is modelled: it
+    carries neither `*_location` nor `situation` today.
+    """
+    game = {
+        "event_id": "401",
+        "home_team": f"{home_loc} Mascots", "away_team": f"{away_loc} Mascots",
+        "home_abbr": "HOM", "away_abbr": "AWY",
+        "home_score": 10, "away_score": 7,
+        "in_progress": in_progress, "final": False,
+        "status": "2nd Quarter", "start_time": "2026-09-05T19:30Z",
+        "home_id": "2", "away_id": "1", "period": period, "clock": clock,
+        "home_location": home_loc, "away_location": away_loc,
+        "situation": situation if situation is not None else {
+            "down": 3, "distance": 7, "yardLine": 39, "possession": "2",
+        },
+    }
+    for key in drop:
+        game.pop(key, None)
+    return game
+
+
+def _install_record(monkeypatch, record):
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.read_json_file",
+        lambda _path: record,
+    )
+
+
+def _explode_on_fetch(monkeypatch):
+    def _boom(_date):
+        raise AssertionError("ESPN was fetched when the record should have served it")
+    monkeypatch.setattr("scripts.poll_ncaaf_live_state._fetch_scoreboard", _boom)
+
+
+def test_a_complete_record_serves_the_index_and_espn_is_NEVER_fetched(monkeypatch):
+    """REACHABILITY: the record branch is taken, and the fetch cannot happen.
+
+    Asserted by making `_fetch_scoreboard` RAISE rather than by counting calls --
+    a counter left at zero is also what a branch that silently returned an empty
+    index would produce, and those are different defects.
+    """
+    import time as _time
+    _install_record(monkeypatch, {"games": [_record_game()], "fetched_at": _time.time()})
+    _explode_on_fetch(monkeypatch)
+
+    index, stats = rw._ncaaf_live_resim_live_index(["2026-09-05"])
+
+    assert list(index) == ["boise state@oregon"]
+    assert stats["record_dates"] == 1
+    assert stats["fetch_dates"] == 0
+    assert stats["fetch_reasons"] == {}
+    assert stats["in_progress"] == 1
+
+
+def test_the_record_path_and_the_fetch_path_build_the_SAME_index(monkeypatch):
+    """The whole design rests on this: ONE index shape, two sources.
+
+    If they diverged, the re-sim would price a different game depending on which
+    source happened to serve it, and nothing downstream could tell. This is the
+    join-tautology lesson applied forward -- the two sides are built from
+    DIFFERENT inputs here (a persisted record vs a raw ESPN event), which is why
+    the comparison means something.
+    """
+    import time as _time
+    situation = {"down": 3, "distance": 7, "yardLine": 39, "possession": "2"}
+
+    _install_record(monkeypatch, {
+        "games": [_record_game(situation=situation)], "fetched_at": _time.time()})
+    _explode_on_fetch(monkeypatch)
+    from_record, _ = rw._ncaaf_live_resim_live_index(["2026-09-05"])
+
+    _install_record(monkeypatch, None)  # force the fetch path
+    monkeypatch.setattr(
+        "scripts.poll_ncaaf_live_state._fetch_scoreboard",
+        lambda _date: {"events": [_espn_event(
+            away_loc="Boise State", home_loc="Oregon", situation=situation)]},
+    )
+    from_fetch, _ = rw._ncaaf_live_resim_live_index(["2026-09-05"])
+
+    assert list(from_record) == list(from_fetch) == ["boise state@oregon"]
+    a, b = from_record["boise state@oregon"], from_fetch["boise state@oregon"]
+    for field in ("in_progress", "final", "home_score", "away_score",
+                  "period", "clock", "possession_owner"):
+        assert a.get(field) == b.get(field), field
+    assert a["situation"]["down"] == b["situation"]["down"] == 3
+    assert a["situation"]["yardLine"] == b["situation"]["yardLine"] == 39
+
+
+def test_todays_producer_is_REFUSED_BY_NAME_and_espn_still_serves(monkeypatch):
+    """THE STATE ON `origin/main` RIGHT NOW, pinned so it cannot pass silently.
+
+    `poll_ncaaf_live_state` persists `home_id`/`away_id`/`period`/`clock` and
+    NOT `*_location` -- and ESPN's `displayName`, which it does persist, matched
+    **0 of 51** board games. So the record cannot key this index yet. The tick
+    must say so by name and keep working, not degrade quietly.
+    """
+    import time as _time
+    _install_record(monkeypatch, {
+        "games": [_record_game(drop=("home_location", "away_location"))],
+        "fetched_at": _time.time()})
+    monkeypatch.setattr(
+        "scripts.poll_ncaaf_live_state._fetch_scoreboard",
+        lambda _date: {"events": [_espn_event(away_loc="Boise State", home_loc="Oregon")]},
+    )
+
+    index, stats = rw._ncaaf_live_resim_live_index(["2026-09-05"])
+
+    assert stats["fetch_reasons"] == {"record_lacks_team_location": 1}
+    assert stats["record_dates"] == 0 and stats["fetch_dates"] == 1
+    assert list(index) == ["boise state@oregon"], "the fetch must still serve the slate"
+
+
+def test_an_in_progress_game_with_no_situation_is_refused_not_defaulted(monkeypatch):
+    """A MISSING INPUT IS A WORSE PROBABILITY, not a missing diagnostic.
+
+    Without `situation` the re-sim starts every drive at the 25 on 1st and 10
+    with possession marginalised. That is a silently degraded model, which
+    `model_engine_standard.md` exists to forbid -- so the record is refused and
+    ESPN serves the real down, distance and field position.
+    """
+    import time as _time
+    _install_record(monkeypatch, {
+        "games": [_record_game(drop=("situation",))], "fetched_at": _time.time()})
+    monkeypatch.setattr(
+        "scripts.poll_ncaaf_live_state._fetch_scoreboard",
+        lambda _date: {"events": [_espn_event(away_loc="Boise State", home_loc="Oregon")]},
+    )
+    _, stats = rw._ncaaf_live_resim_live_index(["2026-09-05"])
+    assert stats["fetch_reasons"] == {"record_lacks_situation": 1}
+
+
+def test_a_PREGAME_game_with_no_situation_is_NOT_refused(monkeypatch):
+    """The mirror of the test above, and the reason it is scoped to in-progress.
+
+    ESPN carries no `situation` for a game that has not kicked off, so requiring
+    it of every row would refuse a perfectly correct record forever -- a guard
+    that can never pass is the same as no feature.
+    """
+    import time as _time
+    _install_record(monkeypatch, {
+        "games": [_record_game(in_progress=False, drop=("situation",))],
+        "fetched_at": _time.time()})
+    _explode_on_fetch(monkeypatch)
+    index, stats = rw._ncaaf_live_resim_live_index(["2026-09-05"])
+    assert stats["record_dates"] == 1 and stats["fetch_reasons"] == {}
+    assert list(index) == ["boise state@oregon"]
+
+
+def test_a_stale_record_refuses_by_name(monkeypatch):
+    """400 s, not web's 240 s: this tick runs on a 180 s interval, so 240 would
+    tolerate ZERO missed producer cycles."""
+    import time as _time
+    _install_record(monkeypatch, {
+        "games": [_record_game()], "fetched_at": _time.time() - 500})
+    monkeypatch.setattr(
+        "scripts.poll_ncaaf_live_state._fetch_scoreboard",
+        lambda _date: {"events": [_espn_event(away_loc="Boise State", home_loc="Oregon")]},
+    )
+    _, stats = rw._ncaaf_live_resim_live_index(["2026-09-05"])
+    assert stats["fetch_reasons"] == {"record_stale": 1}
+
+
+def test_an_unstamped_record_is_not_treated_as_fresh(monkeypatch):
+    """`absent must not default permissive`. A record with no `fetched_at` is
+    exactly the one whose age cannot be argued about."""
+    _install_record(monkeypatch, {"games": [_record_game()]})
+    monkeypatch.setattr(
+        "scripts.poll_ncaaf_live_state._fetch_scoreboard",
+        lambda _date: {"events": [_espn_event(away_loc="Boise State", home_loc="Oregon")]},
+    )
+    _, stats = rw._ncaaf_live_resim_live_index(["2026-09-05"])
+    assert stats["fetch_reasons"] == {"record_has_no_fetched_at": 1}
+
+
+def test_the_records_fetched_at_becomes_the_rows_as_of(monkeypatch):
+    """`liveStateAsOf` must describe when ESPN was READ, not when this tick ran.
+
+    Stamping it with `now` would make a 6-minute-old record look instantaneous
+    on the board, which is the staleness the lens publishes precisely to expose.
+    """
+    import time as _time
+    fetched = _time.time() - 90
+    _install_record(monkeypatch, {"games": [_record_game()], "fetched_at": fetched})
+    _explode_on_fetch(monkeypatch)
+    index, _ = rw._ncaaf_live_resim_live_index(["2026-09-05"])
+    as_of = index["boise state@oregon"]["as_of"]
+    assert as_of.startswith(
+        datetime.fromtimestamp(fetched, tz=timezone.utc).isoformat()[:19])
+
+
 def test_the_live_index_is_keyed_on_location_not_display_name(monkeypatch):
     """MEASURED 2026-09-05 on the live slate: `location` 35/51, `displayName` 0/51.
 

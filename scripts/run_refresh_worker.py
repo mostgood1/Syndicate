@@ -1861,6 +1861,136 @@ def _ncaaf_live_resim_espn_dates(now_utc: datetime) -> list[str]:
     return dates
 
 
+# TWO FIELDS SEPARATE "READ THE WORKER'S RECORD" FROM "FETCH ESPN AGAIN", and
+# they are named here rather than discovered as a bad probability.
+#
+# `ncaaf-live-state-to-worker` (`fc7e7d74`) made `poll_ncaaf_live_state` persist
+# `home_id` / `away_id` / `period` / `clock` alongside `_game_from_event`, so web
+# stopped fetching ESPN per request. This tick can ride the same record and drop
+# the second fetch -- but only when it carries what a RE-SIM needs, which is more
+# than an eyebrow needs:
+#
+#   home_location / away_location   THE JOIN KEY. Measured 2026-09-05 over the
+#                                   live slate: ESPN `team.location` matched
+#                                   35/51 board games, `team.displayName`
+#                                   matched **0**. The record persists
+#                                   displayName (`_game_from_event`), so keying
+#                                   off it would index NOTHING while looking
+#                                   healthy -- the 257-of-257 shape again.
+#   situation                       down / distance / yardLine / possession.
+#                                   `resim_live_game` starts the rest-of-game
+#                                   sim from these; absent, `field_position`
+#                                   defaults to the 25 and possession is
+#                                   marginalised. That is not a missing
+#                                   diagnostic, it is a WORSE PROBABILITY, and
+#                                   an unfed input is indistinguishable from a
+#                                   working one at every level except the data
+#                                   (`model_engine_standard.md`).
+#
+# So this REFUSES BY NAME instead of degrading. A fallback that quietly works is
+# indistinguishable from the feature working -- the trap this repo has paid for
+# repeatedly -- so every refusal is counted and surfaced on the tick's own log
+# line. The moment the producer adds those two fields the reason disappears and
+# the fetch stops, with no change here.
+_NCAAF_RECORD_MAX_AGE_DEFAULT_SECONDS = 400.0
+
+
+def _ncaaf_live_state_record_max_age_seconds() -> float:
+    """Shares the producer's knob, with a DIFFERENT default, deliberately.
+
+    `SYNDICATE_NCAAF_LIVE_STATE_MAX_AGE_SECONDS` is web's 240 s bound. This tick
+    runs on a 180 s interval, so 240 s tolerates ZERO missed producer cycles --
+    a single skipped sweep would silently send it back to fetching. 400 s is
+    just over two of this tick's intervals, so one missed cycle is survivable
+    and two are not, which is the bound worth having.
+    """
+    raw = str(os.environ.get("SYNDICATE_NCAAF_LIVE_STATE_MAX_AGE_SECONDS") or "").strip()
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return _NCAAF_RECORD_MAX_AGE_DEFAULT_SECONDS
+    return value if value > 0 else _NCAAF_RECORD_MAX_AGE_DEFAULT_SECONDS
+
+
+def _ncaaf_live_state_rows_from_record(
+    iso_date: str, *, now_epoch: float | None = None
+) -> tuple[dict[str, dict[str, Any]] | None, str]:
+    """The worker's persisted live-state record as MY index, or None + a reason.
+
+    Returns rows keyed exactly as the fetch path keys them, so the caller cannot
+    tell the two apart downstream -- which is the point: one code path prices
+    them, and a difference would be a second parser.
+
+    ALL-OR-NOTHING PER DATE. A record covering only some games would index a
+    partial slate and read as "ESPN has no game for these teams", which is the
+    reading that cost this lane a whole board. Better one named refusal for the
+    date than a quietly short index.
+    """
+    from scripts.poll_ncaaf_live_state import live_state_path
+    from syndicate.features.ncaaf.live_resim import _norm_name, possession_side_from_espn
+
+    store = _refresh_state_store()
+    try:
+        record = store["read_json_file"](live_state_path(iso_date))
+    except Exception as exc:  # noqa: BLE001 -- a reader must never take the tick down
+        return None, f"record_read_failed_{type(exc).__name__}"
+    if not isinstance(record, Mapping):
+        return None, "record_absent"
+
+    games = record.get("games")
+    if not isinstance(games, list) or not games:
+        return None, "record_carries_no_games"
+
+    fetched_at = record.get("fetched_at")
+    try:
+        age = float(now_epoch if now_epoch is not None else time.time()) - float(fetched_at)
+    except (TypeError, ValueError):
+        # NOT treated as fresh. An unstamped record is exactly the one whose age
+        # cannot be argued about, and `absent must not default permissive`.
+        return None, "record_has_no_fetched_at"
+    if age > _ncaaf_live_state_record_max_age_seconds():
+        return None, "record_stale"
+
+    as_of = datetime.fromtimestamp(float(fetched_at), tz=timezone.utc).isoformat()
+    rows: dict[str, dict[str, Any]] = {}
+    for game in games:
+        if not isinstance(game, Mapping):
+            continue
+        away_loc = _norm_name(game.get("away_location"))
+        home_loc = _norm_name(game.get("home_location"))
+        if not away_loc or not home_loc:
+            return None, "record_lacks_team_location"
+        if bool(game.get("in_progress")) and "situation" not in game:
+            # Only IN-PROGRESS games have a situation to carry, so requiring it
+            # of a pregame row would refuse a correct record forever.
+            return None, "record_lacks_situation"
+        row = dict(game)
+        # POSSESSION IS RESOLVED HERE, THROUGH THE SAME FUNCTION THE FETCH
+        # PATH USES. ESPN names the possessing TEAM BY ID (`situation.
+        # possession = "2"`), never by side, and the producer persists the raw
+        # situation without resolving it -- so copying the record verbatim
+        # yields `possession_owner = None` where the fetch path yields "home".
+        # Caught by `test_the_record_path_and_the_fetch_path_build_the_SAME_
+        # index`, which is the entire reason that test compares two DIFFERENT
+        # inputs rather than one value against itself.
+        #
+        # `possession_side_from_espn` reads `competition["situation"]`, so it
+        # is handed a synthetic competition rather than reimplemented: a second
+        # copy of this resolution is how the two paths would drift apart again.
+        owner, situation = possession_side_from_espn(
+            {"situation": game.get("situation") or {}},
+            home_id=game.get("home_id"),
+            away_id=game.get("away_id"),
+        )
+        row["possession_owner"] = owner
+        row["situation"] = situation
+        row["as_of"] = as_of
+        rows[f"{away_loc}@{home_loc}"] = row
+    if not rows:
+        return None, "record_yielded_no_keys"
+    return rows, "record"
+
+
 def _ncaaf_live_resim_live_index(dates: list[str]) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
     """ESPN state keyed `"{away_location}@{home_location}"`, plus fetch counters.
 
@@ -1897,10 +2027,30 @@ def _ncaaf_live_resim_live_index(dates: list[str]) -> tuple[dict[str, dict[str, 
     index: dict[str, dict[str, Any]] = {}
     stats: dict[str, Any] = {
         "dates": list(dates), "fetch_failures": 0, "events": 0, "keyed": 0, "in_progress": 0,
+        # WHICH SOURCE SERVED THE INDEX, per date. Without this, "the record
+        # is being used" and "the record is missing and we quietly refetched"
+        # produce an identical index and an identical log line.
+        "record_dates": 0, "fetch_dates": 0, "fetch_reasons": {},
     }
     as_of = datetime.now(timezone.utc).isoformat()
 
     for iso_date in dates:
+        # THE WORKER'S RECORD FIRST, ESPN ONLY WHEN IT CANNOT SERVE.
+        record_rows, record_reason = _ncaaf_live_state_rows_from_record(iso_date)
+        if record_rows is not None:
+            index.update(record_rows)
+            stats["record_dates"] = int(stats["record_dates"]) + 1
+            stats["keyed"] = int(stats["keyed"]) + len(record_rows)
+            stats["events"] = int(stats["events"]) + len(record_rows)
+            stats["in_progress"] = int(stats["in_progress"]) + sum(
+                1 for r in record_rows.values() if bool(r.get("in_progress"))
+            )
+            continue
+        # NAMED, and counted. A silent fall-through to the fetch is the
+        # thing this whole branch exists to make visible.
+        stats["fetch_dates"] = int(stats["fetch_dates"]) + 1
+        reasons = stats["fetch_reasons"]
+        reasons[record_reason] = int(reasons.get(record_reason, 0)) + 1
         payload = _fetch_scoreboard(iso_date)
         if not isinstance(payload, Mapping):
             # NAMED, never silent. An ESPN outage and a quiet slate both yield
