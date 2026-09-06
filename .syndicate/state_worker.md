@@ -465,6 +465,8 @@ workers fetch, web reads artifacts, and `request_path_guard` logged **205 "compu
 request path" warnings in a 1,200-line sample**. `live-odds-worker` (**78.5% of billed
 worker egress**) was still undeployed at checkpoint.
 
+**Instrument note 3 — A BANDWIDTH BUCKET TAKES ~50 MINUTES AFTER ITS HOUR CLOSES TO SETTLE, AND GROWS UP TO 39x WHILE DOING IT.** Sampled every 5 min, bucket `2026-09-06T16:00` (covering 15:00-16:00Z): `3.2 -> 5.2 -> 13.3 -> 22.3 -> 44.2 -> 64.7 -> 79.3 -> 95.7 -> 110.3 -> 124.6 -> 125.9`, then flat for 70 further minutes. **A bucket read within an hour of closing is not a low reading, it is an INCOMPLETE one** — and reading it as low is how I got `edge/meter = 2.24` for an hour whose settled ratio is `3.05`. Wait for two consecutive equal samples before quoting a bucket. Buckets days old are settled and safe.
+
 **Instrument note 2 — WORKER bandwidth buckets LAG WEB'S BY 45-90+ MINUTES, and a missing bucket is NOT a zero.** Observed twice: at 00:45Z web had the `00:00Z` bucket while both workers did not; at **02:40Z web reported `02:00Z` (38.6 MB) while refresh-worker and live-odds-worker still stopped at `01:00Z`** — 1h40m after that bucket closed. The services were verified **healthy and emitting logs** at the time, so the gap is the metrics pipeline, not the workload. **Do not read an absent bucket as 0** — a naive `dict.get(ts, 0)` renders the gap as a real reading of zero, which I did once tonight. Budget 90+ minutes before a worker's post-deploy hour is readable, and check web's latest bucket to tell lag from fault.
 
 **Instrument note:** bandwidth metrics are **hourly-only and RIGHT-labelled**
