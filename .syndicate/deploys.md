@@ -5,6 +5,53 @@
 
 ---
 
+## 2026-09-06 01:34Z - 01:39:17Z — live-odds-worker `e78fe40a` — **CATCH-UP: repairs the runtime drift my own poller race caused. The compression half is NOT mine to claim and its row is owed by `render-egress-transport`.** — lane `segment-refusal-deploy`
+
+`deploy=dep-... trigger=api`, posted on a CLEAR window in the same tick, claim
+released with `--token` (no force). Live at **2026-09-06T01:39:17.650096Z**.
+
+**verify — WHAT THIS DEPLOY OF MINE WAS FOR, and it is a repair, not a feature.**
+The 23:08Z double-POST left this service on `7f197639`, which is an ANCESTOR of
+the cancelled `a31fb870`, so it had been running without
+`layer2_board.py` (+22/-2) and `live_gameline_join.py` (+48/-1) for ~2.5 hours.
+`e78fe40a` contains `7f197639`, `d955e445`, `3cb5b4ba` and `cf401fb8`, and
+`merge-base --is-ancestor 7f197639 e78fe40a` is TRUE — forward, not a revert.
+**Reading: the service is at the tip and the drift is closed.**
+
+**THE COMPRESSION RESULT IS NOT VERIFIED AND MUST NOT BE READ FROM THIS ROW.**
+`3cb5b4ba`/`cf401fb8` rode along. Its counter reports mechanism working —
+`ratio=12.89x`, `refused_hosts=0`, single-process ladder confirmed
+(`gzip_responses` 1/200/400/600/800 with no repeats, which is why the deltas are
+real deltas and not two per-process counters subtracted). **But the counter and
+the meter disagree by ~20x**: six successive `BILLED_wire` deltas read
+235/300/286/196/236/325 MB/h (mean ~263, FLAT over 20 min, no decay) while
+Render's own meter bills this service 24.4-26.5 MB/h in the same window. Flat
+rules out a boot burst. **The likeliest reading is that the counter measures a
+direction Render does not bill** — mechanism without money. `render-egress-transport`
+owns that determination and the row; do not pre-empt it here.
+
+**MY OWN ERROR, RECORDED BECAUSE IT NEARLY STOPPED SOMEONE ELSE'S CORRECT WORK.**
+I told that lane their control had collapsed pre-deploy (~13 MB/h vs a 25.4
+baseline floor) and to stop writing their row. **It was arithmetic:** the
+`0.026 GB` day total was ONE landed bucket, not two, and I divided it by two.
+The true pre-deploy hour is **24.4 MB/h**. I had flagged the inference as my weak
+link and leaned on it anyway, and it was persuasive because a real, gentle slate
+decay (36.1 -> 33.5 -> 27.6 -> 25.4 -> 26.5 -> 24.4) pointed the same way. **A
+wrong number that lands beside a true effect is the hardest kind to catch.**
+What survives from it is narrower and still useful: their `< 25.4 MB/h`
+threshold is contaminated, because the last two pre-deploy hours already read
+24.4 and 25.4 — so the test must be against the EXTRAPOLATED trend, not the
+static range.
+
+**MEMORY, still the standing risk on this service and still not cleared.** A
+pre-reboot anchor was taken deliberately at 01:20:14Z so a same-uptime
+comparison stays possible: `headroom 286.383MB, container 1761.617MB` (~87%) at
+2h07 uptime with segment capture live, flat over the preceding 40 min. Every
+post-boot reading after this deploy is the ratchet resetting and is NOT evidence
+about either segments or compression.
+
+
+
 ## 2026-09-05 23:08:26Z - 23:13:56Z — live-odds-worker `7f197639` — **NCAAF h1 SEGMENT CAPTURE ENABLED AND CONFIRMED SPENDING, by credit burn — because the log path CANNOT answer this question.** — lane `segment-refusal-deploy`
 
 `deploy=dep-daea1qnqj5pc73aqh3sg trigger=api`. Enables
