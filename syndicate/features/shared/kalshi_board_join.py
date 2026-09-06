@@ -316,19 +316,56 @@ def _resolve_event(
     return result
 
 
+def _row_market(row: Mapping[str, Any]) -> str:
+    """A board row's market in the join's ONE vocabulary: base name, no segment.
+
+    THE BOARD SPELLS A SEGMENT MARKET TWO WAYS and both are live. Production
+    order rows carry the split form -- `market='totals'`, `segment='first5'` --
+    which is the pair `segment_market_keys('mlb')` produces when quotes come
+    back, and which `bet_status_mlb` names explicitly. Older rows and several
+    fixtures carry the fused form, `market='totals_1st_5_innings'`, with no
+    `segment` field at all.
+
+    `segment_for_board_row` ALREADY reads the segment out of either spelling.
+    So keeping the suffix in the market as well counted the same fact twice: the
+    key carried `first5` in its segment slot AND `_1st_5_innings` in its market
+    slot, and a row that said it one way could never meet a row -- or a contract
+    -- that said it the other.
+
+    Stripping it here, in the one place all three key builders share, is what
+    keeps that from becoming a fourth spelling. The segment is not lost: it is
+    carried by `segment_for_board_row` in `_row_key` and compared by
+    `_segments_agree`, from the row's own field or its suffix, whichever it has.
+
+    THIS WIDENS WHAT THE INDEX PAIRS, ON PURPOSE, AND THE GUARD IS WHY THAT IS
+    SAFE. A `totals_q1` row now lands in the same index slot as a full-game
+    `totals` row at the same line, where before the spelling kept them apart by
+    accident. `_segments_agree` refuses the pairing on the segment, which is the
+    check that was ADDED for exactly this after five orders went onto full-game
+    contracts on 2026-08-28 -- a real predicate rather than a name collision
+    that happened not to occur.
+    """
+    from syndicate.features.shared.market_keys import canonical_market_key
+    from syndicate.features.shared.market_segments import split_segment_market_key
+
+    raw = str(row.get("market") or "").strip().lower()
+    sport = row.get("sport")
+    split = split_segment_market_key(sport, raw)
+    if split is not None:
+        return split[1]
+    return canonical_market_key(sport, raw) or raw
+
+
 def _event_key(row: Mapping[str, Any]) -> tuple[str, str, float] | None:
     """A game line's identity: (event, market, line). No player involved.
 
     Canonicalised through `market_keys` like `_board_key`, so both indexes
     speak one vocabulary -- a second spelling here is how the two would drift.
     """
-    from syndicate.features.shared.market_keys import canonical_market_key
-
     event_id = str(row.get("event_id") or "").strip()
     if not event_id:
         return None
-    raw = str(row.get("market") or "").strip().lower()
-    market = canonical_market_key(row.get("sport"), raw) or raw
+    market = _row_market(row)
     try:
         line = float(row.get("line"))
     except (TypeError, ValueError):
@@ -422,10 +459,7 @@ def _board_key(row: Mapping[str, Any]) -> tuple[str, str, float] | None:
     unrecognised market keys on itself rather than being dropped, so a market we
     have no entry for can still match one Kalshi spells identically.
     """
-    from syndicate.features.shared.market_keys import canonical_market_key
-
-    raw = str(row.get("market") or "").strip().lower()
-    market = canonical_market_key(row.get("sport"), raw) or raw
+    market = _row_market(row)
     player = normalize_person(row.get("player_name"))
     try:
         line = float(row.get("line"))
@@ -555,15 +589,12 @@ def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str, str] | 
     A board row's game is `event_id`; a match carries the same value under
     `board_event_id` because that is what the join copied off the row.
     """
-    from syndicate.features.shared.market_keys import canonical_market_key
-
     event_id = str(row.get("event_id") or "").strip()
     if not event_id:
         return None
     ok, line = _key_line(row.get("line"))
     if not ok:
         return None
-    raw = str(row.get("market") or "").strip().lower()
     # ABSENT MEANS FULL GAME, which is what every board row without an explicit
     # segment has always meant. Stated rather than implied, because the whole
     # defect was an implied value nobody checked.
@@ -572,7 +603,7 @@ def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str, str] | 
     segment = segment_for_board_row(row)
     return (
         event_id,
-        canonical_market_key(row.get("sport"), raw) or raw,
+        _row_market(row),
         normalize_person(row.get("player_name")),
         line,
         str(row.get("side") or "").strip().lower(),
@@ -674,9 +705,57 @@ def kalshi_price_resolver(matches: Sequence[Mapping[str, Any]]):
 
 
 def _classify(market):
-    from syndicate.features.shared.kalshi_catalogue import classify_market
+    """`classify_market`, restated in the BOARD's market vocabulary.
 
-    return classify_market(market)
+    THE TWO SIDES OF THIS JOIN NAME A SEGMENT MARKET DIFFERENTLY, and until
+    2026-09-05 they never met. `classify_market` reads Kalshi's title grammar
+    ("First 5 innings: Over 6.5 runs") and returns OddsAPI's REQUEST spelling,
+    `totals_1st_5_innings`. A board row for the same bet carries
+    `market='totals'` with `segment='first5'` in its own field -- that pair is
+    literally what `segment_market_keys('mlb')` maps the request key onto when
+    the quotes come back. So the contract said `totals_1st_5_innings`, the row
+    said `totals`, and `_event_key`'s index lookup missed.
+
+    THAT MISS HAPPENS BEFORE `_segments_agree` RUNS, which is why registering
+    `KXMLBF5TOTAL` alone would have shipped inert. The segment guard can only
+    refuse a pairing the index actually produced; it cannot create one.
+
+    Normalised HERE rather than in `classify_market` for two reasons. It is the
+    single choke point -- both call sites go through it and everything
+    downstream reads `verdict["market"]` -- and `classify_market`'s suffixed key
+    is the right answer for its other callers, which count coverage per OddsAPI
+    market key and would silently start double-counting `totals` if this moved
+    upstream.
+
+    THE SEGMENT IS NOT LOST BY STRIPPING THE SUFFIX. It is carried by
+    `segment_for_series(verdict["series"])`, which is what `_match_key` keys on
+    and what `_segments_agree` compares -- one source, the series, rather than a
+    suffix that only some contracts spell. A market this does not recognise is
+    returned EXACTLY as classified: `split_segment_market_key` answers None for
+    a non-segment key, and mapping that onto `full` would be the papering-over
+    its own docstring refuses.
+    """
+    from syndicate.features.shared.kalshi_catalogue import classify_market
+    from syndicate.features.shared.market_segments import split_segment_market_key
+
+    verdict = classify_market(market)
+    if verdict.get("status") != "ok":
+        return verdict
+    split = split_segment_market_key(verdict.get("sport"), verdict.get("market"))
+    if split is None:
+        return verdict
+    _segment, board_market = split
+    # A COPY, not a mutation. `classify_market`'s result is handed to other
+    # readers in the same build and rewriting it in place would change what they
+    # see from a function they called themselves.
+    restated = dict(verdict)
+    restated["market"] = board_market
+    # The suffixed key kept under its own name, because the refusal counters and
+    # the coverage audits are keyed on what Kalshi's title actually said, and a
+    # silent rename would make a segment market indistinguishable from the
+    # full-game one in every diagnostic this join prints.
+    restated["oddsapi_market_key"] = verdict.get("market")
+    return restated
 
 
 def join_kalshi_to_board(

@@ -24053,3 +24053,1338 @@ against a base you must re-read to know.
 - **The rule going forward:** when narrowing or widening a guard, treat the enclosing docstring as part of the predicate and grep it for the rule before committing. And when a red test and a docstring agree, check whether they share a commit before treating that as two votes.
 - **SECOND DEFECT, same function, same class:** the old test's surviving half — `("post", kickoff, None) -> "post"` — never reached the guard it named. With `match_box=None` the function returns early on the `isinstance` check whether or not the terminal guard exists. Replaced with `("post", kickoff, {"status_state": "in"}) -> "post"`, which does reach it; deleting the guard now fails 2 tests, restored 78 pass. Same shape as the standing `presence is not reachability` rule: a test can name the right rule while exercising a path that cannot reach it, and it passes for the wrong reason forever.
 - **Cost:** none — the correct side was identified before any edit. The near-miss is the point: the docstring was a live instruction to revert a measured production fix, and it had been sitting there for two weeks.
+
+## 2026-09-05 FORBIDDEN: attributing a workload to YOUR run because it appeared in a dump YOUR run emitted — a machine-wide process dump is not a description of you `[lane suite-order-pollution]`
+
+- **What we believed:** a full-suite run that died with `INTERNALERROR> MemoryError` at 26 GB RSS was explained — the pagefile was "4,864 MB allocated on a 32 GB box" and the suite's own `test_heap_roots`/`test_retainer_census` "legitimately allocate ~20 GB". I put that in a lane block, told the user the pagefile was the binding constraint, and handed them an elevated command to fix it at 32 GB.
+- **What was actually true:** both terms were false and one was impossible. `AutomaticManagedPagefile = True` — 4,864 MB was a SNAPSHOT OF AN EFFECT under load, not a setting (it read 5,120 MB near-idle later, and a peer measured 19,406 MB under six jobs). The two tests allocate low single-digit MB, read straight off the source. And **`test_heap_roots.py` was added at `a2afc7f1`, 2026-09-05 15:30, which is NOT an ancestor of the `24d0a50e` worktree that died** — the file was never in the tree.
+- **How we found out:** a peer lane surfaced the two falsifications rather than editing my block. I re-derived both myself (`Win32_ComputerSystem.AutomaticManagedPagefile`, and the allocation literals) and then found the ancestry point they had not.
+- **How the error was made, and it is the reusable part:** I read `pytest tests/test_heap_roots.py tests/test_retainer_census.py` out of an `ALL_PROCESS_MEMORY` dump **my own run emitted**, and treated it as my run's workload. Those dumps enumerate the whole machine; on this box that is five or six concurrent sessions' worktrees. The 26,260 MB figure came from a `PROCESS_TREE_MEMORY` record tagged `worker: run_live_odds_refresh_worker`, which is one process's tree, not a pytest total.
+- **The rule going forward:** before blaming a file for your failure, prove it was in your tree — `git merge-base --is-ancestor <adding-commit> <your HEAD>`. A machine-wide dump inside your own output is data about the MACHINE. Related: `feedback-outbound-is-invisible-to-request-side-instruments` (an instrument describes its own vantage point, not the thing you care about).
+- **Cost:** a wrong cause in a lane block that a peer and a third lane both propagated, and — worse — **a system-settings change recommended to the user on a false premise.** Retracted to them directly. The real cause of that `MemoryError` is now UNKNOWN and recorded as unknown, which is the point: a lane that believes it knows the cause will not investigate.
+
+
+## EVIDENCE COMPACTED OUT OF `learnings.md` — 2026-09-05
+
+Moved verbatim by `scripts/compact_learnings.py --keep-from 2026-09-05`.
+Nothing summarised or deleted. Each entry keeps its heading AND its rule in
+`learnings.md`; this is the full working. `learnings_index.md` spans both
+files — regenerate with `py -3 scripts/build_learnings_index.py`.
+
+## 2026-09-04 — FORBIDDEN: inferring a session is GONE from its absence in `list_sessions`, even with `include_archived`
+
+`[lane order-sim-view, session 37abeca0]`
+
+I checked the roster twice, with `include_archived: true`, and session
+`3492626c` was absent both times. I wrote it down as gone and borrowed two file
+claims from its lane on that basis. **It then acquired the `live-odds-worker`
+deploy claim at 23:10:51Z** — and was STILL absent from the roster.
+
+**The roster does not list unattended runs.** Scheduled tasks and
+remote-dispatched sessions execute without appearing, which the `send_message`
+tool documents in its own description ("Unavailable in unattended sessions
+(scheduled-task runs and remote-dispatched sessions)"). So the roster answers
+"is there an ATTENDED session", never "is anything running as this id".
+
+**`deploy_claim.py` already said so, in the exact words, and I had read it that
+same session**: *"THIS CLAIM RECORDS NO PID: the one it used to record was the
+acquire CLI's own and always read dead. An unrecorded session is UNKNOWN, not
+gone."* I applied that correctly to the DEPLOY claim — I did not force it — and
+failed to apply the same standard to the FILE claims twenty minutes earlier.
+Same predicate, same evidence, two different conclusions.
+
+**How to apply.** Roster absence is a NULL, not a negative. To act on "that lane
+is gone" you need a positive signal: an explicit release in `lanes.md`, an
+expired TTL on a lock it holds, or the user saying so. Where none exists, the
+correct move is what the lock protocol already prescribes — take it only if the
+work is disjoint, say so reversibly, and expect the holder back.
+
+**This is `absence-in-a-window-is-not-absence` in a new costume**, and the
+retrospective tell is that I described the evidence accurately ("absent from the
+roster") and then silently upgraded it to a conclusion ("is gone") in the same
+sentence I acted on.
+
+## 2026-09-04 — FORBIDDEN: counting a set from your own TEST FIXTURES instead of from the code that produces it
+
+`[lane order-sim-view, session 37abeca0]`
+
+I published "three of the nine `sim_view` verdicts are unreachable" into
+`state.md`, `todo.md`, `learnings.md`, a commit message and two test files. **It
+is four.** `live_contradicts` sits in the same `model_edge_pct is None` branch
+and I never wrote a fixture for it, so it never entered my count.
+
+The error survived a careful measurement — I ran the REAL `commit_portfolio`
+over "one row per verdict class" and read the refusals honestly. The
+measurement was sound; **the enumeration it ran over was mine, not the
+system's.** A per-verdict sweep is only as complete as the list of verdicts you
+hand it, and I built that list from the cases I had already thought of.
+
+It surfaced only because a later task forced the set to become a PUBLISHED
+CONSTANT (`SIM_VIEW_UNREACHABLE`, served in `verdict_reachability`), which made
+me re-derive it from `_layer2_board_columns` and measure all nine.
+
+**How to apply: enumerate from the producer, then measure every member.** When a
+claim is "N of M have property P", the M has to come from the code that emits
+the values — a branch sweep, a literal set, `dataclasses.fields()` — never from
+the fixtures in your test. And where the count is load-bearing enough to
+publish, make it a constant with a test that re-derives it from the source,
+which is what caught this one.
+
+## 2026-09-04 — FORBIDDEN: verifying a ledger mutation with a BEFORE/AFTER set comparison computed by the parser that is blind to the thing at risk
+
+`[lane order-sim-view, session 37abeca0; found by session c38d3e5c]`
+
+I ran `trim_lane_blocks.py --apply` on an over-cap `lanes.md` and certified it
+twice: the tool reported `claims unchanged : 45`, and I then re-derived the set
+myself and reported *"claim set verified unchanged TWICE ... independently by
+re-parsing HEAD's copy against the written one ... (37 -> 37, identical)"*.
+
+**Neither check could have detected the failure it was standing in for, and the
+second was not independent.** Both sides of my comparison came from
+`check_lane_invariants.claims()`, which skips any block whose header fails
+`OPEN_RE = OPEN`. My own block's header read `**REOPENED 2026-09-03 for the
+READ side**` — and `OPEN` correctly rejects `REOPENED`, there being no word
+boundary inside it. So the six files that block declared were **never in the
+claim set at all**, and a block holding six unenforced claims moved out of
+`lanes.md` reporting `claims unchanged`.
+
+**A SET COMPARISON CANNOT PROTECT AN ELEMENT THE PARSER NEVER PRODUCED.** Before
+and after were equal because the parser dropped the same rows on both sides.
+That is not evidence of safety; it is the same blindness, twice, agreeing with
+itself. Calling my second pass "independent" made it worse: it used the same
+predicate family as the tool, so it added confidence without adding information.
+
+The outcome here was fine by luck — the block was genuinely CLOSED and
+claim-free by the time it moved, because I had closed the lane and returned the
+borrowed files first. **Right outcome, unsound verification**, and those look
+identical in a log.
+
+**How to apply.** When verifying that a mutation preserved something, the
+witness must be independent of the machinery under test. For claims that means
+counting DECLARED paths straight out of the `- Files:` text, regardless of
+header status, and comparing that to the ENFORCED set — a mismatch is the whole
+signal. More generally: if X is computed by the component whose correctness is
+in question, `X_before == X_after` proves only that the component is
+consistently wrong.
+
+`scripts/check_lane_claims.py::_near_miss_open` (session f97ad5ab) now fails on
+a block that declares files under a header containing `OPEN` but failing
+`OPEN` — REOPENED, OPENED — which is the emitter-side fix for this class.
+
+## 2026-09-04 — FORBIDDEN: asserting absence from a range whose START YOU CHOSE — and the reason this one got through, which is the actually useful part
+
+`[lane order-sim-view, session 37abeca0; corrected by session c38d3e5c]`
+
+I told a peer session, flatly, *"your restore is not on `origin/main`"*, citing
+`git log 53427c2c..origin/main -- .syndicate/lanes.md` returning exactly one
+commit, my own. **The restore was on `origin/main`.** It landed in `1d6b2f13`,
+which is an ANCESTOR of `53427c2c` — so the range I picked began after the event
+and could not have contained it under any circumstances. Verified after the
+correction: `git merge-base --is-ancestor 1d6b2f13 53427c2c` returns 0, and
+lanes.md at `1d6b2f13` holds the block.
+
+**This is `absence-in-a-window-is-not-absence` for the THIRD recorded time**
+(see 2026-08-2x, where the same shape carried a destructive forced deploy). The
+rule was already written, in this file, and I had cited a neighbouring rule in a
+commit message forty minutes earlier. So "know the rule" is demonstrably not the
+control, and a fourth copy of it would not be either.
+
+**WHAT IS NEW, AND IS THE ONLY PART WORTH ADDING: the null FAVOURED me, and that
+is when it goes unexamined.** I was issuing a correction to another session. The
+empty result agreed with the point I was already making, so it read as
+confirmation and I shipped it as fact. A null that CONTRADICTS your position
+gets a second query; a null that CONFIRMS it gets quoted. That asymmetry is
+where this rule keeps failing, not in ignorance of it.
+
+**How to apply, as a trigger rather than a principle.** When a null result is
+about to become an ASSERTION TO SOMEONE ELSE — especially a correction — state
+the window inside the assertion. If the sentence cannot name what was searched,
+the claim is not ready. And for git specifically: "did X ever happen" is
+`git log --all -- <path>` or `git log -S<string>`, never `A..B` where you chose
+A, because choosing A is choosing the answer.
+
+Peer's own note, worth carrying: they caught my broken block **by eye**, reading
+a deleted-header list and noticing `REOPENED` — not by instrumentation. They
+recorded that their checks had been written up as though they had done the work
+(`02654303`). Attention caught it twice tonight; attention does not scale, which
+is why `_near_miss_open` and the declared-vs-enforced witness are the real fixes.
+
+## 2026-09-04 — A LANE CLAIM ON A LEDGER FILE GUARDS NOTHING, and I read the evidence for that TWICE without extracting it
+
+`[lane order-sim-view, session 37abeca0; surfaced by session c38d3e5c]`
+
+`lane-guard.py` exempts every path containing a `.syndicate` or `.claude`
+segment (`if is_exempt(path): return 0`), and the surrounding comment says it is
+deliberate — *"a file this guard was never supposed to check at all."* So a
+`- Files:` block naming `lanes.md`, `deploys.md` or `state.md` expresses INTENT
+and enforces nothing. `check_lane_claims.py` reports it as a `[note]`:
+3 of 45 claims, all `accuracy-autorun-rearm`'s.
+
+**REFINEMENT, because "guards nothing" reads as "unprotected" and that is
+false.** Ledger files are guarded by CONTENT INVARIANTS rather than by
+OWNERSHIP, which is a different model and a better fit — every session must
+write them, so an exclusive claim would be wrong:
+
+    lane-guard.py            EXEMPTS .syndicate/ and .claude/ entirely
+    ledger-append-guard.py   Edit|Write -- lanes.md (2 predicates), state.md (1)
+    ledger-commit-guard.py   Bash -- this is what BLOCKED me tonight on a stale
+                             lanes.md that would have un-archived 6 blocks
+    ledger-postwrite-check   Bash|PowerShell, after the fact
+
+**~~Note the asymmetry worth knowing: `deploys.md` and `learnings.md` are barely
+referenced by the append guard, so their edit-time protection is thinner than
+`lanes.md`'s. Commit-time still covers them.~~ THAT SENTENCE WAS FALSE, and it
+was a REASSURANCE, which is the worst direction to be wrong in.** Struck rather
+than deleted, because the way it was wrong is the lesson `[corrected 2026-09-04,
+found by session c38d3e5c, measured by me before accepting]`:
+
+    ledger_invariants.TRACKED       17 files: lanes.md, state.md, 14 state_*.md, learnings.md
+    .syndicate/learnings.md         IN TRACKED   -> commit-time DOES cover it
+    .syndicate/deploys.md           ABSENT       -> commit-time does NOT
+
+    ledger-append-guard.py          2 hits on `deploys.md`, BOTH PROSE --
+                                    a docstring at :31 and a remedy string at :176
+    ledger-postwrite-check.py       0 mentions
+
+**So `.syndicate/deploys.md` has NO ledger-guard coverage at any stage**, while
+every other ledger file has some.
+
+**I reached the opposite conclusion from a grep COUNT, and the count measured
+nothing:**
+
+    file                      my grep count    actual commit-time cover
+    .syndicate/deploys.md                 2                       False
+    .syndicate/learnings.md               2                        True
+
+Same number, opposite truth. Counting occurrences of a filename in a guard's
+source cannot distinguish a PREDICATE from a sentence mentioning the file — and
+I used it to certify the file the protocol's own non-negotiable rests on
+(*"Never claim a fix works without a measurement written to
+`.syndicate/deploys.md`"*), and that the session-start digest reads open
+obligations from.
+
+**OPEN, and stated as open rather than settled: I could not determine whether
+the gap is deliberate.** `TRACKED` is an explicit tuple and
+`_discover_state_parts()` only globs `state_*.md`, so `deploys.md` was never a
+candidate for auto-discovery — this is a choice, not a discovery miss. It is
+also append-only prose with no structural invariant of the kind lane headers and
+state keys give the others, so there may be nothing for a guard to check. Worth
+someone resolving; not resolved here.
+
+**THE PART THAT IS MINE.** I had this on screen twice and extracted neither:
+
+1. I READ the exemption block in `lane-guard.py` earlier in the session, while
+   tracing how it resolves the per-session marker. I understood it as
+   path-normalisation trivia and never asked what it implied for claims.
+2. I RAN `check_lane_claims.py` and its output printed `[note] 3 of 45 claim(s)
+   name a file lane-guard EXEMPTS, so they guard nothing` and `[BAD ] 9 of 45
+   claim(s) name NO FILE IN THE REPO` — directly above the line I was looking
+   for. I scrolled past both.
+
+Then I told a peer that the declared-vs-enforced witness needed BUILDING and
+described its construction — when its output had been in my own terminal. They
+caught it by RUNNING the tool instead of reading my summary, and correctly did
+not relay a build request for something that already exists.
+
+**This is `read-the-field-you-already-have` at the level of TOOL OUTPUT rather
+than payload fields.** The rule generalises: when a command prints more than the
+line you went looking for, the rest of it is not noise, it is findings you did
+not have to work for. Before describing a capability as missing, run the tool
+that would already report it.
+
+## 2026-09-04 — a failed rebase leaves a STALE ledger file that `git add` will happily record
+
+`git rebase origin/main` refused with "cannot rebase: You have unstaged changes"
+because `deploys.md` was already modified. I did not notice — the refusal is one
+line among a command's output — and went on to edit and stage `lanes.md` from
+that stale tree. `ledger-commit-guard.py` blocked the commit: it would have
+UN-ARCHIVED three lane blocks a peer had trimmed minutes earlier, reverting their
+whole pass as a side effect of an unrelated deploy record.
+
+**Two rules.**
+
+1. **A rebase that did not run is not a rebase that succeeded.** When a rebase is
+   part of a compound command, check its result before touching ledger files.
+   The dirty file blocking it is usually one you are ABOUT to commit anyway,
+   which is what makes the failure so easy to walk past.
+
+2. **Stat a staged ledger diff against `origin/main`, not against your own HEAD.**
+   Mine read **214 deletions**, which looks exactly like clobbering a peer. It was
+   an artifact: `git checkout origin/main -- lanes.md` onto a stale HEAD shows
+   upstream's trim as *my* deletions. After rebasing, the same commit was **12
+   insertions, 0 deletions**. Both readings are "true"; only one is about what
+   you are recording.
+
+The recovery is the guard's own printed remedy and it works: take upstream's copy
+(`git checkout origin/main -- .syndicate/lanes.md`), re-apply YOUR block only,
+then verify the peer's blocks stayed archived — `lanes.md` count 0 AND
+`lanes_history.md` count >= 1, checked on `origin/main` after pushing. Do not
+verify by re-reading your own working file; it cannot see what upstream holds.
+
+## 2026-09-04 — before a catch-up deploy, check whether the OWNING lane is already shipping it
+
+Twice in consecutive rounds the correct action was to deploy nothing:
+
+- **Round 9, web.** `442f82fe` was `web-oom-profiler-steady`'s OWN commit. That
+  lane held web's claim and web had booted 24 minutes earlier — one minute short
+  of the 25-min window its late-emission method needs, because the accumulator is
+  cumulative from boot. A deploy would have reset the clock as the reading came
+  due.
+- **Round 10, refresh-worker.** `prop-join-yield` held the claim with a deploy
+  ALREADY IN FLIGHT. `dbe0f3b4` carried the same fix by content (`chip_join_key`
+  x3, `9d106d11` an ancestor). Deploying would have duplicated it and risked
+  cancelling their build — the 2026-08-15 incident, and what was done to me at
+  20:44Z on 09-03.
+
+**The rule.** A catch-up round is not entitled to a service. Before deploying,
+ask two questions the claim alone does not answer:
+1. **Who OWNS the pending content?** `check_lane_invariants.claims()` maps file →
+   lane. If the lane that claims the file is live, the commit is theirs to ship.
+2. **Is a deploy already in flight?** `/deploys?limit=1` — a `build_in_progress`
+   is invisible to the preflight's spacing check, which measures from the last
+   FINISHED deploy.
+
+Then check the in-flight commit BY CONTENT, not by ancestry: if it already
+carries the change, there is nothing to do and the catch-up is complete.
+
+## 2026-09-04 — REBASE FIRST, then edit ledger files
+
+Corollary to the stale-rebase rule, hit one round after writing it. Appending to
+`deploys.md` before rebasing makes the tree dirty, `git rebase` refuses with one
+line of output, and every ledger file you then edit is written against a stale
+base. The rule catches it; the SEQUENCING prevents it. Rebase, verify it said
+something other than a refusal, then edit.
+
+Cheap pre-check that beats waiting for `ledger-commit-guard`: compare your
+`lanes.md` block headings against `git show origin/main:.syndicate/lanes.md` and
+assert both directions are empty — nothing of yours that upstream archived
+(would un-archive), nothing of upstream's that you lack (would drop).
+
+## 2026-09-04 — OVERTURNED: `_SCORE_SIM_WEIGHT` is **0.125**, not 0.0. Two load-bearing comments say 0.0, and one of them is the entire basis of `side_picked_by`. `[lane prop-join-yield]`
+
+    opportunity_signals.py:481   _SCORE_SIM_WEIGHT = _env_float("SYNDICATE_SCORE_SIM_WEIGHT", 0.125)
+    SYNDICATE_SCORE_SIM_WEIGHT   NOT SET on refresh-worker or live-odds-worker
+
+Measured on the served board, 25,830 rows carrying a score breakdown:
+**`sim_component` is NON-ZERO on 5,108**, min −1.5000, median 0.2737, max 1.5000,
+with 448 rows flagged `sim_capped`. The sim IS in the ranking, on ~20% of rows,
+and the served board's own explainer agrees ("capped at 1.5 EV points").
+
+**The stale claims:**
+
+  * `layer2_board.py:30` — "**`_SCORE_SIM_WEIGHT` is 0.0**, so this board ranks on
+    market EV and price shopping ALONE and the simulation contributes nothing to
+    the ordering."
+  * `portfolio_commit.py:864` — "At `_SCORE_SIM_WEIGHT = 0.0` the ranking
+    **provably cannot pick a side**..."
+
+The second is the whole justification for `side_picked_by`, whose counterfactual
+("would this row be staked with `model_edge_pct = 0`?") models only the SIZING
+channel. At 0.125 the sim also has a RANKING channel the counterfactual does not
+see, so `price_picked_by: price_shopping` means "price alone would have sized it
+too", NOT "the sim had no hand in it".
+
+**THE FILE PREDICTED THIS EXACT FAILURE, two paragraphs below the stale line:**
+*"This line said `0.5` until 2026-08-16 and the constant had been 0.0 for some
+time. A session brief and an audit both inherited `0.5` from here and built on
+it... If you change that constant, change this line in the same commit."* The
+warning survived; the constant moved anyway; the prose is now stale in the other
+direction. **A comment that names a constant's VALUE is a copy, and copies drift
+— the warning not to let them drift is not a mechanism that stops it.**
+
+**How to apply:**
+- Never quote a tuning constant from prose. Read the assignment, then check for
+  an env override on every service that runs the code — both, here, were needed.
+- When a claim REDUCES to "and therefore X is structurally impossible", re-verify
+  the premise before building on X. `side_picked_by`, `#426`'s framing, and my own
+  reasoning tonight all rest on this one.
+- A cheap empirical check beats reading either: `sim_component` non-zero on any
+  served row falsifies "the sim contributes nothing" in one query.
+
+## 2026-09-04 — THE LEDGER COMMIT GUARD CANNOT SEE A WITHIN-BLOCK REVERT, measured at 117,321 characters
+
+`[lane order-sim-view, session 37abeca0; hazard created and disclosed by session c38d3e5c]`
+
+`lanes.md` was compacted on `origin/main` (`a8000faf`): every OPEN block keeps
+its header, `- Files:` and `- Blocked by:`, and the narrative moved verbatim to
+`lanes_history.md`. The shared PRIMARY tree still holds the pre-compaction copy.
+
+**Measured, not argued:**
+
+    stale primary copy                     203,874 chars
+    compacted copy on origin/main           86,553 chars
+    a commit from the primary tree reverts 117,321 chars
+    `violations(".syndicate/lanes.md", stale, root)`        -> 0
+    `resurrected_blocks(stale, upstream, history)`          -> 0
+
+**The predicate is silent BY DESIGN and at the wrong GRANULARITY.**
+`resurrected_blocks` asks "is a whole block verbatim in history and gone from
+lanes.md" -- the signature of an archive pass being reverted. A COMPACTION moves
+narrative *inside* blocks that stay in place, so no block satisfies that, and a
+commit reverting 118 KB looks like whatever else it touches. The 2026-09-02
+incident it was built from (a kalshi commit reverting a trim from ~90 commits
+behind) is the block-granularity case; this is the line-granularity one, and the
+guard covers exactly one of them.
+
+**What makes it dangerous rather than merely incomplete:** the commit that does
+this looks TINY. The primary tree currently carries a 14-line addition from
+`web-oom-profiler-steady`; committing `lanes.md` from there is a `+14` diff in
+the summary and a 118 KB revert in the tree. Nobody reviewing the numbers would
+look twice.
+
+**NOT FIXED HERE, deliberately.** The obvious predicate -- lines present in
+upstream's `lanes_history.md` AND in the committed `lanes.md` -- is roughly ten
+lines, and I did not write it at 02:0x on a guard that blocks every session's
+commits without working the false-positive cases first. A legitimate append, a
+second compaction, or a block quoted verbatim from history would all need to
+stay green, and `learnings.md` already records that a guard which blocks correct
+work is one people route around. Handed to the session that owns the compaction.
+
+**Generalises past this file:** a diff-size or file-size heuristic would have
+caught it where a structural predicate did not. When a guard's predicate is
+structural, ask what a change of a DIFFERENT SHAPE at the same location looks
+like to it -- here, same file, same direction, different granularity, invisible.
+
+## 2026-09-04 — FORBIDDEN: clearing a shared-tree file on a STRUCTURE check. Content dies inside retained structure.
+
+**Twice-real, same day, two sessions, opposite roles.** The generalisation is
+session c38d3e5c's and it is sharper than either incident:
+
+> "My error and my change were the same mistake, one level apart. I checked at
+> BLOCK level — no lane block existed only in the shared tree — and concluded the
+> checkout was safe. The loss was INSIDE existing blocks."
+
+- **Me, ~01:0xZ.** Ran `git checkout -- .syndicate/lanes.md` in the shared tree
+  after verifying the diff was "139 insertions, **0 deletions**, all mine".
+  Destroyed `ledger-cap-single-source`'s uncommitted block, which existed in no
+  commit anywhere. A peer's unstaged ADDITION is indistinguishable from my own in
+  that stat.
+- **c38d3e5c, ~02:0xZ.** Broadcast `git checkout origin/main -- .syndicate/lanes.md`
+  as the remedy for a stale copy, having checked that no lane BLOCK existed only
+  in the shared tree — true, and 0 of 39. Fourteen uncommitted lines existed
+  nowhere on `origin/main`: a live claim transfer written INSIDE two existing
+  blocks. Caught before anyone ran it.
+
+**Why every guard agreed with both of us.** `ledger-commit-guard`'s `_resurrected`
+looks for resurrected BLOCKS; a compaction moves narrative WITHIN blocks, so it
+passed. `git diff --stat` counts lines, not authorship. A block-level set
+comparison answers "same headings?", not "same content?". Each check is sound and
+each is blind to the same axis.
+
+**THE TEST THAT ACTUALLY WORKS** — content, against the remote, both files:
+
+    git diff HEAD -- <file>            # non-empty? someone is mid-edit: STOP
+    # then, for each added line, does it exist anywhere on origin/main?
+    #   (for lanes.md that means lanes.md AND lanes_history.md, because
+    #    compaction legitimately MOVES lines between them)
+
+In a shared tree the question is never "am I deleting lines". It is **"is
+anything here not mine, and does it exist anywhere else"** — and only the second
+half is answerable by a tool.
+
+**Corollary, also c38d3e5c's:** *"Committing a live session's in-progress edit to
+protect it is the shared-tree hazard wearing a helpful face."* Back it up outside
+the repo and tell the owner; do not land it for them.
+
+## 2026-09-04 — THE UNIFYING RULE: A COMPARISON PROTECTS ONLY AT THE GRANULARITY IT COUNTS
+
+`[lane order-sim-view, session 37abeca0; formulated by session c38d3e5c after
+the same mistake bit both of us at three different granularities in one night]`
+
+Three failures tonight, three granularities, one mechanism:
+
+    SET-vs-SET     a lanes.md trim certified by `claims()` before == after.
+                   My block's claims were never IN the set (REOPENED header),
+                   so both sides dropped them and agreed. I called the second
+                   pass "independent"; it used the same predicate family.
+
+    BLOCK-vs-BLOCK a compaction's safety checked by "does any lane BLOCK exist
+                   only in the shared tree". None did. The loss was INSIDE
+                   blocks, and the proposed remedy would have destroyed 20
+                   uncommitted lines that `git log --all -S` finds in ZERO
+                   commits anywhere.
+
+    BLOCK-vs-BLOCK `_resurrected` missing that same compaction, for the same
+                   reason: it asks whether a whole block is in history and gone
+                   from lanes.md. Narrative moved WITHIN blocks. 117,321
+                   characters, 0 violations.
+
+**The general form: a before/after comparison is blind to anything its
+extractor does not emit, and that blindness is SYMMETRIC — so both sides agree
+and the check reports success.** It is not that the comparison is wrong; it is
+that it answers a question one level coarser than the change.
+
+**The trigger, which is cheap and mechanical:** before trusting a
+before/after check, name the unit it counts (claims, blocks, sections, files),
+then ask *what would a change SMALLER than that unit look like to it?* If the
+answer is "identical", the check does not cover the operation you are about to
+perform. That question would have caught all three of tonight's instances, and
+none of them were caught by care.
+
+**Corollary for remedies, which is where this nearly did real damage.** A
+remedy inherits the granularity of the check that justified it. "No block is
+unique to this tree, therefore `git checkout origin/main -- lanes.md` is safe"
+is the block-level check licensing a FILE-level destructive action. The
+gap between those two levels is where uncommitted work lives.
+`git diff HEAD -- <path>` before any checkout of a shared ledger file, and a
+non-empty result means STOP, not "proceed carefully".
+
+## 2026-09-04 — A DEPLOY THAT SUCCEEDS, TESTS THAT PASS, AND A SMALLER RESPONSE CAN ALL BE TRUE WHILE THE CHANGE DOES NOTHING
+
+`#632`, `f9c4733d`. A fix shipped to drop a 36 MB self-nested copy from
+`/api/intelligence/query`. It dropped the key only when `outer[k] is inner[k]`
+for every key — sound reasoning, since `dict()` is a shallow copy — and it was
+INERT, because `_attach_intelligence_response_aliases` runs between the copy and
+the serialisation and rebuilds every item with `dict(item)`.
+
+Three signals all read as success: the deploy succeeded, every test passed, and
+the served response came back **32.5% smaller**. The size drop was a **smaller
+slate** (1154 rows against 1901 at baseline), not the change. The saving was
+zero.
+
+**THE RULE: verify a payload change by the STRUCTURE you intended to change, not
+by the size of the result.** "Is the key actually gone?" found it in one call;
+the byte count would never have. The same trap re-appeared immediately after the
+real fix landed at a flattering **68.9%**, which was again partly slate size —
+the honest figure was 50.0%, from differencing the SAME captured payload.
+
+Corollary, and it is what makes a size comparison usable at all: **assert the
+denominator is unchanged before quoting a percentage.** The final alias
+measurement ran both arms minutes apart against ONE deploy and asserted
+`870 vs 870 rows` before reporting 47.9%.
+
+Related: `[2026-09-03]` "a conservative guard that cannot be wrong can still be
+worth nothing" — this is that failure in its most convincing costume, because
+the guard was not merely silent, it was accompanied by a number that agreed
+with it.
+
+## 2026-09-04 — THE TWO THINGS ROSTER-ABSENCE ALREADY COST, and what to check before the NEXT force `[lane prop-join-yield]`
+
+**The rule itself is one entry down, written by the lane that found it**
+(`lanes.md` carries `CLAUDE_CODE_SESSION_ID`s, `list_sessions` returns CCD
+`sessionId`s, the spaces never match). This entry is only what that rule cost in
+practice and the check it implies — I had written a THIRD copy of the rule here
+and removed it; `learnings.md` is over budget and three statements of one rule
+is exactly what makes it lossy.
+
+**IT ALREADY TIPPED TWO DECISIONS, both mine, both on 2026-09-03 evening:**
+
+1. Released lane `accuracy-autorun-rearm`'s claims on `deploys.md`/`lanes.md`/
+   `state.md`, writing into the ledger that the owner "CLOSED ITSELF ... absent
+   from the session roster including archived". It was alive throughout and
+   reclaimed them in `940d7616`.
+2. Corroborated a force-acquire of the refresh-worker deploy claim off
+   `fleet-catchup-round3`.
+
+**(2) DISPLACED A LIVE DEPLOY AND COST NOTHING — measured by the owner, and the
+reason it was free is the part to keep:**
+
+    a6f5f586  canceled     created 20:42:17Z  finished 20:44:34Z   <- in flight when forced
+    150cc95b  deactivated  created 20:44:34Z  finished 20:47:17Z   <- mine, same SECOND
+
+`git merge-base --is-ancestor a6f5f586 150cc95b` is TRUE, so `#632`'s subprocess
+cap shipped anyway inside my deploy. **That held ONLY because both commits were
+on `origin/main`.** CLAUDE.md's "deploy a commit that is on origin/main" is what
+makes deploys cumulative; off-main, two deploys do not contain each other and
+the second silently reverts the first (measured 2026-08-15: a verified
+refresh-worker fix live at 21:36:59Z, gone by 21:45:20Z).
+
+**How to apply, and this is the new part:** before `acquire --force`, check the
+service's deploys for a build in **`created`** state, not only
+`build_in_progress` / `update_in_progress` — a deploy can be displaced in the
+same second it was created. And do not count on the ancestry escape: next time
+the displaced commit may not be an ancestor of yours.
+
+**WHY A KNOWN-WEAK TEST STILL DID DAMAGE.** I had already written a FORBIDDEN
+rule that same evening — a claim age that RESETS means the holder is working,
+check `/services/<id>/deploys` before forcing — and I followed it. Roster-absence
+was never the primary reason; it was the SECOND, corroborating one. **A worthless
+test does not become harmless by sitting beside a good one: it supplies the
+confidence the good test was there to withhold.** The owner also published a
+checkpoint reading "session closing ... final" and then kept working for hours,
+so the evidence genuinely pointed that way — which is why the fix is the id-space
+fact, not more caution.
+
+## 2026-09-04 — FORBIDDEN: calling an env key "inert until a deploy" without reading the gate it feeds. If the gate's conditions are ALREADY true, the key is a primed charge waiting for someone else's deploy. `[lane prop-join-yield]`
+
+I set `ACCURACY_SUMMARY_ENABLE_REFRESH_WORKER_AUTORUN=true` on refresh-worker
+and told the user and a peer it was "inert until a deploy — production is
+unchanged". The first clause is true about the RUNNING PROCESS and false about
+the RISK, and only the second one matters.
+
+`scripts/run_refresh_worker.py:2153` `_accuracy_summary_should_run_now` gates on
+`now_central.hour >= 7` AND `last_run_date < today`. At 22:4x Central with
+`last_run_date = 2026-09-02`, **both were already true**. So the key did not wait
+for morning — it would fire on the FIRST TICK after ANY deploy, and
+refresh-worker took **five deploys in the four hours to 02:54Z** (23:41, 00:14,
+00:45, 02:11, 02:51). A peer's unrelated deploy would have fired the first ever
+armed run of a previously OOM-killing job into a live slate with 10 jobs in
+flight.
+
+The lane block already said it: *"NEVER LEAVE THE KEY `true` WITHOUT A COMPLETED
+DEPLOY."* I read that block, quoted other parts of it, and did the thing it
+forbids.
+
+**THE HOUR YOU SET IT IN CHANGES ITS MEANING.** The scheduled task arms at 03:00
+Central precisely because at `hour=3` the gate HOLDS the run until 07:00, on a
+worker that is quiet by then. Arming at 22:00 skips that protection entirely —
+same key, same value, opposite risk.
+
+**How to apply:** before setting any autorun-enable key, read its `should_run`
+predicate and evaluate it against NOW. "Set but not deployed" is safe only when
+the gate would hold the first run, and that is a fact you check, not a property
+of not having deployed. `render_env_set.py`'s own "the running process has not
+seen this yet" is about injection, and is not a safety claim.
+
+## 2026-09-04 — FORBIDDEN: treating absence from `list_sessions` as evidence a session is gone. **`lanes.md` carries `CLAUDE_CODE_SESSION_ID`s; `list_sessions` returns CCD `sessionId`s. The two ID SPACES DO NOT MATCH, so the test has NEVER been valid.** `[lane accuracy-autorun-rearm]`
+
+- **What we believed:** that "absent from the session roster, including archived" corroborates that a lane's owner is gone, and therefore that its claims may be released or its locks forced. An existing rule already said roster-absence means UNKNOWN rather than gone — but it was read as *weak evidence*, and weak evidence still tips a decision.
+- **What was actually true:** it is not weak evidence, it is **no evidence**, because the identifiers being compared are from different namespaces. Proof: `send_message` to `local_b2b5b45b-e938-4cb5-81c2-c211ecc7c703` — the id on an OPEN lane block — returns **"Session not found"** while that session was demonstrably committing to `main`. A transcript search for its lane name returns only sessions that MENTION it, never the owner. So every session whose lane block predates its CCD registration looks identically dead.
+- **How we found out:** I tried to message a peer whose lane block I had damaged, and could not reach them. Independently, two peers ran the same test on MY lane and concluded I had exited — while I was mid-session.
+- **What it cost, measured, on one evening:** (1) this lane's ledger claims were RELEASED by `order-model-view` at ~20:0xZ; (2) the refresh-worker DEPLOY CLAIM was force-acquired off `fleet-catchup-round3` (`cfcce46d`) at ~20:4xZ on the same reasoning. **The second one displaced a deploy in flight** — `a6f5f586` was cancelled at 20:44:34Z, the exact second `150cc95b` was created. **No content was lost, and the reason is instructive: `a6f5f586` IS AN ANCESTOR of `150cc95b`.** That is the "deploy a commit that is on `origin/main`" rule paying out — cumulative deploys are what being on `main` buys, and had either deploy been off-main this would have been a silent revert.
+- **The rule going forward:** **liveness must be established POSITIVELY, from an artifact the session itself writes** — a commit in the last N minutes, a claim whose age RESETS, a fresh preflight record — never from absence in a roster you cannot join to the id you hold. Before forcing any lock, read `/v1/services/<id>/deploys` and check for a deploy in flight; a build in `created` state IS the holder working. And if you must act on a stale-looking claim, prefer waiting: an unexpired claim costs minutes, a displaced deploy can cost a revert nobody sees.
+- **My own contribution to it, stated because it is the fixable half:** I announced "session closing" in a checkpoint and then kept working for hours. A peer reading that plus roster-absence had every reason to conclude I was gone. **Do not publish a terminal status you are not about to honour** — and if work resumes after one, strike the note in the same edit that resumes it.
+
+## 2026-09-04 — CHECK THAT THE THING YOU ARE GATING ACTUALLY RUNS, BEFORE YOU BUILD THE GATE
+
+`#632`. Per-request attribution returned an impossible share (175% on one worker,
+a route at -49.46 MB). I diagnosed it as `app.py`'s background loops sharing the
+process, built a gate for them, tested it, landed it and deployed it.
+
+**Neither loop runs on web.** `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`,
+`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`, the code gate
+defaults to False, and web has logged ZERO loop lines ever. The gate is correct
+and inert, and the diagnosis it rests on is FALSIFIED.
+
+**The evidence was already in the session.** An earlier finding recorded
+`MLB_ENABLE_REFRESH_WORKER_AUTORUN` on web as INERT and web as having no
+reachable background loop. I had read it, written it down, and then reasoned past
+it because the mechanism was plausible and the numbers were suggestive.
+
+THE RULE: before building anything that excludes, suppresses, or compensates for
+a subsystem, **prove that subsystem is REACHED on the service in question** —
+env, code gate, and a log line it would have emitted if it ran. Plausible-and-
+unchecked is how a correct change ends up fixing nothing, and `#632` produced
+that outcome twice in one night (`f9c4733d`'s identity check was the other).
+
+Note the shape of the false confirmation: `skipped_background = 0` is exactly
+what a WORKING gate looks like on a quiet service. The reading that would have
+distinguished them is not in the instrument at all — it is whether the subsystem
+exists.
+
+Related: `[2026-09-04]` "a deploy that succeeds, tests that pass, and a smaller
+response can all be true while the change does nothing."
+
+## 2026-09-04 — FORBIDDEN: acting on a comparison guard whose inputs are not NORMALIZED
+
+My pre-commit check on `deploys.md` reported **"308 upstream measurement sections
+would be dropped"**. The true answer was **0**. Same file, same moment; the
+difference was that the working copy is CRLF and `git show origin/main:<path>`
+returns LF, so every `^## ...` title carried a trailing `\r` on one side and none
+on the other. **No** title matched, so **every** upstream section looked missing.
+
+**Why this is worse than an ordinary bug.** A comparison guard exists to answer
+"will I destroy something", and unnormalized it reports CATASTROPHE and
+CORRECTNESS with the same confidence and the same shape. Worse, the remedy it
+triggers — `git checkout origin/main -- <path>` — is the destructive command, the
+one that already destroyed a peer's lane block on 09-03. A miscalibrated guard
+does not merely fail to help; it points at the loaded gun.
+
+**The rule.** Normalize both sides before comparing anything read from two
+sources — `.replace("\r\n", "\n")` at minimum, on Windows always. Compare
+`git show` output to `git show` output where possible, rather than a working file
+to a git blob.
+
+**What actually caught it**, and it was not the tooling: the output contradicted
+something I already knew — the "missing" list included entries I had pushed
+MYSELF minutes earlier, and my own commit cannot be absent from upstream. Same
+family as *read the field you already have*. **When a guard reports an impossible
+scale of loss, suspect the guard before the file.** 308 of 308 missing is not a
+ledger problem, it is a join problem.
+
+## 2026-09-04 — AN IN-PYTHON FREE CANNOT MOVE PROCESS ANON. CHECK THE ALLOCATOR BEFORE HYPOTHESISING ABOUT FREES
+
+`#632`. Per-request attribution kept producing NEGATIVE retained totals (a route
+at -49.46 MB). I hypothesised that a statement releasing a large object allocated
+by an earlier request was refunding memory inside the current request's window,
+picked the obvious candidate (`LAST_RESULT`, a module-level global holding a copy
+of the intelligence payload, reassigned on every query), instrumented it, shipped
+it and measured.
+
+**Allocated 0.0 MB. Refunded 0.0 MB.**
+
+CPython returns freed objects to **pymalloc's arenas, not to the OS**. Freeing a
+28 MB payload does not reduce `Anonymous:` in `smaps_rollup` at all. The
+hypothesis was not merely aimed at the wrong statement — **it was unsound at the
+mechanism level**, and no choice of statement could have made it true.
+
+`#630` states this fact in its own comment — *"CPython does not return freed
+arenas to the OS"* — and I had read and quoted it hours earlier while working on
+the merge.
+
+THE RULE: before hypothesising that some code FREED memory, confirm the runtime
+can express that as a drop in the metric you are reading. For CPython + anon, it
+usually cannot. A negative anon delta means ARENA RELEASE, which is a property of
+allocator free-list state and belongs to no statement, request or thread — so no
+per-statement probe will ever find it, however well built.
+
+Related: `[2026-09-04]` "check that the thing you are gating actually runs",
+which is the same error one level up — both are cases of building a correct
+instrument for a mechanism that was never there.
+
+## 2026-09-04 FORBIDDEN: an instrument whose partial output is indistinguishable from its complete output. `[lane render-events-nondict-reason]`
+
+`render_events.py` — the tool this file NAMES as the only valid source for an
+`oomKilled` census — crashed mid-listing on a shape it did not expect
+(`details.reason` is a bare string on `auto_deploy_disabled`, 9 of 7,525 events;
+`or {}` rescues only the falsey cases). It printed **289 lines of plausible
+event rows, died at 2026-07-01, and never reached the recent window.** The
+traceback went to **stderr** — which a caller piping through `tail`/`grep` has
+already discarded. So the tool could answer "no OOM events" about a window it
+never read, and had been able to since it shipped 2026-08-16.
+
+The rule is not "handle that shape". It is: **a reader that can stop early MUST
+be able to say that it did, on the stream the caller reads.** Three parts, all
+now in `render_events.py` as the reference:
+
+1. **A completeness marker as the LAST line** (`# OUTPUT COMPLETE`). Its
+   ABSENCE is the signal; nothing else distinguishes a finished listing from a
+   fragment, because a fragment ends too.
+2. **The failure banner goes to STDOUT, not stderr**, with a distinct exit code
+   (3 — apart from quiet-window 0 and dead-reader 2). Writing the warning only
+   to the stream the caller threw away is the same defect one layer up.
+3. **One bad record costs a ROW, not the run.** Render it as
+   `!!UNRENDERABLE <exception>` and count it. Anything else trades a visible
+   anomaly for an invisible truncation.
+
+This is the twin of `[2026-09-02]` "drawing a conclusion from a log line the API
+TRUNCATED": there the transport truncated and here the reader did, and in both
+the output that survived looked complete. **Coverage that is not asserted is not
+coverage** — the same reason this tool already prints READ separately from the
+event span. Working (shapes, falsification, the first honest census):
+`log/2026-09-04.md`.
+
+## 2026-09-04 — a BLOCKED money-relevant commit needs a follow-up read, not just a flag
+
+`848bcab9` — *"every stake was 1/16 Kelly, not 1/4"* — touches
+`pipeline/portfolio_commit.py`, which **only refresh-worker runs**. That service
+was claimed by another lane, so I could not deploy it. I did the right first
+half: named it in my lane as a stake-sizing correction that could not reach
+production until that lane shipped or released, instead of silently skipping a
+commit because its service was busy.
+
+**The half that is easy to miss is going back to check.** I did, and it had
+shipped — refresh-worker `2332b47b`, 0 pending, verified BY CONTENT
+(`_sample_credibility` x1, `_settled_sample_size_by_sport` x2, `848bcab9` an
+ancestor). Bet sizing is corrected in production.
+
+**Why the follow-up matters more than the flag.** A flag without it decays into
+a false open item: it reads as "unresolved" forever, and the next reader spends
+real time re-investigating something already fixed — or worse, treats a live
+correction as still pending and re-derives the wrong risk picture. Cost of the
+check: one `git show <live-sha>:<path> | grep`.
+
+**When it applies.** Any commit you decline to deploy because the service is
+owned or busy, where the content is money-, safety- or correctness-relevant.
+Record what it was, which service is the ONLY one that runs it, and then read
+that service's live SHA for the change before closing the lane.
+
+## 2026-09-04 CITE THE COMMAND YOU RAN, WITH ITS FLAGS — an abridged citation cannot be re-checked, and one day it will have to be. `[lane render-events-truncation-audit]`
+
+`log/2026-08-27.md` recorded a kill as coming from
+`scripts/render_events.py --service refresh-worker`, bare. When that reader
+turned out to crash mid-listing, clearing the finding should have been a
+one-command re-run. It could not be: **the command as written cannot have
+produced the output shown** — bare and unfiltered it dies six weeks before the
+quoted row — so the citation was abridged, and the cheapest check was gone. The
+conclusion was fine; re-deriving it took a full census (56 kills, both endpoints
+matching to the microsecond).
+
+The flags ARE the measurement. `--failures-only` versus bare was the difference
+between an invocation that could truncate and one that provably could not, and
+the brief had dropped exactly that word. Same family as the standing rule that a
+null result is scoped to the window it covered: **a reading is only as
+re-checkable as the command recorded next to it.**
+
+Corollary for auditing an instrument after you fix it: **enumerate the failure
+gates and measure each one against the PRE-FIX binary**, rather than reasoning
+from the diff. Three gates here — a bounded poison set, filtering that removed
+it before rendering, and a summary block computed before the first row — turned
+an unbounded "which conclusions are suspect?" into a single citation defect.
+Working: `findings_2026-09-04_render_events_truncation_audit.md`.
+
+## 2026-09-04 — A WRONG CAUSE IN A PRE-REGISTRATION IS WORSE THAN NO PRE-REGISTRATION, because it is the first explanation the next reader reaches for. `[lane accuracy-ledger-budget-raise, challenged by lane mlb-rate-refit]`
+
+- **What we believed:** that pre-registering how to read a future measurement is straightforwardly good, so writing down a *candidate cause* alongside it makes the note more useful. I registered that if `skipped_budget` crept back toward 24 over the following week, the cause would be `848bcab9` doubling committed positions and therefore doubling ledger growth.
+- **What was actually true:** the ledger does not track positions at all. `records=46944 / dates=8` is **5,868 records per date against 4 committed positions** — ~1,470 records per position, which no causal story supports. The dominant writer is `maybe_record_board_state_to_evaluation_ledger` (`pipeline/intelligence_state.py:3023`), which persists a board-state response's recommendations gated on `source_fingerprint` changing, so a record is one per BOARD RECOMMENDATION per fingerprint change (~2.9 per row per day against 2,027 rows). **CORRECTED 2026-09-04, same day:** I originally wrote here that `record_recommendation` and `record_portfolio_event` have ZERO production callers. **That was false** — the grep behind it excluded the defining file. `build_intelligence_evaluation_bundle` calls `record_recommendation` once per recommendation row (`intelligence_evaluation.py:2542`); it is the PRIMARY writer. The per-order component is still zero, but only because the board-state caller passes no `portfolio_events` key (`pipeline/intelligence_state.py:3073`) — a payload accident, not a structural guarantee. **This correction is itself an instance of the rule below: I asserted a negative at a scope I had not searched.** **AND THE GENERALISATION, which is the reusable half `[named by lane mlb-rate-refit]`: when you establish that something is ZERO or ABSENT, say WHY, because a MAGNITUDE argument and a STRUCTURAL one behave identically today and differently the moment someone adds a caller.** "It would only be ~8 of 5,868" goes stale silently. "It is zero only because THIS caller passes no `portfolio_events` key, and any caller that does makes it real" names the trigger to watch for. Prefer the second, and if you only have the first, say so — an unexplained zero is a fact with no expiry date attached, which is how it survives past the conditions that produced it.
+- **How we found out:** a peer disputed the ARITHMETIC — not the concern — and named the discriminating check ("what IS one record: one per board candidate, or one per order?"). Reading the writer settled it in minutes. Conceding the argument would have left the wrong cause in place; only going to the source replaced it with the right one.
+- **The rule going forward:** pre-register **what reading counts as which outcome**, and keep candidate CAUSES out of it unless the mechanism is already established. A registered cause is not a neutral hypothesis — it is the explanation the next reader adopts first, and it steers them AWAY from the real driver precisely when the measurement goes bad and attention is short. If you do register one, register the check that would discriminate it. And **when retracting, mark the wrong claim false IN PLACE rather than deleting it**: a retraction needs something to point at, or the next reader meets a clean ledger and no reason to doubt the surrounding numbers.
+- **Cost:** none — caught before the measurement existed, by a peer who checked the arithmetic instead of accepting a plausible-sounding second-order effect.
+
+## 2026-09-04 — FORBIDDEN: REBUILDING a shared ledger file from `origin/main`. Every git discard guard watches git; a rebuild is a plain WRITE and none of them fire. `[lane mlb-feed-live-terminal-refresh]`
+
+- **What we believed.** That rebuilding `.syndicate/lanes.md` from
+  `git show origin/main:.syndicate/lanes.md` and re-applying my own block was
+  the SAFE alternative to `git checkout` — precisely because the 2026-09-03
+  rule forbids clearing a checkout on a deletions count. I even ran a check:
+  `git diff origin/main -- .syndicate/lanes.md | grep -c '^-[^-]'` returned
+  **0**, and I reported "zero deletions vs origin/main" as evidence that
+  nothing was lost. I ran that same check twice, an hour apart, and it was
+  worthless both times.
+- **What was actually true.** The primary tree's copy held
+  `### render-events-nondict-reason`, an OPEN lane block that a concurrently
+  running session had written and not yet committed. It existed in the shared
+  working tree and NOWHERE else. My rebuild wrote upstream's bytes over it.
+  **A comparison against upstream cannot see local-only content by
+  construction** — that is not a gap in the check, it is the check's
+  definition. The measured cost: the block is unrecoverable. I searched
+  `origin/main`, all ~40 worktrees under `C:/tmp/syndicate-sessions/`
+  (including the lane's OWN worktree), `lanes_closed.md`,
+  `lanes_closed_archive.md` and `lanes_history.md`. No copy. And
+  `send_message` is unavailable from a scheduled-task run, so I could not even
+  tell the owner.
+- **Two guards were live and neither could fire.** `discard-guard.py` blocked
+  me three separate times that same hour on `git checkout` — it works. It
+  watches GIT OPERATIONS. A Python `write_text()` is not one, so the single
+  most destructive act of the session was the one thing nothing inspected.
+  **Do not read "the guards have been catching me all session" as coverage;
+  read it as a map of what they cover.**
+- **How we found out.** `.claude/hooks/lane-postwrite-check.py` fired on the
+  owner's next write and named `render-events-nondict-reason` as the claimant
+  of `scripts/render_events.py` — a lane I could no longer find in `lanes.md`.
+  The guard that caught it was the one keyed on a DIFFERENT file.
+- **The rule going forward.** **Never rebuild a shared ledger file from a
+  remote. Rebase your own copy, or edit in place.** If a rebuild is genuinely
+  the only option, the pre-check is not against upstream — it is
+  `set(slugs in the file you are about to overwrite) - set(slugs in your
+  replacement)`, which must be empty. Same shape as the 2026-09-03 rule
+  (*"what does this contain that exists NOWHERE ELSE"*) with the answer
+  computed against the WORKING TREE rather than against a remote.
+- **A CHECK, NOT MORE PROSE — shipped in this lane.**
+  `scripts/check_lane_invariants.py` gained
+  `orphaned_lane_markers()`: `.syndicate/.current-lane.<session>` is a
+  SEPARATE FILE, so it survives anything that rewrites `lanes.md`, and every
+  slug a live marker names must have a block in some ledger file. Missing from
+  `lanes.md` but present in `lanes_closed`/`lanes_history` is a stale marker
+  (hint — a FAIL there would be noise and noise gets ignored); missing from
+  ALL of them is a block that exists nowhere, and that FAILS. Six tests,
+  including a reproduction of this incident. **Run against the live tree it
+  immediately found a SECOND orphan, `web-oom-arena-trend`, which nobody had
+  noticed** — so this was not a one-off, it was an unmeasured class.
+- **Cost.** One OPEN lane's goal, hypothesis, falsification test and
+  verification, permanently. Its file CLAIM was reconstructible only because a
+  hook happened to print the claimant, and a stub carrying that claim is now
+  on `main` labelled as reconstructed. Roughly 40 minutes of recovery attempts
+  that found nothing.
+
+## 2026-09-04 — a content-check TOKEN that was guessed FAILS CLOSED, and looks like a missing commit
+
+Verifying `b55fa165` (accuracy-summary ledger budget 2GB→4GB) I grepped the
+deployed tree for `4 * 1024 * 1024 * 1024` and got **0**. The commit writes
+`4_000_000_000`. Reported as-is, that reads "the deploy did not carry this
+commit" — a false alarm about production, from a typo-grade mistake in my own
+probe.
+
+**The asymmetry.** *Verify by content, not ancestry* is the right rule and I keep
+using it; this is its failure mode. A token that is present-but-misspelled
+returns the SAME `0` as a commit that never landed, and `0` is the alarming
+answer, so the mistake manufactures incidents rather than hiding them. That is
+the safer direction than the reverse — but only if the token is checked.
+
+**The discipline that makes the check sound:**
+1. **Take the token FROM THE DIFF**, never from memory or a guess about how a
+   value is spelled — `git show <sha> -- <path> | grep '^+'` and read it.
+2. **Prove the token DISCRIMINATES** before trusting a pass: it must be 0 on the
+   previously-live SHA and non-zero on the target. A token that is 0 on both is
+   telling you nothing, and this is exactly how you find that out.
+3. When a check returns 0, **read the diff before reporting** — the null result
+   is a claim about production and deserves the same scepticism as a positive.
+
+Same family as the CRLF misfire the day before: the tool was fine, the INPUT was
+wrong, and the wrong answer was the alarming one. Both were caught by noticing
+the output contradicted something already known.
+
+## 2026-09-04 — FORBIDDEN: reporting a key as ABSENT from a paginated API without paginating. An unpaginated list read manufactures FALSE ABSENCE, and absence is the finding people act on. `[lane mlb-feed-live-terminal-refresh]`
+
+- **What we believed.** That `SYNDICATE_WEB_DYNO` was ABSENT from the live
+  refresh-worker while `render.yaml` declared it `false` — a blueprint/live
+  drift making `_render_web_dyno()` fall through to its `RENDER` heuristic and
+  call refresh-worker a web dyno, so every gate behind `not _render_web_dyno()`
+  would be inert on the one service that builds the board. I wrote that into a
+  code docstring, a lane block, a `state.md` row, a pushed commit message and
+  a session log, and reported it to the user as a caught trap. The user then
+  asked me to FIX it, which is the cost: a false finding had become a work item.
+- **What was actually true.** The key is present and correct on all three
+  services — web `true`, live-odds-worker `false`, refresh-worker `false`,
+  exactly matching `render.yaml`. My read was **one `limit=100` page of
+  refresh-worker's 153 keys.** `CLAUDE.md` warns to paginate this exact
+  endpoint (*"paginate — `limit` > 100 returns HTTP 400"*), and that warning is
+  loaded into every session in this repo. I read it at session start and made
+  the error anyway, because I was reading the response for ONE key rather than
+  auditing the response's completeness.
+- **How we found out.** Not by re-reading the API — by asking whether the GATED
+  CODE RAN. `[mlb_cards] FEED_LIVE_PRUNE` sits behind `not _render_web_dyno()`;
+  it is in refresh-worker's logs at 15:57:55Z and 15:59:32Z, along with the
+  `board_contract_*` and `cards_context_*` memory samples behind the same gate,
+  while the web service emits none of the three. That is **positive proof the
+  branch is live**, not the weaker "I could not reproduce the problem" — see
+  *retraction is not innocence*; this one clears the bar that rule sets.
+- **The rule going forward.** **A list endpoint answers "what is on this page",
+  never "what exists".** Absence is only a finding once the listing is known to
+  be COMPLETE: paginate to exhaustion and report the total you enumerated
+  (`keys=153`) next to the absence, so the denominator is visible and a short
+  read is obvious to the next reader. And when a config read implies that
+  deployed code is INERT, **check the code's own output before believing it** —
+  a log line, a counter, an emitted stamp. A gate that is really inert is
+  silent, and silence is directly observable. Sibling of *presence is not
+  reachability* pointed the other way: this is ABSENCE is not INERTNESS.
+- **SECOND INSTANCE, SAME DAY, SAME ROOT `[2026-09-04 19:2xZ]`.** Watching for
+  the `FEED_LIVE_STATUS date=2026-09-03` line, I polled the Render logs API
+  with `text=FEED_LIVE_STATUS&limit=20` every 30s. It returned **`0` on all 24
+  polls over 12 minutes** — while the nine 09-03 lines were in the log the
+  whole time. `text=` + `limit=N` is a **RECENCY WINDOW, not a search**: the
+  worker emits `date=2026-09-04` lines continuously, so the once-emitted 09-03
+  lines were pushed out of the newest 20 within seconds. The unfiltered
+  capture over the same window found all nine immediately. Had I trusted the
+  poller I would have concluded the print never ran and redeployed to "fix" a
+  working instrument.
+  **So: a filtered log query answers "is this among the last N lines", never
+  "did this happen".** To ask the second question, capture the window
+  unfiltered and grep locally — which is what `capture_build.py` exists for.
+- **Cost.** No production change was made — the error was caught on the way to
+  making one, when investigating the blast radius of a config write the user had
+  authorised. Had I acted on it instead, I would have "fixed" a correct service
+  and taken a needless refresh-worker deploy. Ledger cost: one code docstring,
+  one lane block, one `state.md` row, one log section and one commit message
+  carrying a false fact, all now corrected in place except the pushed commit
+  message, which cannot be.
+
+## 2026-09-04 — "SELF-VERIFYING" is only true where the EMITTER runs. Find the print, then ask who owns it.
+
+`60afda80` made the Kalshi doubleheader fix self-verifying — its comment says the
+counter is *"counted so the fix can be VERIFIED FROM THE LOGS"*. I deployed it to
+web and live-odds-worker and the verification signal did not appear, because it
+cannot:
+
+    doubleheader_resolved is COMPUTED in syndicate/features/shared/kalshi_board_join.py
+        -> owned by web, refresh-worker AND live-odds-worker
+    doubleheader_resolved is PRINTED at exactly one place repo-wide,
+        pipeline/portfolio_commit.py:665
+        -> `pipeline/` is owned by refresh-worker ALONE
+
+So two of three services now compute the counter and discard it. The
+`[kalshi_odds] BOARD_JOIN` line those services DO emit carries
+`kalshi_markets`, `board_rows`, `matched`, `reasons` — and not this field.
+
+**The rule.** A verification signal has an owner service exactly like the code it
+verifies, **and they need not be the same one**. Computation in `shared/` reaches
+all three; emission in `pipeline/` reaches one. So before claiming a deploy makes
+something verifiable: **locate the PRINT — `git grep <field>` for an f-string,
+repo-wide — and ask `_owners()` who runs THAT file.** Deploying the computation
+to a service that cannot print it buys nothing observable.
+
+**And the second-order trap, which is worse.** Grepping the trading service's
+logs for the token returns **0 lines, correctly** — indistinguishable from "the
+fix is broken". A null result on the wrong service is not evidence about the fix
+at all. Same family as *absent signal ≠ absent path* and *presence is not
+reachability*; the new axis is that the EMITTER has its own deployment identity.
+
+## 2026-09-04 — A FLAT READING FROM AN INSTRUMENT THAT CANNOT SEE THE SUSPECT IS NOT EVIDENCE
+
+`#632`. Five mechanisms were excluded and the memory growth stayed unattributed.
+Two of those exclusions rested on allocator introspection: pymalloc arena counts
+came back flat, and `#435` had already found glibc `malloc_info` flat. I recorded
+fragmentation as EXCLUDED on that basis.
+
+**Both instruments are structurally incapable of seeing the allocation that
+turned out to be responsible.** CPython routes anything over 512 bytes past
+pymalloc to malloc/mmap; pymalloc arenas were ~40% of worker RSS and
+`malloc_info` reached 13.9% coverage. The growth is in 8-64MB anonymous
+mappings — a region class neither can report. A third instrument
+(`/proc/self/smaps`, the kernel's own accounting) found it in one window.
+
+THE RULE: before recording a null result, state what fraction of the quantity
+the instrument can see. A flat reading over 40% of the mass excludes the
+hypothesis over 40% of the mass and says NOTHING about the other 60%. Write the
+coverage next to the verdict, or the verdict will later be read as stronger than
+it was — I recorded "fragmentation excluded" and had to walk it back to
+"excluded within the 40% pymalloc can see".
+
+Corollary, and it is the cheaper check: **a breakdown that does not sum to its
+own total is not attribution.** Every earlier probe in this investigation left a
+residual I reached by subtraction and then narrated. When `by_kind_mb` was
+finally recorded alongside the size buckets, the residual went to `0.00` and one
+narration — "65-70% is heap, so it is glibc's main arena" — turned out to be
+wrong: heap was 7.4%. Name the residual the first time it appears.
+
+Related: `[2026-09-04]` "an in-Python free cannot move process anon", which is
+the same failure a level down — reasoning about a mechanism the instrument in
+hand could not have registered.
+
+## 2026-09-04 — PRE-REGISTER THE GATE, AND LET IT BIND WHEN THE DATA IS POINTING WHERE YOU HOPE
+
+`#632`. The smaps collector was written with its stopping rule fixed BEFORE any
+data: at least 5 readings per worker over at least 35 minutes with a material
+climb. It then withheld its verdict because the worker in question reached
+**34.6 minutes — 24 seconds short** — with the data pointing exactly where I
+wanted it to.
+
+Twenty-four seconds is not a meaningful difference, and that is precisely what
+makes it the dangerous case: every argument for relaxing the threshold was
+available only AFTER seeing the result. I collected more instead; the second
+worker crossed at 37.3 min honestly and both agreed.
+
+THE RULE: a threshold set in advance is only worth something if it also binds
+when it is inconvenient. If a gate is missed by a margin you would have called
+irrelevant beforehand, collect more data — do not edit the gate. The tell that
+you are about to rationalise: the justification for the change refers to the
+data you just saw.
+
+This session also supplies the contrast case for what a gate is FOR: an earlier
+verdict in the same investigation was called on a 12-minute window with two
+interleaved workers, and it was WRONG in a way a 35-minute window caught.
+
+## 2026-09-04 — 100% OF WHAT YOU SAMPLED IS NOT 100% OF THE THING. THE DENOMINATOR MUST COME FROM OUTSIDE THE INSTRUMENT
+
+`#632`. A per-request sampler measured the smaps size-bucket delta across
+individual requests on an allowlist of two routes, and reported:
+`/api/ops/artifacts/export` accounts for **+145.10 of +145.10 MB — 100%**.
+
+It is 100% by construction. `sum(sampled) / sum(sampled)` cannot be anything
+else. Export was the only sampled route with non-zero deltas, so the denominator
+was **a set of routes I chose**, and the number said nothing whatever about the
+process.
+
+The check that caught it compared the attributed total against each process's
+OWN 8-64MB climb over the same window:
+
+    pid 79   process +90.30 MB   attributed  +0.00 MB     0.0%
+    pid 80   process +23.20 MB   attributed +40.60 MB   175.0%
+
+**Failing in OPPOSITE directions is the tell that it is not a scale error.** One
+worker climbed 90 MB with every sampled request reading zero; the other
+attributed nearly twice what its process gained.
+
+THE RULE: an attribution's denominator must be measured INDEPENDENTLY of the
+instrument doing the attributing. If the only quantity you have is what your
+sampler saw, you can report the events it caught — never a share, a percentage,
+or a "this accounts for". Write the share check before the collector, and make
+it a gate rather than a note: this collector PRINTED a warning about exactly this
+failure mode and the warning did not stop the verdict being computed. **A caveat
+in the output is not a check.**
+
+Related: `[2026-09-04]` "a flat reading from an instrument that cannot see the
+suspect is not evidence" — the same error in the other direction, and both are
+about knowing what fraction of the world an instrument can see.
+
+## 2026-09-04 — A PRE-REGISTERED FALSIFICATION TEST IS WORTH WRITING, BECAUSE IT FIRES
+
+`#632`, and this is the counter-example to the entry above rather than another
+failure. The lane `web-oom-per-request-smaps` was opened with this line written
+BEFORE any data existed:
+
+> Falsification test: sampled routes show a per-request delta of ~0 while the
+> process still climbs — then no request owns it and the growth is between
+> requests.
+
+pid 79 then did exactly that: **+90.30 MB of process climb, +0.00 MB across 12
+sampled requests.** The condition had been named in advance, so it was
+recognised immediately as the falsification rather than argued away as thin
+sampling or an unlucky window.
+
+The same session supplies the other half: a stopping rule pre-registered for the
+smaps trend (>= 5 readings over >= 35 min) withheld a verdict at **34.6 minutes**
+— 24 seconds short — with the data pointing where I wanted. Collecting more was
+cheaper than the argument for relaxing it would have been worth.
+
+THE RULE: write the falsification condition into the lane before the first
+measurement, in terms concrete enough to recognise on sight. Its value is
+precisely that it costs something when it fires.
+
+## 2026-09-04 — A BROKEN IDENTIFIER IS WORSE THAN NO IDENTIFIER, BECAUSE IT MANUFACTURES FALSE CONTINUITY
+
+`#632`. Differencing per-process counters needs a process identity, and `pid` is
+not one — a respawned gunicorn worker gets a recycled pid, and differencing
+across that boundary produced **-117% coverage**. So I added `proc_token`.
+
+**It shipped INERT, and inert in the worst available way.** The token was
+generated at module import, and **gunicorn forks its workers AFTER the import**,
+so every worker inherited the identical value. Measured in production 20:24-20:26:
+pid 99 and pid 98 both emitted `6178fc632433`.
+
+The damage is not that the token failed to distinguish workers. It is that a
+SHARED token reads as CONTINUITY. The collector saw one token, concluded one
+process, and confidently differenced pid 99's reading against pid 98's —
+producing a `-110.74 MB` process delta and a `-135.30 MB` residual from two
+different processes. With no token at all it would have refused to compute
+anything. **The fix for the merging defect made the merging invisible.**
+
+It then produced a clean, satisfying answer — `r = +0.870`, "the residual tracks
+skipping" — which I would have reported as the result had I not already been
+chasing the anomaly.
+
+THE TELL WAS IN THE DATA, NOT THE TESTS: `solo_attributed` read **200 at two
+consecutive emissions** while `skipped_concurrent` **fell 33 -> 20**. No
+cumulative counter does that. A second tell in the discarded output: a window
+showing `solo 0` beside `attributed -103.22 MB` — 103 MB attributed across zero
+requests.
+
+The old tests asserted the token was PRESENT and STABLE. **Both were true of the
+broken version.** Presence and stability are exactly the properties a shared
+token has.
+
+THE RULE: an identifier must be tested for the thing it exists to DISTINGUISH,
+not for presence and stability. For any per-process value in a forking server,
+the test is "does a child differ from its parent" — mock `os.getpid()` and
+assert inequality. And derive such values LAZILY: anything computed at import
+time in this codebase is computed once for all workers.
+
+Related: `[2026-09-04]` "100% of what you sampled is not 100% of the thing", and
+the standing `presence is not reachability` — three variants of the same failure,
+where a check confirmed a property the defect also satisfied.
+
+## 2026-09-04 FORBIDDEN: editing a scheduled task's prompt while a session of that task is still ALIVE — it can fire the new prompt IMMEDIATELY. `[lane feed-live-warn-rate, session c4287631]`
+
+I re-armed a one-time task two minutes out with a short DRY-RUN prompt to
+pre-approve its tools, let it run, then restored the real prompt for 20:15 CDT.
+**The dry run's session was still alive.** It picked up the restored prompt and
+began executing the REAL 30-minute measurement at 15:42 — 4.5 hours early, with
+**1 game live instead of the ~12** the window was chosen for, holding the
+worktree the 20:15 run was going to want.
+
+`lastRunAt` and `enabled:false` both said the task had finished. Neither is a
+statement about the SESSION. The task object and the session that ran it have
+separate lifetimes, and only the second one executes a prompt.
+
+**Before updating a task's prompt, check `list_sessions` for a RUNNING session
+whose title matches that task** (the runner names the session after the task —
+here, "Feed live warn rate live slate"). If one is alive, either wait for it or
+accept that it may run whatever you write next, now.
+
+Two things that limited the damage and are worth copying: the prompt made the
+run VERIFY its own premise (it records the live-game count and is told to report
+INCONCLUSIVE rather than fake it), so an early firing self-labels instead of
+masquerading as the designed measurement; and giving the rescheduled run a
+DIFFERENT lane name (`...-peak`) removed the worktree collision outright rather
+than hoping the early run cleaned up. The mistimed run is now a third data point
+(0 live / 1 live / ~12 live), which is a better experiment than the two-point
+one I had planned — but that is luck, not design.
+
+## 2026-09-04 — A COEFFICIENT IS NOT A FINDING UNTIL IT SURVIVES LEAVE-ONE-OUT AND A RANK TEST
+
+`#632`. One collector, one metric, four verdicts, three of them wrong — and each
+wrong one was a clean number with a plausible mechanism attached:
+
+| n | pearson | verdict it printed | why it was wrong |
+|---|---|---|---|
+| 3 | `-0.999` | "FALSIFIED: does not track" | three points |
+| 3 | `+0.870` | "TRACKS skipping" | windows differenced ACROSS two workers |
+| 8 | `+0.710` | "TRACKS skipping" | one window; `-0.297` without it |
+| 16 | `+0.236` | does not track | spearman `-0.047`, `+0.087` on leave-one-out |
+
+The n=3 and n=8 runs gave OPPOSITE conclusions from the same pipeline on the same
+metric. That alone bounds what a coefficient is worth here.
+
+THE RULE: never report a correlation without (a) a rank correlation beside it —
+if Pearson and Spearman disagree in sign or magnitude, the Pearson is describing
+one point's leverage, not a relationship; (b) leave-one-out, naming the most
+influential observation and what the coefficient becomes without it; and (c) the
+raw magnitudes, because `r` says nothing about whether the effect matters.
+
+A corollary that cost real time: **a gate threshold must be set for the
+STATISTIC, not for convenience.** I gated this collector at "3 clean windows"
+because 3 was reachable quickly, and it duly printed FALSIFIED on three points.
+The gate is now n>=8 with the robustness tests built in.
+
+Related: `[2026-09-04]` "100% of what you sampled is not 100% of the thing" and
+"a broken identifier is worse than none" — the same session, the same instrument,
+three different ways of producing a confident wrong number.
+
+## 2026-09-04 — "THE CLAIM HOLDER IS NOT IN THE SESSION ROSTER" IS TRUE OF EVERY CLAIM. IT IS A CATEGORY ERROR, NOT A LIVENESS CHECK
+
+Two sessions in one hour reasoned that a `refresh-worker` deploy claim was
+stranded because its `holder_session` (`3492626c-...`) was absent from
+`list_sessions`, including archived. One was preparing to `acquire --force`.
+
+**The comparison cannot ever succeed, for anyone.** Measured:
+
+* `scripts/deploy_claim.py:251` records `os.environ.get("CLAUDE_CODE_SESSION_ID")`.
+* Every `sessionId` from `list_sessions` (100 pulled, `include_archived=true`)
+  has the form `local_<uuid>`.
+* **They are disjoint id spaces.** This session's claim file records
+  `b2b5b45b-e938-4cb5-81c2-c211ecc7c703`; the roster knows the SAME session as
+  `local_05200b16-4058-4539-95de-73d16ea34b3c`. Different UUIDs, not a prefix.
+
+So a live claim held by a session that is demonstrably running — mine, while
+writing this — ALSO fails the test. **A predicate that returns "absent" for a
+live holder returns it for 100% of claims and discriminates nothing.**
+
+This SUPERSEDES the softer rule already in this file (*"the roster does not list
+unattended or scheduled runs, so absence is not evidence a holder is gone"*).
+That framing implies the check works most of the time and has exceptions. It
+never works. Anything resting on it — including lane notes that justified taking
+a file claim with "session X is GONE — verified, not assumed" — rests on nothing.
+
+**AUTHORITATIVE STATEMENT NOW LIVES IN THE CODE**, which is where the bad
+instruction was and therefore the only place a correction stops reproducing:
+`scripts/deploy_claim.py`, the `holder_session` note (`c1a33299` removed the two
+false sentences, `e8ebdbbf` made it self-verifying). It carries the self-test,
+names `deploy_preflight.py`'s process list as the evidence that does work, and
+records the trap that OUTLIVES the identity fix -- *a free claim is not an idle
+box*, measured at the 22:46Z expiry with an eredivisie build and an MLB sim both
+still in flight. Read that note first; this entry is the ledger trace.
+
+**THE SECOND COST, and it OUTLIVES the identity fix: you cannot CONTACT a claim
+holder from the claim.** The correct response to a live holder is to ask them,
+and there is no channel — the claim records an id the roster cannot resolve.
+Measured 2026-09-04: `search_session_transcripts` on the holder id looked like a
+way in (background-task notifications embed a session's own scratchpad path) and
+returned TWO CONFLICTING candidates, one of which had already told me a
+different id. Unsound; not used.
+
+**What worked, in one round trip: a CONDITIONAL message to the best candidate**
+("ignore if this is not you"), plus the ask left in the holder's LANE BLOCK so it
+lands regardless. The holder confirmed, and had already retargeted to the tip.
+Guessing a recipient would have been wrong; asking one cost nothing. The ledger
+is the only channel that reaches a holder identified solely by a claim.
+
+THE RULE: before comparing two identifiers, confirm they come from the same
+namespace. When a check returns the same answer for a case you KNOW is healthy,
+it is not a check. The cheapest test is to run it against yourself: if
+`deploy_claim.py status` reports your own live claim's holder as unfindable, the
+lookup is broken, not the holder.
+
+What IS evidence about a holder: `deploy_preflight.py` process output. The same
+hour, a peer found `build_soccer_artifacts.py --league eredivisie` (pid 2725)
+running under that exact claim. A running child proves liveness; a roster lookup
+proves nothing.
+
+AND: **TTL expiry frees the LOCK, not the WORK.** A claim that ages out while
+pid 2725 is still building is legal to take and will still kill the build --
+`#630`/2026-08-10, a deploy 61 seconds after a child started. Re-run preflight
+and deploy on CLEAR, not on the clock.
+
+## 2026-09-04 — A RUNNING MINIMUM CANNOT DETECT A RISING FLOOR. CHECK THAT THE STATISTIC CAN EXPRESS THE ANSWER
+
+`#632`. The question was which shape kills the web service: a rising FLOOR
+(retention) or a flat floor under high PEAKS (churn). I built an instrument that
+tracks a running min and a running max of process anon and shipped it.
+
+**The running minimum is the first reading, always, for any non-decreasing
+series.** It can only move DOWN, so on a process that never returns memory it is
+pinned at the boot value forever. The metric I chose to answer "does the floor
+rise" is mathematically incapable of rising. Both workers duly reported
+`floor_mb` fixed at their boot values, which looks like a flat floor -- the CHURN
+signature -- when the truth was the opposite.
+
+What actually answered it was `VmHWM` vs `VmRSS`, which I had added as a
+secondary reading almost in passing: ~29 MB apart on both workers, i.e. each
+process sitting at its own all-time peak, which is retention. An independent
+60-sample RSS poll agreed: in every series the floor equalled the FIRST reading.
+
+THE RULE: before building a statistic, check that it can EXPRESS both answers.
+Write down what the metric would read under each hypothesis; if one hypothesis
+produces a reading the metric cannot distinguish from the other, the metric is
+wrong before any data exists. A running min under retention and a running min
+under churn both read "equal to the first value" -- no data could have separated
+them.
+
+The correct design for a floor that can rise is a WINDOWED minimum (min over the
+last N readings), which is free to move in both directions.
+
+Related: `[2026-09-04]` "a flat reading from an instrument that cannot see the
+suspect is not evidence". Same family: there the instrument could not see the
+memory, here it could not express the shape. **Both are answered by asking what
+the instrument would read if the hypothesis were TRUE, before trusting it when
+it reads negative.**
+
+## 2026-09-04 FORBIDDEN: pinning a copied definition against ANOTHER FILE'S SOURCE TEXT. When the definition moves, the test stops existing instead of failing `[lane lane-invariant-single-source]`
+
+- **The rule going forward:** a module may not hold its own copy of a definition
+  another module enforces -- import it. If you cannot, do NOT settle for a test
+  that scrapes the other file for the definition and compares: that test's
+  precondition is *being able to FIND both copies*, so the refactor that moves
+  one turns the test red for a reason unrelated to drift, and drift then
+  accumulates behind it unwatched. Assert the ABSENCE of a second definition in
+  the file you control (`ast`, module scope) -- that survives any refactor of
+  the other side. **14 tests across three files had been red on `origin/main`
+  for exactly this**, all bound to `lane-guard.py`'s shape after its parser
+  moved to `lane_claims.py`, while `check_lane_invariants.py` still exited 0 and
+  printed INVARIANTS HOLD. The four pinned regexes had NOT drifted; four things
+  nobody had thought to pin had. Worst: a `- Files:` line naming
+  `scripts/archive_released_lanes.py` -- a filename CONTAINING the marker
+  "released" -- yielded the checker ZERO claims, so that lane could contest
+  nothing and the two-holder invariant passed vacuously. Measured on one
+  adversarial ledger: old checker `INVARIANTS HOLD` exit 0 against a contested
+  file AND a stray OPEN lane under `## Archived lanes`; new checker, 2
+  violations, exit 1. Fixed in `312c93a9`.
+- **Corollary, and it cost a wrong green: `is` DOES NOT PROVE A REGEX WAS NOT
+  COPIED.** `re.compile` memoises, so re-pasting `re.compile(r"^###\s")` returns
+  the object the other module already compiled and an identity assertion passes.
+  Verified by mutation: the copy went in, all 30 tests stayed green. Identity
+  still binds tuples and functions; for a regex, ask the AST.
+
+---
+
+## 2026-09-04 — FORBIDDEN: choosing a DEPLOY TARGET by which service CONTAINS the code. Choose it by which service SERVES the reading you predicted. `[lane nfl-projection-deploy]`
+
+- **What we believed:** deploying `web` would take NFL `unmatched_game_rows` from 78
+  to 0. `_attach_book_grid_projections` runs in web's request path, web serves
+  `/api/board/book-grid`, and web had the fix. Every one of those is TRUE.
+- **What was actually true:** the endpoint returned `source: "precomputed_artifact"`.
+  The board is built by **refresh-worker**, which was on a commit with the earlier
+  date-key fix and WITHOUT the alias fix — which predicts 78 exactly. Web deployed,
+  went live, and moved the number by **zero**.
+- **How we found out:** the payload's own provenance. Three tells, cheapest first, any
+  one decisive: `source: "precomputed_artifact"`; **a key the request-path code would
+  have ADDED was missing** (no `projection_coverage`); and the field was **ABSENT, not
+  null** (`projection` was not a key on Rams rows at all — absent means nothing tried,
+  `null` would mean something tried and failed).
+- **The warning was in the file I wrote the prediction into.** `deploys.md`'s owed
+  entry said, in its second sentence: *"The workers rebuild the board, so they want it
+  too."* I read it as an optimisation; it was the load-bearing half.
+- **The rules going forward:**
+  1. **"Which service has the code" and "which service made this response" are
+     different questions, and only the second predicts the number.** Settle the second
+     BEFORE deploying, from a provenance field on a real payload.
+  2. **An artifact-backed number does not move on the DEPLOY — it moves on the next
+     REBUILD.** Read only once the artifact's `generated_at` has advanced past the
+     deploy, or you reproduce the old number and misread it as a second failure.
+  3. A prediction that fails is only useful if its PREMISE is stated. Mine named a
+     service, so the failure localised in one step. "It didn't work" would not have.
+- **Confirmed by the positive case, which is the stronger form:** the number went to 0
+  when refresh-worker got the commit and rebuilt. Web was necessary for the inline
+  path and never sufficient for this reading.
+- **Cost:** one unnecessary web deploy (harmless, fast-forward, no `render.yaml`), one
+  wrong prediction published to `deploys.md` and then superseded in place.
+
+## 2026-09-04 FORBIDDEN: a tool that updates a REGION of a shared file rebuilding that file from the region's start. Splice the region; carry the remainder through untouched, and REFUSE if you cannot classify it
+
+- **The rule going forward.** When a tool rewrites one region of a file other sessions also write, it must locate the region's END, not just its start, and splice. `split_state.py --reindex` computed `head + regenerated_rows` and stopped — correct for every byte it knew about, and it silently deleted everything it did not. **The tell is a rebuild expressed as a prefix plus new content with no suffix term.** Two things make it worse than an ordinary bug: the region's end was defined by a FILTER (`[l for l in lines if not l.startswith("| [")]`) that has no notion of where a table ends, and the result was reported as success — `WROTE state.md (index rebuilt)`, exit 0. Add the conservation check as a RUNTIME guard, not only a test: every non-blank input line outside the rewritten region must appear in the output, or refuse. Verified 2026-09-04: `origin/main` carried 171 non-blank lines below that table, and the fix preserves 171 of 171. Fixed in `29ab5bfb`.
+
+## 2026-09-04 FORBIDDEN: calling a merge lossy from a SAME-FILE line comparison. Content that "vanished" may have MOVED to a sibling file, and the panic fix is to restore stale content over good
+
+- **The rule going forward.** When checking whether a merge, sync or rebuild
+  lost content, diff the working file against the WHOLE sibling corpus, not only
+  against its own previous version. Measured 2026-09-04 syncing the shared
+  primary tree 201 commits forward: a same-file check reported **1,059 lines
+  lost from `learnings.md`**. Against every `.syndicate/**.md` the true number
+  was **3** — upstream had run `compact_learnings.py`, which moves rule bodies
+  into `learnings_archive.md` BY DESIGN. A 350x overstatement, and in the
+  alarming direction, which is the dangerous one here: the obvious response to
+  "the sync ate a thousand lines" is to restore the pre-sync copy, which in this
+  case would have reverted 201 commits of other sessions' work to fix nothing.
+  The same pass also over-reported 113 upstream lines as lost purely because
+  `origin/main` had moved 3 commits past the sync target while the sync ran —
+  **compare against the SHA you actually merged, never against a moving ref.**
+  This is the exact inverse of the same day's rule about rebuilding a shared
+  ledger from `origin/main`: there a check said "0 deletions" and content was
+  genuinely gone; here a check screamed and nothing was. Both come from asking
+  one file a question that is about the tree.
+- **Corollary: 0 deletions is necessary, not sufficient, and a stacked HEADING
+  is how a "clean" merge still corrupts.** The same sync produced 3 duplicated
+  lane blocks and a `learnings_index.md` carrying TWO `## Index — N rules`
+  headers, all with `git diff --numstat` showing zero deletions, because a
+  3-way merge that keeps both sides of a rewritten header line is pure
+  insertion. Check STRUCTURE (one slug one block, one heading one section) after
+  any merge of an append-shaped file, not just the line counts.

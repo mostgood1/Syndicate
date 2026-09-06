@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,7 +17,24 @@ from syndicate.features.shared.odds_control_plane import write_odds_control_plan
 
 
 class OddsControlPlaneTests(unittest.TestCase):
-    def test_odds_history_prefers_artifact_history_over_tracking(self) -> None:
+    def test_odds_history_takes_the_FRESHEST_copy_not_the_highest_precedence(self) -> None:
+        """Renamed and re-pointed `[2026-09-05]`. It asserted the OLD contract.
+
+        `load_odds_history_payload_for_sport` was FIRST-HIT over
+        `odds_history_paths_for_sport`'s fixed precedence (shared -> artifacts ->
+        tracking) and was deliberately changed to NEWEST MTIME WINS, with
+        precedence demoted to a tie-break. Its docstring carries the incident:
+        live on refresh-worker 2026-08-04, `STREAM_PULL_OK` wrote 19,798,176
+        bytes of the 3,436-market MLB shard and the very next board build still
+        read `entry_count=611` from the stale shared copy, leaving every MLB
+        candidate at `history_points=0`.
+
+        This test wrote the three files in precedence order, so `tracking` was
+        newest and correctly won -- and the old assertion read that correct
+        behaviour as a failure. Both halves of the real contract are pinned
+        below, with mtimes SET rather than inherited from write order, because
+        a tie-break cannot be tested by a fixture that never ties.
+        """
         with tempfile.TemporaryDirectory() as tmp_dir:
             data_root = Path(tmp_dir) / "data"
             report_root = Path(tmp_dir) / "reports"
@@ -37,7 +55,38 @@ class OddsControlPlaneTests(unittest.TestCase):
             ):
                 actual_paths = [path.resolve() for path in odds_history_paths_for_sport("nba", shard_key)]
                 self.assertEqual(actual_paths, [shared_path.resolve(), artifact_path.resolve(), tracking_path.resolve()])
-                self.assertEqual(load_odds_history_payload_for_sport("nba", shard_key), {"source": "shared"})
+
+                # (1) FRESHEST WINS, against precedence. `tracking` is last in
+                # precedence and newest here, so a first-hit regression returns
+                # "shared" and fails.
+                os.utime(shared_path, (1_000_000, 1_000_000))
+                os.utime(artifact_path, (1_000_100, 1_000_100))
+                os.utime(tracking_path, (1_000_200, 1_000_200))
+                self.assertEqual(
+                    load_odds_history_payload_for_sport("nba", shard_key),
+                    {"source": "tracking"},
+                    "the freshest copy must win -- a stale higher-precedence copy "
+                    "shadowing a newly pulled shard is the 2026-08-04 incident",
+                )
+
+                # (2) ...and the reverse, so (1) cannot pass by simply always
+                # taking the LAST path: make `artifact` newest and it must win.
+                os.utime(tracking_path, (1_000_050, 1_000_050))
+                self.assertEqual(
+                    load_odds_history_payload_for_sport("nba", shard_key),
+                    {"source": "artifact"},
+                )
+
+                # (3) ON A TIE, precedence decides -- shared first. This is the
+                # writing service's case, where _sync_odds_history_for_refresh
+                # writes all three together.
+                for path in (shared_path, artifact_path, tracking_path):
+                    os.utime(path, (1_000_500, 1_000_500))
+                self.assertEqual(
+                    load_odds_history_payload_for_sport("nba", shard_key),
+                    {"source": "shared"},
+                    "equal mtimes must fall back to precedence order",
+                )
 
     def test_control_plane_snapshot_writes_central_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

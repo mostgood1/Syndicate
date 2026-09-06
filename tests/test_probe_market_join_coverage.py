@@ -13,6 +13,7 @@ exists but never moves, which is a pre-tip snapshot rather than a live line.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -76,10 +77,36 @@ def _run(root: Path, capsys) -> tuple[int, str]:
 
 
 @pytest.fixture(autouse=True)
-def _isolate_data_root(monkeypatch):
+def _isolate_data_root():
     """`--data-root` is applied by SETTING the env the real path helpers read.
-    Undo it between tests so one case cannot leak into the next."""
-    monkeypatch.delenv("SYNDICATE_DATA_ROOT", raising=False)
+    Undo it between tests so one case cannot leak into the next.
+
+    THIS RAN AT THE WRONG END, and the docstring above is what it was always
+    meant to do. `monkeypatch.delenv(..., raising=False)` fires at SETUP, before
+    the test body; `probe.main(["--data-root", ...])` then SETS
+    `SYNDICATE_DATA_ROOT` while the test runs. monkeypatch recorded nothing to
+    undo -- the var was absent when it looked -- so the value survived teardown
+    and leaked to every later test in the same process.
+
+    MEASURED 2026-09-05, full suite under `-n auto`:
+    `test_ncaaf_transfer_portal_builder` died with `FileNotFoundError` on
+    `.../pytest-7981/popen-gw10/test_all_three_present_reads_a0/ncaaf_source/...`
+    -- resolving its NCAAF paths under THIS file's tmp_path, named after the
+    test that set it. It passes in isolation; only the leak fails it.
+
+    Clearing on the way IN and restoring on the way OUT is what "between tests"
+    requires. Restores rather than deletes, so a caller that legitimately has
+    `SYNDICATE_DATA_ROOT` set keeps it.
+    """
+    before = os.environ.get("SYNDICATE_DATA_ROOT")
+    os.environ.pop("SYNDICATE_DATA_ROOT", None)
+    try:
+        yield
+    finally:
+        if before is None:
+            os.environ.pop("SYNDICATE_DATA_ROOT", None)
+        else:
+            os.environ["SYNDICATE_DATA_ROOT"] = before
 
 
 # --------------------------------------------------------------------------

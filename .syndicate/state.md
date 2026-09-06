@@ -120,6 +120,26 @@ current truth.
   already. `deploy_preflight.py` no longer depends on the log line for web
   (it reads `/api/ops/memory`), so nothing is blocked by this being off.
 
+- **2026-09-05 — COMPACT `learnings.md`, THEN RAISE ITS ALARM 400000 -> 460000.**
+  Asked directly, with the numbers, and BOTH were done in that order.
+  `compact_learnings.py --keep-from 2026-09-05` reclaimed **64,557 B**
+  (462,498 -> 397,941) by moving 40 entries' bodies to `learnings_evidence.md`;
+  headings conserved **896 -> 897, zero lost** (the +1 is a peer appending
+  mid-run), verified independently of the tool because the diff reads as 1,201
+  deletions on a shared file.
+  **A correction I owed the user and had given backwards:** I said compaction
+  would leave the file ~1,800 B OVER. It went UNDER by 2,059 B — I had compared
+  against the tool's default `--cap 280000`, not the alarm's real 400,000.
+  The raise was still right, for a different reason than the one I gave: a 0.5%
+  margin against a measured **~6 KB/hour** of fleet growth is a red light again
+  within the hour, which is the failure `session-start.sh` already names
+  ("a warning that is always on is one nobody reads").
+  Consequence to hold onto: **compaction is now nearly spent** — 369 of 432
+  dated entries are ALREADY stubs and re-moving them reclaims zero — and what
+  this alarm measures is the fleet's mistake-to-rule conversion rate
+  (~40 new FORBIDDEN-class rules in 36 hours). **The next lever is neither a
+  raise nor a compaction.** Reasoning is in the hook comment, not only here.
+
 - **2026-08-25 — REAL EXECUTION CAPS: bankroll $1000, Kalshi $50/day,
   Polymarket $100/day, $10 max order, 10 orders/day per exchange, 15 combined.**
   Asked directly, with the numbers. Bankroll was already `$1000`
@@ -1010,3 +1030,30 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
 * Weak signals, recorded as such: pid 98 took **6 of 7** bursts (lopsided for
   round-robin, but n=7), and ONE burst coincided with a 98 MB child process
   (`272:pro`, the only child all window) — an anecdote, not a mechanism.
+
+### `[web-oom-leak]` UPDATE 17 — intelligence response cache **BOUNDED and VERIFIED**: `22.503 -> ~13.1 MB` (-42%), 2026-09-06T02:3xZ `[session b2b5b45b]`
+
+* `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` now carries a **row budget** beside the
+  entry cap, **loop eviction** (the old code popped exactly ONE entry per insert,
+  so a cache over budget by more than one never caught up), and a **one-entry
+  floor** so an oversized slate cannot turn the cache into a permanent miss.
+  Deployed `814fda97`.
+* **Measured: `~13.1 MB` vs a `22.503 MB` control taken on the old code minutes
+  before the deploy — 58%, a 42% reduction, flat over 22.9 min (largest climb
+  `+0.477 MB`), both workers agreeing.**
+* **THE BOOT CONFOUND IS RULED OUT BY THE SAME WINDOW:** census total recovered
+  to `73.66`/`67.89 MB` against a `77.38`/`69.97` control (~95%) while the cache
+  stayed at 58%. The process matured; the cache did not. No cross-epoch
+  comparison was needed.
+* **The control had to be re-taken.** The lane quoted `37.50 MB` from hours
+  earlier on a bigger slate; the live value was `22.503 MB`. Against the stale
+  number, doing nothing would have passed.
+* Row count was chosen over byte-sizing on MEASUREMENT: an accurate deep walk
+  costs `228 ms` per insert; a truncated walk reported `11.31 MB as 1.44 MB`;
+  `json.dumps` costs `70-174 ms` and allocates a `9.44 MB` transient string.
+* **NOT AN OOM FIX** — `#632`'s bytes are not Python objects (28.3% of anon,
+  0.3% of the growth).
+* **NEXT, and NOT shipped:** `slice_intelligence_board_state_for_request` builds
+  `top_opportunities` and `recommendations` as two INDEPENDENT deep copies of the
+  same rows. Every use is a reassignment, never an in-place mutation, so sharing
+  the row dicts would roughly halve that term. Separate change, separate risk.

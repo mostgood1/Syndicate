@@ -135,6 +135,20 @@ def _series_adapter(fn: Any, value: Any) -> Any:
 
 
 AMERICAN_TO_PROBABILITY: list[Impl] = [
+    # ADDED 2026-09-05 by the unregistered-converter sweep. Genuine scalar
+    # american -> probability implementations that the tripwire had caught.
+    Impl("american_to_probability", "scripts.assess_wnba_accuracy", "american_to_prob"),
+    Impl("american_to_probability", "scripts.backtest_soccer_anchor_vs_outcomes", "american_to_prob"),
+    Impl("american_to_probability", "scripts.measure_exchange_prop_option_value", "implied"),
+    Impl("american_to_probability", "scripts.prereg_wnba_favourite_lean", "american_to_probability"),
+    Impl("american_to_probability", "scripts.refresh_nba_oddsapi_props", "_american_to_probability"),
+    Impl("american_to_probability", "scripts.refresh_wnba_oddsapi_props", "_american_to_probability"),
+    Impl("american_to_probability", "scripts.report_nfl_props_roi", "american_to_implied"),
+    Impl("american_to_probability", "scripts.soccer_market_prices_momentum", "american_to_prob"),
+    Impl("american_to_probability", "syndicate.features.ncaaf.prop_model", "american_to_probability"),
+    Impl("american_to_probability", "syndicate.features.shared.prophetx_client", "american_to_probability"),
+    Impl("american_to_probability", "syndicate.features.shared.venue_basis_edge", "_american_to_probability"),
+    Impl("american_to_probability", "syndicate.features.soccer.features.market_odds", "american_to_probability"),
     Impl("american_to_probability", "syndicate.features.shared.opportunity_signals", "implied_probability",
          "float() coercion + zero guard"),
     Impl("american_to_probability", "syndicate.features.shared.quote_enrichment", "_implied_probability",
@@ -200,6 +214,13 @@ def _backfill_card_adapter(fn: Any, value: Any) -> Any:
 
 
 PROBABILITY_TO_AMERICAN: list[Impl] = [
+    # ADDED 2026-09-05 by the unregistered-converter sweep.
+    Impl("probability_to_american", "scripts.refresh_nba_oddsapi_props", "_probability_to_american"),
+    Impl("probability_to_american", "scripts.refresh_wnba_oddsapi_props", "_probability_to_american"),
+    Impl("probability_to_american", "syndicate.features.shared.kalshi_client", "probability_to_american"),
+    Impl("probability_to_american", "syndicate.features.shared.novig_client", "probability_to_american"),
+    Impl("probability_to_american", "syndicate.features.shared.polymarket_client", "probability_to_american"),
+    Impl("probability_to_american", "syndicate.features.shared.venue_quote_adapters", "probability_to_american"),
     Impl("probability_to_american", "syndicate.features.shared.opportunity_signals", "american_price",
          "strict 0<p<1; returns int"),
     Impl("probability_to_american", "pipeline.intelligence_state", "_backfill_layer2_board_columns",
@@ -269,6 +290,32 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "syndicate/features/shared/recommendation_engine.py:_fair_probability": "takes a candidate Mapping",
     "syndicate/features/soccer/features/market_anchoring.py:devig_decimal_odds": "dict in, dict out",
     "syndicate/features/soccer/props.py:_american_odds_text": "display formatting",
+    # ADDED 2026-09-05. The tripwire had accumulated 37 unlisted functions; each
+    # of these was classified from its SIGNATURE or BODY, never its name.
+    "scripts/measure_game_market_option_value.py:implied": "BOUNDED variant -- refuses |price| > MAX_ABS_AMERICAN (1000.0) as a dead price, by design; registering it as the general converter makes it disagree at +10000 where 37 impls agree",
+    "pipeline/novig_odds_refresh.py:novig_odds_enabled": "returns bool; a feature flag",
+    "pipeline/novig_odds_refresh.py:run_novig_odds_refresh": "a refresh job returning a summary dict",
+    "scripts/assess_wnba_accuracy.py:american_profit": "price+outcome->profit, two args (3 impls; see the report)",
+    "scripts/report_nfl_props_roi.py:american_to_profit": "price->profit, not price->probability",
+    "syndicate/features/shared/paper_settlement.py:american_profit": "price->profit, not price->probability",
+    "scripts/backfill_nfl_historical_props.py:_american": "coerces text to an american int; a parser, not a conversion",
+    "syndicate/features/ncaaf/props.py:_american": "coerces text to an american int; a parser, not a conversion",
+    "scripts/backtest_soccer_anchor_vs_outcomes.py:devigged_h2h": "reads an odds cache off disk and devigs two-sided; (Path, date) -> dict",
+    "scripts/watch_clamp_trigger.py:_fair_probabilities": "shortlist in, list of dicts out; not scalar",
+    "syndicate/features/nfl/game_context.py:implied_total_ratio": "team totals over prior weeks; a ratio, a different concept entirely",
+    "syndicate/features/nfl/props.py:_american_is_better": "compares two prices, returns bool",
+    "syndicate/features/shared/novig_client.py:_decimal_or_none": "coercion helper, returns Any",
+    "syndicate/features/shared/novig_orders.py:novig_submitter": "returns a submitter callable; a factory",
+    "syndicate/features/shared/venue_quote_adapters.py:novig_outcome": "(sport, date) -> SourceOutcome; a fetch adapter",
+    # SCALE ADAPTERS THAT DELEGATE. Excused because the conversion they perform
+    # is `probability_to_american`, which IS registered -- the differential still
+    # covers the arithmetic. Their own input is a venue price scale (cents,
+    # dollars, a 0-1 outcome price), not a 0-1 probability, so registering them
+    # under a probability concept would feed the harness the wrong unit.
+    "syndicate/features/shared/kalshi_client.py:cents_to_american": "cents scale; body is probability_to_american(cents_to_probability(cents))",
+    "syndicate/features/shared/kalshi_client.py:dollars_to_american": "dollars scale; delegates to probability_to_american",
+    "syndicate/features/shared/novig_client.py:cents_to_american": "cents scale; delegates to probability_to_american",
+    "syndicate/features/shared/polymarket_client.py:outcome_price_to_american": "raw outcomePrices[i]; body is probability_to_american(_as_probability(value))",
 }
 
 _NAME_HINT = ("implied", "american", "decimal", "devig", "no_vig", "novig",

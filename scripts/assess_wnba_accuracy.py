@@ -29,7 +29,23 @@ if str(REPO_ROOT) not in sys.path:
 # number. `wnba_card_provenance` is the single place that knows the rule.
 from syndicate.features.shared import wnba_card_provenance as provenance  # noqa: E402
 
-SC = os.environ["SC"]
+# READ LAZILY, NOT AT IMPORT `[fixed 2026-09-05]`. This was
+# `os.environ["SC"]` at module level, so importing this module AT ALL raised
+# `KeyError: 'SC'` unless the variable happened to be set -- it is a source-cache
+# directory used by exactly two globs below, and nothing else here needs it.
+# Found by `scripts/probability_differential.py`'s registry, which refuses to
+# count an unimportable implementation as passing: "an unimportable one is
+# untested, not passing". A module-level `os.environ[key]` turns a missing
+# CONFIG value into an ImportError for every consumer, including tooling that
+# only wants one pure function out of the file.
+def _source_cache_root() -> str:
+    root = str(os.environ.get("SC") or "").strip()
+    if not root:
+        raise SystemExit(
+            "assess_wnba_accuracy needs the SC environment variable (the source-cache "
+            "directory holding espn/ and cards/ JSON). Set it and re-run."
+        )
+    return root
 
 
 # ---------------------------------------------------------------- ground truth
@@ -42,7 +58,7 @@ def _jload(path):
 def load_espn_games():
     """{(utc_start_minute, away_tri, home_tri): {...}} plus a by-date index."""
     games = {}
-    for p in sorted(glob.glob(SC + "/espn/*.json")):
+    for p in sorted(glob.glob(_source_cache_root() + "/espn/*.json")):
         for ev in _jload(p).get("events") or []:
             comp = (ev.get("competitions") or [{}])[0]
             stat = ((ev.get("status") or {}).get("type")) or {}
@@ -104,7 +120,7 @@ def join_cards_to_espn(espn):
         by_teams_day[(g["utc"][:10], g["away"], g["home"])].append(g)
 
     joined, unmatched = [], []
-    for p in sorted(glob.glob(SC + "/cards/*.json")):
+    for p in sorted(glob.glob(_source_cache_root() + "/cards/*.json")):
         card_date = os.path.basename(p)[:-5]
         payload = _jload(p)
         for card in payload.get("games") or []:

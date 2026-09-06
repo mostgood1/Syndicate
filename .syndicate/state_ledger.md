@@ -76,6 +76,15 @@ WRONG.* Editing an assertion to match whatever the code now does is how a real
 regression gets erased, and it looks exactly like success. **The rule fired 4
 times out of 18.**
 
+**THE `386 tests, OK` IS DATA-DEPENDENT AND MUST NOT BE READ AGAINST A
+NO-DATA NUMBER.** `python -m unittest tests.test_archives` gives **386 OK** in a
+worktree provisioned `--with-test-data` and **31 failed** in one without `data/`
+-- and the 31 is identical with a change stashed or applied, i.e. it is absence,
+not a regression `[peer lane ncaaf-live-resim-wire, 2026-09-05]`. Both numbers
+are correct for their tree. Quote the provisioning with the number or the pair
+reads as a regression that never happened; this is the same trap
+`[ci-suite-red-test]` was corrected for.
+
 **THREE FAILURE SHAPES THAT ARE NOT STALENESS, and each is reusable:**
 
 1. **A FIXTURE SEAM THAT MOVED.** `test_ncaaf_picks_local`'s `setUp` forces
@@ -141,6 +150,113 @@ changed: at 15:49 CDT six peer python jobs were actively burning CPU (including
 someone else's full `pytest tests/` 34.9 min in) with 10.9 of 31.6 GB free.
 That lane declined to start a third suite "rather than degrade theirs"; `-n 6`
 honours that and still finished.
+
+**CORRECTION 2026-09-05 21:2xZ — THE PAGEFILE IS AUTO-MANAGED, SO "THE
+CONSTRAINT CHANGED" WAS WRONG, AND IT WAS MY CLAIM.** I recorded the pagefile
+moving **4,864 MB -> 19,406 MB (4.0x)** as the condition that had changed since
+`suite-order-pollution`'s death. `AutomaticManagedPagefile = True`: Windows
+grows and shrinks it on demand. Three readings, ONE box, ONE configuration:
+
+    suite-order-pollution   4,864 MB   (its run dying)
+    me, 15:49, 6 peers      19,406 MB  (already inflated by the load)
+    me, 21:2x, near-idle    5,120 MB allocated, 54 MB in use
+
+**4,864 and 19,406 are the same setting in different states, not a settings
+change.** Nothing was reconfigured between their run and mine, so it cannot be
+why mine completed. A DEMAND-DRIVEN quantity read once is not a constraint.
+
+**AND THIS WEAKENS THE CAUSAL CLAIM BELOW, WHICH IS THE PART THAT MATTERS.** I
+argued the suite has no intrinsic 26 GB need because my run peaked at 7.05 GB
+with flat pagefile use. But `test_heap_roots`/`test_retainer_census` are the
+tests that allocate ~20 GB, **and they FAILED in both my runs** — so a low
+total is exactly what a run produces when the big allocators die early instead
+of allocating. The low peak may be a CONSEQUENCE of those failures rather than
+evidence against the need. `[peer lane ncaaf-live-resim-wire raised the
+competing hypothesis; the pagefile reading is mine]`
+
+**RESOLVED 2026-09-05 ~22:0xZ. IT IS NEITHER HYPOTHESIS, THE `~20 GB` IS FICTION,
+AND MY "PARALLEL-ONLY ARTEFACT" LABEL WAS ALSO WRONG.**
+
+`~20 GB` never had a source. Read off both files statically: `test_heap_roots`
+allocates 20x8000 at three sites plus 60,000 (sub-MB); `test_retainer_census`
+~2 MB. **Low single-digit MB.** The figure travelled as prose through
+`suite-order-pollution`, through me, and through a peer lane, and nobody had
+checked it. `[peer lane ncaaf-live-resim-wire found it and retracted its own
+pressure hypothesis on it; sizes confirmed independently here]`
+
+**THE REAL MECHANISM: A FIXED NODE BUDGET AGAINST A VARIABLE AMBIENT HEAP.** The
+census TRAVERSES `gc.get_objects()`; its cost is a function of the heap the
+process already has, not of what these tests allocate. `NODE_CAP = 40000` is a
+budget the walk decrements. Measured inside a real pytest process holding 40
+other test modules:
+
+    cap=   40,000   nodes_used=  40,000   TRUNCATED   probe=['_PLAIN_CACHE']  0.07s
+    cap=  400,000   nodes_used=  74,925   complete    probe=all three         0.21s
+    cap=2,000,000   nodes_used=  74,925   complete    probe=all three         0.19s
+
+The requirement is **74,925 nodes, 1.87x the cap**. The walk stops on its own
+there, so the ceiling costs 0.14 s and not more.
+
+**REPRODUCED WITH ZERO PARALLELISM** -- 40 modules then `test_heap_roots` in ONE
+process, no xdist: 2 failed. So "parallel-only artefact" was my label and it was
+wrong; xdist only MANIFESTS it, because a `--dist=loadscope` worker accumulates
+whole modules. Standalone-passes-therefore-parallelism was the inference, and it
+was the same non-discriminating control as everything else in this subject.
+
+**THE IRONY IS THE LESSON.** The cap's own comment says it exists so these tests
+"exercise behaviour, not the size of whatever process happens to be running
+them", and a sibling docstring states the principle outright: *"A test must not
+be a function of its runner."* **The cap was the fix for runner-dependence and
+it reintroduced runner-dependence in the opposite direction** -- too small a
+budget rather than too large a walk.
+
+FIXED: `CENSUS_NODE_CAP = 400_000` for the census tests (`NODE_CAP` unchanged for
+`PythonHeapTotalTests`, whose ratio/identity assertions need no complete walk),
+and `_rows()` now asserts the census's OWN `node_budget_exhausted` flag -- which
+the payload has always carried and no test read. Every assertion there is
+`assertIn`, so a truncated walk turned "the census does not reach this root" into
+"the census stopped early" while reading identically. Mutation (cap back to
+40,000): **6 failed**, naming the truncation and `nodes_used=40000`, where the old
+code produced a silent `'Holder' not found` on only 2.
+
+**AN OPEN INCIDENT NOW HAS NO CAUSE ATTACHED — this is the consequence, and it
+is bigger than a stale sentence.** `suite-order-pollution`'s OPEN block presents
+its own `MemoryError` as SOLVED: a 4,864 MB pagefile against tests that
+*"legitimately allocate ~20 GB"*. **Both halves are now gone** — the pagefile is
+auto-managed and was never a precondition (retracted above), and the ~20 GB is
+fiction (measured above). What remains is a full suite that died at **26 GB RSS
+emitting zero test-status lines, with no account of why.**
+
+**A LANE THAT BELIEVES IT KNOWS THE CAUSE WILL NOT INVESTIGATE.** The sentence is
+not merely wrong, it is load-bearing in the direction of NOT LOOKING: if that
+`MemoryError` recurs, the block tells the next reader it is understood. So the
+correction to carry is **not "the 20 GB was wrong" but "their 26 GB has no
+explanation any more"** — a correction versus an open question whose owner does
+not know it is open. `[framing from peer lane ncaaf-live-resim-wire]`
+
+The 26 GB itself is unexplained but not mysterious in kind: it was the PARALLEL
+suite's total across workers, and attributing it to these four tests was a step
+nobody took deliberately. What no longer exists is any reason to think those
+tests are the ones to look at.
+
+**NOT EDITED — their block, their lane.** Owner located by transcript search
+rather than by title guess: session `local_8498f6de` prints
+`=== lane marker === suite-order-pollution`, and a session whose `.current-lane`
+marker names the slug is the holder. Messaged there.
+
+**SO THE `test_heap_roots` MECHANISM IS STILL OPEN, AND MY "CONTAMINATION"
+READ IS NOT THE FAVOURITE ANY MORE.** Two hypotheses with DIFFERENT FIXES:
+*contamination* (they census every object in the interpreter, so a parallel
+worker's objects pollute the count) -> isolate them with a marker or
+`--dist=loadgroup`; *memory pressure* (~20 GB of allocation on a pagefile that
+sits at ~5 GB when idle) -> the box cannot run them in parallel at all and the
+pagefile is the defect. **A standalone PASS is consistent with both, so the
+check I reached for cannot discriminate** — the same shape as
+`[2026-09-05] A CONTROL THAT KILLS ONE ALTERNATIVE IS NOT A DISCRIMINATOR`.
+The discriminating measurement is their peak RSS run STANDALONE: a single-
+process peak near the ceiling means pressure. **NOT TAKEN, deliberately** — a
+peer pytest run was in flight at 21:2x and this is the experiment that already
+took one full suite down. It belongs on a genuinely idle box.
 
 **THE MEMORY RISK DID NOT MATERIALISE, and the number says which cause it was:**
 peak python RSS across the WHOLE machine **7.05 GB**, and pagefile usage FLAT at
@@ -246,6 +362,20 @@ reason: *"the natural way to answer the next question is to add one more field,
 and three of those turn a counter into a money record over HTTP."* The guard
 fired for exactly the case it was written for, and appending `by_segment` is the
 decay it exists to stop -- it needs a decision, not a green test.
+**RESOLVED BY THAT LANE, `782a057b`, AND VERIFIED HERE AT THE SOURCE RATHER
+THAN FROM THEIR SUMMARY.** `by_segment` IS a counter and does belong:
+`ops.py:458` reads `bucket["by_segment"].setdefault(segment, {"orders": 0,
+"settled": 0})` -- two integers by `+= 1`, keyed by a bounded segment
+vocabulary. Same risk class as `by_status`. File now 15 passed. **This
+discharges the "believed but unverified" item logged at session close.**
+They also replaced the weak half: the tuple test is a list equality whose
+cheapest green is typing a name into it, so a STRUCTURAL test now walks the
+bucket and permits a number or a dict nesting to numbers and nothing else --
+with `bool` rejected BEFORE the numeric branch (it is an `int` subclass) and an
+explicit anti-vacuity assert that the recursion is reached. Their mutation:
+make a DECLARED field carry a string, so every NAME is unchanged -- tuple test
+GREEN, property test RED.
+
 **`syndicate/blueprints/ops.py` is held by OPEN lane `ncaaf-live-resim-wire`,**
 so it is theirs; surfaced here rather than edited.
 

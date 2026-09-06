@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 import sys
 import urllib.request
 from pathlib import Path
@@ -166,6 +167,53 @@ def _game_from_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _board_fields_from_event(event: Mapping[str, Any]) -> dict[str, Any]:
+    """The four fields the BOARD needs and settlement does not.
+
+    NOT ADDED TO `_game_from_event`, DELIBERATELY. That function is the single
+    definition of what "in progress" and "final" mean, imported unmodified by
+    `ncaaf/live_game_state.py`, `ncaaf/live_resim.py` and refresh-worker's
+    NCAAF tick -- its own docstring and all three call sites say so. Widening
+    it to carry board-only fields would make a board concern a settlement
+    concern, which is the drift those warnings exist to prevent.
+
+    So the extra fields ride ALONGSIDE it in the persisted record instead.
+    This is the identical extraction `ncaaf/live_game_state._state_rows_for_date`
+    performs on web today, moved to the producer so the board can READ the
+    result instead of re-fetching ESPN to compute it -- read off the SAME
+    `competitions[0]` mapping, so it cannot disagree with the state beside it.
+
+    `home_id` / `away_id` are ESPN's team ids, which are the board index's join
+    key (`"{away_id}@{home_id}"`). `period` and `clock` are the eyebrow.
+    """
+    out: dict[str, Any] = {}
+    competitions = event.get("competitions")
+    competitions = competitions if isinstance(competitions, list) else []
+    competition = competitions[0] if competitions and isinstance(competitions[0], Mapping) else {}
+
+    competitors = competition.get("competitors")
+    competitors = competitors if isinstance(competitors, list) else []
+    for row in competitors:
+        if not isinstance(row, Mapping):
+            continue
+        side = str(row.get("homeAway") or "").strip().lower()
+        if side not in ("home", "away"):
+            continue
+        team = row.get("team") if isinstance(row.get("team"), Mapping) else {}
+        team_id = str(team.get("id") or "").strip()
+        if team_id:
+            out[f"{side}_id"] = team_id
+
+    status = event.get("status") if isinstance(event.get("status"), Mapping) else {}
+    period = status.get("period")
+    if isinstance(period, (int, float)) and period:
+        out["period"] = int(period)
+    clock = str(status.get("displayClock") or "").strip()
+    if clock:
+        out["clock"] = clock
+    return out
+
+
 def poll_ncaaf_live_state(iso_date: str, *, persist: bool = True) -> dict[str, Any]:
     """Capture one date's NFL games. Returns a named result, never raises.
 
@@ -186,6 +234,9 @@ def poll_ncaaf_live_state(iso_date: str, *, persist: bool = True) -> dict[str, A
             continue
         game = _game_from_event(event)
         if game is not None:
+            # Board fields ride alongside the settlement record -- see
+            # `_board_fields_from_event` for why they are not IN it.
+            game = {**game, **_board_fields_from_event(event)}
             games.append(game)
 
     record = {
@@ -193,6 +244,11 @@ def poll_ncaaf_live_state(iso_date: str, *, persist: bool = True) -> dict[str, A
         "games": games,
         "count": len(games),
         "finals": sum(1 for game in games if game.get("final")),
+        # THE READER'S FRESHNESS TEST. Without it a consumer cannot tell a
+        # record written 20 seconds ago from one written at yesterday's
+        # kickoff, and a stale record pinning the board to old scores is worse
+        # than the fetch this whole change removes.
+        "fetched_at": time.time(),
     }
     if persist:
         try:

@@ -214,6 +214,59 @@ def test_a_failure_in_the_roi_cut_is_NAMED_not_silent_and_never_500s(client, mon
     assert "by_sport_family_verdict" not in body["sim_view_roi"]
 
 
+def test_every_bucket_value_is_a_COUNTER_never_a_string(client, monkeypatch):
+    """The PROPERTY the declared-fields tuple is only a proxy for.
+
+    WHY THIS EXISTS ALONGSIDE THE TUPLE TEST. `test_the_bucket_carries_only_the
+    _declared_fields` is a list equality: it fails on ANY new field, which is
+    what makes it a good tripwire and a bad specification. Faced with a red
+    assertion the cheapest green is to type the new name into the tuple, and
+    that is precisely the decay the constant's comment warns about -- measured
+    2026-09-05, when `4ffba395` added `by_segment` and left the tuple alone.
+
+    And `test_no_order_level_field_ever_appears` is a DENYLIST of needles
+    (`ticker`, `fill_price`, `player_name`, ...). It catches the leaks somebody
+    already thought of; it cannot catch a field named something nobody listed.
+
+    This one is structural, so it needs no vocabulary: a bucket may contain
+    NUMBERS, or dicts nesting down to numbers, and nothing else. A field
+    carrying an order id, a ticker, a price string, a timestamp or a list of
+    rows fails here on its SHAPE, whatever it is called and whoever adds it.
+    That is "aggregates only" stated as an invariant rather than as a habit.
+    """
+    _install(monkeypatch, [_order(), _order(segment="first_half", outcome="win")])
+    body = json.loads(client.get("/api/ops/execution/ledger-summary", headers=ADMIN).data)
+
+    def assert_counters(node, path):
+        if isinstance(node, bool):
+            # Checked BEFORE the numeric branch: `bool` is a subclass of `int`,
+            # so a flag would otherwise pass as a count.
+            raise AssertionError(f"{path} is a bool; the bucket carries counts, not flags")
+        if isinstance(node, (int, float)):
+            return
+        if isinstance(node, dict):
+            for key, value in node.items():
+                assert isinstance(key, str), f"{path} has a non-string key {key!r}"
+                assert_counters(value, f"{path}.{key}")
+            return
+        raise AssertionError(
+            f"{path} is {type(node).__name__} ({node!r}) -- a bucket value must be a "
+            "number or a dict of numbers. If this is a new aggregate, it does not "
+            "belong in the bucket; if it is a count, make it one."
+        )
+
+    day = body["summary"]["2026-08-27"]
+    assert day, "fixture produced no bucket, so this test would pass vacuously"
+    for venue_key, bucket in day.items():
+        assert_counters(bucket, f"summary.2026-08-27.{venue_key}")
+
+    # The fixture must actually REACH the nested case, or the recursion above is
+    # never exercised and this passes for the wrong reason.
+    bucket = day["live:kalshi"]
+    assert set(bucket["by_segment"]) == {"(unset)", "first_half"}
+    assert bucket["by_segment"]["first_half"] == {"orders": 1, "settled": 1}
+
+
 def test_the_bucket_carries_only_the_declared_fields(client, monkeypatch):
     """A new field must be a deliberate edit to `_LEDGER_SUMMARY_FIELDS`."""
     _install(monkeypatch, [_order()])

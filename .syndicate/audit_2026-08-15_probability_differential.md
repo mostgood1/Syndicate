@@ -300,3 +300,48 @@ Ordered by evidence, not by size of diff.
 - **NOT measured:** `/api/board/game-chips` carries neither field, on all eight
   sports. The 8-sport form 502s; the per-sport form does not. Read as a
   data-shape fact, not as a clean bill of health.
+
+## 2026-09-05 — THE TRIPWIRE HAD 37 UNLISTED FUNCTIONS; CLASSIFYING THEM FOUND TWO REAL DEFECTS
+
+`test_every_converter_is_registered_or_excused` ("Implementation 32 cannot land
+unnoticed") had accumulated **37** converter-shaped functions that were neither
+registered nor excused. Every one was classified from its SIGNATURE or BODY,
+never its name: **18 excused, 19 registered.**
+
+**Two genuine defects, found only because registering them made the harness
+probe them:**
+
+1. **`kalshi_client.probability_to_american` scored 1 of 5 — the worst in the
+   family, in money-placing code on a live venue.** `0.0` and `1.0` RAISED
+   `ZeroDivisionError`, and percent-scale `50.0` returned **+102** — a
+   confident-looking real price for a unit error, which is the failure this
+   audit calls out by name because `confidence` is stored 0-100 alongside
+   probability 0-1 in the same rows. **FIXED**: it now guards `0 < p < 1`, which
+   `polymarket_client`'s twin has always done — and that function's docstring had
+   already NAMED the gap ("unlike `kalshi_client`'s version, which relies on
+   `dollars_to_probability` always running first"). A no-op on the production
+   path, where `dollars_to_probability` runs first; it only changes what a DIRECT
+   caller gets, and `probability_to_american` is exported in `__all__`. **1/5 ->
+   4/5.**
+
+2. **`ncaaf/prop_model.american_to_probability` rounded to 4dp**, returning
+   `0.0099` at +10000 where 37 implementations return `0.0099009901`. That broke
+   the property `test_all_implementations_agree_on_valid_prices` protects.
+   **FIXED** — the arithmetic was already identical; only the `round(..., 4)`
+   differed, and rounding an implied probability serves nothing when it is
+   compared against unrounded model probabilities.
+
+**One registration was withdrawn as a mis-classification, not a failure:**
+`measure_game_market_option_value.implied` refuses `|price| > MAX_ABS_AMERICAN`
+(1000.0) as a dead price BY DESIGN, so it is a bounded variant rather than the
+general converter, and is excused with that reason.
+
+**Seven entries added to `KNOWN_FAILING`** with their exact unmet requirements
+(see the inline comments). They were never tested before rather than newly
+broken, and every remaining failure is at the BOUNDARY — `''`, `None`, and a
+float price that `int()` truncates — which is this audit's standing finding and
+not a claim that the odds maths is wrong.
+
+**Not done, and named so it is not mistaken for done:** the five boundary
+refusals are unfixed. `report_nfl_props_roi:american_to_implied` at 1/5 is the
+weakest and is ROI reporting, not a money path.

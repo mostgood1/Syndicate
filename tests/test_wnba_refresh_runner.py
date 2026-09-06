@@ -3764,8 +3764,31 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 "--do-edges",
                 "--do-export",
             ]
-            with patch.object(module, "_run_refresh_via_cli", side_effect=AssertionError("cli refresh path should not load")), patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")), patch.object(module, "_load_source_cli", side_effect=AssertionError("source cli should not load")), patch.object(module, "_load_module_from_path", side_effect=AssertionError("source tools should not load")), patch("sys.argv", argv):
+            # REUSE REQUIRES A RECORDED INPUT HASH, NOT JUST COMPLETE OUTPUTS
+            # `[140213ea, "#345: the reuse guard took an input_hash and never
+            # read it"]`. `_existing_refresh_state` now ends with
+            # `should_recompute(step_key, input_hash)`, and its comment is
+            # explicit: "Absent a recorded hash `should_recompute` returns True,
+            # so a first run always fetches rather than trusting leftovers."
+            #
+            # This fixture IS that case -- a pristine temp root with complete
+            # files and no prior run -- so the guard correctly declined and the
+            # test read `will_fetch` as a regression. It was written against the
+            # version that ACCEPTED an input_hash and ignored it.
+            #
+            # Standing in for the prior run that would have recorded the hash.
+            # Asserted as CONSULTED below, so this cannot quietly become a test
+            # that no longer exercises the gate at all.
+            with patch.object(module, "should_recompute", return_value=False) as recompute_gate, \
+                    patch.object(module, "_run_refresh_via_cli", side_effect=AssertionError("cli refresh path should not load")), \
+                    patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")), \
+                    patch.object(module, "_load_source_cli", side_effect=AssertionError("source cli should not load")), \
+                    patch.object(module, "_load_module_from_path", side_effect=AssertionError("source tools should not load")), \
+                    patch("sys.argv", argv):
                 rc = module.main()
+
+            self.assertTrue(recompute_gate.called,
+                            "the reuse guard no longer consults the input-hash gate")
 
             self.assertEqual(rc, 0)
             self.assertTrue((artifact_root / "data" / "raw" / f"odds_wnba_player_props_{date_str}.csv").exists())
@@ -3884,14 +3907,33 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 "--do-edges",
                 "--do-export",
             ]
-            with patch.object(
-                module, "_run_refresh_via_cli", side_effect=AssertionError("cli refresh path should not load")
-            ), patch.object(
-                module, "_export_live_snapshot_artifacts", return_value={}
-            ) as export_snapshots, patch(
-                "sys.argv", argv
-            ):
+            # REUSE REQUIRES A RECORDED INPUT HASH, NOT JUST COMPLETE OUTPUTS
+            # `[140213ea, "#345: the reuse guard took an input_hash and never
+            # read it"]`. `_existing_refresh_state` now ends with
+            # `should_recompute(step_key, input_hash)`, and its comment is
+            # explicit: "Absent a recorded hash `should_recompute` returns True,
+            # so a first run always fetches rather than trusting leftovers."
+            #
+            # This fixture IS that case -- a pristine temp root with complete
+            # files and no prior run -- so the guard correctly declined and the
+            # test read `will_fetch` as a regression. It was written against the
+            # version that ACCEPTED an input_hash and ignored it.
+            #
+            # Standing in for the prior run that would have recorded the hash.
+            # Asserted as CONSULTED below, so this cannot quietly become a test
+            # that no longer exercises the gate at all.
+            with patch.object(module, "should_recompute", return_value=False) as recompute_gate, \
+                    patch.object(
+                        module, "_run_refresh_via_cli", side_effect=AssertionError("cli refresh path should not load")
+                    ), patch.object(
+                        module, "_export_live_snapshot_artifacts", return_value={}
+                    ) as export_snapshots, patch(
+                        "sys.argv", argv
+                    ):
                 rc = module.main()
+
+            self.assertTrue(recompute_gate.called,
+                            "the reuse guard no longer consults the input-hash gate")
 
             self.assertEqual(rc, 0)
             export_snapshots.assert_called_once_with(

@@ -3185,8 +3185,25 @@ def slice_intelligence_board_state_for_request(
             top_opportunities = sport_scoped[:opportunity_limit]
 
     response = dict(normalized_state)
-    response["top_opportunities"] = [dict(item) for item in top_opportunities]
-    response["recommendations"] = [dict(item) for item in top_opportunities]
+    # `#632`: ONE set of row objects, not two. These two keys carried
+    # INDEPENDENT deep copies of the same rows -- `[dict(item) for item in
+    # top_opportunities]` evaluated twice -- so every response and every cache
+    # entry paid for the rows twice over.
+    #
+    # THE LISTS STAY DISTINCT (`list(rows)`), only the row dicts are shared:
+    # list-level mutation on one key cannot then disturb the other, and a list of
+    # N pointers costs ~8 bytes per row against a full dict per row.
+    #
+    # Safe because NOTHING mutates a response row in place. Checked by a scripted
+    # search over `pipeline/` and `syndicate/` for loops over either key that
+    # assign into the item: exactly one hit,
+    # `syndicate/features/intelligence.py:11092`, and that is a LOCAL
+    # `recommendations` inside `run_intelligence_query` -- upstream of this
+    # function, mutating candidates before they are ever response rows. Every
+    # other use of both keys is a whole-list reassignment.
+    rows = [dict(item) for item in top_opportunities]
+    response["top_opportunities"] = rows
+    response["recommendations"] = list(rows)
     return response
 
 

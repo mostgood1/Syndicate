@@ -86,7 +86,7 @@ death, never life — do not invert it.
   behind it, which is how I mis-reported pressure as 86% when it was 54%.
 - Blocked by: none.
 
-### intelligence-cache-cap — OPEN — opened 2026-09-05 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### intelligence-cache-cap — CLOSED 2026-09-06 — opened 2026-09-05 — **BOUNDED AND VERIFIED IN PRODUCTION: `22.503 -> ~13.1 MB`, a 42% reduction**, flat over 22.9 min across 46 converged readings on both workers. The cache was ALREADY capped at 32 entries and reached that size anyway — the bound was on the wrong dimension. Fixed by adding a ROW budget, LOOP eviction (the old code popped one entry per insert, so a cache over budget by more than one never caught up), and a one-entry floor so an oversized slate cannot become a permanent cache miss. **The boot confound was ruled out inside the same window:** census total recovered to ~95% of control while the cache stayed at 58% — the process matured, the cache did not. The control was RE-TAKEN first: the lane goal quoted a stale 37.50 MB, against which doing nothing would have passed. Byte-sizing was rejected on measurement (228 ms accurate walk; a truncated walk reporting 11.31 MB as 1.44 MB; json.dumps at 70-174 ms plus a 9.44 MB transient). 11 new tests, 460 in the intelligence suite. **NOT an OOM fix** — `#632`'s bytes are not Python objects. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: bound `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` by CONTENT, not by entry
   count. It measured **37.50 MB** on a live worker WHILE CAPPED at 32 entries —
   the cap is on the wrong dimension, because entry size varies by orders of
@@ -111,6 +111,34 @@ death, never life — do not invert it.
   walk under-reports **11.31 MB as 1.44 MB**; `json.dumps` costs **70-174 ms**
   AND allocates a 9.44 MB transient string on a box that is OOMing. Row count is
   O(1) and tracks the dominant term.
+- Blocked by: none.
+
+### intelligence-rows-dedup — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: stop `slice_intelligence_board_state_for_request` building
+  `top_opportunities` and `recommendations` as TWO INDEPENDENT deep copies of the
+  same rows (`[dict(item) for item in top_opportunities]`, twice). Sharing the
+  row objects roughly halves that term in every response AND in every cache entry.
+- Files: `pipeline/intelligence_state.py` (**`slice_intelligence_board_state_for_request`
+  at ~3155-3190 ONLY**), `tests/test_intelligence_rows_dedup.py` (NEW).
+  `layer2-sim-disagrees` claims this file for *"the `confidence` backfill at
+  ~1888 ONLY"* — disjoint by that lane's own stated scope.
+- THE RISK IS ALIASING, and it was checked rather than assumed: a scripted search
+  for loops over either key that MUTATE the item found exactly one hit,
+  `syndicate/features/intelligence.py:11092` — and that is a LOCAL
+  `recommendations` inside `run_intelligence_query`, upstream of the slice,
+  mutating candidates before they ever become response rows. Every other use of
+  both keys is a whole-list REASSIGNMENT.
+- Hypothesis: sharing the row dicts is behaviour-preserving because nothing
+  mutates a response row in place.
+- Falsification test: a test that mutates a row via `recommendations` and asserts
+  `top_opportunities` is unchanged FAILS — then the two keys are not
+  interchangeable and the dedup must be reverted.
+- Verification: `/api/ops/retainer-census` shows the response cache below its
+  post-cap `~13.1 MB` on a settled worker, against a control re-taken minutes
+  before the deploy (NOT the stale figure from an earlier lane).
+- Design note: keeps the two LIST objects distinct (`list(rows)`), so list-level
+  mutation stays isolated and only the row dicts are shared. The list costs ~8
+  bytes per row; the dicts are the term that matters.
 - Blocked by: none.
 
 ## OPEN
@@ -943,7 +971,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   double-counts once EV carries the model.
 - Blocked by: none. NOT DEPLOYED, and inert until beta is non-zero.
 
-### suite-order-pollution — OPEN, VERIFICATION PARTIAL — opened 2026-09-04 — **ALL 12 FIXED AND LANDED (`324ef0d8`, 6 commits). NOT CLOSED: the stated verification was a FULL `pytest tests/` run and it has not completed.** SCOPED VERIFICATION PASSED: all 7 affected files in ONE process, 14m30s — **2 failed / 446 passed**, and both failures are pre-existing (`test_create_app_never_starts_live_refresh_loop_on_render_web`, `test_create_app_starts_shared_live_refresh_loop`) — confirmed by running them ALONE: they fail identically with `RuntimeError: Working outside of application context`, unrelated to ordering and to this lane. **FULL-SUITE READING OWED.** The attempt died with `INTERNALERROR> MemoryError` at 26GB RSS and `WinError 1455 paging file is too small`, emitting ZERO test-status lines — no result about these fixes either way. Cause is environmental and measurable: **the pagefile is 4,864 MB allocated on a 32 GB box**, while the suite's own `test_heap_roots`/`test_retainer_census` legitimately allocate ~20 GB, and two peer pytest runs were in flight. A third full suite was deliberately NOT started rather than degrade theirs. **NONE OF THE 12 WAS ORDER POLLUTION.** Five mechanisms, each a test asserting a property of the MACHINE while naming a property of the CODE: process AGE (5, `_PROCESS_STARTED_AT` vs an absolute 90-min ceiling); a process-WIDE mock (`patch.object(mod.time, 'sleep')` mutates the singleton `time` module, catching other threads); a module-global registry nothing resets (`kalshi_catalogue._DISCOVERED`); ambient env overrides the assertion never pinned (2); and process-wide MEASUREMENTS (a `list` bucket summing every list in the interpreter; `processed_root()` returning the first POPULATED candidate with the repo mirror always appended). — session b9bc926d-f167-4923-9344-eac7e86a5761
+### suite-order-pollution — CLOSED-VERIFIED 2026-09-05 — opened 2026-09-04 — **OWED FULL-SUITE READING DISCHARGED. `pytest tests/ -n auto --dist=loadscope` on `99f8b578`: 8 failed / 15,429 passed / 51 skipped, 23m30s, NO MemoryError.** **ALL 12 PASS. Not one appears in the 8.** Of those 8, SEVEN fail identically when run ALONE (`test_kalshi_doubleheader_event_match`, both `test_live_refresh_loop::test_create_app_*`, `test_nfl_props`, `test_probability_differential`, both `test_wnba_refresh_runner`) — pre-existing defects, not ordering, not this lane. **CAVEAT ON THE BASELINE, stated because it cannot be re-derived: the original 49/37/12 split was recorded from a run whose output file is now truncated to 23KB with zero FAILED lines. I could NOT diff the 8 against the 37 from disk** — the isolation re-runs above are what the 'pre-existing' claim rests on, and they are a direct measurement rather than a comparison. **THE 8th WAS A 13th INSTANCE OF THIS LANE'S OWN FAMILY, found and fixed.** `test_ncaaf_transfer_portal_builder` PASSES alone and died in-suite with `FileNotFoundError` on `.../popen-gw10/test_all_three_present_reads_a0/ncaaf_source/...` — a tmp root named after the test that set it. `tests/test_probe_market_join_coverage.py::_isolate_data_root` is an autouse fixture whose docstring says 'Undo it between tests so one case cannot leak into the next' and which ran at the WRONG END: `monkeypatch.delenv` fires at SETUP, then `probe.main(--data-root)` SETS the var during the test, so monkeypatch had nothing recorded to undo. Now clears in and restores out. `off != on` MEASURED: without the fix the process exits holding `SYNDICATE_DATA_ROOT=...test_all_three_present_reads_a0`; with it, `None`. Exposed only because `-n auto` regrouped which tests share a worker. — **ALL 12 FIXED AND LANDED (`324ef0d8`, 6 commits). NOT CLOSED: the stated verification was a FULL `pytest tests/` run and it has not completed.** SCOPED VERIFICATION PASSED: all 7 affected files in ONE process, 14m30s — **2 failed / 446 passed**, and both failures are pre-existing (`test_create_app_never_starts_live_refresh_loop_on_render_web`, `test_create_app_starts_shared_live_refresh_loop`) — confirmed by running them ALONE: they fail identically with `RuntimeError: Working outside of application context`, unrelated to ordering and to this lane. **RETRACTED 2026-09-05: THE CAUSE I GAVE FOR THE `MemoryError` WAS WRONG IN BOTH TERMS, AND ONE OF THEM WAS IMPOSSIBLE.** What still stands: a run died with `INTERNALERROR> MemoryError`, emitting ZERO test-status lines, so it was never a result about these fixes. **What I wrongly asserted:** (a) "the pagefile is 4,864 MB allocated on a 32 GB box" — `AutomaticManagedPagefile = True`, measured by me; 4,864 MB was a SNAPSHOT OF AN EFFECT under load, not a setting (5,120 MB near-idle since). (b) "`test_heap_roots`/`test_retainer_census` legitimately allocate ~20 GB" — they allocate low single-digit MB, read off the source; and **`test_heap_roots.py` was added at `a2afc7f1` (2026-09-05 15:30) which is NOT an ancestor of the `24d0a50e` worktree that died, so that file was never in the tree at all.** **HOW THE ERROR WAS MADE, because it is the reusable part:** I read `pytest tests/test_heap_roots.py tests/test_retainer_census.py` out of an `ALL_PROCESS_MEMORY` dump **that my own run emitted**, and treated it as my run's workload. Those dumps enumerate the WHOLE MACHINE — every peer's worktree and command line appears inside my output — and the 26,260 MB line is a `PROCESS_TREE_MEMORY` record, not a pytest total. Surfaced by lane `Fix red test in CI's own suite (test_archives)`; I re-derived every number here rather than take the retraction on trust, and found the ancestry point they had not. **THE CAUSE IS NOW UNKNOWN. Do not treat this MemoryError as understood** — that is the whole reason this is written out rather than deleted. Two data points against it being systemic: a second run of the same suite reached **79% with no MemoryError** (it was killed by the session ending, not by memory), and peer runs completed twice today under `-n auto` with peak machine-wide python RSS **7.05 GB**. `pytest-xdist 3.8.0` is installed, so the owed reading is no longer blocked. **NONE OF THE 12 WAS ORDER POLLUTION.** Five mechanisms, each a test asserting a property of the MACHINE while naming a property of the CODE: process AGE (5, `_PROCESS_STARTED_AT` vs an absolute 90-min ceiling); a process-WIDE mock (`patch.object(mod.time, 'sleep')` mutates the singleton `time` module, catching other threads); a module-global registry nothing resets (`kalshi_catalogue._DISCOVERED`); ambient env overrides the assertion never pinned (2); and process-wide MEASUREMENTS (a `list` bucket summing every list in the interpreter; `processed_root()` returning the first POPULATED candidate with the repo mirror always appended). — session b9bc926d-f167-4923-9344-eac7e86a5761
 - Goal: the 12 order-dependent failures pass in a FULL-SUITE run, not only in isolation. Measured baseline `84817721`: 49 failed / 15,043 passed; 37 of those 49 fail identically in isolation at `b36d993f` and at HEAD (pre-existing, NOT this lane), and 12 fail ONLY in-suite.
 - Files: `tests/test_kalshi_catalogue.py`, `tests/test_live_refresh_loop.py`, `tests/test_memory_watchdog.py`, `tests/test_mlb_sim_run_reconcile.py`, `tests/test_refresh_odds_sources.py`, `tests/test_refresh_state_store.py`, `tests/test_wnba_grader_root_per_file.py`, `tests/conftest.py`.
   Collision check: none of the seven, nor `conftest.py`, appears anywhere in `lanes.md`. No production code is claimed — if a fix turns out to need one, this lane stops and re-claims.
@@ -1639,6 +1667,19 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   at all tonight, so there was no positive control for the pricing STEP on any
   sport. Soccer's 52/52 shows the FIELD is populated elsewhere; it does not show
   the pricing path is healthy elsewhere.
+- **ALSO DONE THIS SESSION, outside the lane's own scope, all landed:** the red
+  `test_the_bucket_carries_only_the_declared_fields` on `main` (`782a057b`,
+  `ops.py` is this lane's claim); `learnings.md` compacted + its alarm raised
+  400000 -> 460000 (`1f032074`, user decision, recorded in `state.md`).
+- **HANDED BACK, NOT DONE — the PRIMARY TREE update.** Left at `e826b5fc`,
+  0 ahead, **21 behind, exactly ONE collision: `.syndicate/lanes.md`**, index
+  clean (narrowed from three; the other two were verified redundant and reset to
+  HEAD). NOT forced because session `b9bc926d`'s uncommitted `lanes.md` does not
+  replay onto `origin/main` — `git apply --check` fails at line 943, the
+  `suite-order-pollution` region whose retraction already landed upstream — so a
+  rebase means resolving a merge conflict inside a LIVE session's lane claims.
+  **It clears itself the moment they commit `lanes.md`.** Working-copy backup and
+  diff: `%TEMP%\claude\primary_preserve\`. Full reasoning: `log/2026-09-05.md`.
 - **`todo.md #71` NOT SATISFIED FOR THIS LANE, deliberately and visibly.**
   `docs/ai_context/todo.md` is claimed IN FULL by `accuracy-ledger-budget-raise`.
   I wrote the `#119` update, the post-write guard caught it, I reverted it, and
@@ -1653,6 +1694,9 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 ### render-egress-transport — OPEN — opened 2026-09-05 — session 9e40eb04-9f1c-464b-a6fb-5acac211e775
 - Goal: get Render bandwidth under the 25 GB included allowance (month was 24.4/25 on day 5). **CAUSE FOUND AND VERIFIED; MITIGATION DEPLOYED ON 2 OF 3 SERVICES.**
 - **Verified:** the bill is `web` polling external feeds ITSELF, **100% billed** — `state_worker.md` `[render-egress-cause]`. Deployed: web `3cb5b4ba` **7.29x**, refresh-worker `ffe8714b` **9.15x**, publish transport **13.0x**, `refused_hosts=0`. ESPN accepts the header from Render's IP.
+- **THAT BASELINE'S THRESHOLD WAS CONTAMINATED, AND THE CORRECTED RULE IS PRE-REGISTERED HERE BEFORE THE BUCKET IS READ `[2026-09-06 02:2xZ]`.** `< 25.4 MB/h` was defined as "outside the entire 19-bucket range" — but the pre-deploy series **declines steadily: 36.1 -> 33.5 -> 27.6 -> 25.4 -> 26.5 -> 24.4** over six hours as the NCAAF slate eased, so the last two pre-deploy hours had ALREADY drifted through the bar. **A static range is the wrong control against a trending baseline.** Caught by lane `ledger-repair-invariants`.
+- **CORRECTED, PRE-REGISTERED DECISION RULE.** OLS on the six pre-deploy buckets: trend `34.8 - 2.33x` MB/h, residual sd 2.10; no-treatment prediction for the `02:00Z` bucket **20.7 MB/h**, 95% prediction interval **[12.8, 28.7]**. **Bucket >= 12.8 => consistent with slate decay alone, NO demonstrated bill effect. Bucket < 12.8 => real effect.** The test keeps its power: a genuine 13.48x cut of a BILLED quantity would read **~1.5 MB/h**, far below the interval.
+- **THE NEAR-MISS IS THE DURABLE PART: my original `< 25.4` bar would have called the no-treatment prediction of 20.7 a PASS.** I would have published a bill saving that was six hours of slate decay, on a threshold I set myself and believed was conservative because it was "outside the whole range". **A threshold is only conservative relative to the RIGHT control.**
 - **PRE-DEPLOY BASELINE for `live-odds-worker`, captured 2026-09-05 20:2x CT BEFORE the tip lands — this is the control and it cannot be re-taken:** hourly bandwidth over 19 buckets (06:00–00:00Z) **mean 30.3 MB/h, median 29.7, sd 3.4, min 25.4, max 38.1 => ~0.71 GB/day**. Unusually tight, which is what makes it a good test. **A working change puts hourly MB below 25.4 — outside the entire pre-deploy range.**
 - **AND THE LOG CANNOT VERIFY IT ON THAT SERVICE — a silent `HTTP_COMPRESSION` there is UNREADABLE, NOT NEGATIVE.** The OddsAPI polling runs in `refresh_odds_sources.py`, a **grandchild** (pid 3221 <- 3220 <- 39) whose stdout never reaches Render's collector — established by lane `ledger-repair-invariants`, which found zero `[ncaaf_odds]` lines across 86 minutes while the fetcher was demonstrably pricing the board. **The bandwidth metric above is the verification, not the logs.**
 - **Compression DOES still reach that grandchild — verified by import, not assumed:** `scripts/refresh_odds_sources.py:49` imports `syndicate.features.shared.odds_control_plane`, which triggers `syndicate/__init__.py`; `fetch_mlb_oddsapi_local.py` and `fetch_soccer_oddsapi_props_local.py` import `syndicate` too. The header goes out; we just cannot watch it. (Checked because "the opener never installs in a subprocess" would mean the change misses 78.5% of worker egress entirely — presence-is-not-reachability, an error I already made once on this service tonight.)
@@ -1762,6 +1806,120 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   entry) checked by CONTENT for `segment` in the join key.
 - Blocked by: none.
 
+### mlb-first5-kalshi-execution — **CLOSED 2026-09-06** — MLB first5 execution on `KXMLBF5TOTAL` is BUILT, LANDED and LIVE; **the production reading was NOT taken** — opened 2026-09-05 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
+- **CLOSED ON AN EXPLICIT USER DECISION, TWICE STATED, WITH THE READING STILL
+  OWED.** I recommended keeping it open and said why; the user directed closure
+  anyway. **The obligation is NOT discharged and does not disappear with this
+  lane** — it lives in `deploys.md` (`6f6ebeb1`) under
+  `2026-09-06 02:59:27Z refresh-worker 933e9beb -> 1f032074`, whose `verify:`
+  field reads **OWED**. Anyone citing this lane as evidence the feature works is
+  citing something that was never measured in production.
+- **What IS established.** Code `d2b060c8` on `origin/main`, live on
+  refresh-worker inside `1f032074` since 2026-09-06T02:59:27Z, content-verified
+  (registration + `_row_market` + `split_segment_market_key` present on the live
+  SHA, all three absent on the previous one). Local replay over PRODUCTION data —
+  84 real settled `KXMLBF5TOTAL` contracts × 553 real `layer2-shortlist` rows,
+  same slate — `matched` **0 -> 8**, `unmapped_series` 84 -> 0,
+  `segment_has_no_matching_series` 6 firing alongside. 283 tests pass; 15 new
+  ones lead with `off != on` at both the catalogue and the join level.
+- **What is NOT established, precisely.** That a `first5` board row acquires a
+  `KXMLBF5*` ticker in production. At 03:14Z: **0 of 597 live orders**. A
+  post-boot join tick had run (03:12:16Z, `matched=120`), so the join is healthy
+  and the F5 pairing specifically is unobserved. The condition did not exist:
+  the join needs `segment='first5'` AND `market='totals'`, and 2026-09-06 had
+  **0** MLB shortlist rows while 2026-09-05 was down to **5**. That null is a
+  fact about the SLATE.
+  **To discharge:** on a built MLB slate, grep refresh-worker for a matched
+  `KXMLBF5TOTAL`, or `/api/portfolio/live` for a `venue_ticker` starting
+  `KXMLBF5`. **NOT `/api/board/book-grid`** — it carries no venue tickers at all
+  (`KXMLBTOTAL` reads 0 there too), so a null from it is about the surface.
+- **THE DEFECT WAS TWO GAPS IN SERIES, either alone inert.** `KXMLBF5TOTAL` was
+  absent from `SERIES_SPORT`; and `classify_market` yields
+  `totals_1st_5_innings` where the board stores `market='totals'` +
+  `segment='first5'`, so the index lookup missed BEFORE `_segments_agree` ran.
+  Fixed symmetrically via `_row_market()`, shared by
+  `_event_key`/`_board_key`/`_row_key`.
+- **A WRONG BELIEF THIS LANE PUBLISHED AND RETRACTED WITHIN THE HOUR.** I
+  predicted `TRIM_BY_SPORT` `kept_by_sport['mlb']` would RISE once the series
+  carried a sport. It did not — 2,740 before, 2,740 after. **Where F5 markets
+  die pre-fix remains unestablished**: `unmapped_series` never appears in the
+  production join's reason breakdown at all, and `series_out_of_scope` (8,004)
+  is the unchecked alternative. The registration is still correct; my account of
+  the mechanism was not.
+- Files: released — `syndicate/features/shared/kalshi_catalogue.py`,
+  `syndicate/features/shared/kalshi_board_join.py`,
+  `syndicate/features/shared/market_segments.py`,
+  `tests/test_mlb_first5_kalshi_execution.py`.
+- **Deliberately NOT done.** `KXMLBF5SPREAD` — a Kalshi spread states a MARGIN
+  where the board writes a HANDICAP, the defect that put 11 orders on the club
+  they were fading. Separate risk class. `KXMLBF5` (five-inning tie) keeps
+  refusing `recognised_but_no_board_market`, correctly.
+
+### ncaaf-live-state-to-worker — OPEN — opened 2026-09-06 — session 9e40eb04-9f1c-464b-a6fb-5acac211e775
+- Goal: **move NCAAF ESPN live-state polling OFF the web request path and onto a worker** `[user: "fix the web polling -- move it to a worker"]`. ONE testable outcome: `NCAAF_LIVE_STATE` still reports real `matched`/`live` counts on the board while web performs **zero** ESPN scoreboard fetches — read as `http_compression`'s `BILLED_responses` on web falling to ~0 for `site.api.espn.com`, and `warn_if_compute_in_request_path("ncaaf_espn_game_state_fetch")` no longer firing.
+- **Why this is a defect independent of the bandwidth work `[measured 2026-09-06]`:** `ncaaf/cards.py:_attach_live_state` -> `ncaaf_game_state_index()` fetches ESPN's college-football scoreboard (**1,441,192 B**) from inside the cards builder, behind a **45 s per-process TTL cache** with **`WEB_CONCURRENCY = 2`** — so every fetch happens twice. `CLAUDE.md`'s load-bearing rule is that workers fetch and web reads artifacts, and the repo's OWN guard agrees: **205 `request_path_guard: compute in request path` warnings per 1,200 log lines.** This is true whether or not the bytes are billed — see `state_worker.md` `[render-egress-cause]`, whose BILLING half I retracted.
+- **The producer already half-exists and nothing runs it on a cadence.** `scripts/poll_ncaaf_live_state.poll_ncaaf_live_state(date, persist=True)` already fetches and writes `live_state_{date}.json` to the SHARED keyvalue store, and `bet_status_ncaaf.py:111` already reads it with the `read_json_file`-then-fallback idiom. But its only non-fallback caller is `paper_settlement.py:912` (settlement, not a live cadence), and its record **lacks the `home_id`/`away_id`/`period`/`clock` fields the board's index needs**. So: enrich the record, add a worker producer, flip web to a reader.
+- **NO CROSS-LANE EDITS NEEDED — verified before designing.** `refresh_odds_sources.py` (FREE) already launches `poll_soccer_live_state.py` as a `RefreshStep` in the live phase on live-odds-worker, which is the producer site. `run_refresh_worker.py` (3 lanes), `run_live_odds_refresh_worker.py` (`ncaaf-live-cadence`) and `live_refresh_loop.py` (`suite-preexisting-seven`) are all CLAIMED and are all avoided.
+- **A STALE OWNERSHIP COMMENT WAS CHECKED, NOT TRUSTED:** `live_game_state.py:69` says `poll_ncaaf_live_state.py` "is owned by OPEN lane `ncaaf-settlement-resolver`". That lane **CLOSED 2026-09-01** ("as unverifiable, not as done"), so the file is free and the comment is stale. Fixed as part of this lane.
+- **SAFETY: the reader lands `store_then_fetch`, so shipping it ALONE changes nothing.** Web reads the store and uses the record only if fresh; if it is missing or stale it fetches exactly as today. Once the worker producer runs, web's fetches drop to zero **with no flag flip** — and if the producer ever dies, the board degrades to today's behaviour rather than to an empty index. An empty index means STATE UNKNOWN and must never render as "nothing is live" (that module's own docstring).
+- **LANDED, AND INERT BY DESIGN `[fc7e7d74, ada53db5]`.** Web reads the worker's record and fetches only when it is absent/unreadable/stale/unkeyed; the producer enrichment (`home_id`/`away_id`/`period`/`clock` + `fetched_at`) rides ALONGSIDE `_game_from_event`, never inside it. 11 tests, **seen RED** with the reader disabled; 813 NCAAF tests; CI's suite 386 OK. Peer lane `ncaaf-live-resim-wire` verified its own dependency independently: `_game_from_event` and `_fetch_scoreboard` are **byte-identical** across the change (`5a2aefda8ce3`, `449571b088ad`), so its tick is unaffected — confirmed by them, not asserted by me.
+- **CORRECTION TO MY OWN CLAIM — IT IS `web-2 -> worker-2`, NOT `-> 1`.** I told my user this consolidates to one fetch. It does not: `ncaaf-live-resim-wire`'s refresh-worker tick calls `_fetch_scoreboard` **itself**, on a different service, for its location-keyed index, and my producer would run on live-odds-worker. Removing web's two-per-45s is still the win, but the honest arithmetic is 2 fetches moved off the request path, not 2 collapsed into 1. **The genuine consolidation is that lane's tick reading my persisted record instead of fetching** — they offered to scope it and will not start on a message.
+- **THE SERVING PATH IS NOW VISIBLE, and this was the peer's sharpest catch.** `matched`/`live`/`final` are identical whether the worker produced the state or web fetched it, so "producer running" and "web silently reverted" were indistinguishable. `ncaaf_game_state_index(..., sources=...)` fills `{date: worker|fetch|cache}` and `NCAAF_LIVE_STATE` now carries `source=worker=3,fetch=1`.
+- **THE STALENESS BOUND IS MEASURED, AND IT IS TIGHTER THAN THE WORST GAP ON PURPOSE.** Live-phase inter-run gaps on live-odds-worker (41-min window, 28 gaps): **median 60 s, MAX 321 s**. So 240 s WILL fall back during a stall — correct, because a stalled producer's record really is stale and a dead clock on a live game is worse than the bytes. Do not raise it without a cadence measurement.
+- **`ada53db5`'s COMMIT MESSAGE IS CORRUPTED and the code is not.** Backticks inside a double-quoted `git commit -m` are command-substituted by bash, so `` `sources` ``, `` `source=worker=3,fetch=1` `` and `` `fetch=` `` were executed and replaced with empty strings. Not amended: `main` is shared and active, and a force-push to fix prose is a worse trade than a note. The eaten terms are restored in the bullets above. **Use `-F -` with a heredoc for commit messages in this repo.**
+- Files: `syndicate/features/ncaaf/live_game_state.py`, `scripts/poll_ncaaf_live_state.py`, `tests/test_ncaaf_live_state_worker.py` (NEW).
+- **NOT CLAIMED BY ME, AND I GOT THIS WRONG FIRST: `scripts/refresh_odds_sources.py` is held by `ncaaf-live-cadence`** ("mode-scoped step filter only"). My own scan reported it FREE because it only read single-line `- Files:` entries and that claim sits on a **continuation line of a multi-line Files block**; `check_lane_invariants.py` caught it when my block made it a second holder. **A claim scan that does not model multi-line Files blocks under-reports holders** — the failure direction that lets you edit across a lane.
+- **THE PRODUCER STEP THEREFORE BELONGS TO `ncaaf-live-cadence`, not to me** — that lane is literally NCAAF live cadence and holds BOTH candidate producer sites (`refresh_odds_sources.py` and `run_live_odds_refresh_worker.py`). Requesting one `RefreshStep` from them rather than editing across. **Until it exists this lane's change is INERT BY DESIGN** (`store_then_fetch` falls back to fetching), which is safe but achieves nothing on its own — do not read "landed" as "web stopped fetching".
+- Blocked by: none.
+
+### remaining-red-triage — CLOSED-VERIFIED 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **5 OF 7 FIXED (`907ee8e9`); 2 ARE ANOTHER LANE'S. THE LAST ONE WAS NOT A TEST REPAIR — it was an audit that found a live money defect in `kalshi_client.probability_to_american` (1 of 5; `0.0`/`1.0` raised ZeroDivisionError and percent-scale `50.0` returned +102). FIXED, 1/5 -> 4/5.** `[user: "fix the remaining 8"]`
+- Goal: the failures still red on `origin/main` after `33c64061` either pass or
+  are recorded as a defect with the test left red on purpose.
+- **THE SET IS 7, NOT 8 — RE-DERIVED, NOT SUBTRACTED.** I said 8 from
+  arithmetic (12 - 4 heap-roots). `782a057b` had already fixed
+  `test_ops_execution_ledger_summary` before run 2's list was acted on, so the
+  true remainder is 7. Re-baselining rather than subtracting is the rule that
+  caught it.
+- Files claimed by ME (checked against every OPEN lane, none held):
+  `tests/test_wnba_refresh_runner.py`, `tests/test_nfl_props.py`,
+  `tests/test_odds_control_plane.py`, `tests/test_probability_differential.py`.
+- **NOT MINE — `tests/test_live_refresh_loop.py` (2 failures) is CLAIMED by OPEN
+  lane `suite-order-pollution`** (its `- Files:` line). Its block already states
+  both are pre-existing and unrelated to it, so they are red with an owner who
+  has disclaimed them. Surfacing rather than editing.
+- Hypothesis: same split as last time — some stale against a deliberate change,
+  some reporting a real defect. **No test is edited green without naming the
+  commit that moved the behaviour.** That rule fired 4 times in 18 last round.
+- Verification: each fixed test green standalone AND in its file; mutation-check
+  every changed assertion; CI's `tests.test_archives` still green.
+- **RESULT.** Each fix names the commit that moved the behaviour: `#441` (union
+  of source roots, so an env var pinning ONE root cannot manufacture absence),
+  the newest-mtime odds loader (2026-08-04 incident: 19,798,176 bytes pulled and
+  the board still read the stale shared copy), and `140213ea` (`#345`, the reuse
+  guard now READS its input_hash, so complete-but-unrecorded leftovers fetch).
+- **THE LAST ONE WAS AN AUDIT.** The tripwire had 37 unlisted converter-shaped
+  functions; classified from SIGNATURE/BODY not name — 18 excused, 19 registered.
+  Registering them made the harness probe them and it found: `kalshi_client`
+  1/5 (FIXED, guards `0<p<1` matching the polymarket twin whose docstring had
+  already named the gap; a no-op on the production path), `ncaaf/prop_model`
+  rounding to 4dp (FIXED), and `assess_wnba_accuracy` unimportable via a
+  module-level `os.environ["SC"]` (FIXED, made lazy).
+  `measure_game_market_option_value.implied` was WITHDRAWN as a
+  mis-classification — bounded at |price|>1000 by design, not the general
+  converter.
+- **A HARNESS GAP CLOSED:** `test_failing_set_does_not_grow` compares a SET of
+  names, so kalshi could fall 4/5 -> 1/5 without changing the set and no test
+  would notice. **Membership is not a score** — `test_kalshi_client.py` now pins
+  the refusals and the working range directly.
+- Verified: **242 passed** across touched areas, 35 in NCAAF dependents, CI's
+  `tests.test_archives` **OK (skipped=2)**; **4 of 4 mutations RED** for the
+  right reason, all at RUNTIME so no file was touched. 7 entries added to
+  `KNOWN_FAILING` with exact unmet requirements + written up in
+  `audit_2026-08-15_probability_differential.md`, as that test's message directs.
+- **NOT DONE, and named so it is not mistaken for done:** the five boundary
+  refusals (`''` / `None`) are unfixed; `report_nfl_props_roi:american_to_implied`
+  at 1/5 is the weakest and is ROI reporting, not a money path.
+- Blocked by: none. No deploy.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -250,14 +250,60 @@ live-odds-worker `7f197639cc97`, web `3cb5b4ba6750`. Choke point confirmed:
 2026-08-25 (the title gate missed it; before that a `totals` row had nothing to
 join to and refused `no_live_price`). The mis-fills are three days later.
 
-**THE FIX BOUGHT SAFETY, NOT CAPABILITY — SEGMENT EXECUTION ON KALSHI IS
-0-FOR-EVERYTHING.** No order in the whole 2,853-order population has ever
-carried a `KXMLBF5*` ticker. `first5` is mapped and executable in principle and
-never has been (every first5 order attempted is `totals_alt`/`spreads_alt`,
-which map to no Kalshi board market). `first3` is **inherently unexecutable**:
-no first3 entry in `_SERIES_SEGMENT` and no Kalshi first-3-innings series exists
+**THE FIX BOUGHT SAFETY, NOT CAPABILITY — SEGMENT EXECUTION ON KALSHI WAS
+0-FOR-EVERYTHING.** No order in the whole 2,853-order population had ever
+carried a `KXMLBF5*` ticker. `first3` is **inherently unexecutable**: no first3
+entry in `_SERIES_SEGMENT` and no Kalshi first-3-innings series exists
 (`KXMLBINNINGTOTAL` is per inning). Still unproven, unchanged from above: the
 guard is proven to REFUSE, never yet proven to have CORRECTED a fill.
+
+**`first5` IS NOW WIRED — TWO GAPS IN SERIES, AND EITHER ALONE SHIPS INERT**
+`[verified 2026-09-05, lane mlb-first5-kalshi-execution, commit `d2b060c8` on
+origin/main, NOT DEPLOYED]`.
+
+1. **`sport_for_series("KXMLBF5TOTAL")` returned None.** The series was absent
+   from `SERIES_SPORT` while `KXMLBTOTAL` sat there, hand-registered 2026-08-25
+   when the same title gate missed it. `classify_market` refused at the FIRST
+   gate with `unmapped_series`, so production fetched these markets **every
+   tick and discarded them** — `[kalshi_odds] TITLE KXMLBF5TOTAL :: 'First 5
+   innings: Over 6.5 runs'` was printing while nothing downstream could read it.
+2. **The two sides named the market differently.** `classify_market` yields
+   OddsAPI's REQUEST spelling `totals_1st_5_innings`; the board stores the pair
+   `segment_market_keys('mlb')` maps it onto — `market='totals'` +
+   `segment='first5'`. `_event_key` canonicalised the ROW only, so the index
+   lookup missed **before `_segments_agree` ever ran**. A guard can only refuse
+   a pairing the index produced; it cannot create one.
+
+Fixed symmetrically — `_row_market()`, one helper shared by
+`_event_key`/`_board_key`/`_row_key`, strips the segment suffix so the fused and
+split spellings key identically. **This WIDENS what the index pairs on purpose**
+and `_segments_agree` is what makes that safe.
+
+**MEASURED, and the FIRST measurement read INERT for a reason worth keeping:**
+replaying TODAY's open contracts against PAST board rows matches nothing however
+correct the code is. Aligned to one slate (2026-09-05) — 84 real settled
+`KXMLBF5TOTAL` contracts from the venue × 553 real production
+`/api/board/layer2-shortlist` rows:
+
+| | matched | `unmapped_series` | `segment_mismatch` |
+|---|---|---|---|
+| OFF (unregistered) | **0** | 84 | 0 |
+| ON (`d2b060c8`) | **8** | 0 | 6 |
+
+8 pairings over 3 real games, every one first5×first5, board market `totals`,
+over→yes / under→no. The guard fires 6 times **alongside** the 8 matches.
+283 tests pass across the kalshi/segment surface.
+
+**THE ADDRESSABLE POPULATION IS SMALL AND THAT IS THE HONEST HEADLINE.** Of 44
+`first5` rows on that slate only **14 carry `market='totals'`** — the rest are
+`totals_alt` (16), `spreads_alt` (8), `spreads` (3), `h2h` (2), `h2h_3_way` (1).
+Kalshi totals match the MAIN line only, which is what full-game `KXMLBTOTAL`
+already does, so this changes first5 from *impossible* to *possible on the main
+total*, not to full coverage.
+
+**NOT DEPLOYED, and `KXMLBF5SPREAD` deliberately NOT registered** — a Kalshi
+spread states a MARGIN where the board writes a HANDICAP, the defect that put 11
+orders on the club they were fading. Separate risk class, separate change.
 
 **FOR ANY SEGMENT RE-GRADE WRITE-BACK: EXCLUDE THE 10 VENUE-SETTLED ROWS.** Not
 only because a venue settlement outranks our inference — for the 5 Kalshi rows
