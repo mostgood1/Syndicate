@@ -2413,3 +2413,37 @@ flag being set.**
   staleness threshold widened to make a counter look good is a silent downgrade
   of the model's input**, and the counter it fixes is the one that would have
   reported it.
+
+## 2026-09-06 FORBIDDEN: gating a destructive decision on a record that something COMPLETED, when a reading of whether it is STILL RUNNING exists. Three instances in one evening. `[lane shortlist-prop-row-duplicates, generalised with lane prop-region-knob]`
+
+- **The near-miss.** Before deploying refresh-worker I ran
+  `scripts/check_deploy_safety.py`: `MLB sim: finished (exit=0)`. At the same
+  instant `scripts/deploy_preflight.py` listed `run_mlb_daily_sim_job.py`
+  **pid 5346 plus four children ALIVE**. The first reads the status ARTIFACT,
+  the second reads the PROCESS LIST. Gating on the cheap one would have killed a
+  running sim while printing a clean window — and the deploy would have looked
+  correct afterwards, because the artifact it consulted still said "finished".
+- **It is a CLASS, not one tool's bug.** The same shape bit twice more the same
+  evening, in a peer lane:
+  - `lastRunAt` reports **dispatch**, not execution (Modern Standby once stalled
+    a scheduled call 9h13m behind its own `lastRunAt`);
+  - `finishedAt` says a deploy **landed** while the artifact it should have
+    rebuilt is hours stale.
+- **The rule.** *Prefer the instrument that samples the thing itself over the one
+  that reads a note about it.* A completion record and a liveness reading
+  disagree **exactly when it matters** — at the moment you are deciding whether
+  something is safe to interrupt — because the note is written by the same run
+  whose state you are asking about, and a run that is still going has not
+  written its ending yet.
+- **How to apply.** Before any interrupt-shaped action (deploy, restart, kill,
+  truncate, overwrite), name which of the two you are holding. If it is a
+  record, go find the sampler: a process list, a live env read, a served
+  payload, an artifact mtime. `deploy_preflight.py` is the sampler for deploys
+  and `check_deploy_safety.py` is not — the latter's own docstring says it
+  widened past `sim_run_status`, which is true and still leaves it artifact-fed.
+- **The inverse also holds and is cheaper to get wrong:** a record that
+  something is STILL RUNNING is not evidence it is DOING anything. `jobs=0`
+  across three post-deploy samples of live-odds-worker is recorded in
+  `deploys.md` as an absence WITH its window (~5 min), because a fixture-aware
+  cadence makes idle the designed state and that window cannot separate idle
+  from stalled.
