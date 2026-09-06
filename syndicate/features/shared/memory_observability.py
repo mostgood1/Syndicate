@@ -694,6 +694,21 @@ def get_all_process_memory_snapshot() -> dict[str, Any]:
                 payload["container_memory_unreclaimable_pct_of_max"] = round(
                     100.0 * unreclaimable_bytes / container_memory_max_bytes, 1
                 )
+    # `#632`: the PER-ARENA glibc split, OFF unless explicitly enabled.
+    #
+    # This is attached here rather than behind a route of its own because
+    # `syndicate/blueprints/ops.py` is held by another OPEN lane, and the
+    # existing `/api/ops/memory` already reaches this function. It is gated
+    # because this function is ALSO reached from `log_all_process_memory()`,
+    # which the workers call at stage checkpoints -- see `malloc_arena_detail`
+    # for why unconditional work on that path is the `#241` shape.
+    try:
+        if arena_detail_enabled():
+            detail = malloc_arena_detail()
+            if detail is not None:
+                payload["glibc_arena_detail"] = detail
+    except Exception:  # noqa: BLE001 - telemetry must never raise
+        pass
     return payload
 
 
@@ -2727,26 +2742,10 @@ def malloc_arena_snapshot() -> dict[str, Any] | None:
     `in_use`, i.e. toward the fragmentation verdict. Worth knowing before a
     borderline call is read as decisive.
     """
-    info = _resolve_malloc_info()
-    if info is None:
-        return None
     try:
-        import ctypes
-
-        libc = _MALLOC_INFO_STATE["libc"]
-        buf = ctypes.c_char_p()
-        size = ctypes.c_size_t()
-        stream = libc.open_memstream(ctypes.byref(buf), ctypes.byref(size))
-        if not stream:
+        xml_text = _malloc_info_xml()
+        if xml_text is None:
             return None
-        try:
-            info(0, stream)
-            libc.fflush(ctypes.c_void_p(stream))
-            xml_text = ctypes.string_at(buf, size.value).decode("utf-8", "replace")
-        finally:
-            libc.fclose(ctypes.c_void_p(stream))
-            if buf:
-                libc.free(buf)
         # Pair the arena reading with the cgroup number it must be judged
         # against. Without this the verdict is computed over whatever slice of
         # memory glibc happens to own -- 11% of it, in the first production
@@ -2759,6 +2758,368 @@ def malloc_arena_snapshot() -> dict[str, Any] | None:
     except Exception as exc:
         print(f"[memory_observability] MALLOC_INFO_FAILED {type(exc).__name__}: {exc}",
               flush=True)
+        return None
+
+
+# --- `#632`: the PER-ARENA split -------------------------------------------
+#
+# WHY THIS EXISTS WHEN `parse_malloc_info_xml` ALREADY PARSES THIS XML. That
+# function reads the TOP-LEVEL totals and deliberately discards every
+# per-`<heap>` figure, because summing both levels would double count. The
+# discarded half is exactly the question `#632` now turns on.
+#
+# THE READING THAT FORCED IT, web, 2026-09-06, clean 31-min window, trim OFF,
+# no restart, both workers, under a held deploy claim:
+#
+#     pid 97   mallinfo2 arena +7.2 MB   process anon +42.4 MB
+#     pid 98   mallinfo2 arena +8.3 MB   process anon +26.9 MB
+#
+# ~80% of the growth landed outside what `mallinfo2` reports. `in_use` was
+# 62-82 MB against 536-677 MB of anon and FELL while anon rose, so the program
+# is not retaining more. `GUNICORN_THREADS=4` creates per-thread arenas, glibc
+# mmaps them in 64 MB-aligned heaps, and `#632`'s smaps work had already
+# localised the growth to 8-64 MB anonymous mappings -- the shape of a non-main
+# arena heap.
+#
+# WHAT THIS DOES *NOT* ASSUME, AND THE REPO SHOULD NOT EITHER. I have been
+# saying `mallinfo2` reports the MAIN ARENA ONLY. That is what `man mallinfo2`
+# says under BUGS ("Information is returned for only the main memory allocation
+# area"), but glibc's own `__libc_mallinfo2` walks `ar_ptr->next` around the
+# arena ring, and neither can be run on any dev machine in this repo. Those two
+# readings of the same function disagree, and the whole "80% is invisible"
+# claim rests on which is right.
+#
+# So this instrument DECIDES IT FROM THE DATA instead of inheriting that
+# assumption. `malloc_info` reports heap 0 and a top-level total separately, and
+# `mallinfo2.arena` must match one of them:
+#
+#     matches heap 0 only        -> main-arena-only. The premise holds.
+#     matches the top-level only -> it already summed every arena, so the growth
+#                                   is NOT in any glibc arena at all. The
+#                                   premise is FALSIFIED and the answer is raw
+#                                   `mmap` outside the allocator.
+#     matches both               -> there is only one arena, so the test CANNOT
+#                                   discriminate. Say so; do not pick a side.
+#
+# That third branch is the one worth guarding. With a single arena the two
+# numbers are equal by construction, and a naive check would read "main arena
+# only" off a comparison that had no power to say anything.
+_MALLOC_ARENA_DETAIL_STATE: dict[str, Any] = {"at": 0.0, "reading": None}
+
+
+def _arena_tol_mb(*values: float) -> float:
+    """Tolerance, in MB, for calling two independently-obtained counts equal.
+
+    An absolute floor plus a relative term. The two libc calls are not atomic
+    with respect to each other, so a busy process really can allocate in
+    between; anything inside this is "the same number", anything outside is a
+    finding.
+    """
+    return max(2.0, 0.02 * max([abs(float(v)) for v in values] or [0.0]))
+
+
+def parse_malloc_info_arenas(
+    xml_text: str,
+    *,
+    anon_mb: float | None = None,
+    mallinfo2_arena_mb: float | None = None,
+) -> dict[str, Any] | None:
+    """Split `malloc_info` XML into PER-ARENA figures, with reconciliation.
+
+    Pure and side-effect free for the same reason its sibling is: the libc call
+    cannot be exercised off Linux, so this half is where the tests live, and
+    parsing is what silently returns a plausible wrong number.
+
+    Every derived claim is paired with the residual it came from. A per-heap sum
+    that does not reproduce glibc's own top-level total means the tree was read
+    wrong, and that has to surface as a failed reconciliation rather than as a
+    confident attribution.
+    """
+    try:
+        import xml.etree.ElementTree as ET
+
+        root = ET.fromstring(xml_text)
+    except Exception:
+        return None
+    if root.tag != "malloc":
+        return None
+
+    def _size(node: Any, tag: str, type_: str) -> int | None:
+        for child in node:                     # direct children only
+            if child.tag == tag and child.get("type") == type_:
+                try:
+                    return int(child.get("size") or 0)
+                except (TypeError, ValueError):
+                    return None
+        return None
+
+    def _mb(value: float | int | None) -> float | None:
+        return None if value is None else round(float(value) / 1024 / 1024, 1)
+
+    top_system = _size(root, "system", "current")
+    if top_system is None:
+        return None
+
+    arenas: list[dict[str, Any]] = []
+    degraded = False
+    for heap in root:
+        if heap.tag != "heap":
+            continue
+        system = _size(heap, "system", "current")
+        if system is None:
+            # A heap we cannot size makes the sum wrong, and a wrong sum must
+            # not quietly present as a SMALLER residual, i.e. as better
+            # agreement than we actually have.
+            degraded = True
+            continue
+        fast = _size(heap, "total", "fast") or 0
+        rest = _size(heap, "total", "rest") or 0
+        free_held = fast + rest
+        raw_nr = heap.get("nr")
+        try:
+            nr = int(raw_nr) if raw_nr is not None else None
+        except (TypeError, ValueError):
+            nr = None
+        if nr is None:
+            degraded = True
+        arenas.append({
+            "nr": nr,
+            "system_current_mb": _mb(system),
+            "free_held_mb": _mb(free_held),
+            "in_use_mb": _mb(max(0, system - free_held)),
+            "free_held_pct": (round(100.0 * free_held / system, 1) if system > 0 else None),
+            # Reserved address space vs what is actually charged to the process.
+            # A secondary arena is mmapped in 64 MB-aligned heaps and only
+            # partly committed, so this is where VSZ-vs-RSS goes.
+            "aspace_total_mb": _mb(_size(heap, "aspace", "total")),
+            "_system_bytes": system,
+        })
+
+    per_heap_sum = sum(int(a["_system_bytes"]) for a in arenas)
+    for a in arenas:
+        a.pop("_system_bytes", None)
+
+    residual = top_system - per_heap_sum
+    out: dict[str, Any] = {
+        "arena_count": len(arenas),
+        "arenas": arenas,
+        "top_level_system_current_mb": _mb(top_system),
+        "per_heap_sum_mb": _mb(per_heap_sum),
+        "reconcile_residual_mb": _mb(residual),
+        # THE GUARD ON EVERYTHING BELOW. If the per-heap figures do not add up
+        # to the total glibc itself reports, the tree was misread and no split
+        # computed from it means anything.
+        "reconciles": (not degraded) and abs(residual) <= (
+            _arena_tol_mb(top_system / 1024.0 / 1024.0) * 1024 * 1024),
+        "heap_fields_degraded": degraded,
+    }
+
+    # --- main vs secondary ---------------------------------------------------
+    main = next((a for a in arenas if a.get("nr") == 0), None)
+    if main is None or degraded:
+        # Without a trustworthy `nr` on every heap there is no way to say which
+        # one is the main arena, and guessing "the first" is how a plausible
+        # wrong number gets published.
+        out["main_arena_mb"] = None
+        out["secondary_arena_mb"] = None
+        out["secondary_pct_of_arenas"] = None
+        out["split_available"] = False
+        out["split_unavailable_reason"] = ("no heap nr=0" if main is None
+                                           else "a heap is missing nr or size")
+    else:
+        main_mb = float(main["system_current_mb"] or 0.0)
+        secondary_mb = round(sum(float(a["system_current_mb"] or 0.0)
+                                 for a in arenas if a is not main), 1)
+        total_mb = main_mb + secondary_mb
+        out["main_arena_mb"] = main_mb
+        out["secondary_arena_mb"] = secondary_mb
+        out["secondary_pct_of_arenas"] = (round(100.0 * secondary_mb / total_mb, 1)
+                                          if total_mb > 0 else None)
+        out["split_available"] = True
+
+    # --- what `mallinfo2` is actually measuring -------------------------------
+    # Resolved from the data, never inherited. See the block comment above.
+    if isinstance(mallinfo2_arena_mb, (int, float)) and mallinfo2_arena_mb > 0:
+        mi = float(mallinfo2_arena_mb)
+        top_mb = float(out["top_level_system_current_mb"] or 0.0)
+        main_mb_opt = out.get("main_arena_mb")
+        out["mallinfo2_arena_mb"] = round(mi, 1)
+        out["mallinfo2_vs_top_level_mb"] = round(mi - top_mb, 1)
+        if main_mb_opt is None:
+            out["mallinfo2_scope"] = "undetermined"
+            out["mallinfo2_scope_why"] = "main/secondary split unavailable"
+        else:
+            main_mb = float(main_mb_opt)
+            out["mallinfo2_vs_main_arena_mb"] = round(mi - main_mb, 1)
+            tol = _arena_tol_mb(mi, top_mb, main_mb)
+            d_main = abs(mi - main_mb)
+            d_top = abs(mi - top_mb)
+            if d_main <= tol and d_top <= tol:
+                out["mallinfo2_scope"] = "indistinguishable"
+                out["mallinfo2_scope_why"] = (
+                    "the main arena and the all-arena total are the same number here "
+                    f"({out['arena_count']} arena(s)), so this comparison cannot "
+                    "discriminate -- it is not evidence for either reading")
+            elif d_main <= tol:
+                out["mallinfo2_scope"] = "main_arena_only"
+                out["mallinfo2_scope_why"] = (
+                    "tracks heap nr=0 and not the all-arena total, so the man page's "
+                    "BUGS note holds and mallinfo2 is blind to secondary arenas")
+            elif d_top <= tol:
+                out["mallinfo2_scope"] = "all_arenas"
+                out["mallinfo2_scope_why"] = (
+                    "tracks the all-arena total, so mallinfo2 was NEVER blind: growth "
+                    "it did not see is not in any glibc arena, and the premise that "
+                    "sent this lane looking at secondary arenas is FALSIFIED")
+            else:
+                out["mallinfo2_scope"] = "neither"
+                out["mallinfo2_scope_why"] = (
+                    "matches neither heap nr=0 nor the all-arena total; the two calls "
+                    "are describing different things and neither residual is usable")
+
+    # --- coverage, and the verdict --------------------------------------------
+    coverage_pct = None
+    top_mb_val = float(out["top_level_system_current_mb"] or 0.0)
+    if isinstance(anon_mb, (int, float)) and anon_mb > 0:
+        coverage_pct = round(100.0 * top_mb_val / float(anon_mb), 1)
+        out["arena_coverage_pct"] = coverage_pct
+        # The complement is the part no arena metric can ever speak to.
+        out["non_arena_anon_mb"] = round(float(anon_mb) - top_mb_val, 1)
+
+    if not out["reconciles"]:
+        out["reads_as"] = "reconciliation_failed"
+    elif out["arena_count"] == 0:
+        out["reads_as"] = "no_arenas_reported"
+    elif out["arena_count"] == 1:
+        # Not a weak result: a direct falsification of "the growth is in the
+        # secondary arenas", because there are none.
+        out["reads_as"] = "single_arena"
+    elif coverage_pct is None:
+        out["reads_as"] = "coverage_unknown"
+    elif coverage_pct < 50.0:
+        # Below half, the arenas are not where the memory lives, and no split
+        # computed over them describes the process.
+        out["reads_as"] = "arenas_not_representative"
+    elif out.get("secondary_pct_of_arenas") is None:
+        out["reads_as"] = "split_unavailable"
+    elif float(out["secondary_pct_of_arenas"]) >= 50.0:
+        out["reads_as"] = "secondary_arenas_dominant"
+    else:
+        out["reads_as"] = "main_arena_dominant"
+    return out
+
+
+def _malloc_info_xml() -> str | None:
+    """The raw `malloc_info` XML, or None where glibc is unavailable.
+
+    Extracted so the aggregate reading and the per-arena one cannot drift apart
+    in how they drive libc. `malloc_arena_snapshot()` behaves exactly as before.
+    """
+    info = _resolve_malloc_info()
+    if info is None:
+        return None
+    import ctypes
+
+    libc = _MALLOC_INFO_STATE["libc"]
+    buf = ctypes.c_char_p()
+    size = ctypes.c_size_t()
+    stream = libc.open_memstream(ctypes.byref(buf), ctypes.byref(size))
+    if not stream:
+        return None
+    try:
+        info(0, stream)
+        libc.fflush(ctypes.c_void_p(stream))
+        return ctypes.string_at(buf, size.value).decode("utf-8", "replace")
+    finally:
+        libc.fclose(ctypes.c_void_p(stream))
+        if buf:
+            libc.free(buf)
+
+
+def arena_detail_enabled() -> bool:
+    """Default OFF. See `malloc_arena_detail` for why this is gated at all."""
+    raw = str(os.environ.get("SYNDICATE_MALLOC_ARENA_DETAIL", "") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _arena_detail_interval_s() -> float:
+    try:
+        return max(0.0, float(os.environ.get(
+            "SYNDICATE_MALLOC_ARENA_DETAIL_INTERVAL_SECONDS", "") or 20.0))
+    except (TypeError, ValueError):
+        return 20.0
+
+
+def malloc_arena_detail(*, force: bool = False) -> dict[str, Any] | None:
+    """One PER-ARENA reading, paired with `mallinfo2` and cgroup anon.
+
+    THE PAIRING IS THE POINT, not a convenience. `mallinfo2.arena` is only
+    interpretable once we know which of `malloc_info`'s two totals it tracks,
+    and that is decided by comparing all three AT THE SAME INSTANT. Fetching
+    them in separate polls would let real allocation between the reads look
+    like a scope difference.
+
+    WHY THIS IS GATED AND THROTTLED (`#241`: worker periodic work is never
+    free). `get_all_process_memory_snapshot()` is reached not only from the
+    on-demand `/api/ops/memory` but from `log_all_process_memory()`, which the
+    workers call at STAGE CHECKPOINTS. An unconditional libc call there is
+    periodic work by another name, and `#241` took a service down that way. So:
+    default OFF, at most one real call per interval when on, and the call's own
+    `duration_ms` is reported so the cost is MEASURED rather than assumed.
+
+    `force=True` bypasses the throttle but not the platform check -- for a
+    caller that has decided it wants a fresh reading now.
+    """
+    now = time.time()
+    if not force:
+        interval = _arena_detail_interval_s()
+        cached = _MALLOC_ARENA_DETAIL_STATE.get("reading")
+        if cached is not None and (now - float(_MALLOC_ARENA_DETAIL_STATE["at"])) < interval:
+            out = dict(cached)
+            out["cached"] = True
+            # Stamped so a poller cannot mistake a held reading for a fresh one.
+            out["age_s"] = round(now - float(_MALLOC_ARENA_DETAIL_STATE["at"]), 1)
+            return out
+    try:
+        started = time.time()
+        xml_text = _malloc_info_xml()
+        if xml_text is None:
+            return None
+        duration_ms = round((time.time() - started) * 1000.0, 2)
+
+        anon_mb = None
+        stat = _read_container_memory_stat()
+        if stat and isinstance(stat.get("anon"), int):
+            anon_mb = stat["anon"] / 1024 / 1024
+
+        mallinfo2_arena_mb = None
+        try:
+            mi = glibc_mallinfo2()
+            if isinstance(mi, dict) and mi.get("available"):
+                raw = mi.get("arena_mb")
+                if isinstance(raw, (int, float)):
+                    mallinfo2_arena_mb = float(raw)
+        except Exception:
+            # An unavailable cross-check degrades the reading to
+            # `mallinfo2_scope` absent -- it must never lose the arena split.
+            mallinfo2_arena_mb = None
+
+        parsed = parse_malloc_info_arenas(
+            xml_text, anon_mb=anon_mb, mallinfo2_arena_mb=mallinfo2_arena_mb)
+        if parsed is None:
+            return None
+        parsed["pid"] = os.getpid()
+        parsed["process_anon_mb"] = round(anon_mb, 1) if anon_mb is not None else None
+        parsed["duration_ms"] = duration_ms
+        parsed["xml_bytes"] = len(xml_text)
+        parsed["cached"] = False
+        parsed["age_s"] = 0.0
+        _MALLOC_ARENA_DETAIL_STATE["at"] = now
+        _MALLOC_ARENA_DETAIL_STATE["reading"] = parsed
+        return dict(parsed)
+    except Exception as exc:
+        print(f"[memory_observability] MALLOC_ARENA_DETAIL_FAILED "
+              f"{type(exc).__name__}: {exc}", flush=True)
         return None
 
 
@@ -3888,7 +4249,12 @@ class _Mallinfo2(ctypes.Structure):
 
 
 _MALLINFO2_STATE: dict[str, Any] = {"resolved": False, "fn": None, "why": None}
-_MALLOC_TRIM_STATE: dict[str, Any] = {"resolved": False, "fn": None, "why": None}
+# NOTE: `_MALLOC_TRIM_STATE` and `_resolve_malloc_trim` are NOT redefined here.
+# They belong to `#285` above (~line 2397). This block once redeclared both,
+# which shadowed them -- Python keeps the LAST binding -- and silently took out
+# `#285`'s `MALLOC_TRIM_INIT` production-proof line and its CDLL-lifetime fix
+# (daed5d92). The duplicate looked harmless because `malloc_trim` still bound
+# and still trimmed; what was lost was the evidence that it had.
 
 
 def _resolve_mallinfo2() -> Any:
@@ -3972,22 +4338,6 @@ def glibc_mallinfo2() -> dict[str, Any]:
     }
 
 
-def _resolve_malloc_trim() -> Any:
-    if _MALLOC_TRIM_STATE["resolved"]:
-        return _MALLOC_TRIM_STATE["fn"]
-    _MALLOC_TRIM_STATE["resolved"] = True
-    try:
-        libc = ctypes.CDLL(None)
-        fn = libc.malloc_trim
-    except Exception as exc:
-        _MALLOC_TRIM_STATE["why"] = f"{type(exc).__name__}: {exc}"
-        return None
-    fn.restype = ctypes.c_int
-    fn.argtypes = [ctypes.c_size_t]
-    _MALLOC_TRIM_STATE["fn"] = fn
-    return fn
-
-
 def malloc_trim_now(pad_bytes: int = 0) -> dict[str, Any]:
     """Call `malloc_trim` and MEASURE it. `#632`.
 
@@ -4012,8 +4362,12 @@ def malloc_trim_now(pad_bytes: int = 0) -> dict[str, Any]:
     """
     fn = _resolve_malloc_trim()
     if fn is None:
+        # `#285`'s state names this `unavailable_reason`; the duplicate that used
+        # to live here called it `why`, so reading `why` returned None and the
+        # caller was told "not found in libc" whatever the real reason was.
         return {"available": False,
-                "why": _MALLOC_TRIM_STATE.get("why") or "malloc_trim not found in libc"}
+                "why": (_MALLOC_TRIM_STATE.get("unavailable_reason")
+                        or "malloc_trim not found in libc")}
 
     before = glibc_mallinfo2()
     anon_before = _process_anon_mb()
