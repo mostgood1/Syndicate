@@ -2075,43 +2075,50 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   when RENDER is set even under strict mode.
 - Blocked by: none.
 
-### kalshi-alt-line-join — OPEN — opened 2026-09-06 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
-- Goal: a Kalshi main-line contract can match an `_alt` board row describing the
-  SAME bet, so `KXMLBF5SPREAD` becomes executable. Single testable outcome:
-  60 real settled `KXMLBF5SPREAD` x 553 production shortlist rows goes
-  `matched` 0 -> >0, with the orientation guard STILL firing and full-game
-  match counts UNCHANGED.
-- Files: `syndicate/features/shared/market_segments.py`,
+### kalshi-alt-line-join — **CLOSED 2026-09-06** — a main-line contract may pair with an `_alt` row; `KXMLBF5SPREAD` goes 0 -> 3 on real data. Landed `21aac548`, NOT DEPLOYED — opened 2026-09-06 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
+- **Verification RAN and all six checks passed** (60 real settled
+  `KXMLBF5SPREAD` + 84 `KXMLBF5TOTAL` contracts x 553 production shortlist rows,
+  2026-09-05):
+
+  | check | result |
+  |---|---|
+  | (1) reachability, `off != on` | `KXMLBF5SPREAD` matched **0 -> 3** |
+  | (2) orientation guard still fires | **4 -> 9** refusals (more, not fewer) |
+  | (3) `_segments_agree` intact | full-game vs first5 refuses by NAMED reason |
+  | (4) tie-break order-independent | asserted in BOTH insertion orders |
+  | (5) full-game unchanged | **0** full-segment rows dropped; totals 8 -> 8 |
+  | (6) suite | **303 pass**, 20 new |
+
+- No capture, no OddsAPI credits, no `render.yaml`. The rows already existed;
+  the join refused them on a suffix.
+- **THE SCOPE'S ACCOUNT OF THE HAZARD WAS WRONG AND READING THE CODE CAUGHT IT.**
+  The scope said a collision means "whichever row the index happens to keep".
+  `by_key`/`by_event` hold LISTS and the join iterates every candidate, so one
+  contract would have produced TWO match records — two stakeable rows, one
+  ticker, **double exposure**. Fixed at index build in
+  `_collapse_duplicate_bets`, keyed on `_row_key` (already the bet identity),
+  tie-broken on the better American price with `alt_main_collisions` reported
+  even when zero.
+- **A CHECK CAUGHT ME MID-BUILD, and the bound it forced is the important part.**
+  The first version deduped EVERY `_row_key` collision and thereby dropped **10
+  full-game PLAYER PROP rows** — `batter_rbis` x4, `batter_total_bases` x3,
+  `batter_hits_runs_rbis` x2, `batter_hits` — a pre-existing condition in this
+  venue's largest surface by order count, on the back of a change scoped to
+  alternate LINES. Verification (5) is what surfaced it. The dedupe is now
+  bounded to rows whose RAW market names DIFFER, i.e. only the collision this
+  change creates.
+- **SIDE FINDING, OWED TO SOMEONE ELSE AND NOT FIXED HERE:** 10 of 553 MLB
+  shortlist rows are exact `_row_key` duplicates of another row — same event,
+  market, player, line, side, segment — all full-game player props. Before
+  anything is changed, someone must establish whether two rows for one prop are
+  two BOOKS (keep both, price-shop) or a duplication defect (fix upstream).
+  That is not answerable from the join.
+- **STILL OWED, unchanged by this lane:** the `verify: OWED` on `1f032074` — a
+  production reading that a `first5` row acquires a `KXMLBF5*` ticker. A
+  scheduled check runs 2026-09-06 18:00 CDT.
+- Files: released — `syndicate/features/shared/market_segments.py`,
   `syndicate/features/shared/kalshi_board_join.py`,
-  `tests/test_kalshi_alt_line_join.py` (NEW).
-- Scope doc: `.syndicate/scope_2026-09-06_f5_spread_board_row.md` (`69122217`).
-- Hypothesis: the gap is VOCABULARY, not data. 6 of 8 first5 `spreads_alt` rows
-  already sit at Kalshi's only two F5 spread strikes (|1.5|, |2.5|) and 11 of 16
-  first5 `totals_alt` rows sit on a Kalshi total strike; the join refuses them
-  because `_row_market` collapses the SEGMENT suffix but not the ALTERNATE one.
-  `totals_alt` at (event, 4.5, over, first5) is the SAME WAGER as `totals` at
-  the same key — the suffix names the FEED, not the bet — unlike segment (a
-  different portion of the game) and spread sign (the opposite club), which stay
-  guarded.
-- **CORRECTION TO THE SCOPE DOC, found while reading before coding.** The scope
-  says a collision means "whichever row the index happens to keep". **Wrong.**
-  `by_event`/`by_key` hold LISTS and the join iterates every candidate
-  (`for candidate in by_event.get(...)`, `for row in rows`), so a main+alt
-  collision produces **TWO match records for ONE contract** — two board rows,
-  both stakeable, both resolving to the same ticker. That is a DOUBLE-EXPOSURE
-  risk, not an arbitrary-pick risk, and it means the dedupe must happen at INDEX
-  BUILD, not by choosing between matches afterwards.
-- Falsification test: if full-game `KXMLBTOTAL`/`KXMLBSPREAD` match counts MOVE
-  on a replayed slate, the collapse is reaching further than the measurement
-  said (full-game carried 0 `_alt` rows) and the change is wrong.
-- Verification (all six from the scope): (1) `off != on` on the real spread
-  data; (2) orientation guard still fires — it counts 4 today, and 0 refusals
-  alongside new matches FAILS the change; (3) `_segments_agree` still refuses a
-  full-game contract against a first5 row, asserted by NAMED reason; (4) the
-  collision tie-break tested in BOTH insertion orders, same winner; (5)
-  full-game match counts unchanged; (6) the 283-test kalshi/segment surface
-  stays green.
-- Blocked by: none. NO DEPLOY in this lane.
+  `tests/test_kalshi_alt_line_join.py`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
