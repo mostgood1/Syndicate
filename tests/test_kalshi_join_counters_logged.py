@@ -83,6 +83,66 @@ def test_a_real_collision_is_visible_in_the_line(capsys, _game_lines_on):
     assert "alt_main_collisions=1" in line, line
 
 
+def test_collapsed_bet_keys_is_the_collapse_denominator(capsys, _game_lines_on):
+    """The recomputed denominator must equal what the collapse actually keyed.
+
+    `collapsed_bet_keys` is computed at the PRINT SITE rather than returned by
+    `join_kalshi_to_board`, because that module is claimed by another lane and a
+    third concurrent edit to it is what produced a line printing
+    `alt_main_collisions` twice. The cost of computing it elsewhere is that it
+    could drift from the collapse it describes, so this pins the identity:
+
+        len(collapsed rows) == collapsed_bet_keys + rows `_row_key` cannot key
+
+    If `_row_key` or `_collapse_duplicate_bets` changes shape, this fails rather
+    than the log quietly reporting a denominator for a different population.
+    """
+    from syndicate.features.shared.kalshi_board_join import (
+        _collapse_duplicate_bets,
+        _row_key,
+    )
+
+    rows = [
+        _board_row(market="totals", quote={"best_any_book": {"price": -120}}),
+        _board_row(market="totals_alt", quote={"best_any_book": {"price": -110}}),
+        _board_row(side="under"),
+        _board_row(segment="first3"),
+        {"sport": "mlb", "market": "totals", "line": None, "side": "over"},  # unkeyable
+    ]
+    collapsed, collisions = _collapse_duplicate_bets(rows)
+    keys = len({k for k in (_row_key(r) for r in rows) if k is not None})
+    unkeyable = sum(1 for r in rows if _row_key(r) is None)
+
+    assert len(collapsed) == keys + unkeyable
+    assert collisions == len(rows) - len(collapsed)
+
+    line = _emitted(capsys, [], rows)
+    assert f"collapsed_bet_keys={keys}" in line, line
+    assert f"alt_main_collisions={collisions}" in line, line
+
+
+def test_the_denominator_is_not_the_row_count(capsys, _game_lines_on):
+    """The whole point: these are different numbers on a board with duplicates.
+
+    And `board_rows` must be the INPUT count. `join_kalshi_to_board` rebinds its
+    own `board_rows` to the post-collapse list before reporting `len(...)`, so
+    reading the field off the report silently redefines it the moment a
+    duplicate exists. That is not hypothetical: production logged `board_rows`
+    1100 here and 1102 on the sibling emitter on 2026-09-06, a gap that is
+    exactly `alt_main_collisions`, and it was first written up as the board
+    changing between two prints 24 seconds apart.
+    """
+    rows = [
+        _board_row(market="totals", quote={"best_any_book": {"price": -120}}),
+        _board_row(market="totals_alt", quote={"best_any_book": {"price": -110}}),
+        _board_row(side="under"),
+    ]
+    line = _emitted(capsys, [], rows)
+    assert "board_rows=3" in line, line          # input, not survivors
+    assert "collapsed_bet_keys=2" in line, line  # distinct bets
+    assert "alt_main_collisions=1" in line, line # and the pair that collapsed
+
+
 def test_no_field_is_emitted_twice(capsys, _game_lines_on):
     """One name, one value, once. This test exists because it happened.
 
@@ -139,7 +199,17 @@ _EMITTERS = {
     "portfolio_commit": ("pipeline/portfolio_commit.py", '"[portfolio_commit] KALSHI_BOARD_JOIN'),
 }
 
-_REQUIRED = ("segment_matched_series", "segment_refused_series", "alt_main_collisions")
+_REQUIRED = (
+    "segment_matched_series",
+    "segment_refused_series",
+    "alt_main_collisions",
+    # The DENOMINATOR travels with the counter or the counter is unreadable.
+    # `bd658209`'s reading had to be filed saying `2 / 1100 board_rows` is not
+    # comparable to the replay's `~1 per 78 keys` -- two denominators counting
+    # different things. A collision count printed without this is a number
+    # nobody can turn into a rate.
+    "collapsed_bet_keys",
+)
 
 
 def _emitter_fields(path: str, anchor: str) -> list[str]:

@@ -1450,13 +1450,45 @@ def join_to_board(
     reported before this one was OddsAPI's view of Kalshi -- game lines only,
     1.2-3.8% of the board. This is the first that is about Kalshi.
     """
-    from syndicate.features.shared.kalshi_board_join import join_kalshi_to_board
+    from syndicate.features.shared.kalshi_board_join import _row_key, join_kalshi_to_board
 
     report = join_kalshi_to_board(markets, rows, selected_date=selected_date)
+    # THE DENOMINATOR FOR `alt_main_collisions`, AND IT IS NOT `board_rows`.
+    #
+    # The collision counter says how many rows described a bet another row had
+    # already described. Its rate is per COLLAPSED KEY, not per row -- and the
+    # first production reading (`bd658209`, 2026-09-06) had to be recorded with
+    # the caveat that `2 / 1100 board_rows` is NOT comparable to the replay's
+    # `~1 per 78 keys`, because the two denominators count different things.
+    # This closes that gap: `collisions / collapsed_bet_keys` is now one ratio.
+    #
+    # Computed HERE rather than returned by the join because
+    # `kalshi_board_join.py` is claimed by another lane, and a third concurrent
+    # edit to that file is exactly what produced a log line printing
+    # `alt_main_collisions` twice. `_row_key` IS the bet identity the collapse
+    # keys on, so this recomputes the same number rather than approximating it --
+    # pinned by `test_collapsed_bet_keys_is_the_collapse_denominator`, which
+    # asserts the identity `len(collapsed) == keys + rows _row_key cannot key`.
+    collapsed_bet_keys = len({k for k in (_row_key(r) for r in rows) if k is not None})
     print(
         "[kalshi_odds] BOARD_JOIN"
         f" kalshi_markets={report.get('kalshi_markets')}"
-        f" board_rows={report.get('board_rows')}"
+        # `len(rows)`, NOT `report['board_rows']`, AND THE DIFFERENCE IS A FIELD
+        # I BROKE. `join_kalshi_to_board` reassigns its `board_rows` name to the
+        # output of `_collapse_duplicate_bets` before reporting `len(...)` of
+        # it, so the moment the collapse shipped this field silently stopped
+        # meaning "rows handed to the join" and started meaning "rows left after
+        # deduplication" -- a changed meaning under an unchanged name, on a
+        # field other tools already read.
+        #
+        # It showed up as a discrepancy I then MIS-EXPLAINED in `deploys.md`:
+        # the 2026-09-06 20:10 tick logged `board_rows=1100` here and `1102` on
+        # the `portfolio_commit` emitter (which takes its own `len`), and I
+        # recorded that as the board moving between the two prints. It was not.
+        # `1102 - alt_main_collisions(2) = 1100` exactly. Restoring the input
+        # count makes the two emitters mean the same thing again, and the
+        # post-collapse population is `collapsed_bet_keys` below.
+        f" board_rows={len(rows)}"
         f" matched={report.get('matched')}"
         # WHICH SERIES A SEGMENT ROW ACTUALLY MET, both directions. Kalshi lists
         # `KXMLBF5TOTAL-...-5` ("First 5 innings: Over 4.5") and
@@ -1483,6 +1515,12 @@ def join_to_board(
         # Replay measured ~1 per 78 collapsed keys -- a ZERO here is worth a
         # second look, not a celebration.
         f" alt_main_collisions={report.get('alt_main_collisions')}"
+        # ...and the denominator BESIDE it, so the rate is legible without a
+        # second lookup. `collisions / collapsed_bet_keys` is the ratio the
+        # replay put at ~1/78; `collisions / board_rows` is a different and
+        # smaller number, and quoting one against the other is the mistake this
+        # field exists to stop.
+        f" collapsed_bet_keys={collapsed_bet_keys}"
         # Named refusals: "Kalshi has nothing we bet" and "our join is broken"
         # must never share a number. That confusion is #505.
         #

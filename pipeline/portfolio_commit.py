@@ -656,6 +656,7 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
     price and a contract id from coming out of two different pairings.
     """
     from syndicate.features.shared.kalshi_board_join import (
+        _row_key as _kalshi_row_key,
         join_kalshi_to_board,
         kalshi_price_resolver,
         kalshi_ticker_resolver,
@@ -672,6 +673,16 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
 
     joined = join_kalshi_to_board(
         markets, board_rows, selected_date=str(selected_date or "")
+    )
+    # THE DENOMINATOR FOR `alt_main_collisions`, AND IT IS NOT `board_rows`.
+    # See the twin in `kalshi_odds_refresh.join_to_board` for the full argument:
+    # the collision rate is per COLLAPSED KEY, and the first production reading
+    # of that counter had to be filed with a caveat because `2 / 1100 rows` and
+    # the replay's `~1 per 78 keys` are not the same ratio. `_row_key` is the
+    # bet identity the collapse keys on, so this is the same number, not an
+    # approximation of it.
+    _collapsed_bet_keys = len(
+        {k for k in (_kalshi_row_key(r) for r in board_rows) if k is not None}
     )
     matches = joined.get("matches") or []
     # `reasons`, NOT `refusals`. This line read `joined.get('refusals')` and
@@ -723,6 +734,11 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
         # celebration. It shipped RETURNED BUT PRINTED NOWHERE (`21aac548`, live
         # in `58302f07`), so the rate this tie-break decides was unmeasurable.
         f" alt_main_collisions={joined.get('alt_main_collisions')}"
+        # ...and its denominator beside it. `collisions / collapsed_bet_keys` is
+        # one ratio; `collisions / board_rows` is a different, smaller one, and
+        # quoting either against the replay's ~1/78 without saying which is the
+        # mistake this field exists to prevent.
+        f" collapsed_bet_keys={_collapsed_bet_keys}"
         # Named refusals last: `reasons` is a dict repr and anything after it is
         # harder to read and to parse. The odds-side emitter learned this the
         # expensive way -- two sessions appended to it within minutes and the
