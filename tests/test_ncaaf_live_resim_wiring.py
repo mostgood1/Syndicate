@@ -708,6 +708,91 @@ def test_the_tick_is_on_by_default_and_off_only_when_told(tmp_path, monkeypatch)
     assert rw._ncaaf_live_resim_enabled() is True
 
 
+# ---------------------------------------------------------------------------
+# PUBLISH LATENCY. Measured 2026-09-06 on WSU @ WASH: tick gaps median 235 s
+# against a 180 s gate, while the published probability sat unchanged for 5
+# samples as the game ran ~8 plays and a possession change. The gate was the
+# floor (min gap 185 s), and the tick costs a median 4.5 s -- 2.5% of its own
+# interval. These pin the fix AND its cost limiter.
+# ---------------------------------------------------------------------------
+
+def _status(live, elapsed):
+    return {"last": {"coverage": {"live_resimmed": live}, "elapsed_seconds": elapsed}}
+
+
+def test_the_interval_shortens_ONLY_while_a_game_is_live(monkeypatch):
+    """off != on. A quiet slate keeps 180 s; a live one gets 75 s.
+
+    The asymmetry is the point: with nothing in play the tick publishes refusals
+    and nothing else, so a faster cadence buys latency nobody can observe and
+    costs CPU on a box that OOMs.
+    """
+    monkeypatch.delenv("SYNDICATE_NCAAF_LIVE_RESIM_INTERVAL_SECONDS", raising=False)
+    assert rw._ncaaf_live_resim_interval_seconds(_status(0, 4.5)) == 180.0
+    assert rw._ncaaf_live_resim_interval_seconds(_status(1, 4.5)) == 75.0
+
+
+def test_the_cadence_BACKS_OFF_as_the_tick_gets_more_expensive(monkeypatch):
+    """`#241` restarted production by adding periodic work to this service, so
+    the floor is derived FROM the measured cost rather than being a constant.
+
+    `max(75, 6*elapsed)` holds the tick under ~1/6 of wall time whatever the
+    slate does -- 1 game (4.5 s) -> 75 s, 7 games (21.7 s, measured) -> 130 s, a
+    budget-capped 90 s tick -> 540 s. A cadence that cannot outrun its own cost
+    cannot be the thing that pins the box.
+    """
+    monkeypatch.delenv("SYNDICATE_NCAAF_LIVE_RESIM_INTERVAL_SECONDS", raising=False)
+    assert rw._ncaaf_live_resim_interval_seconds(_status(7, 21.7)) == pytest.approx(130.2)
+    assert rw._ncaaf_live_resim_interval_seconds(_status(30, 90.0)) == 540.0
+    # monotone in cost -- a more expensive tick is never scheduled sooner
+    seq = [rw._ncaaf_live_resim_interval_seconds(_status(5, e)) for e in (1, 5, 20, 60)]
+    assert seq == sorted(seq)
+
+
+def test_an_explicit_env_interval_is_NOT_second_guessed(monkeypatch):
+    """An operator turning this down during an incident must not have it
+    silently widened by the duty-cycle floor."""
+    monkeypatch.setenv("SYNDICATE_NCAAF_LIVE_RESIM_INTERVAL_SECONDS", "60")
+    assert rw._ncaaf_live_resim_interval_seconds(_status(30, 90.0)) == 60.0
+
+
+def test_a_missing_or_unreadable_status_keeps_the_OLD_cadence(monkeypatch):
+    """Unknown must not resolve to the aggressive branch."""
+    monkeypatch.delenv("SYNDICATE_NCAAF_LIVE_RESIM_INTERVAL_SECONDS", raising=False)
+    assert rw._ncaaf_live_resim_interval_seconds(None) == 180.0
+    assert rw._ncaaf_live_resim_interval_seconds({}) == 180.0
+    assert rw._ncaaf_live_resim_interval_seconds({"last": {}}) == 180.0
+
+
+def test_the_staleness_bound_tightens_only_while_a_game_is_live(monkeypatch):
+    """The SECOND latency term. End-to-end lag is `state age + publish interval`,
+    so shortening the tick alone would republish stale state faster.
+
+    Live -> 120 s, which deliberately gives back part of the fetch saving. That
+    trade is the right way round: the saving exists to avoid a redundant fetch on
+    a QUIET slate, not to price a live game off four-minute-old state (mean age
+    at a random read was 251 s, measured).
+    """
+    monkeypatch.delenv("SYNDICATE_NCAAF_LIVE_STATE_MAX_AGE_SECONDS", raising=False)
+    monkeypatch.setattr(rw, "_ncaaf_live_games_in_play", lambda: True)
+    assert rw._ncaaf_live_state_record_max_age_seconds() == 120.0
+    monkeypatch.setattr(rw, "_ncaaf_live_games_in_play", lambda: False)
+    assert rw._ncaaf_live_state_record_max_age_seconds() == 400.0
+
+
+def test_an_unreadable_status_leaves_the_LOOSE_bound(monkeypatch):
+    """`unknown must not default permissive` cuts the other way here: the risky
+    direction is tightening into extra ESPN fetches on a path nobody is
+    watching, so an unreadable status keeps today's 400 s behaviour."""
+    monkeypatch.delenv("SYNDICATE_NCAAF_LIVE_STATE_MAX_AGE_SECONDS", raising=False)
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.read_json_file",
+        lambda _p: (_ for _ in ()).throw(RuntimeError("store down")),
+    )
+    assert rw._ncaaf_live_games_in_play() is False
+    assert rw._ncaaf_live_state_record_max_age_seconds() == 400.0
+
+
 def test_the_interval_floor_cannot_be_configured_below_one_minute(monkeypatch):
     monkeypatch.setenv("SYNDICATE_NCAAF_LIVE_RESIM_INTERVAL_SECONDS", "1")
     assert rw._ncaaf_live_resim_interval_seconds() == 60.0

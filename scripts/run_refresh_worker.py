@@ -1701,12 +1701,64 @@ def _ncaaf_live_resim_enabled() -> bool:
     return raw not in {"off", "0", "false", "no"}
 
 
-def _ncaaf_live_resim_interval_seconds() -> float:
+# PUBLISH LATENCY IS THE BINDING CONSTRAINT ON A LIVE PROBABILITY, and it was
+# measured before it was changed `[2026-09-06, WSU @ WASH, 15 intervals]`:
+#
+#     tick gaps  median 235 s   min 185 s   max 478 s   against a 180 s gate
+#     tick cost  median 4.5 s   max 7.2 s   (one live game; ~3 s per game)
+#
+# `min 185 s` sitting on the gate is what identifies the gate as the FLOOR --
+# the worker's loop does come round promptly, and this function was holding the
+# tick back. Meanwhile the published probability went 5 SAMPLES without changing
+# while the game ran ~8 plays, a possession change and three first downs: one
+# snapshot at 20:53:40Z, the next at 20:58:39Z, 299 s apart. A number that knows
+# the score but is five minutes behind it is only partly the fix for the defect
+# this lane exists to solve.
+#
+# SO THE INTERVAL IS NOW STATE-DEPENDENT, and short exactly when it matters.
+# Nothing is live -> the tick publishes refusals and nothing else, so its cadence
+# buys nothing and stays at 180 s. A game IS live -> 75 s.
+#
+# AND IT IS SELF-LIMITING ON MEASURED COST, which is the half that makes it safe
+# to shorten at all. `#241` restarted production in a loop by adding periodic
+# work to this service, so the floor is not a constant: it is
+# `max(75, 6 x last_elapsed)`, which holds this tick under ~1/6 of wall time
+# whatever the slate does. One live game (4.5 s) -> 75 s. Seven (21.7 s,
+# measured 2026-09-05) -> 130 s. A budget-capped 90 s tick -> 540 s, i.e. it
+# backs OFF on a big Saturday instead of pinning the box. The cadence cannot
+# outrun the cost because it is derived from it.
+_NCAAF_LIVE_RESIM_LIVE_INTERVAL_SECONDS = 75.0
+_NCAAF_LIVE_RESIM_DUTY_DIVISOR = 6.0
+
+
+def _ncaaf_live_resim_interval_seconds(last_status: Mapping[str, Any] | None = None) -> float:
+    """Seconds between ticks. Shorter while a game is in play, cost-limited.
+
+    An explicit env value still WINS and is not second-guessed -- an operator
+    turning this down in an incident must not have it silently widened by the
+    duty-cycle floor.
+    """
     raw = str(os.environ.get("SYNDICATE_NCAAF_LIVE_RESIM_INTERVAL_SECONDS") or "").strip()
     try:
         return max(60.0, float(raw))
     except (TypeError, ValueError):
+        pass
+
+    status = last_status if isinstance(last_status, Mapping) else {}
+    last = status.get("last") if isinstance(status.get("last"), Mapping) else {}
+    coverage = last.get("coverage") if isinstance(last.get("coverage"), Mapping) else {}
+    try:
+        live = int(coverage.get("live_resimmed") or 0)
+    except (TypeError, ValueError):
+        live = 0
+    if live <= 0:
+        # Nothing in play: this tick emits refusals only. Cadence buys nothing.
         return _NCAAF_LIVE_RESIM_INTERVAL_DEFAULT_SECONDS
+    try:
+        elapsed = float(last.get("elapsed_seconds") or 0.0)
+    except (TypeError, ValueError):
+        elapsed = 0.0
+    return max(_NCAAF_LIVE_RESIM_LIVE_INTERVAL_SECONDS, elapsed * _NCAAF_LIVE_RESIM_DUTY_DIVISOR)
 
 
 def _ncaaf_live_resim_status_path() -> Path:
@@ -1908,8 +1960,53 @@ def _ncaaf_live_state_record_max_age_seconds() -> float:
     try:
         value = float(raw)
     except (TypeError, ValueError):
-        return _NCAAF_RECORD_MAX_AGE_DEFAULT_SECONDS
-    return value if value > 0 else _NCAAF_RECORD_MAX_AGE_DEFAULT_SECONDS
+        value = 0.0
+    if value > 0:
+        return value
+    # THE SECOND LATENCY TERM, and it is bounded here rather than by the
+    # producer. End-to-end lag is `state age + publish interval`; shortening the
+    # tick alone would just republish stale state faster. The live-state record
+    # is written every ~514 s (median, n=27, measured 2026-09-06), and mean age
+    # at a random read was 251 s -- four minutes of a game in which possession,
+    # down and field position all move.
+    #
+    # So while a game is IN PLAY this refuses anything older than 120 s and
+    # fetches ESPN instead. That deliberately GIVES BACK part of the fetch
+    # saving this reader was built for, and the trade is the right way round: the
+    # saving exists to avoid a redundant fetch on a quiet slate, not to price a
+    # live game off four-minute-old state. Off a live slate the 400 s bound
+    # stands and the saving is kept in full.
+    if _ncaaf_live_games_in_play():
+        return _NCAAF_RECORD_MAX_AGE_LIVE_SECONDS
+    return _NCAAF_RECORD_MAX_AGE_DEFAULT_SECONDS
+
+
+_NCAAF_RECORD_MAX_AGE_LIVE_SECONDS = 120.0
+
+
+def _ncaaf_live_games_in_play() -> bool:
+    """Was a game in play on the LAST tick? Cheap, and deliberately backward-looking.
+
+    Read off this producer's own status file rather than by asking ESPN, because
+    the staleness bound is consulted while BUILDING the index -- calling out to
+    decide whether to call out is circular, and would add a fetch to the quiet
+    path this reader exists to keep quiet.
+
+    Being one tick behind is the correct error: it means the FIRST tick after
+    kickoff still uses the 400 s bound, and every tick after it uses 120 s. The
+    opposite mistake -- tightening a tick late after the game ends -- costs only
+    a redundant fetch.
+    """
+    try:
+        status = _refresh_state_store()["read_json_file"](_ncaaf_live_resim_status_path()) or {}
+        last = status.get("last") if isinstance(status.get("last"), Mapping) else {}
+        coverage = last.get("coverage") if isinstance(last.get("coverage"), Mapping) else {}
+        return int(coverage.get("live_resimmed") or 0) > 0
+    except Exception:
+        # Unknown must not default permissive: an unreadable status means the
+        # LOOSE bound, which keeps today's behaviour rather than silently
+        # tightening into extra fetches on a path nobody is watching.
+        return False
 
 
 def _ncaaf_live_state_rows_from_record(
@@ -2122,7 +2219,7 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
         last_run_epoch = float(last_status.get("lastRunEpoch"))
     except (TypeError, ValueError):
         last_run_epoch = 0.0
-    if now - last_run_epoch < _ncaaf_live_resim_interval_seconds():
+    if now - last_run_epoch < _ncaaf_live_resim_interval_seconds(last_status):
         return None
 
     season = date.today().year
