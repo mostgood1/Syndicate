@@ -1172,3 +1172,33 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   savings — those are the numbers that produced the retracted claim.
 * **Current production state: flag `SYNDICATE_MALLOC_TRIM_AUTO=0`, code live and
   inert** (`4f62d937`). Nothing is degraded; pressure ~55%.
+
+### `[web-oom-leak]` UPDATE 23 — **THE PROGRAM'S LIVE DATA IS NOT GROWING. `in_use` is flat-to-FALLING while anon climbs.**, 2026-09-06T20:2xZ `[session b2b5b45b]`
+
+* **Clean 31-minute window, both workers, trim OFF, no restart, under a HELD
+  deploy claim** (three earlier windows had been killed by peer deploys):
+
+        pid 97  n=32  arena +7.2   IN USE -10.3 (62.4..81.8)   free +17.6   anon +42.4
+        pid 98  n=44  arena +8.3   IN USE  -2.9 (67.7..73.3)   free +11.2   anon +26.9
+
+* **THE HEADLINE, robust across every reading taken today: `in_use` sits at
+  62-82 MB while process anon is 536-677 MB. Live program data is UNDER 12% of
+  the process's memory, and over this window it FELL while anon rose.** Whatever
+  the other 88% is, the program is not using it.
+* **The growth is NOT in the main arena.** Anon rose `+42.4`/`+26.9 MB` while the
+  main arena moved `+7.2`/`+8.3` — so ~80% of it landed where `mallinfo2` cannot
+  look. That call reports the MAIN ARENA ONLY, and web runs
+  `GUNICORN_THREADS=4`, so per-thread SECONDARY arenas exist and are created via
+  `mmap`.
+* **The lane's own test could not fire** and said so: with the main arena flat
+  there was nothing to attribute, so the formal verdict is *NOT a result*. The
+  hypothesis was about main-arena fragmentation and this window shows the main
+  arena is not where the action is.
+* **Two earlier hand-read segments (17% and 5% of arena growth becoming live
+  data) describe the BOOT PHASE**, when the main arena fills to ~330-390 MB with
+  ~80% free. They are not contradicted; they are a different phase. Steady state
+  plateaus the main arena and pushes growth to the secondary ones.
+* **NEXT, and it is a specific instrument:** `malloc_info`'s per-arena XML is the
+  only thing that can see secondary arenas. `#435` dismissed it at 13.9%
+  coverage, but that was measuring a different question — coverage of TOTAL anon,
+  not the per-arena split. It should be re-read with this question in hand.

@@ -209,7 +209,7 @@ death, never life — do not invert it.
   marker then named a lane with no block anywhere — the same violation a peer
   caught me on earlier the same day. Commit ledger edits BEFORE syncing.
 
-### web-oom-fragmentation — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-fragmentation — CLOSED 2026-09-06 — opened 2026-09-06 — **THE LANE'S TEST COULD NOT FIRE, AND THAT IS ITSELF THE FINDING.** Clean 31-min window on both workers, trim OFF, no restart, under a HELD claim: the main arena moved only `+7.2`/`+8.3 MB` while anon rose `+42.4`/`+26.9` — so ~80% of the growth is in arenas `mallinfo2` CANNOT SEE (it reports the main arena only; `GUNICORN_THREADS=4` means per-thread secondary arenas exist). With the main arena flat there was nothing to attribute, so the formal verdict is NOT a result. **What IS established, and it is robust across every reading today: `in_use` sits at 62-82 MB against 536-677 MB of process anon — live program data is under 12% of the process, and it FELL over this window while anon rose.** The program is not retaining more. Earlier hand-read segments (17%, 5%) describe the BOOT phase, when the main arena fills to ~330-390 MB with ~80% free. NEXT: `malloc_info` per-arena XML, re-read for the per-arena split rather than for total coverage. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: test whether `#632`'s growth is glibc ARENA FRAGMENTATION rather than
   allocation volume — with the trim OFF, so nothing I did is in the measurement.
 - Files: scratchpad only (a poller against `/api/ops/glibc-malloc`). No code
@@ -236,6 +236,15 @@ death, never life — do not invert it.
   means finding an owner. Fragmentation means the allocation SIZE MIX
   (`M_MMAP_THRESHOLD`, arena count, a different allocator) — and no amount of
   hunting for a Python object would ever have found it.
+- **LEDGER NOTE, two defects in this lane's own bookkeeping.** (1) The OPEN block
+  was **never committed** while the lane was open — it existed only in this
+  session's worktree, so `origin/main` carried no record of the lane at any point
+  it was running. (2) It sat **ABOVE the `## OPEN` heading**, which is the `#466`
+  violation: `check_lane_invariants.py` reported `web-oom-fragmentation` **zero
+  times**, and I read that null as "my lane is not implicated in the contested
+  files" when it actually meant **the checker could not see the lane at all**.
+  The blast radius was nil only because this lane claimed no files. The block
+  below is re-added at close, from the staged blob, after taking upstream's file.
 - Blocked by: none.
 
 ## OPEN
