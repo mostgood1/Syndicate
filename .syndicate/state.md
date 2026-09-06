@@ -1083,3 +1083,24 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   returned by freeing, grows with request traffic, lives in large anon regions.
 * **NEXT: measure `malloc_trim()` before/after.** Not called yet — it mutates
   allocator state and takes the malloc lock across arenas.
+
+### `[web-oom-leak]` UPDATE 19 — **`malloc_trim` returns ~50 MB/worker in ~14 ms; the first intervention that gives memory back**, 2026-09-06T16:1xZ `[session b2b5b45b]`
+
+* **Measured on both live workers after a 12-min settle, POST once each:**
+  pid 97 `354.2 -> 296.1 MB` (**-58.1**) in `14.2 ms`; pid 98 `339.8 -> 292.6`
+  (**-47.3**) in `4.1 ms`. glibc returned `1` on every call and `in_use` did not
+  move, so the drop is attributable to the trim.
+* **~105 MB across the container**, for ~14 ms of malloc-lock hold.
+* **IT DOES NOT RECOVER THE FULL ~200 MB.** pid 97 held `144.3 MB` free and gave
+  back `30.0`. The remainder is FRAGMENTED — free chunks interleaved with live
+  ones, so whole pages cannot be released. **Trim recovers the releasable
+  fraction, not the free total.**
+* **The anon drop EXCEEDS the main-arena drop** (`-58.1` vs `-31.3`), which
+  corroborates the `mallinfo2` coverage caveat: that call sees the MAIN ARENA
+  only, `malloc_trim` iterates ALL arenas, so ~27 MB came from per-thread arenas
+  the measurement cannot see. The two instruments disagree exactly as their
+  documented scopes predict.
+* **Repeat calls return ~0** (`-0.4`, `-0.2`, `+0.0 MB`, sub-ms) — trim is
+  idempotent until free space re-accumulates.
+* **STILL NOT A FIX.** This is a manual call. Automating it needs a cadence, a
+  trigger, and a cost measurement under concurrent load rather than under a probe.

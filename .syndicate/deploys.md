@@ -24193,3 +24193,47 @@ traffic, and that lives in large anonymous regions.
 **`malloc_trim` NOT CALLED in this lane, by its own stated scope.** It mutates
 allocator state and takes the malloc lock across arenas; it gets its own lane and
 its own before/after measurement.
+
+
+---
+
+## 2026-09-06T15:56:40Z — web — `c909c8ef` — **`malloc_trim` RETURNS ~50 MB PER WORKER IN ~14 ms. The first `#632` intervention that gives memory BACK.**
+
+`[lane web-oom-malloc-trim, session b2b5b45b]` CLEAR preflight pinned to target;
+8 new tests, 58 across the memory set.
+
+verify: **one POST per worker after a 12-minute settle, every guard satisfied.**
+
+    pid 97   anon 354.2 -> 296.1  = -58.1 MB   14.2 ms   returned=1   in_use -1.3 STABLE
+    pid 98   anon 339.8 -> 292.6  = -47.3 MB    4.1 ms   returned=1   in_use +0.0 STABLE
+
+**~105 MB returned to the OS across the two workers, for ~14 ms of malloc-lock
+hold on the worse one.** glibc's own return value was `1` (released) on every
+call, and `in_use` did not move — so the drop is the trim's, not concurrent work.
+
+**THE SETTLE WAS LOAD-BEARING.** 12 minutes, longer than usual, because a fresh
+worker has not accumulated the free space trim returns. An early call would have
+reported a small saving and read as "trim does not help" — the boot confound
+producing a FALSE NEGATIVE, which is easy to accept because a disappointing
+result feels like an honest one.
+
+**IT DOES NOT RECLAIM THE FULL ~200 MB, and that is the important limit.**
+pid 97 held `144.3 MB` free in the main arena and gave back `30.0` of it. **The
+rest is FRAGMENTED** — free chunks interleaved with live ones, so whole pages
+cannot be released. Trim recovers the releasable fraction, not the free total.
+
+**THE ANON DROP EXCEEDS THE MAIN-ARENA DROP, which corroborates the earlier
+coverage caveat.** pid 97: anon `-58.1` against arena `-31.3`. `mallinfo2` reports
+the MAIN ARENA ONLY, while `malloc_trim` iterates ALL arenas — so ~27 MB came
+from per-thread secondary arenas that the measurement cannot see but the trim
+can. Two instruments disagreeing in exactly the direction their documented scopes
+predict.
+
+**REPEAT CALLS RETURN ~0** (`-0.4`, `-0.2`, `+0.0` MB, sub-millisecond). Trim is
+idempotent until more free space accumulates, so a periodic call would recover
+only what has built up since the last one — which is what makes a schedule
+plausible rather than wasteful.
+
+**THIS IS A MANUAL CALL, NOT A FIX.** Making it automatic is a separate decision:
+it needs a cadence, a trigger condition, and an answer to what a 14 ms lock hold
+costs under concurrent load rather than under my probe. `#632` remains open.

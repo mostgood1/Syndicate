@@ -200,7 +200,7 @@ death, never life — do not invert it.
   it mutates allocator state and is a separate decision with its own measurement.
 - Blocked by: none.
 
-### web-oom-malloc-trim — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-malloc-trim — CLOSED 2026-09-06 — opened 2026-09-06 — **MEASURED: `malloc_trim` returns ~50 MB per worker in ~14 ms.** pid 97 `-58.1 MB` in `14.2 ms`, pid 98 `-47.3 MB` in `4.1 ms`, ~105 MB across the container; glibc returned `1` and `in_use` held still on both, so the drop is attributable. **It does NOT recover the full ~200 MB** — pid 97 held `144.3 MB` free and returned `30.0`; the rest is fragmented among live chunks. The anon drop EXCEEDING the arena drop (`-58.1` vs `-31.3`) corroborates the `mallinfo2` main-arena-only caveat: trim iterates all arenas, the measurement sees one. Repeat calls return ~0, so trim is idempotent until free space rebuilds. The 12-minute settle was load-bearing — an early call would have produced a FALSE NEGATIVE. **A manual call, not a fix:** automating it needs a cadence, a trigger and a cost measurement under real concurrency. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: measure what `malloc_trim()` actually returns on a live web worker, and
   what it COSTS, before anyone proposes calling it automatically.
 - Files: `syndicate/features/shared/memory_observability.py`,
