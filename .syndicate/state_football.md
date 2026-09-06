@@ -1642,14 +1642,32 @@ with `fetch_dates 0`**, 2 fell back and both said `record_stale` by name.
 `live_index: 3` was **identical in both modes**, which is the "one index, two
 sources" guarantee confirmed on real data rather than fixtures.
 
-**THE FALLBACK IS THE GATE WORKING, AND IT EXPOSED A CADENCE NOBODY HAS
-MEASURED.** The 400 s bound (not web's 240 s: this tick runs at 180 s, so 240
-tolerates zero missed cycles) refuses state it considers old and degrades to a
-correct fetch rather than a stale probability. But the producer's lane reported
-a live-phase median of **60 s** while web logged
-`NCAAF_LIVE_STATE_RECORD_STALE date=2026-09-06 age_seconds=484` — **484 s cannot
-come from a 60 s cadence**, so that step's real write interval is slower than
-the phase it rides. NOT papered over by raising the bound.
+**THE CADENCE IS NOW MEASURED, AND IT IS 7.8x SLOWER THAN REPORTED**
+`[2026-09-06 14:52:58-15:39:06Z, 400 web log samples, lane ncaaf-live-resim-wire]`.
+Write timestamps RECONSTRUCTED per date as `log_time - age_seconds` from
+`NCAAF_LIVE_STATE_FROM_WORKER`, not inferred from the sawtooth: **27 intervals,
+median 514 s, mean 469 s, range 319-672 s.** All five dates move in lockstep
+(gaps identical +/-1 s), so one pass writes every date -- the step rides a FULL
+live-phase pass, which takes minutes, not the 60 s scheduling median its lane
+reported.
+
+**IT PREDICTS THE FALLBACK RATE, WHICH IS WHAT MAKES IT A FINDING RATHER THAN A
+COINCIDENCE.** Expected share of samples finding the record older than a bound
+is `E[max(0, gap-bound)] / E[gap]`: at my **400 s** that is **20.6%**, and the
+tick independently observed **25.0%** (2 of 8). Two instruments, different data,
+agreeing.
+
+    bound  240s (web's)  -> 48.8% expected fallback
+    bound  400s (mine)   -> 20.6%
+    bound  700s          ->  0.0%
+
+**THE CONSEQUENCE IS FOR LIVE GAMES, AND IT IS THE OPPOSITE OF REASSURING.**
+Mean record age at a random sample is **251 s**. Re-simulating from a score,
+clock and possession four minutes old is not a live probability -- a game can
+score twice in that window. So the right move is NOT to raise the bound to 700 s
+to make the fallback vanish; that would buy a fetch saving by pricing on stale
+state, which is the one substitution this whole lane exists to refuse. **The
+cadence is the thing to fix, and it belongs to the producer's step.**
 
 **UNEXERCISED, AND IT IS THE HALF THAT MATTERS:** the record path has never run
 while a game is IN PROGRESS. Today's slate was 3 games, `live_resimmed 0`. So
