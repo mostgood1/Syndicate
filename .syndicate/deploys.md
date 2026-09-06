@@ -25184,3 +25184,64 @@ Not settled: a same-tick `collisions / collapsed_bet_keys` on a slate that
 actually contains `_alt` rows. Take it during afternoon MLB, when segment rows
 are on the board — they arrive near game time and drain as games finish, which
 is documented in the `1f032074` entry above.
+
+## 2026-09-06 21:5xZ — **THE OWED RATIO, MEASURED — and it exposes a SECOND denominator mismatch, one level up from the one `collapsed_bet_keys` was added to fix.** `[lane kalshi-join-counters-logged, reading only — NO DEPLOY]`
+
+Discharges the item left owed by the `30500f16` entry above: a
+`alt_main_collisions / collapsed_bet_keys` ratio taken on a slate that actually
+carries `_alt` rows. Segment rows returned to the board on the evening slate
+(37 `first5`, 8 `first3`, 9 `first1`, **45 `_alt` rows** at 21:48Z), so the
+window reopened the same day.
+
+**Measured by running the REAL `_collapse_duplicate_bets` over the REAL served
+board** (`/api/board/layer2-shortlist?date=2026-09-06`, unfiltered, 21:55Z):
+
+    all sports (715 rows: ncaaf 281, mlb 363, soccer 70, nfl 1)
+        collapsed_bet_keys 712   collisions 3   =  0.421%   ~1 per 237
+    mlb only (363 rows)
+        collapsed_bet_keys 360   collisions 3   =  0.833%   ~1 per 120
+
+**ALL THREE COLLISIONS ARE MLB SEGMENT ROWS**, each a `totals`/`totals_alt`
+pair: `first1 0.5 over`, `first1 0.5 under`, `first5 4.5 under`. That is the
+third independent confirmation that the main/alt collision is a SEGMENT
+phenomenon — full-game rows contribute none.
+
+### THE SECOND DENOMINATOR MISMATCH, and it is the one to carry forward
+
+`collapsed_bet_keys` was added because `2 / 1100 board_rows` was being compared
+to a replay's `~1 per 78 collapsed keys`. Both denominators are now printed
+— but **the printed one is ALL SPORTS**, because the join is called with the
+whole `layer2_shortlist["rows"]`, while the `~1 per 78` replay figure was
+computed over **553 MLB-only** rows.
+
+    comparable to the replay   : 0.833%  (mlb-only, 3/360)   vs replay 1.28% (1/78)
+    what the LOG will print    : 0.421%  (all sports, 3/712)
+
+Same order of magnitude on the comparable pair. **Quoting the logged 0.42%
+against the replay's 1.28% would understate by ~3x for a reason that has nothing
+to do with the collapse.** The log's number is correct for what it counts; it is
+simply a different population.
+
+This also explains the `451 vs 363` gap I first read as a discrepancy: the
+production tick's `board_rows=451` is an ALL-SPORTS count, and I had been
+fetching the shortlist with `?sport=mlb`.
+
+### WHAT IS NOT ESTABLISHED
+
+- **No production tick has yet logged a non-zero `alt_main_collisions` since
+  `30500f16`.** Ticks at 21:53:13Z / 21:53:34Z read `0 / 451`, while the board
+  fetched two minutes later carried 3 colliding pairs over 715 rows. The tick's
+  input and the served shortlist are different snapshots and **I have not
+  established why they differ** — 451 against 715 is not explained by the
+  sport filter alone.
+- So the ratio above is measured **on production DATA with production CODE**,
+  but it is not yet a reading of the production COUNTER. Those are different
+  substrates and the distinction is the point of this ledger.
+
+### The number to use
+
+Until a tick logs non-zero, the defensible statement is: **the main/alt collision
+rate on a live evening slate is ~0.4% of all-sport collapsed keys and ~0.8% of
+MLB collapsed keys, entirely attributable to segment `totals`/`totals_alt`
+pairs.** The tie-break is therefore deciding roughly one bet in 120 MLB keys, not
+one in 78 — and never on a full-game row.
