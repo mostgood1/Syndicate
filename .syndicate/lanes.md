@@ -2181,10 +2181,13 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - **IT IS A RATE OVER A MOVING SLATE, NOT A FIXED COUNT.** 25 collisions at
   artifact `14:44:08Z`, 21 at `15:04:08Z`, 10 when `kalshi-alt-line-join` measured
   it on 09-05. Quote whichever `written_at` the number came from.
-- Files: **NONE CLAIMED.** This lane is a read-only trace and changed no code. The
-  fix sites are held by other OPEN lanes — `layer2_board.py` by `layer2-sim-disagrees`
-  (session 3492626c) — so whoever takes the repair must coordinate rather than
-  inherit this lane's claim.
+- Files: **CLAIMED 2026-09-06, user asked for the repair** —
+  `syndicate/features/shared/book_grid.py`, `pipeline/layer2_shortlist.py`,
+  `tests/test_book_grid_player_name_folding.py` (NEW).
+  NOT claimed and deliberately untouched: `syndicate/features/shared/layer2_board.py`
+  (held by `layer2-sim-disagrees`, session 3492626c) and
+  `syndicate/features/shared/odds_book_quotes.py` — see the fix note below for
+  why `_KEY_FIELDS` must NOT be normalised.
 - Falsification test that WAS run and did not fire: if the board deliberately kept
   one row per venue, kalshi-only rows would appear for ascii-named players too.
   0 of 1,826. And `kalshi_plus_books=600` shows the merge is the intended path.
