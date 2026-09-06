@@ -1846,6 +1846,23 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   correction header now leads with all of the above.
 - Blocked by: none. Nothing owed from this lane.
 
+
+### suite-leak-generator — CLOSED-FALSIFIED 2026-09-06 — opened 2026-09-06 — session b9bc926d-f167-4923-9344-eac7e86a5761 — **THE HYPOTHESIS WAS WRONG AND THIS LANE'S OWN FALSIFICATION CONDITION FIRED.** Measured over a full `-n auto` suite: **8 leak records across ~15,600 tests, 5 files, no dominant fixture, and ZERO env-var leaks.** Leaked threads are `syndicate-background-loop-bootstrap` x2, `syndicate-intelligence-state-loop` x2, `memory-watchdog` x2, `syndicate-venue-poll` x1, subprocess pipe readers x2 — mostly IDLE loops, not the CPU burners that poison `process_time`. **I RETRACT my own earlier claim that this suite "leaks CPU-burning daemon threads by fixture design"** — extrapolated from finding a few by hand; the rate does not support it. The ambient-root problem I expected to dominate is ABSENT at teardown: the existing isolation fixtures work. **NO cross-cutting change was made, because there is no generator to cut off.**
+- Goal (met, negatively): decide by MEASUREMENT whether the recurring scale-dependent failures share a fixable common source. They do not.
+- Files: none — the instrument (`leakdetect.py`) was deliberately never committed to `tests/`.
+- **INSTRUMENT NOTE, because it nearly produced a false finding.** v1 hooked `pytest_runtest_setup`/`teardown`, which snapshots INSIDE those phases — so conftest's autouse `_isolate_reports_root` read as leaking `SYNDICATE_REPORTS_ROOT` from **all 1,312 tests observed**, i.e. a detector indicting the fixture that protects you. Rewritten as a `pytest_runtest_protocol` hookwrapper (brackets setup + call + teardown) and validated BOTH WAYS against a canary — one clean test, one leaking — before any conclusion was drawn. The first canary was itself wrong (`target=lambda: None` finishes before teardown, so its thread was never leaked).
+- Verification: 8 records, listed above, from a full instrumented run (1 failed / 15,602 passed / 41m50s).
+- Blocked by: none.
+
+### ncaaf-live-state-fresh-record — OPEN — opened 2026-09-06 — session b9bc926d-f167-4923-9344-eac7e86a5761
+- Goal: the three `test_ncaaf_live_state_worker` failures stop recurring at full-suite scale. They pass alone, were "fixed" once by `34bcecc8`, and came back in the next full run.
+- Files: `tests/test_ncaaf_live_state_worker.py`.
+  Collision check: named by no OPEN lane's `- Files:` block — `ncaaf-live-state-to-worker` closed after `34bcecc8`.
+- **CAUSE FOUND AND REPRODUCED DETERMINISTICALLY.** `FRESH_RECORD["fetched_at"] = time.time()` was evaluated ONCE AT MODULE IMPORT. `live_game_state` refuses a worker record older than `_worker_record_max_age_seconds()` = **240 s** for a date still moving (`live_game_state.py:342`) — correctly. A full suite runs 18-42 min and under `--dist=loadscope` a worker imports the module long before reaching these tests, so the "fresh" record aged past the gate. The THREE that failed are exactly the three using the constant unmodified; the two that override `fetched_at` on purpose never failed. Sixth instance of this session's family.
+- **A FALSE REPRODUCTION CAME FIRST.** Ageing `tests.test_ncaaf_live_state_worker` changed nothing (23 passed) because `tests/` is NOT a package — pytest imports it as top-level `test_ncaaf_live_state_worker`, so I mutated a different module object. Against the real one: exactly those 3 fail, 20 pass.
+- Verification (done): `fresh_record()` factory stamps at CALL time. IMMUNE BY CONSTRUCTION — the ageing plugin now reports "no import-time timestamp left to age", 23 passed. AND the gate is still exercised: mutating `_worker_record_max_age_seconds` to 1e9 turns FOUR staleness tests red, so immunity was not bought by weakening the file.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

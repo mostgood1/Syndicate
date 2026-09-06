@@ -22,9 +22,32 @@ import pytest
 from syndicate.features.ncaaf import live_game_state as lgs
 
 
-FRESH_RECORD = {
+def fresh_record() -> dict:
+    """`FRESH_RECORD` with a timestamp taken NOW, not at import.
+
+    IT USED TO BE A MODULE-LEVEL DICT with `"fetched_at": time.time()`, which is
+    evaluated ONCE when the module is imported. `live_game_state` refuses a
+    worker record older than `_worker_record_max_age_seconds()` (240 s) for a
+    date that is still moving (`live_game_state.py:342`) -- correctly. A full
+    suite runs 18-42 minutes and, under `--dist=loadscope`, a worker imports
+    this module long before it reaches these tests, so the "fresh" record was
+    routinely older than four minutes by the time it was used and the code fell
+    back to fetching exactly as designed.
+
+    MEASURED 2026-09-06: the three tests that used the constant unmodified were
+    red in a full run, green alone, and red again after being fixed once
+    (`34bcecc8`). Ageing the record 300 s reproduces precisely those three and
+    nothing else.
+
+    The two tests that OVERRIDE `fetched_at` on purpose -- the stale case and
+    the missing-stamp case -- never failed, which is the tell: they were the
+    only ones not depending on how long the suite had been running.
+    """
+    return {**_RECORD_SHAPE, "fetched_at": time.time()}
+
+
+_RECORD_SHAPE = {
     "date": "2026-09-06",
-    "fetched_at": time.time(),
     "count": 2,
     "games": [
         {
@@ -79,7 +102,7 @@ def _patch(monkeypatch, *, record: Any, fetch_rows: list[dict] | None = None) ->
 def test_a_fresh_worker_record_is_used_and_NO_espn_fetch_happens(monkeypatch):
     """REACHABILITY FIRST. If this fails the change is inert and every test
     below is passing for the wrong reason."""
-    calls = _patch(monkeypatch, record=FRESH_RECORD)
+    calls = _patch(monkeypatch, record=fresh_record())
 
     index = lgs.ncaaf_game_state_index(["2026-09-06"])
 
@@ -104,7 +127,7 @@ def test_a_missing_record_falls_back_to_fetching(monkeypatch):
 
 def test_a_stale_record_falls_back_rather_than_pinning_dead_scores(monkeypatch):
     """A stale record is worse than a fetch: it renders confidently wrong."""
-    stale = {**FRESH_RECORD, "fetched_at": time.time() - 10_000}
+    stale = {**fresh_record(), "fetched_at": time.time() - 10_000}
     calls = _patch(monkeypatch, record=stale,
                    fetch_rows=[{"away_id": "1", "home_id": "2", "in_progress": True}])
 
@@ -116,7 +139,7 @@ def test_a_stale_record_falls_back_rather_than_pinning_dead_scores(monkeypatch):
 
 def test_a_record_with_no_timestamp_cannot_be_aged_so_is_refused(monkeypatch):
     """Written by a producer predating `fetched_at`. Unageable == untrustable."""
-    no_stamp = {k: v for k, v in FRESH_RECORD.items() if k != "fetched_at"}
+    no_stamp = {k: v for k, v in fresh_record().items() if k != "fetched_at"}
     calls = _patch(monkeypatch, record=no_stamp, fetch_rows=[])
 
     lgs.ncaaf_game_state_index(["2026-09-06"])
@@ -212,7 +235,7 @@ def test_sources_out_param_names_the_path_that_served(monkeypatch):
     went back to fetching", which is the regression this change exists to
     prevent and would otherwise be invisible.
     """
-    calls = _patch(monkeypatch, record=FRESH_RECORD)
+    calls = _patch(monkeypatch, record=fresh_record())
     sources: dict[str, str] = {}
     lgs.ncaaf_game_state_index(["2026-09-06"], sources=sources)
     assert sources == {"2026-09-06": "worker"}
@@ -230,7 +253,7 @@ def test_sources_out_param_names_the_path_that_served(monkeypatch):
 
 def test_sources_is_optional_so_existing_callers_are_unaffected(monkeypatch):
     """The signature change must not break any caller that does not care."""
-    _patch(monkeypatch, record=FRESH_RECORD)
+    _patch(monkeypatch, record=fresh_record())
     index = lgs.ncaaf_game_state_index(["2026-09-06"])
     assert "153@2628" in index
 
