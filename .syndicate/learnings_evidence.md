@@ -25560,3 +25560,38 @@ it reads negative.**
   tests passed the entire time**, because a fixture commits everything it writes
   and clones nothing. Regression tests were added for both afterwards.
 - **Cost:** none realised; caught before the first real sync.
+
+## 2026-09-06 "We committed to it" is not "we patched it"
+
+- **What we believed:** that the 53 UNCLASSIFIED vendored files could be triaged
+  from Syndicate's own history -- one commit touching the path means we never
+  edited it (stale, adopt upstream), more than one means we patched it (keep).
+  That test returned 53 "ours", 0 stale.
+- **Why that was not good enough:** several of the extra commits are bulk
+  `daily update 2026-05-30 (pre-source publish)` entries covering many vendored
+  files at once. A commit like that is plausibly a vendor RE-PULL, in which case
+  the local content came from upstream and the current difference is staleness --
+  indistinguishable in `git log` from a deliberate fix. The heuristic would have
+  said "ours" either way, which means it was not measuring what it claimed.
+- **The test that actually decides it:** enumerate every blob hash that path has
+  ever had upstream and ask whether our local hash is among them. Present -> we
+  are sitting on an older upstream revision and adopting loses nothing. Absent ->
+  the content never existed upstream, so it is ours. Both tests agreed here (53
+  ours, 0 stale), but only the second one could have disagreed.
+- **How to run it cheaply:** `git log --format= --raw --no-abbrev <branch> --
+  <path>` prints `:100644 100644 <old> <new> M\tpath`, reading the hashes out of
+  the tree diff. The obvious alternative, `cat-file --batch-check` on
+  `<rev>:<path>`, dereferences the BLOB -- which on a blobless clone is a promisor
+  fetch per revision. Measured: over ten minutes and killed, versus 4 seconds for
+  all 53.
+- **Corroboration the hash test cannot give:** two diffs read by hand, each
+  carrying the fix named in its own commit subject -- a hand-copied NBA tricode
+  set replaced in WNBA's injury scraper, and a QNN execution provider gated on
+  availability in NBA's `games_npu.py`.
+- **And a trap on the way:** the first of those diffs showed the ENTIRE file as
+  changed. CRLF vs LF -- the vendored file is CRLF on this checkout, the upstream
+  blob is LF-normalised. The sync script avoids this by comparing blob hashes;
+  running `diff` by hand reintroduced it instantly.
+- **Cost:** none realised. Had the weak test been trusted alone and any of the 53
+  actually been stale, that fix would have been written off as a deliberate local
+  patch and never received again.

@@ -24,8 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 866 rules `[generated]`
-## Index — 867 rules `[generated]`
+## Index — 870 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2871,4 +2870,24 @@ still not count.
   local edit invisible to a tool whose entire purpose was to not overwrite local
   edits. **Both were found by RUNNING the thing against real data; the fixture
   tests passed throughout.**
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-06 "WE COMMITTED TO IT" IS NOT "WE PATCHED IT". TO TELL A LOCAL PATCH FROM A STALE COPY, ASK WHETHER YOUR CONTENT EVER EXISTED UPSTREAM
+
+- **The rule going forward.** Deciding whether a vendored file that differs from
+  upstream is OURS or merely OLD cannot be done from `git log`: a bulk
+  `daily update ... (pre-source publish)` commit touches the file exactly the way
+  a deliberate fix does, and if that commit was itself a vendor re-pull then the
+  content came FROM upstream and the difference is pure staleness. The test that
+  actually decides it is a CONTENT one -- **does our blob hash appear anywhere in
+  that path's upstream history?** Found, and we are simply behind; absent, and the
+  content never existed upstream, so it is ours. Run over 53 files it returned
+  **53 ours, 0 stale**, and it is cheap: `git log --format= --raw --no-abbrev
+  <branch> -- <path>` reads blob hashes straight out of the tree diff. Do NOT use
+  `cat-file --batch-check` on `<rev>:<path>` for this -- on a blobless clone that
+  is a promisor fetch per revision, and the same probe went from over ten minutes
+  (killed) to 4 seconds. Corollary from the same hour: **a hand-run `diff` between
+  a vendored file and its upstream blob reports the whole file as changed** on a
+  CRLF checkout, because the blob is LF-normalised -- the exact artefact the tool
+  avoids by comparing hashes, reintroduced the moment the check went manual.
 - *(evidence in `learnings_evidence.md`)*

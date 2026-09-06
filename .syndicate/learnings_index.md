@@ -1,7 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 866 rules `[generated]`
-## Index — 867 rules `[generated]`
+## Index — 870 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -345,7 +344,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 538**
+**Rules and corrections — 540**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -434,6 +433,7 @@
 - [2026-09-06 A CHECKER'S COVERAGE CLAIM IS ONLY AS GOOD AS THE FILES IT COULD PARSE. COUN…](#2026-09-06-a-checkers-coverage-claim-is-only-as-good-as-the-files-it-could-parse-count-what-it-skipped-not-only-what-it-found)
 - [2026-09-06 A SHADOWED MODULE-LEVEL BINDING IS ONLY DEAD IF NOTHING READ IT *AND* NO DEC…](#2026-09-06-a-shadowed-module-level-binding-is-only-dead-if-nothing-read-it-and-no-decorator-captured-the-object-defined-twice-is-not-the-first-one-is-dead)
 - [2026-09-06 A PARTIAL CLONE THAT CHECKS OUT A WORKING TREE IS NOT A PARTIAL CLONE. `--fi…](#2026-09-06-a-partial-clone-that-checks-out-a-working-tree-is-not-a-partial-clone---filterblobnone-without---no-checkout-fetches-every-blob-anyway-one-request-at-a-time)
+- [2026-09-06 "WE COMMITTED TO IT" IS NOT "WE PATCHED IT". TO TELL A LOCAL PATCH FROM A ST…](#2026-09-06-we-committed-to-it-is-not-we-patched-it-to-tell-a-local-patch-from-a-stale-copy-ask-whether-your-content-ever-existed-upstream)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
@@ -878,6 +878,7 @@
 - [2026-09-06 A checker's coverage claim is only as good as the files it could parse](learnings_evidence.md#2026-09-06-a-checkers-coverage-claim-is-only-as-good-as-the-files-it-could-parse) `[evidence]`
 - [2026-09-06 "Defined twice" is not "the first one is dead"](learnings_evidence.md#2026-09-06-defined-twice-is-not-the-first-one-is-dead) `[evidence]`
 - [2026-09-06 A partial clone that checks out a working tree is not a partial clone](learnings_evidence.md#2026-09-06-a-partial-clone-that-checks-out-a-working-tree-is-not-a-partial-clone) `[evidence]`
+- [2026-09-06 "We committed to it" is not "we patched it"](learnings_evidence.md#2026-09-06-we-committed-to-it-is-not-we-patched-it) `[evidence]`
 - [2026-08-12 — Do not batch changes during a diagnosis](learnings_archive.md#2026-08-12-do-not-batch-changes-during-a-diagnosis) `[evidence]`
 - [2026-08-12 — A rate ceiling is not a fix](learnings_archive.md#2026-08-12-a-rate-ceiling-is-not-a-fix) `[evidence]`
 - [2026-08-12 — Parallel sessions on one problem need lane discipline](learnings_archive.md#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline) `[evidence]`

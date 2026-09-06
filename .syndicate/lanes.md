@@ -1897,6 +1897,53 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   were already in sync. The 4 nhl/nba/wnba entries among them are THIS SESSION's
   own deletions and will resolve themselves when the upstream PRs merge.
 
+### vendor-unclassified-triage — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`80660ee6`. UNCLASSIFIED 53 → 0. All 53 are OURS; 0 stale.** Two independent tests agree: Syndicate has committed to every one since vendoring, and — the decisive one — **our local blob hash appears NOWHERE in that path's upstream history**, so the content never existed upstream and adopting upstream would have discarded real work. New `--keep-local` / `--keep-all-unclassified` record the decision (baseline := upstream's CURRENT hash, content untouched). **`git diff -- vendor/` shows ONLY `upstream_sync.json`, +53/-0 — no vendored source touched.** Lifecycle proven on the real nhl tree: `LOCAL_PATCH` now, and once upstream moves on one of them **`CONFLICT`, file untouched, exit 1** — which is what makes writing 53 files off as local patches safe. 24 tests. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: each of the 53 UNCLASSIFIED vendored files is decided, and the decision is
+  RECORDED so they stop re-prompting on every run. Testable outcome: a second sync
+  reports **0 UNCLASSIFIED**, all 53 reading `LOCAL_PATCH`, and
+  `git diff -- vendor/` still EMPTY.
+- Files: `scripts/sync_vendor_upstream.py`, `vendor/upstream_sync.json`,
+  `tests/test_sync_vendor_upstream.py`. Collision check 2026-09-06: named by no
+  other OPEN lane.
+- **TRIAGED BY TWO INDEPENDENT TESTS, agreeing 53/53 OURS, 0 stale.**
+  (1) Syndicate committed a change to every one of the 53 after vendoring it —
+  weak on its own, because several of those extras are bulk
+  `daily update ... (pre-source publish)` commits that could themselves have been
+  vendor re-pulls. So (2), the decisive one: does our local blob hash appear
+  ANYWHERE in that path's upstream history? For all 53, **no**. Our content never
+  existed upstream, so none of it is staleness and adopting upstream would
+  discard real work.
+- Spot-checked two diffs with line endings normalised; both carry the fix named
+  in their own commit subject. WNBA `scrapers/injuries.py` replaces a hand-copied
+  NBA tricode set that made every WNBA header fail; NBA `games_npu.py` gates the
+  QNN execution provider on availability instead of listing it unconditionally.
+- **A trap worth recording: the first spot-check diff showed the ENTIRE file as
+  changed.** That was CRLF-vs-LF, not content — the same artefact the sync itself
+  avoids by comparing blob hashes, reintroduced the moment I used `diff` by hand.
+- Hypothesis: n/a.
+- Falsification test: if any of the 53 matched a historical upstream blob, "all
+  ours" is wrong and that file should be adopted instead.
+- Verification: a `--keep-local` mode records baseline := upstream's CURRENT hash
+  WITHOUT touching content; the 53 then read `LOCAL_PATCH`, and a later upstream
+  move on one of them must read `CONFLICT` rather than be silently overwritten.
+  Both pinned by tests.
+- Blocked by: none.
+- **The two spot-checked diffs each carry the fix named in their own commit
+  subject**, which is the corroboration the hash test cannot give: WNBA
+  `scrapers/injuries.py` replaces a hand-copied NBA tricode set that made every
+  WNBA header fail, NBA `games_npu.py` gates the QNN execution provider on
+  availability rather than listing it unconditionally.
+- `--keep-all-unclassified` sweeps ONLY unclassified, pinned by a test. Blessing
+  an `UPSTREAM_AHEAD` file as a local patch would turn "we owe them a pull" into
+  "we deliberately diverged", which is the same silent-loss shape in reverse.
+- The `UNCLASSIFIED` report now prints both remedies per file AND the test for
+  choosing between them, so this triage does not have to be re-derived.
+- **STILL OWED, unchanged by this lane:** no real upstream merge has been carried
+  yet. The three PRs are open, so the end-to-end path (merge upstream → run sync →
+  fix lands here) has never run for real. Every `UPSTREAM_AHEAD` proof so far has
+  been a constructed baseline state on a real file, which is close but not the
+  same thing.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
