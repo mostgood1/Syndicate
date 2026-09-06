@@ -336,6 +336,44 @@ stale as a comparand: it records `total_testcases: 11745` against this tree's
 different `data/` mirror. Its 19-failure set is NOT like-for-like, which is
 most of why the raw diff read as 27.
 
+**RUN 3 (2026-09-05 22:31-23:09, HEAD `0ad1480d`, idle, `-n auto`): 31 -> 12 -> 4.**
+
+    4 failed, 15,455 passed, 51 skipped, 1 xfailed, 459 subtests passed
+    in 2274.54s (0:37:54)      collected=15511  failing=4
+
+**EVERY REPAIR HELD. None of the 22 appears** -- not the four `test_heap_roots`,
+not `nfl_props` / `odds_control_plane` / the two `wnba_refresh_runner` /
+`probability_differential`, and the seven converter fixes stayed 5/5 with
+`KNOWN_FAILING` shrunk. The `test_heap_roots` cap concern did NOT fire: I had
+flagged that a full `-n auto` worker holds far more than the 40 modules measured
+at 74,925 nodes, so 400,000 might not suffice. It sufficed, and the guard would
+have NAMED the truncation if not.
+
+**THE PREDICTION WAS WRONG BY BEING STALE, NOT BY BEING MISREASONED.** I
+pre-registered **2**, naming the `test_live_refresh_loop` pair as another lane's.
+`c353b47d` (22:27) fixed them **four minutes before this run started** --
+`suite-order-pollution` acting on the message sent it. All 4 actual failures are
+different tests and all belong to other lanes, dated not assumed:
+
+    ada53db5  09-05 22:20  ncaaf serving-path visibility   -> 3 of the 4
+    16c9ee70  09-04 10:28  kalshi doubleheader placeholder -> 1 of the 4
+
+`ada53db5` landed **11 minutes before the run** -- the same mid-flight arrival as
+`4ffba395` earlier in the day.
+
+**THE 37m54s IS UNEXPLAINED AND IS RECORDED AS UNEXPLAINED.** Run 2 was 19m26s,
+also `-n auto`, also a nominally idle box; run 3 carried 204 more tests. I do not
+have the instrumentation to separate ambient load from test count, and inventing
+a cause here is precisely what the retraction above was for. **Do not quote a
+per-run wall clock for this suite as if it were a property of the suite.**
+
+**THE NON-HERMETIC WRITE SET GREW -- third observation, and bigger.** Run 3 left
+**8** paths dirty against the 5 seen before: the previous four plus
+`reports/intelligence/{intelligence_state.json,intelligence_state_history.jsonl}`
+and a new untracked `reports/intelligence/game_chips_2026_09_05.json`. So the
+footprint is a function of WHICH tests run, not a fixed list -- do not treat the
+recorded set as complete. Preserved (stash + scratchpad), never discarded.
+
 **RUN 2 CONFIRMS THE 18 REPAIRS AND THE PREDICTION WAS PRE-REGISTERED.** After
 `63c10ed5`, on an idle machine at `-n auto`:
 

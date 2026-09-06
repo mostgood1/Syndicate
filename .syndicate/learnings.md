@@ -5165,3 +5165,29 @@ session, 50-second sampling manufactured a fan-out that 10-second sampling
 dissolved, and a 12-minute correlation window reversed at 35 minutes. Coarse or
 short windows do not merely add noise — they produce STRUCTURE that reads as a
 finding. The direction of the error is not predictable, only its presence.
+
+## 2026-09-05 — A PREDICTION NAMING SPECIFIC TESTS EXPIRES IN A REPO WITH LIVE PEERS. Re-derive it at LAUNCH, not when you write it `[lane full-suite-xdist-run]`
+
+Before a 38-minute full-suite run I pre-registered the failing set as **2**, and
+named them: the `test_live_refresh_loop` pair, another lane's, deliberately left
+alone. The run returned **4**, and **none of them was that pair** — a peer had
+fixed both in `c353b47d` at 22:27, **four minutes before my run started**, acting
+on a message I had sent them myself.
+
+**The reasoning was sound and the answer was still wrong**, which is the part
+worth keeping. Pre-registering a prediction is right and I would do it again; the
+defect was that I derived it from a snapshot taken earlier in the session and did
+not re-derive at launch. On this repo that window is not theoretical — ~22 peer
+commits landed between run 2 and run 3, and one of the four new failures
+(`ada53db5`) landed **11 minutes before the run began**.
+
+**The rule.** A prediction that names specific tests, files or counts must be
+re-derived against `origin/main` AT THE MOMENT the measurement starts, and the
+prediction should record the SHA it was derived from. Without that, a wrong
+number cannot be told apart from a stale one — and those have opposite lessons:
+one says the model of the system is broken, the other says only the clock moved.
+
+**Corollary, and it cuts the other way too:** a peer acting on your own message
+is a state change you CAUSED. I sent `suite-order-pollution` the finding, they
+fixed it, and I then predicted their tests would still be red. Messaging a lane
+is a write to the shared system, not just communication.
