@@ -26,8 +26,15 @@ Windows honours `ReadOnly` on **files**, not directories. So:
   unseen; `list` said 83 while the directory held 118.
 - `attrib -R /S /D` does **not** clear it (118 before, 118 after). Only
   `Remove-Item -Recurse -Force` does, because `-Force` overrides `ReadOnly`.
-- `du -sh .git` did not complete in 400 s — placeholder recall makes traversal
-  slow enough to time out tooling.
+- **The store is 5.9 GB**, and `du -sh .git` took over 400 s to say so —
+  placeholder recall makes traversal slow enough to time out tooling. Two
+  consequences. (1) OneDrive is syncing ~5.9 GB of loose objects and packs to
+  the cloud continuously, which is quota and upload bandwidth spent on data git
+  already stores compressed and never needs synced. (2) It makes the
+  same-volume precondition below load-bearing rather than tidy: on one volume
+  the move is a metadata-only rename and effectively instant; across volumes it
+  is a **5.9 GB copy+delete**, not atomic, with a long window in which the store
+  exists in neither place. `move_git_store.py` refuses the cross-volume case.
 
 ## What moving `.git` does and does not fix
 
