@@ -1721,6 +1721,47 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   bound: strictly stronger, since a per-fixture regression repeats a key 9
   times and fails even if the total stays under the old limit.
 - No deploy: tests plus one unreachable function. Blocked by: none.
+### segment-execution-ticker-audit — CLOSED 2026-09-05 — **NOT A LIVE DEFECT. It is the already-recorded `[kalshi-segment-on-full-game]`, and this run DISCHARGES the money-level re-check that entry deferred.** All 10 venue-settled segment orders fall on 2026-08-26/08-28; zero later. LIVE kalshi segment orders 37, 5 tickered, **5/5 on full-game `KXMLBTOTAL`**, all submitted ~16h BEFORE the 21:55:15Z fix boot; POST-boot **0 of 23** (paper: 0 of 45; polymarket: 0 of 0). The reporting agent's null came from reading `ticker` — the field is **`venue_ticker`**. The post-boot null is NOT self-sufficient (all 23 refusals are `no_venue_ticker` on `totals_alt`/`spreads_alt`/`h2h_3_way`, which refused identically PRE-boot 9 of 9, and no segment order has touched plain `totals` since); what closes it is the guard counter **`segment_has_no_matching_series` = 257 refusals over 38 join ticks in 30h** on the running refresh-worker. Guard present by CONTENT on all three live SHAs; choke point confirmed (both — the only two — `matches.append` sites are preceded by `_segments_agree`). SIDE FINDING: the fix bought safety, not capability — **0 orders in 2,853 have ever carried a `KXMLBF5*` ticker**, and `first3` is inherently unexecutable on Kalshi. Landed `47370cc7` on origin/main. No deploy, no order touched. — opened 2026-09-05 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
+- Goal: state, as a RATE with its denominator, what fraction of MLB orders with
+  `segment` not in (`full`, unset) carry a FULL-GAME Kalshi series ticker, split
+  at the boot of the 2026-08-28 join fix (`420dddaa`, booted 21:55:15Z) — and
+  say whether that fix is INERT or HOLDING on the service that actually commits.
+- Files: `.syndicate/findings_2026-09-05_segment_execution_ticker_audit.md`;
+  on confirmation, the EXISTING `[kalshi-segment-on-full-game]` section of
+  `.syndicate/state_kalshi.md` (edit in place — one subject, one section).
+  READ-ONLY on all code. No deploy, no order placement.
+- Hypothesis: **THIS IS NOT A NEW DEFECT — it is the already-verified
+  `[kalshi-segment-on-full-game]` defect, and the 173-order settled population
+  is dominated by orders placed BEFORE its fix booted.** `state_kalshi.md:176`
+  records the identical signature (`first3 under 2.5` -> `KXMLBTOTAL-...`) on
+  five real-money orders, fixed in `632f3473` + `d2ab7e86` + `361d8940`, live
+  in `420dddaa` at 2026-08-28T21:55:15Z. That entry ALSO says, in its own
+  words, **"PROVEN TO FIRE, NOT PROVEN TO HAVE CHANGED AN ORDER"** — zero
+  orders were placed after the boot, so the money-level check was vacuous and
+  was explicitly deferred to "the next slate that actually places". This lane
+  IS that re-run.
+- Sub-hypothesis on the reporting agent's null result: its walk of
+  `/api/portfolio/live` for a `ticker` field returned 0 rows because the order
+  record does not key on `ticker` — `learnings.md` 2026-08-30 already carries
+  exactly that as a FORBIDDEN rule ("my log printed `ticker=None` for every
+  order because `ticker` is not a key on it"). Locate the field the record
+  actually stores before reporting any rate.
+- Falsification test: (a) if segment orders carrying a full-game series exist
+  with an order timestamp AFTER 2026-08-28T21:55:15Z, the hypothesis is wrong
+  and the fix is INERT — a live-money execution defect, not a historical
+  residue. (b) if `kalshi_board_join._match_key` on the DEPLOYED SHA of the
+  committing service does not carry `segment`, the fix never reached the choke
+  point and the ledger entry is overstated.
+- Verification: **RAN, result above.** Full working in
+  `.syndicate/findings_2026-09-05_segment_execution_ticker_audit.md` and in
+  `state_kalshi.md` `[kalshi-segment-on-full-game]`. Original wording: a rate
+  `N_segment_on_fullgame / N_segment_with_kalshi_ticker`
+  read from production (`/api/ops/execution/ledger-summary` `by_segment` or
+  `/api/portfolio/paper?date=<D>`), split pre/post the boot instant, plus the
+  live commit of the committing service (refresh-worker, per the same ledger
+  entry) checked by CONTENT for `segment` in the join key.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
