@@ -92,6 +92,86 @@ def test_a_file_with_a_BOM_is_read_not_skipped(tmp_path):
     assert [f["key"] for f in findings] == ["bommed.py: f"]
 
 
+# --- "bound twice" is not the same as "the first one is dead" ----------------
+
+
+def test_a_live_sequential_rebinding_is_not_a_duplicate():
+    """A linear script that builds a frame, uses it, then narrows it binds the
+    name twice ON PURPOSE. Reporting that is a false positive, and acting on it
+    is a `NameError`: measured on `vendor/*/tools/compute_props_reliability.py`,
+    where `out = grp.agg(...)` / `out['bin_low'] = ...` / `out = out[keep]` was
+    reported as a duplicate by an earlier version of this check."""
+    source = "\n".join(
+        [
+            "out = compute()",
+            "out['extra'] = 1",
+            "out = out[['extra']]",
+            "",
+        ]
+    )
+    assert duplicates_in_source(source, "<synthetic>") == {}
+
+
+def test_the_second_bindings_own_right_hand_side_counts_as_a_read():
+    """`cols_subset = [c for c in cols_subset if ...]` consumes the first value on
+    the very next line. A liveness window that stops BEFORE the second binding
+    calls this dead -- which is exactly the off-by-one that nearly shipped a
+    NameError into two vendored scripts."""
+    source = "\n".join(
+        [
+            "cols = ['a', 'b']",
+            "cols = [c for c in cols if c]",
+            "",
+        ]
+    )
+    assert duplicates_in_source(source, "<synthetic>") == {}
+
+
+def test_a_dead_store_IS_still_reported():
+    """The other half of the same rule -- without this, the liveness refinement
+    would have quietly turned the check off."""
+    source = "\n".join(["x = expensive()", "x = 2", ""])
+    assert duplicates_in_source(source, "<synthetic>") == {"x": [1, 2]}
+
+
+def test_a_read_inside_a_function_body_does_not_keep_the_first_binding_alive():
+    """A function body runs when it is CALLED, by which point the last binding has
+    won. So a reference there is not evidence the first binding was used -- it is
+    evidence of the opposite, which is the whole `memory_observability` failure."""
+    source = "\n".join(
+        [
+            "HANDLER = first",
+            "def use():",
+            "    return HANDLER",
+            "HANDLER = second",
+            "",
+        ]
+    )
+    assert duplicates_in_source(source, "<synthetic>") == {"HANDLER": [1, 4]}
+
+
+def test_a_dead_NAME_can_still_have_a_live_OBJECT():
+    """REPORTED IS NOT THE SAME AS SAFE TO DELETE, and this is the case that
+    proves it. A decorator captures the function when it is defined; rebinding the
+    module name afterwards does not unregister it. In
+    `vendor/*/src/*/cli.py` the two `fetch_rosters_cmd` decorators name their
+    commands DIFFERENTLY, so click 8.1.7 ends up with both `fetch-rosters-cmd` and
+    `fetch-rosters` -- deleting the "shadowed" def deletes a working command.
+    The check still reports it, which is right; the judgement is a human's."""
+    source = "\n".join(
+        [
+            "@cli.command()",
+            "def cmd():",
+            "    pass",
+            "@cli.command('other-name')",
+            "def cmd():",
+            "    pass",
+            "",
+        ]
+    )
+    assert duplicates_in_source(source, "<synthetic>") == {"cmd": [1, 4]}
+
+
 # --- the two roots this file was extended for --------------------------------
 
 

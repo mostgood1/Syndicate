@@ -37,15 +37,14 @@ TWO TIERS, because `vendor/` is not ours to rewrite
 Owned code (`.`, `syndicate/`, `pipeline/`, `scripts/`, `tests/`) must be clean;
 any finding fails. `ALLOWLIST` is empty and should stay that way.
 
-`vendor/` is sibling-repo code pulled in verbatim, and it has 12 duplicates that
-are upstream's, not ours. Failing on them would leave a permanently-red gate,
-and a permanently-red gate gets muted -- which would cost us the owned-code
-coverage that is the whole point. So the vendored set is PINNED in
-`VENDOR_BASELINE` instead: exactly that set passes, anything NEW fails. That
-matters because a vendor sync is precisely how a new one would arrive, and
-because two of those files (`nba_betting_repo/app.py`,
-`wnba_betting_repo/app.py`) are imported by owned code, so their dead
-definitions sit inside modules we load.
+`vendor/` is sibling-repo code pulled in verbatim. It had 12 findings; the five
+that were genuinely dead have been deleted, five more turned out not to be
+duplicates at all (see `duplicates_in_source`), and the two that remain are
+upstream's to reconcile rather than ours. Those are PINNED in `VENDOR_BASELINE`:
+exactly that set passes, anything NEW fails. Failing on them instead would leave
+a permanently-red gate, and a permanently-red gate gets muted -- which would cost
+the owned-code coverage that is the whole point. Pinning also means a vendor
+sync, which is precisely how a new one would arrive, cannot slip one in.
 
 A baseline entry that no longer matches anything is reported as STALE and also
 fails, so the pin cannot quietly rot into a general-purpose allowlist.
@@ -89,57 +88,125 @@ VENDOR_ROOTS = ("vendor",)
 # add a line here, prefer deleting the duplicate, and if you cannot, say why.
 ALLOWLIST: frozenset[str] = frozenset()
 
-# The vendored duplicates as measured 2026-09-06. Upstream's code; we do not
-# edit it. Every one of these pairs DIFFERS -- they are not harmless copies --
-# so if you are syncing a vendor repo and one of these disappears, that is
-# upstream fixing it and the entry should be deleted here.
+# What is left of the vendored set after 2026-09-06.
+#
+# Twelve were found. FIVE were genuinely dead and were DELETED from vendor/ --
+# `_ev_from_prob_and_american` x2, `props_collect`, `props_project_all`, and
+# `__all__` in `shifts_api.py` -- verified by comparing each file's OBSERVABLE
+# surface before and after (EV results over 13 inputs, all 89 Typer commands with
+# their callbacks and params, the `__all__` value): identical.
+#
+# FIVE more were never duplicates at all and are no longer reported, because
+# `duplicates_in_source` now requires the earlier binding to be DEAD: `out` x2 and
+# `cols_subset` x2 are sequential rebindings whose successor consumes them, and
+# `backtest_daily_summary.py`'s `main` is read at module level by an
+# `if __name__ == '__main__':` block sitting between the two definitions.
+#
+# These TWO remain, and they are the interesting shape: the module-level NAME is
+# dead, but the OBJECT is not. Click registers each function when it is decorated,
+# and here the two decorators give DIFFERENT command names, so both survive --
+# verified against click 8.1.7, the group ends up with `fetch-rosters-cmd` AND
+# `fetch-rosters`. Deleting the shadowed def would delete a working CLI command.
+# Pinned rather than fixed: they are upstream's to reconcile.
 VENDOR_BASELINE: frozenset[str] = frozenset(
     {
-        # EV math. Shadowed version takes `_american_to_b`; the live one parses
-        # the american price itself and carries a docstring.
-        "vendor/nba_betting_repo/app.py: _ev_from_prob_and_american",
-        "vendor/wnba_betting_repo/app.py: _ev_from_prob_and_american",
-        # CLI command registered twice; the live one adds an empty-frame guard.
         "vendor/nba_betting_repo/src/nba_betting/cli.py: fetch_rosters_cmd",
         "vendor/wnba_betting_repo/src/wnba_betting/cli.py: fetch_rosters_cmd",
-        # Script-local rebinding in a linear script; harmless.
-        "vendor/nba_betting_repo/tools/compute_props_reliability.py: out",
-        "vendor/wnba_betting_repo/tools/compute_props_reliability.py: out",
-        "vendor/nba_betting_repo/tools/compute_props_reliability_summary.py: cols_subset",
-        "vendor/wnba_betting_repo/tools/compute_props_reliability_summary.py: cols_subset",
-        # Typer commands. `props_project_all`'s shadowed def is a 3-line alias;
-        # the live one is a ~514-line implementation.
-        "vendor/nhl_betting_repo/nhl_betting/cli.py: props_collect",
-        "vendor/nhl_betting_repo/nhl_betting/cli.py: props_project_all",
-        # Shadowed `__all__` exports 2 names, live exports 4.
-        "vendor/nhl_betting_repo/nhl_betting/data/shifts_api.py: __all__",
-        "vendor/nhl_betting_repo/nhl_betting/scripts/backtest_daily_summary.py: main",
     }
 )
 
 
-def module_level_names(tree: ast.Module) -> list[tuple[str, int]]:
-    """Every name bound at the module's own top level, with its line number."""
-    names: list[tuple[str, int]] = []
+def module_level_names(tree: ast.Module) -> list[tuple[str, int, int]]:
+    """Every name bound at the module's own top level, as (name, start, end).
+
+    `end` is the last line of the binding STATEMENT, which is what the liveness
+    window needs: a decorated `def` starts at its first decorator and ends at the
+    last line of its body.
+    """
+    names: list[tuple[str, int, int]] = []
     for node in tree.body:
+        start = getattr(node, "lineno", 0)
+        end = getattr(node, "end_lineno", None) or start
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            names.append((node.name, node.lineno))
+            decorators = [d.lineno for d in node.decorator_list]
+            names.append((node.name, min([start] + decorators), end))
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            names.append((node.target.id, node.lineno))
+            names.append((node.target.id, start, end))
         elif isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name):
-                    names.append((target.id, node.lineno))
+                    names.append((target.id, start, end))
                 elif isinstance(target, (ast.Tuple, ast.List)):
                     # `A, B = ...` binds both; a repeat of either still shadows.
                     for element in target.elts:
                         if isinstance(element, ast.Name):
-                            names.append((element.id, node.lineno))
+                            names.append((element.id, start, end))
     return names
 
 
+def _module_level_reads(tree: ast.Module, name: str, lo: int, hi: int) -> bool:
+    """Is `name` READ by module-level code with lo < lineno <= hi?
+
+    `<= hi` is deliberate: `hi` is the END of the next binding, so that binding's
+    own right-hand side counts. `cols_subset = [c for c in cols_subset if ...]`
+    consumes the previous value, and a strict `<` window calls that dead.
+
+    Function and class bodies are skipped -- they run when called, by which point
+    the LAST binding has already won, so a read there says nothing about whether
+    the earlier binding was used.
+    """
+    found = False
+
+    def scan(stmt: ast.stmt) -> None:
+        nonlocal found
+        for node in ast.walk(stmt):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            if isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, ast.Load):
+                if lo < getattr(node, "lineno", 0) <= hi:
+                    found = True
+                    return
+
+    def descend(body: list[ast.stmt]) -> None:
+        for stmt in body:
+            if found:
+                return
+            if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            scan(stmt)
+            for field in ("body", "orelse", "finalbody"):
+                inner = getattr(stmt, field, None)
+                if isinstance(inner, list):
+                    descend(inner)
+            for handler in getattr(stmt, "handlers", []) or []:
+                descend(handler.body)
+
+    descend(tree.body)
+    return found
+
+
 def duplicates_in_source(source: str, filename: str) -> dict[str, list[int]]:
-    """Names bound more than once at module level, mapped to their line numbers."""
+    """Names whose EARLIER module-level binding is dead, mapped to all their lines.
+
+    "Bound twice" is not the same as "the first one is dead". A linear script that
+    does `out = df.agg(...)` / uses `out` / `out = out[cols]` binds the name twice
+    on purpose, and deleting the first gives a `NameError` -- measured on
+    `vendor/*/tools/compute_props_reliability.py`, where an earlier version of
+    this function reported exactly that as a duplicate. So a rebinding is only
+    reported when nothing READS the earlier value before it is replaced, which is
+    the actual definition of a dead store.
+
+    Verified not to weaken the cases this check exists for: run against
+    `memory_observability.py` at `67af1276^`, it still reports both
+    `_MALLOC_TRIM_STATE` and `_resolve_malloc_trim`.
+
+    NOT covered, deliberately: a shadowed binding that is dead by this rule but
+    whose OBJECT was captured elsewhere -- `@cli.command()` registers the function
+    in a Click group, so it stays reachable under its own command name even though
+    the module name is rebound. Those are still reported (the name IS dead), and
+    the report is right, but "dead name" does not imply "safe to delete". Diff the
+    two definitions before removing either.
+    """
     with warnings.catch_warnings():
         # This function ANALYSES source it never executes. Parsing vendored code
         # raises 13 `DeprecationWarning: invalid escape sequence` from upstream's
@@ -149,10 +216,26 @@ def duplicates_in_source(source: str, filename: str) -> dict[str, list[int]]:
         warnings.simplefilter("ignore", DeprecationWarning)
         warnings.simplefilter("ignore", SyntaxWarning)
         tree = ast.parse(source, filename=filename)
-    lines: dict[str, list[int]] = collections.defaultdict(list)
-    for name, lineno in module_level_names(tree):
-        lines[name].append(lineno)
-    return {name: nums for name, nums in lines.items() if len(nums) > 1}
+
+    bound: dict[str, list[tuple[int, int]]] = collections.defaultdict(list)
+    for name, lineno, end_lineno in module_level_names(tree):
+        bound[name].append((lineno, end_lineno))
+
+    reported: dict[str, list[int]] = {}
+    for name, spans in bound.items():
+        if len(spans) < 2:
+            continue
+        spans.sort()
+        # Report only if some EARLIER binding is never read before the next one
+        # replaces it. That is the dead-store test; a rebinding whose value is
+        # consumed in between is ordinary linear code, not a shadowed definition.
+        dead = any(
+            not _module_level_reads(tree, name, spans[i][1], spans[i + 1][1])
+            for i in range(len(spans) - 1)
+        )
+        if dead:
+            reported[name] = [lineno for lineno, _ in spans]
+    return reported
 
 
 def is_vendor(rel_path: str) -> bool:
