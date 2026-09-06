@@ -629,6 +629,12 @@ Deploy measurement, same instrument `limit=2000` both times: collisions **35 →
 
 **BOUNDED:** today only MLB props have two independent prop feeds. Soccer's 199 prop rows carry one vocabulary (fanduel 193, betrivers 39) so nothing disagrees — but soccer names are diacritic-dense and a second feed there exposes the same class.
 
+**DURABILITY AND THE PENDING CHECK `[2026-09-06 19:0xZ]`.** The fold HELD across four artifacts, not one: `raw_market_agrees` (the criterion — NOT `colliding _row_keys`, which conflates this with the alt-line defect) read **0** at `16:43:53Z`, `18:20:43Z` and `18:56:27Z`, against **25** pre-fix at `14:44:08Z`. `raw_market_differs` moved 4 → 19 → 0 over the same window and belongs to the ALT-LINE lane, not this one — do not credit this fix with it.
+
+**THE 2026-09-07 SLATE COULD NOT BE VERIFIED ON 09-06 AND THE ZEROS ARE ABSENCE.** That artifact existed with 421 rows but `per_sport` carried only `ncaaf` and `soccer` — **no `mlb` key at all**. `scripts/census_board_row_duplicates.py` exits **3 = NOT MEASURABLE** for it, which is deliberately a different exit code from 0, because "no data" must never share one with "verified clean". A one-time task `verify-player-name-fold-0907` is armed for 2026-09-07 11:00 local; **it runs only while the desktop app is open, so it is a reminder, not a guarantee.**
+
+**THE PRIMARY CHECKOUT CANNOT RUN THIS CHECK.** Measured 2026-09-06: `C:\Users\tempadmin\OneDrive\Coding\Syndicate` was **128 commits behind `origin/main`** and did not contain the script — and the worse half is that its `kalshi_board_join.py` is stale too, so the census would import an OLD `_row_key` and measure a different key than production uses: a confident wrong answer rather than a crash. Run it from a tree at `origin/main`; `C:/tmp/syndicate-verify/fold-0907` is kept for that and **should not be deleted**. A 09-06 control is baked into the task — if the known-good date does not read MEASURABLE, the harness is broken and the 09-07 result means nothing whatever it says.
+
 Full audit: `docs/ai_context/kalshi_oddsapi_coverage_audit.md` (branch
 `claude/kalshi-oddsapi-coverage-audit`, `4152111e2`). Evidence is production
 log lines with timestamps; regenerate with
