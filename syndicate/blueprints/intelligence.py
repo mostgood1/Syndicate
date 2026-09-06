@@ -370,6 +370,67 @@ def _slim_response_aliases(response: Any) -> Any:
 #: opt-in with its own declaration.
 _UNCONSUMED_ROW_DIAGNOSTICS = ("trace", "score_breakdown")
 
+#: `quote` sub-fields nothing reads. **16.1% of the wire on their own** --
+#: `quote` is 33.8% of every row and these are 73% of `quote`:
+#:
+#:     book_prices 141.2 KB   other_sides 66.7 KB
+#:     venue_basis  62.6 KB   best_any_book 58.4 KB
+#:     fair_method  18.3 KB   quote_seen_age_seconds 16.7 KB   (per list, x4 lists)
+#:
+#: PROVEN UNREFERENCED, not grepped once and hoped. For each name, across BOTH
+#: consumers (`templates/intelligence.html`, `scripts/watch_clamp_trigger.py`),
+#: in every access form: `.name`, `["name"]`, bare word, and string literal --
+#: all zero. AND nothing consumes `quote` generically, which is the way a field
+#: gets used without ever being named: no `Object.keys(quote)`,
+#: `Object.entries(quote)`, `for..in quote`, `JSON.stringify(quote)`, and no
+#: `...quote` spread. All zero.
+#:
+#: `fair_probability` is the counter-example that made this check necessary: it
+#: greps 0 in the HTML and is used 34 times in the other consumer. A single
+#: grep over one file would have "proved" it droppable. It is NOT in this list.
+_UNCONSUMED_QUOTE_FIELDS = (
+    "book_prices",
+    "other_sides",
+    "venue_basis",
+    "best_any_book",
+    "fair_method",
+    "quote_seen_age_seconds",
+)
+
+#: `movement` sub-keys that are `null` on EVERY row -- 1,497 of 1,497, measured
+#: 2026-09-06. Transmitting `"percent_change": null` costs ~22 B per row per
+#: key and carries no information the absence of the key does not.
+#:
+#: SAFE BECAUSE THE CLIENT IS ALREADY undefined-TOLERANT ON EXACTLY THESE, and
+#: that was checked rather than assumed -- dropping a key turns `null` into
+#: `undefined`, which is only safe if nothing tests presence:
+#:     :1268/:1397  `Array.isArray(movement.history)`        undefined -> false
+#:     :1396/:2924  `numericValue(movement.delta)`
+#:     :1403        `movement.previous_line !== undefined && ... !== null`
+#: The last one checks BOTH, explicitly.
+_ALL_NULL_MOVEMENT_FIELDS = (
+    "delta",
+    "history",
+    "last_line",
+    "last_updated",
+    "percent_change",
+    "previous_line",
+)
+
+#: Row fields that are BYTE-IDENTICAL to another field on the same row, 1,497 of
+#: 1,497. Unlike everything above these ARE read (`market_key` 4, `game_pk` 1,
+#: `selection` 20 references), so they are dropped as REBUILDABLE aliases and
+#: declared in `_dropped_row_aliases` -- the same contract `_slim_response_aliases`
+#: uses at the top level, applied per row, which is the level it never reached.
+#:
+#: Dropped ONLY on an exact match, per row. A row whose pair genuinely differs
+#: keeps both. The failure mode is "no saving", never "wrong value".
+_REBUILDABLE_ROW_ALIASES = (
+    ("market_key", "market"),
+    ("game_pk", "event_id"),
+    ("selection", "display_name"),
+)
+
 #: Lists whose rows carry them. Named explicitly rather than walked, so a new
 #: list elsewhere in the payload is NOT silently stripped by a future edit.
 _DIAGNOSTIC_ROW_LISTS = ("top_opportunities", "ranked_all", "recommendations")
@@ -400,17 +461,42 @@ def _drop_unconsumed_row_diagnostics(response: Any) -> Any:
     slim = dict(response)
     dropped = False
 
+    aliased = False
+
+    def _strip_row(row: Any) -> Any:
+        nonlocal dropped, aliased
+        if not isinstance(row, dict):
+            return row
+        if any(k in row for k in _UNCONSUMED_ROW_DIAGNOSTICS):
+            row = {k: v for k, v in row.items() if k not in _UNCONSUMED_ROW_DIAGNOSTICS}
+            dropped = True
+        quote = row.get("quote")
+        if isinstance(quote, dict) and any(k in quote for k in _UNCONSUMED_QUOTE_FIELDS):
+            row = dict(row)
+            row["quote"] = {k: v for k, v in quote.items() if k not in _UNCONSUMED_QUOTE_FIELDS}
+            dropped = True
+        movement = row.get("movement")
+        if isinstance(movement, dict) and any(
+            movement.get(k) is None for k in _ALL_NULL_MOVEMENT_FIELDS if k in movement
+        ):
+            row = dict(row)
+            row["movement"] = {
+                k: v
+                for k, v in movement.items()
+                if not (k in _ALL_NULL_MOVEMENT_FIELDS and v is None)
+            }
+            dropped = True
+        for alias, canonical in _REBUILDABLE_ROW_ALIASES:
+            if alias in row and canonical in row and row[alias] == row[canonical]:
+                row = dict(row)
+                row.pop(alias, None)
+                aliased = True
+        return row
+
     def _strip(rows: Any) -> Any:
-        nonlocal dropped
         if not isinstance(rows, list):
             return rows
-        out = []
-        for row in rows:
-            if isinstance(row, dict) and any(k in row for k in _UNCONSUMED_ROW_DIAGNOSTICS):
-                row = {k: v for k, v in row.items() if k not in _UNCONSUMED_ROW_DIAGNOSTICS}
-                dropped = True
-            out.append(row)
-        return out
+        return [_strip_row(row) for row in rows]
 
     for key in _DIAGNOSTIC_ROW_LISTS:
         if key in slim:
@@ -424,6 +510,13 @@ def _drop_unconsumed_row_diagnostics(response: Any) -> Any:
 
     if dropped:
         slim["_dropped_row_fields"] = list(_UNCONSUMED_ROW_DIAGNOSTICS)
+        slim["_dropped_quote_fields"] = list(_UNCONSUMED_QUOTE_FIELDS)
+        slim["_dropped_movement_fields"] = list(_ALL_NULL_MOVEMENT_FIELDS)
+    if aliased:
+        # REBUILDABLE, so it is declared as a map rather than a list: the client
+        # restores `alias = row[canonical]`. Distinct key from the drops above
+        # precisely because the contracts differ -- these come back, those do not.
+        slim["_dropped_row_aliases"] = {a: c for a, c in _REBUILDABLE_ROW_ALIASES}
     return slim
 
 

@@ -715,6 +715,43 @@
   // handler defined much further down.
   function rehydrateAliases(payload) {
     if (!payload || typeof payload !== "object") return;
+
+    // PER-ROW aliases, rebuilt BEFORE the early return below, because a payload
+    // can carry these without carrying any top-level alias at all.
+    //
+    // The server drops a row field only when it is BYTE-IDENTICAL to another
+    // field on the SAME row (`market_key`==`market`, `game_pk`==`event_id`,
+    // `selection`==`display_name` -- 1,497 of 1,497 rows, measured 2026-09-06)
+    // and declares the mapping in `_dropped_row_aliases`. These ARE read by
+    // this page (`selection` alone 20 times), which is exactly why they come
+    // back here rather than being dropped outright.
+    //
+    // Restored in place, before any consumer reads a row, so nothing
+    // downstream can tell the difference.
+    const rowAliases = payload._dropped_row_aliases;
+    if (rowAliases && typeof rowAliases === "object") {
+      const aliasPairs = Object.keys(rowAliases);
+      const lists = ["top_opportunities", "ranked_all", "recommendations"];
+      const boardCards = payload.board_contract && Array.isArray(payload.board_contract.cards)
+        ? [payload.board_contract.cards]
+        : [];
+      lists
+        .map(function (k) { return Array.isArray(payload[k]) ? payload[k] : null; })
+        .filter(Boolean)
+        .concat(boardCards)
+        .forEach(function (rows) {
+          rows.forEach(function (row) {
+            if (!row || typeof row !== "object") return;
+            aliasPairs.forEach(function (alias) {
+              const canonical = rowAliases[alias];
+              if (!(alias in row) && Object.prototype.hasOwnProperty.call(row, canonical)) {
+                row[alias] = row[canonical];
+              }
+            });
+          });
+        });
+    }
+
     // `_embed_aliases` is the HTML embed's; `_response_aliases` is the API's
     // opt-in slimming. Same rebuild, two producers.
     const aliases = payload._embed_aliases || payload._response_aliases;

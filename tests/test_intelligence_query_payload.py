@@ -123,3 +123,100 @@ def test_lists_NOT_named_are_untouched():
     payload = {"some_other_list": [_row()]}
     out = intel._drop_unconsumed_row_diagnostics(payload)
     assert "trace" in out["some_other_list"][0]
+
+
+def _rich_row(**extra):
+    row = _row()
+    row["quote"] = {
+        "fair_probability": 0.5,
+        "bookmaker": "dk",
+        "book_prices": [{"b": i} for i in range(20)],
+        "other_sides": [{"o": i} for i in range(10)],
+        "venue_basis": {"v": ["x"] * 20},
+        "best_any_book": {"p": 1},
+        "fair_method": "novig",
+        "quote_seen_age_seconds": 3.0,
+    }
+    row["movement"] = {
+        "trend": "up", "delta": None, "history": None, "last_line": None,
+        "last_updated": None, "percent_change": None, "previous_line": None,
+    }
+    row["market"] = "h2h"; row["market_key"] = "h2h"
+    row["event_id"] = "E1"; row["game_pk"] = "E1"
+    row["display_name"] = "Home ML"; row["selection"] = "Home ML"
+    row.update(extra)
+    return row
+
+
+def test_it_drops_the_PROVEN_UNREFERENCED_quote_fields_and_keeps_the_rest():
+    """16.1% of the wire. Proven unreferenced in every access form across both
+    consumers, with nothing iterating `quote` generically."""
+    out = intel._drop_unconsumed_row_diagnostics({"ranked_all": [_rich_row()]})
+    q = out["ranked_all"][0]["quote"]
+
+    for gone in ("book_prices", "other_sides", "venue_basis", "best_any_book",
+                 "fair_method", "quote_seen_age_seconds"):
+        assert gone not in q, gone
+    # the counter-example that made the proof necessary: greps 0 in the HTML,
+    # used 34 times in the other consumer. It must survive.
+    assert q["fair_probability"] == 0.5
+    assert q["bookmaker"] == "dk"
+
+
+def test_it_drops_ONLY_the_null_movement_keys_and_keeps_a_real_value():
+    out = intel._drop_unconsumed_row_diagnostics({"ranked_all": [_rich_row()]})
+    m = out["ranked_all"][0]["movement"]
+
+    assert m == {"trend": "up"}, m
+
+
+def test_a_movement_field_with_a_REAL_value_is_never_dropped():
+    """Dropped on the VALUE being null, not on the name -- so a slate where
+    these are populated keeps them."""
+    row = _rich_row()
+    row["movement"]["delta"] = -0.5
+    row["movement"]["history"] = [1, 2]
+    out = intel._drop_unconsumed_row_diagnostics({"ranked_all": [row]})
+    m = out["ranked_all"][0]["movement"]
+
+    assert m["delta"] == -0.5
+    assert m["history"] == [1, 2]
+    assert "percent_change" not in m
+
+
+def test_duplicate_row_fields_are_dropped_AND_declared_as_rebuildable():
+    out = intel._drop_unconsumed_row_diagnostics({"ranked_all": [_rich_row()]})
+    row = out["ranked_all"][0]
+
+    assert "market_key" not in row and "game_pk" not in row and "selection" not in row
+    assert row["market"] == "h2h" and row["event_id"] == "E1" and row["display_name"] == "Home ML"
+    # declared as a MAP, because these come back -- unlike the drops above
+    assert out["_dropped_row_aliases"] == {
+        "market_key": "market", "game_pk": "event_id", "selection": "display_name",
+    }
+
+
+def test_a_pair_that_genuinely_DIFFERS_keeps_both():
+    """Dropped only on an exact match, per row. The failure mode is 'no
+    saving', never 'wrong value'."""
+    row = _rich_row()
+    row["market_key"] = "spreads"          # differs from market="h2h"
+    out = intel._drop_unconsumed_row_diagnostics({"ranked_all": [row]})
+
+    assert out["ranked_all"][0]["market_key"] == "spreads"
+    assert out["ranked_all"][0]["market"] == "h2h"
+
+
+def test_the_client_rebuild_restores_EXACTLY_what_was_dropped():
+    """Round trip: the server's declaration is sufficient to reconstruct the
+    dropped aliases, which is the whole contract."""
+    before = _rich_row()
+    out = intel._drop_unconsumed_row_diagnostics({"ranked_all": [dict(before)]})
+
+    row = dict(out["ranked_all"][0])
+    for alias, canonical in out["_dropped_row_aliases"].items():
+        if alias not in row and canonical in row:
+            row[alias] = row[canonical]
+
+    for alias in ("market_key", "game_pk", "selection"):
+        assert row[alias] == before[alias], alias
