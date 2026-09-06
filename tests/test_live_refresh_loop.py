@@ -51,6 +51,45 @@ class _ModuleLocalTime:
 
 
 
+def _join_bootstrap_threads(timeout: float = 10.0) -> None:
+    """`_start_background_loops` hands the work to a daemon thread, so the call
+    returns before `start_live_refresh_background_loop` has run. Join it rather
+    than racing it."""
+    import threading
+
+    for thread in threading.enumerate():
+        if thread.name == "syndicate-background-loop-bootstrap":
+            thread.join(timeout)
+
+
+def _fire_only_the_bootstrap(func):
+    """Invoke ONLY `_start_background_loops`; register everything else untouched.
+
+    THE `func()` IS THE MECHANISM, NOT A MISTAKE -- I removed it once and broke
+    the test properly. On a non-render app `create_app` does
+    `try: app.before_serving(...) except AttributeError: app.before_request(...)`
+    (`syndicate/app.py:534-537`), and Flask has no `before_serving`, so the
+    bootstrap is registered as a before_request hook. Patching that decorator to
+    CALL its argument is how these two tests reach the loop-start decision
+    without issuing a request.
+
+    WHAT BROKE was the bluntness: the patch fired EVERY before_request
+    registration, and `#632` added an unrelated one at `syndicate/app.py:493`,
+    `_note_request_memory_start`, whose first statement is
+    `g._syndicate_memory_token = None`. Called at construction time there is no
+    application context, so both tests died with `RuntimeError: Working outside
+    of application context` -- and the real assertions never ran.
+
+    Selecting by name keeps the mechanism and stops it hijacking handlers the
+    tests were never about. Any future before_request hook is now inert here
+    instead of being executed in a context it was never designed for.
+    """
+    if getattr(func, "__name__", "") == "_start_background_loops":
+        func()
+        _join_bootstrap_threads()
+    return func
+
+
 class LiveRefreshLoopTests(unittest.TestCase):
     def setUp(self) -> None:
         # The #15 per-sport pregame cadence filter consults real liveness
@@ -2574,7 +2613,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
     def test_create_app_starts_shared_live_refresh_loop(self) -> None:
         with patch.dict(os.environ, {"RENDER": "", "RENDER_EXTERNAL_URL": "", "RENDER_SERVICE_ID": ""}, clear=False), patch(
             "syndicate.app.start_live_refresh_background_loop"
-        ) as mocked_start, patch("syndicate.app.Flask.before_request", side_effect=lambda func: func()):
+        ) as mocked_start, patch("syndicate.app.Flask.before_request", side_effect=_fire_only_the_bootstrap):
             create_app()
 
         mocked_start.assert_called_once()
@@ -2606,7 +2645,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             },
             clear=False,
         ), patch("syndicate.app.start_live_refresh_background_loop") as mocked_start, patch(
-            "syndicate.app.Flask.before_request", side_effect=lambda func: func()
+            "syndicate.app.Flask.before_request", side_effect=_fire_only_the_bootstrap
         ):
             create_app()
 
