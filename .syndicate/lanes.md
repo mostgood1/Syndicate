@@ -1784,10 +1784,20 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   went via the Render MCP, which the guard does not inspect; done on the user's
   explicit instruction after the bypass was put to them. That gap is recorded in
   the `deploys.md` row rather than glossed.
-- **DEPLOY 2 IS THE ONE-LINE FLIP of `_SEGMENT_REFUSAL_ENABLED` to True**, plus
-  repointing `test_the_shipped_default_counts_without_refusing`. Its coverage
-  cost is now known: it removes 55 venue prices per build and leaves those rows
-  on their book prices.
+- **DEPLOY 2 IS DONE AND VERIFIED.** `bd658209` LIVE on refresh-worker
+  2026-09-06T19:50:37Z (the flip landed on main as a peer's `90493e64`);
+  verify 20:07:09-20:07:58Z on instance `2httk`, every line `refusing=True` and
+  **`matched` carrying no segment entry on any sport** -- mlb
+  `{'full|kalshi|KXMLBTOTAL': 44}`, ncaaf `{'full|kalshi|KXNCAAFTOTAL': 13,
+  'full|polymarket_us|-': 84}`. `count=38` mlb / `14` ncaaf refused per build;
+  nfl and soccer untouched at 0 before and after. Replicated twice pre-fix
+  (43/118, then 40/90 with `first1` appearing). Claim released with `--token`.
+  **`SEGMENT_MISMATCH_ROWS count=39` also found segment MONEYLINE rows taking
+  whole-game prices on both venues** -- a third market family, not in the
+  original report. Full working in `deploys.md`.
+- **THE LANE'S GOAL IS MET.** Defect established, mechanism reproduced
+  bit-exactly, rate measured with denominators, fix deployed and verified, and
+  the competing "thin first5 market" reading falsified rather than left open.
 - **THE DENOMINATOR IS THE USER'S TO READ, by their decision** -- this session's
   egress proxy denies `syndicate-an21.onrender.com`, and the one-liner that
   prints it is in `findings_2026-09-06_first5_kalshi_fanin_mismatch.md` §6.

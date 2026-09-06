@@ -5,6 +5,76 @@
 
 ---
 
+## 2026-09-06 19:50:37Z — refresh-worker `bd658209` — **DEPLOY 2: THE REFUSAL IS LIVE AND THE MIS-BINDINGS ARE GONE.** `[lane mlb-first5-kalshi-fanin-mismatch]`
+
+**verify:** `[venue_quote_fanin] SEGMENT_MISMATCH_GRID` on instance `2httk`,
+first board build after boot, **20:07:09Z–20:07:58Z**, every line
+`refusing=True`. The load-bearing field is `matched`, which names the series
+behind every reprice that LANDED — **it no longer contains a single segment
+entry on any sport.**
+
+| build | sport | repriced | segment entries in `matched` | `refusing` |
+|---|---|---|---|---|
+| 19:21:16Z | mlb | 118 | `first3:12 first5:31` → **43** | False |
+| 19:45:05Z | mlb | 90 | `first1:2 first3:12 first5:26` → **40** | False |
+| **20:07:09Z** | **mlb** | **44** | **none → 0** | **True** (`count=38` refused) |
+| 19:21:53Z | ncaaf | 121 | `h1\|kalshi:10 h1\|polymarket:2` → **12** | False |
+| 19:45:28Z | ncaaf | 111 | `h1\|kalshi:6 h1\|polymarket:6` → **12** | False |
+| **20:07:29Z** | **ncaaf** | **97** | **none → 0** | **True** (`count=14` refused) |
+| 20:07:18Z | nfl | 62 | none (was none) | True, `count=0` |
+| 20:07:58Z | soccer | 8 | none (was none) | True, `count=0` |
+
+**mlb `matched={'full|kalshi|KXMLBTOTAL': 44}`** and **ncaaf
+`matched={'full|kalshi|KXNCAAFTOTAL': 13, 'full|polymarket_us|-': 84}`** — only
+whole-game pairings survive, on both venues.
+
+**THE DEFECT WAS REPLICATED TWICE BEFORE IT WAS FIXED**, which is what makes the
+zero mean something: 19:21 and 19:45 are independent builds, and the second was
+WORSE (mlb 40/90 = 44.4% vs 43/118 = 36.4%). It also surfaced two things the
+first build had not: **`first1`** as a fourth affected segment, and NCAAF h1
+Polymarket rising 2 → 6, so the cross-venue half is not marginal.
+
+**A THIRD MARKET FAMILY, FOUND ONLY BY THE OTHER PATH'S COUNTER.**
+`SEGMENT_MISMATCH_ROWS count=39 rows_in=9084 stamped=4469 refusing=True` on
+`apply_venue_quotes` — the freshness-stamping path — and its sample carries
+shapes the grid never showed:
+
+    mlb|first5|h2h|None <- polymarket_us|full|h2h|aec-mlb-tb-tex-2026-09-06
+    mlb|first5|h2h|None <- kalshi|full|h2h|KXMLBGAME-26SEP082140TEXSEA-TEX
+    mlb|first3|h2h|None <- polymarket_us|full|h2h|aec-mlb-stl-col-2026-09-06
+
+**Segment MONEYLINE rows were taking whole-game moneyline prices too, on both
+venues.** That was never in the original report and would not have been found
+without guarding both call sites.
+
+**NO COVERAGE WAS LOST WHERE THERE WAS NOTHING TO FIX.** nfl holds at 62
+repriced and soccer at 8, both `count=0` before and after — the two sports that
+were already clean are untouched, which is what separates a targeted refusal
+from a blunt one. mlb's `repriced` fall (90 → 44) and ncaaf's (111 → 97) are the
+refusals plus ordinary slate drift between builds; `count` is the attributable
+number, not the delta.
+
+**Deployed SHA `bd658209`, ON `origin/main`**, carrying `90493e64`'s flip
+(`_SEGMENT_REFUSAL_ENABLED = True`) and peers' join-counter prints. No
+`render.yaml` in the diff, so no `blueprint_sync`. Claim `f7c37016afc487c4`
+acquired 19:47Z, released with `--token`; `status` free. Not forced.
+
+**SAME TWO GAPS AS DEPLOY 1, ON THE SAME USER INSTRUCTION:** no
+`deploy_preflight.py` (`RENDER_API_KEY` absent), and triggered via the Render
+MCP, which the guard does not inspect. Liveness was checked by hand against
+preflight's own evidence and the trigger went into a measured lull —
+`ALL_PROCESS_MEMORY` `process_count=3` at 19:47:13Z (worker + shell + one
+defunct, no job trees), triggered 42 seconds later. Boot healthy on `2httk`.
+**No job killed.**
+
+**SCOPE: refresh-worker ONLY, and that is sufficient, established not assumed.**
+`apply_venue_quotes_to_grid` is reached only via
+`pipeline/layer2_shortlist.build_layer2_shortlist`, whose only callers are in
+`pipeline/intelligence_state.py` — the intelligence-state loop, which
+`state.md [user-decisions] 2026-08-19` records as `true` on refresh-worker and
+`false` on web and live-odds-worker. Web serves the artifact refresh-worker
+writes, so it needs no deploy for this.
+
 ## 2026-09-06 ~19:3xZ — RECONCILIATION: deploy 1 DID happen, and the two coverage numbers are not in conflict `[lane mlb-first5-kalshi-fanin-mismatch]`
 
 `90493e64` ("flip `_SEGMENT_REFUSAL_ENABLED` to True") states *"deploy 1 never

@@ -454,6 +454,35 @@ decision ("instrument first, fix second"), so deploy 1 COUNTS the mis-bindings
 and changes no price and deploy 2 flips the constant.** `SEGMENT_MISMATCH_GRID`
 carries `refusing=`, so a reader can never mistake the count for the repair.
 
+**FIXED, DEPLOYED AND VERIFIED IN PRODUCTION — THE MIS-BINDINGS ARE GONE**
+`[refresh-worker `bd658209` LIVE 2026-09-06T19:50:37Z; verify at 20:07:09-20:07:58Z,
+instance 2httk; working in .syndicate/deploys.md]`.
+`_SEGMENT_REFUSAL_ENABLED = True`, every line `refusing=True`, and **`matched`
+carries no segment entry on any sport**: mlb `{'full|kalshi|KXMLBTOTAL': 44}`
+(was `first3:12 first5:31` and `first1:2 first3:12 first5:26` on the two
+pre-flip builds), ncaaf `{'full|kalshi|KXNCAAFTOTAL': 13,
+'full|polymarket_us|-': 84}` (was `h1|kalshi:10 h1|polymarket:2`, then 6/6).
+`count=38` mlb and `14` ncaaf refused per build. **nfl (62) and soccer (8) are
+untouched at `count=0` before and after** — the refusal is targeted, not blunt.
+
+**REPLICATED TWICE BEFORE THE FIX, and the second build was WORSE** (mlb 40/90 =
+44.4% vs 43/118 = 36.4%). The second also surfaced **`first1`** as a fourth
+affected segment and NCAAF h1 Polymarket rising 2 -> 6.
+
+**A THIRD MARKET FAMILY, visible only on the OTHER call site's counter:**
+`SEGMENT_MISMATCH_ROWS count=39 rows_in=9084 stamped=4469` on
+`apply_venue_quotes`, sampling
+`mlb|first5|h2h|None <- polymarket_us|full|h2h|aec-mlb-tb-tex-2026-09-06` and
+`<- kalshi|full|h2h|KXMLBGAME-26SEP082140TEXSEA-TEX`. **Segment MONEYLINE rows
+were taking whole-game moneyline prices too, on both venues** — never in the
+original report, and only caught because both call sites were guarded.
+
+**SCOPE IS refresh-worker ONLY and that is SUFFICIENT, established not assumed:**
+`apply_venue_quotes_to_grid` is reached only via `build_layer2_shortlist`, whose
+only callers are in `pipeline/intelligence_state.py`, and `state.md
+[user-decisions] 2026-08-19` records that loop as ON for refresh-worker and OFF
+for web and live-odds-worker.
+
 **MEASURED IN PRODUCTION — 55 MIS-BOUND SIDES, TWO SPORTS, BOTH VENUES**
 `[refresh-worker `80d89986` LIVE 2026-09-06T19:04:54Z, reading 19:21:16-19:22:16Z,
 instance l4kdz; working in .syndicate/deploys.md]`. The instrument shipped with
