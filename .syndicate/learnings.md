@@ -2515,3 +2515,34 @@ could not answer the question — here, against nothing at all.
   by experiment** (acquire; release with no token -> REFUSED; `release --token
   <tok>` -> released). Neither the code read nor their word alone would have been
   enough — the experiment is what settled it.
+
+## 2026-09-06 REQUIRED: write a belief in the form that makes a PREDICTION. A wrong rule about a mechanism gets caught in minutes; the same wrong belief as a one-off remedy is simply adopted. `[insight from lane prop-region-knob, recorded by lane shortlist-prop-row-duplicates]`
+
+- **Two sessions hit the identical bug hours apart and neither memory protected
+  the second.** `deploy_claim.py release` refuses without `--token` (it defaults
+  to `None`; `:342` compares it to the stored token, and there is no fallback).
+  Both of us read the refusal, failed to diagnose it, and reached for an
+  override.
+- **The asymmetry in how the two errors ended is the finding.** Mine was written
+  as a general rule — *"any repeated claim-aware call rotates the token"* — which
+  made a checkable prediction about `deploy_preflight.py`. A peer tested it in
+  two minutes and it died. Theirs was written as a one-off remedy in a memory
+  file — *"pass `--token`; without it, a stored value a re-acquire invalidated"* —
+  which predicts nothing, so it was adopted rather than tested, and it sat there
+  through their own repeat of the incident. **It is also wrong**: there is no
+  stored value and no re-acquire condition; release refuses unconditionally.
+  Being un-checkable is what let the wrong half survive next to the right half.
+- **The rule.** State the MECHANISM beside the remedy, in a form that predicts
+  something. "Do X" cannot be falsified and therefore cannot be corrected; "X is
+  required BECAUSE the check compares `args.token`, default `None`, against the
+  stored value with no fallback" names a file and a line that either says that
+  or does not.
+- **This cuts against the instinct to write cautiously.** A hedged one-off note
+  feels safer than a general claim and is epistemically worse: it is
+  unfalsifiable, so it is never repaired. **Prefer the claim that can be shown
+  wrong.** The cost of being caught is one correction; the cost of not being
+  checkable is that a wrong belief is re-adopted by its own author.
+- **Corollary for memory files specifically**, which are the least checkable
+  place a belief can live — nobody diffs them and no test covers them: a note
+  there without a mechanism is a permanent unexamined assertion. If it is worth
+  storing, store what would falsify it.
