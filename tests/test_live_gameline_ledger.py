@@ -209,3 +209,101 @@ class TestDurability:
         p = tmp_path / "led.jsonl"
         out = append_records(p, build_records([_row()], sport="mlb", date_str="d"))
         assert out["enabled"] is False and out["written"] == 0 and not p.exists()
+
+
+# ---------------------------------------------------------------------------
+# THE MARKET BASELINE. Measured 2026-09-06 on NCAAF's accuracy artifact, n=5
+# finalised games: model brier 0.17494 / mae 0.20333, market brier NULL n=0.
+# A model score with no market score beside it cannot answer the only question
+# that matters -- does it beat the close -- so the live probability was
+# unmeasurable rather than merely unmeasured.
+# ---------------------------------------------------------------------------
+from syndicate.features.shared.live_gameline_ledger import _devig_home_prob, _market_fair_prob
+
+
+def test_the_devig_matches_a_hand_computed_market_price():
+    """-2128 / +1106 was the real WSU @ WASH consensus on 2026-09-06.
+
+    Hand-computed: implied 0.9551 / 0.0829, overround 1.0380, fair 0.9201.
+    Pinned against the arithmetic rather than against the function's own output,
+    which would only assert that it is self-consistent.
+    """
+    assert round(_devig_home_prob({"home": -2128, "away": 1106}), 4) == 0.9201
+    assert round(_devig_home_prob({"home": -110, "away": -110}), 4) == 0.5
+
+
+def test_a_priced_market_probability_always_WINS_over_the_devig():
+    """MLB/WNBA/soccer records must be byte-identical after this change.
+
+    The fallback exists for a sport whose projection carries no market price; it
+    must never quietly re-baseline a sport that already had one, because that
+    would move a published accuracy series without anything announcing it.
+    """
+    lg = {"market_prob": 0.77}
+    row = {"market": "h2h", "consensus": {"home": -2128, "away": 1106}}
+    assert _market_fair_prob(lg, row) == 0.77
+
+
+def test_the_fallback_fires_only_for_FULL_GAME_h2h():
+    """`consensus` on a totals or spreads row is over/under or cover pricing.
+
+    Calling either P(home) would score a probability against an event it does
+    not describe -- the exact defect `_SCOREABLE_MARKETS` exists to refuse. A
+    segment row is refused for the same reason: a first5 price is not a
+    full-game win probability.
+    """
+    cons = {"home": -2128, "away": 1106}
+    assert _market_fair_prob({}, {"market": "h2h", "consensus": cons}) is not None
+    assert _market_fair_prob({}, {"market": "totals", "consensus": cons}) is None
+    assert _market_fair_prob({}, {"market": "spreads", "consensus": cons}) is None
+    assert _market_fair_prob({}, {"market": "h2h", "segment": "first5", "consensus": cons}) is None
+
+
+def test_an_unusable_consensus_yields_NONE_not_a_confident_number():
+    """A one-sided or degenerate book is not a market price.
+
+    Returning 0.0/1.0 here would enter the accuracy series as a market that was
+    certain and, when it lost, take the market's log loss to infinity -- a
+    baseline destroyed by a missing quote rather than by being wrong.
+    """
+    assert _market_fair_prob({}, {"market": "h2h", "consensus": {"home": -2128}}) is None
+    assert _market_fair_prob({}, {"market": "h2h", "consensus": {}}) is None
+    assert _market_fair_prob({}, {"market": "h2h"}) is None
+    assert _devig_home_prob({"home": 0, "away": 0}) is None
+
+
+def test_build_records_ACTUALLY_USES_the_devig_fallback():
+    """REACHABILITY, and it is here because the first version of these tests had
+    none.
+
+    The helper tests above all passed with the fallback DISCONNECTED from
+    `build_records` -- a five-line mutation left 26 tests green, so the fix could
+    have shipped inert with a full suite vouching for it. Exercising the helpers
+    proves they compute; only this proves the record carries the result.
+    """
+    from syndicate.features.shared.live_gameline_ledger import build_records
+
+    row = {
+        "sport": "ncaaf", "market": "h2h", "segment": "full",
+        "home_team": "Washington", "away_team": "Washington State",
+        "event_id": "evt-1",
+        # The real WSU @ WASH consensus, 2026-09-06.
+        "consensus": {"home": -2128, "away": 1106},
+        # A projected live row whose PRICER refused: exactly NCAAF's shape --
+        # `market_prob` None because `market_fair_prob_over` is absent upstream.
+        "live_gameline": {
+            "model_prob": 0.9917, "market_prob": None, "priceable": False,
+            "withheld_reason": "no_two_sided_market_price", "sims_run": 120,
+        },
+        "projection": {"live_aware": True},
+    }
+    recs = build_records([row], sport="ncaaf", date_str="2026-09-06")
+    assert len(recs) == 1, "the row must be recorded at all"
+    rec = recs[0]
+    assert rec["model_home_win_prob"] == 0.9917
+    assert rec["market_fair_prob"] == pytest.approx(0.9201, abs=5e-5), (
+        "the record must carry the de-vigged market baseline, not the pricer's None"
+    )
+    # And the pricing verdict is untouched -- this is a MEASUREMENT fix.
+    assert rec["priceable"] is False
+    assert rec["withheld_reason"] == "no_two_sided_market_price"

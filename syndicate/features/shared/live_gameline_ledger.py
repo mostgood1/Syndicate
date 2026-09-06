@@ -227,7 +227,7 @@ def build_records(
                 "books_key": ",".join(books),
                 # --- the OPEN half of CLV ---
                 "model_home_win_prob": lg.get("model_prob"),
-                "market_fair_prob": lg.get("market_prob"),
+                "market_fair_prob": _market_fair_prob(lg, row),
                 "edge_pp": lg.get("edge_pp"),
                 # WHETHER THE BOARD WOULD HAVE SHOWN THIS EDGE, kept as a field
                 # rather than as a filter. A CLV pass restricted to
@@ -386,6 +386,82 @@ def append_records(path: Path, records: list[dict[str, Any]]) -> dict[str, Any]:
         # exist yet.
         coverage["error"] = f"{type(exc).__name__}: {exc}"
     return coverage
+
+
+def _devig_home_prob(consensus: Any) -> float | None:
+    """De-vig a two-sided American moneyline into P(home). None if it is not one.
+
+    Deliberately the SAME arithmetic the pricer uses -- implied probabilities
+    normalised by the overround -- so the measurement baseline and any future
+    priced baseline cannot disagree about what "the market said".
+    """
+    if not isinstance(consensus, Mapping):
+        return None
+
+    def implied(american: Any) -> float | None:
+        try:
+            odds = float(american)
+        except (TypeError, ValueError):
+            return None
+        if odds == 0:
+            return None
+        return abs(odds) / (abs(odds) + 100.0) if odds < 0 else 100.0 / (odds + 100.0)
+
+    home, away = implied(consensus.get("home")), implied(consensus.get("away"))
+    if home is None or away is None:
+        return None
+    total = home + away
+    if total <= 0:
+        return None
+    fair = home / total
+    # A de-vig that lands on a certainty is not a price, it is a settled market.
+    return fair if 0.0 < fair < 1.0 else None
+
+
+def _market_fair_prob(lg: Mapping[str, Any], row: Mapping[str, Any]) -> float | None:
+    """The market's P(home) for this record -- priced value first, de-vig second.
+
+    WHY THIS FALLBACK EXISTS, and why it is HERE and not in the projection.
+    Measured 2026-09-06 on the NCAAF accuracy artifact, n=5 finalised games:
+
+        model  brier 0.17494  mae 0.20333  n=5
+        market brier null     mae null     n=0     <- NO BASELINE
+
+    A model Brier with no market Brier beside it cannot answer the only question
+    that matters -- does this beat the close -- so NCAAF's live probability was
+    unmeasurable, not merely unmeasured. The cause: `price_moneyline` reads
+    `projection.market_fair_prob_over`, which `ncaaf/game_projections.py` writes
+    in its TOTALS branch and not its H2H branch, so `market_prob` came back None
+    and the null propagated into every ledger record.
+
+    THE OBVIOUS FIX IS THE WRONG ONE. Adding that field to the projection would
+    also hand `price_moneyline` a market price, and NCAAF places zero orders
+    today precisely because `portfolio_commit` refuses every row for
+    `no_model_edge_pct`. Supplying it would let an UNGRADED model produce
+    edges that clear that gate -- shipping money exposure to unblock a
+    measurement.
+
+    So the baseline is reconstructed HERE, on the ledger path, from the row's
+    own `consensus`. Nothing in the pricing or ordering path reads this file:
+    `build_records` feeds `live_gameline_score`, which computes Brier and MAE.
+    Measurement gets the market number; the pricer does not.
+
+    The priced value still WINS when present, so MLB/WNBA/soccer records are
+    byte-identical and this cannot quietly re-baseline a sport that already had
+    one.
+    """
+    priced = lg.get("market_prob")
+    if priced is not None:
+        return priced
+    # h2h ONLY. `consensus` on a totals or spreads row is over/under or
+    # home-cover pricing, and calling either P(home) would be scoring a
+    # probability against an event it does not describe -- the exact defect
+    # `_SCOREABLE_MARKETS` was added to stop.
+    if str(row.get("market") or "").strip().lower() != "h2h":
+        return None
+    if str(row.get("segment") or "full").strip().lower() not in ("", "full"):
+        return None
+    return _devig_home_prob(row.get("consensus"))
 
 
 def record_live_gamelines(grid: Any, *, sport: str, date_str: str,
