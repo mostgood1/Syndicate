@@ -252,6 +252,38 @@ death, never life — do not invert it.
   below is re-added at close, from the staged blob, after taking upstream's file.
 - Blocked by: none.
 
+### segment-regrade-apply — OPEN — opened 2026-09-06 — session 3492626c
+- Goal: the 49 mis-graded segment orders carry their CORRECTED outcome in the
+  execution ledger, auditable and reversible.
+- Files: `scripts/apply_segment_regrade.py` (NEW)
+- NOT MINE TO EDIT: `scripts/run_refresh_worker.py` holds the `*_ON_BOOT`
+  trigger pattern and is claimed by `ncaaf-live-resim-wire`. Surfaced to them
+  rather than edited.
+- Why 49 and not 53: 10 of the 173 were settled BY THE VENUE and 3 of those
+  changed. Excluded permanently — for 5 of the 10 the contract we HELD was a
+  full-game `KXMLBTOTAL`, so the venue graded the instrument we actually owned
+  and its grade is the correct one. Applying those would invent P&L no position
+  earned. P&L effect of the 49: **-$31.32**.
+- Design decisions, stated because both could reasonably go the other way:
+  (1) it OVERWRITES `outcome` and preserves `outcome_as_settled` /
+  `pnl_as_settled_dollars` / `regraded_at` / `regrade_reason`. Additive-only
+  would leave calibration, CLV, ROI and `ledger_summary` still reading the wrong
+  field, which is the defect itself. (2) it REFUSES unless the keyvalue backend
+  is configured — verified `rc=3` locally — because a laptop run would write a
+  local document and report success while production is untouched.
+- The original blocker is STALE and that is checked, not assumed:
+  `regrade_segment_orders.py` declined to write partly because concurrent edits
+  were being lost. `#600` replaced the blind whole-document write with
+  `_merge_onto_current` (`execution_ledger.py:842`); this script ASSERTS that
+  function exists before writing, so running it against an older build refuses
+  rather than reintroducing the lost update.
+- Verification: dry run reports 49 / -$31.32 / flips
+  `{won->lost 28, lost->won 20, lost->push 1}`; `--apply` off-service returns
+  `rc=3`. The real verification is post-run: `/api/ops/execution/ledger-summary`
+  `by_segment` settled counts unchanged, and 49 rows carrying
+  `outcome_as_settled`.
+- Blocked by: the trigger. Needs a boot hook in a file another lane holds.
+
 ## OPEN
 
 ## OPEN
