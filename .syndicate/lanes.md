@@ -86,6 +86,33 @@ death, never life — do not invert it.
   behind it, which is how I mis-reported pressure as 86% when it was 54%.
 - Blocked by: none.
 
+### intelligence-cache-cap — OPEN — opened 2026-09-05 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: bound `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` by CONTENT, not by entry
+  count. It measured **37.50 MB** on a live worker WHILE CAPPED at 32 entries —
+  the cap is on the wrong dimension, because entry size varies by orders of
+  magnitude with slate size.
+- Files: `pipeline/intelligence_state.py` (**the cache at ~8416 and its eviction
+  at ~8789 ONLY**), `tests/test_intelligence_cache_cap.py` (NEW).
+  `layer2-sim-disagrees` claims this file for *"the `confidence` backfill at
+  ~1888 ONLY"*, so the two are disjoint by that lane's own stated scope; notice
+  left in their block.
+- NOT AN OOM FIX, and this is stated so nobody later reads it as one: `#632`'s
+  bytes are **not Python objects** (28.3% of anon; 0.3% of the growth). This
+  bounds a real unbounded cache on its own merits.
+- Hypothesis: eviction is also too weak — it pops exactly ONE entry per insert,
+  so a cache that gets over budget by more than one entry never catches up.
+- Falsification test: with the bound in place the cache still exceeds its row
+  budget in production — then size does not track row count and the proxy is
+  wrong.
+- Verification: `/api/ops/retainer-census` shows the cache materially below
+  37.50 MB on a settled worker, and the row budget holds.
+- MEASURED, so the design is not a guess: per-insert SIZING was rejected. An
+  accurate deep walk costs **228 ms** on a 3,000-row payload; a cheap truncated
+  walk under-reports **11.31 MB as 1.44 MB**; `json.dumps` costs **70-174 ms**
+  AND allocates a 9.44 MB transient string on a box that is OOMing. Row count is
+  O(1) and tracks the dominant term.
+- Blocked by: none.
+
 ## OPEN
 
 ## OPEN
@@ -763,8 +790,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 
 ### evaluation-ledger-projected-mirror — OPEN — opened 2026-09-04 — session 5959f891-a9e4-4904-a2f0-486a008278d9 — **BUILT, TESTED AND SHIPPED: deploy commit `d452ece1` reads "web + refresh-worker to c49d47fa: the projected ledger mirror is live, allowlist proven", and `c49d47fa` is inside both live SHAs, checked 2026-09-05T21:45Z by `ledger-repair-invariants`. The projected ledger is the only form that can leave refresh-worker.** `[user: "build the projected ledger producer"]`
 - Goal: the evaluation ledger becomes readable OFF refresh-worker, so `build_accuracy_summary` can be run unbounded (`budget=0`) against a local mirror instead of rationed inside a 4 GB box that is also running board builds and sims. ONE testable outcome: after a deploy, `PROJECTION_DONE ... over_ceiling=0` appears on the worker AND `reports/intelligence/evaluation_ledger_projected/<date>.jsonl` is fetchable from web via `/api/ops/artifacts/stream`.
-- Files: `syndicate/features/shared/evaluation_ledger_projection.py` (NEW), `tests/test_evaluation_ledger_projection.py` (NEW), `scripts/run_refresh_worker.py` (the autorun call site only — every OPEN-lane reference to this file is RELEASED; checked).
-- released: `syndicate/features/shared/artifact_publisher.py` — **moved OUT of the `- Files:` line above on 2026-09-05 by lane `render-egress-transport` (session 9e40eb04).** That line already read "one allowlist entry — the file is explicitly RELEASED and NOT CLAIMED", and it still enforced as a claim: `_claimable_prefix` cuts a Files line at the FIRST disclaimer marker and reads paths only from what PRECEDES it, so a path written BEFORE its own release note is claimed anyway — `lane-guard.py` refused the edit. That is the identical trap the next bullet documents for `intelligence_evaluation.py`, one path later in the same line. Owning session `5959f891-a9e4-4904-a2f0-486a008278d9` is absent from the session roster **including archived** (60 rows, back to 2026-08-31), so the claim was being held on behalf of nobody. Nothing else in this lane is touched, and the allowlist entry it describes is a different region of the file from the publish/pull transport `render-egress-transport` edits.
+- Files: `syndicate/features/shared/evaluation_ledger_projection.py` (NEW), `tests/test_evaluation_ledger_projection.py` (NEW), NOT CLAIMED — one allowlist entry, and the file is explicitly RELEASED [marker moved in front of the path 2026-09-05 by lane `ncaaf-live-resim-wire`, session 520cd594, so the parser reads what this line already SAID; no other change, and the cut point is unmoved so nothing after it gains or loses a claim. Owning session `5959f891-a9e4-4904-a2f0-486a008278d9` is absent from the roster; lane `render-egress-transport` reached the same conclusion independently the same evening and holds an unpushed edit here — if theirs lands first, take it]: `syndicate/features/shared/artifact_publisher.py`, `scripts/run_refresh_worker.py` (the autorun call site only — every OPEN-lane reference to this file is RELEASED; checked).
 - **NOT CLAIMED — written as its own bullet ON PURPOSE, because `check_lane_invariants.py` reads any path named inside a `- Files:` block as a CLAIM even when the prose beside it says the opposite** (it flagged exactly that here on the first attempt): `syndicate/features/shared/intelligence_evaluation.py` is still held by `accuracy-ledger-budget-raise` and is **deliberately NOT touched** by this lane. The producer is a NEW module that IMPORTS `_project_evaluation_record` rather than editing it — which is also the correctness choice, since a copied field list would drift silently into a thinner mirror.
 - Hypothesis: the projection is the transport. **Measured, not assumed:** raw chunks are 95-332 MB/day against a 12 MiB `_PUBLISH_MAX_BYTES`, and refresh-worker serves no HTTP, so the raw ledger has NO route out; the projected copy is ~560 B/record and that cost SATURATES, putting a 250 MB chunk at ~3.3 MB — under `_PUBLISH_STREAM_MIN_BYTES` (4 MiB) and 3.6x under the sweep ceiling.
 - Falsification test: `PROJECTION_OVER_CEILING` firing in production means the ~3.3 MB sizing is wrong and the design needs compression or per-chunk splitting — NOT a raised ceiling, whose own comment forbids that. Equally, if `chunks_deferred` never reaches 0 across successive days the bound is too tight to converge.
@@ -942,9 +968,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `tests/test_smartsim2_resume_state.py` (NEW).
 - Files (ADDED 2026-09-05 after the feasibility probe came back POSITIVE and the
   join hop was traced; re-checked with `claims_by_path`, all FREE):
-  **2026-09-05 ~22:0xZ, on an explicit user override, after this session was
-  asked TWICE for the claim and did not answer, these two moved to lane
+  **2026-09-05 ~22:0xZ, on an explicit user override, these two moved to lane
   `edge-basis-moneyline`:**
+  **CORRECTION 2026-09-05 ~23:1xZ — I wrote here that this session "was asked
+  TWICE for the claim and did not answer". THAT IS WRONG AND I RETRACT IT.** The
+  messages went to session `520cd594` (lane `ncaaf-live-resim-wire`), which never
+  held either file and told me so. This lane's owner is `3492626c`, and
+  **`list_sessions` with `include_archived: true` returns no such session across
+  50 rows** — it was never reachable, so no inference of any kind was available
+  from the silence. not claimed, cross-reference only: `learnings.md` already
+  carries the general form ("a lane
+  block's `session <id>` is neither checkable nor messageable; `acquire` is not a
+  probe"); what is new is that I read UNREACHABLE as REFUSED and put it in the
+  ledger as a justification. **The user override is what authorised this move and
+  it is sufficient on its own** — the false corroboration added nothing and is
+  removed rather than softened.
   released: `syndicate/features/shared/live_gameline_join.py`
   released: `tests/test_ncaaf_live_gameline_registration.py`
   STILL HELD BY THIS LANE:
@@ -1332,6 +1370,47 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   copy passes both checkers. So committing this file from the primary tree would
   DELETE 59 lane blocks from upstream. Nothing here commits `.syndicate/lanes.md`
   from the primary tree; see the checkpoint for what landed and how.
+- **MEASURED AFTER, on `origin/main` `578bce89` (2026-09-05T22:2xZ): BOTH
+  CHECKERS PASS.** `check_lane_invariants.py` exit 0, INVARIANTS HOLD;
+  `check_lane_claims.py` exit 0. The digest's `DIGEST OVERFLOW: 1874B > 1800B`
+  line is gone. `lanes.md` 319,770 -> 185,962 B, 105 lane headers -> 50.
+- What was actually wrong, in the order it was found.
+  (a) CONTESTED `lanes.md`: not two lanes wanting one file, but PROSE inside two
+  `- Files:` blocks. `ncaaf-segment-capture`'s own paragraph explaining that any
+  path-like token in a Files block becomes a claim was ITSELF inside the Files
+  block, so it claimed `lanes.md` and `learnings.md`; `nfl-projection-et-datekey`'s
+  collision-check note claimed `lanes.md`, `369/373/379/383` and two files it
+  said it was NOT touching. Moved to their own bullets; not one word changed.
+  (b) `measured-correlation-pays-off` claimed ``lane`'s`` the same way.
+  (c) The two orphan markers needed OPPOSITE fixes and neither was guessed.
+  `verify-ledger-budget-4gb` is a SCHEDULED TASK id, not a lane -- `git log -S`
+  finds `### verify-ledger-budget-4gb` in ZERO commits, its work is recorded in
+  `accuracy-ledger-budget-raise` and `deploys.md`, and its session is gone; the
+  marker was emptied. `segment-refusal-deploy` was the opposite: an ACTIVE lane
+  holding live deploy claims on web and refresh-worker and named by two other
+  blocks, whose block was never written; it was reconstructed, and labelled
+  RECONSTRUCTED with its evidence.
+- **7 stale deploy headers corrected** (8 edits), each against the SHA the
+  service is running -- web `94c8ac13`, refresh-worker `eb7951fe`,
+  live-odds-worker `3223baa1`, read from `/v1/services/<id>/deploys` and tested
+  with `git merge-base --is-ancestor`. See commit `cab6138f`.
+- **THE 600 B `LANE_CAP` IS UNREACHABLE BY ARCHIVING, AND THE MEASUREMENT SAYS
+  SO.** The digest's OPEN LANES section is built ONLY from the `### ` header and
+  `- Goal:` line of lanes whose status reads OPEN, and `trim_lane_blocks.py`
+  moves only blocks that are neither OPEN nor claim-bearing -- so the 59-block
+  archive pass moved it 28,025 -> 27,840 B, which is noise. Composition on
+  `578bce89`: **46 OPEN header lines, 25,438 B**, the largest single header
+  2,347 B (`mlb-feed-live-terminal-refresh`) -- one header is 3.9x the whole
+  cap. Reduced to the minimal header form the `/lane` template prescribes,
+  46 lanes would still be ~3,588 B, i.e. **6x over cap with zero prose**. Two
+  levers, both bigger than one lane: CLOSE lanes (46 read OPEN, most UNOWNED
+  with dead sessions), or demote header status prose into a `- Status:` bullet
+  (lossless, 25,438 -> ~3,588 B, but it rewrites 46 other lanes' headers).
+  Raising `LANE_CAP` is the third option and is a user decision, not mine.
+- NOT DONE, and each is deliberate: `learnings.md` is 435,254 B against its
+  400,000 cap and `compact_learnings.py` REWRITES THE WHOLE SHARED FILE, so it
+  was left alone; one BAD claim (`export`) remains in `render-egress-transport`,
+  which belongs to session 9e40eb04 and was relayed, not edited.
 - Blocked by: none.
 ### edge-basis-moneyline — CLOSED-VERIFIED 2026-09-05 — `edge_basis` said `pregame` on every live MONEYLINE row while the edge came from the LIVE probability; fixed, landed, mutation-checked
 - Outcome: `_apply_verdict` reads `edge_basis` off `verdict["model_prob"]` — the
@@ -1356,68 +1435,292 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   two silent release failures: `log/2026-09-05.md`, `state_board.md
   [live-edge-basis-label]`, and two new rules in `learnings.md`.
 - Blocked by: none.
-### render-egress-transport — OPEN — opened 2026-09-05 — session 9e40eb04-9f1c-464b-a6fb-5acac211e775
-- Goal: cut Render bandwidth below the 25 GB included allowance. **The month is at 24.4/25 GB on day 5.** ONE testable outcome: after the change, `/v1/metrics/bandwidth` for `web` over a comparable slate hour falls by >=5x against the pre-change hour, and the drop is attributable in the gunicorn access log (response bytes on `/api/ops/artifacts/export`) and in `[ops.publish]` `bytes=` totals.
-- **NOTICE from `segment-refusal-deploy` (session 3492626c) `[2026-09-05]`: THE
-  EXPORT ENDPOINT IS A MEMORY PROBLEM AS WELL AS A BANDWIDTH ONE, which may
-  change the shape of your fix.** `/api/ops/artifacts/export` MATERIALISES each
-  artifact WHOLE into the 2 GB web process -- it streams nothing. Measured
-  tonight: it returned **HTTP 502** at me twice under ordinary measurement
-  reads, once on a single ~200 KB file while web was healthy. `#632` separately
-  confirmed that process does not return memory between requests. So compression
-  on the wire would cut your 24.4 GB and leave the 502s exactly where they are:
-  the spike is the in-process buffer, not the transfer. If that matters to your
-  testable outcome, the fix is "do not materialise the artifact" (stream, or
-  range-serve), and compression is complementary rather than sufficient.
-- **An attribution data point you can have for free:** I pulled **~17 MB**
-  through `/api/ops/artifacts/export` tonight from ONE session doing measurement
-  work -- 16 sim artifacts at ~375 KB, an 11 MB backfill read, plus repeated
-  `names_only` listings. **None of it was necessary**: the same data is
-  git-tracked and I have since redirected that path to local reads
-  (`1578555d`). That is machine-to-machine traffic with no user behind it,
-  which supports your hypothesis, and it means CONSUMER-side audits are worth
-  something alongside the transport fix.
-- **No collision:** I edited `syndicate/blueprints/ops.py` (`4ffba395`) to add a
-  `by_segment` dimension to `/api/ops/execution/ledger-summary`. Your claim on
-  that file is scoped to `/api/ops/artifacts/publish` + `/export`
-  receive/serve -- different endpoints, checked line-by-line. I touched none of
-  `artifact_publisher.py`, `app.py`, or your two new files.
-- Files: `syndicate/features/shared/artifact_publisher.py` (publish + pull transport), `syndicate/blueprints/ops.py` (`/api/ops/artifacts/publish` + `/export` receive/serve), `syndicate/app.py` (response compression hook), `scripts/render_bandwidth_report.py` (NEW), `tests/test_artifact_transport_compression.py` (NEW).
-- **Not claimed by anyone else — checked**: every OPEN-lane mention of `artifact_publisher.py` (`mlb-resolver-write-side-effect`, `ncaaf-games-cache-refresh`, `evaluation-ledger-projected-mirror`) and of `blueprints/ops.py` (`open-bet-live-status`) says RELEASED / NOT CLAIMED in its own prose.
-- Hypothesis: the 24.4 GB is NOT user traffic. It is the worker<->web artifact transport shipping whole uncompressed JSON/JSONL files, in both directions, every cycle. **FALSIFIED — see the retraction above.**
-- Falsification test: attribute the two largest hours from the logs. If public-edge traffic (Render `type=request` logs) accounts for the bulk, the hypothesis is wrong. **THIS TEST WAS TOO WEAK AND IS THE LESSON.** It could only fail one way: it asked whether the PUBLIC edge explained the bill, the edge did not, and I read "not the edge" as "therefore the internal transport" — over a two-term model where a third term existed. The test that actually worked was the CONTROL I nearly did not run: an hour with the SAME internal transport and a DIFFERENT metered value. One hour that agrees is not evidence when a second hour can disagree by 150x.
-- **RETRACTED 2026-09-05, BY ME, BEFORE DEPLOYING ANYTHING — "HYPOTHESIS CONFIRMED" BELOW IS WRONG AND MUST NOT BE QUOTED.** The confirmation rested on ONE hour whose two numbers happened to agree: 2026-09-04 17:00-18:00Z metered **4,050 MB** while the gunicorn log showed 699 MB out + 3,461 MB of inbound publishes = **4,160 MB**. A 97% match on a 4 GB figure reads as proof. It was a coincidence, and the control that breaks it is 2026-09-05 04:00-05:00Z: **1,026 MB out + 4,217 MB of inbound publishes = 5,243 MB of the SAME internal transport, metered at 33.9 MB.** 150x apart. **INTERNAL SERVICE-TO-SERVICE TRAFFIC IS NOT BILLED** — which is what `render.yaml`'s own `SYNDICATE_WEB_PUBLISH_URL` comment has said since the 1.62 TB incident, and both workers are on the internal hostname today (read live, 2026-09-05).
-- **THREE THINGS ARE NOW ELIMINATED AS THE DRIVER, each by measurement, and the elimination is the durable result of this lane:**
-  1. **Internal worker<->web artifact transport.** 5.2 GB of it metered at 33.9 MB (above).
-  2. **Public HTTP responses.** The edge log is COMPLETE — its request counts match `/v1/metrics/http-requests` per bucket (223 vs 221, 131 vs 127, 98 vs 97), so nothing is being dropped — and it accounts for **61.1 MB in the 2,809 MB hour** and **2.6 MB in the 4,050 MB hour**.
-  3. **Deploys.** Three web deploys in the 09-04 16:00-17:00 hour cost 21.4 MB; one deploy in 17:00-18:00 sat in a 4,050 MB hour. No relationship.
-- **AND ONE NEW FACT THAT CHANGES WHAT COMPRESSION IS WORTH: RENDER'S EDGE ALREADY GZIPS PUBLIC RESPONSES.** Same requests, two logs, same hour: `export?pattern=*book_quotes/2026-08-26.jsonl` is **198.8 MB in gunicorn and 4.2 MB at the edge** (n=2 in both, so it is the same two calls, 47x); `/api/intelligence/query` is 16.4 MB vs 1.43 MB (n=14 both, 11.5x). So app-level gzip is REDUNDANT for any client that sends `Accept-Encoding` and only helps callers that do not — `Python-urllib` does not send it by default.
-- **WHAT IS LEFT, AND IT IS NOT YET IDENTIFIED:** web is **19.57 GB of the workspace's 24.55 GB** (every other resource in the account, including 9 legacy sport services, is at ~0 — measured across all 16). The metered bytes are in neither HTTP log, so the remaining candidate class is **web's OWN OUTBOUND connections**, which no HTTP log records. The strongest specific candidate is web <-> the Render Key Value store (`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`, `redis://red-d88bvljbc2fs73epfhhg:6379`) — invisible to both logs, on the right service, and known to carry multi-MB payloads. **NOT MEASURED. Do not act on it as if it were.** `/v1/metrics/bandwidth` has no egress/ingress split and no sub-hourly resolution (probed: 60s/300s/900s all return hourly), and the key-value resource returns 404 for metrics, so the next step is instrumenting web's outbound rather than another API read.
-- **FIRST BILLED-AND-REDUCIBLE FINDING, and it is in the OTHER bucket `[2026-09-05, surfaced by a coordination message from lane `ncaaf-live-resim-wire`]`: EVERY OUTBOUND FETCH THIS REPO MAKES PULLS UNCOMPRESSED.** `urllib` does not send `Accept-Encoding` by default (`requests` does), and there are **122 `urllib.request.Request` call sites across `syndicate/`, `scripts/` and `pipeline/` — ZERO of which send it.** Measured against the real upstreams, plain vs `Accept-Encoding: gzip`:
-
-    | endpoint | plain | gzip | ratio |
-    |---|---|---|---|
-    | ESPN CFB scoreboard `?groups=80&limit=200` | 1,441,192 | 107,229 | **13.4x** |
-    | ESPN NFL scoreboard | 255,887 | 20,912 | **12.2x** |
-    | MLB StatsAPI schedule | 21,296 | 2,864 | 7.4x |
-    | ESPN NBA scoreboard | 9,467 | 2,095 | 4.5x |
-
-  Every upstream already serves gzip; nothing asks. **This is the DASHBOARD'S OTHER BUCKET — "Service-Initiated", 5.06 GB of the month's 24.4 GB** — and unlike web's 19.5 GB it is both identified and fixable. Worked example from the coordinating lane: an ESPN CFB fetch on a 180 s tick is 691 MB/day at 1 fetch and **1.38 GB/day at 2** — more than refresh-worker's ENTIRE Sep 1-5 bandwidth (1.07 GB) — and the fix is one header, NOT a longer interval.
-- **FIX AT THE CHOKE POINT, NOT 122 CALL SITES** (`learnings.md`: fix the choke point all callers share) — **BUILT, TESTED, LANDED IN THE TREE, NOT DEPLOYED `[2026-09-05, user: "do the accept-encoding fix"]`.** `syndicate/features/shared/http_compression.py` installs a global `urllib` opener (`install_opener`) from **`syndicate/__init__.py`** — the ONLY module all three services import (web via `wsgi:application` -> `syndicate.app`; both workers' `startCommand` scripts import `syndicate.features.shared.*`), and chosen over the three entrypoints because two of them are claimed by other OPEN lanes. Nothing in `syndicate/` builds its own opener (checked: zero `build_opener`/`install_opener`/`OpenerDirector`), so nothing bypasses or clobbers it. Kill switch `SYNDICATE_HTTP_GZIP=off`; absent means ON.
-- **THE DEFECT IS WORSE THAN "does not ask", and the control test found it.** `http.client.HTTPConnection.putrequest` sends **`Accept-Encoding: identity`** whenever the caller supplies none — an EXPLICIT REFUSAL on the wire. All 122 sites were actively telling every upstream *not* to compress. I wrote the control expecting an empty header; it asserted the real value and returned `identity`.
-- **VERIFIED LOCALLY ON THE REAL PRODUCTION CALLER, not a synthetic one:** `schedule_adapter._fetch_espn_football_schedule("ncaaf", "2026-09-05")` returns **68 rows** (parsed, correct) while pulling **70,155 bytes instead of 948,450 — 13.5x**, `hosts_refused=0`. NFL same call: 4.4x. 10 new tests in `tests/test_http_compression.py` drive a REAL local HTTP server through REAL `urlopen`, covering off!=on, streamed chunked reads, and the three declines (caller's own `Accept-Encoding`, `Range`, kill switch). **CI's own suite is green: `python -m unittest tests.test_archives`, 383 tests, OK.** Three `test_nfl_fantasy_artifact.py` failures are PRE-EXISTING — discriminated by re-running with `SYNDICATE_HTTP_GZIP=off`, identical 3 failures, so they are not this change.
-- **THE ESPN-403 HAZARD IS HANDLED IN CODE, NOT ASSUMED AWAY.** `_AcceptEncodingHandler.http_error_{403,406,415}` retries once WITHOUT the header and remembers the host for the process; a 403 that persists bare is NOT blamed on the header (the host is un-marked), so an unrelated permission error cannot silently cost compression. Tested both directions.
-- **OWED, AND IT CANNOT BE DISCHARGED FROM THIS MACHINE:** every ratio above was measured from a dev box. `schedule_adapter.py:377-386` records ESPN answering 403 to RENDER'S OUTBOUND IP for a header shape it disliked. After deploy, read `[http_compression] HTTP_COMPRESSION ...` and `ACCEPT_ENCODING_REFUSED ...` off the workers (`render_logs.py --text HTTP_COMPRESSION`) and confirm `refused_hosts=0` with a real `ratio`. A silent `hosts_refused=N` means the header is being rejected and the saving is not happening.
-- **CAVEAT ON THAT TABLE, and it is not pedantic:** measured from a dev machine, not from Render. `schedule_adapter.py:377-386` records that ESPN answers **HTTP 403 to Render's outbound IP** for a bare `User-Agent: Mozilla/5.0` while working with no custom UA at all — ESPN demonstrably discriminates on headers *from Render specifically*. Confirm a 200 from a worker before trusting the ratio in production.
-- **THE CODE IN THIS LANE IS CORRECT AND IS NOT A BANDWIDTH FIX.** gzip on the publish/pull transport, 22 tests green, cuts the internal transport ~28x. That is worth having for web's memory and the workers' time (`#632`, and the NOTICE above), and it must NOT be deployed or recorded as reducing the bill. NOT DEPLOYED.
-- **SUPERSEDED — the reasoning that produced the retracted claim, kept because the per-hour attribution numbers in it are still correct and still useful:** Per-service `/v1/metrics/bandwidth`, 09-01..09-05: web **19.50 GB**, live-odds-worker **3.88 GB**, refresh-worker **1.07 GB**, total **24.45 GB** (dashboard says 24.4 — the metric IS the billed number). The metric buckets are RIGHT-labelled (confirmed twice against request counts). Two hours attributed line by line:
-  - **2026-09-04 17:00–18:00Z = 4,050 MB.** Public edge carried **2.6 MB of it** (131 requests). Internal: **3,461 MB INBOUND** artifact publishes (soccer `tracking/odds_history` 1,274 MB / n=117 / avg 11.2 MB; `artifacts/soccer` 1,038 MB / n=97 / avg 11.0 MB; soccer `tracking/book_quotes` 850 MB / n=25 / **avg 34.8 MB**; ncaaf book_quotes 244 MB; mlb book_quotes 56 MB) plus **699 MB OUTBOUND** responses, of which 573 MB is 38 calls to `/api/ops/artifacts/export?pattern=*2026-09-04*` at **15.4 MB each, every ~90 s, from both workers**. 3,461 + 699 = 4,160 vs the 4,050 bucket — the metric counts BOTH directions.
-  - **2026-09-01 22:00–23:00Z = 2,809 MB.** 2,707 MB of outbound responses: **1,572 MB is ~17 ad-hoc `/api/ops/artifacts/export?pattern=*mlb_source/tracking/book_quotes/2026-08-XX.jsonl` pulls at 80–199 MB EACH** (a local analysis session), 555 MB the routine worker pull, **328 MB is 5 calls to `/api/intelligence/query` at 67 MB each**.
-- The pull watermark is NOT broken — `since=` advances every cycle and the chain is unbroken across the hour. 17.7 MB genuinely changes every 90 s, because odds capture rewrites whole shards.
-- **Compression ratio MEASURED on a real shard**, `data/mlb_source/tracking/book_quotes/2026-07-07.jsonl` 13.92 MB: **gzip-1 → 0.49 MB (3.5%), 0.20 s**; gzip-6 → 0.33 MB (2.4%), 0.41 s. `.state.json` 1.40 MB → 0.13 MB (9.0%).
-- Verification: after deploy, re-run `scripts/render_bandwidth_report.py` over a slate hour and compare against the 09-04 17:00Z and 09-01 22:00Z baselines recorded above, and record the reading in `deploys.md`.
+### full-suite-xdist-run — CLOSED-VERIFIED 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **THE FULL SUITE COMPLETED FOR THE FIRST TIME: 15,307 collected, 32 failed / 15,224 passed / 51 skipped, 3666.33s (1:01:06). The gate's `27 NEW` is NOT 27 regressions — re-run standalone, 6 PASS ALONE (parallel-only artefacts) and 21 fail alone, of which 2 are already-documented pre-existing, 1 is data-shaped and 18 are tests left stale by deliberately shipped changes. NOTHING is caused by this session's code. Falsification test resolved: peak RSS 7.05 GB and a FLAT pagefile, so the earlier `MemoryError` was the 4,864 MB pagefile, not the suite.** — `[user: "install pytest-xdist and run the full suite"]`
+- Goal: ONE testable outcome — `scripts/pytest_baseline.py` completes a full
+  `tests/` run under `pytest-xdist` and prints its verdict against
+  `tests/pytest_baseline.json` (11,745 testcases / 19 known failures). The
+  deliverable is the VERDICT plus the named diff, not "it passed".
+- Files: NONE claimed in the repo. `pytest-xdist>=3.6,<4.0` was ALREADY
+  declared in `requirements-dev.txt` (added 2026-08-25 by the scope note) and
+  merely absent from this machine — installing it edits no file. **I will NOT
+  run `--update`**: that would overwrite a CI-relevant baseline with
+  Windows-local results.
+- **THIS SERVES ANOTHER LANE'S OWED READING. `suite-order-pollution` (OPEN,
+  session b9bc926d) needs exactly this** — its 12 fixes landed in `324ef0d8`
+  and its stated verification is a full `pytest tests/` run that HAS NEVER
+  COMPLETED. Its attempt died with `INTERNALERROR> MemoryError` at 26 GB RSS
+  and `WinError 1455 paging file is too small`, emitting ZERO test-status
+  lines. I am not claiming that lane or its files; if this run completes, the
+  result is offered to it.
+- Hypothesis: the earlier death was ENVIRONMENTAL and one of its two named
+  causes has since changed. That lane measured the pagefile at **4,864 MB on a
+  32 GB box**; it now reads **19,406 MB, auto-managed** — 4.0x — against
+  `test_heap_roots`/`test_retainer_census` legitimately allocating ~20 GB.
+- **DELIBERATELY NOT `-n auto`.** `auto` is 12 workers here, and the other
+  named cause has NOT changed: measured 2026-09-05 15:49 CDT, **six peer
+  python jobs are actively burning CPU** — a full `pytest tests/` 34.9 min in
+  at 1,654 MB (pid 19596), three scoped/chunked runs, and two
+  `score_joint_pair_pricing.py` jobs — with **10.9 GB of 31.6 GB free**. None
+  are stale: every one is accumulating CPU seconds. `suite-order-pollution`
+  declined to start a third suite "rather than degrade theirs" and that
+  judgement still holds, so this run is bounded at `-n 6 --dist=loadscope`.
+  `loadscope` keeps one file's tests in one worker, which is what the scope
+  note recommends against this suite's module-level-state sensitivity.
+- Falsification test: if the run dies with `MemoryError`/`WinError 1455`
+  again, the pagefile was NOT the binding constraint and concurrency is — the
+  next step is then a lower `-n`, or waiting for the peers, NOT a bigger
+  pagefile.
+- Verification: the gate prints `total_testcases` and the failing-set diff.
+  **A diff is EXPECTED and is not by itself a regression**: the baseline was
+  recorded on a 4-core Linux CI sandbox with a different, lossier `data/`
+  mirror, and this worktree is `--with-test-data` on Windows. Any difference
+  must be attributed to environment or to code before it is reported as
+  either.
+- **RESULT.** 6 of the 27 PASS ALONE — all four `test_heap_roots::WiderRootTests`
+  plus `test_quote_join_index_equivalence` and
+  `test_ncaaf_returning_production_builder`. `test_heap_roots` measures every
+  object in the interpreter, so concurrent workers contaminate it by
+  construction: **`--dist=loadscope` does NOT protect process-wide-measurement
+  tests**, which the scope note's §2 predicted and this measures.
+  The other 21 fail alone and, triaged by REASON, contain **zero missing-data
+  errors** — contradicting the expectation going in. 2 are the
+  `Working outside of application context` pair already documented as
+  pre-existing; 1 is data-shaped (`[6, 22] != [6]`); 18 are tests stale against
+  deliberately shipped changes, clustered by subsystem (NCAAF calibration
+  re-fit, soccer live-gate keys, team-qualified totals keys, soccersim numbers).
+  `test_mlb_position_substitutions::test_absent_flag_is_a_no_op` reads like
+  CLAUDE.md's "absent != off" trap and is NOT one — `models.py:576` declares
+  `position_substitutions: bool = True` and `e3bdbc8b` flipped it on purpose.
+- **I did NOT run `--update`** and no repo file was edited by this lane.
+- Offered to `suite-order-pollution`, whose owed reading this is; its block was
+  NOT edited. Full working: `state_ledger.md [full-suite-completes]`.
 - Blocked by: none.
+### ncaaf-live-resim-wire — OPEN — opened 2026-09-05 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — **TESTABLE OUTCOME MET IN PRODUCTION, BOTH HALVES. The re-sim produces (`sources_seen {live_resim: 9, pregame: 42}`) and its output reaches the board (74-83 rows `live_aware`, reproduced on two builds). NO LIVE EDGE IS PUBLISHED and none should be yet — the blocker is ONE LINE in `ncaaf/game_projections.py`'s h2h branch and it is a money decision, not a wiring one.**
+- Goal: `build_live_lens_snapshot` runs on refresh-worker's tick and writes
+  `data/live/ncaaf_live_lens.json`, so a live NCAAF board row carries an edge
+  priced off a probability that knows the score. ONE testable outcome:
+  `/api/ops/live-lens/snapshot-index?sport=ncaaf` reports
+  `sources_seen {live_resim: N}` with N equal to the live-and-resumable count,
+  AND a live NCAAF row whose `projection.live_aware` is true.
+- Files: `scripts/run_refresh_worker.py`, `syndicate/blueprints/ops.py`,
+  `syndicate/features/shared/artifact_publisher.py`,
+  `tests/test_ncaaf_live_resim_wiring.py` (NEW).
+  Collision check RUN 2026-09-05 with `.claude/hooks/lane_claims.py`'s own
+  `claims_by_path` — the guard's own parser rather than the invariant
+  checker — against the ledger as published upstream, and the invariant
+  checker returns INVARIANTS HOLD with these four held here. (No module name
+  spelled out on these lines on purpose: continuation lines of a Files block
+  are re-parsed for paths, and a bare one gets read as a fifth claim.)
+- **THE ONE CONTESTED PATH, AND IT WAS A PARSER ARTEFACT — RESOLVED IN THIS
+  LANE'S COMMIT, ONE LINE, NOTHING MOVED.** `evaluation-ledger-projected-mirror`
+  reads as holding `artifact_publisher.py` while its own `- Files:` line says of
+  it "(one allowlist entry — the file is explicitly RELEASED and NOT CLAIMED)".
+  `_claimable_prefix` cuts a Files line at the FIRST disclaimer marker and keeps
+  only what PRECEDES it, so a path written BEFORE its own release note stays
+  claimed. The fix is to move the MARKER in front of the path and change nothing
+  else — the cut point is where it was, so `scripts/run_refresh_worker.py`, which
+  sits after it and is unclaimed today, stays unclaimed. Rewriting that line more
+  thoroughly was tried first and newly ENFORCED that lane's dormant claim on
+  `run_refresh_worker.py`; the claim-set delta was measured either way and this
+  version removes exactly ONE pair and adds only this lane's four.
+  `render-egress-transport` (session 9e40eb04) reached the same conclusion
+  independently the same evening and holds an unpushed edit to that line — if
+  theirs lands first, take it, the two say the same thing.
+- **REGION SPLIT, the convention `render-egress-transport` uses for `ops.py`.**
+  In `artifact_publisher.py` this lane adds ONE `HOT_ARTIFACT_PATTERNS` entry and
+  its comment — not the publish path, not `pull_hot_artifacts`, not the size
+  constants, not `EXPORT_ONLY_ARTIFACT_PATTERNS`. In `ops.py` it touches ONE
+  endpoint, `/api/ops/live-lens/snapshot-index`, which no other claim names. That
+  session was messaged before either file was touched.
+- NOT claimed and NOT edited: `syndicate/features/ncaaf/live_resim.py`,
+  `board_enrichment.py`, `live_lens_loop.py` (held by `ncaaf-live-resim`);
+  `scripts/generate_smartsim2_ncaaf_projections.py`,
+  `syndicate/features/ncaaf/sources.py` (held by `ncaaf-games-cache-refresh`);
+  `scripts/poll_ncaaf_live_state.py`; `live_gameline_join.py` (released by
+  `edge-basis-moneyline`, FREE now). Every one is imported READ-ONLY, the
+  precedent being `ncaaf/live_game_state.py` importing `poll_ncaaf_live_state`.
+- **RESTORED VERBATIM 2026-09-05 ~22:4xZ by lane `edge-basis-moneyline`** after
+  `check_lane_invariants.py` reported this slug as a live marker whose block was
+  "in NO ledger file". It was neither destroyed nor unwritten — it was complete
+  and uncommitted in this lane's own worktree. Their restore also caught a real
+  defect in my header: ASCII hyphens, which `lane-guard` refuses, so this lane
+  was locked out of its own files by a separator. Both blocks are collapsed into
+  this one; their "has staged, uncommitted work" bullet is DISCHARGED — the work
+  is committed.
+- Hypothesis (written before testing): the re-sim's two inputs are NOT both
+  durably present on refresh-worker, so a naive wiring publishes an all-refusal
+  snapshot after every deploy and the closing reading is a zero that cannot be
+  told from an inert feature.
+- Falsification test: both inputs resolve under `SYNDICATE_DATA_ROOT` and survive
+  a deploy, in which case no mirroring is owed.
+- **HYPOTHESIS CONFIRMED, and it is the reason this was not a one-line call.**
+  `sp_ratings_cache_path` and `ncaaf_historical_loader.DEFAULT_CACHE_DIR` resolve
+  off `__file__`, so on Render they write `/opt/render/project/`**`src`**`/...`
+  — the EPHEMERAL CHECKOUT. Refresh-worker's own logs, read 2026-09-05:
+  `2026-09-04T01:03:29Z` and `2026-09-05T01:15:49Z`, BOTH
+  `[sp_ratings] season=2026 source=api teams=138 cached=/opt/render/project/src/...`
+  — `source=api` twice because the intervening deploy erased the cache each time.
+  Nothing is git-tracked under `data/ncaaf_source/historical_truth/` but four
+  `games_*.json.gz`. `_ncaaf_sp_ratings_index` mirrors to the MOUNTED disk,
+  trusts it 24 h, otherwise re-reads through the generator's own
+  `load_sp_ratings` and rewrites it — so in-season SP+ keeps moving rather than
+  freezing.
+- **MEASURED, local code against live ESPN + live CFBD, 2026-09-05T~22:0xZ**
+  (substrate: CODE, not deployment): `games 51, live_resimmed 8, refused 43`
+  (`game_final 9, game_not_in_progress 13, no_live_state 21`); the join through
+  `build_live_gameline_index` gives `sources_seen {live_resim: 8, pregame: 43}`,
+  `index_size 8`. Boise State @ Oregon Q3 5:36 17-24 → **0.9542** where the board
+  publishes the pregame 97.7%. A second run with **no `CFBD_API_KEY` in the
+  environment at all** — the post-deploy state — read `sp_ratings_source
+  durable_mirror`, 138 teams, and still priced 7 live games.
+- **THE JOIN KEY, re-derived rather than inherited** `[2026-09-05T~21:40Z]`:
+  board 51 games; ESPN team-id pair key **35/51**; ESPN `team.location` key
+  **35/51** with **zero disagreements**; ESPN `team.displayName` **0/51**. The
+  projections artifact carries no ESPN id, so a name key is the only option and
+  `location` is the field that works.
+- **ONE BUG OF MY OWN, CAUGHT BY THE DISCRIMINATING RUN AND WORTH KEEPING.**
+  `_parse_utc_timestamp` returns a NAIVE datetime; I subtracted it from an AWARE
+  `datetime.now(timezone.utc)` inside a bare `except`, so `durable_age` was
+  always None and the mirror was NEVER trusted. It failed in the SAFE direction
+  — ratings still correct, merely re-fetched — so nothing looked wrong. Only the
+  no-key run could tell the two apart.
+- Verification: the closing reading above, plus the refusal breakdown from
+  `snapshot["coverage"]["refusals_by_reason"]` recorded beside it — a zero with
+  no breakdown is not a result. 18 new tests, MUTATION-CHECKED five ways (revert
+  the tz fix / key on `displayName` / remove the loop call / drop the heartbeat
+  publish / substitute a neutral rating): each turns red where predicted. Two of
+  my five predictions named tests that do NOT depend on the mutated line and
+  stayed green — my prediction was wrong, not the tests.
+- **CORROBORATED INDEPENDENTLY, substrate `render` 2026-09-05T21:26Z** (lane
+  `edge-basis-moneyline`): `/api/board/book-grid?sport=ncaaf` returned
+  `live_gamelines {"supported": false, "reason": "no live re-sim wired for ncaaf"}`
+  with 118 live NCAAF rows and 0 carrying a `live_gameline` block. That reason
+  string is `board_enrichment`'s unlisted-sport branch, so **web must be deployed
+  too** — `_LIVE_GAMELINE_SPORTS` gained `ncaaf` in `7d9ec94e`, which web is not
+  running.
+- **CLOSING READING, TAKEN 2026-09-06 00:01-00:11Z, substrate `render`.** Both
+  halves of this lane's stated testable outcome are met.
+  **(A)** `sources_seen {live_resim: 9, pregame: 42}`, `index_size 9`, producer
+  coverage `games 51, live_resimmed 9, refused 42`,
+  `refusals_by_reason {game_final 16, game_not_in_progress 7, no_live_state 18,
+  no_period 1}` — the refusal breakdown recorded beside the count, because a
+  zero without it is not a result.
+  **(B)** 74-83 board rows carry `projection.live_aware: true`, 7 of them h2h,
+  **reproduced on two independent builds** (00:06:47Z and 00:11:01Z);
+  `no_live_gameline_projection` fell **420 -> 297** the moment the key fix landed.
+  Tulane @ Duke Q4 2:19, 3-17: `live_gameline model_prob 1.0, sims_run 120,
+  as_of 00:00:33Z` — matching the snapshot to the second, which a stale artifact
+  cannot contain.
+- **AND THE DURABLE-MIRROR HYPOTHESIS IS DISCHARGED DISCRIMINATINGLY.** First
+  boot read `sp_ratings_source: loader` (predicted — the mirror did not exist
+  yet); this boot reads **`durable_mirror`**. `loader` twice would have meant the
+  mirror does not survive a deploy and the post-deploy gap was still open.
+- **THE EDGE IS WITHHELD AND I FOUND THE LINE. NOT FIXED, ON PURPOSE.**
+  `rows_live_gameline_edged` is 0 on every build; all 7 live-aware h2h rows refuse
+  `no_two_sided_market_price`. My first guess (the market pulled the line on a
+  decided game) was WRONG — Arkansas State @ Memphis at **10-7 in Q2** carries
+  `consensus {away 180, home -325}`, 27 books quoting, and still refuses.
+  `live_gameline_join:1109` prices against
+  `projection.get("market_fair_prob_over")`, and `ncaaf/game_projections.py`
+  writes that key in its TOTALS branch (line 482) and **not in its h2h branch**.
+  Measured on the served board: **soccer 52/52 h2h rows carry it, ncaaf 0 of 30**.
+  Invisible until now because no NCAAF row had ever been `live_aware`, so the
+  moneyline branch was never reached.
+  **The fix is one line — the helper is already imported and used two branches
+  down — and it must not be taken casually.** That h2h branch withholds
+  deliberately: its margin model *"loses to the closing line by 3.563 points of
+  MAE over 2233 games (t=17.2)"*. The live re-sim is NOT that pregame model, so
+  the note does not automatically condemn it — but the LIVE model is ungraded
+  too, and opening the market side would publish live money edges on an ungraded
+  estimator. `#499` is the precedent in reverse. **A lane that can BACKTEST the
+  live probability owns this, not a wiring lane.** `ncaaf/game_projections.py` is
+  FREE as of this writing.
+- **NOT TESTED, NOT CLAIMED:** MLB had **0** h2h rows carrying a projection dict
+  at all tonight, so there was no positive control for the pricing STEP on any
+  sport. Soccer's 52/52 shows the FIELD is populated elsewhere; it does not show
+  the pricing path is healthy elsewhere.
+- **`todo.md #71` NOT SATISFIED FOR THIS LANE, deliberately and visibly.**
+  `docs/ai_context/todo.md` is claimed IN FULL by `accuracy-ledger-budget-raise`.
+  I wrote the `#119` update, the post-write guard caught it, I reverted it, and
+  the exact text is in
+  `.syndicate/handoff_2026-09-05_todo_119_ncaaf_live_resim.md` (`7abc5dcf`). That
+  session is unattended, so the file is the delivery. A whole-file claim on
+  `todo.md` and CLAUDE.md's "every lane updates it before finishing" cannot both
+  be honoured; flagged for the owner.
+- Blocked by: none. Landed on `origin/main`; deploy of web + refresh-worker owed,
+  under `deploy_claim.py` + `deploy_preflight.py`.
 
+### render-egress-transport — OPEN — opened 2026-09-05 — session 9e40eb04-9f1c-464b-a6fb-5acac211e775
+- Goal: get Render bandwidth under the 25 GB included allowance (month was 24.4/25 on day 5). **CAUSE FOUND AND VERIFIED; MITIGATION DEPLOYED ON 2 OF 3 SERVICES.**
+- **Verified:** the bill is `web` polling external feeds ITSELF, **100% billed** — `state_worker.md` `[render-egress-cause]`. Deployed: web `3cb5b4ba` **7.29x**, refresh-worker `ffe8714b` **9.15x**, publish transport **13.0x**, `refused_hosts=0`. ESPN accepts the header from Render's IP.
+- **PRE-DEPLOY BASELINE for `live-odds-worker`, captured 2026-09-05 20:2x CT BEFORE the tip lands — this is the control and it cannot be re-taken:** hourly bandwidth over 19 buckets (06:00–00:00Z) **mean 30.3 MB/h, median 29.7, sd 3.4, min 25.4, max 38.1 => ~0.71 GB/day**. Unusually tight, which is what makes it a good test. **A working change puts hourly MB below 25.4 — outside the entire pre-deploy range.**
+- **AND THE LOG CANNOT VERIFY IT ON THAT SERVICE — a silent `HTTP_COMPRESSION` there is UNREADABLE, NOT NEGATIVE.** The OddsAPI polling runs in `refresh_odds_sources.py`, a **grandchild** (pid 3221 <- 3220 <- 39) whose stdout never reaches Render's collector — established by lane `ledger-repair-invariants`, which found zero `[ncaaf_odds]` lines across 86 minutes while the fetcher was demonstrably pricing the board. **The bandwidth metric above is the verification, not the logs.**
+- **Compression DOES still reach that grandchild — verified by import, not assumed:** `scripts/refresh_odds_sources.py:49` imports `syndicate.features.shared.odds_control_plane`, which triggers `syndicate/__init__.py`; `fetch_mlb_oddsapi_local.py` and `fetch_soccer_oddsapi_props_local.py` import `syndicate` too. The header goes out; we just cannot watch it. (Checked because "the opener never installs in a subprocess" would mean the change misses 78.5% of worker egress entirely — presence-is-not-reachability, an error I already made once on this service tonight.)
+- **OPEN item 1 — `live-odds-worker` is NOT deployed and is 78.5% of billed worker egress** (4.00 of 5.10 GB, Sep 1-5). Claim RELEASED and handed to `ledger-repair-invariants` (session ea1e4863), who was already deploying that service; the tip carries the change, so deploying from it is sufficient. Its `CLEAR` window is seconds wide — **deploy on the notification, do NOT re-run preflight, which overwrites the CLEAR the guard would accept.**
+- **OPEN item 2 — compression is the wrong tool for the rest, and this is the larger win.** The per-process TTL cache doubles every fetch (`WEB_CONCURRENCY=2`), and web should not poll ESPN at all per `CLAUDE.md`'s worker/web split — `request_path_guard` logged 205 "compute in request path" warnings per 1,200 log lines. **Belongs in its own lane, not this one.**
+- **Owed:** a steady-state bandwidth reading over a comparable slate hour. Only ~2 h of post-deploy data exists and the slate confounds it.
+- Files: `syndicate/app.py`, `syndicate/__init__.py`, `syndicate/features/shared/response_compression.py` (NEW), `syndicate/features/shared/http_compression.py` (NEW), `scripts/render_bandwidth_report.py` (NEW), `tests/test_artifact_transport_compression.py` (NEW), `tests/test_http_compression.py` (NEW).
+- **SHARED, not claimed by me — `ncaaf-live-resim-wire` holds them:** `syndicate/features/shared/artifact_publisher.py`, `syndicate/blueprints/ops.py`.
+- Narrative + retractions archived VERBATIM in `lanes_history.md`; session record in `log/2026-09-05.md`.
+- Blocked by: none.
+### stale-test-repair — CLOSED-VERIFIED 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **ALL 18 GREEN (`63c10ed5`). THE LANE'S OWN HYPOTHESIS WAS WRONG FOR 4 OF THEM, AND THE FALSIFICATION RULE IS WHAT CAUGHT IT — plus one REAL production bug fixed on the way.** `[user: "fix the 18 stale tests"]`
+- Goal: each of the 18 that FAIL ALONE on `origin/main` either passes or is
+  recorded as a code defect. **MET**: 18/18 pass; 132 passed across the 12
+  touched files; CI's own gate `python -m unittest tests.test_archives` **386
+  tests, OK (2 skipped)**.
+- Files: 11 test files + `syndicate/features/football/pick_gate.py`. All
+  claim-checked against every OPEN lane before editing; none was held. **ALL
+  RELEASED** — landed on `origin/main`, nothing held.
+- Hypothesis: "stale assertions left by deliberate changes, so the fix is in
+  the test." **TRUE FOR 14, FALSE FOR 4.**
+- Falsification test (pre-registered): *for EACH test I must name the COMMIT
+  that moved the behaviour; if I cannot, the test is presumed RIGHT and the
+  code presumed WRONG.* **IT FIRED FOUR TIMES AND IT IS THE WHOLE VALUE OF
+  THIS LANE.** Without it those four would have been edited green and the
+  things they were reporting would have been erased:
+  - `test_ncaaf_picks_local` (x4): its `setUp` FORCES THE SERVING GATE OPEN
+    and wrote 2-tuple keys into `_SERVING_REGISTRY`, whose key gained a
+    `basis` dimension and is now `(sport, market, basis)`. With `clear=True`
+    that ALSO removed the real entries, so the lookup fell to default-deny and
+    the gate the fixture exists to force OPEN was forced SHUT — the exact
+    inversion its own class docstring warns about. Tell: `NCAAF_PICKS_
+    SUPPRESSED moneyline=1` on stdout.
+  - `test_market_gone_drop` (x2) + `test_soccer_read_scope`: **TIME-ROTTED.**
+    Both pin one end of an age/date comparison to a calendar date while the
+    code reads the wall clock. A "FRESH" sidecar read as SIX DAYS old and every
+    row classified `as_fresh_as_sweep` (`MARKET_GONE_DROPPED none of 1`);
+    `week_games` legitimately reads dates derived from TODAY, so the pass
+    touches 4 distinct dates against a hardcoded 2. **In both the CODE WAS
+    RIGHT** — a genuinely 6-day-old sidecar SHOULD protect its rows, which is
+    this file's own documented NCAAF nine-hour case.
+  - `test_nfl_props_board`: premise unachievable. `two_roots` cannot build a
+    "no roster" world because the resolver also offers the REPO MIRROR, and
+    `data/nfl_source/.../roster_2026_snapshot.csv` is git-tracked and really
+    contains A.J. Brown. Same shape as the NBA betting-card asset bug fixed
+    the same day.
+- **REAL PRODUCTION BUG FOUND AND FIXED:** `pick_gate.registry_snapshot()`
+  unpacks `for (sport, market), verdict` from that same 3-tuple key and raises
+  `ValueError: too many values to unpack`. ZERO callers, which is why nothing
+  broke — a latent landmine from the same incomplete migration. Now returns 3
+  rows with `basis` surfaced.
+- Verification: **mutation-checked, and it caught one of my own repairs being
+  VACUOUS.** Deriving the Polymarket price from `_polymarket_cross_ticks()`
+  was a TAUTOLOGY — flip the default and both sides of the comparison move
+  together — and the mutation ran GREEN. Rewritten to pin three arms
+  explicitly (0->0.55, 1->0.56, 2->0.57). A first mutant for the read scope
+  renamed `picks_rows` and produced import ERRORS, proving only that the test
+  imports the module; the sharper one makes the memo always miss. Final: 5 of
+  5 RED for the right reason.
+- **I TRIPPED THE LANE GUARD AND IT WAS RIGHT.** The mutation script wrote to
+  `pipeline/execute_portfolio.py`, claimed by OPEN lane `order-model-view`. It
+  restores original bytes and the file is verified clean against HEAD, but
+  mutating another lane's file was not mine to do. Both remaining mutations
+  were redone as RUNTIME patches — no file writes at all, which is the better
+  technique regardless.
+- `test_soccer_read_scope` now asserts DEDUPLICATION rather than a count
+  bound: strictly stronger, since a per-fixture regression repeats a key 9
+  times and fails even if the total stays under the old limit.
+- No deploy: tests plus one unreachable function. Blocked by: none.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

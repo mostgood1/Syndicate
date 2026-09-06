@@ -33,12 +33,47 @@ from syndicate.features.shared import live_refresh_loop
 def _iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
+def _pin_process_start(test_case) -> None:
+    """Freeze `_PROCESS_STARTED_AT` at NOW for the duration of one test.
+
+    THESE TESTS DEPENDED ON HOW LONG PYTEST HAD BEEN RUNNING. Every case below
+    builds its `started_at` RELATIVE to `live_refresh_loop._PROCESS_STARTED_AT`
+    -- "nine minutes before this process began" is how you say restart orphan.
+    But that global is bound at IMPORT time (`live_refresh_loop.py:61`), while
+    the runtime-ceiling branch it competes with is ABSOLUTE: `now - started_at >
+    _MLB_SIM_MAX_RUNTIME_SECONDS` (90 min), and it is checked FIRST.
+
+    So the two agree only while the interpreter is young. Run this file alone
+    and `_PROCESS_STARTED_AT` is seconds old, the orphan is 9 minutes old, and
+    the restart branch claims it. Run it 3h33m into `pytest tests/` -- which is
+    what a full suite takes -- and the same orphan is 3h42m old, the ceiling
+    claims it first, and five tests report `killed_runtime_ceiling` for
+    `killed_by_restart`/`died_untracked`.
+
+    MEASURED 2026-09-04: those exact five failed a full-suite run and passed in
+    isolation. Reproduced in 4 seconds by subtracting four hours from
+    `_PROCESS_STARTED_AT`, which is the whole mechanism -- no other test is
+    involved. It was mis-triaged as ordering pollution first; the suite's
+    DURATION is the variable, not its order.
+
+    Pinning to NOW restores the relationship each test is actually written
+    about. `test_runtime_ceiling_is_recorded` is unaffected: it anchors on
+    `datetime.now()` and an explicit ceiling overshoot, so it never depended on
+    the process's age in the first place.
+    """
+    patcher = patch.object(
+        live_refresh_loop, "_PROCESS_STARTED_AT", datetime.now(timezone.utc)
+    )
+    patcher.start()
+    test_case.addCleanup(patcher.stop)
+
 
 class MlbSimRunReconcileTests(unittest.TestCase):
     DATE = "2026-08-12"
     STAMP = "20260812_180745"
 
     def setUp(self) -> None:
+        _pin_process_start(self)
         self._tmp = tempfile.TemporaryDirectory()
         self.reports_root = Path(self._tmp.name)
         self.sim_dir = self.reports_root / "live_refresh_loop" / "mlb_sim_runs"
@@ -217,6 +252,7 @@ class MlbSimNonOwnerTests(unittest.TestCase):
     STAMP = "20260812_203340"
 
     def setUp(self) -> None:
+        _pin_process_start(self)
         self._tmp = tempfile.TemporaryDirectory()
         self.reports_root = Path(self._tmp.name)
         self.sim_dir = self.reports_root / "live_refresh_loop" / "mlb_sim_runs"
@@ -287,6 +323,7 @@ class MlbSimFinalizeMergeTests(unittest.TestCase):
     STAMP = "20260812_052043"
 
     def setUp(self) -> None:
+        _pin_process_start(self)
         self._tmp = tempfile.TemporaryDirectory()
         self.reports_root = Path(self._tmp.name)
         self.sim_dir = self.reports_root / "live_refresh_loop" / "mlb_sim_runs"

@@ -95,6 +95,15 @@ def _market_family(market: str) -> str:
         return "alternate"
     if "_1st_" in market:
         return "segment"
+    # `_1st_*` is MLB's spelling and it was the ONLY spelling this recognised.
+    # Football and hockey segments are suffixed `_q1..._q4`, `_h1`/`_h2`,
+    # `_p1..._p3` (`market_segments._SUFFIX`), so every one of them fell past
+    # this test, past `_FULL_GAME_MARKETS` -- which holds bare `h2h`/`totals`
+    # and not `totals_h1` -- and landed in `other`. The `segment` family is 35%
+    # of all platform burn; a football segment tier billed into `other` would
+    # make the one bucket the cadence decisions are read from silently wrong.
+    if market.endswith(("_q1", "_q2", "_q3", "_q4", "_h1", "_h2", "_p1", "_p2", "_p3")):
+        return "segment"
     if market.startswith(("batter_", "pitcher_", "player_")):
         return "props"
     if market in _FULL_GAME_MARKETS:

@@ -371,6 +371,44 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # Bounded: one ~2 KB file per season, rewritten daily by the projection
     # generator, and `sweep_changed_hot_artifacts` publishes only what changed.
     "ncaaf_source/data/week_state/ncaaf_week_state_*.json",
+    # THE NCAAF LIVE RE-SIM'S RATING INPUT. `lane ncaaf-live-resim-wire`,
+    # measured 2026-09-05.
+    #
+    # Allowlisted BECAUSE it is a MODEL INPUT, per model_engine_standard.md 3b,
+    # the same clause the nflverse schedule entry above cites: an input that is
+    # in neither list cannot be read or published through
+    # `/api/ops/artifacts/*`, which means it cannot be audited on Render at all.
+    # `syndicate/features/ncaaf/live_resim.py` prices its live moneyline off
+    # `sp_offense_defense_rating` pairs derived from this file and REFUSES the
+    # game by name when a team is missing from it -- so "was the rating there"
+    # is a question production has to be able to answer.
+    #
+    # WRITE PATH -> READ PATH, checked rather than assumed, and the two are NOT
+    # the same file today:
+    #   generator  `scripts/generate_smartsim2_ncaaf_projections.sp_ratings_cache_path`
+    #              resolves off `__file__`, so on Render it writes
+    #              /opt/render/project/**src**/data/ncaaf_source/historical_truth/
+    #              -- the EPHEMERAL CHECKOUT. Confirmed on refresh-worker's own
+    #              logs 2026-09-04T01:03:29Z and 2026-09-05T01:15:49Z, both
+    #              `source=api ... cached=/opt/render/project/src/...`, i.e. the
+    #              cache was empty each time because the prior deploy erased it.
+    #   re-sim     `run_refresh_worker._ncaaf_sp_ratings_durable_path` mirrors it
+    #              to `default_ncaaf_source_root()/historical_truth/`, which is
+    #              `$SYNDICATE_NCAAF_SOURCE_ROOT` ==
+    #              /opt/render/project/data/ncaaf_source  -- the MOUNTED disk,
+    #              == `ncaaf_source/historical_truth/...` relative to
+    #              `data_root()`, which is what this pattern matches.
+    # THIS ENTRY COVERS THE MIRROR, NOT THE GENERATOR'S COPY, and only the
+    # mirror is under `data_root()` at all -- a pattern cannot match a path
+    # outside it (`relative_to_data_root` returns None), so an entry aimed at
+    # the checkout copy would have been the inert half of the same defect the
+    # `smartsim2_projections` note above records.
+    #
+    # `#208` as ever: this PERMITS the transfer, it does not make one happen.
+    # Bounded: one ~9 KB JSON per season (138 teams), rewritten at most daily by
+    # the re-sim's 24-hour staleness bound, and `sweep_changed_hot_artifacts`
+    # publishes only what CHANGED.
+    "ncaaf_source/historical_truth/sp_ratings_*.json",
     # `#310`, DIAGNOSTIC. The WNBA grader's actual result inputs, and the file
     # both recon builders are built from. Until now `recon_games_*`,
     # `recon_props_*` and dated `boxscores_*` were in no pattern here (only the

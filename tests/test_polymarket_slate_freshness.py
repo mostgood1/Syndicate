@@ -149,10 +149,27 @@ def test_a_fresh_slate_still_RESOLVES(_artifact, monkeypatch):
     # no business pinning the resolver's arity.
     slug, price, tick, min_qty, outcome_index = resolved[:5]
     assert slug == _Request.venue_ticker
-    assert price == pytest.approx(0.55)
-    # Tick size and minimum quantity come FROM THE MARKET, never inferred.
+    # THE RESOLVER RETURNS THE PRICE THE VENUE WILL ACTUALLY RECEIVE, not the
+    # raw quote. `34d43512` moved the snap and the cross in front of this return
+    # so the pregame gate stops judging an intermediate value nobody pays.
+    #
+    # PINNED PER ARM, NOT DERIVED FROM THE CODE. Deriving the expectation from
+    # `_polymarket_cross_ticks()` -- which was the first attempt here -- is a
+    # TAUTOLOGY: flip the default from 1 to 0 and both sides of the comparison
+    # move together, so the assertion can never fail on the thing it names. A
+    # mutation run caught it green. Setting the arm explicitly keeps the test
+    # independent of the default (the cross is a running experiment and the
+    # default is the arm being tested) while still failing if the cross stops
+    # being applied at all.
     assert tick == 0.01
     assert min_qty == 1
+    assert outcome_index == 0
+
+    for ticks, want in ((0, 0.55), (1, 0.56), (2, 0.57)):
+        monkeypatch.setenv("SYNDICATE_POLYMARKET_CROSS_TICKS", str(ticks))
+        again = execute_portfolio._polymarket_resolve_market(_Request())
+        assert again is not None
+        assert again[1] == pytest.approx(want), f"cross_ticks={ticks}"
     # The index that names WHICH outcome the price belongs to, carried through
     # to `order_body` so the side cannot contradict it.
     assert outcome_index == 0

@@ -322,3 +322,42 @@ def _no_live_espn_calls_in_tests():
     with _patch.object(live_game_state, "_fetch_scoreboard", return_value=None):
         yield
     live_game_state._cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_kalshi_discovered_series():
+    """`kalshi_catalogue._DISCOVERED` is a module-global dict that NOTHING resets.
+
+    `register_discovered()` adds to it and it lives for the life of the
+    interpreter, so one test teaching the catalogue a real series changes what
+    `classify_market` answers for every test after it -- across files, in one
+    direction only, and never in a targeted run.
+
+    MEASURED 2026-09-04: `test_kalshi_catalogue`'s two "unseen series" tests
+    passed alone and failed in a full-suite run --
+    `stat_not_in_market_vocabulary` where they assert `unmapped_series`, and an
+    EMPTY work queue where they assert `{"KXNBAPTS"}`. Both say the same thing:
+    by then the catalogue had LEARNED `KXNBAPTS`, so the series check passed and
+    the stat check refused instead. Reproduced exactly, both failures, with a
+    single `register_discovered({"KXNBAPTS": "nba"})`.
+
+    Where it came from is worth recording, because it is the same defect twice:
+    the suite REWRITES the tracked `reports/intelligence/kalshi_markets.json`
+    (+255,828 lines in the run that found this), and the rewritten file carries
+    `KXNBAPTS` twice while the committed one carries it ZERO times. Discovery
+    then reads that artifact and registers what it finds. The
+    `_isolate_kalshi_markets_artifact` fixture above exists to stop exactly that
+    write and does not cover this path -- the artifact leak is NOT fixed here,
+    only its effect on the in-process registry.
+
+    Snapshot-and-restore rather than clear-on-entry: a test that registers a
+    series on purpose still sees it for its own duration.
+    """
+    from syndicate.features.shared import kalshi_catalogue
+
+    before = dict(kalshi_catalogue._DISCOVERED)
+    try:
+        yield
+    finally:
+        kalshi_catalogue._DISCOVERED.clear()
+        kalshi_catalogue._DISCOVERED.update(before)

@@ -79,6 +79,7 @@ import argparse
 import collections
 import pathlib
 import re
+import subprocess
 import sys
 
 # THE PARSER, IMPORTED FROM THE MODULE THE GUARD ENFORCES WITH. See the module
@@ -287,6 +288,58 @@ def _ledger_text(root: pathlib.Path, name: str) -> str:
         return ""
 
 
+def upstream_lane_slugs(root: pathlib.Path, ref: str = "origin/main"):
+    """Lane slugs `ref`'s ledger files carry, or None if git cannot answer.
+
+    WHY THIS EXISTS `[2026-09-05, lane ledger-repair-invariants]`. The marker
+    check below compares a CURRENT marker set against a WORKING COPY of
+    `lanes.md`, and in the primary tree those two are not the same vintage:
+    sessions work in their own worktrees, so a lane's block lands via
+    `origin/main` while its marker is written into the primary tree's
+    `.syndicate/`. The primary tree then sits behind -- MEASURED 2026-09-05,
+    58 commits behind, 45 lane headers on disk against 101 upstream.
+
+    So the commonest way to fail this check is not a destroyed block at all:
+    it is a lane opened normally from a worktree, whose block is on
+    `origin/main` and simply has not been pulled. Measured the same evening:
+    `web-oom-burst-source` was reported here as "in NO ledger file" while its
+    block was sitting on `origin/main` in commit `aff64eab`.
+
+    THE OLD MESSAGE WAS ACTIVELY WRONG ABOUT THAT CASE. It read "RESTORE it
+    from the owning session -- upstream cannot have it", which is exactly
+    backwards when upstream is where it is, and it points the reader at
+    rewriting a block that already exists -- i.e. at fabricating a second,
+    diverging copy. A checker that fires constantly and names the wrong remedy
+    is worse than one that does not fire: it is the reason the whole banner
+    gets scrolled past.
+
+    RETURNS None, NOT an empty set, when git cannot answer (no repo, no
+    `origin/main`, git missing, a checkout under a temp dir). None means
+    UNKNOWN and the caller must keep the strict verdict; an empty set would
+    mean "upstream definitely has nothing", and an unknown that defaults to
+    the permissive branch is its own recorded failure mode.
+    """
+    slugs: set[str] = set()
+    answered = False
+    for name in ("lanes.md", "lanes_closed.md", "lanes_closed_archive.md",
+                 "lanes_history.md"):
+        try:
+            out = subprocess.run(
+                ["git", "show", f"{ref}:.syndicate/{name}"],
+                cwd=str(root.parent), capture_output=True, timeout=60,
+            )
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return None
+        if out.returncode != 0:
+            continue
+        answered = True
+        slugs |= set(re.findall(
+            r"(?m)^###\s+([A-Za-z0-9._-]+)",
+            out.stdout.decode("utf-8", "replace").lstrip("﻿"),
+        ))
+    return slugs if answered else None
+
+
 def orphaned_lane_markers(text: str, path: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     """Lane slugs a live per-session marker names that no ledger file carries.
 
@@ -382,11 +435,30 @@ def main(argv=None) -> int:
     for slug in stray:
         print(f"        {slug}  (its claims survive, but archiving it would drop them)")
 
+    # SPLIT THE ORPHANS BY WHETHER UPSTREAM HAS THE BLOCK. See
+    # `upstream_lane_slugs`: "not in this working copy" and "nowhere at all"
+    # need opposite remedies -- pull vs restore -- and only the second is a
+    # ledger defect. `None` is UNKNOWN, so everything stays a FAIL.
+    upstream = upstream_lane_slugs(pathlib.Path(args.path).resolve().parent) if orphaned else None
+    behind: list[tuple[str, str]] = []
+    if upstream is not None:
+        behind = [(s, m) for s, m in orphaned if s in upstream]
+        orphaned = [(s, m) for s, m in orphaned if s not in upstream]
+
     print(f"[{'FAIL' if orphaned else 'ok  '}] every live lane marker still has a block somewhere")
     for slug, marker in orphaned:
         print(f"        {slug}  (named by {marker}, in NO ledger file)")
         print(f"          a block that exists nowhere: destroyed, or never written down.")
-        print(f"          RESTORE it from the owning session -- upstream cannot have it.")
+        if upstream is None:
+            print(f"          upstream NOT CHECKED (no git answer) -- confirm origin/main")
+            print(f"          does not carry it before rewriting anything.")
+        else:
+            print(f"          origin/main does not carry it either, so RESTORE it from the")
+            print(f"          owning session -- upstream cannot have it.")
+    for slug, marker in behind:
+        print(f"        [hint] {slug} ({marker}) IS on origin/main and NOT in this")
+        print(f"               working copy -- PULL, do not restore. Writing a fresh block")
+        print(f"               here would create a second, diverging copy.")
     for slug, marker in stale_markers:
         print(f"        [hint] {slug} is archived but {marker} still names it -- empty the marker")
 

@@ -6,6 +6,7 @@ import argparse
 import importlib.util
 import tempfile
 import subprocess
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -22,6 +23,44 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
         return module
+
+
+    def _pinned_soccer_source_root(self):
+        """A source root that EXISTS, so step building is not skipped wholesale.
+
+        `_build_summary` RETURNS EARLY, before running a single step, when any
+        step needs `--source-root` and `_validate_source_root` cannot find it
+        (`refresh_odds_sources.py:2843-2859`). The root resolves through
+        `_source_repo_root` -> `data_root()/soccer_source`, and
+        `SYNDICATE_DATA_ROOT` alone is enough to redirect it: set that to a
+        scratch dir and `<scratch>/soccer_source` does not exist, so soccer
+        contributes ZERO steps and every step-level assertion below becomes
+        vacuous.
+
+        MEASURED 2026-09-04: soccer builds 55 steps normally and 0 under an
+        empty `SYNDICATE_DATA_ROOT`, which is why
+        `test_one_leagues_failed_step_does_not_block_odds_history_sync_for_the_others`
+        passed alone and failed a full-suite run on its own precondition --
+        "0 not greater than 1". The active-league list is NOT the cause: it
+        returns the same ten leagues either way, measured directly.
+
+        `SYNDICATE_DATA_ROOT` IS THE ONLY LEVER, and the obvious one is inert:
+        soccer does NOT go through `_source_repo_root`, so
+        `SYNDICATE_SOURCE_ROOT_SOCCER` is never read for it.
+        `_source_root_resolution` sends soccer to `_local_source_bundle_root`
+        (`refresh_odds_sources.py:757-761`), which is `<SYNDICATE_DATA_ROOT>/
+        soccer_source` or, unset, `REPO_ROOT/data/soccer_source`. Setting the
+        per-sport override here changed nothing -- verified before relying on
+        it, which is the only reason this comment is right.
+
+        So the pin is a scratch data root that CONTAINS `soccer_source`. The
+        real `_validate_source_root` still runs and returns None because the
+        root exists; the gate is not stubbed out.
+        """
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        (Path(tmp.name) / "soccer_source").mkdir(parents=True)
+        return patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": tmp.name}, clear=False)
 
     def _make_step(self, module):
         return module.RefreshStep(
@@ -771,7 +810,9 @@ class RefreshOddsSourcesTests(unittest.TestCase):
             ok = call_count["n"] != 1
             return {"ok": ok, "name": step.name, "dry_run": dry_run}
 
-        with patch.object(module, "_run_command", side_effect=_mixed_step_results), patch.object(
+        with self._pinned_soccer_source_root(), patch.object(
+            module, "_run_command", side_effect=_mixed_step_results
+        ), patch.object(
             module,
             "_sync_post_refresh_tracking_step",
             return_value={"ok": True, "name": "soccer_post_refresh_tracking_sync", "dry_run": False, "meta": {"signals_rows": 3}},
@@ -807,11 +848,19 @@ class RefreshOddsSourcesTests(unittest.TestCase):
             list=False,
         )
 
-        with patch.object(module, "_run_command", return_value={"ok": False, "name": "soccer_every_step_fails", "dry_run": False}), patch.object(
+        with self._pinned_soccer_source_root(), patch.object(
+            module, "_run_command", return_value={"ok": False, "name": "soccer_every_step_fails", "dry_run": False}
+        ) as mocked_run, patch.object(
             module,
             "_sync_post_refresh_tracking_step",
         ) as mocked_tracking:
             summary = module._build_summary(args)
+
+        # The same precondition as the test above, and it was missing here.
+        # Under an unpinned root this test asserted "the sync was never
+        # attempted" while NO STEP HAD RUN AT ALL -- true for the wrong reason,
+        # and it would have kept passing through the defect it guards.
+        self.assertGreater(mocked_run.call_count, 1, "soccer must actually build steps for this to mean anything")
 
         sport_result = summary["results"][0]
         self.assertFalse(sport_result["ok"])

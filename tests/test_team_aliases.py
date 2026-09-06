@@ -249,3 +249,61 @@ def test_adding_la_leaves_the_derived_maps_untouched():
     # `la` must NOT become a bare-nickname key or an "unambiguous word".
     assert "la" not in _nickname_alias_map("nfl")
     assert "la" not in unambiguous_club_tokens("nfl")
+
+
+def test_every_nflverse_schedule_code_resolves():
+    """THE GUARD. Every club code the real NFL schedules contain must resolve.
+
+    `nfl_game_projections` keys its index on the schedule's `home_team` /
+    `away_team` verbatim, so a code the alias map does not know is a whole
+    club's season falling out of the board join -- silently, with no log line
+    and no failing test. That is exactly how the Rams were lost: nflverse
+    writes them `LA`, the map carried `LAR`, and 78 of 1,252 production board
+    rows had no projection until 2026-09-04.
+
+    A hand-written list of the 32 franchises would not have caught it, because
+    the bug was never a MISSING CLUB -- it was a second vocabulary for a club
+    already in the map. So this reads the artifacts themselves, through the
+    module's own `_source_roots()`, and both vocabularies really are present:
+    the 2026 schedule says `LA`/`WAS` while the 2023-2025 preseason files say
+    `LAR`/`WSH`. 34 distinct codes over 5 files.
+    """
+    import csv
+
+    from syndicate.features.shared.nfl_game_projections import _source_roots
+
+    paths = sorted(
+        {p for root in _source_roots() for p in root.glob("schedule*.csv")}
+    )
+    if not paths:
+        pytest.skip(
+            "no NFL schedule artifacts on this checkout -- `data/` is excluded from "
+            "session worktrees by `session_worktree.py`. Run in the primary tree, or "
+            "point SYNDICATE_NFL_SOURCE_ROOT at a mirror."
+        )
+
+    codes: dict[str, set[str]] = {}
+    for path in paths:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for row in csv.DictReader(text.splitlines()):
+            for field in ("home_team", "away_team"):
+                code = (row.get(field) or "").strip()
+                if code:
+                    codes.setdefault(code, set()).add(path.name)
+
+    # NOT VACUOUS. A parse that silently yields nothing must fail here rather
+    # than report success on zero rows -- an empty set trivially satisfies the
+    # assertion below, which would make this guard permissive exactly when the
+    # artifacts it reads are broken.
+    assert len(codes) >= 32, (
+        f"only {len(codes)} distinct club codes parsed from {len(paths)} schedule "
+        f"file(s) -- expected >= 32. The artifacts or this parse are wrong, and a "
+        f"pass here would be vacuous."
+    )
+
+    unresolved = {c: sorted(f) for c, f in codes.items() if canonical_team("nfl", c) is None}
+    assert not unresolved, (
+        "nflverse schedule codes that `_NFL_ALIAS_TO_NAME` cannot resolve -- every one "
+        "is a club whose games drop out of the board projection join, silently: "
+        f"{unresolved}"
+    )

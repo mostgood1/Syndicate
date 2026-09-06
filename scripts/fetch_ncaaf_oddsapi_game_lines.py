@@ -100,10 +100,16 @@ def _market_map() -> dict[str, tuple[str, str]]:
     """Full-game keys only, from the shared vocabulary, used both to REQUEST and
     to TAG so the two cannot drift (`#343`).
 
-    Interval markets are deliberately NOT requested. A first-quarter total shown
-    as the game total is `learnings.md` 2026-08-21's exact failure -- a number
-    that is right and labelled wrong -- and nothing on this board consumes
-    segments yet, so asking for them would only spend credits.
+    THIS MAP IS FOR THE BULK `/sports/{key}/odds` CALL ONLY, and interval
+    markets must stay out of it. Not for the reason originally given here --
+    that nothing consumed segments -- but for a harder one:
+    **the bulk endpoint 422s `INVALID_MARKET` on segment keys.** Merging them in
+    here would not merely waste credits, it would kill the full-game capture
+    too, which is exactly what happened to soccer for nine days in August 2026
+    (`fetch_soccer_oddsapi_odds_local.py:116-139`).
+
+    Segments are captured by a SEPARATE per-event pass -- see
+    `shared/segment_odds_fetch.py`, which carries the measurements.
     """
     from syndicate.features.shared.market_segments import full_game_market_keys
 
@@ -163,7 +169,39 @@ def _event_team_names(events: list[dict[str, Any]]) -> list[str]:
     return names
 
 
-def append_quotes(events: list[dict[str, Any]]) -> dict[str, Any]:
+def fetch_event_segments(
+    api_key: str,
+    events: list[dict[str, Any]],
+    *,
+    sport_key: str = DEFAULT_SPORT_KEY,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Half/quarter prices for the in-window events, via the PER-EVENT route.
+
+    Thin on purpose: every decision that costs money -- which segments, which
+    regions, which events are in window, the event cap -- lives in
+    `shared/segment_odds_fetch.py` so NCAAF and NFL cannot drift apart. That
+    module's docstring carries the measurements, including the two production
+    NFL-preseason shards that prove the per-event route serves these markets.
+
+    **Absent means OFF.** With `SYNDICATE_NCAAF_SEGMENT_MARKETS` unset this
+    makes no call and spends no credit.
+    """
+    from syndicate.features.shared.segment_odds_fetch import fetch_event_segments as _fetch
+
+    return _fetch(
+        api_key=api_key,
+        sport="ncaaf",
+        sport_key=sport_key,
+        base_url=_base_url(),
+        events=events,
+        log_prefix="[ncaaf_odds]",
+    )
+
+
+def append_quotes(
+    events: list[dict[str, Any]],
+    segment_payloads: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Flatten every book's game markets into the shared quote log.
 
     Sharded by each event's OWN commence date rather than by the run date. NFL's
@@ -180,10 +218,24 @@ def append_quotes(events: list[dict[str, Any]]) -> dict[str, Any]:
 
     now = datetime.now(tz=timezone.utc)
     captured_at = now.isoformat()
-    market_map = _market_map()
+    # The UNION map, so one tagging pass covers both the bulk payloads and the
+    # per-event segment payloads. `quote_rows_from_oddsapi_events` drops any key
+    # the map does not name, so a bulk payload contributes only full-game rows
+    # and a segment payload only segment rows -- no cross-contamination, and no
+    # second parser to drift. With segment capture off the union IS the
+    # full-game map and this is bit-for-bit the previous behaviour.
+    from syndicate.features.shared.segment_odds_fetch import merged_market_map
+
+    market_map = merged_market_map(_market_map(), "ncaaf")
+
+    # Concatenated, not merged per event. `_KEY_FIELDS` in `odds_book_quotes`
+    # carries `segment`, so an `h1` total and a full-game total on the same
+    # event/book are distinct keys; neither can displace the other, and the
+    # shard's change-log semantics stay intact.
+    all_events = list(events) + list(segment_payloads or [])
 
     by_date: dict[str, list[dict[str, Any]]] = {}
-    for event in events:
+    for event in all_events:
         commence = str(event.get("commence_time") or "")[:10]
         if not commence:
             # No kickoff date means no shard the board would ever read it from.
@@ -191,7 +243,12 @@ def append_quotes(events: list[dict[str, Any]]) -> dict[str, Any]:
             continue
         by_date.setdefault(commence, []).append(event)
 
-    results: dict[str, Any] = {"dates": {}, "rows_appended": 0, "events": len(events)}
+    results: dict[str, Any] = {
+        "dates": {},
+        "rows_appended": 0,
+        "events": len(events),
+        "segment_payloads": len(segment_payloads or []),
+    }
     for date_str, date_events in sorted(by_date.items()):
         rows = quote_rows_from_oddsapi_events(date_events, market_map=market_map)
         outcome = append_book_quotes(
@@ -342,7 +399,22 @@ def main(argv: list[str] | None = None) -> int:
     if args.report:
         return 0
 
-    outcome = append_quotes(events)
+    # The segment pass rides the SAME step as the bulk call rather than getting
+    # a step of its own: `ncaaf_game_lines_oddsapi` already carries
+    # `phases=("pregame","live")` in `refresh_odds_sources.py`, so the cadence
+    # this needs already exists and the orchestrator (claimed by lane
+    # `ncaaf-live-cadence`) does not have to be touched at all.
+    segment_payloads: list[dict[str, Any]] = []
+    if not args.events_json:
+        api_key = _env("ODDS_API_KEY")
+        if api_key:
+            segment_payloads, _ = fetch_event_segments(
+                api_key,
+                events,
+                sport_key=args.sport_key or _env("ODDS_API_SPORT_NCAAF", DEFAULT_SPORT_KEY) or DEFAULT_SPORT_KEY,
+            )
+
+    outcome = append_quotes(events, segment_payloads)
     for date_str, detail in sorted(outcome["dates"].items()):
         print(
             f"[ncaaf_odds] QUOTES date={date_str} events={detail['events']} "
@@ -350,7 +422,8 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         )
     print(
-        f"[ncaaf_odds] DONE events={outcome['events']} dates={len(outcome['dates'])} "
+        f"[ncaaf_odds] DONE events={outcome['events']} "
+        f"segment_payloads={outcome['segment_payloads']} dates={len(outcome['dates'])} "
         f"rows_appended={outcome['rows_appended']}",
         flush=True,
     )

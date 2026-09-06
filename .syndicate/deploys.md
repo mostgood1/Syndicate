@@ -306,6 +306,19 @@ same expected effect, same measurement, same reader.
 
 **verify:** _(empty — this row is an open obligation)_
 
+## 2026-09-06 01:12:07-01:15:14Z — web `3cb5b4ba` -> `67fd8c9d` — **THE 19.34 GB IS WEB POLLING EXTERNAL FEEDS ITSELF, AND IT IS 100% BILLED. MYSTERY CLOSED.** — lane `render-egress-transport`
+
+- **What this deploy shipped:** the billed/unbilled split in `http_compression` (`cf401fb8`), deployed to answer one question — is web's own outbound traffic BILLED egress or unbilled internal transport?
+- **verify — THE ANSWER, from web's first outbound fetch after boot, 5 seconds post-deploy:**
+  `01:15:09Z [http_compression] HTTP_COMPRESSION gzip_responses=1 wire_bytes=133899 decoded_bytes=818291 saved_bytes=684392 ratio=6.11x refused_hosts=0 BILLED_saved_bytes=684392 BILLED_wire=133899`
+  **`BILLED_saved_bytes == saved_bytes`. 100% external, zero internal.** Every byte web fetches leaves the network and is billed.
+- **WHY FIVE EARLIER PROBES MISSED IT, and this is the durable lesson: it is OUTBOUND.** Render's `type=request` logs record only what web SERVES; the gunicorn access log the same. Internal transport, public responses, public ingress and deploys were each eliminated by measurement and the driver was in none of them, because **no instrument on the request side can see a service making its own calls.** The only thing that ever showed it was a counter inside the client.
+- **THE MECHANISM, named in code.** `ncaaf/cards.py:_attach_live_state` -> `ncaaf_game_state_index()` fetches the ESPN college-football scoreboard (**1,441,192 bytes uncompressed**) from `live_game_state.py`, whose own docstring says *"This runs on web, in the cards builder, behind a TTL cache"* — `_CACHE_TTL_SECONDS = 45.0`. **`WEB_CONCURRENCY = 2` and the cache is PER PROCESS, so every fetch happens twice.**
+- **THE RATE, measured off web's own counter over 112 minutes across both processes:** ~3,600 outbound fetches, **1,294 MB of content = 693 MB/hour = 16.6 GB/day** at the pre-change wire size. ESPN CFB alone is ~230 MB/hour (2 processes x 80 fetches/hour x 1.44 MB) ~ **5.5 GB/day**.
+- **IT EXPLAINS THE SHAPE THAT NEVER MADE SENSE.** Bursty and slate-driven: tonight `games=68, live=24`; this morning, no games, and web ran 0.1-4 MB/hour. Sep 1-4 heavy, Sep 5 morning 0.26 GB. The bandwidth follows the SLATE, not the users.
+- **ALREADY MITIGATED, MEASURED: 7.29x on web** (`3cb5b4ba`, this session). Same traffic, ~1/7th the bytes. 16.6 GB/day -> ~2.3 GB/day.
+- **NOT FIXED, AND COMPRESSION IS THE WRONG TOOL FOR BOTH:** (1) the per-process TTL cache DOUBLES every fetch — a shared cache or a worker-owned fetch halves it outright; (2) **web should not be doing this at all.** `CLAUDE.md`'s load-bearing rule is that workers fetch and web reads artifacts. The repo's own `request_path_guard` agrees: **205 "compute in request path" warnings in a 1,200-line sample.** Compression cuts the bill ~7x; moving the poll off web removes most of the calls.
+
 ## 2026-09-05 23:07:13-23:12:36Z — refresh-worker `eb7951fe` -> `ffe8714b` — **DEPLOYED BY LANE `ncaaf-live-resim-wire` FROM THE TIP, carrying this lane's change. THE OWED ESPN VERIFICATION IS DISCHARGED, POSITIVE.** — lane `render-egress-transport`
 
 - **I did not take this deploy and I did not take a lock.** `ncaaf-live-resim-wire` held `refresh-worker`, retargeted its poller to the tip and shipped it, which is why this landed at all. The readings below are MINE — that lane explicitly declined to report them as my verification, which was the right call, and I re-derived every one from the Render logs API rather than recording what was relayed.

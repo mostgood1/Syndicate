@@ -408,6 +408,7 @@ once this index exists: re-splitting would orphan the parts.
 | [open-problems] | OPEN PROBLEMS | `state.md` |
 | [shipped-verified] | SHIPPED / VERIFIED — current status by item `[2026-08-18; replaces a dozen dated snapshot sections]` | `state.md` |
 | [live-sha-authority] | LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]` | `state.md` |
+| [nba-betting-card-assets-404] | THE NBA BETTING-CARD CSS AND JS WERE 404 IN PRODUCTION -- FIXED, DEPLOYED AND VERIFIED ON THE SERVED PAYLOAD ` | `state_basketball.md` |
 | [wnba-live-lens-directory] | THE WNBA LIVE-LENS READERS OPENED THE WRONG DIRECTORY — fixed and verified locally, NOT DEPLOYED `[verified 20 | `state_basketball.md` |
 | [wnba-recon-producer] | `recon_games` WAS WRITTEN PREGAME AND NEVER REWRITTEN; the producer now exists `[2026-08-31, lane wnba-accurac | `state_basketball.md` |
 | [wnba-consensus-price] | BOOK PRICES WERE AVERAGED ON THE AMERICAN SCALE; 43% OF CARD PRICES WERE IMPOSSIBLE `[2026-08-31, lane wnba-ac | `state_basketball.md` |
@@ -435,9 +436,12 @@ once this index exists: re-splitting would orphan the parts.
 | [board-window-staleness] | — **CAUSE FOUND AND VERIFIED 2026-08-29. It is neither the queue NOR build cost — see `[week-scoped-board-wind | `state_board.md` |
 | [week-scoped-board-window] | SCOPED, NOT BUILT `[2026-08-29]` | `state_board.md` |
 | [board-model-edge-coverage] | 2026-08-30 — 82% of the board is UNSIZABLE, and every `_alt` market is 0% | `state_board.md` |
+| [live-edge-basis-label] | `edge_basis` WAS WRONG ON EVERY LIVE MONEYLINE ROW, AND THE MEASUREMENT THAT CERTIFIED IT COULD NOT HAVE SEEN  | `state_board.md` |
+| [nfl-board-projection-coverage] | NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-project | `state_football.md` |
 | [ncaaf-zero-orders-is-two-gates] | NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry | `state_football.md` |
 | [ncaaf-team-registry-two-files] | THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]` | `state_football.md` |
 | [football-smartsim2] | FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]` | `state_football.md` |
+| [ncaaf-calibration-profile-live] | THE PROMOTED NCAAF PROFILE IS LIVE, AND PROMOTING ONE IS A **CODE DEPLOY** `[verified 2026-09-05, render]` | `state_football.md` |
 | [nfl-archived] | NFL — earlier closed work, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.** | `state_football.md` |
 | [football-model-leaks] | FOOTBALL — TWO MODEL LEAKS, BOTH FIXED `[verified 2026-08-19, lane football-model-owner]` | `state_football.md` |
 | [football-board-defects] | FOOTBALL BOARDS — THREE DEFECTS SHIPPED AND MEASURED `[2026-08-18/19]` — **ARCHIVED 2026-08-19 to `state_archi | `state_football.md` |
@@ -462,6 +466,7 @@ once this index exists: re-splitting would orphan the parts.
 | [nfl-player-props] | NFL player props: capture fixed, model priced and BEATEN by the market | `state_football.md` |
 | [nfl-game-context] | Game context is built and measured, and INERT in production | `state_football.md` |
 | [cfbd-monthly-quota-exhausted] | 2026-08-30 — LIVE: NCAAF projections are FAILING in production, on opener weekend | `state_football.md` |
+| [ncaaf-live-resim] | SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim] | `state_football.md` |
 | [kalshi-in-play-and-real-fees] | KALSHI TRADES IN-PLAY AND PUBLISHES ITS OWN FEE PARAMETERS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE  | `state_kalshi.md` |
 | [kalshi-segment-on-full-game] | KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS: the join key had no `segment` `[verified 2026-08-28, lane p | `state_kalshi.md` |
 | [kalshi-venue-execution] | KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lan | `state_kalshi.md` |
@@ -475,12 +480,18 @@ once this index exists: re-splitting would orphan the parts.
 | [layer1-board-date-scoping] | THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED `[verified 2026-08-30 05:0x-05:5xZ, web+refres | `state_layer2.md` |
 | [board-chip-coverage] | Layer 2 compact game cards — FULL chip coverage, verified 2026-08-26 | `state_layer2.md` |
 | [chip-artifact-content-age] | A chip artifact's TIMESTAMP and its CONTENT age are different numbers — verified 2026-08-27 (lane `mlb-chip-li | `state_layer2.md` |
+| [stale-test-triage] | "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit | `state_ledger.md` |
+| [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |
+| [ci-suite-red-test] | CI'S OWN SUITE IS GREEN. THE "ONE RED TEST" WAS THE 31st DATA-ABSENCE FAILURE, NOT A SURVIVOR OF THEM `[correc | `state_ledger.md` |
 | [state-file-split] | state.md IS AN INDEX PLUS NINE PARTS `[2026-09-03, scripts/split_state.py, commit 23bf6bc7]` | `state_ledger.md` |
 | [session-harness] | SESSION HARNESS — what the hooks actually enforce | `state_ledger.md` |
 | [worktree-test-data] | THE 92 RED TESTS IN A SESSION WORKTREE ARE THE ENVIRONMENT, NOT DEFECTS `[measured + shipped 2026-09-03]` | `state_ledger.md` |
 | [test-baselines] | TEST BASELINES | `state_ledger.md` |
 | [lane-state-carried] | LANE STATE RECORDS CARRIED THROUGH THE 2026-08-18 COLLAPSE — **ARCHIVED 2026-08-19 to `state_archive_2026-08-1 | `state_ledger.md` |
 | [lane-guard-disclaimer-and-worktree-exemption-bugs] | TWO REAL BUGS FOUND IN `lane-guard.py`, NEITHER FIXED `[found 2026-08-18]` — **ARCHIVED 2026-08-19 to `state_a | `state_ledger.md` |
+| [split-state-reindex-truncation] | `split_state.py --reindex --apply` DELETED EVERYTHING BELOW THE `[subject-index]` TABLE — **FIXED, ON MAIN (`2 | `state_ledger.md` |
+| [discard-guard-origin-blindness] | `discard-guard.py` CALLED PUSHED CONTENT "NOWHERE ELSE", AND BLOCKED `git restore --staged` — **FIXED (`e3a515 | `state_ledger.md` |
+| [mlb-hitter-strikeouts-prop] | MLB HITTER `strikeouts` WAS A DEAD FIELD FOR MONTHS; FIXED, DEPLOYED AND VERIFIED — AND NO BET WAS EVER PRICED | `state_mlb.md` |
 | [mlb-sim-edge-is-anti-predictive] | THE MLB SIM'S CLAIMED EDGE IS ANTI-PREDICTIVE, AND THE PROP BOOK IS A REAL EDGE SPENT ON VIG `[verified 2026-0 | `state_mlb.md` |
 | [mlb-live-edge-forbidden] | TWO STANDING CONSTRAINTS ON ANY MLB LIVE-EDGE WORK — lifted out of lane `live-prob-producer-reader-gap` when i | `state_mlb.md` |
 | [mlb-exchange-shopping-value] | EXCHANGE PRICE-SHOPPING IS WORTH `+0.74 ROI POINTS` ON GAME MARKETS AND `+2.43%` ON THE PROP GATE BOOK — both  | `state_mlb.md` |
@@ -505,7 +516,7 @@ once this index exists: re-splitting would orphan the parts.
 | [model-skill] | MODEL SKILL (`#428`) — measured vs not | `state_model.md` |
 | [sim-scheduling-blocker] | 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker — **ARCHIVED 2026-08-19 to `st | `state_model.md` |
 | [sim-edge-analysis-2026-09-01] | FULL-PLATFORM SIM-ENGINE EDGE ANALYSIS — strategy synthesis + new from-code facts `[2026-09-01, session syndic | `state_model.md` |
-| [accuracy-autorun-rearm-state] | `#626`(h) IS ONE ENV KEY AWAY — THE CODE IS ALREADY LIVE `[2026-09-03, lane accuracy-autorun-rearm, no deploy  | `state_model.md` |
+| [accuracy-autorun-rearm-state] | `#626`(h) IS ARMED, RAN, AND PASSED. The budget, not memory, is now the constraint. `[2026-09-04, lane accurac | `state_model.md` |
 | [polymarket-live-totals-quote-names-no-game] | 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game iden | `state_polymarket.md` |
 | [polymarket-fill-price-is-reported] | THE VENUE REPORTS `avgPx`. "This path has no fill price" was FALSE and cost a 12h live halt `[verified 2026-08 | `state_polymarket.md` |
 | [polymarket-h2h-buys-the-wrong-side] | POLYMARKET MONEYLINES BUY THE WRONG TEAM: `outcomes[0]` is not reliably the YES leg `[verified 2026-08-28, lan | `state_polymarket.md` |
@@ -562,6 +573,7 @@ once this index exists: re-splitting would orphan the parts.
 | [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, | `state_worker.md` |
 | [artifact-allowlist-split] | THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT  | `state_worker.md` |
 | [service-memory-saturation] | BOTH PRODUCTION SERVICES WERE MEMORY-SATURATED 2026-09-02/03 — MEASURED, and it BLOCKS analysis work `[lane so | `state_worker.md` |
+| [render-egress-cause] | THE BANDWIDTH BILL IS `web` POLLING EXTERNAL FEEDS ITSELF, AND IT IS 100% BILLED `[verified 2026-09-06, lane r | `state_worker.md` |
 | [web-anon-leak] | THE WEB SERVICE LEAKS ANONYMOUS MEMORY, ~75 MB/h, AND THE DEPLOY CADENCE HIDES IT `[verified 2026-09-01, lane  | `state_worker.md` |
 | [render-server-failed-is-three-events] | `server_failed` IS NOT A FAILURE COUNT — read `details.reason`, one of its meanings is a HEALTHY DELIBERATE EX | `state_worker.md` |
 | [refresh-worker-memory] | MEMORY — refresh-worker: THE OOM IS FIXED; A SLOW RATCHET REMAINS `[verified 2026-08-17, superseding four earl | `state_worker.md` |
@@ -874,3 +886,126 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   distinguish these mechanisms — the gap is near zero whenever a process happens
   to be AT its peak, regardless of whether it returns memory later. It needs a
   SERIES, and UPDATE 10 did not have one.
+
+### `[web-oom-leak]` UPDATE 13 — **the retainer is NOT a module-level container: census explains 6.1% of growth**, 2026-09-05T02:5xZ `[session b2b5b45b]`
+
+* **Two readings, one worker, 13.7 min apart, budget not exhausted:** census
+  `59.0 -> 64.9 MB` (+5.9) while process anon went `389.3 -> 486.1 MB` (+96.8).
+  **The census explains 6.1% of the growth.** Level coverage 15.6% / 12.5% on the
+  two workers.
+* **NAMED RETAINERS (level, not growth):**
+  `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` **~20 MB in ONE entry**;
+  `soccer.cards._CARDS_CONTEXT_CACHE` 14.45 MB / 29;
+  `mlb.cards._MLB_CARDS_CONTEXT_CACHE` 6-10 MB / 4 (**+11.21 MB on one added
+  entry**); `_MLB_TODAY_CACHE` 7.6-10 MB; `LAST_RESULT` ~5 MB.
+* **`LAST_RESULT` reconciles two earlier readings:** it HOLDS ~5 MB and grows
+  0.0 MB per request. The per-request probe was right and so is this.
+* **READ THE LIMIT BEFORE QUOTING THE 6.1%:** the walk's ROOTS are module globals
+  that are already containers. A module-level OBJECT with caches in its
+  `__dict__`, a class attribute, a closure, or thread-local state is never
+  reached. The claim is **"not in container-typed module globals"**, NOT "not in
+  Python". Widening the roots is the next step.
+* **Instrument cost:** 1.2 s, ~10 MB transient, walk completes at 2M nodes. At
+  lower caps the budget exhausts and the ranking becomes *biggest among whatever
+  was reached first* — the 20k/100k/400k runs are NOT quotable.
+* Worker anon grew **+96.8 MB in 13.7 min (~424 MB/h)** during this window,
+  consistent with the fast regime measured earlier tonight.
+
+### `[web-oom-leak]` UPDATE 13 — **the retained bytes are NOT Python objects (28.3%). The object-graph line is CLOSED.**, 2026-09-05T20:4xZ `[session b2b5b45b]`
+
+* **Measured on pid 98 with a CONVERGED walk (891,276 nodes, not truncated):
+  process anon `373.17 MB`, live Python objects `105.56 MB` — `28.3%`.
+  `267.61 MB` (71.7%) is not Python objects.** Threshold pre-registered before
+  the reading (`>=70%` Python / `<=35%` not).
+* Convergence was the whole point: the same call read `7.2%` at a 200k cap and
+  `28.5%` at 800k, both TRUNCATED. **A truncated walk reads as "not Python" —
+  the correct answer here, reached for the wrong reason at any smaller cap.**
+* **CORROBORATION, not proof:** an arena reading from a different worker hours
+  earlier gave `bytes_in_allocated_blocks = 105.731 MB` against this walk's
+  `105.56 MB` — independent methods agreeing to `0.16%`. Different epochs, so
+  suggestive only.
+* Implied decomposition (same caveat): `105.6 MB` live objects, `44.3 MB`
+  pymalloc fragmentation, `223.2 MB` **outside pymalloc arenas entirely** —
+  where the 8-64MB mappings identified earlier must live.
+* **CLOSED: no Python-level probe can reach the 71.7%.** Root sets, retainer
+  censuses and per-request attribution are all blind to non-object bytes.
+  Remaining candidates: C-extension buffers, allocator behaviour below CPython,
+  per-thread state.
+* **STILL WORTH DOING, on its own merits and not as an OOM fix:**
+  `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` **37.50 MB** and
+  `_CARDS_CONTEXT_CACHE` **12.67 MB** are real, nameable, unbounded caches.
+* The census table and the heap ratio came from DIFFERENT workers (pid 99 vs
+  98) — the endpoint round-robins. The ratio is self-consistent; the table is
+  not a breakdown of it.
+
+### `[web-oom-leak]` UPDATE 14 — **the GROWTH is non-Python too, not just the standing total**, 2026-09-05T21:0xZ `[session b2b5b45b]`
+
+* UPDATE 13 measured a STOCK ratio at one instant (28.3%). That does not answer a
+  GROWTH question — a heap could hold 28% of anon and still be the entire
+  growing term. **Measured over 10.9 min, per worker, every walk CONVERGED (0
+  truncated readings discarded):**
+
+        pid 97   anon  +56.26 MB   heap  +0.19 MB   =  0.3% of the growth
+        pid 98   anon +107.06 MB   heap +24.50 MB   = 22.9% of the growth
+
+* **pid 97 is the decisive case: its Python heap sat at `104.68 -> 104.87 MB`,
+  flat to 0.2 MB, while anon climbed 56 MB.** The verdict is upgraded from a
+  snapshot to a trend: the growth itself is non-Python.
+* **pid 98's 22.9% is an UPPER BOUND, not a measurement.** Consecutive walks on
+  that worker swung `184.23 -> 167.18 MB` (~17 MB), so its `+24.50 MB` delta is
+  only modestly above the instrument's own noise. Quote pid 97's `0.3%`.
+* **RATE, measured in the same window and it is steep:** pid 97 `~307 MB/h`,
+  pid 98 `~590 MB/h`, ~900 MB/h combined. Container at the end: **1756.6 MB,
+  85.8%, 291 MB headroom.**
+* Nothing changes about the `#632` conclusion except its strength: no
+  Python-level probe can find the growing bytes.
+
+### `[web-oom-leak]` UPDATE 15 — **CORRECTION: I quoted page cache as OOM pressure. Real pressure is 54%, not 86%.**, 2026-09-05T21:2xZ `[session b2b5b45b]`
+
+* **`container_memory_mb` INCLUDES RECLAIMABLE PAGE CACHE and is NOT the OOM
+  metric.** I quoted `1756.6 MB / 85.8% / 291 MB headroom` and projected an OOM
+  in ~20 minutes. Minutes later the same figure had FALLEN to `1509.1 MB` while
+  both workers' RSS went slightly UP — a ~247 MB move that no process made.
+* Split over 5.1 min (7 samples, 50 s apart):
+
+        total           +151.2 MB   -> +1786 MB/h   (cache swung 469 -> 588 MB)
+        UNRECLAIMABLE    +98.8 MB   -> +1167 MB/h
+        pid 98 rss       +53.9 MB
+        pid 97 rss       +44.2 MB   (sum 98.1 ~= unreclaimable 98.8: consistent)
+
+* **Standing pressure is `1103.7 MB` unreclaimable of 2048 = 54%**, not the 86%
+  I reported. The difference is ~570 MB of file cache the kernel evicts under
+  pressure before it OOMs anything.
+* **GROWTH IS BURSTY, so no rate from a short window is trustworthy — including
+  the ones above.** Both workers rose ~98 MB between 16:17:43 and 16:19:25 and
+  were then FLAT to the decimal (`595.3` / `509.4`) for the remaining 3.5 min.
+  Extrapolating `+1167 MB/h` across a window containing one burst is exactly the
+  error that produced the "~20 minutes to OOM" claim.
+* This is the standing `memory.current is page cache` rule, which I had recorded
+  and did not apply: **split anon from file before calling anything pressure.**
+
+### `[web-oom-leak]` UPDATE 16 — **bursts are ORDINARY TRAFFIC, and the "both workers" observation that started the lane was a SAMPLING ARTIFACT**, 2026-09-05T22:2xZ `[session b2b5b45b]`
+
+* **7 settled bursts at 10 s cadence, 0 restarts inside the window:**
+  `0/7 hit both workers`; sizes `17.6-41.8 MB` (mean `28.0`); gaps
+  `3.3, 0.2, 1.6, 4.0, 0.2, 3.4 min`, spread/mean `1.79` against a periodicity
+  bar of `<=0.35`. **Not simultaneous, not periodic — demand-driven request
+  traffic on one worker at a time.** The scheduled-job / fan-out hypothesis is
+  FALSIFIED.
+* **THE LANE'S FOUNDING OBSERVATION DOES NOT SURVIVE.** It was opened on "both
+  workers rose ~98 MB in ~100 s — one request cannot do that", taken from
+  **50-SECOND sampling** (pid 98 `+53.9`, pid 97 `+44.2` over 5.1 min). At 50 s
+  resolution *"one worker then the other"* is INDISTINGUISHABLE from *"both at
+  once"*. At 10 s resolution it resolves into single-worker bursts, 7 for 7.
+  **A conclusion drawn at a resolution coarser than the phenomenon.**
+* **A FIRST RUN WAS DISCARDED ENTIRELY.** A peer deployed web at
+  `16:29:52-16:32:58` and the detector had no restart guard, so it reported
+  warm-up as bursts — including `+570 MB` and `+284 MB`. Pids are REUSED across a
+  restart (97 and 98 both times), so the pid set looked continuous. Rebuilt with
+  restart inference (RSS drop or a run of failed fetches) and a 10-minute settle
+  window; the rerun excluded 3 warm-up bursts explicitly rather than silently.
+* Consistent with the rest of `#632`: ~28 MB increments match the 8-64MB
+  anonymous mappings already identified, and none of it is reachable from Python.
+* Weak signals, recorded as such: pid 98 took **6 of 7** bursts (lopsided for
+  round-robin, but n=7), and ONE burst coincided with a 98 MB child process
+  (`272:pro`, the only child all window) — an anecdote, not a mechanism.

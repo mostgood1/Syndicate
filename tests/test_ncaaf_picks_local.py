@@ -26,9 +26,29 @@ class NcaafPicksLocalTests(unittest.TestCase):
     """
 
     def setUp(self) -> None:
+        # THE REGISTRY KEY IS A 3-TUPLE `(sport, market, basis)`, AND THIS
+        # FIXTURE WAS STILL WRITING 2-TUPLES.
+        #
+        # A `basis` dimension was added to `_SERVING_REGISTRY` after this file
+        # was written (`MODEL_BASIS` vs `MARKET_BASIS`), and `serving_verdict`
+        # looks up `(sport, _normalise_market(...), resolved_basis)`. A 2-tuple
+        # key can never match that, so every entry installed here was dead --
+        # and because `clear=True` also removed the REAL 3-tuple entries, the
+        # lookup fell through to the default-deny branch. The gate this setUp
+        # exists to force OPEN was therefore forced SHUT, which is the exact
+        # inversion the class docstring warns about: the assertions were
+        # testing the suppressed board instead of the routing.
+        #
+        # `NCAAF_PICKS_SUPPRESSED moneyline=1` on stdout was the tell.
+        #
+        # Keyed by MODEL_BASIS specifically: these tests are about which SOURCE
+        # a model pick routes to. The market-basis verdict does not come from
+        # this registry at all (`_MARKET_BASIS_VERDICT` short-circuits before
+        # the lookup), so opening it here would prove nothing.
         opened = dict(pick_gate._SERVING_REGISTRY)
         for market in ("spread", "moneyline", "total"):
-            opened[("ncaaf", market)] = MarketVerdict(servable=True, reason="TEST: routing fixture")
+            opened[("ncaaf", market, pick_gate.MODEL_BASIS)] = MarketVerdict(
+                servable=True, reason="TEST: routing fixture")
         patcher = patch.dict(pick_gate._SERVING_REGISTRY, opened, clear=True)
         patcher.start()
         self.addCleanup(patcher.stop)

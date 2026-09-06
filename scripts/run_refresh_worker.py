@@ -1628,6 +1628,531 @@ def _run_wnba_postgame_producer_tick() -> dict[str, Any] | None:
     return result
 
 
+# ##########################################################################
+# NCAAF LIVE RE-SIM -- the producer for `data/live/ncaaf_live_lens.json`.
+#
+# `syndicate/features/ncaaf/live_resim.py` shipped 2026-09-05 (`ca5be54b`,
+# `7d9ec94e`) with the engine, the join and 50 tests, AND NOTHING CALLED IT.
+# Measured on production that evening: `/ncaaf/api/live-lens` served 51 games,
+# 8 live, and every live card's win probability was the PREGAME number -- Boise
+# State led Oregon 17-7 in Q2 beside a published "Oregon 97.7%". The board is
+# right to suppress an edge on those rows (`#340`); what was missing is a
+# probability that knows the score. This is the call site.
+#
+# ####################################################################
+# IT MUST BE THIS SERVICE, AND THE REASON IS THE INPUTS, NOT THE COMPUTE.
+# ####################################################################
+# The obvious home is `live_lens_loop`, which already builds every other
+# sport's lens -- and it runs on live-odds-worker
+# (`SYNDICATE_ENABLE_LIVE_LENS_LOOP=true` appears ONLY in that block of
+# `render.yaml`, read 2026-09-05). The re-sim's two inputs are on THIS
+# service's disk:
+#
+#   ncaaf_source/data/smartsim2_projections_<season>_wk<week>.csv
+#       written by `_launch_autorun_season_projections` above, in this file.
+#       Allowlisted, but it carries `wk1` and NO date token, so
+#       `pull_hot_artifacts`' `*<date>*` glob would never carry it across.
+#   ncaaf_source/historical_truth/sp_ratings_<season>.json
+#       see `_ncaaf_sp_ratings_index` below -- the generator writes it to the
+#       EPHEMERAL CHECKOUT, which is the reason that function exists at all.
+#
+# Wiring this into `live_lens_loop` would put the compute on the one service
+# that cannot read what it needs. The OUTPUT has no such problem:
+# `data/live/ncaaf_live_lens.json` matches none of
+# `_KEYVALUE_EXCLUDED_PATH_MARKERS`, so `write_json_file` routes it to the
+# keyvalue store and web reads it back through the same `read_json_file`
+# `board_enrichment.attach_live_gamelines_for_sport` calls. That is the route
+# `mlb_live_lens.json` and `wnba_live_lens.json` already take.
+#
+# UNCONDITIONAL, like the ticks above and for the same reason: it is
+# interval-gated internally, it returns None in a few microseconds when there
+# is no NCAAF week to project, and it has no business waiting on the
+# claimed_count/elif chain that a live MLB slate keeps winning (`#341`).
+# ##########################################################################
+
+# 180s, not 60s. Two things set this and they pull opposite ways. The re-sim
+# itself is cheap and gets cheaper (154 ms/sim with a full game left, 0.7 ms at
+# Q4 0:15; 7 live games measured at ~35 s total for the slate). The ESPN
+# scoreboard fetch is NOT: `?groups=80&limit=200` returned **1,441,192 bytes**
+# uncompressed on the 2026-09-05 slate, measured by lane
+# `render-egress-transport` the same evening, and `urllib` sends no
+# `Accept-Encoding` at any of this repo's 122 call sites, so a 60s tick would
+# pull ~86 MB/hour to buy 120 seconds of freshness on a number that moves with
+# the game clock. When that lane lands gzip on the shared fetcher this inherits
+# a measured 13.4x and the interval can come down.
+_NCAAF_LIVE_RESIM_INTERVAL_DEFAULT_SECONDS = 180.0
+
+# How long a mirrored SP+ file is trusted before the loader is asked again.
+# Bounds staleness of an IN-SEASON rating (SP+ moves week to week) without
+# putting a CFBD call anywhere near the per-tick path.
+_NCAAF_SP_RATINGS_MAX_AGE_SECONDS = 24 * 3600.0
+
+# season -> (ratings index, monotonic stamp, source). Process-local by design:
+# a reboot re-reads, which is what makes the durable mirror the thing that has
+# to be right rather than this cache.
+_NCAAF_SP_RATINGS_MEMO: dict[int, tuple[dict[str, tuple[float, float]], float, str]] = {}
+
+
+def _ncaaf_live_resim_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_NCAAF_LIVE_RESIM") or "").strip().lower()
+    # ABSENT MEANS ON, stated explicitly because CLAUDE.md's standing rule is
+    # that absent != off and the code's default is what decides. Turning this
+    # off needs no deploy; turning it on needs no env var.
+    return raw not in {"off", "0", "false", "no"}
+
+
+def _ncaaf_live_resim_interval_seconds() -> float:
+    raw = str(os.environ.get("SYNDICATE_NCAAF_LIVE_RESIM_INTERVAL_SECONDS") or "").strip()
+    try:
+        return max(60.0, float(raw))
+    except (TypeError, ValueError):
+        return _NCAAF_LIVE_RESIM_INTERVAL_DEFAULT_SECONDS
+
+
+def _ncaaf_live_resim_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "ncaaf_live_resim.json"
+
+
+def _ncaaf_sp_ratings_durable_path(season: int) -> Path:
+    """The mirror THIS producer reads. On the MOUNTED disk, deliberately.
+
+    `default_ncaaf_source_root()` is `$SYNDICATE_NCAAF_SOURCE_ROOT` ==
+    `/opt/render/project/data/ncaaf_source`, so this survives a deploy, and it
+    is `ncaaf_source/historical_truth/sp_ratings_*.json` relative to
+    `data_root()` -- the entry added to `HOT_ARTIFACT_PATTERNS` for it.
+    """
+    from syndicate.features.ncaaf.sources import default_ncaaf_source_root
+
+    return default_ncaaf_source_root() / "historical_truth" / f"sp_ratings_{season}.json"
+
+
+def _ncaaf_sp_ratings_index(season: int) -> tuple[dict[str, tuple[float, float]], str]:
+    """`{norm(team): (offense, defense)}` in RAW SP+ points, and where it came from.
+
+    ####################################################################
+    WHY THIS IS NOT JUST `load_sp_ratings(season)`.
+    ####################################################################
+    MEASURED on refresh-worker's own logs, 2026-09-05:
+
+      2026-09-04T01:03:29Z [sp_ratings] season=2026 source=api teams=138
+        cached=/opt/render/project/src/data/ncaaf_source/historical_truth/sp_ratings_2026.json
+      2026-09-05T01:15:49Z [sp_ratings] season=2026 source=api teams=138
+        cached=/opt/render/project/src/data/ncaaf_source/historical_truth/sp_ratings_2026.json
+
+    `/src/` is the EPHEMERAL CHECKOUT. `sp_ratings_cache_path` and
+    `ncaaf_historical_loader.DEFAULT_CACHE_DIR` both resolve relative to
+    `__file__`, not to `SYNDICATE_DATA_ROOT`, so **every deploy deletes this
+    model's ratings** -- which is why both runs above read `source=api` rather
+    than `source=cache`. Nothing is git-tracked under
+    `data/ncaaf_source/historical_truth/` except four `games_*.json.gz`.
+
+    Wiring the re-sim without noticing that would have shipped a producer whose
+    FIRST reading after its own deploy is `no_pregame_ratings` on every game,
+    for the ~24 hours until the daily projections autorun next runs. A zero is
+    indistinguishable from an inert feature, and this one would have arrived
+    looking exactly like the bug the lane exists to fix.
+
+    ####################################################################
+    THE ORDER, AND WHY EACH STEP IS WHERE IT IS.
+    ####################################################################
+      1. the in-process memo, so the per-tick path does no IO at all;
+      2. the DURABLE mirror on the mounted disk, if younger than 24 h. This is
+         the post-deploy answer and it involves no network;
+      3. `load_sp_ratings(season)` -- the generator's OWN function, imported
+         read-only, whose order is loader-cache -> its JSON cache -> CFBD. It
+         is reached at most once per 24 h per process, so a CFBD call happens
+         only when the mirror is missing or stale;
+      4. on success the mirror is REWRITTEN, which is what keeps in-season
+         ratings moving. A frozen mirror is the quieter of the two failures and
+         is the one worth designing against.
+
+    NEVER a neutral default. `sp_offense_defense_rating` returns None for an
+    unmatched team because 0.0 is the engine's AVERAGE team; an empty index
+    here therefore produces `no_pregame_ratings` refusals BY NAME, and the
+    tick's own status carries `sp_ratings_teams` so that refusal can be
+    attributed to the loader rather than to a team-name mismatch.
+    """
+    memo = _NCAAF_SP_RATINGS_MEMO.get(season)
+    if memo is not None and (time.monotonic() - memo[1]) < _NCAAF_SP_RATINGS_MAX_AGE_SECONDS:
+        return memo[0], memo[2]
+
+    from scripts.generate_smartsim2_ncaaf_projections import _read_sp_cache, _write_sp_cache
+
+    durable_path = _ncaaf_sp_ratings_durable_path(season)
+    durable = _read_sp_cache(durable_path)
+    durable_age = None
+    if durable:
+        try:
+            raw = json.loads(durable_path.read_text(encoding="utf-8"))
+            fetched = _parse_utc_timestamp(str((raw or {}).get("fetched_at") or "") or None)
+            if fetched is not None:
+                # NAIVE UTC ON BOTH SIDES. `_parse_utc_timestamp` ends with
+                # `.replace(tzinfo=None)`, so subtracting it from an AWARE
+                # `datetime.now(timezone.utc)` raises TypeError -- and the first
+                # cut of this function did exactly that inside a bare `except`,
+                # so `durable_age` was always None, the mirror was never
+                # trusted, and every boot fell through to the loader. It failed
+                # in the SAFE direction, which is why nothing looked wrong: the
+                # ratings were still correct, they were just fetched again. The
+                # discriminating run (no `CFBD_API_KEY` in the environment at
+                # all, which is the post-deploy state this branch exists for)
+                # is what caught it.
+                durable_age = (datetime.now(timezone.utc).replace(tzinfo=None) - fetched).total_seconds()
+            else:
+                print(
+                    f"[ncaaf_live_resim] SP_RATINGS_MIRROR_NO_TIMESTAMP path={durable_path}",
+                    flush=True,
+                )
+        except Exception as exc:  # noqa: BLE001
+            # NAMED. An unreadable age sends this to the loader, which is safe
+            # and silent -- and silence here is what hid the bug above.
+            print(
+                f"[ncaaf_live_resim] SP_RATINGS_MIRROR_AGE_UNREADABLE "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            durable_age = None
+    if durable and durable_age is not None and durable_age < _NCAAF_SP_RATINGS_MAX_AGE_SECONDS:
+        _NCAAF_SP_RATINGS_MEMO[season] = (durable, time.monotonic(), "durable_mirror")
+        return durable, "durable_mirror"
+
+    index: dict[str, tuple[float, float]] = {}
+    source = "loader"
+    try:
+        from scripts.generate_smartsim2_ncaaf_projections import load_sp_ratings
+
+        index = dict(load_sp_ratings(season) or {})
+    except Exception as exc:  # noqa: BLE001 -- a rating fetch must never kill the tick
+        print(f"[ncaaf_live_resim] SP_RATINGS_LOAD_FAILED {type(exc).__name__}: {exc}", flush=True)
+        index = {}
+
+    if index:
+        try:
+            _write_sp_cache(durable_path, season, index)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ncaaf_live_resim] SP_RATINGS_MIRROR_FAILED {type(exc).__name__}: {exc}", flush=True)
+    elif durable:
+        # The loader came back empty -- CFBD rate-limited, most likely; see
+        # `cfbd_quota_latch`, and `[cfbd-monthly-quota-exhausted]` in
+        # `state_football.md` for the incident. A STALE rating is a far better
+        # answer than none, and it is reported as stale rather than passed off
+        # as current.
+        index, source = durable, "durable_mirror_stale"
+
+    # Memoised EVEN WHEN EMPTY, so a rate-limited CFBD is retried once a day
+    # rather than once a tick. The empty case is visible in the status line.
+    _NCAAF_SP_RATINGS_MEMO[season] = (index, time.monotonic(), source)
+    return index, source
+
+
+def _ncaaf_live_resim_espn_dates(now_utc: datetime) -> list[str]:
+    """Which ESPN scoreboard dates can carry a game that is live RIGHT NOW.
+
+    Today-UTC always. Yesterday-UTC only in the first 12 hours of a UTC day,
+    which is the window in which an evening-ET kickoff -- filed by ESPN under
+    the ET date, i.e. yesterday-UTC -- can still be in progress. Outside that
+    window the second fetch is 1.4 MB for a slate that is entirely final.
+    """
+    today = now_utc.date()
+    dates: list[str] = []
+    if now_utc.hour < 12:
+        dates.append((today - timedelta(days=1)).isoformat())
+    dates.append(today.isoformat())
+    return dates
+
+
+def _ncaaf_live_resim_live_index(dates: list[str]) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """ESPN state keyed `"{away_location}@{home_location}"`, plus fetch counters.
+
+    ####################################################################
+    NOT A THIRD STATE PARSER, AND NOT A THIRD KEY EITHER.
+    ####################################################################
+    `scripts/poll_ncaaf_live_state._game_from_event` owns what "in progress"
+    and "final" mean -- including reading BOTH `completed` and `state == post`,
+    and suppressing the 0-0 placeholder on an unstarted game -- and is imported
+    unmodified. `live_resim.possession_side_from_espn` owns the
+    down/distance/possession block. This adds only `period`, `displayClock` and
+    the team `location`s, read off the SAME `competitions[0]` mapping so they
+    cannot disagree with the state beside them. That is exactly the shape
+    `ncaaf/live_game_state._state_rows_for_date` already uses on web.
+
+    THE KEY IS THE TEAM `location` PAIR, NOT ESPN's TEAM IDS, and the reason is
+    that the PROJECTIONS ARTIFACT carries no ESPN id -- only `home_team` /
+    `away_team`, which are also the board's join key. Re-derived here rather
+    than inherited, 2026-09-05T~21:40Z against the live slate:
+
+      board 51 games, ESPN 76 events over two dates
+        ESPN team-id pair key      35 / 51 matched
+        ESPN `team.location` key   35 / 51 matched      DISAGREEMENTS: 0
+        ESPN `team.displayName`     0 / 51 matched
+      projections artifact -> ESPN `location` key: 35 / 51, of which 8 in progress
+
+    So the name key needs no id map, and `displayName` ("Boise State Broncos")
+    would have matched NOTHING -- the difference between the two ESPN name
+    fields is the whole join.
+    """
+    from scripts.poll_ncaaf_live_state import _fetch_scoreboard, _game_from_event
+    from syndicate.features.ncaaf.live_resim import _norm_name, possession_side_from_espn
+
+    index: dict[str, dict[str, Any]] = {}
+    stats: dict[str, Any] = {
+        "dates": list(dates), "fetch_failures": 0, "events": 0, "keyed": 0, "in_progress": 0,
+    }
+    as_of = datetime.now(timezone.utc).isoformat()
+
+    for iso_date in dates:
+        payload = _fetch_scoreboard(iso_date)
+        if not isinstance(payload, Mapping):
+            # NAMED, never silent. An ESPN outage and a quiet slate both yield
+            # an empty index and must not read the same way.
+            stats["fetch_failures"] = int(stats["fetch_failures"]) + 1
+            continue
+        events = payload.get("events")
+        for event in events if isinstance(events, list) else ():
+            if not isinstance(event, Mapping):
+                continue
+            state = _game_from_event(event)
+            if state is None:
+                continue
+            stats["events"] = int(stats["events"]) + 1
+
+            competitions = event.get("competitions")
+            competition = (
+                competitions[0]
+                if isinstance(competitions, list) and competitions and isinstance(competitions[0], Mapping)
+                else {}
+            )
+            sides: dict[str, Mapping[str, Any]] = {}
+            competitors = competition.get("competitors")
+            for row in competitors if isinstance(competitors, list) else ():
+                if not isinstance(row, Mapping):
+                    continue
+                side = str(row.get("homeAway") or "").strip().lower()
+                if side in ("home", "away") and isinstance(row.get("team"), Mapping):
+                    sides[side] = row["team"]
+            home_team = sides.get("home") or {}
+            away_team = sides.get("away") or {}
+            key = f"{_norm_name(away_team.get('location'))}@{_norm_name(home_team.get('location'))}"
+            if key == "@":
+                continue
+
+            row_state = dict(state)
+            status = event.get("status") if isinstance(event.get("status"), Mapping) else {}
+            period = status.get("period")
+            if isinstance(period, (int, float)):
+                row_state["period"] = int(period)
+            row_state["clock"] = str(status.get("displayClock") or "").strip()
+            possession_owner, situation = possession_side_from_espn(
+                competition, home_id=home_team.get("id"), away_id=away_team.get("id")
+            )
+            row_state["possession_owner"] = possession_owner
+            row_state["situation"] = situation
+            row_state["as_of"] = as_of
+
+            index[key] = row_state
+            stats["keyed"] = int(stats["keyed"]) + 1
+            if bool(row_state.get("in_progress")):
+                stats["in_progress"] = int(stats["in_progress"]) + 1
+    return index, stats
+
+
+def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
+    """Re-sim every live NCAAF game from its current state and publish the lens.
+
+    Returns a summary the caller logs, or None when the tick did no work.
+    """
+    if not _ncaaf_live_resim_enabled():
+        return None
+
+    store = _refresh_state_store()
+    status_path = _ncaaf_live_resim_status_path()
+    last_status = store["read_json_file"](status_path) or {}
+    now = time.time()
+    try:
+        last_run_epoch = float(last_status.get("lastRunEpoch"))
+    except (TypeError, ValueError):
+        last_run_epoch = 0.0
+    if now - last_run_epoch < _ncaaf_live_resim_interval_seconds():
+        return None
+
+    season = date.today().year
+    week = _season_projection_target_week("ncaaf", season)
+    if week is None:
+        store["write_json_file"](
+            status_path, {**last_status, "lastRunEpoch": now, "last": {"skipped": "no_target_week"}}
+        )
+        return {"skipped": "no_target_week", "season": season}
+
+    from syndicate.features.ncaaf.smartsim2_projection import read_projection_artifact
+
+    data_root = store["data_root"]()
+    projections = read_projection_artifact(
+        season=season, week=week, data_root=data_root / "ncaaf_source" / "data"
+    )
+    if not projections:
+        # NO ESPN FETCH ON THIS PATH, deliberately: with no games to join, the
+        # 1.4 MB scoreboard pull buys nothing. Out of season this is the branch
+        # that runs, forever, for the cost of one artifact stat.
+        store["write_json_file"](
+            status_path,
+            {**last_status, "lastRunEpoch": now, "last": {"skipped": "no_projection_artifact", "week": week}},
+        )
+        return {"skipped": "no_projection_artifact", "season": season, "week": week}
+
+    from syndicate.features.ncaaf.live_resim import (
+        _norm_name,
+        build_live_lens_snapshot,
+        live_lens_snapshot_path,
+        validate_live_lens_snapshot,
+    )
+
+    sp_index, sp_source = _ncaaf_sp_ratings_index(season)
+    ratings: dict[str, tuple[float, float]] = {}
+    if sp_index:
+        from scripts.generate_smartsim2_ncaaf_projections import (
+            sp_league_means,
+            sp_offense_defense_rating,
+        )
+
+        means = sp_league_means(sp_index)
+        for projection in projections:
+            for team in (projection.home_team, projection.away_team):
+                key = _norm_name(team)
+                if not key or key in ratings:
+                    continue
+                # THROUGH THE GENERATOR'S OWN FUNCTION, so the centring and the
+                # defense negation cannot drift from the pregame projection this
+                # re-sim exists to update. It returns None for an unmatched team;
+                # that team is then simply absent here and `_ratings_for` refuses
+                # the game by name rather than rating it league-average.
+                pair = sp_offense_defense_rating(team, sp_index, means)
+                if pair is not None:
+                    ratings[key] = pair
+
+    now_utc = datetime.now(timezone.utc)
+    live_index, fetch_stats = _ncaaf_live_resim_live_index(_ncaaf_live_resim_espn_dates(now_utc))
+
+    # THE KEY IS BUILT WITH `_norm_name`, the SAME function `_ratings_for` looks
+    # up with, and the same normalisation `live_gameline_join._norm_team` and
+    # `ncaaf/game_projections._norm` implement. Importing it rather than writing
+    # a fourth copy is the point: a divergence between these two spellings would
+    # be silent and would look exactly like ESPN not covering the slate.
+    games = [
+        {
+            "away_team": projection.away_team,
+            "home_team": projection.home_team,
+            "live_key": f"{_norm_name(projection.away_team)}@{_norm_name(projection.home_team)}",
+        }
+        for projection in projections
+    ]
+
+    snapshot = build_live_lens_snapshot(
+        now_utc.date().isoformat(),
+        games=games,
+        live_index=live_index,
+        ratings=ratings,
+    )
+    # ####################################################################
+    # THE JOIN KEY IS THE GRID'S SPELLING, AND IT IS NOT THE ARTIFACT'S.
+    # ####################################################################
+    # MEASURED IN PRODUCTION 2026-09-05T23:17:39Z, the first board rebuild after
+    # the first snapshot: the index BUILT correctly -- `index_size 8`,
+    # `sources_seen {live_resim: 8, pregame: 43}` -- and then
+    # `rows_live_gameline_considered 257`, `rows_live_gameline_edged 0`,
+    # `withheld_by_reason {no_live_gameline_projection: 257}`. Every row missed.
+    # Intersection of the two key sets: **ZERO of 8**.
+    #
+    #   lens key, from the projections artifact   grid key, from the odds source
+    #   ('baylor', 'auburn')                      ('baylor bears', 'auburn tigers')
+    #   ('tulane', 'duke')                        ('tulane green wave', 'duke blue devils')
+    #   ('wyoming', 'colorado state')             ('wyoming cowboys', 'colorado state rams')
+    #
+    # `live_gameline_join._norm_team` is a plain lowercase with NO alias table,
+    # deliberately -- its own docstring records that MLB's two sides match
+    # exactly and that reproducing the prop join's alias machinery would import
+    # a 91% miss rate. That is true of MLB because both sides come from one
+    # source. NCAAF's do not: the board grid is named by the ODDS source and the
+    # projections artifact by CFBD.
+    #
+    # SO THE FIX IS TO PUBLISH THE GRID'S SPELLING, and ESPN already has it.
+    # Measured against the 61 live grid keys, over the 8 re-simmed games:
+    #
+    #   ESPN `displayName`        7 / 8      <- this one
+    #   ESPN `location`           0 / 8      (what the artifact uses)
+    #   ESPN `shortDisplayName`   0 / 8
+    #   ESPN `name`               0 / 8
+    #
+    # `build_live_gameline_index` reads `matchup.away.name` / `matchup.home.name`
+    # FIRST and falls through to `away_name`/`home_name`, taking the first shape
+    # that yields both -- so stamping `matchup` here changes the key without
+    # touching that function and without disturbing `away_name`/`home_name`,
+    # which stay the artifact's own spelling for anyone reading the payload.
+    #
+    # THE 8th IS NAMED, NOT PAPERED OVER: ESPN says `sam houston bearkats` and
+    # the grid says `sam houston state bearkats`. One alias would fix tonight's
+    # miss and would be a guess about the odds source's naming everywhere else;
+    # the counter reports it as `no_live_gameline_projection` by name, which is
+    # what a residual should look like. 7 of 8 is the honest number.
+    #
+    # Games with no ESPN row get NO `matchup` and fall through to the artifact
+    # spelling -- they are refused (`no_live_state`) either way, and inventing a
+    # key for them would only make a miss harder to attribute.
+    for game_entry in snapshot.get("games") or ():
+        if not isinstance(game_entry, dict):
+            continue
+        state_row = live_index.get(
+            f"{_norm_name(game_entry.get('away_name'))}@{_norm_name(game_entry.get('home_name'))}"
+        )
+        if not isinstance(state_row, Mapping):
+            continue
+        # `_game_from_event` returns ESPN's `displayName` under these two keys.
+        away_display = str(state_row.get("away_team") or "").strip()
+        home_display = str(state_row.get("home_team") or "").strip()
+        if away_display and home_display:
+            game_entry["matchup"] = {
+                "away": {"name": away_display},
+                "home": {"name": home_display},
+            }
+
+    # PROVENANCE ON THE OUTPUT, not in a log line. `smartsim2_projection.py`'s
+    # own `profile_source` comment is the precedent: a boot-time print is weakly
+    # reachable, and the question "which ratings produced this probability" has
+    # to be answerable from the artifact a reader already has.
+    snapshot["season"] = season
+    snapshot["week"] = week
+    snapshot["spRatingsSource"] = sp_source
+    snapshot["spRatingsTeams"] = len(sp_index)
+    snapshot["espnFetch"] = fetch_stats
+
+    written = False
+    valid, reason = validate_live_lens_snapshot(snapshot)
+    if valid:
+        store["write_json_file"](live_lens_snapshot_path(data_root), snapshot)
+        written = True
+
+    result = {
+        "season": season,
+        "week": week,
+        "date": snapshot.get("date"),
+        "projections": len(projections),
+        "sp_ratings_teams": len(sp_index),
+        "sp_ratings_source": sp_source,
+        "ratings_teams": len(ratings),
+        "espn": fetch_stats,
+        "live_index": len(live_index),
+        "written": written,
+        "invalid_reason": None if valid else reason,
+        "elapsed_seconds": snapshot.get("elapsedSeconds"),
+        # THE DENOMINATORS TRAVEL WITH THE COUNT (`A RATE, NOT A COUNT`).
+        # `live_resimmed` alone cannot say whether a small number is a quiet
+        # slate or a dead producer; `refusals_by_reason` is what separates them,
+        # and it is the second half of this lane's closing reading.
+        "coverage": snapshot.get("coverage") or {},
+    }
+    store["write_json_file"](status_path, {"lastRunEpoch": now, "last": result})
+    return result
+
+
 def _run_mlb_betting_day_backfill_tick() -> dict[str, Any] | None:
     """One-off backfill (2026-08-04): re-runs
     vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py
@@ -5612,6 +6137,43 @@ def main() -> int:
                 print(f"[refresh_worker] WNBA_POSTGAME_PRODUCER {json.dumps(wnba_postgame_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] WNBA_POSTGAME_PRODUCER_ERROR {type(exc).__name__}: {exc}", flush=True)
+
+        # NCAAF LIVE RE-SIM. Unconditional for the same reason as the ticks
+        # above: interval-gated internally, and a live Saturday is exactly when
+        # the claimed_count/elif chain below is busiest -- `#341` is the
+        # precedent for an enabled, correctly-configured autorun that emitted
+        # nothing for weeks because it never won a turn. The live board is the
+        # one surface where losing the turn is losing the whole point.
+        # HEARTBEAT RE-PUBLISHED IMMEDIATELY BEFORE THE BIGGEST SYNCHRONOUS
+        # COST IN THIS LOOP, and the arithmetic is the reason.
+        # `deploy_drain._HEARTBEAT_STALE_SECONDS` is 180 and the poll sleep is
+        # 30, so the deployer treats this worker as UNKNOWN -- and HOLDS -- if
+        # one iteration plus its sleep exceeds 180 s. The re-sim's own budget is
+        # `NCAAF_LIVE_RESIM_BUDGET_SECONDS`, default 90; measured locally at
+        # 90.97 s on a slate whose live games were early enough to be expensive.
+        # Adding that to an iteration that already runs tens of seconds puts the
+        # gap within reach of the bound. Publishing here restarts the clock in
+        # front of the block instead of behind it, for the cost of one keyvalue
+        # write per tick.
+        #
+        # DELIBERATELY NOT `set_in_flight`. That field is what makes a deployer
+        # WAIT, and it exists for the 23-minute board build; a re-sim killed
+        # mid-tick costs one tick and is rebuilt 180 s later. Marking it would
+        # block deploys for up to half of every live Saturday to protect
+        # something that does not need protecting.
+        try:
+            from syndicate.features.shared.deploy_drain import publish_worker_state
+
+            publish_worker_state("refresh-worker")
+        except Exception as exc:
+            print(f"[refresh_worker] DRAIN_STATE_PUBLISH_FAILED stage=pre_ncaaf_live_resim {type(exc).__name__}: {exc}", flush=True)
+
+        try:
+            ncaaf_live_resim_meta = _run_ncaaf_live_resim_tick()
+            if ncaaf_live_resim_meta:
+                print(f"[refresh_worker] NCAAF_LIVE_RESIM {json.dumps(ncaaf_live_resim_meta, sort_keys=True, default=str)}", flush=True)
+        except Exception as exc:
+            print(f"[refresh_worker] NCAAF_LIVE_RESIM_ERROR {type(exc).__name__}: {exc}", flush=True)
 
         refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
         if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):

@@ -5,6 +5,59 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [mlb-hitter-strikeouts-prop] MLB HITTER `strikeouts` WAS A DEAD FIELD FOR MONTHS; FIXED, DEPLOYED AND VERIFIED — AND NO BET WAS EVER PRICED OFF IT `[verified 2026-09-04/05, lanes mlb-hitter-so-dead-field + mlb-ladder-*]`
+
+`_HITTER_PROP_DIST_SPECS` named row_key `"SO"`; the per-sim `hitter_stat_values`
+dict — duplicated at `daily_update.py` `_simw_chunk` and `_sim_many` — never set
+it, and the read is `.get(row_key, 0)`. So `strikeouts_dist` was `{0: n_sims}`
+and `so_mean` `0.0` for EVERY hitter of EVERY game, from at least 2026-05-25.
+Third instance of that file's two-copy drift (`#334`, `#429`).
+
+**VERIFIED ON THE SERVED PAYLOAD, both states.** Before: `mean 0.0 / mode 0 /
+modeProb 1.0 / maxTotal 0`, one rung `{total: 0, exactProb: 1.0}`. After
+`0350dbd2` + a post-deploy sim: **`mean 1.095 / modeProb 0.402 / 5 rungs`**.
+Control `prop=hits`, same player, unchanged in both states.
+
+**NO PRICED RECOMMENDATION WAS EVER POSSIBLE, AND IT IS NOW A CODE-LEVEL
+GUARANTEE, NOT A MARKET-FEED ACCIDENT.** `PropProjectionIndex.project()` returns
+**None** for `batter_strikeouts` on a batter at 0.5 and 1.5 — `_HITTER_BUCKETS`
+has 8 entries and strikeouts is not one. The certainty guard was separately
+proven live with a positive control (a degenerate `batter_hits` row returns
+`model_prob_over_refused: exact_certainty`). Nothing downstream was
+contaminated: **no fitted hitter-props calibration artifact exists at all**, and
+`props_actuals_2026-09-04.csv` (1,373 rows) carries no hitter-strikeouts market.
+
+**THE MARKET FOR IT IS EMPTY, AND THAT IS SEPARATE FROM THE FIX.**
+`oddsapi_hitter_props` requests 7 markets and returns 6: `batter_strikeouts`
+present for **0 of 289 players**, against 270-283 for the other six. It IS
+fetched and paid for (`DEFAULT_HITTER_MARKETS`) and IS joined
+(`ladders_build.py` `hitter_strikeouts`, wired 2026-08-19 by `#440`).
+
+**LADDER CERTAINTY REFUSAL SHIPPED WITH IT** (`fe519fff` + `9b660beb`, both
+services live at `50b266da`, verified by content). `_dist_stats` now refuses an
+exact `overLineProb` and labels it; the card says why. **SCOPE:** it fires only
+with a degenerate histogram AND a market line, so it has never fired in
+production and currently cannot — its evidence is 6 unit tests, and an absence
+of refused rows is EXPECTED, not confirmation.
+
+**VERIFIED ON TWO INDEPENDENTLY REBUILT DATES `[2026-09-05 05:13:08Z]`.**
+2026-09-05 read `mean 0.0 / modeProb 1.0 / 1 rung` for 5h49m after the fix was
+live, because its artifacts were written **106 seconds BEFORE** the deploy
+(sims 23:24:40Z, ladders 23:20:30Z, deploy live 23:26:26Z) and nothing rebuilt
+them. On its FIRST post-deploy build it read **`mean 1.042 / mode 1 /
+modeProb 0.428 / maxTotal 4 / 5 rungs`**. 2026-09-04 corroborates across three
+post-deploy rebuilds (`mean 1.087-1.095`, 5-6 rungs). **A deploy going live and
+the artifact it changes being rebuilt are different events — here 5h49m apart —
+so gate any such check on the ARTIFACT'S mtime, never on the deploy.**
+
+**NOT extended to `_dist_ladder`, deliberately:** its `{total: 0, hitProb: 1.0}`
+is P(X >= 0) and is correctly certain.
+
+**Gate against regression:** `scripts/sim_input_checklist.py` now asserts
+`set(spec row_keys) <= set(hitter_stat_values)` plus two-site drift, before the
+roster glob and not gated on `--warn-only`, so it fails the daily job. Note the
+REACHABILITY tests do NOT catch the two-site drift — `workers=1` never enters
+`_simw_chunk`.
 ## [mlb-sim-edge-is-anti-predictive] THE MLB SIM'S CLAIMED EDGE IS ANTI-PREDICTIVE, AND THE PROP BOOK IS A REAL EDGE SPENT ON VIG `[verified 2026-09-01, lane mlb-accuracy-assessment]`
 
 **DO NOT STAKE ON `model_edge_pct`.** `corr(claimed edge, win) = -0.1379` over

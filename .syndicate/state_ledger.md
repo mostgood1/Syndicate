@@ -5,6 +5,329 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [segment-misgrade-regrade] 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[measured 2026-09-05, substrate render + upstream:statsapi]`
+
+`bet_status.segment_refusal` stopped the bug going forward. This is the answer to
+"how many were already wrong", re-graded against each order's TRUE segment
+actual. Manifest: `reports/segment_regrade/manifest_2026-09-05.json`, 173 rows.
+
+**THE CONTROL IS WHAT MAKES THE NUMBER TRUSTWORTHY, and it ran first.** The
+harness re-grades each order the OLD way and compares to the shipped ledger:
+**172/173 (99.4%) reproduce**. So the flips below are the grading change, not
+reimplementation drift — without that arm, "53 rows differ" would be
+indistinguishable from a rewrite that disagrees with production about
+everything.
+
+    OUTCOME FLIPPED   53/173 = 30.6%
+      won  -> lost    28
+      lost -> won     22
+      lost -> push     2
+      lost -> None     1
+
+    segments: first5 124, first3 42, first1 7
+    settled_by: inferred 163, venue 10
+
+**WHY NOBODY NOTICED: THE ERRORS ARE NEARLY SYMMETRIC.** 28 wrong-wins against
+22 wrong-losses, so the P&L barely moved and no anomaly ever surfaced. Recorded
+P&L on these 173 was **$19.20**; corrected is **$12.17** on $419.76 staked
+(**+2.90% ROI**), a delta of **−$4.48**. A 30.6% grading error rate that costs
+~$7 is exactly the shape that survives indefinitely — **do not let a small P&L
+delta be read as a small defect.** Every downstream calibration, CLV and
+model-accuracy number computed off these rows was fitted to a 30.6% mislabelled
+target.
+
+Actuals came from `upstream:statsapi` schedule+linescore, 180 games over 13
+dates; all 70 games behind these orders are `status=Final` with >=9 complete
+innings, so no partial-game ambiguity.
+
+### THE VENUE ROWS ARE A DIFFERENT AND WORSE PROBLEM — DO NOT WRITE THESE BACK
+
+Of the 10 rows settled by the VENUE rather than inferred, **our correction
+disagrees with the venue on 4**. For those the venue's own settlement matched
+our WHOLE-GAME grade. Two readings, and they are not equally likely:
+
+1. our segment actual is wrong for those 4 — unlikely, the games are Final; or
+2. **the order was FILLED on a full-game contract**, so the venue settled the
+   instrument it actually sold us.
+
+Reading 2 is an EXECUTION defect, not a settlement one, and `segment_refusal`
+does **nothing** about it — that fix stops mis-GRADING, not mis-FILLING. Handed
+to its own session. **UNVERIFIED**: the supporting ticker claim (segment orders
+carrying `KXMLBTOTAL`, the full-game series) could NOT be reproduced — a walk of
+`/api/portfolio/live` returned 0 ticker-carrying rows, so the population still
+needs locating. Complicating context: `KXMLBTOTAL` was historically *absent*
+from the catalogue and was registered on 2026-08-25 to fix a different gap,
+which is a plausible mechanism for segment rows acquiring a full-game contract
+to join to.
+
+**IF ANY WRITE-BACK IS EVER DONE, EXCLUDE THE 10 VENUE-SETTLED ROWS.** For those
+the venue is authoritative; overwriting an actual settlement with our inference
+would repeat this exact class of bug one level down. The other 163 are safe.
+
+## [stale-test-triage] "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit 63c10ed5]`
+
+All 18 red-standalone tests from `[full-suite-completes]` are now green, CI's
+gate is **386 tests, OK (2 skipped)**, and 132 pass across the 12 touched
+files. The durable part is not the repairs, it is the rule that governed them.
+
+**THE RULE, pre-registered in the lane before any edit:** *name the COMMIT
+that moved the behaviour, or the test is presumed RIGHT and the code presumed
+WRONG.* Editing an assertion to match whatever the code now does is how a real
+regression gets erased, and it looks exactly like success. **The rule fired 4
+times out of 18.**
+
+**THREE FAILURE SHAPES THAT ARE NOT STALENESS, and each is reusable:**
+
+1. **A FIXTURE SEAM THAT MOVED.** `test_ncaaf_picks_local`'s `setUp` forces
+   the serving gate OPEN, and wrote 2-tuple keys into `_SERVING_REGISTRY`
+   after its key gained a `basis` dimension `(sport, market, basis)`. With
+   `clear=True` it also removed the genuine entries, so the lookup fell to
+   default-deny: **the fixture that exists to force the gate open was forcing
+   it shut**, and every assertion was testing the suppressed board. This is
+   the `learnings.md` "pinned copy" family with a new face — the test did not
+   copy a definition, it copied a KEY SHAPE.
+
+2. **TIME ROT.** `test_market_gone_drop` and `test_soccer_read_scope` both
+   pinned one end of an age/date comparison to a calendar date while the code
+   reads the wall clock. They passed the day they were written and expired
+   silently. **Write AGES, not DATES:** anchor fixtures to `now` whenever the
+   code under test calls `datetime.now()`. The tell is a test that fails with
+   no commit anywhere near it.
+
+3. **AN UNACHIEVABLE PREMISE.** `test_no_roster_artifact_degrades_to_empty`
+   could not create the absence it names: `SYNDICATE_NFL_SOURCE_ROOT` does not
+   suppress the REPO-MIRROR candidate, and the git-tracked roster really does
+   contain the player. **An env var that does not cover every candidate root
+   cannot manufacture absence** — the same fact behind that day's NBA
+   betting-card 404. Empty the seam directly instead.
+
+**A REAL PRODUCTION BUG CAME OUT OF SHAPE 1.** `pick_gate.registry_snapshot()`
+unpacks `for (sport, market), verdict` from the 3-tuple key and raises
+`ValueError: too many values to unpack`. ZERO callers, so nothing broke and
+nothing reported it. Fixed, `basis` surfaced. **The same incomplete migration
+produced one broken test and one latent landmine; only the test was visible.**
+
+**MUTATION-CHECKING CAUGHT A VACUOUS REPAIR OF MY OWN, and this is the part
+most worth keeping.** To avoid hardcoding a value documented as drifting, the
+Polymarket price assertion was DERIVED from `_polymarket_cross_ticks()` — the
+same function the code calls. That is a TAUTOLOGY: flip the default and both
+sides move together, so it can never fail on the thing it names. The mutation
+ran GREEN and said so. **A test whose expectation is computed from the code
+under test asserts nothing about that code.** Pin the arms explicitly instead
+(0->0.55, 1->0.56, 2->0.57).
+
+Second mutation lesson: a mutant that renames a function produces import
+ERRORS, which prove only that the test imports the module. Kill the MECHANISM
+(make the memo always miss), not the symbol.
+
+**AND MUTATE AT RUNTIME, NOT ON DISK.** The first mutation script wrote to
+`pipeline/execute_portfolio.py`, which OPEN lane `order-model-view` holds; the
+lane guard caught it. Bytes were restored and the file verified clean, but a
+runtime monkeypatch via a `-p` plugin does the same job and touches nobody
+else's file.
+## [full-suite-completes] THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 parallel artefacts + 21 stale tests `[2026-09-05, lane full-suite-xdist-run]`
+
+`pytest-xdist` was ALREADY declared in `requirements-dev.txt` (2026-08-25) and
+merely absent from this machine. Installed 3.8.0; no file changed.
+
+    py -3 scripts/pytest_baseline.py -- tests/ -n 6 --dist=loadscope
+    32 failed, 15,224 passed, 51 skipped, 1 xfailed, 458 subtests passed
+    in 3666.33s (1:01:06)      collected=15307  failing=31
+
+**NOT `-n auto`, ON PURPOSE.** `auto` is 12 workers here. `suite-order-pollution`
+named two causes for its own `MemoryError` death at 26 GB RSS; only one had
+changed. Pagefile **4,864 MB -> 19,406 MB** (4.0x) -- changed. Peer load -- NOT
+changed: at 15:49 CDT six peer python jobs were actively burning CPU (including
+someone else's full `pytest tests/` 34.9 min in) with 10.9 of 31.6 GB free.
+That lane declined to start a third suite "rather than degrade theirs"; `-n 6`
+honours that and still finished.
+
+**THE MEMORY RISK DID NOT MATERIALISE, and the number says which cause it was:**
+peak python RSS across the WHOLE machine **7.05 GB**, and pagefile usage FLAT at
+1,056-1,228 MB for the entire hour -- it never climbed once. So the earlier death
+was the PAGEFILE, not the suite's intrinsic need. The heaviest single worker hit
+2,112 MB, nowhere near the ~20 GB `test_heap_roots`/`test_retainer_census`
+allocate serially.
+
+**~~THIS SUITE IS I/O BOUND HERE, NOT CPU BOUND~~ -- RETRACTED 2026-09-05 20:06Z,
+AND IT WAS MY OWN CLAIM.** Run 1 took 61m06s at `-n 6` on a machine carrying six
+peer jobs, and I inferred I/O-bound from "the machine only turned ~1.5 cores of
+Python work across ten processes" (7.2s of worker CPU per 8s wall). **A SECOND
+RUN ON AN IDLE MACHINE REFUTES IT:**
+
+    run 1   -n 6      6 peer jobs, 10.9 GB free    15,307 tests   3666.33s  (61m06s)
+    run 2   -n auto   idle, 18.9 GB free           15,468 tests   1166.83s  (19m26s)
+
+**3.1x faster.** The reading that produced "I/O bound" was taken WHILE SIX PEER
+JOBS CONTENDED FOR THE SAME DISK -- which is precisely the condition that makes
+any workload look I/O bound, so it could not have distinguished the two. **A
+saturated machine is not evidence about the workload's own shape.** The scope
+note's 3.7x is closer to right than my correction to it was; "do not quote 3.7x
+for this machine" was wrong and is withdrawn.
+
+**WHAT IS STILL NOT ESTABLISHED:** run 2 changed TWO variables at once (idle
+machine AND 12 workers instead of 6), so 3.1x cannot be split between them. Nobody
+should quote a worker-scaling factor from this pair. The one thing it does settle
+is that the suite finishes in ~20 minutes on an idle box, which makes a full run
+an ordinary thing to do rather than an event.
+
+**THE GATE SAID `27 NEW FAILURE(S)`. THAT IS A RAW SET DIFF AND IT IS NOT 27
+REGRESSIONS.** Every failure was re-run STANDALONE, one test per process with
+xdist absent -- the discriminating method the scope note used:
+
+    6 of 27  PASS ALONE -> parallel-only artefact, NOT a code regression
+   21 of 27  FAIL ALONE -> real in this environment, and then triaged by REASON
+
+The 6 are all four `test_heap_roots::WiderRootTests` cases plus
+`test_quote_join_index_equivalence` and `test_ncaaf_returning_production_builder`.
+`test_heap_roots` measures every object in the interpreter, so six concurrent
+workers contaminate it BY CONSTRUCTION. **`--dist=loadscope` does not protect
+process-wide-measurement tests** -- the scope note's own §2 said it would not,
+and this is the first measurement of that.
+
+**OF THE 21 THAT FAIL ALONE, ZERO ARE MISSING-DATA ERRORS.** That contradicted
+the expectation going in (the scope note's NFL-PBP class), and the reasons say
+so plainly -- they are assertion mismatches about BEHAVIOUR:
+
+- **2 pre-existing test-harness**: `test_live_refresh_loop` x2,
+  `RuntimeError: Working outside of application context` -- verbatim what
+  `suite-order-pollution` already recorded as pre-existing and unrelated to
+  ordering. CONFIRMED standalone here, not inferred.
+- **1 data-shaped**: `test_nfl_props` `[6, 22] != [6]` -- this tree's mirror
+  carries a week 22.
+- **18 tests left STALE by deliberately shipped changes**, clustered by
+  subsystem, which is the tell: 4 `test_ncaaf_picks_local` + 1
+  `test_smartsim2_calibration_profile` (NCAAF calibration was re-fitted and
+  PROMOTED by `ncaaf-pace-block`); 3 `test_soccer_live_gates_wiring`
+  (`KeyError: 'live_gameline'`); 2 `test_soccersim_player_props` (numeric,
+  9.3324 vs 13.0); 2 `test_market_gone_drop` (soccer now included);
+  `test_prop_player_keying` (the totals key is now TEAM-QUALIFIED, which is
+  `venue-quote-line-join`'s recorded fix for "a TOTALS key names no GAME");
+  plus polymarket, nfl_props_board and soccer_read_scope.
+
+**THE ONE THAT LOOKED LIKE A LIVE RISK IS NOT ONE, AND WAS CHECKED RATHER THAN
+REPORTED.** `test_mlb_position_substitutions::test_absent_flag_is_a_no_op` fails
+with *"True is not false : the feature must be dark-launched OFF"*, which reads
+exactly like CLAUDE.md's "absent != off" trap. It is not:
+`models.py:576` declares `position_substitutions: bool = True` and `e3bdbc8b`
+(`#624 step 3: enable in-sim position-player substitution`) flipped it
+deliberately. The TEST is stale against an intentional promotion.
+
+**`--update` WAS NOT RUN, deliberately.** It would overwrite a CI-relevant
+baseline with Windows-local results. Note also that the baseline is already
+stale as a comparand: it records `total_testcases: 11745` against this tree's
+**15,307** (~3,500 tests newer) and was recorded on 4-core Linux CI with a
+different `data/` mirror. Its 19-failure set is NOT like-for-like, which is
+most of why the raw diff read as 27.
+
+**RUN 2 CONFIRMS THE 18 REPAIRS AND THE PREDICTION WAS PRE-REGISTERED.** After
+`63c10ed5`, on an idle machine at `-n auto`:
+
+    12 failed, 15,404 passed, 51 skipped, 1 xfailed, 459 subtests passed
+    in 1166.83s (0:19:26)      collected=15468  failing=12
+
+Predicted **13** before the run (31 - 18) and named all thirteen. Got **12**, and
+the arithmetic reconciles exactly: 11 of the 13 appeared, **none of the 18
+repairs did**, and 1 unpredicted failure arrived. The two absent ones are
+`test_quote_join_index_equivalence` and `test_ncaaf_returning_production_builder`
+-- both from the parallel-only set, which **I flagged in advance as worker-count
+dependent by construction**; they passed at 12 workers having failed at 6. The
+four `test_heap_roots` cases still fail, so that subset is real but not stable.
+
+**THE UNPREDICTED ONE IS NOT MINE AND IS DATED, NOT ASSUMED.**
+`test_ops_execution_ledger_summary::test_the_bucket_carries_only_the_declared_fields`
+-- `by_segment` is in the bucket and not in `_LEDGER_SUMMARY_FIELDS`
+(`ops.py:331`). Commit `4ffba395` landed **16:03:00**, ten minutes AFTER run 1
+started (15:53:22) on a worktree pinned at provisioning-time `origin/main`, so
+run 1 could not have seen it. My commits touch neither that file nor its subject.
+
+**DO NOT SILENCE IT BY APPENDING THE FIELD.** That constant's own comment is the
+reason: *"the natural way to answer the next question is to add one more field,
+and three of those turn a counter into a money record over HTTP."* The guard
+fired for exactly the case it was written for, and appending `by_segment` is the
+decay it exists to stop -- it needs a decision, not a green test.
+**`syndicate/blueprints/ops.py` is held by OPEN lane `ncaaf-live-resim-wire`,**
+so it is theirs; surfaced here rather than edited.
+
+**THE NON-HERMETIC WRITES REPRODUCED EXACTLY** -- same four tracked files, same
+new `data/settlement_inputs/`, a fresh live Kalshi fetch. Second observation, so
+it is a property of the suite and not a one-off. This time the DISCARD GUARD
+blocked the revert (those lines exist in no commit on any ref) and it was right
+to: they were `git stash`ed instead, restorable, rather than destroyed.
+
+**THE SUITE IS NOT HERMETIC: IT MAKES LIVE NETWORK CALLS AND WRITES TRACKED
+FILES.** Found by `git status` after the run, not looked for. Four tracked
+files were modified and one untracked directory created:
+
+    reports/intelligence/kalshi_markets.json      +65,028 / -12
+    vendor/wnba_betting_repo/.../schedule_2026.csv    104 / 104
+    vendor/wnba_betting_repo/.../schedule_2026.json     1 / 1
+    data/mlb_source/.../live_lens_2026_06_02.jsonl     +1 / 0
+    data/settlement_inputs/                        NEW, untracked
+
+`kalshi_markets.json` gained `count`, `fetched_at` and `staleness_seconds`, and
+its `fetched_at` reads **2026-09-05T21:53:38Z** -- 16:53 CDT, DURING the run that
+ended 16:54:41. So a test reached the live Kalshi API and persisted the result.
+
+**WHY THIS MATTERS BEYOND TIDINESS: the protocol tells sessions to run tests,
+and the PRIMARY tree is shared.** A full run there silently rewrites those files
+under every other session -- a 65,000-line change to a tracked artifact that
+nobody edited and that `git add -A` would sweep straight into someone's commit.
+In a per-session worktree it is contained, which is one more reason the worktree
+protocol is load-bearing rather than hygiene. Reverted here; nothing committed.
+
+**OFFERED TO `suite-order-pollution` (OPEN), WHOSE OWED READING THIS IS.** Its
+verification is "a full `pytest tests/` run ends with the 12 passing and the
+pre-existing 37 unchanged". This run completed and **none of its 12 files'
+fixed tests appear in any failure list**. I did not edit that lane's block.
+## [ci-suite-red-test] CI'S OWN SUITE IS GREEN. THE "ONE RED TEST" WAS THE 31st DATA-ABSENCE FAILURE, NOT A SURVIVOR OF THEM `[corrected 2026-09-05, lane ci-archives-nba-card-js, commit ba84b331]`
+
+**The claim this section used to make was WRONG, and it is preserved here
+because the way it went wrong is the reusable part:**
+
+> CI's own suite has one red test, with data present. [...] CONTROLLED, not
+> assumed. Same file, same worktree, only `SYNDICATE_DATA_ROOT` moved:
+> without data 31 failed / with data 1 failed, 380 passed. So 30 of the 31
+> were `data/` absence and **one survives with data present** -- it is not a
+> worktree artifact.
+
+**`SYNDICATE_DATA_ROOT` WAS THE WRONG KNOB, so the differential built on it
+could not separate the two populations it was built to separate.**
+`session_worktree.py` says so in its own source, written the day before that
+measurement: *"`SYNDICATE_DATA_ROOT` does NOT solve it. Nine of these read
+`REPO_ROOT/data/...` directly and ignore the variable entirely, which is why
+they stayed invisible to a differential built on that env var."*
+`test_nba_betting_card_js_rewrites_source_routes_to_syndicate_paths` was one
+of those nine. Its residual failure was not a survivor of the control; it was
+a test the control never reached.
+
+MEASURED, this lane, all four readings in the same worktree:
+
+    primary tree (has `data/`)                        1 passed
+    worktree + SYNDICATE_DATA_ROOT     the assertion is `assertIsInstance(
+                                       content, str)` -- `content is None`
+    worktree + SYNDICATE_NBA_ARTIFACT_ROOT            1 passed
+    worktree + SYNDICATE_DATA_ROOT, after `ba84b331`  1 passed
+
+The failing assertion was the FIRST line of the test -- the asset never
+loaded -- so no route-rewriting assertion was ever reached. **CI checks out
+the full repo, `data/nba_source/web/betting-card-v2.js` is git-tracked, and
+the file CI runs was green throughout.** Nothing was red in CI.
+
+**THE RULE, and it is the one that pays for this section.** A control is only
+a control over the population it actually reaches. A differential that
+resolves 30 of 31 cases is not thereby evidence about the 31st: the residual
+is the population the instrument was blind to, and reading it as "the one
+that survived" inverts what a null result means. Before calling any archive
+failure real, check the failing ASSERTION -- `assertIsInstance(content, str)`
+on line 1 of a test named `..._rewrites_source_routes_...` says "input",
+not "logic". `--with-test-data` is the documented control; `SYNDICATE_DATA_ROOT`
+is not, for these nine.
+
+**WHAT THE FALSE ALARM WAS WORTH ANYWAY: a real production outage, in the
+code path it pointed at.** See `[nba-betting-card-assets-404]` in
+`state_basketball.md`. Chasing why a test could not load that asset is what
+found that production could not load it either.
 ## [state-file-split] state.md IS AN INDEX PLUS NINE PARTS `[2026-09-03, scripts/split_state.py, commit 23bf6bc7]`
 
 **Read `state.md` first, then open only the part your work touches.** It holds
@@ -449,3 +772,156 @@ id.**
 ## [lane-state-carried] LANE STATE RECORDS CARRIED THROUGH THE 2026-08-18 COLLAPSE — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.**
 
 ## [lane-guard-disclaimer-and-worktree-exemption-bugs] TWO REAL BUGS FOUND IN `lane-guard.py`, NEITHER FIXED `[found 2026-08-18]` — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.**
+
+## [split-state-reindex-truncation] `split_state.py --reindex --apply` DELETED EVERYTHING BELOW THE `[subject-index]` TABLE — **FIXED, ON MAIN (`29ab5bfb`), AND NOW IN THE PRIMARY TREE TOO** `[2026-09-04, lane split-state-reindex-truncation]`
+
+`reindex()` rebuilt `state.md` as `head + body[:hdr+1] + rows + [""]` and never
+re-emitted `body[hdr+1:]`. Every byte below the table was dropped — silently:
+`reindex: 179 subject(s) across 15 file(s)` / `WROTE state.md (index rebuilt)`,
+exit **0**. Found by lane `sim-clv-decomposition` when it deleted 55 lines of a
+`### [web-oom-leak]` UPDATE block that existed in no commit on any branch.
+
+**The exposure was live and larger than the report.** `origin/main`'s `state.md`
+carried **171 non-blank lines** below the table when the fix landed.
+
+**FIXED.** `table_span()` bounds the table as the `|---` separator plus the
+CONTIGUOUS run of `| [` rows; the rows are spliced in place and head and tail
+carry through untouched. An unclassifiable post-table region — index-shaped rows
+separated from the table by other content — **REFUSES with exit 1 and writes
+nothing**. A runtime guard refuses if any non-blank, non-row input line would be
+lost. Measured on a copy of the real `origin/main` corpus: **171 of 171 tail
+lines preserved**, `state_key_check.py` "coherent". 9 new tests, 8 of which FAIL
+on the pre-fix code.
+
+**THE PRIMARY TREE NOW HAS THE FIX** `[2026-09-04, later the same day]`. A full
+`git pull` was NOT possible and was not forced: the tree is 183 commits behind
+and **11 of its 14 modified files collide** with upstream — other sessions' live
+uncommitted work (`deploys.md`, `lanes.md`, `learnings.md`, `state.md`,
+`render_events.py`, `intelligence_evaluation.py`, two test files, ...). Git
+refuses such a merge outright, and stashing a shared tree would yank four
+sessions' work mid-turn.
+
+Instead, only the two fixed paths were taken:
+`git checkout origin/main -- scripts/split_state.py tests/test_split_state.py`.
+Safe because both were byte-identical to HEAD first, so nothing uncommitted was
+discarded. **Verified in the primary tree:** 31/31 tests pass, and a DRY RUN on
+its real `state.md` reports `post-table region: 56 line(s) PRESERVED (48
+non-blank)` and wrote nothing. The rest of the tree is still 183 behind.
+
+**A worktree cut before `29ab5bfb` still has the old script.** Pull first.
+
+**THAT EXPOSED TWO REAL DEFECTS IN `discard-guard.py`, NOW FIXED (`e3a5154f`)
+AND LIVE IN THE PRIMARY TREE** — see `[discard-guard-origin-blindness]`.
+
+**Preservation is of CONTENT, not BYTES.** The live `state.md` is MIXED-ending —
+580 CRLF lines and a 55-line bare-LF tail written by the appending session's
+tool. `load()` + the write have always normalised endings whole-file, so a
+reindex shows the whole tail in a diff. That is not a content loss.
+
+
+
+## [discard-guard-origin-blindness] `discard-guard.py` CALLED PUSHED CONTENT "NOWHERE ELSE", AND BLOCKED `git restore --staged` — **FIXED (`e3a5154f`) THEN WIDENED TO ALL 610 REFS (`5641ca08`), BUDGET 30s WITH A REAL CEILING (`c56c48a2`); ALL LIVE** `[2026-09-04, lane discard-guard-sees-origin]`
+
+Two defects, both in the OVER-BLOCKING direction — which the hook's own
+`reset --hard` comment already names as the dangerous one, because a guard that
+cries wolf teaches sessions to override it reflexively.
+
+1. **The predicate consulted only `src` and `HEAD`.** A shared tree runs behind
+   routinely — the primary tree was **183 commits behind** — so pushed content
+   read as existing nowhere. `git restore --staged scripts/split_state.py` was
+   BLOCKED with *"201 uncommitted line(s) in neither HEAD nor HEAD"* while the
+   working file was the SAME BLOB as `origin/main` (`363b5528`). Nothing could
+   have been lost. `_safe_revs()` now yields src, HEAD, `origin/main` and the
+   branch upstream, dropping unresolvable ones so it never fetches. The
+   comparison stays PER PATH, so a line is only excused by a copy of the SAME
+   file. The message names the revs it checked.
+2. **`git restore --staged` was matched though the docstring said it was not.**
+   The exemption was documented from day one and never implemented — an
+   index-only command that cannot touch a working file was blocked as a
+   discard. `_index_only()` implements it: `--staged`/`-S` alone is index-only;
+   `--worktree`/`-W`, `-SW`, or neither flag (restore defaults to `--worktree`)
+   all reach the file and still refuse.
+
+**VERIFIED LIVE on the primary tree**, hook driven directly so no real checkout
+ran: `checkout HEAD -- scripts/split_state.py` → **exit 0 (was 2)**;
+`checkout HEAD -- .syndicate/lanes.md` → **exit 2**, "128 uncommitted line(s),
+on none of HEAD, origin/main". 5 new tests FAIL on the pre-fix hook, all
+over-blocks; **every must-refuse case passes on BOTH versions**, which is what
+shows the guard was not weakened. 29/29.
+
+
+**WIDENED TO ALL REFS `[user request, same day]`.** Four revs is still only four;
+content can sit on a branch nobody named, and this repo has **610 refs**, ~170
+of them stale `origin/deploy/*`. `_deep_lines` now searches EVERY committed
+version of the path across every ref.
+
+**The cost was MEASURED, not assumed** — it had been the stated reason to defer:
+
+| path | commits (all refs) | distinct blobs | unique bytes | exhaustive |
+|---|---|---|---|---|
+| `.syndicate/lanes.md` | 1,322 | 1,301 | 246 MB | 11.6s / 13.4s |
+| `.syndicate/learnings.md` | 660 | 654 | 177 MB | ~7s |
+| an ordinary code file | 3-4 | 3-4 | ~30 KB | <0.5s |
+
+Early exit when the line IS found: 3.9s, 120 of 1,301 blobs. `git log --all -S`
+(pickaxe) was rejected on measurement, not taste: **5.9s PER LINE**, so three
+residual lines cost ~18s where the chunked scan resolves all of them in one
+pass. Three git processes regardless of ref count — `rev-list`, one `cat-file
+--batch-check` mapping commits to blobs, then chunked `cat-file --batch`.
+
+**THE SWEEP IS NOT UNCONDITIONAL:** it runs only after the cheap revs fail, i.e.
+only when the hook is about to BLOCK anyway. Allow-path measured **0.59s ->
+0.60s**. **The budget is ONE deadline for the invocation, not one per path** —
+per-path let `checkout -- a b c` cost three budgets, and a hook that can stall a
+shell for an unbounded multiple of its own limit has no limit. 20s keeps this
+repo's worst real case exhaustive: both big ledger files in ONE command measured
+**18.7s, both answers complete**.
+
+**A TRUNCATED SEARCH BLOCKS AND SAYS SO.** It claims "all N committed version(s)
+across every ref" only when it read all of them; otherwise SEARCH TRUNCATED plus
+the knob to raise. A partial search must not be reported as an exhaustive one.
+
+**END-TO-END PROOF, unplanned and better than the tests:** installing the new
+hook was itself BLOCKED by the old one over 6 lines "on none of HEAD,
+origin/main" — every one of which was in pushed commit `e3a5154f`. The identical
+command under the new hook exits **0 in 0.58s**, while `.syndicate/lanes.md`
+with 143 truly unreachable lines still refuses in 11.2s. Same-instant A/B on the
+live tree: **147 flagged -> 143**. 40/40 tests; 8 fail on `e3a5154f`.
+
+
+**BUDGET RAISED TO 30s, AND MADE A REAL CEILING `[user request, c56c48a2]`.**
+Raising it exposed that it was not a ceiling at all: `_git` used a FIXED 30s
+per-call timeout, and `_blob_ids`' `rev-list --all` — the slowest call, 3-5s and
+growing with history — runs BEFORE the chunk loop's deadline check. True bound
+was budget + timeout, **60s for a 30s budget** — the "unbounded multiple of its
+own limit" the constant's own comment rejects one function above. Every git call
+in the sweep now takes its timeout from the time LEFT on the shared deadline.
+Measured same-instant on the live tree with the budget forced to 1s:
+
+| version | elapsed | multiple of budget |
+|---|---|---|
+| `5641ca08` fixed per-call timeout | 6.23s | **6.2x** |
+| `c56c48a2` deadline-derived | 1.30s | 1.3x |
+
+**The subtle half:** when the deadline kills the blob LISTING, `_blob_ids`
+returns empty — indistinguishable from "this path has no committed version at
+all". The first means UNKNOWN, the second NOWHERE. It now reports INCOMPLETE
+there, while a path that genuinely has no history is still NOT labelled
+truncated.
+
+**Why 30 and not 20:** worst real case (both big ledger files, one command,
+content genuinely nowhere) is **18.7s cold / 14.6s warm**. Against 20 that is a
+1.3s margin, which is not headroom; against 30 it is ~11s.
+
+**44 tests, and an HONEST NOTE: all 44 pass on `5641ca08` too.** They are
+REGRESSION GUARDS, not proof of this change — a fixed-vs-derived timeout cannot
+be distinguished in a throwaway repo where every git call is instant. The
+evidence for the ceiling is the measurement above, not the suite.
+
+**THE WIDENING PAID OFF TWICE IN REAL USE.** Installing `5641ca08` was BLOCKED
+by its predecessor and needed `SYNDICATE_ALLOW_DISCARD=1`; installing
+`c56c48a2` needed **no override**, because the deep sweep found the outgoing
+version in history by itself. Separately, a later run on `lanes.md` returned
+exit 0 in 7.2s with **122 lines still unaccounted for by the cheap revs** — all
+found in OLDER commits. A line can sit in an older `origin/main` commit and not
+at its tip; only the all-refs sweep sees that.

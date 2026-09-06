@@ -38,6 +38,45 @@ def _extract_prop_group(summary: dict[str, Any], side_key: str, prop_key: str) -
     return side_group.get(prop_key) if isinstance(side_group.get(prop_key), dict) else {}
 
 
+#: What the card shows in place of a refused probability. Short, because it
+#: sits in a small metric tile next to "Mean" and "Mode".
+_REFUSED_METRIC = "refused"
+
+
+def over_prob_metric(row: Any) -> str:
+    """The "Over" tile: a percentage, `refused`, or `-`.
+
+    THREE STATES, NOT TWO. `overLineProb` is None both when the book quotes no
+    line and when `ladders_build._dist_stats` REFUSED an exact certainty, and
+    before this existed the card rendered `-` for both -- so the label
+    `462d8d6c` added to the data was unread and the reader still could not tell
+    "no market" from "the sim was certain and we will not publish it".
+    """
+    if not isinstance(row, dict):
+        return format_pct(None)
+    if row.get("overLineProbRefused"):
+        return _REFUSED_METRIC
+    return format_pct(row.get("overLineProb"))
+
+
+def over_prob_list_item(row: Any) -> str:
+    """The "Over probability:" bullet, saying WHY when it is refused.
+
+    The tile has room for one word; this line has room for the reason, and the
+    reason is the whole point -- a reader who sees a blank next to a real market
+    line will otherwise assume the data is merely missing.
+    """
+    if isinstance(row, dict) and row.get("overLineProbRefused"):
+        refused_value = row.get("overLineProbRefusedValue")
+        shown = format_pct(refused_value)
+        return (
+            f"Over probability: {_REFUSED_METRIC} — the sim returned an exact "
+            f"{shown}, and a finite simulation cannot establish certainty"
+        )
+    value = row.get("overLineProb") if isinstance(row, dict) else None
+    return f"Over probability: {format_pct(value)}"
+
+
 def build_module_links(selected_date: str, active_label: str) -> list[dict[str, Any]]:
     links = [
         ("Cards", f"/mlb/cards?date={selected_date}"),
@@ -78,14 +117,14 @@ def pitcher_rows_from_summary(summary: dict[str, Any], *, limit: int = 12) -> tu
                 "meta": str(row.get("matchup") or "").strip() or "-",
                 "metrics": [
                     {"label": "Mean", "value": format_num(row.get("mean"))},
-                    {"label": "Over", "value": format_pct(row.get("overLineProb"))},
+                    {"label": "Over", "value": over_prob_metric(row)},
                     {"label": "Mode", "value": format_num(row.get("mode"))},
                     {"label": "Sim count", "value": str(row.get("simCount") or "-")},
                 ],
                 "summary": matchup_summary or fallback_summary,
                 "list_items": reasons[:4] if reasons else [
                     f"Market line: {format_num(row.get('marketLine'))}",
-                    f"Over probability: {format_pct(row.get('overLineProb'))}",
+                    over_prob_list_item(row),
                     f"Most likely outcome: {format_num(row.get('mode'))}",
                 ],
             }
@@ -110,14 +149,14 @@ def hitter_rows_from_summary(summary: dict[str, Any], *, limit: int = 12) -> tup
                 "meta": str(row.get("matchup") or "").strip() or "-",
                 "metrics": [
                     {"label": "Mean", "value": format_num(row.get("mean"))},
-                    {"label": "Over", "value": format_pct(row.get("overLineProb"))},
+                    {"label": "Over", "value": over_prob_metric(row)},
                     {"label": "PA mean", "value": format_num(row.get("paMean"))},
                     {"label": "Order", "value": str(row.get("lineupOrder") or "-")},
                 ],
                 "summary": str(row.get("matchupSummary") or f"{row.get('hitterName')} projects for {format_num(row.get('mean'))} {prop_label.lower()} against {row.get('opponent')}.").strip(),
                 "list_items": reasons[:4] if reasons else [
                     f"Market line: {format_num(row.get('marketLine'))}",
-                    f"Over probability: {format_pct(row.get('overLineProb'))}",
+                    over_prob_list_item(row),
                     f"Mode outcome: {format_num(row.get('mode'))}",
                 ],
             }

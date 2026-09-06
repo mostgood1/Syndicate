@@ -74,6 +74,7 @@ from syndicate.features.mlb.sources import daily_ladders_path
 from syndicate.features.mlb.sources import daily_sim_artifact_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path
+from syndicate.features.shared.probability_refusal import CERTAINTY_REFUSED
 
 # Only strikeouts for now: it is what the compact card reads first, via
 # `_extract_prop_group(summary, "pitcher", "strikeouts")`. The sim artifact
@@ -168,7 +169,40 @@ def _dist_stats(dist: Any, line: float | None) -> dict[str, Any]:
         # strictly greater than the line: a 5.5 line means 6+ is a win, and
         # a whole-number line pushes rather than wins, which this respects.
         over = sum(c for outcome, c in counts.items() if outcome > line) / total
-    return {"mode": mode, "overLineProb": over, "simCount": total}
+    out: dict[str, Any] = {"mode": mode, "overLineProb": over, "simCount": total}
+
+    # REFUSE AN EXACT CERTAINTY BESIDE A REAL MARKET LINE. `#646`(d).
+    #
+    # A finite simulation cannot establish impossibility: `overLineProb == 0.0`
+    # says the OVER cannot happen, which makes the UNDER a 100%-confidence bet
+    # against whatever the book pays. 0.0 is the dangerous end, not 1.0 -- see
+    # `shared/probability_refusal.py`, whose `CERTAINTY_REFUSED` is imported
+    # rather than re-spelled so there is ONE definition of what counts.
+    #
+    # Reached for real: the MLB hitter `strikeouts` dist was `{0: n_sims}` for
+    # every hitter of every game until 2026-09-04, so this returned exactly 0.0
+    # on every strikeouts row that had a line.
+    #
+    # LABELLED, NOT SILENTLY NULLED. `overLineProb` is ALREADY None for "no
+    # market line" (see this function's docstring: a zero probability and an
+    # absent market are different facts the card renders differently), so a bare
+    # None here would collapse the two. The label mirrors
+    # `refuse_published_certainty`'s `_refused` / `_refused_value` pair, and the
+    # original value is KEPT -- this is a refusal to price on a certainty, not
+    # the loss of one.
+    #
+    # SCOPED TO `overLineProb` ALONE, deliberately. `_dist_ladder` emits
+    # `{total: 0, hitProb: 1.0}` and that 1.0 is P(X >= 0) -- trivially and
+    # CORRECTLY certain. A blanket certainty refusal on this surface would blank
+    # a true value, which is why this does not live in `_dist_ladder` too.
+    #
+    # `mode` and `simCount` survive: the sim genuinely produced them. What it
+    # cannot state is P(over) from a sample that never crossed the line.
+    if isinstance(over, float) and over in CERTAINTY_REFUSED:
+        out["overLineProb"] = None
+        out["overLineProbRefused"] = "exact_certainty"
+        out["overLineProbRefusedValue"] = float(over)
+    return out
 
 
 def _dist_ladder(dist: Any) -> list[dict[str, Any]]:

@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import time
+import types
 import uuid
 from pathlib import Path
 from typing import Any
@@ -3569,3 +3570,298 @@ def reset_request_memory_attribution() -> None:
                            "peak_mb": None, "peak_seq": None, "peak_route": None, "n": 0})
     _ARENA_TREND_STATE.update({"count": 0, "last": None})
     _SMAPS_TREND_STATE.update({"count": 0, "last": None})
+
+
+# --- `#632`: WHICH MODULE-LEVEL CONTAINER HOLDS THE BYTES -------------------
+#
+# Everything upstream of this narrowed WHERE the memory lives (8-64MB anonymous
+# mappings) and ruled out WHO allocates it per request (no single route; merges
+# absent; per-request deltas do not compose). What is left is the object graph
+# the workers keep BETWEEN requests, and that is answerable by walking module
+# globals rather than by reading the source and picking a likely-looking cache.
+#
+# Static analysis got as far as "no `lru_cache(maxsize=None)`, but many plain
+# `dict` caches with no eviction". That is a list of suspects, not a measurement.
+
+_CENSUS_NODE_CAP_DEFAULT = 400_000
+
+
+def _deep_size(obj: Any, budget: list[int], seen: set[int],
+               keepalive: list[Any] | None = None) -> int:
+    """Bytes reachable from `obj`, with a shared node budget.
+
+    NOT `sys.getsizeof`, which is shallow: a dict of 200 payloads reports ~9 KB
+    while holding hundreds of MB. The budget is shared across the whole census
+    so one pathological container cannot spend the entire walk, and exhausting
+    it is REPORTED rather than silently returning a small number -- an
+    under-count that looked like a clean result would send the next reader off
+    to hunt C extensions for no reason.
+    """
+    # ID REUSE IS A CORRECTNESS BUG HERE, not a nicety. `seen` is keyed on
+    # `id()`, and `vars(item)` returns a TEMPORARY mappingproxy that is freed as
+    # soon as it is popped -- CPython then hands the same id to the NEXT
+    # temporary, which the walk reads as "already visited" and skips. Measured:
+    # a class's entire `__dict__` was silently dropped, so `Holder.CLASS_CACHE`
+    # (160 KB) never appeared in the census and the class root looked inert. The
+    # walk returned 1,688 bytes where a fresh `seen` returned 164,695.
+    #
+    # Holding a reference makes the id unreusable for as long as `seen` can
+    # remember it. The list must be shared by every call that shares `seen`.
+    if keepalive is None:
+        keepalive = []
+    stack = [obj]
+    total = 0
+    while stack:
+        if budget[0] <= 0:
+            return total
+        item = stack.pop()
+        marker = id(item)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        budget[0] -= 1
+        try:
+            total += sys.getsizeof(item)
+        except Exception:
+            continue
+        if isinstance(item, (str, bytes, bytearray, int, float, bool, type(None))):
+            continue
+        # TYPES WHOSE ATTRIBUTE ACCESS HAS SIDE EFFECTS, skipped before the walk
+        # touches them. Measured: a `MagicMock` in the graph made this loop
+        # NON-TERMINATING -- `hasattr(item, "__dict__")` and `vars(item)` CREATE
+        # and RECORD child mocks, so every visit manufactured new objects for the
+        # walk to visit. It hung for >10 minutes under pytest while the same call
+        # took 0.1 s against the real app.
+        #
+        # `werkzeug.local` proxies are here for the production-side version of the
+        # same hazard: resolving `current_app`/`request`/`g` either raises outside
+        # an app context or, inside one, silently walks the live request.
+        #
+        # The general point is that a "read-only" introspection pass is not
+        # read-only: `sys.getsizeof` calls `__sizeof__`, and `hasattr` calls
+        # `__getattr__`. Both are arbitrary code.
+        item_type_module = str(getattr(type(item), "__module__", ""))
+        if (item_type_module.startswith("unittest.mock")
+                or item_type_module.startswith("werkzeug.local")):
+            continue
+        try:
+            if isinstance(item, (dict, types.MappingProxyType)):
+                # A CLASS's `__dict__` is a mappingproxy, NOT a dict. Without this
+                # the walk stopped dead at every class and the whole `class_attr`
+                # root pass was INERT -- roots added, nothing reachable through
+                # them. Caught by a test asserting the class cache appears, not by
+                # inspection: the census still returned a plausible table with the
+                # class simply absent from it.
+                stack.extend(item.keys())
+                stack.extend(item.values())
+            elif isinstance(item, (list, tuple, set, frozenset)):
+                stack.extend(item)
+            elif hasattr(item, "__dict__"):
+                proxy = vars(item)
+                keepalive.append(proxy)      # see the id-reuse note above
+                stack.append(proxy)
+            elif hasattr(item, "__slots__"):
+                for slot in getattr(item, "__slots__", ()) or ():
+                    try:
+                        stack.append(getattr(item, slot))
+                    except Exception:
+                        pass
+        except Exception:
+            continue
+    return total
+
+
+def module_retainer_census(top: int = 25, node_cap: int | None = None) -> dict[str, Any]:
+    """Deep size of every module-level container in `syndicate.*` / `pipeline.*`.
+
+    ON DEMAND ONLY. A deep object walk on a 600 MB worker is not free, and `#241`
+    is this repo's precedent for periodic work assumed to be cheap putting a
+    service into a restart loop. Nothing calls this on a timer.
+
+    Reports its own coverage against `process_anon_mb_now`, because the
+    interesting outcome may well be that module globals account for very little
+    -- in which case the retained bytes are in C-extension or per-thread state
+    that a Python walk cannot see, and that is a RESULT rather than a failure.
+    """
+    budget = [int(node_cap or _CENSUS_NODE_CAP_DEFAULT)]
+    seen: set[int] = set()
+    keepalive: list[Any] = []      # shared with `seen`; see `_deep_size`
+    rows: list[dict[str, Any]] = []
+    scanned_modules = 0
+
+    for name, module in list(sys.modules.items()):
+        if not (name.startswith("syndicate") or name.startswith("pipeline")):
+            continue
+        namespace = getattr(module, "__dict__", None)
+        if not isinstance(namespace, dict):
+            continue
+        scanned_modules += 1
+        for attr, value in list(namespace.items()):
+            if attr.startswith("__"):
+                continue
+            if not isinstance(value, (dict, list, set, frozenset, tuple)):
+                continue
+            try:
+                length = len(value)
+            except Exception:
+                continue
+            if length <= 0:
+                continue
+            before = budget[0]
+            size = _deep_size(value, budget, seen, keepalive)
+            rows.append({
+                "module": name,
+                "name": attr,
+                "type": type(value).__name__,
+                "len": length,
+                "bytes": size,
+                "mb": round(size / _BYTES_PER_MB, 3),
+                "nodes": before - budget[0],
+                "root_pass": "module_container",
+            })
+            if budget[0] <= 0:
+                break
+        if budget[0] <= 0:
+            break
+
+    # PASS 2 -- CLASS ATTRIBUTES, then PASS 3 -- module-level OBJECTS.
+    # Ordered deliberately: the shared `seen` set means the FIRST root to reach
+    # an object owns it, so specific roots must run before broad ones. A broad
+    # root that ran first would swallow every named cache and report one
+    # useless number. Running them last makes their figure the RESIDUAL, which
+    # is the informative part.
+    for pass_name, want_class in (("class_attr", True), ("module_object", False)):
+        if budget[0] <= 0:
+            break
+        for name, module in list(sys.modules.items()):
+            if not (name.startswith("syndicate") or name.startswith("pipeline")):
+                continue
+            namespace = getattr(module, "__dict__", None)
+            if not isinstance(namespace, dict):
+                continue
+            for attr, value in list(namespace.items()):
+                if attr.startswith("__") or budget[0] <= 0:
+                    continue
+                if isinstance(value, (dict, list, set, frozenset, tuple)):
+                    continue          # already counted in pass 1
+                if isinstance(value, types.ModuleType):
+                    continue          # a module root reaches the whole world
+                is_class = isinstance(value, type)
+                if is_class != want_class:
+                    continue
+                # A CLASS ROOT MUST BE ONE THIS MODULE DEFINES, not one it
+                # imported. Measured: `pipeline.intelligence_state` imports
+                # `Flask`, and walking that class absorbed **27.0 MB** -- the
+                # whole application graph, via class attributes that are
+                # themselves classes -- so it ranked first and every later root,
+                # including the one under test, walked to 0 bytes against the
+                # shared `seen` set.
+                #
+                # An imported class is a world-root wearing a module's name. The
+                # `__module__` check keeps the attribution honest: a row says
+                # "this module's class holds this much", which is the claim the
+                # table is supposed to support.
+                if is_class and str(getattr(value, "__module__", "")) != name:
+                    continue
+                # NEVER touch the INSTANCE to decide. `hasattr(value, "__dict__")`
+                # EXECUTES CODE: on a werkzeug `LocalProxy` (Flask's `current_app`,
+                # `request`, `g`, `session`) it resolves the proxy, which raises
+                # `RuntimeError: Working outside of application context` at import
+                # scope and, worse, SUCCEEDS inside a request -- silently walking
+                # the live request object and attributing it to a module global.
+                # Decide from the TYPE only, and let `gc.get_referents` (C level,
+                # no Python attribute access) do the walking.
+                value_type = type(value)
+                type_module = str(getattr(value_type, "__module__", ""))
+                if type_module.startswith("werkzeug.local"):
+                    continue          # context-bound proxy: resolving it has side effects
+                if isinstance(value, (types.FunctionType, types.BuiltinFunctionType,
+                                      types.MethodType, types.BuiltinMethodType)):
+                    continue
+                before = budget[0]
+                try:
+                    size = _deep_size(value, budget, seen, keepalive)
+                except Exception:
+                    # One hostile object must not take the whole census with it.
+                    continue
+                if size <= 0:
+                    continue
+                rows.append({
+                    "module": name,
+                    "name": attr,
+                    "type": type(value).__name__,
+                    "len": -1,
+                    "bytes": size,
+                    "mb": round(size / _BYTES_PER_MB, 3),
+                    "nodes": before - budget[0],
+                    "root_pass": pass_name,
+                })
+
+    rows.sort(key=lambda r: -r["bytes"])
+    total_mb = round(sum(r["bytes"] for r in rows) / _BYTES_PER_MB, 3)
+    anon = _process_anon_mb()
+    payload: dict[str, Any] = {
+        "pid": os.getpid(),
+        "proc_token": _proc_token(),
+        "modules_scanned": scanned_modules,
+        "containers": len(rows),
+        "census_total_mb": total_mb,
+        "process_anon_mb": round(anon, 3) if anon is not None else None,
+        # THE number to read first: a low coverage means the retainer is not a
+        # module-level Python container at all.
+        "coverage_pct": (round(100.0 * total_mb / anon, 1)
+                         if anon and anon > 0 else None),
+        "node_budget_exhausted": budget[0] <= 0,
+        "nodes_used": int(node_cap or _CENSUS_NODE_CAP_DEFAULT) - budget[0],
+        "top": rows[: max(1, int(top))],
+    }
+    return payload
+
+
+def python_heap_total(node_cap: int | None = None) -> dict[str, Any]:
+    """Deep size of everything reachable from `gc.get_objects()`. `#632`.
+
+    THE DECIDING MEASUREMENT. The narrow census explains 6.1% of a worker's anon
+    growth, but its roots are container-typed module globals only -- so
+    "elsewhere in Python" and "not in Python at all" are indistinguishable from
+    it, and those lead to opposite next steps.
+
+    **Summing `sys.getsizeof` over `gc.get_objects()` would undercount badly**:
+    plain `str` and `bytes` are NOT gc-tracked, and this leak is 8-64MB mappings,
+    which is exactly the shape of large buffers. So the tracked objects are used
+    as ROOTS for the deep walk, which reaches their untracked children.
+
+    A result near `process_anon_mb` means the bytes are Python objects and the
+    root set was the problem. A small fraction means they are not Python objects
+    at all, and every remaining Python-level probe is a dead end.
+    """
+    budget = [int(node_cap or 4_000_000)]
+    seen: set[int] = set()
+    keepalive: list[Any] = []      # shared with `seen`; see `_deep_size`
+    total = 0
+    try:
+        roots = gc.get_objects()
+    except Exception:
+        return {"error": "gc.get_objects() unavailable"}
+    tracked = len(roots)
+    for root in roots:
+        if budget[0] <= 0:
+            break
+        total += _deep_size(root, budget, seen, keepalive)
+    del roots
+    anon = _process_anon_mb()
+    heap_mb = round(total / _BYTES_PER_MB, 3)
+    return {
+        "pid": os.getpid(),
+        "proc_token": _proc_token(),
+        "gc_tracked_objects": tracked,
+        "python_heap_mb": heap_mb,
+        "process_anon_mb": round(anon, 3) if anon is not None else None,
+        # THE ratio. Near 100% => the bytes are Python objects and the earlier
+        # census simply had the wrong roots. Small => not Python objects.
+        "heap_pct_of_anon": (round(100.0 * heap_mb / anon, 1)
+                             if anon and anon > 0 else None),
+        "node_budget_exhausted": budget[0] <= 0,
+        "nodes_used": int(node_cap or 4_000_000) - budget[0],
+        "distinct_objects": len(seen),
+    }

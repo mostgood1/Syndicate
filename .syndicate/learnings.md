@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 819 rules `[generated]`
+## Index — 835 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -35,6 +35,114 @@
 <!-- LEARNINGS-INDEX:END -->
 
 ---
+### 2026-09-05 — FORBIDDEN: a per-item guard implemented as an `A or B` search over a CONCATENATION of every item's source. Whichever item supplies B satisfies it for EVERY value of A, so the check has no failing input at all `[lane ncaaf-segment-capture, commits 7f197639 / 7dfabcf4, NO DEPLOY]`
+
+- **What we believed:** `tests/test_all_sports_segment_wiring.py` guarded the
+  gap it was written for — *"a sport with declared segments and NO wiring
+  anywhere"*. It had been green since the day it was written.
+- **What was actually true:** it read every wired fetcher into ONE string and
+  asked, for each sport, whether `segment_market_keys("<sport>")` **or** the
+  literal `segment_market_keys(league)` appeared in that string. The basketball
+  fetcher always supplies the second token. **So the disjunction was true for
+  every sport in `SPORT_SEGMENTS`, and `unwired` was unconditionally `[]`.**
+  Behind it: NCAAF had never captured a single half or quarter price —
+  `segment == "full"` on **153,723 of 153,723** production rows.
+  Its sibling assertion was wrong in a second, different way: it checked that
+  the token `segment_market_keys("nfl")` appeared in the NFL fetcher. It does —
+  in a map that `main()` never passes to `markets=`, so the 36 keys reached the
+  TAGGER and never the request. **Both halves of the guard were green, and both
+  were measuring something other than what they claimed.**
+- **How we found out:** looking for NFL's supposed 422 and finding there could
+  never have been one, because no segment request was ever sent. Then reading
+  the guard that should have said so.
+- **The rule going forward:** **when a guard is per-item, the search corpus must
+  be per-item too.** Flattening N sources into one string turns "does item i
+  have property P" into "does ANY source have property P", and the two are
+  indistinguishable while every source is healthy. Join on an explicit column
+  instead — the fix here adds a `sport` field to the table and diffs
+  `set(declared) - set(wired)`. And **ship the guard's own falsifier beside it**:
+  a companion test that removes one row and asserts the expression goes
+  non-empty. That test is what converts "it passes" into evidence.
+  This is `instrument blindness` (a healthy reading is evidence only once you
+  know what makes it read unhealthy) with a specific, greppable shape: an `or`
+  over a corpus.
+- **Cost:** NCAAF ran an entire season opener with zero segment capture and a
+  green test asserting the opposite; NFL's regular-season segment map has been
+  dead code with a docstring claiming it was live. Both found only because
+  someone went looking for a vendor error that did not exist.
+
+
+### 2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFERENT EVENTS — gate the check on the ARTIFACT'S mtime `[lane mlb-hitter-so-dead-field, commit bc82090f, no deploy]`
+
+The MLB hitter-strikeouts fix was live on refresh-worker at 23:26:26Z. The
+2026-09-05 board went on reading `mean 0.0 / modeProb 1.000 / 1 rung` for
+**5 h 49 m** afterwards, sitting next to a healthy 2026-09-04. That is the shape
+of a PARTIAL fix, and it is the most dangerous shape there is: it invites the
+next person to "finish" work that is already complete, or to revert it.
+
+The cause was vintage, and the margin was **106 seconds** — the 09-05 sims were
+written 23:24:40Z, the deploy went live 23:26:26Z, and nothing rebuilt that date
+until 05:13:08Z. On its first post-deploy build it read `mean 1.042`.
+
+**RULE: when verifying a fix that a JOB writes into an artifact, gate on the
+artifact's own `generated_at`/mtime crossing the deploy, never on wall clock and
+never on "the deploy is live".** A watcher built that way read `mean 0.0` on two
+of four polls; reporting either would have been a false negative against a
+correct, deployed fix. Publishing the fix is one event, the job re-running is a
+second, and here they were most of a working day apart.
+
+**Corollary, and it is the cheap half: state the expected lag BEFORE you look.**
+Saying "this needs a rebuild, so a zero right after the deploy means nothing"
+costs one sentence and converts a scary reading into an expected one. Two peer
+sessions hit the same confound the same night in opposite directions — one saw
+NFL 78-unmatched persist past a live deploy and clear ninety seconds later on
+the next rebuild.
+
+**And a durability reading is not the same as a verification reading.** The
+09-05 board was re-checked ~14 h and many rebuilds later (`mean 1.077`,
+5 rungs). The first post-deploy read proves the code ran; the later one proves
+it keeps running. A single post-deploy read cannot distinguish "fixed" from
+"fixed once".
+
+
+### 2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEASURES NOTHING `[lanes mlb-ladder-refusal-deploy, commits 2e555b2c / ccb053c7, DEPLOYED]`
+
+Three things went wrong while deploying behind another lane's claim. None cost
+production; all three are cheap to repeat.
+
+**1. `deploy_claim.py acquire` IS NOT A READ-ONLY PROBE.** I ran it to READ the
+refusal message. My own claim had expired seconds earlier, so it ACQUIRED —
+under the throwaway `--holder probe-only` I had passed as a label. Released and
+re-acquired within the minute, but for that minute the lock was recorded to a
+holder that does not exist. **It only behaves like a probe while an unexpired
+claim already exists**, which is exactly the state you cannot assume when you
+are checking. To read the message safely, check `status` first.
+
+**2. A POLL INTERVAL LONGER THAN THE WINDOW IS NOT A SLOW MEASUREMENT, IT IS NO
+MEASUREMENT.** refresh-worker's idle windows are **~90 s, about one per 40 min**.
+I polled at 150 s and returned six consecutive `HOLD`s over ~50 min — which
+reads exactly like "permanently busy" and would have justified either giving up
+or forcing. At 45 s the window appeared on the 4th attempt. **Before concluding
+a resource is never free, check the poll is finer than the thing you are
+hunting.**
+
+**3. PARSE FAILURE MUST NOT WEAR THE SHAPE OF A GOOD READING.** The same waiter
+printed `jobs=0 live=` on a truncated preflight — `jobs=0` is the IDLE signal I
+was waiting for, produced by a read that failed. It defaulted to HOLD (the safe
+branch) by luck of ordering, not design. The rewrite requires an explicit
+`CLEAR`/`HOLD` line and treats anything else as UNKNOWN. Same family as the
+09-04 rule about instruments whose partial output is indistinguishable from
+their success output.
+
+**FORBIDDEN: `git stash` / `rebase` / `stash pop` around a shared-ledger write.**
+Measured: the pop re-applied content already on `origin/main`, producing TWO
+blocks for each of four lanes plus a `UU` conflict, and left the INDEX holding
+eleven files I never staged. `git add <my file>` then `git diff --cached` showed
+all eleven — the index, not my edit. Recovery that worked: verify the
+duplication against `origin/main` (1 block there vs 2 locally) BEFORE discarding
+anything, reset to `origin/main`, re-apply only your own entry, confirm
+`N additions / 0 deletions` on ONE file.
+
 
 ### 2026-09-04 — A SPEC THAT NAMES A KEY IS NOT A GUARANTEE THE KEY IS FED — check the JOIN, not the two sides `[lane mlb-hitter-so-dead-field, commit 0b9a03e7, NO DEPLOY]`
 
@@ -5488,3 +5596,633 @@ it reads negative.**
   the object the other module already compiled and an identity assertion passes.
   Verified by mutation: the copy went in, all 30 tests stayed green. Identity
   still binds tuples and functions; for a regex, ask the AST.
+
+---
+
+## 2026-09-04 — FORBIDDEN: choosing a DEPLOY TARGET by which service CONTAINS the code. Choose it by which service SERVES the reading you predicted. `[lane nfl-projection-deploy]`
+
+- **What we believed:** deploying `web` would take NFL `unmatched_game_rows` from 78
+  to 0. `_attach_book_grid_projections` runs in web's request path, web serves
+  `/api/board/book-grid`, and web had the fix. Every one of those is TRUE.
+- **What was actually true:** the endpoint returned `source: "precomputed_artifact"`.
+  The board is built by **refresh-worker**, which was on a commit with the earlier
+  date-key fix and WITHOUT the alias fix — which predicts 78 exactly. Web deployed,
+  went live, and moved the number by **zero**.
+- **How we found out:** the payload's own provenance. Three tells, cheapest first, any
+  one decisive: `source: "precomputed_artifact"`; **a key the request-path code would
+  have ADDED was missing** (no `projection_coverage`); and the field was **ABSENT, not
+  null** (`projection` was not a key on Rams rows at all — absent means nothing tried,
+  `null` would mean something tried and failed).
+- **The warning was in the file I wrote the prediction into.** `deploys.md`'s owed
+  entry said, in its second sentence: *"The workers rebuild the board, so they want it
+  too."* I read it as an optimisation; it was the load-bearing half.
+- **The rules going forward:**
+  1. **"Which service has the code" and "which service made this response" are
+     different questions, and only the second predicts the number.** Settle the second
+     BEFORE deploying, from a provenance field on a real payload.
+  2. **An artifact-backed number does not move on the DEPLOY — it moves on the next
+     REBUILD.** Read only once the artifact's `generated_at` has advanced past the
+     deploy, or you reproduce the old number and misread it as a second failure.
+  3. A prediction that fails is only useful if its PREMISE is stated. Mine named a
+     service, so the failure localised in one step. "It didn't work" would not have.
+- **Confirmed by the positive case, which is the stronger form:** the number went to 0
+  when refresh-worker got the commit and rebuilt. Web was necessary for the inline
+  path and never sufficient for this reading.
+- **Cost:** one unnecessary web deploy (harmless, fast-forward, no `render.yaml`), one
+  wrong prediction published to `deploys.md` and then superseded in place.
+
+## 2026-09-05 — A CENSUS IS BOUNDED BY ITS ROOTS, AND THE ROOT SET IS THE FIRST THING TO STATE
+
+`#632`. A retainer census walked module globals in `syndicate.*` / `pipeline.*`
+and found that named containers explain **6.1% of a worker's anon GROWTH**. The
+tempting headline is "the memory is not in Python, go look at C extensions".
+
+That headline would be wrong, and the reason is in my own code: the walk's ROOTS
+are module globals **that are already `dict`/`list`/`set`/`tuple`**. A
+module-level OBJECT holding caches in its `__dict__` is skipped before the walk
+starts. So are class attributes, closure cells, and thread-local state. The
+supported claim is *"not in container-typed module globals"* — a strictly
+narrower statement, and the difference is exactly where a lot of real caches live.
+
+THE RULE: a reachability census answers "how much is reachable FROM THESE ROOTS",
+never "how much exists". State the root set beside the coverage number, every
+time, because a low coverage has two very different causes — the memory is
+elsewhere in the process, or the roots were too narrow — and they lead to
+opposite next steps.
+
+The same run supplies a second, sharper instance. At `node_cap` 20k/100k/400k the
+budget EXHAUSTED and coverage read 0.8% / 2.9% / 15.8%. **With the budget
+exhausted, "top N by bytes" is only "biggest among whatever module iteration
+order happened to reach first"** — an arbitrary sample presented as a ranking.
+Only the completed 2M-node walk is quotable, and the census reports
+`node_budget_exhausted` precisely so that a truncated run cannot be read as a
+finished one.
+
+Related: `[2026-09-04]` "a flat reading from an instrument that cannot see the
+suspect is not evidence" and "a running minimum cannot detect a rising floor".
+Three forms of one discipline: know what your instrument CANNOT show before you
+believe what it does.
+
+## 2026-09-05 FORBIDDEN: shipping a fix whose motivating measurement YOU labelled inconclusive. A caveat you wrote is an instruction to yourself, not a disclaimer to the reader
+
+- **What happened.** A one-date run (6 game clusters, 6,396 pairs) showed the
+  MLB sim's measured joint LOSING to plain independence, monotonically worse the
+  further the estimator was allowed to move. I diagnosed a unit error -- the
+  joint publishes Spearman rank correlation of COUNTS while a parlay bets
+  THRESHOLDS, and under a Gaussian copula phi(indicator) is only 54-68% of
+  rho(counts) -- wrote the correction, shipped it (`c6027e1f`), and reported it
+  as explaining every number. I had written "6 clusters, one date; suggestive,
+  not conclusive" onto that finding **in the same session**, then reasoned from
+  it as though it were settled.
+- **What the replication said.** Backfilled 177 games from git-tracked rosters
+  and re-scored: 162,491 pairs, 151 games, 13 dates. **The motivating finding
+  INVERTED.** The joint BEATS independence on same-player pairs by -0.02353
+  log-loss, 95% CI [-0.02849, -0.01854]. And the correction was measurably WORSE
+  than the raw coefficient: +0.00156, CI [+0.00100, +0.00219]. A Gaussian copula
+  over-attenuates for discrete, zero-inflated counts. Reverted in `862b5ccf`.
+- **The rule.** A caveat does not discharge the risk it names. If a finding is
+  too thin to publish it is too thin to BUILD ON -- replicate first, at a sample
+  that can actually separate the arms, or do nothing. The tell is writing a
+  hedge and a fix in the same session.
+- **The second half, and it is what made it invisible.** The conversion shipped
+  with NO TEST referencing it. ADDING it was silently green and REVERTING it was
+  silently green -- a behaviour change on a live pricing path that no test could
+  see, in either direction. **A revert that passes cleanly is not reassurance;
+  it is evidence the change was never covered.** Guard added
+  (`tests/test_joint_resolver_returns_raw.py`), source-level so it needs no
+  fixture, mutation-checked by re-adding the call.
+- **Cost:** none in production -- `c6027e1f` landed after the last deploy
+  (`3a9153f4`), so the conversion was never live. Luck, not process.
+- **Instruments:** `scripts/backfill_mlb_sim_joint.py` (resumable, git-tracked
+  rosters, no export and no StatsAPI) and
+  `scripts/score_joint_pair_pricing.py` (four arms on identical marginals,
+  bootstrap over GAMES).
+
+## 2026-09-05 — A TRUNCATED MEASUREMENT CAN GIVE THE RIGHT ANSWER FOR THE WRONG REASON. CONVERGE, THEN READ.
+
+`#632`. The deciding question was whether the retained bytes were Python objects
+at all. The walk that answers it is budgeted, and the budget changes the answer:
+
+    cap   200,000  ->   20.55 MB    7.2%   TRUNCATED
+    cap   800,000  ->   97.75 MB   28.5%   TRUNCATED
+    cap 2,000,000  ->  105.56 MB   28.3%   CONVERGED
+
+Every reading pointed at the same conclusion ("not Python"). **Only the last one
+is entitled to it.** At a 200k cap the walk had seen 7.2% of anon and would have
+supported the verdict just as comfortably — and been wrong by a factor of five
+about the size of the Python heap, which is the number the FOLLOW-UP work
+depends on.
+
+THE RULE: when a measurement is budgeted, the budget is a parameter of the
+result. Escalate until the instrument reports it did NOT truncate, and refuse to
+report a ratio computed from a truncated walk — build the refusal into the tool,
+because the truncated number will usually agree with whatever you already
+believe. A tool that returns a plausible number when it ran out of budget is
+`[2026-09-04] an instrument whose partial output is indistinguishable from its
+complete output` in a new costume.
+
+The corroboration is worth recording too, including its limit: pymalloc's
+`bytes_in_allocated_blocks` (`105.731 MB`) and an independent object-graph walk
+(`105.56 MB`) agreed to **0.16%**. Two instruments with nothing in common
+arriving at the same number is the strongest evidence this investigation has
+produced — and it is still only SUGGESTIVE, because the readings came from
+different processes hours apart. Same-instant would have made it proof;
+saying so is the difference between corroboration and a coincidence.
+
+## 2026-09-05 — SAMPLE FASTER THAN THE THING YOU ARE DESCRIBING, OR THE SHAPE IS YOUR SAMPLING GRID
+
+`#632`. I opened a lane on a striking observation: both web workers gained ~98 MB
+inside ~100 seconds, and **a single request cannot raise two workers at once**,
+so it had to be a scheduled job or a fan-out. The reasoning was sound and the
+conclusion was wrong, because the observation was an artifact of the sampling
+interval.
+
+It came from samples **50 seconds apart**. At that spacing, "worker A grew, then
+worker B grew" and "A and B grew together" produce identical data. Re-measured at
+**10 seconds**: 7 of 7 bursts hit ONE worker, gaps irregular (spread/mean 1.79
+against a 0.35 bar), and the fan-out hypothesis died.
+
+THE RULE: before drawing a conclusion from the SHAPE of a time series, state what
+the sampling interval can and cannot distinguish. Simultaneity, periodicity and
+burstiness are all properties the grid can manufacture. If the claim is "these
+happened together", the interval must be shorter than the gap you are claiming
+is zero.
+
+The same session produced two more of these, which is what makes it a pattern
+rather than an incident: a correlation called on a 12-minute window that
+reversed at 35 minutes, and a retention-vs-churn verdict called on ONE time point
+that reversed at the next reading. **Coarse sampling does not add noise, it adds
+STRUCTURE** — and the structure looks like a finding.
+
+Corollary, learned the hard way in the same lane: a detector watching a
+production process needs a RESTART GUARD. A peer deployed mid-window and the
+first run reported warm-up as bursts, `+570 MB` and `+284 MB`, with pids REUSED
+across the restart so the process set looked continuous. Boot confounds are
+already in this file for making a fix look good; they make a defect look
+catastrophic just as easily.
+---
+
+## [2026-09-05] A MEASUREMENT THAT CAN ONLY SEE ONE BRANCH DOES NOT CERTIFY THE OTHER — and a fixture that cannot express the failure keeps a whole test file green over it
+
+Lane `edge-basis-moneyline`. `edge_basis` was added on 2026-08-16 to say WHICH
+probability `edge_vs_market_pct` is paired against, on a good measurement: 13
+served rows, the 7 whose edge could not be reproduced from the pregame pair were
+all `live_aware`, the 6 that reconciled were not. **7/7 separation.** It shipped,
+it was verified on served rows, and the lane closed CLOSED-VERIFIED.
+
+It was wrong on h2h from the first commit, for three weeks.
+
+**THE MEASUREMENT SELECTED ITS OWN POPULATION.** Those 13 rows were identified by
+carrying BOTH probabilities — and `live_model_prob_over` is written only by the
+DISTRIBUTION branch. So every row in the sample was totals or spreads, and the
+moneyline branch, which is the one that got the label wrong, could not appear in
+the evidence that certified the fix. The selection criterion and the defect were
+the same variable.
+
+    the label is derived from    `live_projected`   (a PUBLICATION switch)
+    the edge is computed from    `verdict["model_prob"]`
+    the moneyline branch passes   no `live_projected`, deliberately
+    => every live h2h row: edge from the LIVE probability, labelled "pregame"
+
+Measured 2026-09-05 with the real functions: live probability 1.0 against
+`market_fair_prob_over` 0.310 published `edge_vs_market_pct 69.0`, which is
+`(1.0 - 0.310) * 100`; the pregame pairing gives 66.7 and is not what came out.
+
+**AND THE UNIT TESTS COULD NOT HAVE CAUGHT IT.** `test_a_row_with_no_live_projection_says_pregame`
+called `_apply_verdict` directly with a hand-built verdict **carrying no
+`model_prob` key at all** — a verdict none of the three pricers can produce,
+because all three set `model_prob` before they can set `priceable`. The fixture
+was not a simplification of the real object; it was a different object, and the
+one field that discriminates the two branches was the field it omitted. Six tests
+passed over the defect, one of them asserting it by name.
+
+THE RULE, two halves:
+
+1. **State how a verification sample was SELECTED, and check whether the
+   selection can reach the failure mode.** "N of N separated" is a strong result
+   about the rows you looked at and says nothing about a branch that cannot
+   produce a row matching your filter. Where a function has branches, enumerate
+   them and say which ones the evidence covers — `presence != reachability`
+   applied to the MEASUREMENT rather than to the code.
+2. **A fixture must be able to fail.** Before trusting a green test over a
+   hand-built input, ask what the real producer always sets that the fixture
+   omits. Prefer building the input WITH the real producer; where a literal is
+   unavoidable, pin the producer's invariant separately — here,
+   `priceable is True => model_prob is not None`, asserted over all three real
+   pricers, which is what makes the corrected label falsifiable at all.
+
+Adjacent, same root: `layer2_board._live_projection_columns` carried a comment
+asserting `_apply_verdict` is called with `live_projected=verdict["model_prob"]`
+for "EVERY game market (h2h, totals AND spreads)". False, and harmless where it
+stood — it was making a claim about UNITS — while being the load-bearing belief
+one module over. **A comment is only checked where it is load-bearing, so it
+rots fastest exactly where it is quoted.**
+
+## [2026-09-05] IN `lanes.md`, A DISCLAIMER AFTER A PATH DOES NOT DISCLAIM IT — release lines must be MARKER-LED, and only `claims_by_path` can tell you
+
+Lane `edge-basis-moneyline`, releasing three files. **Two attempts changed
+nothing, and the file read correctly both times.**
+
+`_claimable_prefix` cuts a line at its FIRST disclaimer marker and keeps
+everything BEFORE it — deliberately, so "`a.py`, `b.py` (collision check CLEAR)"
+still claims both. Two consequences nobody had written down:
+
+- **A marker governs its own line only.** A `- Files:` line beginning
+  `**released to X:**` disclaims nothing on the wrapped continuation lines that
+  actually carry the paths.
+- **Prose re-claims.** `ncaaf-live-resim` contained the sentence
+  "`live_gameline_join.py` was named as SOLELY held by `live-edge-basis` ... those
+  claims were released" — every marker in it (`held by`, `released`) sits AFTER
+  the backticked path, so the claimable prefix keeps the path and the sentence
+  re-claimed the file all by itself, defeating a release two bullets above it.
+
+Both read, in English, as unambiguous releases. The parser disagreed with both.
+
+THE RULE: write every release as its own marker-led line —
+`  released: \`path/to/file.py\`` — one path per line, marker FIRST. Then
+**verify with `.claude/hooks/lane_claims.py`'s `claims_by_path` over the file you
+actually changed**, asserting the full expected map including the paths that must
+NOT move. Reading the ledger is not verification of the ledger; this is the same
+lesson as `[2026-08-2x] the commit-guard's own fix list can omit a path it just
+flagged`, and it applies to the lane parser for the same reason — the machine and
+the reader disagree about what a sentence means, and only one of them is enforcing.
+
+Corollary for a session worktree: `lane-guard` reads
+`$CLAUDE_PROJECT_DIR/.syndicate/lanes.md` — the PRIMARY tree's working copy — and
+nothing else. That copy was **57 commits behind `origin/main`** here, so a lane
+OPEN upstream guarded nothing locally and three paths read FREE. Landing a claim
+is not the same as enforcing it: check both files.
+
+**SECOND INSTANCE, SAME DAY, FOUND WHILE RESTORING ANOTHER LANE'S BLOCK.**
+`evaluation-ledger-projected-mirror`'s `- Files:` line reads, in one breath:
+
+    ... `artifact_publisher.py` (one allowlist entry -- the file is explicitly
+    RELEASED and NOT CLAIMED), `scripts/run_refresh_worker.py` (the autorun call
+    site only -- every OPEN-lane reference to this file is RELEASED; checked).
+
+The parser reads **both backwards**. The first marker is the `RELEASED` that sits
+AFTER `artifact_publisher.py`, so the prefix keeps that path (CLAIMED, though the
+sentence says released) and discards everything after it, including
+`run_refresh_worker.py` (FREE, though the sentence claims it). No human reads that
+line as ambiguous. Two lanes were then working from opposite beliefs about the
+same file, and a third lane's collision check inherited the error.
+
+Corollary, and it is the expensive half: **the ledger has more than one copy and
+they disagree.** For those four paths, `origin/main`, the primary tree's working
+copy (which is what `lane-guard` actually reads) and the owning lane's own
+worktree gave three different answers. A collision check names ONE substrate or it
+names nothing. Check the copy the guard reads AND the copy other sessions rebase
+onto, and say which you checked.
+
+## 2026-09-05 — FORBIDDEN: running the ledger guard's own remedy, `git checkout origin/main -- <ledger file>`, without first reading `git diff` on that file. It DESTROYS uncommitted work, and a deletions count cannot see what it destroyed. `[lane render-egress-transport]`
+
+- **The rule going forward:** before `git checkout origin/main -- .syndicate/<file>`, run `git diff --numstat -- <that file>` and read it. A working-tree copy that is BEHIND upstream can still hold additions that exist NOWHERE ELSE, and the checkout silently discards them. **`0` in the deletions column is not safety** — it is the exact signature of the case that loses the most, because pure additions delete nothing while being the only copy. Two sessions hit this from opposite directions the same night.
+- **Measured, both instances.** Asked to take upstream's `lanes.md` in the primary tree, `git diff --numstat` read **`98  0`** — ninety-eight lines belonging to another live session, uncommitted, invisible to any deletions check. Separately, the guard blocked a commit touching only `state_football.md` because of a stale `lanes.md` that was never staged, and its printed remedy would have destroyed that same work to unblock an unrelated file.
+- **The guard prints this remedy constantly and warns about the blind spot two lines below it.** The warning is easy to skip because the remedy reads as the fix. Treat the order as: diff first, then decide, and only then checkout.
+- **What to do instead, in the three cases that actually occur.** (1) Only YOUR OWN block is stale — edit that block in place; it is surgical, races nobody, and needs no checkout. (2) The stale file is not the one you are committing — use a scratch index (`GIT_INDEX_FILE` + `read-tree origin/main` + `hash-object -w` + `update-index --cacheinfo` + `write-tree` + `commit-tree`), asserting one path and zero deletions before push; that sidesteps the shared index entirely. (3) You genuinely must take upstream — land from a throwaway worktree at the tip instead, so the shared tree is never rewritten. `[recipe (2) from lane `ledger-repair-invariants`, hit independently the same night]`
+- **A repair left UNCOMMITTED can be the correct end state, and this is when.** If the right content is already on `origin/main`, the tree you are in is dozens of commits behind, and other sessions have uncommitted work in the same file, then committing from there either trips the guard or races them — while the working-tree edit still fixes what local hooks and checkers read. Nobody should later "tidy" it into a commit: a snapshot commit from a stale tree deletes blocks that exist upstream.
+
+## 2026-09-05 — FORBIDDEN: treating a cache path resolved off `__file__` as durable on Render. It is in the EPHEMERAL CHECKOUT, so every deploy erases it — and the erasure is invisible because the code refetches. `[lane ncaaf-live-resim-wire]`
+
+- **What I nearly shipped.** The NCAAF live re-sim's rating input is
+  `sp_ratings_<season>.json`, read through
+  `generate_smartsim2_ncaaf_projections.load_sp_ratings`. Both of its cache
+  locations resolve off `__file__` —
+  `sp_ratings_cache_path` (`Path(__file__).resolve().parents[1] / "data" / ...`)
+  and `ncaaf_historical_loader.DEFAULT_CACHE_DIR` (`parents[6] / "data" / ...`)
+  — which on Render is `/opt/render/project/`**`src`**`/data/...`, the checkout,
+  not `/opt/render/project/data/...`, the mounted disk. Wiring the producer
+  without noticing would have made its FIRST reading after its own deploy
+  `no_pregame_ratings` on every game, for the ~24 h until the next projections
+  autorun. A zero that is indistinguishable from an inert feature, arriving in
+  the shape of the very bug the lane existed to fix.
+- **THE ERASURE IS INVISIBLE BECAUSE THE FALLBACK WORKS.** `load_sp_ratings`
+  falls through a cache miss to CFBD and succeeds, so nothing anywhere reports a
+  lost cache. The tell is in the log line it already prints and nobody read:
+  refresh-worker, `2026-09-04T01:03:29Z` and `2026-09-05T01:15:49Z`, **both**
+  `[sp_ratings] season=2026 source=api teams=138 cached=/opt/render/project/src/...`.
+  `source=api` twice in a row, for a file the same process wrote yesterday, IS
+  the measurement — a cache that never reads `source=cache` is not a cache.
+- **THIS IS THE SECOND INSTANCE OF THE SAME CLASS, and the first is already in
+  this repo.** `#389`, NFL: "the generator wrote to
+  /opt/render/project/src/data/nfl_source (the ephemeral repo checkout) while
+  this guard read /opt/render/project/data/nfl_source (the mounted disk), so the
+  artifact existed and was invisible here, and every deploy discarded it." The
+  fix there was to route BOTH sides through one function. The class predicts
+  more: any `Path(__file__).parents[N] / "data"` in a producer is on the wrong
+  disk on Render, and the sport-root env vars
+  (`SYNDICATE_<SPORT>_SOURCE_ROOT`, `SYNDICATE_DATA_ROOT`) exist precisely
+  because of it.
+- **The rule going forward.** Before treating any file as a model INPUT, resolve
+  its path on the DEPLOYED service and say which of the two roots it lands in.
+  `/opt/render/project/src/` is erased by every deploy;
+  `/opt/render/project/data/` is not. A `__file__`-relative default is the
+  signal. And when a producer and a consumer disagree about where a file lives,
+  do not repoint the producer if that changes ANOTHER lane's refresh cadence —
+  mirroring to the durable root and reading the mirror keeps the producer's
+  behaviour intact, which is what this lane did rather than setting
+  `SYNDICATE_SP_RATINGS_CACHE_DIR` and freezing in-season SP+ at week 1.
+- **The corollary that caught my own bug.** The mirror-freshness branch compared
+  `_parse_utc_timestamp`'s NAIVE datetime against an AWARE
+  `datetime.now(timezone.utc)`, raising TypeError inside a bare `except`, so the
+  mirror was never trusted and every boot fell through to the loader. **It failed
+  in the SAFE direction and was therefore silent**: the ratings were still
+  correct, merely refetched. The only run that could distinguish the two was one
+  with no `CFBD_API_KEY` in the environment at all — i.e. reproducing the
+  post-deploy state rather than testing the happy path. `presence != reachability`
+  applies to a FALLBACK too: a working fallback hides whether the primary path
+  ever ran.
+
+## 2026-09-04 FORBIDDEN: a tool that updates a REGION of a shared file rebuilding that file from the region's start. Splice the region; carry the remainder through untouched, and REFUSE if you cannot classify it
+
+- **The rule going forward.** When a tool rewrites one region of a file other sessions also write, it must locate the region's END, not just its start, and splice. `split_state.py --reindex` computed `head + regenerated_rows` and stopped — correct for every byte it knew about, and it silently deleted everything it did not. **The tell is a rebuild expressed as a prefix plus new content with no suffix term.** Two things make it worse than an ordinary bug: the region's end was defined by a FILTER (`[l for l in lines if not l.startswith("| [")]`) that has no notion of where a table ends, and the result was reported as success — `WROTE state.md (index rebuilt)`, exit 0. Add the conservation check as a RUNTIME guard, not only a test: every non-blank input line outside the rewritten region must appear in the output, or refuse. Verified 2026-09-04: `origin/main` carried 171 non-blank lines below that table, and the fix preserves 171 of 171. Fixed in `29ab5bfb`.
+
+## 2026-09-04 FORBIDDEN: calling a merge lossy from a SAME-FILE line comparison. Content that "vanished" may have MOVED to a sibling file, and the panic fix is to restore stale content over good
+
+- **The rule going forward.** When checking whether a merge, sync or rebuild
+  lost content, diff the working file against the WHOLE sibling corpus, not only
+  against its own previous version. Measured 2026-09-04 syncing the shared
+  primary tree 201 commits forward: a same-file check reported **1,059 lines
+  lost from `learnings.md`**. Against every `.syndicate/**.md` the true number
+  was **3** — upstream had run `compact_learnings.py`, which moves rule bodies
+  into `learnings_archive.md` BY DESIGN. A 350x overstatement, and in the
+  alarming direction, which is the dangerous one here: the obvious response to
+  "the sync ate a thousand lines" is to restore the pre-sync copy, which in this
+  case would have reverted 201 commits of other sessions' work to fix nothing.
+  The same pass also over-reported 113 upstream lines as lost purely because
+  `origin/main` had moved 3 commits past the sync target while the sync ran —
+  **compare against the SHA you actually merged, never against a moving ref.**
+  This is the exact inverse of the same day's rule about rebuilding a shared
+  ledger from `origin/main`: there a check said "0 deletions" and content was
+  genuinely gone; here a check screamed and nothing was. Both come from asking
+  one file a question that is about the tree.
+- **Corollary: 0 deletions is necessary, not sufficient, and a stacked HEADING
+  is how a "clean" merge still corrupts.** The same sync produced 3 duplicated
+  lane blocks and a `learnings_index.md` carrying TWO `## Index — N rules`
+  headers, all with `git diff --numstat` showing zero deletions, because a
+  3-way merge that keeps both sides of a rewritten header line is pure
+  insertion. Check STRUCTURE (one slug one block, one heading one section) after
+  any merge of an append-shaped file, not just the line counts.
+
+## 2026-09-05 FORBIDDEN: overriding the pre-commit ledger guard when it names a file you did not stage - it is reporting a STALE BASE, and the fix is to change the base. `[scheduled task live-gameline-accuracy-snapshot]`
+
+Staged exactly one file (`reports/live_gameline_accuracy/history.jsonl`). The
+guard rejected the commit over `.syndicate/deploys.md`, naming 8 measurement
+sections present on `origin/main` and absent from the commit. Nothing about
+`deploys.md` had been touched.
+
+**It was correct.** The guard checks the whole STAGED TREE, not the diff, and
+local `main` was **32 commits behind** `origin/main` - so HEAD's `deploys.md`
+genuinely was missing those 8 measurements, and the commit would have recorded
+that stale copy. `SYNDICATE_ALLOW_LEDGER_COMMIT=1` or `--no-verify` would have
+made an unverified deploy look verified, which is the precise harm the guard
+exists to prevent.
+
+**How to apply:** when the guard names a file outside your change set, read it
+as "your BASE is stale", never as "the guard is confused about scope". Check
+`git rev-list --left-right --count HEAD...origin/main` first. Then either
+fast-forward, or - if the shared tree cannot safely move - build the commit on
+top of `origin/main` directly.
+
+**The safe recipe when the primary tree must not move** (it was 32 behind, and
+`state.md` + `log/2026-09-04.md` had BOTH changed upstream and carried other
+sessions' uncommitted edits, so a fast-forward there was a cross-session action
+with real blast radius):
+
+    BLOB=$(git hash-object -w <content>)
+    export GIT_INDEX_FILE=<temp>           # never the shared index
+    git read-tree origin/main
+    git update-index --cacheinfo 100644,$BLOB,<path>
+    TREE=$(git write-tree)
+    C=$(git commit-tree $TREE -p origin/main -F -)
+    git diff --numstat origin/main $C      # MUST be your file(s) only, 0 deletions
+    git push origin $C:refs/heads/main
+
+This satisfies the guard's invariant by CONSTRUCTION rather than bypassing it:
+every ledger file in the pushed tree is `origin/main`'s own copy.
+
+**Second trap in the same pass - a local append-only file is not necessarily an
+append of upstream's.** The primary tree's `history.jsonl` held the same 32
+upstream rows in a **different order** plus 4 new ones. `diff` said `1,32c1,32`;
+a set comparison said **0 upstream rows missing**. Committing the local copy
+would have rewritten 32 lines of a file whose standing rule is *never rewrite in
+place* - and a line diff would have called that a rewrite while a row-set check
+would have called it clean. **Reconcile append-only files as SETS, then emit
+upstream-bytes + the new rows in order.** Both checks were needed; either alone
+gives the wrong verdict.
+
+## 2026-09-05 FORBIDDEN: attributing a hazard to the change you just made without measuring the tree WITHOUT it. And `ledger_invariants` does NOT catch a stale tree that is merely MISSING newer blocks
+
+- **The guard gap, measured 2026-09-05 and still open.** The primary tree sat 36
+  commits behind `origin/main`. Committing its `.syndicate/lanes.md` from there
+  would drop **210 non-blank lines and 7 whole lane blocks**, one of them an
+  **OPEN** lane. `ledger_invariants.violations()` returns **0** on that file -
+  called directly, not inferred from a hook exit code - so `ledger-commit-guard`
+  allows it. The staleness arm (`ledger_invariants.py:211-248`) models a stale
+  tree RESURRECTING archived content, which is addition; a stale tree missing
+  newer blocks is SUBTRACTION, and nothing keys on it. The file's own docstring
+  already flagged a sibling case reading "0 on a 208 KB stale working copy", so
+  this is the second instance of the same shape, not the first.
+- **The rule going forward.** Before undoing your own change to remove a hazard,
+  measure the hazard **with the change and without it**. I read the 210-line
+  exposure, attributed it to a 116 KB lane trim I had just applied, and reverted
+  the trim. The restored tree measured **210 lines / 7 blocks - identical**: the
+  exposure was the 36 commits, not the trim, and the revert destroyed a verified
+  reclamation while removing no risk at all. **A number measured only in the
+  present state cannot tell you what caused it.** This is the same error shape
+  as banking a success against the wrong cause, run in reverse - a cost paid
+  against a cause that was never there.
+**CORRECTED THE SAME DAY, BY MEASUREMENT, AFTER A PEER LANE TESTED THE
+PRESCRIPTION I HAD JUST LANDED.** The rule above says to write every release as
+"its own marker-led line". **The MARKER-LED half is right; the OWN-LINE half is
+actively harmful, and I am striking it.** Hoisting a path OUT of a Files line
+moves `_claimable_prefix`'s cut point for everything that followed it, so the
+edit that releases the path you meant to release can silently CLAIM one you did
+not. Run against the real parser on
+`evaluation-ledger-projected-mirror`'s actual line:
+
+    ORIGINAL                     claims artifact_publisher.py   (author says RELEASED)
+                                 leaves run_refresh_worker.py FREE (author says CLAIMED)
+    (a) hoist to its own bullet  releases artifact_publisher.py  <- what I prescribed
+                                 **and NEWLY CLAIMS run_refresh_worker.py**
+    (b) marker moved BEFORE the  releases artifact_publisher.py
+        path, line shape kept    run_refresh_worker.py stays FREE
+
+(a) was my advice and it would have taken a third lane's file
+(`ncaaf-live-resim-wire` had staged edits in `run_refresh_worker.py`) with nobody
+told. (b) removes exactly one pair and nothing else changes hands. Landed by that
+lane as `744689c9`.
+
+THE CORRECTED RULE: **move the MARKER in front of the path; do not move the PATH.**
+And the part that generalises past this parser — a ledger edit is a MUTATION OF A
+CLAIM SET, so diff the claim set, not the text: compute `claims_by_path` before
+and after and assert the delta is exactly the pair you intended, **including that
+nothing else moved**. I had written "assert the full expected map including the
+paths that must NOT move" and then, two paragraphs later, prescribed an edit that
+violates it. A rule and its worked example must be checked against each other;
+the example is what people copy.
+
+## [2026-09-05] A CONTROL THAT KILLS ONE ALTERNATIVE IS NOT A DISCRIMINATOR — and "did the producer run" is never answerable from the consumer
+
+Lane `edge-basis-moneyline`, and the sharp part is that I made this error **ninety
+seconds after writing up the same one**. At ~23:10Z I recorded that a
+`supported: false` reading had come off an artifact built 20 seconds before the
+deploy. At 23:13–23:15Z I then concluded "the producer is deployed and NOT
+writing" from a window that ended **before the first tick ran at 23:15:29Z**.
+Vigilance did not survive one turn. The check has to be mechanical.
+
+**The control was good and it still did not license the conclusion.** I checked
+that the same endpoint on the same service read `snapshot_present: true` for the
+three other sports in the same directory, which really does eliminate the
+web/worker disk split. I then treated *the confound I thought of is eliminated*
+as *my hypothesis is confirmed* — while a third explanation was live the whole
+time. `no_snapshot_at_path` is produced BOTH by "NCAAF-specific defect" and by
+"the tick has not run yet", so the reading could not separate them, and I never
+established the tick interval to know which window I was in.
+
+THE RULE, and it is mechanical rather than attentional:
+
+- **Enumerate what else produces this exact reading before the reading means
+  anything.** A control eliminates the alternative it was designed against and
+  says nothing about the ones you did not list. Two hypotheses that share an
+  observable are one hypothesis until you find an observable they do not share.
+- **Ask the EMITTER, not the absence.** "Did the producer run" is answerable only
+  from the producer's own signal. It existed the whole time and I never looked:
+  `NCAAF_LIVE_RESIM {... "written": true, "elapsed_seconds": 21.741 ...}` on
+  refresh-worker at 23:15:51Z. Same family as
+  *absent signal is about the emitter* and *gate verification on artifact mtime*
+  — this is the third instance in one session, which is the argument for making it
+  a checklist item rather than a thing to remember.
+- **A null needs a denominator IN TIME.** Before reporting "X has not happened",
+  state how long since it could have and what its period is. I had neither.
+
+CORROBORATION FROM THE OTHER SIDE, and it is what settles that this is structural
+rather than a lapse: the peer lane hit the identical trap on the identical data
+and escaped by luck. It read the board at 23:15:59Z, saw
+`"no published live-lens snapshot"`, and the ONLY thing that stopped it recording
+a defect was that it happened to compare two timestamps. **Two independent
+sessions, same reading, same hour; one wrote the wrong conclusion and one did
+not, and the difference was not method.** That is the argument against "be more
+careful" as a remedy -- an error that catches the person who has just finished
+writing the rule about it needs a mechanical check, not attention.
+
+## 2026-09-05 — FORBIDDEN: a JOIN test whose fixture builds BOTH SIDES from one set of names. The key match is then a tautology, and it reads as end-to-end coverage. `[lane ncaaf-live-resim-wire]`
+
+- **18 green tests, a five-way mutation check, and production missed 257 of 257
+  rows.** The NCAAF live re-sim published a lens keyed from the projections
+  artifact (CFBD names) while the board grid is keyed by the ODDS source. First
+  board rebuild past the first snapshot, 2026-09-05T23:17:39Z: `index_size 8`,
+  `sources_seen {live_resim: 8, pregame: 43}`, `skipped_no_team_names 0` — a
+  PERFECT index — and `rows_live_gameline_considered 257`,
+  `rows_live_gameline_edged 0`, `withheld_by_reason
+  {no_live_gameline_projection: 257}`. The two key sets intersected **zero**
+  times: `('baylor', 'auburn')` against `('baylor bears', 'auburn tigers')`.
+- **THE TEST ASSERTED THE BROKEN KEY AND PASSED.** `_wire_tick` built the ESPN
+  event and the projection row from the same `"Baylor"` / `"Auburn"` strings, so
+  both sides of the join agreed BY CONSTRUCTION. The assertion
+  `assert list(index) == [("baylor", "auburn")]` was true of the fixture and
+  false of production, and no amount of running it could tell.
+- **AND THE MUTATION CHECK DID NOT SAVE IT, which is the part I did not expect.**
+  Five mutations, each red exactly where predicted. Mutating the CODE cannot
+  expose this, because the defect is not in the code the test runs — it is in the
+  fixture's assumption that one name space exists. **The mutation you need is to
+  the FIXTURE.** A mutation suite over code is blind to a fixture that cannot
+  express the failure.
+- **This is the join-specific form of the 2026-08-27 rule** ("a test whose FIXTURE
+  cannot violate the property it asserts is not weak coverage, it is zero coverage
+  that reads as strong"), and it is worth stating separately because a JOIN has an
+  obvious tell the general rule does not name: **two producers, one string.** If a
+  join test constructs both sides from a single literal, it is testing `dict.get`.
+- **The rule going forward.** A join test must spell the two sides DIFFERENTLY —
+  the way the two real producers do — and assert the outcome in both directions:
+  one lens spelled like the grid (joins), one spelled like the other producer
+  (does not), with the SAME grid row. `index_size` must be identical across that
+  pair; that is the whole signature, and it is what a perfect index over a failed
+  join looks like. Peer lane `edge-basis-moneyline` built exactly that pair for
+  its own file after this was reported (`c45ad022`) and found the same shape
+  there; a defect of this class is rarely in one file only.
+- **Corollary for the PRODUCER side.** When two systems name the same entity and
+  one of them is an odds feed, do not assume a canonical spelling exists — MEASURE
+  which field matches. Here: ESPN `displayName` **7/8** against the live grid keys,
+  `location` **0/8**, `shortDisplayName` **0/8**, `name` **0/8**. `location` is
+  what the artifact used and it never matched once. And leave the residual NAMED
+  (`sam houston bearkats` vs the grid's `sam houston state bearkats`) rather than
+  aliasing it: one alias fixes one night and is a guess about the feed's naming
+  everywhere else. `live_gameline_join._norm_team` has no alias table on purpose,
+  and its docstring records why — the prop join's alias machinery carries a 91%
+  miss.
+
+---
+
+## 2026-09-05 — FORBIDDEN: reading the RESIDUAL of a partial control as "the one that survived". A control is only a control over the population it actually REACHES. `[lane nfl-la-rams-alias, corrected by ci-archives-nba-card-js]`
+
+- **What we believed:** the full suite's 169 failures in a data-less worktree split
+  cleanly into environment and truth. Re-running the 43 failing files with
+  `SYNDICATE_DATA_ROOT` set gave `169 → 47`, so 122 were data absence — and the
+  archive test still failing was **a confirmed real defect in the file CI runs.**
+- **What was actually true:** the knob was wrong, so the differential never covered
+  the cases it appeared to adjudicate. `session_worktree.py` says it in its own
+  source, written the day BEFORE the measurement: *"`SYNDICATE_DATA_ROOT` does NOT
+  solve it. Nine of these read `REPO_ROOT/data/...` directly and ignore the variable
+  entirely."* The flagged test is ONE OF THOSE NINE. It passes in the primary tree
+  and under `SYNDICATE_NBA_ARTIFACT_ROOT`; the asset is git-tracked and CI checks out
+  the full repo. **CI was green throughout. There was no red test.**
+- **How we found out:** a peer lane read the failing ASSERTION. It was
+  `assertIsInstance(content, str)` on the FIRST line of a test named
+  `..._rewrites_source_routes_...` — the asset never loaded, so the route-rewriting
+  logic was never evaluated. One line of output refuted the claim.
+- **The rules going forward:**
+  1. **A residual is not a survivor until you show the instrument REACHED it.**
+     Resolving 30 of 31 cases is not evidence about the 31st; the remainder is
+     exactly where the instrument is blind, so a partial control CONCENTRATES its
+     own blind spot into the result it makes look most significant.
+  2. **Use the documented control.** `--with-test-data` is this repo's; an env var
+     that merely sounds like the right root is not.
+  3. **Read the failing assertion before classifying a failure.** An `assertIsInstance`
+     on line 1 says INPUT; a comparison deep in a test says LOGIC. Classifying from
+     the test's NAME is how a setup failure becomes a reported defect.
+- **The compounding error, and it is the one to take personally:** the report that
+  made the false claim ALSO contained the caveat that refutes it — *"this control is
+  a LOWER bound on data-absence, not an upper bound"* — and then called the residual a
+  confirmed defect two sentences later. **Writing a limitation and then reasoning as
+  if it did not apply is worse than never noticing it**, because the caveat makes the
+  conclusion look considered to every later reader. If you state a limitation, the
+  next sentence is the one to check against it.
+- **Cost:** none shipped — a false alarm retracted before anyone acted on it, plus one
+  spawned session. **It repaid itself:** chasing why the asset would not load found a
+  REAL production outage in that path (`[nba-betting-card-assets-404]`).
+
+## 2026-09-05 — FORBIDDEN: inferring a workload's SHAPE from a reading taken on a CONTENDED machine. A SATURATED MACHINE IS NOT EVIDENCE ABOUT THE WORKLOAD. `[lane full-suite-xdist-run, self-retraction]`
+
+I measured the full pytest suite at **61m06s** (`-n 6`) while six peer python
+jobs were running, sampled CPU, saw the machine turning only **~1.5 cores across
+ten processes** (7.2s of worker CPU per 8s wall over six workers), and wrote into
+`state_ledger.md`: *"this suite is I/O bound here, not CPU bound"* and *"do not
+quote 3.7x for this machine"* — contradicting a scope note that had measured 3.7x.
+
+A second run on an IDLE machine: **19m26s**. 3.1x faster. The claim was wrong and
+is retracted in place.
+
+**Why the reading could not have supported the conclusion.** Six peer jobs were
+contending for the same disk. Disk contention is *the* condition that makes any
+workload — CPU-bound ones included — show low CPU utilisation and long wall clock.
+So the observation was equally consistent with both hypotheses and discriminated
+neither. **A low-utilisation reading on a loaded box is a fact about the BOX.**
+
+This is the same family as `[2026-09-05] A CONTROL THAT KILLS ONE ALTERNATIVE IS
+NOT A DISCRIMINATOR`, but the tell is different and worth naming on its own:
+**the confound was ambient rather than in the experiment.** Nothing in the
+measurement looked wrong — the numbers were real, the arithmetic right, the
+sampling honest. What was missing was a baseline of the machine itself.
+
+**The rule.** Before attributing slowness to a workload's nature, record what
+else was running. If anything was, the reading bounds the workload's performance
+UNDER THAT LOAD and says nothing about its shape. Re-run on an idle machine
+before writing a characterisation into the ledger — especially one that tells
+future sessions to disregard an existing measurement, which is what makes this
+expensive rather than merely wrong.
+
+**And when you do re-run, change ONE variable.** My second run moved two (idle
+AND 12 workers instead of 6), so the 3.1x still cannot be split between them. It
+was enough to falsify the claim, and NOT enough to replace it with a number —
+recorded as such rather than quoted as a worker-scaling factor.

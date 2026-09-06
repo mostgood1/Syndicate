@@ -684,3 +684,141 @@ regression without checking per-market coverage against that date.
 Venue-scoped coverage is much better than board-wide: the Polymarket line
 reports `sim_view_on=14/29` (48%). The unprojected mass is mostly rows the
 venues do not quote anyway.
+
+## [live-edge-basis-label] `edge_basis` WAS WRONG ON EVERY LIVE MONEYLINE ROW, AND THE MEASUREMENT THAT CERTIFIED IT COULD NOT HAVE SEEN THEM — fixed and landed `[2026-09-05, lane edge-basis-moneyline, commits 5ce75195 + fda5c28a, NO DEPLOY]`
+
+`projection.edge_basis` says WHICH probability `edge_vs_market_pct` was paired
+against. `_apply_verdict` derived it from `live_projected` — the parameter that
+decides whether to PUBLISH the live probability — not from the probability the
+edge was priced from. The MONEYLINE branch of `attach_live_gamelines` passes no
+`live_projected`, deliberately, so **every live h2h row was labelled `pregame`
+while its edge came from `hit["home_win_prob"]`, the live number.** Present from
+the key's first commit (`28b03fef`, 2026-08-16); not a regression.
+
+MEASURED 2026-09-05 with the real functions, decided NCAAF game, `sims=200`:
+
+    verdict   model_prob 1.0   market_prob 0.310   edge_pp 69.0   priceable true
+    published edge_vs_market_pct 69.0 == (1.0 - 0.310) * 100      <- the LIVE pair
+    the pregame pair (0.977 - 0.310) = 66.7, and is NOT what came out
+    published edge_basis "pregame"
+
+**THE FIX IS THE LABEL ONLY**: it is now read off `verdict["model_prob"]`, which
+is what `edge_pp` is computed from in all three pricers, and `_apply_verdict` has
+no caller but `attach_live_gamelines` — so every verdict reaching it was priced
+from a live `hit` and `"pregame"` was never a reachable correct answer.
+
+**THE OBVIOUS WIDENING IS FORBIDDEN AND THE REASON IS IN THIS FILE'S DOMAIN.**
+Passing `live_projected=hit["home_win_prob"]` on the moneyline branch would also
+write `live_model_prob_over`, which `layer2_board._live_projection_columns`
+(~:2214) maps onto `live_model_probability` **with no side awareness**. On an h2h
+row that value is the HOME win probability, so an AWAY moneyline row would render
+the home team's number in the Live column — the defect `_model_prob_for_side`
+exists to fix, on the same field, one column over. Also unguarded on that path:
+`refuse_published_certainty` checks only `model_prob_over`, so a
+`live_model_prob_over` of 1.0 would publish a certainty. **If h2h ever needs to
+serve that column, it needs a side-aware source, not the raw key.**
+
+**WHO READS `edge_basis`: ONE CONSUMER, AND IT NEVER SEES THESE ROWS.**
+`football/pick_gate.filter_pick_rows` (default `basis_key="edge_basis"`); its only
+caller `ncaaf/picks.py:70` feeds it recommendation-artifact rows, and its
+vocabulary is `{"model","market"}` — disjoint from `{"live","pregame"}`. A latent
+name collision, no current overlap. NOT `layer2_board._model_edge_for` (reads
+`edge_vs_market_pct`), NOT `live_gameline_ledger.build_records` (reads
+`lg["model_prob"]` off the gameline block), NOT `live_edge_policy`, and it appears
+in no template, JS or TS. **So the change is label-only on the served payload.**
+
+**POPULATION.** Served board, substrate `render` 2026-09-05T21:26Z: 54 live rows
+across all sports, `rows_live_gameline_edged: 0` on mlb AND soccer,
+`supported: false` on ncaaf — ZERO rows carried the label at that instant, which
+is an instant and not a population. The historical population, substrate `render`
+21:53Z: soccer h2h ledger 411 records / **191 priceable with a final**;
+`history.jsonl` (substrate `checkout`, 36 captures 08-20..09-05) adds mlb **110**
+and wnba **14**. All labelled `pregame` by construction.
+
+**`_MODEL_EDGE_MAX_POINTS = 15.0` IS NOT RELAXED**, and this does not license
+relaxing it — see `[board-model-edge-coverage]`. The bound is still the guard that
+drops the worst live rows; `edge_basis` being correct is a precondition for
+revisiting it, not a reason to.
+
+**TWO CORRECTIONS 2026-09-05 ~23:1xZ, both raised by lane `ncaaf-live-resim-wire`
+and both verified here before being accepted.**
+
+1. **`"no live re-sim wired for ncaaf"` IS REFRESH-WORKER'S COMMIT, NOT WEB'S,
+   and I attributed it to the wrong service twice.** `build_book_grid_artifact`
+   calls `attach_live_gamelines_for_sport` (`book_grid_artifact.py:318`) and
+   writes the `live_gamelines` block at `:425`; its only caller is
+   `run_refresh_worker.py:5371`. The route `board_book_grid_api`
+   (`intelligence.py:2676`) PREFERS `read_book_grid_artifact` and falls through to
+   a serve-time pivot only when the artifact is absent — so on mlb/soccer/ncaaf I
+   read a worker-built artifact, and on wnba (`live_gamelines: null`, a different
+   payload shape) I read the fallback. **What misled me was an accurate docstring
+   about the OTHER path**, on `board_layer2_shortlist_api`: "unlike
+   `/api/board/book-grid` above — which is a serve-time pivot and computes its own
+   grid". True of the fallback, false of what production served.
+   **The reading itself stands; only the service does not.** It decides which
+   deploy discharges it, so it is not a detail.
+2. **PROVEN BY THE STRING FLIPPING WHEN REFRESH-WORKER DEPLOYED, which is
+   stronger than either attribution argument — and my first attempt at this
+   proof was itself a stale-artifact reading.** At 23:09:37Z I read
+   `{"supported": false, "reason": "no live re-sim wired for ncaaf"}` and was
+   about to record "still inert". That artifact's `generated_at` was 23:06:54Z
+   and refresh-worker deployed `ffe8714b` at **23:07:14Z — 20 seconds later**, so
+   the reading described the OLD code. `[gate verification on artifact mtime]`
+   caught in the act. Re-read at 23:13:53Z against an artifact 3 seconds old:
+   **`supported: true`, the string GONE.** `262fd2cf` is inside `ffe8714b`. A
+   string that flips exactly when refresh-worker deploys, while web sat live and
+   unchanged throughout, settles the service.
+
+3. **THE REFUSAL MOVED ONE STAGE DOWN, AND THE FIX IS STILL INERT ON NCAAF —
+   for a different reason than either lane expected.** 23:13:50Z artifact:
+   `supported: true`, `reason: "no published live-lens snapshot"`,
+   `rows_live_gameline_edged: 0`, 97 live NCAAF rows, **0 carrying a
+   `live_gameline` block and 0 carrying `edge_basis`**. The sport is registered;
+   the producer is deployed; the snapshot is not being written.
+   `/api/ops/live-lens/snapshot-index?sport=ncaaf` → `snapshot_present: false`,
+   `no_snapshot_at_path`, `/opt/render/project/data/live/ncaaf_live_lens.json`.
+   **CONTROL RUN, and it is what makes that a finding rather than a null:** the
+   same endpoint on the same web service reports `snapshot_present: true` for
+   **mlb, wnba AND soccer** in the same directory. So the path resolves, the
+   web/worker transport is not the confound, and the absence is NCAAF-specific.
+   Owed by `ncaaf-live-resim-wire`, NOT `ncaaf-live-resim` as written above.
+
+4. **CORRECTION TO (3), AND IT IS THE SAME ERROR AS (2) COMMITTED TWICE INSIDE
+   ONE HOUR.** "The producer is deployed and not writing" was a STALE READ. The
+   first tick wrote at **23:15:29Z**; my window was 23:13–23:15Z. I read the
+   consumer before the producer had run once, having caught myself doing exactly
+   that ninety seconds earlier. At 23:28Z: `snapshot_present: true`,
+   `snapshot_generated_at 2026-09-05T18:26:33-05:00`, 51 games,
+   `sources_seen {live_resim: 6, pregame: 45}`.
+   **AND MY CONTROL WAS SOUND BUT NOT A DISCRIMINATOR.** mlb/wnba/soccer being
+   present did eliminate the disk split — and I then treated "the confound I
+   thought of is eliminated" as "my hypothesis is confirmed", while a third
+   explanation was live the whole time: the tick had not run. Both produce
+   `no_snapshot_at_path`. **The discriminator existed and was the PRODUCER'S OWN
+   SIGNAL** — refresh-worker's `NCAAF_LIVE_RESIM {... "written": true ...}` line
+   at 23:15:51Z. Asking "did the producer run" from the consumer's absence is the
+   standing error `[absent signal is about the emitter]`; a null on the consumer
+   needs the producer's emission and an elapsed-time denominator before it means
+   anything.
+   **THE REAL DEFECT WAS ONE HOP FURTHER ON, AND IT WAS BIGGER:** 257 of 257 rows
+   missed at 23:17:39Z with a PERFECT index (`index_size 8`,
+   `skipped_no_team_names 0`) — the lens keyed from the CFBD projections artifact
+   and the grid from the odds source spell teams differently,
+   `('baylor','auburn')` vs `('baylor bears','auburn tigers')`. Fixed by that lane
+   as `933e9beb`. **So live NCAAF h2h rows were WITHHELD before the join, never
+   mislabelled**, and this lane's `edge_basis` fix gets its first NCAAF population
+   when `933e9beb` deploys. The fixture shape that hid it is now pinned by
+   `test_a_naming_convention_mismatch_is_VISIBLE_and_never_a_silent_zero`.
+
+   **SCOPE OF THAT SENTENCE, because it is the last line of a long section and a
+   skimmer will take it as the summary — it is NOT.** "Never mislabelled" is true
+   of NCAAF GAME-LINE rows ONLY, and NCAAF is the sport where the population
+   ARRIVES, not the sport where the bug lived. `_apply_verdict`'s moneyline branch
+   is SHARED, and mlb, wnba **and soccer** have had a live re-sim joining for
+   weeks: **every one of their priceable live h2h rows carried `pregame` on an
+   edge computed from the live probability, for the whole life of the key.** The
+   measured floor is in POPULATION above — soccer **191**, mlb **110**, wnba
+   **14** priceable h2h ledger records with a final. **Soccer is the largest and
+   is easy to drop from this list**: the framing this defect arrived under said
+   "MLB and WNBA", and soccer was found only by measuring. Read (4) as "NCAAF adds
+   a new population", never as "the label was never wrong".

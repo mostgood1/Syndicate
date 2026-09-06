@@ -3,15 +3,52 @@ from __future__ import annotations
 import csv
 import json
 import os
+import time as _real_time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from syndicate.app import create_app
 from syndicate.features.shared import live_refresh_loop
 from scripts import run_live_odds_refresh_worker
+
+
+class _ModuleLocalTime:
+    """A `time` facade for ONE module, so a sleep mock cannot see other threads.
+
+    `patch.object(run_live_odds_refresh_worker.time, "sleep", ...)` READS as
+    module-scoped and is not. `mod.time` IS the singleton `time` module, so
+    setting an attribute on it patches `time.sleep` PROCESS-WIDE: every sleep in
+    every thread hits the mock, including daemon threads that earlier tests
+    started and never stopped (`syndicate-venue-poll`, `memory-watchdog`, the
+    live-lens reporter).
+
+    MEASURED 2026-09-04: `..._sleeps_for_adaptive_idle_interval` passed alone
+    and failed in a full-suite run with "Expected 'sleep' to be called once.
+    Called 11 times. Calls: [call(0.15), call(0.15), ...]". The worker has
+    exactly ONE `time.sleep` call site (`run_live_odds_refresh_worker.py:2423`)
+    and never passes 0.15, so all eleven came from somebody else's thread.
+    Demonstrated directly: patch `time.sleep`, start a thread that sleeps, and
+    the mock records it.
+
+    The other two sites here do not capture their mock, so they cannot fail this
+    way -- but they were silently turning OTHER threads' sleeps into no-ops for
+    the duration, which is the same defect pointed outward. All three are
+    module-local now.
+
+    Patching the NAME in the worker's namespace is what the original intended.
+    Everything but `sleep` delegates to the real module, so `monotonic` and
+    `time` -- the only others the worker uses -- keep working.
+    """
+
+    def __init__(self, sleep) -> None:
+        self.sleep = sleep
+
+    def __getattr__(self, name):
+        return getattr(_real_time, name)
+
 
 
 class LiveRefreshLoopTests(unittest.TestCase):
@@ -2605,7 +2642,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             run_live_odds_refresh_worker,
             "_live_refresh_loop_interval_seconds",
             return_value=5,
-        ), patch.object(run_live_odds_refresh_worker.time, "sleep", return_value=None), patch.object(
+        ), patch.object(run_live_odds_refresh_worker, "time", _ModuleLocalTime(Mock(return_value=None))), patch.object(
             run_live_odds_refresh_worker.signal,
             "signal",
             side_effect=ValueError("skip signals"),
@@ -2628,6 +2665,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         # must use the adaptive interval (900s idle/pregame) computed from
         # the tick's own result, not the fixed base interval.
         pregame_meta = {"phase": "pregame", "adaptive": True, "anyLive": False}
+        mocked_sleep = Mock(return_value=None)
         with patch.object(run_live_odds_refresh_worker, "_acquire_process_lock", return_value=True), patch.object(
             run_live_odds_refresh_worker,
             "_start_live_lens_reports",
@@ -2636,7 +2674,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             run_live_odds_refresh_worker,
             "_live_refresh_loop_interval_seconds",
             return_value=60,
-        ), patch.object(run_live_odds_refresh_worker.time, "sleep", return_value=None) as mocked_sleep, patch.object(
+        ), patch.object(run_live_odds_refresh_worker, "time", _ModuleLocalTime(mocked_sleep)), patch.object(
             run_live_odds_refresh_worker.signal,
             "signal",
             side_effect=ValueError("skip signals"),
@@ -2665,7 +2703,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
             "_live_refresh_loop_interval_seconds",
             return_value=5,
         ), patch.object(run_live_odds_refresh_worker, "_max_uptime_seconds", return_value=0.0), patch.object(
-            run_live_odds_refresh_worker.time, "sleep", return_value=None
+            run_live_odds_refresh_worker, "time", _ModuleLocalTime(Mock(return_value=None))
         ), patch.object(
             run_live_odds_refresh_worker.signal,
             "signal",

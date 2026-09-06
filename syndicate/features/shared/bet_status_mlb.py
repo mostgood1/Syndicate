@@ -31,6 +31,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from syndicate.features.shared.bet_status import segment_refusal
+
 __all__ = ["mlb_status_resolver"]
 
 REASON_NO_GAME_PK = "no_game_pk"
@@ -315,6 +317,23 @@ def mlb_status_resolver(selected_date: str):
         # counts readable as a work list.
         if str(order.get("sport") or "").strip().lower() not in {"mlb", ""}:
             return {"unavailable_reason": REASON_NOT_MLB}
+
+        # SEGMENT NEXT, AND THIS IS THE SPORT IT IS LIVE FOR. `_combined_score`
+        # below reads `linescore.teams.<side>.runs`, the CUMULATIVE nine-inning
+        # total -- never `linescore.innings`, which is in the same payload and
+        # is where a first-five actual would come from. So `segment="first5"` +
+        # `market="totals"` matched `_GAME_TOTAL_MARKETS`, took the whole-game
+        # runs, and settled a five-inning UNDER 3.5 against a total of 8.
+        #
+        # Measured 2026-09-05: production `book_quotes` for 2026-09-04 carried
+        # 21,714 `first5`, 5,549 `first3` and 3,343 `first1` MLB rows, so the
+        # orders this mis-grades are writable today. `#563` is the same defect
+        # one stage earlier -- five orders, $7.08 -- and its fix put `segment`
+        # into the board/venue MATCH key only, which stops you PLACING the bet
+        # on the wrong ticket and does nothing about grading it.
+        refusal = segment_refusal(order)
+        if refusal is not None:
+            return refusal
 
         game_pk, reason = _resolve_game_pk(order, schedule())
         if game_pk is None:

@@ -14,7 +14,17 @@ from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 
 
-def _without_explicit_roots() -> None:
+# Beyond the three root overrides, these each INDEPENDENTLY turn the
+# hosted-storage `RuntimeError` into a silent fallback, so a test asserting that
+# raise has to pin them too (`source_roots.py:111-130`, `refresh_state_store.py:
+# 367-375`). Opt-in rather than always-on: `test_render_hosted_reports_root_
+# falls_back_to_repo_reports` SETS `RENDER` on purpose and must keep it -- the
+# distinction that matters is "this test set it" versus "it was ambient", and
+# only the second is pollution.
+_ALSO_SUPPRESSES_THE_RAISE = ("RENDER", "SYNDICATE_SOURCE_ROOT_NBA", "SYNDICATE_ARTIFACT_ROOT_NBA")
+
+
+def _without_explicit_roots(*, also: tuple[str, ...] = ()) -> None:
     """Remove the root overrides from an already-patched `os.environ`.
 
     THESE TWO TESTS ARE ABOUT THE ABSENCE OF AN OVERRIDE, so the absence has to
@@ -27,8 +37,16 @@ def _without_explicit_roots() -> None:
 
     Call this INSIDE the `patch.dict` context: it snapshots and restores the
     entire mapping on exit, so the pops are undone with everything else.
+
+    THE SECOND BLOCK OF `test_hosted_storage_requires_explicit_roots` DID NOT
+    CALL THIS, and that is the 2026-08-24 defect a second time, in the same
+    test. Measured 2026-09-04: it passed alone and failed a full-suite run at
+    `preferred_source_roots(...)` with "RuntimeError not raised", because
+    `SYNDICATE_DATA_ROOT` was ambient by then and became a candidate root, so
+    the raise never happened. Reproduced exactly -- same file, same line -- by
+    running that one test with a root var exported.
     """
-    for name in ("SYNDICATE_REPORTS_ROOT", "SYNDICATE_STATE_ROOT", "SYNDICATE_DATA_ROOT"):
+    for name in ("SYNDICATE_REPORTS_ROOT", "SYNDICATE_STATE_ROOT", "SYNDICATE_DATA_ROOT") + tuple(also):
         os.environ.pop(name, None)
 
 
@@ -108,7 +126,7 @@ class RefreshStateStoreTests(unittest.TestCase):
             },
             clear=False,
         ):
-            _without_explicit_roots()
+            _without_explicit_roots(also=_ALSO_SUPPRESSES_THE_RAISE)
             with self.assertRaises(RuntimeError):
                 refresh_state_store.data_root()
             with self.assertRaises(RuntimeError):
@@ -141,6 +159,7 @@ class RefreshStateStoreTests(unittest.TestCase):
                 },
                 clear=False,
             ):
+                _without_explicit_roots(also=_ALSO_SUPPRESSES_THE_RAISE)
                 with self.assertRaises(RuntimeError):
                     preferred_source_roots(probe_file, env_var="SYNDICATE_SOURCE_ROOT_NBA", local_dir_name="nba_source")
                 with self.assertRaises(RuntimeError):

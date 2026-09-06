@@ -59,6 +59,9 @@ __all__ = [
     "resolve_bet_status",
     "statuses_for_orders",
     "bet_status_report_line",
+    "FULL_GAME_SEGMENT",
+    "REASON_SEGMENT_PREFIX",
+    "segment_refusal",
 ]
 
 STATUS_WON = "won"
@@ -145,6 +148,91 @@ def is_monotone_market(market: Any) -> bool:
     here would declare a spread bet WON in the second inning.
     """
     return str(market or "").strip().lower() in _MONOTONE_MARKETS
+
+
+# THE SEGMENT A WHOLE-GAME ACTUAL CAN GRADE, AND THE ONLY ONE.
+#
+# The board spells a segment bet as TWO fields -- `market="totals"` plus
+# `segment="first5"` -- and `market_segments.segment_market_keys` is where that
+# split is made (`out[f"{base}_{suffix}"] = (seg, canonical)`, the canonical
+# market being the bare name). Every stage downstream keeps them apart:
+# `odds_book_quotes._KEY_FIELDS`, `book_grid._INSTANCE_FIELDS`,
+# `kalshi_board_join._match_key` and `execution_ledger`'s row all carry
+# `segment`.
+#
+# THE GRADERS DO NOT READ IT. Measured 2026-09-05 across every status resolver:
+# `bet_status_wnba` refuses a non-full segment and is the ONLY one that does.
+# mlb / ncaaf / nfl / soccer each take `market` alone, match `"totals"`, and
+# return the whole-game combined score -- so a first-five-innings UNDER 3.5 is
+# compared against a nine-inning total of 8 and settles LOST, with confidence
+# and without a log line. That is not an ungraded bet, it is a wrongly graded
+# one, which is the more expensive direction: an ungraded row shows up in the
+# work list, a mis-graded row shows up in the P&L as skill.
+#
+# It is live today, not hypothetical. Production `book_quotes` for 2026-09-04
+# carried 21,714 `first5`, 5,549 `first3` and 3,343 `first1` MLB rows for such
+# an order to be written from.
+FULL_GAME_SEGMENT = "full"
+
+# Named for the thing that is wrong -- the ACTUAL is whole-game -- rather than
+# for the artifact it came from, because the cause is shared and the artifacts
+# are not. `bet_status_wnba` says `final_box_is_full_game_not_h1` for the same
+# refusal; that wording is kept where it is, since it is additionally true.
+REASON_SEGMENT_PREFIX = "actual_is_full_game_not_"
+
+
+def segment_refusal(
+    order: Mapping[str, Any],
+    *,
+    reason_prefix: str = REASON_SEGMENT_PREFIX,
+) -> dict[str, Any] | None:
+    """`None` if this order may be graded off a whole-game actual, else a refusal.
+
+    `reason_prefix` EXISTS FOR ONE CALLER AND SHOULD NOT GROW. `bet_status_wnba`
+    already shipped this refusal, spelled `final_box_is_full_game_not_<seg>`, and
+    that string is a recorded reading in `state_basketball.md`. Renaming it to
+    unify the vocabulary would orphan that reading for a cosmetic gain -- the
+    same trade `bet_status_ncaaf` declines when it keeps NFL's unprefixed
+    `game_carries_no_scores`. New callers take the default.
+
+    ABSENT MEANS `full`, AND THAT PERMISSIVE DEFAULT IS DELIBERATE -- it is the
+    one direction this guard is allowed to be lenient in, and the reasoning has
+    to be stated because the standing rule is the opposite ("unknown must not
+    default permissive").
+
+    Every full-game order ever written carries no `segment` key at all: the
+    field was added for the board's quote rows, not retrofitted onto the
+    ledger's history. Refusing on absence would therefore refuse THE ENTIRE
+    BOOK rather than the segment rows -- taking grading to zero, which is
+    precisely the failure `kalshi_catalogue` records paying for once already
+    (a false positive on `KXNFLH2HWINS` would have taken the Kalshi order path
+    to zero). A guard that can only fire on a value that is PRESENT and NOT
+    `full` cannot make that mistake.
+
+    The exposure this leaves is narrow and named: a segment row that loses its
+    `segment` field somewhere upstream grades as full-game. That is a JOIN
+    defect, not a grading one, and `execution_ledger` writes the field today
+    (`:134`, `:268`, `:1117`), so nothing currently produces it.
+
+    Call this at the TOP of a resolver, before the market check and before any
+    artifact is read. Segment is permanently unanswerable from a whole-game
+    actual, while a missing artifact is transient, and checking the transient
+    condition first hides the structural one behind a reason that looks like it
+    will fix itself -- the ordering rule `bet_status_wnba` states and paid for.
+    """
+    if not isinstance(order, Mapping):
+        return None
+    # STRIP BEFORE THE DEFAULT, not after. `str(x or "full")` leaves a
+    # whitespace-only value intact -- `"  "` is truthy -- and the strip that
+    # followed then produced `""`, which is not `"full"`, so the order refused
+    # with `actual_is_full_game_not_` and no segment named. A refusal whose
+    # reason has a blank where the cause goes is unreadable as a work item, and
+    # it fires on a row that should have graded. Caught by
+    # `test_absent_blank_and_full_all_grade["  "]`, not by review.
+    segment = str(order.get("segment") or "").strip().lower() or FULL_GAME_SEGMENT
+    if segment == FULL_GAME_SEGMENT:
+        return None
+    return {"unavailable_reason": f"{reason_prefix}{segment}"}
 
 
 def _as_float(value: Any) -> float | None:

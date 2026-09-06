@@ -5,6 +5,37 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [nfl-board-projection-coverage] NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-projection-et-datekey + nfl-la-rams-alias]`
+
+`/api/board/book-grid?sport=nfl` reads **`unmatched_game_rows` 0** of 1,251 game rows;
+all 78 Los Angeles Rams rows carry a projection. Two defects, two commits:
+
+    299  baseline
+     78  `52870f57`  the projection join compared a UTC day against an ET day
+      0  `fb7a1f96`  nflverse writes the Rams `LA`; `_NFL_ALIAS_TO_NAME` knew only `LAR`
+
+**CONFIRMED TWICE, on two different deployed commits and two different rebuilt
+artifacts** — so this is not a one-artifact fluke:
+
+    2026-09-04T23:19:34Z  refresh-worker `ea1e3ac0`   unmatched 0 / 1,251, Rams 78/78
+    2026-09-05T02:18:14Z  refresh-worker `3a9153f4`   unmatched 0 / 1,251, Rams 78/78
+
+web is ALSO on `3a9153f4` (live 2026-09-04T23:02:47Z). Verified by CONTENT, not only
+ancestry: `git show 3a9153f4:.../team_aliases.py` carries the `"la"` entry, and both
+`fb7a1f96` and `52870f57` are ancestors. Several sessions have deployed both services
+since, and the fix has survived each — it is on `main`, so it rides along.
+
+**THIS ENDPOINT SERVES `source: "precomputed_artifact"` — refresh-worker's output,
+NOT web's request path.** A web deploy of the same commit moved the number by ZERO;
+it moved only once refresh-worker had the commit AND rebuilt. Anyone changing
+`attach_nfl_game_projections` or `team_aliases` must deploy **refresh-worker** and wait
+for a rebuild before reading. Tells that the request path did not run: no
+`projection_coverage` key in the response, and `projection` ABSENT (not null) on rows.
+
+**nflverse vocabulary, enumerated over all of `data/nfl_source/schedule_2026.csv`:**
+32 distinct codes, `LA` (Rams) and `LAC` (Chargers) present, **`LAR` absent entirely**,
+`WAS` not `WSH`. `_NFL_ALIAS_TO_NAME` now resolves all 32.
+
 ## [ncaaf-zero-orders-is-two-gates] NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry-roi-curve]`
 
 The board is alive: `/api/board/layer2-shortlist?sport=ncaaf` serves **480 rows**,
@@ -255,6 +286,97 @@ Re-check in-season with `scripts/probe_ncaaf_injury_feed.py`.
 - **Do NOT diagnose NCAAF from a local checkout** — `data/**` is a lossy mirror.
 - Stage 0 ledger: `syndicate/features/football/pick_ledger.py` +
   `build_ncaaf_pick_ledger.py` / `build_nfl_preseason_pick_ledger.py`.
+
+## [ncaaf-calibration-profile-live] THE PROMOTED NCAAF PROFILE IS LIVE, AND PROMOTING ONE IS A **CODE DEPLOY** `[verified 2026-09-05, render]`
+
+The production read `ncaaf-pace-block` left owed is DISCHARGED. refresh-worker
+(`eb7951fe`) emits `[calibration] ncaaf profile source=artifact
+version=ncaaf-goal-line-refit-1 goal_line_touchdown=True
+drive_yardage_multiplier=0.95` — `source=artifact`, and BOTH discriminating
+fields disagree with the in-source defaults (`False` / `1.15`), so this
+distinguishes the promoted fit from the default rather than merely reporting a
+healthy-looking string. All **51/51** rows of
+`smartsim2_projections_2026_wk1.csv` carry `profile_source=artifact` +
+`profile_version=ncaaf-goal-line-refit-1`, and all **51/51** served
+`/ncaaf/api/cards` join back to that CSV by team pair with projected
+total/spread equal to 1dp. Every NCAAF number on the board came from the
+promoted fit. **Nothing is owed and there is no env var to set.**
+
+**THE OPERATIONAL FACT, and it is the reusable one: a calibration profile is
+selected by the CODE DEPLOY, not by configuration.**
+`SYNDICATE_CALIBRATION_PROFILE_DIR` and
+`SYNDICATE_CALIBRATION_PROFILE_PATH_NCAAF`/`_NFL` are **absent from all three
+services** (enumerated live, paginated: web 77 keys, refresh-worker 154,
+live-odds-worker 129). `calibration_profile_dir()` therefore falls through to
+`repo_root_from(__file__)/data/calibration` — path arithmetic on the module's
+own location, **with no `SYNDICATE_DATA_ROOT` term**. So the artifact publisher
+CANNOT deliver a profile: it is not in `HOT_ARTIFACT_PATTERNS`, and
+`export?pattern=ncaaf_source/historical_truth/*&names_only=1` returns
+`count=0`. Promoting a re-fit means deploying every service that runs that sim.
+
+**Only refresh-worker runs an NCAAF sim** (as a subprocess). web and
+live-odds-worker never import the module, so `[calibration] ncaaf` matching
+nothing in their logs is NOT evidence about them — they have no emitter to be
+silent. (`learnings.md`: absent signal is a fact about the emitter.)
+
+### Three corrections to the headline this lane promoted on
+
+The `15.00% -> 7.24%, impossible drives 159 -> 0` framing is wrong in shape,
+though the decision it justified stands.
+
+- **`15.00% -> 7.24%` is the MEAN NORMALIZED ERROR over 7 scored metrics — NOT
+  an impossible-drive rate.** The two were conflated.
+- **`159 -> 0` is a COUNT at 120 games, and a count is not a rate.** State it as
+  **~6.5–7.3% of all drives -> 0.00%**; the engine docstring independently says
+  6.60%.
+- **`-7.76 pts` is the TOP of the range, not the centre.** Out-of-sample
+  replication over three seed blocks (200 games, neutral ratings): promoted
+  **7.24 / 7.33 / 7.00** — stable, so the fit is NOT in-sample-only — but the
+  DEFAULT arm ranges **15.00 / 13.94 / 12.72**, and the fit's own block is the
+  default's WORST. Block mean is **13.89 -> 7.19, −6.70 pts.**
+
+### On a REAL slate the composite gain mostly evaporates — the impossible-drive rate is the metric that survives
+
+30 games kicking off 2026-09-05, 300 seeds, real SP+ ratings. The local run
+reproduced production's served per-game score means **exactly (60/60 values,
+max |diff| 0.0000)**, so these are production's own drives, not an analogue.
+
+| | promoted (what ran) | shipped default (counterfactual) |
+|---|---|---|
+| impossible drives (>100 yd) | **1 / 221,557 = 0.0005%** | 18,647 / 190,850 = **9.77%** |
+| longest drive | 103 yd | **528 yd** |
+| scored mean abs err | 9.78% | 10.55% |
+
+The composite improves only **0.77 pts** here, not 7.76. The default's
+`yards_per_drive` (44.37 vs truth 42.49) even looks BETTER than the promoted
+profile's 32.50 — bought by 9.77% of drives being physically impossible. **The
+default's estimator is right for the wrong reason.** A single-slate composite is
+confounded by slate composition; the impossible-drive rate is the
+slate-independent, interpretable number. Judge future football re-fits on it.
+
+### Two traps left standing
+
+- **`smartsim2_projections_2026_wk2.csv` on production is a PRE-REFIT July
+  artifact** — 49 rows, `generated_at` 2026-07-21, PPA-rated, and **no
+  `profile_source`/`profile_version` columns at all**. Nothing serves it because
+  the resolver pins week 1. **If the week resolver is ever fixed without
+  regenerating wk2, the board silently moves onto a pre-refit artifact** — and
+  the absent stamp columns mean it would not announce itself.
+- **NFL's resolution is UNOBSERVABLE from production.** No `[calibration] nfl`
+  print, and `nfl/smartsim2_projection.py` carries `profile_name` but not
+  `profile_source`/`profile_version`. NFL running its in-source default (the
+  deliberate decision) rests on inference-from-absence: file absent at the
+  deployed SHA, no env override. NCAAF has an emitter AND an output stamp; NFL
+  has neither. One line + two columns closes it.
+- `calibration_profile_store.py`'s docstring — *"Nothing calls this yet from a
+  live sim path"* — **is FALSE** for NCAAF since `600a753a` (2026-08-27) and for
+  NFL since `#440` Phase 5. It is the first thing a future session reads here.
+
+**Method note that cost a wrong first read:** `render_logs.py` returns the
+NEWEST `limit` matches in a window, so a wide `--text calibration` window
+returns 40 lines of `INTEL_TRACE {"calibration_error": ...}` and **hides** the
+one line that matters. Narrow the window and quote the bracket: `--text
+"[calibration]"`.
 
 ## [nfl-archived] NFL — earlier closed work, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.**
 
@@ -1508,3 +1630,237 @@ with no local substitute" — the same argument applies to `/ppa/games`, which
 `load_ppa_ratings_asof` calls once per prior week (~15 per season). Caching it
 would make backtests repeatable and quota-independent after one fetch. It does
 not help before the roll: the cache is empty and cannot be filled.
+
+## [ncaaf-live-resim] SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim]`
+
+**THE DEFECT, measured on production mid-slate.** `/ncaaf/api/live-lens` served
+**51 games, 8 live, 26 final** while every live card's win probability, predicted
+final, spread and total was the PREGAME number. Boise State led Oregon **17-7 in
+Q2** beside a published **"Oregon 97.7%"**. The board suppressing an edge on
+those rows is CORRECT (`#340`); what was missing was a probability that knows
+the score.
+
+**THE ENGINE ALWAYS COULD.** `possession_state.build_initial_possession_state`
+has always taken `quarter`, `clock_remaining`, `score_home`, `score_away`, and
+`drive_simulator` already branches on `state.quarter` / `state.clock_remaining`
+for the two-minute drill and end-of-half. `game_simulator.simulate_game`
+hard-coded `quarter=1`, `clock_remaining=quarter_seconds`, no score, and looped
+`range(1, quarters + 1)`. Four defaulted fields and a loop bound — landed
+`ca5be54b`.
+
+**PREGAME OUTPUT IS BIT-IDENTICAL.** 40 shared seeds, the two edited files
+stashed and restored in ONE worktree: sha256 `3281e358...` both ways. A first
+attempt compared two working trees and reported a DIFFERENCE — it was wrong, and
+the reason is worth keeping: the trees loaded different NCAAF calibration
+profiles (`source=default` in a `--no-data` worktree vs the promoted
+`ncaaf-goal-line-refit-1` artifact in the primary tree). A cross-tree A/B of a
+sim engine measures the profile, not the diff.
+
+**WHAT THE RE-SIM SAYS ON REAL LIVE STATE**, ratings held NEUTRAL so the number
+is the state's contribution alone (n=120/game):
+
+| game | state | board pregame | live re-sim |
+|---|---|---|---|
+| Boise State @ Oregon | Q2 2:48, 17-7 away | **97.7%** | **0.2500** |
+| Oklahoma State @ Tulsa | Q2 2:43, 0-3 home | 18.3% | 0.6458 |
+| Texas State @ Texas | Q2 0:27, 7-28 home | 93.0% | 1.0000 |
+| Northern Illinois @ Iowa | Q1 2:35, 0-20 home | 100.0% | 0.9667 |
+
+**COVERAGE, with denominators `[2026-09-05, production cards + ESPN, same
+minute]`:** 51 board games; 30 matched to today's ESPN slate (the other 21 kick
+off on other dates — the ESPN-id key and an ESPN-`location`-name key matched the
+SAME 30, so the producer needs no id map); 8 live on both sides; **7 of 8
+(87.5%) carry a resumable state** and would publish a live-aware probability.
+The 8th refuses `no_period` (kickoff not taken). Over all 30 matched:
+`game_final 9, game_not_in_progress 13, no_period 1`.
+
+**COST FALLS AS THE GAME RUNS** — 154 ms/sim pregame, 85 ms at Q2, 7.9 ms at
+Q4 2:00, 0.7 ms at Q4 0:15. The 7 live games above took ~4-7 s each at 120 sims,
+~35 s for the slate, inside the 90 s tick budget. **A live re-sim is always
+cheaper than the pregame sim it updates.** The 2-sigma edge bar at n=120 came
+out 2.26 / 6.98 / 8.62 pp (min/median/max).
+
+**THE INTERLOCK.** Every unpriceable path returns a named `NcaafResimRefusal`
+and publishes a lane stamped `pregame` carrying **no `modelHomeWinProb` key at
+all** — not the pregame value, not zero, not a null an `or` could rescue.
+`LIVE_LENS_SOURCES_BY_SPORT["ncaaf"] = ("live_resim",)` accepts only the priced
+stamp, so the join withholds while `sources_seen` still shows the reason. That
+is `#414`'s rule enforced by the stamp instead of by convention.
+
+**ONE MARKET FAMILY, DELIBERATELY.** The lane carries `modelHomeWinProb` and
+`simsRun` and NO `marginDist` / `totalRunsDist`, because `live_gameline_join`
+would price totals and spreads off those the moment they appeared and no NCAAF
+live totals estimator has ever been graded (`#499` is the precedent in the other
+direction: WNBA totals only priced after a 249-game backtest gave a measured
+0.150 interval).
+
+**THE PRODUCER MUST RUN ON refresh-worker, NOT ON THE LIVE-LENS LOOP.** Read
+from `render.yaml`: `SYNDICATE_ENABLE_LIVE_LENS_LOOP=true` appears ONLY in the
+live-odds-worker block. The re-sim's two inputs are on refresh-worker's disk —
+`ncaaf_source/data/smartsim2_projections_*_wk*.csv` (allowlisted, but carrying
+`wk1` and no DATE token, so `pull_hot_artifacts`' `*<date>*` glob would never
+carry it) and `ncaaf_source/historical_truth/sp_ratings_<season>.json` (**not in
+`HOT_ARTIFACT_PATTERNS` at all**). Wiring this into `live_lens_loop` would put
+the compute on the one service that cannot read its inputs. The OUTPUT has no
+such problem: `data/live/ncaaf_live_lens.json` is keyvalue-backed by
+`refresh_state_store`, which is how `mlb_live_lens.json` already reaches web.
+
+**ALL THREE OWED ITEMS DISCHARGED, AND THE WIRING FOUND TWO THINGS THE ENGINE
+WORK COULD NOT** `[2026-09-05, lane ncaaf-live-resim-wire, commits 262fd2cf +
+933e9beb, refresh-worker ffe8714b]`. The OWED block below is answered rather than
+deleted, because what it predicted and what happened differ in a way worth
+keeping.
+
+**THE PRODUCER IS LIVE AND MEASURED, substrate `render`.**
+`/api/ops/live-lens/snapshot-index?sport=ncaaf` at 23:15:59Z:
+`sources_seen {live_resim: 8, pregame: 43}`, `index_size 8`,
+`skipped_no_team_names 0`, producer coverage `games 51, live_resimmed 8,
+refused 43` with `refusals_by_reason {game_final 14, game_not_in_progress 8,
+no_live_state 21}` — against **20 ESPN games in progress at the same instant**, 8
+of them FBS-vs-FBS and therefore in the week's artifact. Wyoming @ Colorado State
+**0.6875**, Tulane @ Duke 0.9667, Baylor @ Auburn 0.9917. The tick's own line:
+`elapsed_seconds 21.741` against a 90 s budget, `espn fetch_failures 0`,
+`ratings_teams 94`, `written true`.
+
+**(1) THE TICK RUNS ON refresh-worker, and the reason the OWED block gave was
+right for a reason it did not know.** It said `live_lens_loop` "cannot read
+`sp_ratings_<season>.json` off refresh-worker's disk". The sharper fact:
+**NOTHING can, after a deploy.** `sp_ratings_cache_path` and
+`ncaaf_historical_loader.DEFAULT_CACHE_DIR` both resolve off `__file__`, so on
+Render they write `/opt/render/project/`**`src`**`/...` — the EPHEMERAL CHECKOUT.
+Refresh-worker's own logs, 2026-09-04T01:03:29Z and 2026-09-05T01:15:49Z, BOTH
+`[sp_ratings] source=api ... cached=/opt/render/project/src/...`: `source=api`
+twice for a file the same process wrote the day before. A cache that never reads
+`source=cache` is not a cache. The tick mirrors to
+`$SYNDICATE_NCAAF_SOURCE_ROOT/historical_truth/` (the MOUNTED disk), trusts it
+24 h, and otherwise re-reads through the generator's own `load_sp_ratings` and
+rewrites it — so in-season SP+ keeps moving instead of freezing at week 1.
+Proven with **no `CFBD_API_KEY` in the environment at all**, which is the
+post-deploy state: `sp_ratings_source durable_mirror`, 138 teams, 7 live games
+still priced. **First production boot read `loader` as predicted (mirror absent,
+one CFBD call, mirror written). THE DISCRIMINATING FOLLOW-UP IS THE NEXT BOOT:
+it must read `durable_mirror`. `loader` again means the mirror is not surviving.**
+Full rule: `learnings.md` 2026-09-05.
+
+**(2) THE ALLOWLIST ENTRY IS IN, and the claim that blocked it was a parser
+artefact, not a dispute.** `ncaaf_source/historical_truth/sp_ratings_*.json` is in
+`HOT_ARTIFACT_PATTERNS`. It matches the MIRROR, which is the only copy under
+`data_root()` at all — an entry aimed at the checkout copy could never match, so
+it would have been the inert half of the same defect the
+`smartsim2_projections` entry records. `evaluation-ledger-projected-mirror` read
+as holding that file while its own prose said the opposite; `_claimable_prefix`
+cuts a Files line at its FIRST disclaimer marker, so a path written BEFORE its
+release note stays claimed. **Move the MARKER, not the PATH** — hoisting the path
+also moves the cut point and newly ENFORCES that lane's dormant claim on
+`run_refresh_worker.py`. Claim-set delta measured both ways.
+
+**(3) THE JOIN KEY WAS WRONG AND ONLY PRODUCTION COULD SAY SO.** The closing
+reading's second half failed at the first board rebuild past the snapshot
+(23:17:39Z): a PERFECT index — `index_size 8`, `sources_seen {live_resim: 8,
+pregame: 43}`, `skipped_no_team_names 0` — and `rows_live_gameline_considered
+257`, `rows_live_gameline_edged 0`, `withheld_by_reason
+{no_live_gameline_projection: 257}`. **The two key sets did not intersect at all,
+0 of 8.** The lens is keyed from the projections artifact (CFBD), the grid from
+the ODDS source:
+
+| lens key | grid key |
+|---|---|
+| `('baylor', 'auburn')` | `('baylor bears', 'auburn tigers')` |
+| `('tulane', 'duke')` | `('tulane green wave', 'duke blue devils')` |
+| `('wyoming', 'colorado state')` | `('wyoming cowboys', 'colorado state rams')` |
+
+`live_gameline_join._norm_team` has NO alias table on purpose — MLB's two sides
+match exactly because both come from one source. NCAAF's have two owners. Fixed
+by publishing ESPN's `displayName` as `matchup`, which
+`build_live_gameline_index` reads first: measured against the 61 live grid keys,
+`displayName` **7/8**, `location` **0/8**, `shortDisplayName` 0/8, `name` 0/8;
+re-run end to end against the live grid, **6 of 7 index keys hit**. The residual
+is NAMED, not aliased: ESPN `sam houston bearkats` vs the grid's `sam houston
+state bearkats`.
+
+**AND THE TEST THAT SHOULD HAVE CAUGHT IT ASSERTED THE BROKEN KEY AND PASSED.**
+The fixture built the grid row and the projection from the SAME names, so the two
+sides agreed by construction; a five-way mutation check did not help, because the
+mutation needed was to the FIXTURE. 18 green tests against 257 of 257 missing in
+production. That is `learnings.md` 2026-08-27 ("a fixture that cannot violate the
+property it asserts is zero coverage that reads as strong") met head-on with the
+rule already on file, and the join-specific form is: **a join test whose fixture
+builds BOTH SIDES from one set of names cannot test the join.**
+
+**THE BOARD HALF IS NOW READ AND MET `[2026-09-06 00:01-00:11Z]`.** 74-83 rows
+carry `projection.live_aware: true`, 7 of them h2h, **reproduced on two
+independent builds**; `no_live_gameline_projection` fell **420 -> 297** when
+`933e9beb` landed. Tulane @ Duke Q4 2:19 3-17 carried `live_gameline model_prob
+1.0, sims_run 120, as_of 00:00:33Z`, matching the snapshot to the second — which
+a stale artifact cannot contain. The durable mirror also discharged
+discriminatingly: first boot `sp_ratings_source: loader` (predicted), second boot
+**`durable_mirror`**.
+
+**WHAT IS STILL WITHHELD, AND IT IS NOT THIS LANE'S TO OPEN.**
+`rows_live_gameline_edged` is **0** on every build; all 7 live-aware h2h rows
+refuse `no_two_sided_market_price`. NOT because the market is degenerate —
+Arkansas State @ Memphis at **10-7 in Q2** carries `consensus {away 180, home
+-325}` with 27 books quoting and still refuses. `live_gameline_join:1109` prices
+against `projection.market_fair_prob_over`, and `ncaaf/game_projections.py`
+writes that key in its TOTALS branch (line 482) and **not in its h2h branch**.
+Served board: **soccer 52/52 h2h rows carry it, ncaaf 0 of 30, mlb 0 of 0** (mlb
+had no h2h projection dict at all tonight, so there was NO positive control for
+the pricing step on any sport). Invisible until now because no NCAAF row had ever
+been `live_aware`.
+
+**The fix is one line — the helper is already imported and used two branches down
+— and it is a MONEY decision, not a wiring one.** That branch withholds because
+its margin model *"loses to the closing line by 3.563 points of MAE over 2233
+games (t=17.2)"*. The live re-sim is NOT that pregame model, so the note does not
+automatically condemn it; but the LIVE model is ungraded too, and opening the
+market side would publish live NCAAF money edges on an ungraded estimator —
+`#499` in reverse. **A lane that can BACKTEST the live probability owns this.**
+`ncaaf/game_projections.py` is FREE.
+
+**OWED, none of it taken this session (no deploy, no env change, by
+instruction):** (1) call `build_live_lens_snapshot` from refresh-worker's tick
+and write it through `write_json_file`; (2) add `sp_ratings_*.json` to
+`HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py` is held by
+`evaluation-ledger-projected-mirror`); (3) a deploy of web + refresh-worker.
+The reading that closes it: `/api/ops/live-lens/snapshot-index?sport=ncaaf`
+showing `sources_seen {live_resim: N}` with N equal to the live-and-resumable
+count, and a live NCAAF row on the board carrying an edge whose
+`projection.live_aware` is true.
+
+**FOUND ON THE WAY, AND IT IS NOT NCAAF'S: A LIVE MONEYLINE EDGE IS LABELLED
+`edge_basis: "pregame"` `[measured 2026-09-05, affects mlb and wnba equally]`.**
+**SCOPE CORRECTION, 2026-09-05 ~23:5xZ, by lane `edge-basis-moneyline` after
+this lane repeated the line above to them unmeasured: "mlb and wnba" is ONE
+SPORT SHORT, and the missing one is the LARGEST.** Priceable live h2h ledger
+records with a final: **soccer 191** (substrate `render`,
+`/api/board/book-grid` `live_gameline_score`), mlb 110 (substrate `checkout`,
+36 captures 08-20..09-05), wnba 14. Soccer only surfaced because they
+MEASURED instead of taking this line's framing; I had quoted it forward as
+fact in a cross-session message, which is how an unmeasured scope
+propagates. Full three-sport version, and the label fix itself (landed
+`5ce75195`): `state_board.md [live-edge-basis-label]`. Kept rather than
+rewritten because the original sentence is what was believed and repeated.
+`live_gameline_join._apply_verdict` sets
+`edge_basis = "live" if live_projected is not None else "pregame"`; the
+DISTRIBUTION branch passes `live_projected`, the MONEYLINE branch does not — yet
+`price_moneyline` is called with `model_prob=hit["home_win_prob"]`, the live
+number. Measured with the real functions: a live probability of **1.0** against
+`market_fair_prob_over` **0.310** produced `edge_vs_market_pct` **69.0**, which
+is `(1.0 - 0.310) * 100`; the pregame pairing `(0.977 - 0.310)` gives 66.7 and is
+NOT what came out. The row was labelled `pregame`. That label exists precisely
+because "a reader cannot recover" the pairing (its own comment, measured 7/7 on
+the served shortlist 2026-08-16), so being wrong on the moneyline path defeats
+what it was added for. **PINNED, NOT FIXED** — `tests/test_ncaaf_live_gameline_
+registration.py` asserts the current value with the reason stated, because
+correcting it changes the label on every live moneyline row on three sports'
+boards and belongs to a change that can measure that.
+
+**THE JOIN HOP IS PROVEN END TO END** `[commit 7d9ec94e]`, not just the
+producer: `build_game_lens -> build_live_gameline_index -> attach_live_gamelines
+-> live_edge_policy`, with the OPPOSITE outcome asserted for a refused game (the
+index is empty, `live_aware` is never set, the pregame `model_prob_over` is
+untouched, the suppression reason stands). Two things the first draft of that
+test got wrong are kept as comments: the grid row had no `age_seconds`, so the
+staleness gate — which sits ABOVE the market branch, so a newly registered sport
+cannot route around it — refused every case before any model reached it, and the
+refusal tests "passed" for a reason unrelated to the re-sim.

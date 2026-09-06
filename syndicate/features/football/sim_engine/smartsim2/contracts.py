@@ -120,6 +120,24 @@ class SmartSim2SimulationInput:
     initial_down: int = 1
     initial_distance: int = 10
     initial_possession_owner: str = "home"
+    # RESUME FROM MID-GAME. `build_initial_possession_state` has always accepted
+    # `quarter`, `clock_remaining`, `score_home` and `score_away`; `simulate_game`
+    # simply never passed them, so the engine could only ever be started at
+    # kickoff with an empty scoreboard. That gap -- not the model -- is why NCAAF
+    # had no live re-sim.
+    #
+    # THE DEFAULTS ARE EXACTLY THE OLD HARD-CODED VALUES, so every existing
+    # caller (`generate_smartsim2_ncaaf_projections`, both NFL generators, the
+    # trial/validation scripts) produces a BIT-IDENTICAL result. That equality is
+    # pinned by `tests/test_smartsim2_resume_state.py`, both directions.
+    #
+    # `initial_clock_seconds` is None rather than 900 on purpose: `quarter_seconds`
+    # is itself a parameter, and a literal default here would silently desync from
+    # it the first time anyone simulates a non-15-minute quarter.
+    initial_quarter: int = 1
+    initial_clock_seconds: int | None = None
+    initial_score_home: int = 0
+    initial_score_away: int = 0
     feature_generation_payload: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

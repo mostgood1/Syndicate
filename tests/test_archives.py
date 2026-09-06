@@ -55,6 +55,7 @@ from syndicate.features.nba.live_game_accuracy import build_live_game_accuracy_p
 from syndicate.features.nba.live_prop_accuracy import build_live_prop_accuracy_payload
 from syndicate.features.nba.betting_card import source_betting_card_js
 from syndicate.features.nba.betting_card import source_web_text
+from syndicate.features.nba.betting_card import source_betting_card_asset_version
 from syndicate.features.nba.live_prop_audit import build_live_prop_audit_payload
 from syndicate.features.nba.sources import default_date_for_season as default_nba_date_for_season
 from syndicate.features.nba.sources import processed_path as nba_processed_path
@@ -1503,7 +1504,7 @@ class DateArchiveHelperTests(unittest.TestCase):
             local_file.parent.mkdir(parents=True, exist_ok=True)
             local_file.write_text("local-css", encoding="utf-8")
 
-            with patch("syndicate.features.nba.betting_card._artifact_root", return_value=local_root):
+            with patch("syndicate.features.nba.betting_card._artifact_roots", return_value=[local_root]):
                 self.assertEqual(source_web_text("betting-card-v2.css"), "local-css")
 
     def test_nba_source_web_text_returns_none_when_local_mirror_asset_is_missing(self) -> None:
@@ -1512,8 +1513,80 @@ class DateArchiveHelperTests(unittest.TestCase):
             local_root = root / "data" / "nba_source"
             local_root.mkdir(parents=True, exist_ok=True)
 
-            with patch("syndicate.features.nba.betting_card._artifact_root", return_value=local_root):
+            with patch("syndicate.features.nba.betting_card._artifact_roots", return_value=[local_root]):
                 self.assertIsNone(source_web_text("betting-card-v2.css"))
+
+    def test_nba_source_web_text_falls_through_an_artifact_root_that_lacks_the_asset(self) -> None:
+        # PRODUCTION SHAPE, measured 2026-09-05: SYNDICATE_NBA_ARTIFACT_ROOT
+        # names the Render DISK (.../nba_source/source_artifacts), which has no
+        # web/ tree because these two assets are git-tracked and sit in no
+        # publish allowlist -- nothing ever copies them there. The only copy on
+        # Render is in the checkout. A single-root lookup asked the disk and
+        # stopped, so /nba/assets/betting-card-v2.js served 404 / 0 bytes while
+        # the page that references it served 200.
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            disk_root = root / "nba_source" / "source_artifacts"
+            disk_root.mkdir(parents=True, exist_ok=True)
+            checkout_root = root / "data" / "nba_source"
+            asset = checkout_root / "web" / "betting-card-v2.js"
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.write_text("checkout-js", encoding="utf-8")
+
+            with patch.dict(os.environ, {"SYNDICATE_NBA_ARTIFACT_ROOT": str(disk_root)}), patch(
+                "syndicate.features.nba.betting_card.preferred_source_roots",
+                return_value=[checkout_root],
+            ):
+                self.assertEqual(source_web_text("betting-card-v2.js"), "checkout-js")
+
+    def test_nba_source_web_text_still_prefers_the_artifact_root_that_has_the_asset(self) -> None:
+        # The other half of the same change, and the half that makes it safe to
+        # deploy: falling THROUGH an artifact root must not mean falling PAST
+        # one. Whatever production resolves today it must still resolve.
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            disk_root = root / "nba_source" / "source_artifacts"
+            disk_asset = disk_root / "web" / "betting-card-v2.js"
+            disk_asset.parent.mkdir(parents=True, exist_ok=True)
+            disk_asset.write_text("disk-js", encoding="utf-8")
+            checkout_root = root / "data" / "nba_source"
+            checkout_asset = checkout_root / "web" / "betting-card-v2.js"
+            checkout_asset.parent.mkdir(parents=True, exist_ok=True)
+            checkout_asset.write_text("checkout-js", encoding="utf-8")
+
+            with patch.dict(os.environ, {"SYNDICATE_NBA_ARTIFACT_ROOT": str(disk_root)}), patch(
+                "syndicate.features.nba.betting_card.preferred_source_roots",
+                return_value=[checkout_root],
+            ):
+                self.assertEqual(source_web_text("betting-card-v2.js"), "disk-js")
+
+    def test_nba_betting_card_asset_version_is_not_the_missing_file_fallback(self) -> None:
+        # ?v=1 on the live page was this same defect showing through the version
+        # stamp: "1" is what source_betting_card_asset_version returns when it
+        # can stat NEITHER file. != "1" is the discriminating check -- a real
+        # mtime is a 19-digit nanosecond integer.
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            disk_root = root / "nba_source" / "source_artifacts"
+            disk_root.mkdir(parents=True, exist_ok=True)
+            checkout_root = root / "data" / "nba_source"
+            for name in ("betting-card-v2.css", "betting-card-v2.js"):
+                asset = checkout_root / "web" / name
+                asset.parent.mkdir(parents=True, exist_ok=True)
+                asset.write_text("x", encoding="utf-8")
+
+            source_betting_card_asset_version.cache_clear()
+            try:
+                with patch.dict(os.environ, {"SYNDICATE_NBA_ARTIFACT_ROOT": str(disk_root)}), patch(
+                    "syndicate.features.nba.betting_card.preferred_source_roots",
+                    return_value=[checkout_root],
+                ):
+                    version = source_betting_card_asset_version()
+            finally:
+                source_betting_card_asset_version.cache_clear()
+
+            self.assertNotEqual(version, "1")
+            self.assertTrue(version.isdigit())
 
     def test_nhl_processed_path_prefers_local_artifact_mirror(self) -> None:
         with TemporaryDirectory() as temp_dir:

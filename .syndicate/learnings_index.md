@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 819 rules `[generated]`
+## Index — 835 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,8 +8,9 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 295**
+**FORBIDDEN — 306**
 
+- [2026-09-05 — FORBIDDEN: a per-item guard implemented as an `A or B` search over a CONCA…](#2026-09-05-forbidden-a-per-item-guard-implemented-as-an-a-or-b-search-over-a-concatenation-of-every-items-source-whichever-item-supplies-b-satisfies-it-for-every-value-of-a-so-the-check-has-no-failing-input-at-all-lane-ncaaf-segment-capture-commits-7f197639-7dfabcf4-no-deploy)
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
 - [2026-09-01 — FORBIDDEN: reading a null or a clean result before establishing that it is…](#2026-09-01-forbidden-reading-a-null-or-a-clean-result-before-establishing-that-it-is-readable-yet-find-the-thing-that-says-the-signal-could-have-arrived-then-read-it-four-instances-in-one-evening-two-false-positives-and-two-false-negatives-lanes-mlb-accuracy-assessment-wnba-accuracy-assessment)
 - [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
@@ -231,6 +232,16 @@
 - [2026-09-04 — FORBIDDEN: reporting a key as ABSENT from a paginated API without paginati…](#2026-09-04-forbidden-reporting-a-key-as-absent-from-a-paginated-api-without-paginating-an-unpaginated-list-read-manufactures-false-absence-and-absence-is-the-finding-people-act-on-lane-mlb-feed-live-terminal-refresh)
 - [2026-09-04 FORBIDDEN: editing a scheduled task's prompt while a session of that task is…](#2026-09-04-forbidden-editing-a-scheduled-tasks-prompt-while-a-session-of-that-task-is-still-alive-it-can-fire-the-new-prompt-immediately-lane-feed-live-warn-rate-session-c4287631)
 - [2026-09-04 FORBIDDEN: pinning a copied definition against ANOTHER FILE'S SOURCE TEXT. W…](#2026-09-04-forbidden-pinning-a-copied-definition-against-another-files-source-text-when-the-definition-moves-the-test-stops-existing-instead-of-failing-lane-lane-invariant-single-source)
+- [2026-09-04 — FORBIDDEN: choosing a DEPLOY TARGET by which service CONTAINS the code. Ch…](#2026-09-04-forbidden-choosing-a-deploy-target-by-which-service-contains-the-code-choose-it-by-which-service-serves-the-reading-you-predicted-lane-nfl-projection-deploy)
+- [2026-09-05 FORBIDDEN: shipping a fix whose motivating measurement YOU labelled inconclu…](#2026-09-05-forbidden-shipping-a-fix-whose-motivating-measurement-you-labelled-inconclusive-a-caveat-you-wrote-is-an-instruction-to-yourself-not-a-disclaimer-to-the-reader)
+- [2026-09-05 — FORBIDDEN: running the ledger guard's own remedy, `git checkout origin/mai…](#2026-09-05-forbidden-running-the-ledger-guards-own-remedy-git-checkout-originmain----ledger-file-without-first-reading-git-diff-on-that-file-it-destroys-uncommitted-work-and-a-deletions-count-cannot-see-what-it-destroyed-lane-render-egress-transport)
+- [2026-09-05 — FORBIDDEN: treating a cache path resolved off `__file__` as durable on Ren…](#2026-09-05-forbidden-treating-a-cache-path-resolved-off-__file__-as-durable-on-render-it-is-in-the-ephemeral-checkout-so-every-deploy-erases-it-and-the-erasure-is-invisible-because-the-code-refetches-lane-ncaaf-live-resim-wire)
+- [2026-09-04 FORBIDDEN: a tool that updates a REGION of a shared file rebuilding that fil…](#2026-09-04-forbidden-a-tool-that-updates-a-region-of-a-shared-file-rebuilding-that-file-from-the-regions-start-splice-the-region-carry-the-remainder-through-untouched-and-refuse-if-you-cannot-classify-it)
+- [2026-09-04 FORBIDDEN: calling a merge lossy from a SAME-FILE line comparison. Content t…](#2026-09-04-forbidden-calling-a-merge-lossy-from-a-same-file-line-comparison-content-that-vanished-may-have-moved-to-a-sibling-file-and-the-panic-fix-is-to-restore-stale-content-over-good)
+- [2026-09-05 FORBIDDEN: overriding the pre-commit ledger guard when it names a file you d…](#2026-09-05-forbidden-overriding-the-pre-commit-ledger-guard-when-it-names-a-file-you-did-not-stage---it-is-reporting-a-stale-base-and-the-fix-is-to-change-the-base-scheduled-task-live-gameline-accuracy-snapshot)
+- [2026-09-05 FORBIDDEN: attributing a hazard to the change you just made without measurin…](#2026-09-05-forbidden-attributing-a-hazard-to-the-change-you-just-made-without-measuring-the-tree-without-it-and-ledger_invariants-does-not-catch-a-stale-tree-that-is-merely-missing-newer-blocks)
+- [2026-09-05 — FORBIDDEN: a JOIN test whose fixture builds BOTH SIDES from one set of nam…](#2026-09-05-forbidden-a-join-test-whose-fixture-builds-both-sides-from-one-set-of-names-the-key-match-is-then-a-tautology-and-it-reads-as-end-to-end-coverage-lane-ncaaf-live-resim-wire)
+- [2026-09-05 — FORBIDDEN: reading the RESIDUAL of a partial control as "the one that surv…](#2026-09-05-forbidden-reading-the-residual-of-a-partial-control-as-the-one-that-survived-a-control-is-only-a-control-over-the-population-it-actually-reaches-lane-nfl-la-rams-alias-corrected-by-ci-archives-nba-card-js)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -315,8 +326,10 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 518**
+**Rules and corrections — 523**
 
+- [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
+- [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
 - [2026-09-04 — A SPEC THAT NAMES A KEY IS NOT A GUARANTEE THE KEY IS FED — check the JOIN…](#2026-09-04-a-spec-that-names-a-key-is-not-a-guarantee-the-key-is-fed-check-the-join-not-the-two-sides-lane-mlb-hitter-so-dead-field-commit-0b9a03e7-no-deploy)
 - [2026-08-20 — An artifact can OUTGROW the publish ceiling, and the failure is silent](#2026-08-20-an-artifact-can-outgrow-the-publish-ceiling-and-the-failure-is-silent)
 - [2026-08-20 — OVERTURNED: "the slate date rolled, the gate expired". It had not.](#2026-08-20-overturned-the-slate-date-rolled-the-gate-expired-it-had-not)
@@ -521,6 +534,9 @@
 - [2026-09-04 — A COEFFICIENT IS NOT A FINDING UNTIL IT SURVIVES LEAVE-ONE-OUT AND A RANK…](#2026-09-04-a-coefficient-is-not-a-finding-until-it-survives-leave-one-out-and-a-rank-test)
 - [2026-09-04 — "THE CLAIM HOLDER IS NOT IN THE SESSION ROSTER" IS TRUE OF EVERY CLAIM. IT…](#2026-09-04-the-claim-holder-is-not-in-the-session-roster-is-true-of-every-claim-it-is-a-category-error-not-a-liveness-check)
 - [2026-09-04 — A RUNNING MINIMUM CANNOT DETECT A RISING FLOOR. CHECK THAT THE STATISTIC C…](#2026-09-04-a-running-minimum-cannot-detect-a-rising-floor-check-that-the-statistic-can-express-the-answer)
+- [2026-09-05 — A CENSUS IS BOUNDED BY ITS ROOTS, AND THE ROOT SET IS THE FIRST THING TO S…](#2026-09-05-a-census-is-bounded-by-its-roots-and-the-root-set-is-the-first-thing-to-state)
+- [2026-09-05 — A TRUNCATED MEASUREMENT CAN GIVE THE RIGHT ANSWER FOR THE WRONG REASON. CO…](#2026-09-05-a-truncated-measurement-can-give-the-right-answer-for-the-wrong-reason-converge-then-read)
+- [2026-09-05 — SAMPLE FASTER THAN THE THING YOU ARE DESCRIBING, OR THE SHAPE IS YOUR SAMP…](#2026-09-05-sample-faster-than-the-thing-you-are-describing-or-the-shape-is-your-sampling-grid)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

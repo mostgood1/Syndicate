@@ -2179,8 +2179,8 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     # being published as both `live_projection` and `live_total`.
     #
     # `live_gameline_join._apply_verdict` is called with
-    # `live_projected=verdict["model_prob"]` for EVERY game market (h2h, totals
-    # AND spreads, `live_gameline_join.py:876`), so the value is 0..1. The board
+    # `live_projected=verdict["model_prob"]` on the DISTRIBUTION branch (totals
+    # and spreads), so where the value arrives at all it is 0..1. The board
     # then rendered it through `displayLiveProjection`'s `toFixed(1)`: a live
     # moneyline at 19% read **"0.2"** in the Live column, and a totals row
     # claimed a live projected total of 0.2 goals. That is worse than the blank
@@ -2210,6 +2210,26 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
         if total_mean is not None:
             out["live_total"] = total_mean
 
+    # **h2h GAME ROWS DELIBERATELY DO NOT REACH THIS, AND MUST NOT** `[2026-09-05,
+    # lane edge-basis-moneyline]`. The comment above used to say `_apply_verdict`
+    # is called with `live_projected=verdict["model_prob"]` for "EVERY game market
+    # (h2h, totals AND spreads)". That was never true: the MONEYLINE branch of
+    # `attach_live_gamelines` passes no `live_projected` at all, so an h2h row
+    # carries no `live_model_prob_over` and this cell stays blank for it. The
+    # wording is corrected above -- and the belief it encoded is what hid a real
+    # defect for three weeks, because `live_gameline_join` was reading that same
+    # parameter to decide `edge_basis` and therefore labelled every live h2h edge
+    # `pregame` while pricing it off the LIVE probability.
+    #
+    # Making h2h feed this was the obvious fix there and was REJECTED for what it
+    # would do HERE. `live_model_prob_over` on an h2h row is the HOME win
+    # probability, and this maps it onto `live_model_probability` with no side
+    # awareness -- so an AWAY moneyline row would render the home team's number
+    # in the Live column. That is exactly the defect `_model_prob_for_side` below
+    # was written to fix ("109 of 114 h2h rows", the pregame column, 2026-08-20),
+    # on the same field, one column over. A blank is honest; the home number on an
+    # away row is not. If this ever needs to serve h2h, it needs a side-aware
+    # source, not the raw key.
     live_prob = _as_float(
         projection.get("live_model_prob_over")
         if projection.get("live_model_prob_over") is not None

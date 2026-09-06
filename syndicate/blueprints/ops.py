@@ -354,6 +354,13 @@ def api_ops_execution_ledger_summary() -> Any:
     property of the construction rather than of remembering to strip fields:
     there is nothing to strip.
 
+    `by_segment` answers "how many segment bets exist, and how many were
+    GRADED" -- the question `bet_status.segment_refusal` made urgent and that
+    this endpoint could not previously answer, because it grouped by
+    `mode:venue` and dropped `segment`. A non-`full` entry with `settled > 0` is
+    an order that was graded while the resolvers still ignored its segment, i.e.
+    scored against the whole-game actual.
+
     `?days=` bounds the window (default 7, max 60). `?mode=` filters
     live/paper; absent means both, split out rather than summed, since a paper
     order and a live order are not the same event and adding them is how a
@@ -409,9 +416,31 @@ def api_ops_execution_ledger_summary() -> Any:
 
         bucket = summary.setdefault(date, {}).setdefault(f"{mode}:{venue}", {
             "orders": 0, "filled": 0, "staked_dollars": 0.0, "by_status": {},
+            "by_segment": {},
         })
         bucket["orders"] += 1
         bucket["by_status"][status] = bucket["by_status"].get(status, 0) + 1
+
+        # SEGMENT, counted because nothing else counts it. `bet_status
+        # .segment_refusal` now stops a segment order being graded against the
+        # whole-game actual, and the immediate follow-up -- how many were
+        # mis-settled before that landed -- was unanswerable from this endpoint:
+        # `segment` is on every order and was dropped here.
+        #
+        # `settled` is the number that answers it. An order carrying an
+        # `outcome` has been GRADED, so a non-`full` segment with an outcome is
+        # exactly the exposed population.
+        #
+        # ABSENT IS `(unset)`, NOT `full`. The grader maps absent onto full on
+        # purpose; a counter that did the same would make "no segment was ever
+        # recorded" and "this is a whole-game bet" indistinguishable, which is
+        # the distinction being asked for.
+        raw_segment = order.get("segment")
+        segment = str(raw_segment or "").strip().lower() or "(unset)"
+        seg_bucket = bucket["by_segment"].setdefault(segment, {"orders": 0, "settled": 0})
+        seg_bucket["orders"] += 1
+        if str(order.get("outcome") or "").strip():
+            seg_bucket["settled"] += 1
         if status == "filled":
             bucket["filled"] += 1
             try:
@@ -426,6 +455,7 @@ def api_ops_execution_ledger_summary() -> Any:
         for bucket in day.values():
             bucket["staked_dollars"] = round(bucket["staked_dollars"], 2)
             bucket["by_status"] = dict(sorted(bucket["by_status"].items()))
+            bucket["by_segment"] = dict(sorted(bucket["by_segment"].items()))
 
     # SETTLED ROI SPLIT BY THE SIM'S OWN VERDICT, within sport x market family.
     #
@@ -809,6 +839,48 @@ def api_ops_memory() -> Any:
     return jsonify({"ok": True, "memory": get_all_process_memory_snapshot()})
 
 
+@ops_bp.get("/api/ops/retainer-census")
+def api_ops_retainer_census() -> Any:
+    # `#632`: which module-level container holds the bytes the workers keep
+    # between requests. Read-only, ON DEMAND ONLY, and never on a timer -- the
+    # walk is a deep object traversal and `#241` is the precedent for periodic
+    # work assumed cheap taking a service down.
+    #
+    # It reports its own coverage against process anon, because the informative
+    # outcome may be that module globals account for very little: that would say
+    # the retained bytes are in C-extension or per-thread state a Python walk
+    # cannot see, which is a RESULT and not a failed measurement.
+    from syndicate.features.shared.memory_observability import module_retainer_census
+
+    try:
+        top = max(1, min(100, int(request.args.get("top", 25))))
+    except (TypeError, ValueError):
+        top = 25
+    try:
+        node_cap = max(1000, min(2_000_000, int(request.args.get("node_cap", 400000))))
+    except (TypeError, ValueError):
+        node_cap = 400000
+    return jsonify({"ok": True, "census": module_retainer_census(top=top, node_cap=node_cap)})
+
+
+@ops_bp.get("/api/ops/python-heap")
+def api_ops_python_heap() -> Any:
+    # `#632`, and this is the deciding measurement rather than another probe.
+    # The retainer census explains 6.1% of a worker's anon growth, but its roots
+    # are container-typed module globals only -- so "elsewhere in Python" and
+    # "not in Python at all" read identically from it, and they lead to opposite
+    # next steps. This walks from `gc.get_objects()` and reports the ratio.
+    #
+    # Heavier than the census. On demand only, node-capped, truncation reported.
+    from syndicate.features.shared.memory_observability import python_heap_total
+
+    try:
+        node_cap = max(10000, min(8_000_000, int(request.args.get("node_cap", 4000000))))
+    except (TypeError, ValueError):
+        node_cap = 4000000
+    return jsonify({"ok": True, "heap": python_heap_total(node_cap=node_cap)})
+
+
 @ops_bp.get("/api/ops/keyvalue/diagnostics")
 def api_ops_keyvalue_diagnostics() -> Any:
     # Board audit follow-up, 2026-07-31: read-only Redis INFO stats for the
@@ -1010,7 +1082,17 @@ def api_ops_live_lens_snapshot_index() -> Any:
             ],
         })
 
-    index = build_live_gameline_index(snapshot, sources=sources)
+    # `diagnostics` PASSED, and it was not before. `build_live_gameline_index`
+    # fills it with `sources_seen` -- EVERY lens stamp in the snapshot, accepted
+    # or refused -- and this endpoint was building the index and throwing that
+    # away, so the one field that separates "no producer" from "a producer that
+    # declines to call this state live" was unreadable from outside the worker.
+    # That distinction is the whole reason `sources_seen` exists (its own
+    # docstring records WNBA's `index=0 considered=184` being read as "no live
+    # model wired", which was false), and it is the closing reading for the
+    # NCAAF live re-sim: `{live_resim: N}` against `{pregame: M}`.
+    index_diag: dict[str, Any] = {}
+    index = build_live_gameline_index(snapshot, sources=sources, diagnostics=index_diag)
     # THE PROP INDEX, through the SAME function the board's join calls. The
     # gameline index above cannot stand in for it: they read different keys and,
     # on 2026-08-21, disagreed.
@@ -1044,6 +1126,15 @@ def api_ops_live_lens_snapshot_index() -> Any:
         "snapshot_game_count": len(snapshot.get("games") or []),
         "index_size": len(index),
         "indexed_keys": [list(k) for k in index],
+        # WHY THE INDEX IS THE SIZE IT IS, not just what size it is.
+        "index_diagnostics": index_diag,
+        # THE PRODUCER'S OWN COVERAGE BLOCK, verbatim. `sources_seen` above is
+        # the JOIN's view (what reached it, by stamp); this is the PRODUCER's
+        # (what it refused, by reason). A reading that has one and not the other
+        # cannot tell a quiet slate from a broken input -- `refusals_by_reason`
+        # naming `no_pregame_ratings` and naming `game_not_in_progress` are
+        # opposite conclusions from the same `live_resim: 0`.
+        "producer_coverage": snapshot.get("coverage"),
         "prop_index": prop_summary,
         "games": games_out,
     })

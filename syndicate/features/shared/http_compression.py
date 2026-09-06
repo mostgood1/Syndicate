@@ -88,6 +88,18 @@ _STATS: dict[str, int] = {
     "decoded_bytes": 0,
     "hosts_refused": 0,
     "retries_without_header": 0,
+    # SPLIT BY WHETHER THE BYTES ARE BILLED, because the unsplit total is not
+    # an answer to the question this module exists for. Measured 2026-09-05:
+    # 5,243 MB of internal worker->web transport metered 33.9 MB, i.e. private
+    # traffic is not billed -- so a combined "saved 687 MB" mixes a real
+    # bandwidth saving with a memory-and-time saving and overstates the bill.
+    # `external` is the half that shows up on the invoice.
+    "wire_bytes_external": 0,
+    "decoded_bytes_external": 0,
+    "responses_gzip_external": 0,
+    "wire_bytes_internal": 0,
+    "decoded_bytes_internal": 0,
+    "responses_gzip_internal": 0,
 }
 
 # Hosts that answered 4xx to a request carrying our header and succeeded
@@ -98,6 +110,9 @@ _REFUSING_HOSTS: set[str] = set()
 
 _LOG_EVERY = 200
 
+# Set once the first real reading has been printed. See `_bump`.
+_FIRST_LOGGED = False
+
 # Retried without the header, then remembered. 406 and 415 are the honest
 # "cannot produce that representation" answers; 403 is in the list because it
 # is what ESPN actually returned to Render for an unwelcome header, and the
@@ -105,6 +120,31 @@ _LOG_EVERY = 200
 _ENCODING_REFUSAL_STATUSES = (403, 406, 415)
 
 _MARKER = "X-Syndicate-Added-Accept-Encoding"
+
+
+_PRIVATE_PREFIXES = ("10.", "127.", "192.168.", "172.16.", "172.17.", "172.18.",
+                     "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.",
+                     "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.",
+                     "172.31.")
+
+
+def _traffic_class(host: str) -> str:
+    """`external` (BILLED) or `internal` (not billed). A HEURISTIC, stated as one.
+
+    Render's own service hostnames carry no dot (`syndicate-an21`), and the
+    private ranges are private by definition; everything else is assumed to
+    leave the network and therefore to cost money. The failure direction is
+    deliberate: an unknown host counts as EXTERNAL, so the billed figure this
+    produces is an over-estimate rather than a flattering one.
+    """
+    host = (host or "").strip().lower()
+    if not host:
+        return "external"
+    if "." not in host:
+        return "internal"
+    if host.startswith(_PRIVATE_PREFIXES) or host == "localhost":
+        return "internal"
+    return "external"
 
 
 def _enabled() -> bool:
@@ -124,23 +164,61 @@ def stats() -> dict[str, int]:
     with _STATS_LOCK:
         snapshot = dict(_STATS)
     snapshot["saved_bytes"] = max(snapshot["decoded_bytes"] - snapshot["wire_bytes"], 0)
+    # The number to quote at anyone asking about the bill.
+    snapshot["saved_bytes_external"] = max(
+        snapshot["decoded_bytes_external"] - snapshot["wire_bytes_external"], 0
+    )
+    snapshot["saved_bytes_internal"] = max(
+        snapshot["decoded_bytes_internal"] - snapshot["wire_bytes_internal"], 0
+    )
     return snapshot
 
 
 def _bump(field: str, amount: int = 1) -> None:
     with _STATS_LOCK:
         _STATS[field] += amount
-        should_log = field == "responses_gzip" and _STATS["responses_gzip"] % _LOG_EVERY == 0
+        # FIRST READ LOGS IMMEDIATELY, then every `_LOG_EVERY` responses. The
+        # original gate was `% _LOG_EVERY == 0` alone, which meant the first
+        # reading needed 200 events -- so at deploy time, the one moment the
+        # instrument is actually needed, its silence was indistinguishable
+        # from an unreachable emitter. An instrument that cannot verify its
+        # own deploy is not an instrument. Found by trying to use it.
+        #
+        # The trigger is the first DECODED BYTES, not the first response.
+        # `responses_gzip` increments when the wrapper is built, which is
+        # before anything has been read -- firing there printed a line of
+        # zeros that read as "compression saved nothing", which is a worse
+        # failure than silence because it looks like an answer.
+        global _FIRST_LOGGED
+        count = _STATS["responses_gzip"]
+        should_log = (field == "responses_gzip" and count % _LOG_EVERY == 0) or (
+            field == "decoded_bytes" and not _FIRST_LOGGED and _STATS["decoded_bytes"] > 0
+        )
+        if should_log:
+            _FIRST_LOGGED = True
         wire = _STATS["wire_bytes"]
         decoded = _STATS["decoded_bytes"]
-        gzipped = _STATS["responses_gzip"]
+        gzipped = count
         plain = _STATS["responses_plain"]
+        ext_wire = _STATS["wire_bytes_external"]
+        ext_decoded = _STATS["decoded_bytes_external"]
+        ext_n = _STATS["responses_gzip_external"]
     if should_log:
         ratio = (decoded / wire) if wire else 0.0
+        ext_ratio = (ext_decoded / ext_wire) if ext_wire else 0.0
         print(
-            f"[http_compression] HTTP_COMPRESSION gzip_responses={gzipped} plain_responses={plain} "
+            # PID, because these counters are PER PROCESS and the log line is
+            # the only place a reader meets them. web runs WEB_CONCURRENCY=2
+            # gunicorn workers and live-odds-worker forks job children, so two
+            # samples can come from two independent counters -- and a DELTA
+            # taken across them is not a rate, it is noise that looks like one.
+            # Without this field that is undetectable after the fact.
+            f"[http_compression] HTTP_COMPRESSION pid={os.getpid()} "
+            f"gzip_responses={gzipped} plain_responses={plain} "
             f"wire_bytes={wire} decoded_bytes={decoded} saved_bytes={max(decoded - wire, 0)} "
-            f"ratio={ratio:.2f}x refused_hosts={len(_REFUSING_HOSTS)}",
+            f"ratio={ratio:.2f}x refused_hosts={len(_REFUSING_HOSTS)} "
+            f"BILLED_saved_bytes={max(ext_decoded - ext_wire, 0)} BILLED_wire={ext_wire} "
+            f"BILLED_responses={ext_n} BILLED_ratio={ext_ratio:.2f}x",
             flush=True,
         )
 
@@ -148,8 +226,9 @@ def _bump(field: str, amount: int = 1) -> None:
 class _CountingReader(io.RawIOBase):
     """Counts the bytes that actually crossed the wire, under the decoder."""
 
-    def __init__(self, raw: Any) -> None:
+    def __init__(self, raw: Any, traffic_class: str = "external") -> None:
         self._raw = raw
+        self._class = traffic_class
 
     def readable(self) -> bool:
         return True
@@ -157,6 +236,7 @@ class _CountingReader(io.RawIOBase):
     def read(self, size: int = -1) -> bytes:
         chunk = self._raw.read(size)
         if chunk:
+            _bump(f"wire_bytes_{self._class}", len(chunk))
             _bump("wire_bytes", len(chunk))
         return chunk
 
@@ -182,13 +262,16 @@ class _GzipResponse(io.BufferedIOBase):
     resident bytes on a worker that has neither to spare.
     """
 
-    def __init__(self, response: Any) -> None:
+    def __init__(self, response: Any, traffic_class: str = "external") -> None:
         self._response = response
+        self._class = traffic_class
         # Built BEFORE the headers are edited. If this raises, `http_response`
         # hands the caller the untouched original -- a response whose headers
         # had already been stripped would claim to be plain while carrying a
         # gzip body, which is worse than either outcome on its own.
-        self._stream = gzip.GzipFile(fileobj=_CountingReader(response), mode="rb")
+        self._stream = gzip.GzipFile(
+            fileobj=_CountingReader(response, traffic_class), mode="rb"
+        )
         headers = response.headers
         # Both of these describe the ENCODED body and stop being true here.
         # Leaving `Content-Length` in place would be a lie a caller could act
@@ -208,6 +291,7 @@ class _GzipResponse(io.BufferedIOBase):
         # "everything"; GzipFile spells that -1.
         chunk = self._stream.read(-1 if size is None else size)
         if chunk:
+            _bump(f"decoded_bytes_{self._class}", len(chunk))
             _bump("decoded_bytes", len(chunk))
         return chunk
 
@@ -217,6 +301,7 @@ class _GzipResponse(io.BufferedIOBase):
     def readline(self, size: int = -1) -> bytes:  # type: ignore[override]
         line = self._stream.readline(size)
         if line:
+            _bump(f"decoded_bytes_{self._class}", len(line))
             _bump("decoded_bytes", len(line))
         return line
 
@@ -282,9 +367,14 @@ class _AcceptEncodingHandler(urllib.request.BaseHandler):
             if request.has_header(_MARKER.capitalize()):
                 _bump("responses_plain")
             return response
+        try:
+            klass = _traffic_class(urlparse(request.full_url).hostname or "")
+        except Exception:
+            klass = "external"
+        _bump(f"responses_gzip_{klass}")
         _bump("responses_gzip")
         try:
-            return _GzipResponse(response)
+            return _GzipResponse(response, klass)
         except Exception:
             # A malformed gzip header must degrade to the caller's own error
             # handling on the raw body, never to an exception raised out of a
@@ -396,6 +486,8 @@ def _reset_for_tests() -> None:
         _INSTALLED = False
     urllib.request.install_opener(urllib.request.build_opener())
     _REFUSING_HOSTS.clear()
+    global _FIRST_LOGGED
     with _STATS_LOCK:
         for key in _STATS:
             _STATS[key] = 0
+    _FIRST_LOGGED = False

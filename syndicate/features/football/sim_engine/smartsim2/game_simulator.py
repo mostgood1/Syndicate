@@ -71,6 +71,15 @@ def simulate_game(
     profile: CalibrationProfile = NFL_CALIBRATION_PROFILE,
 ) -> SmartSim2SimulationOutput:
     rng = rng or Random(simulation_input.seed)
+    # RESUME-CAPABLE START. These four were hard-coded (`quarter=1`,
+    # `clock_remaining=quarter_seconds`, and no score at all, so 0-0), which made
+    # the engine start-of-game only. Their defaults on
+    # `SmartSim2SimulationInput` are those same values, so a caller that does not
+    # ask to resume gets the identical simulation it always did.
+    start_quarter = max(1, int(simulation_input.initial_quarter or 1))
+    start_clock = simulation_input.initial_clock_seconds
+    if start_clock is None:
+        start_clock = simulation_input.quarter_seconds
     state = build_initial_possession_state(
         home_team=simulation_input.home_team,
         away_team=simulation_input.away_team,
@@ -78,16 +87,18 @@ def simulate_game(
         field_position=simulation_input.initial_field_position,
         down=simulation_input.initial_down,
         distance=simulation_input.initial_distance,
-        quarter=1,
-        clock_remaining=simulation_input.quarter_seconds,
+        quarter=start_quarter,
+        clock_remaining=start_clock,
+        score_home=simulation_input.initial_score_home,
+        score_away=simulation_input.initial_score_away,
     )
 
     possession_log: list[dict[str, Any]] = []
     drive_log: list[dict[str, Any]] = []
     quarter_log: list[dict[str, Any]] = []
-    quarter_start_clock = simulation_input.quarter_seconds
+    quarter_start_clock = int(start_clock)
 
-    for quarter in range(1, simulation_input.quarters + 1):
+    for quarter in range(start_quarter, simulation_input.quarters + 1):
         quarter_drive_count = 0
         quarter_possession_count = 0
         quarter_home_points_start = state.score_home
@@ -122,20 +133,33 @@ def simulate_game(
             quarter_start_clock = simulation_input.quarter_seconds
             continue
 
-        if state.score_home == state.score_away:
-            ot_owner = "away" if state.possession_owner == "home" else "home"
-            state = replace(state, possession_owner=ot_owner, field_position=25, down=1, distance=10)
-            overtime_cap = 2
-            overtime_rounds = 0
-            while state.score_home == state.score_away and overtime_rounds < overtime_cap:
-                overtime_rounds += 1
-                state = replace(state, quarter=state.quarter + 1, clock_remaining=simulation_input.quarter_seconds)
-                drive_result = simulate_drive(state, simulation_input, rng=rng, profile=profile)
-                drive_log.append(drive_result.to_dict())
-                possession_log.extend(step.to_dict() for step in drive_result.steps)
-                state = drive_result.end_state
-                if state.score_home != state.score_away:
-                    break
+    # OVERTIME, MOVED OUT OF THE LOOP AND OTHERWISE UNCHANGED.
+    #
+    # It used to sit inside the final iteration, after `quarter <
+    # quarters` had `continue`d away every earlier one -- so it ran exactly
+    # once, as the last thing before the loop exited. Running it here is the
+    # same sequence for every pregame caller, and the equality test pins that.
+    #
+    # What moving it BUYS is the resume case the loop cannot reach: a game
+    # already IN overtime has `initial_quarter = 5`, `range(5, 5)` is empty, and
+    # the old shape would have returned the carried-in score as if it were final
+    # -- a silent 1.0/0.0/0.5 on a game that is still being played. The producer
+    # refuses overtime for its own reasons (`ncaaf/live_resim.py`), but the
+    # engine must not answer confidently when it has simulated nothing.
+    if state.score_home == state.score_away:
+        ot_owner = "away" if state.possession_owner == "home" else "home"
+        state = replace(state, possession_owner=ot_owner, field_position=25, down=1, distance=10)
+        overtime_cap = 2
+        overtime_rounds = 0
+        while state.score_home == state.score_away and overtime_rounds < overtime_cap:
+            overtime_rounds += 1
+            state = replace(state, quarter=state.quarter + 1, clock_remaining=simulation_input.quarter_seconds)
+            drive_result = simulate_drive(state, simulation_input, rng=rng, profile=profile)
+            drive_log.append(drive_result.to_dict())
+            possession_log.extend(step.to_dict() for step in drive_result.steps)
+            state = drive_result.end_state
+            if state.score_home != state.score_away:
+                break
 
     final_score = {"home": state.score_home, "away": state.score_away}
     drive_log = _merge_quarter_carryover_drives(drive_log)

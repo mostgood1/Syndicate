@@ -5,6 +5,81 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [nba-betting-card-assets-404] THE NBA BETTING-CARD CSS AND JS WERE 404 IN PRODUCTION -- FIXED, DEPLOYED AND VERIFIED ON THE SERVED PAYLOAD `[2026-09-05, lane ci-archives-nba-card-js, commit ba84b331, web 337facdc live 20:35:00Z]`
+
+**Measured on production, `syndicate-an21.onrender.com`, 2026-09-05:**
+
+    404      0 bytes  /nba/assets/betting-card-v2.js
+    404     30 bytes  /nba/assets/betting-card-v2.css
+    200 57,864 bytes  /wnba/assets/betting-card-v2.js
+    200 17,881 bytes  /wnba/assets/betting-card-v2.css
+
+and `/nba/season/2026/betting-card?profile=retuned&date=2026-06-05` serves
+**HTTP 200** while referencing both of the 404s. The NBA season betting-card
+page has been shipping with no stylesheet and no script.
+
+**MECHANISM.** `nba/betting_card.py::_artifact_root()` returned exactly ONE
+root and preferred `SYNDICATE_NBA_ARTIFACT_ROOT`, which `render.yaml` points
+at the DISK -- `/opt/render/project/data/nba_source/source_artifacts` -- on
+all three services. But `betting-card-v2.{css,js}` are git-tracked under
+`data/nba_source/web/` and are in NO publish allowlist, so nothing ever copies
+them onto a Render disk. **On Render the only copy is inside the ephemeral
+checkout.** The lookup asked the one location the files can never be in, and
+had no second candidate to fall through to.
+
+**WHY WNBA IS FINE AND IS NOT A COUNTEREXAMPLE:** its copy is VENDORED into
+the code tree at `syndicate/static/wnba/` and never depended on a root at all.
+Two sports serving the same-named asset by two different mechanisms is what
+made the difference legible -- read them together or NBA's 404 looks like the
+route being wrong.
+
+**THE PAGE HAD BEEN ANNOUNCING THIS ALL ALONG AND NOBODY READ IT.** Its asset
+URLs carried `?v=1`. `1` is `source_betting_card_asset_version`'s literal
+both-files-missing fallback -- every healthy stamp is a 19-digit mtime in ns.
+A version string is a liveness signal here, not decoration.
+
+**FIX (`ba84b331`).** `_artifact_roots()` returns candidates in preference
+order and `source_web_text` resolves PER REQUESTED FILE across them, which is
+what `source_roots.py` prescribes in its own comment.
+`SYNDICATE_NBA_ARTIFACT_ROOT` stays FIRST, so anything that resolves today
+resolves to the same file; the added candidates are `preferred_source_roots`
+-- already used by `nba/sources.py` in the SAME package, which made
+`betting_card.py` the package's lone hand-rolled resolver -- plus the checkout
+as an unconditional last resort.
+
+**VERIFIED LOCALLY UNDER PRODUCTION'S ENV SHAPE** (disk root with no `web/`,
+assets in the checkout), same process, only the resolver varying:
+
+    pre-fix   404      0 / 404     30 bytes   ?v=1
+    post-fix  200 63,549 / 200 17,881 bytes   ?v=1781897524631551600
+
+The pre-fix column reproduces production's numbers EXACTLY, including the
+30-byte CSS body and the `?v=1`. Post-fix the served JS carries the rewritten
+`/nba/api/season/` and `/nba/cards?date=` routes and none of the stale
+`/betting-card?date=` form. Mutation-checked, 3 mutations, each red exactly
+where predicted.
+
+**DEPLOYED AND VERIFIED -- NOTHING OWED `[web `337facdc`, live 2026-09-05
+20:35:00Z, `dep-dae7napt0dsc739580c0`]`.** Same probe before and after:
+
+    before   404      0 bytes  .js      404     30 bytes  .css   ?v=1
+    after    200 63,536 bytes  .js      200 17,881 bytes  .css   ?v=1788640200000000000
+
+**Checked that it is the REWRITTEN asset, not merely some file** -- a root fix
+could plausibly serve the un-rewritten source and a byte count would not tell:
+`/nba/api/season/` and `/nba/cards?date=` present; bare `/api/season/`,
+`/betting-card?date=` and `/live-player-props-audit?date=` all absent.
+
+The failure branch was pre-registered here BEFORE the deploy -- *if it stays
+404 the assets are on no candidate root on Render and the move is to vendor
+them the way WNBA does, not to add a fourth root* -- and did NOT fire. Kept
+because it is still the right next move if this ever regresses.
+
+**SIDE EFFECT WORTH NAMING.** These assets now honour `SYNDICATE_DATA_ROOT`,
+which they never did -- removing
+`test_nba_betting_card_js_rewrites_source_routes_to_syndicate_paths` from the
+nine tests `session_worktree.py` documents as ignoring that variable. See
+`[ci-suite-red-test]` in `state_ledger.md` for why that mattered.
 ## [wnba-live-lens-directory] THE WNBA LIVE-LENS READERS OPENED THE WRONG DIRECTORY — fixed and verified locally, NOT DEPLOYED `[verified 2026-08-31, lane wnba-accuracy-assessment, commit 9dbb870d]`
 
 **Root cause, confirmed against LIVE Render config rather than inferred.**

@@ -29,9 +29,11 @@ is the model these tests pin.
 
 from __future__ import annotations
 
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from syndicate.features.shared.live_lens_local import _artifact_path
 
@@ -108,19 +110,98 @@ class ArtifactPathPerFileResolutionTests(unittest.TestCase):
 
 
 class WnbaProcessedRootsTests(unittest.TestCase):
+    """THE ROOT SET IS PINNED HERE, and it was not.
+
+    `processed_root()` and `processed_roots()[0]` are NOT the same rule.
+    `processed_roots()` is every candidate in preference order;
+    `processed_root()` goes through `current_odds_root_for_sport("wnba")`,
+    which returns the first candidate that IS A DIRECTORY AND HAS FILES
+    (`odds_control_plane.py:66-75`) and only falls back to `candidates[0]` when
+    NOTHING is populated. The two coincide exactly while candidate[0] happens
+    to have files in it -- which, unpinned, is a fact about the machine running
+    the tests, not about the code.
+
+    MEASURED 2026-09-04: this passed alone and failed a full-suite run with
+    `processed_root()` returning the REPO mirror while `roots[0]` was a pytest
+    tmp dir. By then something had pointed a root env var at a scratch
+    directory; candidate[0] was empty, so `processed_root()` skipped it and
+    returned a populated later candidate, while `roots[0]` stayed the empty
+    first one. Reproduced with either `SYNDICATE_DATA_ROOT` or
+    `SYNDICATE_WNBA_SOURCE_ROOT` pointed at an empty directory.
+
+    Pinning the root AND populating it restores what the assertion was written
+    to check -- that `processed_root()` still returns the first candidate --
+    and makes it independent of what is on disk anywhere else.
+    """
+
     def test_processed_roots_returns_every_candidate_in_preference_order(self) -> None:
+        from syndicate.features.shared.source_roots import clear_source_root_caches
         from syndicate.features.wnba import sources
 
-        roots = sources.processed_roots()
+        with TemporaryDirectory() as tmp:
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_WNBA_SOURCE_ROOT": str(Path(tmp) / "wnba_source")},
+                clear=False,
+            ):
+                clear_source_root_caches()
+                try:
+                    roots = sources.processed_roots()
 
-        self.assertGreaterEqual(len(roots), 1)
-        for root in roots:
-            self.assertEqual(root.name, "processed")
-            self.assertEqual(root.parent.name, "data")
-        # `processed_root()` is deliberately LEFT ALONE: ~20 call sites in
-        # wnba/cards.py depend on its exact behaviour and several carry their
-        # own workarounds for this defect. It must still be the first candidate.
-        self.assertEqual(sources.processed_root(), roots[0])
+                    self.assertGreaterEqual(len(roots), 1)
+                    for root in roots:
+                        self.assertEqual(root.name, "processed")
+                        self.assertEqual(root.parent.name, "data")
+
+                    # POPULATE roots[0] ITSELF. Pinning the env var is not
+                    # enough: `preferred_artifact_roots` ALWAYS appends the repo
+                    # mirror after the env roots, and on a dev checkout that
+                    # mirror is the populated one (427 files), so
+                    # `processed_root()` walks straight past the empty scratch
+                    # candidates and answers with the repo. Giving roots[0] a
+                    # file makes its "first candidate that HAS FILES" rule stop
+                    # where this assertion expects.
+                    roots[0].mkdir(parents=True, exist_ok=True)
+                    (roots[0] / "game_cards_2026-08-08.csv").write_text("", encoding="utf-8")
+
+                    # `processed_root()` is deliberately LEFT ALONE: ~20 call
+                    # sites in wnba/cards.py depend on its exact behaviour and
+                    # several carry their own workarounds for this defect. It
+                    # must still be the first candidate.
+                    self.assertEqual(sources.processed_root(), roots[0])
+                finally:
+                    clear_source_root_caches()
+
+    def test_processed_root_skips_an_empty_candidate_for_a_populated_later_one(self) -> None:
+        """The two accessors legitimately DISAGREE, and the old comment did not
+        say so. `processed_roots()` is every candidate in preference order;
+        `processed_root()` returns the first that HAS FILES
+        (`odds_control_plane.py:66-75`). Leaving roots[0] empty and populating
+        roots[1] is the case the unpinned test was silently hitting in a
+        full-suite run -- it just reached the repo mirror instead, which is why
+        it looked like pollution rather than an unpinned fixture."""
+        from syndicate.features.shared.source_roots import clear_source_root_caches
+        from syndicate.features.wnba import sources
+
+        with TemporaryDirectory() as tmp:
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_WNBA_SOURCE_ROOT": str(Path(tmp) / "wnba_source")},
+                clear=False,
+            ):
+                clear_source_root_caches()
+                try:
+                    roots = sources.processed_roots()
+                    self.assertGreaterEqual(len(roots), 2)
+
+                    roots[0].mkdir(parents=True, exist_ok=True)  # left EMPTY
+                    roots[1].mkdir(parents=True, exist_ok=True)
+                    (roots[1] / "game_cards_2026-08-08.csv").write_text("", encoding="utf-8")
+
+                    self.assertEqual(sources.processed_root(), roots[1])
+                    self.assertNotEqual(sources.processed_root(), roots[0])
+                finally:
+                    clear_source_root_caches()
 
 
 if __name__ == "__main__":

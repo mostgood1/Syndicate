@@ -59,6 +59,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from syndicate.features.shared.bet_status import segment_refusal
+
 __all__ = ["wnba_status_resolver"]
 
 REASON_NO_EVENT_ID = "no_event_id"
@@ -200,6 +202,20 @@ def wnba_status_resolver(selected_date: str):
             # This resolver is handed every order; a non-WNBA one is not a
             # defect in anything and must not be reported as a WNBA failure.
             return {"unavailable_reason": f"not_a_wnba_order"}
+
+        # SEGMENT BEFORE MARKET, AND IT MOVED UP HERE FROM
+        # `_game_line_from_final_box` -- where it was correct but reachable only
+        # by GAME LINES. A `segment="h1"` PLAYER PROP walked straight past it,
+        # matched `_MARKET_TO_BOX_KEY["player_points"]`, and got graded off the
+        # whole-game box. Same defect, one market family over.
+        #
+        # The wording is WNBA's own, not the shared default: this string is a
+        # recorded reading in `state_basketball.md` and renaming it would orphan
+        # that for nothing. Everything else about the check is now shared with
+        # mlb / ncaaf / nfl / soccer, which had no such check at all.
+        refusal = segment_refusal(order, reason_prefix="final_box_is_full_game_not_")
+        if refusal is not None:
+            return refusal
 
         # THE MARKET CHECK COMES FIRST, before the artifact read. "We have no
         # box key for this market" is permanent; "the box is not captured yet"
@@ -495,14 +511,13 @@ def _game_line_from_final_box(order, market, team_scores) -> dict[str, Any]:
     """
     from syndicate.features.shared.game_line_bet import game_line_view
 
-    # THE SEGMENT COMES FIRST, before any artifact is consulted. A half or
-    # quarter line is permanently unanswerable from a full-game boxscore, and
-    # checking the transient condition first would hide the structural one --
-    # the same ordering rule this module applies to the market check.
-    segment = str(order.get("segment") or _FULL_GAME_SEGMENT).strip().lower()
-    if segment != _FULL_GAME_SEGMENT:
-        return {"unavailable_reason": f"final_box_is_full_game_not_{segment}"}
-
+    # THE SEGMENT CHECK THAT STOOD HERE NOW RUNS AT THE RESOLVER ENTRY, and is
+    # deleted rather than left as a second line of defence. `resolve` (~:205) is
+    # this function's ONLY caller -- verified, not assumed -- so a copy here is
+    # unreachable code that reads as protection, and the next person to change
+    # one of the two would have no way to know which one fires. The refusal
+    # string is unchanged; only the place it is decided moved, so that PLAYER
+    # PROPS are covered too. They never reached this function.
     if team_scores is None:
         # No final box for the date. NOT the same as "this game is unfinished",
         # and the live box genuinely has no team scores to fall back on -- so
