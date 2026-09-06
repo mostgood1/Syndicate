@@ -91,6 +91,54 @@ sibling `ncaaf_team_registry.csv` will show the team and prove nothing.
 
 ## [nfl-rating-units] NFL'S SIM CANNOT TELL TEAMS APART, AND THE CAUSE IS A UNITS DEFECT THIS REPO ALREADY FIXED FOR NCAAF `[measured 2026-09-06, lane nfl-rating-units, substrate checkout]`
 
+**THE SCALE WAS FITTED AND BACKTESTED. IT LOSES TO THE CLOSING LINE AND DOES NOT
+SHIP** `[2026-09-06, walk-forward, 816 games, lane nfl-rating-units]`.
+
+Design, stated because the result depends on it: ratings for season S week W use
+only weeks **< W** plus season S-1 as fallback (production's own contract); the
+coefficient is fitted on **2023-2024** and reported on **2025**, which it never
+saw; and the objective is **MAE against actual margins**, NOT resemblance to the
+market. Fitting the scale so the model's spread matches the market's 5.69 would
+optimise for LOOKING like the market.
+
+    FITTED ON TRAIN ONLY: a=+1.5, k=0.34  (implied NFL_RATING_SCALE ~25)
+
+                     model MAE   market MAE   model-market
+    TRAIN                10.410       9.756        +0.655
+    TEST (held out)      10.495       9.722        +0.773
+
+    paired per-game |error|, n=272:  mean +0.773, **t = +3.34**
+    model closer on 118 of 272 games (43.4%); sign test z = -2.18
+
+**It loses on TRAIN TOO** -- a model that cannot beat the market on the data it
+was optimised against will not on new data. t=3.34 on the SAME games makes the
+gap real rather than sampling noise. **So the units correction stays gated OFF
+and no scale constant is adopted.**
+
+**THE TWO OBJECTIVES ACTIVELY DISAGREE, which is why "match 5.69" was the wrong
+target.** The MAE-optimal model has predicted stdev **4.36 against the market's
+6.23** -- accuracy wants the model SHRUNK further, while dispersion-matching
+wanted it widened. Choosing the scale that reproduced the market's spread would
+have overshot accuracy in the name of looking right.
+
+**WHAT IMPROVED, and it is real:** the units fix cures the pathology it was built
+for -- coin-flip games fall from 93.8% to 3 of 14, certainty claims from present
+to zero -- and NFL's 0.77 MAE gap is by far the SMALLEST of the three football
+and soccer models measured against their markets (NCAAF loses by 3.563 at
+t=17.2; soccer lost on a leak-free backtest and was held). NFL-with-the-fix is
+the closest this platform has come to its own market. It still loses.
+
+**SIGN CONVENTION CHECKED BEFORE USE, not after:** `spread_line` as-is gives
+market MAE 9.756 against 14.283 negated, so as-is is correct. A flipped
+benchmark would have made the market look terrible and the model look great.
+
+**ONE NUMBER LABELLED AS DERIVED, NOT VERIFIED:** the implied scale ~25 converts
+`k` through `b=8.55`, taken from a single week-10 measurement (margin stdev 11.44
+over engine rating diff 1.338). The linearity check that would confirm the
+engine's transfer is linear across scales had not completed. The FIT and the
+BACKTEST do not depend on it -- `k` was fitted directly on rating differences in
+points -- but the scale constant does.
+
 **THE SYMPTOM.** Across-game `margin_mean` stdev is **2.16 points** for NFL
 against **15.37** for NCAAF, and **93.8%** of NFL games land in P(home)
 0.35..0.65. A model that puts every matchup within a couple of points of even is
