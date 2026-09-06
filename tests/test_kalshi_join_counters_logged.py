@@ -15,6 +15,9 @@ has removed the only thing being checked.
 
 from __future__ import annotations
 
+import re
+from collections import Counter
+
 import pytest
 
 from pipeline.kalshi_odds_refresh import join_to_board
@@ -78,6 +81,33 @@ def test_a_real_collision_is_visible_in_the_line(capsys, _game_lines_on):
     ]
     line = _emitted(capsys, [], rows)
     assert "alt_main_collisions=1" in line, line
+
+
+def test_no_field_is_emitted_twice(capsys, _game_lines_on):
+    """One name, one value, once. This test exists because it happened.
+
+    Two sessions added counters to this single print statement within minutes of
+    each other on 2026-09-06. Both landed, and the merged line emitted
+    `alt_main_collisions=` TWICE plus two spellings of the same segment data
+    (`segment_matched` beside `segment_refused_series`), half of them stranded
+    AFTER the `reasons={...}` dict repr.
+
+    Nothing caught it: both sessions' tests asserted "the token is present", and
+    a duplicate is present twice. Presence is the wrong predicate for a line
+    other tools parse -- `re.search(r'alt_main_collisions=(\\d+)')` silently
+    takes the first of two, which is the shape of bug this repo keeps paying for.
+    """
+    line = _emitted(capsys, [], [_board_row()])
+    names = re.findall(r"\b([a-z_]+)=", line)
+    dupes = {n: c for n, c in Counter(names).items() if c > 1}
+    assert not dupes, f"emitted twice: {dupes}\n{line}"
+
+
+def test_reasons_is_last_so_nothing_is_stranded_behind_a_dict_repr(capsys, _game_lines_on):
+    """`reasons` is a dict repr; fields after it are harder to read and parse."""
+    line = _emitted(capsys, [], [_board_row()])
+    assert line.rstrip().endswith("}"), line
+    assert line.index("reasons=") > line.index("alt_main_collisions="), line
 
 
 def test_the_line_still_carries_what_it_carried_before(capsys, _game_lines_on):

@@ -1458,27 +1458,6 @@ def join_to_board(
         f" kalshi_markets={report.get('kalshi_markets')}"
         f" board_rows={report.get('board_rows')}"
         f" matched={report.get('matched')}"
-        # HOW MANY BOARD ROWS DESCRIBED A BET ANOTHER ROW ALREADY DESCRIBED --
-        # main line and alternate line for one event/line/side/segment, which
-        # `_row_market`'s alt collapse makes share a key. Printed even when
-        # zero, because this is the number that says whether the price
-        # tie-break in `_collapse_duplicate_bets` is deciding anything.
-        #
-        # IT WAS RETURNED AND NOT PRINTED FOR ITS FIRST DEPLOY (`21aac548` ->
-        # live in `58302f07`), so the rate was unmeasurable in production for
-        # exactly as long as it took someone to look for it. A counter that
-        # exists only in the return dict is not an instrument.
-        f" alt_main_collisions={report.get('alt_main_collisions')}"
-        # WHICH SERIES A SEGMENT ROW MATCHED, AND WHICH IT REFUSED, keyed
-        # `<board segment>-><series>`. `segment_has_no_matching_series` was read
-        # three different ways in one day because a bare count has no
-        # denominator: a zero in `matched` now sits beside what was refused and
-        # against which series.
-        f" segment_matched_series={report.get('segment_matched_series')}"
-        f" segment_refused_series={report.get('segment_refused_series')}"
-        # Named refusals: "Kalshi has nothing we bet" and "our join is broken"
-        # must never share a number. That confusion is #505.
-        f" reasons={report.get('reasons')}"
         # WHICH SERIES A SEGMENT ROW ACTUALLY MET, both directions. Kalshi lists
         # `KXMLBF5TOTAL-...-5` ("First 5 innings: Over 4.5") and
         # `KXMLBTOTAL-...-5` ("Over 4.5 runs scored") for the SAME game at the
@@ -1488,8 +1467,14 @@ def join_to_board(
         # inference. Refusals are printed BESIDE matches because
         # `segment_has_no_matching_series: 0` was read three different ways in
         # one day for want of a denominator.
-        f" segment_matched={report.get('segment_matched_series')}"
-        f" segment_refused={report.get('segment_refused_series')}"
+        #
+        # NAMED FOR THE REPORT KEY, not shortened: the same token greps the code
+        # and the logs. Two sessions added these to this one statement within
+        # minutes of each other and the merge emitted BOTH spellings plus
+        # `alt_main_collisions` TWICE -- see
+        # `test_no_field_is_emitted_twice`, which exists because of that.
+        f" segment_matched_series={report.get('segment_matched_series')}"
+        f" segment_refused_series={report.get('segment_refused_series')}"
         # ALT/MAIN COLLAPSE RATE. `_row_market()` also strips the `_alt` suffix,
         # so a main-line row and an alternate row for one bet now key
         # identically and `_collapse_duplicate_bets` picks one. This is the rate
@@ -1497,7 +1482,13 @@ def join_to_board(
         # NOWHERE, so the guard's frequency was unmeasurable in production.
         # Replay measured ~1 per 78 collapsed keys -- a ZERO here is worth a
         # second look, not a celebration.
-        f" alt_main_collisions={report.get('alt_main_collisions')}",
+        f" alt_main_collisions={report.get('alt_main_collisions')}"
+        # Named refusals: "Kalshi has nothing we bet" and "our join is broken"
+        # must never share a number. That confusion is #505.
+        #
+        # LAST ON THE LINE, because it is a dict repr and everything after it is
+        # harder to read and to parse.
+        f" reasons={report.get('reasons')}",
         flush=True,
     )
     # On a zero-match join, print BOTH SIDES' keys. A count of failures with no
