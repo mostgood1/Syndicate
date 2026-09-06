@@ -201,3 +201,35 @@ def test_board_fields_are_absent_not_fabricated_on_a_thin_event():
     fields = _board_fields_from_event({"competitions": [{"competitors": []}], "status": {}})
     assert "home_id" not in fields and "away_id" not in fields
     assert "period" not in fields and "clock" not in fields
+
+
+def test_sources_out_param_names_the_path_that_served(monkeypatch):
+    """A WORKING FALLBACK AND A WORKING FEATURE LOOK IDENTICAL WITHOUT THIS.
+
+    The board's coverage counters (`matched`/`live`/`final`) are the same
+    whether the worker produced the state or web fetched it. `sources` is the
+    only thing that distinguishes "the producer is running" from "web quietly
+    went back to fetching", which is the regression this change exists to
+    prevent and would otherwise be invisible.
+    """
+    calls = _patch(monkeypatch, record=FRESH_RECORD)
+    sources: dict[str, str] = {}
+    lgs.ncaaf_game_state_index(["2026-09-06"], sources=sources)
+    assert sources == {"2026-09-06": "worker"}
+    assert calls["fetch"] == 0
+
+    with lgs._cache_lock:
+        lgs._cache.clear()
+    calls = _patch(monkeypatch, record=None,
+                   fetch_rows=[{"away_id": "1", "home_id": "2", "in_progress": True}])
+    sources = {}
+    lgs.ncaaf_game_state_index(["2026-09-06"], sources=sources)
+    assert sources == {"2026-09-06": "fetch"}, "a fallback must be nameable, not silent"
+    assert calls["fetch"] == 1
+
+
+def test_sources_is_optional_so_existing_callers_are_unaffected(monkeypatch):
+    """The signature change must not break any caller that does not care."""
+    _patch(monkeypatch, record=FRESH_RECORD)
+    index = lgs.ncaaf_game_state_index(["2026-09-06"])
+    assert "153@2628" in index

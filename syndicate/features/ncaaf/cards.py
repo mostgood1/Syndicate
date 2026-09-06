@@ -2801,7 +2801,14 @@ def _attach_live_state(games: list[dict[str, Any]], season: int, week: int) -> N
         from syndicate.features.ncaaf.live_game_state import ncaaf_game_state_index
         from syndicate.features.ncaaf.live_game_state import stamp_scheduled_start_times
 
-        index = ncaaf_game_state_index(_ncaaf_week_kickoff_dates(season, week))
+        # `sources` is why the next log line can distinguish "the worker is
+        # producing" from "web quietly went back to fetching". Those render
+        # identically and emit identical coverage counters, and the second is
+        # the regression this path was changed to prevent.
+        state_sources: dict[str, str] = {}
+        index = ncaaf_game_state_index(
+            _ncaaf_week_kickoff_dates(season, week), sources=state_sources
+        )
         coverage = attach_ncaaf_live_game_state(games, index)
         # Every card, not just today's: the ESPN join only reaches dates that
         # have started, and kickoff is already on the card for all of them.
@@ -2812,10 +2819,19 @@ def _attach_live_state(games: list[dict[str, Any]], season: int, week: int) -> N
     # `matched` is printed separately from `live`/`final` because a dead join
     # and a quiet slate render identically and are different defects.
     # `logger.info` does not reach Render's collector -- hence print/flush.
+    # `source=` counts DATES by which path served them, e.g. `worker=3,fetch=1`.
+    # A run showing any `fetch=` on a healthy platform means the worker record
+    # was absent or stale for that date -- the one thing that otherwise looks
+    # exactly like success.
+    source_counts: dict[str, int] = {}
+    for value in state_sources.values():
+        source_counts[value] = source_counts.get(value, 0) + 1
+    source_note = ",".join(f"{k}={v}" for k, v in sorted(source_counts.items())) or "none"
     print(
         f"NCAAF_LIVE_STATE week={week} games={coverage.get('games')} "
         f"index={coverage.get('index')} matched={coverage.get('matched')} "
-        f"live={coverage.get('live')} final={coverage.get('final')}",
+        f"live={coverage.get('live')} final={coverage.get('final')} "
+        f"source={source_note}",
         flush=True,
     )
 

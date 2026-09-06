@@ -266,10 +266,18 @@ def _state_rows_for_date(iso_date: str) -> list[dict[str, Any]]:
 def _worker_record_max_age_seconds() -> float:
     """How fresh the worker's record must be to be used instead of fetching.
 
-    Default 240 s. The producer runs on live-odds-worker's live phase (~90 s
-    sweeps), so 240 s tolerates a missed sweep without going stale, while still
-    refusing a record old enough to pin the board to dead scores. ABSENT MEANS
-    240 -- a service nobody configured should still prefer the worker.
+    Default 240 s, and the number is MEASURED, not assumed. The live phase's
+    inter-run gap on live-odds-worker (2026-09-06, 41-minute window, 28 gaps):
+    **median 60 s, max 321 s**.
+
+    So 240 s is deliberately TIGHTER than the worst observed gap, and the
+    fallback will fire during a stall. That is the correct direction: when the
+    producer falls behind, the record really IS stale, and fetching returns a
+    right answer where trusting it would put a dead clock on a live game. The
+    cost of a tight bound is bytes; the cost of a loose one is a wrong board.
+
+    ABSENT MEANS 240 -- a service nobody configured should still prefer the
+    worker. Raise it only with a cadence measurement in hand.
     """
     raw = str(os.environ.get("SYNDICATE_NCAAF_LIVE_STATE_MAX_AGE_SECONDS") or "").strip()
     try:
@@ -334,11 +342,23 @@ def _rows_from_worker_record(iso_date: str) -> dict[str, dict[str, Any]] | None:
     return rows_by_key
 
 
-def ncaaf_game_state_index(dates: Any) -> dict[str, dict[str, Any]]:
+def ncaaf_game_state_index(
+    dates: Any, *, sources: dict[str, str] | None = None
+) -> dict[str, dict[str, Any]]:
     """Per-game ESPN state for the given dates, keyed `"{away_id}@{home_id}"`.
 
     An empty result means STATE UNKNOWN and must never be read as "nothing is
     live" -- see the module docstring.
+
+    `sources` is an optional out-parameter: pass a dict and it is filled with
+    `{iso_date: "worker" | "fetch" | "cache"}`. **THIS EXISTS BECAUSE A WORKING
+    FALLBACK AND A WORKING FEATURE LOOK IDENTICAL FROM OUTSIDE.** Without it,
+    "the worker is producing" and "web quietly went back to fetching" render
+    the same board and emit the same coverage counters -- and the second is the
+    regression this module was changed to prevent. Measured 2026-09-06: the
+    live phase's inter-run gap is a median of 60 s but reached **321 s**, so
+    the fallback WILL fire sometimes and a reader needs to tell an occasional
+    miss from a dead producer.
     """
     index: dict[str, dict[str, Any]] = {}
     for iso_date in past_or_current_dates(dates):
@@ -347,12 +367,17 @@ def ncaaf_game_state_index(dates: Any) -> dict[str, dict[str, Any]]:
             cached = _cache.get(iso_date)
             rows_by_key = dict(cached[1]) if cached is not None and now - cached[0] < _CACHE_TTL_SECONDS else None
 
+        if rows_by_key is not None and sources is not None:
+            sources[iso_date] = "cache"
+
         if rows_by_key is None:
             # WORKER-PRODUCED RECORD FIRST. `poll_ncaaf_live_state` writes this
             # to the SHARED keyvalue store, so on a healthy platform the board
             # READS state instead of fetching it -- which is the whole point of
             # `CLAUDE.md`'s worker/web split.
             rows_by_key = _rows_from_worker_record(iso_date)
+            if rows_by_key is not None and sources is not None:
+                sources[iso_date] = "worker"
 
         if rows_by_key is None:
             # FALLBACK, and it is why this is safe to land before the producer
@@ -361,6 +386,8 @@ def ncaaf_game_state_index(dates: Any) -> dict[str, dict[str, Any]]:
             # empty index -- an empty index means STATE UNKNOWN (see the module
             # docstring) and would render a live slate as pregame.
             warn_if_compute_in_request_path("ncaaf_espn_game_state_fetch")
+            if sources is not None:
+                sources[iso_date] = "fetch"
             rows_by_key = {}
             for state in _state_rows_for_date(iso_date):
                 away_id = str(state.get("away_id") or "")
