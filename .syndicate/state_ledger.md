@@ -514,6 +514,16 @@ allocate low single-digit MB, and that file was **not even in the tree that
 died** (`a2afc7f1` is not an ancestor of `24d0a50e`). **The cause of that
 `MemoryError` is UNKNOWN.** Full retraction: `a4a6c9f9`.
 
+**LATEST READING `[2026-09-06, lane ncaaf-live-state-fresh-record]` -- 1 failed /
+15,641 passed / 35m49s at `a9611409`, and THE COMPOSITION HAS STOPPED
+ROTATING.** Six full runs at roughly the same tree went 0 -> 1 -> 2 -> 4 -> 1 ->
+1 failures, and the last two failed on the SAME test
+(`test_malloc_trim_release`, owned by `web-oom-malloc-trim`). Until then every
+run had a DIFFERENT failure set, which is why a green run was only ever a
+sample. The 35m49s duration matters: it is well past the 240 s staleness window
+that used to age the ncaaf record out, so a long run is the STRONGER test of
+that fix.
+
 ## [ci-suite-red-test] CI'S OWN SUITE IS GREEN. THE "ONE RED TEST" WAS THE 31st DATA-ABSENCE FAILURE, NOT A SURVIVOR OF THEM `[corrected 2026-09-05, lane ci-archives-nba-card-js, commit ba84b331]`
 
 **The claim this section used to make was WRONG, and it is preserved here

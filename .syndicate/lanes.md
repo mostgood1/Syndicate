@@ -1929,7 +1929,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: 8 records, listed above, from a full instrumented run (1 failed / 15,602 passed / 41m50s).
 - Blocked by: none.
 
-### ncaaf-live-state-fresh-record — OPEN — opened 2026-09-06 — session b9bc926d-f167-4923-9344-eac7e86a5761
+### ncaaf-live-state-fresh-record — CLOSED-VERIFIED 2026-09-06 — opened 2026-09-06 — **GOAL MET ON A FULL RUN THAT IS ITSELF THE HARD CASE.** `a9611409`, `-n auto --dist=loadscope`: **1 failed / 15,641 passed / 35m49s**, and the one failure is `test_malloc_trim_release` (`web-oom-malloc-trim`'s, handed over in `767c8f9a`). The three ncaaf tests are GREEN in a run lasting 35m49s — far past the 240 s staleness window that used to age the record out, which is the regime they failed in. A LONG run is the stronger test of this fix, not the weaker one. — session b9bc926d-f167-4923-9344-eac7e86a5761
 - Goal: the three `test_ncaaf_live_state_worker` failures stop recurring at full-suite scale. They pass alone, were "fixed" once by `34bcecc8`, and came back in the next full run.
 - Files: `tests/test_ncaaf_live_state_worker.py`.
   Collision check: named by no OPEN lane's `- Files:` block — `ncaaf-live-state-to-worker` closed after `34bcecc8`.

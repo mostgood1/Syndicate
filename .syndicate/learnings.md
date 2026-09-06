@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 853 rules `[generated]`
+## Index — 857 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2698,3 +2698,8 @@ silent invitation for a peer to edit underneath you.
 Related, same day and same root: the block ALSO sat above the `## OPEN` heading
 (the `#466` violation), which is a second way for a block to be present and
 still not count.
+
+## 2026-09-06 FORBIDDEN: concluding a hypothesis is WRONG from a simulation you did not confirm reached the real object — `tests/` is not a package, so pytest's module is not yours
+
+- **The rule going forward.** A reproduction that changes nothing has TWO readings: the hypothesis is wrong, or the instrument never touched the thing. Distinguish them before believing either. Concretely: pytest imports a test module under a name derived from rootdir, and with no `tests/__init__.py` that name is top-level `test_foo` — **not** `tests.test_foo`. Importing the dotted path creates a SECOND module object, so mutating it is invisible to the run. I aged a module-level timestamp, saw 23 passed, and was one step from recording "not the cause"; against `sys.modules["test_foo"]` exactly the 3 predicted tests failed. **Assert the object you mutated is the one under test** — print its `id()`, or mutate through `sys.modules` and fail loudly when the key is absent.
+- *(evidence in `learnings_evidence.md`)*
