@@ -1633,6 +1633,55 @@ not help before the roll: the cache is empty and cannot be filled.
 
 ## [ncaaf-live-resim] SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim]`
 
+**LIVE-SLATE READING — PASS, AND IT CONFIRMS THE ENGINE PROPERTY ON REAL STATE
+FOR THE FIRST TIME** `[2026-09-06 20:08:19Z, refresh-worker 58302f07, WSU @ WASH
+Q1 11:54, lane ncaaf-live-resim-wire]`. The one thing nobody had: the worker's
+live-state record feeding an IN-PROGRESS re-sim.
+
+    19:48:27  rec 0 fetch 1 {record_stale:1}  live_resimmed 0
+    19:58:55  rec 1 fetch 0 {}                live_resimmed 0
+    20:02:11  rec 1 fetch 0 {}                live_resimmed 0
+    20:08:19  rec 1 fetch 0 {}                live_resimmed 1   <- PASS
+
+**`record_dates 1` and `live_resimmed 1` on the SAME line**, with
+`game_not_in_progress` falling 3 -> 2. `situation` — the field that makes this a
+re-sim question rather than an eyebrow question — is now exercised end to end in
+production. Board: `sources_seen {live_resim: 1, pregame: 50}`, `index_size 1`,
+**7 live_aware rows**, `sims 120`, `as_of 20:06:57Z`.
+
+**THE VALUE LOOKED WRONG AND SURVIVED THE CHECK, which is the part worth
+keeping.** Live P(home) read **0.991667 at 0-0 in Q1** — implausible on its face,
+and the same shape as the defect this whole lane exists to fix (a pregame number
+published on a live game). It is not that:
+
+    live P(home)        0.991667
+    pregame P(home)     0.9900        -> live - pregame = +0.0017
+    market fair (devig) 0.9201        -> model - market = +0.0715
+
+**A rest-of-game sim resumed at 0-0 with 3:06 elapsed SHOULD reproduce the
+pregame number, and it does, to 0.2 pp.** That is the resume-at-kickoff identity
+(`ca5be54b`, previously verified only on 40 shared seeds in a fixture) confirmed
+on REAL PRODUCTION LIVE STATE. The implausibility is the MODEL's, not the live
+path's: NCAAF's margin model loses to the close by 3.563 MAE at t=17.2, which is
+why `pick_gate` denies it and why the edge is suppressed.
+
+**MY PRE-REGISTERED PREDICTION WAS WRONG AND IS RECORDED AS SUCH.** I predicted
+the PREDICTED FAILURE — `live_resimmed > 0` only ever co-occurring with
+`record_stale`, the ~514 s cadence outrunning the 180 s tick. It passed instead,
+because kickoff happened to land ~70 s after a record write. **The cadence
+finding is unaffected and the prediction was probabilistic, not falsified: one
+favourable draw does not make a 514 s write interval safe.** The 19:48:27 tick in
+this very window still refused `record_stale`.
+
+**STILL WITHHELD, AS DESIGNED:** `rows_live_gameline_edged 0`. The h2h row
+carries `consensus {home -2128, away +1106}` — a real two-sided price — and is
+refused `no_two_sided_market_price` because `ncaaf/game_projections.py` writes
+`market_fair_prob_over` in its TOTALS branch and not its H2H branch. This reading
+CONFIRMS that diagnosis on a live row: the market price exists, the projection
+field does not. Spreads and totals refuse
+`live_resim_published_no_distribution_for_this_market`, which is the deliberate
+one-market-family choice.
+
 **THE TICK NO LONGER FETCHES ESPN ITSELF — MEASURED, 6 TICKS OF 8**
 `[2026-09-06 15:02-15:31Z, refresh-worker 58302f07, lane ncaaf-live-resim-wire]`.
 `ncaaf-live-state-to-worker` made `poll_ncaaf_live_state` persist team
