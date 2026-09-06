@@ -120,6 +120,26 @@ current truth.
   already. `deploy_preflight.py` no longer depends on the log line for web
   (it reads `/api/ops/memory`), so nothing is blocked by this being off.
 
+- **2026-09-05 — COMPACT `learnings.md`, THEN RAISE ITS ALARM 400000 -> 460000.**
+  Asked directly, with the numbers, and BOTH were done in that order.
+  `compact_learnings.py --keep-from 2026-09-05` reclaimed **64,557 B**
+  (462,498 -> 397,941) by moving 40 entries' bodies to `learnings_evidence.md`;
+  headings conserved **896 -> 897, zero lost** (the +1 is a peer appending
+  mid-run), verified independently of the tool because the diff reads as 1,201
+  deletions on a shared file.
+  **A correction I owed the user and had given backwards:** I said compaction
+  would leave the file ~1,800 B OVER. It went UNDER by 2,059 B — I had compared
+  against the tool's default `--cap 280000`, not the alarm's real 400,000.
+  The raise was still right, for a different reason than the one I gave: a 0.5%
+  margin against a measured **~6 KB/hour** of fleet growth is a red light again
+  within the hour, which is the failure `session-start.sh` already names
+  ("a warning that is always on is one nobody reads").
+  Consequence to hold onto: **compaction is now nearly spent** — 369 of 432
+  dated entries are ALREADY stubs and re-moving them reclaims zero — and what
+  this alarm measures is the fleet's mistake-to-rule conversion rate
+  (~40 new FORBIDDEN-class rules in 36 hours). **The next lever is neither a
+  raise nor a compaction.** Reasoning is in the hook comment, not only here.
+
 - **2026-08-25 — REAL EXECUTION CAPS: bankroll $1000, Kalshi $50/day,
   Polymarket $100/day, $10 max order, 10 orders/day per exchange, 15 combined.**
   Asked directly, with the numbers. Bankroll was already `$1000`

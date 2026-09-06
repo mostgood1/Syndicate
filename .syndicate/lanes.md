@@ -1667,6 +1667,19 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   at all tonight, so there was no positive control for the pricing STEP on any
   sport. Soccer's 52/52 shows the FIELD is populated elsewhere; it does not show
   the pricing path is healthy elsewhere.
+- **ALSO DONE THIS SESSION, outside the lane's own scope, all landed:** the red
+  `test_the_bucket_carries_only_the_declared_fields` on `main` (`782a057b`,
+  `ops.py` is this lane's claim); `learnings.md` compacted + its alarm raised
+  400000 -> 460000 (`1f032074`, user decision, recorded in `state.md`).
+- **HANDED BACK, NOT DONE — the PRIMARY TREE update.** Left at `e826b5fc`,
+  0 ahead, **21 behind, exactly ONE collision: `.syndicate/lanes.md`**, index
+  clean (narrowed from three; the other two were verified redundant and reset to
+  HEAD). NOT forced because session `b9bc926d`'s uncommitted `lanes.md` does not
+  replay onto `origin/main` — `git apply --check` fails at line 943, the
+  `suite-order-pollution` region whose retraction already landed upstream — so a
+  rebase means resolving a merge conflict inside a LIVE session's lane claims.
+  **It clears itself the moment they commit `lanes.md`.** Working-copy backup and
+  diff: `%TEMP%\claude\primary_preserve\`. Full reasoning: `log/2026-09-05.md`.
 - **`todo.md #71` NOT SATISFIED FOR THIS LANE, deliberately and visibly.**
   `docs/ai_context/todo.md` is claimed IN FULL by `accuracy-ledger-budget-raise`.
   I wrote the `#119` update, the post-write guard caught it, I reverted it, and
