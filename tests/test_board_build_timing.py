@@ -30,6 +30,7 @@ import os
 import sys
 import time
 import unittest
+from unittest.mock import patch
 import contextlib
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -49,6 +50,58 @@ def _field(line: str, key: str) -> str:
         if part.startswith(key + "="):
             return part.split("=", 1)[1]
     raise AssertionError(f"{key} not in {line!r}")
+
+
+class _ScriptedClock:
+    """`time` for ONE module, with `monotonic`/`process_time` handed to it.
+
+    WHY THESE TWO TESTS CANNOT USE THE REAL CLOCKS. `_timed_candidate_pool`
+    reads `time.process_time()`, which is CPU for the whole PROCESS -- every
+    thread in it. That is the right choice for the instrument (its docstring
+    says so: a child process burning a core must not appear, which is what
+    makes the wall/CPU gap readable as contention). It is the wrong thing for a
+    test to assert against, because a pytest worker's process is not the test's
+    to control.
+
+    MEASURED 2026-09-06, and TWO leaked CPU-burning threads are enough:
+
+        leaked threads   sleeping cpu_s   sleeping off_cpu_pct
+              0               0.00              100.0
+              2               0.30                5.2
+              8               0.60               18.4
+
+    At 2 threads `assertLess(cpu, 0.1)` and `assertGreater(off, 80.0)` both
+    fail. This suite leaks daemon threads by design of its fixtures
+    (`syndicate-venue-poll`, `memory-watchdog`, the live-lens reporter), and at
+    full-suite scale an xdist worker has accumulated many -- which is why these
+    passed alone, passed across 192 files, and failed only in the full run.
+
+    An EARLIER attempt to reproduce this with multiprocessing burners could
+    never have worked: `process_time` does not count other PROCESSES. Threads,
+    not processes, and that distinction is the whole defect.
+
+    Scripting the clocks tests strictly more than the real ones did -- the
+    exact reported arithmetic, not a threshold that happened to hold on an idle
+    box. Patched onto the module's own name, never onto the `time` singleton.
+    """
+
+    def __init__(self, wall_deltas, cpu_deltas):
+        self._wall = list(wall_deltas)
+        self._cpu = list(cpu_deltas)
+
+    def monotonic(self):
+        return self._wall.pop(0)
+
+    def process_time(self):
+        return self._cpu.pop(0)
+
+    def __getattr__(self, name):
+        return getattr(time, name)
+
+
+def _run_with_clock(fn, wall_deltas, cpu_deltas):
+    with patch.object(state, "time", _ScriptedClock(wall_deltas, cpu_deltas)):
+        return _run(fn)
 
 
 class BoardBuildTimingTests(unittest.TestCase):
@@ -72,7 +125,13 @@ class BoardBuildTimingTests(unittest.TestCase):
         # THE LOAD-BEARING CASE. Blocked on IO or queued behind another loop:
         # wall accrues, CPU does not. This is the shape the 9m34s window is
         # suspected of, and the one no existing log line can distinguish.
-        _result, out = _run(lambda: (time.sleep(0.25), {})[1])
+        #
+        # Clocks are SCRIPTED -- see `_ScriptedClock`. With the real ones this
+        # asserted a property of the pytest worker's process, and failed in the
+        # full suite once leaked daemon threads burned CPU during the sleep.
+        _result, out = _run_with_clock(
+            lambda: {}, wall_deltas=[100.0, 100.25], cpu_deltas=[10.0, 10.001]
+        )
         line = [l for l in out.splitlines() if "BOARD_BUILD_TIMING" in l][0]
         wall = float(_field(line, "wall_s"))
         cpu = float(_field(line, "cpu_s"))
@@ -85,49 +144,51 @@ class BoardBuildTimingTests(unittest.TestCase):
         # The other half. Without this the test above would pass on a timer
         # that always reported "waiting".
         #
-        # THE ABSOLUTE THRESHOLD HERE WAS A CLAIM ABOUT THE MACHINE, not about
-        # the instrument. It asserted `off_cpu_pct < 40.0`, which holds only
-        # when a core is free. Measured 2026-09-06 in a full `-n auto` suite:
-        # 79.7 -- and the instrument was RIGHT. A build burning 0.25 s of CPU
-        # that waits 1 s to be scheduled genuinely did spend ~80% of its wall
-        # time off-CPU, and a timer that reported otherwise would be lying.
+        # HISTORY, because this test has now been wrong TWICE in opposite
+        # directions. It first asserted `off_cpu_pct < 40.0`, an absolute bound
+        # that holds only when a core is free; in a full `-n auto` suite it read
+        # 79.7 and the instrument was RIGHT. I replaced that with a comparison
+        # against a SLEEPING build measured in the same process -- which was
+        # sound only while a sleeping build reads ~100, and leaked CPU-burning
+        # threads make it read 5.2. That second version failed at full-suite
+        # scale for the same underlying reason as the first: both asserted
+        # against a process the test does not control.
         #
-        # So this now asserts the two things that do not depend on scheduling
-        # luck: the reported percentage matches its own inputs, and a busy
-        # build still reads as MORE on-CPU than a sleeping one measured under
-        # the same conditions. The second is what the comment above is really
-        # asking for -- a timer stuck on "waiting" fails it at any load.
-        def burn():
-            end = time.process_time() + 0.25
-            total = 0
-            while time.process_time() < end:
-                total += sum(range(500))
-            return {"total": total}
-
-        _result, out = _run(burn)
+        # Scripted clocks end it. The distinction this test exists for -- a
+        # computing build must not read as a waiting one -- is now asserted on
+        # the instrument's arithmetic, which is the only part that is actually
+        # this code's responsibility.
+        _result, out = _run_with_clock(
+            lambda: {"total": 1}, wall_deltas=[100.0, 100.26], cpu_deltas=[10.0, 10.25]
+        )
         line = [l for l in out.splitlines() if "BOARD_BUILD_TIMING" in l][0]
         cpu = float(_field(line, "cpu_s"))
         off = float(_field(line, "off_cpu_pct"))
         self.assertGreaterEqual(cpu, 0.2, "a busy build must accrue CPU")
+        self.assertLess(off, 40.0, "off_cpu_pct must show this as computing")
 
-        # NOT asserting `off == (wall - cpu) / wall` from this line: the line
-        # prints `wall_s` and `cpu_s` at ONE DECIMAL (`:.1f`) while
-        # `off_cpu_pct` is computed from the unrounded values
-        # (`intelligence_state.py:3992`), so the identity is not recoverable
-        # from what is logged -- 20.1 reported against 33.3 recomputed from the
-        # rounded pair. Worth knowing before anyone tries to audit a build from
-        # its log line alone.
-        #
-        # The comparison the original threshold was standing in for, taken in
-        # the same process so both readings see the same contention.
-        _sleep_result, sleep_out = _run(lambda: (time.sleep(0.25), {})[1])
-        sleep_line = [l for l in sleep_out.splitlines() if "BOARD_BUILD_TIMING" in l][0]
-        sleep_off = float(_field(sleep_line, "off_cpu_pct"))
-        self.assertLess(
-            off, sleep_off,
-            "a busy build must read as more on-CPU than a sleeping one; "
-            f"busy={off} sleeping={sleep_off}",
+    def test_the_real_clocks_are_still_wired_up(self):
+        """`_ScriptedClock` proves the ARITHMETIC; this proves the WIRING.
+
+        Without it, both tests above would keep passing if
+        `_timed_candidate_pool` stopped reading the clocks entirely. No
+        threshold and no timing assertion -- only that a real run emits the
+        line with numbers that parse and a wall that advanced.
+        """
+        # 0.25 s, not 0.05: `wall_s` prints at ONE DECIMAL, so a 0.05 s sleep
+        # renders as `0.0` whenever it lands a hair under the rounding
+        # boundary, and this test would flake for a formatting reason.
+        _result, out = _run(lambda: (time.sleep(0.25), {})[1])
+        line = [l for l in out.splitlines() if "BOARD_BUILD_TIMING" in l][0]
+        self.assertGreaterEqual(
+            float(_field(line, "wall_s")), 0.2,
+            "the real monotonic clock must be read -- a timer stuck at zero "
+            "would satisfy every scripted-clock test above",
         )
+        # CPU and the percentage are only required to PARSE here. Asserting a
+        # bound on either is what made this file machine-dependent twice.
+        self.assertGreaterEqual(float(_field(line, "cpu_s")), 0.0)
+        float(_field(line, "off_cpu_pct"))
 
     def test_it_reports_even_when_the_build_RAISES(self):
         # A build that dies partway is exactly when the timing matters most,
