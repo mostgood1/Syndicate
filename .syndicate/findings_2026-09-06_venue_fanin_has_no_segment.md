@@ -1,5 +1,55 @@
 # `venue_quote_fanin` HAS NO `segment` — the 2026-08-28 defect survives in a second module
 
+> ## CORRECTION, appended 2026-09-06 ~19:0xZ — READ THIS BEFORE THE BODY
+>
+> **1. ANOTHER SESSION FOUND THIS FIRST, EARLIER, AND WITH A BETTER MEASUREMENT.**
+> `e77be334` (2026-09-06 18:24:03Z) — *"a first5 board row takes a FULL-GAME
+> contract's price"*. They measured MIL@CIN at ~16:20Z, **two hours before me**,
+> and did what I did not: replayed it through `apply_venue_quotes_to_grid` on
+> byte-identical deployed code, bound the row to
+> `KXMLBTOTAL-26SEP061340MILCIN-4`, and **reproduced all four production numbers
+> exactly** (price -669, consensus 0.492611, edge_pct -38.535, and the whole
+> `venue_basis.reason` string) — then showed that with only the `KXMLBF5TOTAL`
+> contract present the row takes no price at all. That rules out "thin F5
+> market" as an alternative explanation. Mine did not.
+>
+> **2. MY "the token `segment` appears zero times" CLAIM WAS READ OFF A STALE
+> CHECKOUT.** I grepped the PRIMARY TREE at ~18:45Z. `e77be334` had landed on
+> `origin/main` at 18:24Z, so the statement was already false there. It remained
+> true of the DEPLOYED code, which is the only reason the production reading
+> stood up. **`project_primary_tree_is_not_deployed_code` is a rule I hold and
+> broke** — grep the deployed SHA, not the checkout.
+>
+> **3. "Not fixed" WAS WRONG WHEN WRITTEN, AND "fixed" IS STILL WRONG NOW.**
+> The true state:
+>
+> | | state |
+> |---|---|
+> | fix on `origin/main` | **yes**, `e77be334` |
+> | deployed anywhere | **NO** — refresh-worker `11a6a829` (18:08:13Z) and web `2b3c1974` (18:25:44Z) both lack `_segment_disagrees`, checked by content |
+> | refuses when deployed | **NO** — `_SEGMENT_REFUSAL_ENABLED = False` |
+>
+> The guard is wired at BOTH call sites (`:592`, `:1568`) and COUNTS
+> unconditionally, but only *refuses* behind that flag. That is a deliberate
+> measure-first staging — their own title says "the refusal ships inert" — so
+> the coverage cost can be sized before anything is stripped off the board.
+> **The defect is therefore still live in production and will remain live after
+> the next deploy** until someone measures the cost and flips the flag.
+>
+> **4. THEY ESTABLISHED A SCOPE I LEFT OPEN.** I listed "whether any order was
+> placed off one of these" as unestablished. They answer it: *"Execution stays
+> guarded, so this corrupts the board, EV, the shortlist and board-price
+> grading, not a fill."* The order path's `_segments_agree` still holds. So this
+> is a BOARD-INTEGRITY defect, not a live-money one — which is a materially
+> smaller claim than the framing below.
+>
+> **5. My lane `venue-fanin-segment-key` is CLOSED as a duplicate.** No code was
+> written. What follows is my original independent finding, kept verbatim
+> because two sessions reaching the same diagnosis from different games is
+> corroboration worth preserving — but where it and the above disagree, the
+> above is right.
+
+
 `[found 2026-09-06 ~18:4xZ, lane kalshi-alt-line-join (incidental), substrate: render]`
 
 **Found while taking an unrelated reading. Not fixed. Not mine to fix silently —
