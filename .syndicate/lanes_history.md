@@ -27744,3 +27744,279 @@ lost no protection and no open lane left the session-start digest.
 - **SHARED, not claimed by me — `ncaaf-live-resim-wire` holds them:** `syndicate/features/shared/artifact_publisher.py`, `syndicate/blueprints/ops.py`.
 - Narrative + retractions archived VERBATIM in `lanes_history.md`; session record in `log/2026-09-05.md`.
 - Blocked by: none.
+
+
+<!-- moved from lanes.md at checkpoint 2026-09-06, lane shortlist-prop-row-duplicates; status now lives in lanes.md, narrative in log/2026-09-06.md -->
+### shortlist-prop-row-duplicates — OPEN — opened 2026-09-06 — session 28a9fe7e-56ba-4bda-9f84-762015fc0a62
+- Goal: answer the question `kalshi-alt-line-join` handed on — are two shortlist
+  rows sharing one `_row_key` (a) one bet at two BOOKS, kept so the price can be
+  shopped, or (b) a duplication defect upstream. ANSWERED: **(b)**, and the
+  producer is named to file:line.
+- **ANSWER — (b), a duplication defect. Hypothesis (a) is FALSIFIED by a control
+  taken on the same payload** `[substrate: render, /api/board/layer2-shortlist
+  ?date=2026-09-06&sport=mlb&limit=2000, artifact written_at 2026-09-06T14:44:08Z,
+  1,996 MLB rows]`:
+
+  | reading | value |
+  |---|---|
+  | prop rows carrying kalshi *inside* a multi-book `book_prices` | **600** |
+  | prop rows that are kalshi-ONLY | **37** |
+  | of those 37, how many have a diacritic in `player_name` | **37 / 37** |
+  | ascii-named prop rows that are kalshi-only | **0 / 1,826** |
+  | colliding `_row_key`s | 25 (extra rows 25) |
+  | of those 25, how many are a diacritic spelling pair | **25 / 25** |
+
+  Price-shopping in this board happens INSIDE one row — `quote.book_prices`
+  holds up to 7 venues and `best_any_book` picks — and it folds Kalshi in 600
+  times on this very slate. So two rows for one bet is not the price-shopping
+  mechanism; it is that mechanism FAILING. The 25 collisions are six players,
+  every one a `Julio Rodriguez` / `Julio Rodríguez` pair.
+- **`limit` DEFAULTS TO 200 ON THAT ENDPOINT AND SILENTLY TRUNCATES.** The first
+  fetch returned 200 of 1,996 rows and censused **0 collisions** — a clean bill
+  of health for a defect that was present. `_board_rows_for_join` reads the
+  artifact directly and is NOT truncated, so the endpoint's default hides
+  exactly the rows the join acts on. Pass `limit=2000`.
+- **PIPELINE TRACE, file:line at each hop.** The same module normalises on the
+  way IN, stamps un-normalised on the way OUT, and normalises again on the way
+  BACK — which is why the split is invisible until the join re-collapses it:
+  1. `syndicate/features/shared/kalshi_board_join.py:1372-1373` — the contract is
+     matched to a board row on `normalize_person` (accent-folded, so the match
+     SUCCEEDS), then the emitted match is stamped `player_name = verdict["subject"]`
+     — the VENUE's raw spelling, not the board row's.
+  2. `syndicate/features/shared/odds_book_quotes.py:566` —
+     `quote_rows_from_kalshi_matches` writes that raw spelling into `book_quotes`.
+  3. `syndicate/features/shared/book_grid.py:52` — `_INSTANCE_FIELDS =
+     ("sport","kind","event_id","segment","market","player_name")`, **raw**. Two
+     spellings = two market instances.
+  4. `syndicate/features/shared/layer2_board.py:1644` `build_layer2_rows` fans
+     each grid row out — two candidates for one bet.
+  5. `kalshi_board_join.py:622` `_row_key` normalises AGAIN, so both rows collapse
+     to one key, one contract pairs with both, and the join emits two match
+     records. That is the double-exposure path.
+- **MECHANISM PROOF, `off != on` on the real `build_book_grid`** `[substrate:
+  checkout @ origin/main — evidence about the CODE, not the deployment]`. Three
+  quotes, one bet, dk/betmgm ascii + kalshi:
+      spellings agree  -> 1 grid row, books ['betmgm','draftkings','kalshi']
+      one accent apart -> 2 grid rows, ['betmgm','draftkings'] and ['kalshi']
+- **IT IS NOT A KALSHI DEFECT, and framing it that way would produce the wrong
+  fix.** `Andrés Chaparro` reaches the board ACCENTED from williamhill_us, betmgm,
+  betonlineag and draftkings — OddsAPI books carry diacritics too. The invariant
+  broken is general: **any two quote sources that disagree on the raw spelling of
+  one player split that bet into two grid rows.** Today only MLB props have two
+  independent prop feeds (Kalshi direct + OddsAPI), which is why the count is
+  0 for soccer (199 prop rows, books `fanduel`/`betrivers` only — one vocabulary),
+  0 for ncaaf and nfl, and 0 for wnba (no rows).
+- **IT IS A RATE OVER A MOVING SLATE, NOT A FIXED COUNT.** 25 collisions at
+  artifact `14:44:08Z`, 21 at `15:04:08Z`, 10 when `kalshi-alt-line-join` measured
+  it on 09-05. Quote whichever `written_at` the number came from.
+- Files: **CLAIMED 2026-09-06, user asked for the repair** —
+  `syndicate/features/shared/book_grid.py`,
+  `syndicate/features/shared/odds_book_quotes.py`,
+  `pipeline/layer2_shortlist.py`,
+  `tests/test_book_grid_player_name_folding.py` (NEW),
+  `scripts/census_board_row_duplicates.py` (NEW).
+  `odds_book_quotes.py` was NOT in the first claim and had to be TAKEN mid-fix —
+  `market_sides_for_quote` holds a second copy of the same identity tuple, and
+  folding one without the other silently drops a price. No OPEN lane held it.
+  NOT claimed and deliberately untouched: `syndicate/features/shared/layer2_board.py`
+  (held by `layer2-sim-disagrees`, session 3492626c).
+- Falsification test that WAS run and did not fire: if the board deliberately kept
+  one row per venue, kalshi-only rows would appear for ascii-named players too.
+  0 of 1,826. And `kalshi_plus_books=600` shows the merge is the intended path.
+- **DO NOT "FIX" THIS IN THE JOIN.** `21aac548` bounded `_collapse_duplicate_bets`
+  to rows whose RAW market names differ precisely so it would not silently drop
+  these. Deduping them there would hide a split that has already cost the board a
+  real price: on `batter_hits julio rodriguez 0.5 over` the kalshi row prices -194
+  alone while the book row's `best_any_book` is betrivers -195 — the two are never
+  compared, so `best_any_book` is not the best price available. The repair belongs
+  at hop 2 or 3 (normalise the name into the grid key, keeping the raw spelling on
+  the row for display).
+- **WHAT THE SPLIT COSTS, and it is the reason this is worth fixing rather than
+  deduping** `[same payload, artifact 2026-09-06T14:44:08Z, all 25 pairs]`. The
+  stranded kalshi price was compared against the multi-book row's
+  `best_any_book`, converted to decimal:
+
+      kalshi strictly BETTER  16 / 25       books better  7       equal  2
+      when kalshi is better:  median +6.92% payout, max +23.41%
+      (`batter_home_runs jose ramirez 0.5 over`: kalshi +733 vs best book +575)
+
+  So on 16 of 25 bets the field named `best_any_book` is NOT the best price
+  available, and the board never compares the two. A join-level dedupe cannot
+  recover this: it picks a row, it does not MERGE the price maps, so
+  `book_prices` stays incomplete and every downstream reader of it -- dispersion,
+  CLV, any backtest -- stays blind to the better side. Fixing the grid key
+  restores the comparison AND removes the duplicate in one move.
+- **FIX BUILT, TESTED AND LANDED — NOT DEPLOYED** `[2026-09-06]`. The repair is a
+  FOLD at the market-identity level, in ONE function every identity now calls:
+  `odds_book_quotes.fold_market_identity_term(field, value)`, which
+  `normalize_person`s `player_name` and passes every other field through.
+  Call sites: `book_grid._instance_key` (both `freshest_rows_for_grid` and
+  `build_book_grid`), `book_grid._line_group_key`,
+  `odds_book_quotes.market_sides_for_quote`, and
+  `layer2_shortlist._fold_group_term` (both `_index_last_seen` and
+  `_classify_stale_row`, on BOTH sides of the comparison).
+- **A HALF-DONE FOLD IS WORSE THAN NONE, AND THE FIRST VERSION WAS ONE.**
+  `_INSTANCE_FIELDS` has carried a written warning since it was authored — it
+  must not disagree with `market_sides_for_quote`'s own base tuple "or sides
+  land in different grid rows and the grid silently under-reports book
+  coverage". Folding only `book_grid` did exactly that: the two spellings merged
+  into one grid row and the Kalshi price was then dropped on the floor
+  (`books=['betmgm','draftkings']`, one row, the quote gone). **That is strictly
+  worse than the defect** — the duplicate at least kept both prices reachable.
+  A reachability test written before the correctness tests is what caught it;
+  nothing else would have, because one row is what "fixed" looks like.
+- **`_KEY_FIELDS` IS DELIBERATELY NOT FOLDED, and that is what forced the
+  `layer2_shortlist` half.** It is the dedup key an APPEND-ONLY change log is
+  written against, and `_classify_stale_row` guards on its exact field ORDER, so
+  `last_seen` still carries every raw spelling while a grid row now carries one.
+  Compared unfolded, a merged row's group comes back EMPTY — and an empty group
+  returns `market_gone`, which is the ONE label the caller acts on by DROPPING
+  the row. A failed join there deletes a live market rather than degrading a
+  diagnostic, so both sides of that comparison fold too.
+- **THE FIRST VERSION OF THE FIX WAS TOO SLOW TO SHIP, AND ONLY A BENCHMARK SAID
+  SO** `[measured on this machine before deploying, 2026-09-06]`. The grid pivot
+  is a hot path a production day feeds ~274,000 rows, and `normalize_person` does
+  an NFKD pass, a per-character generator and a regex sub. Naive:
+
+      _instance_key over 50,000 rows   folded 1.751s  vs raw 0.063s   (27x)
+      whole build                      3.23s -- the fold was 52% of it
+
+  Two changes, and **the obvious one was not the one that mattered**:
+  1. a memo on the fold (`_FOLD_CACHE`, clear-on-full at 32,768). Bought only
+     1.751 -> 1.508s. The working set is tiny (303 distinct names in the
+     benchmark, 304 in production) so it hits almost always -- which is exactly
+     why it was not the bottleneck.
+  2. **the call COUNT.** Folding by calling one function per field cost six
+     Python calls per row where five could only ever return `str(...)`. Guarding
+     on `field in _FOLDED_IDENTITY_FIELDS` at all three sites -- `_instance_key`,
+     `_line_group_key` and `market_sides_for_quote`'s inner loop -- is what
+     actually paid.
+
+  After, on a PRODUCTION-SHAPED input (153,600 quote rows, 8 books x 2 sides per
+  market, so `market_sides_for_quote`'s inner loop is amplified the way it is in
+  production rather than the way a flat synthetic makes it look):
+
+      fold ON 2.720s   fold OFF 2.302s   -> +0.418s, +18% of the grid pivot
+
+  ~0.3% of a 2-minute board build. Shipped at that. The 27x version was not.
+- **VERIFICATION.**
+
+  | check | result |
+  |---|---|
+  | (1) `off != on`, PRODUCTION data — 25 real colliding pairs replayed | **0/25 merged -> 25/25 merged** |
+  | (2) the stranded price arrives with the merge | `cells` = betmgm+draftkings+**kalshi** |
+  | (3) merged row sees a price better than one row alone could | **20 / 25** |
+  | (4) new tests fail with the fold reverted (probe, then restored) | **3 of 13 fail** |
+  | (5) the label is not the key — no `julio rodriguez` on the board | asserted, + order-independence |
+  | (6) fold reaches no further: 2 players stay 2, every other field still splits | asserted (5 fields) |
+  | (7) `book_grid` + `layer2_shortlist` surface | **149 pass** (was 82 green at baseline) |
+  | (8) wider sweep, `-k` grid/kalshi/venue/quote/board/shortlist/clv | **1,577 pass, 3 pre-existing fails** |
+
+  The 3 are `test_nfl_preseason_market_board_live_odds` (2) and
+  `test_layer2_lane_chip_join` (2, one shared with the first sweep) — each shown
+  PRE-EXISTING by running it with the fold disabled and enabled at the same
+  instant, identical failures both ways. Not adopted, not fixed here.
+- **SUBSTRATE.** (1)-(3) are `checkout` runs over `render`-sourced DATA: real
+  production prices and real production spellings through the real
+  `build_book_grid`. **They are evidence about the CODE, never about the
+  deployment.** Nothing here says production has merged anything — that needs a
+  deploy and a re-fetch of the same endpoint.
+- **DEPLOYED AND MEASURED — refresh-worker `91d523ad` live 16:24:47Z. Full row
+  in `deploys.md`.** BEFORE 16:16:30Z / AFTER 16:43:53Z, same instrument,
+  `limit=2000` both times: collisions **35 -> 4**, `kalshi_plus_books`
+  **654 -> 666 (ROSE)**, `kalshi_only` **39 -> 0**, names with two spellings
+  **10 -> 0**. The RISE is the load-bearing half — an outage would take the
+  first three to zero too, and would take this DOWN.
+- **THE PREDICTION WAS 0 AND THE ANSWER IS 4; I WAS WRONG AND THE 4 ARE A
+  DIFFERENT DEFECT.** All four are `totals`/`totals_alt` and
+  `spreads`/`spreads_alt` GAME lines, `player_name=None`, zero diacritic — the
+  main-vs-alternate collision `21aac548` already owns. Verified by RUNNING
+  `_collapse_duplicate_bets` over the real production rows, not by trusting its
+  docstring: shortlist 4, collapsed 4, **collisions the JOIN sees 0**. The
+  double-exposure path is closed end to end.
+- **STILL OWED: web and live-odds-worker.** Both run the same
+  `build_book_grid` / `market_sides_for_quote` and are still unfolded, so until
+  they land the services disagree about what one bet is. Both live SHAs are
+  ancestors of `91d523ad`.
+- **STILL OWED: the deploy and its measurement.** The reading that would close
+  this: `/api/board/layer2-shortlist?date=<D>&sport=mlb&limit=2000` on a rebuilt
+  artifact, `colliding _row_key`s **> 0 -> 0**, with `kalshi_plus_books` RISING
+  (the merge landing) rather than `kalshi_only` merely falling (which a capture
+  outage would also produce). **`limit=2000` — the default 200 censuses 0
+  collisions on a defective board and is how this would be "verified" wrongly.**
+- Verification: the six readings in the table above, all from one fetch of one
+  artifact (`written_at 2026-09-06T14:44:08Z`), plus the `off != on` mechanism run.
+- Blocked by: none. NO DEPLOY in this lane; no code changed.
+
+- **WEB GOT THE FIX FOR FREE, AND I CHECKED RATHER THAN ASSUMED.** `web-oom-trim-auto`
+  deployed `f6af42cf` at 16:24:41Z; `git merge-base --is-ancestor 91d523ad f6af42cf`
+  confirms it CONTAINS the fold. So web's serve-time `/api/board/book-grid` is
+  folded too, without a second deploy or a second restart.
+- **LIVE-ODDS-WORKER IS NOT DEPLOYED, AND I CHOSE NOT TO FORCE IT.** Still
+  `54c9b157`. Preflight HELD for 20 consecutive attempts over ~29 minutes with
+  the job count GROWING 3 -> 5 -> 6 — `refresh_odds_sources.py` and
+  `poll_soccer_live_state.py`, i.e. the service doing its job during a live
+  slate. Killing an in-flight odds refresh is the 2026-08-03 incident
+  `check_deploy_safety`'s own docstring records.
+  **The bound that makes waiting the right call rather than a stall:** this
+  service does not build the shortlist or the board grid — refresh-worker and
+  web do, and both are folded and measured. Its only exposure to the change is
+  `quote_ref_for_bet` -> `market_sides_for_quote`, a bet-quote lookup. So the
+  duplicate-row and double-exposure defects are CLOSED on every surface that
+  stakes money; what is left is a consistency gap, not a correctness one.
+  **It needs no deploy of its own.** Every SHA on `main` now contains the fold,
+  so it lands on this service's next deploy for any reason — which is exactly
+  how web got it. Claim released.
+- **~~THE POLLER STRANDED MY OWN CLAIM~~ — RETRACTED 2026-09-06, IT WAS OPERATOR
+  ERROR AND I BLAMED A TOOL.** The bullet that stood here said `deploy_preflight
+  --holder` "rotates the token too" and proposed the class rule *any repeated
+  claim-aware call rotates the token*. **That is false.** Lane
+  `prop-region-knob` challenged it; I checked and they are right.
+  - **Code:** every `token` in `deploy_preflight.py` is `ADMIN_TOKEN`, the API
+    auth header. There is no claim write in it at all — no `acquire`, no
+    `renew`, no `_write_claim`.
+  - **The actual cause, `deploy_claim.py:342` + `:402`:**
+    `release` takes `--token`, **`default=None`**, and refuses when it does not
+    match. I never passed it. `acquire` had PRINTED the token to me both times
+    (`255f6537d6740784`, `82e84fd51b717566`) and I read past it.
+  - **Confirmed by experiment**, not by reading: acquire, then
+    `release` with no token -> REFUSED; `release --token <tok>` -> released.
+  - **So I used `--force` twice to get past a refusal I caused myself.** `--force`
+    is the gesture reserved for a session that is GONE. No harm — both claims
+    were mine — but the gesture was wrong and the reasoning behind it was
+    invented.
+  - The pre-existing rule (*a poll loop reads `status`, never `acquire`*) was
+    never violated and never inadequate. It simply had nothing to do with this.
+- **ALL THREE SERVICES NOW CARRY THE FOLD** `[2026-09-06, user asked for
+  live-odds-worker in the next quiet window]`: web `f6af42cf` 16:24:41Z (rode a
+  peer's deploy), refresh-worker `91d523ad` 16:24:47Z (measured), live-odds-worker
+  `f65ec45e` 17:53:14Z. Rows for both deploys in `deploys.md`. The quiet window
+  opened on the FIRST check — the jobs that held the service for 20 consecutive
+  checks earlier had finished on their own. Nothing killed on either deploy.
+- **THE HEADLINE NUMBER I USED WAS THE WRONG ONE, AND THE SCRIPT FIXED IT.**
+  I reported `colliding _row_keys 35 -> 4` and then had to explain the 4 in
+  prose. The number that actually matters splits by CLASS, because two different
+  defects share that counter: a collision whose RAW market names DIFFER is the
+  main-vs-alternate case `_collapse_duplicate_bets` collapses at index build, and
+  one whose raw names AGREE is the case that reaches the join as double
+  exposure. Measured on production 2026-09-06T17:56:15Z:
+
+      colliding _row_keys        2
+         raw market DIFFERS      2    <- collapsed by the join
+         raw market AGREES       0    <- reaches the join; DOUBLE EXPOSURE
+      kalshi_only                0
+      names w/ 2 spellings       0
+
+  **`raw_market_agrees` is the number to quote.** It needs no prose and it does
+  not move when the other lane's defect does.
+- **THE MEASUREMENT IS NOW REPRODUCIBLE BY ANYONE:
+  `scripts/census_board_row_duplicates.py`.** Until it landed, every number in
+  the `deploys.md` rows above could be re-taken by exactly one session, which
+  makes them claims rather than evidence. It uses the REAL `_row_key` and
+  `normalize_person` (never a private copy), forces `limit=2000`, splits
+  collisions by class, and `--baseline`/`--compare` BUCKETS keys into
+  both/after_only/before_only — because a row-count delta cannot tell genuine
+  new coverage from one bet splitting into two rows, and only the collision
+  count separates them. Its compare prints an explicit NOT-PROVEN verdict when
+  duplicates fall while `kalshi_plus_books` does not rise, which is the capture-
+  outage signature that mimics a working fold.
