@@ -261,12 +261,17 @@ guard is proven to REFUSE, never yet proven to have CORRECTED a fill.
 `[verified 2026-09-05, lane mlb-first5-kalshi-execution, commit `d2b060c8` on
 origin/main, NOT DEPLOYED]`.
 
-1. **`sport_for_series("KXMLBF5TOTAL")` returned None.** The series was absent
-   from `SERIES_SPORT` while `KXMLBTOTAL` sat there, hand-registered 2026-08-25
-   when the same title gate missed it. `classify_market` refused at the FIRST
-   gate with `unmapped_series`, so production fetched these markets **every
-   tick and discarded them** — `[kalshi_odds] TITLE KXMLBF5TOTAL :: 'First 5
-   innings: Over 6.5 runs'` was printing while nothing downstream could read it.
+1. ~~**`sport_for_series("KXMLBF5TOTAL")` returned None**, so `classify_market`
+   refused at the first gate with `unmapped_series`.~~ **RETRACTED 2026-09-06 —
+   TRUE OF A COLD PROCESS, FALSE OF PRODUCTION.** `sport_for_series` reads the
+   hand registry **then `_DISCOVERED`**, and Kalshi's real series title is
+   `'First 5 Innings Total'` (read from the venue's `/series` endpoint), which
+   `game_market_from_title` resolves to `totals` — so discovery had **already**
+   mapped the series to `mlb` at runtime. Production was never unregistered.
+   Measured over the same real data: discovery-only gives `matched=0`,
+   `unmapped_series=0`, `no_matching_board_row=21`; adding the hand registration
+   on top changes **nothing**. The registration is defence-in-depth against a
+   failed catalogue read, not the fix.
 2. **The two sides named the market differently.** `classify_market` yields
    OddsAPI's REQUEST spelling `totals_1st_5_innings`; the board stores the pair
    `segment_market_keys('mlb')` maps it onto — `market='totals'` +
@@ -278,6 +283,20 @@ Fixed symmetrically — `_row_market()`, one helper shared by
 `_event_key`/`_board_key`/`_row_key`, strips the segment suffix so the fused and
 split spellings key identically. **This WIDENS what the index pairs on purpose**
 and `_segments_agree` is what makes that safe.
+
+**GAP 2 IS THE WHOLE PRODUCTION FIX, and this is where F5 markets actually died
+pre-fix: at the JOIN'S INDEX LOOKUP, counted as `no_matching_board_row`** — not
+`unmapped_series`, which never fired in a single production join line. Factorised
+over 84 real settled contracts × 553 production shortlist rows (2026-09-05):
+cold+nothing `matched=0 unmapped_series=84`; **discovery-only (= real pre-fix
+production) `matched=0`, `no_matching_board_row=21`**; discovery+bridge
+`matched=8`; hand+discovery+bridge (shipped) `matched=8` — identical to the row
+above it. **The two readings that were telling me this all along and that I
+walked past twice: production's join reasons carried NO `unmapped_series`, and
+its trim carried NO `unmapped` bucket.** Both said the series was already mapped.
+My first replay ran in a cold process and so measured a state production was
+never in — `state.md`'s substrate rule exactly: a local run is evidence about the
+CODE, never about the DEPLOYMENT.
 
 **MEASURED, and the FIRST measurement read INERT for a reason worth keeping:**
 replaying TODAY's open contracts against PAST board rows matches nothing however

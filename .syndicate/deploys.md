@@ -23927,3 +23927,63 @@ live-odds-worker nor web over 24h. No `render.yaml` change, no `blueprint_sync`.
 at 02:33:49Z; I held until `MLB_DAILY_SIM_END ... exit_code=0
 duration_seconds=1097` at 02:53:02Z and confirmed no newer sim had started. The
 deploy that landed did so after that window.
+
+
+## 2026-09-06 04:0xZ — **CORRECTION to the `1f032074` entry above: I had the MECHANISM WRONG. Only ONE of the two changes was load-bearing in production, and it is the one I called secondary.** `[lane mlb-first5-kalshi-execution, re-opened question]`
+
+The entry above says the defect was "two gaps in series, either alone inert".
+**That is true of a COLD PROCESS and false of PRODUCTION.**
+
+`sport_for_series` reads the hand registry **then `_DISCOVERED`**. Kalshi's real
+series title for `KXMLBF5TOTAL` is **`'First 5 Innings Total'`** (read from
+`/trade-api/v2/series/KXMLBF5TOTAL`, not guessed), and
+`game_market_from_title('First 5 Innings Total')` resolves to `totals` — so
+`auto_game_series_from_catalogue` **had already discovered the series and mapped
+it to `mlb` at runtime**. Production was never in the unregistered state my
+replay measured.
+
+Factorised over the same real data (84 settled `KXMLBF5TOTAL` contracts × 553
+production shortlist rows, 2026-09-05):
+
+| state | matched | `unmapped_series` | `no_matching_board_row` |
+|---|---|---|---|
+| cold, neither fix — *what my first replay measured* | 0 | **84** | 0 |
+| cold, hand registration only | 0 | 0 | 21 |
+| **discovery only — ACTUAL PRE-FIX PRODUCTION** | **0** | **0** | **21** |
+| discovery + `_row_market` bridge | **8** | 0 | 14 |
+| hand + discovery + bridge — *shipped* | 8 | 0 | 14 |
+
+**Rows 4 and 5 are identical: the hand registration changed NOTHING in
+production.** The entire production fix is the `_row_market` vocabulary bridge.
+
+**So the answer to "where did F5 markets die pre-fix" is: at the JOIN'S INDEX
+LOOKUP, counted as `no_matching_board_row`** — the contract keyed
+`totals_1st_5_innings`, the board row keyed `totals`, and they never met. Not
+`unmapped_series`, which is why that reason never appeared in a single
+production join line and why my search for it kept coming back empty.
+
+**Three earlier statements this retires:**
+1. *"Two gaps in series, either alone inert."* Wrong for production. One gap.
+   The registration is defence-in-depth for a failed catalogue read (which is
+   what `SERIES_SPORT`'s own docstring claims for it) and is worth keeping, but
+   it was not the fix.
+2. *"F5 markets were dropped before the join, at the sport trim."* Wrong, and I
+   already retracted it — now the REASON is known: F5 was mapped to `mlb` by
+   discovery, so it was counted inside `kept_by_sport['mlb']` all along. That is
+   why `mlb` read 2,740 before and after: nothing moved between buckets.
+3. *"`unmapped_series` never appears, mechanism unexplained."* Explained: it
+   never appears because it never fired.
+
+**The rule this cost.** My replay ran in a cold process where discovery had never
+run, so it measured a state production was never in — and I read its `off != on`
+as proof of what production needed. `state.md`'s own substrate rule says it: **a
+local run is evidence about the CODE, never about the DEPLOYMENT.** The tell was
+available and I walked past it twice: production's join reasons had NO
+`unmapped_series`, and its trim had NO `unmapped` bucket. Both were saying the
+series was already mapped.
+
+**Nothing about the deploy changes.** `1f032074` is still correct and still live;
+the shipped state is row 5. `verify:` remains **OWED** — a production reading
+that a `first5` row acquires a `KXMLBF5*` ticker — and is now MORE likely to be
+observable than the original entry implied, because the mechanism that was
+actually broken is the one that got fixed.
