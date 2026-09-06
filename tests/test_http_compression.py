@@ -266,3 +266,96 @@ def test_a_genuine_403_is_not_blamed_on_the_header(server):
 def test_install_is_idempotent():
     assert hc.install_http_compression() is True
     assert hc.install_http_compression() is False
+
+
+def test_traffic_class_splits_billed_from_unbilled():
+    """The unsplit total is not an answer to the question this module exists for.
+
+    Internal worker->web transport is not billed (measured 2026-09-05: 5,243 MB
+    of it metered 33.9 MB), so a combined "saved 687 MB" mixes a real bandwidth
+    saving with a memory saving. Unknown must resolve to EXTERNAL so the billed
+    figure over-estimates rather than flatters.
+    """
+    assert hc._traffic_class("syndicate-an21") == "internal"      # Render service name, no dot
+    assert hc._traffic_class("10.197.59.162") == "internal"
+    assert hc._traffic_class("127.0.0.1") == "internal"
+    assert hc._traffic_class("localhost") == "internal"
+    assert hc._traffic_class("site.api.espn.com") == "external"
+    assert hc._traffic_class("statsapi.mlb.com") == "external"
+    assert hc._traffic_class("") == "external"                     # unknown -> billed
+    assert hc._traffic_class("172.32.0.1") == "external"           # just outside the private range
+
+
+def test_a_loopback_fetch_counts_as_internal_not_billed(server):
+    """The test server is 127.0.0.1, so its bytes must NOT land in the billed bucket."""
+    hc.install_http_compression()
+
+    with urllib.request.urlopen(urllib.request.Request(f"{server}/feed"), timeout=10) as response:
+        response.read()
+
+    stats = hc.stats()
+    assert stats["responses_gzip"] == 1
+    assert stats["responses_gzip_internal"] == 1
+    assert stats["responses_gzip_external"] == 0
+    assert stats["decoded_bytes_internal"] == len(BODY)
+    # The billed figure stays at zero for unbilled traffic -- the whole point.
+    assert stats["saved_bytes_external"] == 0
+    assert stats["saved_bytes_internal"] > 0
+
+
+def test_the_first_response_logs_immediately(server, capfd):
+    """An instrument whose first reading needs 200 events cannot verify its own deploy.
+
+    That is not hypothetical: it is exactly what happened on the 2026-09-05
+    refresh-worker deploy, where HTTP_COMPRESSION was silent at T+10min and the
+    silence was indistinguishable from an unreachable emitter.
+    """
+    hc.install_http_compression()
+
+    with urllib.request.urlopen(urllib.request.Request(f"{server}/feed"), timeout=10) as response:
+        response.read()
+
+    out = capfd.readouterr().out
+    assert "HTTP_COMPRESSION" in out, "the FIRST gzip response must log, not the 200th"
+    assert "gzip_responses=1 " in out
+    assert "BILLED_saved_bytes=" in out
+
+
+def test_the_split_reconciles_with_the_total(server):
+    """internal + external == total, in both directions.
+
+    Guards the accounting itself: a class counter that silently diverges from
+    the aggregate would make the BILLED figure wrong in a way no ratio looks
+    odd enough to catch.
+    """
+    hc.install_http_compression()
+    with urllib.request.urlopen(urllib.request.Request(f"{server}/feed"), timeout=10) as response:
+        response.read()
+
+    s = hc.stats()
+    assert s["decoded_bytes"] == s["decoded_bytes_internal"] + s["decoded_bytes_external"]
+    assert s["wire_bytes"] == s["wire_bytes_internal"] + s["wire_bytes_external"]
+    assert s["responses_gzip"] == s["responses_gzip_internal"] + s["responses_gzip_external"]
+
+
+def test_the_first_line_reports_a_real_billed_ratio(server, capfd, monkeypatch):
+    """REGRESSION. The first line reported BILLED_ratio=0.00x on a 12.9x fetch.
+
+    The aggregate `decoded_bytes` bump is what fires the log, and it was
+    landing BEFORE its paired class bump -- so the line was printed from a
+    half-updated state, with the billed wire bytes counted and the billed
+    decoded bytes not yet. A line of zeros that looks like an answer is worse
+    than silence, which is the same failure this early-logging exists to fix.
+    """
+    monkeypatch.setattr(hc, "_traffic_class", lambda host: "external")
+    hc.install_http_compression()
+
+    with urllib.request.urlopen(urllib.request.Request(f"{server}/feed"), timeout=10) as response:
+        response.read()
+
+    line = [l for l in capfd.readouterr().out.splitlines() if "HTTP_COMPRESSION" in l][0]
+    assert "BILLED_ratio=0.00x" not in line, line
+    assert "BILLED_saved_bytes=0 " not in line, line
+    s = hc.stats()
+    assert s["saved_bytes_external"] > 0
+    assert s["saved_bytes_internal"] == 0
