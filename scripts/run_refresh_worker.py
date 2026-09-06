@@ -6021,6 +6021,61 @@ def main() -> int:
                 print(f"[kalshi_polymarket_arb] UNMAPPED_DIAG_FAILED {type(exc).__name__}: {exc}", flush=True)
     except Exception as exc:
         print(f"[refresh_worker] KALSHI_POLYMARKET_ARB_PROBE_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # ONE-SHOT, ENV-GATED: apply the MLB segment regrade. Built by lane
+    # `segment-regrade-writeback` (`e796a5a5`); carried here rather than edited
+    # in by them because this file is claimed by `ncaaf-live-resim-wire` and two
+    # lanes editing one boot block is how a print statement got mangled earlier
+    # today.
+    #
+    # THIS CODE IS INERT AND STAYS INERT UNTIL SOMEONE SETS THE VARIABLE. Adding
+    # it is a file-ownership courtesy; SETTING
+    # `SYNDICATE_SEGMENT_REGRADE_APPLY_ON_BOOT` is a decision to REWRITE SETTLED
+    # MONEY HISTORY -- 49 MLB segment orders graded against the whole-game
+    # actual, P&L effect -$31.32 -- and that decision belongs to the user, not
+    # to either lane. Do not set it to "make the tests pass" or to tidy a
+    # counter.
+    #
+    # WHY A BOOT HOOK IS ACCEPTABLE HERE, checked rather than assumed: the
+    # script is IDEMPOTENT. `apply_segment_regrade.py:176` skips any row already
+    # carrying `outcome_as_settled`, so a re-run reports `already corrected` and
+    # writes nothing. That matters because this service restarts on OOM and on
+    # every deploy, so a hook gated only by an operator remembering to unset a
+    # variable would otherwise be a repeat-application risk rather than the
+    # one-shot its name claims.
+    #
+    # Reversible by construction: each corrected row keeps `outcome_as_settled`
+    # and `pnl_as_settled_dollars` beside the new values. The 10 venue-settled
+    # rows are excluded permanently and deliberately -- for 5 of them the
+    # contract HELD was a full-game `KXMLBTOTAL`, so the venue graded the
+    # instrument actually owned, and "correcting" those would invent P&L no
+    # position earned.
+    try:
+        import os as _os
+
+        if str(_os.environ.get("SYNDICATE_SEGMENT_REGRADE_APPLY_ON_BOOT") or "").strip().lower() in {
+            "1", "true", "yes", "on",
+        }:
+            import subprocess as _sp
+            import sys as _sys
+
+            _manifest = (
+                _os.environ.get("SYNDICATE_SEGMENT_REGRADE_MANIFEST")
+                or "reports/segment_regrade/manifest_2026-09-05.json"
+            )
+            _res = _sp.run(
+                [_sys.executable, "scripts/apply_segment_regrade.py",
+                 "--manifest", _manifest, "--apply"],
+                capture_output=True, text=True,
+            )
+            print(f"[segment_regrade] rc={_res.returncode} " + (_res.stdout or "")[-1500:], flush=True)
+            if _res.returncode != 0:
+                # NAMED, not swallowed. rc=3 is the script's own refusal when the
+                # ledger is not present -- which on this service would mean the
+                # hook ran somewhere it must not, and is a louder fact than a
+                # non-zero exit.
+                print(f"[segment_regrade] NONZERO_EXIT stderr={(_res.stderr or '')[-600:]}", flush=True)
+    except Exception as exc:
+        print(f"[refresh_worker] SEGMENT_REGRADE_HOOK_FAILED {type(exc).__name__}: {exc}", flush=True)
     # NOTE: Polymarket's odds refresh (pipeline/polymarket_odds_refresh.py)
     # deliberately gets NO hook here -- another session already built and
     # wired it into scripts/run_live_odds_refresh_worker.py's own boot
