@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 848 rules `[generated]`
+## Index — 853 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -35,6 +35,40 @@
 <!-- LEARNINGS-INDEX:END -->
 
 ---
+## 2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value written by join B. Name the WRITER of the field in the falsification test itself. `[lane mlb-first5-kalshi-fanin-mismatch, vs 15410ca7]`
+
+Two sessions investigated one board row on the same day and reached opposite
+verdicts. Both measurements were CORRECT:
+
+    join_kalshi_to_board      -> the ORDER path resolves KXMLBF5TOTAL   (peer)
+    apply_venue_quotes_to_grid-> the PRICE came from KXMLBTOTAL, -669   (this lane)
+
+The peer's falsification test read "if the emitted series for that row reads
+KXMLBF5TOTAL, the mismatch hypothesis is dead" — a well-formed test pointed at
+the wrong function. "The series for that row" has two answers because two joins
+touch the row, and the one that mattered was the one that WROTE the field under
+suspicion (`price_source`, `book_prices`, `venue_basis`).
+
+**THE REMEDY IS ONE CLAUSE IN THE TEST:** write the falsification test as *"the
+series that `<function that assigns the field>` used"*, not *"the series for
+that row"*. If you cannot name that function, that is the first thing to find,
+not a detail to fill in later.
+
+**AND THE TELL WAS SITTING IN THE FIXTURE.** Their test file carried both real
+contracts with real prices — `KXMLBTOTAL` at `-669`/0.870 (commented "the number
+production actually showed") and `KXMLBF5TOTAL` at `+103`/0.492. The conclusion
+was "0.870 is a wide ask on a thin first5 market" while the file itself said the
+first5 ask was 0.492 and the 0.870 belonged to the full-game contract. **When a
+conclusion and a fixture in the same commit disagree, the fixture is the
+measurement and the conclusion is the story.** Re-read your own fixture against
+your own headline before shipping the headline.
+
+**DO NOT let this read as "the peer was careless."** They revised their
+hypothesis DOWNWARD before building, wrote an explicit falsification test,
+shipped instrumentation only, and used real tickers instead of paraphrases —
+all of which is why the refutation was cheap to produce. A vaguer investigation
+would have left nothing to check.
+
 ## 2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deployed, firing, and named after it. Find the code that WROTE the field you are looking at. `[lane mlb-first5-kalshi-fanin-mismatch]`
 
 A first5 board row was priced at a whole-game 0.870. `_segments_agree` exists

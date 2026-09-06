@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 848 rules `[generated]`
+## Index — 853 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,8 +8,9 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 315**
+**FORBIDDEN — 318**
 
+- [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
 - [2026-09-06 — FORBIDDEN: shipping a refusal keyed to ONE spelling of a value that has sy…](#2026-09-06-forbidden-shipping-a-refusal-keyed-to-one-spelling-of-a-value-that-has-synonyms-check-the-synonym-set-before-the-predicate-not-after-lane-mlb-first5-kalshi-fanin-mismatch)
 - [2026-09-05 — FORBIDDEN: a per-item guard implemented as an `A or B` search over a CONCA…](#2026-09-05-forbidden-a-per-item-guard-implemented-as-an-a-or-b-search-over-a-concatenation-of-every-items-source-whichever-item-supplies-b-satisfies-it-for-every-value-of-a-so-the-check-has-no-failing-input-at-all-lane-ncaaf-segment-capture-commits-7f197639-7dfabcf4-no-deploy)
@@ -136,6 +137,8 @@
 - [2026-09-05 FORBIDDEN: attributing a workload to YOUR run because it appeared in a dump…](#2026-09-05-forbidden-attributing-a-workload-to-your-run-because-it-appeared-in-a-dump-your-run-emitted-a-machine-wide-process-dump-is-not-a-description-of-you)
 - [2026-09-05 — FORBIDDEN: simulating "the artifact is absent" by repointing its ROOT env…](#2026-09-05-forbidden-simulating-the-artifact-is-absent-by-repointing-its-root-env-var-alone-the-repo-mirror-is-still-a-candidate-so-the-test-measures-your-machine-lane-nfl-fantasy-artifact-root)
 - [2026-09-06 FORBIDDEN: asserting an ABSOLUTE threshold on a timing ratio in a test — it…](#2026-09-06-forbidden-asserting-an-absolute-threshold-on-a-timing-ratio-in-a-test-it-is-a-claim-about-the-machines-scheduler-and-the-instrument-reporting-otherwise-would-be-lying)
+- [2026-09-06 FORBIDDEN: gating a destructive decision on a record that something COMPLETE…](#2026-09-06-forbidden-gating-a-destructive-decision-on-a-record-that-something-completed-when-a-reading-of-whether-it-is-still-running-exists-three-instances-in-one-evening-lane-shortlist-prop-row-duplicates-generalised-with-lane-prop-region-knob)
+- [2026-09-06 FORBIDDEN: reaching for `--force` on a refusal you have not read. Mine said…](#2026-09-06-forbidden-reaching-for---force-on-a-refusal-you-have-not-read-mine-said-what-was-wrong-i-invented-a-tool-bug-instead-and-nearly-wrote-it-into-this-file-as-a-class-lane-shortlist-prop-row-duplicates-caught-by-lane-prop-region-knob)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -335,7 +338,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 527**
+**Rules and corrections — 529**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -417,6 +420,8 @@
 - [2026-09-05 — A PREDICTION NAMING SPECIFIC TESTS EXPIRES IN A REPO WITH LIVE PEERS. Re-d…](#2026-09-05-a-prediction-naming-specific-tests-expires-in-a-repo-with-live-peers-re-derive-it-at-launch-not-when-you-write-it-lane-full-suite-xdist-run)
 - [2026-09-06 — VERIFY A DEPLOY WITH A DISCRIMINATOR THAT IS A **KEY**, NOT A VALUE. My pr…](#2026-09-06-verify-a-deploy-with-a-discriminator-that-is-a-key-not-a-value-my-predicted-value-was-wrong-and-the-verification-survived-anyway-lane-ncaaf-live-resim-wire)
 - [2026-09-06 — A SCHEDULING INTERVAL IS NOT A COMPLETION INTERVAL, and the two share a na…](#2026-09-06-a-scheduling-interval-is-not-a-completion-interval-and-the-two-share-a-name-measured-78x-apart-lane-ncaaf-live-resim-wire)
+- [2026-09-06 — AN INTERVENTION'S OWN OUTPUT CANNOT SUPPLY ITS COUNTERFACTUAL](#2026-09-06-an-interventions-own-output-cannot-supply-its-counterfactual)
+- [2026-09-06 REQUIRED: write a belief in the form that makes a PREDICTION. A wrong rule a…](#2026-09-06-required-write-a-belief-in-the-form-that-makes-a-prediction-a-wrong-rule-about-a-mechanism-gets-caught-in-minutes-the-same-wrong-belief-as-a-one-off-remedy-is-simply-adopted-insight-from-lane-prop-region-knob-recorded-by-lane-shortlist-prop-row-duplicates)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

@@ -454,6 +454,35 @@ decision ("instrument first, fix second"), so deploy 1 COUNTS the mis-bindings
 and changes no price and deploy 2 flips the constant.** `SEGMENT_MISMATCH_GRID`
 carries `refusing=`, so a reader can never mistake the count for the repair.
 
+**A PEER READ THE SAME ROW AND CONCLUDED THE OPPOSITE; THEIR OWN FIXTURE
+REFUTES IT** `[15410ca7 on origin/main, "…and it DISPROVES the alarm that
+prompted it"]`. Their MEASUREMENT is correct and is not in dispute:
+`join_kalshi_to_board` resolves `KXMLBF5TOTAL` for a first5 row and
+`_segments_agree` refuses `KXMLBTOTAL` there. That is the ORDER path. The
+board's PRICE is written by `apply_venue_quotes_to_grid`, and there the same row
+takes `KXMLBTOTAL-26SEP061210MILCIN-5` at `-669`. Two joins, two answers, no
+contradiction — and the 0.870 on the board is the second one.
+
+**THE REFUTING NUMBER IS IN THEIR OWN TEST FILE.**
+`tests/test_kalshi_match_series_observable.py` carries the real venue prices:
+`KXMLBTOTAL-…-5` at **`yes_american -669` / 0.870** (their comment: *"the number
+production actually showed"*) and `KXMLBF5TOTAL-…-5` at **`yes_american 103` /
+0.492**. **The first5 ask is a coin flip agreeing with the 7-book consensus of
+0.4926 to three decimals — it is not wide and it is not 0.870**, so "a wide ask
+on a thin first5 market" cannot be what the board showed. Replaying THEIR two
+contracts through the pricing path reproduces production exactly:
+`venue_ref=KXMLBTOTAL-26SEP061210MILCIN-5`, `venue_probability 0.869961`,
+`edge_pct -38.535`, and `matched={'first5|kalshi|KXMLBTOTAL': 2}`.
+
+By their own falsification criterion ("if it reads `KXMLBTOTAL` … that is a much
+bigger finding") this is the bigger finding, with one refinement: the guard is
+not being BYPASSED, it is not ON that path.
+
+**THE REAL TICKERS ARE THEIRS AND ARE ADOPTED HERE:**
+`KXMLBTOTAL-26SEP061210MILCIN-5` / `KXMLBF5TOTAL-26SEP061210MILCIN-5` (12:10
+first pitch, rung 5), read from the venue. The `…1340…-4` strings used in this
+lane's first replay were constructed and are superseded.
+
 **NEARLY SHIPPED AS AN OUTAGE.** The first comparator used
 `normalize_segment(...) != "full"`, which folds only the empty string, and it
 failed **10 tests across two suites** whose grid rows say `segment="full_game"`

@@ -234,3 +234,80 @@ call -- the price is still `-669` and the count is still `2`.
 first two of which are reachability (`off != on`) rather than correctness;
 3,078 green across the venue/kalshi/segment/book_grid/shortlist/layer2/
 polymarket/portfolio/execution/settlement surface.
+
+
+---
+
+## 10. A PEER REACHED THE OPPOSITE CONCLUSION, AND THEIR OWN FIXTURE REFUTES IT `[15410ca7 on origin/main, 2026-09-06 13:40 CDT]`
+
+`kalshi-join: make the matched SERIES observable -- and it DISPROVES the alarm
+that prompted it` instrumented the join and concluded:
+
+> So kalshi 0.870 is a WIDE ASK on a thin first5 market and edge_pct=-38.5 is
+> the system correctly declining it. Not a mis-pairing.
+
+**Their measurement is CORRECT. Their conclusion does not follow from it, and
+the number that settles it is in their own test file.**
+
+### What each of us actually measured
+
+| | function | question | answer |
+|---|---|---|---|
+| peer `15410ca7` | `join_kalshi_to_board` (`kalshi_board_join.py`) | which TICKER does the ORDER path resolve for a first5 row? | `KXMLBF5TOTAL` — `KXMLBTOTAL` refused by `_segments_agree`. **Right.** |
+| this lane | `apply_venue_quotes_to_grid` (`venue_quote_fanin.py`) | which contract writes `best[side].price` / `price_source` / `book_prices` / `venue_basis`? | `KXMLBTOTAL` at `-669`. **Also right.** |
+
+Two joins, two answers, no contradiction. The board row's `0.870` is written by
+the second one.
+
+### Their fixture carries the refutation
+
+`tests/test_kalshi_match_series_observable.py` @ `15410ca7`, real venue prices:
+
+    KXMLBTOTAL-26SEP061210MILCIN-5    "Over 4.5 runs scored"
+        yes_american -669   yes_probability 0.870
+        # their own comment: "the number production actually showed"
+
+    KXMLBF5TOTAL-26SEP061210MILCIN-5  "First 5 innings: Over 4.5 runs"
+        yes_american  103   yes_probability 0.492
+
+**The first5 contract's ask is 0.492 (+103) — a coin flip that agrees with the
+7-book consensus of 0.4926 to three decimals. It is not wide, and it is not
+0.870.** So "a wide ask on a thin first5 market" cannot be what the board
+showed; 0.870 is the full-game contract's price, and the full-game contract is
+the one their own comment labels as the number production showed.
+
+### Replayed through the PRICING path on their exact two contracts
+
+    WHAT KALSHI OFFERS
+      mlb|totals_1st_5_innings|over|4.5   p=0.492  +103   KXMLBF5TOTAL-26SEP061210MILCIN-5
+      mlb|totals|over|4.5                 p=0.870  -669   KXMLBTOTAL-26SEP061210MILCIN-5
+
+    THE first5 BOARD ROW, after apply_venue_quotes_to_grid
+      price -669   price_source kalshi
+      venue_ref KXMLBTOTAL-26SEP061210MILCIN-5
+      venue_probability 0.869961   edge_pct -38.535        <- production's number
+
+    SEGMENT_MISMATCH_GRID ... matched={'first5|kalshi|KXMLBTOTAL': 2}
+      sample=['mlb|first5|totals|4.5 <- kalshi|full|totals|KXMLBTOTAL-26SEP061210MILCIN-5']
+
+The board never asks for `mlb|totals_1st_5_innings|over|4.5`, so the F5 contract
+— correctly priced, sitting right there in the same artifact — is unreachable.
+
+### By their own stated criterion this is the bigger finding
+
+Their falsification test, verbatim from their lane block:
+
+> if the emitted series for that row reads `KXMLBF5TOTAL`, the mismatch
+> hypothesis is dead and the wide-ask reading is confirmed. If it reads
+> `KXMLBTOTAL`, a guard that provably computes False is being bypassed and that
+> is a much bigger finding.
+
+It reads `KXMLBTOTAL` — on the join that priced the row. The one refinement:
+the guard is not being *bypassed*. It is not **on** that path. `_segments_agree`
+lives in `kalshi_board_join.py`; nothing in `venue_quote_fanin.py` imported it,
+and the word `segment` did not occur in that module at all.
+
+**ADOPTED FROM THEIR WORK:** the real tickers are `...26SEP061210MILCIN-5`
+(12:10 first pitch, rung 5), not the `...1340...-4` I had constructed. Their
+strings are read from the venue; mine were synthetic. Every replay above now
+uses theirs, which is why the reproduction is stronger than it was in §3.
