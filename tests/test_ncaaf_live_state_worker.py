@@ -374,3 +374,82 @@ def test_the_record_is_SUFFICIENT_to_resolve_possession_without_a_second_parser(
     )
     assert side == "home", f"possession must resolve to a SIDE, got {side!r}"
     assert raw.get("down") == 3
+
+
+def test_a_fresh_record_with_ZERO_games_is_ACCEPTED_not_refused(monkeypatch):
+    """A date with no games is a COMPLETE answer, not a missing one.
+
+    Measured in production 2026-09-06: `RECORD_UNKEYED date=2026-08-30 games=0`
+    fired on every board build for a date ESPN genuinely has no events on. The
+    reader refused it and fetched, and the fetch returned the same nothing --
+    a pointless call per build, per date, forever, that looked exactly like the
+    producer failing.
+    """
+    empty = {"date": "2026-08-30", "fetched_at": time.time(), "games": []}
+    calls = _patch(monkeypatch, record=empty, fetch_rows=[])
+
+    sources = {}
+    index = lgs.ncaaf_game_state_index(["2026-08-30"], sources=sources)
+
+    assert calls["fetch"] == 0, "an empty date must NOT trigger a fetch"
+    assert index == {}
+    assert sources == {"2026-08-30": "worker"}
+
+
+def test_a_fresh_record_with_games_but_NO_ids_is_still_refused(monkeypatch, capfd):
+    """The other half of the same branch: that one IS deploy skew."""
+    unkeyed = {"date": "2026-09-06", "fetched_at": time.time(),
+               "games": [{"home_team": "B", "away_team": "A", "in_progress": True}]}
+    calls = _patch(monkeypatch, record=unkeyed,
+                   fetch_rows=[{"away_id": "1", "home_id": "2", "in_progress": True}])
+
+    lgs.ncaaf_game_state_index(["2026-09-06"])
+
+    assert calls["fetch"] == 1
+    assert "NCAAF_LIVE_STATE_RECORD_UNKEYED" in capfd.readouterr().out
+
+
+def test_a_stale_record_is_ACCEPTED_when_every_game_is_final(monkeypatch):
+    """A final score cannot change, so its record cannot go stale.
+
+    Measured in production 2026-09-06: the producer runs once per full sweep,
+    so records age 247-940s against a 240s bound, and the board was re-fetching
+    ALL SIX dates every time -- including five whose games finished days ago.
+    """
+    old_final = {
+        "date": "2026-09-03", "fetched_at": time.time() - 10_000,
+        "games": [{"away_id": "1", "home_id": "2", "final": True, "in_progress": False},
+                  {"away_id": "3", "home_id": "4", "final": True, "in_progress": False}],
+    }
+    calls = _patch(monkeypatch, record=old_final, fetch_rows=[])
+    sources = {}
+    index = lgs.ncaaf_game_state_index(["2026-09-03"], sources=sources)
+
+    assert calls["fetch"] == 0, "a finished date must not be re-fetched at any age"
+    assert set(index) == {"1@2", "3@4"}
+    assert sources == {"2026-09-03": "worker"}
+
+
+def test_a_stale_record_is_still_REFUSED_when_a_game_is_unfinished(monkeypatch):
+    """The live date is exactly the one freshness is for."""
+    stale_live = {
+        "date": "2026-09-06", "fetched_at": time.time() - 10_000,
+        "games": [{"away_id": "1", "home_id": "2", "final": True},
+                  {"away_id": "3", "home_id": "4", "final": False, "in_progress": True}],
+    }
+    calls = _patch(monkeypatch, record=stale_live,
+                   fetch_rows=[{"away_id": "9", "home_id": "9", "in_progress": True}])
+    lgs.ncaaf_game_state_index(["2026-09-06"])
+    assert calls["fetch"] == 1
+
+
+def test_a_stale_PREGAME_date_is_refused_because_kickoff_can_happen(monkeypatch):
+    """Pregame counts as moving: a game can start inside the staleness window,
+    and a stale record would render a started game as pregame."""
+    stale_pregame = {
+        "date": "2026-09-06", "fetched_at": time.time() - 10_000,
+        "games": [{"away_id": "1", "home_id": "2", "final": False, "in_progress": False}],
+    }
+    calls = _patch(monkeypatch, record=stale_pregame, fetch_rows=[])
+    lgs.ncaaf_game_state_index(["2026-09-06"])
+    assert calls["fetch"] == 1

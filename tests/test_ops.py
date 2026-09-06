@@ -1277,6 +1277,14 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(
             [s.get("name") for s in refresh_steps],
             [
+                # ANNOUNCED 2026-09-06, lane `ncaaf-live-state-to-worker`: the
+                # producer that lets web READ NCAAF live state instead of
+                # fetching ESPN inside the request path. Updated rather than
+                # loosened, exactly as the comment above requires -- this
+                # assertion is a tripwire for UNannounced steps, and loosening
+                # it to accommodate an announced one would disarm it for the
+                # next unannounced one.
+                "ncaaf_live_state",
                 "ncaaf_game_lines_oddsapi",
                 "ncaaf_player_props_oddsapi",
                 "ncaaf_lines_snapshot",
@@ -1341,6 +1349,14 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(
             [s.get("name") for s in refresh_steps],
             [
+                # ANNOUNCED 2026-09-06, lane `ncaaf-live-state-to-worker`: the
+                # producer that lets web READ NCAAF live state instead of
+                # fetching ESPN inside the request path. Updated rather than
+                # loosened, exactly as the comment above requires -- this
+                # assertion is a tripwire for UNannounced steps, and loosening
+                # it to accommodate an announced one would disarm it for the
+                # next unannounced one.
+                "ncaaf_live_state",
                 "ncaaf_game_lines_oddsapi",
                 "ncaaf_player_props_oddsapi",
                 "ncaaf_lines_snapshot",

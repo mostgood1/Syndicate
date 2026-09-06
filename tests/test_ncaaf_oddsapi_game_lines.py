@@ -431,12 +431,18 @@ def test_the_sweep_runs_the_game_lines_capture_before_the_legacy_bundle():
     # the OddsAPI capture runs BEFORE the legacy bundle, so a bundle failure
     # cannot cost the board its prices.
     assert names == [
+        # ANNOUNCED 2026-09-06, lane `ncaaf-live-state-to-worker`.
+        "ncaaf_live_state",
         "ncaaf_game_lines_oddsapi",
         "ncaaf_player_props_oddsapi",
         "ncaaf_lines_snapshot",
     ]
 
-    capture = steps[0]
+    # BY NAME, NOT BY POSITION. This was `steps[0]` and broke the moment a step
+    # was inserted ahead of it -- while the property it checks (the OddsAPI
+    # capture runs before the legacy bundle) was never about position 0 at all.
+    capture = next(s for s in steps if s.name == "ncaaf_game_lines_oddsapi")
+    assert names.index("ncaaf_game_lines_oddsapi") < names.index("ncaaf_lines_snapshot")
     assert capture.phases == ("pregame", "live")
     assert any(str(part).endswith("fetch_ncaaf_oddsapi_game_lines.py") for part in capture.command)
 
@@ -454,7 +460,12 @@ def test_the_capture_step_is_not_week_scoped():
     steps = refresh_odds_sources._build_ncaaf_steps(
         argparse.Namespace(week=3, season=2026, date="2026-09-19")
     )
-    capture = steps[0]
+    # BY NAME, NOT BY POSITION -- see the sibling test above. `steps[0]` is now
+    # `ncaaf_live_state`, which DOES take `--season/--week`, and legitimately:
+    # it uses them to resolve WHICH DATES to poll and still writes one record
+    # PER DATE. The claim in this docstring is about the OddsAPI CAPTURE, whose
+    # shards are keyed by commence date, and it is unchanged.
+    capture = next(s for s in steps if s.name == "ncaaf_game_lines_oddsapi")
     assert "--week" not in [str(part) for part in capture.command]
     assert "--season" not in [str(part) for part in capture.command]
 

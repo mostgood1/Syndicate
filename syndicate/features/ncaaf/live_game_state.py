@@ -313,12 +313,38 @@ def _rows_from_worker_record(iso_date: str) -> dict[str, dict[str, Any]] | None:
         # aged, so it cannot be trusted for a LIVE board.
         return None
     age = time.time() - float(fetched_at)
-    if age > _worker_record_max_age_seconds():
-        print(f"NCAAF_LIVE_STATE_RECORD_STALE date={iso_date} age_seconds={age:.0f}", flush=True)
-        return None
 
     games = record.get("games")
     if not isinstance(games, list):
+        return None
+
+    # STALENESS ONLY MATTERS FOR A DATE THAT CAN STILL CHANGE.
+    #
+    # Measured in production 2026-09-06: the producer runs once per full
+    # `refresh_odds_sources` sweep, so records age **247-940 s** (4-16 min)
+    # against a 240 s bound -- and the board was falling back to a fetch for
+    # ALL SIX DATES whenever it did. That is the right call for today's live
+    # slate and pure waste for the five past dates, whose games are FINAL and
+    # whose scores cannot change no matter how old the record is.
+    #
+    # So the bound is applied only to dates that are still moving. A date whose
+    # games are ALL final is served from any record, at any age.
+    #
+    # `final` is `_game_from_event`'s own field, so "is this date done" means
+    # exactly what settlement means by it -- not a second definition.
+    #
+    # PREGAME COUNTS AS MOVING, deliberately: a scheduled game can KICK OFF
+    # inside the staleness window, and serving a stale record would render a
+    # started game as pregame. Only "all final" is safe.
+    still_moving = any(
+        isinstance(g, Mapping) and not g.get("final") for g in games
+    )
+    if still_moving and age > _worker_record_max_age_seconds():
+        print(
+            f"NCAAF_LIVE_STATE_RECORD_STALE date={iso_date} age_seconds={age:.0f} "
+            f"unfinished_games={sum(1 for g in games if isinstance(g, Mapping) and not g.get('final'))}",
+            flush=True,
+        )
         return None
 
     rows_by_key: dict[str, dict[str, Any]] = {}
@@ -331,10 +357,25 @@ def _rows_from_worker_record(iso_date: str) -> dict[str, dict[str, Any]] | None:
             rows_by_key[f"{away_id}@{home_id}"] = {**state, "date": iso_date}
 
     if not rows_by_key:
-        # The record exists and is fresh but keys NOTHING -- the producer is
-        # running an older build with no `home_id`/`away_id`. Fetching is the
-        # right answer, and the line names it so a deploy skew is visible
-        # rather than looking like a quiet slate.
+        # TWO DIFFERENT CASES, AND CONFLATING THEM COST A POINTLESS FETCH PER
+        # BOARD BUILD -- measured in production 2026-09-06:
+        # `NCAAF_LIVE_STATE_RECORD_UNKEYED date=2026-08-30 games=0`, on every
+        # build, for a date ESPN genuinely has no events on.
+        #
+        #   games == []      -> the date HAS no games. A complete, correct
+        #                       answer. Accept it: it contributes nothing to
+        #                       the index, which is exactly right, and
+        #                       re-fetching can only return the same nothing.
+        #   games non-empty  -> rows exist but none carry `home_id`/`away_id`,
+        #                       i.e. an OLDER PRODUCER is writing records
+        #                       without the board fields. Deploy skew. Refuse,
+        #                       and name it.
+        #
+        # The first version refused BOTH, which turned "no games that day" into
+        # a permanent fallback that looked like the producer failing. An empty
+        # answer is not a missing one.
+        if not games:
+            return {}
         print(f"NCAAF_LIVE_STATE_RECORD_UNKEYED date={iso_date} games={len(games)}", flush=True)
         return None
 

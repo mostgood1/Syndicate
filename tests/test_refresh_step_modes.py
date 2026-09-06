@@ -98,13 +98,34 @@ def _ncaaf_args():
     return argparse.Namespace(season=None, week=None, date="2026-09-03")
 
 
-def test_ncaaf_fast_mode_keeps_ONLY_the_game_line_capture(mod):
+def test_ncaaf_fast_mode_keeps_ONLY_the_CREDIT_FREE_and_price_steps(mod):
     """The price capture survives; the per-event prop sweep and the legacy
     bundle runner do not. This is what makes a 5-minute NCAAF cadence cost 108
-    credits an hour instead of thousands."""
+    credits an hour instead of thousands.
+
+    `ncaaf_live_state` was ADDED to this list on 2026-09-06 (lane
+    `ncaaf-live-state-to-worker`) and the assertion widened rather than the step
+    excluded. **The filter's purpose is OddsAPI CREDIT COST, and that step burns
+    none** -- it is one ESPN scoreboard GET (~107 KB gzipped). Excluding it
+    would have made `fast` silently revert the board to fetching ESPN from
+    inside the web REQUEST PATH, which is the defect that lane exists to
+    remove, reintroduced by a mode nobody would think to check.
+
+    So the credit invariant is now asserted DIRECTLY below, rather than implied
+    by a hardcoded list -- a list cannot tell a free step from an expensive
+    one, and that is the property this test is actually defending.
+    """
     steps = mod._build_ncaaf_steps(_ncaaf_args())
     names = [s.name for s in mod._filter_steps(steps, "live", "fast")]
-    assert names == ["ncaaf_game_lines_oddsapi"], names
+    assert names == ["ncaaf_live_state", "ncaaf_game_lines_oddsapi"], names
+
+    # THE PROPERTY, not the list: no OddsAPI-credit-burning step beyond the one
+    # game-line capture survives `fast`.
+    credit_burners = [
+        step for step in mod._filter_steps(steps, "live", "fast")
+        if any("oddsapi" in str(part).lower() for part in step.command)
+    ]
+    assert [s.name for s in credit_burners] == ["ncaaf_game_lines_oddsapi"], credit_burners
 
 
 def test_ncaaf_full_mode_is_UNCHANGED(mod):
@@ -115,6 +136,12 @@ def test_ncaaf_full_mode_is_UNCHANGED(mod):
     steps = mod._build_ncaaf_steps(_ncaaf_args())
     names = [s.name for s in mod._filter_steps(steps, "live", "full")]
     assert names == [
+        # ADDED 2026-09-06, lane `ncaaf-live-state-to-worker`: the producer that
+        # lets web READ live state instead of fetching ESPN in the request path.
+        # First in the list on purpose -- it is cheap and the board's freshness
+        # depends on it, and this file's own soccer note records that a cheap
+        # step queued behind expensive ones goes stale exactly when games run.
+        "ncaaf_live_state",
         "ncaaf_game_lines_oddsapi",
         "ncaaf_player_props_oddsapi",
         "ncaaf_lines_snapshot",
@@ -127,8 +154,8 @@ def test_the_game_line_step_is_the_one_that_writes_prices(mod):
     list must contain the script that appends to the shared book-quote log."""
     steps = mod._build_ncaaf_steps(_ncaaf_args())
     fast = mod._filter_steps(steps, "live", "fast")
-    assert len(fast) == 1
-    assert any("fetch_ncaaf_oddsapi_game_lines.py" in str(part) for part in fast[0].command)
+    price_steps = [s for s in fast if any("fetch_ncaaf_oddsapi_game_lines.py" in str(p) for p in s.command)]
+    assert len(price_steps) == 1, [s.name for s in fast]
 
 
 def test_no_other_sport_gained_a_mode_scope(mod):
