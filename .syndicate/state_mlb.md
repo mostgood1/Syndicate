@@ -248,6 +248,57 @@ comparison is UNCHANGED by that capture and the 0-of-103 reading still stands:
 `quote.book_prices` is what the board reads, and changing it is step 3, gated on
 step 2.
 
+## [mlb-certainty-claims] MLB PUBLISHES LIVE WIN PROBABILITIES OF EXACTLY 0.0 AND 1.0, PRICES THEM, AND TWO OF THEM LOST `[measured 2026-09-06, lane nfl-rating-units, substrate render]`
+
+**Found while auditing NCAAF's estimator; it lands hardest on MLB because MLB is
+PRICED and NCAAF is suppressed.** Read from the live-gameline ledger via
+`/api/ops/artifacts/export`, 6 days (08-21, 08-22, 08-27, 08-29, 09-05, 09-06),
+25,331 records of which **2,810 are h2h carrying a model probability**:
+
+    EXACTLY 0.0 or 1.0        83   (2.95%)
+    of those, priceable=True  59   <- an edge was PUBLISHED off a certainty
+    caught by the interval    18   (`prob_interval_swamps_edge`)
+    no two-sided price         6
+
+**TWO OF THEM LOST, and both were `p = 0.0` -- the model asserting the home team
+had EXACTLY ZERO chance:**
+
+    2026-08-29  ARI 2 @ SF  7   AWAY certain -> home won   7 records, max |edge_pp| 46.2
+    2026-08-29  BOS 2 @ NYY 9   AWAY certain -> home won   2 records, max |edge_pp| 55.9
+
+Over the 25 distinct games carrying such a claim: **23 hit, 2 missed, 0
+unmatched** (joined to MLB StatsAPI finals for the same dates). So the claims are
+usually right -- and that is not a defence. **An exact 0.0 has no recovery: when
+it is wrong it is maximally wrong.** Brier takes its ceiling of 1.0 on all 9 of
+those records, and any log-loss scoring is INFINITE. The series used to judge the
+model is precisely what a certainty claim corrupts.
+
+**THE MECHANISM IS AN INTERNAL INCONSISTENCY IN THE SHARED JOIN, not an MLB
+modelling choice.** `live_gameline_join.prob_std_err` computes its interval with
+**Agresti-Coull** add-two (`p_adj = (successes + 2) / (n + 4)`), explicitly
+because "the Wald form is 0.0 at p=0 and p=1 ... it is a LIVE case: the re-sim
+quantises to k/n". It then DISCARDS `p_adj` and publishes the raw Wald `k/n` as
+the point estimate. The module applies its own correction to the WIDTH and not to
+the CENTRE.
+
+**WHY THE INTERVAL DOES NOT CATCH THEM.** At p=1.0, n=120 the Agresti-Coull 2-sigma
+bar is only **2.26 pp**, so a 46-56 pp claimed edge clears it comfortably. The
+gate is working as designed; it is being handed a point estimate its own
+estimator would not have produced.
+
+**WHAT SMOOTHING WOULD AND WOULD NOT FIX -- stated so nobody ships it as a
+cure.** Agresti-Coull turns 1.0 into 0.9839, so a 77 pp edge becomes ~76 pp: it
+does NOT materially shrink the large edges, which come from the model genuinely
+disagreeing with the market. What it DOES fix is the unbounded scoring penalty
+and the publication of a certainty no 120-sample estimator can support. Those are
+different problems and only the second is an estimator defect.
+
+**NOT FIXED HERE.** `live_gameline_join.py`, `live_gameline_ledger.py` and
+`mlb/live_lens.py` were all FREE of lane claims at the time of measurement, but
+this is MLB's money path and the reference module; the change belongs to a lane
+that owns it. **The export was `truncated: True`, so 83 and 59 are FLOORS, not a
+census.**
+
 ## [mlb-live-edge-forbidden] TWO STANDING CONSTRAINTS ON ANY MLB LIVE-EDGE WORK — lifted out of lane `live-prob-producer-reader-gap` when it closed `[2026-09-01]`
 
 **Recorded here because the lane that held them is CLOSED and a constraint that
