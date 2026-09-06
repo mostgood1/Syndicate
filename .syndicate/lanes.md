@@ -164,6 +164,36 @@ death, never life — do not invert it.
   shortlist (`shortlist-prop-row-duplicates`). Different endpoints, same shape.
 - Blocked by: none. All four files unclaimed on origin/main.
 
+### kalshi-match-series-observable — OPEN — opened 2026-09-06 — session 3492626c
+- Goal: make the SERIES a board row matched observable, so "which contract did
+  this row price from" is a reading rather than an inference.
+- Files: `syndicate/features/shared/kalshi_board_join.py`,
+  `tests/test_kalshi_match_series_observable.py` (NEW)
+- Why: a live first5 row (MIL@CIN, over 4.5) showed `kalshi 0.870` against a
+  7-book consensus of `0.4926`. 0.87 is what a WHOLE-GAME over 4.5 is worth, and
+  Kalshi lists BOTH `KXMLBTOTAL-26SEP061210MILCIN-5` ("Over 4.5 runs scored")
+  and `KXMLBF5TOTAL-26SEP061210MILCIN-5` ("First 5 innings: Over 4.5 runs") --
+  same game, same strike. `_row_market()` strips the segment by design, so both
+  key as `(event,'totals',4.5)`. I could NOT tell which one priced the row:
+  board rows carry no `venue_ticker` (0 of 2000) and the join emits no match
+  record.
+- Hypothesis, REVISED DOWNWARD before building: probably NOT a mismatch. Both
+  paths are segment-aware -- `_segments_agree` computes `first5 == full` -> False
+  at both `matches.append` sites, and `book_grid._INSTANCE_FIELDS` carries
+  `segment`. The likely truth is a WIDE ASK on a thin first5 market, with
+  `edge_pct=-38.5` being the system correctly declining it.
+- Falsification test: if the emitted series for that row reads `KXMLBF5TOTAL`,
+  the mismatch hypothesis is dead and the wide-ask reading is confirmed. If it
+  reads `KXMLBTOTAL`, a guard that provably computes False is being bypassed and
+  that is a much bigger finding.
+- Verification: a log line naming, per segment board row, the series it matched;
+  plus refusal counts keyed by series so the guard's behaviour is visible when it
+  DOES fire. Reachability asserted on emitted content, not on a symbol.
+- NOT IN THIS LANE: any change to matching behaviour. This is instrumentation
+  only -- the join's decisions are unchanged.
+- Blocked by: none. `kalshi_board_join.py` unclaimed; `portfolio_commit.py` and
+  `ops.py` are claimed by others and are deliberately NOT touched.
+
 ## OPEN
 
 ## OPEN
