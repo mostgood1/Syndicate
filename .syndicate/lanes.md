@@ -2006,6 +2006,17 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   aborted partway and reported the files it HAD patched, so `ncaaf/prop_model`
   was silently never edited. The re-score is what found it.
 - Blocked by: none. No deploy.
+
+### suite-clock-races — OPEN — opened 2026-09-06 — session b9bc926d-f167-4923-9344-eac7e86a5761
+- Goal: the two full-suite failures that are mine to take pass in a full `-n auto --dist=loadscope` run as well as in isolation. Baseline `0ad1480d`: 7 failed / 15,453 passed / 37m13s; all five new failures pass ALONE, so all are order/parallelism dependent.
+- Files: `tests/test_quote_join_index_equivalence.py`, `tests/test_board_build_timing.py`.
+  Collision check: both FREE — named by no OPEN lane's `- Files:` block.
+- **THREE OF THE FIVE ARE NOT MINE AND ARE NOT TAKEN.** `tests/test_ncaaf_live_state_worker.py` (3 failures) is CLAIMED by OPEN lane `ncaaf-live-state-to-worker`, which CREATED that file today (`ada53db5`) and is actively working. Their symptom is the same family: `web must not fetch ESPN when a fresh record exists` / `{'2026-09-06': 'fetch'} != {'2026-09-06': 'worker'}` — the worker record is not found in-suite though it is found alone. Surfaced to them, not edited.
+- Hypothesis, per case: (a) `test_indexed_join_matches_the_full_scan_on_every_query_shape` compares the results of TWO separate calls, and the payload carries `capture_age_seconds`/`book_age_seconds` derived from `datetime.now()` — under parallel load the two calls straddle a second (`623654` vs `623655`). Its second failure, `29 not greater than or equal to 30`, is a CONSEQUENCE not a cause: `checked += 1` sits after the failing assert inside the `subTest` block, so a failed subtest skips the increment. (b) `test_a_busy_build_reads_as_COMPUTING` asserts `off_cpu_pct < 40.0` and measured 79.7 — a CPU-vs-wall ratio, and under `-n auto` the process is descheduled by competing workers, so genuine compute reads as waiting.
+- Falsification test: if (a) still differs with a FIXED `now` passed to both calls, the divergence is real and the indexed join disagrees with the full scan — a genuine `#414` defect, not a clock race, and far more serious.
+- Verification: both pass in isolation AND in a full `-n auto` run, with no new failures.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -139,15 +140,30 @@ class QuoteJoinIndexEquivalence(unittest.TestCase):
             yield {**base, "event_id": "nope", "market": "h2h", "selection": home}
 
     def test_indexed_join_matches_the_full_scan_on_every_query_shape(self) -> None:
+        # ONE `now` FOR BOTH PATHS. The payload carries `capture_age_seconds`
+        # and `book_age_seconds`, derived from `datetime.now(timezone.utc)`
+        # inside `quote_ref_for_bet`. Comparing two SEPARATE calls therefore
+        # compares two different instants, and under `-n auto` the pair
+        # straddles a second often enough to fail: measured 2026-09-06 in a
+        # full suite, `623654` vs `623655` on an otherwise identical dict.
+        #
+        # `quote_ref_for_bet` already takes `now` and forwards it (`now=now`),
+        # so this uses the function's own seam rather than freezing the clock
+        # -- the age arithmetic still runs, it just runs from a fixed point.
+        frozen = datetime(2026, 9, 6, 12, 0, 0, tzinfo=timezone.utc)
         checked = 0
         for query in self._queries():
             with self.subTest(query=query):
                 obq._BOOK_QUOTES_INDEX_CACHE.clear()
-                indexed = quote_ref_for_bet(**query)
+                indexed = quote_ref_for_bet(now=frozen, **query)
                 obq._BOOK_QUOTES_INDEX_CACHE.clear()
-                scanned = self._full_scan_result(**query)
+                scanned = self._full_scan_result(now=frozen, **query)
                 self.assertEqual(indexed, scanned)
-                checked += 1
+            # OUTSIDE the subTest on purpose. It used to sit inside, after the
+            # assert, so a failing subtest skipped the increment and the
+            # coverage guard below fired too -- reporting "29 not >= 30" as if
+            # the generator had shrunk. One defect must not present as two.
+            checked += 1
         # Guards against a generator that silently yields nothing -- an
         # all-passing loop over zero cases is the shape #288 left behind.
         self.assertGreaterEqual(checked, 30)
