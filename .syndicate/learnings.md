@@ -2703,3 +2703,49 @@ still not count.
 
 - **The rule going forward.** A reproduction that changes nothing has TWO readings: the hypothesis is wrong, or the instrument never touched the thing. Distinguish them before believing either. Concretely: pytest imports a test module under a name derived from rootdir, and with no `tests/__init__.py` that name is top-level `test_foo` — **not** `tests.test_foo`. Importing the dotted path creates a SECOND module object, so mutating it is invisible to the run. I aged a module-level timestamp, saw 23 passed, and was one step from recording "not the cause"; against `sys.modules["test_foo"]` exactly the 3 predicted tests failed. **Assert the object you mutated is the one under test** — print its `id()`, or mutate through `sys.modules` and fail loudly when the key is absent.
 - *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-06 — FORBIDDEN: adding a transform that REBINDS the name a reported field is derived from. The field keeps its name, changes its meaning, and every existing reader keeps working while answering a different question. `[lane kalshi-join-counters-logged]`
+
+- **What happened.** `join_kalshi_to_board` reports `board_rows=len(board_rows)`.
+  I added `board_rows, collisions = _collapse_duplicate_bets(board_rows)` above
+  it. From that commit (`21aac548`) the field stopped meaning "rows handed to
+  the join" and started meaning "rows surviving deduplication" — on ONE of the
+  two emitters, because the other takes its own `len()` of the input.
+- **Why nothing caught it.** Before the collapse the two values were identical,
+  so no test, reader or log line could distinguish them; the divergence only
+  begins on the first board that HAS a duplicate. The symptom in production was
+  a 2-row gap between two prints 24 seconds apart — `1100` vs `1102` — which
+  I wrote up in `deploys.md` as the board moving between them. It was
+  `alt_main_collisions` exactly, and I had to correct the entry (`dc886130`).
+- **How it WAS caught, which is the transferable part.** Not by review and not
+  by looking for it. A test written for a DIFFERENT feature needed a case where
+  the row count and a new denominator differ, and it failed with `board_rows=2`
+  where 3 rows went in. **A new field that must differ from an old one is a
+  cheap probe for whether the old one still means what it says.**
+- **The rule.** When adding a transform whose output you bind to an existing
+  name, grep for every reported/logged/returned field derived from that name
+  BEFORE landing, and either leave the field on the pre-transform value or
+  rename it. A silently redefined field is worse than a missing one: a missing
+  field breaks its readers loudly, a redefined field keeps them all green.
+- *(evidence: `deploys.md` entries for `bd658209` and its correction; fix and
+  test in `922a68dc`)*
+
+## 2026-09-06 — FORBIDDEN: asserting "the token is present" as the test for a log line other tools parse. A duplicate is present twice. `[lane kalshi-join-counters-logged]`
+
+- **What happened.** A peer session and I added counters to the SAME print
+  statement within minutes. Both landed. The merged line emitted
+  `alt_main_collisions=` twice, two spellings of the same segment data, and half
+  the fields stranded after the `reasons={...}` dict repr.
+- **Neither test suite caught it** — both of us asserted the token appeared in
+  the line, and it did, twice. `re.search(r'alt_main_collisions=(\d+)')` silently
+  takes the first of two; I had written that exact regex against these logs
+  repeatedly the same day.
+- **The rule.** For a line that is machine-read, presence is not the predicate.
+  Assert the field set: no name emitted twice, and the dict-repr field last so
+  nothing is stranded behind it. `test_no_field_is_emitted_twice` in
+  `tests/test_kalshi_join_counters_logged.py` is the shape.
+- **Second-order:** when two sessions must touch one statement, one of them
+  should do both edits. I asked the peer to add my field; they asked me to add
+  theirs; we both edited anyway. Whoever notices the overlap first should take
+  the whole thing rather than split it.
+- *(evidence: the merged line and its fix in `3d1d2173`)*
