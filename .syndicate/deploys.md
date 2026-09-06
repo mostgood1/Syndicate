@@ -59,6 +59,22 @@ is the one-line flip.
 instrument `e77be334`. Claim `1d5ce9c6fe5fcb0f` acquired 19:0xZ, released with
 `--token` after the reading; `status` reads `free`. Not forced.
 
+**I CANCELLED A PEER'S IN-FLIGHT DEPLOY, AND IT COST THEM NOTHING — CHECKED,
+NOT ASSUMED.** `dep-daerfpfqj5pc73ala6u0` (commit `1abbd087`, the
+`[kalshi_odds] BOARD_JOIN` counter prints) started 18:58:45Z and shows
+`status: canceled` at **19:02:16Z** — the instant my trigger landed; Render
+cancels an in-progress deploy when a new one starts. `git merge-base
+--is-ancestor 1abbd087 80d89986` is **true**, so their change went live inside
+mine and their counters are on the running SHA (12 occurrences by content). It
+was cancelled during BUILD, not during the update phase, so it caused no extra
+restart — the 2026-08-10 hazard did not apply.
+
+**THE CLAIM DID NOT SERIALISE US, AND THAT IS THE THING TO NOTICE.** They were
+mid-deploy at 18:58:45Z and my `acquire` at ~19:00Z reported the service
+**free**. So that deploy was taken without the claim held. Not my lane's to
+fix, but it is the second half of *serialisation is not composition*: the lock
+only orders deploys that ask it.
+
 **PREFLIGHT WAS NOT RUN, AND THAT IS A REAL GAP IN THIS ROW.** `RENDER_API_KEY`
 is absent from that session so `deploy_preflight.py` exits before doing any
 work; the deploy went through the Render MCP, which the guard does not inspect
