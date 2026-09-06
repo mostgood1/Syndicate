@@ -1060,3 +1060,25 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   `top_opportunities` and `recommendations` as two INDEPENDENT deep copies of the
   same rows. Every use is a reassignment, never an in-place mutation, so sharing
   the row dicts would roughly halve that term. Separate change, separate risk.
+
+### `[web-oom-leak]` UPDATE 18 — **FOUND: ~200 MB per worker is FREED-BUT-RETAINED in glibc's arena**, 2026-09-06T15:4xZ `[session b2b5b45b]`
+
+* **`mallinfo2` on both live workers, 16 samples after an 8-minute settle:**
+  arena `269.4`/`275.5 MB`, **in use only `72.8`/`72.1 MB`**, **free-but-retained
+  `196.6`/`203.4 MB` (72.9% / 73.7% of what glibc holds)**. Both workers agree to
+  within 1%.
+* **This is the first mechanism `#632` has identified that admits a FIX.** The
+  memory is not lost — it is freed, and glibc is holding it rather than returning
+  it. `malloc_trim()` is the mechanism that hands it back; `releasable_top_mb`
+  alone was `41.6 MB`.
+* **NOT the call `#435` tried.** That was `malloc_info` (per-arena XML, 13.9%
+  coverage). `mallinfo2` is a different function.
+* **COVERAGE CAVEAT — 61% IS A FLOOR:** `mallinfo2` reports the MAIN ARENA ONLY,
+  and web runs `GUNICORN_THREADS=4`, so per-thread secondary arenas (created via
+  `mmap`) are excluded. This RECONCILES what looked like a contradiction: smaps
+  `by_kind` gave `anon_mmap 370.0` vs `heap 81.2 MB`, while `mallinfo2` gives
+  `arena 275.5` vs `mmapped 0.387 MB` — different arenas, not different truths.
+* Consistent with everything else measured: not Python objects (28.3%), not
+  returned by freeing, grows with request traffic, lives in large anon regions.
+* **NEXT: measure `malloc_trim()` before/after.** Not called yet — it mutates
+  allocator state and takes the malloc lock across arenas.

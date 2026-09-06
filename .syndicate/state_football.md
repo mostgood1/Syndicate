@@ -1668,6 +1668,14 @@ score twice in that window. So the right move is NOT to raise the bound to 700 s
 to make the fallback vanish; that would buy a fetch saving by pricing on stale
 state, which is the one substitution this whole lane exists to refuse. **The
 cadence is the thing to fix, and it belongs to the producer's step.**
+**THE FALLBACK IS THE GATE WORKING, AND IT EXPOSED A CADENCE NOBODY HAS
+MEASURED.** The 400 s bound (not web's 240 s: this tick runs at 180 s, so 240
+tolerates zero missed cycles) refuses state it considers old and degrades to a
+correct fetch rather than a stale probability. But the producer's lane reported
+a live-phase median of **60 s** while web logged
+`NCAAF_LIVE_STATE_RECORD_STALE date=2026-09-06 age_seconds=484` — **484 s cannot
+come from a 60 s cadence**, so that step's real write interval is slower than
+the phase it rides. NOT papered over by raising the bound.
 
 **UNEXERCISED, AND IT IS THE HALF THAT MATTERS:** the record path has never run
 while a game is IN PROGRESS. Today's slate was 3 games, `live_resimmed 0`. So

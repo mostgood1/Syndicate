@@ -24150,3 +24150,46 @@ actively deploying to, for a change that is already unit-verified and is NOT an
 OOM fix. The noise floor answers the question that actually mattered (is the
 effect bigger than the drift?) for the price of an hour of polling and no
 restarts.
+
+
+---
+
+## 2026-09-06T15:28:35Z — web — `4e631364` — **`#632`: ~200 MB PER WORKER IS FREED-BUT-RETAINED IN glibc'S ARENA**
+
+`[lane web-oom-mallinfo2, session b2b5b45b]` CLEAR preflight pinned to target;
+11 new tests, 72 across the memory set.
+
+verify: **`/api/ops/glibc-malloc`, 16 samples over both workers after an 8-minute
+settle.** Both agree to within 1% and the pattern is stable across every sample.
+
+    pid 97   anon 447.6 MB   glibc 269.8 (61.2%)   arena 269.4   mmapped 0.4
+             IN USE 72.8 MB   FREE-RETAINED 196.6 MB (72.9%)
+    pid 99   anon 452.4 MB   glibc 275.9 (61.0%)   arena 275.5   mmapped 0.4
+             IN USE 72.1 MB   FREE-RETAINED 203.4 MB (73.7%)   releasable_top 41.6
+
+**~200 MB per worker is memory the OS gave us, the program freed, and glibc has
+not handed back.** In use is only ~72 MB.
+
+**THIS IS NOT WHAT `#435` MEASURED.** That used `malloc_info` (per-arena XML,
+13.9% coverage). `mallinfo2` is a different call and reports `hblkhd` — mmapped
+space — directly.
+
+**THE CAVEAT, and it changes what 61% means: `mallinfo2` REPORTS THE MAIN ARENA
+ONLY.** Per-thread secondary arenas are excluded, and web runs
+`GUNICORN_THREADS=4`, so they almost certainly exist and are created via `mmap`.
+
+That reconciles a contradiction which would otherwise read as a finding: the
+smaps `by_kind` reading showed `anon_mmap 370.0 MB` against `heap 81.2 MB`, while
+`mallinfo2` shows `arena 275.5 MB` against `mmapped 0.387 MB`. Those look
+irreconcilable until you notice they describe DIFFERENT ARENAS — smaps sees all
+of them, `mallinfo2` sees one. **So 61% coverage is a FLOOR, not a total, and the
+true freed-but-retained figure is plausibly larger.**
+
+**This explains the shape every other instrument pointed at:** memory that is not
+Python objects (28.3% by a converged walk), that freeing does not return (an
+arena does not shrink because a chunk was freed), that grows with request
+traffic, and that lives in large anonymous regions.
+
+**`malloc_trim` NOT CALLED in this lane, by its own stated scope.** It mutates
+allocator state and takes the malloc lock across arenas; it gets its own lane and
+its own before/after measurement.

@@ -172,7 +172,7 @@ death, never life — do not invert it.
 - Blocked by: none. `mlb-first5-kalshi-execution` CLOSED 2026-09-06 and released
   its claim on `kalshi_catalogue.py`.
 
-### web-oom-mallinfo2 — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-mallinfo2 — CLOSED 2026-09-06 — opened 2026-09-06 — **FOUND THE MECHANISM: ~200 MB per worker is FREED-BUT-RETAINED in glibc.** 16 samples on both live workers: arena `269.4`/`275.5 MB`, in use only `72.8`/`72.1 MB`, free-but-retained **`196.6`/`203.4 MB` (72.9%/73.7%)**, agreeing to within 1%. Not the call `#435` tried (`malloc_info`, 13.9% coverage). **Coverage caveat: `mallinfo2` reports the MAIN ARENA ONLY**, and with `GUNICORN_THREADS=4` the per-thread arenas are excluded — which RECONCILES smaps `anon_mmap 370` vs `heap 81.2` against `mallinfo2` `arena 275.5` vs `mmapped 0.387`: different arenas, not different truths. So 61% coverage is a FLOOR. `malloc_trim` deliberately NOT called here, per this lane's own stated scope; it gets `web-oom-malloc-trim`. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: find where `#632`'s **71.7% non-Python anon** lives, using glibc's own
   accounting — and split "in use" from "freed but retained", because those have
   OPPOSITE fixes.
@@ -198,6 +198,36 @@ death, never life — do not invert it.
 - SAFETY: `mallinfo2` is a read, but it takes the malloc lock — on demand only,
   never on the request path. **`malloc_trim` will NOT be called in this lane**;
   it mutates allocator state and is a separate decision with its own measurement.
+- Blocked by: none.
+
+### web-oom-malloc-trim — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: measure what `malloc_trim()` actually returns on a live web worker, and
+  what it COSTS, before anyone proposes calling it automatically.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_malloc_trim.py` (NEW).
+- **`ops.py` IS DELIBERATELY NOT CLAIMED HERE, and the overlap was surfaced
+  rather than assumed.** `ncaaf-live-resim-wire` (session 520cd594) formally
+  holds that file, for ONE endpoint (`/api/ops/live-lens/snapshot-index`) by its
+  own stated scope. This lane ADDS one new endpoint,
+  `/api/ops/glibc-malloc-trim`, and touches no existing one — disjoint under the
+  region-split convention that lane cites, so a second formal claim would make
+  the file read as contested for no reason. Notice left in their block instead.
+  If they object, this edit comes out.
+- WHY: `mallinfo2` measured **~200 MB per worker freed-but-retained** in glibc's
+  main arena (in use only ~72 MB, free 72.9%/73.7%). That is the first `#632`
+  mechanism that admits a fix.
+- Hypothesis: `malloc_trim(0)` returns a large fraction of that ~200 MB to the
+  OS, visible as a fall in `process_anon_mb` within the same call.
+- Falsification test: anon does NOT fall materially after the trim — then the
+  free space is fragmented among live chunks, `MADV_DONTNEED` cannot release
+  whole pages, and trim is not the fix.
+- Verification: before/after `mallinfo2` AND `process_anon_mb` from ONE call, on
+  a settled worker, with the call's DURATION reported.
+- SAFETY, and it is the point of a separate lane: `malloc_trim` MUTATES
+  allocator state and takes the malloc lock across arenas. **POST only, never a
+  GET a crawler or monitor could trigger**, never automatic, never on the request
+  path. The duration measurement is a first-class output because a long lock hold
+  on a live service is itself a defect.
 - Blocked by: none.
 
 ## OPEN
@@ -1613,6 +1643,12 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `render-egress-transport` (session 9e40eb04) reached the same conclusion
   independently the same evening and holds an unpushed edit to that line — if
   theirs lands first, take it, the two say the same thing.
+- **NOTICE from `web-oom-malloc-trim` `[2026-09-06]`: I am adding ONE NEW
+  endpoint to `ops.py`, `/api/ops/glibc-malloc-trim`, and touching no existing
+  one — in particular not `/api/ops/live-lens/snapshot-index`, which is yours.
+  Disjoint under the region split you cite. `#632` measured ~200 MB per worker
+  freed-but-retained in glibc's arena; this lane measures what `malloc_trim`
+  returns and what it costs.**
 - **REGION SPLIT, the convention `render-egress-transport` uses for `ops.py`.**
   In `artifact_publisher.py` this lane adds ONE `HOT_ARTIFACT_PATTERNS` entry and
   its comment — not the publish path, not `pull_hot_artifacts`, not the size
