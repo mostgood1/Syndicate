@@ -2451,6 +2451,32 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   artifact (`written_at 2026-09-06T14:44:08Z`), plus the `off != on` mechanism run.
 - Blocked by: none. NO DEPLOY in this lane; no code changed.
 
+- **WEB GOT THE FIX FOR FREE, AND I CHECKED RATHER THAN ASSUMED.** `web-oom-trim-auto`
+  deployed `f6af42cf` at 16:24:41Z; `git merge-base --is-ancestor 91d523ad f6af42cf`
+  confirms it CONTAINS the fold. So web's serve-time `/api/board/book-grid` is
+  folded too, without a second deploy or a second restart.
+- **LIVE-ODDS-WORKER IS NOT DEPLOYED, AND I CHOSE NOT TO FORCE IT.** Still
+  `54c9b157`. Preflight HELD for 20 consecutive attempts over ~29 minutes with
+  the job count GROWING 3 -> 5 -> 6 — `refresh_odds_sources.py` and
+  `poll_soccer_live_state.py`, i.e. the service doing its job during a live
+  slate. Killing an in-flight odds refresh is the 2026-08-03 incident
+  `check_deploy_safety`'s own docstring records.
+  **The bound that makes waiting the right call rather than a stall:** this
+  service does not build the shortlist or the board grid — refresh-worker and
+  web do, and both are folded and measured. Its only exposure to the change is
+  `quote_ref_for_bet` -> `market_sides_for_quote`, a bet-quote lookup. So the
+  duplicate-row and double-exposure defects are CLOSED on every surface that
+  stakes money; what is left is a consistency gap, not a correctness one.
+  **It needs no deploy of its own.** Every SHA on `main` now contains the fold,
+  so it lands on this service's next deploy for any reason — which is exactly
+  how web got it. Claim released.
+- **THE POLLER STRANDED MY OWN CLAIM, AGAIN, AND THE KNOWN RULE DID NOT COVER
+  IT.** `release` refused with "held by shortlist-prop-row-duplicates and the
+  token does not match" — my lane, my session id. The recorded rule is "a watch
+  loop must re-`status`, never re-`acquire`", and I did not re-acquire: the loop
+  called `deploy_preflight --holder`, which rotates the token too. Forced,
+  safely, because the holder was verifiably me. **The rule should read: any
+  repeated claim-aware call rotates the token, not just `acquire`.**
 ### compact-learnings-stale-cap — CLOSED 2026-09-06 — opened 2026-09-06 — session 4b1b66a3 — **FIXED (`37ffb3bb`). Reported `1.48x *** STILL OVER ***` on a file 39,366 B UNDER budget; now `0.90x UNDER [cap from session-start.sh]`. Same 13 sections and same 26,649 B reclaimed — only the REPORT changed. NO TRIM WAS RUN: learnings.md never needed one.**
 - Goal: `compact_learnings.py` reports the cap `session-start.sh` actually
   enforces, so it stops manufacturing a "*** STILL OVER ***" that is not true.
