@@ -484,7 +484,23 @@ def main() -> int:
     # count for no benefit -- the endpoint is identical.
     request_markets = markets + game_markets
 
-    events = fetch_events(api_key, sport_key=sport_key, region=args.region)
+    # PER-SPORT PROP REGIONS. `args.region` stays the base and is never
+    # narrowed; `SYNDICATE_SOCCER_PROP_REGIONS` adds to it. Unset is exactly
+    # today's behaviour (`us`), so this spends nothing until somebody decides to
+    # widen SOCCER specifically -- which is the point: `ODDS_API_REGION` is
+    # shared with NFL and NCAAF props, and props bill per EVENT (~1M/month for a
+    # region, vs ~30K on game lines). Measured 2026-09-06: soccer prop rows were
+    # 164 of 174 single-book on fanduel/betrivers while soccer overall carried
+    # 12 books, so the thinness is the PROP CALL, not the region in general.
+    #
+    # Widened at the point of USE rather than at the argparse default so an
+    # explicit `--region` is widened identically and the two paths cannot drift.
+    from syndicate.features.shared.odds_regions import prop_regions
+
+    region = prop_regions("soccer", args.region)
+    if region != args.region:
+        print(f"[soccer_props] PROP_REGIONS base={args.region} -> {region}", flush=True)
+    events = fetch_events(api_key, sport_key=sport_key, region=region)
     print(f"Fetched {len(events)} events for {sport_key}")
     if args.event_ids:
         wanted = {e.strip() for e in args.event_ids.split(",") if e.strip()}
@@ -508,7 +524,7 @@ def main() -> int:
         if not event_id:
             continue
         payload = fetch_event_player_props(
-            api_key, sport_key=sport_key, event_id=event_id, region=args.region, markets=request_markets
+            api_key, sport_key=sport_key, event_id=event_id, region=region, markets=request_markets
         )
         if payload is None:
             continue

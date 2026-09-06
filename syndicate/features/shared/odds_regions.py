@@ -100,6 +100,41 @@ def wnba_regions(regions: str, *, env: "dict[str, str] | None" = None) -> str:
     return widened_regions(regions, WNBA_REGIONS_ENV, env=env)
 
 
+#: PER-SPORT PROP REGIONS, and the per-sport part is the whole point.
+#:
+#: `ODDS_API_REGION` (singular) is read by SIX fetchers across four sports and
+#: is unset in production, so all six default to `us`. Setting it to reach `eu`
+#: on soccer props would silently widen NFL and NCAAF props too -- and props
+#: bill per EVENT, the ~1M/month side of the split this module exists to keep
+#: apart. One name per sport makes that decision takeable for one sport.
+#:
+#: Measured 2026-09-06, served board: soccer `oddsapi_props` rows were 164 of
+#: 174 SINGLE-BOOK (fanduel 135, betrivers 39) while soccer rows overall carried
+#: 12 books. The thinness is specific to player props, not to `us`.
+PROP_REGIONS_ENV_TEMPLATE = "SYNDICATE_{sport}_PROP_REGIONS"
+
+
+def prop_regions_env(sport: str) -> str:
+    """The env var name for one sport's PROP-call regions."""
+    return PROP_REGIONS_ENV_TEMPLATE.format(sport=str(sport or "").strip().upper())
+
+
+def prop_regions(sport: str, regions: str, *, env: "dict[str, str] | None" = None) -> str:
+    """`regions` widened by THIS SPORT's prop extras. Never narrowed.
+
+    Unset is exactly today's behaviour, which is the safety property that makes
+    this landable without a spend: the base `regions` is always kept, so a
+    misconfigured value can widen coverage but can never silently drop `us`.
+
+    WHAT WIDENING BUYS, AND WHAT IT COSTS. `eu` reached pinnacle, matchbook and
+    betfair_ex_eu on NCAAF game lines -- real sharps against a board consensus
+    that was otherwise soft-book only. On PROPS the same region is billed per
+    event, so it is the ~1M/month side. Do not turn this on for a sport without
+    pricing that sport's event count first.
+    """
+    return widened_regions(regions, prop_regions_env(sport), env=env)
+
+
 def game_line_regions(regions: str, *, env: "dict[str, str] | None" = None) -> str:
     """`regions` widened by the configured extras. Never narrowed.
 
