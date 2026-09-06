@@ -24988,3 +24988,52 @@ flag twice.
 test_offered_overlap_separates_a_coverage_gap_from_a_freshness_loss` fails on
 unmodified `origin/main` with the flag False — pre-existing, control run, not
 from this change.
+
+## 2026-09-06 — **CORRECTION to the `bd658209` reading above: the `board_rows` gap was NOT the board moving, and the field itself had changed meaning under me.** `[lane kalshi-join-counters-logged]`
+
+The entry above reports the 20:10 tick as `board_rows` 1100 on `[kalshi_odds]`
+against 1102 on `[portfolio_commit]`, and explains it as "the board moved
+between them, which is expected". **That is wrong.**
+
+    portfolio_commit 1102  −  alt_main_collisions 2  =  1100  kalshi_odds
+
+Exactly, not approximately. `join_kalshi_to_board` rebinds its own `board_rows`
+name to the output of `_collapse_duplicate_bets` before reporting `len(...)` of
+it, so the two emitters were reporting **different populations under one field
+name**: the odds side read the post-collapse count out of the report dict, the
+order side took its own `len()` of the input. The gap was the collapse.
+
+**THE FIELD CHANGED MEANING THE MOMENT MY COLLAPSE SHIPPED (`21aac548`), AND
+NOTHING ANNOUNCED IT.** Before that commit `report['board_rows']` and
+`len(rows)` were the same number, so no reader could have noticed; afterwards
+`board_rows` silently meant "rows surviving deduplication" on one emitter and
+"rows handed to the join" on the other. A changed meaning under an unchanged
+name is worse than a missing field, because every existing reader keeps working
+and quietly answers a different question.
+
+**Found by a test written for something else.** Adding `collapsed_bet_keys`
+needed a case asserting `board_rows` and the new denominator differ on a board
+with duplicates; it failed with `board_rows=2` where 3 rows went in. I would not
+have gone looking.
+
+**FIXED in `922a68dc`**, two parts:
+- `[kalshi_odds] BOARD_JOIN` now prints `board_rows={len(rows)}` — the INPUT
+  count, restoring the pre-`21aac548` meaning and making both emitters agree.
+- Both emitters now print **`collapsed_bet_keys`** beside `alt_main_collisions`,
+  so the collision count finally has a comparable denominator. The caveat in the
+  entry above — that `2 / 1100 board_rows` is not the replay's `~1 per 78
+  collapsed keys` — no longer needs stating in prose: the ratio is on the line.
+
+`collapsed_bet_keys` is computed at the print site rather than returned by the
+join, because `kalshi_board_join.py` is claimed by another OPEN lane and a third
+concurrent edit to that file is what produced the duplicated-field line this
+lane already had to clean up. `_row_key` is the identity the collapse keys on,
+so it is the same number, pinned by a test asserting
+`len(collapsed) == collapsed_bet_keys + rows _row_key cannot key`.
+
+**The substantive findings in the entry above are unaffected** —
+`alt_main_collisions=2` non-zero, `first5->KXMLBF5SPREAD: 11` matched,
+`first5->KXMLBTOTAL: 34` refused beside `first5->KXMLBF5TOTAL: 25` matched. Only
+the `board_rows` explanation was wrong. **The next reading should be taken on a
+tick after `922a68dc` deploys**; until then production still logs the old
+`board_rows` semantics on the odds emitter.
