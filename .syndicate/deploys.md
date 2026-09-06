@@ -5,6 +5,72 @@
 
 ---
 
+## 2026-09-06 19:04:54Z — refresh-worker `80d89986` — **THE MEASURING DEPLOY. LIVE, AND THE RATE IS 55 MIS-BOUND SIDES ACROSS TWO SPORTS.** `[lane mlb-first5-kalshi-fanin-mismatch]`
+
+**verify:** `[venue_quote_fanin] SEGMENT_MISMATCH_GRID` on instance `l4kdz`, first
+board build after boot, 19:21:16Z–19:22:16Z. This is the reading; everything
+below is read off those four lines.
+
+| sport | `sides_seen` | venue-repriced | **mis-bound** | rate of repriced |
+|---|---|---|---|---|
+| **mlb** | 5,932 | 118 | **43** | **36.4%** |
+| **ncaaf** | 1,218 | 121 | **12** | **9.9%** |
+| nfl | 2,494 | 62 | 0 | 0.0% |
+| soccer | 18,631 | 10 | 0 | 0.0% |
+| **all** | | **311** | **55** | **17.7%** |
+
+**MLB** `count=48 sides_seen=5932 repriced=118`
+`matched={'first3|kalshi|KXMLBTOTAL': 12, 'first5|kalshi|KXMLBTOTAL': 31, 'full|kalshi|KXMLBTOTAL': 75}`
+
+**More than a third of every Kalshi-priced MLB board side is a segment row
+wearing a FULL-GAME contract's price.** 48 detected at match time, 43 actually
+landed — the 5 gap is detections that then lost the "venue must be fresher than
+the book" test, so `count` is the exposure and `matched` is what reached the
+board.
+
+**`first3` IS IN IT — 12 sides.** That is the 2026-08-28 shape exactly
+(`first3 under 2.5 -> KXMLBTOTAL`, five orders, $7.08). `first3` is *inherently
+unexecutable* on Kalshi (no first-3-innings series exists), so nothing can fill
+it — but its BOARD PRICE is being taken from the nine-inning contract anyway.
+
+**SLATE-WIDE, NOT ONE GAME.** The sample names six different fixtures:
+`KXMLBTOTAL-26SEP061410AZHOU-5`, `…1610NYYSD-4`, `…1410TORKC-6`, `…1410AZHOU-6`,
+`…1435TBTEX-4`, `…1335BOSBAL-5`.
+
+**NCAAF** `count=12 sides_seen=1218 repriced=121`
+`matched={'full|kalshi|KXNCAAFTOTAL': 17, 'full|polymarket_us|-': 92, 'h1|kalshi|KXNCAAFTOTAL': 10, 'h1|polymarket_us|-': 2}`
+
+**THE DEFECT IS NOT MLB-ONLY AND NOT KALSHI-ONLY.** NCAAF first-half rows take
+full-game contracts: 10 from Kalshi and **2 from Polymarket** —
+`ncaaf|h1|totals|19.5 <- polymarket_us|full|totals|tsc-cfb-woff-kentst-2026-09-12-total-19pt5`.
+The cross-venue half was predicted structurally in
+`findings_2026-09-06_first5_kalshi_fanin_mismatch.md` §7 and could not be
+measured before this deploy. It is measured now.
+
+**NFL and soccer are CLEAN at 0**, which is what makes the two non-zeros
+readable rather than a counter that fires everywhere.
+
+**NOTHING WAS REPAIRED BY THIS DEPLOY, BY DESIGN.** `_SEGMENT_REFUSAL_ENABLED`
+ships **False**; every line reads `refusing=False`, and the 55 sides above are
+still on the board wearing those prices. This deploy sized the defect. Deploy 2
+is the one-line flip.
+
+**Deployed SHA `80d89986`, which is ON `origin/main`** and contains the
+instrument `e77be334`. Claim `1d5ce9c6fe5fcb0f` acquired 19:0xZ, released with
+`--token` after the reading; `status` reads `free`. Not forced.
+
+**PREFLIGHT WAS NOT RUN, AND THAT IS A REAL GAP IN THIS ROW.** `RENDER_API_KEY`
+is absent from that session so `deploy_preflight.py` exits before doing any
+work; the deploy went through the Render MCP, which the guard does not inspect
+(it matches `Bash`/`PowerShell` only). **Done on the user's explicit instruction
+after the bypass was put to them in those words.** The liveness half was checked
+by hand against preflight's own evidence — `ALL_PROCESS_MEMORY` — and the deploy
+was HELD for ~20 minutes across two full-slate MLB sims (`fingerprint_change`,
+15 games) until `process_count` fell to **3** at 18:58:24Z, i.e. worker + shell
++ one defunct, no job trees. Triggered 19:02:16Z into that lull. Boot confirmed
+healthy on new instance `l4kdz`: pids reset, jobs resumed within 13 minutes.
+**No job was killed.**
+
 ## 2026-09-06 ~18:30Z — refresh-worker — **NOT DEPLOYED. Claim taken and RELEASED.** `[lane mlb-first5-kalshi-fanin-mismatch]`
 
 Asked to run the measuring deploy for the first5-on-full-game price defect

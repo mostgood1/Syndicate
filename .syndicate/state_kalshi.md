@@ -454,6 +454,39 @@ decision ("instrument first, fix second"), so deploy 1 COUNTS the mis-bindings
 and changes no price and deploy 2 flips the constant.** `SEGMENT_MISMATCH_GRID`
 carries `refusing=`, so a reader can never mistake the count for the repair.
 
+**MEASURED IN PRODUCTION — 55 MIS-BOUND SIDES, TWO SPORTS, BOTH VENUES**
+`[refresh-worker `80d89986` LIVE 2026-09-06T19:04:54Z, reading 19:21:16-19:22:16Z,
+instance l4kdz; working in .syndicate/deploys.md]`. The instrument shipped with
+the refusal INERT, so this is the defect's size, not its repair.
+
+| sport | `sides_seen` | venue-repriced | **mis-bound** | rate |
+|---|---|---|---|---|
+| mlb | 5,932 | 118 | **43** | **36.4%** |
+| ncaaf | 1,218 | 121 | **12** | 9.9% |
+| nfl | 2,494 | 62 | 0 | 0% |
+| soccer | 18,631 | 10 | 0 | 0% |
+
+`matched={'first3|kalshi|KXMLBTOTAL': 12, 'first5|kalshi|KXMLBTOTAL': 31,
+'full|kalshi|KXMLBTOTAL': 75}` — **more than a third of every Kalshi-priced MLB
+board side is a segment row wearing a nine-inning price.** 48 detected, 43
+landed; the gap is detections that lost the fresher-than-the-book test.
+Slate-wide across six fixtures (AZHOU, NYYSD, TORKC, TBTEX, BOSBAL).
+
+**`first3` IS IN IT (12 sides)** — the 2026-08-28 shape exactly. Nothing can
+fill it (no Kalshi first-3-innings series exists), but its board price is the
+nine-inning contract's.
+
+**AND IT IS NOT MLB-ONLY OR KALSHI-ONLY.** NCAAF `h1` rows take full-game
+contracts — 10 from Kalshi and **2 from Polymarket**
+(`ncaaf|h1|totals|19.5 <- polymarket_us|full|totals|tsc-cfb-woff-kentst-2026-09-12-total-19pt5`).
+The cross-venue half was predicted structurally and is now measured. NFL and
+soccer read 0, which is what makes the two non-zeros a signal rather than a
+counter that fires everywhere.
+
+**STILL LIVE.** `_SEGMENT_REFUSAL_ENABLED = False`; every line reads
+`refusing=False` and those 55 sides are on the board now. Deploy 2 is the
+one-line flip.
+
 **A PEER READ THE SAME ROW AND CONCLUDED THE OPPOSITE; THEIR OWN FIXTURE
 REFUTES IT** `[15410ca7 on origin/main, "…and it DISPROVES the alarm that
 prompted it"]`. Their MEASUREMENT is correct and is not in dispute:

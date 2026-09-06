@@ -1773,11 +1773,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   price off every whole-game row spelled that way. Folded explicitly; production
   writes `full`, established from the ORDER path matching 545-845 rows per join
   with an unfolded comparator.
-- **DEPLOY PLAN, decided by the user 2026-09-06: instrument first, fix second.**
-  Deploy 1 carries `_SEGMENT_REFUSAL_ENABLED = False` -- it counts the
-  mis-bindings on a live slate and changes no price, which is what gives the
-  refusal a coverage cost to record before it is taken. Deploy 2 flips the
-  constant. Neither has been run; the claim + preflight are unspent.
+- **DEPLOY 1 IS DONE AND THE RATE IS MEASURED.** `80d89986` LIVE on
+  refresh-worker 2026-09-06T19:04:54Z; reading 19:21:16-19:22:16Z on instance
+  `l4kdz`. **55 mis-bound sides of 311 venue-repriced, across TWO sports and
+  BOTH venues** -- mlb 43/118 (36.4%, including 12 `first3`), ncaaf 12/121 (10
+  kalshi + **2 polymarket**), nfl 0, soccer 0. Full working in `deploys.md`.
+  Held ~20 min across two full-slate MLB sims and triggered into a
+  `process_count=3` lull; no job killed. Claim released with `--token`.
+  **Preflight NOT run** -- no `RENDER_API_KEY` in that session -- and the deploy
+  went via the Render MCP, which the guard does not inspect; done on the user's
+  explicit instruction after the bypass was put to them. That gap is recorded in
+  the `deploys.md` row rather than glossed.
+- **DEPLOY 2 IS THE ONE-LINE FLIP of `_SEGMENT_REFUSAL_ENABLED` to True**, plus
+  repointing `test_the_shipped_default_counts_without_refusing`. Its coverage
+  cost is now known: it removes 55 venue prices per build and leaves those rows
+  on their book prices.
 - **THE DENOMINATOR IS THE USER'S TO READ, by their decision** -- this session's
   egress proxy denies `syndicate-an21.onrender.com`, and the one-liner that
   prints it is in `findings_2026-09-06_first5_kalshi_fanin_mismatch.md` §6.
