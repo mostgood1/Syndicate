@@ -174,6 +174,56 @@ of allocating. The low peak may be a CONSEQUENCE of those failures rather than
 evidence against the need. `[peer lane ncaaf-live-resim-wire raised the
 competing hypothesis; the pagefile reading is mine]`
 
+**RESOLVED 2026-09-05 ~22:0xZ. IT IS NEITHER HYPOTHESIS, THE `~20 GB` IS FICTION,
+AND MY "PARALLEL-ONLY ARTEFACT" LABEL WAS ALSO WRONG.**
+
+`~20 GB` never had a source. Read off both files statically: `test_heap_roots`
+allocates 20x8000 at three sites plus 60,000 (sub-MB); `test_retainer_census`
+~2 MB. **Low single-digit MB.** The figure travelled as prose through
+`suite-order-pollution`, through me, and through a peer lane, and nobody had
+checked it. `[peer lane ncaaf-live-resim-wire found it and retracted its own
+pressure hypothesis on it; sizes confirmed independently here]`
+
+**THE REAL MECHANISM: A FIXED NODE BUDGET AGAINST A VARIABLE AMBIENT HEAP.** The
+census TRAVERSES `gc.get_objects()`; its cost is a function of the heap the
+process already has, not of what these tests allocate. `NODE_CAP = 40000` is a
+budget the walk decrements. Measured inside a real pytest process holding 40
+other test modules:
+
+    cap=   40,000   nodes_used=  40,000   TRUNCATED   probe=['_PLAIN_CACHE']  0.07s
+    cap=  400,000   nodes_used=  74,925   complete    probe=all three         0.21s
+    cap=2,000,000   nodes_used=  74,925   complete    probe=all three         0.19s
+
+The requirement is **74,925 nodes, 1.87x the cap**. The walk stops on its own
+there, so the ceiling costs 0.14 s and not more.
+
+**REPRODUCED WITH ZERO PARALLELISM** -- 40 modules then `test_heap_roots` in ONE
+process, no xdist: 2 failed. So "parallel-only artefact" was my label and it was
+wrong; xdist only MANIFESTS it, because a `--dist=loadscope` worker accumulates
+whole modules. Standalone-passes-therefore-parallelism was the inference, and it
+was the same non-discriminating control as everything else in this subject.
+
+**THE IRONY IS THE LESSON.** The cap's own comment says it exists so these tests
+"exercise behaviour, not the size of whatever process happens to be running
+them", and a sibling docstring states the principle outright: *"A test must not
+be a function of its runner."* **The cap was the fix for runner-dependence and
+it reintroduced runner-dependence in the opposite direction** -- too small a
+budget rather than too large a walk.
+
+FIXED: `CENSUS_NODE_CAP = 400_000` for the census tests (`NODE_CAP` unchanged for
+`PythonHeapTotalTests`, whose ratio/identity assertions need no complete walk),
+and `_rows()` now asserts the census's OWN `node_budget_exhausted` flag -- which
+the payload has always carried and no test read. Every assertion there is
+`assertIn`, so a truncated walk turned "the census does not reach this root" into
+"the census stopped early" while reading identically. Mutation (cap back to
+40,000): **6 failed**, naming the truncation and `nodes_used=40000`, where the old
+code produced a silent `'Holder' not found` on only 2.
+
+**STILL CARRIES THE FICTION AND IS NOT MINE TO EDIT:** `suite-order-pollution`'s
+OPEN lane block still reads *"`test_heap_roots`/`test_retainer_census`
+legitimately allocate ~20 GB"*, and that sentence is load-bearing for its
+account of its own `MemoryError`. Surfaced, not edited.
+
 **SO THE `test_heap_roots` MECHANISM IS STILL OPEN, AND MY "CONTAMINATION"
 READ IS NOT THE FAVOURITE ANY MORE.** Two hypotheses with DIFFERENT FIXES:
 *contamination* (they census every object in the interpreter, so a parallel

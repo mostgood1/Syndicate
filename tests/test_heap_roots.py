@@ -31,6 +31,34 @@ from syndicate.features.shared import memory_observability as MOD
 # pytest hung for minutes while the same call took ~1 s against the real app.
 NODE_CAP = 40000
 
+# ...BUT A CAP IS ALSO A WAY TO DEPEND ON THE RUNNER, IN THE OTHER DIRECTION, AND
+# THAT IS WHAT 40,000 WAS DOING TO `WiderRootTests` `[measured 2026-09-05]`.
+#
+# The census walks the interpreter's EXISTING object graph; its cost is a
+# function of the ambient heap, not of the ~0.5 MB these tests allocate. Run the
+# file alone and 40,000 nodes reaches this probe. Run it in a process that has
+# already imported 40 other test modules -- which is what a `--dist=loadscope`
+# worker is -- and the budget is spent before the walk arrives:
+#
+#     cap=   40,000   nodes_used=  40,000   TRUNCATED   probe=['_PLAIN_CACHE']
+#     cap=  400,000   nodes_used=  74,925   complete    probe=all three   0.21s
+#     cap=2,000,000   nodes_used=  74,925   complete    probe=all three   0.19s
+#
+# The real requirement is 74,925 -- 1.87x the old cap -- and the walk stops on
+# its own at that point, so raising the ceiling costs 0.14 s and not more. The
+# failure it produced was silent and misleading: `assertIn('Holder', rows)` with
+# `Holder` simply absent, which reads as the CENSUS being broken rather than as
+# the walk never having got there.
+#
+# 400,000 is ~5.3x the measured requirement of a 40-module process. That is
+# headroom, not a guarantee -- so `_rows()` asserts the census's OWN
+# `node_budget_exhausted` flag, and a future process big enough to spend even
+# this budget fails by NAMING the truncation instead of mis-reporting a missing
+# root. `PythonHeapTotalTests` keeps `NODE_CAP`: its assertions are ratios and
+# identity, they do not require a complete walk, and `python_heap_total` is the
+# call the docstring below records as hanging for minutes when uncapped.
+CENSUS_NODE_CAP = 400_000
+
 
 
 class WiderRootTests(unittest.TestCase):
@@ -60,12 +88,22 @@ class WiderRootTests(unittest.TestCase):
         sys.modules.pop(self._name, None)
 
     def _rows(self, census):
+        # A TRUNCATED WALK CANNOT SUPPORT AN ABSENCE CLAIM. Every assertion below
+        # is `assertIn`, so an exhausted budget turns "the census does not reach
+        # this root" into "the census stopped early" while reading identically.
+        # The payload already carries the flag; nothing here used to look at it.
+        self.assertFalse(
+            census.get("node_budget_exhausted"),
+            "the census ran out of node budget before finishing, so a missing root "
+            "here says nothing about the census -- raise CENSUS_NODE_CAP "
+            f"(nodes_used={census.get('nodes_used')})",
+        )
         return {r["name"]: r for r in census["top"] if r["module"] == self._name}
 
     def test_a_CLASS_ATTRIBUTE_cache_is_now_reached(self) -> None:
         """Invisible to the old census, which only looked at module globals that
         were themselves containers."""
-        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=NODE_CAP))
+        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=CENSUS_NODE_CAP))
 
         self.assertIn("Holder", rows)
         self.assertGreater(rows["Holder"]["mb"], 0.1)
@@ -74,14 +112,14 @@ class WiderRootTests(unittest.TestCase):
     def test_a_MODULE_LEVEL_OBJECT_holding_a_cache_is_now_reached(self) -> None:
         """A singleton with caches in its `__dict__` -- the shape the old root
         set skipped before the walk even started."""
-        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=NODE_CAP))
+        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=CENSUS_NODE_CAP))
 
         self.assertIn("SINGLETON", rows)
         self.assertGreater(rows["SINGLETON"]["mb"], 0.1)
         self.assertEqual(rows["SINGLETON"]["root_pass"], "module_object")
 
     def test_the_plain_container_still_reports_under_its_OWN_pass(self) -> None:
-        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=NODE_CAP))
+        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=CENSUS_NODE_CAP))
 
         self.assertEqual(rows["_PLAIN_CACHE"]["root_pass"], "module_container")
 
@@ -94,7 +132,7 @@ class WiderRootTests(unittest.TestCase):
 
         sys.modules[self._name].SomeImportedClass = _json.JSONDecoder
 
-        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=NODE_CAP))
+        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=CENSUS_NODE_CAP))
 
         self.assertNotIn("SomeImportedClass", rows)
 
@@ -103,7 +141,7 @@ class WiderRootTests(unittest.TestCase):
         the table meaningless."""
         sys.modules[self._name].SOME_MODULE = sys.modules["json"]
 
-        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=NODE_CAP))
+        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=CENSUS_NODE_CAP))
 
         self.assertNotIn("SOME_MODULE", rows)
 
@@ -116,7 +154,7 @@ class WiderRootTests(unittest.TestCase):
         module._SHARED_CONTAINER = shared
         module.SINGLETON.also_holds = shared
 
-        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=NODE_CAP))
+        rows = self._rows(MOD.module_retainer_census(top=100, node_cap=CENSUS_NODE_CAP))
 
         self.assertGreater(rows["_SHARED_CONTAINER"]["mb"], 0.05)
         self.assertEqual(rows["_SHARED_CONTAINER"]["root_pass"], "module_container")
