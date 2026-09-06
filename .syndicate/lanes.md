@@ -2119,6 +2119,87 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `syndicate/features/shared/kalshi_board_join.py`,
   `tests/test_kalshi_alt_line_join.py`.
 
+### shortlist-prop-row-duplicates — OPEN — opened 2026-09-06 — session 28a9fe7e-56ba-4bda-9f84-762015fc0a62
+- Goal: answer the question `kalshi-alt-line-join` handed on — are two shortlist
+  rows sharing one `_row_key` (a) one bet at two BOOKS, kept so the price can be
+  shopped, or (b) a duplication defect upstream. ANSWERED: **(b)**, and the
+  producer is named to file:line.
+- **ANSWER — (b), a duplication defect. Hypothesis (a) is FALSIFIED by a control
+  taken on the same payload** `[substrate: render, /api/board/layer2-shortlist
+  ?date=2026-09-06&sport=mlb&limit=2000, artifact written_at 2026-09-06T14:44:08Z,
+  1,996 MLB rows]`:
+
+  | reading | value |
+  |---|---|
+  | prop rows carrying kalshi *inside* a multi-book `book_prices` | **600** |
+  | prop rows that are kalshi-ONLY | **37** |
+  | of those 37, how many have a diacritic in `player_name` | **37 / 37** |
+  | ascii-named prop rows that are kalshi-only | **0 / 1,826** |
+  | colliding `_row_key`s | 25 (extra rows 25) |
+  | of those 25, how many are a diacritic spelling pair | **25 / 25** |
+
+  Price-shopping in this board happens INSIDE one row — `quote.book_prices`
+  holds up to 7 venues and `best_any_book` picks — and it folds Kalshi in 600
+  times on this very slate. So two rows for one bet is not the price-shopping
+  mechanism; it is that mechanism FAILING. The 25 collisions are six players,
+  every one a `Julio Rodriguez` / `Julio Rodríguez` pair.
+- **`limit` DEFAULTS TO 200 ON THAT ENDPOINT AND SILENTLY TRUNCATES.** The first
+  fetch returned 200 of 1,996 rows and censused **0 collisions** — a clean bill
+  of health for a defect that was present. `_board_rows_for_join` reads the
+  artifact directly and is NOT truncated, so the endpoint's default hides
+  exactly the rows the join acts on. Pass `limit=2000`.
+- **PIPELINE TRACE, file:line at each hop.** The same module normalises on the
+  way IN, stamps un-normalised on the way OUT, and normalises again on the way
+  BACK — which is why the split is invisible until the join re-collapses it:
+  1. `syndicate/features/shared/kalshi_board_join.py:1372-1373` — the contract is
+     matched to a board row on `normalize_person` (accent-folded, so the match
+     SUCCEEDS), then the emitted match is stamped `player_name = verdict["subject"]`
+     — the VENUE's raw spelling, not the board row's.
+  2. `syndicate/features/shared/odds_book_quotes.py:566` —
+     `quote_rows_from_kalshi_matches` writes that raw spelling into `book_quotes`.
+  3. `syndicate/features/shared/book_grid.py:52` — `_INSTANCE_FIELDS =
+     ("sport","kind","event_id","segment","market","player_name")`, **raw**. Two
+     spellings = two market instances.
+  4. `syndicate/features/shared/layer2_board.py:1644` `build_layer2_rows` fans
+     each grid row out — two candidates for one bet.
+  5. `kalshi_board_join.py:622` `_row_key` normalises AGAIN, so both rows collapse
+     to one key, one contract pairs with both, and the join emits two match
+     records. That is the double-exposure path.
+- **MECHANISM PROOF, `off != on` on the real `build_book_grid`** `[substrate:
+  checkout @ origin/main — evidence about the CODE, not the deployment]`. Three
+  quotes, one bet, dk/betmgm ascii + kalshi:
+      spellings agree  -> 1 grid row, books ['betmgm','draftkings','kalshi']
+      one accent apart -> 2 grid rows, ['betmgm','draftkings'] and ['kalshi']
+- **IT IS NOT A KALSHI DEFECT, and framing it that way would produce the wrong
+  fix.** `Andrés Chaparro` reaches the board ACCENTED from williamhill_us, betmgm,
+  betonlineag and draftkings — OddsAPI books carry diacritics too. The invariant
+  broken is general: **any two quote sources that disagree on the raw spelling of
+  one player split that bet into two grid rows.** Today only MLB props have two
+  independent prop feeds (Kalshi direct + OddsAPI), which is why the count is
+  0 for soccer (199 prop rows, books `fanduel`/`betrivers` only — one vocabulary),
+  0 for ncaaf and nfl, and 0 for wnba (no rows).
+- **IT IS A RATE OVER A MOVING SLATE, NOT A FIXED COUNT.** 25 collisions at
+  artifact `14:44:08Z`, 21 at `15:04:08Z`, 10 when `kalshi-alt-line-join` measured
+  it on 09-05. Quote whichever `written_at` the number came from.
+- Files: **NONE CLAIMED.** This lane is a read-only trace and changed no code. The
+  fix sites are held by other OPEN lanes — `layer2_board.py` by `layer2-sim-disagrees`
+  (session 3492626c) — so whoever takes the repair must coordinate rather than
+  inherit this lane's claim.
+- Falsification test that WAS run and did not fire: if the board deliberately kept
+  one row per venue, kalshi-only rows would appear for ascii-named players too.
+  0 of 1,826. And `kalshi_plus_books=600` shows the merge is the intended path.
+- **DO NOT "FIX" THIS IN THE JOIN.** `21aac548` bounded `_collapse_duplicate_bets`
+  to rows whose RAW market names differ precisely so it would not silently drop
+  these. Deduping them there would hide a split that has already cost the board a
+  real price: on `batter_hits julio rodriguez 0.5 over` the kalshi row prices -194
+  alone while the book row's `best_any_book` is betrivers -195 — the two are never
+  compared, so `best_any_book` is not the best price available. The repair belongs
+  at hop 2 or 3 (normalise the name into the grid key, keeping the raw spelling on
+  the row for display).
+- Verification: the six readings in the table above, all from one fetch of one
+  artifact (`written_at 2026-09-06T14:44:08Z`), plus the `off != on` mechanism run.
+- Blocked by: none. NO DEPLOY in this lane; no code changed.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
