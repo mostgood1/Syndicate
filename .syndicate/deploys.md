@@ -24905,3 +24905,86 @@ of which is the ORDER path.
 `settled-sample-nfl-reconcile`'s reading (`SETTLED_SAMPLE` printing `nfl: 12`
 with `credibility 0.25`) — its code landed in `53d8f9c9` and rides this deploy,
 so that reading should now be takeable.
+
+
+## 2026-09-06 19:51:11Z — refresh-worker `80d89986` -> `bd658209` — **THE SEGMENT REFUSAL IS LIVE AND FIRING: a full-game venue quote no longer prices a segment row. MEASURED, with one number I could not fully control.** `[lane venue-fanin-segment-key; flip authored by me, deploy triggered by lane kalshi-join-counters-logged]`
+
+**I DID NOT TRIGGER THIS DEPLOY AND DID NOT HOLD THE CLAIM.** I asked for the
+refresh-worker claim at 19:44Z and it was HELD by `kalshi-join-counters-logged`,
+taken 12 seconds earlier. Their deploy of `origin/main` carried my commit
+`90493e64` because it was already on main. Third time today that landing first
+made the next deploy cumulative rather than a race. A second deploy would have
+been a redundant 4GB restart — and would have killed a sim, which is what the
+19:04:54Z deploy did to run `20260906_185943` (triggered 18:59:43, no
+`MLB_DAILY_SIM_END`, ever).
+
+**CONTENT-VERIFIED ON THE LIVE SHA**, not inferred from ancestry:
+
+    bd6582097a40   _SEGMENT_REFUSAL_ENABLED = True : True
+                   _segment_disagrees present      : True
+
+**verify: THE PREDICATES WERE NAMED BEFORE THE READING WAS TAKEN.** All four met.
+
+| | before, 19:21:16Z (`80d89986`) | after, 20:07:09Z (`bd658209`) |
+|---|---|---|
+| `refusing=` | `False` | **`True`** |
+| mlb `matched` | `first3:12, first5:31, full:75` | **`full:44` ONLY** |
+| ncaaf `matched` | `h1\|kalshi:10, h1\|polymarket_us:2, full:17, full\|pm:92` | **`full:13, full\|pm:84` ONLY** |
+| mlb `count` | 48 | **38** — still non-zero |
+| ncaaf `count` | 12 | **14** — still non-zero |
+| nfl `matched` | `full:62` | `full:62` — unchanged |
+
+Every `first3|`, `first5|` and `h1|` entry is gone from `matched` across BOTH
+sports and BOTH venues, while `sample=` still lists the mis-bindings being
+DETECTED. That combination is the point: the refusal fires and the instrument
+did not go quiet with it. A `count` that fell to 0 alongside the refusal would
+have been this repo's instrument-blindness failure wearing a success.
+
+**THE NUMBER I COULD NOT FULLY CONTROL, stated because my own lane made it the
+falsification test.** mlb `full|kalshi|KXMLBTOTAL` fell **75 -> 44** — legitimate
+full-game repricing — and the lane says "if full-game match counts MOVE, the
+change is wrong". Three things argue it is slate churn rather than
+over-refusal, and none of them is a controlled experiment:
+
+- `sides_seen` fell 5,932 -> 5,541 over the same 46 minutes as games finished;
+- nfl held **62 -> 62** exactly;
+- **soccer ROSE, 4 -> 8** — a guard that over-refuses cannot increase a count.
+
+Structurally it also cannot touch full rows: `_segment_disagrees` compares the
+row's segment to the quote's, and full-vs-full agrees. **Close to excluded, not
+excluded.** A same-instant before/after on one frozen slate is what would settle
+it, and that was not run.
+
+**THE COVERAGE COST, and I gave a low number earlier from the wrong instrument.**
+I first sized this at 17 rows off the SERVED PAYLOAD and reported Polymarket and
+NCAAF as unmeasured. Deploy 1's own counter — live since 19:04:54Z, which I had
+also wrongly said had never produced a production number — says:
+
+    mlb    count=48  of sides_seen=5,932   (0.81%)
+    ncaaf  count=12  of sides_seen=1,234   (0.99%)
+    ROWS   count=74  of rows_in=10,438     (0.71%)
+
+and it DOES span Polymarket (`h1|polymarket_us`, plus an mlb `first5 h2h` bound
+to a full-game `aec-` slug). Bigger and broader than my proxy; under 1% of every
+population either way, so the decision is unchanged and now rests on the
+intended instrument.
+
+**THE STAGING THIS OVERRODE.** `_SEGMENT_REFUSAL_ENABLED = False` was
+`[user decision 2026-09-06: "instrument first, fix second"]`, recorded in lane
+`mlb-first5-kalshi-fanin-mismatch`. Flipped on an explicit second user decision
+the same day ("measure the coverage cost and flip the flag"). Logged here rather
+than left as a silent revert. That lane's session was unreachable to coordinate
+with — `send_message` rejects its id, which is in a different space from
+`list_sessions`, exactly as `deploy_claim.py`'s own docstring warns.
+
+**Tests: 19 passing.** Two of that lane's tests were INVERTED, not deleted —
+`test_the_shipped_default_counts_without_refusing` pinned the staged `False` and
+is now `..._now_REFUSES_and_still_counts`, keeping the original trap by asserting
+the count is non-zero AND the price is gone on the same call. The match-record
+test now forces the flag OFF so it keeps testing the instrument rather than the
+flag twice.
+
+**Not deployed by me, nothing to release.** `test_prop_player_keying::
+test_offered_overlap_separates_a_coverage_gap_from_a_freshness_loss` fails on
+unmodified `origin/main` with the flag False — pre-existing, control run, not
+from this change.
