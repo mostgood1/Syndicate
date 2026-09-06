@@ -1657,7 +1657,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   egress proxy denies `syndicate-an21.onrender.com`, and the one-liner that
   prints it is in `findings_2026-09-06_first5_kalshi_fanin_mismatch.md` §6.
 
-### web-oom-secondary-arenas — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-secondary-arenas — OPEN (instrument BUILT and landed `67af1276`; INERT in production until deployed and `SYNDICATE_MALLOC_ARENA_DETAIL=1`, so the verification reading is still OWED) — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: build the PER-ARENA `malloc_info` readout and use it to say which arena
   holds `#632`'s growth on **web**. `mallinfo2` reports the MAIN ARENA ONLY, and
   the clean 2026-09-06 window showed the main arena moving `+7.2`/`+8.3 MB` while

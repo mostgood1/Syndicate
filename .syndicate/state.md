@@ -1202,3 +1202,70 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   only thing that can see secondary arenas. `#435` dismissed it at 13.9%
   coverage, but that was measuring a different question — coverage of TOTAL anon,
   not the per-arena split. It should be re-read with this question in hand.
+
+### `[web-oom-leak]` UPDATE 24 — **A DUPLICATE DEFINITION HAD SILENTLY KILLED `#285`'s PROOF LINE**, plus the per-arena instrument is built (and INERT), 2026-09-06T21:1xZ `[session b2b5b45b]`
+
+* **THE DEFECT, and it is live code.** `_MALLOC_TRIM_STATE` and
+  `_resolve_malloc_trim` were each defined **TWICE** at module scope in
+  `syndicate/features/shared/memory_observability.py` — once by `#285`
+  (~line 2397) and again ~1,900 lines later, beside the `mallinfo2` work **this
+  session added earlier the same day**. Python keeps the LAST binding, so
+  `#285`'s resolver was dead code. Fixed in `67af1276`.
+* **Nothing failed loudly, which is why it survived.** `malloc_trim` still bound
+  and still trimmed. What the duplicate removed was the EVIDENCE:
+  * **`MALLOC_TRIM_INIT`** — the one-time line `#285` added *precisely because*
+    the binding cannot be exercised on any dev machine here, so a production log
+    line is its only proof. Grepping for it after a deploy returned nothing,
+    which reads as *"the binding failed"* and actually meant *"the emitter is
+    gone"*. This is `[feedback_absent_signal_is_about_the_emitter]` again, and
+    this time I caused it.
+  * **commit `daed5d92`**, *"hold the CDLL, not just the function pointer taken
+    off it"* — the duplicate kept only the pointer, re-opening a FIXED lifetime
+    bug.
+  * the `libc.so.6` → `find_library("c")` → `None` fallback chain, narrowed to a
+    single `CDLL(None)`.
+* **Blast radius is real, not theoretical:** `release_freed_memory_to_os()` is
+  called from **five sites** in `pipeline/intelligence_state.py` (layer2 refresh
+  guards, candidate pool, overview headroom). Also, `malloc_trim_now()` was
+  reading a `why` key that the surviving state dict does not have, so it reported
+  *"malloc_trim not found in libc"* **whatever the real reason was**.
+* **How it was found:** `tests/test_malloc_trim_release.py` had a RED test
+  asserting `MALLOC_TRIM_INIT` is emitted. It was failing, it was in the area I
+  was working, and it was telling the truth. `[feedback_documented_caveat_is_a_scheduled_defect]`.
+* **A repo-wide AST sweep found TWO MORE instances**, both outside this lane and
+  both FREE at the time: `syndicate/features/nba/live_lens.py`
+  (`build_live_lens_api_payload`, lines 747 and 807 — a LIVE API payload
+  builder) and `syndicate/features/nhl/cards.py` (`_sim_hist_rows`, 521 and 539).
+  Flagged, not fixed here. A test now pins the no-duplicate invariant for
+  `memory_observability.py`; a repo-wide check is the better home for it.
+
+* **THE INSTRUMENT, built and landed but NOT YET LIVE.**
+  `parse_malloc_info_arenas()` splits `malloc_info` XML **per `<heap>`**, which
+  `parse_malloc_info_xml` discards by design (top-level totals only, to avoid
+  double counting). Each `<heap nr=N>` IS an arena, so this is the only
+  instrument that can see the secondary arenas `mallinfo2` does not report.
+* **It does NOT inherit my own assumption.** I have been asserting `mallinfo2`
+  is main-arena-only. `man mallinfo2` says so under BUGS; glibc's
+  `__libc_mallinfo2` walks the arena ring; neither runs on any machine here, and
+  **the entire "80% is invisible" claim from UPDATE 23 rests on which is right.**
+  So `mallinfo2.arena` is compared against BOTH heap 0 and the top-level total
+  and the scope is decided FROM THE DATA — including `indistinguishable` when
+  there is one arena and the comparison has no power to say anything.
+  **If it comes back `all_arenas`, UPDATE 23's premise is falsified** and the
+  growth is outside glibc entirely.
+* Every derived number is paired with its residual: per-heap sum vs glibc's own
+  top-level total, and a FAILED reconciliation blocks every downstream verdict
+  rather than yielding a confident split off a misread tree. Coverage against
+  cgroup anon gates it too — below 50% the arenas are not where the memory lives.
+* **INERT until deployed AND enabled.** `SYNDICATE_MALLOC_ARENA_DETAIL` defaults
+  **OFF**, and web runs a deploy branch with `autoDeploy = no`, so landing on
+  `main` ships nothing. It is flag-gated and throttled because
+  `get_all_process_memory_snapshot()` is also reached from
+  `log_all_process_memory()` at worker STAGE CHECKPOINTS — unconditional libc
+  work there is the `#241` shape. The call reports its own `duration_ms`, and a
+  cached reading is stamped `age_s`, so neither the cost nor the freshness has to
+  be assumed.
+* Reachability note: it rides the EXISTING `/api/ops/memory` rather than a route
+  of its own, because `syndicate/blueprints/ops.py` is held by
+  `ncaaf-live-resim-wire`. 36 new tests; 89 pass across the memory-instrument
+  files, including the previously-red `MALLOC_TRIM_INIT` test.
