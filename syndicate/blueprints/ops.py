@@ -881,6 +881,24 @@ def api_ops_retainer_census() -> Any:
     return jsonify({"ok": True, "census": module_retainer_census(top=top, node_cap=node_cap)})
 
 
+@ops_bp.get("/api/ops/glibc-malloc")
+def api_ops_glibc_malloc() -> Any:
+    # `#632`. 71.7% of a worker's anon is not Python objects, so the question
+    # moves below CPython. This is `mallinfo2`, NOT the `malloc_info` that `#435`
+    # already found blind at 13.9% coverage -- `hblkhd` reports space in MMAPPED
+    # regions, which is the 8-64MB class the smaps trend identified.
+    #
+    # Answers two things with opposite fixes: whether glibc holds the memory at
+    # all (`glibc_pct_of_anon`), and whether what it holds is IN USE or FREE
+    # (`free_pct_of_glibc`) -- the latter is returnable with `malloc_trim`.
+    #
+    # Read-only, but it takes the malloc lock, so it is on demand and never on
+    # the request path.
+    from syndicate.features.shared.memory_observability import glibc_mallinfo2
+
+    return jsonify({"ok": True, "mallinfo": glibc_mallinfo2()})
+
+
 @ops_bp.get("/api/ops/python-heap")
 def api_ops_python_heap() -> Any:
     # `#632`, and this is the deciding measurement rather than another probe.

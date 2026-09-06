@@ -172,6 +172,34 @@ death, never life — do not invert it.
 - Blocked by: none. `mlb-first5-kalshi-execution` CLOSED 2026-09-06 and released
   its claim on `kalshi_catalogue.py`.
 
+### web-oom-mallinfo2 — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: find where `#632`'s **71.7% non-Python anon** lives, using glibc's own
+  accounting — and split "in use" from "freed but retained", because those have
+  OPPOSITE fixes.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `syndicate/blueprints/ops.py`, `tests/test_mallinfo2.py` (NEW).
+- **THIS IS NOT WHAT `#435` TRIED.** That used `malloc_info` — per-arena XML,
+  13.9% coverage, and structurally blind to mmapped chunks. **`mallinfo2` is a
+  different call**, and its `hblkhd` field is precisely "space allocated in
+  mmapped regions", which is the 8-64MB class the smaps trend identified.
+- The two questions it can answer that nothing else has:
+  1. **Is the memory in glibc's allocator at all?** `arena + hblkhd` against
+     process anon. If it does not reconcile, the bytes bypass malloc entirely
+     (a C extension mmapping directly) and even this is the wrong layer.
+  2. **If it is: IN USE (`uordblks`) or FREED-BUT-RETAINED (`fordblks`,
+     `keepcost`)?** Retained-but-free is returnable with `malloc_trim()` — an
+     actual candidate FIX, the first this investigation has had. In-use means a
+     C owner to find.
+- Hypothesis: a large `hblkhd` accounts for most of the non-Python anon.
+- Falsification test: `arena + hblkhd` is a small fraction of anon — then glibc
+  is not holding it either, and the next layer is direct `mmap` by an extension.
+- Verification: `mallinfo2` and `process_anon_mb` from the SAME call on one
+  worker, with the reconciliation ratio reported, over matched windows.
+- SAFETY: `mallinfo2` is a read, but it takes the malloc lock — on demand only,
+  never on the request path. **`malloc_trim` will NOT be called in this lane**;
+  it mutates allocator state and is a separate decision with its own measurement.
+- Blocked by: none.
+
 ## OPEN
 
 ## OPEN

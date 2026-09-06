@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import ctypes
 import gc
 import json
 import os
@@ -3864,4 +3865,107 @@ def python_heap_total(node_cap: int | None = None) -> dict[str, Any]:
         "node_budget_exhausted": budget[0] <= 0,
         "nodes_used": int(node_cap or 4_000_000) - budget[0],
         "distinct_objects": len(seen),
+    }
+
+
+class _Mallinfo2(ctypes.Structure):
+    # glibc `struct mallinfo2` -- ten `size_t` fields, in this order. The older
+    # `mallinfo` has the SAME field names as `int`, which SILENTLY WRAPS past
+    # 2 GB; on a 2 GB service that is exactly the range being measured, so this
+    # code uses `mallinfo2` (glibc 2.33+) or reports nothing at all.
+    _fields_ = [
+        ("arena", ctypes.c_size_t),      # non-mmapped space allocated (brk)
+        ("ordblks", ctypes.c_size_t),    # number of free chunks
+        ("smblks", ctypes.c_size_t),     # number of free fastbin blocks
+        ("hblks", ctypes.c_size_t),      # number of MMAPPED REGIONS
+        ("hblkhd", ctypes.c_size_t),     # SPACE ALLOCATED IN MMAPPED REGIONS
+        ("usmblks", ctypes.c_size_t),    # always 0 in modern glibc
+        ("fsmblks", ctypes.c_size_t),    # space in freed fastbin blocks
+        ("uordblks", ctypes.c_size_t),   # total ALLOCATED space
+        ("fordblks", ctypes.c_size_t),   # total FREE space inside the arena
+        ("keepcost", ctypes.c_size_t),   # top-most releasable space
+    ]
+
+
+_MALLINFO2_STATE: dict[str, Any] = {"resolved": False, "fn": None, "why": None}
+
+
+def _resolve_mallinfo2() -> Any:
+    if _MALLINFO2_STATE["resolved"]:
+        return _MALLINFO2_STATE["fn"]
+    _MALLINFO2_STATE["resolved"] = True
+    try:
+        libc = ctypes.CDLL(None)
+        fn = libc.mallinfo2
+    except Exception as exc:
+        _MALLINFO2_STATE["why"] = f"{type(exc).__name__}: {exc}"
+        return None
+    fn.restype = _Mallinfo2
+    fn.argtypes = []
+    _MALLINFO2_STATE["fn"] = fn
+    return fn
+
+
+def glibc_mallinfo2() -> dict[str, Any]:
+    """glibc's OWN accounting of the heap. `#632`.
+
+    THE GAP THIS TARGETS: 71.7% of a worker's anon is not Python objects
+    (28.3% measured by a converged object-graph walk, 0.3% of the GROWTH). No
+    Python-level probe can see those bytes, so the question moves down a layer.
+
+    **THIS IS NOT `malloc_info`, which `#435` already tried and found blind
+    (13.9% coverage).** That call reports per-arena XML and cannot see mmapped
+    chunks. `hblkhd` here is *space allocated in mmapped regions* -- exactly the
+    8-64MB region class the smaps trend identified as the growing term.
+
+    Two questions it can settle, and they have OPPOSITE fixes:
+
+    * `arena + hblkhd` against process anon -- **is the memory in glibc at all?**
+      If it does not reconcile, the bytes bypass malloc (a C extension calling
+      `mmap` directly) and even this is the wrong layer.
+    * `uordblks` (in use) against `fordblks`/`keepcost` (free but retained) --
+      **retained-but-free is returnable with `malloc_trim()`**, which would be
+      the first actual fix candidate this investigation has produced. In-use
+      means there is a C owner to find instead.
+
+    Takes the malloc lock, so it is a read but not a free one: on demand only,
+    never on the request path.
+    """
+    fn = _resolve_mallinfo2()
+    if fn is None:
+        # ABSENT, not zero. A zero would assert "glibc holds nothing", which is a
+        # claim; absence is the truth on a platform without glibc 2.33+.
+        return {"available": False,
+                "why": _MALLINFO2_STATE.get("why") or "mallinfo2 not found in libc"}
+    try:
+        info = fn()
+    except Exception as exc:
+        return {"available": False, "why": f"call failed: {type(exc).__name__}: {exc}"}
+
+    arena_mb = info.arena / _BYTES_PER_MB
+    hblkhd_mb = info.hblkhd / _BYTES_PER_MB
+    in_use_mb = info.uordblks / _BYTES_PER_MB
+    free_mb = info.fordblks / _BYTES_PER_MB
+    anon = _process_anon_mb()
+    glibc_total = arena_mb + hblkhd_mb
+    return {
+        "available": True,
+        "pid": os.getpid(),
+        "proc_token": _proc_token(),
+        "arena_mb": round(arena_mb, 3),
+        "mmapped_mb": round(hblkhd_mb, 3),
+        "mmapped_regions": int(info.hblks),
+        "in_use_mb": round(in_use_mb, 3),
+        "free_in_arena_mb": round(free_mb, 3),
+        "releasable_top_mb": round(info.keepcost / _BYTES_PER_MB, 3),
+        "glibc_total_mb": round(glibc_total, 3),
+        "process_anon_mb": round(anon, 3) if anon is not None else None,
+        # THE reconciliation. Near 100% => glibc holds it and the next question
+        # is in-use vs retained. Small => not glibc either.
+        "glibc_pct_of_anon": (round(100.0 * glibc_total / anon, 1)
+                              if anon and anon > 0 else None),
+        # Of what glibc holds, how much is FREE rather than in use. High means
+        # `malloc_trim` has something to give back.
+        "free_pct_of_glibc": (round(100.0 * free_mb / glibc_total, 1)
+                              if glibc_total > 0 else None),
     }
