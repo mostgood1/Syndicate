@@ -141,6 +141,37 @@ death, never life — do not invert it.
   bytes per row; the dicts are the term that matters.
 - Blocked by: none.
 
+### ncaaf-h1-kalshi-series — OPEN — opened 2026-09-06 — session 3492626c
+- Goal: NCAAF first-half board rows can resolve a Kalshi ticker. Today 24 of 200
+  Layer 2 shortlist rows are `segment=h1` (15 `totals`, 8 `spreads`, 1 `h2h`,
+  all ncaaf, EV up to 5.14%) and NONE can execute: `sport_for_series` and
+  `segment_for_series` both return None for every `KXNCAAF1H*` series, so
+  `classify_market` refuses at the first gate. Production reports
+  `GAP series=KXNCAAF1H count=400 reason=recognised_but_no_board_market`.
+- Files: `syndicate/features/shared/kalshi_catalogue.py`,
+  `tests/test_ncaaf_h1_kalshi_series.py` (NEW)
+- Hypothesis: this is the SAME two-gate defect `mlb-first5-kalshi-execution`
+  found for `KXMLBF5TOTAL` (`d2b060c8`, now CLOSED) — absent from `SERIES_SPORT`,
+  so the markets are fetched every tick and discarded. Kalshi lists
+  `KXNCAAF1H` (winner, 'TCU wins the 1st half'), `KXNCAAF1HTOTAL` and
+  `KXNCAAF1HSPREAD`; all three appear in production titles.
+- Falsification test: if `sport_for_series("KXNCAAF1HTOTAL")` is already
+  non-None on the DEPLOYED sha, the diagnosis is wrong and the blocker is
+  downstream in the board join, not the registry.
+- Verification: a replay of real production `KXNCAAF1HTOTAL` contracts against
+  real `segment=h1` shortlist rows going matched=0 -> matched>0, with
+  `segment_has_no_matching_series` still firing alongside. NOT a deploy in this
+  lane.
+- SCOPE DECISION, following the precedent this repo already set:
+  `KXNCAAF1HSPREAD` will be added to the SEGMENT table but **NOT** registered as
+  tradeable. `KXMLBF5SPREAD` was deliberately excluded for the same reason — a
+  Kalshi spread states a MARGIN where the board writes a HANDICAP, the defect
+  that once put 11 orders on the club they were fading. Separate risk class,
+  separate change. That leaves 16 of the 24 rows addressable (15 totals + 1
+  h2h), and the 8 spread rows deliberately unaddressed.
+- Blocked by: none. `mlb-first5-kalshi-execution` CLOSED 2026-09-06 and released
+  its claim on `kalshi_catalogue.py`.
+
 ## OPEN
 
 ## OPEN
