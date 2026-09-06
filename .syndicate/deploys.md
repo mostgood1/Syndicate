@@ -5,6 +5,53 @@
 
 ---
 
+## 2026-09-06 01:34Z - 01:39:17Z — live-odds-worker `e78fe40a` — **CATCH-UP: repairs the runtime drift my own poller race caused. The compression half is NOT mine to claim and its row is owed by `render-egress-transport`.** — lane `segment-refusal-deploy`
+
+`deploy=dep-... trigger=api`, posted on a CLEAR window in the same tick, claim
+released with `--token` (no force). Live at **2026-09-06T01:39:17.650096Z**.
+
+**verify — WHAT THIS DEPLOY OF MINE WAS FOR, and it is a repair, not a feature.**
+The 23:08Z double-POST left this service on `7f197639`, which is an ANCESTOR of
+the cancelled `a31fb870`, so it had been running without
+`layer2_board.py` (+22/-2) and `live_gameline_join.py` (+48/-1) for ~2.5 hours.
+`e78fe40a` contains `7f197639`, `d955e445`, `3cb5b4ba` and `cf401fb8`, and
+`merge-base --is-ancestor 7f197639 e78fe40a` is TRUE — forward, not a revert.
+**Reading: the service is at the tip and the drift is closed.**
+
+**THE COMPRESSION RESULT IS NOT VERIFIED AND MUST NOT BE READ FROM THIS ROW.**
+`3cb5b4ba`/`cf401fb8` rode along. Its counter reports mechanism working —
+`ratio=12.89x`, `refused_hosts=0`, single-process ladder confirmed
+(`gzip_responses` 1/200/400/600/800 with no repeats, which is why the deltas are
+real deltas and not two per-process counters subtracted). **But the counter and
+the meter disagree by ~20x**: six successive `BILLED_wire` deltas read
+235/300/286/196/236/325 MB/h (mean ~263, FLAT over 20 min, no decay) while
+Render's own meter bills this service 24.4-26.5 MB/h in the same window. Flat
+rules out a boot burst. **The likeliest reading is that the counter measures a
+direction Render does not bill** — mechanism without money. `render-egress-transport`
+owns that determination and the row; do not pre-empt it here.
+
+**MY OWN ERROR, RECORDED BECAUSE IT NEARLY STOPPED SOMEONE ELSE'S CORRECT WORK.**
+I told that lane their control had collapsed pre-deploy (~13 MB/h vs a 25.4
+baseline floor) and to stop writing their row. **It was arithmetic:** the
+`0.026 GB` day total was ONE landed bucket, not two, and I divided it by two.
+The true pre-deploy hour is **24.4 MB/h**. I had flagged the inference as my weak
+link and leaned on it anyway, and it was persuasive because a real, gentle slate
+decay (36.1 -> 33.5 -> 27.6 -> 25.4 -> 26.5 -> 24.4) pointed the same way. **A
+wrong number that lands beside a true effect is the hardest kind to catch.**
+What survives from it is narrower and still useful: their `< 25.4 MB/h`
+threshold is contaminated, because the last two pre-deploy hours already read
+24.4 and 25.4 — so the test must be against the EXTRAPOLATED trend, not the
+static range.
+
+**MEMORY, still the standing risk on this service and still not cleared.** A
+pre-reboot anchor was taken deliberately at 01:20:14Z so a same-uptime
+comparison stays possible: `headroom 286.383MB, container 1761.617MB` (~87%) at
+2h07 uptime with segment capture live, flat over the preceding 40 min. Every
+post-boot reading after this deploy is the ratchet resetting and is NOT evidence
+about either segments or compression.
+
+
+
 ## 2026-09-05 23:08:26Z - 23:13:56Z — live-odds-worker `7f197639` — **NCAAF h1 SEGMENT CAPTURE ENABLED AND CONFIRMED SPENDING, by credit burn — because the log path CANNOT answer this question.** — lane `segment-refusal-deploy`
 
 `deploy=dep-daea1qnqj5pc73aqh3sg trigger=api`. Enables
@@ -305,6 +352,26 @@ Everything else in the row below stands unchanged: same claim, same rollback,
 same expected effect, same measurement, same reader.
 
 **verify:** _(empty — this row is an open obligation)_
+
+## 2026-09-06 01:33-01:39:17Z — live-odds-worker `7f197639` -> `e78fe40a` — **MECHANISM VERIFIED, 12-13x. BILL EFFECT NOT DEMONSTRATED, AND ON THIS EVIDENCE THERE ISN'T ONE.** — lane `render-egress-transport`
+
+- **Deployed by lane `ledger-repair-invariants` from the tip; I took no lock and no deploy.** The readings are mine, re-derived from the Render logs and metrics APIs rather than recorded as relayed. That lane also repaired a poller race that had left this service behind `main` on real code for hours (`a31fb870` cancelled by `7f197639` 16 s later, the OLDER commit winning).
+- **verify (1) — MECHANISM, on the last service without it.** Single-emitter ladder, verified by me (`gzip_responses` 1/200/400/600/800, strictly monotonic, no repeats — two per-process counters interleave, as they visibly do on web):
+  `01:52:10Z HTTP_COMPRESSION gzip_responses=800 ... ratio=13.48x refused_hosts=0 BILLED_wire=60,607,269`
+- **verify (2) — `ACCEPT_ENCODING_REFUSED`: ZERO on every service, across 2,600+ compressed responses.** ESPN accepts the header from Render's outbound IP. `schedule_adapter.py:377-386`'s hazard is real and this header does not trip it.
+- **verify (3) — THE BILL DID NOT MOVE, AND THE REASON IS STRUCTURAL: `[render-egress-cause]` IS RETRACTED IN PART.** The counter measures INBOUND response bodies; Render's meter does not count them. Contradiction inside PRE-change data, needing no post-deploy bucket: **235 MB/h of billed wire at 13.48x implies ~3,173 MB/h pre-change, against a pre-change meter of 24.4-38.1 MB/h — ~105x** (~130x against the true last pre-deploy hour, ~87x at the lowest observed plateau). **BURST cannot rescue it:** steady state would have to be `30.3/13.48 = 2.2 MB/h`, i.e. the plateau would have to fall ~100x; it decayed `418 -> 196 -> 235` and **flattened 6-9x ABOVE** the meter. Discriminator designed by `ledger-repair-invariants`; six deltas mean ~263 MB/h, flat.
+- **THE THRESHOLD I SET FOR THIS ROW WAS CONTAMINATED, AND THAT IS THE PART WORTH KEEPING.** `< 25.4 MB/h` was "outside the entire 19-bucket pre-deploy range" — but that range was measured over a busy slate and the series was trending through my own bar (`36.1 -> 33.5 -> 27.6 -> 25.4 -> 26.5 -> 24.4`). **My original bar would have called the NO-TREATMENT prediction of 20.7 MB/h a PASS** — six hours of NCAAF slate decay published as a bandwidth saving, on a threshold I set myself and believed conservative. **A threshold is only conservative relative to the RIGHT control.** Caught by `ledger-repair-invariants`.
+- **PRE-REGISTERED REPLACEMENT (`648791fb`, recorded before reading):** OLS on the six pre-deploy buckets, trend `34.8 - 2.33x` MB/h, residual sd 2.10, no-treatment prediction **20.7**, 95% PI **[12.8, 28.7]**. **Bucket >= 12.8 => decay alone, no effect. < 12.8 => real effect.** A genuine 13.48x cut of a billed quantity reads **~1.5 MB/h**. **Prediction recorded before reading: it will NOT drop below 12.8.** `02:00Z` had not been reported by the API as of 02:20Z; append the outcome here.
+- **THE TEST IS POWERED FOR THE `13.48x` CLAIM, NOT FOR *ANY* SAVING — DO NOT READ ITS NULL AS "compression is worthless here".** `[limitation raised by lane `ledger-repair-invariants`]` Minimum detectable effect is `(20.7 - 12.8) / 20.7` = **38%**: only a reduction of 38% or more in the METERED quantity is distinguishable from slate decay. So a bucket at **~15 MB/h is consistent with BOTH no effect AND a ~28% real saving**, and the test cannot separate them.
+
+    a 10% real saving -> 18.6 MB/h   invisible
+    a 30% real saving -> 14.5 MB/h   invisible
+    a 50% real saving -> 10.3 MB/h   DETECTED
+    the full 13.48x    ->  1.4 MB/h   DETECTED
+
+  The power comes entirely from the size of the claim being tested. **A null here falsifies "the 12-13x reaches the bill"; it does NOT establish "the bill is unchanged".** The retraction above rests on the ~105x pre-change contradiction, which is independent of this test and does not inherit its blind spot.
+- **WHAT THIS CHANGE IS ACTUALLY WORTH, stated so nobody quotes a ratio as money:** it removes inbound bytes, receiver memory and decode time — real and useful on 2 GB instances (`#632`) — and **does not reduce the metered bill through that path.** The publish-transport gzip (13.0x, 122 MB/10 min) is likewise internal and unbilled.
+- **STILL UNIDENTIFIED: what web's 19.34 GB is.** Served responses, internal transport, public ingress, deploys and now inbound fetches are each eliminated by measurement.
 
 ## 2026-09-06 01:12:07-01:15:14Z — web `3cb5b4ba` -> `67fd8c9d` — **THE 19.34 GB IS WEB POLLING EXTERNAL FEEDS ITSELF, AND IT IS 100% BILLED. MYSTERY CLOSED.** — lane `render-egress-transport`
 
@@ -23735,3 +23802,53 @@ pid 98.** The endpoint round-robins across workers, so the two are DIFFERENT
 processes — the ratio is internally consistent (anon and heap come from one
 call), but the root table must not be read as a breakdown OF that ratio. Pairing
 them would need a `proc_token` filter the endpoint does not offer.
+
+
+---
+
+## 2026-09-06T02:00:38Z — web — `814fda97` — **intelligence response cache BOUNDED: 22.503 -> 13.1 MB, and the boot confound is RULED OUT**
+
+`[lane intelligence-cache-cap, session b2b5b45b]` — carries `409d84fe`. CLEAR
+preflight pinned to the target; two earlier attempts waited out in-flight merge
+jobs rather than killing them.
+
+verify: **`/api/ops/retainer-census`, 46 converged readings over 22.9 min on both
+workers, against a control taken on the OLD code MINUTES BEFORE the deploy.**
+
+    CONTROL (old code, mature process)   pid 98  22.501 MB   pid 99  22.505 MB
+    AFTER  (22.9 min, both workers)      pid 97  12.73 -> 13.21 MB  (max 13.26)
+                                         pid 98  14.89 -> 13.15 MB  (max 14.89)
+    largest climb over the window        +0.477 MB
+    result                               ~13.1 MB = 58% of control, -42%
+
+**THE BOOT CONFOUND IS RULED OUT, and this is the part that makes it a
+verification rather than a hope.** The post-deploy process was 8 minutes old, so
+EVERY cache in it was small — census total had fallen `77.4 -> 51.5 MB`, a 25.8 MB
+drop the response cache explains only 7.5 MB of. Judging it there would have
+credited a young process to my change.
+
+Over the next 23 minutes the process MATURED: **census total climbed back to
+`73.66` / `67.89 MB`, ~95% of the `77.38` / `69.97` control — while the response
+cache stayed flat at ~13 MB, 58%.** The rest of the process refilled and the
+cache did not. That separates "bounded" from "not yet full" on the same process,
+in the same window, with no cross-epoch comparison.
+
+**The cache is still POPULATED (~13 MB, not zero), which was a stated failure
+mode:** a cap that empties the cache makes every request rebuild the board and
+costs far more than it saves. The one-entry floor exists for that and the
+verifier was written to report an empty cache as a REGRESSION, not a success.
+
+**A CONTROL CORRECTION worth recording.** The lane goal quoted **37.50 MB**, from
+hours earlier on a bigger slate. The live figure minutes before the deploy was
+**22.503 MB**. Verifying against 37.50 would have passed with NO CHANGE AT ALL —
+a stale baseline is the same error that produced this session's wrong
+"few hours to OOM" estimate.
+
+**NOT AN OOM FIX.** `#632`'s bytes are not Python objects — 28.3% of anon, 0.3%
+of the growth. This bounds a real unbounded cache and does not touch the leak.
+
+Incidental, not a verification: an earlier preflight HOLD showed two merge
+children under DIFFERENT parents (ppid 99, ppid 98) — one per worker, consistent
+with `SYNDICATE_ARTIFACT_MERGE_CHILD_CAP=1` being per-process. First sighting of
+merge children running at all since that cap shipped; the concurrency
+measurement it would need is still not taken.

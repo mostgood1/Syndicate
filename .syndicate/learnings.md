@@ -6226,3 +6226,30 @@ expensive rather than merely wrong.
 AND 12 workers instead of 6), so the 3.1x still cannot be split between them. It
 was enough to falsify the claim, and NOT enough to replace it with a number —
 recorded as such rather than quoted as a worker-scaling factor.
+
+## 2026-09-05 FORBIDDEN: attributing a workload to YOUR run because it appeared in a dump YOUR run emitted — a machine-wide process dump is not a description of you
+
+- **The rule going forward.** `ALL_PROCESS_MEMORY` / `PROCESS_TREE_MEMORY` enumerate **every process on the box**, so on a machine with parallel sessions your own output contains other lanes' worktrees, command lines and RSS. Reading one of those lines as "what my run was doing" is a single step and it reads exactly like evidence. **Before blaming a test file for your failure, prove it was IN YOUR TREE:** `git merge-base --is-ancestor <commit-that-added-it> <your HEAD>`. Mine was not — the file postdated my worktree by hours, so it could not have participated at all, and no amount of reasoning about its allocations was ever going to be relevant. Second half: a `tree_rss_mb` line is one process's tree, never a pytest total.
+- *(evidence in `learnings_evidence.md`)*
+
+## [2026-09-05] ANCHOR A LEDGER EDIT ON A LINE, NEVER ON A SUBSTRING — `text.index("## Archived lanes")` matched PROSE
+
+Lane none (primary-tree pull), session b4916e4e. Restoring a lane block, I found
+the insertion point with `text.index("## Archived lanes")`. That string occurs in
+`lanes.md` **as prose inside another lane's block** at line 97 — a sentence about
+the archived section, not the heading. The block was spliced into the middle of
+that sentence, and because the splice left `## Archived lanes` at a line start
+above 48 OPEN lanes, `check_lane_invariants` went from `[ok]` to
+**`48 OPEN lane(s) under Archived`** in one write.
+
+Caught only because I re-ran the checker; the file still looked plausible, and a
+grep for my own inserted header returned NOTHING, which is the tell — an anchor
+that lands mid-line produces a block whose header is not at a line start.
+
+THE RULE: match on `line.startswith(...)` over `splitlines(keepends=True)`, and
+prefer the most specific form of the heading (`## Archived lanes (full bodies`)
+because this file has TWO archived sections and several prose mentions. Then
+verify the result STRUCTURALLY — `grep -c "^### <slug>"` must be 1 — rather than
+trusting that the write succeeded. A ledger file is prose ABOUT its own
+structure, so its structure words appear in its prose; substring search cannot
+tell the two apart.
