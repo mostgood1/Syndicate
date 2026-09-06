@@ -1870,6 +1870,54 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - **THE PRODUCER STEP THEREFORE BELONGS TO `ncaaf-live-cadence`, not to me** — that lane is literally NCAAF live cadence and holds BOTH candidate producer sites (`refresh_odds_sources.py` and `run_live_odds_refresh_worker.py`). Requesting one `RefreshStep` from them rather than editing across. **Until it exists this lane's change is INERT BY DESIGN** (`store_then_fetch` falls back to fetching), which is safe but achieves nothing on its own — do not read "landed" as "web stopped fetching".
 - Blocked by: none.
 
+### remaining-red-triage — CLOSED-VERIFIED 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **5 OF 7 FIXED (`907ee8e9`); 2 ARE ANOTHER LANE'S. THE LAST ONE WAS NOT A TEST REPAIR — it was an audit that found a live money defect in `kalshi_client.probability_to_american` (1 of 5; `0.0`/`1.0` raised ZeroDivisionError and percent-scale `50.0` returned +102). FIXED, 1/5 -> 4/5.** `[user: "fix the remaining 8"]`
+- Goal: the failures still red on `origin/main` after `33c64061` either pass or
+  are recorded as a defect with the test left red on purpose.
+- **THE SET IS 7, NOT 8 — RE-DERIVED, NOT SUBTRACTED.** I said 8 from
+  arithmetic (12 - 4 heap-roots). `782a057b` had already fixed
+  `test_ops_execution_ledger_summary` before run 2's list was acted on, so the
+  true remainder is 7. Re-baselining rather than subtracting is the rule that
+  caught it.
+- Files claimed by ME (checked against every OPEN lane, none held):
+  `tests/test_wnba_refresh_runner.py`, `tests/test_nfl_props.py`,
+  `tests/test_odds_control_plane.py`, `tests/test_probability_differential.py`.
+- **NOT MINE — `tests/test_live_refresh_loop.py` (2 failures) is CLAIMED by OPEN
+  lane `suite-order-pollution`** (its `- Files:` line). Its block already states
+  both are pre-existing and unrelated to it, so they are red with an owner who
+  has disclaimed them. Surfacing rather than editing.
+- Hypothesis: same split as last time — some stale against a deliberate change,
+  some reporting a real defect. **No test is edited green without naming the
+  commit that moved the behaviour.** That rule fired 4 times in 18 last round.
+- Verification: each fixed test green standalone AND in its file; mutation-check
+  every changed assertion; CI's `tests.test_archives` still green.
+- **RESULT.** Each fix names the commit that moved the behaviour: `#441` (union
+  of source roots, so an env var pinning ONE root cannot manufacture absence),
+  the newest-mtime odds loader (2026-08-04 incident: 19,798,176 bytes pulled and
+  the board still read the stale shared copy), and `140213ea` (`#345`, the reuse
+  guard now READS its input_hash, so complete-but-unrecorded leftovers fetch).
+- **THE LAST ONE WAS AN AUDIT.** The tripwire had 37 unlisted converter-shaped
+  functions; classified from SIGNATURE/BODY not name — 18 excused, 19 registered.
+  Registering them made the harness probe them and it found: `kalshi_client`
+  1/5 (FIXED, guards `0<p<1` matching the polymarket twin whose docstring had
+  already named the gap; a no-op on the production path), `ncaaf/prop_model`
+  rounding to 4dp (FIXED), and `assess_wnba_accuracy` unimportable via a
+  module-level `os.environ["SC"]` (FIXED, made lazy).
+  `measure_game_market_option_value.implied` was WITHDRAWN as a
+  mis-classification — bounded at |price|>1000 by design, not the general
+  converter.
+- **A HARNESS GAP CLOSED:** `test_failing_set_does_not_grow` compares a SET of
+  names, so kalshi could fall 4/5 -> 1/5 without changing the set and no test
+  would notice. **Membership is not a score** — `test_kalshi_client.py` now pins
+  the refusals and the working range directly.
+- Verified: **242 passed** across touched areas, 35 in NCAAF dependents, CI's
+  `tests.test_archives` **OK (skipped=2)**; **4 of 4 mutations RED** for the
+  right reason, all at RUNTIME so no file was touched. 7 entries added to
+  `KNOWN_FAILING` with exact unmet requirements + written up in
+  `audit_2026-08-15_probability_differential.md`, as that test's message directs.
+- **NOT DONE, and named so it is not mistaken for done:** the five boundary
+  refusals (`''` / `None`) are unfixed; `report_nfl_props_roi:american_to_implied`
+  at 1/5 is the weakest and is ROI reporting, not a money path.
+- Blocked by: none. No deploy.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
