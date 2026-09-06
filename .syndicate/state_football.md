@@ -1633,6 +1633,29 @@ not help before the roll: the cache is empty and cannot be filled.
 
 ## [ncaaf-live-resim] SMARTSIM2 CAN BE RESUMED FROM MID-GAME; ITS ENTRYPOINT COULD NOT `[measured 2026-09-05, lane ncaaf-live-resim]`
 
+**THE TICK NO LONGER FETCHES ESPN ITSELF — MEASURED, 6 TICKS OF 8**
+`[2026-09-06 15:02-15:31Z, refresh-worker 58302f07, lane ncaaf-live-resim-wire]`.
+`ncaaf-live-state-to-worker` made `poll_ncaaf_live_state` persist team
+`location` and the raw `situation` (`1b266180`); this tick reads that record
+first (`77abe822`). Production, 8 consecutive ticks: **6 served from the record
+with `fetch_dates 0`**, 2 fell back and both said `record_stale` by name.
+`live_index: 3` was **identical in both modes**, which is the "one index, two
+sources" guarantee confirmed on real data rather than fixtures.
+
+**THE FALLBACK IS THE GATE WORKING, AND IT EXPOSED A CADENCE NOBODY HAS
+MEASURED.** The 400 s bound (not web's 240 s: this tick runs at 180 s, so 240
+tolerates zero missed cycles) refuses state it considers old and degrades to a
+correct fetch rather than a stale probability. But the producer's lane reported
+a live-phase median of **60 s** while web logged
+`NCAAF_LIVE_STATE_RECORD_STALE date=2026-09-06 age_seconds=484` — **484 s cannot
+come from a 60 s cadence**, so that step's real write interval is slower than
+the phase it rides. NOT papered over by raising the bound.
+
+**UNEXERCISED, AND IT IS THE HALF THAT MATTERS:** the record path has never run
+while a game is IN PROGRESS. Today's slate was 3 games, `live_resimmed 0`. So
+`situation` — the field that makes this a re-sim question rather than an eyebrow
+question — is unproven end to end in production. Owed on the next live slate.
+
 **THE DEFECT, measured on production mid-slate.** `/ncaaf/api/live-lens` served
 **51 games, 8 live, 26 final** while every live card's win probability, predicted
 final, spread and total was the PREGAME number. Boise State led Oregon **17-7 in

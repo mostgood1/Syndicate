@@ -1726,6 +1726,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   at all tonight, so there was no positive control for the pricing STEP on any
   sport. Soccer's 52/52 shows the FIELD is populated elsewhere; it does not show
   the pricing path is healthy elsewhere.
+- **THE SECOND ESPN FETCH IS GONE, MEASURED `[2026-09-06 15:02-15:31Z,
+  refresh-worker `58302f07`]`.** The tick reads
+  `ncaaf-live-state-to-worker`'s persisted record (`77abe822` + their
+  `1b266180`): **6 ticks of 8 with `fetch_dates 0`**, the other 2 refusing
+  `record_stale` by name, `live_index 3` identical in both modes. **I held the
+  claim and deployed NOTHING** — `ncaaf-h1-kalshi-series` had already shipped the
+  exact tip I targeted; claim released with its token, no force.
+  **OWED: the record path has never run while a game is IN PROGRESS**, so
+  `situation` is unproven end to end. Next live slate.
 - **ALSO DONE THIS SESSION, outside the lane's own scope, all landed:** the red
   `test_the_bucket_carries_only_the_declared_fields` on `main` (`782a057b`,
   `ops.py` is this lane's claim); `learnings.md` compacted + its alarm raised

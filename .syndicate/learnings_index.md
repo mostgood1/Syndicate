@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 844 rules `[generated]`
+## Index — 845 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -333,7 +333,7 @@
 - [2026-08-12 — EXONERATED: the soccer window is not the egress cause](learnings_evidence.md#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause) `[evidence]`
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](learnings_evidence.md#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib) `[evidence]`
 
-**Rules and corrections — 525**
+**Rules and corrections — 526**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -546,6 +546,7 @@
 - [2026-09-05 — SAMPLE FASTER THAN THE THING YOU ARE DESCRIBING, OR THE SHAPE IS YOUR SAMP…](#2026-09-05-sample-faster-than-the-thing-you-are-describing-or-the-shape-is-your-sampling-grid)
 - [2026-09-06 — A CONTROL AND ITS TREATMENT MUST COVER THE SAME LENGTH OF TIME](#2026-09-06-a-control-and-its-treatment-must-cover-the-same-length-of-time)
 - [2026-09-05 — A PREDICTION NAMING SPECIFIC TESTS EXPIRES IN A REPO WITH LIVE PEERS. Re-d…](#2026-09-05-a-prediction-naming-specific-tests-expires-in-a-repo-with-live-peers-re-derive-it-at-launch-not-when-you-write-it-lane-full-suite-xdist-run)
+- [2026-09-06 — VERIFY A DEPLOY WITH A DISCRIMINATOR THAT IS A **KEY**, NOT A VALUE. My pr…](#2026-09-06-verify-a-deploy-with-a-discriminator-that-is-a-key-not-a-value-my-predicted-value-was-wrong-and-the-verification-survived-anyway-lane-ncaaf-live-resim-wire)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

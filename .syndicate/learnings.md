@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 844 rules `[generated]`
+## Index — 845 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5307,3 +5307,29 @@ flag being set.**
 
 - **The rule going forward.** `assertLess(off_cpu_pct, 40.0)` held only while a core was free. In a full `-n auto` suite it measured **79.7** — and the instrument was RIGHT: a build burning 0.25 s of CPU that waits a second to be scheduled genuinely did spend ~80% of its wall time off-CPU. **Do not "fix" the instrument to satisfy the threshold, and do not weaken the assertion — replace it with a COMPARISON taken in the same process**, so both readings see the same contention. Here: a busy build must read as more on-CPU than a SLEEPING one, which is sound by construction because a sleeping build's `off_cpu_pct` is exactly 100.0. Corollary, measured the same day: **a load test is not a reproduction.** 6x CPU oversubscription (72 burners) reached only 15.8%, where the old assertion still PASSES — so whatever descheduled that worker was not CPU contention, and a green load test would have been false comfort.
 - *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-06 — VERIFY A DEPLOY WITH A DISCRIMINATOR THAT IS A **KEY**, NOT A VALUE. My predicted value was wrong and the verification survived anyway. `[lane ncaaf-live-resim-wire]`
+
+- **What I predicted, in writing, to the user and to the peer:** the tick would
+  report `fetch_reasons {"record_absent": N}`, because the producer half was not
+  deployed. **The real reading was `record_dates 1, fetch_dates 0`** — their
+  producer shipped in the window between my saying it and the tick running.
+- **Why it cost nothing:** the check asserted that `record_dates` / `fetch_dates`
+  / `fetch_reasons` were **PRESENT**, not that they held particular values. Those
+  keys did not exist in that log line before the commit, so their presence proves
+  the new code executed *whatever it reports*. Had I asserted the expected value,
+  a CORRECT result would have read as a failure and I would have chased a
+  working system.
+- **The rule.** A verification has two jobs — *did my code run* and *what did it
+  say* — and they need different instruments. Prove execution with something
+  STRUCTURAL that only the new build can emit: a new key, a new counter name, a
+  new log prefix. Prove behaviour with the value. **Collapsing them into one
+  value assertion means a wrong prediction is indistinguishable from a broken
+  deploy**, and on a machine where peers deploy under you, predictions about the
+  world go stale between writing them and reading them.
+- **Corollary, same session:** `git checkout origin/main -- <file>` does not
+  clear a rebase collision — it STAGES a change and leaves the file just as
+  dirty. And in a multi-tree session, do not trust cwd: a `pytest` run and a
+  `grep` both silently landed in the PRIMARY tree, the first measuring another
+  session's uncommitted edits to the file under test, the second reporting a file
+  I had just written as missing. Use `git -C <path>`.
