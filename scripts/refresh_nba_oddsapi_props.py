@@ -896,6 +896,14 @@ def _american_to_probability(odds: float) -> float | None:
 
 def _probability_to_american(probability: float) -> float | None:
     """Inverse of `_american_to_probability`; `+100` is canonical even money."""
+    # COERCE BEFORE COMPARING `[2026-09-05]`. `0.0 < probability < 1.0` raises
+    # TypeError on `""` instead of refusing, so a caller handing this a string
+    # got an exception where every sibling returns None. Boundary only: a valid
+    # float takes the identical path and returns the identical value.
+    try:
+        probability = float(probability)
+    except (TypeError, ValueError):
+        return None
     if not (0.0 < probability < 1.0):
         return None
     if probability > 0.5:

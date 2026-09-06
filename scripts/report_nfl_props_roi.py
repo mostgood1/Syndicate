@@ -64,10 +64,29 @@ def american_to_profit(price: int) -> float:
     return price / 100.0 if price > 0 else 100.0 / abs(price)
 
 
-def american_to_implied(price: int) -> float:
-    """Implied probability INCLUDING vig -- the number the model must beat."""
-    price = int(price)
-    return 100.0 / (price + 100.0) if price > 0 else abs(price) / (abs(price) + 100.0)
+def american_to_implied(price: Any) -> float | None:
+    """Implied probability INCLUDING vig -- the number the model must beat.
+
+    SCORED 1 OF 5 in `scripts/probability_differential.py` when the registry
+    first covered it `[2026-09-05]`, the weakest of the family, and every
+    failure was a missing guard rather than wrong arithmetic:
+
+      price=0   -> 0.0        a certainty, returned as a probability
+      price=None-> TypeError  int(None)
+      price=''  -> ValueError int('')
+      -110.5    -> -110       int() truncated a half-point price
+
+    `0` is the one worth naming: `abs(0)/(0+100)` is 0.0, so a missing price
+    read as a 0% market rather than as no market -- and 0.0 is a number the
+    caller will happily divide an edge by.
+    """
+    try:
+        value = float(price)
+    except (TypeError, ValueError):
+        return None
+    if value == 0.0:
+        return None
+    return 100.0 / (value + 100.0) if value > 0 else abs(value) / (abs(value) + 100.0)
 
 
 def quote_path(season: int, week: int) -> Path:

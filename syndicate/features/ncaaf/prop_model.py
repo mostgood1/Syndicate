@@ -235,8 +235,12 @@ def american_to_probability(price: Any) -> float | None:
     calling this fair would overstate the market's true probability and make
     every model edge look larger than it is.
     """
+    # FLOAT, NOT INT `[2026-09-05]`. `int("-110.5")` RAISES, so a half-point
+    # price refused instead of converting -- the differential harness probes
+    # -110.5 and expects 0.5249406175. Truncating to -110 would have been worse
+    # than refusing: it returns a plausible number for a price nobody quoted.
     try:
-        value = int(str(price).replace("+", "").strip())
+        value = float(str(price).replace("+", "").strip())
     except (TypeError, ValueError):
         return None
     if value == 0:

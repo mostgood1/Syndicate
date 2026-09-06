@@ -1931,6 +1931,49 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: all six pass in isolation, and a full `pytest tests/ -n auto --dist=loadscope` shows them green with no new failures.
 - Blocked by: none.
 
+### converter-boundary-refusals — CLOSED-VERIFIED 2026-09-05 — session 378ea9e6-9aeb-41d4-974a-f9af9332d76d — **ALL SEVEN AT 5/5 AND REMOVED FROM `KNOWN_FAILING`. Every one was a MISSING COERCION, not wrong arithmetic. The pre-registered falsification test PASSED: no valid price moved.** `[user: "fix the 5 boundary refusals"]`
+- Goal: the seven `KNOWN_FAILING` entries added by the 2026-09-05 converter
+  sweep meet every stated requirement, and leave `KNOWN_FAILING` rather than
+  sitting in it. Testable outcome: each scores 5/5 and is REMOVED from the map,
+  with `test_failing_set_does_not_grow` still green (it fails on a test that
+  starts passing too, so removal is mandatory, not optional).
+- Files: `scripts/{report_nfl_props_roi,refresh_nba_oddsapi_props,
+  refresh_wnba_oddsapi_props}.py`, `syndicate/features/ncaaf/prop_model.py`,
+  `syndicate/features/shared/{kalshi_client,novig_client,polymarket_client}.py`,
+  `tests/test_probability_differential.py`. Claim-checked against every OPEN
+  lane: none held. The two `refresh_wnba_oddsapi_props.py` mentions are a lane
+  HEADER's prose and an explicit "ALL RELEASED -- not a claim" record.
+- The contract, read off `REQUIREMENTS` rather than assumed: `0`/`0.0`, `None`
+  and `""` must all return **None**; `-110.5` must return **0.5249406175**.
+- Hypothesis: every failure is a MISSING COERCION, not wrong arithmetic --
+  `int(price)` and `0.0 < probability < 1.0` both raise on `None`/`""` instead
+  of refusing, and `int()` truncates a float price.
+- **Falsification test: if any fix changes a value on a VALID price, it is not a
+  boundary fix and must be backed out.** `test_all_implementations_agree_on_valid
+  _prices` is the guard for exactly that and must stay green.
+- Verification: 5/5 for all seven, entries removed from `KNOWN_FAILING`, the
+  agreement test green, mutation-check each coercion, CI's `tests.test_archives`
+  green.
+- **RESULT: 7 of 7 at 5/5**, and REMOVED from `KNOWN_FAILING` rather than left
+  in it — `probability_to_american` is down to one remaining entry. `float()`
+  before the range compare on kalshi/novig/polymarket (`0.0 < p < 1.0` raised
+  TypeError on `""`); the same on refresh_nba/refresh_wnba, which had NO `None`
+  guard at all; `int("-110.5")` -> `float(...)` on `ncaaf/prop_model`; and
+  `report_nfl_props_roi` (the 1/5) gained a zero guard — `price=0` had returned
+  **0.0**, so a missing price read as a 0% market, and 0.0 is a number a caller
+  will divide an edge by.
+- **FALSIFICATION TEST PASSED — no VALID price moved.** All six probe prices
+  still agree across every implementation (`plus_100` 0.5 ... `minus_10000`
+  0.9900990099) and the three venue clients still return an identical `-163`
+  for 0.62. A boundary fix that changes a real conversion is not one.
+- Verified: 125 passed across the converter files, 10/10 in the differential;
+  **4 of 4 mutations RED**, one per requirement type
+  (`refuses_empty_string` / `refuses_none` / `refuses_zero` /
+  `accepts_float_price`), each reverted at RUNTIME so no file was touched.
+- Caught by verifying rather than trusting a success message: the first batch
+  aborted partway and reported the files it HAD patched, so `ncaaf/prop_model`
+  was silently never edited. The re-score is what found it.
+- Blocked by: none. No deploy.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

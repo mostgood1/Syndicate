@@ -342,6 +342,28 @@ broken, and every remaining failure is at the BOUNDARY — `''`, `None`, and a
 float price that `int()` truncates — which is this audit's standing finding and
 not a claim that the odds maths is wrong.
 
-**Not done, and named so it is not mistaken for done:** the five boundary
-refusals are unfixed. `report_nfl_props_roi:american_to_implied` at 1/5 is the
-weakest and is ROI reporting, not a money path.
+**~~Not done~~ -- DONE 2026-09-05, same day.** All seven now score **5/5** and
+have been REMOVED from `KNOWN_FAILING` rather than left sitting in it.
+`KNOWN_FAILING` for `probability_to_american` is down to a single entry.
+
+Every one was a MISSING COERCION, not wrong arithmetic:
+
+    kalshi / novig / polymarket   float() before `0.0 < p < 1.0`, which raised
+                                  TypeError on '' instead of refusing
+    refresh_nba / refresh_wnba    same, and they had no None guard at all
+    ncaaf/prop_model              int("-110.5") RAISES, so a half-point price
+                                  refused; float() -> 0.5249406175771971
+    report_nfl_props_roi          was 1/5: price=0 returned 0.0 (a missing price
+                                  read as a 0% market, and 0.0 is a number a
+                                  caller will divide an edge by), None/'' raised
+
+**THE FALSIFICATION TEST WAS PRE-REGISTERED AND PASSED: no VALID price moved.**
+A boundary fix that changes a real conversion is not a boundary fix. All six
+probe prices still agree across every implementation (`plus_100` 0.5 ...
+`minus_10000` 0.9900990099), and the three venue clients return an identical
+`-163` for 0.62 — the same value they returned before.
+
+Mutation-checked one per requirement type, each reverted at RUNTIME: drop the
+kalshi string coercion (`refuses_empty_string`), drop refresh_wnba's
+(`refuses_none`), drop the report_nfl_props_roi zero guard (`refuses_zero`),
+restore ncaaf's `int()` (`accepts_float_price`) — **4 of 4 RED.**

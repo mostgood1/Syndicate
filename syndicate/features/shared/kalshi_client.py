@@ -346,6 +346,14 @@ def probability_to_american(probability: float | None) -> int | None:
     # A NO-OP ON THE PRODUCTION PATH: `dollars_to_probability` already returns
     # a value strictly inside (0, 1) or None, so this only changes what a
     # DIRECT caller gets -- a refusal instead of a crash or a wrong price.
+    # COERCE BEFORE COMPARING `[2026-09-05]`. `0.0 < probability < 1.0` raises
+    # TypeError on `""` instead of refusing, so a caller handing this a string
+    # got an exception where every sibling returns None. Boundary only: a valid
+    # float takes the identical path and returns the identical value.
+    try:
+        probability = float(probability)
+    except (TypeError, ValueError):
+        return None
     if not (0.0 < probability < 1.0):
         return None
     if probability >= 0.5:
