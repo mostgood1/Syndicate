@@ -3279,9 +3279,28 @@ def build_anon_partition(
 
     # A negative residual is arithmetically impossible for a true partition, so
     # it can only mean two terms are counting the same bytes. Small negatives are
-    # the three readings not being atomic; a real overlap is not small.
-    tolerance = max(2.0, 0.02 * anon)
-    if residual < -tolerance:
+    # the three readings not being atomic.
+    #
+    # TWO DIFFERENT QUESTIONS, TWO DIFFERENT THRESHOLDS -- they shared one at
+    # first and it produced a FALSE `terms_overlap` in production within minutes:
+    # residual `-4.3 MB` on a `209.0 MB` process, against a 2%/2 MB bar of 4.18.
+    # Four megabytes is what a live worker allocates between three sequential
+    # readings; it is not two terms counting the same bytes.
+    #
+    # The overlap bar is therefore calibrated against what a REAL overlap would
+    # look like, not against zero. The failure it exists to catch is a CPython
+    # without `ARENA_USE_MMAP`, where the whole pymalloc term is double counted --
+    # ~100 MB at boot and growing, i.e. tens of percent of anon. A 5%/8 MB bar
+    # sits an order of magnitude above the slack and an order of magnitude below
+    # the fault, which is the only place a threshold is worth putting.
+    #
+    # `smaps_agrees_with_rollup` keeps the TIGHT bar: that compares two reads of
+    # the SAME quantity, which have no reason to differ at all.
+    overlap_bar = max(8.0, 0.05 * anon)
+    read_agreement_bar = max(2.0, 0.02 * anon)
+    tolerance = read_agreement_bar
+    out["overlap_bar_mb"] = round(overlap_bar, 1)
+    if residual < -overlap_bar:
         out["reads_as"] = "terms_overlap"
         out["overlap_mb"] = round(-residual, 1)
         out["why"] = (

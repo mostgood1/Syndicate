@@ -95,8 +95,8 @@ def test_terms_summing_past_anon_REFUSES_and_names_the_likely_cause():
 
 
 def test_a_small_negative_is_slack_not_overlap():
-    # Three readings that are not atomic can cross slightly. Tolerance is
-    # max(2 MB, 2% of anon) -- 11.9 MB here -- so a 5 MB cross is not a finding.
+    # Three readings that are not atomic can cross slightly. The overlap bar is
+    # max(8 MB, 5% of anon) -- 29.8 MB here -- so a 5 MB cross is not a finding.
     got = _build(pymalloc=169.1)
     assert got["residual_mb"] == pytest.approx(-5.0, abs=0.3)
     assert got["reads_as"] != "terms_overlap"
@@ -227,3 +227,45 @@ def test_pymalloc_reader_actually_returns_a_number_here():
     assert isinstance(got["arena_mb"], float)
     assert got["arena_mb"] > 0
     assert got["captured_chars"] > 0
+
+
+# --- the threshold, calibrated against a real fault ---------------------------
+
+def test_the_production_false_positive_is_now_slack():
+    """Measured on the live instrument within minutes of deploying it: residual
+    -4.3 MB on a 209.0 MB process tripped `terms_overlap` against a 2%/2 MB bar
+    of 4.18. Four megabytes is what a worker serving traffic allocates between
+    three sequential readings -- not two terms counting the same bytes."""
+    got = memory_observability.build_anon_partition(
+        anon_mb=209.0,
+        smaps=_smaps(4.4, 0.1),
+        glibc=_glibc(104.8),
+        pymalloc={"arena_mb": 104.0},
+    )
+    assert got["residual_mb"] == pytest.approx(-4.3, abs=0.2)
+    assert got["reads_as"] != "terms_overlap"
+
+
+def test_the_bar_still_catches_a_whole_term_double_counted():
+    """The fault it exists for: a CPython without ARENA_USE_MMAP, where the whole
+    pymalloc term is already inside glibc's figure. That is ~100 MB at boot, an
+    order of magnitude above the slack the bar now tolerates."""
+    got = memory_observability.build_anon_partition(
+        anon_mb=209.0,
+        smaps=_smaps(4.4, 0.1),
+        glibc=_glibc(104.8),
+        pymalloc={"arena_mb": 204.0},
+    )
+    assert got["reads_as"] == "terms_overlap"
+    assert got["overlap_mb"] == pytest.approx(104.3, abs=0.3)
+    assert "ARENA_USE_MMAP" in got["why"]
+
+
+def test_the_two_bars_are_independent():
+    # The read-agreement check compares two reads of the SAME quantity and keeps
+    # the tight bar; the overlap bar is deliberately looser.
+    got = _build(anon=209.0, glibc=104.8, pymalloc=104.0, file_backed=4.4,
+                 stack=0.1, smaps_total=203.0)
+    assert got["overlap_bar_mb"] == pytest.approx(10.45, abs=0.1)
+    assert got["smaps_agrees_with_rollup"] is False   # 6.0 MB apart, tight bar
+    assert got["reads_as"] != "terms_overlap"         # 4.3 MB under, loose bar
