@@ -5191,3 +5191,36 @@ one says the model of the system is broken, the other says only the clock moved.
 is a state change you CAUSED. I sent `suite-order-pollution` the finding, they
 fixed it, and I then predicted their tests would still be red. Messaging a lane
 is a write to the shared system, not just communication.
+## 2026-09-05 — FORBIDDEN: simulating "the artifact is absent" by repointing its ROOT env var alone. The repo mirror is still a candidate, so the test measures your machine. `[lane nfl-fantasy-artifact-root]`
+
+- **The rule.** A test that wants an artifact to read as ABSENT must disable the
+  repo-mirror fallback as well as repoint the root:
+  `SYNDICATE_REQUIRE_HOSTED_STORAGE=1` **and** `RENDER` cleared. Repointing
+  `SYNDICATE_<SPORT>_SOURCE_ROOT` at an empty tmp dir does not achieve absence.
+- **Why.** `source_roots.preferred_artifact_roots` appends the repo
+  `data/<sport>` mirror as a candidate root unless strict hosted storage is on —
+  deliberately, as `CLAUDE.md`'s cold-start safety net — and re-appends it when
+  `RENDER` is set even under strict mode. So the search still reaches the
+  checkout.
+- **The failure it produces is the worst kind: it depends on the DEVELOPER'S
+  DISK.** `nfl_fantasy_projections_<season>.json` is UNTRACKED and absent from
+  `origin/main`. Three tests in `test_nfl_fantasy_artifact.py` therefore PASSED
+  on CI and on a fresh dyno and FAILED on any box that had run the build. Same
+  commit, same tests, opposite results — decided by whether `data/` happened to
+  hold a local artifact. Measured 2026-09-05: env at an empty tmp dir ->
+  `load_projection_artifact(2026)` returned the real checkout artifact; fallback
+  disabled -> `None`.
+- **AND THE OBVIOUS FIX WAS THE WRONG ONE.** The persuasive hypothesis was that
+  `artifact_path()` is a third instance of `#389`/`#441` — resolving through
+  `_first_existing_root`, which picks a root by probing for the UNRELATED
+  `upcoming_recs_*.csv`. The repo has fixed that selector twice and documents it
+  precisely, so it reads as the answer. It is not: the per-requested-file
+  resolver searches the SAME candidate list, the checkout root is in it and has
+  the file, and both resolvers returned it. Converting `artifact_path()` would
+  have been a plausible, well-argued, entirely inert change — and the red test
+  would have stayed red for a reason nobody was looking at any more.
+- **How to apply.** Before "fixing" a resolver because its docstring describes
+  your symptom, run BOTH resolvers on the failing input and check they actually
+  differ. A shared candidate list makes two different selectors give the same
+  answer.
+

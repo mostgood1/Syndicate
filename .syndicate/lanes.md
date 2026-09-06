@@ -2015,6 +2015,55 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Hypothesis, per case: (a) `test_indexed_join_matches_the_full_scan_on_every_query_shape` compares the results of TWO separate calls, and the payload carries `capture_age_seconds`/`book_age_seconds` derived from `datetime.now()` — under parallel load the two calls straddle a second (`623654` vs `623655`). Its second failure, `29 not greater than or equal to 30`, is a CONSEQUENCE not a cause: `checked += 1` sits after the failing assert inside the `subTest` block, so a failed subtest skips the increment. (b) `test_a_busy_build_reads_as_COMPUTING` asserts `off_cpu_pct < 40.0` and measured 79.7 — a CPU-vs-wall ratio, and under `-n auto` the process is descheduled by competing workers, so genuine compute reads as waiting.
 - Falsification test: if (a) still differs with a FIXED `now` passed to both calls, the divergence is real and the indexed join disagrees with the full scan — a genuine `#414` defect, not a clock race, and far more serious.
 - Verification: both pass in isolation AND in a full `-n auto` run, with no new failures.
+### nfl-fantasy-artifact-root — CLOSED 2026-09-05 — opened 2026-09-05 — session 4b1b66a3 — **FIXED AND LANDED (`63ab36a0`). The three tests were MACHINE-DEPENDENT, not a production defect: they passed on CI and a fresh dyno and failed on any box that had generated the UNTRACKED artifact. 37/37 in the tree that has `data/`. TWO HYPOTHESES FALSIFIED FIRST — see below; neither is a defect.**
+- Goal: the three `tests/test_nfl_fantasy_artifact.py` failures pass IN A TREE
+  THAT HAS `data/` — they are unreachable without it, which is why a worktree
+  run reported "5 passed, 32 skipped" and looked green.
+- Files: `syndicate/features/nfl/fantasy_artifact.py`,
+  `tests/test_nfl_fantasy_artifact.py`.
+  Collision-checked 2026-09-05 against all 48 OPEN lanes: `fantasy_artifact.py`,
+  `nfl/sources.py` and the test file are named by none of them.
+- Hypothesis: THE THIRD INSTANCE OF `#389`/`#441`. `artifact_path()` resolves via
+  `default_nfl_source_root()` -> `_first_existing_root()`, which picks a root by
+  probing for `upcoming_recs_*.csv` — an UNRELATED artifact family. The repo
+  checkout ships those CSVs; a tmp root does not. So with
+  `SYNDICATE_NFL_SOURCE_ROOT` pointed at an empty tmp dir the selector SKIPS it
+  and returns the checkout, serving the real 2026 artifact where the test
+  requires absence. `#389` fixed this for the write path and `#441` for pbp;
+  `_resolve_nfl_tracking_path()` already exists as the per-requested-file
+  resolver and is used by pbp, injuries and depth charts. Fantasy was never
+  converted.
+- Falsification test: if the cause were the tests being stale rather than the
+  resolver, pointing `SYNDICATE_NFL_SOURCE_ROOT` at a directory that DOES
+  contain `upcoming_recs_*.csv` but no fantasy artifact would still serve the
+  artifact. If instead absence is then honoured, the selector is the cause.
+- PRODUCTION RELEVANCE, not just a red test: on the web dyno the checkout ships
+  `upcoming_recs_*.csv` while the real artifacts live on the mounted disk, so
+  this selector can send reads to the checkout — the exact failure `#441`
+  measured (2.36-day-stale artifact, ~107 relaunches/day).
+- Verification: DONE. **37/37 in the primary tree** (full `data/`, where all
+  three failed). In a worktree WITHOUT `data/`: the three go failing -> passing
+  and the other seven failures — parity cases needing raw nflverse inputs — are
+  UNCHANGED, so the diff is exactly the three intended and nothing collateral.
+- **HYPOTHESIS 1 FALSIFIED (the one in this block above).** `artifact_path()` is
+  NOT a third instance of `#389`/`#441`. Converting it to the per-requested-file
+  `_resolve_nfl_tracking_path` changes nothing: that resolver searches the SAME
+  candidate list, and the checkout root is in that list and HAS the file.
+  Measured — both resolvers returned the checkout artifact with the env
+  repointed at an empty tmp dir.
+- **HYPOTHESIS 2 FALSIFIED.** Production is not at fault, so no production file
+  was touched. `nfl_fantasy_projections_<season>.json` is UNTRACKED and absent
+  from `origin/main`; on a fresh checkout it does not exist, so the degraded
+  path is already correct.
+- **ACTUAL CAUSE.** `preferred_artifact_roots` appends the repo
+  `data/nfl_source` mirror as a candidate unless strict hosted storage is on —
+  deliberately, as `CLAUDE.md`'s cold-start safety net. Repointing
+  `SYNDICATE_NFL_SOURCE_ROOT` therefore does NOT simulate absence on a box that
+  has run the build. Measured: env at an empty tmp dir ->
+  `load_projection_artifact(2026)` returned the real checkout artifact; with the
+  mirror fallback disabled -> `None`. `_isolate_source_root()` repoints AND
+  disables the fallback, clearing `RENDER` too because the mirror is re-appended
+  when RENDER is set even under strict mode.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
