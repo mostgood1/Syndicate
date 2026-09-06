@@ -1125,3 +1125,26 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   request per interval per worker pays it. The median understates the tail.
 * Re-accumulation is fast: ~100 MB per five minutes per worker against ~120
   returned.
+
+### `[web-oom-leak]` UPDATE 21 — **RETRACTION: the auto-trim headline was my own artifact; flag OFF**, 2026-09-06T18:0xZ `[session b2b5b45b]`
+
+* **RETRACTED from UPDATE 20:** *"without the trims the container would have
+  reached ~2,361 MB"*. That assumed the `1,481 MB` returned would otherwise have
+  ACCUMULATED; it would not — it was free arena space being REUSED in place.
+* **Matched short windows (>=50 publish calls each):** pre-trim `n=62`, median
+  **`0.000 MB/call`** (50 of 62 read exactly zero); post-trim `n=28`, median
+  **`0.893 MB/call`**. Boundary `16:24:41`, the instant the flag went live.
+* **MECHANISM:** `malloc_trim` returns pages via `MADV_DONTNEED`;
+  `smaps_rollup`'s `Anonymous` counts RESIDENT pages, so the next request
+  re-faults them and the per-request delta records that as fresh allocation. The
+  trim turns *reuse-in-place* into *return-then-refault*.
+* **The "~3 GB/h allocation rate" is therefore substantially the trim's own
+  doing.** Pre-trim, `/api/ops/artifacts/publish` — ~1,300 calls per window, the
+  busiest route — cost nothing measurable in anon.
+* **SURVIVES:** the trim does return memory (12 trims, glibc returning 1,
+  `in_use` unmoved, 12 independent container falls). **DOES NOT SURVIVE:** that
+  the memory would otherwise have accumulated.
+* **NET EFFECT UNDETERMINED** — lowers RSS, adds page-fault churn, nothing
+  measured says which wins. Needs a controlled on/off comparison over matched
+  windows. **Flag set to `0`** rather than run a production change on an
+  invalidated inference. The code stays, inert.

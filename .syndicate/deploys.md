@@ -24378,3 +24378,55 @@ interval is ever shortened.
 
 **Re-accumulation is fast:** pid 97 went `411 -> 331` at 16:29 and was back to
 `431` by 16:34 — ~100 MB regained in five minutes against ~120 returned.
+
+
+---
+
+## 2026-09-06T18:0xZ — web — **RETRACTION: the auto-trim's headline number was MY OWN ARTIFACT, and the flag is being turned OFF**
+
+`[lane web-oom-trim-auto, session b2b5b45b]` `SYNDICATE_MALLOC_TRIM_AUTO` set
+`1 -> 0`; deploy pending a CLEAR preflight. The CODE stays (inert, default off);
+only the flag changes.
+
+**WHAT I RETRACT, from the entry above:**
+
+> *"Without the trims the container would have reached ~2,361 MB against a
+> 2,048 MB limit inside 34 minutes."*
+
+**That is wrong.** It assumed the `1,481 MB` the trims returned would otherwise
+have ACCUMULATED. It would not have — it was free arena space being REUSED in
+place. I built a counterfactual out of the intervention's own output without ever
+asking what the memory would have done without it.
+
+**THE EVIDENCE, matched short windows of >=50 publish calls each:**
+
+    pre-trim    n=62 windows   median 0.000 MB/call   (50 of 62 read EXACTLY 0.000)
+    POST-trim   n=28 windows   median 0.893 MB/call
+    boundary    16:24:41 -- the instant the flag went live
+
+**MECHANISM.** `malloc_trim` returns free pages with `MADV_DONTNEED`.
+`smaps_rollup`'s `Anonymous` counts RESIDENT pages, so the next request touching
+those addresses faults them back in — and the per-request anon delta records that
+**re-fault as if it were fresh allocation**. The trim converts *reuse-in-place*
+into *return-then-refault*: same work, more page faults, and it reads as
+allocation on every instrument I own.
+
+**SO THE "~3 GB/h ALLOCATION" IS SUBSTANTIALLY MY OWN INTERVENTION.** Pre-trim,
+`/api/ops/artifacts/publish` — the highest-volume route on the service, ~1,300
+calls per window — cost **nothing measurable in anon**, because the arena served
+it from its own free list.
+
+**WHAT SURVIVES.** The trim really does return memory: 12 trims, glibc returning
+1 each time, `in_use` unmoved, and 12 independent falls in container
+unreclaimable. That was two sources agreeing and it still is. What does NOT
+survive is the claim that the returned memory would otherwise have accumulated,
+and therefore the claim that the trim was holding the service under its limit.
+
+**WHETHER THE TRIM IS NET-POSITIVE IS NOW UNDETERMINED.** It lowers RSS and it
+adds page-fault churn, and nothing measured says which wins. That needs a
+controlled on/off comparison over matched windows — which is exactly the
+discipline I applied to four other claims tonight and did not apply here before
+enabling it in production.
+
+**Turned off pending that comparison.** Leaving it on would mean running a
+production behaviour change justified by an inference I have just invalidated.

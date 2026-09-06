@@ -2447,3 +2447,37 @@ flag being set.**
   `deploys.md` as an absence WITH its window (~5 min), because a fixture-aware
   cadence makes idle the designed state and that window cannot separate idle
   from stalled.
+## 2026-09-06 — AN INTERVENTION'S OWN OUTPUT CANNOT SUPPLY ITS COUNTERFACTUAL
+
+`#632`. I enabled an automatic `malloc_trim`, measured `1,481 MB` returned over
+34 minutes across 12 trims, and wrote: *"without the trims the container would
+have reached ~2,361 MB against a 2,048 MB limit."*
+
+The arithmetic was simply `starting_level + returned + observed_net`. Every term
+came from the intervention's own instrumentation while the intervention was
+running. **The one thing it needed — what the memory would have done with the
+trim OFF — was never measured.**
+
+It would have done something different. Matched windows before and after the
+flag: `/api/ops/artifacts/publish` cost a median of **0.000 MB/call across 62
+pre-trim windows** and **0.893 MB/call across 28 post-trim ones**. `malloc_trim`
+releases pages with `MADV_DONTNEED`; `smaps_rollup` counts RESIDENT pages, so the
+next request faults them back and every instrument records a re-fault as fresh
+allocation. Before the trim, that memory was reused in place and cost nothing.
+
+So the returned `1,481 MB` was largely memory the trim itself caused to be
+re-acquired. The saving was real; the counterfactual was fiction.
+
+THE RULE: when an intervention is running, its instruments measure a world that
+CONTAINS it. A claim of the form "without X this would have been worse" requires
+an observation with X OFF — not a subtraction performed on X's own numbers. If
+turning X off is not possible, the claim is not available either, and the honest
+output is "X did N, net effect undetermined".
+
+The tell was there and I walked past it: the number I was crediting to X was
+produced by X. Ask "what generated this figure?" before "what does it imply?".
+
+Related, and this is the fourth costume this session: a 60-second control against
+a 31-minute treatment, a fan-out invented by 50-second sampling, a retention
+verdict from one time point. Each time the comparison was against something that
+could not answer the question — here, against nothing at all.
