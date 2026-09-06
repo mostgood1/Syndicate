@@ -20,27 +20,23 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from scripts import check_duplicate_module_names as checker  # noqa: E402
 from scripts.check_duplicate_module_names import DEFAULT_ROOTS  # noqa: E402
 from scripts.check_duplicate_module_names import duplicates_in_source  # noqa: E402
+from scripts.check_duplicate_module_names import classify  # noqa: E402
 from scripts.check_duplicate_module_names import scan  # noqa: E402
+
+SHADOWED = "\n".join(["def f():", "    return 1", "", "", "def f():", "    return 2", ""])
+
+
+# --- the detector itself -----------------------------------------------------
 
 
 def test_the_check_actually_detects_a_duplicate():
     """OFF != ON. A check whose only evidence is that it returns clean has not
-    been shown to be able to return anything else -- and this repo has shipped
-    inert guards before. Establish the positive reading first."""
-    shadowed = "\n".join(
-        [
-            "def f():",
-            "    return 1",
-            "",
-            "",
-            "def f():",
-            "    return 2",
-            "",
-        ]
-    )
-    assert duplicates_in_source(shadowed, "<synthetic>") == {"f": [1, 5]}
+    been shown able to return anything else -- and this repo has shipped inert
+    guards before. Establish the positive reading first."""
+    assert duplicates_in_source(SHADOWED, "<synthetic>") == {"f": [1, 5]}
 
 
 def test_it_counts_assignments_and_classes_not_only_defs():
@@ -81,15 +77,103 @@ def test_a_conditional_definition_is_not_a_duplicate():
     assert duplicates_in_source(source, "<synthetic>") == {}
 
 
+def test_a_file_with_a_BOM_is_read_not_skipped(tmp_path):
+    """REGRESSION. The scanner read sources as `utf-8`, so a BOM became
+    `SyntaxError: invalid non-printable character U+FEFF` and the file was
+    SKIPPED -- 15 of them under `vendor/wnba_betting_repo/tools/`, hiding 2 real
+    findings. Python's own import machinery decodes with `utf-8-sig`. A parse
+    error that silently drops a file is the unknown-defaults-permissive shape,
+    so this is pinned rather than left to the next reader."""
+    (tmp_path / "bommed.py").write_text(SHADOWED, encoding="utf-8-sig")
+    findings, errors = scan(["."], repo_root=tmp_path)
+    assert errors == [], "a BOM must not read as a parse error: %r" % (errors,)
+    assert [f["key"] for f in findings] == ["bommed.py: f"]
+
+
+# --- the two roots this file was extended for --------------------------------
+
+
+def test_repo_root_and_vendor_are_both_scanned_by_default():
+    assert "." in DEFAULT_ROOTS, "repo-root *.py files (app.py, wsgi.py, ...) must be covered"
+    assert "vendor" in DEFAULT_ROOTS, "vendored sibling-repo code must be covered"
+
+
+def test_the_repo_root_entry_does_not_recurse(tmp_path):
+    """`.` means the repo-root files THEMSELVES. Recursing from `.` would drag in
+    `data/` (34k+ files) and `.venv/`, which is why it is a special case rather
+    than just another root."""
+    (tmp_path / "top.py").write_text(SHADOWED, encoding="utf-8")
+    nested = tmp_path / "data" / "deep"
+    nested.mkdir(parents=True)
+    (nested / "buried.py").write_text(SHADOWED, encoding="utf-8")
+    findings, errors = scan(["."], repo_root=tmp_path)
+    assert errors == []
+    assert [f["key"] for f in findings] == ["top.py: f"]
+
+
+def test_a_duplicate_in_a_repo_root_file_is_owned_and_fails(tmp_path):
+    """off != on for the repo-root tier."""
+    (tmp_path / "app.py").write_text(SHADOWED, encoding="utf-8")
+    findings, _ = scan(["."], repo_root=tmp_path)
+    tiers = classify(findings, ["."])
+    assert [f["key"] for f in tiers["owned"]] == ["app.py: f"]
+    assert tiers["vendor_new"] == []
+
+
+def test_a_NEW_duplicate_under_vendor_fails_even_though_vendor_is_pinned(tmp_path):
+    """The pin freezes the KNOWN vendored set; it is not a blanket exemption. A
+    vendor sync is exactly how a new one would arrive, so this is the case the
+    tier exists for."""
+    vendored = tmp_path / "vendor" / "some_repo"
+    vendored.mkdir(parents=True)
+    (vendored / "mod.py").write_text(SHADOWED, encoding="utf-8")
+    findings, _ = scan(["vendor"], repo_root=tmp_path)
+    tiers = classify(findings, ["vendor"])
+    assert [f["key"] for f in tiers["vendor_new"]] == ["vendor/some_repo/mod.py: f"]
+    assert tiers["owned"] == [], "a vendored finding must not be reported as owned"
+
+
+def test_a_pinned_entry_that_no_longer_exists_is_reported_stale(monkeypatch, tmp_path):
+    """Otherwise the pin rots into the general-purpose allowlist this check
+    deliberately does not have. If upstream fixes one, we must delete the entry."""
+    monkeypatch.setattr(checker, "VENDOR_BASELINE", frozenset({"vendor/gone/mod.py: f"}))
+    (tmp_path / "vendor").mkdir()
+    findings, _ = scan(["vendor"], repo_root=tmp_path)
+    assert classify(findings, ["vendor"])["stale"] == ["vendor/gone/mod.py: f"]
+
+
+def test_a_narrowed_run_does_not_report_the_whole_pin_as_stale(monkeypatch, tmp_path):
+    """`--roots syndicate` must not fail with 12 stale entries just because it
+    never looked at vendor/. A check that cries wolf on a narrowed run gets run
+    with `|| true`."""
+    monkeypatch.setattr(checker, "VENDOR_BASELINE", frozenset({"vendor/gone/mod.py: f"}))
+    (tmp_path / "syndicate").mkdir()
+    findings, _ = scan(["syndicate"], repo_root=tmp_path)
+    assert classify(findings, ["syndicate"])["stale"] == []
+
+
+# --- the invariant itself ----------------------------------------------------
+
+
 def test_no_module_level_name_is_defined_twice_anywhere():
-    """The invariant itself, over `syndicate/`, `pipeline/`, `scripts/`, `tests/`."""
+    """Over the repo root, `syndicate/`, `pipeline/`, `scripts/`, `tests/` and
+    `vendor/` -- vendored findings only count if they are not in the pin."""
     findings, errors = scan(list(DEFAULT_ROOTS), repo_root=REPO_ROOT)
     assert not errors, "files the duplicate check could not parse: %r" % (errors,)
-    rendered = [
-        "%s: `%s` at lines %s" % (item["path"], item["name"], item["lines"])
-        for item in findings
-    ]
-    assert not rendered, (
+    tiers = classify(findings, list(DEFAULT_ROOTS))
+
+    def render(items):
+        return "; ".join("%s at lines %s" % (item["key"], item["lines"]) for item in items)
+
+    assert not tiers["owned"], (
         "module-level names defined more than once (Python keeps the LAST "
-        "binding, so every earlier definition is dead code): " + "; ".join(rendered)
+        "binding, so every earlier definition is dead code): " + render(tiers["owned"])
+    )
+    assert not tiers["vendor_new"], (
+        "NEW duplicate(s) under vendor/ that are not in VENDOR_BASELINE -- diff "
+        "the two definitions, then pin with a note: " + render(tiers["vendor_new"])
+    )
+    assert not tiers["stale"], (
+        "VENDOR_BASELINE names duplicate(s) that no longer exist; delete these "
+        "entries: " + "; ".join(tiers["stale"])
     )

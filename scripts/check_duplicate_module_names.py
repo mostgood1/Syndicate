@@ -32,6 +32,24 @@ assignment. Only the module's own top level is scanned (`tree.body`), so the
 ordinary conditional-definition patterns (`try: import x / except ImportError:`,
 `if TYPE_CHECKING:`, `if sys.platform == ...:`) are nested and never flagged.
 
+TWO TIERS, because `vendor/` is not ours to rewrite
+---------------------------------------------------
+Owned code (`.`, `syndicate/`, `pipeline/`, `scripts/`, `tests/`) must be clean;
+any finding fails. `ALLOWLIST` is empty and should stay that way.
+
+`vendor/` is sibling-repo code pulled in verbatim, and it has 12 duplicates that
+are upstream's, not ours. Failing on them would leave a permanently-red gate,
+and a permanently-red gate gets muted -- which would cost us the owned-code
+coverage that is the whole point. So the vendored set is PINNED in
+`VENDOR_BASELINE` instead: exactly that set passes, anything NEW fails. That
+matters because a vendor sync is precisely how a new one would arrive, and
+because two of those files (`nba_betting_repo/app.py`,
+`wnba_betting_repo/app.py`) are imported by owned code, so their dead
+definitions sit inside modules we load.
+
+A baseline entry that no longer matches anything is reported as STALE and also
+fails, so the pin cannot quietly rot into a general-purpose allowlist.
+
 Usage:
     python scripts/check_duplicate_module_names.py
     python scripts/check_duplicate_module_names.py --json
@@ -47,23 +65,57 @@ import ast
 import collections
 import json
 import sys
+import warnings
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-# Scanned by default. `vendor/` is deliberately absent -- it is other people's
-# code, vendored verbatim, and reformatting it would defeat the point of
-# vendoring it.
-DEFAULT_ROOTS = ("syndicate", "pipeline", "scripts", "tests")
+# `.` means the repo-root `*.py` files themselves, NOT a recursive walk of the
+# whole tree -- recursing from `.` would drag in `data/`, `.venv/` and every
+# other root we do not mean.
+ROOT_LEVEL = "."
 
-# `<posix path>: <name>` entries that are known-good and deliberately exempt.
+DEFAULT_ROOTS = (ROOT_LEVEL, "syndicate", "pipeline", "scripts", "tests", "vendor")
+
+# Roots whose findings are pinned rather than failed. See the two-tier note above.
+VENDOR_ROOTS = ("vendor",)
+
+# `<posix path>: <name>` entries in OWNED code that are known-good and exempt.
 #
-# IT IS EMPTY, AND THAT IS THE POINT. Every duplicate found when this check was
-# written was either a real defect or an exact-value copy that could simply be
-# deleted, so nothing needed an exemption. An allowlist with entries in it is a
-# place for the next real one to hide -- if you are about to add a line here,
-# prefer deleting the duplicate, and if you cannot, say why in the entry.
+# IT IS EMPTY, AND THAT IS THE POINT. Every duplicate found in owned code when
+# this check was written was either a real defect or an exact-value copy that
+# could simply be deleted, so nothing needed an exemption. An allowlist with
+# entries in it is a place for the next real one to hide -- if you are about to
+# add a line here, prefer deleting the duplicate, and if you cannot, say why.
 ALLOWLIST: frozenset[str] = frozenset()
+
+# The vendored duplicates as measured 2026-09-06. Upstream's code; we do not
+# edit it. Every one of these pairs DIFFERS -- they are not harmless copies --
+# so if you are syncing a vendor repo and one of these disappears, that is
+# upstream fixing it and the entry should be deleted here.
+VENDOR_BASELINE: frozenset[str] = frozenset(
+    {
+        # EV math. Shadowed version takes `_american_to_b`; the live one parses
+        # the american price itself and carries a docstring.
+        "vendor/nba_betting_repo/app.py: _ev_from_prob_and_american",
+        "vendor/wnba_betting_repo/app.py: _ev_from_prob_and_american",
+        # CLI command registered twice; the live one adds an empty-frame guard.
+        "vendor/nba_betting_repo/src/nba_betting/cli.py: fetch_rosters_cmd",
+        "vendor/wnba_betting_repo/src/wnba_betting/cli.py: fetch_rosters_cmd",
+        # Script-local rebinding in a linear script; harmless.
+        "vendor/nba_betting_repo/tools/compute_props_reliability.py: out",
+        "vendor/wnba_betting_repo/tools/compute_props_reliability.py: out",
+        "vendor/nba_betting_repo/tools/compute_props_reliability_summary.py: cols_subset",
+        "vendor/wnba_betting_repo/tools/compute_props_reliability_summary.py: cols_subset",
+        # Typer commands. `props_project_all`'s shadowed def is a 3-line alias;
+        # the live one is a ~514-line implementation.
+        "vendor/nhl_betting_repo/nhl_betting/cli.py: props_collect",
+        "vendor/nhl_betting_repo/nhl_betting/cli.py: props_project_all",
+        # Shadowed `__all__` exports 2 names, live exports 4.
+        "vendor/nhl_betting_repo/nhl_betting/data/shifts_api.py: __all__",
+        "vendor/nhl_betting_repo/nhl_betting/scripts/backtest_daily_summary.py: main",
+    }
+)
 
 
 def module_level_names(tree: ast.Module) -> list[tuple[str, int]]:
@@ -88,11 +140,30 @@ def module_level_names(tree: ast.Module) -> list[tuple[str, int]]:
 
 def duplicates_in_source(source: str, filename: str) -> dict[str, list[int]]:
     """Names bound more than once at module level, mapped to their line numbers."""
-    tree = ast.parse(source, filename=filename)
+    with warnings.catch_warnings():
+        # This function ANALYSES source it never executes. Parsing vendored code
+        # raises 13 `DeprecationWarning: invalid escape sequence` from upstream's
+        # regex strings, and letting those into every test run's warning summary
+        # is how a check earns a `-W ignore` that would also hide our own. They
+        # already reach anyone who actually imports those modules.
+        warnings.simplefilter("ignore", DeprecationWarning)
+        warnings.simplefilter("ignore", SyntaxWarning)
+        tree = ast.parse(source, filename=filename)
     lines: dict[str, list[int]] = collections.defaultdict(list)
     for name, lineno in module_level_names(tree):
         lines[name].append(lineno)
     return {name: nums for name, nums in lines.items() if len(nums) > 1}
+
+
+def is_vendor(rel_path: str) -> bool:
+    return any(rel_path == root or rel_path.startswith(root + "/") for root in VENDOR_ROOTS)
+
+
+def iter_python_files(base: Path, root: str):
+    """`.` yields the repo-root files only; anything else is a recursive walk."""
+    if root == ROOT_LEVEL:
+        return sorted(base.glob("*.py"))
+    return sorted((base / root).rglob("*.py"))
 
 
 def scan(roots: list[str], repo_root: Path | None = None) -> tuple[list[dict[str, object]], list[dict[str, str]]]:
@@ -101,14 +172,19 @@ def scan(roots: list[str], repo_root: Path | None = None) -> tuple[list[dict[str
     findings: list[dict[str, object]] = []
     errors: list[dict[str, str]] = []
     for root in roots:
-        root_path = base / root
-        if not root_path.is_dir():
+        if root != ROOT_LEVEL and not (base / root).is_dir():
             errors.append({"path": root, "error": "not a directory"})
             continue
-        for path in sorted(root_path.rglob("*.py")):
+        for path in iter_python_files(base, root):
             rel = path.relative_to(base).as_posix()
             try:
-                source = path.read_text(encoding="utf-8")
+                # `utf-8-sig`, NOT `utf-8`: Python's own import machinery strips a
+                # BOM, and reading as plain utf-8 makes every BOM'd file raise
+                # `SyntaxError: invalid non-printable character U+FEFF` and be
+                # SKIPPED. That skipped 15 files under `vendor/` and hid 2 real
+                # findings -- a parse error that drops a file is the
+                # unknown-defaults-permissive shape, so it must not recur.
+                source = path.read_text(encoding="utf-8-sig")
             except (OSError, UnicodeDecodeError) as exc:
                 errors.append({"path": rel, "error": "%s: %s" % (type(exc).__name__, exc)})
                 continue
@@ -118,45 +194,82 @@ def scan(roots: list[str], repo_root: Path | None = None) -> tuple[list[dict[str
                 errors.append({"path": rel, "error": "SyntaxError: %s" % exc})
                 continue
             for name, linenos in sorted(dupes.items()):
-                if "%s: %s" % (rel, name) in ALLOWLIST:
-                    continue
-                findings.append({"path": rel, "name": name, "lines": linenos})
+                findings.append({"path": rel, "name": name, "lines": linenos, "key": "%s: %s" % (rel, name)})
     return findings, errors
+
+
+def classify(findings: list[dict[str, object]], roots: list[str]) -> dict[str, list]:
+    """Split findings into the tiers that decide the exit code."""
+    owned: list[dict[str, object]] = []
+    vendor_new: list[dict[str, object]] = []
+    vendor_pinned: list[dict[str, object]] = []
+    for finding in findings:
+        key = str(finding["key"])
+        if is_vendor(str(finding["path"])):
+            (vendor_pinned if key in VENDOR_BASELINE else vendor_new).append(finding)
+        elif key not in ALLOWLIST:
+            owned.append(finding)
+
+    # Only judge the pin for completeness when vendor was actually scanned --
+    # `--roots syndicate` must not report all 12 as stale.
+    vendor_scanned = any(root in VENDOR_ROOTS for root in roots)
+    seen = {str(f["key"]) for f in vendor_pinned}
+    stale = sorted(VENDOR_BASELINE - seen) if vendor_scanned else []
+    return {"owned": owned, "vendor_new": vendor_new, "vendor_pinned": vendor_pinned, "stale": stale}
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--roots", nargs="+", default=list(DEFAULT_ROOTS), help="directories to scan (default: %s)" % " ".join(DEFAULT_ROOTS))
+    parser.add_argument("--roots", nargs="+", default=list(DEFAULT_ROOTS), help="directories to scan; '.' means the repo-root *.py files only (default: %s)" % " ".join(DEFAULT_ROOTS))
     parser.add_argument("--json", action="store_true", dest="as_json", help="emit machine-readable output")
     return parser.parse_args(argv)
+
+
+def _render(finding: dict[str, object], label: str) -> str:
+    lines = ", ".join(str(num) for num in finding["lines"])  # type: ignore[index]
+    return "%s  %s: `%s` defined %d times (lines %s)" % (label, finding["path"], finding["name"], len(finding["lines"]), lines)  # type: ignore[arg-type]
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     findings, errors = scan(args.roots)
+    tiers = classify(findings, args.roots)
 
     if args.as_json:
-        print(json.dumps({"ok": not findings and not errors, "roots": args.roots, "findings": findings, "errors": errors}, indent=2))
+        ok = not errors and not tiers["owned"] and not tiers["vendor_new"] and not tiers["stale"]
+        print(json.dumps({"ok": ok, "roots": args.roots, **tiers, "errors": errors}, indent=2))
         if errors:
             return 2
-        return 1 if findings else 0
+        return 0 if ok else 1
 
     for error in errors:
         print("ERROR  %s -- %s" % (error["path"], error["error"]))
-    for finding in findings:
-        lines = ", ".join(str(num) for num in finding["lines"])
-        print("DUPLICATE  %s: `%s` defined %d times (lines %s)" % (finding["path"], finding["name"], len(finding["lines"]), lines))
+    for finding in tiers["owned"]:
+        print(_render(finding, "DUPLICATE"))
+    for finding in tiers["vendor_new"]:
+        print(_render(finding, "NEW-IN-VENDOR"))
+    for key in tiers["stale"]:
+        print("STALE-PIN  %s -- in VENDOR_BASELINE but no longer present; delete the entry" % key)
 
-    if findings:
+    if tiers["owned"]:
         print()
-        print("%d duplicate module-level name(s). Python keeps the LAST binding, so" % len(findings))
-        print("every definition but the last is dead code. Diff them before deleting:")
-        print("they may be identical, or the shadowed one may hold a fix that has")
-        print("silently not been running.")
+        print("%d duplicate module-level name(s) in owned code. Python keeps the LAST" % len(tiers["owned"]))
+        print("binding, so every definition but the last is dead code. Diff them before")
+        print("deleting: they may be identical, or the shadowed one may hold a fix that")
+        print("has silently not been running.")
+    if tiers["vendor_new"]:
+        print()
+        print("%d NEW duplicate(s) under vendor/, not in VENDOR_BASELINE. If a vendor" % len(tiers["vendor_new"]))
+        print("sync brought this in, diff the two definitions and add it to the pin with")
+        print("a note saying which is live and how they differ.")
+
+    if tiers["owned"] or tiers["vendor_new"] or tiers["stale"]:
         return 1
     if errors:
         return 2
     print("ok  no module-level name is defined twice in %s" % ", ".join(args.roots))
+    if tiers["vendor_pinned"]:
+        print("    (%d known vendored duplicate(s) pinned in VENDOR_BASELINE, unchanged)" % len(tiers["vendor_pinned"]))
     return 0
 
 
