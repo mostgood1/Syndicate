@@ -2358,6 +2358,39 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   never what is moved).
 - Blocked by: none.
 
+### learnings-archive-august — CLOSED 2026-09-06 — opened 2026-09-06 — session 4b1b66a3 — **283 August entries archived VERBATIM. `learnings.md` 417,226 -> 223,344 B (0.49x of cap). Index still 845 rules — nothing lost discoverability. 0 non-blank lines lost across both files; the only 3 replaced lines are the stale pointer/header I deliberately rewrote. New tool `scripts/archive_learnings.py`, refusal path proven to fire.**
+- Goal: August's 283 dated entries move VERBATIM to `learnings_archive.md`,
+  every rule stays findable via `learnings_index.md`, and nothing is deleted.
+- Files: `scripts/archive_learnings.py` (NEW), `.syndicate/learnings.md`,
+  `.syndicate/learnings_archive.md`, `.syndicate/learnings_index.md`.
+  Collision note: `accuracy-ledger-budget-raise` lists `.syndicate/*`, but its
+  subject is `build_accuracy_summary`'s 2 GB ledger-READ budget, unrelated to
+  this file's size. `check_lane_claims.py` reports `.syndicate/` EXEMPT from
+  lane-guard, so a claim there guards nothing — `ledger-repair-invariants`
+  records the same reasoning. Every session appends to `learnings.md`
+  concurrently, so this lands immediately rather than being held open.
+- **THIS IS HOUSEKEEPING, NOT A FIX. `learnings.md` is UNDER budget**: 417,226 B
+  against the 460,000 enforced by `session-start.sh`. The earlier "over budget"
+  alarm was a stale digest plus `compact_learnings.py`'s stale constant, both
+  already corrected (`37ffb3bb`). Nothing forces this pass; the value is that
+  every session reads this file at start.
+- **THE HAZARD, MEASURED BEFORE WRITING ANYTHING: the heading date format is
+  HETEROGENEOUS.** Five shapes across 482 sections — `## 2026-08-20 —`,
+  `## [2026-09-05]`, bare `## 08-21 ...`, a trailing `` `[2026-08-20]` ``, and
+  one with the date only in the body. A naive `^## 2026-\d\d-\d\d` misses 41
+  real rules; a loose one sweeps up the four STRUCTURAL sections, including the
+  `## Index` and the `## Entries before 2026-08-20 — moved to ...` POINTER.
+  Classifier validated first: **482 sections = 4 structural + 478 dated +
+  0 unclassified.** An unclassifiable section must stop the pass, not default.
+- Falsification test: if the cutoff were wrong, the "before/after" heading and
+  non-blank-line conservation checks across `learnings.md` +
+  `learnings_archive.md` would fail. They gate the write.
+- Verification: every heading present before is present after in exactly one of
+  the two files; every non-blank line conserved; `learnings.md` re-read
+  immediately before the write and a concurrent change is a REFUSAL;
+  `build_learnings_index.py` regenerated and its rule count not reduced.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
