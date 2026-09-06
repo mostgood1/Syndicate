@@ -28989,22 +28989,33 @@ lost no protection and no open lane left the session-start digest.
 - Blocked by: none.
 
 ### kalshi-join-counters-logged — **CLOSED 2026-09-06 — VERIFIED IN PRODUCTION** — opened 2026-09-06 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
-- **Testable outcome MET.** Both emitters carry the counters on the deployed SHA
-  `bd658209`, read from the LINES rather than the source: `[kalshi_odds]
-  BOARD_JOIN ... alt_main_collisions=4 segment_matched_series={...}` at
-  19:24:32Z and `[portfolio_commit] KALSHI_BOARD_JOIN ... alt_main_collisions=2
-  ...` at 20:10:38Z. 22 tests green.
+- **Testable outcome MET.** Both emitters carry the counters on the deployed
+  SHA, read from the LINES rather than the source. Final state is `30500f16`
+  (live 21:00:02Z), which added `collapsed_bet_keys` and restored `board_rows`;
+  the earlier `bd658209` carried the first three counters. 22 tests green.
 - **It immediately paid for itself.** `segment_matched_series` is what showed
-  `first5->KXMLBF5TOTAL: 41` and `first5->KXMLBF5SPREAD: 22` matching in
-  production — the evidence that discharged the `verify: OWED` on `1f032074`
-  (`deploys.md`, this date). A counter nobody could read would have left that
-  question open another day.
-- `alt_main_collisions` reads 2-4 per tick, consistent with the ~1% collision
-  rate measured on a 553-row sample before shipping.
-- Files: `pipeline/kalshi_odds_refresh.py`, `pipeline/portfolio_commit.py`,
+  `first5->KXMLBF5TOTAL` and `first5->KXMLBF5SPREAD` matching in production —
+  the evidence that discharged the `verify: OWED` on `1f032074`. A counter
+  nobody could read would have left that question open another day.
+- **CORRECTED — this block previously said `alt_main_collisions` "reads 2-4 per
+  tick, consistent with the ~1% collision rate measured on a 553-row sample".
+  THAT COMPARISON WAS INVALID and the claim is withdrawn.** The two figures have
+  different denominators: the sample rate was per COLLAPSED KEY, the log count
+  was against BOARD ROWS, and the build emitting 2-4 did not print a
+  denominator at all. `collapsed_bet_keys` exists to close exactly that gap.
+- **OWED, and this block previously said "Nothing owed".** A same-tick
+  `alt_main_collisions / collapsed_bet_keys` on a slate that actually carries
+  `_alt` rows. The first tick after `30500f16` read `0 / 655` — an empty
+  numerator POPULATION (311 board rows, all `segment='full'`, zero `_alt`), not
+  a measurement of the rate. Take it during afternoon MLB.
+- **Also landed here, recorded because it was a defect of mine:** `board_rows`
+  silently changed meaning when `_collapse_duplicate_bets` rebound the name
+  (`21aac548`), and I mis-explained the resulting 1100-vs-1102 gap in
+  `deploys.md` before correcting it (`dc886130`). Fixed in `922a68dc`; confirmed
+  655 == 655 across both emitters at 21:16Z.
+- Files: `pipeline/kalshi_odds_refresh.py`, `pipeline/portfolio_commit.py`
+  (TAKEN from `settled-sample-nfl-reconcile` by user decision, `c94565f6`),
   `tests/test_kalshi_join_counters_logged.py`. All landed on `origin/main`.
-- Nothing owed.
-
 ### venue-fanin-segment-key — **CLOSED 2026-09-06, DUPLICATE — no code written** — opened 2026-09-06 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
 - **Another session had already found and fixed this, two hours earlier and with
   a better measurement.** `e77be334` (18:24:03Z). They replayed MIL@CIN through
