@@ -23852,3 +23852,78 @@ children under DIFFERENT parents (ppid 99, ppid 98) — one per worker, consiste
 with `SYNDICATE_ARTIFACT_MERGE_CHILD_CAP=1` being per-process. First sighting of
 merge children running at all since that cap shipped; the concurrency
 measurement it would need is still not taken.
+
+
+## 2026-09-06 02:59:27Z — refresh-worker `933e9beb` -> `1f032074` — **MLB first5 execution on `KXMLBF5TOTAL` IS LIVE. MECHANISM NOT YET MEASURED IN PRODUCTION — THE READING IS OWED AND THE CONDITION FOR IT DOES NOT EXIST TONIGHT.** `[lane mlb-first5-kalshi-execution]`
+
+**I DID NOT TRIGGER THIS DEPLOY AND DID NOT HOLD THE CLAIM.** The claim was held
+by lane `segment-refusal-deploy` (session 3492626c), acquired ~1.7 min before I
+asked for it. Its deploy of `1f032074` carries my commit `d2b060c8` because I had
+landed on `origin/main` first. That is the intended composition — a deploy of
+main is cumulative — so triggering a second deploy would have been a redundant
+restart of a 4GB worker for code already in the build. Recorded here under MY
+lane because the change is mine and the measurement obligation is mine.
+
+**CONTENT-VERIFIED ON BOTH SIDES, not inferred from ancestry:**
+
+| SHA | `"KXMLBF5TOTAL": "mlb"` | `_row_market` | `split_segment_market_key` |
+|---|---|---|---|
+| `933e9bebf154` (was live) | no | 0 | no |
+| `1f032074a9bb` (live 02:59:27Z) | **yes** | **4** | **yes** |
+
+**PRE-BOOT CONTROL, captured 02:59:12Z** — 4h of join ticks on `933e9beb`:
+`matched` 4,973 over 19 ticks; refusal reasons `market_is_for_another_date`
+47,616 / `no_matching_board_row` 29,814 / `event_not_on_our_board` 17,599 /
+`recognised_but_no_board_market` 9,047 / `series_out_of_scope` 8,004 /
+`unreadable_title` 5,055 / `segment_has_no_matching_series` **72**.
+`TRIM_BY_SPORT` `kept_by_sport['mlb']` = **2,740** (kept 6,000, trimmed 5,482).
+
+**verify: OWED.** The reading that proves this worked is **a `first5` board row
+acquiring a `KXMLBF5TOTAL` ticker in production** — an order or match record
+whose `venue_ticker` starts `KXMLBF5`. As of 03:11Z: **0 of 597 live orders**
+carry one, and no post-boot `BOARD_JOIN` tick has run yet (join cadence ~18 min,
+boot 02:59:27Z).
+
+**THE CONDITION FOR THAT READING DOES NOT EXIST RIGHT NOW, AND SAYING SO IS THE
+POINT.** The join can only pair an F5 contract with a board row that is
+`segment='first5'` AND `market='totals'`:
+
+    2026-09-06  mlb shortlist rows = 0        <- slate not built
+    2026-09-05  mlb shortlist rows = 338, first5-totals = 5  (was 14 earlier; the
+                                                              slate is winding down)
+
+So a null tonight is a fact about the SLATE, not about the fix. Discharge it on
+a built MLB slate with first5 `totals` rows and a live quote — a daytime
+condition. Until then this deploy is LIVE AND UNVERIFIED, and must not be cited
+as evidence the feature works.
+
+**A HYPOTHESIS I PUBLISHED AN HOUR AGO AND THE DATA DID NOT SUPPORT — RETRACTED
+HERE RATHER THAN LEFT STANDING.** I reasoned that F5 markets were being dropped
+BEFORE the join at the sport trim (because `unmapped_series` never appears in the
+join's reason breakdown), and predicted `kept_by_sport['mlb']` would RISE once
+the series carried a sport. It did not:
+
+    PRE  01:31:22  mlb=2740      POST 03:05:55  mlb=2740
+
+Identical, and 2,740 recurs across pre-boot ticks (2740 / 3109 / 2740), so it
+looks like a demand/floor artefact rather than a coincidence. **Where F5 markets
+die pre-fix is therefore still unestablished** — `unmapped_series`'s absence from
+the join counters is unexplained, and `series_out_of_scope` (8,004) is the
+obvious alternative I have not checked. The registration is still correct and
+still necessary (measured off=0 -> on=8 in replay); what is NOT established is my
+account of which stage was discarding them.
+
+**Local replay that justified shipping** (not a production reading): 84 real
+settled `KXMLBF5TOTAL` contracts from the venue API x 553 real production
+`layer2-shortlist` rows, same slate 2026-09-05 — `matched` **0 -> 8**,
+`unmapped_series` 84 -> 0, `segment_has_no_matching_series` 6 firing alongside.
+283 tests pass across the kalshi/segment surface.
+
+**Blast radius: refresh-worker only, and that was measured.** `KALSHI_BOARD_JOIN`
+and `segment_has_no_matching_series` appear on refresh-worker and on NEITHER
+live-odds-worker nor web over 24h. No `render.yaml` change, no `blueprint_sync`.
+
+**Sim safety:** `MLB_DAILY_SIM_TRIGGERED run_stamp=20260906_023349` was in flight
+at 02:33:49Z; I held until `MLB_DAILY_SIM_END ... exit_code=0
+duration_seconds=1097` at 02:53:02Z and confirmed no newer sim had started. The
+deploy that landed did so after that window.
