@@ -113,6 +113,34 @@ death, never life — do not invert it.
   O(1) and tracks the dominant term.
 - Blocked by: none.
 
+### intelligence-rows-dedup — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: stop `slice_intelligence_board_state_for_request` building
+  `top_opportunities` and `recommendations` as TWO INDEPENDENT deep copies of the
+  same rows (`[dict(item) for item in top_opportunities]`, twice). Sharing the
+  row objects roughly halves that term in every response AND in every cache entry.
+- Files: `pipeline/intelligence_state.py` (**`slice_intelligence_board_state_for_request`
+  at ~3155-3190 ONLY**), `tests/test_intelligence_rows_dedup.py` (NEW).
+  `layer2-sim-disagrees` claims this file for *"the `confidence` backfill at
+  ~1888 ONLY"* — disjoint by that lane's own stated scope.
+- THE RISK IS ALIASING, and it was checked rather than assumed: a scripted search
+  for loops over either key that MUTATE the item found exactly one hit,
+  `syndicate/features/intelligence.py:11092` — and that is a LOCAL
+  `recommendations` inside `run_intelligence_query`, upstream of the slice,
+  mutating candidates before they ever become response rows. Every other use of
+  both keys is a whole-list REASSIGNMENT.
+- Hypothesis: sharing the row dicts is behaviour-preserving because nothing
+  mutates a response row in place.
+- Falsification test: a test that mutates a row via `recommendations` and asserts
+  `top_opportunities` is unchanged FAILS — then the two keys are not
+  interchangeable and the dedup must be reverted.
+- Verification: `/api/ops/retainer-census` shows the response cache below its
+  post-cap `~13.1 MB` on a settled worker, against a control re-taken minutes
+  before the deploy (NOT the stale figure from an earlier lane).
+- Design note: keeps the two LIST objects distinct (`list(rows)`), so list-level
+  mutation stays isolated and only the row dicts are shared. The list costs ~8
+  bytes per row; the dicts are the term that matters.
+- Blocked by: none.
+
 ## OPEN
 
 ## OPEN
