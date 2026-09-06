@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 834 rules `[generated]`
+## Index — 835 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -6151,3 +6151,43 @@ writing the rule about it needs a mechanical check, not attention.
   everywhere else. `live_gameline_join._norm_team` has no alias table on purpose,
   and its docstring records why — the prop join's alias machinery carries a 91%
   miss.
+
+---
+
+## 2026-09-05 — FORBIDDEN: reading the RESIDUAL of a partial control as "the one that survived". A control is only a control over the population it actually REACHES. `[lane nfl-la-rams-alias, corrected by ci-archives-nba-card-js]`
+
+- **What we believed:** the full suite's 169 failures in a data-less worktree split
+  cleanly into environment and truth. Re-running the 43 failing files with
+  `SYNDICATE_DATA_ROOT` set gave `169 → 47`, so 122 were data absence — and the
+  archive test still failing was **a confirmed real defect in the file CI runs.**
+- **What was actually true:** the knob was wrong, so the differential never covered
+  the cases it appeared to adjudicate. `session_worktree.py` says it in its own
+  source, written the day BEFORE the measurement: *"`SYNDICATE_DATA_ROOT` does NOT
+  solve it. Nine of these read `REPO_ROOT/data/...` directly and ignore the variable
+  entirely."* The flagged test is ONE OF THOSE NINE. It passes in the primary tree
+  and under `SYNDICATE_NBA_ARTIFACT_ROOT`; the asset is git-tracked and CI checks out
+  the full repo. **CI was green throughout. There was no red test.**
+- **How we found out:** a peer lane read the failing ASSERTION. It was
+  `assertIsInstance(content, str)` on the FIRST line of a test named
+  `..._rewrites_source_routes_...` — the asset never loaded, so the route-rewriting
+  logic was never evaluated. One line of output refuted the claim.
+- **The rules going forward:**
+  1. **A residual is not a survivor until you show the instrument REACHED it.**
+     Resolving 30 of 31 cases is not evidence about the 31st; the remainder is
+     exactly where the instrument is blind, so a partial control CONCENTRATES its
+     own blind spot into the result it makes look most significant.
+  2. **Use the documented control.** `--with-test-data` is this repo's; an env var
+     that merely sounds like the right root is not.
+  3. **Read the failing assertion before classifying a failure.** An `assertIsInstance`
+     on line 1 says INPUT; a comparison deep in a test says LOGIC. Classifying from
+     the test's NAME is how a setup failure becomes a reported defect.
+- **The compounding error, and it is the one to take personally:** the report that
+  made the false claim ALSO contained the caveat that refutes it — *"this control is
+  a LOWER bound on data-absence, not an upper bound"* — and then called the residual a
+  confirmed defect two sentences later. **Writing a limitation and then reasoning as
+  if it did not apply is worse than never noticing it**, because the caveat makes the
+  conclusion look considered to every later reader. If you state a limitation, the
+  next sentence is the one to check against it.
+- **Cost:** none shipped — a false alarm retracted before anyone acted on it, plus one
+  spawned session. **It repaid itself:** chasing why the asset would not load found a
+  REAL production outage in that path (`[nba-betting-card-assets-404]`).
