@@ -357,6 +357,31 @@ against request counts), and **values SETTLE UPWARD for hours** after a bucket
 closes — one bucket read 74.9 MB and later 123.2 MB. **Never compare a fresh bucket
 to a complete log scan.**
 
+**THE CHRONIC HALF IS NOW IDENTIFIED, AND IT IS NOT THE PIPELINE: `/api/intelligence/query`, TO THE USER'S OWN BROWSER.** Edge traffic 2026-09-06 10:00-16:00Z (6 h, spike-free regime): **162.3 MB over 739 requests**, of which
+
+    /api/intelligence/query   131.1 MB   59 calls   MEDIAN 2.53 MB EACH   = 81%
+    client 73.75.177.190      159.3 MB  497 calls                        = 98%
+    user agents               Chrome/Linux 48 calls, iPad 11 calls
+
+**That 2.53 MB is ALREADY GZIPPED** — `install_response_compression` is registered
+`after_request` unconditionally, the type is `application/json` and the floor is
+4,096 B — so the uncompressed payload is on the order of 15-30 MB **per UI round
+trip**. At ~22 MB/h of edge traffic and the ~2x coefficient that is **~1.05
+GB/day**, i.e. essentially ALL of web's chronic 0.65-0.75 GB/day.
+
+**Cadence: median gap 52 s, max 1,624 s, 12 of 58 gaps under 15 s.** Clustered
+interactive use with page loads firing several, not a fixed poll.
+
+**PUBLISH REQUEST BODIES ARE THE LARGEST FLOW INTO WEB AND WERE INVISIBLE TO EVERY
+EARLIER MEASUREMENT.** `/api/ops/artifacts/publish` is a POST: the artifact rides in
+the REQUEST body, and the gunicorn access log records only the RESPONSE size (~130 B).
+Measured from the worker side (`PUBLISH_OK ... bytes=`): **2,737 MB** in the 09-04
+17:00-18:00 spike hour, **2,496 MB** in the 09-05 04:00-05:00 hour, **472 MB** on
+09-06 08:00-09:00. **It still does not explain the spikes** — those three hours
+metered 4,050 / 33.9 / 0.5 MB against near-identical inbound volume, with the same
+internal URL, no `render.yaml` change since 09-03, and no matching step change on
+either worker.
+
 **WHAT IS ACTIONABLE WITHOUT KNOWING THE MECHANISM.** The spikes cluster in working
 hours (CT afternoon/evening) and track session/deploy activity, not the pipeline.
 Sep 5-6, with the system largely at rest, ran **0.42-0.75 GB/day on web**. The
