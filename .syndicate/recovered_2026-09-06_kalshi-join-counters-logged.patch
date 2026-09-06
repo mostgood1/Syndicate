@@ -1,0 +1,100 @@
+diff --git a/pipeline/portfolio_commit.py b/pipeline/portfolio_commit.py
+index 7f6e1a53..1f084fb2 100644
+--- a/pipeline/portfolio_commit.py
++++ b/pipeline/portfolio_commit.py
+@@ -704,6 +704,30 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
+         # doubleheader contracts that day were on a series with no sport
+         # mapping; `> 0` on any later slate settles it from the logs alone.
+         f" doubleheader_resolved={joined.get('doubleheader_resolved')}"
++        # THE SAME THREE COUNTERS THE ODDS-SIDE EMITTER PRINTS, and they matter
++        # MORE here: this is the join whose output becomes an ORDER, so a
++        # duplicate bet or a wrong-series pairing costs money on this path and
++        # only coverage on the other.
++        #
++        # WHICH SERIES A SEGMENT ROW MET, both directions. Kalshi lists
++        # `KXMLBF5TOTAL-...-5` and `KXMLBTOTAL-...-5` for the SAME game at the
++        # SAME strike, and `_row_market()` strips the segment on purpose so both
++        # key as (event,'totals',4.5). `_segments_agree` separates them --
++        # unprinted, "which contract priced this row" was an inference.
++        f" segment_matched_series={joined.get('segment_matched_series')}"
++        f" segment_refused_series={joined.get('segment_refused_series')}"
++        # ALT/MAIN COLLAPSE RATE. `_row_market()` also strips `_alt`, so a
++        # main-line row and an alternate row for one bet key identically and
++        # `_collapse_duplicate_bets` picks one. Replay measured ~1 per 78
++        # collapsed keys -- a ZERO here is worth a second look, not a
++        # celebration. It shipped RETURNED BUT PRINTED NOWHERE (`21aac548`, live
++        # in `58302f07`), so the rate this tie-break decides was unmeasurable.
++        f" alt_main_collisions={joined.get('alt_main_collisions')}"
++        # Named refusals last: `reasons` is a dict repr and anything after it is
++        # harder to read and to parse. The odds-side emitter learned this the
++        # expensive way -- two sessions appended to it within minutes and the
++        # merged line stranded four fields behind the dict and printed
++        # `alt_main_collisions` twice.
+         f" reasons={reasons}",
+         flush=True,
+     )
+diff --git a/tests/test_kalshi_join_counters_logged.py b/tests/test_kalshi_join_counters_logged.py
+index 5dbe3ce2..67fc4418 100644
+--- a/tests/test_kalshi_join_counters_logged.py
++++ b/tests/test_kalshi_join_counters_logged.py
+@@ -115,3 +115,60 @@ def test_the_line_still_carries_what_it_carried_before(capsys, _game_lines_on):
+     line = _emitted(capsys, [], [_board_row()])
+     for token in ("kalshi_markets=", "board_rows=", "matched=", "reasons="):
+         assert token in line, (token, line)
++
++
++# ---------------------------------------------------------------------------
++# BOTH EMITTERS, checked at the SOURCE.
++#
++# There are two `KALSHI_BOARD_JOIN` prints -- `[kalshi_odds]` in
++# `kalshi_odds_refresh` and `[portfolio_commit]` in `portfolio_commit`. The
++# second is the one whose output becomes an ORDER, so a counter missing there
++# costs more than one missing in the first. They drifted apart for a whole
++# deploy and nothing noticed, because each file's tests only ever looked at its
++# own line.
++#
++# Driving the `portfolio_commit` emitter through stdout needs the whole commit
++# path stood up, so this reads the f-string from the SOURCE instead. Weaker than
++# capturing output -- it proves the field is written, not that it renders -- but
++# it is the check that would have caught the duplicate merge in either file, and
++# the stdout tests above cover rendering for the emitter that can be driven.
++# ---------------------------------------------------------------------------
++
++_EMITTERS = {
++    "kalshi_odds_refresh": ("pipeline/kalshi_odds_refresh.py", '"[kalshi_odds] BOARD_JOIN"'),
++    "portfolio_commit": ("pipeline/portfolio_commit.py", '"[portfolio_commit] KALSHI_BOARD_JOIN'),
++}
++
++_REQUIRED = ("segment_matched_series", "segment_refused_series", "alt_main_collisions")
++
++
++def _emitter_fields(path: str, anchor: str) -> list[str]:
++    from pathlib import Path
++
++    src = Path(__file__).resolve().parents[1] / path
++    text = src.read_text(encoding="utf-8")
++    start = text.index(anchor)
++    end = text.index("flush=True", start)
++    return re.findall(r'f"[^"]*? ([a-z_]+)=\{', text[start:end])
++
++
++@pytest.mark.parametrize("name", sorted(_EMITTERS))
++@pytest.mark.parametrize("field", _REQUIRED)
++def test_both_emitters_print_every_counter(name, field):
++    path, anchor = _EMITTERS[name]
++    assert field in _emitter_fields(path, anchor), f"{name} does not print {field}"
++
++
++@pytest.mark.parametrize("name", sorted(_EMITTERS))
++def test_neither_emitter_prints_a_field_twice(name):
++    path, anchor = _EMITTERS[name]
++    fields = _emitter_fields(path, anchor)
++    dupes = {f: c for f, c in Counter(fields).items() if c > 1}
++    assert not dupes, f"{name} emits twice: {dupes}"
++
++
++@pytest.mark.parametrize("name", sorted(_EMITTERS))
++def test_reasons_is_last_in_both_emitters(name):
++    path, anchor = _EMITTERS[name]
++    fields = _emitter_fields(path, anchor)
++    assert fields[-1] == "reasons", f"{name} field order: {fields}"

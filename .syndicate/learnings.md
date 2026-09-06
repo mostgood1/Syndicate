@@ -2631,3 +2631,41 @@ could not answer the question — here, against nothing at all.
   place a belief can live — nobody diffs them and no test covers them: a note
   there without a mechanism is a permanent unexamined assertion. If it is worth
   storing, store what would falsify it.
+
+## 2026-09-06 — FORBIDDEN: `git stash` in this repo. The stash stack is SHARED across every worktree, so a push/pop pair is not yours and can swap two sessions' work. `[lane venue-fanin-segment-key / kalshi-alt-line-join]`
+
+- **What happened.** I ran `git stash push <2 files>` in a session worktree to
+  get a clean tree for a control test, then `git stash pop`. Between the two,
+  another session pushed and popped on the same stack. I popped THEIR entry:
+  81 lines of unpushed work from lane `kalshi-join-counters-logged`
+  (`pipeline/portfolio_commit.py` +24, `tests/test_kalshi_join_counters_logged.py`
+  +57) landed in MY worktree AND MY INDEX, staged, while my own two files
+  vanished. Diagnosing it, I then ran `git stash push --keep-index`, which wiped
+  my edits a SECOND time and swept their content into a mixed stash.
+- **Why the worktree does not protect you.** `session_worktree.py` gives each
+  session its own INDEX, and that is the isolation the protocol advertises. The
+  stash is a REF (`refs/stash`), and refs live in the shared object store — so a
+  worktree isolates the index and shares the stash. "I am in my own worktree" is
+  exactly the belief that made this feel safe.
+- **The tell I ignored.** Every safe recipe I had used all session builds a
+  commit through a private `GIT_INDEX_FILE`, reads blobs with `git hash-object`,
+  and NEVER touches the worktree or a shared ref. I stepped outside that for one
+  convenience command.
+- **How to apply.** Never `git stash` here. To test against a different tree
+  state: `git diff > /tmp/mine.patch` then `git checkout -- <paths>`, or read the
+  other state with `git show <rev>:<path>` and diff in memory. To build a commit,
+  use the `GIT_INDEX_FILE` recipe. If you have already stashed, do NOT pop --
+  `git stash show -p stash@{n}` it to a patch file, verify the paths are YOURS,
+  and apply that.
+- **Recovery that worked**, for the next person: the popped content was still in
+  the worktree, so `git diff --cached <their paths> > .syndicate/recovered_*.patch`
+  preserved it before anything else; `git apply --check` verified it; my own
+  change was REBUILT from context rather than recovered forensically, which was
+  faster and deterministic. Dropped stash commits also survive in
+  `git fsck --unreachable` until GC, but do not rely on it.
+- **A mixed stash is the lasting hazard.** `stash@{0}` labelled `WIP on
+  session/pc-counters` now contains BOTH that session's work and mine, because
+  `--keep-index` stashes whatever is in the tree regardless of who put it there.
+  A stash's LABEL names the branch it was created on, not the work it holds --
+  so the label is not evidence of ownership. Check `git stash show --numstat`
+  before popping anything.
