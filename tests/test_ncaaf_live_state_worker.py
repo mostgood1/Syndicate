@@ -233,3 +233,32 @@ def test_sources_is_optional_so_existing_callers_are_unaffected(monkeypatch):
     _patch(monkeypatch, record=FRESH_RECORD)
     index = lgs.ncaaf_game_state_index(["2026-09-06"])
     assert "153@2628" in index
+
+
+def test_the_worker_producer_step_exists_and_runs_first_and_ungated():
+    """The reader is INERT without this step, so its absence is the whole risk.
+
+    Asserts three separate things, each of which has bitten this repo before:
+      - the step EXISTS (otherwise web silently keeps fetching forever)
+      - it runs FIRST, because `refresh_odds_sources`'s own soccer block records
+        that a cheap step queued behind expensive ones goes stale exactly when
+        games are running
+      - it is in BOTH phases and carries no extra gate -- that file's `#520`
+        note records that re-applying an upstream gate at the launch site is
+        how NFL lost 24 hours of capture
+    """
+    import argparse
+    from scripts import refresh_odds_sources as ros
+
+    steps = ros._build_ncaaf_steps(
+        argparse.Namespace(date="2026-09-06", season=None, week=None)
+    )
+    names = [s.name for s in steps]
+    assert "ncaaf_live_state" in names, "the producer step is missing; the reader is inert without it"
+
+    step = steps[names.index("ncaaf_live_state")]
+    assert names[0] == "ncaaf_live_state", f"must run first, got order {names}"
+    assert set(step.phases) == {"pregame", "live"}
+    command = [str(part) for part in step.command]
+    assert any("poll_ncaaf_live_state.py" in part for part in command)
+    assert "--date" in command and "2026-09-06" in command

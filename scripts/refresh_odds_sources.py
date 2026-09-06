@@ -1100,6 +1100,45 @@ def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
     if args.week is not None:
         command.extend(["--week", str(args.week)])
     return [
+        # THE BOARD'S LIVE STATE, AND IT IS FIRST BECAUSE IT IS CHEAP AND
+        # FRESHNESS IS THE WHOLE POINT.
+        #
+        # WHAT THIS REPLACES. `ncaaf/cards.py:_attach_live_state` used to fetch
+        # ESPN's scoreboard (1,441,192 B uncompressed) from inside the WEB
+        # REQUEST PATH, behind a 45 s cache that is PER PROCESS -- and
+        # `WEB_CONCURRENCY = 2`, so every fetch happened twice. `CLAUDE.md`'s
+        # load-bearing rule is that workers fetch and web reads; the repo's own
+        # guard had been reporting the violation all along, at 205
+        # `request_path_guard: compute in request path` warnings per 1,200 log
+        # lines. This step is the producer that lets web read instead.
+        #
+        # `live_game_state.ncaaf_game_state_index` reads the record this
+        # writes and falls back to fetching when it is absent or older than
+        # `SYNDICATE_NCAAF_LIVE_STATE_MAX_AGE_SECONDS` (240 s). So if this step
+        # stops running, the board does not break -- it silently reverts to the
+        # old behaviour, which is why that function also reports `source=` and
+        # why `NCAAF_LIVE_STATE` now carries `source=worker=N,fetch=N`.
+        #
+        # FIRST IN THE LIST, for the reason the soccer live-state block below
+        # states in its own words: a cheap step queued behind expensive ones
+        # can go stale exactly when games are running. The staleness bound is
+        # 240 s against a live-phase inter-run gap measured at median 60 s and
+        # max 321 s (2026-09-06), so a step that slips behind the expensive
+        # captures would spend the slate falling back to a web fetch.
+        #
+        # NOT SEPARATELY GATED, ON PURPOSE, and this file already says why: the
+        # `#520` note below records that re-applying an upstream gate at the
+        # launch site is exactly how NFL lost 24 hours of capture. An empty
+        # scoreboard is one cheap GET (~107 KB gzipped, since the outbound
+        # `Accept-Encoding` change) and writes a record with no games, which is
+        # the correct reading for a quiet day.
+        RefreshStep(
+            name="ncaaf_live_state",
+            phases=("pregame", "live"),
+            cwd=REPO_ROOT,
+            command=(python_exe, "scripts/poll_ncaaf_live_state.py", "--date", args.date),
+            description="Capture NCAAF live game state so the board READS it instead of fetching ESPN in the request path.",
+        ),
         # `#552`. THE MARKET CAPTURE GOES FIRST, and it is the step that gives
         # the NCAAF board a price at all.
         #
