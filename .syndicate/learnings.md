@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 865 rules `[generated]`
+## Index — 866 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2819,3 +2819,35 @@ still not count.
   values the surviving function returns, the command set the decorators register,
   the `__all__` -- never by the source diff, which cannot see any of these.
 - *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-06 — FORBIDDEN: mutating the tree a BACKGROUND JOB is reading. It keeps running and silently measures something else. `[lane nfl-rating-units]`
+
+- **What happened.** A linearity experiment ran `os.chdir(<primary tree>)` and
+  looped over two rating scales. While it ran, I reverted that tree to the
+  original code -- correctly, to move my change into a worktree -- and the job
+  carried on against the reverted source. It reported a clean, plausible,
+  fully-formed result for a code path that no longer existed.
+- **The tell was in the output and I nearly read past it: `margin ratio 20/10 =
+  1.000, stdev 0.000`.** An effect of EXACTLY zero, with zero variance, is not a
+  finding about the system -- it is the signature of an input that never
+  changed. A sublinear response would have been noisy; a no-op is silent and
+  perfect. **Suspect a result that is too clean before you suspect one that is
+  surprising.**
+- **A background job holds a DEPENDENCY on the tree it was launched against, and
+  nothing in git or the job records that.** `git checkout`'s guards protect
+  files from being lost; they say nothing about a running reader. The
+  discard-guard fired on that very checkout, I preserved the content correctly,
+  and the preservation was irrelevant to this failure.
+- **The rule.** Before mutating a tree, enumerate what is RUNNING against it --
+  and if a long job needs a specific code state, launch it from a worktree
+  pinned to that state, not from the shared tree. Corollary for the reader: a
+  job that depends on source should PRINT the discriminating fact about the code
+  it loaded (here, whether the constant it is sweeping even exists), so the
+  output is self-diagnosing rather than plausible.
+- **What saved it: the derived number was already LABELLED derived.** The
+  backtest computed its own rating differences and never called the sim, so the
+  verdict (model loses to the close at t=3.34) was untouched. Only the
+  `NFL_RATING_SCALE ~25` conversion depended on the void run, and it had been
+  written down as "derived, not verified" before the error was found. **Labelling
+  a number's provenance is what makes a later invalidation cheap instead of
+  contaminating.**

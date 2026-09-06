@@ -132,12 +132,28 @@ the closest this platform has come to its own market. It still loses.
 market MAE 9.756 against 14.283 negated, so as-is is correct. A flipped
 benchmark would have made the market look terrible and the model look great.
 
-**ONE NUMBER LABELLED AS DERIVED, NOT VERIFIED:** the implied scale ~25 converts
-`k` through `b=8.55`, taken from a single week-10 measurement (margin stdev 11.44
-over engine rating diff 1.338). The linearity check that would confirm the
-engine's transfer is linear across scales had not completed. The FIT and the
-BACKTEST do not depend on it -- `k` was fitted directly on rating differences in
-points -- but the scale constant does.
+**THE LINEARITY CHECK RAN AGAINST THE WRONG CODE AND IS VOID. My error, and the
+mechanism is worth more than the number.** It ran `os.chdir(<primary tree>)` --
+and I reverted that tree to the ORIGINAL per-play code, to move the change into a
+worktree, WHILE THE JOB WAS STILL RUNNING. So it measured the unfixed path, where
+`NFL_RATING_SCALE` does not exist and changing it is a no-op. The output said so
+plainly and I nearly read past it: **margin ratio 20/10 = 1.000, stdev 0.000**,
+with rating diffs of ~0.09 -- per-PLAY magnitudes, not the ~1.3 per-game ones.
+A scale change that moves nothing at all is not a sublinear response, it is a
+scale that was never applied.
+
+**WHAT SURVIVES, and why.** The BACKTEST does not touch the sim or
+`team_rating`: `nfl_backtest_scale.py` computes `diff_points` with its own
+per-game centred implementation, so the fit (`k=0.34`) and the verdict
+(model loses to the close, t=+3.34 on held-out 2025) stand independently of this.
+The week-10 measurement (margin stdev 2.16 -> 11.44) also stands -- it ran BEFORE
+the revert, against the fixed code.
+
+**WHAT DOES NOT:** the implied `NFL_RATING_SCALE ~25`. It converts `k` through
+`b=8.55` from that week-10 run, and the check that would confirm the engine's
+transfer is linear across scales has NOT been run. It remains DERIVED, NOT
+VERIFIED -- which is how it was labelled before this correction, and the label is
+the only reason the error costs nothing downstream.
 
 **THE SYMPTOM.** Across-game `margin_mean` stdev is **2.16 points** for NFL
 against **15.37** for NCAAF, and **93.8%** of NFL games land in P(home)

@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 865 rules `[generated]`
+## Index — 866 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 323**
+**FORBIDDEN — 324**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -143,6 +143,7 @@
 - [2026-09-06 FORBIDDEN: concluding a hypothesis is WRONG from a simulation you did not co…](#2026-09-06-forbidden-concluding-a-hypothesis-is-wrong-from-a-simulation-you-did-not-confirm-reached-the-real-object-tests-is-not-a-package-so-pytests-module-is-not-yours)
 - [2026-09-06 — FORBIDDEN: adding a transform that REBINDS the name a reported field is de…](#2026-09-06-forbidden-adding-a-transform-that-rebinds-the-name-a-reported-field-is-derived-from-the-field-keeps-its-name-changes-its-meaning-and-every-existing-reader-keeps-working-while-answering-a-different-question-lane-kalshi-join-counters-logged)
 - [2026-09-06 — FORBIDDEN: asserting "the token is present" as the test for a log line oth…](#2026-09-06-forbidden-asserting-the-token-is-present-as-the-test-for-a-log-line-other-tools-parse-a-duplicate-is-present-twice-lane-kalshi-join-counters-logged)
+- [2026-09-06 — FORBIDDEN: mutating the tree a BACKGROUND JOB is reading. It keeps running…](#2026-09-06-forbidden-mutating-the-tree-a-background-job-is-reading-it-keeps-running-and-silently-measures-something-else-lane-nfl-rating-units)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
