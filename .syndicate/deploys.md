@@ -5,7 +5,433 @@
 
 ---
 
+## 2026-09-05 23:08:26Z - 23:13:56Z — live-odds-worker `7f197639` — **NCAAF h1 SEGMENT CAPTURE ENABLED AND CONFIRMED SPENDING, by credit burn — because the log path CANNOT answer this question.** — lane `segment-refusal-deploy`
 
+`deploy=dep-daea1qnqj5pc73aqh3sg trigger=api`. Enables
+`SYNDICATE_NCAAF_SEGMENT_MARKETS=h1`, set on live-odds-worker via the single-key
+API at 22:23Z (never `render.yaml` — that fires `blueprint_sync` across all
+three services). The key was set BEFORE the deploy deliberately, so one scarce
+idle window carried both; until the deploy it was configured and unread.
+
+**verify — THE READING IS A 5-MINUTE CREDIT SAWTOOTH ON `by_sport.ncaaf`.**
+Sampled `/api/ops/oddsapi/quota` every 150s for 20.1 min from 23:23Z:
+
+    baseline  ncaaf credits=37408 calls=233940
+    steps     +95, +95, +103, +39   spacing ~5 min
+
+The spacing matches `NCAAF_LINES_AUTORUN_LAUNCHED ... interval_s=300`, read from
+production the same hour. **The step DECOMPOSES against the pre-segment cost:**
+that sweep was one bulk request billed 3 credits x 3 regions (`us,eu,us_ex`) =
+**9 credits**. So 95 - 9 = 86, and at this tier's 3 credits/event that is
+**~29 events per sweep** — consistent with a 6h pregame + 105-min live window on
+a Saturday slate. `by_market_family.segment` moved +86 on the same ticks, which
+also confirms the `_market_family` fix: NCAAF `_h1` keys now bill into `segment`
+rather than the `other` bucket.
+
+**WHY NOT A LOG LINE, and this is the durable part.** `SEGMENT_PLAN` /
+`SEGMENT_CAPTURE disabled` — one of which the code prints unconditionally —
+appear NOWHERE. That is **not** evidence the tier is inert. There are **zero
+`[ncaaf_odds]` lines in an 86-minute window that includes the pre-deploy
+period**, when that fetcher was demonstrably running and pricing the board:
+`fetch_ncaaf_oddsapi_game_lines.py` is a grandchild subprocess whose stdout never
+reaches Render's log collector. The absence is a fact about the EMITTER. A first
+search compounded it — `render_logs.py` reported `COVERED 23:16:28 .. 23:16:28`,
+a single instant of a 12-minute window, which is exactly the truncation that
+tool prints so it is not read as absence.
+
+**WHAT THIS DOES NOT SHOW.** Billing proves the outbound calls go out at this
+tier's shape. It does NOT prove the vendor returned rows. The tradeable reading
+is still `segment != "full"` in the NCAAF quote log **with its denominator**, and
+it is NOT taken — `/api/ops/artifacts/export` reads artifacts whole into the 2GB
+web process and 502s, and the shard is 22MB. Do not report capture as working on
+this row alone.
+
+**COST — the shipped model was ~2x LOW, and the term is named.** Measured
+**~1,769 ncaaf credits/hr**, ~24.8K over a 14-hour game day, against a published
+estimate of ~11.7K/day. The gap is the pregame tier: the cost model assumed a
+6h/30-min tier, but there is **no per-tier throttle** — both tiers sweep at the
+caller's 300s tick, so pregame is 6x its modelled cost while live is half.
+Still comfortable: overall 2,500 credits/hr, 30d projection 1,800,039 of the
+5,000,000 cap. Hard ceiling is bounded by `DEFAULT_MAX_EVENTS=40` -> 1,440
+credits/hr.
+
+**MEMORY IS THE STANDING RISK AND IT IS NOT YET CLEARED.** Pre-deploy this
+service read `container_memory_pct_of_max: 98.7` with **27MB headroom** at
+23:20Z; at 00:42Z it reads **88.5% / 235MB**. That is NOT an improvement to bank
+— the deploy rebooted it, and the floor is the ratchet, so 90 min post-boot and
+~27h of uptime are not comparable. Per-event fetches are new periodic work on
+the 2GB service, and new periodic work here is what caused `#241`'s restart loop.
+No restart during the 20-min probe. **The off switch is one key back to unset
+plus a deploy.**
+
+**INCIDENT — TWO DEPLOYS FIRED 16s APART AND THE OLDER ONE WON.** A poller armed
+before this session's context was compacted was still running; a second poller
+was armed without checking for it. `a31fb870` posted 23:08:10Z and was
+**CANCELED** at 23:08:26Z by `7f197639`. Both carry the segment code so the
+feature is unaffected, but `7f197639` is the OLDER commit, and the cancelled one
+also carried runtime files (`layer2_board.py` +22/-2,
+`live_gameline_join.py` +48/-1). **`render_deploy.py`'s rollback guard could not
+catch it**: it re-reads the LIVE SHA, which at 23:08:26Z was still `3223baa1`,
+so the older target still looked like a descendant. Serialisation is not
+composition — and a guard that reads live state cannot see a deploy that has not
+landed yet. **Before arming a deploy poller, enumerate the ones already running.**
+
+
+
+
+
+## 2026-09-05 23:51:59Z - 2026-09-06 00:11Z — refresh-worker `933e9beb` — **BOTH OWED READINGS TAKEN. The durable mirror survived a deploy; the lens now reaches the board and 74-83 rows carry `live_aware`. THE EDGE IS STILL WITHHELD, and I found exactly why — it is one line, upstream of me, and it should NOT be applied without a decision.** — lane `ncaaf-live-resim-wire`
+
+`deploy=dep-daeam7vqj5pc73asjt5g trigger=api`, posted on a CLEAR window (0 jobs)
+past the 25-min spacing, so it discarded no board build (`#563`).
+
+**verify, READING A — the durable SP+ mirror survived a deploy. MET, and it is
+DISCRIMINATING.** The first boot read `sp_ratings_source: loader` (predicted: the
+mirror did not exist yet, so it went to CFBD once and wrote it). This boot:
+
+    2026-09-06T00:01:07.191Z [refresh_worker] NCAAF_LIVE_RESIM
+      {"coverage": {"games": 51, "live_resimmed": 9, "refused": 42,
+        "refusals_by_reason": {"game_final": 16, "game_not_in_progress": 7,
+                               "no_live_state": 18, "no_period": 1}},
+       "sp_ratings_source": "durable_mirror", ...}
+
+`loader` a second time would have meant the mirror is not surviving and the
+post-deploy ratings gap is still open. It read `durable_mirror`. **That closes the
+trap this lane's hypothesis was written about.**
+
+**verify, READING B — the board. THE JOIN IS PROVEN; THE EDGE IS NOT.** Do not
+read the first half as the second.
+
+    00:06:47Z build   live_aware 83   h2h 7   index_size 9   sources_seen {live_resim: 9, pregame: 42}
+    00:11:01Z build   live_aware 70   h2h 7   (REPRODUCED on a second, independent build)
+    `no_live_gameline_projection` fell 420 -> 297 the moment the key fix landed.
+
+One full row, Tulane @ Duke, Q4 2:19, 3-17:
+
+    live_gameline  home_win_prob 1.0  model_prob 1.0  sims_run 120
+                   prob_std_err 0.0113  as_of 2026-09-06T00:00:33Z  carried_forward false
+    projection     live_aware true  basis smartsim2_home_win_rate  model_prob_over 0.8533
+
+`as_of` matches the snapshot to the second, which a stale artifact cannot
+contain — this is the live re-sim reaching the board. The pregame 0.8533 sits
+beside the live 1.0 rather than overwriting it, as designed.
+
+**BUT `rows_live_gameline_edged` is 0, on every build, and I ran the diagnosis
+down rather than reporting the counter.** All 7 live-aware h2h rows refuse
+`no_two_sided_market_price`. My first guess — "the market pulled the line on a
+decided game" — was WRONG, and the data killed it: Arkansas State @ Memphis at
+**10-7 in Q2** carries `consensus {"away": 180, "home": -325}`, an ordinary
+two-sided live price, 27 books quoting, and still refuses. So does Wyoming @
+Colorado State at 6-14 (`{"away": 168, "home": -297}`, 25 books).
+
+**THE CAUSE, traced to the line.** `live_gameline_join.py:1109` calls
+`price_moneyline(market_prob=projection.get("market_fair_prob_over"))` — it reads
+the de-vigged price off the ROW'S PROJECTION, not off `consensus`. And
+`ncaaf/game_projections.py` writes that key in its **totals** branch (line 482)
+and **NOT in its h2h branch** (line 405-433). Measured across sports on the
+served board:
+
+| sport | h2h rows | with a projection dict | with `market_fair_prob_over` |
+|---|---|---|---|
+| soccer | 52 | 52 | **52** |
+| ncaaf | 79 | 30 | **0** |
+| mlb | 43 | 0 | 0 |
+
+So `price_moneyline` receives `None` for every NCAAF h2h row and refuses
+unconditionally. **This could not have been seen before**: no NCAAF row had ever
+been `live_aware`, so the moneyline branch was never reached. My re-sim supplies
+the model side; the market side has never been de-vigged onto an NCAAF h2h row.
+
+**I ALSO NEARLY RECORDED A WRONG CAUSE.** I wrote "the key is never written for
+ncaaf" off a grep that returned nothing for my search term, then re-grepped and
+found it at line 482 — written, but in the wrong branch. Absence of a grep hit is
+a fact about the search string.
+
+**WHY I AM NOT FIXING IT, and this is a decision rather than a deferral.**
+`_no_vig_over_probability` is already imported in that file and already used two
+branches down, so the change is ONE LINE. But NCAAF's h2h branch sets
+`edge_unavailable_reason` deliberately — its margin model *"loses to the closing
+line by 3.563 points of MAE over 2233 games (t=17.2)"*. Adding the market price
+would open pricing on that market. **My live probability is NOT that pregame
+margin model** — it is a rest-of-game sim from the real score — so the note
+condemning the pregame model does not automatically condemn it. **But nobody has
+graded the LIVE model against outcomes either.** Wiring the market side would
+release live NCAAF moneyline edges on the strength of an ungraded estimator,
+which is `#499`'s exact precedent in reverse (WNBA totals only became priceable
+after a 249-game backtest). That is a money decision, not a wiring one, and it
+belongs to a lane that can measure it.
+
+**WHAT IS TRUE, STATED WITHOUT INFLATION:** the NCAAF live re-sim produces in
+production, its output reaches the board, and a live NCAAF row now carries a
+live-aware projection with a probability that knows the score — where two hours
+ago it carried the pregame number. **No live NCAAF edge is published, and none
+should be until the live model is graded.** The board still suppresses, which
+`#340` says it should.
+
+**One thing I could not test and will not claim:** MLB has 0 h2h rows carrying a
+projection dict at all tonight, so I had no positive control for the pricing step
+on any sport. Soccer's 52/52 is evidence the FIELD is populated elsewhere, not
+that the pricing path is healthy elsewhere.
+
+## 2026-09-05 23:13:09-23:18:27Z — refresh-worker `ffe8714b` — **HALF ONE VERIFIED IN PRODUCTION; HALF TWO FOUND A REAL DEFECT AND IT IS MINE.** The NCAAF live re-sim produces; the board join missed 257 of 257 rows on a key I published. — lane `ncaaf-live-resim-wire`
+
+`deploy=dep-daea18f40ujc73edp0vg trigger=api`. Boot `[refresh_worker] BOOTED`
+23:13:09.878Z. Claim held by this lane throughout; web went to `3cb5b4ba`
+separately at 22:57-23:00Z (lane `render-egress-transport`, their row).
+
+**verify, HALF 1 — the producer. MET.** `/api/ops/live-lens/snapshot-index?sport=ncaaf`,
+read 23:15:59Z:
+
+    snapshot_present   true   /opt/render/project/data/live/ncaaf_live_lens.json
+    sources_seen       {"live_resim": 8, "pregame": 43}
+    index_size 8   indexed 8   skipped_no_accepted_lane 43   skipped_no_team_names 0
+    producer coverage  games 51, live_resimmed 8, refused 43
+                       refusals_by_reason {game_final 14, game_not_in_progress 8, no_live_state 21}
+
+All 8 `join_accepts: true`: Wyoming @ Colorado State **0.6875**, Arkansas State @
+Memphis 0.7625, Florida International @ South Florida 0.90, Tulane @ Duke 0.9667,
+Baylor @ Auburn 0.9917, and three at 1.0. **Denominator at the same instant: 20
+ESPN games in progress**, of which 8 are FBS-vs-FBS and therefore in the week's
+projections artifact; the other 12 are FCS opponents the artifact never carries.
+
+The worker's own line, an independent reading of the same tick:
+
+    23:15:51.380Z [refresh_worker] NCAAF_LIVE_RESIM {"coverage": {...}, "elapsed_seconds": 21.741,
+      "espn": {"dates": ["2026-09-05"], "events": 68, "fetch_failures": 0, "in_progress": 20, "keyed": 68},
+      "projections": 51, "ratings_teams": 94, "sp_ratings_source": "loader",
+      "sp_ratings_teams": 138, "week": 1, "written": true}
+
+`sp_ratings_source: loader` is the PREDICTED first-boot value — the durable
+mirror did not exist yet, so it went to CFBD once and wrote it. **The
+discriminating follow-up is the NEXT boot: it must read `durable_mirror`.** If it
+reads `loader` again the mirror is not surviving and the post-deploy gap is back.
+21.7 s against a 90 s budget, no `tick_budget_exhausted`.
+
+**verify, HALF 2 — the board. NOT MET, and the failure is diagnostic rather than
+silent.** First read at 23:15:59Z showed `"no published live-lens snapshot"`, which
+was a TIMESTAMP: the book grid was built 23:13:50Z and the snapshot written
+23:15:29Z, so the board was 99 s older than the thing it was looking for
+(`gate verification on artifact mtime`). I waited for a rebuild rather than
+concluding. The rebuild at **23:17:39Z**, comfortably after the snapshot, is the
+real reading:
+
+    index_size 8   sources_seen {"live_resim": 8, "pregame": 43}   skipped_no_team_names 0
+    rows_live_gameline_considered 257
+    rows_live_gameline_edged      0
+    withheld_by_reason  {"no_live_gameline_projection": 257}
+
+**THE INDEX WAS PERFECT AND EVERY ROW STILL MISSED, because the two key sets do
+not intersect at all — 0 of 8.** The lens is keyed from the projections artifact
+(CFBD) and the grid from the ODDS source:
+
+    ('baylor', 'auburn')            vs  ('baylor bears', 'auburn tigers')
+    ('tulane', 'duke')              vs  ('tulane green wave', 'duke blue devils')
+    ('wyoming', 'colorado state')   vs  ('wyoming cowboys', 'colorado state rams')
+
+`live_gameline_join._norm_team` has no alias table ON PURPOSE — its docstring
+records that MLB's two sides match exactly because both come from one source, and
+that copying the prop join's alias machinery would import a 91% miss. NCAAF's two
+sides have different owners, so the producer has to publish the grid's spelling.
+
+**FIXED AND LANDED AS `933e9beb`, NOT YET DEPLOYED** (rate-limited: 25 min minimum
+spacing from 23:13). ESPN's `displayName` is stamped as `matchup`, which
+`build_live_gameline_index` reads first. Measured against the 61 live grid keys:
+`displayName` **7/8**, `location` 0/8, `shortDisplayName` 0/8, `name` 0/8. Re-run
+end to end against the LIVE production grid after the fix: **6 of 7 index keys
+hit**. The residual is named, not aliased away — ESPN says `sam houston bearkats`,
+the grid says `sam houston state bearkats`.
+
+**WHAT I GOT WRONG, AND IT IS THE REUSABLE PART.** `test_the_tick_publishes_a_
+snapshot_the_board_join_accepts` asserted `("baylor", "auburn")` and PASSED, while
+production missed 257 of 257 rows. The fixture built the grid row and the
+projection from the SAME names, so the two sides agreed by construction — **a
+fixture that cannot express the disagreement cannot test the join.** Mutation
+checks did not help either: the mutation I would have needed was to the FIXTURE,
+not to the code. Same shape as `learnings.md` 2026-08-27, *"a test whose FIXTURE
+cannot violate the property it asserts is not weak coverage, it is zero coverage
+that reads as strong"*. Corrected in place with the reason inline.
+
+## 2026-09-05 23:07:14Z — **AMENDMENT: refresh-worker deployed to the `origin/main` tip `ffe8714b`, not the `6320fe91` the PENDING row below names.** `deploy=dep-daea18f40ujc73edp0vg trigger=api`. — lane `ncaaf-live-resim-wire`
+
+Not a correction of a measurement — a change to a stated blast radius, and the
+row that stated it is append-only, so this is the amendment rather than an edit.
+**HONEST ABOUT ITS OWN TIMING, because the wording nearly claimed more than it
+earned:** the decision and this text were settled at ~23:0xZ, before the deploy;
+the row reached the ledger a few minutes AFTER it fired, because the clear window
+opened at 23:07:12Z and had closed within seconds twice already tonight. Read it
+as a stated intent, not as a pre-registration.
+
+**WHY.** Lane `render-egress-transport` landed `3cb5b4ba` while refresh-worker
+sat on preflight HOLD, and asked for a tip deploy rather than taking its own
+lock on a service that has had no clear window since 22:37Z. Standing rule:
+deploy a commit that is ON `origin/main` (`[2026-08-18, user decision]`); a tip
+is as compliant as a pinned SHA and saves that service a second restart it
+would otherwise need on the same scarce window.
+
+**WHAT THE TARGET NOW ALSO CARRIES, and it is bigger than one more commit.**
+`3cb5b4ba` installs a **global `urllib` opener from `syndicate/__init__.py`** that
+adds `Accept-Encoding: gzip` and gunzips the reply. That is not scoped to my
+fetch — it changes EVERY outbound HTTP call in the worker process: OddsAPI,
+ESPN, StatsAPI, Polymarket, Kalshi. Its author measured 42 new tests, CI's own
+suite green (`tests.test_archives`, 386 OK), a kill switch
+`SYNDICATE_HTTP_GZIP=off` (absent means ON), and a 403/406/415 fallback that
+retries once bare and pins the host uncompressed for the process.
+
+**WHY I TOOK IT ANYWAY, stated as a judgement and not as a fact.** It removes
+the one cost I flagged against my own change in the row below: the ESPN CFB
+scoreboard at 1,441,192 bytes uncompressed, which set my 180 s interval.
+Measured through my actual caller: **948,450 -> 70,155 bytes, 13.5x**. And their
+correction to me is the part that decides it — I had written that a worker's
+inbound fetch "may not be billed at all", generalising their control hour past
+what it measured. Their arithmetic settles it: Sep 1-5, refresh-worker 1.07 GB +
+live-odds-worker 3.91 GB = **4.98 GB against the dashboard's Service-Initiated
+5.06 GB**. A worker fetching the public internet IS billed. My ESPN bytes are in
+that bucket.
+
+**THE ONE OUTCOME NEITHER OF US HAS TESTED, and it breaks MY input if it fires.**
+`poll_ncaaf_live_state._fetch_scoreboard`'s docstring pins "no custom headers:
+urllib's own default User-Agent is what ESPN accepts from Render" — ESPN
+demonstrably discriminates on request headers *specifically from Render's
+outbound IP*. `Accept-Encoding` is a different and far safer header, and the
+opener falls back on 403, but every measurement of it so far was taken from a
+dev box. **After this deploy:** `render_logs.py --service refresh-worker --text
+ACCEPT_ENCODING_REFUSED` naming `site.api.espn.com` means ESPN rejects it from
+Render, 180 s is load-bearing again, and my tick's ESPN join is the thing to
+check first. Silence plus a real `ratio=` on `HTTP_COMPRESSION` means the
+opposite. **That reading belongs in `render-egress-transport`'s row, not mine** —
+I will read it because it gates my input, and send it to them to record.
+
+Everything else in the row below stands unchanged: same claim, same rollback,
+same expected effect, same measurement, same reader.
+
+**verify:** _(empty — this row is an open obligation)_
+
+## 2026-09-05 23:07:13-23:12:36Z — refresh-worker `eb7951fe` -> `ffe8714b` — **DEPLOYED BY LANE `ncaaf-live-resim-wire` FROM THE TIP, carrying this lane's change. THE OWED ESPN VERIFICATION IS DISCHARGED, POSITIVE.** — lane `render-egress-transport`
+
+- **I did not take this deploy and I did not take a lock.** `ncaaf-live-resim-wire` held `refresh-worker`, retargeted its poller to the tip and shipped it, which is why this landed at all. The readings below are MINE — that lane explicitly declined to report them as my verification, which was the right call, and I re-derived every one from the Render logs API rather than recording what was relayed.
+- **verify (1) — THE ONE MY DEV-BOX NUMBERS COULD NOT TEST. ESPN ACCEPTS `Accept-Encoding: gzip` FROM RENDER'S OUTBOUND IP.**
+  `2026-09-05T23:15:51.380Z [refresh_worker] NCAAF_LIVE_RESIM ... "espn": {"dates": ["2026-09-05"], "events": 68, "fetch_failures": 0, "in_progress": 20, "keyed": 68}`
+  That is `poll_ncaaf_live_state._fetch_scoreboard` — **the exact function whose docstring pins "no custom headers: urllib's own default User-Agent is what ESPN accepts from Render"** — running through the global opener. A 403 would read `fetch_failures: 1` and an empty index. `schedule_adapter.py:377-386`'s hazard is real and this header does not trip it.
+- **verify (2) — `ACCEPT_ENCODING_REFUSED`: ZERO, and this null IS readable.** The emitter exists at `http_compression.py:345`; checked before drawing anything from its absence. No host has refused, ESPN included.
+- **verify (3) — THE PUBLISH-SIDE GZIP IS WORKING IN PRODUCTION, measured on the wire.** Over 42 `PUBLISH_OK` lines in the 10 minutes after boot:
+  **12 streamed publishes, `raw_bytes` 138,272,659 -> `bytes` 10,660,391 on the wire — 13.0x, 122 MB removed.** Per file: soccer book_grid 18,774,103 -> 1,369,013 (13.7x); mlb 13,677,409 -> 1,132,154 (12.1x); ncaaf 4,696,474 -> 499,719 (9.4x).
+- **NOT READABLE, AND MUST NOT BE PUT IN A ROW AS EVIDENCE: `HTTP_COMPRESSION` silence.** `_bump` gates on `responses_gzip % _LOG_EVERY == 0` with `_LOG_EVERY = 200` (`http_compression.py:99,133`), so ~10 min post-boot the counter has not reached 200. Silence is indistinguishable from an unreachable emitter — the one thing it exists to distinguish.
+- **INSTRUMENT DEFECT, mine, found by trying to use it: an instrument whose FIRST reading requires 200 events cannot verify its own deploy.** The counter is correct for steady state and useless for the moment anyone actually needs it. Fix is to emit the first line early (n=1, then every 200) or on a time basis. Recorded, not yet fixed.
+- **GAP FOUND, quantified, NOT fixed: the JSON-envelope publish path is still uncompressed.** gzip was scoped to the streamed path (>4 MiB) only. In the same window **30 of 42 publishes took the envelope path and shipped 26,806,498 bytes uncompressed**, largest single body **4,417,620 B**. That is the next obvious win on this transport and it is a one-line threshold decision, not a redesign.
+- **DO NOT read any of this as a bandwidth saving.** Every byte above is INTERNAL worker->web traffic, which is not billed (2026-09-05 04:00-05:00Z: 5,243 MB of it metered 33.9 MB). What 122 MB/10 min buys is **memory and time on the 2 GB web receiver**, which `#632` says is the scarce resource. The BILLED win from this change is the outbound ESPN/feed fetches, and verify (1) is what proves that path works at all.
+
+## 2026-09-05 23:1xZ — **CORRECTION to the row below: the duplicate `Vary` is real, but the CAUSE I recorded for it is wrong, and so is the fix.** — lane `render-egress-transport`
+
+- **What I wrote:** "`compress_response` appends when `"accept-encoding" not in response.headers.get("Vary", "")`, and `.get` reads only the FIRST of a repeated header. Fix is `headers.set`, not append."
+- **Why that is wrong.** Inside the app there is only ever ONE `Vary` — werkzeug's `Headers.__setitem__` replaces rather than appends, so my hook cannot produce a pair on its own, and `headers.set` would change nothing.
+- **What it actually is, isolated by testing routes my hook provably never reaches.** `image/png` (returns before `Vary` on content-type) — **no `Vary` at all**. A 404 (returns before `Vary` on status) — **exactly one `Vary`**. So **RENDER'S EDGE adds `Vary: Accept-Encoding` itself** on text-ish responses, after my hook has already added the app's. Two layers, one header each, and neither is duplicating internally.
+- **Consequence: it is cosmetic and stays.** Repeated `Vary: Accept-Encoding` is semantically identical to one under RFC 9110 field-list combination. Nothing to fix in `response_compression.py`; the app's header is still required, because the edge's presence is not something the app can depend on.
+- **The reason this correction exists at all:** I diagnosed a defect from its symptom and wrote the diagnosis into an append-only ledger in the same breath. The symptom was real; the cause was a guess that read like a finding. Corrected by appending, never by editing the row below.
+
+## 2026-09-05 22:57:42-23:00:51Z — web `6320fe91` -> `3cb5b4ba` — **DEPLOYED, LIVE, VERIFIED ON THE SERVED PAYLOAD.** Response gzip is on; the OUTBOUND half is deployed and NOT yet demonstrated. — lane `render-egress-transport`
+
+- **verify (the reading that proves it worked): a same-instant A/B against production, one path, two requests differing only in `Accept-Encoding`.**
+  `/api/board/game-chips?date=2026-09-05&sports=mlb,ncaaf,soccer` — **130,894 bytes plain -> 17,261 gzipped, 7.6x**, response carrying
+  `Content-Encoding: gzip` and `Vary: Accept-Encoding`. `/api/portfolio/summary?limit=100` — 2,746 -> 941, 2.9x. Same instant on purpose:
+  a before/after across a deploy would have compared two different board states.
+- preflight **CLEAR** at 22:57:24Z (only gunicorn + 2 already-dead defunct children; no sim, no job to kill). Claim held by this lane, acquired 22:57:07Z.
+- **WHAT THIS DOES NOT SHOW, and must not be read as showing: the bandwidth bill.** Serving gzip to a client that asks changes little, because
+  **Render's edge already gzipped these responses** (measured: 198.8 MB at the origin vs 4.2 MB at the edge for the same request). The saving that
+  matters is OUTBOUND, and on web it is UNDEMONSTRATED: zero `[http_compression] HTTP_COMPRESSION` lines since 23:00:51Z — expected, since that
+  line prints every 200 gzip responses and web's fetch loops are disabled (`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`,
+  `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`). **The service that will exercise it is refresh-worker, which is held by another lane.**
+- **The one genuinely good null: zero `ACCEPT_ENCODING_REFUSED`.** That is the ESPN-403-from-Render hazard not firing so far. It is a WEAK null — web
+  barely fetches — and the real test is refresh-worker's ESPN calls.
+- **A bandwidth reading is NOT AVAILABLE YET and nobody should quote one before 2026-09-06T00:00Z.** `/v1/metrics/bandwidth` is hourly-only
+  (60/300/900s resolutions all return hourly) and RIGHT-labelled, so the first bucket containing only post-deploy time is `2026-09-06T00:00:00Z`.
+  Baseline to compare against, from `scripts/render_bandwidth_report.py`: web ran **~1 GB/day chronic** Aug 21-31 and 6.28/1.21/3.87/7.89 GB on
+  Sep 1-4, against 0.40 GB on Sep 5.
+- **DEFECT INTRODUCED, cosmetic, recorded rather than quietly fixed:** some routes now serve `Vary: Accept-Encoding` TWICE
+  (seen on `/api/portfolio/summary`). Legal HTTP, sloppy, and mine. `response_compression.compress_response` appends when
+  `"accept-encoding" not in response.headers.get("Vary", "")`, and `.get` reads only the FIRST of a repeated header. Fix is `headers.set`, not append.
+- **DO NOT credit this deploy with the 19.5 GB.** Web's share of the month is still unexplained — internal transport, public responses, public
+  ingress and deploys are each eliminated by measurement (`lanes.md`, lane `render-egress-transport`).
+
+## 2026-09-05 22:4xZ — web + refresh-worker -> `744689c9` — **PENDING, measurement column EMPTY.** The NCAAF live re-sim producer. — lane `ncaaf-live-resim-wire`
+
+**1. SCOPE — this is NOT a one-change deploy and saying otherwise would be
+false.** Deploying the `origin/main` tip is the rule (`[2026-08-18, user
+decision]`; a branch cut from the live SHA is FORBIDDEN and silently reverts its
+predecessor), so this carries 22 commits. Mine are `262fd2cf` (the wiring) and
+`744689c9` (the ledger). Also riding, named rather than discovered later:
+`5ce75195`+`fda5c28a` (`edge-basis-moneyline`, `live_gameline_join.py` +49 — the
+live moneyline `edge_basis` label), `7dfabcf4`/`d955e445`/`7f197639`
+(`ncaaf-segment-capture` + NFL segment keys, `segment_odds_fetch.py` NEW 406,
+**default OFF**), `a31fb870`-era `layer2_board.py` +24, `oddsapi_quota.py` +9,
+and `check_lane_invariants.py` tooling. Not diagnosing, so the one-change rule
+does not bind; the blast radius is stated instead.
+
+**2. EXPECTED EFFECT, as a number and a window.** Within ONE 180 s tick of
+refresh-worker going live: `/api/ops/live-lens/snapshot-index?sport=ncaaf`
+returns `snapshot_present: true` and
+`index_diagnostics.sources_seen {live_resim: N, pregame: 51-N}` where **N equals
+the count of games that are both in the week's projections artifact and ESPN-live
+at that instant**. Locally against this same slate that was 8 of 51 at ~22:0xZ.
+On the next book-grid rebuild, `/api/board/book-grid?sport=ncaaf` stops returning
+`live_gamelines {"supported": false, "reason": "no live re-sim wired for ncaaf"}`
+and at least one live row carries `projection.live_aware: true`.
+
+**A ZERO IS NOT A FAILURE BY ITSELF AND MUST NOT BE READ AS ONE.** N falls to 0
+when the slate goes final, which it will tonight. The discriminating field is
+`producer_coverage.refusals_by_reason`: `game_final` on every row means the
+producer ran and the slate ended; `no_pregame_ratings` means the SP+ mirror did
+not populate; `no_live_state` on everything means the ESPN name join broke; an
+ABSENT snapshot means the tick never ran.
+
+**3. MEASUREMENT — who reads it.** This lane, from this session, on the
+production endpoints above. Refresh-worker's own line
+`[refresh_worker] NCAAF_LIVE_RESIM {...}` carries the same coverage block and is
+readable via `scripts/render_logs.py --service refresh-worker --text
+NCAAF_LIVE_RESIM`; the artifact and the log line are independent readings of the
+same tick and both are recorded.
+
+**4. BLAST RADIUS.** web (2 GB, request path) and refresh-worker (4 GB,
+persistent disk — stop-then-start, instances cannot overlap). live-odds-worker is
+NOT deployed and needs nothing here. `render.yaml` is NOT touched, so no
+`blueprint_sync` and no env rewrite. New per-tick cost on refresh-worker: one to
+two ESPN scoreboard GETs (1,441,192 bytes each, measured by
+`render-egress-transport` today) plus a re-sim bounded by
+`NCAAF_LIVE_RESIM_BUDGET_SECONDS`, default 90 s, on a 180 s interval — a ~50%
+worst-case duty cycle during a live slate, and the first lever if that is too
+much is `SYNDICATE_NCAAF_LIVE_RESIM_INTERVAL_SECONDS`, with
+`SYNDICATE_NCAAF_LIVE_RESIM=off` as the kill switch. Neither needs a code change.
+
+**5. ROLLBACK.** `SYNDICATE_NCAAF_LIVE_RESIM=off` disables the producer without a
+deploy path change; a full revert is `git revert 262fd2cf` and a redeploy. The
+producer only WRITES `data/live/ncaaf_live_lens.json`; with it off, the join
+returns `no published live-lens snapshot` and the board is exactly what it is
+today.
+
+**6. LEDGER CHECK.** `learnings.md` 2026-08-27 forbids allowlisting a
+KEYVALUE-backed path and calling it readable — the entry added here is
+`ncaaf_source/historical_truth/sp_ratings_*.json`, a real FILE on the mounted
+disk, not a keyvalue path. `learnings.md` 2026-08-20 (`HOT_ARTIFACT_PATTERNS` is
+about worker->web) is why that entry is NOT load-bearing for the feature and is
+recorded as auditability only. No EXONERATED or FORBIDDEN rule is reverted.
+OPEN lanes on the same files: `artifact_publisher.py`'s stale claim was a parser
+artefact and is resolved in `744689c9`; `render-egress-transport` holds the
+publish/pull transport region of that file and was messaged first.
+
+**7. VERDICT: PASS for web, HOLD for refresh-worker at 22:37Z.** Preflight
+`refresh-worker` returned **HOLD — 10 jobs in flight**, including
+`run_mlb_daily_sim_job.py --sims 1000 --reason tip_off_window` (pid 2814) and a
+soccer artifact build. A deploy kills them. Waiting, not forcing.
+
+**PROVENANCE CORRECTION, MADE BEFORE DEPLOYING AND WORTH THE SPACE.**
+`/api/board/book-grid?sport=ncaaf` returning "no live re-sim wired for ncaaf" was
+read as a fact about WEB. It is not: web's live `94c8ac13` **does** contain
+`7d9ec94e`, which put `ncaaf` in `_LIVE_GAMELINE_SPORTS`. That string is
+refresh-worker's, because `book_grid_artifact.py` calls
+`attach_live_gamelines_for_sport` when it BUILDS the artifact, and refresh-worker
+is on `eb7951fe`, which does not contain `7d9ec94e`. Ancestry said web had the
+fix and the payload said otherwise; the producer of the payload is the answer.
+
+**verify:** _(empty — this row is an open obligation)_
 
 ## 2026-09-05 20:29:31-20:35:00Z — web `50b266da` -> `337facdc` — **DEPLOYED, LIVE, VERIFIED ON THE SERVED PAYLOAD. The NBA betting-card CSS and JS serve for the first time; both had been 404.** — lane `ci-archives-nba-card-js`
 

@@ -201,6 +201,70 @@ found by repeating the audit, not by a report.
 **PROVEN TO FIRE, NOT PROVEN TO HAVE CHANGED AN ORDER.** Zero orders were
 placed after either boot, so the money-level check is vacuous. Re-run on the
 next slate that actually places.
+
+**THAT RE-RUN IS DONE — THE DEFECT IS NOT LIVE, AND NOTHING HAS MIS-FILLED SINCE**
+`[verified on production 2026-09-05, lane segment-execution-ticker-audit;
+working in .syndicate/findings_2026-09-05_segment_execution_ticker_audit.md]`.
+Prompted by a re-grade agent reporting 10 venue-settled segment orders whose
+venue outcome matched our FULL-GAME grade on 9 of 10 and our SEGMENT grade on
+0 of 10. That reading is CORRECT and it is about **this** defect, on
+**2026-08-26 and 2026-08-28 only** — every one of the 10, zero later.
+
+Rates, both modes, denominators named. Era split on `submitted_at` against the
+21:55:15Z boot:
+
+| population | n | got a `venue_ticker` | on a FULL-GAME series |
+|---|---|---|---|
+| LIVE kalshi, `segment != full` | 37 | 5 | **5/5**, all `KXMLBTOTAL` |
+| — POST-boot | 23 | **0** | 0 |
+| PAPER kalshi, `segment != full` | 70 | 5 | 5, all `KXMLBTOTAL` |
+| — POST-boot | 45 | **0** | 0 |
+| LIVE polymarket, `segment != full` | 6 | 6 (`aec-` slug) | all PRE-boot |
+| — POST-boot | **0** | 0 | 0 |
+
+The 5 live Kalshi fills are 2026-08-28T05:17:26Z..T05:49:17Z — ~16h BEFORE the
+boot — and are the same five tickers listed above.
+
+**THE FIELD IS `venue_ticker`, NOT `ticker`,** on `orders[]`/`unreconciled[]` of
+`/api/portfolio/live?on=all&show=all` and on `/api/portfolio/paper?date=<D>`.
+A walk for `ticker` returns 0 rows from either. `ledger-summary` emits no ticker
+BY CONSTRUCTION (`_LEDGER_SUMMARY_FIELDS`), so it can never answer this.
+
+**THE GUARD IS FIRING, WHICH IS THE ONLY THING THAT MAKES THE NULL MEAN ANYTHING.**
+`segment_has_no_matching_series` = **257 refusals over 38 join ticks in 30h** on
+the running refresh-worker (`933e9bebf154`), on both `[kalshi_odds] BOARD_JOIN`
+and `[portfolio_commit] KALSHI_BOARD_JOIN`. Needed because the post-boot null
+is otherwise vacuous: all 23 post-boot refusals are `OrderBuildError:
+no_venue_ticker` on `totals_alt`/`spreads_alt`/`h2h_3_way`, and those same three
+markets **also refused `no_venue_ticker` PRE-boot, 9 of 9**. The reason does not
+discriminate, and the shape that DID mis-fill (plain `market=totals`) has not
+been attempted by a segment row once since. Post-boot live kalshi on plain
+`totals`: 46 orders, 0 segment, 46 full, 40 tickered — the join is alive.
+
+Guard present by CONTENT on all three live SHAs: refresh-worker `933e9bebf154`,
+live-odds-worker `7f197639cc97`, web `3cb5b4ba6750`. Choke point confirmed:
+`kalshi_ticker_resolver` reads only `matches`, and both — the only two —
+`matches.append` sites are immediately preceded by `_segments_agree`.
+
+**THE MECHANISM IS CONFIRMED AS HISTORY:** `KXMLBTOTAL` was hand-registered
+2026-08-25 (the title gate missed it; before that a `totals` row had nothing to
+join to and refused `no_live_price`). The mis-fills are three days later.
+
+**THE FIX BOUGHT SAFETY, NOT CAPABILITY — SEGMENT EXECUTION ON KALSHI IS
+0-FOR-EVERYTHING.** No order in the whole 2,853-order population has ever
+carried a `KXMLBF5*` ticker. `first5` is mapped and executable in principle and
+never has been (every first5 order attempted is `totals_alt`/`spreads_alt`,
+which map to no Kalshi board market). `first3` is **inherently unexecutable**:
+no first3 entry in `_SERIES_SEGMENT` and no Kalshi first-3-innings series exists
+(`KXMLBINNINGTOTAL` is per inning). Still unproven, unchanged from above: the
+guard is proven to REFUSE, never yet proven to have CORRECTED a fill.
+
+**FOR ANY SEGMENT RE-GRADE WRITE-BACK: EXCLUDE THE 10 VENUE-SETTLED ROWS.** Not
+only because a venue settlement outranks our inference — for the 5 Kalshi rows
+the contract we HELD was a full-game contract, so the venue's grade is the
+correct grade of the bet actually owned. `reports/segment_regrade/manifest_2026-09-05.json`
+proposes `outcome_changed=True` on `KXMLBTOTAL-26AUG281840LADDET-3`
+(`lost` -> `won`); applying it would invent P&L no position earned.
 `segment_for_series` + `segment` in both key tuples + `series` stamped at both
 match-record sites (neither carried it). Unmapped defaults to `full` because the
 protection is on the BOARD side; refusal is reserved for an unmapped series
