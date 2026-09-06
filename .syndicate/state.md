@@ -1148,3 +1148,27 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   measured says which wins. Needs a controlled on/off comparison over matched
   windows. **Flag set to `0`** rather than run a production change on an
   invalidated inference. The code stays, inert.
+
+### `[web-oom-leak]` UPDATE 22 — the trim A/B is **DEFERRED to a quiet window, with a runnable harness committed**, 2026-09-06T18:3xZ `[session b2b5b45b]`
+
+* **The question left open:** is automatic `malloc_trim` net-positive? It returns
+  memory (12 trims, glibc confirming, two independent sources) AND causes the
+  returned pages to be re-faulted. Nothing measured says which wins.
+* **FIRST ATTEMPT DIED AFTER 3.4 CLEAN MINUTES.** A peer deployed web at
+  `18:22:36`, mid-window. A restart resets every memory metric, so the arm was
+  discarded rather than salvaged.
+* **THIS IS THE ENVIRONMENT, NOT BAD LUCK: web took a deploy roughly every 20-30
+  minutes** through the working day (`15:22`, `15:53`, `16:21`, `18:04`,
+  `18:22`). The experiment needs **~84 uninterrupted minutes** — a 12-minute
+  settle plus a 30-minute window, twice.
+* **DEFERRED by user decision** rather than rushed. Shortening the settle would
+  produce a FALSE NEGATIVE — a fresh worker has not accumulated the free arena
+  space the trim returns — and that is the failure mode that reads as an honest
+  disappointing result.
+* **`scripts/malloc_trim_ab.py` is committed and runnable.** `arm OFF <ts>`,
+  `arm ON <ts>`, `compare`. It detects a mid-window restart and says DISCARD; it
+  refuses to call a winner if the arms' request volumes differ by >25%; and its
+  decision metric is CONTAINER UNRECLAIMABLE, never the trim's own reported
+  savings — those are the numbers that produced the retracted claim.
+* **Current production state: flag `SYNDICATE_MALLOC_TRIM_AUTO=0`, code live and
+  inert** (`4f62d937`). Nothing is degraded; pressure ~55%.

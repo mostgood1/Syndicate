@@ -194,6 +194,21 @@ death, never life — do not invert it.
 - Blocked by: none. `kalshi_board_join.py` unclaimed; `portfolio_commit.py` and
   `ops.py` are claimed by others and are deliberately NOT touched.
 
+### web-oom-trim-ab — CLOSED 2026-09-06 (DEFERRED, harness committed) — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **NOT RUN: web takes a deploy every 20-30 min and the experiment needs ~84 uninterrupted minutes.** The first OFF arm died after **3.4 clean minutes** when a peer deployed at `18:22:36`; a restart resets every memory metric, so it was discarded rather than salvaged. Deferred to a quiet window by user decision rather than shortened — a short settle produces a FALSE NEGATIVE, because a fresh worker has not accumulated the free arena space the trim returns. **`scripts/malloc_trim_ab.py` is committed and runnable** (`arm OFF|ON <golive-ts>`, then `compare`): it discards an arm that sees a mid-window restart, refuses a verdict when the arms' request volumes differ by >25%, and judges on CONTAINER UNRECLAIMABLE rather than on the trim's own reported savings — the numbers that produced the retracted counterfactual. Flag is OFF in production; code live and inert.
+- Goal: settle whether automatic `malloc_trim` is NET-POSITIVE, by observing the
+  service with the flag OFF and ON over matched windows.
+- Files: `scripts/malloc_trim_ab.py` (NEW, committed). Env
+  `SYNDICATE_MALLOC_TRIM_AUTO` on web.
+- Falsification test: ON is equal or HIGHER than OFF on container unreclaimable.
+  Then the trim costs page faults and buys nothing, and the flag stays off — a
+  real finding that closes the question.
+- Verification owed by whoever runs it: two arms, identical treatment, no restart
+  inside either window, request volumes within 25%.
+- **LEDGER NOTE:** this block was re-added after I destroyed it myself with
+  `git checkout origin/main -- .syndicate/` while it was still uncommitted. The
+  marker then named a lane with no block anywhere — the same violation a peer
+  caught me on earlier the same day. Commit ledger edits BEFORE syncing.
+
 ## OPEN
 
 ## OPEN
