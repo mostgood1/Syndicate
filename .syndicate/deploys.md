@@ -5,6 +5,63 @@
 
 ---
 
+## 2026-09-06 ~18:30Z — refresh-worker — **NOT DEPLOYED. Claim taken and RELEASED.** `[lane mlb-first5-kalshi-fanin-mismatch]`
+
+Asked to run the measuring deploy for the first5-on-full-game price defect
+(`SEGMENT_MISMATCH_GRID`, refusal INERT). **Stopped before triggering.** Three
+independent blockers; the first is the one the preflight exists for.
+
+**1. WORK IN FLIGHT — this is a NOT CLEAR, on preflight's own evidence.**
+`ALL_PROCESS_MEMORY` on refresh-worker `srv-...co8ls0-gn872` at
+**2026-09-06T18:29:26Z**, `process_count=12`, TWO job trees running:
+
+    pid 408  run_mlb_daily_sim_job.py --date 2026-09-06 --sims 1000 --workers 2
+             --reason tip_off_window --only-game-pks 822848      <- AN IN-FLIGHT MLB SIM
+      476    tools/daily_update.py --workflow ui-daily
+      747    daily_update_multi_profile.py
+      1274   vendor/mlb_bettingv2/tools/daily_update.py --workflow core
+      1403 / 1406  multiprocessing-fork children      1276  resource_tracker
+    pid 1337 run_refresh_odds_job.py --  refresh_odds_sources.py --sports soccer --phase live
+      1338   refresh_odds_sources.py
+      1599   build_soccer_artifacts.py --league epl --date 2026-09-13
+
+CLAUDE.md's standing warning is exactly this: **deploying kills an in-flight MLB
+sim.** Game 822848's sim and the EPL artifact build would both have died. This
+is the 2026-08-10 shape `deploy_preflight.py` was written for, and there is no
+safe abort once the update phase starts.
+
+**2. `RENDER_API_KEY` IS ABSENT from this session** — not in the environment and
+there is no `.env`. `deploy_preflight.py` exits on line 224 before doing any
+work, so the deploy guard's second condition (a CLEAR preflight inside 15 min
+for the exact SHA) **cannot be satisfied at all** from here. The liveness
+reading above was taken from the SAME log line preflight parses
+(`newest_log(... "ALL_PROCESS_MEMORY")`), via the Render MCP — it is preflight's
+input, NOT a substitute for its verdict.
+
+**3. OFF_MAIN, and deploying anyway would have silently reverted 13 peer
+commits.** The work is `8ca2f3db` on `claude/great-fermi-x2ry2x`;
+`origin/main` is `723a9ca6` and had moved **13 commits** ahead of the branch
+base. `git merge-base --is-ancestor` says NO. Among those 13 is `b704da2b`
+("RETRACTION: the auto-trim headline was my own artifact; **flag turned OFF**")
+— a peer's deliberate production change that an off-main deploy would undo.
+That is the measured 2026-08-15 incident verbatim: *serialisation is not
+composition.* `--allow-off-main` was NOT used.
+
+**WHAT WAS DONE INSTEAD, all reversible:** claim acquired
+(`761ed9e17acfc0cb`), branch rebased onto `origin/main` (only conflict was an
+append-vs-append hunk in `log/2026-09-06.md`, resolved by keeping BOTH entries),
+**3,080 tests green on the rebased tree**, ledger checks clean
+(`state_key_check` coherent, `check_lane_invariants` INVARIANTS HOLD). Claim
+**released with `--token`, not forced**; `status` reads `free`.
+
+**WHAT UNBLOCKS IT:** (a) a `RENDER_API_KEY` so preflight can actually run;
+(b) permission to land `8ca2f3db` on `origin/main`, since a deploy must be of a
+commit that is on main; (c) a lull with no MLB sim / soccer build in flight —
+re-read `ALL_PROCESS_MEMORY` at the time, do not assume this one.
+
+**NO MEASUREMENT IS CLAIMED HERE. Nothing was deployed and nothing changed in
+production.**
+
 ## 2026-09-06 02:50Z — **NOT A DEPLOY. A CLAIM INCIDENT: I `--force`d an EXPIRED live-odds-worker claim into a LIVE 45-minute block on a contended service, to fix a missing command-line argument.** — lane `segment-refusal-deploy`
 
 Recorded here because the protocol says a forced claim goes in this file, and
