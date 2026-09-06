@@ -465,6 +465,17 @@ pre-flip builds), ncaaf `{'full|kalshi|KXNCAAFTOTAL': 13,
 `count=38` mlb and `14` ncaaf refused per build. **nfl (62) and soccer (8) are
 untouched at `count=0` before and after** — the refusal is targeted, not blunt.
 
+**WATCHED FOR THREE BUILD CYCLES (20:07:09-20:49:32Z, one instance, no
+restart): 11 emissions, every one `refusing=True` with ZERO segment entries in
+`matched`.** The load-bearing ones are the three with `count > 0` -- mlb 38,
+ncaaf 14, rows-path 39 -- where segment quotes demonstrably reached the join and
+were refused while `matched` stayed clean. **The eight later zeros discriminate
+nothing on their own** (guard working vs population drained) and are not counted
+as confirmations. **MLB has exactly ONE post-flip build** because its slate
+ended -- `GRID_REPRICE sport=mlb` also stops at 20:07:10Z and
+`LAYER2_BOARD_HEALTH` at 20:49 lists only ncaaf and soccer -- so a second MLB
+confirmation is OWED on the next slate.
+
 **REPLICATED TWICE BEFORE THE FIX, and the second build was WORSE** (mlb 40/90 =
 44.4% vs 43/118 = 36.4%). The second also surfaced **`first1`** as a fourth
 affected segment and NCAAF h1 Polymarket rising 2 -> 6.

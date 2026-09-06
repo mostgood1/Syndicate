@@ -54,6 +54,41 @@ from a blunt one. mlb's `repriced` fall (90 → 44) and ncaaf's (111 → 97) are
 refusals plus ordinary slate drift between builds; `count` is the attributable
 number, not the delta.
 
+**WATCHED FOR THREE BUILD CYCLES — 11 EMISSIONS, EVERY ONE CLEAN**
+`[20:07:09Z – 20:49:32Z, instance 2httk throughout, no restart, no peer deploy]`:
+
+| time | sport | `count` | repriced | segment entries in `matched` |
+|---|---|---|---|---|
+| 20:07:09 | mlb | **38** | 44 | 0 |
+| 20:07:18 | nfl | 0 | 62 | 0 |
+| 20:07:29 | ncaaf | **14** | 97 | 0 |
+| 20:07:58 | soccer | 0 | 8 | 0 |
+| 20:08:21 | *rows path* | **39** | stamped 4,469 | 0 |
+| 20:33:14 | ncaaf | 0 | 96 | 0 |
+| 20:33:39 | soccer | 0 | 28 | 0 |
+| 20:34:04 | *rows path* | 0 | stamped 4,138 | 0 |
+| 20:48:34 | ncaaf | 0 | 98 | 0 |
+| 20:49:06 | soccer | 0 | 18 | 0 |
+| 20:49:32 | *rows path* | 0 | stamped 4,140 | 0 |
+
+**THE LOAD-BEARING ROWS ARE THE THREE WITH `count > 0`** — mlb 38, ncaaf 14,
+rows 39, all at ~20:07-20:08 — because those are the builds where segment quotes
+DEMONSTRABLY reached the join and were refused while `matched` stayed clean. The
+eight later zeros are consistent with the guard working AND with the segment
+population having drained, and on their own they discriminate nothing. That is
+the same ambiguity this counter was built to escape, and it is stated rather
+than counted as eight confirmations.
+
+**MLB LEFT THE SPORT SET AFTER 20:07, and it is the end of the slate, not a
+fault.** `GRID_REPRICE sport=mlb` also stops at 20:07:10Z — the whole MLB
+shortlist build stopped, upstream of this change — while ncaaf and soccer kept
+cycling every ~15 min. `[layer2_shortlist] STALE_ROW_CAUSE` and
+`LAYER2_BOARD_HEALTH` at 20:49 name **only ncaaf and soccer**, both `live_rows=0`;
+`CONSUME_SPORT_SEGMENTS sport=mlb` fell 540 -> 528 -> 421 candidates as games
+finished. **So MLB has exactly ONE post-flip build — but it is the
+discriminating one.** A second MLB confirmation is owed on the next slate and
+nothing here should be read as having it.
+
 **Deployed SHA `bd658209`, ON `origin/main`**, carrying `90493e64`'s flip
 (`_SEGMENT_REFUSAL_ENABLED = True`) and peers' join-counter prints. No
 `render.yaml` in the diff, so no `blueprint_sync`. Claim `f7c37016afc487c4`
