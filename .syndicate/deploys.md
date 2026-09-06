@@ -5,6 +5,79 @@
 
 ---
 
+## 2026-09-05 23:08:26Z - 23:13:56Z — live-odds-worker `7f197639` — **NCAAF h1 SEGMENT CAPTURE ENABLED AND CONFIRMED SPENDING, by credit burn — because the log path CANNOT answer this question.** — lane `segment-refusal-deploy`
+
+`deploy=dep-daea1qnqj5pc73aqh3sg trigger=api`. Enables
+`SYNDICATE_NCAAF_SEGMENT_MARKETS=h1`, set on live-odds-worker via the single-key
+API at 22:23Z (never `render.yaml` — that fires `blueprint_sync` across all
+three services). The key was set BEFORE the deploy deliberately, so one scarce
+idle window carried both; until the deploy it was configured and unread.
+
+**verify — THE READING IS A 5-MINUTE CREDIT SAWTOOTH ON `by_sport.ncaaf`.**
+Sampled `/api/ops/oddsapi/quota` every 150s for 20.1 min from 23:23Z:
+
+    baseline  ncaaf credits=37408 calls=233940
+    steps     +95, +95, +103, +39   spacing ~5 min
+
+The spacing matches `NCAAF_LINES_AUTORUN_LAUNCHED ... interval_s=300`, read from
+production the same hour. **The step DECOMPOSES against the pre-segment cost:**
+that sweep was one bulk request billed 3 credits x 3 regions (`us,eu,us_ex`) =
+**9 credits**. So 95 - 9 = 86, and at this tier's 3 credits/event that is
+**~29 events per sweep** — consistent with a 6h pregame + 105-min live window on
+a Saturday slate. `by_market_family.segment` moved +86 on the same ticks, which
+also confirms the `_market_family` fix: NCAAF `_h1` keys now bill into `segment`
+rather than the `other` bucket.
+
+**WHY NOT A LOG LINE, and this is the durable part.** `SEGMENT_PLAN` /
+`SEGMENT_CAPTURE disabled` — one of which the code prints unconditionally —
+appear NOWHERE. That is **not** evidence the tier is inert. There are **zero
+`[ncaaf_odds]` lines in an 86-minute window that includes the pre-deploy
+period**, when that fetcher was demonstrably running and pricing the board:
+`fetch_ncaaf_oddsapi_game_lines.py` is a grandchild subprocess whose stdout never
+reaches Render's log collector. The absence is a fact about the EMITTER. A first
+search compounded it — `render_logs.py` reported `COVERED 23:16:28 .. 23:16:28`,
+a single instant of a 12-minute window, which is exactly the truncation that
+tool prints so it is not read as absence.
+
+**WHAT THIS DOES NOT SHOW.** Billing proves the outbound calls go out at this
+tier's shape. It does NOT prove the vendor returned rows. The tradeable reading
+is still `segment != "full"` in the NCAAF quote log **with its denominator**, and
+it is NOT taken — `/api/ops/artifacts/export` reads artifacts whole into the 2GB
+web process and 502s, and the shard is 22MB. Do not report capture as working on
+this row alone.
+
+**COST — the shipped model was ~2x LOW, and the term is named.** Measured
+**~1,769 ncaaf credits/hr**, ~24.8K over a 14-hour game day, against a published
+estimate of ~11.7K/day. The gap is the pregame tier: the cost model assumed a
+6h/30-min tier, but there is **no per-tier throttle** — both tiers sweep at the
+caller's 300s tick, so pregame is 6x its modelled cost while live is half.
+Still comfortable: overall 2,500 credits/hr, 30d projection 1,800,039 of the
+5,000,000 cap. Hard ceiling is bounded by `DEFAULT_MAX_EVENTS=40` -> 1,440
+credits/hr.
+
+**MEMORY IS THE STANDING RISK AND IT IS NOT YET CLEARED.** Pre-deploy this
+service read `container_memory_pct_of_max: 98.7` with **27MB headroom** at
+23:20Z; at 00:42Z it reads **88.5% / 235MB**. That is NOT an improvement to bank
+— the deploy rebooted it, and the floor is the ratchet, so 90 min post-boot and
+~27h of uptime are not comparable. Per-event fetches are new periodic work on
+the 2GB service, and new periodic work here is what caused `#241`'s restart loop.
+No restart during the 20-min probe. **The off switch is one key back to unset
+plus a deploy.**
+
+**INCIDENT — TWO DEPLOYS FIRED 16s APART AND THE OLDER ONE WON.** A poller armed
+before this session's context was compacted was still running; a second poller
+was armed without checking for it. `a31fb870` posted 23:08:10Z and was
+**CANCELED** at 23:08:26Z by `7f197639`. Both carry the segment code so the
+feature is unaffected, but `7f197639` is the OLDER commit, and the cancelled one
+also carried runtime files (`layer2_board.py` +22/-2,
+`live_gameline_join.py` +48/-1). **`render_deploy.py`'s rollback guard could not
+catch it**: it re-reads the LIVE SHA, which at 23:08:26Z was still `3223baa1`,
+so the older target still looked like a descendant. Serialisation is not
+composition — and a guard that reads live state cannot see a deploy that has not
+landed yet. **Before arming a deploy poller, enumerate the ones already running.**
+
+
+
 
 
 ## 2026-09-05 23:51:59Z - 2026-09-06 00:11Z — refresh-worker `933e9beb` — **BOTH OWED READINGS TAKEN. The durable mirror survived a deploy; the lens now reaches the board and 74-83 rows carry `live_aware`. THE EDGE IS STILL WITHHELD, and I found exactly why — it is one line, upstream of me, and it should NOT be applied without a decision.** — lane `ncaaf-live-resim-wire`
