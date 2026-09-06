@@ -881,6 +881,22 @@ def api_ops_retainer_census() -> Any:
     return jsonify({"ok": True, "census": module_retainer_census(top=top, node_cap=node_cap)})
 
 
+@ops_bp.post("/api/ops/glibc-malloc-trim")
+def api_ops_glibc_malloc_trim() -> Any:
+    # `#632`. `mallinfo2` measured ~200 MB per worker freed-but-retained in
+    # glibc's arena against ~72 MB in use; this calls `malloc_trim` once and
+    # measures what actually comes back.
+    #
+    # **POST, DELIBERATELY.** This MUTATES allocator state and takes the malloc
+    # lock. A GET would be reachable by a crawler, an uptime monitor, a browser
+    # prefetch or a link-preview fetcher -- none of which should be able to stall
+    # every request on this worker. Never called automatically, never on the
+    # request path.
+    from syndicate.features.shared.memory_observability import malloc_trim_now
+
+    return jsonify({"ok": True, "trim": malloc_trim_now()})
+
+
 @ops_bp.get("/api/ops/glibc-malloc")
 def api_ops_glibc_malloc() -> Any:
     # `#632`. 71.7% of a worker's anon is not Python objects, so the question

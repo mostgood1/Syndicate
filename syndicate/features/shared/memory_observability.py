@@ -3888,6 +3888,7 @@ class _Mallinfo2(ctypes.Structure):
 
 
 _MALLINFO2_STATE: dict[str, Any] = {"resolved": False, "fn": None, "why": None}
+_MALLOC_TRIM_STATE: dict[str, Any] = {"resolved": False, "fn": None, "why": None}
 
 
 def _resolve_mallinfo2() -> Any:
@@ -3968,4 +3969,89 @@ def glibc_mallinfo2() -> dict[str, Any]:
         # `malloc_trim` has something to give back.
         "free_pct_of_glibc": (round(100.0 * free_mb / glibc_total, 1)
                               if glibc_total > 0 else None),
+    }
+
+
+def _resolve_malloc_trim() -> Any:
+    if _MALLOC_TRIM_STATE["resolved"]:
+        return _MALLOC_TRIM_STATE["fn"]
+    _MALLOC_TRIM_STATE["resolved"] = True
+    try:
+        libc = ctypes.CDLL(None)
+        fn = libc.malloc_trim
+    except Exception as exc:
+        _MALLOC_TRIM_STATE["why"] = f"{type(exc).__name__}: {exc}"
+        return None
+    fn.restype = ctypes.c_int
+    fn.argtypes = [ctypes.c_size_t]
+    _MALLOC_TRIM_STATE["fn"] = fn
+    return fn
+
+
+def malloc_trim_now(pad_bytes: int = 0) -> dict[str, Any]:
+    """Call `malloc_trim` and MEASURE it. `#632`.
+
+    WHAT THIS IS FOR. `mallinfo2` measured ~200 MB per worker freed-but-retained
+    in glibc's arena, against only ~72 MB in use. `malloc_trim` is the call that
+    hands free pages back to the OS. This runs it ONCE and reports the before/
+    after on both sides — glibc's own accounting AND the process's anon, which
+    are independent numbers and must move together for the result to be believed.
+
+    **IT MUTATES ALLOCATOR STATE AND TAKES THE MALLOC LOCK.** So:
+
+    * the DURATION is a first-class output, not a footnote. A long lock hold on a
+      live 2-worker service is its own defect, and "it freed 200 MB" is not worth
+      having if it stalled every request for a second to do it.
+    * it is POST-only at the route, so no crawler, monitor or prefetch can
+      trigger it, and it is never called automatically or on the request path.
+
+    `malloc_trim` returns 1 if it released memory, 0 if it could not. That return
+    is reported verbatim rather than inferred from the deltas: a 0 with a large
+    apparent drop would mean something else moved the memory and the reading is
+    not ours.
+    """
+    fn = _resolve_malloc_trim()
+    if fn is None:
+        return {"available": False,
+                "why": _MALLOC_TRIM_STATE.get("why") or "malloc_trim not found in libc"}
+
+    before = glibc_mallinfo2()
+    anon_before = _process_anon_mb()
+    started = time.monotonic()
+    try:
+        returned = int(fn(ctypes.c_size_t(max(0, int(pad_bytes)))))
+    except Exception as exc:
+        return {"available": False, "why": f"call failed: {type(exc).__name__}: {exc}"}
+    duration_ms = (time.monotonic() - started) * 1000.0
+    anon_after = _process_anon_mb()
+    after = glibc_mallinfo2()
+
+    def _delta(key: str) -> float | None:
+        if not (before.get("available") and after.get("available")):
+            return None
+        return round(after[key] - before[key], 3)
+
+    anon_delta = (round(anon_after - anon_before, 3)
+                  if anon_before is not None and anon_after is not None else None)
+    return {
+        "available": True,
+        "pid": os.getpid(),
+        "proc_token": _proc_token(),
+        # glibc's OWN answer: 1 = it released memory, 0 = it could not.
+        "malloc_trim_returned": returned,
+        "duration_ms": round(duration_ms, 2),
+        "anon_before_mb": round(anon_before, 3) if anon_before is not None else None,
+        "anon_after_mb": round(anon_after, 3) if anon_after is not None else None,
+        # THE number. Negative means memory went back to the OS.
+        "anon_delta_mb": anon_delta,
+        "arena_delta_mb": _delta("arena_mb"),
+        "free_in_arena_delta_mb": _delta("free_in_arena_mb"),
+        "in_use_delta_mb": _delta("in_use_mb"),
+        "free_pct_before": before.get("free_pct_of_glibc"),
+        "free_pct_after": after.get("free_pct_of_glibc"),
+        # IN-USE MUST NOT MOVE. Trim releases FREE pages; if allocated bytes
+        # changed, the process was doing other work during the call and the
+        # deltas are not attributable to the trim.
+        "in_use_stable": (abs(_delta("in_use_mb")) < 5.0
+                          if _delta("in_use_mb") is not None else None),
     }
