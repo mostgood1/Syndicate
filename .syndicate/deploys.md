@@ -25346,3 +25346,140 @@ throttled; `#241` respected.
 **caveat, stated because it bounds the result:** the ramp window began at a boot
 I caused. Its 3-minute settle does not cover a ramp that runs ~30 minutes, which
 is why it is reported as the ramp rather than as steady state.
+
+---
+
+## 2026-09-06 — refresh-worker `1f032074` — first5/KXMLBF5 reading — **DISCHARGED. Six orders on today's slate carry a `KXMLBF5*` ticker, against a prior population of 0 in 2,853.** `[scheduled reading; discharges the verify: OWED on the 02:59:27Z entry]`
+
+**READ-ONLY reading. No deploy, no order, no `render.yaml`.** Taken 2026-09-06
+17:20–18:15 CDT (22:20–23:15Z).
+
+**THE RATE, WITH ITS DENOMINATOR.** `/api/portfolio/paper?date=2026-09-06` →
+254 `orphan_orders`; 16 carry `segment='first5'`; **9** of those are on venue
+`paper:kalshi`, all `filled`.
+
+    6 of 9   carry a KXMLBF5* venue_ticker   (4 KXMLBF5TOTAL, 2 KXMLBF5SPREAD)
+    0 of 9   landed on a full-game KXMLBTOTAL / KXMLBSPREAD
+    3 of 9   carry no venue_ticker at all    (spreads_alt -1.5 home, -2.5 home, -2.5 away)
+
+The named order, board row and status the obligation asked for:
+
+| venue_ticker | board row | status |
+|---|---|---|
+| `KXMLBF5TOTAL-26SEP061610ATHSEA-7` | `totals_alt` 6.5 over, first5, ATH@SEA | filled 19:25:14.7Z, +355, $3.86, ev 2.90 |
+| `KXMLBF5TOTAL-26SEP061610NYYSD-7` | `totals_alt` 6.5 over, first5, NYY@SD | filled 19:25:13.6Z, +426, $4.19, ev 3.72 |
+| `KXMLBF5TOTAL-26SEP061410AZHOU-2` | `totals_alt` 1.5 under, first5, AZ@HOU | filled 17:27:36.6Z, +614, $1.41, ev 2.61 |
+| `KXMLBF5TOTAL-26SEP061340CHCMIA-7` | `totals_alt` 6.5 over, first5, CHC@MIA | filled 17:07:09.4Z, +285, $1.11, ev 2.34 |
+| `KXMLBF5SPREAD-26SEP061340SFNYM-SF2` | `spreads_alt` -1.5 away, first5, SF@NYM | filled 17:07:06.1Z, +335, $1.69, ev 2.22 |
+| `KXMLBF5SPREAD-26SEP061335BOSBAL-BAL3` | `spreads_alt` -2.5 home, first5, BOS@BAL | filled 16:45:48.7Z, +567, $1.22, ev 4.22 |
+
+All six `mode=paper`, `venue=paper:kalshi`, `side_picked_by=price_shopping`.
+$13.48 of paper stake. The baseline this is measured against is the 02:59:27Z
+entry's: **no order in a 2,853-order population had ever carried a `KXMLBF5*`
+ticker.**
+
+**THE LIVE LEDGER'S 0 IS UNINFORMATIVE AND MUST NOT BE READ AS A NEGATIVE.**
+`/api/portfolio/live?on=all&show=all` → 0 of 596 orders carry `KXMLBF5`. But its
+newest `selected_date` is **2026-09-04** and it holds **0 orders dated
+2026-09-06 at all** — the 596 span 08-23..09-04, entirely pre-fix days. The
+denominator for today in that ledger is zero, so the null is about its date
+coverage, not about the join. (`execution_mode=live`, `live_armed=true`,
+`kill_switch.engaged=false`, `state_age_seconds=146` at read time.) Today's MLB
+Kalshi commits are in the paper ledger.
+
+Also visible there, and NOT new: 28 kalshi `first5` orders dated 08-25..09-04,
+27 `rejected` and **one filled on a whole-game ticker** —
+`KXMLBTOTAL-26AUG281840LADDET-4`, `totals` 3.5 under, 2026-08-28. That is the
+pre-guard defect this work exists to stop, preserved in history.
+
+**MECHANISM — refresh-worker logs, 11:06–23:06Z, 20 `BOARD_JOIN` ticks.**
+Latest tick `22:47:01.149Z`, `kalshi_markets=6000 board_rows=461 matched=122`:
+
+    segment_matched_series={'first5->KXMLBF5SPREAD': 3, 'first5->KXMLBF5TOTAL': 12}
+    segment_refused_series={'first1->KXMLBF5TOTAL': 1, 'first3->KXMLBF5SPREAD': 1,
+      'first3->KXMLBSPREAD': 1, 'first5->KXMLBSPREAD': 3, 'first5->KXMLBTOTAL': 8,
+      'full->KXMLBF5TOTAL': 2}
+    alt_main_collisions=2 collapsed_bet_keys=459
+    reasons={'event_not_on_our_board': 738, 'market_is_for_another_date': 3143,
+      'no_kalshi_price': 6, 'no_matching_board_row': 641,
+      'recognised_but_no_board_market': 676, 'segment_has_no_matching_series': 16,
+      'spread_line_orientation_mismatch': 28, 'stat_not_in_market_vocabulary': 169,
+      'team_side_unresolved': 36, 'unreadable_title': 533}
+
+Summed over the 13 ticks that emitted the counter: `first5->KXMLBF5TOTAL` 132,
+`first5->KXMLBF5SPREAD` 48. **Those are pairing-INSTANCES over 13 re-joins of one
+slate, not 180 distinct bets** — the distinct-bet number is the 6 orders above.
+The refusal counter is the segment guard visibly working in the other direction:
+`first5->KXMLBTOTAL` **164** over the window, `full->KXMLBF5TOTAL` 18.
+
+On the three counters the obligation named: `no_matching_board_row` is non-zero
+(641 latest, 2,375 at 16:17Z) but it is a WHOLE-CATALOGUE counter, so it is not
+evidence about F5 in either direction and I am not citing it as such.
+`segment_has_no_matching_series` (16 latest / 75 at 16:17Z) and
+`spread_line_orientation_mismatch` (28 / 86) both still fire — correct
+behaviour, as the obligation said.
+
+**INSTRUMENT BLINDNESS, STATED SO NOBODY LATER READS IT AS A ZERO.**
+`segment_matched_series` / `segment_refused_series` are **absent from every tick
+before 19:24:32Z**. They were added by the ~19:04Z deploy (`80d899864fa1`;
+the canceled `1abbd087` is literally "kalshi_odds: print the counters the join
+already returned"). Absence before that is the emitter, not the join. 13 of 20
+ticks carried them; the 7 empty ones post-19:04 are thin late-slate ticks
+(`board_rows` 357–655) and those `{}` are real zeros.
+
+**CODE STILL LIVE — VERIFIED BY CONTENT, NOT ANCESTRY.** refresh-worker's live
+deploy is **`30500f167f8c`** (finished 21:00:02.457746Z), **not `1f032074`** —
+seven deploys have landed since, so this check was load-bearing.
+`git show 30500f167f8c:syndicate/features/shared/kalshi_board_join.py` defines
+`_row_market` at **:319** and calls it from `_event_key` (:383), `_board_key`
+(:477) and `_row_key` (:621) — 5 occurrences. `split_segment_market_key` present
+(5 / 1 / 3 across `kalshi_board_join.py`, `market_segments.py`,
+`venue_quote_fanin.py`). `"KXMLBF5TOTAL": "mlb"` at `kalshi_catalogue.py:226`.
+No revert.
+
+**A PREMISE OF THE OBLIGATION THAT IS WRONG ABOUT THE DEPLOYED CODE, AND WOULD
+HAVE PRODUCED THE OPPOSITE VERDICT.** The reading brief said `totals_alt` /
+`spreads_alt` "cannot match a main-line contract by design — do not count them
+as joinable", and told me to STOP and report "uninformative" if the joinable
+count were 0. Under that rule today's shortlist gave 3 joinable rows; under the
+code's actual behaviour it gives 7. **`_row_market` collapses `totals_alt` →
+`totals` deliberately** — its own docstring says "THIS WIDENS WHAT THE INDEX
+PAIRS, ON PURPOSE, AND THE GUARD IS WHY THAT IS SAFE" — and
+`_collapse_duplicate_bets` (:649) exists precisely because that collapse makes a
+main row and an alt row the same key. **All six matched orders are on `_alt`
+rows.** Applied literally, the brief's denominator rule would have called a
+DISCHARGE uninformative. Nothing was widened to get this result; the widening
+shipped in `1f032074` and is guarded by `_segments_agree`.
+
+**`KXMLBF5SPREAD` MATCHED, WHICH THE OBLIGATION PREDICTED IT COULD NOT.** The
+premise — Kalshi lists F5 spreads only at 1.5/2.5 while the board's first5
+spreads sat at 0.5/-0.5/-1.0 — holds for the board's MAIN line. Today the board
+carried `spreads_alt` rows AT -1.5 and -2.5, and the alt collapse let them pair:
+2 orders, 48 pairing-instances. Still not a widening — `first5->KXMLBSPREAD` was
+refused 76 times over the same window. `kalshi_catalogue.py:217` still declines
+to hand-register `KXMLBF5SPREAD`; runtime catalogue discovery maps it, which is
+exactly the mechanism the 04:0xZ correction established.
+
+**DENOMINATOR CAVEAT.** `/api/board/layer2-shortlist?date=2026-09-06&sport=mlb`
+read at 23:02Z returned 309 MLB rows — `full` 297, `first5` **8**, `first3` 4 —
+and all 8 first5 rows belonged to ONE live game (MIN@CWS). That is a late-day
+snapshot: the join's own `board_rows` was 1,832–2,230 between 16:17Z and 18:22Z,
+and every one of the six orders was written 16:45–19:25Z. **The join's per-tick
+`board_rows` is the honest denominator for this reading; the shortlist taken at
+the end of the night understates the day it is describing.** Kalshi is
+demonstrably on the F5 board even in that thin snapshot: the first5
+`totals_alt` 0.5-over row carried `best_any_book={'bookmaker': 'kalshi',
+'price': -614}` and the 6.5-under row `kalshi: -809`.
+
+**A DOWNSTREAM GAP FOUND, DELIBERATELY NOT REPAIRED.** All six orders carry
+`bet_status.unavailable_reason = actual_is_full_game_not_first5` and
+`mark.reason = market_not_on_board`. That is `segment_refusal()`
+(`bet_status.py:184`) doing exactly its job — refusing to grade a first-five bet
+off a whole-game actual — but it means **these six are ungradeable until a
+first5 actual exists**, $13.48 of paper stake unsettleable by construction. The
+join now produces segment-correct positions faster than settlement can grade
+them. That belongs with lane `segment-regrade-apply`; this reading did not touch
+it, and per the obligation I did not widen anything to make it go away.
+
+**verify: DISCHARGED.** The `verify: OWED` on the 2026-09-06 02:59:27Z
+`1f032074` entry is satisfied by the six `KXMLBF5*` tickers above.
