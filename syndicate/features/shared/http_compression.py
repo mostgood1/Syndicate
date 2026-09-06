@@ -207,7 +207,14 @@ def _bump(field: str, amount: int = 1) -> None:
         ratio = (decoded / wire) if wire else 0.0
         ext_ratio = (ext_decoded / ext_wire) if ext_wire else 0.0
         print(
-            f"[http_compression] HTTP_COMPRESSION gzip_responses={gzipped} plain_responses={plain} "
+            # PID, because these counters are PER PROCESS and the log line is
+            # the only place a reader meets them. web runs WEB_CONCURRENCY=2
+            # gunicorn workers and live-odds-worker forks job children, so two
+            # samples can come from two independent counters -- and a DELTA
+            # taken across them is not a rate, it is noise that looks like one.
+            # Without this field that is undetectable after the fact.
+            f"[http_compression] HTTP_COMPRESSION pid={os.getpid()} "
+            f"gzip_responses={gzipped} plain_responses={plain} "
             f"wire_bytes={wire} decoded_bytes={decoded} saved_bytes={max(decoded - wire, 0)} "
             f"ratio={ratio:.2f}x refused_hosts={len(_REFUSING_HOSTS)} "
             f"BILLED_saved_bytes={max(ext_decoded - ext_wire, 0)} BILLED_wire={ext_wire} "
