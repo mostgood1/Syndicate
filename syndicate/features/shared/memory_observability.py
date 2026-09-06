@@ -709,6 +709,18 @@ def get_all_process_memory_snapshot() -> dict[str, Any]:
                 payload["glibc_arena_detail"] = detail
     except Exception:  # noqa: BLE001 - telemetry must never raise
         pass
+    # `#632`: the PARTITION of anon -- glibc vs pymalloc vs `.so` data vs the
+    # rest. Separate flag from the arena detail above because it is heavier
+    # (`/proc/self/smaps` is O(regions), `_debugmallocstats` briefly dup2s fd 2)
+    # and because the two answer different questions; one should be switchable
+    # off without the other.
+    try:
+        if anon_partition_enabled():
+            part = anon_partition()
+            if part is not None:
+                payload["anon_partition"] = part
+    except Exception:  # noqa: BLE001 - telemetry must never raise
+        pass
     return payload
 
 
@@ -3139,6 +3151,253 @@ def malloc_arena_detail(*, force: bool = False) -> dict[str, Any] | None:
         return dict(parsed)
     except Exception as exc:
         print(f"[memory_observability] MALLOC_ARENA_DETAIL_FAILED "
+              f"{type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
+# --- `#632`: PARTITION the anon, and name what is not `malloc` ---------------
+#
+# WHAT THIS ANSWERS. `UPDATE 25` established that glibc's arena fills to a
+# ~390 MB CEILING in ~30 minutes and then stops, and that `hblkhd` is 0.4 MB, so
+# the rest is not glibc's large-allocation mmap path either. That leaves
+# 205.1 MB (34.4%) on pid 97 and 142.1 MB (27.6%) on pid 98 which is anonymous,
+# grows in BOTH the ramp and the plateau, and belongs to no allocator this
+# investigation has measured. Once the arena saturates, that residual IS the
+# whole OOM trajectory.
+#
+# WHY A PARTITION AND NOT ANOTHER METRIC. Three authorities already exist in this
+# file and none of them is read against the others:
+#
+#   kernel    `parse_smaps`              per-region `Anonymous:`, by kind and size
+#   glibc     `glibc_mallinfo2`          arena + `hblkhd`
+#   CPython   `log_pymalloc_arena_stats` real arena totals off `_debugmallocstats`
+#
+# Each alone reports a slice and calls it a reading. Subtracting them AT ONE
+# INSTANT is the only way to get a residual that means anything -- fetched in
+# separate polls, real allocation in between looks like an unexplained term.
+#
+# THE OVERLAP TEST IS THE LOAD-BEARING PART, NOT THE HYPOTHESIS.
+# On Linux CPython mmaps its pymalloc arenas (`ARENA_USE_MMAP`), so they are anon
+# that glibc never sees and adding them is correct. But a CPython built WITHOUT
+# that flag takes its arenas from `malloc`, which puts them INSIDE glibc's number
+# -- and then adding them DOUBLE COUNTS, inflating the explained share and
+# shrinking the residual toward a tidy, wrong answer. So this does not infer the
+# build from the version string. It tests the inequality:
+#
+#     glibc + pymalloc + file_backed + stack  >  anon   =>  the terms OVERLAP
+#
+# and REFUSES to publish a partition when that fires. A sum of parts exceeding
+# the whole is arithmetically impossible for a true partition, which is exactly
+# the shape that caught the container-denominator bug one lane ago.
+_ANON_PARTITION_STATE: dict[str, Any] = {"at": 0.0, "reading": None}
+_ANON_PARTITION_PYMALLOC_BUDGET: dict[str, Any] = {"count": 0}
+_ANON_PARTITION_PYMALLOC_MAX = 500
+
+
+def anon_partition_enabled() -> bool:
+    """Default OFF. `/proc/self/smaps` is O(regions) and `_debugmallocstats`
+    writes from C -- heavier than `mallinfo2`, and this function is reached from
+    `log_all_process_memory()` at worker stage checkpoints (`#241`)."""
+    raw = str(os.environ.get("SYNDICATE_ANON_PARTITION", "") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _anon_partition_interval_s() -> float:
+    try:
+        return max(0.0, float(os.environ.get(
+            "SYNDICATE_ANON_PARTITION_INTERVAL_SECONDS", "") or 45.0))
+    except (TypeError, ValueError):
+        return 45.0
+
+
+def build_anon_partition(
+    *,
+    anon_mb: float | None,
+    smaps: dict[str, Any] | None,
+    glibc: dict[str, Any] | None,
+    pymalloc: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Reduce three independent readings to one partition of process anon.
+
+    Pure, so the arithmetic and every refusal are testable off Linux -- where
+    none of the three readings can actually be taken.
+
+    `anon_mb` is the AUTHORITY for the whole and must be per-process
+    (`smaps_rollup`), never the container cgroup: pairing a per-process numerator
+    with a container denominator is the bug this investigation shipped one lane
+    ago, and identical anon across two pids was the only thing that revealed it.
+    """
+    out: dict[str, Any] = {"terms": {}, "sources": {}}
+
+    def _term(name: str, value: float | None, source: str) -> None:
+        if value is None:
+            out["terms"][name] = None
+            out["sources"][name] = source + " (UNAVAILABLE)"
+        else:
+            out["terms"][name] = round(float(value), 1)
+            out["sources"][name] = source
+
+    glibc_total = None
+    if isinstance(glibc, dict) and glibc.get("available"):
+        raw = glibc.get("glibc_total_mb")
+        if isinstance(raw, (int, float)):
+            glibc_total = float(raw)
+    _term("glibc_malloc", glibc_total, "mallinfo2 arena+hblkhd")
+
+    pymalloc_total = None
+    if isinstance(pymalloc, dict):
+        raw = pymalloc.get("arena_mb")
+        if isinstance(raw, (int, float)):
+            pymalloc_total = float(raw)
+    _term("pymalloc_arenas", pymalloc_total, "sys._debugmallocstats arenas")
+
+    file_backed = stack = None
+    by_kind = (smaps or {}).get("by_kind_mb") if isinstance(smaps, dict) else None
+    if isinstance(by_kind, dict):
+        # `.so` private-dirty data/bss: anonymous pages inside a file-backed
+        # mapping. Charged to `anon` by the cgroup, invisible to every allocator.
+        file_backed = float(by_kind.get("file_backed") or 0.0)
+        stack = float(by_kind.get("stack") or 0.0)
+    _term("so_private_dirty", file_backed, "smaps by_kind file_backed")
+    _term("main_thread_stack", stack, "smaps by_kind stack")
+
+    named = [v for v in (glibc_total, pymalloc_total, file_backed, stack) if v is not None]
+    named_sum = sum(named)
+    out["named_total_mb"] = round(named_sum, 1)
+    out["anon_total_mb"] = round(float(anon_mb), 1) if anon_mb is not None else None
+    out["terms_unavailable"] = [k for k, v in out["terms"].items() if v is None]
+
+    if anon_mb is None or float(anon_mb) <= 0:
+        out["reads_as"] = "no_anon_reading"
+        return out
+
+    anon = float(anon_mb)
+    residual = anon - named_sum
+    out["residual_mb"] = round(residual, 1)
+    out["residual_pct_of_anon"] = round(100.0 * residual / anon, 1)
+    out["named_pct_of_anon"] = round(100.0 * named_sum / anon, 1)
+
+    # A negative residual is arithmetically impossible for a true partition, so
+    # it can only mean two terms are counting the same bytes. Small negatives are
+    # the three readings not being atomic; a real overlap is not small.
+    tolerance = max(2.0, 0.02 * anon)
+    if residual < -tolerance:
+        out["reads_as"] = "terms_overlap"
+        out["overlap_mb"] = round(-residual, 1)
+        out["why"] = (
+            "the named terms SUM TO MORE THAN anon, which is impossible for a "
+            "partition -- two of them count the same bytes. The likeliest cause "
+            "is a CPython built WITHOUT ARENA_USE_MMAP, whose pymalloc arenas "
+            "come from malloc and are therefore already inside the glibc figure. "
+            "No attribution below is usable.")
+        return out
+
+    if out["terms_unavailable"]:
+        # A missing term inflates the residual by exactly its size, so the
+        # residual cannot be called unexplained memory.
+        out["reads_as"] = "incomplete"
+        out["why"] = ("term(s) %s could not be read, so the residual is inflated by "
+                      "whatever they hold and is NOT evidence of unattributed memory"
+                      % ", ".join(out["terms_unavailable"]))
+        return out
+
+    if out["residual_pct_of_anon"] <= 15.0:
+        out["reads_as"] = "explained"
+        out["why"] = ("the named terms account for the process's anon; the residual "
+                      "is within the slack of three non-atomic readings")
+    else:
+        out["reads_as"] = "residual_unexplained"
+        out["why"] = ("a real block of anon belongs to none of glibc, pymalloc, .so "
+                      "private-dirty or the main stack -- the size buckets are the "
+                      "next lead, not a fourth guess")
+
+    # Which term actually dominates. Reported rather than inferred by a reader.
+    ranked = sorted(((v, k) for k, v in out["terms"].items() if v is not None), reverse=True)
+    if ranked:
+        out["largest_named_term"] = ranked[0][1]
+        out["largest_named_term_mb"] = ranked[0][0]
+    if isinstance(smaps, dict):
+        # Corroboration, not a term: glibc's secondary arenas are 64 MB-aligned
+        # heaps and pymalloc arenas are 1 MB, so the size histogram should look
+        # like whatever the partition says dominates.
+        out["anon_mmap_by_size_mb"] = smaps.get("anon_mmap_by_size_mb")
+        out["largest_regions_mb"] = smaps.get("largest_regions_mb")
+        out["smaps_own_total_mb"] = smaps.get("total_anon_mb")
+        own = smaps.get("total_anon_mb")
+        if isinstance(own, (int, float)):
+            # Two independent kernel reads of the same quantity. Disagreement
+            # means one of them is not measuring what its name says.
+            out["smaps_vs_rollup_mb"] = round(float(own) - anon, 1)
+            out["smaps_agrees_with_rollup"] = abs(float(own) - anon) <= tolerance
+    return out
+
+
+def anon_partition(*, force: bool = False) -> dict[str, Any] | None:
+    """One partition reading: kernel, glibc and CPython at the same instant.
+
+    Returns None where the readings cannot be taken at all (every dev machine in
+    this repo). Never raises -- telemetry must not be able to fail a request.
+    """
+    now = time.time()
+    if not force:
+        interval = _anon_partition_interval_s()
+        cached = _ANON_PARTITION_STATE.get("reading")
+        if cached is not None and (now - float(_ANON_PARTITION_STATE["at"])) < interval:
+            out = dict(cached)
+            out["cached"] = True
+            out["age_s"] = round(now - float(_ANON_PARTITION_STATE["at"]), 1)
+            return out
+    try:
+        started = time.time()
+        # ONE INSTANT: anon first, then the two allocator views, then the kernel
+        # map. Ordered so the cheapest and most volatile is taken closest to the
+        # anon figure everything is measured against.
+        anon_mb = _process_anon_mb()
+        glibc = None
+        try:
+            glibc = glibc_mallinfo2()
+        except Exception:
+            glibc = None
+        pymalloc = None
+        try:
+            # OUR OWN BUDGET COUNTER, not the shared one. The default cap is
+            # THREE calls per process -- sized for a one-shot diagnostic -- and a
+            # 30-minute window would get three real readings and then a stream of
+            # `incomplete` ones that look like a finding. Passing a separate
+            # counter is what the function's own docstring prescribes
+            # ("Separate counters, never shared").
+            #
+            # COST, because it is not free: `_debugmallocstats` writes from C to
+            # fd 2, so the reader dup2s fd 2 to a temp file for a few
+            # milliseconds. A concurrent thread logging inside that window lands
+            # there instead of the collector. The throttle bounds how often that
+            # happens; at the 45 s default it is ~40 windows per half hour.
+            pymalloc = log_pymalloc_arena_stats(
+                "anon_partition", budget=(_ANON_PARTITION_PYMALLOC_BUDGET,
+                                          _ANON_PARTITION_PYMALLOC_MAX), quiet=True)
+        except Exception:
+            pymalloc = None
+        smaps = None
+        try:
+            path = _PROCFS_ROOT / "self" / "smaps"
+            if path.exists():
+                smaps = parse_smaps(path.read_text(encoding="utf-8", errors="ignore"))
+        except Exception:
+            smaps = None
+        if anon_mb is None and smaps is None and glibc is None:
+            return None
+
+        out = build_anon_partition(anon_mb=anon_mb, smaps=smaps, glibc=glibc,
+                                   pymalloc=pymalloc)
+        out["pid"] = os.getpid()
+        out["duration_ms"] = round((time.time() - started) * 1000.0, 2)
+        out["cached"] = False
+        out["age_s"] = 0.0
+        _ANON_PARTITION_STATE["at"] = now
+        _ANON_PARTITION_STATE["reading"] = out
+        return dict(out)
+    except Exception as exc:
+        print(f"[memory_observability] ANON_PARTITION_FAILED "
               f"{type(exc).__name__}: {exc}", flush=True)
         return None
 
