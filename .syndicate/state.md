@@ -1269,3 +1269,60 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   of its own, because `syndicate/blueprints/ops.py` is held by
   `ncaaf-live-resim-wire`. 36 new tests; 89 pass across the memory-instrument
   files, including the previously-red `MALLOC_TRIM_INIT` test.
+
+### `[web-oom-leak]` UPDATE 25 — **THE ARENA HAS A CEILING (~390 MB in ~30 min). `mallinfo2` WAS NEVER BLIND, so UPDATE 23's headline is CORRECTED.**, 2026-09-06T22:2xZ `[session b2b5b45b]`
+
+* **`mallinfo2` READS EVERY ARENA. `82 of 82` readings returned
+  `mallinfo2_scope == "all_arenas"`**, matching the all-arena total to `0.0 MB`
+  and missing the main arena by `70.1 MB` with 15-20 arenas live — so the
+  comparison had power, unlike the single-arena case the instrument refuses.
+  `man mallinfo2`'s BUGS note ("only the main memory allocation area") does NOT
+  describe this glibc; `__libc_mallinfo2` walks the arena ring.
+* **CORRECTION TO `UPDATE 23`.** I wrote that ~80% of the growth "landed where
+  `mallinfo2` cannot look". **Wrong — it was never blind.** Re-reading the SAME
+  numbers with correct semantics says something stronger: of `+69.3 MB` anon
+  growth, glibc's whole allocator took `+15.5 MB`, so **77.6% was outside the
+  allocator**, not hiding in secondary arenas.
+* **ALSO CORRECTED: the "58-72% coverage" I quoted was MISPAIRED** — it crossed
+  one worker's arena with the other's anon. Paired correctly the mature figure is
+  **58.6-61.3%**.
+* **THE RAMP IS THE OPPOSITE OF THE PLATEAU, and that is the finding.** A 33-min
+  window on a freshly restarted process, both workers, no restart, trim OFF:
+
+        pid 97  n=37  anon +266.9  glibc ALL +211.7 (79%)  main +20.7  secondary +190.9
+        pid 98  n=37  anon +213.9  glibc ALL +194.5 (91%)  main +34.9  secondary +159.8
+
+  In the ramp the allocator takes **79-91%** of the growth and **~85% of THAT
+  goes to SECONDARY arenas** (arena count 15 -> 20). In the mature phase it takes
+  **22.4%**. Both are true; they are consecutive phases.
+* **THE CEILING IS REPRODUCIBLE ACROSS THREE INDEPENDENT WINDOWS** on pid 97:
+  `387.7` at the end of the ramp, `388.2 -> 395.4` through UPDATE 23's window,
+  `390.1` on a later spot read. **The arena fills to ~390 MB in ~30 minutes and
+  then stops.** Everything after that is growth the allocator does not take.
+* **THE RESIDUAL IS NOT `malloc` AT ALL.** `hblkhd` — glibc's large-allocation
+  mmap path — is **0.4 MB in 3 regions**. So "outside the arena" is not "large
+  chunks mmapped by malloc"; it is outside `malloc` entirely. `205.1 MB` (34.4%)
+  on pid 97, `142.1 MB` (27.6%) on pid 98, and it grows steadily in BOTH phases
+  (`+55.2` over the ramp, `+35.2` over UPDATE 23's mature window).
+* **AND THE ARENA IS MOSTLY NOT LIVE DATA.** At ~50 min: `in_use` `51.8`/`54.0 MB`
+  against `338.3`/`319.2 MB` free-in-arena. **87% of what glibc holds is free
+  chunks it has not returned** — ~660 MB across two workers, against a 2,048 MB
+  limit. That is the standing cost `malloc_trim` addresses and the A/B
+  (`scripts/malloc_trim_ab.py`) is still owed on.
+* **A DEFECT IN MY OWN INSTRUMENT, caught in its first window and BEFORE any
+  conclusion was drawn from it.** **Pids 97 and 98 both reported
+  `process_anon_mb` = `701.6`** — identical, which is impossible for a
+  per-process figure, because I had paired per-process arena numbers with the
+  CONTAINER cgroup's anon. Coverage was
+  understated by roughly the worker count (`15.9-32.3%` measured, `47.8-56.1%`
+  true). `_process_anon_mb()` exists in the same file for exactly this and its
+  docstring records the same substitution producing a 61-150% attributed share on
+  2026-09-03. Fixed in both callers, with the source now REPORTED in
+  `anon_source` — a fallback indistinguishable from the real thing is how it
+  survived a whole window.
+* **NEXT, and it is now a narrow question:** name the ~150-205 MB of per-worker
+  anon that is not `malloc`. CPython's pymalloc arenas are `mmap`ped directly and
+  would land exactly here, as would thread stacks (`GUNICORN_THREADS=4`) and
+  C-extension buffers. `#632`'s earlier heap census put Python objects at 28.3%
+  of anon, which is the right order of magnitude — that census should be re-read
+  against THIS denominator rather than repeated.

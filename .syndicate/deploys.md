@@ -25296,3 +25296,53 @@ the comparable pair is 0.833% vs 1.28%.
 - **A reading taken against `date=` on this endpoint must check which date the
   loop is building.** Comparing a served artifact to a join tick without
   matching the date compares two slates, and in the evening they will not match.
+
+## 2026-09-06 21:48:09Z — web `56f80c4d` -> `4585a98a` — **THE GLIBC ARENA HAS A CEILING (~390 MB, reached in ~30 min), AND `mallinfo2` WAS NEVER BLIND. `[lane web-oom-secondary-arenas]`**
+
+**what:** deployed the per-arena `malloc_info` instrument and set
+`SYNDICATE_MALLOC_ARENA_DETAIL=1` on web (single-key PUT, not `render.yaml`, so
+no `blueprint_sync`). Two deploys: `cdfcaeb8` at 21:22:42Z, then `4585a98a` at
+21:48:09Z after the first window exposed a wrong denominator in my own
+instrument. Claim held by `web-oom-secondary-arenas` throughout, preflight CLEAR
+for both, released at 22:2xZ.
+
+**verify:** `mallinfo2_scope == "all_arenas"` on **82 of 82 readings**, with
+`mallinfo2.arena` matching the all-arena total to `0.0 MB` and missing the main
+arena by `70.1 MB` across 15-20 live arenas. Reconciliation (per-heap sum vs
+glibc's own top-level total) held on every reading, residual `0.0 MB`.
+
+**THE MEASUREMENT** — 33-min window, both workers, no restart, trim OFF:
+
+        pid 97  n=37  span 28.4 min   anon +266.9   glibc ALL +211.7 (79%)
+                                      main +20.7    secondary +190.9
+                                      NON-glibc +55.2 (21%)
+        pid 98  n=37  span 29.7 min   anon +213.9   glibc ALL +194.5 (91%)
+                                      main +34.9    secondary +159.8
+                                      NON-glibc +19.4 (9%)
+
+**AND THE PHASE THAT MATTERS MORE.** That window measured a process I had just
+restarted, so it is the RAMP. `UPDATE 23`'s window measured a MATURE process and
+says the opposite — allocator `+15.5` of `+69.3 MB`, **22.4%**. Both are true and
+they are consecutive: **the arena fills to a CEILING and then stops.** Three
+independent windows put that ceiling in the same place on pid 97 — `387.7` at the
+end of the ramp, `388.2 -> 395.4` through UPDATE 23, `390.1` on a spot read after.
+
+**WHAT THE ARENA ACTUALLY HOLDS, spot read at ~50 min age:**
+
+        pid 97   anon 595.6   arenas 390.1 (65.5%)   glibc mmap 0.4 (3 regions)
+                 NOT glibc at all 205.1 (34.4%)
+                 in_use 51.8    free-in-arena 338.3
+        pid 98   anon 515.7   arenas 373.2 (72.4%)   glibc mmap 0.4 (3 regions)
+                 NOT glibc at all 142.1 (27.6%)
+                 in_use 54.0    free-in-arena 319.2
+
+`hblkhd` is **0.4 MB**, so the residual is not glibc's large-allocation mmap
+path either — it is outside `malloc` entirely. And of the ~390 MB glibc holds,
+**~52 MB is live program data**: 87% is free chunks the allocator keeps.
+
+**instrument cost:** median `0.9-1.0 ms`, max `5.9 ms` per call. Flag-gated and
+throttled; `#241` respected.
+
+**caveat, stated because it bounds the result:** the ramp window began at a boot
+I caused. Its 3-minute settle does not cover a ramp that runs ~30 minutes, which
+is why it is reported as the ramp rather than as steady state.
