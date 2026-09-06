@@ -2196,6 +2196,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   compared, so `best_any_book` is not the best price available. The repair belongs
   at hop 2 or 3 (normalise the name into the grid key, keeping the raw spelling on
   the row for display).
+- **WHAT THE SPLIT COSTS, and it is the reason this is worth fixing rather than
+  deduping** `[same payload, artifact 2026-09-06T14:44:08Z, all 25 pairs]`. The
+  stranded kalshi price was compared against the multi-book row's
+  `best_any_book`, converted to decimal:
+
+      kalshi strictly BETTER  16 / 25       books better  7       equal  2
+      when kalshi is better:  median +6.92% payout, max +23.41%
+      (`batter_home_runs jose ramirez 0.5 over`: kalshi +733 vs best book +575)
+
+  So on 16 of 25 bets the field named `best_any_book` is NOT the best price
+  available, and the board never compares the two. A join-level dedupe cannot
+  recover this: it picks a row, it does not MERGE the price maps, so
+  `book_prices` stays incomplete and every downstream reader of it -- dispersion,
+  CLV, any backtest -- stays blind to the better side. Fixing the grid key
+  restores the comparison AND removes the duplicate in one move.
 - Verification: the six readings in the table above, all from one fetch of one
   artifact (`written_at 2026-09-06T14:44:08Z`), plus the `off != on` mechanism run.
 - Blocked by: none. NO DEPLOY in this lane; no code changed.
