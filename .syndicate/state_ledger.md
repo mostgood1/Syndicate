@@ -76,6 +76,15 @@ WRONG.* Editing an assertion to match whatever the code now does is how a real
 regression gets erased, and it looks exactly like success. **The rule fired 4
 times out of 18.**
 
+**THE `386 tests, OK` IS DATA-DEPENDENT AND MUST NOT BE READ AGAINST A
+NO-DATA NUMBER.** `python -m unittest tests.test_archives` gives **386 OK** in a
+worktree provisioned `--with-test-data` and **31 failed** in one without `data/`
+-- and the 31 is identical with a change stashed or applied, i.e. it is absence,
+not a regression `[peer lane ncaaf-live-resim-wire, 2026-09-05]`. Both numbers
+are correct for their tree. Quote the provisioning with the number or the pair
+reads as a regression that never happened; this is the same trap
+`[ci-suite-red-test]` was corrected for.
+
 **THREE FAILURE SHAPES THAT ARE NOT STALENESS, and each is reusable:**
 
 1. **A FIXTURE SEAM THAT MOVED.** `test_ncaaf_picks_local`'s `setUp` forces
@@ -246,6 +255,20 @@ reason: *"the natural way to answer the next question is to add one more field,
 and three of those turn a counter into a money record over HTTP."* The guard
 fired for exactly the case it was written for, and appending `by_segment` is the
 decay it exists to stop -- it needs a decision, not a green test.
+**RESOLVED BY THAT LANE, `782a057b`, AND VERIFIED HERE AT THE SOURCE RATHER
+THAN FROM THEIR SUMMARY.** `by_segment` IS a counter and does belong:
+`ops.py:458` reads `bucket["by_segment"].setdefault(segment, {"orders": 0,
+"settled": 0})` -- two integers by `+= 1`, keyed by a bounded segment
+vocabulary. Same risk class as `by_status`. File now 15 passed. **This
+discharges the "believed but unverified" item logged at session close.**
+They also replaced the weak half: the tuple test is a list equality whose
+cheapest green is typing a name into it, so a STRUCTURAL test now walks the
+bucket and permits a number or a dict nesting to numbers and nothing else --
+with `bool` rejected BEFORE the numeric branch (it is an `int` subclass) and an
+explicit anti-vacuity assert that the recursion is reached. Their mutation:
+make a DECLARED field carry a string, so every NAME is unchanged -- tuple test
+GREEN, property test RED.
+
 **`syndicate/blueprints/ops.py` is held by OPEN lane `ncaaf-live-resim-wire`,**
 so it is theirs; surfaced here rather than edited.
 
