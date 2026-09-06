@@ -1742,6 +1742,9 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   (default branch `main`), `vendor/wnba_betting_repo` -> `mostgood1/WNBA-Betting`
   (`main`), `vendor/nhl_betting_repo` -> `mostgood1/NHL-Betting` (**`master`**,
   not `main`), `vendor/mlb_bettingv2` -> `mostgood1/MLB-BettingV2`.
+- **SUPERSEDED SAME DAY, and the line above is now false:** the mapping IS recorded
+  in-repo — it went into `CLAUDE.md`'s directory map, with the divergence warning
+  and the "a fix landed only in `vendor/` is reverted by the next re-pull" rule.
 
 ### web-oom-non-malloc-anon — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: NAME the `~150-205 MB` per web worker that is anonymous memory and is
