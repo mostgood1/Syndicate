@@ -1916,6 +1916,51 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Usage: `--check`, `--watch --interval-minutes 20`, `--capture <bucket>`. Idempotent, so `--watch` can run indefinitely.
 - Blocked by: none.
 
+### web-oom-secondary-arenas — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: build the PER-ARENA `malloc_info` readout and use it to say which arena
+  holds `#632`'s growth on **web**. `mallinfo2` reports the MAIN ARENA ONLY, and
+  the clean 2026-09-06 window showed the main arena moving `+7.2`/`+8.3 MB` while
+  anon rose `+42.4`/`+26.9` — so ~80% of the growth is somewhere it cannot look.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_malloc_info_arenas.py`.
+  NOT claimed, deliberately: `syndicate/blueprints/ops.py` — held by lane
+  `ncaaf-live-resim-wire`.
+  NOT claimed, deliberately: `scripts/run_refresh_worker.py` — same holder.
+  The reading therefore reaches web through the EXISTING `/api/ops/memory`
+  → `get_all_process_memory_snapshot()`, which lives in this lane's own file, so
+  no route needs adding. A dedicated endpoint would read better; it is not worth
+  crossing a lane for.
+- **WHY `#435`'s DISMISSAL DOES NOT SETTLE THIS — two independent reasons.**
+  (1) DIFFERENT SERVICE. `malloc_arena_snapshot()` is called from
+  `scripts/run_refresh_worker.py` and NOWHERE ELSE, so 13.9% coverage is a
+  REFRESH-WORKER number. Web has never taken this reading. On web the main arena
+  ALONE is 330-390 MB against 536-677 MB anon — 58-72%, not 13.9%. The arena is
+  representative here and was not there.
+  (2) DIFFERENT QUESTION. That number was coverage of TOTAL anon, used to decide
+  whether the aggregate verdict could be trusted. This lane asks how the arenas
+  SPLIT, which the current parser cannot answer at all: it reads only the
+  top-level totals and discards every per-`<heap>` figure.
+- Hypothesis, written before measuring: web's SECONDARY arenas hold the growth.
+  `GUNICORN_THREADS=4` creates per-thread arenas, glibc mmaps them in 64 MB-aligned
+  heaps, and `#632`'s smaps breakdown already localised the growth to **8-64 MB
+  anonymous mappings** — which is the shape of a non-main arena heap.
+- Falsification test: top-level `system current` ≈ the main arena's own
+  `system current` (one real arena), or arena total stays far below anon while
+  anon climbs. Either way the growth is NOT in a glibc arena and this is raw
+  `mmap` — report that, do not reach for a third allocator metric.
+- Verification, and it is a RECONCILIATION not a single number: (a) per-heap
+  `system current` must SUM to the top-level `system current`, reported as a
+  residual so a parse error cannot pass as a finding; (b) heap `nr=0`'s
+  `system current` must agree with `mallinfo2`'s `arena` on the same process at
+  the same instant — two independent libc calls that must tell the same story;
+  (c) >= 25 readings over >= 30 min on both web workers, no restart, trim OFF.
+- COST DISCIPLINE (`#241`): `get_all_process_memory_snapshot()` is also reached
+  from `log_all_process_memory()`, which workers call at STAGE CHECKPOINTS. So
+  the detail is FLAG-GATED (default OFF), throttled to one libc call per
+  interval, and reports its own `duration_ms` so the cost is measured rather
+  than assumed.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
