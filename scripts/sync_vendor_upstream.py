@@ -32,11 +32,25 @@ as git stores it, already EOL-normalised, so CRLF-vs-LF cannot produce a false
 difference -- which matters because these trees are CRLF on Windows checkouts and
 one file carries a BOM.
 
+RESOLVING AN `UNCLASSIFIED` FILE. The question is whether our version is a
+deliberate patch or just an old copy, and it has a mechanical answer: **does our
+blob hash appear anywhere in that path's upstream history?** If it does, we are
+merely behind and `--adopt-upstream` loses nothing. If it does not, our content
+never existed upstream, so it is ours and `--keep-local` records that. Get the
+history cheaply with `git log --format= --raw --no-abbrev <branch> -- <path>` on
+a blobless clone -- `--raw` reads blob hashes out of the tree diff, whereas
+`cat-file` on `<rev>:<path>` triggers a promisor fetch per revision.
+
+Run against the 53 that existed on 2026-09-06, that test returned 53 ours, 0
+stale, agreeing with a second check (Syndicate had committed to every one of them
+after vendoring). All 53 are now recorded as `LOCAL_PATCH`.
+
 Usage:
     python scripts/sync_vendor_upstream.py                      # report, all trees
     python scripts/sync_vendor_upstream.py --trees nhl          # one tree
     python scripts/sync_vendor_upstream.py --apply              # take UPSTREAM_AHEAD only
     python scripts/sync_vendor_upstream.py --apply --adopt-upstream <path> ...
+    python scripts/sync_vendor_upstream.py --keep-local <path> ...   # ours; record it
     python scripts/sync_vendor_upstream.py --seed-baseline      # first run only
     python scripts/sync_vendor_upstream.py --json
 
@@ -277,6 +291,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--apply", action="store_true", help="write UPSTREAM_AHEAD files (default is report only)")
     p.add_argument("--adopt-upstream", nargs="+", default=[], metavar="PATH",
                    help="also take upstream for these tree-relative paths, whatever their state")
+    p.add_argument("--keep-local", nargs="+", default=[], metavar="PATH",
+                   help="record that these paths hold a deliberate local patch: baseline := upstream's "
+                        "CURRENT hash, content untouched. They then read LOCAL_PATCH, and a later "
+                        "upstream change to one reads CONFLICT instead of overwriting it.")
+    p.add_argument("--keep-all-unclassified", action="store_true",
+                   help="apply --keep-local to every UNCLASSIFIED path in scope. Only after you have "
+                        "established that none of them is merely STALE -- this writes off the whole "
+                        "queue at once, and a stale file blessed this way is a fix you never receive.")
     p.add_argument("--include-data", action="store_true", help="include data/ (regenerated artifacts; off by default)")
     p.add_argument("--seed-baseline", action="store_true",
                    help="record the CURRENT upstream hash for every IN_SYNC file, without writing any source file")
@@ -328,8 +350,11 @@ def main(argv: list[str] | None = None) -> int:
             if row["state"] == LOCAL_PATCH:
                 print("          kept -- we changed this and upstream did not")
             elif row["state"] == UNCLASSIFIED:
-                print("          no baseline entry; cannot tell who changed it. Diff, then")
-                print("          --adopt-upstream to take theirs, or --seed-baseline once it matches.")
+                print("          no baseline entry; cannot tell who changed it. Decide it:")
+                print("          --keep-local %s   (ours: record it, content untouched)" % row["path"])
+                print("          --adopt-upstream %s   (stale: take theirs)" % row["path"])
+                print("          To tell which: does our blob hash appear anywhere in that path's")
+                print("          upstream history? If yes we are merely behind; if no, it is ours.")
             elif row["state"] == CONFLICT:
                 print("          both sides moved since the last sync -- merge by hand")
 
@@ -342,6 +367,29 @@ def main(argv: list[str] | None = None) -> int:
                     baseline["trees"].setdefault(s["tree"], {}).setdefault("files", {})[row["path"]] = row["upstream"]
                     applied += 1
                     print("      applied      %s" % row["path"])
+
+        if args.keep_local or args.keep_all_unclassified:
+            files = baseline["trees"].setdefault(s["tree"], {}).setdefault("files", {})
+            kept_here = 0
+            for row in s["rows"]:
+                if row["upstream"] is None:
+                    continue
+                named = row["path"] in args.keep_local
+                sweep = args.keep_all_unclassified and row["state"] == UNCLASSIFIED
+                if not (named or sweep):
+                    continue
+                # Record upstream's CURRENT hash as the baseline while leaving the
+                # file alone. That is what "we hold a deliberate patch here" means
+                # in this model: local != baseline (ours), upstream == baseline
+                # (nothing new from them) -> LOCAL_PATCH. When upstream next moves,
+                # both differ from the baseline and it becomes CONFLICT, which is
+                # the correct answer -- someone has to look.
+                files[row["path"]] = row["upstream"]
+                kept_here += 1
+            baseline["trees"][s["tree"]]["repo"] = s["repo"]
+            baseline["trees"][s["tree"]]["branch"] = s["branch"]
+            if kept_here:
+                print("    recorded %d local patch(es); content untouched" % kept_here)
 
         if args.seed_baseline:
             files = baseline["trees"].setdefault(s["tree"], {}).setdefault("files", {})
@@ -357,7 +405,7 @@ def main(argv: list[str] | None = None) -> int:
             print("    unrecorded ON PURPOSE, so nothing that already differs is blessed")
         print()
 
-    if args.apply or args.seed_baseline:
+    if args.apply or args.seed_baseline or args.keep_local or args.keep_all_unclassified:
         save_baseline(baseline)
         print("baseline written: %s" % BASELINE_PATH.relative_to(REPO_ROOT).as_posix())
 

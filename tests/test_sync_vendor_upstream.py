@@ -266,6 +266,71 @@ def test_apply_keeps_the_files_existing_line_endings(world, capsys):
     )
 
 
+def test_keep_local_records_the_decision_without_touching_content(world, capsys):
+    """The way an UNCLASSIFIED file gets resolved as ours. Baseline := upstream's
+    CURRENT hash, content left alone, so it reads LOCAL_PATCH from then on instead
+    of re-prompting on every run."""
+    (world["tree_dir"] / "ours.py").write_text("our fix\n", encoding="utf-8")
+    _git(world["local"], "commit", "-qam", "our patch, no baseline yet")
+    capsys.readouterr()
+
+    out = capsys.readouterr().out
+    _run("--trees", "demo")
+    assert "UNCLASSIFIED ours.py" in _norm(capsys.readouterr().out)
+
+    _run("--trees", "demo", "--keep-local", "ours.py")
+    capsys.readouterr()
+    assert (world["tree_dir"] / "ours.py").read_text(encoding="utf-8") == "our fix\n"
+
+    _run("--trees", "demo")
+    out = capsys.readouterr().out
+    assert "LOCAL_PATCH ours.py" in _norm(out)
+    assert "UNCLASSIFIED" not in out
+
+
+def test_a_recorded_local_patch_becomes_a_CONFLICT_when_upstream_moves(world, capsys):
+    """The property the whole triage rests on. Writing 53 files off as LOCAL_PATCH
+    is only safe if a LATER upstream change to one of them stops the sync instead
+    of overwriting our work."""
+    (world["tree_dir"] / "ours.py").write_text("our fix\n", encoding="utf-8")
+    _git(world["local"], "commit", "-qam", "our patch")
+    _run("--trees", "demo", "--keep-local", "ours.py")
+    capsys.readouterr()
+
+    (world["upstream"] / "ours.py").write_text("upstream moves too\n", encoding="utf-8")
+    _git(world["upstream"], "commit", "-qam", "upstream moves ours.py")
+
+    rc = _run("--trees", "demo", "--apply")
+    out = capsys.readouterr().out
+    assert "CONFLICT ours.py" in _norm(out)
+    assert (world["tree_dir"] / "ours.py").read_text(encoding="utf-8") == "our fix\n"
+    assert rc == 1
+
+
+def test_keep_all_unclassified_sweeps_only_unclassified(world, capsys):
+    """It must not quietly bless an UPSTREAM_AHEAD file as a local patch -- that
+    would convert 'we owe them a pull' into 'we deliberately diverged'."""
+    _run("--trees", "demo", "--seed-baseline")
+    # theirs.py: upstream moves, we did not -> UPSTREAM_AHEAD (has a baseline)
+    (world["upstream"] / "theirs.py").write_text("v2\n", encoding="utf-8")
+    _git(world["upstream"], "commit", "-qam", "upstream moves theirs.py")
+    # keep.py: drop its baseline entry so it is UNCLASSIFIED, and diverge it
+    data = json.loads((world["local"] / "vendor" / "upstream_sync.json").read_text(encoding="utf-8"))
+    del data["trees"]["demo_repo"]["files"]["keep.py"]
+    (world["local"] / "vendor" / "upstream_sync.json").write_text(
+        json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    (world["tree_dir"] / "keep.py").write_text("locally changed\n", encoding="utf-8")
+    _git(world["local"], "commit", "-qam", "diverge keep.py")
+    capsys.readouterr()
+
+    _run("--trees", "demo", "--keep-all-unclassified")
+    capsys.readouterr()
+    _run("--trees", "demo")
+    out = _norm(capsys.readouterr().out)
+    assert "LOCAL_PATCH keep.py" in out, "the UNCLASSIFIED one should now be recorded"
+    assert "UPSTREAM_AHEAD theirs.py" in out, "the UPSTREAM_AHEAD one must be left alone"
+
+
 def test_seeding_does_not_bless_a_file_that_already_differs(world, capsys):
     """Seeding records IN_SYNC files only. If it recorded everything, the very next
     run would call a pre-existing local patch `UPSTREAM_AHEAD` and overwrite it."""
