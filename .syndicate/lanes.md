@@ -310,7 +310,7 @@ death, never life — do not invert it.
   `syndicate/features/shared/paper_settlement.py`,
   `pipeline/portfolio_commit.py`,
   `tests/test_settled_sample_credibility.py`,
-  `syndicate/blueprints/intelligence.py` (the two-line population label beside
+  released: `syndicate/blueprints/intelligence.py` — TAKEN 2026-09-06 by `intelligence-query-payload-dedup` (user decision; this lane names no session). Was: (the two-line population label beside
   `settlement_all_time` ONLY — nothing else in that 5,000-line file).
   NOT claimed and NOT edited: `syndicate/features/shared/execution_ledger.py`
   (held by `order-model-view`).
@@ -357,6 +357,7 @@ death, never life — do not invert it.
   keeps sizing NFL at 0.36 on duplicated rows. The reading that closes this is
   the next `SETTLED_SAMPLE` line printing `nfl: 12` with `credibility 0.25`.
 
+- **`syndicate/blueprints/intelligence.py` MOVED OUT 2026-09-06 to lane `intelligence-query-payload-dedup`, by EXPLICIT USER DECISION ("take it and do the work").** This lane names **no session id at all**, so there is nobody to ask. **The scopes are DISJOINT and yours is untouched:** you hold "the two-line population label"; the move covers only the `/api/intelligence/query` route's response shaping (`_slim_response_aliases` and its call site). If that is wrong, say so and I will hand it back.
 ### open-bet-live-status — OPEN, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — opened 2026-08-26 — session syndicate-27 (749848)
 - Files: released: `blueprints/intelligence.py`,
   **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
@@ -812,11 +813,12 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   line-by-line before taking this),
   `pipeline/intelligence_state.py` (**the `confidence` backfill at ~1888 ONLY**;
   `layer2-cap-raise` marks the file `released:`),
-  `syndicate/templates/intelligence.html` (unclaimed; `chipForGame` is the other
+  released: `syndicate/templates/intelligence.html` — TAKEN 2026-09-06 by `intelligence-query-payload-dedup` (user decision; owning session 3492626c is unreachable and this lane's work is SHIPPED). Was: (unclaimed; `chipForGame` is the other
   lane's area and is untouched),
   `tests/test_layer2_sim_view.py` (NEW).
 - Blocked by: none.
 
+- **`syndicate/templates/intelligence.html` MOVED OUT 2026-09-06 to lane `intelligence-query-payload-dedup`, by EXPLICIT USER DECISION.** Owning session `3492626c-1ec4-4366-9dbe-f194ae319c84` is **absent from the session roster INCLUDING ARCHIVED** (60 rows) and `send_message` returns `Session not found`; this lane's own header records its work as SHIPPED (`939a8c00`), so the claim was vestigial. Scope taken: **the request payload only** (one added field on the fetch body).
 ### ncaaf-live-cadence — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **DIAGNOSED, BUILT, LANDED ON `origin/main` AS `a9247011`, AND SHIPPED -- inside all three live SHAs, checked 2026-09-05T21:45Z by `ledger-repair-invariants`. THE CADENCE IMPROVEMENT IS STILL UNMEASURED AND THIS LANE CANNOT MEASURE IT.**
 - Files: `scripts/run_live_odds_refresh_worker.py`,
   released: `scripts/refresh_odds_sources.py` — **MOVED OUT 2026-09-06 to lane `ncaaf-live-state-to-worker` by EXPLICIT USER DECISION** ("add the RefreshStep yourself"), after that lane surfaced the conflict rather than editing across. This lane's owning session `3492626c-1ec4-4366-9dbe-f194ae319c84` is **absent from the session roster INCLUDING ARCHIVED** (60 rows back to 2026-08-31) and `send_message` returns `Session not found`, so the claim was held on behalf of nobody. **The mode-scoped step filter this lane worked on is NOT touched** — the edit adds one live-phase `RefreshStep` to `_build_ncaaf_steps`.
@@ -2504,7 +2506,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   - `scripts/watch_clamp_trigger.py:82` — POSTs per check. Reads `shortlist.rows[]` plus a generic node walk for `fair_price` / `quote` / `fair_probability` / `matchup`, and keys results on `(sport, market, side, matchup)`. **It does not name `ranked_all`, `boardContract` or `by_sport`** — but it WALKS, so "dedup changes what a generic walk finds" is the one hazard to prove out rather than assume.
 - **Keep `_embed_aliases`' two rules — they are what make it safe rather than clever:** nothing is dropped that is not PROVABLY redundant (exact-match comparison against the canonical form; the failure mode is "no saving", never "wrong data"), and the client rebuilds before any consumer reads the payload.
 - **BLOCKED: `syndicate/blueprints/intelligence.py` is claimed by OPEN lane `open-bet-live-status`, which the session digest marks UNOWNED** (ownership sweep 2026-08-31, owning session gone). NOT taken unilaterally — needs a user decision or a live holder, exactly as `refresh_odds_sources.py` did.
-- Files: `tests/test_intelligence_query_payload.py` (NEW).
+- Files: `syndicate/blueprints/intelligence.py` (the query route's response shaping only), `syndicate/templates/intelligence.html` (the request payload only), `tests/test_intelligence_query_payload.py` (NEW).
 - **WANTED, NOT CLAIMED — this lane holds no production file yet, deliberately.** `syndicate/blueprints/intelligence.py` (the `_hydrate_board_response_payload` call site only) is held by `open-bet-live-status`, and `syndicate/templates/intelligence.html` by `layer2-sim-disagrees`. **I caught the second one only because `check_lane_invariants.py` flagged it** — my own grep over `- Files:` lines missed it, since that lane names the path on a continuation line. A claim survey that greps one line shape is not a survey. `scripts/watch_clamp_trigger.py` is READ-ONLY survey and is not claimed.
 - Evidence: `state_worker.md` `[render-egress-spikes]`. Note this lane addresses the CHRONIC half only; the ~10 anomalous spike buckets remain unexplained and are NOT in scope.
 - Blocked by: the claim above.
