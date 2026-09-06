@@ -4055,3 +4055,105 @@ def malloc_trim_now(pad_bytes: int = 0) -> dict[str, Any]:
         "in_use_stable": (abs(_delta("in_use_mb")) < 5.0
                           if _delta("in_use_mb") is not None else None),
     }
+
+
+_TRIM_AUTO_STATE: dict[str, Any] = {"last_at": 0.0, "trims": 0, "skipped_interval": 0,
+                                    "skipped_threshold": 0, "returned_mb": 0.0}
+_TRIM_AUTO_INTERVAL_S_DEFAULT = 300.0
+_TRIM_AUTO_MIN_FREE_MB_DEFAULT = 64.0
+
+
+def trim_auto_enabled() -> bool:
+    # DEFAULT OFF. This mutates allocator state on a live service, so it ships
+    # inert and is switched on by env with a measurement -- never by landing.
+    return str(os.environ.get("SYNDICATE_MALLOC_TRIM_AUTO") or "").strip().lower() in {
+        "1", "true", "yes", "on"}
+
+
+def _trim_auto_float(env_key: str, default: float) -> float:
+    raw_value = str(os.environ.get(env_key) or "").strip()
+    if not raw_value:
+        return default
+    try:
+        parsed = float(raw_value)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
+def maybe_trim_after_request() -> dict[str, Any] | None:
+    """Trim at most once per interval, and only when there is something to give.
+
+    `#632`. The manual measurement returned **-58.1 MB in 14.2 ms** and
+    **-47.3 MB in 4.1 ms**, with glibc reporting a release and `in_use` unmoved.
+    Repeat calls returned ~0, because trim is idempotent until free space
+    rebuilds -- which is exactly why this is gated rather than periodic.
+
+    THE ORDER OF THE GATES IS THE COST CONTROL:
+
+    1. `enabled` -- an env read, default OFF.
+    2. `interval` -- ONE clock comparison. This is the common path, taken by
+       essentially every request, and it does no allocator work at all.
+    3. `free_in_arena` -- only now does anything touch the malloc lock, at most
+       once per interval, and only to decide whether the trim is worth doing.
+
+    So the 14 ms lock hold lands on ONE request per interval instead of on every
+    request. **NO NEW THREAD AND NO SCHEDULER**: it rides the existing
+    `teardown_request` hook, because `#241` is the precedent where added periodic
+    worker work caused a production restart loop.
+
+    Returns the trim result when it fired, else None. Exceptions never escape --
+    a memory diagnostic must not be able to fail a request.
+    """
+    if not trim_auto_enabled():
+        return None
+    try:
+        interval = _trim_auto_float("SYNDICATE_MALLOC_TRIM_INTERVAL_S",
+                                    _TRIM_AUTO_INTERVAL_S_DEFAULT)
+        now = time.monotonic()
+        if now - float(_TRIM_AUTO_STATE["last_at"] or 0.0) < interval:
+            _TRIM_AUTO_STATE["skipped_interval"] += 1
+            return None
+        # Claim the slot BEFORE the expensive part, so two threads racing here
+        # cannot both trim.
+        _TRIM_AUTO_STATE["last_at"] = now
+
+        min_free = _trim_auto_float("SYNDICATE_MALLOC_TRIM_MIN_FREE_MB",
+                                    _TRIM_AUTO_MIN_FREE_MB_DEFAULT)
+        info = glibc_mallinfo2()
+        if not info.get("available"):
+            return None
+        if float(info.get("free_in_arena_mb") or 0.0) < min_free:
+            _TRIM_AUTO_STATE["skipped_threshold"] += 1
+            return None
+
+        result = malloc_trim_now()
+        if not result.get("available"):
+            return None
+        _TRIM_AUTO_STATE["trims"] += 1
+        delta = result.get("anon_delta_mb")
+        if isinstance(delta, (int, float)):
+            _TRIM_AUTO_STATE["returned_mb"] = round(
+                float(_TRIM_AUTO_STATE["returned_mb"]) + float(delta), 3)
+        # ONE line per trim, carrying what a reader needs to judge it: how much
+        # came back, how long the lock was held, and whether `in_use` stayed put.
+        print(
+            "MALLOC_TRIM_AUTO " + json.dumps({
+                "pid": result.get("pid"),
+                "proc_token": result.get("proc_token"),
+                "anon_delta_mb": delta,
+                "anon_before_mb": result.get("anon_before_mb"),
+                "anon_after_mb": result.get("anon_after_mb"),
+                "duration_ms": result.get("duration_ms"),
+                "returned": result.get("malloc_trim_returned"),
+                "in_use_stable": result.get("in_use_stable"),
+                "free_before_mb": info.get("free_in_arena_mb"),
+                "trims_this_process": _TRIM_AUTO_STATE["trims"],
+                "returned_mb_total": _TRIM_AUTO_STATE["returned_mb"],
+            }, sort_keys=True),
+            flush=True,
+        )
+        return result
+    except Exception:
+        # A memory diagnostic must never fail a request.
+        return None

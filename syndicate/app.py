@@ -526,6 +526,18 @@ def create_app() -> Flask:
             memory_observability.note_request_end(token, rule)
         except Exception:
             pass
+        # `#632`: hand freed-but-retained arena pages back to the OS. Measured
+        # manually at -58.1 MB in 14.2 ms and -47.3 MB in 4.1 ms, glibc reporting
+        # a release with `in_use` unmoved.
+        #
+        # DEFAULT OFF, and gated so the common path is one clock comparison: the
+        # 14 ms malloc-lock hold lands on ONE request per interval, not on every
+        # request. It rides THIS hook rather than a new thread because `#241` is
+        # the precedent where added periodic worker work caused a restart loop.
+        try:
+            memory_observability.maybe_trim_after_request()
+        except Exception:
+            pass
 
     if _is_render_web_dyno():
         if _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):

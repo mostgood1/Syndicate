@@ -261,6 +261,35 @@ death, never life — do not invert it.
   decision; this lane only makes it possible to take that decision for one sport.
 - Blocked by: none. All four files unclaimed on origin/main.
 
+### web-oom-trim-auto — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: call `malloc_trim` automatically on web, returning the ~50 MB/worker that
+  the manual measurement proved recoverable — **without** paying for it on every
+  request.
+- Files: `syndicate/features/shared/memory_observability.py`, `syndicate/app.py`
+  (**the teardown hook ONLY**), `tests/test_trim_auto.py` (NEW). No OPEN lane
+  claims `app.py`.
+- MEASURED BASIS: `-58.1 MB` in `14.2 ms` and `-47.3 MB` in `4.1 ms`, glibc
+  returning 1, `in_use` stable. Repeat calls return **~0** — trim is idempotent
+  until free space rebuilds.
+- DESIGN, and every part of it is a cost control:
+  * **DEFAULT OFF.** A production behaviour change ships inert and is turned on
+    by env with a measurement, never by landing.
+  * **No new thread and no scheduler.** It piggybacks the EXISTING
+    `teardown_request` hook. `#241` is the precedent: periodic worker work caused
+    a restart loop, and the cheapest way not to repeat it is not to add a timer.
+  * **Interval gate FIRST** (default 300 s), so the common path is one clock
+    comparison and nothing else.
+  * **Threshold gate SECOND**, on `free_in_arena_mb` — because repeat trims
+    return ~0, and an unconditional periodic trim is mostly waste.
+  * The 14 ms lock hold lands on ONE request per interval, not on every request.
+- Hypothesis: the sawtooth becomes visible in production — anon climbs, drops by
+  tens of MB on a trim, climbs again — with no latency complaint.
+- Falsification test: the trim fires but anon does not fall, OR request latency
+  degrades measurably. Either kills it.
+- Verification: `MALLOC_TRIM_AUTO` log lines in production showing the delta and
+  duration, plus container anon over a window that contains several trims.
+- Blocked by: none.
+
 ## OPEN
 
 ## OPEN
