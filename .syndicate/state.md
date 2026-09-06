@@ -573,6 +573,7 @@ once this index exists: re-splitting would orphan the parts.
 | [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, | `state_worker.md` |
 | [artifact-allowlist-split] | THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT  | `state_worker.md` |
 | [service-memory-saturation] | BOTH PRODUCTION SERVICES WERE MEMORY-SATURATED 2026-09-02/03 — MEASURED, and it BLOCKS analysis work `[lane so | `state_worker.md` |
+| [render-egress-cause] | THE BANDWIDTH BILL IS `web` POLLING EXTERNAL FEEDS ITSELF, AND IT IS 100% BILLED `[verified 2026-09-06, lane r | `state_worker.md` |
 | [web-anon-leak] | THE WEB SERVICE LEAKS ANONYMOUS MEMORY, ~75 MB/h, AND THE DEPLOY CADENCE HIDES IT `[verified 2026-09-01, lane  | `state_worker.md` |
 | [render-server-failed-is-three-events] | `server_failed` IS NOT A FAILURE COUNT — read `details.reason`, one of its meanings is a HEALTHY DELIBERATE EX | `state_worker.md` |
 | [refresh-worker-memory] | MEMORY — refresh-worker: THE OOM IS FIXED; A SLOW RATCHET REMAINS `[verified 2026-08-17, superseding four earl | `state_worker.md` |

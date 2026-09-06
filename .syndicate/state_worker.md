@@ -284,6 +284,48 @@ were being pulled throughout the window and the 02:15:54Z health-check timeout
 coincides with a second run's assembly. Corroborates `#632` (web OOM at 2Gi,
 unowned) with a fresh instance.
 
+## [render-egress-cause] THE BANDWIDTH BILL IS `web` POLLING EXTERNAL FEEDS ITSELF, AND IT IS 100% BILLED `[verified 2026-09-06, lane render-egress-transport, web `67fd8c9d`]`
+
+**The month hit 24.4/25 GB on day 5.** `web` was 19.5 GB of the workspace's 24.45 GB
+(Sep 1-5), and Render's dashboard calls that bucket "HTTP Responses" — which is
+**misleading and cost five wrong hypotheses**: web's SERVED bytes were **2.6 MB in an
+hour metered at 4,050 MB**. The bucket is dominated by web's OWN OUTBOUND CALLS.
+
+**Proof, from web's first outbound fetch 5 s after the `67fd8c9d` boot:**
+`HTTP_COMPRESSION gzip_responses=1 wire_bytes=133899 decoded_bytes=818291 saved_bytes=684392 BILLED_saved_bytes=684392`.
+`BILLED_saved_bytes == saved_bytes` — **100% external, zero internal.**
+
+**Mechanism, named in code.** `ncaaf/cards.py:_attach_live_state` ->
+`ncaaf_game_state_index()` fetches the ESPN CFB scoreboard (**1,441,192 B**) via
+`live_game_state.py`, whose own docstring says it runs **on web, in the cards builder**,
+behind `_CACHE_TTL_SECONDS = 45.0`. **`WEB_CONCURRENCY = 2` and that cache is PER
+PROCESS, so every fetch happens twice.** Measured: ~3,600 fetches / 112 min across both
+processes = **693 MB/hour = 16.6 GB/day** at the pre-change wire size.
+
+**The bandwidth follows the SLATE, not the users** — `games=68, live=24` on a football
+Saturday; 0.1-4 MB/hour with no games. That is the shape nobody could explain.
+
+**`urllib` was REFUSING compression, not omitting it.** `http.client.putrequest` sends
+`Accept-Encoding: identity` when the caller sets none; **122 call sites, none set it**.
+Fixed at the choke point (`syndicate/__init__.py` installs a global opener). Measured:
+web **7.29x**, refresh-worker **9.15x**, `refused_hosts=0` across 2,600+ responses.
+**ESPN accepts the header from Render's IP** (`fetch_failures: 0`, 68 events) — the one
+thing a dev box could not test, and `schedule_adapter.py:377-386` says ESPN
+discriminates on headers from Render specifically.
+
+**INTERNAL TRANSPORT IS NOT BILLED** — 5,243 MB of worker<->web transport in one hour
+metered **33.9 MB**. Any "saved N MB" figure that does not split billed from unbilled
+overstates the bill.
+
+**NOT FIXED, and compression is the wrong tool for both:** (1) the per-process TTL cache
+DOUBLES every fetch; (2) **web should not poll ESPN at all** — `CLAUDE.md`'s rule is
+workers fetch, web reads artifacts, and `request_path_guard` logged **205 "compute in
+request path" warnings in a 1,200-line sample**. `live-odds-worker` (**78.5% of billed
+worker egress**) was still undeployed at checkpoint.
+
+**Instrument note:** bandwidth metrics are **hourly-only and RIGHT-labelled**
+(`resolutionSeconds < 3600` is silently ignored; the `00:00Z` bucket covers 23:00-00:00).
+
 ## [web-anon-leak] THE WEB SERVICE LEAKS ANONYMOUS MEMORY, ~75 MB/h, AND THE DEPLOY CADENCE HIDES IT `[verified 2026-09-01, lane game-market-entry-roi-curve, `todo #632`]`
 
 **This is a real memory problem and it is NOT the page-cache misreading `#566`
