@@ -220,7 +220,7 @@ death, never life — do not invert it.
   `origin/main:.syndicate/lanes.md` — the guard's OWN parser, not
   `check_lane_invariants`; ZERO of these has a holder):
   `syndicate/features/shared/paper_settlement.py`,
-  `pipeline/portfolio_commit.py`,
+  released: `pipeline/portfolio_commit.py` — **TAKEN 2026-09-06 by `kalshi-join-counters-logged`** (user decision, asked and given; this lane names no session id anywhere and no live marker claims it, so there was nobody to ask). **This lane's work on the file is UNTOUCHED** — it LANDED in `53d8f9c9` and the change taken is three additive fields on the `KALSHI_BOARD_JOIN` print statement, nothing in `_sample_credibility` or the decision dedupe. **This lane's OWED DEPLOY READING IS UNAFFECTED AND STILL OWED**: `SETTLED_SAMPLE` printing `nfl: 12` with `credibility 0.25`. Same treatment, same day, as `intelligence.py` above.
   `tests/test_settled_sample_credibility.py`,
   released: `syndicate/blueprints/intelligence.py` — TAKEN 2026-09-06 by `intelligence-query-payload-dedup` (user decision; this lane names no session). Was: (the two-line population label beside
   `settlement_all_time` ONLY — nothing else in that 5,000-line file).
