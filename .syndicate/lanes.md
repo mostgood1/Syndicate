@@ -97,6 +97,53 @@ death, never life — do not invert it.
   `outcome_as_settled`.
 - Blocked by: the trigger. Needs a boot hook in a file another lane holds.
 
+### nfl-rating-units — OPEN — opened 2026-09-06 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — **NFL's sim cannot tell teams apart: across-game margin spread 2.16 pts against NCAAF's 15.37**
+- Goal: establish whether NFL's smartsim2 projections are undifferentiated because
+  the ratings are a PER-PLAY rate rather than points-per-game, and if so state the
+  size of the effect. ONE testable outcome: the across-game stdev of
+  `margin_mean` for an NFL week, and what it becomes under a points-denominated
+  rating on the same slate.
+- Files (collision-checked 2026-09-06 with `lane_claims.claims_by_path` over
+  `origin/main`; every one returned FREE):
+  `scripts/generate_smartsim2_nfl_projections.py`,
+  `syndicate/features/nfl/smartsim2_projection.py`.
+  NOT claimed and NOT edited: `syndicate/features/football/sim_engine/smartsim2/**`
+  (the engine itself is shared with NCAAF and a change there moves a calibrated
+  sport), `ncaaf/*` (this is the NFL half).
+- **HYPOTHESIS, written before testing, and it is a REPEAT of a diagnosis this
+  repo already made for the other sport.** `generate_smartsim2_nfl_projections`
+  rates teams with `_mean_epa` — expected points added PER PLAY. NCAAF used the
+  equivalent (CFBD `PPA overall`) and abandoned it: `state_football.md` records
+  *"PPA `overall` is a PER-PLAY rate with SD 0.089 ... the resulting differential
+  had SD 0.136, which the engine rendered as margin SD 1.74 against a market SD
+  of 14.46. SP+ is already denominated in points per game (SD ~13), which is the
+  quantity a margin model needs."* If that is the cause here, NFL is one sport
+  behind a fix already made.
+- **MEASURED BEFORE THE HYPOTHESIS WAS FORMED** (2026-09-06, git-tracked
+  artifacts, `checkout` substrate — NOT a production claim):
+
+  | | NFL 2025 wk1 | NCAAF 2026 wk1 |
+  |---|---|---|
+  | across-game `margin_mean` stdev | **2.16** | 15.37 |
+  | games in P(home) 0.35..0.65 | **93.8%** | 13.7% |
+  | within-game `margin_stdev` | 13.66 | 13.14 |
+  | within-game `total_stdev` | 11.87 | 12.21 |
+
+  The within-game numbers being near-identical is what localises this to the
+  RATINGS INPUT rather than the shared engine: the same code shapes one game's
+  spread in both sports and does it consistently.
+- Falsification test: NFL's EPA-derived rating differential has a spread
+  COMPARABLE to NCAAF's SP+ differential once scaled, i.e. the flatness comes
+  from somewhere else (the calibration profile, the schedule join, or a
+  neutral-default fallback swallowing real ratings). Then the units story is
+  wrong and the cause is elsewhere.
+- Verification: state the rating spread in POINTS and the margin spread it
+  produces, against the market's margin SD on the same games. NO REFIT SHIPPED
+  without a held-out comparison — `state_football.md`'s soccer precedent is a
+  model that lost to the market and was correctly held back.
+- Blocked by: none. Read-only diagnosis first; no code change without the
+  measurement.
+
 ## OPEN
 
 ## OPEN
