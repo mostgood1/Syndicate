@@ -2191,12 +2191,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   artifact `14:44:08Z`, 21 at `15:04:08Z`, 10 when `kalshi-alt-line-join` measured
   it on 09-05. Quote whichever `written_at` the number came from.
 - Files: **CLAIMED 2026-09-06, user asked for the repair** —
-  `syndicate/features/shared/book_grid.py`, `pipeline/layer2_shortlist.py`,
+  `syndicate/features/shared/book_grid.py`,
+  `syndicate/features/shared/odds_book_quotes.py`,
+  `pipeline/layer2_shortlist.py`,
   `tests/test_book_grid_player_name_folding.py` (NEW).
+  `odds_book_quotes.py` was NOT in the first claim and had to be TAKEN mid-fix —
+  `market_sides_for_quote` holds a second copy of the same identity tuple, and
+  folding one without the other silently drops a price. No OPEN lane held it.
   NOT claimed and deliberately untouched: `syndicate/features/shared/layer2_board.py`
-  (held by `layer2-sim-disagrees`, session 3492626c) and
-  `syndicate/features/shared/odds_book_quotes.py` — see the fix note below for
-  why `_KEY_FIELDS` must NOT be normalised.
+  (held by `layer2-sim-disagrees`, session 3492626c).
 - Falsification test that WAS run and did not fire: if the board deliberately kept
   one row per venue, kalshi-only rows would appear for ascii-named players too.
   0 of 1,826. And `kalshi_plus_books=600` shows the merge is the intended path.
@@ -2223,6 +2226,61 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `book_prices` stays incomplete and every downstream reader of it -- dispersion,
   CLV, any backtest -- stays blind to the better side. Fixing the grid key
   restores the comparison AND removes the duplicate in one move.
+- **FIX BUILT, TESTED AND LANDED — NOT DEPLOYED** `[2026-09-06]`. The repair is a
+  FOLD at the market-identity level, in ONE function every identity now calls:
+  `odds_book_quotes.fold_market_identity_term(field, value)`, which
+  `normalize_person`s `player_name` and passes every other field through.
+  Call sites: `book_grid._instance_key` (both `freshest_rows_for_grid` and
+  `build_book_grid`), `book_grid._line_group_key`,
+  `odds_book_quotes.market_sides_for_quote`, and
+  `layer2_shortlist._fold_group_term` (both `_index_last_seen` and
+  `_classify_stale_row`, on BOTH sides of the comparison).
+- **A HALF-DONE FOLD IS WORSE THAN NONE, AND THE FIRST VERSION WAS ONE.**
+  `_INSTANCE_FIELDS` has carried a written warning since it was authored — it
+  must not disagree with `market_sides_for_quote`'s own base tuple "or sides
+  land in different grid rows and the grid silently under-reports book
+  coverage". Folding only `book_grid` did exactly that: the two spellings merged
+  into one grid row and the Kalshi price was then dropped on the floor
+  (`books=['betmgm','draftkings']`, one row, the quote gone). **That is strictly
+  worse than the defect** — the duplicate at least kept both prices reachable.
+  A reachability test written before the correctness tests is what caught it;
+  nothing else would have, because one row is what "fixed" looks like.
+- **`_KEY_FIELDS` IS DELIBERATELY NOT FOLDED, and that is what forced the
+  `layer2_shortlist` half.** It is the dedup key an APPEND-ONLY change log is
+  written against, and `_classify_stale_row` guards on its exact field ORDER, so
+  `last_seen` still carries every raw spelling while a grid row now carries one.
+  Compared unfolded, a merged row's group comes back EMPTY — and an empty group
+  returns `market_gone`, which is the ONE label the caller acts on by DROPPING
+  the row. A failed join there deletes a live market rather than degrading a
+  diagnostic, so both sides of that comparison fold too.
+- **VERIFICATION.**
+
+  | check | result |
+  |---|---|
+  | (1) `off != on`, PRODUCTION data — 25 real colliding pairs replayed | **0/25 merged -> 25/25 merged** |
+  | (2) the stranded price arrives with the merge | `cells` = betmgm+draftkings+**kalshi** |
+  | (3) merged row sees a price better than one row alone could | **20 / 25** |
+  | (4) new tests fail with the fold reverted (probe, then restored) | **3 of 13 fail** |
+  | (5) the label is not the key — no `julio rodriguez` on the board | asserted, + order-independence |
+  | (6) fold reaches no further: 2 players stay 2, every other field still splits | asserted (5 fields) |
+  | (7) `book_grid` + `layer2_shortlist` surface | **149 pass** (was 82 green at baseline) |
+  | (8) wider sweep, `-k` grid/kalshi/venue/quote/board/shortlist/clv | **1,577 pass, 3 pre-existing fails** |
+
+  The 3 are `test_nfl_preseason_market_board_live_odds` (2) and
+  `test_layer2_lane_chip_join` (2, one shared with the first sweep) — each shown
+  PRE-EXISTING by running it with the fold disabled and enabled at the same
+  instant, identical failures both ways. Not adopted, not fixed here.
+- **SUBSTRATE.** (1)-(3) are `checkout` runs over `render`-sourced DATA: real
+  production prices and real production spellings through the real
+  `build_book_grid`. **They are evidence about the CODE, never about the
+  deployment.** Nothing here says production has merged anything — that needs a
+  deploy and a re-fetch of the same endpoint.
+- **STILL OWED: the deploy and its measurement.** The reading that would close
+  this: `/api/board/layer2-shortlist?date=<D>&sport=mlb&limit=2000` on a rebuilt
+  artifact, `colliding _row_key`s **> 0 -> 0**, with `kalshi_plus_books` RISING
+  (the merge landing) rather than `kalshi_only` merely falling (which a capture
+  outage would also produce). **`limit=2000` — the default 200 censuses 0
+  collisions on a defective board and is how this would be "verified" wrongly.**
 - Verification: the six readings in the table above, all from one fetch of one
   artifact (`written_at 2026-09-06T14:44:08Z`), plus the `off != on` mechanism run.
 - Blocked by: none. NO DEPLOY in this lane; no code changed.

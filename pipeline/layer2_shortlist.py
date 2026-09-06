@@ -55,6 +55,35 @@ def _quote_age_percentiles(values: list[float]) -> tuple[float, float, float] | 
 _QUOTE_KEY_ORDER = ("sport", "kind", "event_id", "bookmaker", "segment", "market", "selection", "player_name", "line")
 _QUOTE_GROUP_FIELDS = ("sport", "kind", "event_id", "segment", "market", "player_name")
 
+
+def _fold_group_term(field: str, value: Any) -> str:
+    """A group term, folded the same way `book_grid._instance_key` folds it.
+
+    **BOTH SIDES OF THIS COMPARISON MUST FOLD, AND THE FAILURE MODE IS A DROP.**
+
+    `_classify_stale_row` matches a GRID row's fields against groups sliced out
+    of `last_seen` keys, and those two now come from different vocabularies:
+    `book_grid` folds the player name into one instance and labels the row with
+    ONE of the raw spellings, while `last_seen` is keyed off
+    `odds_book_quotes._KEY_FIELDS`, which is the append-only change log and
+    still carries every spelling separately. Unfolded, a merged row would find
+    only the stamps written under the spelling it happens to display.
+
+    That is not a cosmetic miss. An empty group returns `market_gone`, and
+    `market_gone` is the ONE label that DROPS the row -- so a failed join here
+    deletes a live market rather than degrading a diagnostic. Folding both sides
+    keeps the lookup total.
+
+    `_KEY_FIELDS` itself is deliberately NOT normalised: it is the dedup key an
+    append-only log is written against, `quote_rows_from_kalshi_matches`
+    documents what a key collision does there, and `_classify_stale_row` guards
+    on its exact field ORDER. The repair belongs at the comparison, not in the
+    log.
+    """
+    from syndicate.features.shared.odds_book_quotes import fold_market_identity_term
+
+    return fold_market_identity_term(field, value)
+
 # NO ABSOLUTE STALENESS THRESHOLD LIVES HERE, and the first two attempts both
 # had one. `#569`.
 #
@@ -101,7 +130,9 @@ def _index_last_seen(last_seen: Mapping[str, str]) -> dict[tuple[str, ...], dict
         parts = key.split("|")
         if len(parts) != width:
             continue
-        group = tuple(parts[i] for i in group_positions)
+        group = tuple(
+            _fold_group_term(_QUOTE_KEY_ORDER[i], parts[i]) for i in group_positions
+        )
         line = parts[-1]
         bucket = index.setdefault(group, {})
         # FRESHEST per line, because the scan took the max and this must not
@@ -179,7 +210,11 @@ def _classify_stale_row(
     except Exception:
         return "unknown_no_key_fields"
 
-    want = {f: str(row.get(f) or "") for f in _QUOTE_GROUP_FIELDS}
+    # FOLDED on this side too -- see `_fold_group_term`. The grid row carries a
+    # display spelling and `last_seen` carries every raw one; comparing them
+    # unfolded makes a merged row's group come back empty, which this function
+    # reports as `market_gone` and the caller acts on by DROPPING the row.
+    want = {f: _fold_group_term(f, row.get(f)) for f in _QUOTE_GROUP_FIELDS}
     idx = {f: _QUOTE_KEY_ORDER.index(f) for f in _QUOTE_GROUP_FIELDS}
     row_line = str(row.get("line") or "")
 
@@ -199,7 +234,9 @@ def _classify_stale_row(
             parts = key.split("|")
             if len(parts) != len(_QUOTE_KEY_ORDER):
                 continue
-            if any(parts[idx[f]] != want[f] for f in _QUOTE_GROUP_FIELDS):
+            if any(
+                _fold_group_term(f, parts[idx[f]]) != want[f] for f in _QUOTE_GROUP_FIELDS
+            ):
                 continue
             if parts[-1] == row_line:
                 continue  # same line, different book/selection -- not the orphan test

@@ -1337,6 +1337,53 @@ def _line_value(row: Mapping[str, Any]) -> float | None:
     return None if value != value else value  # NaN is written for line-less markets
 
 
+# FIELDS WHOSE VALUE IS FOLDED BEFORE IT IDENTIFIES A MARKET INSTANCE.
+_FOLDED_IDENTITY_FIELDS = frozenset({"player_name"})
+
+
+def fold_market_identity_term(field: str, value: Any) -> str:
+    """One term of a market-instance identity, folded. THE ONLY IMPLEMENTATION.
+
+    **THE RAW PLAYER NAME SPLIT ONE BET INTO TWO MARKET INSTANCES.** Two feeds
+    spell one player differently and both write `book_quotes` -- OddsAPI's books
+    carry `Julio Rodriguez`, the Kalshi direct feed carries `Julio Rodríguez`
+    (`kalshi_board_join` matches the contract on `normalize_person`, so the
+    match succeeds, then stamps the match with the VENUE's raw spelling, which
+    `quote_rows_from_kalshi_matches` writes through verbatim). Keyed raw, those
+    are two instances: the prices never meet in one `book_prices` and the board
+    offers both as separately stakeable rows for the same bet.
+
+    Measured on production 2026-09-06 (artifact `written_at 14:44:08Z`, 1,996
+    MLB shortlist rows): 25 `_row_key` collisions, **all 25 a diacritic pair**;
+    37 kalshi-only prop rows, **37/37 accented**, against **0 of 1,826**
+    ascii-named ones. On **16 of the 25** the stranded price BEAT the other
+    row's `best_any_book` -- median +6.92% payout, max +23.41%.
+
+    **IT LIVES HERE, AND EVERY IDENTITY CALLS IT.** `book_grid._INSTANCE_FIELDS`
+    already carried the warning that it and `market_sides_for_quote`'s base
+    tuple must not disagree, "or sides land in different grid rows and the grid
+    silently under-reports book coverage" -- which is exactly what folding only
+    one of them produced when this fix was first written: the grid merged to one
+    row and the Kalshi price was dropped on the floor. One function, called by
+    all of them, is the only shape that cannot drift.
+
+    **`_KEY_FIELDS` IS DELIBERATELY NOT FOLDED.** That is the dedup key an
+    APPEND-ONLY change log is written against -- see
+    `quote_rows_from_kalshi_matches` on what a key collision does there -- and
+    `layer2_shortlist._classify_stale_row` guards on its exact field ORDER. The
+    log keeps every spelling it was told; the folding belongs at the identities
+    that COMPARE, which is what this is.
+    """
+    if field not in _FOLDED_IDENTITY_FIELDS:
+        return str(value or "")
+    # Imported inside the call: `kalshi_board_join` owns the normaliser and this
+    # module is imported very early. A private copy here is the drift this repo
+    # has already paid for -- two normalisers disagreeing on one name.
+    from syndicate.features.shared.kalshi_board_join import normalize_person
+
+    return normalize_person(value)
+
+
 def market_sides_for_quote(
     rows: Iterable[Mapping[str, Any]], chosen: Mapping[str, Any]
 ) -> list[dict[str, Any]]:
@@ -1356,8 +1403,11 @@ def market_sides_for_quote(
         included or the sides sum to less than a market and the "fair" price is
         wrong in the bettor's favour -- the most dangerous direction.
     """
+    # FOLDED, and it must stay in lockstep with `book_grid._instance_key` --
+    # they are the same identity asked twice, and `_INSTANCE_FIELDS` carries the
+    # standing warning about what their disagreeing costs.
     base = tuple(
-        str(chosen.get(field) or "")
+        fold_market_identity_term(field, chosen.get(field))
         for field in ("sport", "kind", "event_id", "segment", "market", "player_name")
     )
     chosen_line = _line_value(chosen)
@@ -1366,7 +1416,7 @@ def market_sides_for_quote(
     for row in rows or ():
         if not isinstance(row, Mapping) or row.get("price") is None:
             continue
-        if tuple(str(row.get(field) or "") for field in
+        if tuple(fold_market_identity_term(field, row.get(field)) for field in
                  ("sport", "kind", "event_id", "segment", "market", "player_name")) != base:
             continue
         line = _line_value(row)

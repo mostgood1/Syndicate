@@ -35,6 +35,7 @@ from typing import Any
 from syndicate.features.shared.odds_book_quotes import (
     _implied_probability,
     _line_value,
+    fold_market_identity_term,
     market_sides_for_quote,
 )
 from syndicate.features.shared.book_shortlist import (
@@ -49,7 +50,81 @@ from syndicate.features.shared.market_basis_edge import market_basis_edge
 # side it is. Mirrors `market_sides_for_quote`'s own base tuple exactly -- if
 # these two ever disagree, sides land in different grid rows and the grid
 # silently under-reports book coverage.
+#
+# THAT WARNING IS NOT HYPOTHETICAL AND IT FIRED. Folding the player name here
+# and not there merged the two spellings into one grid row and then dropped the
+# second feed's price entirely -- one row, `books=['betmgm','draftkings']`, the
+# Kalshi quote gone. Both sides now call `fold_market_identity_term`, which is
+# the only implementation.
 _INSTANCE_FIELDS = ("sport", "kind", "event_id", "segment", "market", "player_name")
+
+
+def _instance_key(row: Mapping[str, Any]) -> tuple[str, ...]:
+    """`_INSTANCE_FIELDS`, with the PLAYER NAME FOLDED so one bet is one instance.
+
+    **THE RAW NAME SPLIT ONE BET INTO TWO GRID ROWS, AND IT COST A PRICE.**
+
+    Two feeds spell one player differently and both write `book_quotes`:
+    OddsAPI's books carry `Julio Rodriguez` while the Kalshi direct feed carries
+    `Julio Rodríguez` -- `kalshi_board_join` matches the contract on
+    `normalize_person` (so the match SUCCEEDS) and then stamps the match with
+    the VENUE's raw spelling, which `quote_rows_from_kalshi_matches` writes
+    through verbatim. Keyed raw, those are two market instances, so the two
+    prices never meet in one `book_prices` and the board offers BOTH as
+    separately stakeable rows for the same bet.
+
+    MEASURED on production, `/api/board/layer2-shortlist?date=2026-09-06&
+    sport=mlb&limit=2000`, artifact `written_at 2026-09-06T14:44:08Z`, 1,996 MLB
+    rows:
+
+        colliding `_row_key`s                        25   (all 25 diacritic pairs)
+        prop rows kalshi-only                        37   (37/37 accented)
+        ascii-named prop rows that are kalshi-only    0 / 1,826
+        prop rows with kalshi INSIDE a multi-book map 600
+
+    That last number is the control: folding venues into one row is the designed
+    path and it already runs 600 times on that slate, so a second row is that
+    mechanism failing rather than a deliberate per-venue listing. On **16 of the
+    25** pairs the stranded price BEAT the other row's `best_any_book` (median
+    +6.92% payout, max +23.41%), so the field named "best available" was not.
+
+    **IT IS NOT A KALSHI DEFECT.** `Andrés Chaparro` reaches the board accented
+    from williamhill_us, betmgm, betonlineag and draftkings. The invariant is
+    general: any two sources disagreeing on a raw spelling split the bet. Folding
+    here fixes every such pair, whichever feeds disagree.
+
+    **THE FOLD IS FOR THE KEY ONLY.** The row keeps a real, cased, accented
+    display name -- see `_instance_display_name`. A key is an identity and a
+    name is a label, and collapsing the two would put `julio rodriguez` on the
+    board.
+    """
+    return tuple(
+        fold_market_identity_term(field, row.get(field)) for field in _INSTANCE_FIELDS
+    )
+
+
+def _instance_display_name(rows: Iterable[Mapping[str, Any]]) -> str | None:
+    """The spelling to SHOW for a folded instance, or None when there is no name.
+
+    MOST FREQUENT RAW SPELLING, TIE-BROKEN LEXICOGRAPHICALLY. Both halves are
+    load-bearing:
+
+    * most frequent, so the board shows the vocabulary the majority of the
+      books actually publish rather than whichever feed happened to be read
+      first -- `key[5]` used to supply this and is now folded, so it cannot;
+    * lexicographic tie-break, so the answer does not depend on iteration order.
+      A display name that flips between builds churns the UI and, worse, makes
+      `_line_group_key` and `layer2_shortlist._classify_stale_row` -- both of
+      which read this field off the grid row -- non-deterministic.
+    """
+    counts: dict[str, int] = {}
+    for row in rows:
+        name = str(row.get("player_name") or "").strip()
+        if name:
+            counts[name] = counts.get(name, 0) + 1
+    if not counts:
+        return None
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
 
 # How far behind the freshest quote on a market a "best" price may sit before it
 # is labelled suspect. 15 minutes: long enough that ordinary pregame staggering
@@ -292,7 +367,7 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
             _book_name = str(row.get("bookmaker") or "").strip().lower()
             if _book_name and ("kalshi" in _book_name or "polymarket" in _book_name):
                 direct_feed_near_misses[_book_name] = direct_feed_near_misses.get(_book_name, 0) + 1
-        instance = tuple(str(row.get(field) or "") for field in _INSTANCE_FIELDS)
+        instance = _instance_key(row)
         materialised = row if isinstance(row, dict) else dict(row)
         key = instance + (
             str(row.get("line") or ""),
@@ -369,11 +444,16 @@ def build_book_grid(
     for row in materialised:
         if _price(row.get("price")) is None:
             continue
-        key = tuple(str(row.get(field) or "") for field in _INSTANCE_FIELDS)
+        key = _instance_key(row)
         instances.setdefault(key, []).append(row)
 
     grid: list[dict[str, Any]] = []
     for key, group in instances.items():
+        # ONE NAME PER INSTANCE, DECIDED ONCE HERE rather than per anchor line.
+        # `key[5]` is folded (`_instance_key`), so it can no longer supply the
+        # label; and deciding per anchor would let two alternate lines of the
+        # same market disagree about how to spell their own player.
+        display_player = _instance_display_name(group)
         # Within an instance, distinct line values can still be different market
         # instances (alternate lines). Anchor on each distinct line and let the
         # shared rule gather its sides.
@@ -643,7 +723,9 @@ def build_book_grid(
                     "event_id": key[2],
                     "segment": key[3],
                     "market": key[4],
-                    "player_name": key[5] or None,
+                    # The REAL spelling, not the folded key term. See
+                    # `_instance_display_name`.
+                    "player_name": display_player,
                     # Canonical (away/over perspective), not the anchor's raw
                     # line -- which side anchored is an accident of iteration
                     # order, and #262 is what that ambiguity cost.
@@ -760,9 +842,15 @@ def _line_group_key(row: Mapping[str, Any]) -> tuple[str, ...]:
     Alternates of one market share this key, so they can be compared against
     each other. `player_name` is in it: two players' props in the same market
     are different markets and must not prune one another.
+
+    FOLDED, for the same reason `_instance_key` is: this runs over GRID rows, so
+    it inherits whatever spelling `_instance_display_name` picked. That pick is
+    deterministic today and folding here means this key does not DEPEND on it
+    staying so -- and it keeps every identity in this module on one vocabulary,
+    which is the property that failed when only some of them were folded.
     """
     return tuple(
-        str(row.get(field) or "")
+        fold_market_identity_term(field, row.get(field))
         for field in ("sport", "event_id", "kind", "market", "segment", "player_name")
     )
 
