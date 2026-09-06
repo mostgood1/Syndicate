@@ -5138,3 +5138,30 @@ verify the result STRUCTURALLY — `grep -c "^### <slug>"` must be 1 — rather 
 trusting that the write succeeded. A ledger file is prose ABOUT its own
 structure, so its structure words appear in its prose; substring search cannot
 tell the two apart.
+
+## 2026-09-06 — A CONTROL AND ITS TREATMENT MUST COVER THE SAME LENGTH OF TIME
+
+`#632`. I took a pre-deploy control of a cache size and it came out beautifully
+tight: 10 samples, spread **0.003 MB**. I recorded that tightness as a strength —
+"far outside the control spread" became the test the treatment had to beat.
+
+The control was **10 samples over ~60 seconds**. The treatment was **60 samples
+over 31 minutes**. The tightness measured the DURATION, not the quantity: a
+one-minute window cannot contain variation that takes minutes to appear. Sampled
+over comparable spans the two ranges overlap almost entirely — pre `8.509-11.783`
+against post `7.250-11.336` — and the effect I was about to certify sits inside
+that overlap.
+
+An automated verdict said CONFIRMED on the strength of that control. It was
+right about its own criteria and wrong about the world.
+
+THE RULE: a baseline and the thing it is compared against must span the same
+duration, and a suspiciously tight baseline is evidence the window is too short,
+NOT evidence the system is stable. Before quoting a spread, state how long it was
+measured over.
+
+This is the sampling-grid failure again, in a third costume: earlier the same
+session, 50-second sampling manufactured a fan-out that 10-second sampling
+dissolved, and a 12-minute correlation window reversed at 35 minutes. Coarse or
+short windows do not merely add noise — they produce STRUCTURE that reads as a
+finding. The direction of the error is not predictable, only its presence.

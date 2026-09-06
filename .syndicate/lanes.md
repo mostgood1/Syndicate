@@ -113,7 +113,7 @@ death, never life — do not invert it.
   O(1) and tracks the dominant term.
 - Blocked by: none.
 
-### intelligence-rows-dedup — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### intelligence-rows-dedup — CLOSED 2026-09-06 — opened 2026-09-06 — **UNIT-VERIFIED, PRODUCTION SUGGESTIVE ONLY.** `top_opportunities` and `recommendations` now share one set of row objects (lists stay distinct, so list-level mutation is isolated): **0.120 -> 0.068 MB, 43.8%** of the duplicated row term on a fixed 300-row slate, deterministic. Aliasing risk was checked by a scripted search, not assumed — the one in-place mutation found is a LOCAL list upstream of this function — and both the intended aliasing and the "rows must stay copies of `ranked_all`" hazard are pinned by tests. 470 tests green. **The production comparison is NOT verified and I overrode an automated CONFIRMED:** median fell 10.6% (8.512 -> 7.609) but the ranges overlap heavily, because my control was 10 samples over 60 SECONDS against a treatment of 60 samples over 31 MINUTES — the control's 0.003 MB "tightness" measured its duration, not the system. NOT an OOM fix. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: stop `slice_intelligence_board_state_for_request` building
   `top_opportunities` and `recommendations` as TWO INDEPENDENT deep copies of the
   same rows (`[dict(item) for item in top_opportunities]`, twice). Sharing the

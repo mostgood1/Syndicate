@@ -23987,3 +23987,47 @@ the shipped state is row 5. `verify:` remains **OWED** — a production reading
 that a `first5` row acquires a `KXMLBF5*` ticker — and is now MORE likely to be
 observable than the original entry implied, because the mechanism that was
 actually broken is the one that got fixed.
+
+
+---
+
+## 2026-09-06T03:11:02Z — web — `e65b08b9` — row dedup: **UNIT-VERIFIED (43.8%), PRODUCTION SUGGESTIVE ONLY — my control window was 30x too short**
+
+`[lane intelligence-rows-dedup, session b2b5b45b]` CLEAR preflight pinned to the
+target; 470 tests green.
+
+**WHAT IS VERIFIED, and it does not depend on production:** on a fixed 300-row
+slate, `top_opportunities` + `recommendations` went **0.120 MB -> 0.068 MB, a
+43.8% saving** on the duplicated row term. Deterministic, no variance.
+
+**WHAT IS NOT VERIFIED: the production number. The automated verdict said
+CONFIRMED and I am overriding it.**
+
+    PRE-dedup  (cap live)  n=18  min 8.509  median 8.512  max 11.783
+    POST-dedup             n=16  min 7.250  median 7.609  max 11.336
+    median change -10.6%   RANGES OVERLAP HEAVILY
+
+**THE FLAW IS IN MY CONTROL, not in the data.** The control that looked
+beautifully tight — spread `0.003 MB` — was **10 samples over ~60 SECONDS**. The
+treatment was **60 samples over 31 MINUTES**. A one-minute window cannot see
+variance a thirty-one-minute window does, so the "tightness" was an artifact of
+duration, and comparing them made the effect look far cleaner than the evidence
+supports. Wider pre-deploy observations from earlier the same evening span
+`8.509-11.783`, which overlaps the post range almost entirely.
+
+The maturation check DID behave correctly on its own terms — census total
+recovered `41.68 -> 58.26 MB` (74% of control) while the cache median held at
+85% — and that argues against a pure boot confound. But 74% recovery is weaker
+than the 95% that settled the cache-cap lane, and it cannot rescue a comparison
+whose baseline was mis-sampled.
+
+**HONEST VERDICT: the median moved -10.6% in the predicted direction and by
+roughly the predicted magnitude** (43.8% of the row term, if rows are ~24% of
+what this cache holds). **That is SUGGESTIVE and consistent, not measured.**
+
+Also observed and not smoothed away: post-deploy samples reached `8.911` and
+`11.336 MB`, ABOVE the control median. The cache is more variable than a median
+conveys, and peaks are what OOM a service.
+
+**NOT AN OOM FIX** — `#632`'s bytes are not Python objects (28.3% of anon, 0.3%
+of the growth).
