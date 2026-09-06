@@ -5,6 +5,42 @@
 
 ---
 
+## 2026-09-06 ~19:3xZ — RECONCILIATION: deploy 1 DID happen, and the two coverage numbers are not in conflict `[lane mlb-first5-kalshi-fanin-mismatch]`
+
+`90493e64` ("flip `_SEGMENT_REFUSAL_ENABLED` to True") states *"deploy 1 never
+happened … `segment_mismatch_detected` has never produced a production number"*
+and content-checks refresh-worker at `11a6a829`. **That was true when written
+and is now stale.** `80d89986` went LIVE on refresh-worker at **19:04:54Z** and
+the counter produced its numbers at 19:21:16Z. No criticism intended — the two
+landed inside the same half hour and their check was honest at the time.
+
+**BOTH MEASUREMENTS ARE RIGHT; THEY COUNT DIFFERENT POPULATIONS.**
+
+| | population | unit | result |
+|---|---|---|---|
+| `90493e64` | **served** `/api/board/layer2-shortlist` | ROWS | 17 of 1,124 (1.51%); 65.4% of the 26 segment rows; kalshi ×17; **0 displayable, 0 servable** |
+| this deploy | **grid**, inside `apply_venue_quotes_to_grid` | SIDES | 55 of 311 venue-repriced; mlb 43/118, ncaaf 12/121 |
+
+The grid is upstream of the shortlist and much larger, and it counts SIDES (two
+per row). So ~55 sides ≈ ~27 rows at the pricing layer against 17 rows that
+survive to the served payload — consistent, and the difference is the filtering
+between the two, not a disagreement.
+
+**TWO THINGS THE SHORTLIST SAMPLE DID NOT SEE, and they are the reason the grid
+counter earns its place:** the served sample reads `kalshi ×17 (100%)`, while
+the grid shows **NCAAF `h1` rows** mis-bound (12) and **2 of them from
+POLYMARKET**. Either those did not reach the served shortlist or they were not
+looked for. The cross-venue and cross-sport halves are only visible upstream.
+
+**THEIR "0 displayable, 0 servable" IS THE STRONGER ARGUMENT FOR THE FLIP** and
+it stands: the refusal strips nothing a user can see or act on.
+
+**THE FLIP IS ON MAIN AND DEPLOYED NOWHERE.** refresh-worker is running
+`80d89986`, which has `_SEGMENT_REFUSAL_ENABLED = False`. **So the 55 sides are
+still mis-priced in production right now.** `90493e64` says `NOT DEPLOYED` and
+that is still accurate. Deploy 2 is owed by whoever takes it next; the suite is
+green on main with the flag on (19 in the segment file).
+
 ## 2026-09-06 19:04:54Z — refresh-worker `80d89986` — **THE MEASURING DEPLOY. LIVE, AND THE RATE IS 55 MIS-BOUND SIDES ACROSS TWO SPORTS.** `[lane mlb-first5-kalshi-fanin-mismatch]`
 
 **verify:** `[venue_quote_fanin] SEGMENT_MISMATCH_GRID` on instance `l4kdz`, first
