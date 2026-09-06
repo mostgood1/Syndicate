@@ -55,6 +55,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
+import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
 from typing import Any
@@ -82,10 +84,45 @@ def _nonascii(text: Any) -> bool:
     return any(ord(ch) > 127 for ch in str(text or ""))
 
 
-def fetch(base_url: str, date: str, sport: str, timeout: float) -> dict:
+def fetch(base_url: str, date: str, sport: str, timeout: float, *, retries: int = 4) -> dict:
+    """Read the shortlist, RETRYING a 502.
+
+    **A 502 HERE IS ROUTINE AND MEANS NOTHING ABOUT THE BOARD.** A web deploy
+    502s every route for ~2 minutes (`blueprint_sync` measured 2026-08-08), and
+    with several sessions deploying, a census run of any length will meet one.
+    The first version of this script raised a bare `HTTPError` traceback, which
+    is indistinguishable at a glance from "the endpoint is broken" and invites
+    exactly the wrong conclusion -- that the board is down, or that a fold
+    regressed. Measured the day it landed: the first run against a forward date
+    hit one and reported a stack trace.
+
+    An EMPTY slate and an UNREACHABLE service must never look alike, so a
+    non-502 error is raised with its status named rather than swallowed.
+    """
     url = f"{base_url}/api/board/layer2-shortlist?date={date}&sport={sport}&limit=2000"
-    with urllib.request.urlopen(url, timeout=timeout) as handle:
-        return json.load(handle)
+    last: Exception | None = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as handle:
+                return json.load(handle)
+        except urllib.error.HTTPError as exc:
+            last = exc
+            if exc.code != 502:
+                raise SystemExit(
+                    f"HTTP {exc.code} from {url}\n"
+                    f"  This is a SERVICE answer, not a board answer -- do not read it as "
+                    f"'no rows' or 'no duplicates'."
+                ) from exc
+            wait = 20 * (attempt + 1)
+            print(f"  502 (attempt {attempt + 1}/{retries}) -- a web deploy 502s every route "
+                  f"for ~2 min; retrying in {wait}s", flush=True)
+            time.sleep(wait)
+        except urllib.error.URLError as exc:
+            raise SystemExit(f"cannot reach {base_url}: {exc.reason}") from exc
+    raise SystemExit(
+        f"still 502 after {retries} attempts ({last}). A deploy is probably in flight; "
+        f"re-run when it is live. NOTHING is known about the board from this."
+    )
 
 
 def census(payload: dict) -> dict:
@@ -150,6 +187,45 @@ def census(payload: dict) -> dict:
     }
 
 
+def measurability(result: dict) -> tuple[bool, str]:
+    """Can this reading distinguish a HELD fold from a BROKEN one? `(ok, why)`.
+
+    **A CENSUS THAT CANNOT READ UNHEALTHY IS NOT A VERIFICATION**, and this
+    script shipped able to print one. Asked for a forward date whose MLB slate
+    was not built yet, it rendered `colliding _row_keys 0` over **zero rows** in
+    the same format as a real pass. Nothing about that output says "no data";
+    every counter is legitimately 0 and the reader supplies the conclusion.
+
+    The defect this measures only EXISTS where two prop feeds disagree about a
+    name, so the reading is informative only when both are present:
+
+      * prop rows at all -- no props, no player names, nothing to fold;
+      * an exchange price INSIDE a multi-book map (`kalshi_plus_books`) -- this
+        is the merge working. At zero, either the exchange is absent from this
+        slate or capture is down, and in both cases a 0 collision count is
+        explained by absence rather than by the fold.
+
+    Deliberately NOT keyed on "are there diacritic names today". That is the
+    thing under test, and gating the instrument on it would make the census
+    unable to fail -- the same circularity as an instrument built out of the
+    symptom it measures.
+    """
+    if result["rows_read"] == 0:
+        return False, "the slate is EMPTY -- 0 rows read. Nothing is known."
+    if result["prop_rows"] == 0:
+        return False, f"{result['rows_read']} rows but ZERO prop rows -- the fold acts on props."
+    if result["kalshi_plus_books"] == 0:
+        return False, (
+            f"{result['prop_rows']} prop rows but kalshi_plus_books=0 -- no exchange price "
+            "sits inside a multi-book map, so a 0 collision count is explained by the "
+            "exchange being absent, not by the fold holding."
+        )
+    return True, (
+        f"{result['prop_rows']} prop rows, kalshi_plus_books={result['kalshi_plus_books']} "
+        "-- both feeds present, so a 0 here is a real 0."
+    )
+
+
 def render(result: dict) -> None:
     print(f"written_at                 {result['written_at']}")
     print(f"rows read / total          {result['rows_read']} / {result['total_rows']}"
@@ -168,6 +244,18 @@ def render(result: dict) -> None:
     print(f"names w/ 2 spellings       {result['names_with_two_spellings']}")
     for name, variants in sorted(result["two_spelling_names"].items()):
         print(f"      {name!r}: {variants}")
+    ok, why = measurability(result)
+    print()
+    if ok:
+        verdict = ("HELD" if result["colliding_keys_raw_market_agrees"] == 0
+                   else "NOT HELD -- same-market collisions present")
+        print(f"MEASURABLE: {why}")
+        print(f"VERDICT: {verdict}")
+    else:
+        # Loud, and it does NOT say the board is fine. An unmeasurable slate and
+        # a clean one print the same counters; only this line separates them.
+        print(f"*** NOT MEASURABLE: {why}")
+        print("*** The zeros above are ABSENCE, not health. Do not record this as a pass.")
 
 
 def compare(before: dict, after: dict) -> None:
@@ -225,7 +313,16 @@ def main() -> int:
     if args.compare:
         with open(args.compare, encoding="utf-8") as handle:
             compare(json.load(handle), result)
-    return 0
+
+    # EXIT CODE, so an automated run cannot report success by saying nothing.
+    #   0 = measurable AND held
+    #   2 = measurable AND a same-market collision is present (the real alarm)
+    #   3 = NOT MEASURABLE -- distinct from both, because "no data" must never
+    #       share an exit code with "verified clean".
+    ok, _ = measurability(result)
+    if not ok:
+        return 3
+    return 0 if result["colliding_keys_raw_market_agrees"] == 0 else 2
 
 
 if __name__ == "__main__":
