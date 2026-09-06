@@ -1765,6 +1765,58 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   entry) checked by CONTENT for `segment` in the join key.
 - Blocked by: none.
 
+### mlb-first5-kalshi-execution — OPEN (REOPENED 2026-09-05 to DEPLOY, user authorised) — **CODE DONE AND LANDED (`d2b060c8` on origin/main); DEPLOY IN PROGRESS.** TWO gaps in series, either alone inert: `KXMLBF5TOTAL` was absent from `SERIES_SPORT` (refused `unmapped_series` at the first gate while production fetched it every tick), AND the two sides named the market differently — `classify_market` yields `totals_1st_5_innings`, the board stores `market='totals'`+`segment='first5'`, so the index lookup missed BEFORE `_segments_agree` ran. Fixed symmetrically via `_row_market()`, one helper shared by `_event_key`/`_board_key`/`_row_key`. **VERIFIED off=0 -> on=8** on 84 real settled venue contracts x 553 real production shortlist rows, same slate (2026-09-05); 3 real games, all first5xfirst5, and `segment_mismatch=6` fires alongside. 283 tests pass. **The first measurement read INERT** — today's contracts against past board rows match nothing however correct the code is; aligning the slate is what made it readable. HONEST LIMIT: only 14 of 44 first5 rows carry `market='totals'`, so this is *possible on the main total*, not full coverage. `KXMLBF5SPREAD` deliberately excluded (margin-vs-handicap sign class). — opened 2026-09-05 — session 66666c0d-f2a4-45a6-b2d9-04520ce89ae5
+- Goal: a `segment=first5` MLB board row can MATCH a `KXMLBF5TOTAL` contract and
+  acquire a venue ticker, where today it acquires none. Single testable outcome:
+  a join replayed over PRODUCTION markets + PRODUCTION board rows returns
+  `matched > 0` on `KXMLBF5TOTAL`, `off != on`, and a full-game row still
+  REFUSES against an F5 contract.
+- Files: `syndicate/features/shared/kalshi_catalogue.py`,
+  `syndicate/features/shared/kalshi_board_join.py`,
+  `syndicate/features/shared/market_segments.py`,
+  `tests/test_mlb_first5_kalshi_execution.py` (NEW).
+- Hypothesis: TWO gaps, both measured, and registering the series alone is NOT
+  enough.
+  (1) `sport_for_series("KXMLBF5TOTAL")` returns **None** — it is absent from
+  `SERIES_SPORT` while `KXMLBTOTAL` is present (registered by hand 2026-08-25
+  after the title gate missed it). `classify_market` therefore refuses at the
+  FIRST gate with `unmapped_series`, so the markets are fetched every tick in
+  production and discarded. Corroborated independently by a comment another lane
+  left in `kalshi_board_join` on 2026-09-04: "the only doubleheader contracts on
+  the board were `KXMLBF5SPREAD`, a series with no sport mapping".
+  (2) Once the sport resolves, `classify_market` yields
+  `market='totals_1st_5_innings'` (OddsAPI's REQUEST vocabulary), while the
+  board row carries `market='totals'` + `segment='first5'` — `segment_market_keys('mlb')`
+  maps `totals_1st_5_innings -> ('first5','totals')` and is the source of truth
+  for that split. `_event_key` canonicalises the ROW only, so the index lookup
+  misses before `_segments_agree` is ever reached. The two vocabularies must be
+  made to meet at the join's `_classify`, which both call sites share.
+- Falsification test: (1) is wrong if `sport_for_series("KXMLBF5TOTAL")` is
+  non-None on the DEPLOYED SHA (checked there, not just locally). (2) is wrong
+  if a production board row carries `market='totals_1st_5_innings'` verbatim —
+  in which case registering alone suffices and the normalization is harmful.
+- The catalogue's own existing test module is held by OPEN lane
+  `suite-order-pollution`, so this lane adds a NEW test file rather than
+  touching it. (Named here without its path on purpose: a path inside a
+  `- Files:` block IS a claim however it is worded — `learnings.md` 2026-09-03.)
+- Scope, deliberately narrow: `KXMLBF5TOTAL` ONLY, mirroring what full-game
+  `KXMLBTOTAL` already does (match `market='totals'`, never `totals_alt`).
+  `KXMLBF5SPREAD` is NOT included — spreads carry the margin/handicap sign
+  inversion that has its own incident record, and it is a separate risk class.
+  `KXMLBF5` (first-five tie) already refuses as `recognised_but_no_board_market`
+  and must keep refusing.
+- HARD CONSTRAINT satisfied before starting: `bet_status.segment_refusal` is
+  live on ALL THREE services by CONTENT (refresh-worker `933e9bebf154`,
+  live-odds-worker `7f197639cc97`, web `3cb5b4ba6750`), so a first5 row becoming
+  stakeable can no longer inherit a whole-game actual at grading. This is the
+  constraint lane `ncaaf-segment-capture` set.
+- Verification: local replay over production data showing `matched>0` with the
+  change and `0` without it; a full-game row refusing an F5 contract; the
+  existing `segment_has_no_matching_series` guard still firing. **NO DEPLOY in
+  this lane** — a deploy needs its own claim, preflight, and an explicit
+  decision, and none is taken here.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
