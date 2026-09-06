@@ -266,6 +266,43 @@ death, never life — do not invert it.
   inert for NCAAF and nobody noticed).
 - NOT IN THIS LANE: turning `eu` on. That is a ~1M/month spend and its own
   decision; this lane only makes it possible to take that decision for one sport.
+- **ACCEPTANCE CRITERIA FOR EVER TURNING THE KNOB ON, corrected by lane
+  `shortlist-prop-row-duplicates` `[2026-09-06]`.** My first version was
+  "widen one sport, then check `books_quoting` rises while ROW COUNTS STAY
+  FLAT". **Flat is too strong and would report a WORKING widen as a broken
+  merge**: a newly-reached book lists bets no current book lists -- a player, a
+  line, a market with no row before -- and those are genuine coverage, not
+  duplicates. The right instrument joins before/after on `_row_key`:
+
+      colliding `_row_key`s          stay 0     <- the merge held
+      books_quoting on keys in BOTH  rises      <- the real coverage number
+      keys only in AFTER             expected   <- new coverage, not a fault
+      keys only in BEFORE            regression <- the one to worry about
+
+  **An unfolded name spelling appears as a COLLISION, never as a new key** --
+  which is why the collision count is the alarm and the row count is not. That
+  belongs in the criteria permanently, not just for one before/after.
+- **ORDER MATTERS AND IT ALREADY WENT THE RIGHT WAY.** `player_name` folding
+  into the market-identity key (`odds_book_quotes.fold_market_identity_term`,
+  read by `book_grid._instance_key`) shipped FIRST. Unfolded, this knob would
+  have produced a **false negative**: more regions -> more books -> more
+  spellings -> extra ROWS instead of extra columns in `book_prices`, so
+  `books_quoting` stays ~2 while duplicates grow. The knob would have looked
+  inert while making things worse.
+- **`limit=2000` IS NOT OPTIONAL on any census here.** `/api/board/layer2-shortlist`
+  defaults to **200** and truncates silently: a peer's first census of the
+  duplicate defect returned 200 of 1,996 rows and reported **0 collisions** --
+  a clean bill of health for a defect that was present. Same trap bit me one
+  step earlier the same day: I read `h1=0` off the default and nearly called it
+  MOOT while the rows sat below the cut.
+- **STOPPING CONDITION:** soccer prop names are diacritic-dense (`Can Yılmaz
+  Uzun`, `Nicolò Casale` on the 2026-09-06 slate). Today the fold is untested
+  against divergent vocabularies because BOTH books share one; a third region's
+  books may not. So widen ONE sport, re-measure collisions globally (not just
+  the widened sport), and stop if they leave zero.
+- **Two instruments agree on the gap**: 164 of 174 single-book off the served
+  board (this lane), 199 prop rows / fanduel 193 / betrivers 39 off the
+  shortlist (`shortlist-prop-row-duplicates`). Different endpoints, same shape.
 - Blocked by: none. All four files unclaimed on origin/main.
 
 ### web-oom-trim-auto — CLOSED 2026-09-06 — opened 2026-09-06 — **LIVE AND VERIFIED.** `SYNDICATE_MALLOC_TRIM_AUTO=1` on web: **12 trims over 33.9 min across both workers, mean `-123.5 MB` each, `1,481.4 MB` total**, all with glibc returning 1 and `in_use` unmoved, and container unreclaimable falling in 12 separate intervals — two sources sharing no code. **But the NET is still +203.2 MB (`676.6 -> 879.8`), so gross growth was ~2,982 MB/h and this is a faster drain, NOT a fix.** Without the trims the container would have reached ~2,361 MB against a 2,048 limit inside 34 minutes. COST: 3 of 12 held the malloc lock 62-75 ms (median 12.3), on one request per interval per worker — the median understates the tail. Gated at 300 s / 64 MB on the existing teardown hook, no new thread (`#241`). — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
