@@ -284,6 +284,35 @@ were being pulled throughout the window and the 02:15:54Z health-check timeout
 coincides with a second run's assembly. Corroborates `#632` (web OOM at 2Gi,
 unowned) with a fresh instance.
 
+## [live-odds-worker-deploy-window] `deploy_preflight` ALMOST NEVER CLEARS ON live-odds-worker DURING A LIVE SLATE, and the reason is a LONG-RUNNING PARENT, not a stuck job `[measured 2026-09-06, lane ncaaf-live-state-to-worker]`
+
+**Symptom:** `deploy_preflight --service live-odds-worker` returned `HOLD: N job(s)
+in flight` on **every one of ~60 polls over 50 minutes** (04:00-04:53Z), across two
+sessions' attempts, on a live NCAAF Saturday.
+
+**IT IS NOT A STUCK JOB — checked, because the two need opposite responses.** Over a
+15-minute window of `ALL_PROCESS_MEMORY` samples the CHILD pids turn over constantly
+(`6632 -> 6863 -> 7041 -> 7239`), so sweeps are progressing normally. But
+**`run_refresh_odds_job.py` (pid 3132) and `refresh_odds_sources.py` (pid 3134) never
+change** — they were alive continuously from 04:30 to 04:45+.
+
+**So `CLEAR` exists only in the gap between one `refresh_odds_sources.py` run ending
+and the next starting.** That gap is SECONDS wide, and during a live slate the sweeps
+run back-to-back so it may not occur for tens of minutes at a time. One was caught at
+`01:00:35Z` and immediately destroyed by re-running preflight to confirm it (see
+`lanes.md` — the guard honours a CLEAR for 15 min, so **deploy on the notification,
+never re-verify**).
+
+**HOW TO APPLY.** Deploying this service is a *scheduling* problem, not a lock
+problem: **take the window outside a live slate**, or arm a watcher that deploys on
+the notification. Polling faster does not help — preflight reads a log line emitted
+every ~60 s, so calls closer together than that return the SAME sample and are one
+observation, not several. Do NOT read a long run of `HOLD` as a stuck worker without
+checking whether the child pids turn over.
+
+**The guard cannot be overridden from a Bash command.** `SYNDICATE_DEPLOY_GUARD=off`
+is read from the HOOK's environment, which an inline env prefix does not reach.
+
 ## [render-egress-cause] **THE BILLING HALF IS RETRACTED — RENDER'S METER DOES NOT COUNT INBOUND EXTERNAL BYTES.** The mechanism is real; what web's 19.34 GB IS remains UNEXPLAINED `[retracted 2026-09-06 by me, BEFORE any row claimed a saving; lane render-egress-transport]`
 
 **RETRACTED: that web's 19.34 GB is its own outbound feed polling, and that
