@@ -379,6 +379,23 @@ same expected effect, same measurement, same reader.
 - **WHAT THIS CHANGE IS ACTUALLY WORTH, stated so nobody quotes a ratio as money:** it removes inbound bytes, receiver memory and decode time — real and useful on 2 GB instances (`#632`) — and **does not reduce the metered bill through that path.** The publish-transport gzip (13.0x, 122 MB/10 min) is likewise internal and unbilled.
 - **STILL UNIDENTIFIED: what web's 19.34 GB is.** Served responses, internal transport, public ingress, deploys and now inbound fetches are each eliminated by measurement.
 
+## 2026-09-06 05:12:50-06:38:43Z — live-odds-worker `e78fe40a` -> `54c9b157`, web `b72ebcd6` -> `58302f07` — **VERIFIED: `source=worker=6`. WEB NO LONGER FETCHES ESPN FROM THE REQUEST PATH.** — lane `ncaaf-live-state-to-worker`
+
+- **verify — MEASURED OVER ~50 MINUTES OF REAL BOARD BUILDS, 2026-09-06 14:0x-14:5xZ:**
+
+    22 (43.1%)  source=cache=1,worker=5
+    15 (29.4%)  source=worker=6        <- ALL SIX DATES FROM THE WORKER
+    14 (27.5%)  source=fetch=1,worker=5
+
+    date-reads: worker=270  cache=22  fetch=14   of 306
+    **ESPN fetches eliminated: 95.4%.** Before this change all 306 were fetches.
+
+- **THE RESIDUAL 4.6% IS THE FALLBACK WORKING, NOT A DEFECT — and it is named:** `NCAAF_LIVE_STATE_RECORD_STALE date=2026-09-06 age_seconds=284..532 unfinished_games=3`. Today's date has unfinished games, so it is "still moving" and its record must be fresh; the producer runs **once per full `refresh_odds_sources` sweep (4-16 min)**, which cannot beat a 240 s bound. So the one date that genuinely needs sub-4-minute freshness is fetched, and the five that cannot change are not. **`worker=6` appears exactly when today's record happens to be fresh.**
+- **WHAT WAS REMOVED.** `ncaaf/cards.py` fetched a **1,441,192 B** ESPN scoreboard per date, inside the web REQUEST PATH, behind a **45 s PER-PROCESS** cache with `WEB_CONCURRENCY=2` — **6 dates x 2 processes = up to 12 calls per 45 s**. `CLAUDE.md`'s rule is that workers fetch and web reads; `request_path_guard` had been logging the violation at 205 warnings per 1,200 lines.
+- **TWO DEFECTS IN MY OWN READER WERE FOUND BY THIS DEPLOY AND FIXED BEFORE THIS ROW WAS WRITTEN** (`34bcecc8`): a fresh EMPTY record refused as deploy skew (`games=0` on a date ESPN has no events for — an empty answer is not a missing one), and staleness applied to dates whose games were ALL FINAL days ago. The provenance counter is the only reason either surfaced; both render an identical board.
+- **NOT A BANDWIDTH FIX, AND MUST NOT BE QUOTED AS ONE.** These are inbound bytes, which `state_worker.md` `[render-egress-cause]` establishes Render does not meter. This is a REQUEST-PATH and ARCHITECTURE fix: it removes compute and a 1.4 MB blocking GET from a page render, and it buys memory on a 2 GB instance (`#632`).
+- **Deploys:** producer `54c9b157` live 05:15:44Z (deployed 18 s after a `CLEAR`, on a service whose window is seconds wide — see `state_worker.md` `[live-odds-worker-deploy-window]`); reader fixes `58302f07` live 06:38:43Z.
+
 ## 2026-09-06 01:12:07-01:15:14Z — web `3cb5b4ba` -> `67fd8c9d` — **THE 19.34 GB IS WEB POLLING EXTERNAL FEEDS ITSELF, AND IT IS 100% BILLED. MYSTERY CLOSED.** — lane `render-egress-transport`
 
 - **What this deploy shipped:** the billed/unbilled split in `http_compression` (`cf401fb8`), deployed to answer one question — is web's own outbound traffic BILLED egress or unbilled internal transport?
