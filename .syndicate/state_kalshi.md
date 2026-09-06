@@ -377,6 +377,97 @@ version — would have unindexed the whole prop book. 9 tests, 127 passing.
 live-odds-worker over the same 2h window. Execution stamps `ticker_resolver(row)`
 verbatim from the plan, so the ticker is decided at commit time.
 
+**THE SAME DEFECT IS LIVE ON A SECOND JOIN THAT THIS ENTRY NEVER COVERED — THE
+BOARD'S PRICE, NOT THE ORDER'S TICKER** `[verified 2026-09-06, lane
+mlb-first5-kalshi-fanin-mismatch; working in
+.syndicate/findings_2026-09-06_first5_kalshi_fanin_mismatch.md; FIXED, TESTED,
+NOT DEPLOYED]`.
+
+Production 2026-09-06 ~16:20Z, `/api/board/layer2-shortlist`: a **first5
+totals 4.5 over** row for MIL@CIN (live) carrying `price_source=kalshi`,
+`book_prices['kalshi'] = -669` (0.870) against a 7-book consensus of
+**0.492611**, `edge_pct = -38.535`.
+
+**IT IS A FULL-GAME `KXMLBTOTAL` CONTRACT, AND THE "THIN F5 MARKET" READING IS
+NOT MERELY UNLIKELY — IT IS STRUCTURALLY IMPOSSIBLE HERE.** Replayed through
+`apply_venue_quotes_to_grid` on code byte-identical to the deployed SHA, with
+both contracts present: the row bound to `KXMLBTOTAL-26SEP061340MILCIN-4` and
+reproduced **all four numbers exactly** — price `-669`, consensus `0.492611`,
+edge `-38.535`, and the whole `venue_basis.reason` string. With **only** the
+`KXMLBF5TOTAL` contract in the artifact the row took **no venue price at all**.
+
+**WHY THIS ENTRY'S GUARD DOES NOT REACH IT, AND WHY ITS COUNTER COULD NOT SAY
+SO.** `_segments_agree` guards the two `matches.append` sites of the ORDER path
+(`portfolio_commit` → `kalshi_ticker_resolver`). The board's PRICE is written by
+`pipeline/layer2_shortlist.py:622` → `venue_quote_fanin.apply_venue_quotes_to_grid`,
+whose key is `quote_key(sport, row["market"], side, line)` — `market` only,
+though the grid row carries `segment` beside it. **The word `segment` did not
+occur once in `venue_quote_fanin.py`.** So
+`segment_has_no_matching_series` is the *other* join's counter and can never
+discriminate here; on 2026-09-06 it was not even 0 — `[kalshi_odds] BOARD_JOIN`
+read **160** at 17:05:41Z and **191** at 17:26:14Z, firing all day on a path
+that was never producing these rows.
+
+**THE KEY ALGEBRA, run on the deployed code.** `classify_market` gives
+`KXMLBF5TOTAL` → `market='totals_1st_5_innings'` → `mlb|totals_1st_5_innings|over|4.5`,
+and `KXMLBTOTAL` → `market='totals'` → `mlb|totals|over|4.5`. The board stores
+the PAIR (`market='totals'` + `segment='first5'`), so a first5 row asks the
+full-game question and **no board row ever asks the key a segment contract
+publishes under**.
+
+**THE RATE. Numerator 0, by construction:** of segment board rows carrying
+`price_source=kalshi`, the number whose matched series can be a SEGMENT series
+is exactly zero. **Denominator unmeasured** — that session's egress proxy denied
+`syndicate-an21.onrender.com` (organization policy), so the served payload was
+unreadable. From logs: `GRID_REPRICE sport=mlb` at 16:15:09Z (the build behind
+the reading) `sides_seen=4830 repriced=44 by_source={'kalshi': 44}`, rising to
+`125` of `6098` by 17:59Z; `LIVE_GAMELINE_JOIN` withheld
+`segment_is_not_full_game` **469 of 549** considered at 17:59Z, so the segment
+population is not marginal.
+
+**THE OBSERVED LEG WAS THE HARMLESS ONE.** Same replay, the other side of the
+same contract: `under +590`, `venue_prob 0.144928`, **`edge_pct +33.899`** — the
+fabricated top-of-board edge this entry already describes. "EV happened to be
+negative" is a fact about which leg was looked at. Execution remains guarded, so
+this corrupts the BOARD, EV, the shortlist and board-price grading — not, on
+current evidence, a fill.
+
+**IT SPANS BOTH VENUES AGAIN.** `polymarket_us_outcome` drops segment contracts
+outright ("A FIRST-QUARTER TOTAL IS NOT A GAME TOTAL") and `kalshi_outcome`
+publishes them under the fused spelling; both protect a full-game ROW from a
+segment CONTRACT and **neither protects a segment ROW from a full-game
+contract**. `GRID_REPRICE` at 16:40:22Z carried `polymarket_us: 38`.
+
+**FIXED AS A REFUSAL PLUS AN INSTRUMENT, NOT A WIDENING** —
+`_segment_disagrees` in `venue_quote_fanin.py`, at both match sites, reusing
+`segment_for_board_row` (this repo's existing row-side resolver) and
+`split_segment_market_key` for the quote. New unconditional log lines
+`SEGMENT_MISMATCH_GRID` / `SEGMENT_MISMATCH_ROWS` carry the count, the
+denominator, a de-duplicated sample naming BOTH halves and the ticker, and
+`matched=<row segment>|<venue>|<series>` for every surviving reprice — the
+match record that did not exist, and the reason the ticker could not be read:
+`venue_ref` is stamped on `best[side]` and `layer2_board`'s quote projection
+copies a FIXED field list that omits it. 18 tests, first two reachability
+(`off != on`); 3,078 green across the venue/board/portfolio surface.
+**NOT DEPLOYED, AND STAGED: `_SEGMENT_REFUSAL_ENABLED` ships False by user
+decision ("instrument first, fix second"), so deploy 1 COUNTS the mis-bindings
+and changes no price and deploy 2 flips the constant.** `SEGMENT_MISMATCH_GRID`
+carries `refusing=`, so a reader can never mistake the count for the repair.
+
+**NEARLY SHIPPED AS AN OUTAGE.** The first comparator used
+`normalize_segment(...) != "full"`, which folds only the empty string, and it
+failed **10 tests across two suites** whose grid rows say `segment="full_game"`
+— it would have stripped the venue price off every whole-game row spelled that
+way. Production writes `full` (`fetch_mlb_oddsapi_local.py:955`; and the ORDER
+path's own unfolded comparator matched 545–845 rows per join, which
+`full_game` rows could not have done), but the synonym is alive in fixtures and
+in `layer2_board._segment_label`. Folded explicitly, pinned by a parametrised
+test. **Side finding, not fixed here:** `segment_for_board_row` returns
+`full_game` verbatim while `segment_for_series('KXMLBTOTAL')` is `full`, so a
+board row ever spelled that way silently loses its ticker on the ORDER path too
+— `kalshi_catalogue.py` is held by lane `ncaaf-h1-kalshi-series`.
+
+
 ## [kalshi-venue-execution] KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lane kalshi-spread-join-sign]`
 
 **Kalshi splits markets across EXCHANGE SHARDS, and balances are PER-SHARD.**

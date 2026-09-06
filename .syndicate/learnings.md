@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 846 rules `[generated]`
+## Index — 848 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -35,6 +35,57 @@
 <!-- LEARNINGS-INDEX:END -->
 
 ---
+## 2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deployed, firing, and named after it. Find the code that WROTE the field you are looking at. `[lane mlb-first5-kalshi-fanin-mismatch]`
+
+A first5 board row was priced at a whole-game 0.870. `_segments_agree` exists
+for exactly that, was present by content on all three live SHAs, and its counter
+`segment_has_no_matching_series` was firing 160-191 times per join that very
+hour. Every one of those readings is true and **none of them is about the field
+in question**: the guard is on the ORDER path
+(`portfolio_commit` → `kalshi_ticker_resolver`), and `price_source` /
+`book_prices` / `venue_basis` are written by `venue_quote_fanin`, a different
+module in which the word `segment` did not occur once.
+
+The 2026-09-05 audit that established the guard was correct is still correct. It
+answered "can a segment bet get a wrong TICKER". The question a day later was
+"can a segment row get a wrong PRICE", and the same words name two joins.
+
+**THE REMEDY, and it is one grep, not a judgement:** before crediting a guard,
+grep for the WRITER of the exact field you are looking at, and check the guard
+is on that call path. `grep -rn "price_source" ` reaches
+`venue_quote_fanin.py:1397` in one hop. A counter's name is not its scope.
+
+**THE COROLLARY THAT COST THE MOST TIME:** "the counter reads 0, which is
+consistent both with the guard working and with the guard not being on this
+path" is the right observation and the wrong conclusion to stop at. A counter
+belonging to another path cannot be evidence in either direction — it is not
+weak evidence, it is *no* evidence, and treating it as weak keeps the wrong
+hypothesis alive.
+
+## 2026-09-06 — FORBIDDEN: shipping a refusal keyed to ONE spelling of a value that has synonyms. Check the synonym set before the predicate, not after. `[lane mlb-first5-kalshi-fanin-mismatch]`
+
+A segment guard compared `normalize_segment(row["segment"]) != "full"`.
+`normalize_segment` folds only the empty string, and grid rows in two existing
+suites carry `segment="full_game"` — so the guard refused **10 tests** and would
+have stripped the venue price off every whole-game row spelled that way. A
+refusal that removes coverage is not a fix; it is an outage with a good
+rationale.
+
+Production writes `full`, and that was ESTABLISHED rather than assumed: the
+ORDER path's own comparator does not fold either, and it matched 545-845 board
+rows per join that day — rows spelled `full_game` could not have done that.
+The synonym lives in fixtures and in `layer2_board._segment_label`'s accepted
+set (`full`, `full_game`, `game`).
+
+**FOLD ANYWAY WHEN THE COST IS ASYMMETRIC.** Being wrong about the spelling
+costs a silent coverage collapse; folding costs at most one refusal you would
+have wanted. Take the cheap side, and write down which spelling you verified so
+the next reader knows what the fold is insuring against.
+
+**AND: the existing fixtures were the instrument.** They were not "wrong" and
+must not be edited to make a new predicate pass — that is how a test stops being
+able to witness the thing it was written for.
+
 ### 2026-09-05 — FORBIDDEN: a per-item guard implemented as an `A or B` search over a CONCATENATION of every item's source. Whichever item supplies B satisfies it for EVERY value of A, so the check has no failing input at all `[lane ncaaf-segment-capture, commits 7f197639 / 7dfabcf4, NO DEPLOY]`
 
 - **What we believed:** `tests/test_all_sports_segment_wiring.py` guarded the

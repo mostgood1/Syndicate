@@ -71,6 +71,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, Sequence
 
+from syndicate.features.shared.market_segments import split_segment_market_key
+
 __all__ = [
     "SOURCES",
     "SourceOutcome",
@@ -108,6 +110,27 @@ _DEFAULT_ENABLED: dict[str, bool] = {
     # than silently, so the line does not train readers to ignore it.
     "oddsapi_props": True,
 }
+
+# THE REFUSAL SHIPS INERT, AND IS TURNED ON BY A SECOND DEPLOY.
+#
+# `[user decision, 2026-09-06: "instrument first, fix second"]`. This commit
+# MEASURES the defect and changes no price; the next flips this constant.
+#
+# The repo's own precedent is `#632`'s auto-trim ("DEFAULT OFF is deliberate: a
+# production behaviour change ships inert and is turned on by env with a
+# measurement, never by landing"), and the reason this is a CONSTANT rather
+# than an env key is specific to this repo: an env key means either a
+# `render.yaml` push -- which fires `blueprint_sync` and rewrites the WHOLE env
+# block on live services, per CLAUDE.md -- or a live-API edit that leaves the
+# blueprint drifted. A one-line constant needs a deploy, which is what was
+# asked for, and leaves nothing behind.
+#
+# WHY MEASURE FIRST AT ALL. The denominator is unknown: this session's egress
+# proxy denies `syndicate-an21.onrender.com`, so how many segment rows are
+# venue-priced right now could not be read. A refusal whose coverage cost is
+# unmeasured is a change nobody can size, and `deploys.md` would have nothing
+# to record but an intention.
+_SEGMENT_REFUSAL_ENABLED = False
 
 # Novig's public CSV mirror is anonymized at the game/player/team level --
 # `reportTicker`/`contractSeries` name a CATEGORY, never a specific bet
@@ -456,6 +479,18 @@ def apply_venue_quotes(
     # the cross-game bleed is actually gone; a non-zero one is the fix working.
     cross_game_rejected = 0
     ambiguous_unnamed_rejected = 0
+    # Quotes DETECTED pricing a different PORTION of the game than the row.
+    #
+    # `_detected`, NOT `_rejected`, and the distinction is the whole point of
+    # shipping this before the refusal: while `_SEGMENT_REFUSAL_ENABLED` is
+    # False these are counted and STILL USED, so a counter named for a refusal
+    # that is not happening would be a log line that lies. `refusing=` on the
+    # printed line carries which stage produced the number.
+    #
+    # Sampled as well as counted, because a count alone cannot say whether the
+    # guard is protecting anything or simply never firing.
+    segment_mismatch_detected = 0
+    segment_mismatch_sample: list[str] = []
     row_claimants: dict[str, dict[str, set[str]]] = {}
     per_source: dict[str, int] = {}
     per_source_by_sport: dict[str, dict[str, int]] = {}
@@ -548,6 +583,17 @@ def apply_venue_quotes(
             ):
                 ambiguous_unnamed_rejected += 1
                 continue
+            # A QUOTE FOR A DIFFERENT PORTION OF THE GAME IS NOT THIS ROW'S
+            # PRICE, however well its key matched. Same rule and same helper as
+            # the grid path below -- two paths disagreeing about whether a
+            # quote may answer a row is a join that works on whichever one you
+            # happen to read, which is the failure `#603` already paid for
+            # here. See `_segment_disagrees` for the measurement.
+            if _segment_disagrees(sport, row, found):
+                segment_mismatch_detected += 1
+                _note_segment_mismatch(segment_mismatch_sample, sport, row, found)
+                if _SEGMENT_REFUSAL_ENABLED:
+                    continue
             quote, key = found, candidate
             break
         if quote is None:
@@ -620,12 +666,32 @@ def apply_venue_quotes(
         flush=True,
     )
 
+    # UNCONDITIONAL, INCLUDING THE ZERO, AND WITH THE SAMPLE BESIDE IT. The
+    # 2026-09-05 audit could not tell "the guard is fine" from "the guard is
+    # not on this path", because the counter it read
+    # (`segment_has_no_matching_series`) belongs to the OTHER join. A counter
+    # that appears only when it fires cannot distinguish "ran and refused
+    # nothing" from "never ran", and that ambiguity is what let this defect
+    # live for a day after it was suspected.
+    print(
+        "[venue_quote_fanin] SEGMENT_MISMATCH_ROWS"
+        f" count={segment_mismatch_detected} rows_in={len(rows)} stamped={stamped}"
+        f" sample={segment_mismatch_sample} refusing={_SEGMENT_REFUSAL_ENABLED}"
+        " -- venue quotes pricing a DIFFERENT portion of the game."
+        " refusing=False means COUNTED AND STILL USED: this is the defect's"
+        " size, not its repair",
+        flush=True,
+    )
+
     return {
         "rows": out,
         "rows_in": len(rows),
         "stamped": stamped,
         "cross_game_rejected": cross_game_rejected,
         "ambiguous_unnamed_rejected": ambiguous_unnamed_rejected,
+        "segment_mismatch_detected": segment_mismatch_detected,
+        "segment_refusal_enabled": _SEGMENT_REFUSAL_ENABLED,
+        "segment_mismatch_sample": list(segment_mismatch_sample),
         # The number that predicts whether this actually helped. Rows left
         # unstamped keep whatever age they had and will be gated on it.
         "unstamped": len(rows) - stamped,
@@ -668,6 +734,53 @@ def apply_venue_quotes(
 
 _UNMATCHED_SAMPLE_LIMIT = 8
 _OFFERED_SAMPLE_LIMIT = 4
+_SEGMENT_MISMATCH_SAMPLE_LIMIT = 6
+
+
+def _note_segment_mismatch(
+    bucket: list[str], sport: str, row: Mapping[str, Any], quote: Any
+) -> None:
+    """Record WHAT was refused, bounded and de-duplicated.
+
+    BOTH HALVES OF THE PAIRING, and the venue's own identifier for the
+    contract. A count says how big the problem is and never what shape it is --
+    the failure `unmatched_by_sport_sample` was added for two files up. With
+    the ticker here, "which contract priced this row" stops being a question
+    only a deploy can answer, which is precisely what could not be answered
+    about the 2026-09-06 board rows: `venue_ref` is stamped on `best[side]` and
+    `layer2_board`'s quote projection copies a FIXED field list that omits it,
+    so no board row has ever carried it.
+
+    DISTINCT SHAPES ONLY. One mis-binding repeats across every rung of a
+    ladder, and a sample that shows the same pairing six times is a sample of
+    one.
+    """
+    entry = (
+        f"{sport}|{_row_segment(row)}|{row.get('market')}"
+        f"|{row.get('line')} <- {getattr(quote, 'source', None)}"
+        f"|{_quote_segment(sport, quote)}|{getattr(quote, 'market', None)}"
+        f"|{getattr(quote, 'venue_ref', None)}"
+    )
+    if entry not in bucket and len(bucket) < _SEGMENT_MISMATCH_SAMPLE_LIMIT:
+        bucket.append(entry)
+
+
+def _bump_matched_series(
+    counts: dict[str, int], sport: str, row: Mapping[str, Any], quote: Any
+) -> None:
+    """`{'<row segment>|<venue>|<series>': n}` for every reprice that survived.
+
+    THE SERIES, NOT THE TICKER. A ladder puts a dozen tickers on one series and
+    the identity that decides correctness is the series -- `KXMLBTOTAL` is the
+    whole game and `KXMLBF5TOTAL` is five innings, whatever the strike. Kalshi
+    tickers are `<SERIES>-<event><suffix>`; Polymarket slugs carry no series, so
+    they report the venue alone rather than a guessed prefix.
+    """
+    ref = str(getattr(quote, "venue_ref", None) or "")
+    source = str(getattr(quote, "source", None) or "?")
+    series = ref.split("-", 1)[0] if (source == "kalshi" and "-" in ref) else "-"
+    key = f"{_row_segment(row)}|{source}|{series}"
+    counts[key] = counts.get(key, 0) + 1
 
 
 # Markets whose SIDE is a role (`over`/`under`, `home`/`away`) rather than a
@@ -865,6 +978,133 @@ def _unconfirmed_on_a_contested_key(
     if not quote_game or not row_token:
         return True
     return quote_game != row_token
+
+
+# EVERY SPELLING OF "THE WHOLE GAME", FOLDED TO ONE.
+#
+# THIS IS NOT TIDINESS, IT IS THE DIFFERENCE BETWEEN A GUARD AND AN OUTAGE.
+# The first version of `_segment_disagrees` compared `normalize_segment(...)`
+# against `full` and refused **10 tests across two suites** whose grid rows
+# carry `segment="full_game"` -- i.e. it would have stripped the Kalshi price
+# off every whole-game row spelled that way, which is the exact coverage
+# collapse a refusal must never cause.
+#
+# The set is `layer2_board._segment_label`'s, which is a MEASURED list ("30 of
+# 102 rows carried a non-`full` segment", served board 2026-08-16) rather than
+# one guessed here.
+#
+# WHICH SPELLING PRODUCTION WRITES, established rather than assumed: `full`.
+# `fetch_mlb_oddsapi_local.py:955` and `market_segments.full_game_market_keys`
+# both emit it, and the decisive reading is the ORDER path -- its own
+# `_segments_agree` compares `segment_for_board_row(row)` to a series segment
+# of `full` with NO fold, and `[kalshi_odds] BOARD_JOIN` matched 545-845 board
+# rows per join on 2026-09-06. Rows spelled `full_game` would have matched
+# ZERO. So the synonym lives in FIXTURES, not in the producer.
+#
+# It is folded here anyway, and deliberately, because a guard that is correct
+# only under the spelling I happened to verify is a guard that fails silently
+# the day a second producer appears -- and the cost of being wrong is
+# asymmetric: folding can only ever refuse LESS.
+_FULL_GAME_TOKENS = frozenset({"", "full", "full_game", "game"})
+
+
+def _fold_full(token: Any) -> str:
+    text = str(token or "").strip().lower()
+    return "full" if text in _FULL_GAME_TOKENS else text
+
+
+def _row_segment(row: Mapping[str, Any]) -> str:
+    """The portion of the game a BOARD/GRID row bets.
+
+    `segment_for_board_row` is the ORDER path's own resolver, reused rather
+    than reimplemented -- two resolvers is how the halves of a join end up on
+    different vocabularies, which this module's `_candidate_keys` docstring
+    already says in its own words. It adds the case a plain field read misses:
+    a row whose `segment` is empty but whose MARKET name carries the suffix
+    (`totals_1st_5_innings`), where the suffix IS the segment.
+    """
+    try:
+        from syndicate.features.shared.kalshi_catalogue import segment_for_board_row
+    except Exception:  # pragma: no cover - import guard, not a behaviour branch
+        return _fold_full(row.get("segment"))
+    return _fold_full(segment_for_board_row(row))
+
+
+def _quote_segment(sport: str, quote: Any) -> str:
+    """The PORTION OF THE GAME a venue quote describes, in the board's words.
+
+    `split_segment_market_key` is the one decoder, reused rather than reparsed
+    -- its own docstring names this join as the caller that needs it, because
+    a venue produces the FUSED spelling (`totals_1st_5_innings`) while the
+    board stores the PAIR (`market='totals'`, `segment='first5'`).
+
+    A market key that does not decode is `full`, and that is the honest reading
+    HERE for the same reason `normalize_segment` gives: a market with no
+    segment suffix is the whole game. It is not papering over an unrecognised
+    key, because the direction this feeds is a REFUSAL -- an undecodable quote
+    can only ever lose a segment row, never win one.
+    """
+    if not quote:
+        return "full"
+    split = split_segment_market_key(sport, getattr(quote, "market", None))
+    return split[0] if split else "full"
+
+
+def _segment_disagrees(sport: str, row: Mapping[str, Any], quote: Any) -> bool:
+    """True when this quote prices a DIFFERENT portion of the game than the row.
+
+    --------------------------------------------------------------------------
+    THE MEASUREMENT, 2026-09-06 -- and it is the 2026-08-28 defect on a second
+    path
+    --------------------------------------------------------------------------
+
+    Production carried, on `/api/board/layer2-shortlist`:
+
+        segment=first5 market=totals line=4.5 side=over   MIL @ CIN (live)
+        quote.book_prices['kalshi'] = -669
+        venue_basis.reason = "kalshi at 0.870 plus 0.0080 commission
+                              against a 7-book consensus"
+        consensus_probability = 0.492611   edge_pct = -38.535
+
+    The seven books price the FIRST FIVE at 0.4926, which is right. 0.870 is
+    what a WHOLE GAME over 4.5 costs. Replayed through this module on the SHA
+    refresh-worker was running, with both contracts in the artifact, the first5
+    row bound to `KXMLBTOTAL-26SEP061340MILCIN-4` and reproduced all four
+    numbers exactly -- price, consensus, edge and the whole prose string. With
+    only the `KXMLBF5TOTAL` contract present the row took NO venue price at all,
+    so the "thin first5 market" reading is not merely unlikely, it is
+    structurally impossible on this path.
+
+    WHY THE GUARD THAT ALREADY EXISTS DOES NOT COVER THIS. `kalshi_board_join.
+    _segments_agree` sits at the two `matches.append` sites of the ORDER path
+    (`portfolio_commit` -> `kalshi_ticker_resolver`). The board's PRICE comes
+    from here instead, and `apply_venue_quotes_to_grid` -> `quote_key(sport,
+    row["market"], side, line)` reads `market` and never `segment` -- though
+    the grid row carries both (`book_grid._INSTANCE_FIELDS`). Two joins over
+    the same venue, one guarded.
+
+    BOTH ADAPTERS PROTECT THE MIRROR CASE AND NEITHER PROTECTS THIS ONE.
+    `polymarket_us_outcome` refuses a segment CONTRACT outright ("A FIRST-
+    QUARTER TOTAL IS NOT A GAME TOTAL"), which keeps a segment price off a
+    full-game row; `kalshi_outcome` publishes segment contracts under the fused
+    spelling, which does the same by accident of the key. Neither stops a
+    segment ROW taking a FULL-GAME contract, so this defect spans both venues
+    exactly as the 2026-08-28 one did.
+
+    THE SIDE THAT MATTERS IS NOT THE ONE THAT SHOWED. The observed over read
+    `edge_pct = -38.5` and ranked nowhere. The UNDER leg of the same contract,
+    same replay, reads `+590` American and `edge_pct = +33.9` -- a fabricated
+    edge on a row that would rank first. `state_kalshi.md` says it in one line:
+    "a mis-keyed join presents as the best line on the board".
+
+    A REFUSAL, NOT A WIDENING. This can only remove a pairing; it cannot create
+    one. Binding a first5 row to a real `KXMLBF5TOTAL` contract would need the
+    two sides to agree on a key, which is a separate change that stakes money
+    and needs its own measurement -- see `state_kalshi.md`
+    `[kalshi-segment-on-full-game]` on why the honest route is never a looser
+    join.
+    """
+    return _row_segment(row) != _quote_segment(sport, quote)
 
 
 def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
@@ -1246,6 +1486,16 @@ def apply_venue_quotes_to_grid(
     cross_game_rejected = 0
     ambiguous_unnamed_rejected = 0
     grid_claimants: dict[str, set[str]] | None = None
+    # THE DEFECT'S OWN SIZE. `_detected` rather than `_rejected`: with
+    # `_SEGMENT_REFUSAL_ENABLED` False these pairings are counted and still
+    # used, which is the measuring stage. See `_segment_disagrees`.
+    segment_mismatch_detected = 0
+    segment_mismatch_sample: list[str] = []
+    # WHICH CONTRACT ACTUALLY PRICED THE BOARD, by venue and series. The board
+    # row cannot answer this -- `layer2_board`'s quote projection copies a
+    # fixed field list and `venue_ref` is not in it -- so on 2026-09-06 the
+    # only way to name the contract behind a price was to replay the join.
+    matched_series: dict[str, int] = {}
     venue_basis_rows = 0
     live_venue_ages: list[float] = []
     live_venue_ages_by_source: dict[str, list[float]] = {}
@@ -1309,6 +1559,19 @@ def apply_venue_quotes_to_grid(
                 ):
                     ambiguous_unnamed_rejected += 1
                     continue
+                # THE GUARD THIS PATH NEVER HAD. `quote_key` above is built
+                # from `market` alone, while the grid row carries `segment`
+                # beside it (`book_grid._INSTANCE_FIELDS`) -- so a `first5`
+                # row and a full-game row ask the identical question and take
+                # the identical answer. Measured on production 2026-09-06 and
+                # reproduced exactly; see `_segment_disagrees`.
+                if _segment_disagrees(sport_slug, row, found):
+                    segment_mismatch_detected += 1
+                    _note_segment_mismatch(
+                        segment_mismatch_sample, sport_slug, row, found
+                    )
+                    if _SEGMENT_REFUSAL_ENABLED:
+                        continue
                 quote = found
                 break
             if quote is None or quote.source not in _LIVE_QUOTING_VENUES:
@@ -1395,6 +1658,12 @@ def apply_venue_quotes_to_grid(
             side_best["price_source"] = quote.source
             if quote.venue_ref:
                 side_best["venue_ref"] = quote.venue_ref
+            # THE MATCH RECORD. Counted by (venue, series, row segment) rather
+            # than logged per row: 125 repriced sides is a wall of text, and
+            # the question people actually ask -- "did a segment row take a
+            # full-game contract" -- is answered by the grouping, not by the
+            # rows. `KXMLBTOTAL-26SEP061340MILCIN-4` -> `KXMLBTOTAL`.
+            _bump_matched_series(matched_series, sport_slug, row, quote)
             repriced += 1
             by_source[quote.source] = by_source.get(quote.source, 0) + 1
 
@@ -1470,10 +1739,34 @@ def apply_venue_quotes_to_grid(
             flush=True,
         )
 
+    # UNCONDITIONAL, INCLUDING THE ZERO. This is the line that would have
+    # settled 2026-09-06 in one reading instead of a replay: `count` is the
+    # defect's size, `sample` is its shape, and `matched=` names the series
+    # every SURVIVING reprice came from, with the board row's own segment
+    # beside it. A `full5:KXMLBTOTAL` pairing in `matched` would mean the guard
+    # is wired and still letting one through.
+    print(
+        "[venue_quote_fanin] SEGMENT_MISMATCH_GRID"
+        f" sport={sport_slug} count={segment_mismatch_detected}"
+        f" sides_seen={sides_seen} repriced={repriced}"
+        f" matched={dict(sorted(matched_series.items()))}"
+        f" sample={segment_mismatch_sample} refusing={_SEGMENT_REFUSAL_ENABLED}"
+        " -- venue quotes pricing a DIFFERENT portion of the game."
+        " refusing=False means COUNTED AND STILL USED: `count` is the defect's"
+        " size, not its repair. `matched` is <row segment>|<venue>|<series> for"
+        " every reprice that landed, so a `first5|kalshi|KXMLBTOTAL` entry there"
+        " IS the mis-binding, named",
+        flush=True,
+    )
+
     return {
         "sport": sport_slug,
         "sides_seen": sides_seen,
         "repriced": repriced,
+        "segment_mismatch_detected": segment_mismatch_detected,
+        "segment_refusal_enabled": _SEGMENT_REFUSAL_ENABLED,
+        "segment_mismatch_sample": list(segment_mismatch_sample),
+        "matched_series": dict(sorted(matched_series.items())),
         # `#603`. Reported so a zero is attributable and a non-zero is legible.
         # The first version of this counter existed only in a return value that
         # NOTHING printed, which made the mechanism unreadable in production --
