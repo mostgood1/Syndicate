@@ -2354,7 +2354,8 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `syndicate/features/shared/book_grid.py`,
   `syndicate/features/shared/odds_book_quotes.py`,
   `pipeline/layer2_shortlist.py`,
-  `tests/test_book_grid_player_name_folding.py` (NEW).
+  `tests/test_book_grid_player_name_folding.py` (NEW),
+  `scripts/census_board_row_duplicates.py` (NEW).
   `odds_book_quotes.py` was NOT in the first claim and had to be TAKEN mid-fix —
   `market_sides_for_quote` holds a second copy of the same identity tuple, and
   folding one without the other silently drops a price. No OPEN lane held it.
@@ -2514,6 +2515,39 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   called `deploy_preflight --holder`, which rotates the token too. Forced,
   safely, because the holder was verifiably me. **The rule should read: any
   repeated claim-aware call rotates the token, not just `acquire`.**
+- **ALL THREE SERVICES NOW CARRY THE FOLD** `[2026-09-06, user asked for
+  live-odds-worker in the next quiet window]`: web `f6af42cf` 16:24:41Z (rode a
+  peer's deploy), refresh-worker `91d523ad` 16:24:47Z (measured), live-odds-worker
+  `f65ec45e` 17:53:14Z. Rows for both deploys in `deploys.md`. The quiet window
+  opened on the FIRST check — the jobs that held the service for 20 consecutive
+  checks earlier had finished on their own. Nothing killed on either deploy.
+- **THE HEADLINE NUMBER I USED WAS THE WRONG ONE, AND THE SCRIPT FIXED IT.**
+  I reported `colliding _row_keys 35 -> 4` and then had to explain the 4 in
+  prose. The number that actually matters splits by CLASS, because two different
+  defects share that counter: a collision whose RAW market names DIFFER is the
+  main-vs-alternate case `_collapse_duplicate_bets` collapses at index build, and
+  one whose raw names AGREE is the case that reaches the join as double
+  exposure. Measured on production 2026-09-06T17:56:15Z:
+
+      colliding _row_keys        2
+         raw market DIFFERS      2    <- collapsed by the join
+         raw market AGREES       0    <- reaches the join; DOUBLE EXPOSURE
+      kalshi_only                0
+      names w/ 2 spellings       0
+
+  **`raw_market_agrees` is the number to quote.** It needs no prose and it does
+  not move when the other lane's defect does.
+- **THE MEASUREMENT IS NOW REPRODUCIBLE BY ANYONE:
+  `scripts/census_board_row_duplicates.py`.** Until it landed, every number in
+  the `deploys.md` rows above could be re-taken by exactly one session, which
+  makes them claims rather than evidence. It uses the REAL `_row_key` and
+  `normalize_person` (never a private copy), forces `limit=2000`, splits
+  collisions by class, and `--baseline`/`--compare` BUCKETS keys into
+  both/after_only/before_only — because a row-count delta cannot tell genuine
+  new coverage from one bet splitting into two rows, and only the collision
+  count separates them. Its compare prints an explicit NOT-PROVEN verdict when
+  duplicates fall while `kalshi_plus_books` does not rise, which is the capture-
+  outage signature that mimics a working fold.
 ### compact-learnings-stale-cap — CLOSED 2026-09-06 — opened 2026-09-06 — session 4b1b66a3 — **FIXED (`37ffb3bb`). Reported `1.48x *** STILL OVER ***` on a file 39,366 B UNDER budget; now `0.90x UNDER [cap from session-start.sh]`. Same 13 sections and same 26,649 B reclaimed — only the REPORT changed. NO TRIM WAS RUN: learnings.md never needed one.**
 - Goal: `compact_learnings.py` reports the cap `session-start.sh` actually
   enforces, so it stops manufacturing a "*** STILL OVER ***" that is not true.

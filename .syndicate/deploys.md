@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-09-06 17:50:05Z - 17:53:14Z — live-odds-worker `54c9b157` -> `f65ec45e` — **THE THIRD SERVICE ONTO THE PLAYER-NAME FOLD. A CONSISTENCY DEPLOY, AND ITS `verify:` SAYS SO RATHER THAN DRESSING UP A SHA READ.** — lane `shortlist-prop-row-duplicates`
+
+**verify — WHAT I ACTUALLY HAVE, AND WHAT I DO NOT.**
+
+    HAVE  live SHA `f65ec45e` read from the Render API, finished 17:53:14Z
+    HAVE  no crash loop: one live deploy, priors deactivated normally
+    HAVE  worker process alive at 17:56:14Z, 3 min after restart
+    HAVE  preflight now refuses as "already contained in live" -- the deploy landed
+    DO NOT HAVE  a post-restart JOB observed. jobs=0 across 3 post-deploy samples.
+
+**THERE IS NO BOARD-VISIBLE READING THAT DISTINGUISHES FOLDED FROM UNFOLDED ON
+THIS SERVICE, and that is a property of the service, not a gap in the effort.**
+live-odds-worker builds neither the shortlist nor the board grid — refresh-worker
+and web do, and both were folded and measured at 16:24Z. Its only exposure to
+the change is `quote_ref_for_bet` -> `market_sides_for_quote`, a bet-quote
+lookup with no artifact of its own. So `verify:` is "restarted onto the new SHA
+without crash-looping", NOT "the fold was observed working here". Anyone
+treating this row as behavioural evidence of the fold is reading it wrong; the
+behavioural evidence is the refresh-worker row above.
+
+**jobs=0 IS NOT EVIDENCE OF A STALL.** The pregame sweep cadence is fixture-aware
+and runs to hours when the next fixture is far out (`#440` Phase 1b), so an idle
+window is the designed behaviour. Recorded as an absence rather than resolved,
+because the window I watched (~5 min) cannot distinguish "idle by cadence" from
+"loop did not restart" — and stating a null result without its window is the
+2026-08-30 rule.
+
+**WHAT IT COST: nothing.** Preflight CLEAR at 17:49:17Z with 2 processes, both
+infrastructure, zero jobs. The odds refresh and soccer live-state polls that
+held this service for 20 consecutive checks over ~29 minutes earlier had
+finished on their own. No job killed, no capture interrupted.
+
+**IT ALSO CARRIED A PEER'S CHANGE, WHICH THEY DID NOT KNOW.** `f65ec45e` is the
+`origin/main` tip and contains `a946a79d` (`prop-regions`, lane
+`prop-region-knob`) — verified by `merge-base --is-ancestor`. That lane was
+waiting to ask for it to ride a refresh-worker deploy; on THIS service it is
+already live. It still needs refresh-worker, where its soccer props fetcher
+actually runs.
+
+**ALL THREE SERVICES NOW CARRY THE FOLD:** web `f6af42cf` (16:24:41Z, rode a
+peer's deploy), refresh-worker `91d523ad` (16:24:47Z, measured), live-odds-worker
+`f65ec45e` (17:53:14Z, this row).
+
 ## 2026-09-06 16:19:33Z - 16:24:47Z — refresh-worker `58302f07` -> `91d523ad` — **ONE BET WAS TWO STAKEABLE ROWS WHENEVER TWO FEEDS SPELLED ITS PLAYER DIFFERENTLY. THE DIACRITIC CLASS IS NOW ZERO AND THE MERGE IS WHAT DID IT.** — lane `shortlist-prop-row-duplicates`
 
 **verify — TWO SIGNALS, because either alone is ambiguous.** Same instrument,
