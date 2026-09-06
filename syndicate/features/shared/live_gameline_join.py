@@ -379,6 +379,82 @@ def prob_std_err(probability: Any, sims: Any) -> float | None:
     return math.sqrt(max(0.0, p_adj * (1.0 - p_adj)) / n_adj)
 
 
+def agresti_coull_point(probability: Any, sims: Any) -> float | None:
+    """The POINT estimate from the estimator this module already uses for the
+    INTERVAL. None when it cannot be computed.
+
+    THE MODULE WAS INTERNALLY INCONSISTENT. `prob_std_err` computes
+    `p_adj = (successes + 2) / (n + 4)` -- Agresti-Coull add-two -- explicitly
+    because the Wald form is 0.0 at p=0 and p=1 and "it is a LIVE case: the
+    re-sim quantises to k/n". It then DISCARDED `p_adj`, and the caller published
+    the raw Wald `k/n`. The correction was applied to the WIDTH and never to the
+    CENTRE.
+
+    MEASURED, production MLB live-gameline ledger, 6 days to 2026-09-06, 2,810
+    h2h records carrying a model probability (the export was truncated, so these
+    are FLOORS):
+
+        exactly 0.0 or 1.0          83   (2.95%)
+        of those, PRICED            59   -- an edge published off a certainty
+        distinct games              25   -- 23 hit, 2 LOST
+
+          2026-08-29  ARI 2 @ SF  7   p=0.0, home won   max |edge_pp| 46.2
+          2026-08-29  BOS 2 @ NYY 9   p=0.0, home won   max |edge_pp| 55.9
+
+    Both claimed the home side had EXACTLY ZERO chance. 23-of-25 is not a
+    defence: an exact 0.0 has no recovery, Brier takes its ceiling of 1.0, and
+    log loss is INFINITE -- one such row can dominate the series used to judge
+    the model.
+
+    WHY THE PRECISION GATE DID NOT CATCH THEM. At p=1.0, n=120 the Agresti-Coull
+    2-sigma bar is 2.26 pp, so a 46-56 pp edge clears it comfortably. The gate
+    was working; it was being handed a point estimate its own estimator would
+    never have produced.
+
+    WHY NOT THE NBA/WNBA FORM, which is structurally immune. `nba/cards.py:1520`
+    `_margin_win_prob` is `1/(1+exp(-margin/3.4))` -- continuous, so it never
+    reaches the boundary. Three reasons it is not the fix here:
+
+      * It reads ONE number off the sim (`margin_mean`) and discards the
+        distribution. For a LIVE re-sim that is a downgrade exactly where the
+        re-sim earns its keep -- a 3-point lead on the opponent 2 with 0:40 left
+        and a 3-point lead at kickoff share a mean margin and do not share a win
+        probability.
+      * `3.4` is a fitted BASKETBALL scale. Football margins are multi-modal at
+        3 and 7; baseball run margins are skewed and discrete. A logistic/normal
+        tail is THIN, so in the tails -- where all 83 of those rows live -- it
+        could come out MORE confident, not less. Adopting it is a mechanism
+        change needing a per-sport re-fit and a backtest, per
+        `model_engine_standard.md`, not a port.
+      * Immunity there was not free: no sim count means no interval, so those
+        sports were refused `REASON_UNUSABLE_SIMS` until `#481` gave them a
+        measured calibration error to price against.
+
+    WHAT THIS DOES NOT FIX, stated so it is not oversold. The shift is at most
+    ~1.6 pp at n=120 and is ZERO at p=0.5 -- shrinkage toward the middle that
+    touches only the tails, where k/n is least trustworthy. A 77 pp edge becomes
+    ~76 pp. It does NOT shrink large edges; those come from the model genuinely
+    disagreeing with the market. It removes the unbounded scoring penalty and
+    stops publishing a certainty no 120-sample estimator can support. Two
+    different problems, and only the second is an estimator defect.
+
+    ORDERING, and why this lands before the NFL scale. `nfl-rating-units`
+    measured NFL as too FLAT to ever reach the boundary (across-game
+    `margin_mean` stdev 2.16, and 0 of 14 games at 0.0/1.0). The units fix takes
+    that to 11.44, and an engine that differentiates will eventually return
+    300/300 -- so shipping the scale first would INTRODUCE this defect to a sport
+    that does not have it today.
+    """
+    try:
+        raw_p = float(probability)
+        n = int(sims)
+    except (TypeError, ValueError):
+        return None
+    if not (0.0 <= raw_p <= 1.0) or n <= 0:
+        return None
+    return (raw_p * float(n) + 2.0) / (float(n) + 4.0)
+
+
 def _analytic_markets_from_lens(lens: Mapping[str, Any]) -> dict[str, Any]:
     """The lens's own per-market live probabilities, where it publishes them.
 
@@ -522,6 +598,8 @@ def price_distribution_market(
         "model_prob": None,
         "market_prob": None,
         "edge_pp": None,
+        "model_prob_raw": None,
+        "point_estimator": None,
         "prob_std_err": None,
         "priceable": False,
         "withheld_reason": None,
@@ -579,6 +657,18 @@ def price_distribution_market(
         out["withheld_reason"] = REASON_UNUSABLE_SIMS
         return out
     out["prob_std_err"] = std_err
+    # SAME DEFECT, SAME FIX. `_dist_prob_over` is a proportion of the re-sim's
+    # own histogram -- k/n by another name -- and it returns exactly 1.0 for any
+    # line outside the sampled support, which a live total routinely is. This
+    # path has no analytic branch, so every row here is sim-derived and no
+    # `basis` gate is needed. Ordered after `std_err` for the same double-shrink
+    # reason as the moneyline above.
+    smoothed = agresti_coull_point(model_prob, sims)
+    if smoothed is not None:
+        out["model_prob_raw"] = float(model_prob)
+        model_prob = smoothed
+        out["model_prob"] = smoothed
+        out["point_estimator"] = "agresti_coull"
     edge = _edge_pp(float(model_prob), market_p)
     out["edge_pp"] = round(edge, 2)
     # THE SAME BAR AS THE MONEYLINE, deliberately. A histogram answers "what is
@@ -617,6 +707,8 @@ def price_moneyline(
         "market_prob": None,
         "edge_pp": None,
         "std_err_basis": None,
+        "model_prob_raw": None,
+        "point_estimator": None,
         "prob_std_err": None,
         "priceable": False,
         "withheld_reason": None,
@@ -660,6 +752,26 @@ def price_moneyline(
         # row is refused by the SAME name it was before.
         out["withheld_reason"] = REASON_UNUSABLE_SIMS
         return out
+    # THE CENTRE NOW MATCHES THE INTERVAL -- and only HERE, after `se` has been
+    # taken from the RAW proportion. `prob_std_err` reconstructs
+    # `successes = p * n`, so handing it an already-smoothed `p` applies add-two
+    # TWICE: at p=1.0, n=120 the interval comes out 0.0157 where 0.0113 is
+    # correct, a 39% over-wide bar that would silently withhold real edges.
+    # Smoothing before the SE is computed is the obvious way to write this, and
+    # it is wrong.
+    #
+    # `sim_count` ONLY. The `analytic_calibration` branch (`#481`, WNBA) is not
+    # a k/n proportion -- it is a closed-form probability carrying a measured
+    # calibration error, and add-two would be shrinking a quantity that was
+    # never a count. Gating on `basis` rather than on `n` is what keeps the two
+    # apart.
+    if basis == "sim_count":
+        smoothed = agresti_coull_point(p, n)
+        if smoothed is not None:
+            out["model_prob_raw"] = p
+            p = smoothed
+            out["model_prob"] = p
+            out["point_estimator"] = "agresti_coull"
     out["prob_std_err"] = se
     # Which interval decided this row. Without it, an analytic verdict and a
     # sim-derived one are indistinguishable in the ledger, and this module's

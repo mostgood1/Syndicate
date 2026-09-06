@@ -278,7 +278,13 @@ class TestTheV4LedgerFieldsAreActuallyPOPULATED:
         rec = self._record({})
         assert rec["inning"] is None
         assert rec["pregame_home_win_prob"] is None
-        assert rec["model_home_win_prob"] == 0.6842
+        # WAS 0.6842 -- the RAW `k/n` the snapshot carries. The ledger records
+        # what was PUBLISHED, which is now the Agresti-Coull estimate the
+        # interval was always computed from: (0.6842*120 + 2)/124 = 0.678258.
+        # The ledger grading the published number rather than an internal one is
+        # the point -- a ledger that stored a value the board never showed could
+        # not be used to judge the board.
+        assert rec["model_home_win_prob"] == pytest.approx(0.678258, abs=1e-6)
         assert rec["priceable"] is True
 
 

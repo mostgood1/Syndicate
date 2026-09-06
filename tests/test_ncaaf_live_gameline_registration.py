@@ -104,11 +104,23 @@ def test_a_live_resim_lane_indexes_prices_and_releases_the_edge():
     projection = row["projection"]
     assert projection["live_aware"] is True
     assert projection["edge_vs_market_pct"] is not None
-    # THE EDGE IS COMPUTED FROM THE LIVE PROBABILITY. 1.0 against a market still
-    # saying 0.310 is 69.0 points; the pregame pairing (0.977 - 0.310) would be
-    # 66.7 and is NOT what came out. This is the assertion that proves the live
-    # number reached the price rather than merely being published beside it.
-    assert round(projection["edge_vs_market_pct"], 1) == 69.0
+    # THE EDGE IS COMPUTED FROM THE LIVE PROBABILITY. This is the assertion that
+    # proves the live number reached the PRICE rather than merely being published
+    # beside it: the pregame pairing (0.977 - 0.310) would be 66.7.
+    #
+    # WAS 69.0, from a raw live probability of exactly 1.0. The published
+    # estimate is now the Agresti-Coull one this module already used for the
+    # interval -- (1.0*200 + 2)/204 = 0.990196 at this fixture's 200 sims -- so
+    # the edge is 68.0. NOTE WHAT THIS FIXTURE IS: a live probability of EXACTLY
+    # 1.0, which is the defect the estimator change exists to stop publishing.
+    # Production produced the same thing on real state at 2026-09-06T23:30Z
+    # (WSU @ WASH, P=1.0 for the final ten minutes).
+    assert round(projection["edge_vs_market_pct"], 1) == 68.0
+    # AND THE DISCRIMINATOR IS PINNED, not left implied. The live/pregame gap
+    # narrowed from 2.3pp to 1.3pp, so an assertion on the live literal alone is
+    # now a weaker test than it reads as. This says outright which pairing the
+    # edge came from, and fails if the pregame one is ever substituted.
+    assert round(projection["edge_vs_market_pct"], 1) != 66.7
     assert row["live_gameline"]["home_win_prob"] == 1.0
     assert projection["model_prob_over"] == 0.977, "the pregame number stays readable"
 

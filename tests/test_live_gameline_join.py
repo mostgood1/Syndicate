@@ -93,29 +93,54 @@ class TestPriceMoneyline:
         v = price_moneyline(model_prob=0.68, market_prob=0.50, sims=120)
         assert v["priceable"] is True
         assert v["withheld_reason"] is None
-        assert v["edge_pp"] == pytest.approx(18.0)
+        # WAS 18.0 on the raw `k/n`. The published estimate is now the same
+        # Agresti-Coull value the interval was always computed from:
+        # 0.68 -> (81.6+2)/124 = 0.674194 at n=120, so the edge shrinks 0.58pp.
+        # The two assertions ABOVE are the ones with meaning here and neither
+        # moved -- a 17.4pp edge clears a 9.1pp bar exactly as an 18.0pp one did.
+        assert v["model_prob_raw"] == 0.68
+        assert v["edge_pp"] == pytest.approx(17.419, abs=1e-3)
 
     def test_a_two_point_edge_is_REFUSED_at_120_sims(self):
         """The decision in one assertion. 2 points against a ~9.1-point bar."""
         v = price_moneyline(model_prob=0.52, market_prob=0.50, sims=120)
         assert v["priceable"] is False
         assert v["withheld_reason"] == REASON_NOT_PRICEABLE
-        assert v["edge_pp"] == pytest.approx(2.0)
+        # WAS 2.0 on the raw `k/n`; 0.52 -> (62.4+2)/124 = 0.519355 at n=120.
+        # Still refused, which is what this test is named for.
+        assert v["model_prob_raw"] == 0.52
+        assert v["edge_pp"] == pytest.approx(1.935, abs=1e-3)
         # The edge is still REPORTED -- withheld is not the same as hidden.
         # NB the SE is evaluated at the MODEL's p (0.52), not at 0.5, so it is
         # 0.045613 and not the table's 0.045644. See the class docstring below.
         assert v["prob_std_err"] == pytest.approx(prob_std_err(0.52, 120))
 
     def test_the_same_two_point_edge_PRICES_at_2500_sims(self):
-        """Raising sims is the honest lever, and it needs no change here:
-        at n=2500 the bar is 2.0 points and a 2.0-point edge clears it."""
-        v = price_moneyline(model_prob=0.52, market_prob=0.50, sims=2500)
+        """Raising sims is the honest lever.
+
+        THE MODEL PROBABILITY MOVED 0.52 -> 0.53 AND THE REASON IS NOT COSMETIC.
+        The old version sat EXACTLY on the threshold by construction -- its own
+        docstring said "the bar is 2.0 points and a 2.0-point edge clears it",
+        and it cleared by 0.003pp. Once the published estimate became the
+        Agresti-Coull one the edge came out at 1.9968 against a 1.9968 bar and
+        the row was refused: a knife-edge fixture flipping, not the lever
+        breaking. A test pinned to a tie tells you nothing about either side of
+        it, so this now clears with real headroom (a ~3pp edge against the same
+        ~2.0pp bar) and still fails if the bar stops tightening with n.
+        """
+        v = price_moneyline(model_prob=0.53, market_prob=0.50, sims=2500)
         assert v["priceable"] is True
+        # ... and the SAME edge is still refused at 120 sims, which is the
+        # comparison the pair exists to make.
+        assert price_moneyline(model_prob=0.53, market_prob=0.50,
+                               sims=120)["priceable"] is False
 
     def test_the_gate_is_symmetric_for_negative_edges(self):
         v = price_moneyline(model_prob=0.32, market_prob=0.50, sims=120)
         assert v["priceable"] is True
-        assert v["edge_pp"] == pytest.approx(-18.0)
+        # WAS -18.0; 0.32 -> (38.4+2)/124 = 0.325806. Symmetric with the +18.0
+        # case above by the same 0.58pp, which is the property being tested.
+        assert v["edge_pp"] == pytest.approx(-17.419, abs=1e-3)
 
     def test_units_are_points_on_both_sides_of_the_gate(self):
         """A unit mismatch here would decide what gets published.
@@ -260,7 +285,9 @@ class TestIndexAndAttach:
         row = grid[0]
         assert row["projection"]["live_aware"] is True
         assert row["projection"]["edge_unavailable_reason"] is None
-        assert row["projection"]["edge_vs_market_pct"] == pytest.approx(18.42, abs=0.01)
+        # WAS 18.42 off the raw `k/n`. `rows_live_gameline_edged == 1` and
+        # `live_aware is True` above are unchanged -- the row still prices.
+        assert row["projection"]["edge_vs_market_pct"] == pytest.approx(17.83, abs=0.01)
         assert row["live_gameline"]["game_pk"] == 823184
 
     def test_attach_withholds_a_small_edge_but_still_marks_live_aware(self):
@@ -450,7 +477,10 @@ class TestSegmentFilter:
         grid = [self._row("full", 0.8750)]
         cov = attach_live_gamelines(grid, build_live_gameline_index(self._snapshot()))
         assert cov["rows_live_gameline_edged"] == 1
-        assert grid[0]["live_gameline"]["edge_pp"] == pytest.approx(9.17, abs=0.01)
+        # WAS 9.17. The largest shift in this file, because this fixture's
+        # proportion sits nearest the boundary -- the shift is |2-4p|/(n+4), so
+        # it is greatest exactly where `k/n` is least trustworthy. Still edged.
+        assert grid[0]["live_gameline"]["edge_pp"] == pytest.approx(7.66, abs=0.01)
 
     @pytest.mark.parametrize("segment", ["first1", "first3", "first5", "", None, "unknown"])
     def test_every_non_full_segment_including_ABSENT_is_refused(self, segment):
@@ -501,15 +531,19 @@ class TestLiveDistributionPricing:
     def test_over_probability_comes_off_the_histogram(self):
         """P(total > 7.5) = (15+5)/100 = 0.40 exactly, not a normal fit."""
         out = self._price(line=7.5, side="over", market_prob=0.20)
-        assert out["model_prob"] == 0.40
+        # `model_prob_raw` IS the histogram read. The published `model_prob` is
+        # the Agresti-Coull estimate built from it, so the EXACT assertion these
+        # tests exist to make belongs on the raw field -- weakening it to an
+        # approximation would blunt the guard on the spread-frame sign bug.
+        assert out["model_prob_raw"] == 0.40
 
     def test_under_is_the_complement_side_not_one_minus_over(self):
         """P(total < 7.5) = (10+20+30)/100 = 0.60. Push mass is excluded from
         BOTH sides, so at a whole-number line these do not sum to 1."""
-        assert self._price(line=7.5, side="under", market_prob=0.20)["model_prob"] == 0.60
+        assert self._price(line=7.5, side="under", market_prob=0.20)["model_prob_raw"] == 0.60
         out = self._price(line=7.0, side="over", market_prob=0.20)
         under = self._price(line=7.0, side="under", market_prob=0.20)
-        assert out["model_prob"] + under["model_prob"] < 1.0, "the push on 7 must not be split"
+        assert out["model_prob_raw"] + under["model_prob_raw"] < 1.0, "the push on 7 must not be split"
 
     def test_the_spread_home_branch_does_not_negate(self):
         """The sign convention that cost 19-28 point phantom edges in 2026-08.
@@ -524,13 +558,13 @@ class TestLiveDistributionPricing:
         """
         out = self._price(dist=self.MARGIN_DIST, line=1.5, side="home",
                           market="spreads", market_prob=0.50)
-        assert out["model_prob"] == 0.25, "home branch negated the line"
+        assert out["model_prob_raw"] == 0.25, "home branch negated the line"
 
     def test_the_spread_away_branch_reads_the_frame_it_is_given(self):
         """away wants P(margin < L). At L=1.5: (10+15+20+10+20)/100 = 0.75."""
         out = self._price(dist=self.MARGIN_DIST, line=1.5, side="away",
                           market="spreads", market_prob=0.50)
-        assert out["model_prob"] == 0.75
+        assert out["model_prob_raw"] == 0.75
 
     def test_alt_lines_are_priced_by_the_same_distribution(self):
         """The whole point of a histogram over a mean: any line is answerable.
@@ -540,11 +574,11 @@ class TestLiveDistributionPricing:
         `totals_alt`, because neither key was in the set.
         """
         for market in ("totals_alt", "alternate_totals"):
-            assert self._price(market=market, line=9.5, market_prob=0.10)["model_prob"] == 0.05
+            assert self._price(market=market, line=9.5, market_prob=0.10)["model_prob_raw"] == 0.05
         for market in ("spreads_alt", "alternate_spreads"):
             out = self._price(dist=self.MARGIN_DIST, line=2.5, side="home",
                               market=market, market_prob=0.50)
-            assert out["model_prob"] == 0.10
+            assert out["model_prob_raw"] == 0.10
 
     def test_the_precision_gate_is_the_same_bar_as_the_moneyline(self):
         """A histogram answers WHICH probability, not how precise it is.
@@ -559,7 +593,10 @@ class TestLiveDistributionPricing:
         assert tight["withheld_reason"] == REASON_NOT_PRICEABLE
         wide = self._price(line=7.5, side="over", market_prob=0.15)
         assert wide["priceable"] is True
-        assert wide["edge_pp"] == 25.0
+        # WAS 25.0 off the raw 0.40; the published estimate is (40+2)/104 =
+        # 0.403846 at n=100. Both gate outcomes above are unchanged, which is
+        # what this test is for.
+        assert wide["edge_pp"] == 25.38
 
     def test_an_absent_distribution_refuses_by_name(self):
         """An old snapshot degrades to a NAMED refusal, never to a guess."""
