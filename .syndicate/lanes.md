@@ -2227,6 +2227,36 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   artifact (`written_at 2026-09-06T14:44:08Z`), plus the `off != on` mechanism run.
 - Blocked by: none. NO DEPLOY in this lane; no code changed.
 
+### compact-learnings-stale-cap — CLOSED 2026-09-06 — opened 2026-09-06 — session 4b1b66a3 — **FIXED (`37ffb3bb`). Reported `1.48x *** STILL OVER ***` on a file 39,366 B UNDER budget; now `0.90x UNDER [cap from session-start.sh]`. Same 13 sections and same 26,649 B reclaimed — only the REPORT changed. NO TRIM WAS RUN: learnings.md never needed one.**
+- Goal: `compact_learnings.py` reports the cap `session-start.sh` actually
+  enforces, so it stops manufacturing a "*** STILL OVER ***" that is not true.
+- Files: `scripts/compact_learnings.py`.
+  Collision-checked 2026-09-06 across all OPEN lanes. `ledger-repair-invariants`
+  MENTIONS this file in prose but its `- Files:` line reads "NONE CLAIMED", and
+  the file is unmodified in the primary tree. Mention is not a claim.
+- **THE DEFECT, and it nearly cost a shared ledger.** `compact_learnings.py:114`
+  hardcodes `--cap` default `280000`, with a comment that itself admits "caps
+  were raised 2026-09-01". The enforced cap is **460000**
+  (`session-start.sh:382`, raised 400000 -> 460000 by USER DECISION in
+  `1f032074`). So the tool reported `cap 280000 : 1.48x -> 1.38x *** STILL
+  OVER ***` on a file that is **420,634 B — 39,366 B UNDER budget**. Acting on
+  that reading means compacting the repo's most contended ledger against a
+  constraint that does not exist.
+- **THIS IS THE THIRD INSTANCE AND THE FIX IS ALREADY IN THE REPO.**
+  `trim_lane_blocks.py:57-69` and `archive_released_lanes.py:73-85` both carry
+  it, and their comments describe this exact incident: "a session read this
+  tool's '*** STILL OVER ***' line and reported a non-existent constraint to
+  their user. See ledger_caps.py." `ledger_caps.py` exists to end the drift and
+  says a fourth copy of the number is "the problem restated" — which is what
+  line 114 is.
+- Hypothesis: n/a. This is not a diagnosis; the cap is read from two files and
+  they disagree, which is directly observable.
+- Verification: with no `--cap`, the tool reports 460000 sourced from
+  session-start.sh and says UNDER for the current file; `--cap` still overrides;
+  a dry run still reclaims the same 26,649 B (the fix changes what is REPORTED,
+  never what is moved).
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
