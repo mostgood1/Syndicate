@@ -1657,9 +1657,36 @@ is `E[max(0, gap-bound)] / E[gap]`: at my **400 s** that is **20.6%**, and the
 tick independently observed **25.0%** (2 of 8). Two instruments, different data,
 agreeing.
 
-    bound  240s (web's)  -> 48.8% expected fallback
+    bound  240s            -> 48.8%   <- WRONG FOR WEB. see the correction below
     bound  400s (mine)   -> 20.6%
     bound  700s          ->  0.0%
+
+**CORRECTION — MY 48.8% FOR WEB OVERESTIMATED BY ~2x, AND THE MISSING RULE IS
+WORTH MORE THAN THE NUMBER** `[measured by lane render-egress-transport on web,
+14:00-16:00Z, 146 board builds / 876 date-reads]`. Production:
+**worker 793 (90.5%), cache 45 (5.1%), fetch 38 (4.3%)**, and **all 38 STALE
+refusals are `date=2026-09-06`** — 26.0% of TODAY'S-date reads, 4.3% of all
+date-reads. So web is ~95.7% effective, NOT "roughly half".
+
+**Why the model was wrong: web applies its 240 s bound ONLY to dates that can
+still change.** A date whose games are all `final` is served from a record of any
+age, because a final score cannot go stale. Five of six dates are finished, so
+the bound never touches them. My arithmetic assumed the bound applies to every
+read — which is true of MY tick, where every tick is the live date, and false of
+theirs. **Both numbers are right about different denominators.** I labelled it as
+my arithmetic rather than their counters and asked them to check it; they did,
+and this is the result.
+
+**AND IT EXPOSES AN ASSUMPTION IN MY OWN 20.6% THAT I SHOULD STATE:** it models
+sampling as UNIFORM over the gap. My tick samples on a fixed 180 s period against
+a quasi-periodic ~469 s producer, which can ALIAS rather than sample uniformly.
+The observed 25.0% agreed, but on n=8. Treat 20.6% as an estimate whose error
+bar has not been established, not as a validated model.
+
+**THE UNDERLYING POINT SURVIVES AND SHARPENS.** Exposure scales with the number
+of dates in motion: today ONE of six is live. On a real Saturday with games
+spanning two ET dates, two are moving and the fallback roughly doubles — **the
+consolidation is weakest exactly when the board needs it most.**
 
 **THE CONSEQUENCE IS FOR LIVE GAMES, AND IT IS THE OPPOSITE OF REASSURING.**
 Mean record age at a random sample is **251 s**. Re-simulating from a score,
