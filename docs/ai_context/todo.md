@@ -45368,7 +45368,34 @@ real-time state.
 > composition, not a new shift. One more reading recommended before
 > trusting this percentage as the new normal.
 
-**#234****#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
+> **Long-window check, 2026-09-06T22:12Z, new baseline (2026-09-01T14:48Z,
+> 7-day cap rollover), 127.4h total — the confirming read the prior entry
+> asked for:**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 458,616s (127.4h, 677,918 obs) | 294,566 | 2,312.3 | **1.66M** | **33.3%** |
+>
+> Down from the first post-rotation reading (79.3%) to **33.3%** — confirms
+> that reading was a restart artifact, not the new steady state. This is
+> comfortably the best sustained number since tracking began. `by_market_family`
+> shape (props 37.7%, segment 35.3%, alternate 19.3%, full_game 4.5%) still
+> matches the established composition — no new shift.
+>
+> **New cost driver worth watching, not acting on: NCAAF season has started.**
+> 251,045 calls (`by_sport`) since 09-01, cheap per-call so far (44,296cr
+> total — mostly event-list/cheap markets), but this is a brand-new
+> contributor that didn't exist in any prior reading. Same pattern as NFL
+> preseason ramping earlier — worth a check once NCAAF's own props/segment
+> markets are in full swing, not urgent now. `race_detected_count` jumped
+> 9 → 69 over this window, but observation volume also roughly doubled
+> (331,943 → 677,918) — rate-wise this is consistent with more concurrent
+> sports writing at once (NCAAF added), not a new problem; races remain
+> self-detected and non-corrupting by design.
+
+**#234**
+
+**#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
 #215, collided with a concurrent session's unrelated #215/#216 board/ranking
 work `ba5d1e58`; renumbered to #221; #221 turned out to also be taken by that
