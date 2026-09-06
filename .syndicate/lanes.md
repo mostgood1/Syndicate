@@ -1728,6 +1728,20 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `test_nfl_live_lens_api_*` pair re-baselined earlier today against unmodified
   HEAD; they touch no file this lane changed.
 - **Not deployed and none needed:** `vendor/**` and a checker, no `render.yaml`.
+- **OWED ITEM DISCHARGED 2026-09-06 — the 5 fixes are open as upstream PRs**, so a
+  vendor re-pull carries them instead of reverting them:
+  [NBA-Betting#1](https://github.com/mostgood1/NBA-Betting/pull/1),
+  [WNBA-Betting#1](https://github.com/mostgood1/WNBA-Betting/pull/1),
+  [NHL-Betting#1](https://github.com/mostgood1/NHL-Betting/pull/1). All OPEN and
+  MERGEABLE; +0/-10, +0/-10, +0/-31.
+- **WHERE `vendor/` COMES FROM IS RECORDED NOWHERE IN THIS REPO** — no
+  `.gitmodules`, no `.git` under `vendor/`, no `pyproject`/`setup.py` in the
+  vendored trees, and `CLAUDE.md` says only "vendored sibling-repo code pulled in
+  directly". The mapping had to be derived from the account's repo list and then
+  confirmed by content: `vendor/nba_betting_repo` -> `mostgood1/NBA-Betting`
+  (default branch `main`), `vendor/wnba_betting_repo` -> `mostgood1/WNBA-Betting`
+  (`main`), `vendor/nhl_betting_repo` -> `mostgood1/NHL-Betting` (**`master`**,
+  not `main`), `vendor/mlb_bettingv2` -> `mostgood1/MLB-BettingV2`.
 
 ### web-oom-non-malloc-anon — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: NAME the `~150-205 MB` per web worker that is anonymous memory and is
