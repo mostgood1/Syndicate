@@ -67,19 +67,40 @@ This module adds only what the board needs and settlement does not: the ESPN
 Those are read straight off the same event mapping, so they cannot disagree
 with the state fields beside them.
 
-`scripts/poll_ncaaf_live_state.py` is owned by OPEN lane
-`ncaaf-settlement-resolver`; this module imports it READ-ONLY and changes
-nothing in it.
+`scripts/poll_ncaaf_live_state.py` used to be owned by lane
+`ncaaf-settlement-resolver`, which **CLOSED 2026-09-01** ("as unverifiable, not
+as done") -- the claim in the previous version of this comment was stale for
+five days. It is now the PRODUCER for this module (lane
+`ncaaf-live-state-to-worker`): it writes the record read below, and carries the
+board's `home_id`/`away_id`/`period`/`clock` alongside -- never inside --
+`_game_from_event`.
 
 --------------------------------------------------------------------------
-REQUEST PATH, DELIBERATELY, WITH THE SAME GUARD NFL USES
+WORKER-PRODUCED, WITH THE REQUEST-PATH FETCH KEPT AS A FALLBACK
 --------------------------------------------------------------------------
 
-This runs on web, in the cards builder, behind a TTL cache and
-`warn_if_compute_in_request_path` -- the identical shape
-`nfl/live_game_state.py` already uses in production for the same purpose. It is
-a bounded GET, never a computation, and it fails SOFT: any failure yields an
-EMPTY index, and an empty index leaves every card untouched. "State unknown"
+**THE FETCH IS NO LONGER THE PRIMARY PATH `[2026-09-06]`.**
+`ncaaf_game_state_index` first reads the record `poll_ncaaf_live_state` writes
+to the SHARED keyvalue store from a worker, and fetches ESPN only when that
+record is absent, unreadable, stale, or unkeyed. On a healthy platform web
+performs **zero** scoreboard fetches, which is what `CLAUDE.md`'s worker/web
+split requires: workers fetch, web reads.
+
+WHY IT MATTERED. This ran in the cards builder on every board build, behind a
+**45 s TTL cache that is PER PROCESS** -- and `WEB_CONCURRENCY = 2`, so every
+fetch happened twice. The payload is **1,441,192 bytes** uncompressed. The
+repo's own guard had been reporting it all along: 205
+`request_path_guard: compute in request path` warnings per 1,200 log lines.
+
+THE FALLBACK IS NOT VESTIGIAL AND MUST NOT BE DELETED. It is what makes the
+reader safe when no producer is running -- and when this landed, none was. A
+reader without it would answer an absent record with an EMPTY index, and an
+empty index means STATE UNKNOWN, which would render a live Saturday slate as
+pregame. Degrading to the old fetch is strictly better than degrading to a
+confidently wrong board.
+
+It is a bounded GET, never a computation, and it fails SOFT: any failure yields
+an EMPTY index, and an empty index leaves every card untouched. "State unknown"
 and "nothing is live" must never render the same way by accident, so callers
 get coverage counters (`matched` separately from `live`/`final`) rather than a
 single number that cannot distinguish a dead join from a quiet slate.
@@ -93,6 +114,7 @@ from __future__ import annotations
 
 import re
 import threading
+import os
 import time
 from datetime import datetime, timezone
 from typing import Any, Mapping
@@ -241,6 +263,77 @@ def _state_rows_for_date(iso_date: str) -> list[dict[str, Any]]:
     return rows
 
 
+def _worker_record_max_age_seconds() -> float:
+    """How fresh the worker's record must be to be used instead of fetching.
+
+    Default 240 s. The producer runs on live-odds-worker's live phase (~90 s
+    sweeps), so 240 s tolerates a missed sweep without going stale, while still
+    refusing a record old enough to pin the board to dead scores. ABSENT MEANS
+    240 -- a service nobody configured should still prefer the worker.
+    """
+    raw = str(os.environ.get("SYNDICATE_NCAAF_LIVE_STATE_MAX_AGE_SECONDS") or "").strip()
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 240.0
+    return value if value > 0 else 240.0
+
+
+def _rows_from_worker_record(iso_date: str) -> dict[str, dict[str, Any]] | None:
+    """The worker's record for one date, or None meaning "fetch instead".
+
+    None is returned for absent, unreadable, stale, or shape-wrong records --
+    every case where fetching is the right answer. It is NEVER returned as an
+    empty dict for those, because `{}` is a POSITIVE claim ("no games keyed")
+    and would suppress the fallback.
+    """
+    try:
+        from scripts.poll_ncaaf_live_state import live_state_path
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        record = read_json_file(live_state_path(iso_date))
+    except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
+        print(f"NCAAF_LIVE_STATE_RECORD_READ_FAILED date={iso_date} error={type(exc).__name__}: {exc}", flush=True)
+        return None
+
+    if not isinstance(record, Mapping):
+        return None
+
+    fetched_at = record.get("fetched_at")
+    if not isinstance(fetched_at, (int, float)):
+        # A record written before the producer carried a timestamp. Cannot be
+        # aged, so it cannot be trusted for a LIVE board.
+        return None
+    age = time.time() - float(fetched_at)
+    if age > _worker_record_max_age_seconds():
+        print(f"NCAAF_LIVE_STATE_RECORD_STALE date={iso_date} age_seconds={age:.0f}", flush=True)
+        return None
+
+    games = record.get("games")
+    if not isinstance(games, list):
+        return None
+
+    rows_by_key: dict[str, dict[str, Any]] = {}
+    for state in games:
+        if not isinstance(state, Mapping):
+            continue
+        away_id = str(state.get("away_id") or "")
+        home_id = str(state.get("home_id") or "")
+        if away_id and home_id:
+            rows_by_key[f"{away_id}@{home_id}"] = {**state, "date": iso_date}
+
+    if not rows_by_key:
+        # The record exists and is fresh but keys NOTHING -- the producer is
+        # running an older build with no `home_id`/`away_id`. Fetching is the
+        # right answer, and the line names it so a deploy skew is visible
+        # rather than looking like a quiet slate.
+        print(f"NCAAF_LIVE_STATE_RECORD_UNKEYED date={iso_date} games={len(games)}", flush=True)
+        return None
+
+    print(f"NCAAF_LIVE_STATE_FROM_WORKER date={iso_date} keyed={len(rows_by_key)} age_seconds={age:.0f}", flush=True)
+    return rows_by_key
+
+
 def ncaaf_game_state_index(dates: Any) -> dict[str, dict[str, Any]]:
     """Per-game ESPN state for the given dates, keyed `"{away_id}@{home_id}"`.
 
@@ -255,6 +348,18 @@ def ncaaf_game_state_index(dates: Any) -> dict[str, dict[str, Any]]:
             rows_by_key = dict(cached[1]) if cached is not None and now - cached[0] < _CACHE_TTL_SECONDS else None
 
         if rows_by_key is None:
+            # WORKER-PRODUCED RECORD FIRST. `poll_ncaaf_live_state` writes this
+            # to the SHARED keyvalue store, so on a healthy platform the board
+            # READS state instead of fetching it -- which is the whole point of
+            # `CLAUDE.md`'s worker/web split.
+            rows_by_key = _rows_from_worker_record(iso_date)
+
+        if rows_by_key is None:
+            # FALLBACK, and it is why this is safe to land before the producer
+            # exists: no record, or a stale one, and the board fetches exactly
+            # as it always did. The failure mode is today's behaviour, never an
+            # empty index -- an empty index means STATE UNKNOWN (see the module
+            # docstring) and would render a live slate as pregame.
             warn_if_compute_in_request_path("ncaaf_espn_game_state_fetch")
             rows_by_key = {}
             for state in _state_rows_for_date(iso_date):
