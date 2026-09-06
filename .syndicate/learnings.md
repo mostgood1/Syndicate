@@ -5250,3 +5250,38 @@ is a write to the shared system, not just communication.
   differ. A shared candidate list makes two different selectors give the same
   answer.
 
+
+## [2026-09-06] AN ATTRIBUTE'S NAME IS NOT ITS SEMANTICS, AND A REMEDY IS A CLAIM UNTIL YOU MEASURE IT
+
+Lane `git-out-of-onedrive`. I found `ReadOnly` on the directories under
+`.git/worktrees/` and reported, confidently, that "ReadOnly on the directories is
+exactly why deletion fails with Permission denied. That's the whole thing." Then
+I prescribed `attrib -R /S /D`.
+
+**Both halves were wrong, and each was wrong in a way the other hid.** Windows
+largely IGNORES `ReadOnly` on directories — it honours it on FILES, and the real
+blockers were the `logs`/`refs` files INSIDE each entry. And `attrib -R /S /D`
+did not clear it either: **118 ReadOnly before, 118 after**. The thing that
+works is `Remove-Item -Recurse -Force`, and it works because `-Force` overrides
+`ReadOnly` itself — not because anything I ran had prepared the ground.
+
+I only found out because I ran the remedy and counted afterwards. Had I run
+`Remove-Item -Force` first (as I did on one entry, which succeeded), I would have
+concluded `attrib` had worked and shipped a runbook step that does nothing.
+
+TWO RULES, and the second is the one that generalises past Windows:
+
+- **Do not infer a mechanism from a flag's NAME.** `ReadOnly`, `Offline`,
+  `PINNED` are OS-specific words whose behaviour differs by object type. Test the
+  mechanism on one instance before describing it, and before prescribing for it.
+- **A REMEDY IS A HYPOTHESIS. Count before and after.** "I applied the fix and
+  the operation then succeeded" does not establish that the fix did anything —
+  something else in the same command may be doing the work. Same shape as
+  *gate on the output, not the input* and *confirm the code ran*: assert the
+  thing you changed actually changed, not merely that the outcome improved.
+
+Related, same session: I called a `git worktree` lock "a deliberate act by
+whoever created it" and declined to clear it, without reading
+`.git/worktrees/<name>/locked`. It said `initializing` — git's own automatic lock
+from an abandoned `worktree add`. **Intent is a thing you read, not infer from a
+flag being set.**

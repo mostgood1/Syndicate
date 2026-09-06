@@ -1093,3 +1093,42 @@ version in history by itself. Separately, a later run on `lanes.md` returned
 exit 0 in 7.2s with **122 lines still unaccounted for by the cheap revs** — all
 found in OLDER commits. A line can sit in an older `origin/main` commit and not
 at its tip; only the all-refs sweep sees that.
+
+## [git-store-onedrive] ONEDRIVE MANAGES `.git` AND `.syndicate`, AND IT SILENTLY BREAKS `git worktree remove` `[2026-09-06, lane git-out-of-onedrive, commits cef79cf9 + 28ae6b5c, NO DEPLOY]`
+
+The repo is at `C:\Users\<user>\OneDrive\Coding\Syndicate`, so OneDrive's Cloud
+Files filter manages the working tree AND the git store. **The store is 5.9 GB**
+and is being synced to the cloud continuously. Measured attributes:
+
+    .git                    Directory + ReparsePoint + PINNED
+    .git\worktrees\<entry>  ReadOnly + Directory + Archive + ReparsePoint + PINNED
+                            and the logs/ + refs/ FILES inside each are ReadOnly
+    .syndicate              ReadOnly + Directory + Archive + ReparsePoint + PINNED
+
+**WHAT THIS BREAKS, and it fails half-way rather than loudly.** Windows honours
+`ReadOnly` on FILES, not directories. So `git worktree remove` deletes the
+worktree contents, then cannot delete `.git/worktrees/<name>` — leaving BOTH a
+stale registration and an empty husk directory. **Three occurrences in one
+session**, including on the cleanup's own worktrees.
+
+**AND THE STALE REGISTRATIONS ARE INVISIBLE.** A registration whose `gitdir`
+file is missing is hidden from `git worktree list` while still occupying
+`.git/worktrees/`. Measured 2026-09-06: `list` said **83** while the directory
+held **118**. 36 dead entries had accumulated unseen. Cleaned to 83/83/0.
+
+**THE OBVIOUS REMEDY DOES NOT WORK.** `attrib -R /S /D` left the count unchanged
+(118 ReadOnly before, 118 after). What works is PowerShell
+`Remove-Item -Recurse -Force`, because `-Force` overrides `ReadOnly` itself.
+Do not reach for `attrib`.
+
+**Relocation tooling exists and has NOT been run:** `scripts/move_git_store.py`
+(dry run by default, refuses on a dirty tree — it correctly returned
+`REFUSE: 10 tracked file(s) modified`), `tests/test_move_git_store.py`, runbook
+`docs/ai_context/git_store_relocation.md`. Worktree pointers are ABSOLUTE, so
+84 of them need rewriting; same-volume only, because 5.9 GB across volumes is a
+non-atomic copy+delete.
+
+**MOVING `.git` WOULD NOT FIX THE LEDGER.** `.syndicate/` carries the same
+attributes and is in the WORKING tree, so the CRLF-rewrite warning on every
+ledger append and OneDrive arbitrating ledger writes are unchanged by it.
+Ending that class means moving the repo, not the store.
