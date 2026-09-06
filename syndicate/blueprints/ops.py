@@ -328,7 +328,25 @@ def api_ops_wnba_refresh_decision() -> Any:
 # constant and asserted in tests, because "aggregates only" is a property that
 # decays silently: the natural way to answer the next question is to add one
 # more field, and three of those turn a counter into a money record over HTTP.
-_LEDGER_SUMMARY_FIELDS = ("orders", "filled", "staked_dollars", "by_status")
+#
+# `by_segment` ADDED 2026-09-05, and the guard is the reason it was reviewed
+# rather than appended. `4ffba395` added the field and left this tuple alone,
+# so the assertion went red on `main` -- which is the guard firing for exactly
+# the case it was written for. Making it green by typing one more name into
+# the tuple IS the decay described above, so the question it forces was
+# answered first: is `by_segment` a COUNTER or a RECORD?
+#
+# It is a counter. `{segment: {"orders": N, "settled": M}}` -- two integers,
+# both reached by `+= 1`, keyed by a bounded vocabulary (`full`,
+# `first_half`, ..., `(unset)`) that names no order, carries no price, ticker,
+# client id or player, and whose cardinality is set by the segment lexicon
+# rather than by the number of orders. That is the same shape and the same
+# risk class as `by_status`, which this tuple has always declared.
+#
+# THE TUPLE IS A REVIEWED ALLOWLIST, NOT A LIST TO KEEP UP TO DATE. If the
+# next field cannot survive that paragraph, the fix is to keep it out of the
+# bucket -- not to extend this line.
+_LEDGER_SUMMARY_FIELDS = ("orders", "filled", "staked_dollars", "by_status", "by_segment")
 
 
 @ops_bp.get("/api/ops/execution/ledger-summary")

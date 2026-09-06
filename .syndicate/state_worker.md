@@ -361,6 +361,8 @@ workers fetch, web reads artifacts, and `request_path_guard` logged **205 "compu
 request path" warnings in a 1,200-line sample**. `live-odds-worker` (**78.5% of billed
 worker egress**) was still undeployed at checkpoint.
 
+**Instrument note 2 — WORKER bandwidth buckets LAG WEB'S BY 45-90+ MINUTES, and a missing bucket is NOT a zero.** Observed twice: at 00:45Z web had the `00:00Z` bucket while both workers did not; at **02:40Z web reported `02:00Z` (38.6 MB) while refresh-worker and live-odds-worker still stopped at `01:00Z`** — 1h40m after that bucket closed. The services were verified **healthy and emitting logs** at the time, so the gap is the metrics pipeline, not the workload. **Do not read an absent bucket as 0** — a naive `dict.get(ts, 0)` renders the gap as a real reading of zero, which I did once tonight. Budget 90+ minutes before a worker's post-deploy hour is readable, and check web's latest bucket to tell lag from fault.
+
 **Instrument note:** bandwidth metrics are **hourly-only and RIGHT-labelled**
 (`resolutionSeconds < 3600` is silently ignored; the `00:00Z` bucket covers 23:00-00:00).
 

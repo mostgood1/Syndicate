@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 835 rules `[generated]`
+## Index — 838 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 306**
+**FORBIDDEN — 309**
 
 - [2026-09-05 — FORBIDDEN: a per-item guard implemented as an `A or B` search over a CONCA…](#2026-09-05-forbidden-a-per-item-guard-implemented-as-an-a-or-b-search-over-a-concatenation-of-every-items-source-whichever-item-supplies-b-satisfies-it-for-every-value-of-a-so-the-check-has-no-failing-input-at-all-lane-ncaaf-segment-capture-commits-7f197639-7dfabcf4-no-deploy)
 - [2026-09-01 — FORBIDDEN: citing `deploy_claim.py`'s `pid` as evidence a claim holder is…](#2026-09-01-forbidden-citing-deploy_claimpys-pid-as-evidence-a-claim-holder-is-gone-it-records-the-cli-processs-own-pid-which-exits-in-1s-so-every-claim-reads-as-dead-within-seconds-of-being-taken-i-broke-a-live-claim-on-it-lane-mlb-accuracy-assessment-reported-by-lane-open-lanes-cleanup)
@@ -242,6 +242,8 @@
 - [2026-09-05 FORBIDDEN: attributing a hazard to the change you just made without measurin…](#2026-09-05-forbidden-attributing-a-hazard-to-the-change-you-just-made-without-measuring-the-tree-without-it-and-ledger_invariants-does-not-catch-a-stale-tree-that-is-merely-missing-newer-blocks)
 - [2026-09-05 — FORBIDDEN: a JOIN test whose fixture builds BOTH SIDES from one set of nam…](#2026-09-05-forbidden-a-join-test-whose-fixture-builds-both-sides-from-one-set-of-names-the-key-match-is-then-a-tautology-and-it-reads-as-end-to-end-coverage-lane-ncaaf-live-resim-wire)
 - [2026-09-05 — FORBIDDEN: reading the RESIDUAL of a partial control as "the one that surv…](#2026-09-05-forbidden-reading-the-residual-of-a-partial-control-as-the-one-that-survived-a-control-is-only-a-control-over-the-population-it-actually-reaches-lane-nfl-la-rams-alias-corrected-by-ci-archives-nba-card-js)
+- [2026-09-05 — FORBIDDEN: inferring a workload's SHAPE from a reading taken on a CONTENDE…](#2026-09-05-forbidden-inferring-a-workloads-shape-from-a-reading-taken-on-a-contended-machine-a-saturated-machine-is-not-evidence-about-the-workload-lane-full-suite-xdist-run-self-retraction)
+- [2026-09-05 FORBIDDEN: attributing a workload to YOUR run because it appeared in a dump…](#2026-09-05-forbidden-attributing-a-workload-to-your-run-because-it-appeared-in-a-dump-your-run-emitted-a-machine-wide-process-dump-is-not-a-description-of-you)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -316,6 +318,7 @@
 - [2026-08-29 — FORBIDDEN: gating a verdict on ELAPSED TIME when the artifact carries its…](learnings_evidence.md#2026-08-29-forbidden-gating-a-verdict-on-elapsed-time-when-the-artifact-carries-its-own-build-stamp) `[evidence]`
 - [2026-08-29 — FORBIDDEN: closing a name-join gap by POPULATING an alias map, without fir…](learnings_evidence.md#2026-08-29-forbidden-closing-a-name-join-gap-by-populating-an-alias-map-without-first-checking-the-maps-source-carries-the-missing-name) `[evidence]`
 - [2026-08-29 — FORBIDDEN: never treat a `lanes.md` claim as evidence that anyone is holdi…](learnings_evidence.md#2026-08-29-forbidden-never-treat-a-lanesmd-claim-as-evidence-that-anyone-is-holding-the-file-lane-guardpy-has-no-liveness-notion-so-a-claim-outlives-its-session-forever) `[evidence]`
+- [2026-09-05 FORBIDDEN: attributing a workload to YOUR run because it appeared in a dump…](learnings_evidence.md#2026-09-05-forbidden-attributing-a-workload-to-your-run-because-it-appeared-in-a-dump-your-run-emitted-a-machine-wide-process-dump-is-not-a-description-of-you-lane-suite-order-pollution) `[evidence]`
 
 **EXONERATED — 6**
 

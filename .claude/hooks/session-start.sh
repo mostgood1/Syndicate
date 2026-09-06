@@ -348,7 +348,38 @@ for sf in .syndicate/state.md .syndicate/state_*.md; do
 done
 [ "$STATE_TOTAL" -gt 1100000 ] && BLOAT="${BLOAT}state total $((STATE_TOTAL/1024))KB>1074KB, "
 
-for f in lanes.md:240000 learnings.md:400000; do
+# learnings.md 400000 -> 460000, 2026-09-05 [USER DECISION], AFTER compacting.
+# The raise is second, not first, and that ORDER is the whole justification:
+# `compact_learnings.py --keep-from 2026-09-05` was run first and reclaimed
+# 64,557 B (462,498 -> 397,941), moving 40 entries' bodies to the evidence file
+# while their headings and rule lines stayed here. Conservation verified
+# independently of the tool: 896 headings before across learnings+evidence, 897
+# after (the +1 is a peer appending mid-run), ZERO lost, and learnings.md itself
+# still carries all 483 of its own headings.
+#
+# 460,000 = post-compaction 397,941 + 15.6%, which is the `current size + ~15%
+# headroom` rule the 2026-09-01 block above states. Deliberately NOT based on
+# the size right now (405,388): that number already includes ~7 KB peers
+# appended DURING the compaction, and sizing a cap to a moment of load is the
+# same error a peer made tonight reading an auto-managed pagefile mid-run and
+# calling it a precondition.
+#
+# WHY A RAISE WAS STILL RIGHT WHEN COMPACTION ALONE CLEARED THE CAP. It cleared
+# it by 2,059 B -- 0.5%. Measured this session, the file grew ~6 KB/hour across
+# an active multi-session evening and ~7 KB during the compaction window alone,
+# so a 0.5% margin is a red light again within the hour. That is the exact
+# failure the 2026-09-01 block names: `a cap that cannot be met by any
+# non-destructive operation is not a budget, it is a permanent red light -- and
+# a warning that is always on is one nobody reads.` 460,000 leaves ~55 KB, i.e.
+# 8-9 hours of fleet work, so it still FIRES on a runaway.
+#
+# WHAT THIS ALARM IS ACTUALLY MEASURING, because it is not sloppy writing:
+# ~40 new FORBIDDEN-class rules were appended in 36 hours by parallel sessions.
+# The number tracks the fleet's mistake-to-rule conversion rate. Read it that
+# way before compacting again -- and note compaction is now nearly spent, since
+# 369 of 432 dated entries are ALREADY stubs and re-moving them reclaims zero.
+# The next lever is not a raise and not a compaction; it is fewer, better rules.
+for f in lanes.md:240000 learnings.md:460000; do
   n=${f%%:*}; cap=${f##*:}
   if [ -f ".syndicate/$n" ]; then
     SZ=$(wc -c < ".syndicate/$n" 2>/dev/null | tr -d ' ')
