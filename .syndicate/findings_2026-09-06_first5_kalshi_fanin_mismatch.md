@@ -311,3 +311,45 @@ and the word `segment` did not occur in that module at all.
 (12:10 first pitch, rung 5), not the `...1340...-4` I had constructed. Their
 strings are read from the venue; mine were synthetic. Every replay above now
 uses theirs, which is why the reproduction is stronger than it was in §3.
+
+
+---
+
+## 11. HOW FAR THE DAMAGE REACHES — narrowed, and a wrong FILL is NOT reachable
+
+Measured on the deployed code with a fresh artifact (a stale one returns a false
+null on every row — the 45s venue ceiling; noted because the first run of this
+table read all-`None` for exactly that reason):
+
+| board row | Kalshi reprice |
+|---|---|
+| `first5` **`totals`** | **`-669`, `KXMLBTOTAL-26SEP061210MILCIN-5`** ← the defect |
+| `first5` `totals_alt` | none |
+| `first5` `spreads` / `spreads_alt` | none |
+| `full` `totals` | `-669`, same contract (correct) |
+| `full` `totals_alt` / `spreads*` | none |
+
+**The mis-priced population is MAIN-LINE `totals` only.** The Kalshi adapter
+publishes `totals` (and `h2h`; `spreads` refused), and — unlike the order path —
+`venue_quote_fanin` does **not** collapse `_alt` onto the main line:
+`base_market_for_alternate` is imported in `kalshi_board_join.py:350/371` and
+appears nowhere in `venue_quote_fanin.py`.
+
+**That asymmetry is what keeps a wrong FILL out of reach today.** A peer measured
+(`b8b54d2f`) that the only 4 orders ever carrying a `KXMLBF5*` ticker are **all
+on `_alt` rows**, and all four are `paper:kalshi` — no live-money F5 order
+exists. So the rows that are mis-priced (main-line) and the rows that can
+currently execute on Kalshi (`_alt`) are **disjoint**. And a main-line first5 row
+that did rank on the fabricated edge would meet `_segments_agree` at order build,
+which computes `first5 != full` for `KXMLBTOTAL` and refuses.
+
+**So the standing risk statement is unchanged and now has a mechanism behind it:
+this corrupts the BOARD, the EV, the ranking and anything grading against the
+board price. It does not produce a wrong fill.** What it can produce is a
+main-line first5 row ranking on a fabricated edge and then being refused at the
+venue — wasted selection capacity, not a wrong bet.
+
+**The thing that would change this** is either side of the asymmetry closing:
+`venue_quote_fanin` learning the `_alt` collapse, or Kalshi main-line totals
+becoming executable for segment rows. Neither is in this change; both are worth
+knowing before someone adds one.
