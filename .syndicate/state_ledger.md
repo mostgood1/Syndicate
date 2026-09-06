@@ -151,6 +151,43 @@ someone else's full `pytest tests/` 34.9 min in) with 10.9 of 31.6 GB free.
 That lane declined to start a third suite "rather than degrade theirs"; `-n 6`
 honours that and still finished.
 
+**CORRECTION 2026-09-05 21:2xZ — THE PAGEFILE IS AUTO-MANAGED, SO "THE
+CONSTRAINT CHANGED" WAS WRONG, AND IT WAS MY CLAIM.** I recorded the pagefile
+moving **4,864 MB -> 19,406 MB (4.0x)** as the condition that had changed since
+`suite-order-pollution`'s death. `AutomaticManagedPagefile = True`: Windows
+grows and shrinks it on demand. Three readings, ONE box, ONE configuration:
+
+    suite-order-pollution   4,864 MB   (its run dying)
+    me, 15:49, 6 peers      19,406 MB  (already inflated by the load)
+    me, 21:2x, near-idle    5,120 MB allocated, 54 MB in use
+
+**4,864 and 19,406 are the same setting in different states, not a settings
+change.** Nothing was reconfigured between their run and mine, so it cannot be
+why mine completed. A DEMAND-DRIVEN quantity read once is not a constraint.
+
+**AND THIS WEAKENS THE CAUSAL CLAIM BELOW, WHICH IS THE PART THAT MATTERS.** I
+argued the suite has no intrinsic 26 GB need because my run peaked at 7.05 GB
+with flat pagefile use. But `test_heap_roots`/`test_retainer_census` are the
+tests that allocate ~20 GB, **and they FAILED in both my runs** — so a low
+total is exactly what a run produces when the big allocators die early instead
+of allocating. The low peak may be a CONSEQUENCE of those failures rather than
+evidence against the need. `[peer lane ncaaf-live-resim-wire raised the
+competing hypothesis; the pagefile reading is mine]`
+
+**SO THE `test_heap_roots` MECHANISM IS STILL OPEN, AND MY "CONTAMINATION"
+READ IS NOT THE FAVOURITE ANY MORE.** Two hypotheses with DIFFERENT FIXES:
+*contamination* (they census every object in the interpreter, so a parallel
+worker's objects pollute the count) -> isolate them with a marker or
+`--dist=loadgroup`; *memory pressure* (~20 GB of allocation on a pagefile that
+sits at ~5 GB when idle) -> the box cannot run them in parallel at all and the
+pagefile is the defect. **A standalone PASS is consistent with both, so the
+check I reached for cannot discriminate** — the same shape as
+`[2026-09-05] A CONTROL THAT KILLS ONE ALTERNATIVE IS NOT A DISCRIMINATOR`.
+The discriminating measurement is their peak RSS run STANDALONE: a single-
+process peak near the ceiling means pressure. **NOT TAKEN, deliberately** — a
+peer pytest run was in flight at 21:2x and this is the experiment that already
+took one full suite down. It belongs on a genuinely idle box.
+
 **THE MEMORY RISK DID NOT MATERIALISE, and the number says which cause it was:**
 peak python RSS across the WHOLE machine **7.05 GB**, and pagefile usage FLAT at
 1,056-1,228 MB for the entire hour -- it never climbed once. So the earlier death
