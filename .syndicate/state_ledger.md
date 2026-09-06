@@ -1178,3 +1178,37 @@ non-atomic copy+delete.
 attributes and is in the WORKING tree, so the CRLF-rewrite warning on every
 ledger append and OneDrive arbitrating ledger writes are unchanged by it.
 Ending that class means moving the repo, not the store.
+
+## [full-suite-run-method] RUNNING THE FULL SUITE ON THIS MACHINE NEEDS BATCHING, AN ISOLATION RETRY AND A PINNED MANIFEST — and the failure LIST expires within hours `[2026-09-05/06, lane nfl-fantasy-artifact-root]`
+
+**`py -3 -m pytest tests/` IN ONE PROCESS CANNOT FINISH.** 989 files / ~15.7k
+tests died at 31% with `OSError [WinError 1450] Insufficient system resources`
+creating a tmp_path, then INTERNALERROR/MemoryError formatting that error. Not a
+test defect: 4,866 tests had passed with 0 failures at that point.
+
+**A LONG-LIVED PARENT IS NOT ENOUGH EITHER.** Batching into 25 pytest processes
+ran batches 1-3 clean then failed EVERY batch from 4 on — WinError 1450 now on
+`stat()` of ordinary repo files, plus rc=3221225626 and conftest ImportErrors.
+Proof it was the environment: batch 4 re-run ALONE returned **489 passed**, and
+batch 3 went "5 failed, 2 errors" -> "375 passed" between runs. **A batch result
+is not trustworthy until reproduced in isolation.** Cause is contention — other
+sessions running pytest concurrently, one holding 16.7 GB.
+
+**THE CERTIFIED PASS (method that worked):** 25 batches of 40, one process each,
+**manifest PINNED** (a fresh glob re-slices every boundary — measured 987 -> 989
+files inside one hour, so a batch index stops naming the same files between
+restarts and a file can run twice or never), per-batch audit trail, isolation
+retry only for environmental signatures or NO SUMMARY, and a `settled` rule so a
+recorded failure is never re-run. Result: **989/989 files covered exactly once,
+0 skipped, 15,256 passed / 16 failed.**
+
+**THE FAILURE LIST FROM THAT PASS IS DEAD — DO NOT QUOTE IT.** Re-checked hours
+later against current `origin/main`: **all 16 green**. Peers had landed the
+fixes while the run was in flight (`0ad1480d`, `c353b47d`, `ff022d5d`,
+`782a057b`). The COVERAGE method holds; the failure list expires within hours on
+a repo with this many concurrent sessions. **Re-baseline against `origin/main`
+before offering any suite failure as work.**
+
+**AND A WORKTREE WITHOUT `data/` CANNOT ANSWER THE QUESTION.** The same re-check
+read "369 passed, 32 skipped" and looked green; the 32 skips WERE the
+data-dependent tests. Reading a skip count as a pass is how a real failure hides.
