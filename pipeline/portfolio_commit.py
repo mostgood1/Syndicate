@@ -704,6 +704,30 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
         # doubleheader contracts that day were on a series with no sport
         # mapping; `> 0` on any later slate settles it from the logs alone.
         f" doubleheader_resolved={joined.get('doubleheader_resolved')}"
+        # THE SAME THREE COUNTERS THE ODDS-SIDE EMITTER PRINTS, and they matter
+        # MORE here: this is the join whose output becomes an ORDER, so a
+        # duplicate bet or a wrong-series pairing costs money on this path and
+        # only coverage on the other.
+        #
+        # WHICH SERIES A SEGMENT ROW MET, both directions. Kalshi lists
+        # `KXMLBF5TOTAL-...-5` and `KXMLBTOTAL-...-5` for the SAME game at the
+        # SAME strike, and `_row_market()` strips the segment on purpose so both
+        # key as (event,'totals',4.5). `_segments_agree` separates them --
+        # unprinted, "which contract priced this row" was an inference.
+        f" segment_matched_series={joined.get('segment_matched_series')}"
+        f" segment_refused_series={joined.get('segment_refused_series')}"
+        # ALT/MAIN COLLAPSE RATE. `_row_market()` also strips `_alt`, so a
+        # main-line row and an alternate row for one bet key identically and
+        # `_collapse_duplicate_bets` picks one. Replay measured ~1 per 78
+        # collapsed keys -- a ZERO here is worth a second look, not a
+        # celebration. It shipped RETURNED BUT PRINTED NOWHERE (`21aac548`, live
+        # in `58302f07`), so the rate this tie-break decides was unmeasurable.
+        f" alt_main_collisions={joined.get('alt_main_collisions')}"
+        # Named refusals last: `reasons` is a dict repr and anything after it is
+        # harder to read and to parse. The odds-side emitter learned this the
+        # expensive way -- two sessions appended to it within minutes and the
+        # merged line stranded four fields behind the dict and printed
+        # `alt_main_collisions` twice.
         f" reasons={reasons}",
         flush=True,
     )

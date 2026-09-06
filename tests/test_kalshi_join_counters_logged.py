@@ -115,3 +115,60 @@ def test_the_line_still_carries_what_it_carried_before(capsys, _game_lines_on):
     line = _emitted(capsys, [], [_board_row()])
     for token in ("kalshi_markets=", "board_rows=", "matched=", "reasons="):
         assert token in line, (token, line)
+
+
+# ---------------------------------------------------------------------------
+# BOTH EMITTERS, checked at the SOURCE.
+#
+# There are two `KALSHI_BOARD_JOIN` prints -- `[kalshi_odds]` in
+# `kalshi_odds_refresh` and `[portfolio_commit]` in `portfolio_commit`. The
+# second is the one whose output becomes an ORDER, so a counter missing there
+# costs more than one missing in the first. They drifted apart for a whole
+# deploy and nothing noticed, because each file's tests only ever looked at its
+# own line.
+#
+# Driving the `portfolio_commit` emitter through stdout needs the whole commit
+# path stood up, so this reads the f-string from the SOURCE instead. Weaker than
+# capturing output -- it proves the field is written, not that it renders -- but
+# it is the check that would have caught the duplicate merge in either file, and
+# the stdout tests above cover rendering for the emitter that can be driven.
+# ---------------------------------------------------------------------------
+
+_EMITTERS = {
+    "kalshi_odds_refresh": ("pipeline/kalshi_odds_refresh.py", '"[kalshi_odds] BOARD_JOIN"'),
+    "portfolio_commit": ("pipeline/portfolio_commit.py", '"[portfolio_commit] KALSHI_BOARD_JOIN'),
+}
+
+_REQUIRED = ("segment_matched_series", "segment_refused_series", "alt_main_collisions")
+
+
+def _emitter_fields(path: str, anchor: str) -> list[str]:
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1] / path
+    text = src.read_text(encoding="utf-8")
+    start = text.index(anchor)
+    end = text.index("flush=True", start)
+    return re.findall(r'f"[^"]*? ([a-z_]+)=\{', text[start:end])
+
+
+@pytest.mark.parametrize("name", sorted(_EMITTERS))
+@pytest.mark.parametrize("field", _REQUIRED)
+def test_both_emitters_print_every_counter(name, field):
+    path, anchor = _EMITTERS[name]
+    assert field in _emitter_fields(path, anchor), f"{name} does not print {field}"
+
+
+@pytest.mark.parametrize("name", sorted(_EMITTERS))
+def test_neither_emitter_prints_a_field_twice(name):
+    path, anchor = _EMITTERS[name]
+    fields = _emitter_fields(path, anchor)
+    dupes = {f: c for f, c in Counter(fields).items() if c > 1}
+    assert not dupes, f"{name} emits twice: {dupes}"
+
+
+@pytest.mark.parametrize("name", sorted(_EMITTERS))
+def test_reasons_is_last_in_both_emitters(name):
+    path, anchor = _EMITTERS[name]
+    fields = _emitter_fields(path, anchor)
+    assert fields[-1] == "reasons", f"{name} field order: {fields}"
