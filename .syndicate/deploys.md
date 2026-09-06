@@ -640,6 +640,22 @@ same expected effect, same measurement, same reader.
 - **WHAT THIS CHANGE IS ACTUALLY WORTH, stated so nobody quotes a ratio as money:** it removes inbound bytes, receiver memory and decode time — real and useful on 2 GB instances (`#632`) — and **does not reduce the metered bill through that path.** The publish-transport gzip (13.0x, 122 MB/10 min) is likewise internal and unbilled.
 - **STILL UNIDENTIFIED: what web's 19.34 GB is.** Served responses, internal transport, public ingress, deploys and now inbound fetches are each eliminated by measurement.
 
+## 2026-09-06 19:10:45-19:13:50Z — web `2b3c1974` -> `56f80c4d` — **THE ROW DATA ITSELF: the flag now takes 32.8% off the served payload, up from 9.0%.** — lane `intelligence-query-payload-dedup`
+
+- **verify — SERVED payload, same question, same minute, flag off vs on:**
+
+    {"slim_aliases":true}                                 1,323,150 B gzipped
+    {"slim_aliases":true,"drop_row_diagnostics":true}       889,702 B gzipped
+                                                           **-32.8%**
+
+  (9.0% at the previous deploy; the absolute numbers differ because the slate shrank from 1,497 to 1,082 rows.) Predicted 22.9% additional on the pre-deploy payload.
+- **verify — CORRECTNESS on the wire, all three lists, 1,082 rows each:** every one of the **11 dropped fields present on 0 rows**; every one of the **7 kept fields present on all 1,082**; **0 rows** still carrying a null `movement` value; and **`quote.fair_probability` on 1082/1082**. All four declarations served (`_dropped_row_fields`, `_dropped_quote_fields`, `_dropped_movement_fields`, `_dropped_row_aliases`).
+- **verify — the page still renders** with the client now rebuilding per-row aliases: `run-syndicate` driver, `/intelligence`, exit 0 (it exits non-zero and prints on any console or page error).
+- **THE GZIPPED SAVING EXCEEDED THE RAW ONE THIS TIME — 22.9% vs 18.1%** — because removing highly repetitive structures helps compression. At the previous deploy I assumed the opposite and was wrong by half. Measured both ways rather than reasoned about, both times.
+- **WHY `quote` COULD BE TOUCHED AT ALL, and it is not "I grepped it".** Zero hits across BOTH consumers in every access form — `.name`, `["name"]`, bare word, string literal — AND nothing consumes `quote` generically: no `Object.keys`/`Object.entries`/`for..in`/`JSON.stringify`/spread. **`fair_probability` is the counter-example that forced that standard:** it greps 0 in the HTML and is used 34 times in the other consumer, so a single grep over one file would have "proved" it droppable. It is not in the list, and the served payload confirms it survives on every row.
+- **THREE KINDS OF WASTE NEEDED THREE CONTRACTS.** Unreferenced (`quote` sub-fields, `trace`, `score_breakdown`) — gone, declared. All-null (`movement`, 1,497/1,497) — dropped on the VALUE not the name, so a slate that populates them keeps them; safe only because the client is already `undefined`-tolerant there (`Array.isArray`, `numericValue`, and an explicit `!== undefined && !== null` at `:1403` — checked, not assumed). Byte-identical duplicates (`market_key`/`game_pk`/`selection`, 1,497/1,497) — these ARE read, so they are **rebuildable aliases**, declared and restored client-side, which is `_slim_response_aliases`' own contract applied at the row level it never reached.
+- **Cumulative effect on the chronic driver:** this endpoint was 81% of web's chronic egress at ~1.05 GB/day. **~0.34 GB/day now comes off it.** It still does not put the workspace under 25 GB on its own.
+
 ## 2026-09-06 18:22:35-18:25:44Z — web `58302f07` -> `2b3c1974` — **MEASURED ON THE SERVED PAYLOAD: 9.0% off the wire on web's single largest endpoint.** — lane `intelligence-query-payload-dedup`
 
 - **verify — the SERVED payload, same question, same minute, flag off vs on:**
