@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 861 rules `[generated]`
+## Index — 863 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2772,4 +2772,28 @@ still not count.
   `syndicate/ pipeline/ scripts/ tests/` returned **8 files**, not dozens, which
   is what made an EMPTY allowlist possible. Keep it empty -- an allowlist with
   entries in it is where the next real one hides.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-06 A CHECKER'S COVERAGE CLAIM IS ONLY AS GOOD AS THE FILES IT COULD PARSE. COUNT WHAT IT SKIPPED, NOT ONLY WHAT IT FOUND
+
+- **The rule going forward.** `check_duplicate_module_names.py` read sources as
+  `utf-8`. Every BOM'd file therefore raised
+  `SyntaxError: invalid non-printable character U+FEFF` and was SKIPPED. Measured
+  over `vendor/`: **`utf-8` skips 46 files and reports 10 duplicates; `utf-8-sig`
+  skips 0 and reports 12.** Python's own import machinery decodes with
+  `utf-8-sig`, so those files import fine; only the checker could not read them.
+  **The skip was REPORTED** as ERROR lines and still did not register, because
+  the run was piped through `tail` and I read `EXIT=0` off the pipe rather than
+  the script. Then, writing the fix up, I gave the skip count as **15** -- read
+  off that same `tail`-truncated list -- and it reached a code comment, a test
+  docstring and a commit message before I measured it. **I made the error the fix
+  is about while documenting the fix.** Three lessons: (a) parse with `utf-8-sig`
+  when analysing source you did not write; (b) **a checker that returns "clean"
+  over N files has told you nothing until you know N and how many it could not
+  read** -- a skipped file is indistinguishable from a clean one in any output
+  that reports only findings; (c) a piped `$?` is `tail`'s exit code, not the
+  command's. Corollary that made this visible at all: **widening a check's scope
+  is how you discover the check's own blind spots** -- this defect existed from
+  the moment the script was written and was invisible while it scanned only owned
+  code, where nothing carries a BOM.
 - *(evidence in `learnings_evidence.md`)*

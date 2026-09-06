@@ -25443,3 +25443,38 @@ it reads negative.**
   line, one cost nothing, one disabled tests. The failure mode does not announce
   which kind it is, and review cannot tell them apart at 1,000+ lines of
   separation.
+
+## 2026-09-06 A checker's coverage claim is only as good as the files it could parse
+
+- **What we believed:** that `scripts/check_duplicate_module_names.py`, having
+  been extended to `vendor/`, had reported the vendored duplicate set -- 10 of
+  them -- and that its exit code said so.
+- **What was actually true:** it had SKIPPED 46 files it could not parse, and the
+  real count was 12. The scanner opened sources with `encoding="utf-8"`, so a
+  leading BOM reached `ast.parse` as `\ufeff` and raised
+  `SyntaxError: invalid non-printable character U+FEFF`. Those files import
+  perfectly well -- CPython's loader decodes source with `utf-8-sig` -- so the
+  defect was entirely in the checker. The two hidden findings were
+  `vendor/wnba_betting_repo/app.py: _ev_from_prob_and_american` and
+  `vendor/wnba_betting_repo/src/wnba_betting/cli.py: fetch_rosters_cmd`, both of
+  which differ between their shadowed and live definitions.
+- **How we found out:** re-running the scan with `utf-8-sig` and comparing:
+  15 parse errors / 10 duplicates -> 0 parse errors / 12 duplicates.
+- **The reading that misled me, and it is the reusable part:** the very first
+  vendor scan printed all 15 ERROR lines AND `EXIT=0`. The exit code was
+  `tail`'s, taken from `$?` after a pipe, not the script's -- the script would
+  have returned 2. I had the skip count on screen and read past it because the
+  summary line said what I expected. **A findings-only summary cannot distinguish
+  a clean file from an unread one**, so a check must report its denominator, and
+  a piped `$?` is not the command's exit code.
+- **The rule going forward:** parse third-party source with `utf-8-sig`; make a
+  checker state how many files it read and how many it skipped; and never read an
+  exit code off the end of a pipe. Pinned by a regression test asserting a BOM'd
+  file produces a finding rather than an error.
+- **Cost:** none realised -- caught while widening scope, before the pin was
+  written, so the frozen baseline has all 12 rather than 10. Had it not been
+  caught, the two missing entries would have shown up later as NEW-IN-VENDOR on
+  an unrelated vendor sync and been blamed on that sync.
+- **Also worth keeping:** the defect was invisible for as long as the check
+  scanned only owned code, because nothing there carries a BOM. Widening a
+  check's scope tests the CHECK, not only the new files.

@@ -1612,6 +1612,57 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   than assumed.
 - Blocked by: none.
 
+### dup-module-defs-vendor — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`77aaff4b`. Six roots now, not four.** Repo-root (`app.py`, `run_debug.py`, `run_tests_wrapper.py`, `wsgi.py`) all CLEAN, so free coverage. `vendor/`'s **12** duplicates are PINNED in `VENDOR_BASELINE`, not failed — every pair DIFFERS, they are upstream's, and failing on all 12 leaves a permanently-red gate, which gets muted, which costs the owned-code coverage that is the point. New-in-vendor FAILS; a pin entry that stops matching is reported STALE and also fails, so the pin cannot rot into the general-purpose allowlist this check deliberately does not have. **`ALLOWLIST`, which governs OWNED code, is still EMPTY.** **A REAL DEFECT IN MY OWN CHECK, exposed only by widening its scope:** it read sources as `utf-8`, so every BOM'd file raised `SyntaxError: U+FEFF` and was SKIPPED. Measured over `vendor/`: **`utf-8` skips 46 files and reports 10 duplicates; `utf-8-sig` skips 0 and reports 12.** Python's import machinery uses `utf-8-sig`, so those files import fine — only the checker could not read them. Regression test added. **I FIRST WROTE THAT NUMBER AS 15, off a `tail`-truncated error list** — the same findings-only-summary failure the fix is about, made while documenting the fix. Corrected by measuring both encodings. **NOT EDITED: any `vendor/**` source.** The 12 include `_ev_from_prob_and_american` (EV math, two implementations) in both `nba_betting_repo/app.py` and `wnba_betting_repo/app.py`, which owned code IMPORTS (`syndicate/features/{nba,wnba}/live_lens.py`), plus `props_project_all` where a 3-line alias shadows a ~514-line implementation. Surfaced to the user as a separate decision, not taken unilaterally. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: `scripts/check_duplicate_module_names.py` covers `vendor/` and the
+  repo-root `*.py` files, and a NEW duplicate in either fails the check —
+  without a permanently-red gate over code we do not own.
+- Files: `scripts/check_duplicate_module_names.py`,
+  `tests/test_duplicate_module_names.py`. Collision check 2026-09-06: named by no
+  OPEN lane (only by this session's own CLOSED `dup-module-defs` block).
+  NOT editing any `vendor/**` source — see below.
+- Hypothesis: n/a (static facts, already measured).
+- **MEASURED BEFORE WRITING ANYTHING.** Repo-root: `app.py`, `run_debug.py`,
+  `run_tests_wrapper.py`, `wsgi.py` — all four CLEAN, so adding them is free.
+  `vendor/`: 609 files, 4.4 s, **12 duplicates**, and every pair DIFFERS
+  substantially — `_ev_from_prob_and_american` (EV math) in both
+  `nba_betting_repo/app.py` and `wnba_betting_repo/app.py`, `props_project_all`
+  in `nhl_betting_repo` where the shadowed def is a 3-line alias and the live one
+  is a 514-line implementation, `__all__` in `shifts_api.py` exporting 2 names
+  shadowed vs 4 live. **Both `app.py` files are imported by owned code**
+  (`syndicate/features/{nba,wnba}/live_lens.py` import `_live_lens_tick_payload`
+  from them), so these are dead definitions inside modules we load.
+- **A REAL DEFECT IN THE CHECKER, found by this extension.** It read sources as
+  `utf-8`, so 15 BOM'd files under `vendor/wnba_betting_repo/tools/` raised
+  `SyntaxError: invalid non-printable character U+FEFF` and were SKIPPED. Python's
+  own import machinery decodes with `utf-8-sig` and handles them fine. Those skips
+  hid **2 of the 12** findings. A parse error that skips a file is the
+  unknown-defaults-permissive shape.
+- Falsification test: if the vendored finding set cannot be frozen without
+  churn — i.e. it changes for reasons unrelated to a vendor sync — the freeze is
+  the wrong mechanism and vendor should be advisory-only.
+- Verification: repo-root and `vendor/` both scanned; owned-code allowlist still
+  EMPTY; the 12 vendored findings pinned; `off != on` — an injected duplicate in
+  a repo-root file AND in `vendor/` each make the check exit non-zero, and a
+  pinned vendor entry that disappears is reported as stale rather than lingering.
+- Blocked by: none.
+- **Verification ran.** `off != on` at CLI level for BOTH new roots: baseline
+  exit 0; a duplicate planted in a repo-root file prints `DUPLICATE` and exits 1;
+  a duplicate planted under `vendor/` prints `NEW-IN-VENDOR` and exits 1; both
+  removed, exit 0, no probe files left behind. 11 tests pass (4 new, plus one
+  that a narrowed `--roots syndicate` run does NOT report the whole pin as
+  stale — a check that cries wolf on a narrowed run gets run with `|| true`).
+- Parsing vendored code also pushed 13 `DeprecationWarning: invalid escape
+  sequence` into every test run's warning summary; suppressed around the parse,
+  since this function analyses source it never executes and those warnings
+  already reach anyone who imports the modules. Letting them accumulate is how a
+  check earns a blanket `-W ignore` that would hide our own.
+- Cost: `vendor/` is 609 files / 4.4 s for the CLI; the test file went 11 s → 23 s.
+- **OWED, and it is a decision rather than work:** whether to delete the 12
+  shadowed vendored definitions. Arguments both ways are in the commit message —
+  a vendor sync would clobber the edits, but two of the files are imported by
+  owned code. Precedent exists for editing `vendor/**` when the user asks
+  (`vendor/mlb_bettingv2/.../build_season_betting_cards_manifest.py`, 2026-08-31).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 861 rules `[generated]`
+## Index — 863 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -343,7 +343,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 532**
+**Rules and corrections — 534**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -429,6 +429,7 @@
 - [2026-09-06 REQUIRED: write a belief in the form that makes a PREDICTION. A wrong rule a…](#2026-09-06-required-write-a-belief-in-the-form-that-makes-a-prediction-a-wrong-rule-about-a-mechanism-gets-caught-in-minutes-the-same-wrong-belief-as-a-one-off-remedy-is-simply-adopted-insight-from-lane-prop-region-knob-recorded-by-lane-shortlist-prop-row-duplicates)
 - [2026-09-06 - COMMITTING A LANE BLOCK IS NOT CLAIMING IT. LANDING IS.](#2026-09-06---committing-a-lane-block-is-not-claiming-it-landing-is)
 - [2026-09-06 A DUPLICATE MODULE-LEVEL NAME IN A TEST FILE SILENTLY UN-RUNS TESTS. A GREEN…](#2026-09-06-a-duplicate-module-level-name-in-a-test-file-silently-un-runs-tests-a-green-suite-is-not-evidence-they-ran----count-collected-not-passed)
+- [2026-09-06 A CHECKER'S COVERAGE CLAIM IS ONLY AS GOOD AS THE FILES IT COULD PARSE. COUN…](#2026-09-06-a-checkers-coverage-claim-is-only-as-good-as-the-files-it-could-parse-count-what-it-skipped-not-only-what-it-found)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
@@ -870,6 +871,7 @@
 - [2026-09-03 — a census is only as wide as its pattern: "prose only" for five scripts my…](learnings_evidence.md#2026-09-03-a-census-is-only-as-wide-as-its-pattern-prose-only-for-five-scripts-my-own-refactor-had-just-broken) `[evidence]`
 - [2026-09-04 WHEN A COMMIT NARROWS A PREDICATE, THE DOCSTRING IS PART OF THE PREDICATE —…](learnings_evidence.md#2026-09-04-when-a-commit-narrows-a-predicate-the-docstring-is-part-of-the-predicate-a-stale-contract-line-does-not-read-as-stale-it-reads-as-corroboration-for-whichever-test-still-encodes-the-old-rule-lane-soccer-card-final-state) `[evidence]`
 - [2026-09-06 A duplicate module-level name in a test file silently un-runs tests](learnings_evidence.md#2026-09-06-a-duplicate-module-level-name-in-a-test-file-silently-un-runs-tests) `[evidence]`
+- [2026-09-06 A checker's coverage claim is only as good as the files it could parse](learnings_evidence.md#2026-09-06-a-checkers-coverage-claim-is-only-as-good-as-the-files-it-could-parse) `[evidence]`
 - [2026-08-12 — Do not batch changes during a diagnosis](learnings_archive.md#2026-08-12-do-not-batch-changes-during-a-diagnosis) `[evidence]`
 - [2026-08-12 — A rate ceiling is not a fix](learnings_archive.md#2026-08-12-a-rate-ceiling-is-not-a-fix) `[evidence]`
 - [2026-08-12 — Parallel sessions on one problem need lane discipline](learnings_archive.md#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline) `[evidence]`
