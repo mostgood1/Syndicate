@@ -25126,3 +25126,61 @@ has been placed**, so the execution path beyond paper is still unexercised. The
 grading path is also untested for these: `bet_status.segment_refusal` refuses to
 grade a segment order, so these six will need the venue's own settlement or they
 sit ungraded. Neither is a defect found; both are unmeasured.
+
+## 2026-09-06 21:00:02Z — refresh-worker `bd658209` -> `30500f16` — **THE `board_rows` FIX IS CONFIRMED (655 == 655 across both emitters) AND THE COLLISION RATE NOW HAS ITS DENOMINATOR.** `[lane kalshi-join-counters-logged]`
+
+**My deploy, uncontested this time.** Sim `20260906_203651` waited out to
+`exit_code=0 duration_seconds=972`; claim acquired 20:54:20Z; preflight **CLEAR**
+for the exact target with only infrastructure processes. Deploy
+`dep-daet658n74is73fcrsb0` triggered 20:54:5xZ, live 21:00:02Z. Content-verified:
+`collapsed_bet_keys` and `board_rows={len(rows)}` present on `30500f16` and
+absent on `bd658209`.
+
+### The reading — first post-boot tick, 21:16:47Z / 21:17:19Z
+
+    [kalshi_odds]      board_rows=655  collapsed_bet_keys=655  alt_main_collisions=0  matched=199
+    [portfolio_commit] board_rows=655  collapsed_bet_keys=655  alt_main_collisions=0  matched=199
+
+    segment_matched_series = {}
+    segment_refused_series = {'full->KXMLBF5TOTAL': 4}
+
+**`board_rows` IS 655 ON BOTH EMITTERS — THE CORRECTION ABOVE IS CONFIRMED.**
+The previous tick read 1100 here and 1102 there, a gap I first wrote up as the
+board moving and which was actually `alt_main_collisions`. The two lines now
+report the same population under the same name.
+
+### `alt_main_collisions=0`, AND THE ZERO IS EXPLAINED RATHER THAN CELEBRATED
+
+The comment beside this counter says a zero is worth a second look. Taken:
+
+- `collapsed_bet_keys == board_rows == 655`, so every row keyed and every key
+  was distinct. Zero collisions is the ARITHMETIC CONSEQUENCE, not a silent
+  failure — a broken counter would show `collapsed_bet_keys < board_rows`
+  with collisions still 0, which is the inconsistent shape to watch for.
+- `segment_refused_series` carries only `full->KXMLBF5TOTAL: 4` — the MIRROR
+  direction. **No `first5->` entry at all**, so no segment row reached the join.
+- Confirmed against the board rather than inferred: `/api/board/layer2-shortlist`
+  at 21:2xZ returned **311 MLB rows, every one `segment='full'`, and ZERO rows
+  on an `_alt` market**.
+
+That closes the causal chain. Measured earlier today, **all 27 `_alt` rows on the
+board were segment rows and full-game carried none** — so an evening slate with
+no segment rows has no `_alt` rows, hence no main/alt pairs, hence no
+collisions. The counter is tracking its population correctly.
+
+**THE RATE IS THEREFORE `0 / 655` ON THIS TICK, AND THAT IS NOT A REFUTATION OF
+THE REPLAY'S ~1/78.** The replay ran on a mid-afternoon slate carrying 27 `_alt`
+rows; this tick had none. Comparable readings need a tick WITH segment rows —
+the 20:10 tick was one (2 collisions), and its denominator is now recoverable
+only for future ticks. **The honest state: the denominator is now printed, and
+the first tick to exercise it had an empty numerator population.**
+
+### What this deploy settles and what it does not
+
+Settled: both emitters agree on `board_rows`; `collapsed_bet_keys` is live on
+both; the collision rate is expressible as one ratio from one line.
+
+Not settled: a same-tick `collisions / collapsed_bet_keys` on a slate that
+actually contains `_alt` rows. Take it during afternoon MLB, when segment rows
+are on the board — they arrive near game time and drain as games finish, which
+is documented in the `1f032074` entry above.
