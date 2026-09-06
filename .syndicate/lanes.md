@@ -1663,6 +1663,72 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   owned code. Precedent exists for editing `vendor/**` when the user asks
   (`vendor/mlb_bettingv2/.../build_season_betting_cards_manifest.py`, 2026-08-31).
 
+### vendor-dupe-deletion — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`15f40071`. 5 DELETED, 7 CORRECTLY NOT — the ask was 'delete the 12' and only 5 were dead.** 51 lines removed, ZERO insertions. **Verified by OBSERVABLE SURFACE, not source diff:** a probe imported each edited module before and after and compared `_ev_from_prob_and_american` over 13 input combinations on both apps, all **89** Typer commands with callback/docstring/params, and `shifts_api.__all__` — IDENTICAL in every field. BOM on `wnba_betting_repo/app.py` and CRLF preserved. **THE 7 THAT ARE WORKING CODE:** `out` x2 and `cols_subset` x2 are sequential rebindings whose successor CONSUMES them (`cols_subset = [c for c in cols_subset if ...]`) — deleting gives `NameError`. `fetch_rosters_cmd` x2 is the interesting shape: the module NAME is dead but the OBJECT is not, because Click registers each function at decoration and the two decorators name their commands DIFFERENTLY — verified against click 8.1.7, the group holds BOTH `fetch-rosters-cmd` AND `fetch-rosters`. `backtest_daily_summary.py` is TWO SCRIPTS CONCATENATED: `if __name__ == '__main__': sys.exit(main(sys.argv))` sits BETWEEN the two defs, so as a script the first `main` runs and exits before the second exists, and as an import the second wins. **`VENDOR_BASELINE` 12 → 2.** — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: the genuinely-dead shadowed definitions in `vendor/` are gone, with the
+  served behaviour of each file proven unchanged; the rest are correctly NOT
+  deleted, and the checker stops flagging the ones that were never duplicates.
+- Files: `vendor/nba_betting_repo/app.py`, `vendor/wnba_betting_repo/app.py`,
+  `vendor/nhl_betting_repo/nhl_betting/cli.py`,
+  `vendor/nhl_betting_repo/nhl_betting/data/shifts_api.py`,
+  `scripts/check_duplicate_module_names.py`, `tests/test_duplicate_module_names.py`.
+  Collision check 2026-09-06: no OPEN lane claims any of them (the `vendor/`
+  claims at lanes.md:504/506 are `mlb_bettingv2` and RELEASED).
+- **THE ASK WAS "DELETE THE 12". ONLY 5 ARE DEAD. This is the finding, not a
+  caveat.** A shadowed module-level binding is dead only if NOTHING reads it
+  before the second binding executes AND no decorator captured the object.
+  Measured, per pair:
+  - **DEAD (5), deleting:** `_ev_from_prob_and_american` x2 (undecorated, never
+    read between), `props_collect` + `props_project_all`
+    (`@app.command(name='props-collect')` then `@app.command()` — Typer derives
+    the SAME name from the function, so the registry collapses to one and the
+    first is unreachable), `__all__` in `shifts_api.py` (plain literal, not
+    self-referential).
+  - **LIVE (7), NOT deleting:** `out` x2 and `cols_subset` x2 are ordinary
+    SEQUENTIAL REBINDINGS whose second RHS consumes the first value
+    (`cols_subset = [c for c in cols_subset if ...]`) — deleting gives
+    `NameError`. `fetch_rosters_cmd` x2 is `@cli.command()` then
+    `@cli.command('fetch-rosters')`: **Click registers BOTH, under
+    `fetch-rosters-cmd` AND `fetch-rosters`** — verified by running the decorator
+    pattern against click 8.1.7 — so the "shadowed" def is a working CLI command.
+    `backtest_daily_summary.py` is TWO SCRIPTS CONCATENATED: line 100 is
+    `if __name__ == '__main__': sys.exit(main(sys.argv))`, which runs the FIRST
+    `main` and exits before the second is ever defined, so as a script the FIRST
+    is live and as an import the SECOND is — deleting either changes behaviour.
+- **A DEFECT IN MY OWN CLASSIFIER, caught before it did damage.** v1 used a
+  strict `lineno < second.lineno` window and so missed that the second binding's
+  OWN right-hand side reads the name. It called both `cols_subset` pairs "safe to
+  delete"; acting on that would have shipped a `NameError` into two vendored
+  scripts.
+- Falsification test: if deleting a "dead" definition changes a file's observable
+  surface — the surviving function's source, a Typer/Click command set, or an
+  `__all__` value — then it was not dead and the classification is wrong.
+- Verification: per file, before/after comparison of the OBSERVABLE surface, not
+  the source diff; the checker's own suite still passes; `VENDOR_BASELINE` shrinks
+  to exactly the pairs that remain, each with the reason it is not deletable.
+- Blocked by: none.
+- **A DEFECT IN MY OWN CLASSIFIER, caught before it did damage — this is the
+  part worth keeping.** v1 used a strict `lineno < second.lineno` liveness window
+  and so never looked at the second binding's OWN right-hand side. It reported
+  both `cols_subset` pairs as "safe to delete". Acting on that would have shipped
+  a `NameError` into two vendored scripts. The window must be `lo < line <= end
+  of the next binding`.
+- `duplicates_in_source` now requires the earlier binding to be DEAD, which drops
+  `out`, `cols_subset` and `main` as the false positives they always were.
+  **Two guards that it did not weaken the check:** run against
+  `memory_observability.py` at `67af1276^` it STILL reports both
+  `_MALLOC_TRIM_STATE` and `_resolve_malloc_trim`, and reports clean at
+  `67af1276`; and a decorated pair is still reported even though the name is
+  dead, because REPORTED IS NOT SAFE TO DELETE.
+- Suites: check exits 0 with 2 pinned; `test_duplicate_module_names` 16 passed
+  (5 new); `test_nba_live_lens_routes` + `test_nba_live_snapshots_local` +
+  `test_live_lens_local` + `test_wnba_live_lens_published_cards_context` +
+  `test_wnba_live_lens_worker` **66 passed** — those cover the owned modules that
+  `import` the two edited `app.py` files. `test_archives -k "live_lens or nhl"`
+  89 passed / 2 failed, and the 2 are the same pre-existing
+  `test_nfl_live_lens_api_*` pair re-baselined earlier today against unmodified
+  HEAD; they touch no file this lane changed.
+- **Not deployed and none needed:** `vendor/**` and a checker, no `render.yaml`.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

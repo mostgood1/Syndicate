@@ -25478,3 +25478,46 @@ it reads negative.**
 - **Also worth keeping:** the defect was invisible for as long as the check
   scanned only owned code, because nothing there carries a BOM. Widening a
   check's scope tests the CHECK, not only the new files.
+
+## 2026-09-06 "Defined twice" is not "the first one is dead"
+
+- **What we believed:** that the 12 duplicate module-level names found in
+  `vendor/` were 12 shadowed, unreachable definitions, and that deleting the
+  earlier one of each pair was a mechanical, behaviour-preserving cleanup.
+- **What was actually true:** 5 were dead. The other 7 were live for three
+  different reasons, none of which is visible in a "this name is bound twice"
+  report:
+    * `out` x2 and `cols_subset` x2 -- ordinary sequential rebinding in a linear
+      script. `cols_subset = ['bin_low', ...]` then
+      `cols_subset = [c for c in cols_subset if c in out.columns]`. The first
+      value is consumed by the second statement.
+    * `fetch_rosters_cmd` x2 -- `@cli.command()` on the first, then
+      `@cli.command('fetch-rosters')` on the second. Click registers a command
+      when the decorator runs, so rebinding the module name afterwards does not
+      unregister it; the two decorators give DIFFERENT names, so the group ends
+      up with both `fetch-rosters-cmd` and `fetch-rosters`. The module NAME is
+      dead; the OBJECT is a working CLI command.
+    * `backtest_daily_summary.py: main` -- the file is two scripts concatenated,
+      with `if __name__ == '__main__': sys.exit(main(sys.argv))` sitting BETWEEN
+      the two definitions. Run as a script, the first `main` executes and the
+      process exits before the second is ever defined. Imported, the second wins.
+- **How we found out:** a liveness classifier over the AST, then -- for the
+  decorator cases -- RUNNING the decorator pattern against the installed click
+  8.1.7 and typer 0.12.5 rather than reasoning about their naming rules. They
+  behave oppositely: Click's derived name kept both commands, Typer's derived
+  name collapsed to one. Reading the decorators would have gotten one of the two
+  wrong.
+- **The near-miss, and it is the reusable part:** my FIRST classifier used a
+  strict `lineno < second_binding.lineno` window and therefore never examined the
+  second binding's own right-hand side. It reported both `cols_subset` pairs as
+  "safe to delete". Had I acted on that verdict, two vendored scripts would have
+  gained a `NameError` -- from a tool I wrote specifically to make this judgement
+  safe. The window has to be `lo < line <= end of the next binding`.
+- **The rule going forward:** verify a deletion against the file's OBSERVABLE
+  SURFACE, not its source diff. Here that meant importing each edited module
+  before and after and comparing the values `_ev_from_prob_and_american` returns
+  over 13 inputs, all 89 Typer commands with callback and parameters, and
+  `__all__` -- identical in every field. A source diff showing "only the dead
+  definition removed" would have looked equally clean for the 7 deletions that
+  were wrong.
+- **Cost:** none realised. 51 lines deleted, zero insertions, surface unchanged.

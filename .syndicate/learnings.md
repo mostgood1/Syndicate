@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 863 rules `[generated]`
+## Index — 865 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2796,4 +2796,26 @@ still not count.
   is how you discover the check's own blind spots** -- this defect existed from
   the moment the script was written and was invisible while it scanned only owned
   code, where nothing carries a BOM.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-06 A SHADOWED MODULE-LEVEL BINDING IS ONLY DEAD IF NOTHING READ IT *AND* NO DECORATOR CAPTURED THE OBJECT. "DEFINED TWICE" IS NOT "THE FIRST ONE IS DEAD"
+
+- **The rule going forward.** Asked to delete 12 duplicate module-level
+  definitions in `vendor/`, only **5** were actually dead. Three distinct reasons
+  the other 7 were live, and each needs its own test: (1) **a sequential
+  rebinding whose successor consumes it** -- `cols_subset = [c for c in
+  cols_subset if ...]`; deleting the first gives `NameError`, and the read is on
+  the SECOND binding's own right-hand side, so any liveness window that stops
+  before it reports the opposite of the truth. (2) **a decorator already captured
+  the object** -- `@cli.command()` then `@cli.command('fetch-rosters')` on the
+  same function name leaves the module name dead but registers TWO working
+  commands (`fetch-rosters-cmd` and `fetch-rosters`, verified by running the
+  pattern against click 8.1.7); Typer with a derived name collapses to one, so
+  the same shape goes the OTHER way and must be checked, not assumed. (3) **a
+  module-level `if __name__ == '__main__':` between the two definitions** --
+  `backtest_daily_summary.py` is two scripts concatenated, so as a script the
+  FIRST `main` runs and exits before the second is defined, and as an import the
+  second wins. **Verify a deletion by the file's OBSERVABLE SURFACE** -- the
+  values the surviving function returns, the command set the decorators register,
+  the `__all__` -- never by the source diff, which cannot see any of these.
 - *(evidence in `learnings_evidence.md`)*
