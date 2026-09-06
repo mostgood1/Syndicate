@@ -3658,6 +3658,22 @@
       // that does not slim simply sends everything and the rebuild is a no-op.
       // Measured 18.16 MB of a 36 MB payload once the self-mirror was gone.
       slim_aliases: true,
+      // Row-level diagnostics this page never reads. `trace` and
+      // `score_breakdown` ride on EVERY row of THREE lists (top_opportunities,
+      // ranked_all, board_contract.cards) at 2,004 rows each -- measured
+      // 2026-09-06 as 2.73 MB of a 17.4 MB payload, 15.7%, on top of what
+      // `slim_aliases` already removes.
+      //
+      // SEPARATE FLAG ON PURPOSE. `slim_aliases` promises the server dropped
+      // only keys we can REBUILD, and lists them in `_response_aliases`. These
+      // are not rebuildable -- they are gone. The server declares them in
+      // `_dropped_row_fields` so a missing key reads as "dropped on request"
+      // rather than "the server had no value", which is a different fact.
+      //
+      // Nothing here consults either field; `board_score_components` LOOKS
+      // like the same kind of thing and is deliberately NOT dropped, because
+      // `renderScoreParts` (~:3085) reads it.
+      drop_row_diagnostics: true,
     };
     // Only forward state.date to the server when it's a deliberate override
     // (URL deep link or the free-text date input) -- day-tab clicks set

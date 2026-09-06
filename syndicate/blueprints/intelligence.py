@@ -343,6 +343,90 @@ def _slim_response_aliases(response: Any) -> Any:
     return slim
 
 
+#: Row-level fields the query payload carries THREE TIMES and NOTHING READS.
+#:
+#: MEASURED on the live endpoint 2026-09-06 against the served payload
+#: (`slim_aliases=true`, i.e. AFTER the existing alias slimming):
+#:
+#:     payload                        17.4 MB raw / 2.51 MB gzipped
+#:       top_opportunities   2004 rows  6.59 MB
+#:       ranked_all          2004 rows  5.92 MB
+#:       board_contract.cards 2004 rows 5.91 MB
+#:
+#:     per list:  trace 0.40 MB   score_breakdown 0.51 MB
+#:     x3 lists:  2.73 MB = 15.7% of the payload
+#:
+#: CONSUMER SURVEY, and it is why only these two are here. This endpoint has
+#: exactly two consumers: `templates/intelligence.html` and
+#: `scripts/watch_clamp_trigger.py`. Neither mentions `trace` or
+#: `score_breakdown` anywhere. `board_score_components` LOOKS like a third
+#: candidate of the same kind and is NOT dropped -- `intelligence.html:3085`
+#: reads it (`const parts = (item && item.board_score_components) || {}`).
+#:
+#: WHY THIS IS NOT PART OF `slim_aliases`. That flag's contract is "dropped keys
+#: are provably REBUILDABLE, and `_response_aliases` says how". These are not
+#: rebuildable -- they are simply gone. Folding them into that flag would make
+#: its promise false for the fields that need it most, so this is its own
+#: opt-in with its own declaration.
+_UNCONSUMED_ROW_DIAGNOSTICS = ("trace", "score_breakdown")
+
+#: Lists whose rows carry them. Named explicitly rather than walked, so a new
+#: list elsewhere in the payload is NOT silently stripped by a future edit.
+_DIAGNOSTIC_ROW_LISTS = ("top_opportunities", "ranked_all", "recommendations")
+
+
+def _row_diagnostics_drop_requested(payload: Any) -> bool:
+    """Only drop when the caller asks. Absent means NO.
+
+    Same reasoning as `_alias_slim_requested`: the consumers of this endpoint
+    are not all in this repository, and an opt-in costs the caller one field
+    and costs everyone else nothing.
+    """
+    if not isinstance(payload, dict):
+        return False
+    return _query_bool(payload.get("drop_row_diagnostics"))
+
+
+def _drop_unconsumed_row_diagnostics(response: Any) -> Any:
+    """Strip `_UNCONSUMED_ROW_DIAGNOSTICS` from every row list, and SAY SO.
+
+    Declares `_dropped_row_fields` on the payload. A consumer that finds a
+    field missing can then see that it was dropped deliberately and which ones
+    -- rather than reading an absent key as "the server had no value", which is
+    a different fact and the one that would send someone debugging upstream.
+    """
+    if not isinstance(response, dict):
+        return response
+    slim = dict(response)
+    dropped = False
+
+    def _strip(rows: Any) -> Any:
+        nonlocal dropped
+        if not isinstance(rows, list):
+            return rows
+        out = []
+        for row in rows:
+            if isinstance(row, dict) and any(k in row for k in _UNCONSUMED_ROW_DIAGNOSTICS):
+                row = {k: v for k, v in row.items() if k not in _UNCONSUMED_ROW_DIAGNOSTICS}
+                dropped = True
+            out.append(row)
+        return out
+
+    for key in _DIAGNOSTIC_ROW_LISTS:
+        if key in slim:
+            slim[key] = _strip(slim.get(key))
+
+    contract = slim.get("board_contract")
+    if isinstance(contract, dict) and "cards" in contract:
+        contract = dict(contract)
+        contract["cards"] = _strip(contract.get("cards"))
+        slim["board_contract"] = contract
+
+    if dropped:
+        slim["_dropped_row_fields"] = list(_UNCONSUMED_ROW_DIAGNOSTICS)
+    return slim
+
+
 def _alias_slim_requested(payload: Any) -> bool:
     """Only slim when the caller asks. Absent means NO.
 
@@ -1923,6 +2007,8 @@ def intelligence_query_api():
                 response_payload.pop("response", None)      # `#632`: 50% of the payload
             if _alias_slim_requested(payload):
                 response_payload = _slim_response_aliases(response_payload)
+            if _row_diagnostics_drop_requested(payload):
+                response_payload = _drop_unconsumed_row_diagnostics(response_payload)
             versioned_response = _versioned_query_response(response_payload)
             versioned_response.update(_debug_state_fields(response_payload, source="combined_board_window"))
             # Was unconditionally None -- correct back when this branch was
@@ -1971,6 +2057,8 @@ def intelligence_query_api():
                     response_payload.pop("response", None)  # `#632`: 50% of the payload
                 if _alias_slim_requested(payload):
                     response_payload = _slim_response_aliases(response_payload)
+                if _row_diagnostics_drop_requested(payload):
+                    response_payload = _drop_unconsumed_row_diagnostics(response_payload)
                 versioned_response = _versioned_query_response(response_payload)
                 versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
                 versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
@@ -2037,6 +2125,8 @@ def intelligence_query_api():
                 response_payload.pop("response", None)      # `#632`: 50% of the payload
             if _alias_slim_requested(payload):
                 response_payload = _slim_response_aliases(response_payload)
+            if _row_diagnostics_drop_requested(payload):
+                response_payload = _drop_unconsumed_row_diagnostics(response_payload)
             versioned_response = _versioned_query_response(response_payload)
             versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
             versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
