@@ -65,7 +65,7 @@ id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
 markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
-### ncaaf-h1-kalshi-series — OPEN — opened 2026-09-06 — session 3492626c
+### ncaaf-h1-kalshi-series — **CLOSED-VERIFIED 2026-09-06** — `KXNCAAF1HTOTAL` registered and live (`fd704135` in `58302f07`, 14:55:30Z); the real title 'Over 6.5 1H points scored' classifies `status=ok`. Winner and spread deliberately NOT registered — both are declined by name upstream and the spread is the margin-vs-handicap class. — opened 2026-09-06 — session 3492626c
 - Goal: NCAAF first-half board rows can resolve a Kalshi ticker. Today 24 of 200
   Layer 2 shortlist rows are `segment=h1` (15 `totals`, 8 `spreads`, 1 `h2h`,
   all ncaaf, EV up to 5.14%) and NONE can execute: `sport_for_series` and
@@ -164,7 +164,7 @@ death, never life — do not invert it.
   shortlist (`shortlist-prop-row-duplicates`). Different endpoints, same shape.
 - Blocked by: none. All four files unclaimed on origin/main.
 
-### kalshi-match-series-observable — OPEN — opened 2026-09-06 — session 3492626c
+### kalshi-match-series-observable — **CLOSED-VERIFIED 2026-09-06** — which contract priced a row is now a READING on both emitters: `segment_matched_series` / `segment_refused_series` / `alt_main_collisions`, clean in production 20:10Z. It DISPROVED the alarm that built it — every segment match lands on `KXMLBF5*`, zero on `KXMLBTOTAL`, and the guard refused that pairing 59x in one join. — opened 2026-09-06 — session 3492626c
 - Goal: make the SERIES a board row matched observable, so "which contract did
   this row price from" is a reading rather than an inference.
 - Files: `syndicate/features/shared/kalshi_board_join.py`,
@@ -1454,7 +1454,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none for capture. Stakeability blocked on the grading deploy,
   which belongs to lane `segment-refusal-deploy`.
 
-### segment-refusal-deploy — OPEN — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **BLOCK RECONSTRUCTED 2026-09-05 by `ledger-repair-invariants`; see the reconstruction bullet before trusting any detail**
+### segment-refusal-deploy — **CLOSED-VERIFIED 2026-09-06** — segment orders no longer grade against the whole-game actual; refusal live on web+refresh-worker, `by_segment` added to `/api/ops/execution/ledger-summary`, and the 173 already-mis-settled orders re-graded (53 wrong, 30.6%, control reproduces the ledger 172/173). — opened 2026-09-05 — session 3492626c
 - Goal: `bet_status.segment_refusal` live on BOTH web and refresh-worker, so no
   segment row can become stakeable while the settlement key has no segment
   dimension.
