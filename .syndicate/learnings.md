@@ -5249,6 +5249,23 @@ is a write to the shared system, not just communication.
   your symptom, run BOTH resolvers on the failing input and check they actually
   differ. A shared candidate list makes two different selectors give the same
   answer.
+- **SWEPT 2026-09-06, and it is the ONLY instance.** The entry above closed with
+  "not swept for"; it has now been swept. Across all 989 test files, four tests
+  repoint an artifact root AND assert absence without disabling the fallback,
+  and all four are accounted for: one is this entry's own fixed test, and three
+  are FALSE POSITIVES whose `is None` / `== []` is not about an artifact at all
+  — `record["prior_attempts"]` on a fresh order
+  (`test_execution_ledger:2139`), `_artifact_date()` of a file the test just
+  WROTE (`test_live_gameline_accuracy:261`), and a quota latch the test cleared
+  (`test_ncaaf_games_cache_refresh:331`).
+- **The null result is only worth what the instrument is worth, so the sweep was
+  validated against the pre-fix file first: it flagged 3 of 3 known-bad tests.**
+  Its blind spots, stated: it matches `SYNDICATE_*_{SOURCE,DATA,ARTIFACT}_ROOT`
+  literals and a fixed set of absence forms, so a repoint done inside a FIXTURE
+  or helper, or an absence written as `len(x) == 0` / `assert not payload`,
+  would not match. This entry's own fixed test demonstrates that blind spot
+  exactly — once the guard moved into `_isolate_source_root`, the regex stopped
+  seeing it and reported the test as suspect.
 
 
 ## [2026-09-06] AN ATTRIBUTE'S NAME IS NOT ITS SEMANTICS, AND A REMEDY IS A CLAIM UNTIL YOU MEASURE IT
