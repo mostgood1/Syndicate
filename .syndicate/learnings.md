@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 835 rules `[generated]`
+## Index — 838 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -6226,3 +6226,8 @@ expensive rather than merely wrong.
 AND 12 workers instead of 6), so the 3.1x still cannot be split between them. It
 was enough to falsify the claim, and NOT enough to replace it with a number —
 recorded as such rather than quoted as a worker-scaling factor.
+
+## 2026-09-05 FORBIDDEN: attributing a workload to YOUR run because it appeared in a dump YOUR run emitted — a machine-wide process dump is not a description of you
+
+- **The rule going forward.** `ALL_PROCESS_MEMORY` / `PROCESS_TREE_MEMORY` enumerate **every process on the box**, so on a machine with parallel sessions your own output contains other lanes' worktrees, command lines and RSS. Reading one of those lines as "what my run was doing" is a single step and it reads exactly like evidence. **Before blaming a test file for your failure, prove it was IN YOUR TREE:** `git merge-base --is-ancestor <commit-that-added-it> <your HEAD>`. Mine was not — the file postdated my worktree by hours, so it could not have participated at all, and no amount of reasoning about its allocations was ever going to be relevant. Second half: a `tree_rss_mb` line is one process's tree, never a pytest total.
+- *(evidence in `learnings_evidence.md`)*

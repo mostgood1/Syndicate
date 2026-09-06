@@ -194,6 +194,36 @@ SERIES_SPORT: dict[str, str] = {
     # it has had.
     "KXMLBSB": "mlb",
     "KXMLBTOTAL": "mlb",
+    # FIRST FIVE INNINGS, and it is the same absence one segment deeper.
+    #
+    # `KXMLBTOTAL` was hand-registered above on 2026-08-25 because the title
+    # gate misses it. `KXMLBF5TOTAL` was missed by the SAME gate and nobody
+    # noticed, because a full-game contract was standing in for it: measured
+    # 2026-09-05, `sport_for_series("KXMLBF5TOTAL")` returned None, so
+    # `classify_market` refused at the FIRST gate with `unmapped_series` and
+    # every one of these markets was fetched each tick and thrown away.
+    # Production was quoting `KXMLBF5TOTAL-26SEP061340SFNYM-7` while
+    # `[kalshi_odds] TITLE` printed its title and nothing downstream could read
+    # it. Zero orders in a 2,853-order population have ever carried a
+    # `KXMLBF5*` ticker.
+    #
+    # NOT A COSMETIC GAP. Until 2026-08-28 a `first5`/`first3` board row could
+    # match full-game `KXMLBTOTAL` -- five real orders, $7.08 -- and the fix for
+    # that put `segment` in the join key, which correctly stopped the wrong
+    # fill. It could not produce the RIGHT one while this line was missing, so
+    # first-five was left unexecutable rather than mis-executed. That is the
+    # safe direction and it is not the finished one.
+    #
+    # `KXMLBF5SPREAD` is deliberately NOT registered here. A Kalshi spread
+    # states a MARGIN where the board writes a HANDICAP, and pairing those on
+    # magnitude alone put 11 orders on the club they were fading (see
+    # `[kalshi-venue-execution]`). That inversion is handled for full-game
+    # spreads and has earned its own verification; adding a segment to it is a
+    # separate risk class and a separate change.
+    # `KXMLBF5` (the first-five tie) needs no entry: it already refuses as
+    # `recognised_but_no_board_market`, which is correct -- there is no board
+    # market for a five-inning draw.
+    "KXMLBF5TOTAL": "mlb",
     "KXNBATOTAL": "nba",
     "KXNFLTOTAL": "nfl",
     "KXNCAAFTOTAL": "ncaaf",
