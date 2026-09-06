@@ -6191,3 +6191,38 @@ writing the rule about it needs a mechanical check, not attention.
 - **Cost:** none shipped — a false alarm retracted before anyone acted on it, plus one
   spawned session. **It repaid itself:** chasing why the asset would not load found a
   REAL production outage in that path (`[nba-betting-card-assets-404]`).
+
+## 2026-09-05 — FORBIDDEN: inferring a workload's SHAPE from a reading taken on a CONTENDED machine. A SATURATED MACHINE IS NOT EVIDENCE ABOUT THE WORKLOAD. `[lane full-suite-xdist-run, self-retraction]`
+
+I measured the full pytest suite at **61m06s** (`-n 6`) while six peer python
+jobs were running, sampled CPU, saw the machine turning only **~1.5 cores across
+ten processes** (7.2s of worker CPU per 8s wall over six workers), and wrote into
+`state_ledger.md`: *"this suite is I/O bound here, not CPU bound"* and *"do not
+quote 3.7x for this machine"* — contradicting a scope note that had measured 3.7x.
+
+A second run on an IDLE machine: **19m26s**. 3.1x faster. The claim was wrong and
+is retracted in place.
+
+**Why the reading could not have supported the conclusion.** Six peer jobs were
+contending for the same disk. Disk contention is *the* condition that makes any
+workload — CPU-bound ones included — show low CPU utilisation and long wall clock.
+So the observation was equally consistent with both hypotheses and discriminated
+neither. **A low-utilisation reading on a loaded box is a fact about the BOX.**
+
+This is the same family as `[2026-09-05] A CONTROL THAT KILLS ONE ALTERNATIVE IS
+NOT A DISCRIMINATOR`, but the tell is different and worth naming on its own:
+**the confound was ambient rather than in the experiment.** Nothing in the
+measurement looked wrong — the numbers were real, the arithmetic right, the
+sampling honest. What was missing was a baseline of the machine itself.
+
+**The rule.** Before attributing slowness to a workload's nature, record what
+else was running. If anything was, the reading bounds the workload's performance
+UNDER THAT LOAD and says nothing about its shape. Re-run on an idle machine
+before writing a characterisation into the ledger — especially one that tells
+future sessions to disregard an existing measurement, which is what makes this
+expensive rather than merely wrong.
+
+**And when you do re-run, change ONE variable.** My second run moved two (idle
+AND 12 workers instead of 6), so the 3.1x still cannot be split between them. It
+was enough to falsify the claim, and NOT enough to replace it with a number —
+recorded as such rather than quoted as a worker-scaling factor.
