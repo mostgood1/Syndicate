@@ -227,6 +227,19 @@ SERIES_SPORT: dict[str, str] = {
     "KXNBATOTAL": "nba",
     "KXNFLTOTAL": "nfl",
     "KXNCAAFTOTAL": "ncaaf",
+    # NCAAF FIRST HALF, registered 2026-09-06 for the same reason
+    # `KXMLBF5TOTAL` was on 2026-09-05: the title gate missed it, so
+    # `sport_for_series` returned None and `classify_market` refused at the
+    # FIRST gate with `unmapped_series` -- while production fetched these
+    # every tick and discarded them. Measured the same day: 24 of 200 Layer 2
+    # shortlist rows were `segment=h1` and not one could resolve a ticker.
+    #
+    # ONLY THE TOTAL. `KXNCAAF1H` (winner) and `KXNCAAF1HSPREAD` are declined
+    # by `recognised_unpriceable_title` BY NAME, upstream of this table, so
+    # registering them here would change nothing -- and the spread is the
+    # margin-vs-handicap risk class `KXMLBF5SPREAD` is excluded for. Both are
+    # separate decisions with their own arguments.
+    "KXNCAAF1HTOTAL": "ncaaf",
     "KXNCAABTOTAL": "ncaab",
     # ...and the moneyline/spread pair for the same sports, for the same
     # reason. `KXMLBGAME` and `KXMLBSPREAD` currently register only because a
@@ -1520,6 +1533,20 @@ _SERIES_SEGMENT: dict[str, str] = {
     "KXNBATOTAL": "full",
     "KXNFLTOTAL": "full",
     "KXNCAAFTOTAL": "full",
+    # NCAAF first half -- THE TOTAL ONLY, and the omission of the other two is
+    # the load-bearing part.
+    #
+    # `segment_for_series` returning **None** IS the refusal: an unmapped series
+    # carrying a segment marker is declined, which is what keeps a first-half
+    # contract from key-matching a whole-game board row. Listing a series HERE
+    # is an affirmative statement that we trade it, and it REMOVES that
+    # protection. `tests/test_kalshi_segment_marker_shape.py` pins exactly this
+    # -- `KXNCAAF1HSPREAD` is in its `SEGMENT_SPELLINGS` refuse-list.
+    #
+    # So `KXNCAAF1H` (winner) and `KXNCAAF1HSPREAD` are deliberately ABSENT and
+    # keep returning None. The spread is additionally the margin-vs-handicap
+    # risk class `KXMLBF5SPREAD` is excluded from trading for.
+    "KXNCAAF1HTOTAL": "h1",
     "KXNCAABTOTAL": "full",
     "KXWNBAGAME": "full",
 }

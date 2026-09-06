@@ -187,17 +187,39 @@ def test_split_doubleheader_refuses_shapes_that_are_not_one():
     assert _split_doubleheader("ABCG1") == (None, None), "needs 4+ leading letters"
 
 
-def test_a_segment_series_is_still_unmapped_and_that_is_KNOWN():
-    """The F5/1H/1Q series carry no sport, so they cannot resolve at all -- a
-    gap this fix does NOT close. Pinned so a future reader does not assume the
-    doubleheader work made Kalshi's segment inventory reachable."""
+def test_most_of_the_segment_inventory_is_STILL_unmapped():
+    """Kalshi's segment inventory is reachable ONE SERIES AT A TIME, on purpose.
+
+    This test used to assert that the whole F5/1H/1Q family carried no sport.
+    Two deliberate registrations have since been made, each with its own
+    argument, and the test asked to be updated alongside such a decision rather
+    than deleted:
+
+      `KXMLBF5TOTAL`   2026-09-05, lane mlb-first5-kalshi-execution (d2b060c8)
+      `KXNCAAF1HTOTAL` 2026-09-06, lane ncaaf-h1-kalshi-series
+
+    BOTH ARE TOTALS, AND THAT IS THE PATTERN, NOT A COINCIDENCE. A Kalshi
+    spread states a MARGIN where the board writes a HANDICAP -- the defect that
+    put 11 orders on the club they were fading -- so `KXMLBF5SPREAD` and
+    `KXNCAAF1HSPREAD` stay unmapped. The quarter series stay unmapped because
+    nothing has argued for them at all.
+
+    The point this still pins: reaching a segment series is an explicit act. A
+    blanket prefix rule that made the whole family resolve would be the failure.
+    """
     import syndicate.features.shared.kalshi_catalogue as kc
 
-    for series in ("KXMLBF5SPREAD", "KXMLBF5TOTAL", "KXNCAAF1QSPREAD"):
+    for series in ("KXMLBF5SPREAD", "KXNCAAF1HSPREAD", "KXNCAAF1QSPREAD",
+                   "KXNFL2QTOTAL", "KXNCAAF1H"):
         assert kc.sport_for_series(series) is None, (
             "%s now resolves to a sport -- if that was deliberate, this test "
             "should be updated ALONG WITH a decision about segment pricing, "
             "not deleted" % series)
+
+    # off != on: the two that WERE argued for must actually resolve, or the
+    # loop above would pass against a registry that reaches nothing.
+    assert kc.sport_for_series("KXMLBF5TOTAL") == "mlb"
+    assert kc.sport_for_series("KXNCAAF1HTOTAL") == "ncaaf"
     assert kc.sport_for_series("KXMLBGAME") == "mlb", "the full-game series still works"
 
 

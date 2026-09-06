@@ -85,7 +85,11 @@ def test_a_head_to_head_series_is_not_a_half():
 def test_no_registered_or_out_of_scope_series_is_mistaken_for_a_segment():
     """The population check. A wrong refusal here zeroes the Kalshi order path,
     which the module warns is worse than the $7.08 defect it guards against."""
-    mapped = {"KXMLBF5", "KXMLBF5SPREAD", "KXMLBF5TOTAL"}
+    # Deliberately mapped segment series -- each one an explicit decision to
+    # trade that contract, not an oversight. `KXNCAAF1HTOTAL` joined
+    # 2026-09-06 (lane ncaaf-h1-kalshi-series); its sibling winner and
+    # spread are NOT here and must keep refusing.
+    mapped = {"KXMLBF5", "KXMLBF5SPREAD", "KXMLBF5TOTAL", "KXNCAAF1HTOTAL"}
     everything = set(kc.SERIES_SPORT) | set(kc.SERIES_OUT_OF_SCOPE)
     assert len(everything) > 50, "the registries shrank -- this check is not guarding much"
     wrong = {s: kc.segment_for_series(s) for s in everything
