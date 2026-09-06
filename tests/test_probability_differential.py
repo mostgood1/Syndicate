@@ -47,6 +47,11 @@ OWNERS = {
 # requirement -- see the report for which and why.
 KNOWN_FAILING = {
     "american_to_probability": {
+        # ADDED 2026-09-05 by the unregistered-converter sweep -- these were
+        # never tested before, not newly broken. Both fail only at the
+        # BOUNDARY, which is this audit's standing finding.
+        "scripts.report_nfl_props_roi:american_to_implied",  # 1/5: refuses_zero, refuses_none, refuses_empty_string, accepts_float_price (int()s the price, so -105.5 -> -105)
+        "syndicate.features.ncaaf.prop_model:american_to_probability",  # 4/5: accepts_float_price (int()s the price); its 4dp round WAS fixed here
         "scripts.fetch_mlb_oddsapi_local:_american_implied_prob",
         "scripts.regrade_mlb_game_markets:_american_to_implied",
         "scripts.validate_soccer_vs_market:_american_to_prob",
@@ -66,6 +71,16 @@ KNOWN_FAILING = {
         "syndicate.features.nhl.sim_engine.hockeysim.adapters:american_to_decimal",
     },
     "probability_to_american": {
+        # ADDED 2026-09-05 by the same sweep. All five refuse '' with a
+        # TypeError instead of returning None; the two script-local ones also
+        # raise on None. `kalshi_client` was the outlier at 1/5 and was FIXED
+        # here (ZeroDivisionError on 0.0/1.0, and percent-scale 50.0 -> +102);
+        # it now matches its siblings at 4/5.
+        "scripts.refresh_nba_oddsapi_props:_probability_to_american",  # 3/5: refuses_none, refuses_empty_string
+        "scripts.refresh_wnba_oddsapi_props:_probability_to_american",  # 3/5: refuses_none, refuses_empty_string
+        "syndicate.features.shared.kalshi_client:probability_to_american",  # 4/5: refuses_empty_string
+        "syndicate.features.shared.novig_client:probability_to_american",  # 4/5: refuses_empty_string
+        "syndicate.features.shared.polymarket_client:probability_to_american",  # 4/5: refuses_empty_string
         # ALL THREE `max(0.02, min(0.98, p))` clamp sites are now fixed and are
         # deliberately NOT listed -- `wnba.cards:_american_from_prob`
         # (`de0c367f`), then `layer2_board:_american_from_probability` and the

@@ -154,11 +154,35 @@ class NflPropsTests(unittest.TestCase):
         self.assertEqual(props.nfl_props_key("Seattle Seahawks", "New England Patriots"), "Seattle Seahawks|New England Patriots")
 
     def test_available_weeks_excludes_header_only_stubs(self) -> None:
+        """`SYNDICATE_NFL_SOURCE_ROOT` CANNOT ISOLATE THIS ONE, and setUp setting
+        it is not enough `[fixed 2026-09-05]`.
+
+        `#441` deliberately changed `nfl_props_available_weeks` to UNION
+        `nfl_source_roots()` rather than glob the single root
+        `default_nfl_source_root()` picks -- because globbing one root
+        enumerated the ephemeral checkout, and a week captured to the mounted
+        disk after the last mirror refresh could never be listed. That change is
+        right and is not what this test is about.
+
+        The consequence for the test: the env var pins ONE candidate, the union
+        still reaches the repo mirror, and `data/nfl_source/
+        oddsapi_player_props_2025_wk22.csv` is git-tracked with 66 real rows --
+        so the assertion read `[6, 22] != [6]` and looked like a broken stub
+        filter. **An env var that does not cover every candidate root cannot
+        manufacture absence**; pin the seam the function actually iterates.
+        """
         self._write_props(2025, 5, [])
         self._write_props(2025, 6, [
             {"player": "Some Guy", "market": "Anytime TD", "over_price": "250", "home_team": "A", "away_team": "B"},
         ])
-        self.assertEqual(props.nfl_props_available_weeks(2025), [6])
+        with patch.object(props, "nfl_source_roots", return_value=[Path(self.nfl_root)]):
+            weeks = props.nfl_props_available_weeks(2025)
+
+        # Week 5 exists on disk and is header-only; week 6 has a real row. The
+        # exclusion is the whole point, so assert BOTH directions -- a filter
+        # that dropped everything would satisfy `22 not in weeks` alone.
+        self.assertEqual(weeks, [6])
+        self.assertNotIn(5, weeks, "a header-only stub was listed as an available week")
 
     def test_model_probability_uses_hit_rate_for_anytime_td(self) -> None:
         prob = props._nfl_prop_model_probability(stat="anytime_td", mean=0.4, stdev=None, n=5, line=None)

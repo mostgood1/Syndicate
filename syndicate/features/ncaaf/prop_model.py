@@ -241,9 +241,17 @@ def american_to_probability(price: Any) -> float | None:
         return None
     if value == 0:
         return None
+    # NOT ROUNDED `[2026-09-05]`. The arithmetic is identical to the other 37
+    # implementations in `scripts/probability_differential.py`'s registry; this
+    # one alone wrapped it in `round(..., 4)`, so at +10000 it returned 0.0099
+    # where every other implementation returns 0.0099009901. That breaks the
+    # property `test_all_implementations_agree_on_valid_prices` protects -- and
+    # rounding an implied probability to four places serves nothing here, since
+    # it is consumed as a float and compared against model probabilities that
+    # are not rounded.
     if value > 0:
-        return round(100.0 / (value + 100.0), 4)
-    return round(-value / (-value + 100.0), 4)
+        return 100.0 / (value + 100.0)
+    return -value / (-value + 100.0)
 
 
 def reset_caches() -> None:

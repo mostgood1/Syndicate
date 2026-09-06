@@ -329,6 +329,25 @@ def probability_to_american(probability: float | None) -> int | None:
     """
     if probability is None:
         return None
+    # GUARDS ITS OWN RANGE `[added 2026-09-05]`, which `polymarket_client`'s
+    # twin has always done and this one did not -- that function's docstring
+    # already named the gap: it guards "unlike `kalshi_client`'s version, which
+    # relies on `dollars_to_probability` always running first in its own call
+    # chain -- this function is exported in `__all__` and callable directly, and
+    # 0/1 would otherwise divide by zero instead of refusing."
+    #
+    # MEASURED once the differential registry covered it: this scored 1 of 5,
+    # the worst of the family. `0.0` and `1.0` RAISED ZeroDivisionError, and a
+    # PERCENT-SCALE `50.0` returned **+102** -- a confident-looking real price
+    # for a unit error, which is the one failure mode this repo's own harness
+    # calls out by name, because `confidence` is stored 0-100 alongside
+    # probability 0-1 in the same rows.
+    #
+    # A NO-OP ON THE PRODUCTION PATH: `dollars_to_probability` already returns
+    # a value strictly inside (0, 1) or None, so this only changes what a
+    # DIRECT caller gets -- a refusal instead of a crash or a wrong price.
+    if not (0.0 < probability < 1.0):
+        return None
     if probability >= 0.5:
         # Favourite: negative American odds.
         return int(round(-100.0 * probability / (1.0 - probability)))

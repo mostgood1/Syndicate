@@ -409,3 +409,34 @@ def test_an_empty_market_list_is_refused_not_reported_as_ok(monkeypatch):
     assert out["status"] == "error"
     assert "empty_markets" in out["reason"]
     assert "keys=" in out["reason"]
+
+def test_probability_to_american_refuses_the_range_it_cannot_price():
+    """PINS THE FIX DIRECTLY, because the differential harness cannot.
+
+    `test_failing_set_does_not_grow` compares a SET of failing implementation
+    names. `kalshi_client:probability_to_american` is in that set (it still
+    fails `refuses_empty_string`), so its score could fall 4/5 -> 1/5 and the
+    set would not change and no test would notice. Membership is not a score.
+
+    What it scored 1/5 for, measured 2026-09-05 before the guard:
+      0.0  -> ZeroDivisionError      1.0  -> ZeroDivisionError
+      50.0 -> +102, a confident-looking price for a PERCENT-SCALE unit error
+
+    That last one is the dangerous shape: `confidence` is stored 0-100 beside
+    probability 0-1 in the same rows, and this function is exported in
+    `__all__`, so a direct caller never passes through `dollars_to_probability`.
+    """
+    from syndicate.features.shared.kalshi_client import probability_to_american
+
+    # Refusals, not crashes and not prices.
+    assert probability_to_american(0.0) is None
+    assert probability_to_american(1.0) is None
+    assert probability_to_american(-0.1) is None
+    assert probability_to_american(1.5) is None
+    assert probability_to_american(50.0) is None, "percent scale must refuse, not price"
+    assert probability_to_american(None) is None
+
+    # ...and the guard must not have eaten the working range.
+    assert probability_to_american(0.5) == -100
+    assert probability_to_american(0.8) == -400
+    assert probability_to_american(0.2) == 400
