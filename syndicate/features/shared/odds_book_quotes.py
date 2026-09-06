@@ -1340,6 +1340,31 @@ def _line_value(row: Mapping[str, Any]) -> float | None:
 # FIELDS WHOSE VALUE IS FOLDED BEFORE IT IDENTIFIES A MARKET INSTANCE.
 _FOLDED_IDENTITY_FIELDS = frozenset({"player_name"})
 
+# MEMOISED, AND THE CACHE IS NOT AN OPTIMISATION -- IT IS WHAT MAKES THE FOLD
+# AFFORDABLE ON THE WORKER.
+#
+# MEASURED before it existed, 50,000 synthetic quote rows through the real
+# `build_book_grid` on this machine:
+#
+#     _instance_key   folded 1.751s   raw 0.063s   -- 27x, +1.687s
+#     whole build     3.23s            -- the fold was 52% of it
+#
+# `normalize_person` does an NFKD pass, a per-character generator and a regex
+# sub, and the grid calls it once per row per identity on a hot path that a
+# production day feeds ~274,000 rows. `#372` is this repo's precedent for
+# stalling a whole build with per-row work, and the refresh-worker runs at
+# ~86% of its ceiling.
+#
+# The working set is TINY -- 304 distinct player names over 1,866 production
+# prop rows -- so a plain dict hit answers almost every call.
+#
+# CLEAR-ON-FULL rather than an LRU: an LRU's bookkeeping costs more than the
+# miss it saves at this hit rate, and the cap exists only to bound memory
+# against an unbounded stream of junk names, not to manage a working set that
+# never approaches it. Keyed on the RAW string, so it cannot mask a spelling.
+_FOLD_CACHE: dict[str, str] = {}
+_FOLD_CACHE_MAX = 32768
+
 
 def fold_market_identity_term(field: str, value: Any) -> str:
     """One term of a market-instance identity, folded. THE ONLY IMPLEMENTATION.
@@ -1376,12 +1401,21 @@ def fold_market_identity_term(field: str, value: Any) -> str:
     """
     if field not in _FOLDED_IDENTITY_FIELDS:
         return str(value or "")
+    raw = str(value or "")
+    cached = _FOLD_CACHE.get(raw)
+    if cached is not None:
+        return cached
     # Imported inside the call: `kalshi_board_join` owns the normaliser and this
     # module is imported very early. A private copy here is the drift this repo
-    # has already paid for -- two normalisers disagreeing on one name.
+    # has already paid for -- two normalisers disagreeing on one name. The cache
+    # above makes this a cold-path lookup rather than a per-row one.
     from syndicate.features.shared.kalshi_board_join import normalize_person
 
-    return normalize_person(value)
+    folded = normalize_person(raw)
+    if len(_FOLD_CACHE) >= _FOLD_CACHE_MAX:
+        _FOLD_CACHE.clear()
+    _FOLD_CACHE[raw] = folded
+    return folded
 
 
 def market_sides_for_quote(
@@ -1408,6 +1442,8 @@ def market_sides_for_quote(
     # standing warning about what their disagreeing costs.
     base = tuple(
         fold_market_identity_term(field, chosen.get(field))
+        if field in _FOLDED_IDENTITY_FIELDS
+        else str(chosen.get(field) or "")
         for field in ("sport", "kind", "event_id", "segment", "market", "player_name")
     )
     chosen_line = _line_value(chosen)
@@ -1416,8 +1452,14 @@ def market_sides_for_quote(
     for row in rows or ():
         if not isinstance(row, Mapping) or row.get("price") is None:
             continue
-        if tuple(fold_market_identity_term(field, row.get(field)) for field in
-                 ("sport", "kind", "event_id", "segment", "market", "player_name")) != base:
+        # Same call-count guard as `book_grid._instance_key`: this runs once per
+        # row per anchor, the innermost loop in the whole pivot.
+        if tuple(
+            fold_market_identity_term(field, row.get(field))
+            if field in _FOLDED_IDENTITY_FIELDS
+            else str(row.get(field) or "")
+            for field in ("sport", "kind", "event_id", "segment", "market", "player_name")
+        ) != base:
             continue
         line = _line_value(row)
         if chosen_line is None:

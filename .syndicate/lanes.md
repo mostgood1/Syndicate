@@ -2327,6 +2327,32 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   returns `market_gone`, which is the ONE label the caller acts on by DROPPING
   the row. A failed join there deletes a live market rather than degrading a
   diagnostic, so both sides of that comparison fold too.
+- **THE FIRST VERSION OF THE FIX WAS TOO SLOW TO SHIP, AND ONLY A BENCHMARK SAID
+  SO** `[measured on this machine before deploying, 2026-09-06]`. The grid pivot
+  is a hot path a production day feeds ~274,000 rows, and `normalize_person` does
+  an NFKD pass, a per-character generator and a regex sub. Naive:
+
+      _instance_key over 50,000 rows   folded 1.751s  vs raw 0.063s   (27x)
+      whole build                      3.23s -- the fold was 52% of it
+
+  Two changes, and **the obvious one was not the one that mattered**:
+  1. a memo on the fold (`_FOLD_CACHE`, clear-on-full at 32,768). Bought only
+     1.751 -> 1.508s. The working set is tiny (303 distinct names in the
+     benchmark, 304 in production) so it hits almost always -- which is exactly
+     why it was not the bottleneck.
+  2. **the call COUNT.** Folding by calling one function per field cost six
+     Python calls per row where five could only ever return `str(...)`. Guarding
+     on `field in _FOLDED_IDENTITY_FIELDS` at all three sites -- `_instance_key`,
+     `_line_group_key` and `market_sides_for_quote`'s inner loop -- is what
+     actually paid.
+
+  After, on a PRODUCTION-SHAPED input (153,600 quote rows, 8 books x 2 sides per
+  market, so `market_sides_for_quote`'s inner loop is amplified the way it is in
+  production rather than the way a flat synthetic makes it look):
+
+      fold ON 2.720s   fold OFF 2.302s   -> +0.418s, +18% of the grid pivot
+
+  ~0.3% of a 2-minute board build. Shipped at that. The 27x version was not.
 - **VERIFICATION.**
 
   | check | result |
