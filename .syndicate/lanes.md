@@ -209,6 +209,35 @@ death, never life — do not invert it.
   marker then named a lane with no block anywhere — the same violation a peer
   caught me on earlier the same day. Commit ledger edits BEFORE syncing.
 
+### web-oom-fragmentation — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: test whether `#632`'s growth is glibc ARENA FRAGMENTATION rather than
+  allocation volume — with the trim OFF, so nothing I did is in the measurement.
+- Files: scratchpad only (a poller against `/api/ops/glibc-malloc`). No code
+  changes, no file claims.
+- THE HINT IS ALREADY IN THE DATA. Across every `mallinfo2` reading taken today,
+  **`in_use` stayed between 54 and 72 MB while the arena ranged 148-275 MB**:
+
+        15:5x  arena 275.5   in_use 72.1   free 203.4
+        16:2x  arena 198.5   in_use 54.2   free 144.3
+        16:2x  arena 148.7   in_use 54.4   free  94.4
+
+  A live footprint that flat, under an arena that large, is the signature of
+  free space that cannot be reused.
+- Hypothesis: `in_use` stays flat while `arena` and `free_in_arena` climb
+  together. glibc extends the heap because free chunks cannot satisfy incoming
+  requests — not because the program is holding more.
+- Falsification test: `in_use` climbs WITH the arena. Then the program really is
+  retaining more, fragmentation is not the story, and the search goes back to
+  what holds it.
+- Verification: >= 25 readings over >= 30 min on both workers with the trim OFF,
+  reporting `in_use` trend against `arena` trend, and the ratio of one to the
+  other. A restart inside the window discards it.
+- WHY IT MATTERS: fragmentation and retention have DIFFERENT FIXES. Retention
+  means finding an owner. Fragmentation means the allocation SIZE MIX
+  (`M_MMAP_THRESHOLD`, arena count, a different allocator) — and no amount of
+  hunting for a Python object would ever have found it.
+- Blocked by: none.
+
 ## OPEN
 
 ## OPEN
