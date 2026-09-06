@@ -5,6 +5,66 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [soccer-prop-book-coverage] WIDENING SOCCER PROP REGIONS BUYS ONE SOFT BOOK FOR ~1M CREDITS/MONTH — **KNOB SHIPPED, DELIBERATELY LEFT OFF** `[measured 2026-09-06, lane prop-region-knob]`
+
+Soccer player props are the platform's thinnest book coverage: **164 of 174
+`oddsapi_props` rows single-book** on the served board (fanduel 135, betrivers
+39), independently confirmed by lane `shortlist-prop-row-duplicates` off the
+shortlist (199 rows, fanduel 193 / betrivers 39). Soccer rows OVERALL carry 12
+books, so the thinness is the PROP CALL, not the `us` region.
+
+**PROBED ON THE VENDOR RATHER THAN ARGUED.** Lecce @ Cagliari, +20h, `player_shots`:
+
+    us            2 books   betrivers, fanduel      <- what we get today
+    eu            1 book    onexbet
+    us_ex         0 books   --
+    us,eu,us_ex   3 books   betrivers, fanduel, onexbet   credits_this_call=3
+
+**THE DECISION: `SYNDICATE_SOCCER_PROP_REGIONS` STAYS UNSET.** `eu` takes this
+market from 2 books to 3 and the third is **onexbet, a soft book, not a sharp**.
+The repo's measured **+2.79 ROI points** came from one book -> best-of-4-8;
+2 -> 3 with a soft third is a much thinner version of that trade, against
+**~1M credits/month** because OddsAPI bills props PER EVENT.
+
+**`us_ex` ADDS NOTHING HERE, and that is the surprising half.** It is the region
+carrying `novig` and `prophetx` — the sharps that took NCAAF game lines from 0
+of 5 sharps to a real consensus — and they **do not quote soccer player shots at
+all**. `pinnacle` likewise appears on soccer GAME LINES (already `eu,us_ex`) and
+not on player shots. Coverage that transformed one market family says nothing
+about another.
+
+**THE BILLING MULTIPLIER IS NOW MEASURED, NOT QUOTED:** `x-requests-used` moved
+**1 credit for `us` alone, 1 for `eu` alone, 3 for all three regions** — one per
+region per event, exactly what `odds_regions.py` warns the prop side costs.
+
+### THE TRAP THAT NEARLY PRODUCED A FALSE "VENDOR DOES NOT OFFER IT"
+
+**Soccer props exist only in a window near kickoff, and BOTH ends read zero:**
+
+    fixture +6 days      us 0 books, eu 0 books, credits_this_call=0
+    game 1.6h IN PLAY    us 0 books, eu 0 books
+    fixture +20h         us 2 books, eu 1 book        <- the only readable window
+
+My first two probes picked a 6-day-out fixture and read zero on both regions —
+which looks exactly like "EU does not sell this" and would have closed the
+question wrongly. **A zero here measures the CALENDAR, not the region.** Same
+property that made segment totals read `alternate`-only at 15:00Z and
+`standard` by 16:44Z the same day. Any future probe must target a fixture
+roughly 6-30h out and check `credits_this_call > 0` — a call that bills nothing
+returned nothing and is not evidence.
+
+**The knob itself is deployed and inert** (`a946a79d`, live in `11a6a829`
+18:08:13Z): `prop_regions(sport, regions)` is per-sport so `eu` can be bought
+for ONE sport rather than dragging NFL and NCAAF props onto the same tier, which
+the single global `ODDS_API_REGION` could not express. Unset returns the base
+`us`, so it spends nothing until someone takes this decision deliberately.
+
+**If it is ever revisited:** re-probe near kickoff, and gate acceptance on lane
+`prop-region-knob`'s criteria — `raw_market_agrees` stays 0, `books_quoting`
+rises on keys present in BOTH before and after, using
+`scripts/census_board_row_duplicates.py` with `limit=2000` (the endpoint
+defaults to 200 and truncates silently).
+
 ## [soccer-market-anchor] MARKET-ANCHORING IS REACHABLE AND STILL OFF BY DECISION — MEASURED 2026-09-02 `[lane soccer-anchor-cost, main 686d8282/0844694c]`
 
 **Weight stays 0.0. The blocker was never cost; it was two dead name joins, an
