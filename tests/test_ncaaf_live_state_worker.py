@@ -305,3 +305,72 @@ def test_the_step_passes_season_and_week_so_coverage_is_not_one_date():
     assert "--season" in command and "--week" in command, (
         "without these the producer covers ONE date and web keeps fetching the rest"
     )
+
+
+def _in_progress_event():
+    return {
+        "id": "401",
+        "status": {"period": 2, "displayClock": "13:45", "type": {"state": "in", "description": "In Progress"}},
+        "competitions": [{
+            "situation": {"down": 3, "distance": 7, "yardLine": 42, "possession": "2628"},
+            "competitors": [
+                {"homeAway": "home", "team": {"id": "2628", "location": "Washington",
+                                              "displayName": "Washington Huskies", "abbreviation": "WASH"}, "score": "21"},
+                {"homeAway": "away", "team": {"id": "153", "location": "Washington State",
+                                              "displayName": "Washington State Cougars", "abbreviation": "WSU"}, "score": "14"},
+            ],
+        }],
+    }
+
+
+def test_location_is_persisted_and_is_NOT_the_display_name():
+    """`location` and `displayName` are not interchangeable as a JOIN KEY.
+
+    The projections artifact carries no ESPN id, only team names. Measured by
+    lane ncaaf-live-resim-wire on the live 2026-09-05 slate: `team.location`
+    matched 35 of 51 board games, `team.displayName` matched ZERO. Keying off
+    displayName indexes nothing while looking perfectly healthy.
+    """
+    from scripts.poll_ncaaf_live_state import _board_fields_from_event
+
+    fields = _board_fields_from_event(_in_progress_event())
+    assert fields["home_location"] == "Washington"
+    assert fields["away_location"] == "Washington State"
+    assert "Huskies" not in fields["home_location"]
+
+
+def test_situation_is_persisted_RAW_for_in_progress_and_absent_for_pregame():
+    """Absent on pregame is CORRECT -- verified against live ESPN 2026-09-06.
+
+    A consumer requiring `situation` of a pregame row would refuse a correct
+    record forever.
+    """
+    from scripts.poll_ncaaf_live_state import _board_fields_from_event
+
+    live = _board_fields_from_event(_in_progress_event())
+    assert live["situation"]["down"] == 3
+    assert live["situation"]["possession"] == "2628"
+
+    pregame = _in_progress_event()
+    pregame["competitions"][0].pop("situation")
+    assert "situation" not in _board_fields_from_event(pregame)
+
+
+def test_the_record_is_SUFFICIENT_to_resolve_possession_without_a_second_parser():
+    """ESPN names the possessor BY ID, never by side.
+
+    The record deliberately persists `situation` unresolved: resolving it here
+    would make a SECOND parser of a field `live_resim.possession_side_from_espn`
+    already owns, which is the drift `_game_from_event`'s docstring exists to
+    prevent. This proves the record carries enough for that ONE resolver to be
+    handed a synthetic competition and get the right answer.
+    """
+    from scripts.poll_ncaaf_live_state import _board_fields_from_event
+    from syndicate.features.ncaaf.live_resim import possession_side_from_espn
+
+    rec = _board_fields_from_event(_in_progress_event())
+    side, raw = possession_side_from_espn(
+        {"situation": rec["situation"]}, home_id=rec["home_id"], away_id=rec["away_id"]
+    )
+    assert side == "home", f"possession must resolve to a SIDE, got {side!r}"
+    assert raw.get("down") == 3
