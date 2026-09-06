@@ -360,7 +360,17 @@ class MlbSimFinalizeMergeTests(unittest.TestCase):
         self.assertEqual(status["publishedArtifacts"], 68)
         self.assertEqual(status["timedOut"], False)
         self.assertEqual(status["sims"], 1000)
-        self.assertEqual(status["duration_seconds"], 15 * 60)
+        # A BOUND, NOT AN EQUALITY -- the same shape the sibling class already
+        # uses for this field, and for the same reason. `duration_seconds` is
+        # NOT derived from the `finished_at` written beside it:
+        # `_persist_finished_mlb_sim_run` calls `_sim_run_duration_seconds`
+        # WITHOUT a `finished_at`, so the helper falls through to its own
+        # `datetime.now(timezone.utc)`. The number therefore includes however
+        # long this test took between computing `started` and reaching the
+        # call -- 900 on an idle box, 902 in a full `-n auto` suite (measured
+        # 2026-09-06 at `f65ec45e`), and unbounded under real load.
+        self.assertGreaterEqual(status["duration_seconds"], 15 * 60)
+        self.assertLess(status["duration_seconds"], 15 * 60 + 300)
 
 
 if __name__ == "__main__":
