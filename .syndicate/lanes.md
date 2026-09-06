@@ -1873,6 +1873,16 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification (done): `fresh_record()` factory stamps at CALL time. IMMUNE BY CONSTRUCTION — the ageing plugin now reports "no import-time timestamp left to age", 23 passed. AND the gate is still exercised: mutating `_worker_record_max_age_seconds` to 1e9 turns FOUR staleness tests red, so immunity was not bought by weakening the file.
 - Blocked by: none.
 
+### bandwidth-spike-tripwire — CLOSED 2026-09-06 — opened AND closed 2026-09-06 — session 9e40eb04 — **BUILT AND VALIDATED against the known 4,050 MB spike; it reproduces the hand measurements exactly.**
+- **Outcome:** `scripts/bandwidth_tripwire.py` (`9d4e487f`). Fed `2026-09-04T18:00` it returns **edge 2.63 MB / 131 requests, app served 698.84 MB / 4,126 access lines**, the 17:26 deploy in-window, and the other two services flat at 10.2 / 27.2 MB — matching every figure measured by hand during the investigation. Validation capture committed at `reports/bandwidth_spikes/web_20260904T180000Z.json`.
+- **IT DEMONSTRATED ITS OWN REASON FOR EXISTING.** Publish volume for that SAME window now reads **2,040.9 MB against the 2,737.7 MB measured two days earlier** — the logs aged out underneath. Capturing late loses evidence silently, which is what happened to every pass of this investigation.
+- **Four instrument traps baked in as CODE, not comments**, each having produced a wrong reading: right-labelled buckets; settle-before-judging (a bucket grows up to 39x over ~50 min, so a fresh LOW reading is INCOMPLETE, not low); edge-vs-app logs captured separately because **the gap between them IS the open question**; and 429 AND 5xx retried. It also reads publish REQUEST BODIES from the worker side, which no response-size count can see.
+- **14 tests, none touching the network.** One found its own flakiness — the unsettled-bucket case was built as `now-10min` then truncated, which yields the previous hour's label late in the hour; it failed at `:55` and passed at `:05`. Fixed, with the reason recorded in the test.
+- **WHAT IT DOES NOT DO, deliberately:** it does not claim what the meter counts. That contradiction is unresolved (`state_worker.md` `[render-egress-spikes]`); this is evidence-gathering, not an argument.
+- **THIS BLOCK WAS RECONSTRUCTED AT CLOSE, and that is the lesson.** The lane was opened in a WORKTREE and never committed; a later `git reset --hard origin/main` in that same worktree discarded it, so it existed on no ref while the code it governed shipped. **Open a lane and PUSH it before starting the work** — an uncommitted lane block is not a claim, it is a note in a scratch directory, and `check_lane_invariants` cannot see it to complain.
+- Usage: `--check`, `--watch --interval-minutes 20`, `--capture <bucket>`. Idempotent, so `--watch` can run indefinitely.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
