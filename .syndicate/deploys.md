@@ -5,6 +5,63 @@
 
 ---
 
+## 2026-09-06 15:02-15:31Z — refresh-worker `58302f07` — **THE SECOND ESPN FETCH IS GONE, 6 ticks of 8, and the 2 that fell back did so BY NAME. I did not take this deploy.** — lane `ncaaf-live-resim-wire`
+
+**I HELD A CLAIM AND DEPLOYED NOTHING, deliberately.** Lane
+`ncaaf-h1-kalshi-series` acquired refresh-worker 0.1 min before I tried and
+deployed `58302f07` — which is the exact `origin/main` tip I had targeted, and
+`git merge-base --is-ancestor 77abe822 58302f07` confirms it already carried my
+record reader. A second deploy would have restarted the service and discarded a
+board build (`#563`) to ship code that was already live. Poller stopped, claim
+released. **Check whether the thing the lock guards has already happened** —
+2026-08-29's rule, applied before forcing anything rather than after.
+
+**verify — THE BRANCH RAN, and the discriminator is a KEY not a value.**
+`record_dates` / `fetch_dates` / `fetch_reasons` did not exist in this tick's log
+line before `77abe822`, so their PRESENCE proves the new code executed
+independently of what they report. All three present on every tick below.
+
+    15:02:58  rec 1  fetch 0  {}                    idx 3
+    15:07:17  rec 0  fetch 1  {"record_stale": 1}   idx 3
+    15:10:40  rec 1  fetch 0  {}                    idx 3
+    15:14:20  rec 1  fetch 0  {}                    idx 3
+    15:17:35  rec 0  fetch 1  {"record_stale": 1}   idx 3
+    15:21:58  rec 1  fetch 0  {}                    idx 3
+    15:26:44  rec 1  fetch 0  {}                    idx 3
+    15:31:16  rec 1  fetch 0  {}                    idx 3
+
+**6 of 8 ticks served from the worker's record with ZERO ESPN fetches.** The
+consolidation `ncaaf-live-state-to-worker` asked for is real and measured, not
+projected — and it happened without either of us deploying for it, because their
+producer (`1b266180`) and my reader (`77abe822`) both rode a third lane's deploy.
+
+**`idx 3` IS CONSTANT ACROSS BOTH MODES, and that is the finding worth keeping.**
+The index is identical whether the record or ESPN served it — the guarantee
+`test_the_record_path_and_the_fetch_path_build_the_SAME_index` asserts against
+fixtures, now confirmed on production data. A divergence here would have meant
+the re-sim priced a different game depending on which source happened to win.
+
+**THE 2 FALLBACKS ARE THE GATE WORKING, AND THEY CONTRADICT A NUMBER I WAS
+GIVEN.** Both are `record_stale`, i.e. my 400 s bound refusing to price live
+state it considers old — the designed behaviour, and it degrades to a correct
+fetch rather than to a stale probability. But the producer's lane reported a
+live-phase median of **60 s**, and web's own reader logged
+`NCAAF_LIVE_STATE_RECORD_STALE date=2026-09-06 age_seconds=484` at 15:33:14Z.
+**A record reaching 484 s cannot come from a 60 s cadence**, so the write
+interval for THIS step is materially slower than the phase it rides. 25% of ticks
+paying for a second fetch is small, and the number that explains it is not one
+either lane has measured yet.
+
+**NOT CLAIMED:** that this is steady state. Eight ticks over 29 minutes on a
+3-game slate with nothing live (`live_resimmed 0`, `game_not_in_progress 3`,
+`no_live_state 48` — the other 48 board games kick off on other dates). The
+record path has not yet been exercised while a game is actually in progress,
+which is when `situation` matters and when a stale record would cost the most.
+That reading is owed on the next live slate.
+
+**`sp_ratings_source: durable_mirror` on every tick**, so the mirror has now
+survived two further deploys.
+
 ## 2026-09-06 01:34Z - 01:39:17Z — live-odds-worker `e78fe40a` — **CATCH-UP: repairs the runtime drift my own poller race caused. The compression half is NOT mine to claim and its row is owed by `render-egress-transport`.** — lane `segment-refusal-deploy`
 
 `deploy=dep-... trigger=api`, posted on a CLEAR window in the same tick, claim
