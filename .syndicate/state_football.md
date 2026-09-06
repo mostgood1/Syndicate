@@ -89,6 +89,55 @@ claimed those keys because the rows are not in the file that is read.
 print `team_registry_snapshot_path()` and grep THAT file. Grepping the
 sibling `ncaaf_team_registry.csv` will show the team and prove nothing.
 
+## [nfl-rating-units] NFL'S SIM CANNOT TELL TEAMS APART, AND THE CAUSE IS A UNITS DEFECT THIS REPO ALREADY FIXED FOR NCAAF `[measured 2026-09-06, lane nfl-rating-units, substrate checkout]`
+
+**THE SYMPTOM.** Across-game `margin_mean` stdev is **2.16 points** for NFL
+against **15.37** for NCAAF, and **93.8%** of NFL games land in P(home)
+0.35..0.65. A model that puts every matchup within a couple of points of even is
+not miscalibrated -- it is not discriminating at all.
+
+**LOCALISED TO THE RATINGS INPUT, NOT THE SHARED ENGINE.** The within-game
+numbers are near-identical across the two sports -- `margin_stdev` 13.66 vs
+13.14, `total_stdev` 11.87 vs 12.21 -- so the same code shapes one game's spread
+in both and does it consistently. What differs is what it is fed.
+
+**THE CAUSE, confirmed in the source.** `generate_smartsim2_nfl_projections
+.team_rating` returns `_mean_epa(...)` -- expected points added PER PLAY, raw,
+**uncentred and unscaled**. NCAAF's `sp_offense_defense_rating` returns
+`(sp_rating - league_mean) / SP_RATING_SCALE` -- points per game, centred on the
+league, divided by 10. Mean EPA/play has SD ~0.05-0.10 across teams; SP+ over 10
+has SD ~1.3. **NFL feeds the engine roughly one twentieth of the rating spread.**
+
+This is the SAME diagnosis this repo already made for the other sport and acted
+on: `[ncaaf-ratings]` records PPA `overall` as "a PER-PLAY rate with SD 0.089 ...
+which the engine rendered as margin SD **1.74** against a market SD of 14.46",
+and the fix was SP+, "already denominated in points per game, which is the
+quantity a margin model needs". NFL's 2.16 sits in that neighbourhood. **NFL is
+one sport behind a fix already made.**
+
+**THE FALSIFICATION TEST WAS RUN AND FAILED TO FALSIFY.** The stated alternative
+was a neutral-default fallback swallowing real ratings. Measured over three
+weeks: **zero `neutral_no_data`** -- wk1 16/16 `prior_season_fallback`, wk10
+14/14 and wk11 15/15 `current_season_rolling`, with margin stdev 2.16 / 2.22 /
+2.04. Every team has real EPA, the flatness is stable across weeks AND across
+both rating sources, so it is structural rather than a data gap.
+
+**THE ENGINE'S RESPONSE IS SUBLINEAR, so "multiply by 20" is NOT the fix.** A
+~16x rating-spread ratio (NCAAF/NFL) produces only a ~7.1x margin-spread ratio.
+Any scale factor has to be FITTED against held-out outcomes. **No refit is
+shipped from this measurement** -- the soccer precedent in this ledger is a model
+that was re-fitted, looked better, still lost to the market, and was correctly
+held.
+
+**WHAT IS NOT AFFECTED, traced rather than assumed:** player props. Every
+consumer of `sim_engine.smartsim2` outside the engine package is
+`ncaaf/{cards,game_projections,live_resim,smartsim2_projection,sources}`,
+`nfl/smartsim2_projection`, and the generator/backtest/refit scripts. Neither
+`ncaaf/prop_model.py`, `ncaaf/props.py`, `nfl/props.py` nor
+`shared/prop_projections.py` imports it -- NCAAF props are an anytime-TD model on
+historical rates. **The blast radius is game-level markets only: moneyline,
+spread, total.**
+
 ## [football-smartsim2] FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]`
 
 **Owner: `football-model-owner`.** Strategy, every measurement and the exit
