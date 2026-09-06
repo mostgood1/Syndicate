@@ -2424,6 +2424,23 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `build_book_grid`. **They are evidence about the CODE, never about the
   deployment.** Nothing here says production has merged anything — that needs a
   deploy and a re-fetch of the same endpoint.
+- **DEPLOYED AND MEASURED — refresh-worker `91d523ad` live 16:24:47Z. Full row
+  in `deploys.md`.** BEFORE 16:16:30Z / AFTER 16:43:53Z, same instrument,
+  `limit=2000` both times: collisions **35 -> 4**, `kalshi_plus_books`
+  **654 -> 666 (ROSE)**, `kalshi_only` **39 -> 0**, names with two spellings
+  **10 -> 0**. The RISE is the load-bearing half — an outage would take the
+  first three to zero too, and would take this DOWN.
+- **THE PREDICTION WAS 0 AND THE ANSWER IS 4; I WAS WRONG AND THE 4 ARE A
+  DIFFERENT DEFECT.** All four are `totals`/`totals_alt` and
+  `spreads`/`spreads_alt` GAME lines, `player_name=None`, zero diacritic — the
+  main-vs-alternate collision `21aac548` already owns. Verified by RUNNING
+  `_collapse_duplicate_bets` over the real production rows, not by trusting its
+  docstring: shortlist 4, collapsed 4, **collisions the JOIN sees 0**. The
+  double-exposure path is closed end to end.
+- **STILL OWED: web and live-odds-worker.** Both run the same
+  `build_book_grid` / `market_sides_for_quote` and are still unfolded, so until
+  they land the services disagree about what one bet is. Both live SHAs are
+  ancestors of `91d523ad`.
 - **STILL OWED: the deploy and its measurement.** The reading that would close
   this: `/api/board/layer2-shortlist?date=<D>&sport=mlb&limit=2000` on a rebuilt
   artifact, `colliding _row_key`s **> 0 -> 0**, with `kalshi_plus_books` RISING

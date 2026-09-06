@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-09-06 16:19:33Z - 16:24:47Z — refresh-worker `58302f07` -> `91d523ad` — **ONE BET WAS TWO STAKEABLE ROWS WHENEVER TWO FEEDS SPELLED ITS PLAYER DIFFERENTLY. THE DIACRITIC CLASS IS NOW ZERO AND THE MERGE IS WHAT DID IT.** — lane `shortlist-prop-row-duplicates`
+
+**verify — TWO SIGNALS, because either alone is ambiguous.** Same instrument,
+same endpoint, `limit=2000` both times (the default of 200 censuses **0**
+collisions on a defective board — that is how this gets "verified" wrongly):
+
+    /api/board/layer2-shortlist?date=2026-09-06&sport=mlb&limit=2000
+
+    | signal                | BEFORE 16:16:30Z | AFTER 16:43:53Z |
+    |-----------------------|------------------|-----------------|
+    | colliding `_row_key`s | 35               | 4               |
+    | kalshi_plus_books     | 654              | **666  (ROSE)** |
+    | kalshi_only           | 39 (39 accented) | **0**           |
+    | names w/ 2 spellings  | 10               | **0**           |
+
+**`kalshi_plus_books` RISING is the load-bearing half.** A capture outage drives
+`kalshi_only` and the collisions to 0 as well — and would drive this DOWN. It
+went up, so the duplicates were removed by MERGING the two rows, not by losing
+one. Confirmed directly rather than inferred: every previously-split player now
+shows ONE spelling with kalshi INSIDE the book map — Julio Rodriguez 9 rows
+with kalshi / 1 without, Yandy Diaz 11/2, Jeremy Pena 5/2, Carlos Narvaez 6/3.
+
+**MY PREDICTION WAS 0 COLLISIONS AND THE ANSWER IS 4. I was wrong, and the 4 are
+a DIFFERENT DEFECT.** Written before the deploy, so it stands as recorded. All
+four survivors are `totals`/`totals_alt` and `spreads`/`spreads_alt` GAME lines
+with `player_name=None` — zero diacritic content. That is the main-vs-alternate
+collision `21aac548` built `_collapse_duplicate_bets` for, and the join handles
+it at index build. **Checked rather than assumed**, by running the real function
+over the real production rows:
+
+    collisions in the SHORTLIST                4
+    rows collapsed by the join at index build  4
+    collisions the JOIN actually sees          0
+
+So the double-exposure path is closed end to end: 0 contracts pair with two
+stakeable rows. The 4 survive only as display rows and the surviving side is
+the better price in each (`totals first5 3.5 under` kept kalshi +567).
+
+**WHAT IT COST.** Nothing was killed. Preflight went CLEAR at 16:17:16Z with 0
+jobs in flight — an MLB daily sim had been running for 25 minutes and finished
+on its own (pid 5346 reaped). No board build lost, no live-lens tick interrupted.
+
+**THE CHEAP INSTRUMENT SAID THE OPPOSITE, AND IT WAS WRONG.**
+`check_deploy_safety.py` reported `MLB sim: finished (exit=0)` at 15:59Z while
+`deploy_preflight.py` listed `run_mlb_daily_sim_job.py` pid 5346 plus four
+children ALIVE at the same instant. The first reads the status ARTIFACT, the
+second reads the PROCESS list. Gating on the artifact would have killed a
+running sim while reporting a clean window.
+
+**NOT DEPLOYED, AND STILL OWED:** web (`c909c8ef`) and live-odds-worker
+(`54c9b157`) run the same `build_book_grid` / `market_sides_for_quote` and are
+still unfolded. Web computes a serve-time grid for `/api/board/book-grid`, so
+until it lands the two services disagree about what one bet is — the exact
+"two vocabularies" hazard this fix removes. Both live SHAs are ancestors of
+`91d523ad`, so both are advances, not reverts.
+
 ## 2026-09-06 15:02-15:31Z — refresh-worker `58302f07` — **THE SECOND ESPN FETCH IS GONE, 6 ticks of 8, and the 2 that fell back did so BY NAME. I did not take this deploy.** — lane `ncaaf-live-resim-wire`
 
 **I HELD A CLAIM AND DEPLOYED NOTHING, deliberately.** Lane
