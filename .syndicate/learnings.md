@@ -3045,3 +3045,71 @@ payload "closes any of that 3.56-point gap" in **slate-wide margin MAE** (model
 the MARKET rather than the model's own past -- and still wrong to do it on the
 slate average. The same 2,233 games would answer the subset question if the rows
 were kept.
+
+## 2026-09-07 FORBIDDEN: verifying a fix with a predicate on a TOTAL that can move for another reason
+
+**Nineteen days, every night, the same ten failures — and the guard that was
+supposed to catch it fired correctly and said nothing.**
+
+MLB's sim publishes `sim_input_report_<date>.json` from the WORKER. Read back
+across every report on production:
+
+    08-19   ok 55   FAIL 15   disabled 0
+    08-20   ok 55   FAIL 10   disabled 5     <- the "improvement"
+    08-21 .. 09-07  ok 55   FAIL 10   disabled 5   (19 days, identical)
+
+`deploys.md` for `39570b24` had written the verification in advance and written
+it well: *"Expect nfail 15 -> 6 ... Still 15 on a fresh generated_at means a
+SIXTH cause and must be reopened."* The count went to 10. Not 15, so the reopen
+never triggered; not 6, so nothing had actually cleared.
+
+**THE 15 -> 10 DROP WAS A RECLASSIFICATION, NOT A FIX.** Five `vs_pitcher_*`
+fields moved from `FAIL` to `disabled` (BVP off by config) in the same window.
+The ten fields the note NAMED -- `conditional_arsenal`, `count_bucket_map`,
+`pitch_type_*`, the four `statcast_splits_*` -- never cleared once.
+
+THE RULE. **A verification predicate must key on the THING, not on a count that
+contains it.** The note listed the exact ten field names and then gated on the
+total. Had it gated on the names it would have failed loudly on 08-21. Same
+family as "a rate, not a count" and "gate on the output, not the input": an
+aggregate is a lossy summary, and the loss is exactly where a second cause hides.
+
+### And the root cause is a SECOND instance of the same shape
+
+`SYNDICATE_MLB_ROSTER_REBUILD_DATE` was pinned to `2026-08-19` -- **the day
+BEFORE** the artifact fix it was meant to prove went live (`39570b24`, live
+2026-08-20T17:54:04Z). The gate is date-scoped and self-expiring BY DESIGN, which
+is good design; it was armed for a date that expired before the thing it gated
+existed. So every run since printed `ROSTER_REBUILD inert: gate=2026-08-19 does
+not match date=<today>` and reused `roster_objs` built the day before the
+artifacts arrived.
+
+The artifacts were present, loadable and correct the whole time -- arsenal 546 KB
+/ 466 pitchers, `payload["pitchers"]` exactly as `load_arsenal` expects, and
+`SYNDICATE_DATA_ROOT` correctly set. This is CLAUDE.md's own warning realised:
+*"Publishing is not sufficient -- a new input needs a roster REBUILD or it is
+silently ignored."*
+
+### Two instruments that could not have caught it, and one that did
+
+* **The log line cannot be read.** The code prints `ROSTER_REBUILD inert`
+  deliberately ("Silence here would be indistinguishable from 'the rebuild
+  ran'") -- but `MLB_DAILY_SIM_START` and `mlb_sim_job` return **0 lines in 8h**
+  from Render's logs API while that process is demonstrably running. The
+  emitter never reaches the collector, so a log-based check would have read
+  clean forever. **Test that the line is EMITTED before designing a check
+  around it.**
+* **The local checklist is worse than useless here.** Run on a laptop it
+  reported 17 fields at 0.0%; production says 7 of those are fed at 76-79% and
+  10 are genuinely dead. Both halves wrong in opposite directions.
+* **The ARTIFACT is the instrument.** `sim_input_report` is written by the
+  worker, exportable, and 20 days deep. It had the answer every night.
+
+### The date basis, because I got it wrong the same way
+
+I armed the replacement gate from the report FILENAME
+(`sim_input_report_2026-09-07.json`) and set `2026-09-07`. The job's own paths
+say otherwise: `daily/snapshots/2026-09-06/roster_*.json`, and `2026-09-06`
+dominates the worker's log messages 37-to-6. The filename and the slate date use
+different bases. The value happens to be right for the NEXT slate -- correct by
+luck, not by reasoning, which is worth recording as exactly that.
