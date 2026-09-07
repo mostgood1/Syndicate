@@ -1,16 +1,15 @@
-# Pull upstream changes into `vendor/` on a schedule, and open a PR with them.
+# Pull upstream changes into `vendor/` ON DEMAND, and open a PR with them.
 #
 # WHY THIS EXISTS: `vendor/` holds partial copies of four sibling repos with no
 # shared git history. A fix merged upstream reaches Syndicate only if somebody
 # pulls it, and nothing was pulling it -- the trees had drifted to 24 differing
 # code files before anyone counted. `scripts/sync_vendor_upstream.py` does the
-# pulling; this runs it so that it happens without being remembered.
+# pulling; this is the reviewed, PR-opening way to run it.
 #
-# WHY GITHUB ACTIONS AND NOT A LOCAL SCHEDULED TASK: the dev machine's own ledger
-# records `lastRunAt` being a DISPATCH time rather than an execution time, with
-# Modern Standby stalling a scheduled call by 9h13m. A sync that silently does
-# not run is worse than no sync at all, because the report it never produced is
-# indistinguishable from "nothing to do".
+# THE RECURRING RUN IS NOT HERE. It is `scripts/vendor_sync_daily.ps1` on a local
+# scheduled task, which reports daily and writes an artifact proving it executed.
+# This workflow is the manual, heavier-weight path: it can APPLY and open a PR,
+# which the local job deliberately never does.
 #
 # WHAT IT WILL AND WILL NOT DO:
 #   * applies ONLY `UPSTREAM_AHEAD` -- files we have never touched, where upstream
@@ -22,17 +21,22 @@
 #     see the script's docstring for how to make it.
 #   * never deletes a local-only file and never adds a file we do not vendor.
 #
-# IT DOES NOT FAIL THE BUILD when there is something to decide. A daily red run
-# is a daily ignored run; the signal is the PR and the summary, not the tick.
-# It fails only when the sync itself could not run (exit 2).
+# IT DOES NOT FAIL THE BUILD when there is something to decide -- the signal is
+# the PR and the summary. It fails only when the sync itself could not run (2).
 
 name: vendor-sync
 
+# MANUAL TRIGGER ONLY -- there is deliberately no `schedule:` here.
+#
+# `#486` (2026-08-20, user decision) removed `Daily Update`'s cron: "we no longer
+# use that daily update feature, everything runs on render." This file originally
+# carried a daily cron and was the ONLY `schedule:` left in the repo, which
+# reintroduced exactly the pattern that decision removed. `daily-update.yml` and
+# `pytest-baseline-update.yml` are both dispatch-only for the same reason.
+#
+# The recurring run lives in `scripts/vendor_sync_daily.ps1` instead, as a local
+# scheduled task, verified firing unattended 2026-09-07 09:20:02 local.
 on:
-  schedule:
-    # 09:20 UTC daily. Off the hour on purpose: GitHub's scheduler queues heavily
-    # at :00 and drops runs under load.
-    - cron: '20 9 * * *'
   workflow_dispatch:
     inputs:
       apply:
@@ -80,8 +84,8 @@ jobs:
               print("| `%s` | %d |" % (k, t[k]))
           print()
           # Only states that need somebody to DO something. `LOCAL_PATCH` is a
-          # steady state -- 52 of them today -- and printing the list daily is how
-          # a daily summary stops being read.
+          # steady state -- 52 of them today -- and listing it every run is how a
+          # summary stops being read.
           ACTIONABLE = ("UPSTREAM_AHEAD", "CONFLICT", "UNCLASSIFIED")
           if not any(t.get(s) for s in ACTIONABLE):
               print("Nothing to decide. %d file(s) in sync, %d local patch(es) held.\n"
@@ -107,7 +111,7 @@ jobs:
           PY
 
       - name: Apply upstream-ahead files and open a PR
-        if: steps.report.outputs.upstream_ahead != '0' && (github.event_name == 'schedule' || inputs.apply)
+        if: steps.report.outputs.upstream_ahead != '0' && inputs.apply
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
