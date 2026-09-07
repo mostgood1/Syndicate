@@ -576,6 +576,12 @@ def main() -> int:
             # "worker" iff the mounted-disk root is configured; `_data_root()`
             # falls back to REPO/data on a dev box and that is "local".
             "host": "worker" if str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() else "local",
+            # CANONICAL provenance key, same spelling in all five reports.
+            # See the note in the MLB checklist: `host` only means
+            # SYNDICATE_DATA_ROOT was set, so it cannot distinguish a
+            # worker from a laptop that has it set. The resolved path can.
+            "resolved_root": str(base),
+            # kept: pre-existing readers, and it is the same value here.
             "data_root": str(base),
             # This gate covers BOTH leagues in one pass -- Level 0's key drift
             # and Level 1's consumed/produced sets are shared, and the alarm

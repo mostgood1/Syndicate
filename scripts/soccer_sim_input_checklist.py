@@ -415,6 +415,13 @@ def main() -> int:
             # "worker" iff the mounted-disk root is configured; `_data_root()`
             # falls back to REPO/data on a dev box and that is "local".
             "host": "worker" if str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() else "local",
+            # CANONICAL provenance key, same spelling in all five reports.
+            # `host` alone is not provenance -- it only means
+            # SYNDICATE_DATA_ROOT was set, and a laptop run with that var
+            # set stamps itself `worker`. One did, on 2026-09-07, with 24
+            # failures while production read 10. Read them together.
+            "resolved_root": str(base),
+            # kept: pre-existing readers, and it is the same value here.
             "data_root": str(base),
             "league": "eredivisie",
             # This script's OWN counts, named for what they count -- soccer has

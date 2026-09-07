@@ -591,6 +591,15 @@ def main() -> int:
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(
                 json.dumps({**published, "published_for_sport": sport,
+                            # CANONICAL provenance key, same spelling in
+                            # all five reports. Distinct from
+                            # `artifact_root` below, which is the PER-SPORT
+                            # root this particular file was written under
+                            # and differs between the two files one run
+                            # emits. `resolved_root` is the run's single
+                            # resolved data root, which is what a
+                            # provenance check needs.
+                            "resolved_root": str(root),
                             "artifact_root": str(root)}, indent=2),
                 encoding="utf-8",
             )
