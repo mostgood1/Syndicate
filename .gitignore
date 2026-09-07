@@ -90,6 +90,29 @@ data/nfl_source/historical_truth/
 data/ncaaf_source/historical_truth/*
 !data/ncaaf_source/historical_truth/games_*.json.gz
 
+# SP+ RATINGS AND DRIVE HISTORY, TRACKED FOR THE SAME REASON `games_*` IS.
+#
+# Both are CFBD pulls against a MONTHLY quota that this repo has already
+# exhausted once (`cfbd_quota_latch` exists because a stale-artifact trigger
+# refired hourly for days against a limit CFBD had already refused). Losing
+# these files does not cost a re-download, it costs quota that may not be
+# available when it is needed.
+#
+# And a COMPLETED season's SP+ never changes -- `--refresh-sp-cache`'s own help
+# says so: "In-season a rating still moves week to week; a completed season's
+# never does." An immutable 6 KB file that is expensive to re-fetch is exactly
+# what a cold-start safety net is for.
+#
+# The drives are the load-bearing half. `calibrate_ncaaf_drive_structure.py`
+# measures against 53,548 real drives over 2,264 games (2023-2025) out of these
+# files, and `build_ncaaf_pace_snapshot.py --drives-cache` rebuilds a per-season
+# pace snapshot from them with NO API call at all -- which is the only reason
+# per-season feature snapshots are reachable offline. ~750 KB each, three
+# seasons: 2.3 MB total, against the 90 MB+ nflverse pulls the comment below
+# calls too large.
+!data/ncaaf_source/historical_truth/sp_ratings_*.json
+!data/ncaaf_source/historical_truth/drives_*.json.gz
+
 # Raw NFL tracking pulls (nflverse pbp, FTN charting): regenerable release
 # downloads, not source, and individual files run 90MB+ -- too large for
 # GitHub history.

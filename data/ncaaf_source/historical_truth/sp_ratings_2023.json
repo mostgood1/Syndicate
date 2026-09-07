@@ -1,0 +1,539 @@
+{
+ "fetched_at": "2026-09-07T01:40:25.687093+00:00",
+ "season": 2023,
+ "source": "cfbd /ratings/sp",
+ "teams": {
+  "air force": [
+   25.6,
+   20.9
+  ],
+  "akron": [
+   10.5,
+   30.1
+  ],
+  "alabama": [
+   36.8,
+   15.6
+  ],
+  "app st": [
+   33.5,
+   30.7
+  ],
+  "arizona": [
+   37.3,
+   23.1
+  ],
+  "arizona st": [
+   20.2,
+   29.9
+  ],
+  "arkansas": [
+   28.3,
+   26.6
+  ],
+  "arkansas st": [
+   25.8,
+   32.8
+  ],
+  "army": [
+   18.4,
+   22.5
+  ],
+  "auburn": [
+   26.4,
+   20.1
+  ],
+  "ball st": [
+   12.6,
+   26.3
+  ],
+  "baylor": [
+   24.5,
+   32.6
+  ],
+  "boise st": [
+   32.7,
+   28.2
+  ],
+  "boston college": [
+   22.2,
+   27.6
+  ],
+  "bowling green": [
+   21.5,
+   27.4
+  ],
+  "buffalo": [
+   15.3,
+   29.5
+  ],
+  "byu": [
+   25.3,
+   30.3
+  ],
+  "california": [
+   30.6,
+   28.7
+  ],
+  "central michigan": [
+   16.8,
+   34.0
+  ],
+  "charlotte": [
+   14.8,
+   34.4
+  ],
+  "cincinnati": [
+   21.3,
+   28.3
+  ],
+  "clemson": [
+   29.3,
+   19.0
+  ],
+  "coastal carolina": [
+   27.6,
+   27.2
+  ],
+  "colorado": [
+   29.6,
+   34.4
+  ],
+  "colorado st": [
+   21.9,
+   32.0
+  ],
+  "duke": [
+   27.3,
+   19.5
+  ],
+  "east carolina": [
+   15.4,
+   28.1
+  ],
+  "eastern michigan": [
+   13.0,
+   26.8
+  ],
+  "florida": [
+   31.1,
+   26.0
+  ],
+  "florida atlantic": [
+   19.8,
+   27.9
+  ],
+  "florida international": [
+   16.0,
+   35.6
+  ],
+  "florida st": [
+   34.1,
+   16.5
+  ],
+  "fresno st": [
+   28.9,
+   27.9
+  ],
+  "georgia": [
+   41.5,
+   12.2
+  ],
+  "georgia southern": [
+   30.8,
+   36.5
+  ],
+  "georgia st": [
+   28.2,
+   33.3
+  ],
+  "georgia tech": [
+   29.4,
+   29.1
+  ],
+  "hawaii": [
+   19.4,
+   35.7
+  ],
+  "houston": [
+   25.6,
+   32.2
+  ],
+  "illinois": [
+   21.6,
+   24.1
+  ],
+  "indiana": [
+   19.6,
+   27.2
+  ],
+  "iowa": [
+   13.8,
+   9.3
+  ],
+  "iowa st": [
+   26.4,
+   20.1
+  ],
+  "jacksonville st": [
+   24.8,
+   25.9
+  ],
+  "james madison": [
+   34.6,
+   23.7
+  ],
+  "kansas": [
+   35.6,
+   26.1
+  ],
+  "kansas st": [
+   38.9,
+   21.8
+  ],
+  "kent st": [
+   8.2,
+   34.8
+  ],
+  "kentucky": [
+   31.6,
+   22.2
+  ],
+  "liberty": [
+   36.2,
+   26.3
+  ],
+  "louisiana": [
+   32.4,
+   33.1
+  ],
+  "louisiana tech": [
+   22.1,
+   36.0
+  ],
+  "louisville": [
+   30.1,
+   22.3
+  ],
+  "lsu": [
+   44.6,
+   25.0
+  ],
+  "marshall": [
+   24.4,
+   31.5
+  ],
+  "maryland": [
+   28.3,
+   17.6
+  ],
+  "massachusetts": [
+   20.8,
+   36.2
+  ],
+  "memphis": [
+   37.1,
+   33.8
+  ],
+  "miami": [
+   30.7,
+   23.1
+  ],
+  "miami oh": [
+   18.5,
+   17.7
+  ],
+  "michigan": [
+   36.6,
+   7.2
+  ],
+  "michigan st": [
+   15.7,
+   24.0
+  ],
+  "middle tennessee": [
+   21.5,
+   30.0
+  ],
+  "minnesota": [
+   20.0,
+   21.1
+  ],
+  "mississippi st": [
+   24.7,
+   24.9
+  ],
+  "missouri": [
+   36.5,
+   18.0
+  ],
+  "navy": [
+   15.0,
+   27.2
+  ],
+  "nc st": [
+   25.5,
+   19.7
+  ],
+  "nebraska": [
+   15.6,
+   13.9
+  ],
+  "nevada": [
+   14.6,
+   37.0
+  ],
+  "new mexico": [
+   22.5,
+   37.2
+  ],
+  "new mexico st": [
+   23.3,
+   25.8
+  ],
+  "north carolina": [
+   34.4,
+   27.8
+  ],
+  "north texas": [
+   32.9,
+   41.3
+  ],
+  "northern illinois": [
+   18.3,
+   24.2
+  ],
+  "northwestern": [
+   18.5,
+   18.5
+  ],
+  "notre dame": [
+   36.3,
+   16.7
+  ],
+  "ohio": [
+   18.5,
+   18.1
+  ],
+  "ohio st": [
+   31.5,
+   7.8
+  ],
+  "oklahoma": [
+   38.5,
+   22.6
+  ],
+  "oklahoma st": [
+   32.8,
+   27.1
+  ],
+  "old dominion": [
+   23.1,
+   31.3
+  ],
+  "ole miss": [
+   36.3,
+   19.2
+  ],
+  "oregon": [
+   45.0,
+   18.2
+  ],
+  "oregon st": [
+   33.2,
+   22.3
+  ],
+  "penn st": [
+   32.7,
+   10.5
+  ],
+  "pittsburgh": [
+   19.3,
+   26.0
+  ],
+  "purdue": [
+   21.8,
+   27.1
+  ],
+  "rice": [
+   26.0,
+   34.4
+  ],
+  "rutgers": [
+   21.0,
+   18.7
+  ],
+  "sam houston": [
+   16.0,
+   28.8
+  ],
+  "san diego st": [
+   19.4,
+   30.2
+  ],
+  "san jos st": [
+   28.1,
+   29.5
+  ],
+  "smu": [
+   34.1,
+   23.0
+  ],
+  "south alabama": [
+   30.6,
+   26.0
+  ],
+  "south carolina": [
+   28.2,
+   25.6
+  ],
+  "south florida": [
+   28.4,
+   34.5
+  ],
+  "southern miss": [
+   23.5,
+   36.4
+  ],
+  "stanford": [
+   21.4,
+   34.5
+  ],
+  "syracuse": [
+   22.2,
+   26.1
+  ],
+  "tcu": [
+   33.5,
+   25.3
+  ],
+  "temple": [
+   18.6,
+   37.8
+  ],
+  "tennessee": [
+   34.9,
+   19.2
+  ],
+  "texas": [
+   39.3,
+   17.7
+  ],
+  "texas aandm": [
+   34.5,
+   18.8
+  ],
+  "texas st": [
+   31.2,
+   33.8
+  ],
+  "texas tech": [
+   29.6,
+   24.7
+  ],
+  "toledo": [
+   25.5,
+   21.7
+  ],
+  "troy": [
+   30.7,
+   20.1
+  ],
+  "tulane": [
+   26.5,
+   24.4
+  ],
+  "tulsa": [
+   20.9,
+   34.7
+  ],
+  "uab": [
+   26.9,
+   39.6
+  ],
+  "ucf": [
+   30.3,
+   25.2
+  ],
+  "ucla": [
+   29.6,
+   18.4
+  ],
+  "uconn": [
+   17.0,
+   31.0
+  ],
+  "ul monroe": [
+   17.6,
+   37.5
+  ],
+  "unlv": [
+   32.1,
+   32.7
+  ],
+  "usc": [
+   43.3,
+   32.8
+  ],
+  "utah": [
+   26.7,
+   19.4
+  ],
+  "utah st": [
+   28.6,
+   38.6
+  ],
+  "utep": [
+   16.9,
+   32.0
+  ],
+  "utsa": [
+   31.3,
+   27.3
+  ],
+  "vanderbilt": [
+   23.6,
+   36.3
+  ],
+  "virginia": [
+   21.0,
+   31.7
+  ],
+  "virginia tech": [
+   27.5,
+   23.3
+  ],
+  "wake forest": [
+   20.2,
+   26.9
+  ],
+  "washington": [
+   40.3,
+   24.7
+  ],
+  "washington st": [
+   31.0,
+   27.4
+  ],
+  "west virginia": [
+   31.5,
+   24.6
+  ],
+  "western kentucky": [
+   28.7,
+   30.1
+  ],
+  "western michigan": [
+   19.1,
+   33.2
+  ],
+  "wisconsin": [
+   22.2,
+   14.1
+  ],
+  "wyoming": [
+   23.5,
+   26.1
+  ]
+ }
+}
