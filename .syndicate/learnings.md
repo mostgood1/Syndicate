@@ -2975,6 +2975,15 @@ minutes made the transition legible; one sample is indistinguishable from a
 failed fix, and two samples on the same side of the boundary are worse -- they
 look like corroboration.
 
+`[ATTRIBUTION, split precisely, because this entry is about credit surviving the
+conversation that produced it. The eight-minute measurement and the poll-interval
+rule are lane `soccer-threeway-precision-gate`'s. The two-sample corroboration
+clause and the adjacency explanation are this lane's. I initially credited the
+corroboration clause TO them in a message; they checked their own sent text,
+found they had not written it, and asked to be un-credited. A wrong credit in a
+ledger outlives the conversation -- which is the same argument that made the
+retraction above worth making, pointed the other way.]`
+
 WHY THIS KEEPS RECURRING. Every one of these instruments is honest about
 something; it is just not the something being asked. `status=live` is true about
 the deploy. `lastRunAt` is true about dispatch. The shortlist is true about the
