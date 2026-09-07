@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 888 rules `[generated]`
+## Index — 891 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 328**
+**FORBIDDEN — 330**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -148,6 +148,8 @@
 - [2026-09-07 FORBIDDEN: deciding whether a model earns its keep from a SLATE-AVERAGE metr…](#2026-09-07-forbidden-deciding-whether-a-model-earns-its-keep-from-a-slate-average-metric)
 - [2026-09-07 FORBIDDEN: verifying a fix with a predicate on a TOTAL that can move for ano…](#2026-09-07-forbidden-verifying-a-fix-with-a-predicate-on-a-total-that-can-move-for-another-reason)
 - [2026-09-07 FORBIDDEN: building or proposing a guard before locating the one that alread…](#2026-09-07-forbidden-building-or-proposing-a-guard-before-locating-the-one-that-already-exists)
+- [2026-09-06 FORBIDDEN: reading a shared refusal/guard function's SCOPE off its NAME. Its…](#2026-09-06-forbidden-reading-a-shared-refusalguard-functions-scope-off-its-name-its-scope-is-the-field-list-it-actually-reads-and-a-three-way-market-has-three-legs-lane-soccer-threeway-precision-gate)
+- [2026-09-07 FORBIDDEN: a COMPOUND absence claim where only one clause was checked. "Not…](#2026-09-07-forbidden-a-compound-absence-claim-where-only-one-clause-was-checked-not-in-x-not-in-y-from-one-command-that-saw-only-x-lane-soccer-threeway-precision-gate)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -348,7 +350,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 554**
+**Rules and corrections — 555**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -448,6 +450,7 @@
 - [2026-09-07 SETTLED: the MLB pitcher inputs were NEVER dead -- nineteen days of measurin…](#2026-09-07-settled-the-mlb-pitcher-inputs-were-never-dead----nineteen-days-of-measuring-june)
 - [2026-09-07 A probe you designed yourself can MANUFACTURE bugs -- discriminate shape-fai…](#2026-09-07-a-probe-you-designed-yourself-can-manufacture-bugs----discriminate-shape-failure-from-real-failure-before-reporting)
 - [2026-09-07 A freshness gate must be `> deploy.finishedAt`, and an UNCHANGED control is…](#2026-09-07-a-freshness-gate-must-be-deployfinishedat-and-an-unchanged-control-is-not-automatically-a-null-result)
+- [2026-09-07 The deploy-claim breadcrumb id is not merely un-prefixed -- it is not in the…](#2026-09-07-the-deploy-claim-breadcrumb-id-is-not-merely-un-prefixed----it-is-not-in-the-roster-at-all)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

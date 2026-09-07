@@ -571,7 +571,7 @@ once this index exists: re-splitting would orphan the parts.
 | [portfolio-settlement] | PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[ver | `state_portfolio.md` |
 | [order-model-attribution] | AN ORDER RECORDS THE SIM'S VERDICT — DEPLOYED AND VERIFIED ON PRODUCTION; THE COMMIT GATE MAKES FOUR OF THE NI | `state_portfolio.md` |
 | [soccer-prop-book-coverage] | WIDENING SOCCER PROP REGIONS BUYS ONE SOFT BOOK FOR ~1M CREDITS/MONTH — **KNOB SHIPPED, DELIBERATELY LEFT OFF* | `state_soccer.md` |
-| [soccer-input-gate] | THE SOCCER INPUT GATE NOW RUNS, AND 4 OF ITS 9 ALARMS WERE DECISIONS — MEASURED 2026-09-07 `[lane soccer-unfed-inputs` | `state_soccer.md` |
+| [soccer-input-gate] | THE SOCCER INPUT GATE NOW RUNS, AND 4 OF ITS 9 ALARMS WERE DECISIONS — MEASURED 2026-09-07 `[lane soccer-unfed | `state_soccer.md` |
 | [soccer-market-anchor] | MARKET-ANCHORING IS REACHABLE AND STILL OFF BY DECISION — MEASURED 2026-09-02 `[lane soccer-anchor-cost, main  | `state_soccer.md` |
 | [soccer-board-coverage] | — MEASURED 2026-09-02, production, NOT A DEFECT | `state_soccer.md` |
 | [soccer-live-match-state] | Soccer's live tier is WIRED AND VERIFIED ON LIVE MATCHES (2026-08-21) | `state_soccer.md` |
@@ -580,6 +580,7 @@ once this index exists: re-splitting would orphan the parts.
 | [soccer] | SOCCER | `state_soccer.md` |
 | [soccer-live-tier] | SOCCER'S LIVE TIER — VERIFIED, AND WHAT IS NOT | `state_soccer.md` |
 | [soccer-shots-prop-skill] | SOCCER SHOTS PROPS â€” THE POISSON SHAPE IS RIGHT AND THE MEAN IS INFLATED `[measured 2026-08-31, lane layer1- | `state_soccer.md` |
+| [soccer-moneyline-precision] | SOCCER'S MONEYLINE EDGE IS NOW GATED ON ITS OWN SIM NOISE, AND 61% OF IT WAS INSIDE THAT NOISE `[measured 2026 | `state_soccer.md` |
 | [live-lens-snapshot] | THE LIVE-LENS SNAPSHOT CANNOT BE DATED — it is a 4 MB KEYVALUE key, not a file, and archiving it would cost ~5 | `state_ui.md` |
 | [live-surface-tier5] | THE LIVE SURFACE — Tier 5 `[measured 08-15 02:3x–03:0xZ]` | `state_ui.md` |
 | [ask-the-syndicate] | ASK THE SYNDICATE | `state_ui.md` |

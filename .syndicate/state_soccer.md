@@ -1022,3 +1022,47 @@ prop and every derived probability at once. It is also a live money-path change
 on a board that currently ranks one-sided rows on model edge. **That is a
 product decision, and the drifting `c` says it wants a scheduled re-fit rather
 than a constant.**
+
+## [soccer-moneyline-precision] SOCCER'S MONEYLINE EDGE IS NOW GATED ON ITS OWN SIM NOISE, AND 61% OF IT WAS INSIDE THAT NOISE `[measured 2026-09-06, lane soccer-threeway-precision-gate, main 8b6a1f4d]`
+
+**LANDED ON `main`, NOT DEPLOYED** (`autoDeploy = no`). Commits `6a20281c`
+(home leg, `soccer_projections._price_against_market`) and `8b6a1f4d` (draw and
+away legs, `layer2_board._model_edge_for`). Both route through
+`live_gameline_join.price_moneyline` rather than restating the rule.
+
+**n IS 400, AND IT IS MEASURED, NOT READ OFF A DEFAULT.** All 114
+`win_probability` values served by `/soccer/{epl,la_liga,serie_a,bundesliga}/api/cards`
+are exact multiples of 1/400 and no smaller n fits. The source default in
+`live_lens.py` says `simulations: int = 300`, so **the default is not what
+production runs** — infer n from quantisation, do not read the signature.
+
+**THE BAR THAT FOLLOWS FROM THAT: 4.00 pp at p=0.20, 4.98 pp at p=0.50.** A
+soccer moneyline disagreement is usually smaller, so on
+`/api/board/layer2-shortlist?sport=soccer` (2026-09-06, 59 moneyline rows, 28
+carrying a model edge) **17 of 28 — 61% — are newly withheld**: 8 home, 9 away,
+0 draw. 11 still price. USER DECISION taken on exactly these numbers: ship it.
+Withheld rows fall back to EV alone; they do not disappear.
+
+**THE ESTIMATOR IS NOT WHAT MOVED.** Mean shift on `|edge|` is +0.03 pp, max
+0.35 pp. The GATE does all the work here. Anyone re-measuring this must not
+attribute the drop to Agresti-Coull.
+
+**WHAT WAS ALREADY COVERED, so it is not re-fixed:**
+`probability_refusal.refuse_published_certainty` runs at
+`soccer_projections.py:1270`, one line after pricing, and blanks a
+`model_prob_over` of exactly 0.0/1.0. It reads **`model_prob_over` and nothing
+else** — so the HOME leg's exact certainty was never live, and the DRAW/AWAY
+legs were. `_MODEL_EDGE_MAX_POINTS` (15.0) was separately absorbing the most
+extreme cases, which is why everything between the bar and the cap was published
+for weeks with nobody seeing a certainty.
+
+**STILL RAW ON DISPLAY:** `_model_prob_for_side` returns the raw `k/n`, so the
+"Projected" cell and the priced edge use different centres. Fixing it needs the
+LIVE sim count plumbed first — `live_projection_join.py:633` overwrites
+`model_prob_over` with `live_prob_over`, so pairing it with the pregame
+`sims_run` would be the wrong `n`, silently.
+
+**DEAD FIELD, MEASURED:** `soccer_live_gameline_source.py:198` writes
+`side_probabilities` ({home, draw, away}) and NOTHING reads it but its own test.
+`attach_live_gamelines` prices `hit["home_win_prob"]` only and skips
+`h2h_3_way` at the market filter entirely.

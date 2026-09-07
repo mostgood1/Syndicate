@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 888 rules `[generated]`
+## Index — 891 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3495,3 +3495,61 @@ Accepting it unmeasured would have replaced one wrong mechanism with another --
 and a remedy whose mechanism is wrong makes no prediction, so it fails silently
 the next time.
 - *(evidence in `.syndicate/log/2026-09-07.md`)*
+
+## 2026-09-06 FORBIDDEN: reading a shared refusal/guard function's SCOPE off its NAME. Its scope is the FIELD LIST it actually reads, and a three-way market has three legs. `[lane soccer-threeway-precision-gate]`
+
+`probability_refusal.refuse_published_certainty` is named, documented and
+reasoned about as the platform's answer to "a finite simulation cannot
+establish impossibility". Its module docstring runs forty lines, calls itself
+**platform-wide**, and tabulates the 25 certainties it was built for across four
+sports. It reads exactly one field: `model_prob_over`.
+
+Soccer's `h2h_3_way` projection carries THREE probabilities --
+`model_prob_over` (home), `draw_probability`, `away_probability`. So the guard
+covered one leg of three, and the two it missed are the ones structurally most
+likely to hit the boundary: a draw is a NARROW outcome, and `draws / n` reaches
+zero as soon as a second goal separates the sides.
+
+WHAT MADE IT INVISIBLE FOR WEEKS, and this is the part worth keeping:
+`layer2_board._MODEL_EDGE_MAX_POINTS` (15.0) was silently dropping the WORST
+cases. A `0/400` leg against a 0.16 fair reads -16.0 pp and is refused by the
+cap, never by a certainty rule. So the extreme end looked handled, the middle
+published freely, and nobody could find an example that looked wrong.
+**A cap that discards your worst cases will hide the defect that produces them.**
+
+HOW TO APPLY. Before relying on a shared guard, grep the FIELDS it reads and
+compare that list against the fields the data actually carries on the path you
+are on. "It is handled platform-wide" is a claim about a function's ambition,
+not its predicate. The same check would have caught
+`soccer_live_gameline_source.py:198`, which publishes a full `side_probabilities`
+vector that no consumer reads at all.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-07 FORBIDDEN: a COMPOUND absence claim where only one clause was checked. "Not in X, not in Y" from one command that saw only X. `[lane soccer-threeway-precision-gate]`
+
+I ran `ls .syndicate/findings_*` in the PRIMARY TREE and reported a file was
+"not in the primary tree, not on origin/main". The first clause was measured.
+The second was invented in the same breath, and it was FALSE -- three commits
+touch that file on `origin/main` (`cc598278`, `583519c9`, `cbe02a45`). A peer
+spent a turn refuting it, and I had warned THEM about primary-tree staleness in
+the same message.
+
+The failure is not the stale tree -- that is already a rule. It is that the
+verified clause LAUNDERS the unverified one. Two clauses in one sentence read as
+one measurement because there is no visible seam, so the half with evidence
+lends its credibility to the half without. `[sharpened 2026-09-07 by lane
+ncaaf-live-resim-wire, which hit the identical shape as "a grep proving a symbol
+EXISTS doing duty for a claim that it is CALLED" -- same defect, different
+clause.]`
+
+AND IT HAPPENED INSIDE A WARNING ABOUT THE VERY THING. I was telling a peer to
+beware primary-tree staleness in the same message. That is not incidental: the
+seam stops being visible exactly when you are most confident, because the
+sentence is doing rhetorical work and you are reading it for force rather than
+for evidence.
+
+HOW TO APPLY. For a shared file, `git ls-tree -r origin/main -- <path>` or
+`git cat-file -e origin/main:<path>` after a `git fetch` -- the checkout answers
+a different question. More generally: if a sentence names two scopes, run two
+checks or name only the one you ran.
+- *(evidence in `learnings_evidence.md`)*
