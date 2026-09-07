@@ -25568,3 +25568,47 @@ FREQUENCY, not the duration. `SYNDICATE_ANON_PARTITION=0` and deployed
 
 **glibc's ceiling confirmed a fourth and fifth time:** `418.0` and `400.5 MB` at
 the end of the ramp, oscillating `400-420` through the whole mature window.
+
+## 2026-09-07 01:16:5xZ — web `b38a18d8` -> `08b59317` — **SEVEN GROWTH EPISODES CAUGHT. THEY ALTERNATE BETWEEN glibc AND PYMALLOC, AND PYMALLOC IS NOT A CONSTANT.** `[lane web-oom-growth-episode]`
+
+**what:** deployed the in-process growth-episode detector
+(`SYNDICATE_GROWTH_EPISODE=1`, single-key PUT), then redeployed `08b59317` to add
+a warm-up after the first run fired on the boot ramp. Claim held by
+`web-oom-growth-episode`; preflight CLEAR for both; exact SHA both times.
+
+**verify:** **7 episodes in a 55-minute window**, both workers, every one
+`reads_as attributed` with the unattributed term between `-2.0%` and `+24.9%` —
+so the cheap capture (no `smaps`) held throughout.
+
+        pid  age    anon delta   rate        glibc    pymalloc   unattrib
+        96    955s   +19.9 MB    17.8/min     75.1%      0.0%      24.9%
+        97   1121s   +19.1 MB     4.9/min      0.0%     89.1%      10.9%
+        97   1517s   +17.6 MB     2.7/min     12.6%     74.0%      13.4%
+        96   2013s   +33.8 MB    13.8/min     98.4%      0.0%       1.6%
+        96   2080s   +18.3 MB    16.4/min      0.0%     98.4%       1.6%
+        97   2511s   +55.4 MB    35.8/min     90.8%     10.8%      -1.7%
+        96   3032s   +49.3 MB    63.1/min    102.0%      0.0%      -2.0%
+
+**THE LANE'S HYPOTHESIS IS REFUTED.** It predicted glibc. Four episodes are
+glibc-dominant and **three are PYMALLOC-dominant at 74-98.4%**. Both allocators
+grow, in alternating discrete jumps.
+
+**AND `UPDATE 26` NEEDS CORRECTING:** pymalloc arenas jump `+6.0`, `+13.0`,
+`+17.0`, `+18.0 MB` — all near-integer, consistent with 1 MB arena granularity.
+The 31-minute mature window that reported `+0.0 MB` simply did not span a jump.
+
+**THE RATE, and it is an OOM trajectory:** sustained post-warm-up growth of
+**3.68 MB/min (pid 96) and 3.98 MB/min (pid 97)** — `2.6-2.9x` faster than
+`UPDATE 23`'s 1.4 MB/min. Two workers is **~7.4 MB/min of container growth**.
+
+**ROUTES ARE NOT AN ATTRIBUTION and the numbers say so.**
+`/api/ops/artifacts/publish` appears in all seven mixes, but growth does NOT
+scale with it: 224 requests / 101 publishes produced `+17.6 MB`, while 36
+requests / 9 publishes produced `+55.4 MB`. **This is the same route I already
+retracted once this session** — the "publish dominates" reading was trim-inflated,
+and pre-trim it cost ~0 MB in anon terms. It is not being re-adopted on a
+co-occurrence.
+
+**COST:** per-request path is one clock comparison; the capture runs on a 15 s
+interval at ~4-5 ms (`mallinfo2` ~1 ms + pymalloc 2.86 ms, no `smaps`). Flag left
+ON — it is now producing findings and costs ~0.03% of a worker.

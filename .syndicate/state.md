@@ -1368,3 +1368,47 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   counted, ~100 MB — not against zero: 5%/8 MB, an order of magnitude above the
   slack and below the fault. The read-agreement check keeps the tight 2%/2 MB bar
   because it compares two reads of the SAME quantity.
+
+### `[web-oom-leak]` UPDATE 27 — **SEVEN EPISODES CAUGHT. BOTH ALLOCATORS GROW, ALTERNATING — and PYMALLOC IS NOT THE CONSTANT `UPDATE 26` CALLED IT.**, 2026-09-07T02:1xZ `[session b2b5b45b]`
+
+* **The in-process detector caught 7 episodes in 55 minutes**, both workers,
+  every one `attributed` with the unattributed term between `-2.0%` and `+24.9%`
+  — so the cheap capture (allocators only, no `smaps`) was sufficient throughout,
+  which was the assumption it was built to expose if wrong.
+* **THE LANE'S HYPOTHESIS IS REFUTED.** It predicted glibc. **4 episodes are
+  glibc-dominant, 3 are PYMALLOC-dominant at 74-98.4%.** They alternate:
+
+        96 @  955s  +19.9 MB  glibc 75.1%      97 @ 1121s  +19.1 MB  pymalloc 89.1%
+        97 @ 1517s  +17.6 MB  pymalloc 74.0%   96 @ 2013s  +33.8 MB  glibc 98.4%
+        96 @ 2080s  +18.3 MB  pymalloc 98.4%   97 @ 2511s  +55.4 MB  glibc 90.8%
+        96 @ 3032s  +49.3 MB  glibc 102.0%
+
+* **CORRECTION TO `UPDATE 26`, which called pymalloc "a large CONSTANT, not a
+  leak".** It grows — in DISCRETE JUMPS of `+6.0`, `+13.0`, `+17.0`, `+18.0 MB`,
+  all near-integer and consistent with 1 MB arena granularity. The 31-minute
+  mature window that measured `+0.0 MB` on both workers did not span a jump. That
+  is the difference between a continuous instrument and a sampled one, and it is
+  exactly `[feedback_absence_in_a_window_is_not_absence]` — which UPDATE 26 cited
+  about anon and then failed to apply to its own pymalloc reading.
+* **THE RATE IS AN OOM TRAJECTORY.** Sustained post-warm-up: **3.68 MB/min** on
+  pid 96 and **3.98 MB/min** on pid 97, `2.6-2.9x` `UPDATE 23`'s 1.4 MB/min. Two
+  workers is **~7.4 MB/min of container growth** against a 2,048 MB limit.
+* **THE ROUTE MIX IS NOT AN ATTRIBUTION, and the arithmetic says so.**
+  `/api/ops/artifacts/publish` appears in all seven, but growth does NOT scale
+  with it: **224 requests / 101 publishes → `+17.6 MB`**, while **36 requests / 9
+  publishes → `+55.4 MB`**. This is the same route whose attribution I RETRACTED
+  earlier this session as trim-inflated (pre-trim it cost ~0 MB in anon terms),
+  and a co-occurrence is not grounds to re-adopt it.
+* **THE DETECTOR ITSELF NEEDED A WARM-UP, found in production.** Its first run
+  fired 18.4 s after boot on `+230.3 MB at 750 MB/min` with `/` and `/healthz`
+  the only routes — the boot ramp, three orders of magnitude faster than the
+  phenomenon. That cost the episode slot and, worse, polluted
+  `max_anon_rise_seen_mb`, the one field that separates "the process was flat"
+  from "the trigger is mis-sized". Warm-up now 900 s; process age is derived
+  LAZILY PER PID because gunicorn forks after import (the trap that shipped
+  `proc_token` inert earlier in `#632`).
+* **NEXT, and it is now two separate questions:** (a) what triggers a pymalloc
+  arena jump — 1 MB granularity means it is a real allocation burst, not
+  fragmentation; (b) whether glibc's episodes are the arena re-expanding above
+  the ~390-400 MB ceiling, which `malloc_trim` would address and
+  `scripts/malloc_trim_ab.py` is still owed on.

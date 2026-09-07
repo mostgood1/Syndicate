@@ -1989,7 +1989,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   constructed baseline state and the fixture — genuine, but not the same as
   upstream moving a file we had never touched.
 
-### web-oom-growth-episode — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-growth-episode — CLOSED 2026-09-06 — opened 2026-09-06 — **CAUGHT SEVEN, AND THE HYPOTHESIS IS REFUTED.** 7 episodes in 55 min, both workers, all `attributed` with unattributed `-2.0%` to `+24.9%`. The lane predicted glibc; **4 are glibc-dominant and 3 are PYMALLOC-dominant (74-98.4%)**, alternating. **This also corrects `UPDATE 26`'s "pymalloc is a large CONSTANT, not a leak"** — it jumps `+6`/`+13`/`+17`/`+18 MB`, near-integer, 1 MB arena granularity; the 31-min mature window simply did not span a jump. Sustained rate **3.68-3.98 MB/min per worker**, 2.6-2.9x UPDATE 23, ~7.4 MB/min per container — an OOM trajectory. `/api/ops/artifacts/publish` is in all seven route mixes but growth does NOT scale with it (224 reqs/101 publishes → +17.6 MB; 36 reqs/9 publishes → +55.4 MB), and that attribution was already retracted once this session as trim-inflated — not re-adopted on a co-occurrence. Detector needed a warm-up after firing on the boot ramp (+230.3 MB at 750 MB/min, `/healthz` only). NEXT: what triggers a pymalloc arena jump, and whether glibc's episodes are the arena re-expanding past its ceiling. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: CATCH one of `#632`'s intermittent growth episodes IN THE PROCESS, and
   attribute its anon delta across `glibc` / `pymalloc` / unattributed.
 - Files: `syndicate/features/shared/memory_observability.py`,
