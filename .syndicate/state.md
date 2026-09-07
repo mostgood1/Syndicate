@@ -1592,3 +1592,61 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   small one) or one call did something the others did not. That difference is
   itself measurable and worth resolving before acting.
 * Profile returned to **OFF** after the reading, per `UPDATE 29`.
+
+### `[web-oom-leak]` UPDATE 32 — **THE DIAGNOSTIC RING IS A PEAK GENERATOR: ~18,600 simultaneously-live objects per checkpoint, ~15x/min, retaining nothing.**, 2026-09-07T08:1xZ `[session b2b5b45b]`
+
+* **Tested `/wnba/api/live_player_boxscore` in isolation** — `UPDATE 31`'s lead.
+  It peaks **196x the control** locally but moved the arena **+0.0 MB**. The lead
+  is NOT confirmed, and I am not calling it the cause.
+* **Its SIBLING is the one that grows the arena.**
+  `/wnba/api/final_player_boxscore`, order-independent, two controls flat:
+
+        order reversed, n=20      final  +2,321.9 blocks/req   arena +16.0 MB
+                                  live      +69.0 blocks/req   arena  +0.0 MB
+                                  healthz    -1.4 blocks/req   arena  +0.0 MB
+
+        4 successive batches of 20:   +347.6 -> +10,589.9 -> +17,134.0 -> +18,536.1 /req
+                                      arena  +0.0 -> +38.0 -> +13.0 -> +33.0 MB
+
+  **It ACCELERATES**, which is the signature of an O(n) cost over something that
+  is itself growing.
+* **`tracemalloc` names the chain, at 100% coverage** (244,637 of 243,443 blocks):
+
+        route -> pipeline/intelligence_state.py:5958 _diag_log_all_process_memory
+              -> memory_observability.py:2174 log_and_persist_process_memory
+              -> memory_observability.py:2049 dump_process_memory_checkpoint
+              -> refresh_state_store read_json_file -> json.loads  **+11.32 MB**
+
+  `dump_process_memory_checkpoint` **READ-MODIFY-WRITES THE WHOLE RING**: it
+  `json.loads` the entire file, appends one record, truncates to 300, re-encodes
+  and writes it back — on every checkpoint.
+* **AT THE DESIGNED SIZE, which is what matters for production.** Reconstructed
+  the ring exactly as documented (300 records, 6 container processes) — 359 KB
+  at **1,224 B/record against the docstring's 1,233**:
+
+        json.loads        peak  +18,620 blocks SIMULTANEOUSLY LIVE
+        + re-encode       peak  +18,644 blocks
+        retained after            +11 blocks
+
+  **It retains nothing and peaks enormously**, ~15 times a minute. `UPDATE 30`
+  and `31` established that arena count follows PEAK simultaneous live blocks and
+  that pymalloc rarely returns an arena. For scale, the production
+  `blocks_inflight_max` measured 3,370 (`/api/ops/memory`) and 44,007
+  (`live_player_boxscore`) — 18,600 sits squarely between them.
+* **THE DIAGNOSTIC MACHINERY BUILT TO INVESTIGATE THE OOM IS A PLAUSIBLE DRIVER
+  OF IT.** The ring's docstring reasons carefully about the WRITE cost ("~1.1MB
+  rewritten ~15x/min on a memory-constrained worker"); the READ side, which
+  materialises ~18,600 live objects each time, is not considered anywhere.
+* **WHAT DOES NOT TRANSFER, stated because the local numbers are dramatic.** The
+  84 MB of arena growth from 80 local calls is inflated by process count: each
+  local record embeds **337 Windows processes with cmdlines** against Render's
+  **~6**, roughly 50x. **The local MAGNITUDE is not a production number.** What
+  transfers is the MECHANISM and the designed-size figure above.
+* **STILL NOT PROVEN:** that this accounts for production's arena jumps. I have a
+  mechanism, a chain and a plausible magnitude — not a production measurement.
+  The direct test is to correlate a `GROWTH_EPISODE` timestamp against checkpoint
+  writes, or to cut the ring's read cost and re-measure the arena rate.
+* **SEPARATE DEFECT, seen in the same trace:** the route emits
+  `WARNING: compute in request path (operation=wnba_has_games_for_date_espn_fetch)`
+  — a live upstream fetch inside a Flask handler, which `CLAUDE.md`'s
+  load-bearing rule forbids outright.
