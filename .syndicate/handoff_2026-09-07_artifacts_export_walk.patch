@@ -1,0 +1,108 @@
+diff --git a/syndicate/blueprints/ops.py b/syndicate/blueprints/ops.py
+index 623a4573..b54b2730 100644
+--- a/syndicate/blueprints/ops.py
++++ b/syndicate/blueprints/ops.py
+@@ -29,6 +29,8 @@ from syndicate.features.shared.artifact_publisher import is_hot_artifact_relativ
+ from syndicate.features.shared.artifact_publisher import EXPORT_ONLY_ARTIFACT_PATTERNS
+ from syndicate.features.shared.artifact_publisher import is_exportable_artifact_relative_path
+ from syndicate.features.shared.artifact_publisher import relative_to_data_root
++from syndicate.features.shared.artifact_walk import iter_pattern_matches
++from syndicate.features.shared.artifact_walk import patterns_that_can_match
+ # Private on purpose, and imported rather than re-stated. It is the SAME
+ # predicate that decides a Range/tail pull in `pull_streamed_artifact`, and the
+ # two must not drift: merging establishes the append-only invariant that the
+@@ -2712,22 +2714,26 @@ def api_ops_artifacts_export() -> Any:
+         # way a mirror can discover these artifacts exist -- a 403 and an
+         # absence are indistinguishable to a caller, and that confusion has
+         # already produced two wrong readings in this repo.
+-        for pattern in HOT_ARTIFACT_PATTERNS + EXPORT_ONLY_ARTIFACT_PATTERNS:
+-            for path in root.glob(pattern):
+-                if not path.is_file():
+-                    continue
+-                relative_path = relative_to_data_root(path)
+-                if not relative_path or not is_exportable_artifact_relative_path(relative_path):
+-                    continue
+-                if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
+-                    continue
+-                try:
+-                    stat = path.stat()
+-                    if since_epoch is not None and stat.st_mtime < since_epoch:
+-                        continue
+-                    listing[relative_path] = {"bytes": stat.st_size, "mtime": stat.st_mtime}
+-                except Exception:
++        # `#632`: one listing per DIRECTORY, not one glob per pattern. The 176
++        # patterns collapse onto 95 parents and the busiest is named by 18 of
++        # them, so this directory was being listed 18 times per sport. Measured
++        # on production before the change: this walk reads no file bodies and
++        # still TIMED OUT after 180 s.
++        _inventory = patterns_that_can_match(
++            HOT_ARTIFACT_PATTERNS + EXPORT_ONLY_ARTIFACT_PATTERNS, subset_pattern)
++        for path in iter_pattern_matches(root, _inventory):
++            relative_path = relative_to_data_root(path)
++            if not relative_path or not is_exportable_artifact_relative_path(relative_path):
++                continue
++            if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
++                continue
++            try:
++                stat = path.stat()
++                if since_epoch is not None and stat.st_mtime < since_epoch:
+                     continue
++                listing[relative_path] = {"bytes": stat.st_size, "mtime": stat.st_mtime}
++            except Exception:
++                continue
+         # No `truncated` key on purpose: this path never reads a file, so there
+         # is no budget to exceed and nothing to truncate. Reporting a field that
+         # is structurally always False would invite a caller to trust it on the
+@@ -2765,30 +2771,29 @@ def api_ops_artifacts_export() -> Any:
+     _body_patterns = (
+         HOT_ARTIFACT_PATTERNS + EXPORT_ONLY_ARTIFACT_PATTERNS if subset_pattern else HOT_ARTIFACT_PATTERNS
+     )
+-    for pattern in _body_patterns:
+-        if truncated:
+-            break
+-        for path in root.glob(pattern):
+-            if not path.is_file():
+-                continue
+-            relative_path = relative_to_data_root(path)
+-            if not relative_path or not is_exportable_artifact_relative_path(relative_path):
+-                continue
+-            if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
+-                continue
+-            try:
+-                stat = path.stat()
+-                if since_epoch is not None and stat.st_mtime < since_epoch:
+-                    continue
+-                if total_bytes + stat.st_size > budget_bytes and artifacts:
+-                    # Stop before reading, not after -- reading it is the
+-                    # memory we are trying not to spend.
+-                    truncated = True
+-                    break
+-                artifacts[relative_path] = path.read_text(encoding="utf-8")
+-                total_bytes += stat.st_size
+-            except Exception:
++    # `#632`: same grouped walk as the inventory path above. The budget break
++    # now exits ONE loop instead of two, which is the same behaviour -- the old
++    # inner `break` set `truncated` and the outer loop tested it immediately.
++    for path in iter_pattern_matches(
++            root, patterns_that_can_match(_body_patterns, subset_pattern)):
++        relative_path = relative_to_data_root(path)
++        if not relative_path or not is_exportable_artifact_relative_path(relative_path):
++            continue
++        if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
++            continue
++        try:
++            stat = path.stat()
++            if since_epoch is not None and stat.st_mtime < since_epoch:
+                 continue
++            if total_bytes + stat.st_size > budget_bytes and artifacts:
++                # Stop before reading, not after -- reading it is the
++                # memory we are trying not to spend.
++                truncated = True
++                break
++            artifacts[relative_path] = path.read_text(encoding="utf-8")
++            total_bytes += stat.st_size
++        except Exception:
++            continue
+     return jsonify({
+         "ok": True,
+         "count": len(artifacts),
