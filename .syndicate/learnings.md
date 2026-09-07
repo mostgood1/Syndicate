@@ -2999,3 +2999,49 @@ consulted (3 of 10 legs). Sibling of `ANALYTIC_UNCALIBRATED` and of "unknown mus
 not default permissive". A per-side count taken across that boundary measures the
 early return as much as the gate, which is why the "8 home / 9 away / 0 draw"
 split was retracted while the 17-of-28 total stood.
+
+## 2026-09-07 FORBIDDEN: deciding whether a model earns its keep from a SLATE-AVERAGE metric
+
+`[user, 2026-09-07: "remember you are globally making a call on something that
+should enhance SOME games to be bet on"]`
+
+**Nobody bets the slate.** A model can lose to the market on mean MAE and still
+be worth having, if its errors concentrate in games it has no read on while the
+subset where it disagrees hardest with the market is where it is right. That is
+the entire mechanism of selective +EV betting: you do not need to beat the market
+everywhere, you need a subset where you do.
+
+So `mean |model - actual|` over every game **cannot answer the question it is
+usually asked to answer.** Reported alone it is not merely incomplete -- it will
+say NO to a model that has a real, narrow edge, and it will say so with a
+confident-looking number.
+
+WHAT THIS COST HERE. The NFL drive-prior backtest reported
+`MAE off 10.573 / on 10.537 / market 9.410, t=+0.61` and I read it as a clean
+null. It may still be one -- but the harness had **discarded the per-game rows**,
+so the only data that could distinguish "no edge anywhere" from "no edge on
+average, real edge in the top decile" was gone, and answering required
+re-simulating 178 games twice.
+
+THE RULE, in three parts:
+
+1. **KEEP THE PER-GAME ROWS.** They cost nothing and every interesting cut --
+   by disagreement, by week, by favourite/underdog, by total -- is then seconds
+   instead of another full run. An aggregate is a lossy summary of data you
+   already had.
+2. **BUCKET BY THE AXIS THE BETTOR SELECTS ON**, which is
+   `|model - market|`, not by anything intrinsic to the model. Beating the market
+   on games you would never bet is worth nothing; losing there costs nothing.
+3. **FIT TO THE SUBSET, NOT THE SLATE.** A calibration fitted to minimise mean
+   error over every game is optimising performance on the games nobody bets. A
+   grid search against that objective can be executed perfectly and still be
+   answering the wrong question -- which is why the NFL first-calibration sweep
+   was STOPPED mid-run rather than reported.
+
+THIS INDICTS AN EXISTING HARNESS TOO, not just mine.
+`scripts/refit_ncaaf_smartsim2_payload.py` frames its go/no-go as whether the
+payload "closes any of that 3.56-point gap" in **slate-wide margin MAE** (model
+15.775 vs market 12.212 over n=2233). That framing is right to benchmark against
+the MARKET rather than the model's own past -- and still wrong to do it on the
+slate average. The same 2,233 games would answer the subset question if the rows
+were kept.
