@@ -3318,3 +3318,69 @@ only bound, and `--force` on that basis breaks a live session's claim.
   category than the tool** — recurring unattended jobs — and a question pitched
   at the tool cannot find a decision pitched at the pattern.
 - *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-07 SETTLED: the MLB pitcher inputs were NEVER dead -- nineteen days of measuring June
+
+**Final state of a thread that reversed three times. Every earlier entry on it is
+superseded by this one.**
+
+    generated 2026-09-07T16:27:40Z   roster_source 'sim'   rosters 8
+    POPULATED 9/10
+      fed        pitch_type_{whiff,inplay,hr}_mult, conditional_arsenal,
+                 count_bucket_map, statcast_splits_{source,n_pitches,
+                 start_date,end_date}
+      still zero conditional_arsenal_source
+    CONTROL     bb_gb_rate 69.3%  (77.4% in the June-sampled report)
+
+**THE CONTROL IS THE POINT.** `bb_gb_rate` comes from the same enrichment block
+and was expected to MOVE if the sample changed. It moved. Without it, 9/10 would
+have been just another number from an instrument that had already lied four
+times; with it, the reading is anchored. **Every check in this thread that lacked
+a field whose value I could predict SHOULD change produced a wrong conclusion.**
+
+### THE ONE-WORD CAUSE
+
+`sorted(glob(...))[:8]` is ASCENDING, and the date is the leading path segment.
+It selected the eight OLDEST roster_objs on disk -- 2026-06-15, two months before
+the arsenal and pitch-splits artifacts existed. Those rosters could never contain
+the audited fields. So the report was a constant, and a constant reading was read
+as a stable fact about production when it was a stable fact about eight fixed old
+files.
+
+### MY OWN CLAIMS, SCORED
+
+    original: 10 fields dead          WRONG   -- measuring June
+    retraction: 7 already fed         RIGHT in substance, WRONG in method
+                                      (compared the FLAT rosters, a different file)
+    un-retraction: 10 genuinely dead  WRONG   -- trusted a report still sampling June
+    actual: 9/10 fed on current rosters
+
+Twice I reversed on evidence that was itself measuring the wrong thing. The
+retraction was right for reasons I could not have defended, which is not the same
+as being right -- and I withdrew it on a report I had not validated.
+
+### WHAT WAS WASTED, AND WHAT WAS NOT
+
+Wasted: a stale-gate root cause (`SYNDICATE_MLB_ROSTER_REBUILD_DATE=2026-08-19`
+was genuinely stale but irrelevant), a production env change, and two deploys --
+all chasing an artifact of the measurement. The loaders were never broken;
+running `apply_arsenal_to_pitcher` over the real artifact populated all three
+maps first try, and I should have weighted that above the report the moment they
+disagreed.
+
+Not wasted: three real defects in the instrument, each independently capable of
+producing a false negative -- wrong parent directory (`daily_pitcher_props`
+instead of `daily`), no provenance field in the PUBLISHED report, and the
+ascending sort. Four sports' input audits run on this shape.
+
+### THE RULE
+
+**A measurement that never changes is not therefore stable.** Nineteen identical
+nightly readings read as strong evidence of a persistent defect; they were
+evidence that the sample was frozen. Before trusting a constant, establish what
+would make it move -- and if nothing in the pipeline could, the constant is
+describing the instrument, not the system.
+
+Remaining, and it is the whole of it: `conditional_arsenal_source` is zero while
+`conditional_arsenal` is populated -- a value present without its provenance
+label. One field.
