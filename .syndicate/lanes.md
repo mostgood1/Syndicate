@@ -1740,6 +1740,38 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   and a test that the basis agrees with `_model_edge_for` by construction.
 - Blocked by: none.
 
+### web-oom-profiler-steady — OPEN — REOPENED 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **`#632` REFRAMED: web is not dying of MEMORY, it is dying of LATENCY. 32.5% of requests exceed the 5 s health-check budget; 35 `server_failed` events, ZERO `evicted=True`. Mechanisms for the two worst routes are on `main` with 27 tests; neither is landed at its call site.**
+- Goal: remove the request-path work that starves web's 8 gunicorn slots, one
+  route at a time, each with a measurement.
+- Files: `syndicate/features/shared/single_flight.py`,
+  `syndicate/features/shared/artifact_walk.py`,
+  `tests/test_single_flight.py`,
+  `tests/test_artifact_walk.py`,
+  `syndicate/features/shared/memory_observability.py`,
+  `syndicate/app.py`,
+  `scripts/malloc_trim_ab.py`,
+  `scripts/ring_cost_ab.py`
+- Bookkeeping note: this lane was CLOSED 2026-09-04 and archived to
+  `lanes_history.md`, but the session kept working under the slug. Reopened
+  rather than opened under a new name, so the history stays joined. All eight
+  paths above were checked against every OPEN lane's `Files:` block first: free.
+- Hypothesis: n/a for the fixes (they are mechanisms, not diagnoses). The
+  standing one, UNTESTED: removing per-request rebuild work from
+  `/api/ops/artifacts/export` and `/api/intelligence/query` moves the ≥5 s
+  request share below the health-check budget.
+- Falsification test: the ≥5 s share does NOT fall after both land. That would
+  mean the latency lives somewhere these two routes do not reach — most likely
+  `/api/board/game-chips` (11 ms typical, 11.6 s worst) or the ESPN fetch
+  `request_path_guard` already names inside a Flask handler.
+- Verification: the ≥5 s request share, re-measured the same way as the 32.5%
+  baseline, AFTER both call-site patches are live. NOT the test suite — the
+  tests prove the mechanism, not the effect. A `COMBINED_BOARD_SERVED_STALE`
+  count with a request denominator beside it proves the single flight is firing.
+- Blocked by: a USER DECISION. Both call sites are claimed by lanes whose
+  owning sessions (`5611932c`, `3492626c`, and `ncaaf-live-resim-wire`'s) are
+  absent from `list_sessions(include_archived=True, limit=80)`. Handoffs and
+  verified patches are written; taking the claims needs an explicit override.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

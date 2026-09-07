@@ -1866,3 +1866,53 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   which already name the offending operations; (3) `/api/intelligence/query` at
   5 s median and 1.5 MB responses. Raising `GUNICORN_THREADS` would buy headroom
   but treats the symptom.
+
+### `[web-oom-leak]` UPDATE 38 — **BOTH SLOW ROUTES FIXED AND TESTED ON `main`; NEITHER IS LANDED AT ITS CALL SITE, because every lane claiming those two files is owned by an absent session.**, 2026-09-07T23:1xZ `[session b2b5b45b]`
+
+`UPDATE 37` named three slow routes. Two now have a mechanism on `main` with
+tests, and a verified diff waiting for the file's owner.
+
+**`/api/ops/artifacts/export`** (26 s median, 87 s max) — the cost is the
+directory WALK, not the file bodies: `?names_only=1` reads no bodies and still
+timed out after 180 s. 176 patterns collapse onto 95 parents and the busiest is
+named by 18 of them, so that directory is listed 18 times per sport per request.
+`syndicate/features/shared/artifact_walk.py` + 12 tests, landed `b79e7eb5`.
+Measured on a local mirror: **125 → 51 `scandir`, byte-identical file set.**
+Handoff: `.syndicate/handoff_2026-09-07_artifacts_export_walk.md`.
+
+**`/api/intelligence/query`** (5 s median, 18 s max) — two compounding causes,
+both in the code. `_COMBINED_INTELLIGENCE_RESPONSE_CACHE` is read at
+`intelligence_state.py:8599` and written at `:8861` with NOTHING between, so N
+concurrent misses each start their own rebuild; and the TTL defaults to **15 s**
+(`:8493`) while the rebuild costs 5–18 s, so past ~15 s the entry is stale the
+moment it is written. `syndicate/features/shared/single_flight.py` + 15 threaded
+tests, landed `e7519883`. Handoff + verified patch:
+`.syndicate/handoff_2026-09-07_intelligence_query_singleflight.{md,patch}`.
+
+**The A/B, driving the real function with 8 threads: 8 date-reads → 1.**
+**Elapsed was UNCHANGED at ~1.00 s and that is not a latency result** — the stub
+sleeps, so parallel sleeps do not contend. What collapses is WORK COUNT. The
+production claim is about SLOT OCCUPANCY: each rebuild holds one of web's 8
+gunicorn slots (`WEB_CONCURRENCY=2` × `GUNICORN_THREADS=4`) for 5–18 s, so one
+expiry can take the whole pool and leave `/healthz` nowhere to run. A wall-clock
+number would need a load test, which has NOT been run.
+
+**Why neither is landed at its call site.** `check_lane_claims.py`: `ops.py` is
+held by `ncaaf-live-resim-wire`; `intelligence_state.py` is held by THREE open
+lanes — `polymarket-yes-leg-binding`, `layer2-cap-raise` (both session
+`5611932c`) and `layer2-sim-disagrees` (`3492626c`). **Neither session appears in
+`list_sessions(include_archived=True, limit=80)`**, which reaches back to
+2026-08-31. Every prior take from `3492626c` was an EXPLICIT USER DECISION, so
+these two are queued as decisions, not taken.
+
+**Design note worth keeping.** The single-flight ships two classes and the call
+site needs the one that stores NOTHING. That cache is bounded by ROW COUNT, not
+entries, because `#632` itself measured it at **37.50 MB while obeying its
+32-entry cap** — entry size varies by orders of magnitude with slate size.
+Substituting a generic entry-capped cache would have reintroduced the exact bug
+that bound was added to fix. **A cache is not a drop-in for a cache.**
+
+**Still unaddressed from `UPDATE 37`:** `/api/board/game-chips` (bimodal, 11 ms
+typical / 11.6 s worst) and the `request_path_guard` line that already names a
+live ESPN fetch inside a Flask handler
+(`operation=wnba_has_games_for_date_espn_fetch`).
