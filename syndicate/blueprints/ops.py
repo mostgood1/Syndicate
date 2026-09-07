@@ -2212,6 +2212,54 @@ def _publish_divergence_verdict(relative_path: str, incoming_bytes: int, publish
     return True, marker + f" verdict=REFUSED consecutive_refusals={streak}"
 
 
+def _log_publish_accepted(relative_path, target_path, prev):
+    """One line per SUCCESSFUL replace, with what was there before.
+
+    WHY (2026-09-07). This endpoint printed only its merge and divergence
+    branches, so a plain successful overwrite left NO record at the receiver at
+    all. When three MLB season artifacts reverted to a three-week-old copy
+    between 18:07:15Z and 18:20:56Z, the writer could not be identified from
+    web's own logs -- the revert had to be reconstructed across services from
+    response SIZES in the access log, and the first occurrence remains
+    unattributed because nothing here recorded it.
+
+    Logs the PREVIOUS size and mtime beside the new ones, because that is what
+    makes a revert self-evident in the log rather than something you have to
+    already suspect: an artifact going back to a size it held hours earlier is
+    the signature. `prev` is a stat taken BEFORE the replace -- a stat, not a
+    read, so this costs no I/O proportional to artifact size.
+
+    Deliberately NOT a guard. Refusing an older publish is a behaviour change
+    across every artifact family (a repair after web loses a copy is a
+    legitimate older write), and that decision is not this function's to make.
+    This makes the next occurrence ATTRIBUTABLE, which is the thing that was
+    missing.
+    """
+    try:
+        publisher = str(request.headers.get("X-Artifact-Publisher") or "").strip() or "unknown"
+        new_bytes = target_path.stat().st_size
+        if prev is None:
+            print(f"[ops.publish] ACCEPTED path={relative_path} publisher={publisher} "
+                  f"bytes={new_bytes} prev=absent", flush=True)
+        else:
+            prev_bytes, prev_mtime = prev
+            print(f"[ops.publish] ACCEPTED path={relative_path} publisher={publisher} "
+                  f"bytes={new_bytes} prev_bytes={prev_bytes} delta={new_bytes - prev_bytes:+d} "
+                  f"prev_mtime={prev_mtime:.0f}", flush=True)
+    except Exception:
+        # A logging failure must never fail a publish that already succeeded.
+        pass
+
+
+def _stat_before_replace(target_path):
+    """(size, mtime) of the copy about to be overwritten, or None if absent."""
+    try:
+        st = target_path.stat()
+        return (st.st_size, st.st_mtime)
+    except Exception:
+        return None
+
+
 def _publish_streamed_body() -> Any:
     """Receive a raw streamed artifact body, one chunk resident at a time.
 
@@ -2386,7 +2434,9 @@ def _publish_streamed_body() -> Any:
                 return jsonify({"ok": True, "relative_path": relative_path,
                                 "bytes": target_path.stat().st_size,
                                 "merge": "fallback_replace"}), 200
+        _prev_stat = _stat_before_replace(target_path)
         os.replace(temp_path, target_path)
+        _log_publish_accepted(relative_path, target_path, _prev_stat)
     except Exception as exc:
         try:
             temp_path.unlink(missing_ok=True)
@@ -2485,7 +2535,9 @@ def _write_published_artifact(relative_path: str, content: Any) -> Any:
             if merged.get("handled"):
                 return jsonify({"ok": True, "relative_path": relative_path,
                                 "merge": "fallback_replace"}), 200
+        _prev_stat = _stat_before_replace(target_path)
         os.replace(temp_path, target_path)
+        _log_publish_accepted(relative_path, target_path, _prev_stat)
     except Exception as exc:
         # write_text() left the .tmp behind on any failure, on the same disk
         # that holds the artifacts, once per failed publish.
