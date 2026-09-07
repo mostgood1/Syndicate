@@ -3223,3 +3223,78 @@ The report now carries `roster_source` and `roster_glob`, so this question is
 answerable in one read instead of a night of it. It did not change the answer --
 it made the answer TRUSTWORTHY, which is the only reason the reversal could be
 settled at all.
+
+
+## 2026-09-07 FORBIDDEN: building or proposing a guard before locating the one that already exists
+
+TWO INSTANCES IN ONE SESSION, on the same machinery, both mine.
+
+**(a) I built a narrower copy of a check and trusted it over the real one.**
+Before deploying refresh-worker I pre-screened for an in-flight MLB sim by
+grepping the last `ALL_PROCESS_MEMORY` line for `mlb_daily_sim`. It said clear.
+`deploy_preflight.py`, reading the actual process table, said `HOLD: 5 job(s) in
+flight` -- `run_mlb_daily_sim_job.py`, `daily_update.py --workflow ui-daily`,
+and three vendor children, none of whose cmdlines contained my substring. On the
+strength of MY check I armed a production env flag and held the deploy claim on
+a contended service for 33 minutes for a deploy that could never go.
+
+**(b) I proposed adding a check that already existed twice.** A pinned deploy
+target (`5876bbc9`, live when chosen) became a rollback of a peer's `8f647bbb`
+two hours later. I reported it as a near-miss and proposed adding an ancestry
+check to `deploy_preflight.py`. But `render_deploy.py:136-156` ALREADY re-reads
+the live sha at deploy time and refuses a non-descendant (`--allow-rollback` is
+the escape; its docstring cites the 2026-08-14 incident of this exact shape),
+and preflight ALREADY reports `HOLD: <sha> is already contained in live <sha>`.
+My watcher goes through `render_deploy.py`, so it would have returned 2 and my
+loop would have disarmed and released. **It would have failed loudly. It was
+never armed to revert, and I said it was.**
+
+WHY THE OVERSTATEMENT MATTERS MORE THAN THE MISS. A near-miss report is a claim
+about what the SYSTEM would have allowed. Getting that wrong argues for guards
+that exist and misprices the ones that do not. I reported catching a hazard I
+had not actually been exposed to.
+
+AND THE PROPOSED FIX WAS WORSE THAN THE STATUS QUO, per lane
+`ncaaf-live-resim-wire`: preflight's CLEAR is valid for 15 minutes and this
+check must hold AT POST TIME, so a copy there is a second owner that drifts and
+gives false comfort in exactly the window the real guard covers.
+
+RELATED, and why the reflex is strong: a guard you did not write is invisible
+until you go looking, while one you write yourself is vivid. That asymmetry is
+the whole mechanism -- it is not laziness, it is that your own instrument is the
+one you can see.
+
+HOW TO APPLY. Before writing a check, or reporting that one is missing:
+`grep` the sanctioned entrypoint for the concern (`REFUS`, `HOLD`, `guard`,
+`--allow-`) and read its docstring. If a guard exists, route through it instead
+of reimplementing it -- and if the answer is "my code bypasses it", the fix is
+to stop bypassing it, not to duplicate it. State which entrypoint you checked.
+
+COROLLARY, measured the same night: a target chosen because it was live is an
+ASSUMPTION the moment it is stored. Anything sitting in a poll loop must
+re-resolve the world before acting, not remember it. And `target == live` is
+STRICTER than the shipped rule and self-defeating -- `render_deploy.py` returns
+2 on it (`ALREADY live -- nothing to deploy`). Deploys are meant to be
+CUMULATIVE; roll-forward from `main` is the sanctioned shape, so "isolate my
+change by redeploying the live sha" is the doctrine backwards.
+- *(evidence in `.syndicate/log/2026-09-07.md`)*
+
+## 2026-09-07 The deploy claim's `session:` breadcrumb does not resolve, even for a LIVE holder
+
+`deploy_claim.py status` printed holder session
+`520cd594-1ffa-4116-8951-4c4b53ffbfcf`. That id does not resolve in
+`list_sessions` even with `include_archived: true` -- while that session was
+alive, running, and holding the claim. The peer independently hit the same thing
+looking up `3492626c` and concluded "gone" when only "not resolvable" was
+supported.
+
+The claim's own text already says it is a breadcrumb and the TTL is the real
+liveness bound. What was NOT known: it fails to resolve for a live holder, so
+`not found` carries no information about the holder at all -- it is not weak
+evidence of absence, it is zero evidence.
+
+HOW TO APPLY. To reach a claim holder, search `list_sessions` by TITLE (lane
+slugs map to session titles closely enough in practice) -- that worked when the
+id did not. Never infer a holder is gone from a failed id lookup; the TTL is the
+only bound, and `--force` on that basis breaks a live session's claim.
+- *(evidence in `.syndicate/log/2026-09-07.md`)*

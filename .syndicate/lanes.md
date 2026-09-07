@@ -65,7 +65,7 @@ id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
 markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
-### segment-regrade-apply — OPEN — opened 2026-09-06 — session 3492626c
+### segment-regrade-apply — OPEN (applied; second source owed) — opened 2026-09-06 — session 3492626c
 - Goal: the 49 mis-graded segment orders carry their CORRECTED outcome in the
   execution ledger, auditable and reversible.
 - Files: `scripts/apply_segment_regrade.py` (NEW)
@@ -95,6 +95,15 @@ death, never life — do not invert it.
   `rc=3`. The real verification is post-run: `/api/ops/execution/ledger-summary`
   `by_segment` settled counts unchanged, and 49 rows carrying
   `outcome_as_settled`.
+- **APPLIED 2026-09-07 00:03:18Z** under refresh-worker `271a92e1`:
+  `corrected 49, already 0, NOT FOUND 0, rc=0`, plus `KEYVALUE_WRITE_LARGE ...
+  caller=execution_ledger.py:931 <- apply_segment_regrade.py:215`. Narrative and
+  the four failed confirmation attempts: `.syndicate/log/2026-09-07.md`.
+- STILL OPEN — the SECOND SOURCE. Every reading above is the writer's account of
+  itself, and no endpoint exposes paper-book historical rows (all 49 are paper).
+  The remaining instrument is the script's own idempotency: re-run the boot hook
+  and read `already corrected 49 / corrected 0`. Blocked only on having a commit
+  ahead of live to roll forward onto.
 - Blocked by: the trigger. Needs a boot hook in a file another lane holds.
 
 ### nfl-rating-units — OPEN — opened 2026-09-06 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — **NFL's sim cannot tell teams apart: across-game margin spread 2.16 pts against NCAAF's 15.37**
