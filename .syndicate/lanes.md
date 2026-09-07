@@ -2262,6 +2262,33 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   flag goes back OFF when the reading is done.
 - Blocked by: none.
 
+### web-oom-ring-arena-ab — OPEN — opened 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: measure whether halving the diagnostic ring's allocation peak
+  (`fd352a3b`) changes the pymalloc ARENA in production.
+- Files: scratchpad harness only (`arena_rate_ab.py`). Code already landed.
+- **WHY A LEVEL AND NOT A RATE.** The cut removes ~9,000 simultaneously-live
+  blocks from a peak recurring ~15x/min. Arenas are sized to the HIGHEST peak
+  ever seen and pymalloc rarely returns one, so once the arena covers the old
+  peak a smaller peak CANNOT shrink it. **Any effect is in the RAMP**, so this
+  compares the arena LEVEL at matched process ages (600/1200/1800 s).
+- **THIS ALSO FIXES `UPDATE 29`'s POWER PROBLEM.** pymalloc moves in discrete
+  1 MB jumps: there, one worker jumped `+18 MB` and the other `+0.0` over the
+  same window, and a `0.0/0.0` control arm was always a plausible coin flip. A
+  LEVEL at fixed age is a far more stable statistic than counting rare events.
+- **BOTH ARMS RUN THE SAME BUILD**, toggled by `SYNDICATE_RING_KEEP_CMDLINE`
+  (`2803f83f`). Deploying the pre-cut commit would have moved production
+  backwards and made the arms differ by a whole build rather than one behaviour.
+- Hypothesis: the arena level is LOWER in the SLIM arm at matched age. If the
+  ring is a real arena-sizing event, halving its peak should show in the ramp.
+- Falsification test: no material difference (<4 MB at age 1800 s). That would
+  mean the ring peak, though real and measured, is NOT what sizes the arena, and
+  `UPDATE 32`'s mechanism is not the driver.
+- Verification: both arms with all three age points on >= 2 workers, volume skew
+  <25%, AND a per-worker spread check — overlapping ranges mean a DIRECTION at
+  most, never a magnitude. That check is `UPDATE 29`'s exact failure, added to
+  the harness up front this time rather than after the fact.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
