@@ -214,9 +214,22 @@ through the real function, split by GAME, score on Brier against outcomes.
   linear ramp**, not a probability model: every margin ≥ +14 is 0.95 and every
   margin ≤ −14 is 0.05. Clamping means it cannot hit 0/1, so it is not this
   defect — but a linear map is cruder than either the logistic or `k/n`.
-  **REACHABILITY UNKNOWN.** Its importers are lift-analysis, season-validation
-  and a `sim_engine` package, none obviously on the board path, and the NFL board
-  uses smartsim2 instead. One check settles whether it is live.
+  `[SETTLED — the draft left this open; it is now answered, so nobody re-runs
+  the grep.]` **NOT on the board path, so not a live pricing defect.** The only
+  instantiation outside `features/football/` is
+  `scripts/football_sim_input_checklist.py:349`. Every board and projection
+  import reaches `football.sim_engine.smartsim2.*` DIRECTLY (`ncaaf/cards.py:28`,
+  `ncaaf/live_resim.py:98-102`, `ncaaf/game_projections.py:252`,
+  `ncaaf/sources.py:275`, the `smartsim2_projection` shims) and never touches
+  `FootballSimulationAdapter`. Importing a smartsim2 submodule does execute
+  `football/sim_engine/__init__.py`, which imports the adapter — so it is
+  reachable BY IMPORT and never CALLED. Presence is not reachability, in the
+  direction that favours us for once.
+
+  Worth one line anyway: the ramp lives in the tooling that VALIDATES the real
+  engine, so the input checklist carries a notion of win probability the engine
+  does not share. Not money, but a checklist that disagrees with its subject is
+  a poor oracle.
 
 - **The test suite writes into git-tracked `data/**`.** Running the sweep
   truncated
