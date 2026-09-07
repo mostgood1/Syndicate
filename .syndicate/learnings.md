@@ -3459,3 +3459,39 @@ key's own presence, since a pre-fix artifact does not contain
 for it, and the fixed value matching its sibling exactly (0.86 = 0.86) is the
 predicted value rather than merely a non-zero one.
 - *(evidence in `.syndicate/deploys.md`, 2026-09-07 17:44:53Z)*
+
+
+## 2026-09-07 The deploy-claim breadcrumb id is not merely un-prefixed -- it is not in the roster at all
+
+SUPERSEDES the entry above it, which said the claim's `session:` breadcrumb
+"does not resolve in `list_sessions` even for a LIVE holder" and told the reader
+to search by TITLE. A peer offered a tidier explanation: ids DO resolve, they
+just need the `local_` prefix, and the breadcrumb stores the bare uuid.
+
+**Half right, and the half that is wrong matters.** The prefix gotcha is REAL:
+`send_message` to a bare uuid returns "not found" and to `local_<uuid>` works --
+I hit that myself today and it cost a lookup. But it does not explain the
+breadcrumb, and I checked before accepting it:
+
+    deploy_claim breadcrumb        520cd594-1ffa-4116-8951-4c4b53ffbfcf
+    that lane's actual session id  local_605f483c-45a8-48d2-a500-eb4f4572d515
+
+Different uuids. `520cd594` appears in `list_sessions` in NEITHER form, across
+40 sessions back to 2026-09-04, which covers the whole life of that claim. So
+prefixing `520cd594` resolves nothing -- there is no such session by that id.
+
+HOW TO APPLY, both facts kept separate because they have different remedies:
+- To MESSAGE a session, use the `local_`-prefixed id from `list_sessions`. A
+  bare uuid fails with "not found", which reads as absence and is not.
+- To identify a CLAIM HOLDER, do not expect the breadcrumb to resolve at all --
+  it records an id that need not correspond to anything `list_sessions` returns.
+  Match by TITLE. The TTL remains the only liveness bound, and a failed lookup
+  is still zero evidence the holder is gone.
+
+AND THE META-POINT, which is why this is an entry rather than an edit: a peer's
+correction is a claim like any other. This one was offered confidently, was
+plausible, matched a real gotcha, and still did not explain the case at hand.
+Accepting it unmeasured would have replaced one wrong mechanism with another --
+and a remedy whose mechanism is wrong makes no prediction, so it fails silently
+the next time.
+- *(evidence in `.syndicate/log/2026-09-07.md`)*
