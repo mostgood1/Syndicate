@@ -1412,3 +1412,42 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   fragmentation; (b) whether glibc's episodes are the arena re-expanding above
   the ~390-400 MB ceiling, which `malloc_trim` would address and
   `scripts/malloc_trim_ab.py` is still owed on.
+
+### `[web-oom-leak]` UPDATE 28 — **THE PYMALLOC GROWTH IS PER-REQUEST, NOT PER-ROUTE. `/healthz` retains as fast as the artifact endpoints.**, 2026-09-07T03:0xZ `[session b2b5b45b]`
+
+* **Per-route RETAINED pymalloc blocks, ~1,340 solo requests per worker,
+  gen2-free windows only.** Among routes with a real sample (`n>=80`) the
+  per-request retention spans **18.6-32.8 blocks** (pid 97) and **21.2-37.9**
+  (pid 98) — a **1.8x spread, IDENTICAL on both workers**. A route-specific leak
+  would be orders of magnitude apart.
+* **THE LANE'S FALSIFICATION CONDITION FIRED, as written:** *"retained blocks
+  spread evenly across routes"*. They do. **No route drives the arena jumps; the
+  request COUNT does.**
+* **`/healthz` RETAINS 26.6-28.0 BLOCKS PER REQUEST** — a trivial health check,
+  and the cleanest control available. It leaks at the same rate as
+  `/api/ops/artifacts/stream` and `export`. Whatever retains is in the SHARED
+  request path or the interpreter, not in any handler.
+* **`/api/ops/artifacts/publish` leads on TOTAL (38-41%) purely because it is
+  served most** (762 and 680 of ~1,340 solo requests) — and it has the **LOWEST
+  per-request rate of the four**. Ranking by total would have re-adopted an
+  attribution I already retracted once today as trim-inflated. That is three
+  separate times this route has looked guilty by co-occurrence and been wrong.
+* **THE RECONCILIATION PASSES, which is what licenses the conclusion.** The solo
+  sample covers 78-81% of requests, so scaled up it is ~42.7k and ~48.3k blocks
+  against the **9.0 and 13.0 MB of arena jumps** caught on those same pids —
+  **221 and 282 bytes per retained block**, against ~50-200 B for a small object
+  with pymalloc overhead. Same order. The blocks measured DO account for the
+  arenas, so the growth is not hiding somewhere the sample never saw.
+* **CAVEAT I CANNOT CLOSE FROM THIS DATA:** this session added per-request
+  instrumentation, and uniform per-request retention is exactly what that would
+  look like. The phenomenon PREDATES it — `UPDATE 23` measured the growth hours
+  before any of this code existed — so the leak is not mine; but I cannot say
+  from these numbers how much of the ~25 blocks/request the instruments
+  themselves contribute. Measuring that needs the profile toggled OFF and the
+  arena rate re-read.
+* **NEXT:** the target is now a SHARED per-request retainer of ~20-38 small
+  objects, not a route. Candidates in order of testability: this session's own
+  instrumentation (toggle it off and re-measure the arena rate — cheapest and
+  also closes the caveat above), Flask/Werkzeug per-request caches, and logging.
+  A route allowlist is no longer the right tool; a before/after on the shared
+  path is.

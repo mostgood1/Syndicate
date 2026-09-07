@@ -2123,7 +2123,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   tomorrow rather than assuming.
   because of that and should be RETIRED when it clears.
 
-### web-oom-pymalloc-trigger — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-pymalloc-trigger — CLOSED 2026-09-06 — opened 2026-09-06 — **THE HYPOTHESIS IS REFUTED AND THE LANE'S OWN FALSIFICATION CONDITION FIRED.** Per-route retained pymalloc blocks over ~1,340 solo requests per worker: among routes with `n>=80` the rate spans **18.6-32.8/req** (pid 97) and **21.2-37.9** (pid 98) — a **1.8x spread, identical on both workers**, where a route-specific leak would be orders apart. **`/healthz` retains 26.6-28.0 blocks/req**, the same as the artifact endpoints, so the retainer is in the SHARED request path, not a handler. `publish` leads on TOTAL only because it is served most and has the LOWEST per-request rate — ranking by total would have re-adopted a once-retracted attribution for the third time. **Reconciliation PASSES**: scaled for the 78-81% solo coverage, ~42.7k/48.3k blocks against 9.0/13.0 MB of arena jumps = **221/282 B per block**, same order as a small object. Open caveat: this session's own per-request instrumentation would look exactly like this; the phenomenon predates it (`UPDATE 23`) so it is not mine, but its contribution is unmeasured. NEXT: toggle the profile OFF and re-read the arena rate — cheapest test, and it closes the caveat too. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: find WHICH ROUTE drives `#632`'s pymalloc arena jumps, by attributing
   RETAINED pymalloc blocks per route on solo requests.
 - Files: `syndicate/features/shared/memory_observability.py`,

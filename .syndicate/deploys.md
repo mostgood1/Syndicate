@@ -25612,3 +25612,50 @@ co-occurrence.
 **COST:** per-request path is one clock comparison; the capture runs on a 15 s
 interval at ~4-5 ms (`mallinfo2` ~1 ms + pymalloc 2.86 ms, no `smaps`). Flag left
 ON — it is now producing findings and costs ~0.03% of a worker.
+
+## 2026-09-07 02:2xZ — web `08b59317` -> `4100cd75` — **THE PYMALLOC GROWTH IS PER-REQUEST, NOT PER-ROUTE. `/healthz` LEAKS AS FAST AS ANYTHING ELSE.** `[lane web-oom-pymalloc-trigger]`
+
+**what:** deployed per-route RETAINED pymalloc block attribution on the existing
+solo-request path. `SYNDICATE_REQUEST_MEMORY_PROFILE` was ALREADY `on` — the
+machinery had been collecting all along and simply had no API surface, which is
+why every earlier check saw nothing. Claim held; preflight CLEAR (a first run
+returned HOLD for a job that finished between runs, re-run before deploying).
+
+**verify:** ~1,340 solo requests per worker, 13 and 11 distinct routes,
+gen2-free windows only:
+
+        pid 97                       blocks     n    per_req   share
+        /api/ops/artifacts/publish    14142    762     18.6    40.7%
+        /api/ops/artifacts/stream      7843    239     32.8    22.6%
+        /healthz                       5238    197     26.6    15.1%
+        /api/ops/artifacts/export      2613     88     29.7     7.5%
+
+        pid 98
+        /api/ops/artifacts/publish    14401    680     21.2    38.1%
+        /api/ops/artifacts/stream      9753    257     37.9    25.8%
+        /healthz                       7726    276     28.0    20.4%
+        /api/ops/artifacts/export      3030     88     34.4     8.0%
+
+**THE HYPOTHESIS IS REFUTED, AND THE FALSIFICATION CONDITION WAS THE ONE
+WRITTEN DOWN:** *"retained blocks spread evenly across routes"*. Among routes
+with a real sample (n>=80) the per-request rate spans **18.6-32.8** on pid 97 and
+**21.2-37.9** on pid 98 — a **1.8x spread, identical on both workers**. A
+route-specific leak would be orders of magnitude apart, not 1.8x.
+
+**`/healthz` RETAINS 26.6-28.0 BLOCKS PER REQUEST.** It is a trivial health
+check. That is the control, and it leaks at the same rate as the artifact
+endpoints — which is the whole finding.
+
+**`publish` LEADS ON TOTAL ONLY BECAUSE IT IS SERVED MOST** (762 and 680 of
+~1,340 solo requests) and has the **LOWEST per-request rate of the four**. Ranking
+by total would have re-adopted, for the third time, an attribution already
+retracted once this session as trim-inflated.
+
+**THE RECONCILIATION PASSES.** The solo sample covers 78-81% of requests
+(`skipped_concurrent` 304 and 378), so scaling up: ~42.7k and ~48.3k blocks
+against the **9.0 MB and 13.0 MB of arena jumps** the episode detector caught on
+those same pids — **221 and 282 bytes per retained block**. A small object with
+pymalloc overhead is ~50-200 B. Same order, so the blocks measured DO account for
+the arenas; the growth is not coming from somewhere the sample never saw.
+
+**cost:** two `getallocatedblocks()` calls per solo request, ~1.4 microseconds.
