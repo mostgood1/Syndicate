@@ -1924,13 +1924,25 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
     steps.append(
         RefreshStep(
             name="soccer_sim_input_checklist",
-            phases=("pregame",),
+            # BOTH PHASES, and this is load-bearing: refresh-worker runs with
+            # `SYNDICATE_LIVE_ODDS_REFRESH_PHASE=live` (read off the live service
+            # 2026-09-07), so a pregame-only step NEVER EXECUTES there. The
+            # soccer artifact steps above already carry `live` for the same
+            # reason. A gate that cannot run is worse than no gate: it reports
+            # nothing and looks armed.
+            #
+            # `--min-interval-hours 6` is what makes `live` affordable -- the
+            # script exits before touching disk when today's report is fresh, so
+            # the 60s cadence costs a process spawn, not a ratings build.
+            phases=("pregame", "live"),
             cwd=REPO_ROOT,
             command=(
                 python_exe,
                 "scripts/soccer_sim_input_checklist.py",
                 "--publish",
                 "--warn-only",
+                "--min-interval-hours",
+                "6",
             ),
             description="Audit which soccer sim-engine inputs are CONSUMED but UNPOPULATED, and publish the bounded result so production is readable.",
         )

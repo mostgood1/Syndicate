@@ -181,7 +181,31 @@ def main() -> int:
              "(`run_mlb_daily_sim_job.py`). A human run should NOT pass it -- the non-zero "
              "exit is the gate.",
     )
+    ap.add_argument(
+        "--min-interval-hours", type=float, default=0.0,
+        help="with --publish: exit 0 WITHOUT doing any work if today's report is younger "
+             "than this. The production caller passes it because refresh-worker runs "
+             "`--phase live` on a 60s cadence and this gate costs seconds of CPU it does "
+             "not need to spend more than a few times a day (`#241`: periodic worker work "
+             "is never free). 0 disables the throttle, which is what a human run wants.",
+    )
     args = ap.parse_args()
+
+    # THROTTLE FIRST, BEFORE ANY WORK. The history read, the ratings build and
+    # the AST walk all sit below; skipping them is the entire point, so this
+    # cannot move down. Says WHY it skipped -- a silent early return is
+    # indistinguishable from a run that found nothing wrong, which is the
+    # ambiguity this whole file exists to remove.
+    if args.publish and args.min_interval_hours > 0:
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        existing = (_data_root() / "soccer_source/source_artifacts/data/sim_input_report"
+                    / f"sim_input_report_{stamp}.json")
+        if existing.is_file():
+            age_h = (datetime.now(timezone.utc).timestamp() - existing.stat().st_mtime) / 3600.0
+            if age_h < args.min_interval_hours:
+                print(f"SKIPPED: {existing.name} is {age_h:.2f}h old, under the "
+                      f"{args.min_interval_hours}h floor -- no work done, exiting 0.")
+                return 0
 
     # A REAL feature payload from the production constructor -- not a fixture.
     # Ratings shaped like `compute_team_ratings` output so the call is honest.
