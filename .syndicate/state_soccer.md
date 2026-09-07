@@ -65,6 +65,51 @@ rises on keys present in BOTH before and after, using
 `scripts/census_board_row_duplicates.py` with `limit=2000` (the endpoint
 defaults to 200 and truncates silently).
 
+## [soccer-input-gate] THE SOCCER INPUT GATE NOW RUNS, AND 4 OF ITS 9 ALARMS WERE DECISIONS — MEASURED 2026-09-07 `[lane soccer-unfed-inputs, main 91f7e904]`
+
+**`soccer_sim_input_checklist.py` had NO CALLER** from its creation on
+2026-08-18 until now. Production held **20 MLB `sim_input_report`s and ZERO
+soccer ones**, so "is soccer's input surface fed" was unanswerable in
+production. `model_engine_standard.md` §1 mandates a GATING checklist; this one
+gated nothing. Now a single pregame step in `_build_soccer_steps`, last, with
+`--warn-only` so an input alarm cannot fail the build it audits.
+
+**The standing "9 unfed inputs" is a true COUNT and a false defect list.**
+Re-derived: **2 real, 2 instrument blind spot, 5 deliberate.** Now 9 → **2
+alarms + 5 `disabled`**, verified against a real production odds CSV.
+
+- **Deliberate, do NOT wire:** `goals_per_match` / `goals_against_per_match`
+  (goals are the xG STAND-IN, so feeding both double-weights 0.22 → 0.36 — A/B
+  measured `total_mean` 3.16 → 3.39); both `ppda` entries (no ppda column in
+  the source; `compute_team_ratings` emits 0.0 and 0.0 reads as the MOST
+  aggressive press); `model_probability` (names the MODEL's own view —
+  circular at prior-build time).
+- **Survivors, genuinely sourceless:** `big_chances_per_match`,
+  `pace_seconds_per_event`. football-data carries goals/shots/corners/fouls/
+  cards/odds and nothing else. Fixing these needs a DATA SOURCE, not wiring.
+
+**THE MARKET PRIOR WAS A KEY MISMATCH.** `attach_market_odds` writes
+`market_odds` — the ANCHOR's input. The engine reads `market_features` and was
+never given one, while `totals` (1,450 rows) and `spreads` (812) were parsed out
+of the same CSV and dropped against 3,783 `h2h`. `_market_prior_index` therefore
+returned a **constant 0.5 for every fixture ever simulated**.
+
+**WIRED, NOT ARMED — `SYNDICATE_SOCCER_MARKET_PRIOR`, default off.** n=181
+priced events across all ten leagues: unfed 0.5 flat; fed min 0.133 / **median
+0.633** / max 1.000 / sd 0.201, saturating at the 1.0 clamp. The median moves
+the term UP, so arming it is a SYSTEMATIC SHIFT into an engine calibrated with
+it pinned — mechanism-vs-estimator, the rates that absorbed the constant need
+re-fitting. Downstream: `shot_generation_probability` mean +0.0044, max +0.0100
+(weight 0.02, `possession_priors.py:347`).
+
+**OWED:** the graded backtest, off vs on, over dates with retained
+`odds_history`, on the BETTABLE SUBSET rather than a slate average. The user
+approved feeding these inputs on that condition (2026-09-07).
+
+**NOT the anchor.** This writes `market_features` only and sits ABOVE the
+`weight <= 0.0` early return (production's state — below it, nothing runs).
+`[soccer-market-anchor]` is untouched and stays at weight 0.0.
+
 ## [soccer-market-anchor] MARKET-ANCHORING IS REACHABLE AND STILL OFF BY DECISION — MEASURED 2026-09-02 `[lane soccer-anchor-cost, main 686d8282/0844694c]`
 
 **Weight stays 0.0. The blocker was never cost; it was two dead name joins, an
