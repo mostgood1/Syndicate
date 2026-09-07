@@ -314,6 +314,8 @@ def main(argv: list[str] | None = None) -> int:
     baseline = load_baseline()
     baseline.setdefault("trees", {})
 
+    writing = bool(args.apply or args.seed_baseline or args.keep_local or args.keep_all_unclassified)
+
     surveys = []
     for key in args.trees:
         spec = TREES[key]
@@ -368,6 +370,28 @@ def main(argv: list[str] | None = None) -> int:
                     applied += 1
                     print("      applied      %s" % row["path"])
 
+        if writing:
+            # An IN_SYNC file's baseline IS its current hash, by definition --
+            # local == upstream == what we last took. Refresh it on every write.
+            #
+            # Without this, a file that BECOMES in-sync keeps whatever hash it had
+            # before and the staleness is invisible, because `classify` returns
+            # IN_SYNC on `local == upstream` without ever consulting the baseline.
+            # It only surfaces the next time upstream moves, as a spurious
+            # CONFLICT where the right answer is UPSTREAM_AHEAD -- turning a file
+            # we no longer patch into a permanent manual step. Measured on
+            # `nhl_betting/data/shifts_api.py` right after its upstream PR merged.
+            files = baseline["trees"].setdefault(s["tree"], {}).setdefault("files", {})
+            refreshed = 0
+            for row in s["rows"]:
+                if row["state"] == IN_SYNC and files.get(row["path"]) != row["upstream"]:
+                    files[row["path"]] = row["upstream"]
+                    refreshed += 1
+            baseline["trees"][s["tree"]]["repo"] = s["repo"]
+            baseline["trees"][s["tree"]]["branch"] = s["branch"]
+            if refreshed:
+                print("    refreshed %d in-sync baseline entr(ies)" % refreshed)
+
         if args.keep_local or args.keep_all_unclassified:
             files = baseline["trees"].setdefault(s["tree"], {}).setdefault("files", {})
             kept_here = 0
@@ -405,7 +429,7 @@ def main(argv: list[str] | None = None) -> int:
             print("    unrecorded ON PURPOSE, so nothing that already differs is blessed")
         print()
 
-    if args.apply or args.seed_baseline or args.keep_local or args.keep_all_unclassified:
+    if writing:
         save_baseline(baseline)
         print("baseline written: %s" % BASELINE_PATH.relative_to(REPO_ROOT).as_posix())
 

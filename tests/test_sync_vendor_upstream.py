@@ -331,6 +331,44 @@ def test_keep_all_unclassified_sweeps_only_unclassified(world, capsys):
     assert "UPSTREAM_AHEAD theirs.py" in out, "the UPSTREAM_AHEAD one must be left alone"
 
 
+def test_a_file_that_BECOMES_in_sync_does_not_keep_a_stale_baseline(world, capsys):
+    """REGRESSION, found on the real trees the moment the upstream PRs merged.
+
+    When upstream absorbs our patch, the file goes LOCAL_PATCH -> IN_SYNC. But
+    `classify` returns IN_SYNC on `local == upstream` WITHOUT consulting the
+    baseline, so a stale entry there is invisible -- until the next upstream
+    change, which then reads CONFLICT where the right answer is UPSTREAM_AHEAD.
+    CONFLICT is the one state that stops an automatic sync, so this quietly turns
+    a file we no longer patch into a permanent manual step."""
+    (world["tree_dir"] / "ours.py").write_text("our fix\n", encoding="utf-8")
+    _git(world["local"], "commit", "-qam", "our patch")
+    _run("--trees", "demo", "--keep-local", "ours.py")
+    capsys.readouterr()
+
+    baseline_path = world["local"] / "vendor" / "upstream_sync.json"
+    stale = json.loads(baseline_path.read_text(encoding="utf-8"))["trees"]["demo_repo"]["files"]["ours.py"]
+
+    # upstream absorbs exactly our change -> the file becomes IN_SYNC
+    (world["upstream"] / "ours.py").write_text("our fix\n", encoding="utf-8")
+    _git(world["upstream"], "commit", "-qam", "upstream takes our fix")
+
+    _run("--trees", "demo", "--apply")
+    out = capsys.readouterr().out
+    assert "ours.py" not in _norm(out), "should be IN_SYNC and therefore unreported"
+
+    fresh = json.loads(baseline_path.read_text(encoding="utf-8"))["trees"]["demo_repo"]["files"]["ours.py"]
+    assert fresh != stale, "the baseline must be refreshed once the file is in sync"
+
+    # and the next upstream move must be applicable, not a conflict
+    (world["upstream"] / "ours.py").write_text("upstream moves again\n", encoding="utf-8")
+    _git(world["upstream"], "commit", "-qam", "upstream moves on")
+    _run("--trees", "demo", "--apply")
+    capsys.readouterr()
+    assert (world["tree_dir"] / "ours.py").read_text(encoding="utf-8") == "upstream moves again\n", (
+        "a stale baseline would have made this a CONFLICT and left the file behind"
+    )
+
+
 def test_seeding_does_not_bless_a_file_that_already_differs(world, capsys):
     """Seeding records IN_SYNC files only. If it recorded everything, the very next
     run would call a pre-existing local patch `UPSTREAM_AHEAD` and overwrite it."""
