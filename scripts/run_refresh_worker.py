@@ -209,6 +209,35 @@ def _bootstrap_soccer_history_seed_files() -> None:
     seeded_leagues = _bootstrap_soccer_seed_files(relative_subdir="history", glob_pattern="*.csv")
     if seeded_leagues:
         print(f"[refresh_worker] SOCCER_HISTORY_SEED_BOOTSTRAPPED leagues={seeded_leagues}", flush=True)
+
+    # `espn_match_stats.json` LIVES IN THE SAME `history/` DIRECTORY AND THE
+    # `*.csv` GLOB ABOVE SILENTLY EXCLUDES IT.
+    #
+    # FOUND BY MEASUREMENT, on the first soccer `sim_input_report` ever
+    # published from production (2026-09-07T19:42:35Z, host=worker,
+    # data_root=/opt/render/project/data). Everything derived from
+    # `matches_*.csv` read `ok` -- shots_per_match, corners_per_match,
+    # points_per_match -- and every field derived from the ESPN file alarmed:
+    # `possession_metrics.possession_share`, both `set_piece_xg_share` sites,
+    # and `availability_metrics.availability_index`. Same directory, opposite
+    # verdicts, which is what named the glob as the cause.
+    #
+    # It is git-tracked for 9 leagues (636KB-1.18MB each) and had been sitting
+    # in the checkout since 2026-08-19 while the worker's disk never received
+    # it. refresh-worker runs NO general bootstrap -- see the comment on
+    # `_bootstrap_soccer_player_seed_files`: it is a plain script with no Flask
+    # app, so `_bootstrap_render_data` never runs here and these narrow seeders
+    # are the only path from the checkout onto this disk.
+    #
+    # Its own glob, not a widened `*` on the call above: the seeder skips a
+    # directory that already has ANY file matching the pattern, so widening it
+    # to `*` would make the existing `matches_*.csv` suppress the JSON forever.
+    # A separate pattern gets its own presence test, which is exactly what makes
+    # this copy reachable at all.
+    seeded_espn = _bootstrap_soccer_seed_files(
+        relative_subdir="history", glob_pattern="espn_match_stats.json")
+    if seeded_espn:
+        print(f"[refresh_worker] SOCCER_ESPN_STATS_SEED_BOOTSTRAPPED leagues={seeded_espn}", flush=True)
     seeded_team_history = _bootstrap_soccer_seed_files(relative_subdir="team_history", glob_pattern="teams_*.csv")
     if seeded_team_history:
         print(

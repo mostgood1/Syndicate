@@ -2328,7 +2328,19 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   backtest.
 - Files: `scripts/soccer_sim_input_checklist.py`, `scripts/build_soccer_artifacts.py`,
   `scripts/refresh_odds_sources.py` (soccer steps only),
-  `tests/test_soccer_sim_input_checklist.py` (new).
+  `syndicate/features/soccer/features/market_odds.py`,
+  `tests/test_soccer_market_features.py`,
+  `scripts/backtest_soccer_market_prior.py`.
+  NOT claimed, deliberately: `scripts/run_refresh_worker.py` -- held by lane
+  `ncaaf-live-resim-wire`.
+  NOT claimed, deliberately: `syndicate/blueprints/ops.py` -- same holder.
+  Both lanes are THIS SESSION (520cd594), so the edits made from here -- the
+  soccer ESPN seed at the `history/` glob, and the publish-ACCEPTED log raised
+  by `segment-regrade-apply` -- are not cross-session. The claims stay in the
+  other block because two lanes may not claim one file; duplicating them trips
+  the contested-file invariant, which is how I found the right shape. Written
+  down because `lane-postwrite-check` flagged both writes and a same-session
+  borrow nobody records reads as a cross-lane edit to the next session.
 - Findings so far (2026-09-07, re-derived — NOT taken from the earlier session's
   "9 unfed" claim, which was true as a count and misleading as a defect list):
   **9 CONSUMED+UNPOPULATED, of which only 3 are defects.** DELIBERATE, do NOT
