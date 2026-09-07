@@ -998,9 +998,16 @@ weakest clause. Two of these three were testing the deploy; the third was
 testing an unrelated file, so its failure said nothing about the change and the
 verify could never pass. One clause per mechanism, each separately falsifiable.
 
-**Still open:** production has NOT yet been read at 10/10 — the deploy was
-queued behind the 25-min spacing and an in-flight MLB sim, not shipped. Until
-that reading exists, the fix is verified in a round-trip only.
+**CLOSED 2026-09-07T17:44:53Z — read in production.** `b4b1535d` live at
+17:24:04Z; the first `sim_input_report_2026-09-07.json` generated after it
+(17:44:53Z, host=worker, rosters=8) reads **65/65 with `failures: []`**.
+`pitcher.conditional_arsenal_source` went **0.0 → 0.86, EQUAL to
+`conditional_arsenal`** — the value a correct fix predicts, since the producer
+sets the pair on adjacent lines. It also proves the rosters were REBUILT rather
+than reused: a pre-fix artifact lacks the key entirely, so no cache could
+return non-zero for it. `bb_gb_rate` held at 0.6933/0.6786, which is CORRECT
+for a same-date serialisation fix — see `deploys.md` for why that control not
+moving is the expected reading here and not a null result.
 
 **THE ROSTER-REBUILD THEORY IS RETIRED — do not spend more time on it.**
 `--use-roster-artifacts` only reuses an artifact for the SAME date that also

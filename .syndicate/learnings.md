@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 887 rules `[generated]`
+## Index — 888 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3423,3 +3423,39 @@ un-passable and its failure said nothing about the change under test. This is
 the same-day rule about compound ABSENCE claims, running the other way. One
 clause per mechanism, each separately falsifiable.
 - *(evidence in `.syndicate/log/2026-09-07.md`)*
+
+
+## 2026-09-07 A freshness gate must be `> deploy.finishedAt`, and an UNCHANGED control is not automatically a null result
+
+Two instrument errors in one verification, both of which would have reported the
+WRONG verdict about a fix that was in fact correct.
+
+**1. "Newer than my last reading" is not "newer than the deploy."** Verifying
+`conditional_arsenal_source`, I gated the watcher on `generated_at` differing
+from the 16:27:40Z baseline. It fired on a report generated **17:12:10Z** --
+newer than the baseline, and **12 minutes BEFORE the deploy went live at
+17:24:04Z**. Old code, still showing the failure. Reported as the verdict it
+would have called a good fix broken and sent me hunting a second bug that did
+not exist. The correct predicate is `generated_at > deploy.finishedAt`; the
+baseline is not a proxy for it, because artifacts are produced continuously and
+one will land in the gap between your reading and your deploy.
+
+**2. The control I demanded was the wrong control, and I had said so in advance.**
+I wrote that `bb_gb_rate` MUST move or the artifact is cached. It did not move
+(0.6933/0.6786, identical), and the result was still sound. That control was
+built for the June-glob SAMPLING bug, where the underlying sample changed and
+rates shifted 77.4% -> 69.3%. This was a pure SERIALISATION fix on the same date
+and the same inputs, where every rate should be byte-identical and a MOVED rate
+would have been the alarm. Holding to my own stated criterion would have made me
+doubt a correct result.
+
+HOW TO APPLY. Name, before reading, WHICH failure each control discriminates and
+in WHICH direction. A control inherits the failure mode it was designed against;
+carried to a different change it can invert -- "must move" becomes "must not
+move" -- and a criterion stated in advance is not thereby the right one. Where a
+control is ambiguous, prefer a discriminator the failure CANNOT fake: here the
+key's own presence, since a pre-fix artifact does not contain
+`conditional_arsenal_source` at all, so no cached roster could return non-zero
+for it, and the fixed value matching its sibling exactly (0.86 = 0.86) is the
+predicted value rather than merely a non-zero one.
+- *(evidence in `.syndicate/deploys.md`, 2026-09-07 17:44:53Z)*

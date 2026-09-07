@@ -5,6 +5,67 @@
 
 ---
 
+## 2026-09-07 17:44:53Z — refresh-worker `b4b1535d` — **MEASURED: the sim input report is 65/65, `failures: []`.** `[lane ncaaf-live-resim-wire]`
+
+**Settles the MEASUREMENT PENDING row below** (`dep-daff4vm1egvs739t17ng`,
+deployed 17:21:02Z, live 17:24:04.813646Z). Appended rather than edited — this
+ledger is append-only and a past row is never rewritten.
+
+**The reading**, `sim_input_report_2026-09-07.json`, host=worker, rosters=8,
+counts `{batter: 224, pitcher: 150}`:
+
+| | baseline `16:27:40Z` | pre-deploy `17:12:10Z` | **measured `17:44:53Z`** |
+|---|---|---|---|
+| populated | 64/65 | 64/65 | **65/65** |
+| `failures` | `conditional_arsenal_source 0.0` | same | **`[]`** |
+| `pitcher.conditional_arsenal` | 0.86 | 0.86 | 0.86 |
+| `pitcher.conditional_arsenal_source` | **0.0** | **0.0** | **0.86** |
+| `pitcher.bb_gb_rate` | 0.6933 | 0.6933 | 0.6933 |
+| `batter.bb_gb_rate` | 0.6786 | 0.6786 | 0.6786 |
+
+**The load-bearing number is that `conditional_arsenal_source` is 0.86 — EQUAL to
+`conditional_arsenal`, not merely non-zero.** `conditional_mix.py:99-101` sets
+the pair on adjacent lines, so identical coverage is the value a correct fix
+PREDICTS. And it proves the rosters were REBUILT, not reused: a pre-fix artifact
+does not contain the key at all, so no cached roster could produce a non-zero
+reading for it.
+
+**A REPORT NEWER THAN THE BASELINE IS NOT A REPORT NEWER THAN THE DEPLOY.**
+The `17:12:10Z` column above is why this row exists. That report beat the
+16:27:40Z baseline and my first watcher accepted it as fresh — while it had been
+generated **12 minutes BEFORE the deploy went live**, by the old code, and it
+still showed the failure. Reported as a verdict it would have called a good fix
+broken. The gate must be `generated_at > deploy.finishedAt`; "newer than the
+last reading I took" is not the same predicate. `deploy live != artifact rebuilt`
+was already a standing rule and this is a second instance of it.
+
+**THE CONTROL DID NOT MOVE, AND THAT IS CORRECT HERE — my stated criterion was
+wrong.** The verify line below says `bb_gb_rate` must move or the artifact is
+cached. It did not move, and the result is still sound: that control was built
+for a DIFFERENT failure — the June-glob sampling bug, where the underlying sample
+changed and rates shifted 77.4% → 69.3%. This deploy was a pure SERIALISATION
+fix on the same date and the same inputs, so every rate SHOULD be byte-identical;
+a moved rate would have been the alarm. The discriminator that actually carries
+the proof is `generated_at` plus the key's own presence. **A control is only
+evidence once you know which failure it discriminates — an unchanged control is
+not automatically a null result.**
+
+**Not verified by log line, deliberately.** `ROSTER_REBUILD armed` returned
+nothing from the Render logs API over a 2h45m window in which sims demonstrably
+ran. That is not a missing rebuild: the sim's stdout goes to a disk file the log
+collector cannot serve, which `state_mlb.md` already records. The branch was
+confirmed instead from the live process tree (`run_mlb_daily_sim_job.py` pid 65
+→ `daily_update.py` pid 84 → vendor sim pid 292 + workers, all low post-boot
+pids) and then from the artifact itself.
+
+**Cost, as accepted:** five jobs killed — the MLB sim, the odds refresh pair, and
+a soccer championship artifact build. All returned on their own cadence; the
+replacement sim launched after boot and published at 17:44:53Z, 20 min after
+live, consistent with the ~21 min in `#563`.
+
+**Claim released** at 17:2xZ, before this measurement, so no peer was blocked
+while waiting on the reading.
+
 ## 2026-09-07 17:21:02Z — refresh-worker `b4b1535d` — **serialize `conditional_arsenal_source` — the last failing field in the sim input report.** `[lane ncaaf-live-resim-wire]`
 
 Carries `af70a5cd`. `roster_to_dict.ser_pitcher` serialises an EXPLICIT dict
