@@ -7,6 +7,16 @@ reading arena bytes costs 2.86 ms a side. `sys.getallocatedblocks()` is 0.679
 microseconds and measures the CAUSE (live blocks) rather than the effect
 (arenas), so it rides the existing solo-request path unconditionally.
 
+TWO DIFFERENT QUANTITIES ARE RECORDED, and conflating them cost this
+investigation two published numbers:
+
+  blocks_inflight_*   measured at teardown_request. NOT retention -- the
+                      response, request context and environ are all still alive
+                      there, so it over-counts by 16x. Kept because a
+                      within-request PEAK is what actually drives arena count.
+  blocks_retained_*   measured on the NEXT request's way in, once everything of
+                      this one is gone. This is retention.
+
 These tests run the real allocator -- no mock can tell you whether the counter
 actually tracks retention.
 """
@@ -74,8 +84,8 @@ def test_a_route_that_retains_is_separated_from_one_that_does_not():
     _request("/churns", lambda: [{"k": i} for i in range(20000)] and None)
 
     routes = memory_observability._REQUEST_MEMORY_STATE["routes"]
-    kept = routes["/keeps"]["blocks_total"]
-    churned = routes["/churns"]["blocks_total"]
+    kept = routes["/keeps"]["blocks_inflight_total"]
+    churned = routes["/churns"]["blocks_inflight_total"]
     assert kept > 15000, "a retaining route must show its blocks"
     assert churned < kept / 10, "a churning route must not look like a retaining one"
     assert keep  # keep the reference alive to the assertion
@@ -86,9 +96,9 @@ def test_repeated_requests_accumulate_and_track_n():
     for _ in range(3):
         _request("/keeps", lambda: held.extend({"k": i} for i in range(5000)))
     row = memory_observability._REQUEST_MEMORY_STATE["routes"]["/keeps"]
-    assert row["blocks_n"] == 3
-    assert row["blocks_total"] > 12000
-    assert row["blocks_max"] > 4000
+    assert row["blocks_inflight_n"] == 3
+    assert row["blocks_inflight_total"] > 12000
+    assert row["blocks_inflight_max"] > 4000
     assert len(held) == 15000
 
 
@@ -100,7 +110,7 @@ def test_a_row_created_before_this_shipped_does_not_KeyError():
     _request("/legacy")
     row = state["routes"]["/legacy"]
     assert row["solo_n"] == 6
-    assert row["blocks_n"] == 1
+    assert row["blocks_inflight_n"] == 1
 
 
 # --- the discards, inherited from the anon path ------------------------------
@@ -114,7 +124,7 @@ def test_a_concurrent_request_is_not_attributed():
     routes = memory_observability._REQUEST_MEMORY_STATE["routes"]
     # The outer request was not alone throughout either, so neither is recorded.
     assert "/inner" not in routes
-    assert routes.get("/outer", {}).get("blocks_n") is None
+    assert routes.get("/outer", {}).get("blocks_inflight_n") is None
 
 
 def test_a_background_iteration_disqualifies_the_window():
@@ -172,7 +182,9 @@ def test_reset_clears_the_blocks_state():
     assert memory_observability._BLOCKS_SPLIT_STATE["no_gc2_n"] == 1
     memory_observability.reset_request_memory_attribution()
     assert memory_observability._BLOCKS_SPLIT_STATE == {
-        "with_gc2_n": 0, "with_gc2_blocks": 0, "no_gc2_n": 0, "no_gc2_blocks": 0}
+        "with_gc2_n": 0, "with_gc2_blocks": 0, "no_gc2_n": 0, "no_gc2_blocks": 0,
+        "retained_n": 0, "retained_blocks": 0}
+    assert memory_observability._PENDING_BLOCK_WINDOW["before"] is None
 
 
 def test_nothing_is_recorded_when_the_profile_is_off(monkeypatch):
@@ -192,3 +204,129 @@ def test_blocks_stop_when_anon_becomes_unreadable(monkeypatch):
     _request("/keeps", lambda: held.extend({"k": i} for i in range(5000)))
     assert memory_observability._REQUEST_MEMORY_STATE["routes"] == {}
     assert memory_observability._REQUEST_MEMORY_STATE["unreadable"] >= 1
+
+
+# --- the DEFERRED window: retention measured after the request dies -----------
+
+def _mini_app():
+    """A minimal Flask app wired exactly as `syndicate/app.py` wires the real
+    one: solo accounting in before/teardown, block accounting in middleware."""
+    import flask
+
+    app = flask.Flask(__name__)
+    held: list = []
+
+    @app.get("/keeps")
+    def _keeps():
+        held.extend({"k": i} for i in range(3000))
+        return "ok"
+
+    @app.get("/churns")
+    def _churns():
+        [{"k": i} for i in range(3000)]
+        return "ok"
+
+    @app.before_request
+    def _start():
+        flask.g._tok = memory_observability.note_request_start(
+            getattr(flask.request.url_rule, "rule", None))
+
+    @app.teardown_request
+    def _end(_exc=None):
+        memory_observability.note_request_end(
+            getattr(flask.g, "_tok", None),
+            getattr(flask.request.url_rule, "rule", None) or "<unmatched>",
+            emit_every=10 ** 9)
+
+    memory_observability.install_block_accounting(app)
+    return app, held
+
+
+def test_the_deferred_window_agrees_with_ground_truth():
+    """The whole point. Measured before the fix: `/healthz` scored 64.7
+    blocks/req at teardown against 4.1 once the request had fully returned, and
+    #632 published that 16x over-count twice. This pins that the retained figure
+    now tracks an outer measurement of the same requests."""
+    import gc
+
+    app, _held = _mini_app()
+    c = app.test_client()
+    for _ in range(60):
+        c.get("/churns")
+    gc.collect(); gc.collect()
+    memory_observability.reset_request_memory_attribution()
+
+    n = 200
+    before = memory_observability._allocated_blocks()
+    for _ in range(n):
+        c.get("/churns")
+    truth = (memory_observability._allocated_blocks() - before) / n
+
+    row = memory_observability._REQUEST_MEMORY_STATE["routes"]["/churns"]
+    retained = row["blocks_retained_total"] / row["blocks_retained_n"]
+    inflight = row["blocks_inflight_total"] / row["blocks_inflight_n"]
+
+    assert abs(retained - truth) < 5.0, (
+        "retained %.1f must track ground truth %.1f" % (retained, truth))
+    # And it must be far closer than the teardown figure it replaces.
+    assert abs(retained - truth) < abs(inflight - truth)
+
+
+def test_it_records_every_request_but_the_last():
+    # The window closes on the NEXT request's way in, so the final one stays
+    # pending until traffic resumes. One sample, no accuracy.
+    app, _ = _mini_app()
+    c = app.test_client()
+    memory_observability.reset_request_memory_attribution()
+    for _ in range(25):
+        c.get("/churns")
+    row = memory_observability._REQUEST_MEMORY_STATE["routes"]["/churns"]
+    assert row["blocks_retained_n"] == 24
+    assert memory_observability._PENDING_BLOCK_WINDOW["before"] is not None
+
+
+def test_it_does_not_depend_on_close_being_called():
+    """WHY THE DESIGN IS DEFERRED RATHER THAN A ClosingIterator. That callback
+    fires only on an explicit `close()`, and Flask's test client never calls it
+    -- verified. Such an instrument would work under gunicorn and record NOTHING
+    under test, which is the deployed-inert shape this repo keeps hitting. This
+    test IS the guard: it runs through the test client, which does not close."""
+    app, _ = _mini_app()
+    c = app.test_client()
+    memory_observability.reset_request_memory_attribution()
+    for _ in range(10):
+        c.get("/churns")
+    assert memory_observability._REQUEST_MEMORY_STATE["routes"]["/churns"]["blocks_retained_n"] == 9
+
+
+def test_a_background_iteration_in_the_GAP_disqualifies_the_window():
+    # The solo gate covers the request itself; the deferred window also spans the
+    # gap AFTER it, so the background seq is checked across that too.
+    app, _ = _mini_app()
+    c = app.test_client()
+    memory_observability.reset_request_memory_attribution()
+    c.get("/churns")
+    memory_observability.note_background_work_start()
+    memory_observability.note_background_work_end()
+    c.get("/churns")
+    row = memory_observability._REQUEST_MEMORY_STATE["routes"].get("/churns", {})
+    assert not row.get("blocks_retained_n"), "a window spanning a loop iteration must be dropped"
+    assert memory_observability._REQUEST_MEMORY_STATE["skipped_background"] >= 1
+
+
+def test_installing_twice_is_a_no_op():
+    app, _ = _mini_app()
+    wrapped = app.wsgi_app
+    memory_observability.install_block_accounting(app)
+    assert app.wsgi_app is wrapped, "double-wrapping would double-count every request"
+
+
+def test_the_middleware_does_nothing_when_the_profile_is_off(monkeypatch):
+    app, _ = _mini_app()
+    c = app.test_client()
+    memory_observability.reset_request_memory_attribution()
+    monkeypatch.delenv("SYNDICATE_REQUEST_MEMORY_PROFILE", raising=False)
+    for _ in range(10):
+        c.get("/churns")
+    assert memory_observability._REQUEST_MEMORY_STATE["routes"] == {}
+    assert memory_observability._PENDING_BLOCK_WINDOW["before"] is None

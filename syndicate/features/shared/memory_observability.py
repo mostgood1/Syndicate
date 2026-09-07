@@ -4027,7 +4027,9 @@ def _request_memory_lock() -> Any:
 # 4,200x cheaper than the arena read, and it measures the cause rather than the
 # effect.
 _BLOCKS_SPLIT_STATE: dict[str, Any] = {"with_gc2_n": 0, "with_gc2_blocks": 0,
-                                       "no_gc2_n": 0, "no_gc2_blocks": 0}
+                                       "no_gc2_n": 0, "no_gc2_blocks": 0,
+                                       # measured after close(), the real thing
+                                       "retained_n": 0, "retained_blocks": 0}
 
 
 def _allocated_blocks() -> int | None:
@@ -4385,6 +4387,17 @@ def note_request_end(token: dict[str, Any] | None, route: str,
     collected = (isinstance(gc2_before, int) and gc2_before >= 0
                  and gc2_after >= 0 and gc2_after > gc2_before)
     key = str(route or "unknown")
+    # Hand the WSGI middleware what only Flask knows: the matched RULE (the
+    # environ has the raw path, which would make one route per date) and whether
+    # this window was solo. `environ` is the one object that outlives teardown
+    # and is still reachable from the close callback.
+    try:
+        from flask import request as _flask_request
+
+        _flask_request.environ["syndicate.block_route"] = key
+        _flask_request.environ["syndicate.block_solo"] = True
+    except Exception:
+        pass
     # Running floor/peak of PROCESS anon. `after` is the reading this request
     # ended at, so the extremes are over real observed states rather than over a
     # separate sampling cadence that could miss the spike entirely.
@@ -4416,12 +4429,23 @@ def note_request_end(token: dict[str, Any] | None, route: str,
         row["solo_n"] += 1
         row["total_mb"] = round(row["total_mb"] + delta, 3)
         row["max_mb"] = round(max(row["max_mb"], delta), 3)
-        # `#632`: blocks RETAINED by this request. `.get` defaults because a row
-        # created before this shipped has none of these keys.
+        # `#632`: blocks alive AT TEARDOWN. **NOT retention** -- measured
+        # 2026-09-07, this hook fires BEFORE the response object, the request
+        # context and the WSGI environ are released, so it over-counts retention
+        # by **16x** (64.7 blocks/req here vs 4.1 after the request fully
+        # returns). The fields keep the `inflight` name so nobody reads them as
+        # retention again; `blocks_retained_*` below is the real thing, taken in
+        # WSGI middleware after `close()`.
+        #
+        # It is KEPT rather than deleted because the reframe in `UPDATE 30` makes
+        # it useful: pymalloc arena count follows PEAK SIMULTANEOUS live blocks,
+        # and a within-request peak is exactly what this is closer to.
         if blocks_delta is not None:
-            row["blocks_n"] = int(row.get("blocks_n") or 0) + 1
-            row["blocks_total"] = int(row.get("blocks_total") or 0) + blocks_delta
-            row["blocks_max"] = max(int(row.get("blocks_max") or 0), blocks_delta)
+            row["blocks_inflight_n"] = int(row.get("blocks_inflight_n") or 0) + 1
+            row["blocks_inflight_total"] = (
+                int(row.get("blocks_inflight_total") or 0) + blocks_delta)
+            row["blocks_inflight_max"] = max(
+                int(row.get("blocks_inflight_max") or 0), blocks_delta)
             # SPLIT, DO NOT EXCLUDE -- the same rule the anon deltas follow. A
             # gen-2 collection inside the window frees blocks the request did not
             # allocate, so those windows systematically under-report retention
@@ -4595,6 +4619,109 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
     }
 
 
+def record_retained_blocks(route: str, delta: int) -> None:
+    """Record blocks a request left behind, measured after its response closed."""
+    with _request_memory_lock():
+        row = _REQUEST_MEMORY_STATE["routes"].setdefault(
+            str(route), {"solo_n": 0, "total_mb": 0.0, "max_mb": 0.0})
+        row["blocks_retained_n"] = int(row.get("blocks_retained_n") or 0) + 1
+        row["blocks_retained_total"] = (
+            int(row.get("blocks_retained_total") or 0) + delta)
+        row["blocks_retained_max"] = max(
+            int(row.get("blocks_retained_max") or 0), delta)
+        _BLOCKS_SPLIT_STATE["retained_n"] = int(
+            _BLOCKS_SPLIT_STATE.get("retained_n") or 0) + 1
+        _BLOCKS_SPLIT_STATE["retained_blocks"] = int(
+            _BLOCKS_SPLIT_STATE.get("retained_blocks") or 0) + delta
+
+
+# The window that is measured on the NEXT request's way in. See
+# `install_block_accounting` for why it is deferred rather than closed inline.
+_PENDING_BLOCK_WINDOW: dict[str, Any] = {
+    "route": None, "before": None, "solo": False, "background_seq": None}
+
+
+def finish_pending_block_window() -> None:
+    """Close out the PREVIOUS request's window. Never raises."""
+    try:
+        pending = _PENDING_BLOCK_WINDOW
+        before = pending.get("before")
+        if before is None:
+            return
+        route, solo = pending.get("route"), pending.get("solo")
+        bg_seq = pending.get("background_seq")
+        pending.update({"route": None, "before": None, "solo": False,
+                        "background_seq": None})
+        if not solo or not route:
+            return
+        # A background iteration between the two requests would land its
+        # allocations in this window, so the same seq check the solo gate uses
+        # during a request is applied across the GAP after it.
+        if bg_seq is not None and _BACKGROUND_MEMORY_STATE["seq"] != bg_seq:
+            with _request_memory_lock():
+                _REQUEST_MEMORY_STATE["skipped_background"] += 1
+            return
+        if _BACKGROUND_MEMORY_STATE["inflight"] != 0:
+            return
+        after = _allocated_blocks()
+        if after is None:
+            return
+        record_retained_blocks(str(route), after - int(before))
+    except Exception:  # noqa: BLE001 - telemetry must never raise
+        pass
+
+
+def install_block_accounting(flask_app: Any) -> Any:
+    """Wrap the WSGI app so retained blocks are measured after the request DIES.
+
+    WHY NOT A FLASK HOOK. `teardown_request` is the last hook Flask offers but
+    NOT the last thing to run: the response object, the request context and the
+    WSGI environ are all still alive when it fires. Measured locally over 500
+    requests, `/healthz` scored **64.7 blocks/req** at teardown against **4.1**
+    once the request had fully returned -- a 16x over-count that `#632` published
+    twice before catching.
+
+    WHY NOT `ClosingIterator` EITHER, which was the obvious fix and is wrong
+    here. Its callback fires only on an explicit `close()`, and **Flask's test
+    client never calls it** -- verified. That instrument would have worked under
+    gunicorn and recorded NOTHING under test, which is the deployed-inert shape
+    this investigation keeps tripping over: no local test could have caught a
+    regression in it.
+
+    So the window is DEFERRED: it closes on the NEXT request's way in. That is
+    strictly LATER than `close()` -- the server has finished with the response
+    and released the environ by then -- it needs no cooperation from the server
+    or the test client, and it is exercised by exactly the same code path in
+    both. The cost is that the last request before an idle period is not
+    recorded until traffic resumes, which loses one sample and no accuracy.
+    """
+    if getattr(flask_app, "_syndicate_block_accounting", False):
+        return flask_app
+    inner = flask_app.wsgi_app
+
+    def _middleware(environ, start_response):
+        if not request_memory_profile_enabled():
+            return inner(environ, start_response)
+        # Close the previous request FIRST: everything of it is gone by now, and
+        # this reading doubles as the start of the current window.
+        finish_pending_block_window()
+        before = _allocated_blocks()
+        iterable = inner(environ, start_response)
+        # The rule and the solo verdict are stamped on the environ by the
+        # teardown hook -- Flask is the only layer that knows either.
+        _PENDING_BLOCK_WINDOW.update({
+            "route": environ.get("syndicate.block_route"),
+            "solo": bool(environ.get("syndicate.block_solo")),
+            "before": before,
+            "background_seq": _BACKGROUND_MEMORY_STATE["seq"],
+        })
+        return iterable
+
+    flask_app.wsgi_app = _middleware
+    flask_app._syndicate_block_accounting = True
+    return flask_app
+
+
 def reset_request_memory_attribution() -> None:
     """Tests only. Module-level accumulators otherwise leak across cases and the
     second test reads the first one's numbers."""
@@ -4606,7 +4733,10 @@ def reset_request_memory_attribution() -> None:
     _GC_SPLIT_STATE.update({"with_gc2_n": 0, "with_gc2_mb": 0.0,
                             "no_gc2_n": 0, "no_gc2_mb": 0.0})
     _BLOCKS_SPLIT_STATE.update({"with_gc2_n": 0, "with_gc2_blocks": 0,
-                                "no_gc2_n": 0, "no_gc2_blocks": 0})
+                                "no_gc2_n": 0, "no_gc2_blocks": 0,
+                                "retained_n": 0, "retained_blocks": 0})
+    _PENDING_BLOCK_WINDOW.update({"route": None, "before": None, "solo": False,
+                                  "background_seq": None})
     _GLOBAL_REASSIGN_STATE.clear()
     _PER_REQUEST_SMAPS_STATE.update({"count": 0, "routes": {}})
     _REQUEST_MEMORY_STATE["attributed_total_mb"] = 0.0

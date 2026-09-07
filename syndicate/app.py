@@ -563,6 +563,14 @@ def create_app() -> Flask:
         except AttributeError:
             app.before_request(_start_background_loops)
 
+    # `#632`: retained blocks must be counted AFTER the response closes.
+    # `teardown_request` above is the last FLASK hook but not the last thing to
+    # run, and measuring there over-counted retention by 16x. Installed last so
+    # it wraps every other middleware too.
+    try:
+        memory_observability.install_block_accounting(app)
+    except Exception:
+        pass
     return app
 
 
