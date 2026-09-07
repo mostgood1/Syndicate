@@ -524,6 +524,51 @@ sample. The 35m49s duration matters: it is well past the 240 s staleness window
 that used to age the ncaaf record out, so a long run is the STRONGER test of
 that fix.
 
+## [github-actions-dead] GITHUB ACTIONS HAS RUN NOTHING SINCE 2026-08-22 — THE ACCOUNT IS BILLING-LOCKED, SO `ci.yml` HAS GATED NOTHING FOR 15 DAYS `[measured 2026-09-06/07, lane vendor-sync-schedule]`
+
+**Every workflow run fails before it starts.** A dispatched run returns
+`completed/failure` in ~1 second with **zero steps executed** and the annotation
+*"The job was not started because your account is locked due to a billing
+issue."*
+
+- **Last successful run of ANY workflow: `2026-08-22T21:07Z`.**
+- `gh run list --limit 100` → **failure for all 100**. A run sampled from
+  2026-09-05 shows the same signature (`steps: 0`, job never started).
+- **The consequence is the part that matters:** `ci.yml` runs the archive suite,
+  the ledger-coherence checks and the `pytest_baseline` gate. It has therefore
+  **gated nothing since 2026-08-22** — every commit landed in that window is
+  unverified by CI, including all of this session's. Nothing announces this. **A
+  repo whose CI silently stopped looks identical to one whose CI keeps passing**,
+  from the commit log, from a green-looking branch, and from the workflow files.
+- Check it with `gh run list --repo mostgood1/Syndicate --status success --limit 5`.
+  If that returns nothing recent, CI is not gating anything, whatever the files say.
+
+**WHAT ACTIONS CAN DO IF BILLING CLEARS**, audited 2026-09-07 so it does not have
+to be re-derived:
+
+| workflow | triggers | capability |
+|---|---|---|
+| `ci.yml` | push, pull_request | read-only |
+| `daily-update.yml` | `workflow_dispatch` | pushes |
+| `pytest-baseline-update.yml` | `workflow_dispatch` | pushes, opens PR |
+| `vendor-sync.yml` | `workflow_dispatch` | pushes, opens PR |
+
+- **No `schedule:` in any workflow, no webhooks, no deploy keys.** Nothing runs
+  unattended and nothing outside Actions can act on the repo. `#486`
+  `[2026-08-20, user decision]` removed the last cron — *"we no longer use that
+  daily update feature, everything runs on render"* — and a cron re-added by
+  `vendor-sync.yml` on 2026-09-06 was removed again on 2026-09-07 for that reason.
+- **NO WORKFLOW CAN DEPLOY.** `daily-update.yml` used to POST to
+  `RENDER_WEB_DEPLOY_HOOK_URL`, which bypassed `deploy_claim.py`,
+  `deploy_preflight.py`, `deploys.md` and `deploy-guard.py` — the guard cannot see
+  a GitHub runner. Removed 2026-09-07 (`72b20346`). **The secret is still
+  configured**, so a future workflow could reference it again.
+- `daily-update.yml`'s default dispatch still `git push`es a ~370-file / ~51MB
+  data snapshot to whichever branch it is dispatched from. Intended under `#486`;
+  not obvious from the button.
+- Two secrets remain in use: `ADMIN_TOKEN`, `ODDS_API_KEY`. Dispatching
+  `daily-update.yml` spends OddsAPI quota against the 5M cap.
+
 ## [ci-suite-red-test] CI'S OWN SUITE IS GREEN. THE "ONE RED TEST" WAS THE 31st DATA-ABSENCE FAILURE, NOT A SURVIVOR OF THEM `[corrected 2026-09-05, lane ci-archives-nba-card-js, commit ba84b331]`
 
 **The claim this section used to make was WRONG, and it is preserved here
