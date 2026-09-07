@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 876 rules `[generated]`
+## Index — 885 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3298,3 +3298,23 @@ slugs map to session titles closely enough in practice) -- that worked when the
 id did not. Never infer a holder is gone from a failed id lookup; the TTL is the
 only bound, and `--force` on that basis breaks a live session's claim.
 - *(evidence in `.syndicate/log/2026-09-07.md`)*
+
+## 2026-09-07 A CONVENTION YOU COPY MAY BE A DECISION YOU ARE OVERTURNING. "ALL THE OTHER FILES DO X" DOES NOT TELL YOU WHY THEY DO X
+
+- **The rule going forward.** Adding `.github/workflows/vendor-sync.yml` I read
+  the two neighbouring workflows, matched their structure, permissions and
+  comment style — and shipped the one thing they pointedly did NOT have: a
+  `schedule:`. Both are `workflow_dispatch`-only because `#486`
+  `[2026-08-20, user decision]` removed `Daily Update`'s cron with the words *"we
+  no longer use that daily update feature, everything runs on render"*. My file
+  became **the only cron in the repository**, seventeen days after the last one
+  was deliberately deleted. **Copying a convention reproduces its SHAPE and
+  discards its REASON**, and the absence of a feature is exactly the part a
+  template cannot carry. Before adding a recurring or outward-facing mechanism,
+  grep the ledger for a decision about that mechanism — `state_ledger.md` had it,
+  quoted, and I never searched. Note also what made it hard to see: Actions was
+  not retired wholesale (`ci.yml` is live and maintained), so "does this repo use
+  Actions?" answered YES and told me nothing. **The retired thing was a narrower
+  category than the tool** — recurring unattended jobs — and a question pitched
+  at the tool cannot find a decision pitched at the pattern.
+- *(evidence in `learnings_evidence.md`)*

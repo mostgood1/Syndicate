@@ -2066,6 +2066,17 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   MATCH the locally measured `IN_SYNC 570 / LOCAL_ONLY 215 / LOCAL_PATCH 52`, and
   which opens no PR when there is nothing to take. Not "the YAML parses".
 - Blocked by: none.
+- **THE CRON IS GONE `[2026-09-07, user decision]`, `ff850d06`.** The user asked
+  whether this re-used GitHub Actions, and it did: `#486` (2026-08-20) removed
+  `Daily Update`'s cron — *"we no longer use that daily update feature,
+  everything runs on render"* — and this file shipped with a daily `schedule:`,
+  making it **the only cron left in the repo**, seventeen days later. Now
+  `workflow_dispatch` only, matching `daily-update.yml` and
+  `pytest-baseline-update.yml`. The workflow is still worth keeping: it is the
+  reviewed PR-opening path and it can APPLY, which the local job never does.
+  **I did not find that decision because I never looked for one** — I checked
+  that other workflows existed and copied their conventions, which is not the
+  same as asking whether a convention was a choice.
 - **UNBLOCKED BY:** resolving the GitHub billing lock on the account. Nothing in
   this repo needs to change — the workflow starts running on its own schedule the
   moment the lock lifts, and `--offline`-free runs need no secrets.

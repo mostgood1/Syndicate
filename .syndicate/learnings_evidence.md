@@ -25702,3 +25702,41 @@ it reads negative.**
 - **Cost:** none realised beyond 3.9 GB of disk for a few minutes. The failure
   mode worth remembering is that the job would have kept "working" indefinitely
   while doing a full checkout of a 37k-file repository every day.
+
+## 2026-09-07 A convention you copy may be a decision you are overturning
+
+- **What we believed:** that adding a scheduled GitHub Actions workflow for the
+  vendor sync was uncontroversial, because the repo plainly used Actions --
+  `ci.yml`, `daily-update.yml` and `pytest-baseline-update.yml` were all present,
+  and the new file matched their permissions block, concurrency group, heavy
+  comment header and PR-opening step.
+- **What was actually true:** the repo had NO scheduled workflow at all.
+  `ci.yml` is push/PR, and the other two are `workflow_dispatch`-only -- because
+  `#486` `[2026-08-20, user decision]`, recorded in `state_ledger.md`, removed
+  `Daily Update`'s cron with the user's own words: *"we no longer use that daily
+  update feature, everything runs on render."* The new file's
+  `cron: '20 9 * * *'` made it the only cron in the repository, seventeen days
+  after the last one was deliberately deleted.
+- **How we found out:** the user asked "I thought we weren't using github actions
+  anymore in the app -- is this re-utilizing that now?" A `grep` of the ledger for
+  the decision took one command and returned it immediately, quoted. Nothing
+  stopped that grep being run a day earlier except not thinking to.
+- **Why it was easy to miss, which is the reusable part:** Actions was not
+  retired wholesale. `ci.yml` is live and actively maintained -- there is open
+  work on its concurrency behaviour and its pytest-baseline gate. So the question
+  "does this repo use GitHub Actions?" answers YES and is worthless. The retired
+  category was narrower than the tool: recurring unattended jobs. A question
+  pitched at the TOOL cannot find a decision pitched at the PATTERN.
+- **And the second-order cost:** the file's header argued at length for GitHub
+  Actions OVER a local scheduled task, citing this machine's Modern Standby
+  stall. Once the cron came out and the local task became the recurring runner,
+  that rationale was the exact inverse of the arrangement in place, sitting in a
+  comment that reads as current. Removing a mechanism means removing the argument
+  for it too.
+- **The rule going forward:** before adding a recurring or outward-facing
+  mechanism, grep the ledger for a decision about that MECHANISM, not about the
+  tool that hosts it. Copying a convention reproduces its shape and discards its
+  reason, and the absence of a feature is precisely what a template cannot carry.
+- **Cost:** none realised -- Actions has been billing-locked since 2026-08-22, so
+  the cron never fired once. Had billing been healthy it would have started
+  opening PRs on a schedule the owner had explicitly retired.

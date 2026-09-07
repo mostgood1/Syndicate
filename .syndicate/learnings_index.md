@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 876 rules `[generated]`
+## Index — 885 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 324**
+**FORBIDDEN — 328**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -144,6 +144,10 @@
 - [2026-09-06 — FORBIDDEN: adding a transform that REBINDS the name a reported field is de…](#2026-09-06-forbidden-adding-a-transform-that-rebinds-the-name-a-reported-field-is-derived-from-the-field-keeps-its-name-changes-its-meaning-and-every-existing-reader-keeps-working-while-answering-a-different-question-lane-kalshi-join-counters-logged)
 - [2026-09-06 — FORBIDDEN: asserting "the token is present" as the test for a log line oth…](#2026-09-06-forbidden-asserting-the-token-is-present-as-the-test-for-a-log-line-other-tools-parse-a-duplicate-is-present-twice-lane-kalshi-join-counters-logged)
 - [2026-09-06 — FORBIDDEN: mutating the tree a BACKGROUND JOB is reading. It keeps running…](#2026-09-06-forbidden-mutating-the-tree-a-background-job-is-reading-it-keeps-running-and-silently-measures-something-else-lane-nfl-rating-units)
+- [2026-09-07 FORBIDDEN: reading an artifact-backed surface ONCE to decide whether a deplo…](#2026-09-07-forbidden-reading-an-artifact-backed-surface-once-to-decide-whether-a-deploy-worked)
+- [2026-09-07 FORBIDDEN: deciding whether a model earns its keep from a SLATE-AVERAGE metr…](#2026-09-07-forbidden-deciding-whether-a-model-earns-its-keep-from-a-slate-average-metric)
+- [2026-09-07 FORBIDDEN: verifying a fix with a predicate on a TOTAL that can move for ano…](#2026-09-07-forbidden-verifying-a-fix-with-a-predicate-on-a-total-that-can-move-for-another-reason)
+- [2026-09-07 FORBIDDEN: building or proposing a guard before locating the one that alread…](#2026-09-07-forbidden-building-or-proposing-a-guard-before-locating-the-one-that-already-exists)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -344,7 +348,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 546**
+**Rules and corrections — 551**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -437,6 +441,10 @@
 - [2026-09-06 A STATE MACHINE THAT SHORT-CIRCUITS ON THE HAPPY PATH STOPS MAINTAINING THE…](#2026-09-06-a-state-machine-that-short-circuits-on-the-happy-path-stops-maintaining-the-data-the-unhappy-paths-need-the-staleness-is-invisible-until-it-is-load-bearing)
 - [2026-09-06 A SCHEDULE IS A CLAIM ABOUT A PLATFORM YOU HAVE NOT TESTED. DISPATCH IT ONCE…](#2026-09-06-a-schedule-is-a-claim-about-a-platform-you-have-not-tested-dispatch-it-once-or-you-have-shipped-a-job-that-silently-never-runs)
 - [2026-09-06 A GUARD THAT INFERS ITS POSTCONDITION FROM AN ARTEFACT'S EXISTENCE CANNOT SE…](#2026-09-06-a-guard-that-infers-its-postcondition-from-an-artefacts-existence-cannot-see-a-half-built-one-and-will-defend-it-forever)
+- [2026-09-07 CORRECTION: the MLB "ten dead inputs" was SEVEN-TENTHS A BROKEN INSTRUMENT](#2026-09-07-correction-the-mlb-ten-dead-inputs-was-seven-tenths-a-broken-instrument)
+- [2026-09-07 RESOLVED: the ten MLB pitcher inputs ARE unfed -- and my retraction was the…](#2026-09-07-resolved-the-ten-mlb-pitcher-inputs-are-unfed----and-my-retraction-was-the-wrong-turn)
+- [2026-09-07 The deploy claim's `session:` breadcrumb does not resolve, even for a LIVE h…](#2026-09-07-the-deploy-claims-session-breadcrumb-does-not-resolve-even-for-a-live-holder)
+- [2026-09-07 A CONVENTION YOU COPY MAY BE A DECISION YOU ARE OVERTURNING. "ALL THE OTHER…](#2026-09-07-a-convention-you-copy-may-be-a-decision-you-are-overturning-all-the-other-files-do-x-does-not-tell-you-why-they-do-x)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
@@ -885,6 +893,7 @@
 - [2026-09-06 A state machine that short-circuits on the happy path stops maintaining the…](learnings_evidence.md#2026-09-06-a-state-machine-that-short-circuits-on-the-happy-path-stops-maintaining-the-data-the-unhappy-paths-need) `[evidence]`
 - [2026-09-06 A schedule is a claim about a platform you have not tested](learnings_evidence.md#2026-09-06-a-schedule-is-a-claim-about-a-platform-you-have-not-tested) `[evidence]`
 - [2026-09-06 A guard that infers its postcondition from an artefact's existence cannot se…](learnings_evidence.md#2026-09-06-a-guard-that-infers-its-postcondition-from-an-artefacts-existence-cannot-see-a-half-built-one) `[evidence]`
+- [2026-09-07 A convention you copy may be a decision you are overturning](learnings_evidence.md#2026-09-07-a-convention-you-copy-may-be-a-decision-you-are-overturning) `[evidence]`
 - [2026-08-12 — Do not batch changes during a diagnosis](learnings_archive.md#2026-08-12-do-not-batch-changes-during-a-diagnosis) `[evidence]`
 - [2026-08-12 — A rate ceiling is not a fix](learnings_archive.md#2026-08-12-a-rate-ceiling-is-not-a-fix) `[evidence]`
 - [2026-08-12 — Parallel sessions on one problem need lane discipline](learnings_archive.md#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline) `[evidence]`
