@@ -63,10 +63,21 @@ FAST_STEPS: tuple[tuple[str, list[str]], ...] = (
     ("hook guard: lane hyphen", [".claude/hooks/test_lane_guard_hyphen.py"]),
 )
 
-# job `pytest-baseline`. `--runnable` and the xdist flags are ci.yml's, verbatim.
-PYTEST_STEP = ("pytest vs baseline",
-               ["scripts/pytest_baseline.py", "--runnable", "--",
-                "tests/", "-n", "auto", "--dist=loadscope"])
+# job `pytest-baseline`. `--runnable` and `--dist=loadscope` are ci.yml's,
+# verbatim. The WORKER COUNT is the one deliberate divergence and it is a
+# parameter rather than a different constant, so the difference is visible at
+# the call site instead of buried here.
+#
+# WHY IT HAD TO BECOME A KNOB. `-n auto` is correct on GitHub's runner (16GB)
+# and fatal on a Render cron: the first real run died at 18:36:44Z with
+# `Your cronjob failed because of an error: Out of memory (used over 2Gi)`,
+# inside this step. `-n auto` spawns one xdist worker per CPU and each holds a
+# full import of the app, so the peak scales with core count on a box that has
+# more cores than gigabytes.
+def _pytest_step(workers: str) -> tuple[str, list[str]]:
+    return ("pytest vs baseline",
+            ["scripts/pytest_baseline.py", "--runnable", "--",
+             "tests/", "-n", workers, "--dist=loadscope"])
 
 
 def run(label: str, argv: list[str], timeout: int) -> dict:
@@ -90,6 +101,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-pytest", action="store_true",
                     help="run only ci.yml's `test` job, not the full suite")
+    ap.add_argument("--pytest-workers", default="auto",
+                    help="xdist worker count. ci.yml uses 'auto'; a 2Gi Render "
+                         "cron cannot afford that (it OOM'd at 18:36:44Z on "
+                         "2026-09-07) because each worker holds a full app "
+                         "import. Pass a small integer there.")
     ap.add_argument("--json", type=Path, help="write the run summary here")
     args = ap.parse_args()
 
@@ -102,7 +118,11 @@ def main() -> int:
 
     results = [run(label, argv, 900) for label, argv in FAST_STEPS]
     if not args.skip_pytest:
-        results.append(run(*PYTEST_STEP, 3000))
+        label, argv = _pytest_step(str(args.pytest_workers))
+        note = ("" if str(args.pytest_workers) == "auto"
+                else "  -- DIVERGES from ci.yml's 'auto', deliberately, for memory")
+        print(f"\n(xdist workers: {args.pytest_workers}{note})", flush=True)
+        results.append(run(label, argv, 3000))
 
     failed = [r for r in results if r["rc"] != 0]
     print("\n" + "=" * 72)
