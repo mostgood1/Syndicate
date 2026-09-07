@@ -117,9 +117,23 @@ def _season_artifact_probe(season: int = 2026) -> dict:
             row["exists"] = p.is_file()
             if row["exists"]:
                 row["bytes"] = int(p.stat().st_size)
+                # `mtime` IS THE MISLEADING FIELD AND IS KEPT ONLY FOR
+                # CONTINUITY. `pull_season_artifacts()` copies each file from
+                # web before every sim run, so mtime refreshes daily while the
+                # CONTENTS can be weeks old. Measured 2026-09-07: all five
+                # carried that morning's mtime and a `generated_at` of
+                # 2026-08-17/18 -- three weeks stale behind a fresh timestamp.
                 row["mtime"] = float(p.stat().st_mtime)
                 doc = json.loads(p.read_text(encoding="utf-8"))
                 row["loadable"] = True
+                # THE FIELD THAT ACTUALLY ANSWERS "IS THE WORKER'S COPY
+                # CURRENT?". Without it this probe can only say the file is
+                # PRESENT, and presence was never the open question -- the
+                # builders publish, the puller pulls, and the artifact can
+                # still be from last month. `None` when the document carries
+                # no such field, which is itself worth seeing.
+                row["generated_at"] = doc.get("generated_at") or doc.get(
+                    "generated_at_utc") or (doc.get("meta") or {}).get("generated_at")
                 for k in keys:
                     row[f"n_{k}"] = len(doc.get(k) or {})
         except Exception as exc:
