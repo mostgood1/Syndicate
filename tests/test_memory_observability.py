@@ -710,3 +710,34 @@ def test_ring_cost_is_recorded_per_checkpoint(tmp_path, monkeypatch):
 def test_ring_cost_never_raises_on_a_bad_reading(monkeypatch):
     monkeypatch.setattr(memory_observability, "_allocated_blocks", lambda: None)
     memory_observability._note_ring_cost(None, 0.0, 3)   # must be a no-op, not a raise
+
+
+def test_ring_cost_emits_a_windowed_line_for_the_worker(tmp_path, monkeypatch, capsys):
+    """refresh-worker has NO HTTP server, so the /api/ops/memory readout that
+    carries ring_cost on web is unreachable there -- a counter only readable from
+    web can never report a worker's behaviour. The Render logs API is the path
+    that works, so the cost is also emitted as a line.
+
+    WINDOWED, not cumulative: each line is an independent sample, so an arm gets
+    many of them and a mean has a spread. A running total would give one number
+    per process and hide its variance."""
+    memory_observability._RING_COST_STATE.update(
+        {"n": 0, "blocks_sum": 0, "blocks_max": 0, "ms_sum": 0.0, "ms_max": 0.0,
+         "records_last": 0, "blocks_min": None})
+    monkeypatch.setattr(memory_observability, "_RING_COST_EMIT_EVERY", 3)
+    monkeypatch.setattr(memory_observability, "process_memory_checkpoint_path",
+                        lambda: tmp_path / "ring.json")
+    monkeypatch.setenv("SYNDICATE_RING_KEEP_CMDLINE", "1")
+    for i in range(6):
+        memory_observability.dump_process_memory_checkpoint("s%d" % i, {"processes": []})
+    lines = [l for l in capsys.readouterr().out.splitlines() if l.startswith("RING_COST ")]
+    assert len(lines) == 2, "one line per window of 3, not per checkpoint"
+    import json as _json
+    rec = _json.loads(lines[0][len("RING_COST "):])
+    assert rec["n"] == 3
+    # The arm label travels WITH the sample, so a line can never be attributed to
+    # the wrong treatment after the fact.
+    assert rec["keep_cmdline"] == "1"
+    assert rec["checkpoints_total"] == 3
+    # The window resets, so the second line is independent of the first.
+    assert _json.loads(lines[1][len("RING_COST "):])["checkpoints_total"] == 6

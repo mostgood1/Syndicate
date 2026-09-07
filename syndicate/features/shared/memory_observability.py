@@ -2028,6 +2028,7 @@ def process_memory_checkpoint_path() -> Path:
     return reports_root() / "live_refresh_loop" / "memory_diagnostics.json"
 
 
+_RING_COST_EMIT_EVERY = 20
 _RING_COST_STATE: dict[str, Any] = {"n": 0, "blocks_sum": 0, "blocks_max": 0,
                                     "ms_sum": 0.0, "ms_max": 0.0, "records_last": 0,
                                     "blocks_min": None}
@@ -2049,6 +2050,31 @@ def _note_ring_cost(before: int | None, t0: float, records: int) -> None:
         st["ms_sum"] = float(st["ms_sum"]) + ms
         st["ms_max"] = max(float(st["ms_max"]), ms)
         st["records_last"] = int(records)
+        # EMIT PERIODICALLY, because refresh-worker has no HTTP server -- the
+        # `/api/ops/memory` readout that carries this on web is unreachable
+        # there, and a counter only readable from web can never report a
+        # worker's behaviour. The Render logs API is the path that does work.
+        #
+        # WINDOWED, not cumulative: each line is an INDEPENDENT sample, so an arm
+        # yields many of them and a mean has a spread to go with it. A running
+        # total would give one number per process and hide its variance.
+        window = _RING_COST_EMIT_EVERY
+        if st["n"] % window == 0:
+            n = window
+            print("RING_COST " + json.dumps({
+                "n": n,
+                "blocks_mean": round(int(st["blocks_sum"]) / n, 1),
+                "blocks_max": int(st["blocks_max"]),
+                "ms_mean": round(float(st["ms_sum"]) / n, 2),
+                "ms_max": round(float(st["ms_max"]), 2),
+                "records": int(records),
+                "keep_cmdline": str(os.environ.get("SYNDICATE_RING_KEEP_CMDLINE", "")
+                                    or "").strip(),
+                "pid": os.getpid(),
+                "checkpoints_total": int(st["n"]),
+            }, sort_keys=True), flush=True)
+            st.update({"blocks_sum": 0, "blocks_max": 0, "ms_sum": 0.0, "ms_max": 0.0,
+                       "blocks_min": None})
     except Exception:  # noqa: BLE001 - telemetry must never raise
         pass
 
