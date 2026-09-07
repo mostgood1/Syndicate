@@ -25742,3 +25742,344 @@ Flips among the 49: `{won->lost 28, lost->won 20, lost->push 1}`.
 **reversible:** every corrected row carries `outcome_as_settled`,
 `pnl_as_settled_dollars`, `regraded_at`, `regrade_manifest` and
 `regrade_reason`.
+
+
+## 2026-09-06/07 refresh-worker `ed97f6ee` -> `d9672ac7` — soccer moneyline precision gate `[lane soccer-threeway-precision-gate]`
+
+- **what:** soccer `h2h` / `h2h_3_way` legs now price through
+  `live_gameline_join.price_moneyline` (Agresti-Coull point estimate + 2-sigma
+  bar) instead of publishing a bare `(model_prob - fair) * 100`. Commits
+  `6a20281c` (home leg, `soccer_projections`) and `8b6a1f4d` (draw/away legs,
+  `layer2_board._model_edge_for`).
+- **service:** refresh-worker ONLY. **web already had it** — live SHA
+  `08b59317` (deployed 01:16:11Z by another session) already contained
+  `8b6a1f4d`, so for ~10 minutes web priced with the gate while refresh-worker
+  published without it. This deploy closed that split. live-odds-worker does
+  NOT build layer2 rows (its intelligence-state loop flag is false) and was
+  deliberately left at `f65ec45e`, 138 commits behind.
+- **bundle:** 14 commits. Not one change — `0a22d2fa` (nfl
+  `feature_generation_payload`), `49217b07` (ncaaf same), `b38a18d8`/`08b59317`
+  (`#632` growth detector) are other lanes' code riding along. Attribution for
+  anything ELSE that moves on refresh-worker tonight must account for them.
+- **locks:** claim acquired 01:22:29Z (replaced an EXPIRED claim held by
+  `ncaaf-live-resim-wire`, 75.5 min old). Preflight CLEAR at 01:22:48Z for the
+  exact target `d9672ac7`, sample age 18s, only infra processes + 1 defunct
+  child. Board build idle since 01:21:32Z, MLB sim finished. An odds refresh WAS
+  running but on live-odds-worker, which this deploy does not restart.
+- **deploy:** `dep-daf140ht0dsc73c3oamg`, trigger=api, live **01:26:11Z**.
+
+### verify: THE SERVED SHORTLIST'S MODEL-EDGE COUNT FELL 28 -> 11 ON THE FIRST BOARD BUILD AFTER THE DEPLOY
+
+`/api/board/layer2-shortlist?sport=soccer`, polled every 90s across the deploy.
+Counting soccer moneyline rows carrying a non-null `model_edge_pct`:
+
+    01:26:32Z   36 rows   28 edged   away 13 / home 15   <- pre-gate build, still served
+    01:28:03Z   36 rows   28 edged   away 13 / home 15
+    01:29:33Z   36 rows   28 edged   away 13 / home 15
+    01:31:04Z   36 rows   28 edged   away 13 / home 15
+    01:32:34Z   36 rows   28 edged   away 13 / home 15
+    01:34:05Z   35 rows   11 edged   away  4 / home  7   <- FIRST POST-DEPLOY BUILD
+
+**THE DEPLOY WENT LIVE AT 01:26:11Z AND THE NUMBER DID NOT MOVE FOR EIGHT
+MINUTES.** Five identical readings after `status=live` are the point: the
+shortlist is a published artifact, so a deploy changes nothing until the worker
+REBUILDS it. Anyone who had read once at 01:27Z would have recorded a clean
+null result for a fix that was already live.
+
+11 is the number predicted from the pre-deploy measurement (17 of 28 withheld,
+11 surviving), and both sides fell as predicted rather than one collapsing:
+away 13->4, home 15->7.
+
+**WHAT THIS DOES NOT SHOW.** The DRAW leg is still unexercised — zero draw rows
+carried a model edge in either reading, so `8b6a1f4d`'s specific target (the
+`0/n` draw certainty) has been verified by unit test and by the away-leg path
+that shares its branch, NOT by a production draw row. The row count also moved
+36 -> 35 as the slate turned over, so these are two different populations, not a
+paired before/after on identical rows.
+
+### ADDENDUM 2026-09-07 — what else `d9672ac7` carried, and a DRAW-LEG verification that supersedes the caveat above
+
+**THE BUNDLE, confirmed by its author** `[lane ncaaf-live-resim-wire]`. The 14
+commits included the estimator fix, the ledger `point_estimator` key, and NFL +
+NCAAF drive-prior payload wiring. They checked Render's env API directly rather
+than trusting defaults: neither `SYNDICATE_NFL_DRIVE_PRIORS` nor
+`SYNDICATE_NCAAF_DRIVE_PRIORS` is set, so both landed INERT as intended.
+**Caveat they raised and it belongs here: the NCAAF wiring in this SHA has since
+been superseded TWICE on main and is undeployed** (the deployed version fed
+`pace` and duplicated `feature_payload.py`). Inert either way — but the deployed
+code on refresh-worker is not the current code, and anyone reading this deploy
+as "NCAAF drive priors are live in their current form" would be wrong twice over.
+
+**THE DRAW-LEG CAVEAT ABOVE IS NOW PARTLY DISCHARGED.** Verified on the
+2026-09-07 pregame slate by running the DEPLOYED `_model_edge_for` /
+`price_moneyline` over production's own projections
+(`/api/board/layer1?sport=soccer&date=2026-09-07`):
+
+  * Cagliari draw, model 0.2475 / fair 0.3068 -> served **-5.6813**, and the leg
+    priced alone returns the same -5.68. A real production draw leg, priced
+    through the new gate.
+  * Elche draw, model 0.25 / fair 0.2727 -> correctly WITHHELD.
+  * Agresti-Coull visible in production data: Elche's draw is raw 0.25 at n=400,
+    and at a 0.20 fair the deployed code returns `5.2475` = `(102/404-0.20)*100`.
+    Raw `k/n` would give exactly `5.0`.
+  * `sims_run: 400` and `point_estimator: "agresti_coull"` are stamped on every
+    soccer projection. **Production now STATES the n that had to be inferred.**
+
+WHAT IS STILL NOT DISCHARGED: no draw row has appeared on the SERVED SHORTLIST
+carrying a model edge. The verification above is the deployed code over
+production inputs, which is stronger than a fixture and weaker than a served
+row. Draw rows are structurally rare there — 24 of 25 events on 2026-09-06 had a
+quoted draw price and no draw row.
+
+**AND A REGRESSION THIS DEPLOY INTRODUCED — see `log/2026-09-06.md` for the
+measurement.** `_model_edge_for`'s `if edge is None: return
+_modelled_fair_edge_for(...)` early return was written for a one-sided quote.
+The new gate writes `edge_vs_market_pct = None` for a DIFFERENT state — priced
+and withheld as imprecise — and the two are indistinguishable at that line. So a
+withheld HOME leg silently drops the DRAW and AWAY legs before their own bars are
+consulted: **3 of 10 legs on the 2026-09-07 slate, including a +10.13 pp away
+edge that clears its own 2-sigma bar.** Not a safety hole —
+`_modelled_fair_edge_for` is side-matched and returns None rather than an ungated
+number — but it means the **"9 away rows newly withheld" figure above conflates
+two mechanisms**, and the fix is NOT yet applied.
+
+
+## 2026-09-07 refresh-worker `d9672ac7` -> `62937ea4` — the withheld-home collision `[lane soccer-threeway-precision-gate]`
+
+- **what:** `_model_edge_for` checks the three-way vector BEFORE the
+  modelled-fair fallback, so a leg that clears its own 2-sigma bar is priced
+  regardless of whether the HOME leg of the same match was withheld. Fixes a
+  regression introduced by the previous deploy (`d9672ac7`).
+- **locks:** claim acquired 02:06:46Z. Preflight **CLEAR** 02:06:59Z for the
+  exact target `62937ea4`, sample age -1s, only 2 infra processes.
+- **sims:** USER DIRECTED "deploy through sims". In the event none were killed —
+  the `tip_off_window` MLB sim (pid 1075, started 01:50:50Z) **finished on its
+  own with exit=0** during the wait, and odds refresh was idle. Only a board
+  build was in flight, which is a recurring few-minute job and self-heals. The
+  authorisation was given and not needed; recording that so nobody later cites
+  this as evidence that killing a sim is cheap.
+- **deploy:** `dep-daf1ojv40ujc7396krs0`, trigger=api, live **02:10:02Z**.
+
+### verify: THE THREE DROPPED LEGS NOW PRICE AT EXACTLY THEIR OWN-BAR VALUES, 3 LOST -> 0
+
+Same method that FOUND the regression, held constant — deployed code over
+production's own projections (`/api/board/layer1?sport=soccer&date=2026-09-07`),
+real 3-leg proportional de-vig from each row's own `consensus`. The local file
+was confirmed byte-identical to `62937ea4` (`git diff --quiet 62937ea4 --`).
+
+    Getafe   draw   home WITHHELD   served -6.56   own bar -6.56
+    Getafe   away   home WITHHELD   served +10.13  own bar +10.13
+    Udinese  draw   home WITHHELD   served  -6.09  own bar  -6.09
+    Udinese  away   home WITHHELD   served  None   own bar  None    <- still refused
+    Estoril  draw   home WITHHELD   served  None   own bar  None    <- still refused
+    Estoril  away   home WITHHELD   served  None   own bar  None    <- still refused
+
+    legs 10 | priced 4 | LOST to the early return 0     (before: priced 1, LOST 3)
+
+**Every served value equals that leg's own-bar value exactly**, and the three
+legs that fail their own bar are STILL refused — so this restored REACHABILITY,
+not permissiveness. A fix that had become a bypass would show numbers in those
+three rows too.
+
+### THE SERVED SHORTLIST DID NOT MOVE, AND THAT IS NOT A CONTRADICTION — IT IS A DIFFERENT POPULATION
+
+Polled across a real rebuild (row count 35 -> 32 at 02:17:50Z proves the artifact
+was rebuilt, not cached): `edged` 11 -> 11, `draw/away_edged` 4 -> 4.
+
+**A NULL RESULT THAT MUST NOT BE READ AS A FAILED FIX.** The three withheld-home
+fixtures (Getafe, Udinese, Estoril) are NOT ON THE SHORTLIST at all — it filters
+hard, and on 2026-09-06 24 of 25 events had a quoted draw price and no draw row.
+The rows that ARE on it are ones whose home leg PRICED, which this fix does not
+touch. So the shortlist cannot show this change today, in either direction.
+
+STILL OWED, and it is the same debt as the first deploy: an end-to-end reading on
+the SERVED BOARD, which needs a slate where a withheld-home three-way row also
+clears the shortlist's own eligibility. Not yet observed.
+
+#### 2026-09-06 ~21:3x CDT — WHY the shortlist could not show it, measured properly this time
+
+The entry above says the shortlist "is a different population". That was right
+but under-specified, and the sharper version matters for anyone trying to verify
+a board change through that surface:
+
+**The shortlist's `date` field does NOT tell you which matchday its rows are
+for.** Measured: `date: "2026-09-06"`, `horizon_days: 1`, and all 32 of its
+soccer moneyline rows carried a `commence_time` between **2026-09-08 and
+2026-09-11**. Meanwhile `layer1?date=2026-09-07` served the 5 pregame fixtures
+carrying the withheld-home projections. Two different matchdays, so the join was
+empty by construction — `rows_from_3way_slate = 0` across 6 polls.
+
+**AND THE ZERO WAS CHECKED BEFORE IT WAS EXPLAINED.** A failed name join looks
+identical to genuine absence. Printing both club sets showed a real intersection
+of 3 (`Cagliari`, `Elche CF`, `Lazio`) appearing in DIFFERENT fixtures — so the
+names normalise fine and the cause is scope, not the join. Without that check
+"different population" would have been a guess wearing a measurement's clothes.
+
+CONSEQUENCE FOR THE OWED READING: it must be driven from the SHORTLIST's own
+fixtures and their `commence_time` dates, then looked up in `layer1` at THOSE
+dates — not from `layer1` at today's date. The scheduled task
+`soccer-threeway-shortlist-verify` was corrected to do it in that order.
+
+Also observed and not chased: `web` returns intermittent HTTP 502 on these
+endpoints; every fetch here needs a retry or a transient reads as a null.
+
+#### 2026-09-06 ~21:4x CDT — the owed reading, run with the CORRECTED join. Still not closed, but now fully explained.
+
+Driven from the SHORTLIST's own fixtures and looked up in `layer1` at their
+`commence_time` dates (2026-09-08/09/11/12), which is the order the earlier
+attempt had backwards:
+
+    projections indexed                              103
+    HOME withheld BY THE GATE                         28
+    shortlist fixtures                                24  (23 with a projection)
+    ...of those, HOME withheld by the gate             9   <- the population exists
+    their draw/away rows present on the shortlist      7
+    DEBT-CLOSING ROWS (priced draw/away)               0
+
+**ALL 7 ARE CORRECT REFUSALS, CHECKED INDIVIDUALLY RATHER THAN ASSUMED.** Each
+was re-priced through `price_moneyline` against its own fair and `sims_run`, and
+every one returned `withheld_reason = prob_interval_swamps_edge`:
+
+    Cagliari @ Atalanta      away  model .1425 vs fair .1587   (1.6 pp)
+    Espanyol @ Osasuna       away  model .2200 vs fair .2464   (2.6 pp)
+    E. Frankfurt @ Mainz     away  model .3050 vs fair .2823   (2.3 pp)
+    Stuttgart @ Hoffenheim   away  model .3625 vs fair .3512   (1.1 pp)
+    Nice @ Auxerre           away  model .3725 vs fair .3506   (2.2 pp)
+    Angers @ Le Havre        away  model .2575 vs fair .2844   (2.7 pp)
+    AC Milan @ Lazio         away  model .4300 vs fair .4101   (2.0 pp)
+
+    suspect (should have priced but served None): 0
+
+**THIS IS THE GATE WORKING, NOT A GAP.** Every one of those disagreements is
+1.1-2.7 pp against a 4-5 pp bar at n=400. The distinction that makes this null
+worth anything is that each `None` was checked AGAINST ITS OWN BAR: a served
+`None` that should have priced would have meant the fix was not reaching the
+board build, and is indistinguishable from a correct refusal without that check.
+
+**WHAT CLOSING THE DEBT ACTUALLY REQUIRES**, now that it is measurable: a
+fixture whose HOME leg is withheld AND whose draw or away leg disagrees with the
+market by more than ~5 pp AND which clears the shortlist's own eligibility. Rarer
+than assumed — 0 of 7 candidates tonight. It is not a reason to loosen the bar.
+
+#### 2026-09-07 10:42-10:54 CDT — THE DEBT IS CLOSED. Six draw/away rows on the SERVED shortlist, all six on fixtures whose HOME leg the gate withheld `[scheduled task soccer-threeway-shortlist-verify]`
+
+The reading owed by BOTH deploys above. Not deployed code over production
+inputs this time — rows the board actually published.
+
+**THE FIX IS STILL IN THE DEPLOYED CODE, CHECKED BY CONTENT, NOT ANCESTRY ALONE.**
+refresh-worker has moved on twice since `62937ea4`: live SHA is **`c395cfb5`**
+(`dep-daf5souq1p3s73bq9rkg`, trigger=api, live 2026-09-07T06:51:51Z = 01:51 CDT),
+with `8f647bbb` and `5876bbc9` deactivated behind it. `62937ea4` is an ancestor,
+AND `layer2_board.py` + `soccer_projections.py` are **byte-identical** between
+`62937ea4` and `c395cfb5`; `live_gameline_join.py` gained 13 lines that are a
+`home_margin` ledger-field copy inside `_apply_verdict` (ledger v5), nowhere near
+`price_moneyline`. A later deploy CAN roll a fix back and this one did not.
+Pricing env on refresh-worker read live and PAGINATED (155 keys):
+`MLB_LIVE_GAMELINE_MIN_SIMS`, `SYNDICATE_LIVE_GAMELINE_MIN_EDGE_PP` and
+`SYNDICATE_LIVE_GAMELINE_MAX_QUOTE_AGE_SECONDS` are all **absent**, so code
+defaults apply and a local re-price is comparable.
+
+**THE LOCAL WORKING TREE IS NOT THE DEPLOYED CODE AND WOULD HAVE GIVEN THE WRONG
+ANSWER.** `git diff c395cfb5 -- <the three files>` is 21 insertions / **371
+deletions** — the primary tree is behind. Every re-price below ran against
+`git show c395cfb5:syndicate/features/shared/live_gameline_join.py` extracted to
+a scratch module, not against the checkout.
+
+    /api/board/layer2-shortlist?sport=soccer, 8 polls, 10:42:19 -> 10:54:23 CDT
+
+    soccer moneyline rows                            103  (away 34 / draw 36 / home 33)
+    rows carrying model_edge_pct                       39  (40 on the first poll)
+    layer1 HOME projections indexed                   110
+    HOME legs WITHHELD BY THE GATE                     51   (one-sided quotes: 0)
+    HOME legs priced                                   59
+    shortlist fixtures                                 79  (65 with a layer1 projection)
+    ...of those, HOME withheld by the gate             30
+    their draw/away rows on the shortlist              29
+    **DEBT-CLOSING ROWS (priced draw/away)              6**
+    suspect (served None but WOULD have priced)         0
+
+    Lazio        @ Udinese            away   +6.3189   (own bar 4.89 pp)
+    Lincoln City @ Preston North End  away   -7.4089   (own bar 4.29 pp)
+    Celta Vigo   @ Getafe             away  +10.1892   (own bar 4.84 pp)
+    Charlotte FC @ CF Montreal        draw   +4.8509   (own bar 4.56 pp)
+    PSG          @ Brest              draw   +6.4342   (own bar 4.22 pp)
+    Juventus     @ Sassuolo           draw   +5.8691   (own bar 4.54 pp)
+
+**THREE OF THE SIX ARE DRAW ROWS, WHICH RETIRES THE ONE CAVEAT BOTH DEPLOYS
+CARRIED.** `d9672ac7`'s verify said the draw leg was "still unexercised — zero
+draw rows carried a model edge in either reading". Charlotte, PSG and Juventus
+are draw rows on the served shortlist carrying a model edge. `8b6a1f4d` is now
+verified by a served row, not only by unit test and the shared away branch.
+
+**ALL SIX HOME LEGS ARE WITHHELD BY THE GATE, BY NAME, NOT BY A ONE-SIDED
+QUOTE.** Each carries `edge_vs_market_pct: null` WITH a `prob_std_err`, and
+layer1 states the reason outright: `"the model probability is inside its own
+simulation noise: prob_interval_swamps_edge"`. `sims_run: 400` and
+`point_estimator: "agresti_coull"` on every one. Juventus @ Sassuolo is the
+cleanest instance of exactly what `62937ea4` fixed — home model 0.1975 vs fair
+0.1775 is 2.0 pp against a 3.98 pp bar, correctly refused, and its draw leg
+prices at +5.87 instead of being dropped.
+
+**THE SMOOTHED ESTIMATE IS THE ONE BEING PUBLISHED — the arithmetic is exact on
+all six, not approximate.** Reconstructing `p = quote.fair_probability +
+model_edge_pct/100` and comparing against `(k+2)/404` where `k = round(model_prob
+* 400)`:
+
+    leg                        raw k   (k+2)/404   served p    raw k/n
+    Lazio       away            162    0.405941   0.405940    0.405000
+    Lincoln     away             98    0.247525   0.247525    0.245000
+    Celta Vigo  away            154    0.386139   0.386138    0.385000
+    Charlotte   draw            119    0.299505   0.299505    0.297500
+    PSG         draw             93    0.235149   0.235149    0.232500
+    Juventus    draw            117    0.294554   0.294555    0.292500
+
+Six of six land on Agresti-Coull to within 1e-6 and none lands on raw `k/n`.
+Re-pricing each leg through the DEPLOYED `price_moneyline` returns the served
+value to 4 dp on all six, and `priceable=True` in all six — so these are legs
+clearing their OWN bar, not a bypass.
+
+**THE 23 NULLS WERE CHECKED INDIVIDUALLY AND ALL 23 ARE CORRECT REFUSALS.** Every
+one re-priced to `withheld_reason = prob_interval_swamps_edge`; disagreements run
+0.01-3.50 pp against 4-5 pp bars (tightest: Deportivo La Coruna @ Getafe away,
+0.01 pp; widest: Frosinone @ Genoa away, 3.50 pp). **suspects = 0.** Without that
+check a correct refusal and a fix that never reached the board build look the
+same.
+
+**THE ARTIFACT REBUILT TWICE DURING THE POLL, so this is not one stale read.**
+`written_at` moved `15:37:48Z -> 15:43:54Z -> 15:49:01Z` across the 8 polls and
+`edged` moved 40 -> 39, while the same six fixtures closed the debt in every
+single pass. Two edges drifted with the market (Celta Vigo 10.1892 -> 9.7649,
+Lazio 6.3189 -> 6.2508); nothing appeared or disappeared. **Zero HTTP 502s today**
+— the intermittent-502 note above is still worth keeping, but it did not fire in
+these 8 x ~10 fetches.
+
+**METHOD NOTE, because the previous attempt got 0 and this one got 6, and the
+difference is NOT the fix.** The 09-06 attempt indexed 103 projections against 24
+shortlist fixtures; today it is 110 against 79. The slate is simply much bigger
+(103 moneyline rows vs 32). The shortlist `date` field lied again in exactly the
+recorded way — `date: "2026-09-07"`, `horizon_days: 1`, rows commencing
+**2026-09-07 through 2026-09-13** — so the drive-from-the-shortlist ordering was
+load-bearing. I additionally indexed layer1 at BOTH the UTC and the US-Central
+date of each `commence_time`, since the board scopes by Central and a 02:30Z
+kickoff sits on the previous Central date. That widening was defensive and did
+NOT decide today's result: all six closers were found at the UTC date of their
+own kickoff.
+
+**NOTHING WAS LOOSENED.** No code was changed, no lane opened, no deploy taken.
+The bar is the same 2-sigma-at-n=400 bar; the slate finally contained fixtures
+that clear it on a non-home leg while failing it on home.
+
+**LEDGER-COMMIT-GUARD OVERRIDE, and why.** This entry was committed with
+`SYNDICATE_ALLOW_LEDGER_COMMIT=1`. The guard did NOT object to `deploys.md` --
+that file was first reconciled onto `origin/main` (it was 44 sections behind;
+upstream is now a byte-exact prefix, additions-only, 0 deletions against both
+HEAD and `origin/main`, and the lane's two previously-uncommitted entries
+`d9672ac7`/`62937ea4` are preserved). It objected to `lanes.md`, which is stale
+in this SHARED primary tree (280 commits behind) and is NOT part of this commit;
+the guard checks every ledger file's working state, not only the staged path.
+No lane was opened and no lanes.md edit was made by this task. Reconciling
+`lanes.md` belongs to whoever left it behind -- 302 upstream-archived lines
+would be un-archived by a naive commit, which is exactly what the guard is for.
+**This commit is LOCAL ONLY. It was not pushed**: this tree has diverged
+(1 ahead / 281 behind) and rebasing a shared primary tree is not this task's
+to do.
