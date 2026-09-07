@@ -1541,3 +1541,54 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   allocation, not for something that leaks. Fixing the instrument means measuring
   in WSGI middleware wrapping the full call — after `close()` — rather than in
   `teardown_request`, which is the last Flask hook but not the last thing to run.
+
+### `[web-oom-leak]` UPDATE 31 — **STEADY-STATE RETENTION IS ZERO. The arena is driven by a PEAK, and one route peaks at 44,007 blocks in a single request.**, 2026-09-07T07:3xZ `[session b2b5b45b]`
+
+* **The table re-read with the FIXED instrument (`8bcdef11`), as a DELTA between
+  two warm snapshots** — cumulative totals are useless here: on this deploy
+  `retained_blocks` read `663,143` at n=34 and `663,803` at n=239, so the first
+  34 requests carried ~19,500 blocks each (caches, lazy imports) while the next
+  205 averaged **3.2**. Reading the cumulative figure would have republished boot
+  as a leak.
+
+        pid 78   +794 solo requests   TOTAL RETAINED    -18 blocks  = -0.0/req
+        pid 79   +722 solo requests   TOTAL RETAINED  +3,969 blocks = +5.5/req
+
+  Local ground truth was `4.45/req`, so **the fix transfers from `test_client` to
+  gunicorn**. Steady-state per-request retention is **~0**. There is no
+  per-request leak.
+* **`UPDATE 28` IS CONFIRMED AS AN INFLIGHT MEASUREMENT.** The renamed
+  `blocks_inflight` column reads **17.1-30.7/req** here, against UPDATE 28's
+  reported "18.6-37.9". Same quantity, same numbers — it was measuring
+  per-request scaffolding and calling it retention. The retraction in `UPDATE 30`
+  is now corroborated by the corrected instrument, not just by a local test.
+* **THE RECONCILIATION FAILS, exactly as `UPDATE 30` predicted:**
+  * pid 79: `7.0 MB` of arena jump against ~`5,150` retained blocks =
+    **1,425 bytes per block**, and pymalloc caps at 512 B.
+  * pid 78 is the cleanest case available: **`53.0 MB` of arena growth against
+    NET `-18` blocks retained.** Retention cannot account for the arenas at all.
+* **THE PEAK COLUMN IS THE LEAD, and it is very concentrated:**
+
+        route                             peak blocks (78/79)   calls
+        /wnba/api/live_player_boxscore       44,007 /  3,277      9 / 11
+        /api/ops/memory                       3,370 /     43      5 /  8
+        /api/ops/artifacts/export               761 /    114     63 / 77
+        /api/ops/artifacts/publish              701 /    277    493 /428
+        /healthz                                148 /    145    142 /132
+
+  **`/wnba/api/live_player_boxscore` peaks 13-60x above every other route**, on
+  9-11 calls. At 64-128 B per small object that is **2.7-5.4 MB of simultaneously
+  live objects in ONE request** — and arenas are allocated to cover the peak,
+  which pymalloc then rarely returns.
+* **AN ARITHMETIC COINCIDENCE THAT IS A HYPOTHESIS, NOT A RESULT:** pid 78's
+  `53 MB` jump would need **10-20** such requests, and that route was served
+  **9** times in the window. Suggestive and the right order — but I have NOT
+  shown the jump coincided with those calls, and this is the same route-shaped
+  reasoning that made `/api/ops/artifacts/publish` look guilty three times and be
+  wrong each time. **It needs a direct test:** correlate the episode timestamp
+  against that route's calls, or call it in isolation and watch the arena.
+* **NOTE the peak asymmetry between workers** — `44,007` on pid 78 vs `3,277` on
+  pid 79 for the same route. Either the work is input-dependent (a big game vs a
+  small one) or one call did something the others did not. That difference is
+  itself measurable and worth resolving before acting.
+* Profile returned to **OFF** after the reading, per `UPDATE 29`.
