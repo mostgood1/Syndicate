@@ -2033,6 +2033,46 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   small `smaps_rollup` read.
 - Blocked by: none.
 
+### vendor-sync-schedule — **BLOCKED 2026-09-06 — NOT CLOSED, because the stated verification FAILED** — opened 2026-09-06 — **`09588947` is landed and correct, and it CANNOT RUN.** A real `workflow_dispatch` returned `completed/failure` in 1s with zero steps executed: *"The job was not started because your account is locked due to a billing issue."* **THIS IS NOT ABOUT THIS WORKFLOW. GITHUB ACTIONS IS DEAD FOR THE WHOLE REPO, AND HAS BEEN FOR 15 DAYS.** Last successful run of ANY workflow: **2026-08-22T21:07Z**. 100 of the last 100 runs failed. A run sampled from 2026-09-05 shows the same signature (`steps=0`, job never started). **So `ci.yml` — the pytest-baseline gate this repo's protocol leans on — has not gated anything for 15 days, and every commit landed in that window is unverified by CI**, including this session's. Nothing surfaced that; it had to be looked for. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: the vendor sync runs daily without anyone remembering to run it, and its
+  output is a PR a human reviews — never a push to `main`, never an auto-apply of
+  anything but `UPSTREAM_AHEAD`.
+- Files: `.github/workflows/vendor-sync.yml` (new). Claimed by no other OPEN lane.
+- **NOT a local scheduled task, deliberately.** This machine's ledger already
+  records `lastRunAt` being dispatch rather than execution, with Modern Standby
+  stalling a scheduled call by 9h13m. A sync that silently does not run is worse
+  than no sync, because the report it never produced reads the same as "nothing
+  to do". GitHub Actions runs off this machine entirely.
+- Follows `pytest-baseline-update.yml`'s house pattern: heavy WHY header,
+  concurrency group, explicit `permissions`, and **it opens a PR rather than
+  committing to `main`** — the diff is the review surface.
+- Hypothesis: n/a.
+- Falsification test: if the runner cannot reach the four upstream repos, or the
+  report differs from the local one, the workflow is measuring something else and
+  scheduling it is worthless.
+- Verification: a real `workflow_dispatch` run on the actual runner, whose totals
+  MATCH the locally measured `IN_SYNC 570 / LOCAL_ONLY 215 / LOCAL_PATCH 52`, and
+  which opens no PR when there is nothing to take. Not "the YAML parses".
+- Blocked by: none.
+- **UNBLOCKED BY:** resolving the GitHub billing lock on the account. Nothing in
+  this repo needs to change — the workflow starts running on its own schedule the
+  moment the lock lifts, and `--offline`-free runs need no secrets.
+- **Deliberately NOT done:** changing any billing or repository setting. That is
+  the account owner's, not a session's.
+- What IS verified: the YAML parses, both embedded `run` scripts pass `bash -n`,
+  the report block was exercised against real `--json` output from the current
+  trees, and the workflow is registered and dispatchable (`vendor-sync active
+  351896093`). What is NOT verified is the only thing that matters — that it
+  produces the right answer on a runner.
+- **A second, unrelated blocker found on the way and worth knowing before the
+  first successful run:** "Allow GitHub Actions to create and approve pull
+  requests" is OFF (`can_approve_pull_request_reviews=false`), so `gh pr create`
+  from the Actions token will be refused. The workflow already degrades — it
+  pushes the branch first and prints a compare URL — but the PR step will not
+  work until that setting is on either.
+- The existing `pytest-baseline-update.yml` opens a PR the same way and **has
+  never run once**, so that path was never proven here. It is not a precedent.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

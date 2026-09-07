@@ -25630,3 +25630,38 @@ it reads negative.**
   tests passed throughout and would have kept passing -- none of them had a file
   transition INTO in-sync and then move again, which is the only sequence that
   exposes it.
+
+## 2026-09-06 A schedule is a claim about a platform you have not tested
+
+- **What we believed:** that committing `.github/workflows/vendor-sync.yml` with
+  a daily cron scheduled the vendor sync. The YAML parsed, both embedded `run`
+  blocks passed `bash -n`, the report block had been exercised against real
+  `--json` output, and `gh workflow list` showed `vendor-sync active 351896093`.
+- **What was actually true:** it cannot run at all. A real `workflow_dispatch`
+  returned `completed/failure` in **1 second, zero steps executed**, annotated
+  *"The job was not started because your account is locked due to a billing
+  issue."*
+- **And the finding is much larger than the lane.** The last successful run of
+  ANY workflow in this repository is **2026-08-22T21:07Z** -- fifteen days
+  earlier. `gh run list --limit 100` returns **failure for all 100**. A run
+  sampled from 2026-09-05 shows the same signature, `steps=0`, a job that never
+  started. `ci.yml` runs the pytest-baseline gate that this repo's protocol
+  leans on, and it has therefore gated nothing for fifteen days: every commit
+  landed in that window is unverified by CI, this session's included.
+- **How we found out:** dispatching the workflow once instead of trusting that a
+  committed file is a running job. Nothing else in the loop would have said so --
+  a repo whose CI silently stopped looks exactly like one whose CI keeps passing,
+  from the commit log, from the branch protection UI, and from the workflow file
+  itself.
+- **The rule going forward:** dispatch a new scheduled workflow once, and read
+  the RUN, not the registration. For a reporting job specifically, the failure is
+  doubly quiet -- a job that never runs emits no report, which is indistinguishable
+  from a report saying nothing needs attention.
+- **Also worth keeping:** the reason this workflow was put on Actions at all was
+  that the local scheduler is unreliable here (`lastRunAt` is a dispatch time;
+  Modern Standby stalled a call by 9h13m). Both platforms fail the same way --
+  silently, by not running -- and neither is trustworthy without a positive
+  reading from the run itself.
+- **Cost:** none realised. Caught before the lane was closed, so it is recorded
+  as BLOCKED rather than done. Had it been closed on "the YAML is valid", the
+  sync would have been believed to be running daily while never executing once.

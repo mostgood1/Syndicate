@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 872 rules `[generated]`
+## Index — 874 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2908,4 +2908,24 @@ still not count.
   Found only by inspecting the outcome of a real run: the fixture tests passed,
   and would have kept passing, because they never had a file transition INTO
   in-sync and then move again.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-06 A SCHEDULE IS A CLAIM ABOUT A PLATFORM YOU HAVE NOT TESTED. DISPATCH IT ONCE, OR YOU HAVE SHIPPED A JOB THAT SILENTLY NEVER RUNS
+
+- **The rule going forward.** A committed workflow file with a valid cron is not
+  a scheduled job; it is a request. Dispatching `vendor-sync` once returned
+  `completed/failure` in **1 second with zero steps executed** -- *"The job was
+  not started because your account is locked due to a billing issue."* Valid
+  YAML, `bash -n`-clean scripts, and a registered workflow ID all said healthy;
+  none of them touches whether a runner will pick it up. **And the failure mode
+  is the worst kind for a sync: a job that never runs produces no report, which
+  reads exactly like "nothing to do".** The same reasoning that rejected a local
+  scheduled task here (`lastRunAt` is dispatch, not execution) applies to the
+  replacement, and I nearly shipped it unexercised. Corollary, found by the same
+  dispatch and much larger than the lane: **GitHub Actions has been dead for this
+  whole repo for 15 days** -- last success 2026-08-22T21:07Z, 100 of the last 100
+  runs failed -- so `ci.yml`'s pytest-baseline gate has not gated a single commit
+  in that window, including this session's. Nothing announced it. **A CI system
+  that stops running looks identical to one that keeps passing, from anywhere
+  except its own run history.**
 - *(evidence in `learnings_evidence.md`)*
