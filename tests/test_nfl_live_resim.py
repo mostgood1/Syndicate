@@ -138,3 +138,54 @@ def test_overtime_is_refused_before_the_sim_runs():
     )
     assert isinstance(out, NflResimRefusal)
     assert out.reason == "overtime_not_resumable"
+
+
+# --------------------------------------------------------------------------
+# THE OUTPUT GUARD. Added 2026-09-07 after lane soccer-unfed-inputs showed the
+# input floor covered 13% of a 93.8% defect -- arithmetic re-derived before
+# accepting: NFL rating sd 2.16 -> gap sd 3.05 -> P(|gap|<0.5) = 13.0%, against
+# a measured 93.8% of games landing inside P(home) 0.35-0.65. At least 80.8% of
+# games cleared the floor AND were uninformative.
+# --------------------------------------------------------------------------
+from syndicate.features.nfl.live_resim import UNINFORMATIVE_BAND  # noqa: E402
+
+
+def test_a_coin_flip_output_is_REFUSED_even_with_separated_ratings():
+    """The case the input floor could not see: ratings that clear the gap floor
+    and still produce a probability inside the band the engine cannot beat the
+    close in. This is ~81% of NFL games today."""
+    out = resim_live_game(
+        NflLiveGameState(away_team="A", home_team="B", period=1,
+                         clock_seconds=900, home_score=0, away_score=0),
+        **SEPARATED, sims=40, env={"SYNDICATE_NFL_LIVE_RESIM": "1"},
+    )
+    if isinstance(out, NflResimRefusal):
+        assert out.reason in {"uninformative_probability", "degenerate_ratings"}
+        if out.reason == "uninformative_probability":
+            assert "skill gate" in out.detail or "t=+3.34" in out.detail
+    else:
+        # If it published, it must be OUTSIDE the band -- never inside it.
+        lo, hi = UNINFORMATIVE_BAND
+        p = out["model_home_win_prob"]
+        assert not (lo <= p <= hi), (
+            f"published p={p} inside the uninformative band {lo}-{hi}")
+
+
+def test_a_decided_game_still_publishes():
+    """off != on for the output guard. A guard that refuses everything is the
+    same as no producer -- a blowout late must still price, because that is a
+    probability the engine CAN express."""
+    out = resim_live_game(
+        NflLiveGameState(away_team="A", home_team="B", period=4,
+                         clock_seconds=60, home_score=38, away_score=3),
+        **SEPARATED, sims=40, env={"SYNDICATE_NFL_LIVE_RESIM": "1"},
+    )
+    assert not isinstance(out, NflResimRefusal), getattr(out, "detail", "")
+    lo, hi = UNINFORMATIVE_BAND
+    assert out["model_home_win_prob"] > hi
+
+
+def test_the_band_is_the_measured_one_not_an_invented_one():
+    """Pins the constant to the measurement it came from. If someone widens it,
+    this test makes them say why."""
+    assert UNINFORMATIVE_BAND == (0.35, 0.65)

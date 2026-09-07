@@ -72,20 +72,51 @@ PREGAME_LENS_SOURCE = "pregame"
 DEFAULT_SIMS = 120
 MAX_RESUMABLE_PERIOD = 4
 
-# THE NUMBER THIS MODULE REFUSES BELOW, and where it comes from.
+# A LITERAL-DEGENERACY FLOOR ON THE INPUT. Kept, but it is NOT the real guard --
+# see `UNINFORMATIVE_BAND` below, and read this comment before trusting it.
 #
-# `nfl-rating-units` measured NFL's across-game `margin_mean` stdev at 2.16
-# points against NCAAF's 15.37 on a comparable slate, with a market spread range
-# of ~14. A rating spread that cannot move the simulated margin cannot move the
-# win probability either, so every game converges on ~0.5 and the engine is
-# reporting its prior rather than its opinion.
+# THIS FLOOR WAS THE WHOLE GUARD AND IT DID NOT COVER THE FAILURE MODE.
+# `[corrected 2026-09-07 by lane soccer-unfed-inputs; arithmetic re-derived here
+# before accepting]`. Using `nfl-rating-units`' own number -- NFL rating sd 2.16,
+# so a difference of two ratings has sd 2.16*sqrt(2) = 3.05:
 #
-# 0.5 rating points is deliberately a LOW bar -- it is not "the ratings are
-# good", it is "the ratings are not literally identical". A working rating
-# clears it by an order of magnitude; the degenerate case does not clear it at
-# all. Set low on purpose: this is a floor against publishing noise, not a
-# quality gate, and a quality gate is `nfl-rating-units`' to write.
+#     P(|rating gap| < 0.5)          13.0%   <- what this floor catches
+#     P(output inside 0.35-0.65)     93.8%   <- the measured defect
+#
+# So AT LEAST 80.8% of games clear this floor AND are uninformative. The floor
+# stops LITERAL degeneracy; the defect is COMPRESSION. A gap of 0.6 clears a 0.5
+# floor comfortably and still yields a coin flip.
+#
+# The same arithmetic on NCAAF (sd 15.37) refuses 1.8% -- this floor was
+# calibrated as if NFL's ratings behaved like NCAAF's, which is precisely what
+# `nfl-rating-units` measured they do not.
+#
+# **A guard that makes wiring LOOK safe without making it safe is worse than no
+# guard**, because a named refusal in the lane reads to a later auditor as "the
+# brake held". Kept only because literal-identical ratings are still worth
+# refusing early and cheaply.
 RATING_SEPARATION_FLOOR = 0.5
+
+# THE REAL GUARD, and it is on the OUTPUT because that is where the defect is.
+#
+# Refuse when the produced probability lands in the band this engine has never
+# been shown to beat the closing line inside. Measured: 93.8% of NFL games land
+# in P(home) 0.35-0.65, and NFL regular season loses to the close at t=+3.34
+# over 272 held-out games with NO skill gate on the h2h branch.
+#
+# I ARGUED AGAINST AN OUTPUT CHECK AND WAS WRONG. My objection was that a
+# confident-looking 0.5 from a broken rating is indistinguishable from a
+# genuinely even game, so refusing on the output cannot tell them apart. True --
+# and it does not matter: on an engine with no demonstrated skill, a GENUINE
+# 0.5 has no more value than a spurious one. Refusing both costs nothing real,
+# and refusing neither is what publishes noise.
+#
+# It fires on ~93.8% of games today and on progressively fewer as the rating
+# starts separating teams, which is what a floor is supposed to do. Its exit
+# condition is explicit: **remove it when a skill gate exists on the h2h branch**
+# -- the thing NCAAF gets for free from `no_two_sided_market_price` and NFL does
+# not have. Until then it is doing that gate's job.
+UNINFORMATIVE_BAND = (0.35, 0.65)
 
 
 def nfl_live_resim_enabled(env: Mapping[str, str] | None = None) -> bool:
@@ -268,6 +299,20 @@ def resim_live_game(
     k = home_wins + 0.5 * ties
     raw = k / ran
     smoothed = (k + 2.0) / (ran + 4.0)
+
+    # THE OUTPUT GUARD. Runs AFTER the sim, on the number that would be
+    # published, because that is where the measured defect lives -- the input
+    # floor above catches 13% of a 93.8% problem. Refusing here costs a genuine
+    # coin-flip game its lane, and that is the right trade while the engine has
+    # no demonstrated skill: an edge on a true 0.5 is worth nothing either.
+    lo, hi = UNINFORMATIVE_BAND
+    if lo <= smoothed <= hi:
+        return NflResimRefusal(
+            "uninformative_probability",
+            f"p={smoothed:.4f} is inside {lo}-{hi}, the band this engine has not "
+            f"been shown to beat the close in (t=+3.34, no h2h skill gate). "
+            f"Remove this guard when that gate exists.",
+        )
     return {
         "model_home_win_prob": round(smoothed, 6),
         "model_home_win_prob_raw": round(raw, 6),
