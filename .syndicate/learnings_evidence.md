@@ -25665,3 +25665,40 @@ it reads negative.**
 - **Cost:** none realised. Caught before the lane was closed, so it is recorded
   as BLOCKED rather than done. Had it been closed on "the YAML is valid", the
   sync would have been believed to be running daily while never executing once.
+
+## 2026-09-06 A guard that infers its postcondition from an artefact's existence cannot see a half-built one
+
+- **What we believed:** that `scripts/vendor_sync_daily.ps1` was ready once it
+  parsed and ran correctly by hand -- it had produced the right totals on the
+  first direct invocation (`IN_SYNC 570, LOCAL_ONLY 215, LOCAL_PATCH 52`).
+- **What was actually true:** it failed on the first three scheduler-driven runs,
+  for three different reasons, and carried a fourth defect that cost 3.9 GB
+  without failing at all.
+    * **Run 1**: `can't open file '...scripts\sync_vendor_upstream.py'`. The task
+      pointed at the primary checkout, which is **241 commits behind
+      `origin/main`** and does not contain that script -- it landed today.
+    * **Run 2**: `error: "Preparing worktree (detached HEAD aa0349aa)"`. That is
+      git's SUCCESS message. Windows PowerShell 5.1 wraps a native command's
+      stderr in ErrorRecords when the stream is redirected, and
+      `$ErrorActionPreference = 'Stop'` then throws on it.
+    * **Run 3**: `git  -> exit 1` -- git invoked with no arguments, because
+      `param([string[]] $Args)` collides with PowerShell's automatic `$Args`.
+    * **The silent one**: run 2 died between `git worktree add` and
+      `git sparse-checkout set`. The setup guard was
+      `if (-not (Test-Path "$wt\.git"))`, so from then on it skipped repair and
+      every checkout materialised the whole repo. Measured at **3876 MB**,
+      `data/` included, for a job that reads `scripts/` and `vendor/`.
+      `git -C $wt sparse-checkout list` said `fatal: this worktree is not sparse`.
+- **How we found out:** running the task through the scheduler after each fix and
+  reading the artifact, rather than reading the script. It parsed cleanly the
+  whole time, and a `[ScriptBlock]::Create` syntax check passed at every stage.
+- **The fix and its measurement:** check the postcondition -- `sparse-checkout
+  list` exits 0 -- and repair when it does not. Next run: **3876 MB -> 125 MB**,
+  with `ok: true` and totals matching the hand measurement exactly.
+- **The rule going forward:** a setup guard must test the state it is supposed to
+  guarantee, not a proxy that happens to correlate with it. Existence correlates
+  with completeness only when nothing is ever interrupted -- and an interrupted
+  setup is precisely the case the guard exists for.
+- **Cost:** none realised beyond 3.9 GB of disk for a few minutes. The failure
+  mode worth remembering is that the job would have kept "working" indefinitely
+  while doing a full checkout of a 37k-file repository every day.

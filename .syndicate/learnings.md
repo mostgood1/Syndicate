@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 874 rules `[generated]`
+## Index — 876 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2928,4 +2928,26 @@ still not count.
   in that window, including this session's. Nothing announced it. **A CI system
   that stops running looks identical to one that keeps passing, from anywhere
   except its own run history.**
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-06 A GUARD THAT INFERS ITS POSTCONDITION FROM AN ARTEFACT'S EXISTENCE CANNOT SEE A HALF-BUILT ONE, AND WILL DEFEND IT FOREVER
+
+- **The rule going forward.** `if (-not (Test-Path "$wt\.git")) { worktree add; sparse-checkout set }`
+  reads as "set this up once". It is really "assume anything with a `.git` is
+  fully set up". An earlier failure died BETWEEN the two commands, leaving a
+  worktree that was real but not sparse -- and from then on the guard skipped
+  repair on every run while each checkout materialised the entire repository:
+  **3.9 GB, `data/` and all, for a job whose input is two directories.** Nothing
+  reported it; the job "worked". **Check the POSTCONDITION you actually need
+  (`git sparse-checkout list` succeeds), not a proxy for it (a directory
+  exists)** -- the two differ exactly when a previous run was interrupted, which
+  is the case a setup guard exists for. Same family as this session's stale
+  baseline: state that is only WRITTEN on the happy path, or only CHECKED by
+  proxy, silently rots. Corollary, three more from the same script and all found
+  the same way: it read a shared checkout **241 commits behind** and missing the
+  script it invokes; `$ErrorActionPreference='Stop'` plus a redirected native
+  stderr turned git's own success message into a recorded error (PowerShell 5.1
+  wraps native stderr in ErrorRecords); and `param([string[]] $Args)` collides
+  with PowerShell's AUTOMATIC `$Args`, so git ran with no arguments. **The script
+  parsed cleanly through all four.**
 - *(evidence in `learnings_evidence.md`)*

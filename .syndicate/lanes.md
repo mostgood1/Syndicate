@@ -2076,6 +2076,53 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - The existing `pytest-baseline-update.yml` opens a PR the same way and **has
   never run once**, so that path was never proven here. It is not a precedent.
 
+### vendor-sync-local-stopgap — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`aa0349aa` + `e94a6ea5`. A SCHEDULER-DRIVEN run produced the right answer.** Task `Syndicate vendor-sync report`, daily 09:20, `StartWhenAvailable`, state Ready. Verified by the ARTIFACT, never by `LastRunTime`: `reports/vendor_sync/latest.json` carries a fresh `executed_at` and `IN_SYNC 570 / LOCAL_ONLY 215 / LOCAL_PATCH 52`, an exact match for the hand measurement. **FOUR BUGS, EVERY ONE FOUND BY RUNNING IT — the script was syntactically fine throughout.** (1) it read the PRIMARY checkout, which is **241 commits behind `origin/main` and does not contain `sync_vendor_upstream.py` at all**; now reports on `origin/main` via a sparse worktree. (2) `$ErrorActionPreference='Stop'` plus redirected native stderr turned git's own `Preparing worktree (detached HEAD ...)` progress line into a thrown error on a command that had SUCCEEDED — PowerShell 5.1 wraps native stderr in ErrorRecords. (3) `param([string[]] $Args)` collides with PowerShell's AUTOMATIC `$Args`; git ran with no arguments (`git  -> exit 1`). (4) the worktree setup inferred its postcondition from *the directory exists*, so a worktree left half-built by bug 2 was never made sparse — **3.9 GB materialised, `data/` and all**, for a job reading two directories; now checked and repaired, **3876 MB → 125 MB**. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: while GitHub Actions is billing-locked, the vendor sync still runs daily
+  on this machine AND leaves proof it executed — so "upstream has not moved" and
+  "the task never fired" are distinguishable. Testable outcome: a report artifact
+  whose `executed_at` advances, verified by running the task and reading the
+  FILE, not the scheduler's `LastRunTime`.
+- Files: `scripts/vendor_sync_daily.ps1` (new),
+  `reports/vendor_sync/` (new, generated). Claimed by no other OPEN lane.
+- **THE WHOLE DESIGN IS SHAPED BY THIS MACHINE'S KNOWN FAILURE MODE.** The ledger
+  records `lastRunAt` being a DISPATCH time rather than an execution time, with
+  Modern Standby stalling a scheduled call by 9h13m — and the workflow this is
+  standing in for failed the same silent way (never started, no report). So the
+  task's output is an ARTIFACT WITH ITS OWN TIMESTAMP, and verification reads
+  that artifact. A scheduler that says it ran is not evidence it ran.
+- **REPORT ONLY. It never writes `vendor/`.** The primary tree is shared by
+  concurrent sessions; leaving modified vendored files there is how an unrelated
+  session sweeps them into its commit. Applying stays a human act.
+- **It records how far behind `origin/main` the tree is.** The primary tree is
+  routinely behind (measured repeatedly today), and a sync reading a stale tree
+  can classify a file that was already resolved as UNCLASSIFIED. Labelling the
+  reading beats silently publishing a wrong one.
+- Hypothesis: n/a.
+- Falsification test: if the artifact's `executed_at` does not advance after a
+  real task run, the scheduler is not running it and the stopgap is worthless —
+  which is exactly the thing that must not be assumed.
+- Verification: register, run the task, and read `reports/vendor_sync/latest.json`
+  — its `executed_at` must be fresh and its totals must MATCH the local
+  `IN_SYNC 570 / LOCAL_ONLY 215 / LOCAL_PATCH 52`. Then confirm `git status` shows
+  no `vendor/` modification.
+- Blocked by: `vendor-sync-schedule` is BLOCKED on GitHub billing; this exists
+  because of that and should be RETIRED when it clears.
+- **Report-only holds.** `git status -- vendor/` in the primary tree shows only
+  two WNBA `data/processed/schedule_2026.*` files, and both were already modified
+  before this session began — checked against the session-start snapshot rather
+  than assumed.
+- The task and its sparse worktree are MACHINE-LOCAL state, not in the repo:
+  task `Syndicate vendor-sync report`, worktree
+  `%LOCALAPPDATA%\syndicate\vendor-sync-worktree` (registered in the primary
+  repo's `.git/worktrees`). Retiring this means removing both, not just deleting
+  the script.
+- **Not verified:** that the task fires on its own at 09:20 unattended. Every run
+  so far was `Start-ScheduledTask`, which proves the action works, not that the
+  trigger does — and the trigger is precisely what this machine has been caught
+  failing before. The `history.jsonl` gap is what will answer it; read that
+  tomorrow rather than assuming.
+  because of that and should be RETIRED when it clears.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
