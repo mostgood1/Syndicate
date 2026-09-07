@@ -65,7 +65,7 @@ id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
 markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
-### segment-regrade-apply — OPEN (applied; second source owed) — opened 2026-09-06 — session 3492626c
+### segment-regrade-apply — CLOSED 2026-09-07 — opened 2026-09-06 — session 3492626c — **49 rows corrected, −$31.32, and the idempotency re-run reported `already corrected 49 / corrected 0`, so the write persisted. Second source is a per-ROW marker read, not the writer's account of itself.**
 - Goal: the 49 mis-graded segment orders carry their CORRECTED outcome in the
   execution ledger, auditable and reversible.
 - Files: `scripts/apply_segment_regrade.py` (NEW)
