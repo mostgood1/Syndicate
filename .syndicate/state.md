@@ -1775,3 +1775,38 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   **refresh-worker**, not web. The instrumentation is deployed and service-
   agnostic. And for `#632` proper, the ring is now eliminated as a web-OOM
   candidate — the field is clear again.
+
+### `[web-oom-leak]` UPDATE 36 — **THE RING A/B IS DEFERRED: refresh-worker has NO quiet window, and waiting cannot create one.**, 2026-09-07T20:0xZ `[session b2b5b45b]`
+
+* **MEASURED, 75 minutes of polling.** A waiter watched refresh-worker for both
+  conditions — claim free AND no job in flight — and **never found a clear
+  moment**. Board builds started at `18:57, 19:05, 19:10, 19:23, 19:30, 19:35,
+  19:39, 19:46` (every **5-8 minutes**), interleaved with MLB sims
+  (`tip_off_window`, `fingerprint_change`, `props_now_available`) and odds
+  refreshes. The claim itself freed several times; a JOB was in flight every
+  time.
+* **WAITING CANNOT SOLVE IT, and that is the finding.** A deploy takes ~5 minutes
+  to go live while builds start every 5-8. **Even catching a gap lands the
+  restart inside the NEXT build**, so a tighter poll does not help. The
+  experiment needs a genuinely quiet period (overnight / no games) or a
+  deliberate decision to kill one board build per arm. **Same shelf and the same
+  reason as `scripts/malloc_trim_ab.py`** — now confirmed on a second service.
+* **DEFERRED WITH A RUNNABLE HARNESS**, not a note: `scripts/ring_cost_ab.py`
+  (`plan` / `read FAT|SLIM` / `compare`). It reads via the **Render logs API**
+  because refresh-worker has no HTTP server, drops lines whose `keep_cmdline`
+  belongs to the other arm, **gates on ring length** (the read cost scales with
+  it), and reports the SPREAD — refusing a verdict when ranges overlap even at N
+  in the hundreds.
+* **A MISTAKE I MADE AND UNDID.** I set `SYNDICATE_RING_KEEP_CMDLINE=1` on
+  refresh-worker BEFORE checking the claim, which a peer held. An env change is
+  inert until a deploy — so it would have ridden along on **their** deploy and
+  silently switched their service to the fat records. Reverted to `0` within the
+  minute. **Setting config on a service another session holds is the same class
+  of error as deploying into their window; the flag just makes it quieter.**
+* **AND THE VALUE IS LIMITED EVEN WHEN IT RUNS.** `UPDATE 35` established the
+  ring is inert on web, so this measures the WORKER's efficiency. `#632` is a WEB
+  OOM and the ring is already eliminated as a candidate for it. Worth doing for
+  the 4 GB worker's own sake; it will not move the OOM investigation.
+* **NOT held, NOT pending:** no claims held, and no env change left on any
+  service (web `RING_KEEP_CMDLINE='0'`, `REQUEST_MEMORY_PROFILE='off'`,
+  `GROWTH_EPISODE='1'`).
