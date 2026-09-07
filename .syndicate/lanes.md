@@ -1645,6 +1645,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none.
 
 ### web-oom-trim-ab — OPEN — opened 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-trim-ab — CLOSED 2026-09-07 — opened 2026-09-07 — **OFF ARM COMPLETE, ON ARM NOT RUN, AND THE QUESTION IS NO LONGER THE RIGHT ONE.** OFF: pid 79 glibc `390.6` pymalloc `198.1` anon `592.0` (n=44); pid 78 glibc `378.5` pymalloc `194.8` anon `576.0` (n=44); no restart in window. The ON arm was halted BEFORE deploying because checking whether my deploy had broken web turned up `UPDATE 37`: **35 `server_failed` events, ZERO `evicted=True`** — web is failing 5-second HEALTH CHECKS, not being OOM-killed, and has been since 2026-08-26. `malloc_trim` holds the malloc lock ~14 ms per call, so enabling it on a service whose failures are latency would push the real failure mode the WRONG way. Flag left at `0`; harness (`scripts/malloc_trim_ab.py`) is rewritten and runnable with a pymalloc CONTROL term if the question is ever revived. Superseded by the latency investigation. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: settle whether automatic `malloc_trim` is NET-POSITIVE on web — the
   measurement owed since the 2026-09-06 retraction.
 - Files: `scripts/malloc_trim_ab.py` (rewritten `fd0ce9c6`). No runtime code

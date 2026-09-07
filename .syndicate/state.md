@@ -1811,3 +1811,58 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
 * **NOT held, NOT pending:** no claims held, and no env change left on any
   service (web `RING_KEEP_CMDLINE='0'`, `REQUEST_MEMORY_PROFILE='off'`,
   `GROWTH_EPISODE='1'`).
+
+### `[web-oom-leak]` UPDATE 37 — **WEB IS NOT DYING OF MEMORY. It is dying of LATENCY: 32.5% of requests exceed the 5-second health-check budget.**, 2026-09-07T22:2xZ `[session b2b5b45b]`
+
+* **THERE ARE NO OOM KILLS.** Across the full available Render event history
+  (~800 events, back past 2026-08-26): **35 `server_failed`, and ZERO with
+  `evicted=True`.** Every one reads
+  `{"evicted": false, "unhealthy": "HTTP health check failed (timed out after 5
+  seconds)"}`. `#632` has been framed as an OOM investigation for two days;
+  **the failure mode in the events API is UNRESPONSIVENESS.**
+* **AND IT PREDATES EVERYTHING I SHIPPED** — the oldest is `2026-08-26`, my first
+  instrumentation deploy was `2026-09-06T21:00Z`. Not caused by this session.
+  Seven today: `06:16, 13:08, 13:53, 16:08, 19:11, 20:44, 21:55`.
+* **THE LATENCY IS CATASTROPHIC.** 628 requests in the 90 minutes to 22:00Z:
+
+        p50     475 ms
+        p90  13,732 ms
+        p99  64,902 ms
+        max 142,801 ms   (2.4 MINUTES)
+
+        >= 5s (the health-check budget): 204 requests = **32.5%**
+        >= 10s: 104      >= 15s: 54
+
+* **THE MECHANISM IS THREAD STARVATION.** gunicorn runs `WEB_CONCURRENCY=2` x
+  `GUNICORN_THREADS=4` = **8 concurrent slots**. With a third of requests holding
+  a slot for 5+ seconds, the pool saturates, `/healthz` cannot get a thread
+  within 5 s, and Render restarts the instance. The 21:55 window shows it
+  directly: `13166`, `13828`, `16682`, `18267 ms` in the ten seconds before
+  `Handling signal: term`.
+* **THE ROUTES, joined to slow requests by timestamp proximity (PARTIAL — only
+  ~76 of 204 slow requests fell within 2 s of an access line, so treat the counts
+  as a floor, not a census):**
+
+        /api/ops/artifacts/export      n=3   median 26,057 ms   max 87,448
+        /api/intelligence/query        n=8   median  5,063 ms   max 18,291
+        /api/board/game-chips          n=19  median     11 ms   max 11,599
+
+  `game-chips` is BIMODAL — 11 ms typical, 11.6 s worst — the signature of a cache
+  miss doing real work in the request path.
+* **`compute in request path` IS BEING LOGGED, BY NAME.**
+  `WARNING:syndicate.features.shared.request_path_guard: (operation=
+  wnba_has_games_for_date_espn_fetch)` fires twice in the same ten seconds — a
+  LIVE UPSTREAM ESPN FETCH inside a Flask handler. `CLAUDE.md`'s load-bearing
+  rule forbids exactly this, and the guard that detects it is already wired.
+* **WHY THE MEMORY WORK FOUND NOTHING, and it was not wasted.** Composition is
+  fully accounted (~400 MB glibc arena of which only ~52 MB is live, ~165 MB
+  pymalloc, ~4.5 MB else), there is NO per-request leak (retention `-0.0` to
+  `+5.5` blocks/request), and nothing approaches the limit — container sits at
+  47.7% unreclaimable. **Two days of measurement kept finding no leak because
+  there is no leak.** The eliminations are sound; the question was wrong.
+* **NEXT, and it is a different investigation:** cut request-path latency.
+  Ordered by evidence: (1) `/api/ops/artifacts/export` at a 26 s MEDIAN — this is
+  the backup workflow's own endpoint; (2) the `request_path_guard` warnings,
+  which already name the offending operations; (3) `/api/intelligence/query` at
+  5 s median and 1.5 MB responses. Raising `GUNICORN_THREADS` would buy headroom
+  but treats the symptom.
