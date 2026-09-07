@@ -981,6 +981,27 @@ NON-ZERO. Read it at
 PUBLISHED ARTIFACT, not a log line — the sim's stdout goes to a disk file the
 Render log API cannot serve.
 
+**RESOLVED 2026-09-07, and this verify was PARTLY UNSATISFIABLE as written.**
+`conditional_arsenal` and `count_bucket_map` did go non-zero. The third clause,
+`conditional_arsenal_source`, could not have been satisfied by ANY deploy of
+this change: the field was never in `ser_pitcher`'s explicit serialize list, so
+it was set in memory (`conditional_mix.py:99-101`), read back on load
+(`roster_artifact.py:343`), and dropped on write. A defect in a different file,
+unrelated to the conditional-mix wiring this block was verifying. Fixed by
+`af70a5cd` (one line, plus `tests/test_roster_artifact_roundtrip.py`, a
+`dataclasses.fields()` walk that fails pre-fix and passes post-fix). A
+69-field round-trip audit of both profiles found this was the ONLY such field:
+1 lost unfixed, 0 lost fixed.
+
+**Lesson, and it generalises past MLB:** a compound `verify:` inherits its
+weakest clause. Two of these three were testing the deploy; the third was
+testing an unrelated file, so its failure said nothing about the change and the
+verify could never pass. One clause per mechanism, each separately falsifiable.
+
+**Still open:** production has NOT yet been read at 10/10 — the deploy was
+queued behind the 25-min spacing and an in-flight MLB sim, not shipped. Until
+that reading exists, the fix is verified in a round-trip only.
+
 **THE ROSTER-REBUILD THEORY IS RETIRED — do not spend more time on it.**
 `--use-roster-artifacts` only reuses an artifact for the SAME date that also
 passes `_roster_artifact_matches_inputs`, so a fresh game date always rebuilds.

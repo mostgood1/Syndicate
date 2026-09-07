@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 885 rules `[generated]`
+## Index — 887 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3384,3 +3384,42 @@ describing the instrument, not the system.
 Remaining, and it is the whole of it: `conditional_arsenal_source` is zero while
 `conditional_arsenal` is populated -- a value present without its provenance
 label. One field.
+
+
+## 2026-09-07 A probe you designed yourself can MANUFACTURE bugs -- discriminate shape-failure from real failure BEFORE reporting
+
+Auditing whether MLB profile fields survive the roster artifact, I set every
+field to a distinctive value via `dataclasses.fields()`, round-tripped, and got
+**26 fields "LOST"** across `PitcherProfile` and `BatterProfile`. A 26-defect
+report would have been confident, specific, and entirely wrong.
+
+All 26 were the PROBE's fault. The serializer uses a different key domain per
+field family and both sides agree on each: `{str(k): float(v)}` for
+`platoon_mult_*` / `venue_mult_*` / `statcast_quality_mult` (**str** keys),
+`_ser/_de_intkey_map` for `vs_venue_*` / `vs_pitcher_*` (**int** keys), and
+`str(cell_key)` for `conditional_arsenal`. I had fed `PitchType` enum keys to
+all of them and a tuple to the last. Wrong-shaped keys came back as
+`'PitchType.FF'` or were silently dropped to `{}` -- which is INDISTINGUISHABLE
+from a serializer that does not persist the field.
+
+Re-run with each field's real key shape: **1 lost, not 26** -- and that one was
+a genuine write-side omission (`conditional_arsenal_source`), confirmed OFF!=ON.
+
+HOW TO APPLY. When a broad audit returns a large number of hits, the FIRST
+hypothesis is the instrument, not the system -- especially when the hits cluster
+by shape rather than by subsystem (here: every dict field, no scalar). Before
+reporting N findings, take one hit and prove it fails for the reason you claim,
+against what the real PRODUCER writes. A null-shaped result (`{}`, `''`, `0`)
+means "my probe did not survive"; it does NOT mean "this field is not
+persisted". And a permanent test must not encode the probe shape it happened to
+guess -- probe every shape the module supports and call a field lost only when
+NONE survives, or the test re-breaks at the next refactor.
+
+COROLLARY -- a compound `verify:` inherits its WEAKEST clause. `state_mlb.md`
+required `conditional_arsenal` / `count_bucket_map` / `conditional_arsenal_source`
+all non-zero. The third could not be satisfied by any deploy of that change --
+the field was dropped by a different file -- so the verify was permanently
+un-passable and its failure said nothing about the change under test. This is
+the same-day rule about compound ABSENCE claims, running the other way. One
+clause per mechanism, each separately falsifiable.
+- *(evidence in `.syndicate/log/2026-09-07.md`)*

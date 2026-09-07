@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 885 rules `[generated]`
+## Index — 887 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -348,7 +348,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 551**
+**Rules and corrections — 553**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -445,6 +445,8 @@
 - [2026-09-07 RESOLVED: the ten MLB pitcher inputs ARE unfed -- and my retraction was the…](#2026-09-07-resolved-the-ten-mlb-pitcher-inputs-are-unfed----and-my-retraction-was-the-wrong-turn)
 - [2026-09-07 The deploy claim's `session:` breadcrumb does not resolve, even for a LIVE h…](#2026-09-07-the-deploy-claims-session-breadcrumb-does-not-resolve-even-for-a-live-holder)
 - [2026-09-07 A CONVENTION YOU COPY MAY BE A DECISION YOU ARE OVERTURNING. "ALL THE OTHER…](#2026-09-07-a-convention-you-copy-may-be-a-decision-you-are-overturning-all-the-other-files-do-x-does-not-tell-you-why-they-do-x)
+- [2026-09-07 SETTLED: the MLB pitcher inputs were NEVER dead -- nineteen days of measurin…](#2026-09-07-settled-the-mlb-pitcher-inputs-were-never-dead----nineteen-days-of-measuring-june)
+- [2026-09-07 A probe you designed yourself can MANUFACTURE bugs -- discriminate shape-fai…](#2026-09-07-a-probe-you-designed-yourself-can-manufacture-bugs----discriminate-shape-failure-from-real-failure-before-reporting)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`
