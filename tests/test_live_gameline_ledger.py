@@ -307,3 +307,68 @@ def test_build_records_ACTUALLY_USES_the_devig_fallback():
     # And the pricing verdict is untouched -- this is a MEASUREMENT fix.
     assert rec["priceable"] is False
     assert rec["withheld_reason"] == "no_two_sided_market_price"
+
+
+def test_the_ledger_records_WHICH_ESTIMATOR_produced_the_probability():
+    """The ledger is the series the model is judged on, and it is about to hold
+    two different estimators.
+
+    Until 2026-09-06 the published point estimate was the raw Wald `k/n` while
+    the interval beside it was Agresti-Coull. Records after the fix carry the
+    smoothed centre. A CLV or calibration pass spanning that boundary would
+    average two estimators and read the step as model drift, so the record has
+    to say which one produced it.
+
+    IT IS ALSO THE KEY THE DEPLOY IS VERIFIED BY, which is the real reason this
+    test exists. A smoothed value is not self-identifying -- 0.983871 is
+    indistinguishable from a sim that happened to return it -- so verifying by
+    VALUE proves nothing. `point_estimator` did not exist before the commit,
+    which is what makes its PRESENCE evidence.
+    """
+    from syndicate.features.shared.live_gameline_ledger import build_records
+
+    row = {
+        "sport": "ncaaf", "market": "h2h", "segment": "full",
+        "home_team": "Washington", "away_team": "Washington State",
+        "event_id": "evt-ac-1",
+        "consensus": {"home": -2128, "away": 1106},
+        # Exactly what production published on WSU @ WASH for the final ten
+        # minutes: an raw certainty at 120 sims, smoothed to (120+2)/(120+4).
+        "live_gameline": {
+            "model_prob": 122.0 / 124.0,
+            "model_prob_raw": 1.0,
+            "point_estimator": "agresti_coull",
+            "market_prob": 0.9201, "priceable": True,
+            "withheld_reason": None, "sims_run": 120,
+        },
+        "projection": {"live_aware": True},
+    }
+    rec = build_records([row], sport="ncaaf", date_str="2026-09-06")[0]
+
+    assert rec["point_estimator"] == "agresti_coull"
+    assert rec["model_home_win_prob_raw"] == 1.0
+    # The published centre is the SMOOTHED one, and it is not the raw one.
+    assert rec["model_home_win_prob"] == 122.0 / 124.0
+    assert rec["model_home_win_prob"] != rec["model_home_win_prob_raw"]
+
+
+def test_a_record_from_BEFORE_the_estimator_fix_still_builds():
+    """Absence must read as 'unknown estimator', never as a crash and never as a
+    silent claim that it was Agresti-Coull. Every historical record has neither
+    key, and they are not repairable -- the raw proportion is not recoverable
+    from the stored value once the interval has been discarded."""
+    from syndicate.features.shared.live_gameline_ledger import build_records
+
+    row = {
+        "sport": "mlb", "market": "h2h", "segment": "full",
+        "home_team": "NYY", "away_team": "BOS", "event_id": "evt-ac-2",
+        "consensus": {"home": -150, "away": 130},
+        "live_gameline": {"model_prob": 0.61, "market_prob": 0.55,
+                          "priceable": True, "sims_run": 120},
+        "projection": {"live_aware": True},
+    }
+    rec = build_records([row], sport="mlb", date_str="2026-08-29")[0]
+
+    assert rec["point_estimator"] is None
+    assert rec["model_home_win_prob_raw"] is None
+    assert rec["model_home_win_prob"] == 0.61

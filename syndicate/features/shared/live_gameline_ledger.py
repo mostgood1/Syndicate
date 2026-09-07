@@ -238,6 +238,29 @@ def build_records(
                 "withheld_reason": lg.get("withheld_reason"),
                 "sigma": lg.get("sigma"),
                 # --- what makes the number interpretable later ---
+                #
+                # WHICH ESTIMATOR PRODUCED `model_home_win_prob`, and what the
+                # sim actually returned before it. Both `None` on every record
+                # written before 2026-09-06.
+                #
+                # THIS FILE IS THE SERIES THE MODEL IS JUDGED ON, and it is
+                # about to contain two different estimators with no way to tell
+                # them apart. Until 2026-09-06 the published point estimate was
+                # the raw Wald `k/n` while the INTERVAL beside it was
+                # Agresti-Coull -- `prob_std_err` computed `(k+2)/(n+4)` and
+                # discarded it. Records after the fix carry the smoothed centre.
+                # A CLV or calibration pass spanning that boundary would be
+                # averaging two estimators and would read the step as model
+                # drift. `point_estimator` is what lets it split instead.
+                #
+                # AND IT IS THE KEY THE DEPLOY IS VERIFIED BY. A smoothed value
+                # is not self-identifying: 0.983871 is indistinguishable from a
+                # sim that happened to return it. Checking the VALUE would be
+                # the mistake this session already made once -- the reading
+                # survived only because the discriminator was a KEY that did not
+                # exist before the commit. This is that key.
+                "point_estimator": lg.get("point_estimator"),
+                "model_home_win_prob_raw": lg.get("model_prob_raw"),
                 "prob_std_err": lg.get("prob_std_err"),
                 "sims_run": lg.get("sims_run"),
                 "live_state_as_of": lg.get("as_of"),
