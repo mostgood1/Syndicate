@@ -74,6 +74,15 @@ Two collateral costs:
 - **Why** refresh-worker publishes soccer `odds_history` at all when
   live-odds-worker owns the fuller copy. That is the question worth answering,
   and it belongs to whoever owns that publish loop.
+  **PARTIAL DATUM, from lane `soccer-unfed-inputs` 2026-09-07, THEIR observation
+  not mine and labelled a hypothesis by them:** BOTH services run
+  `refresh_odds_sources.py` with soccer steps — `build_soccer_artifacts.py
+  --league primeira_liga` was in live-odds-worker's process list at 22:07Z, and
+  the same script under refresh-worker earlier. If that holds, this is not "the
+  wrong service publishing" but TWO SERVICES RUNNING THE SAME STEP AGAINST
+  DIFFERENT DISKS, which explains the consistent ~74-75% subset shape far better
+  than a stray writer would: each disk holds what its own service has captured.
+  NOT traced to which service is supposed to own it; nobody has checked.
 - Whether 2.22 GB/hour is billed egress. It is worker->web inside Render, so it
   may be internal; `[render-egress-cause]` says web's OUTBOUND polling is 100%
   billed, which is a different path. Do not cite this as a bill without checking.
