@@ -729,6 +729,14 @@ def get_all_process_memory_snapshot() -> dict[str, Any]:
             payload["growth_episodes"] = growth_episode_report()
     except Exception:  # noqa: BLE001 - telemetry must never raise
         pass
+    # `#632`: per-route solo attribution, including RETAINED pymalloc blocks.
+    # Already emitted as a log line every 200 solo requests; surfaced here too so
+    # it can be polled. Reads accumulated state and takes no measurement.
+    try:
+        if request_memory_profile_enabled():
+            payload["request_memory"] = request_memory_attribution_payload()
+    except Exception:  # noqa: BLE001 - telemetry must never raise
+        pass
     return payload
 
 
@@ -3984,6 +3992,35 @@ def _request_memory_lock() -> Any:
     return _REQUEST_MEMORY_LOCK
 
 
+# `#632`: RETAINED pymalloc blocks per route.
+#
+# WHY BLOCKS AND NOT ARENA BYTES. `UPDATE 27` caught pymalloc arenas jumping
+# `+6`/`+13`/`+17`/`+18 MB` in 1 MB units, so a jump is a burst of SMALL-OBJECT
+# allocations that outlives the free pools -- not fragmentation. To find which
+# route does it, the measurement has to be per-request, and reading arena bytes
+# costs `2.86 ms` a side (`sys._debugmallocstats` dumps and reparses).
+#
+# `sys.getallocatedblocks()` is **0.679 microseconds** -- measured, 100k calls --
+# and it is the quantity that DRIVES arena count: arenas exist to hold live
+# blocks. Benchmarked here: a 50,000-dict burst moved it `+149,723`, and after
+# `del` it settled at `+140`. That settled figure is the number this attributes,
+# because what a route RETAINS is what forces a new arena; what it allocates and
+# frees inside its own window costs nothing.
+#
+# 4,200x cheaper than the arena read, and it measures the cause rather than the
+# effect.
+_BLOCKS_SPLIT_STATE: dict[str, Any] = {"with_gc2_n": 0, "with_gc2_blocks": 0,
+                                       "no_gc2_n": 0, "no_gc2_blocks": 0}
+
+
+def _allocated_blocks() -> int | None:
+    """Live pymalloc blocks, or None where the interpreter does not report them."""
+    try:
+        return int(sys.getallocatedblocks())
+    except Exception:
+        return None
+
+
 def request_memory_profile_enabled() -> bool:
     """Default OFF. Absent means off, and so does any value that is not a
     recognised truthy token -- an unreadable setting must not switch on new
@@ -4268,7 +4305,10 @@ def note_request_start(route: str | None = None) -> dict[str, Any] | None:
             _REQUEST_MEMORY_STATE["unreadable"] += 1
         return {"attribute": False, "seq": seq}
     token = {"attribute": True, "seq": seq, "anon_before_mb": before,
-             "background_seq": background_seq, "gc2_before": _gc_gen2_collections()}
+             "background_seq": background_seq, "gc2_before": _gc_gen2_collections(),
+             # Sub-microsecond, so it is taken unconditionally rather than
+             # behind a budget like the smaps buckets below.
+             "blocks_before": _allocated_blocks()}
     # PER-REQUEST BUCKETS, only for an explicitly named route and only while
     # budget remains. `route` is passed in because the caller is the only layer
     # that knows it at ENTRY -- the attribution table learns it at teardown,
@@ -4345,12 +4385,40 @@ def note_request_end(token: dict[str, Any] | None, route: str,
             _finish_per_request_smaps(token, key)
         except Exception:
             pass
+    # Taken here, outside the lock and after every early return above, so a
+    # window that was not solo throughout is discarded by the code path rather
+    # than by a check someone has to remember to write.
+    blocks_before = token.get("blocks_before")
+    blocks_after = _allocated_blocks()
+    blocks_delta = (blocks_after - blocks_before
+                    if isinstance(blocks_before, int) and isinstance(blocks_after, int)
+                    else None)
     with _request_memory_lock():
         state = _REQUEST_MEMORY_STATE
         row = state["routes"].setdefault(key, {"solo_n": 0, "total_mb": 0.0, "max_mb": 0.0})
         row["solo_n"] += 1
         row["total_mb"] = round(row["total_mb"] + delta, 3)
         row["max_mb"] = round(max(row["max_mb"], delta), 3)
+        # `#632`: blocks RETAINED by this request. `.get` defaults because a row
+        # created before this shipped has none of these keys.
+        if blocks_delta is not None:
+            row["blocks_n"] = int(row.get("blocks_n") or 0) + 1
+            row["blocks_total"] = int(row.get("blocks_total") or 0) + blocks_delta
+            row["blocks_max"] = max(int(row.get("blocks_max") or 0), blocks_delta)
+            # SPLIT, DO NOT EXCLUDE -- the same rule the anon deltas follow. A
+            # gen-2 collection inside the window frees blocks the request did not
+            # allocate, so those windows systematically under-report retention
+            # and must be countable separately rather than silently averaged in.
+            if collected:
+                _BLOCKS_SPLIT_STATE["with_gc2_n"] += 1
+                _BLOCKS_SPLIT_STATE["with_gc2_blocks"] += blocks_delta
+                row["blocks_gc2_n"] = int(row.get("blocks_gc2_n") or 0) + 1
+            else:
+                _BLOCKS_SPLIT_STATE["no_gc2_n"] += 1
+                _BLOCKS_SPLIT_STATE["no_gc2_blocks"] += blocks_delta
+                row["blocks_no_gc2_n"] = int(row.get("blocks_no_gc2_n") or 0) + 1
+                row["blocks_no_gc2_total"] = (
+                    int(row.get("blocks_no_gc2_total") or 0) + blocks_delta)
         # The UNTRUNCATED total. `routes` is capped at `top` for display, so
         # summing it under-reports whenever a process serves more distinct
         # routes than the cap -- pid 80 had `distinct_routes=13, len=12` and
@@ -4479,6 +4547,10 @@ def request_memory_attribution_payload(top: int = 12) -> dict[str, Any]:
         # inside the window. If `with_gc2_mb` is strongly negative while
         # `no_gc2_mb` is positive, the collector is the third source.
         "gc2_split": dict(_GC_SPLIT_STATE),
+        # `#632`: the same split over RETAINED pymalloc blocks. Arenas exist to
+        # hold live blocks, so this is the quantity that drives the arena jumps
+        # `UPDATE 27` caught -- measured at the cause rather than the effect.
+        "blocks_split": dict(_BLOCKS_SPLIT_STATE),
         "gc2_collections_total": _gc_gen2_collections(),
         # `#632`: arenas held from the OS vs bytes actually live in them. The
         # difference is fragmentation -- memory no free() can return.
@@ -4516,6 +4588,8 @@ def reset_request_memory_attribution() -> None:
     _BACKGROUND_MEMORY_STATE.update({"inflight": 0, "seq": 0})
     _GC_SPLIT_STATE.update({"with_gc2_n": 0, "with_gc2_mb": 0.0,
                             "no_gc2_n": 0, "no_gc2_mb": 0.0})
+    _BLOCKS_SPLIT_STATE.update({"with_gc2_n": 0, "with_gc2_blocks": 0,
+                                "no_gc2_n": 0, "no_gc2_blocks": 0})
     _GLOBAL_REASSIGN_STATE.clear()
     _PER_REQUEST_SMAPS_STATE.update({"count": 0, "routes": {}})
     _REQUEST_MEMORY_STATE["attributed_total_mb"] = 0.0

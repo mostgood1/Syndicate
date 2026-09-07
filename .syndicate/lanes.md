@@ -2123,6 +2123,52 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   tomorrow rather than assuming.
   because of that and should be RETIRED when it clears.
 
+### web-oom-pymalloc-trigger — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: find WHICH ROUTE drives `#632`'s pymalloc arena jumps, by attributing
+  RETAINED pymalloc blocks per route on solo requests.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_retained_blocks.py`.
+  NOT claimed, deliberately: `syndicate/blueprints/ops.py` — held by lane
+  `ncaaf-live-resim-wire`; the reading rides the existing `/api/ops/memory`.
+- **WHY BLOCKS AND NOT ARENA BYTES.** `UPDATE 27` caught pymalloc jumping
+  `+6`/`+13`/`+17`/`+18 MB` in 1 MB units — so a jump is a burst of SMALL-OBJECT
+  allocations outliving the free pools, not fragmentation. Per-request resolution
+  is needed, and the arena read costs `2.86 ms` a side.
+  `sys.getallocatedblocks()` is **0.679 microseconds** (measured, 100k calls) and
+  is the quantity that DRIVES arena count. Benchmarked: a 50,000-dict burst moved
+  it `+149,723`; after `del` it settled at `+140`. **4,200x cheaper, and it
+  measures the cause rather than the effect.**
+- **IT REUSES THE EXISTING SOLO MACHINERY RATHER THAN ADDING A FOURTH
+  INSTRUMENT.** `note_request_start`/`note_request_end` already gate on
+  `inflight == 0` at BOTH ends plus a background-loop seq check — built after
+  per-route attribution produced shares of 61-150%, which is impossible for a
+  partition. Retained blocks ride that same window and inherit every discard.
+- Hypothesis, written before measuring: ONE route dominates retained blocks, and
+  it is an artifacts endpoint — `/api/ops/artifacts/publish`, `stream` or
+  `export` appear in all seven episode route mixes.
+- **BUT THAT ROUTE IS ALREADY ONCE-RETRACTED.** I attributed growth to
+  `publish` earlier this session and withdrew it as TRIM-INFLATED; pre-trim it
+  cost ~0 MB in anon terms. And `UPDATE 27` showed growth does NOT scale with it
+  (224 reqs/101 publishes → `+17.6 MB`; 36 reqs/9 publishes → `+55.4 MB`). So
+  this lane needs a per-route BLOCK total, not another co-occurrence.
+- Falsification test: retained blocks spread evenly across routes, or the top
+  route by blocks is NOT one that appears in the episode mixes. Either way the
+  jumps are not request-driven and the next suspect is a background loop.
+- Verification: a per-route `blocks_no_gc2_total` table from production with a
+  clear leader, and its magnitude reconciled against the arena jumps — a `+17 MB`
+  jump is ~17 arenas, so the leader must account for a comparable block count.
+- **GC2 IS SPLIT, NOT EXCLUDED**, the same rule the anon deltas already follow: a
+  gen-2 collection inside a window frees blocks the request never allocated, so
+  those windows under-report retention and are counted apart.
+- **A COUPLING WORTH KNOWING:** blocks ride the solo window, which only opens
+  when per-process anon reads. If `smaps_rollup` ever fails, block attribution
+  stops with it — pinned by a test, and the `unreadable` counter is what makes
+  that visible instead of silent.
+- COST: two `getallocatedblocks()` calls per solo request, ~1.4 microseconds
+  total. Gated by the EXISTING `SYNDICATE_REQUEST_MEMORY_PROFILE`, which is
+  currently OFF on web and has to be turned on for this to record anything.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
