@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-09-07 20:12:33Z — refresh-worker `a9a0d958` — **MEASURED: `espn_match_stats.json` reached the worker for the first time — 9 leagues.** `[lane soccer-unfed-inputs]`
+
+`dep-dafhien40ujc73bamtkg`, POSTed 20:06:18Z, live 20:11:58.836823Z, preflight
+CLEAR (waited for a gap; the MLB sim was not killed). Carries `ba8de73d` (the
+seed) and `a9a0d958` (gate throttle 6h -> 1h).
+
+**READING 1 — CONFIRMED.**
+
+    20:12:33.614Z [refresh_worker] SOCCER_ESPN_STATS_SEED_BOOTSTRAPPED
+      leagues=['belgian_pro_league','bundesliga','championship','epl',
+               'eredivisie','la_liga','ligue_1','primeira_liga','serie_a']
+
+**The census lines prove the cause inside ONE directory**, which is what makes
+this attributable rather than merely fixed:
+
+    subdir=history  seeded=[]          already_present=[9 leagues]   <- the *.csv call
+    subdir=history  seeded=[9 leagues] already_present=[]            <- the espn_match_stats.json call
+
+One glob finds everything present; the other finds NOTHING present and copies
+all nine. The `*.csv` seed had been running successfully for weeks beside a file
+it could never match.
+
+**verify (READING 2, OWED):** the first `soccer_source/.../sim_input_report_*.json`
+with `generated_at` after 20:11:58Z must drop from **6 alarms to 2** —
+`possession_metrics.possession_share`, both `set_piece_metrics.set_piece_xg_share`
+sites and `availability_metrics.availability_index` flipping to `ok`.
+`big_chances_per_match` and `pace_seconds_per_event` MUST REMAIN — football-data
+has no column for either, so if they vanish the instrument is wrong, not the
+data. Earliest possible run **20:42:35Z**: the 19:42:35Z report plus the 1h
+throttle, which is the throttle working, not a stall.
+
+**A NULL THAT WAS MY INSTRUMENT, recorded because it nearly read as a failure.**
+The watcher's own log check returned `nothing matched` — it queried the instant
+the deploy reported live (20:11:58Z) and the seed line lands 35s later at
+20:12:33Z. It checked before the event it was checking for. The only reason that
+null was not believed is that `[refresh_worker]` lines had been confirmed
+readable BEFOREHAND, against live traffic. Validate the instrument on a known
+positive before trusting its negative.
+
+**Not an OOM, though it reads like one.** `ALL_PROCESS_MEMORY` during this window
+shows `container_memory_pct_of_max: 97.5` and `headroom_mb: 101`. `accounted_rss_mb`
+is **1745 of 4096 (43%)** — the container figure is dominated by page cache and
+the `headroom` field is the one this ledger already records as wrong. The hourly
+gate subprocess is affordable against the ANON number, not the container one.
+
 ## 2026-09-07 17:44:53Z — refresh-worker `b4b1535d` — **MEASURED: the sim input report is 65/65, `failures: []`.** `[lane ncaaf-live-resim-wire]`
 
 **Settles the MEASUREMENT PENDING row below** (`dep-daff4vm1egvs739t17ng`,
