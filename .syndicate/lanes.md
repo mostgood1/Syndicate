@@ -2169,6 +2169,41 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   currently OFF on web and has to be turned on for this to record anything.
 - Blocked by: none.
 
+### web-oom-profile-ab — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: settle whether THIS SESSION'S OWN per-request instrumentation drives the
+  pymalloc arena rate, by toggling `SYNDICATE_REQUEST_MEMORY_PROFILE` and
+  re-reading it.
+- Files: scratchpad harness only (`profile_ab.py`). No code changes; the two
+  supporting commits (`4f8e9356`, `7f104271`) are already landed.
+- **WHY THIS IS OWED.** `UPDATE 28` found retention is per-REQUEST, not per-route
+  — ~19-38 blocks on every route including `/healthz`. **That is also exactly
+  what my own per-request instrumentation would look like**, and UPDATE 28 could
+  not separate the two. It recorded the caveat rather than resolving it; this
+  resolves it.
+- Hypothesis: the profile is NOT the driver — the growth predates every
+  instrument this session added (`UPDATE 23` measured it hours earlier). But
+  "predates" only proves the leak is not MINE, not that my instruments contribute
+  nothing, which is the actual question.
+- **THE INSTRUMENT IS NOT THE THING BEING TOGGLED.** pymalloc is read by the
+  growth detector, which stays ON in both arms. Letting an intervention supply
+  its own measurement is precisely what produced this session's RETRACTED
+  counterfactual.
+- **THE AGE WINDOW IS THE CONTROL:** both arms measured over process age
+  `900-2400s`. pymalloc RAMPS from boot (`55 -> 102 -> 143 -> 162 MB` measured
+  over ~35 min), so comparing a young process against an old one reports the
+  ramp, not the flag.
+- **VOLUME IS A GATE, NOT A CORRECTION.** Arms are sequential, so traffic drift
+  is uncontrolled. `requests_total` comes from the detector because
+  `solo_attributed` lives inside the flag being toggled; `compare` REFUSES a
+  verdict above 25% skew rather than normalising after seeing the data.
+- Falsification test: the rate is materially unchanged with the profile off —
+  then UPDATE 28's per-request retention is real, belongs to the shared request
+  path, and Flask/Werkzeug and logging are next.
+- Verification: both arms collected over the same age window with <25% volume
+  skew, and a stated share. If the ON arm did not grow either, that is NOT a
+  result and the pair is re-run.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
