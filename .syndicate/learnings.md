@@ -3113,3 +3113,51 @@ say otherwise: `daily/snapshots/2026-09-06/roster_*.json`, and `2026-09-06`
 dominates the worker's log messages 37-to-6. The filename and the slate date use
 different bases. The value happens to be right for the NEXT slate -- correct by
 luck, not by reasoning, which is worth recording as exactly that.
+
+## 2026-09-07 CORRECTION: the MLB "ten dead inputs" was SEVEN-TENTHS A BROKEN INSTRUMENT
+
+**Retracts most of the entry above it, and the retraction is the lesson.**
+
+I reported that ten MLB pitcher inputs had been dead in production for nineteen
+days, root-caused it to a stale `SYNDICATE_MLB_ROSTER_REBUILD_DATE`, armed a new
+gate, and deployed. Then I read the ROSTER SNAPSHOTS the sim actually consumes:
+
+    field                    09-07(post)  09-06   09-04   08-25
+    pitch_type_whiff_mult       14/18     17/18   13/19   12/16
+    statcast_splits_source      14/18     11/18   10/19   11/16
+    conditional_arsenal          0/18      0/18    0/19    0/16
+    count_bucket_map             0/18      0/18    0/19    0/16
+
+**Seven of the ten were already fed, for at least two weeks before my deploy.**
+They were never broken. And the post-deploy `sim_input_report` STILL says 0/10
+while those same rosters read 60-95% -- so the report and the artifact it claims
+to summarise flatly contradict each other, and the roster is the one the sim
+reads. `rosters: 8` in the report against 12-17 roster files on disk is the same
+symptom: it is measuring a different, smaller roster source.
+
+WHAT ACTUALLY SURVIVES: `conditional_arsenal`, `conditional_arsenal_source` and
+`count_bucket_map` are 0 on EVERY day sampled including after the rebuild --
+genuinely unfed, from the `conditional_mix` artifact. **Three fields, not ten.**
+The stale gate was real and is worth fixing; it was not the cause of the reported
+zeros, and my deploy's effect is NOT demonstrated -- 09-07 sits inside the
+day-to-day spread of the pre-deploy samples.
+
+### THE RULE, and it is not "the mirror lies"
+
+I had already rejected the LOCAL checklist for being mirror-based. I then treated
+the PRODUCTION report as ground truth **because it came from the worker** -- and
+provenance is not accuracy. A report is a CLAIM ABOUT an artifact; the artifact
+is the evidence. I built a verification, a monitor and a deploy on a number I had
+never once checked against the thing it summarises.
+
+**Check the summary against its subject before building anything on the summary.**
+The cost of that check here was one export call. The cost of skipping it was a
+wrong root cause, a production env change, a deploy, and a confident ledger entry
+that had to be retracted.
+
+The corollary is uncomfortable and worth stating: the previous entry's whole
+"nineteen days, nobody noticed" narrative was ALSO built on that report. The
+nineteen days of identical `FAIL 10` are nineteen days of the same broken
+measurement, not nineteen days of dead inputs. The predicate lesson in that entry
+(key on the thing, not on a count containing it) still stands -- it is just that
+the thing it should have keyed on was wrong too.
