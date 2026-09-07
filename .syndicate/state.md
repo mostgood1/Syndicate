@@ -1689,3 +1689,50 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
 * limits: n=2 workers per arm, one pair, not repeated. A peer's 13-file /
   947-insertion landing between arms was checked and touches **zero** runtime
   files.
+
+### `[web-oom-leak]` UPDATE 34 — **RETRACTION OF `UPDATE 33`: the arms were NOT comparable, and the mechanism cannot produce 38 MB.**, 2026-09-07T18:0xZ `[session b2b5b45b]`
+
+* **I set out to explain `UPDATE 33`'s 44x multiplier and the explanation
+  falsified the result instead.** Two independent checks, both against the
+  measurement I had just published.
+* **CHECK 1 — the mechanism is ~60x too small.** My hypothesis was pymalloc POOL
+  fragmentation: pools are per-size-class and an arena frees only when every pool
+  in it is free, so a peak could strand `POOL_SIZE` per straggler. **Measured
+  directly out of `_debugmallocstats`** rather than argued:
+
+        FAT   json.loads  +76 pools  1.26 MB live  ->  1.19 MB of pools
+        SLIM  json.loads  +35 pools  0.66 MB live  ->  0.55 MB of pools
+        the cut removes  41 pools, 634 KB live
+        pool bytes / live bytes = **1.1x**, not 44x
+
+  **Pools are nearly fully packed. There is no fragmentation amplification.** One
+  checkpoint's cut saves ~`0.64 MB` of pool footprint — the mechanism can produce
+  well under 1 MB, not 38. (Note this build reports **16,384-byte pools**, not the
+  4,096 I first assumed; the arithmetic I nearly published was wrong twice over.)
+* **CHECK 2 — the arms differed in memory the cut CANNOT TOUCH.** At age 1800 s:
+
+        arm    pymalloc   total anon   NON-pymalloc anon
+        FAT      209.0       563.2          354.2
+        SLIM     171.0       491.8          320.8
+        delta    -38.0       -71.4          **-33.4**
+
+  The cut removes pymalloc-domain allocations only. It cannot change the glibc
+  arena, `.so` private-dirty or thread stacks. **A 33.4 MB gap there — 47% of the
+  total anon difference — proves the two arms did not see the same workload.**
+* **SO `UPDATE 33`'s "38 MB per worker" IS RETRACTED.** The separated per-worker
+  ranges and the 14% volume gate BOTH passed and the result was still confounded.
+* **WHY THE GATE MISSED IT, and this is the transferable lesson: I gated on
+  REQUEST COUNT, which is not WORK PER REQUEST.** The arms ran ~50 minutes apart;
+  a lighter game slate gives the same request count with far less allocation per
+  request. Every future arm on this service needs a work proxy — payload bytes,
+  or a non-target memory term used as a control — not a request tally.
+* **WHAT SURVIVES.** The ring cut is still a real, deterministic reduction:
+  `18,644 -> 9,642` blocks and `360 -> 151 KB` per checkpoint, measured locally
+  and reproducible. It removes data that is redundant by construction (`cmdline`
+  is constant per pid, stored up to 300 times), so it stays. **What is withdrawn
+  is its production VALUE, not its correctness.** On the pool measurement its
+  true worth is ~`0.6 MB` of transient footprint per checkpoint, ~15x/min — real,
+  small, and nothing like 38 MB.
+* **`UPDATE 32` NEEDS THE SAME DISCOUNT.** The ring is a peak generator, and that
+  measurement stands; but "plausible driver of the OOM" rested on the arena
+  response now retracted. It is a contributor of ~0.6 MB per checkpoint.
