@@ -2204,6 +2204,41 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   result and the pair is re-run.
 - Blocked by: none.
 
+### web-oom-retention-reread — OPEN — opened 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: re-read the per-route retention table with the FIXED instrument, and
+  replace `UPDATE 28`'s retracted numbers with correct ones.
+- Files: scratchpad reader only. The fix is already landed (`8bcdef11`); this
+  lane deploys and measures, it does not change code.
+- **WHY A RE-READ IS OWED.** `UPDATE 30` retracted `UPDATE 28`'s "~19-38 blocks
+  retained per request" and its reconciliation: the instrument read
+  `getallocatedblocks()` at `teardown_request`, which fires BEFORE the response,
+  the request context and the environ are released, over-counting retention
+  **16x** (64.7 vs 4.1 blocks/req locally). The table it produced is not
+  retention, so the question it was meant to answer is still open.
+- The fix measures on the NEXT request's way in, once everything of the previous
+  one is gone. Verified locally: ground truth `4.45`, fixed `5.33`, old `16.85`
+  blocks/req — error `12.40 -> 0.88`.
+- **TWO COLUMNS NOW, AND THEY ANSWER DIFFERENT QUESTIONS.**
+  `blocks_retained_*` is retention. `blocks_inflight_*` is the old teardown
+  figure, kept and RENAMED because `UPDATE 30`'s reframe makes it useful: arena
+  count follows PEAK SIMULTANEOUS live blocks, and a within-request peak is what
+  that figure is closer to. **`blocks_inflight_max` is the column the arena
+  question actually needs.**
+- Hypothesis: retained blocks per request are SMALL (single digits, as locally),
+  so per-request retention is not the OOM driver at all, and the arena growth
+  tracks `blocks_inflight_max` — i.e. transient peaks, not leaks.
+- Falsification test: retention is large in production (tens per request) despite
+  being small locally. That would mean gunicorn/threading adds retention that
+  `test_client` does not, and the local ground truth does not transfer.
+- Verification: a per-route table with BOTH columns, and a reconciliation of
+  retained blocks against any pymalloc arena jump caught in the same window —
+  the check that `UPDATE 28` reported as passing on inflated input.
+- **COST, and it is a deliberate trade:** `UPDATE 29` found turning the profile
+  OFF is associated with a lower anon rate (direction consistent, magnitude
+  undetermined). Turning it back ON for this measurement re-incurs that. The
+  flag goes back OFF when the reading is done.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
