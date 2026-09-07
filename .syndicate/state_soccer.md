@@ -102,9 +102,33 @@ it pinned — mechanism-vs-estimator, the rates that absorbed the constant need
 re-fitting. Downstream: `shot_generation_probability` mean +0.0044, max +0.0100
 (weight 0.02, `possession_priors.py:347`).
 
-**OWED:** the graded backtest, off vs on, over dates with retained
-`odds_history`, on the BETTABLE SUBSET rather than a slate average. The user
-approved feeding these inputs on that condition (2026-09-07).
+**BACKTESTED 2026-09-07 — NULL. THE FLAG STAYS OFF.** n=600 matches, paired
+(identical ratings, fixtures and seeds; only `market_features` differs), 100
+sims/arm. **Brier OFF 0.24527 vs ON 0.24630, delta +0.00104, paired t +0.592.**
+The 95% CI is **[-0.00240, +0.00447]**, so an improvement larger than 0.0024
+Brier is ruled out. The mechanism is REACHABLE, not inert — the arms differ on
+**548 of 600** and mean |p_on - p_off| is 0.034, so this is a real null rather
+than an A/B that never moved.
+
+**No subset rescues it**, checked because a global average is exactly the wrong
+instrument for "should help SOME games": by market total line, `<2.4` n=102
+delta +0.0029 (t +0.81), `2.4-2.8` n=233 +0.0020 (t +0.80), `>=2.8` n=265
+-0.0005 (t -0.17). Every bucket is inside noise and the two larger ones point
+the wrong way.
+
+**THIS IS A PROXY AND THE LIMIT IS STRUCTURAL, not a shortcut.** Match results
+run to 2026-05-24; captured `odds_history` starts 2026-07-31. **ZERO
+overlapping matches**, so production's actual input — real captured totals and
+spread lines — cannot be graded against outcomes at all today. The proxy inverts
+closing 1X2 + over/under-2.5 into the two quantities the engine reads. It tests
+the mechanism's DIRECTION, never the magnitude production would see. Harness:
+`scripts/backtest_soccer_market_prior.py`; rows in
+`reports/soccer_backtest/market_prior_ab_2026-09-07.json`.
+
+**What would change the answer:** retaining captured lines alongside results, so
+the same fixture has both. Until that exists, every market-fed mechanism in this
+engine is unvalidatable on real inputs — which is a bigger finding than this
+null and applies beyond soccer.
 
 **NOT the anchor.** This writes `market_features` only and sits ABOVE the
 `weight <= 0.0` early return (production's state — below it, nothing runs).
