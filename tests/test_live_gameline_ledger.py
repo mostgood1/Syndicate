@@ -372,3 +372,63 @@ def test_a_record_from_BEFORE_the_estimator_fix_still_builds():
     assert rec["point_estimator"] is None
     assert rec["model_home_win_prob_raw"] is None
     assert rec["model_home_win_prob"] == 0.61
+
+
+def test_the_ledger_records_the_model_POINT_FORECASTS_for_line_markets():
+    """SPREADS AND TOTALS WERE UNEVALUABLE, and this is what fixes it.
+
+    Their market leg is the LINE, not a probability. Both sides quote near
+    -110, so de-vigging the PRICE returns ~0.50 whatever the line is -- measured
+    on production 2026-09-05, market-leg sd was h2h 0.251, spreads 0.132, totals
+    0.058. A probability-vs-probability comparison there scores an informative
+    estimator against a constant and reports a FAKE EDGE: `subset_edge_scan`
+    first produced a spreads top-decile Brier of 0.087 against 0.244, a ~90% ATS
+    hit rate, before it learned to refuse these markets.
+
+    With the model's MEANS stored beside the `line` v3 already carried, the
+    comparison becomes a point forecast -- |line - actual| against
+    |model_mean - actual| -- which needs no distributional assumption and is
+    exactly how the NFL backtest scores `spread_line` against `margin_mean`.
+
+    ASSERTS ON VALUES, NOT ON KEYS EXISTING, because `live_gameline_join`'s copy
+    list warns in its own comment that a key added there and in `build_records`
+    but not to the block "reaches the ledger as None and the feature ships inert
+    with every test green". A test that only checked `in rec` would pass against
+    exactly that failure.
+    """
+    from syndicate.features.shared.live_gameline_ledger import build_records
+
+    row = {
+        "sport": "mlb", "market": "totals", "segment": "full", "line": 8.5,
+        "home_team": "NYY", "away_team": "BOS", "event_id": "evt-pf-1",
+        "consensus": {"over": -110, "under": -110},
+        "live_gameline": {
+            "model_prob": 0.61, "market_prob": 0.5, "priceable": True,
+            "sims_run": 120, "total_mean": 9.42, "home_margin": -1.75,
+        },
+        "projection": {"live_aware": True},
+    }
+    rec = build_records([row], sport="mlb", date_str="2026-09-07")[0]
+
+    assert rec["model_total_mean"] == 9.42
+    assert rec["model_margin_mean"] == -1.75
+    assert rec["line"] == 8.5          # the market's own forecast, already stored
+    assert rec["v"] >= 5
+
+
+def test_a_record_with_no_means_still_builds_and_says_so():
+    """Absent must stay absent. Every pre-v5 record has neither mean and they are
+    NOT recoverable from what was stored -- a reader needing them filters on `v`."""
+    from syndicate.features.shared.live_gameline_ledger import build_records
+
+    row = {
+        "sport": "mlb", "market": "totals", "segment": "full", "line": 8.5,
+        "home_team": "NYY", "away_team": "BOS", "event_id": "evt-pf-2",
+        "consensus": {"over": -110, "under": -110},
+        "live_gameline": {"model_prob": 0.61, "market_prob": 0.5,
+                          "priceable": True, "sims_run": 120},
+        "projection": {"live_aware": True},
+    }
+    rec = build_records([row], sport="mlb", date_str="2026-09-07")[0]
+    assert rec["model_total_mean"] is None
+    assert rec["model_margin_mean"] is None

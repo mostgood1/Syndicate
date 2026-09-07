@@ -1254,7 +1254,20 @@ def _apply_verdict(
         block["game_pk"] = hit.get("game_pk")
         block["home_win_prob"] = hit.get("home_win_prob")
         block["sims_run"] = hit.get("sims_run")
+        # THE MODEL'S POINT FORECASTS, beside the line they will be scored
+        # against. `total_mean` was already copied; `home_margin` was not, and
+        # without it SPREADS could never be evaluated at all.
+        #
+        # WHY THIS IS THE FIX FOR LINE-PRICED MARKETS. Spreads and totals are
+        # quoted about -110/-110, so de-vigging the PRICE returns ~0.50 whatever
+        # the line is -- measured 2026-09-05, market-leg sd h2h 0.251, spreads
+        # 0.132, totals 0.058. The market does not express its view as a
+        # probability; it expresses it as the LINE. So the honest comparison is
+        # a POINT FORECAST -- |line - actual| against |model_mean - actual| --
+        # which needs no distributional assumption and is exactly how the NFL
+        # backtest scores `spread_line` against `margin_mean`.
         block["total_mean"] = hit.get("total_mean")
+        block["home_margin"] = hit.get("home_margin")
         block["as_of"] = hit.get("as_of")
         block["carried_forward"] = hit.get("carried_forward")
         # v4 LEDGER FIELDS. This copy list is EXPLICIT, so a key added to

@@ -66,7 +66,22 @@ from typing import Any
 # not read the new fields. A reader that needs them must filter to `v >= 4`;
 # earlier records cannot be repaired, because neither the clock nor the pregame
 # baseline is recoverable from what was stored.
-LEDGER_VERSION = 4
+# v5 (2026-09-07) carries `model_total_mean` and `model_margin_mean` -- the
+# model's point forecasts, beside the `line` v3 already stores. ADDITIVE and NOT
+# a population change: `record_key` is untouched, so v4 and v5 count the same
+# things and pool freely for any question that does not read the new fields.
+#
+# It exists because SPREADS AND TOTALS WERE UNEVALUABLE. Their market leg is the
+# LINE, not a probability -- both sides quote near -110, so the de-vigged price
+# is ~0.50 whatever the line is (measured sd: h2h 0.251, spreads 0.132, totals
+# 0.058). A probability-vs-probability comparison there measures an informative
+# estimator against a constant and reports a fake edge; `subset_edge_scan` first
+# produced a ~90% ATS hit rate that way. With the means stored, the comparison
+# becomes a POINT FORECAST against the line, which needs no assumption.
+#
+# Earlier records cannot be repaired: neither mean is recoverable from what was
+# stored. A reader that needs them must filter to `v >= 5`.
+LEDGER_VERSION = 5
 
 # A live slate tops out around 15 games x a handful of priceable markets. 500
 # is far above that and still bounds a pathological build.
@@ -259,6 +274,21 @@ def build_records(
                 # the mistake this session already made once -- the reading
                 # survived only because the discriminator was a KEY that did not
                 # exist before the commit. This is that key.
+                # THE MODEL'S POINT FORECASTS (v5). `line` is already stored
+                # above, so these two make SPREADS and TOTALS evaluable for the
+                # first time: score |line - actual| against
+                # |model_margin_mean - actual| (spreads) or
+                # |model_total_mean - actual| (totals).
+                #
+                # A PROBABILITY COMPARISON IS NOT AVAILABLE FOR THESE MARKETS and
+                # storing one would be inventing it. Both sides quote near -110,
+                # so the de-vigged price is ~0.50 regardless of the line -- any
+                # "edge" measured against that is an artifact of comparing an
+                # informative estimator to a constant, which is exactly the fake
+                # ~90% ATS result `subset_edge_scan` produced before it learned
+                # to refuse these markets.
+                "model_total_mean": lg.get("total_mean"),
+                "model_margin_mean": lg.get("home_margin"),
                 "point_estimator": lg.get("point_estimator"),
                 "model_home_win_prob_raw": lg.get("model_prob_raw"),
                 "prob_std_err": lg.get("prob_std_err"),

@@ -290,6 +290,32 @@ class TestIndexAndAttach:
         assert row["projection"]["edge_vs_market_pct"] == pytest.approx(17.83, abs=0.01)
         assert row["live_gameline"]["game_pk"] == 823184
 
+    def test_the_block_carries_the_model_POINT_FORECASTS(self):
+        """THE THIRD PLACE, and it had no test at all until now.
+
+        `_apply_verdict`'s copy list warns in its own comment that a key added to
+        `live_gameline_from_lens` and to `build_records` but NOT to the block
+        "reaches the ledger as None and the feature ships inert with every test
+        green". `total_mean` had been copied there since v4 with nothing
+        asserting it, and `home_margin` was missing entirely -- so SPREADS could
+        never have been evaluated even once the ledger stored a field for them.
+
+        These two make line-priced markets scoreable at all. Their market leg is
+        the LINE, not a probability: both sides quote near -110, so the de-vigged
+        price is ~0.50 whatever the line is (measured sd on production
+        2026-09-05: h2h 0.251, spreads 0.132, totals 0.058). Comparing a model
+        probability against that constant produced a fake ~90% ATS edge in
+        `subset_edge_scan` before it learned to refuse those markets. With the
+        means stored beside the line, the comparison becomes a point forecast.
+
+        Asserts VALUES, not `in`: a key present and None is the exact failure.
+        """
+        grid = [self._row(market_prob=0.50)]
+        attach_live_gamelines(grid, build_live_gameline_index(self._snapshot()))
+        block = grid[0]["live_gameline"]
+        assert block["total_mean"] == 8.5
+        assert block["home_margin"] == 0.7
+
     def test_attach_withholds_a_small_edge_but_still_marks_live_aware(self):
         """live_aware is about the MODEL knowing the score; priceable is about
         precision. Conflating them would either refuse everything or price noise."""

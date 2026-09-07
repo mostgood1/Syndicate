@@ -264,7 +264,13 @@ class TestTheV4LedgerFieldsAreActuallyPOPULATED:
             "baselineHomeWinProb": 0.5571,
             "progress": {"fraction": 0.55, "inning": 5, "half": "bottom",
                          "outs": 1, "outsRecorded": 28}})
-        assert rec["v"] == 4
+        # `>=`, not `==`. This test is about the v4 FIELDS still being POPULATED,
+        # which is what its class name says; the exact version number is
+        # incidental to that. Pinned as `== 4` it failed the moment v5 added the
+        # model point forecasts -- an ADDITIVE change that leaves every field
+        # below untouched. A test that breaks on every additive bump trains
+        # people to edit the number without reading what the assertion is for.
+        assert rec["v"] >= 4
         assert rec["inning"] == 5
         assert rec["half"] == "bottom"
         assert rec["outs"] == 1
