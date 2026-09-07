@@ -1780,6 +1780,23 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
+            # `#488`, and it was MISSING ON THIS PATH ONLY.
+            #
+            # `_publish_streamed` has sent this since #488; `publish_hot_artifact`
+            # -- the JSON path, which is what small artifacts take -- never did.
+            # So the receiver's publisher field was populated for large files and
+            # `unknown` for small ones, which is worse than uniformly absent: it
+            # looks like a working field with gaps rather than a missing one.
+            #
+            # MEASURED 2026-09-07: every `[ops.publish] ACCEPTED` line on web
+            # read `publisher=unknown`, including
+            # `arsenal_2026.json bytes=546739` -- a JSON-path publish. The field
+            # #488 added specifically to spot two services alternately
+            # overwriting one path was empty for exactly the incident it was
+            # built for. `SYNDICATE_REFRESH_LANE` is set ('refresh-worker',
+            # read off the live service), so the identity existed the whole
+            # time and only this header was dropping it.
+            "X-Artifact-Publisher": _publisher_identity(),
         },
     )
     try:
