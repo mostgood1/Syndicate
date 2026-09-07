@@ -2865,6 +2865,12 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 # dark-launch pattern as the daily-sim trigger above.
 # ---------------------------------------------------------------------------
 
+# Once per PROCESS, matching the lifetime of the thing it compensates for:
+# `_LAST_PUBLISHED_CHECKSUM` in `artifact_publisher` is also in-process, so a
+# restart clears both together. Module-level rather than a function attribute
+# so it is visible to anyone reading for restart-scoped state.
+_SEASON_ARTIFACTS_PULLED_THIS_PROCESS: bool = False
+
 _MLB_STATCAST_REFRESH_PROCESS: subprocess.Popen | None = None
 _MLB_STATCAST_REFRESH_MAX_RUNTIME_SECONDS = 90 * 60
 
@@ -5798,6 +5804,47 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 	meta["finishedAt"] = _utc_now()
 	write_json_file(_meta_dir() / "latest_live_refresh_tick.json", meta)
 	try:
+		# PULL THE SEASON INPUTS BEFORE THE FIRST SWEEP OF THIS PROCESS.
+		#
+		# MEASURED 2026-09-07, twice, and it silently undid a whole day's work.
+		# `_LAST_PUBLISHED_CHECKSUM` is in-process by design -- its own
+		# docstring says "a restart clears this and the next sweep republishes
+		# everything once". This service can NEVER rebuild the season-scoped
+		# MLB inputs (arsenal / quality / batted_ball): they come from
+		# `pybaseball` Statcast leaderboards, which are deliberately not in
+		# this image. So it holds whatever copy it last had -- 2026-08-18 --
+		# and on the first sweep after every restart it republishes that
+		# THREE-WEEK-OLD copy over whatever web is serving.
+		#
+		#     17:53Z  cron rebuilds and publishes all three, read back OK
+		#     18:38Z  this sweep, one boot later, republishes the Aug-18 copies
+		#     19:07Z  my own deploy restarts the worker; it happens AGAIN
+		#
+		# Proven by hash: the three files live on production match the exact
+		# checksums this process reports in `PUBLISH_SKIPPED_UNCHANGED`.
+		# refresh-worker restarted 24+ times in three days, so this is the
+		# normal case, not an edge.
+		#
+		# The fix is ordering, not suppression. `pull_season_artifacts()`
+		# already exists and is already the way these files reach this disk;
+		# it simply had no caller at process start, only before a roster
+		# build. Pulling first makes the local copy current, so the blind
+		# post-restart republish pushes back what web already has instead of
+		# reverting it. Publishing is left alone deliberately -- a sweep that
+		# skipped these would also stop repairing them if web ever lost them.
+		global _SEASON_ARTIFACTS_PULLED_THIS_PROCESS
+		if not _SEASON_ARTIFACTS_PULLED_THIS_PROCESS:
+			_SEASON_ARTIFACTS_PULLED_THIS_PROCESS = True
+			try:
+				from syndicate.features.shared.artifact_publisher import pull_season_artifacts
+				_pulled = pull_season_artifacts()
+				print(f"[live_refresh] SEASON_PULL_BEFORE_FIRST_SWEEP written={_pulled}",
+					flush=True)
+			except Exception as _exc:
+				# Never fatal: a failed pull leaves the old behaviour, which is
+				# what happened every day before this call existed.
+				print(f"[live_refresh] SEASON_PULL_BEFORE_FIRST_SWEEP_FAILED "
+					f"{type(_exc).__name__}", flush=True)
 		publish_since_epoch = _hot_artifact_publish_since_epoch(tick_started_epoch=tick_started_epoch)
 		sweep_result = sweep_changed_hot_artifacts(publish_since_epoch)
 		meta["publishedArtifacts"] = sweep_result.published_count
