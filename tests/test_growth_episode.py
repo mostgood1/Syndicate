@@ -316,3 +316,24 @@ def test_process_age_is_per_pid_not_inherited_from_import(monkeypatch):
     age = memory_observability._growth_process_age_s()
     assert age < 5.0, "a new pid must re-derive its own t0, not inherit one"
     assert memory_observability._GROWTH_EPISODE_AGE_STATE["pid"] == _os.getpid()
+
+
+def test_the_latest_triple_is_published_whether_or_not_it_fires(monkeypatch):
+    """A rate comparison needs the pymalloc arena size CONTINUOUSLY, not only
+    inside an episode. The triple is already taken every interval, so publishing
+    it adds no measurement -- and without it, toggling another flag and re-reading
+    the arena rate would need a second instrument."""
+    monkeypatch.setenv("SYNDICATE_GROWTH_EPISODE", "1")
+    monkeypatch.setenv("SYNDICATE_GROWTH_EPISODE_CHECK_SECONDS", "0")
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: 500.0)
+    monkeypatch.setattr(memory_observability, "glibc_mallinfo2",
+                        lambda: {"available": True, "glibc_total_mb": 390.0})
+    monkeypatch.setattr(memory_observability, "log_pymalloc_arena_stats",
+                        lambda *a, **k: {"arena_mb": 162.0})
+    memory_observability.maybe_capture_growth_episode("/x")
+    report = memory_observability.growth_episode_report()
+    assert report["episodes_captured"] == 0, "nothing should have fired"
+    cap = report["last_capture"]
+    assert cap["anon"] == 500.0
+    assert cap["glibc"] == 390.0
+    assert cap["pymalloc"] == 162.0

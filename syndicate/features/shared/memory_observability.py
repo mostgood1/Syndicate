@@ -3478,6 +3478,7 @@ _GROWTH_EPISODE_STATE: dict[str, Any] = {
     "episodes": [],          # ring, most recent last
     "routes": {},            # rule -> count since the baseline
     "max_delta_mb": 0.0,     # largest rise SEEN, even if it never fired
+    "last_capture": None,    # most recent triple, fired or not
     "checks": 0,
     "pymalloc_budget": {"count": 0},
 }
@@ -3634,6 +3635,11 @@ def maybe_capture_growth_episode(route: str | None = None) -> dict[str, Any] | N
         capture = _growth_capture()
         if capture is None:
             return None
+        # Kept whether or not it fires. The triple is already being taken every
+        # interval; publishing it costs nothing and makes the pymalloc arena
+        # size readable CONTINUOUSLY instead of only inside an episode -- which
+        # is what a rate comparison needs.
+        state["last_capture"] = capture
         baseline = state["baseline"]
         if baseline is None:
             _growth_rebase(capture)
@@ -3718,6 +3724,9 @@ def growth_episode_report() -> dict[str, Any]:
                            if baseline else None),
         "baseline_anon_mb": (round(float(baseline["anon"]), 1) if baseline else None),
         "routes_since_baseline_total": sum(state["routes"].values()),
+        # The latest triple, so anon / glibc / pymalloc can be tracked over time
+        # by polling rather than by adding another measurement.
+        "last_capture": (dict(state["last_capture"]) if state["last_capture"] else None),
         "episodes": list(state["episodes"]),
     }
 
