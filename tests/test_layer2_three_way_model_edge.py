@@ -284,3 +284,54 @@ def test_the_sentinel_separates_no_vector_from_refused_leg():
     assert refused is None
     assert no_vector is not refused
 
+# --------------------------------------------------------------------------
+# THE BASIS LABEL must agree with the number. `62937ea4` made
+# `_model_edge_for` return a MARKET-priced edge where `edge_vs_market_pct` is
+# None, and `model_edge_basis` decided "market" off that same field -- so a real
+# measured edge was published with basis None. 4 of 77 served soccer moneyline
+# rows on 2026-09-07. Diagnostic only (nothing reads the field but these tests),
+# but it is the same defect the postmortem is about, made while fixing it.
+# --------------------------------------------------------------------------
+
+
+def test_a_withheld_home_three_way_leg_is_labelled_market_fair():
+    from syndicate.features.shared.layer2_board import (
+        MODEL_EDGE_BASIS_MARKET, model_edge_basis,
+    )
+    row = _home_withheld(0.3475, 0.2675, 0.385)
+    assert _model_edge_for(row, "away", 0.2848) is not None
+    assert model_edge_basis(row, "away", 0.2848) == MODEL_EDGE_BASIS_MARKET
+
+
+def test_the_basis_and_the_number_agree_by_construction():
+    """Whenever `_model_edge_for` yields a number, the basis must not be None --
+    and whenever it declines, the basis must not claim `market_fair` off a
+    three-way leg. Two independent answers to "did this leg price" is how they
+    drift apart, which is why both call `_three_way_leg_edge`."""
+    from syndicate.features.shared.layer2_board import (
+        MODEL_EDGE_BASIS_MARKET, model_edge_basis,
+    )
+    cases = [
+        (_home_withheld(0.3475, 0.2675, 0.385), "away", 0.2848),   # prices
+        (_home_withheld(0.3475, 0.2675, 0.385), "draw", 0.3354),   # prices
+        (_home_withheld(0.4325, 0.2825, 0.285), "draw", 0.2806),   # refused: inside its bar
+        (_three_way(0.41, 0.24, 0.35, 0.5047, -9.47), "away", 0.2817),  # home priced
+    ]
+    for row, side, fair in cases:
+        edge = _model_edge_for(row, side, fair)
+        basis = model_edge_basis(row, side, fair)
+        if edge is None:
+            assert basis != MODEL_EDGE_BASIS_MARKET or                 row["projection"].get("edge_vs_market_pct") is not None, (side, edge, basis)
+        else:
+            assert basis is not None, f"priced {side} at {edge} with no basis"
+
+
+def test_a_two_way_row_is_unaffected_when_fair_is_omitted():
+    """The `fair` argument is optional so existing two-way callers keep working;
+    there the first branch answers and the three-way check never runs."""
+    from syndicate.features.shared.layer2_board import (
+        MODEL_EDGE_BASIS_MARKET, model_edge_basis,
+    )
+    row = {"projection": {"side": "home", "edge_vs_market_pct": 4.2}}
+    assert model_edge_basis(row, "away") == MODEL_EDGE_BASIS_MARKET
+

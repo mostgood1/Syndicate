@@ -1414,18 +1414,47 @@ def _sim_direction_contradiction(row: Mapping[str, Any], projection: Mapping[str
     return round(gap, 3)
 
 
-def model_edge_basis(row: Mapping[str, Any], side: str) -> str | None:
+def model_edge_basis(row: Mapping[str, Any], side: str, fair: Any = None) -> str | None:
     """Which fair the row's `model_edge_pct` was priced against, or None.
 
     Published on the candidate so a consumer can tell a measured disagreement
     from a modelled one WITHOUT re-deriving it -- the `basis` discipline `#263`
     asked for, and the thing that keeps this fallback from reading as the
     measured number it deliberately is not.
+
+    `fair` IS THIS ROW'S OWN SIDE FAIR and must be passed wherever the answer
+    could be a three-way leg. It is optional only so callers that already know
+    the row is two-way keep working; omitting it there costs nothing because
+    the first branch answers.
+
+    THE THREE-WAY BRANCH IS WHY THIS TAKES `fair` AT ALL `[2026-09-07]`.
+    `62937ea4` made `_model_edge_for` return a MARKET-priced edge in the case
+    where `edge_vs_market_pct` is None -- a home leg the precision gate withheld,
+    whose draw/away legs are still priced against their own bars. This function
+    decided `market` off that same field being non-None, and
+    `_modelled_fair_edge_for` is strictly side-matched so it declines a
+    draw/away row too. The label therefore fell through to None on a genuinely
+    measured edge: 4 of 77 served soccer moneyline rows on 2026-09-07 (SC
+    Telstar away +4.52, FC Porto draw +5.47, Braga draw -5.20, PSG @ Brest away
+    -5.95), each one a row whose home leg was withheld.
+
+    That is the same defect the `62937ea4` postmortem is about -- a field
+    acquiring a state its consumer does not enumerate -- introduced while fixing
+    it. Diagnostic only: nothing in `.py`/`.html`/`.js` reads this field but its
+    own tests, and the edge VALUE was always correct.
+
+    IT CALLS `_three_way_leg_edge` RATHER THAN RESTATING THE TEST. Two
+    independent answers to "did this leg price" is exactly how the basis and the
+    number drift apart again; sharing the helper makes them agree by
+    construction.
     """
     projection = row.get("projection")
     if not isinstance(projection, Mapping):
         return None
     if _as_float(projection.get("edge_vs_market_pct")) is not None:
+        return MODEL_EDGE_BASIS_MARKET
+    leg = _three_way_leg_edge(projection, side, fair)
+    if leg is not _NO_THREE_WAY and leg is not None:
         return MODEL_EDGE_BASIS_MARKET
     if _modelled_fair_edge_for(projection, side) is not None:
         return MODEL_EDGE_BASIS_MODELLED
@@ -2115,7 +2144,11 @@ def build_layer2_rows(
             # and a measured one are different confidences and `#242` forbids
             # letting the first wear the second's clothes.
             candidate["model_edge_basis"] = (
-                model_edge_basis(row, side) if model_edge is not None else None
+                # `fair` is THIS row's own side fair -- the same value
+                # `_model_edge_for` was given two lines up. Passing it is what
+                # lets a three-way leg be labelled `market_fair` instead of
+                # falling through to None.
+                model_edge_basis(row, side, fair) if model_edge is not None else None
             )
             candidate["score"] = score
             if score is not None:
