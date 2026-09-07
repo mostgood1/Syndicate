@@ -2865,12 +2865,6 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 # dark-launch pattern as the daily-sim trigger above.
 # ---------------------------------------------------------------------------
 
-# Once per PROCESS, matching the lifetime of the thing it compensates for:
-# `_LAST_PUBLISHED_CHECKSUM` in `artifact_publisher` is also in-process, so a
-# restart clears both together. Module-level rather than a function attribute
-# so it is visible to anyone reading for restart-scoped state.
-_SEASON_ARTIFACTS_PULLED_THIS_PROCESS: bool = False
-
 _MLB_STATCAST_REFRESH_PROCESS: subprocess.Popen | None = None
 _MLB_STATCAST_REFRESH_MAX_RUNTIME_SECONDS = 90 * 60
 
@@ -5829,22 +5823,17 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		# already exists and is already the way these files reach this disk;
 		# it simply had no caller at process start, only before a roster
 		# build. Pulling first makes the local copy current, so the blind
-		# post-restart republish pushes back what web already has instead of
-		# reverting it. Publishing is left alone deliberately -- a sweep that
-		# skipped these would also stop repairing them if web ever lost them.
-		global _SEASON_ARTIFACTS_PULLED_THIS_PROCESS
-		if not _SEASON_ARTIFACTS_PULLED_THIS_PROCESS:
-			_SEASON_ARTIFACTS_PULLED_THIS_PROCESS = True
-			try:
-				from syndicate.features.shared.artifact_publisher import pull_season_artifacts
-				_pulled = pull_season_artifacts()
-				print(f"[live_refresh] SEASON_PULL_BEFORE_FIRST_SWEEP written={_pulled}",
-					flush=True)
-			except Exception as _exc:
-				# Never fatal: a failed pull leaves the old behaviour, which is
-				# what happened every day before this call existed.
-				print(f"[live_refresh] SEASON_PULL_BEFORE_FIRST_SWEEP_FAILED "
-					f"{type(_exc).__name__}", flush=True)
+		# The once-per-process season pull that used to sit HERE has moved INTO
+		# `sweep_changed_hot_artifacts` (`artifact_publisher.py`). It was inert
+		# where it was: this is one of FOUR paths into that sweep, and on the
+		# 20:11:58Z boot the live-lens loop swept first, so the guard never ran
+		# and `arsenal`/`quality` reverted to 2026-08-18 anyway at 20:17:47Z --
+		# on a deploy that already contained the fix.
+		#
+		# DELETED rather than left beside the new one, at the original author's
+		# request and for the reason they gave: two half-guards read as
+		# belt-and-braces while the outer one prints a reassuring line about work
+		# the inner one is actually doing.
 		publish_since_epoch = _hot_artifact_publish_since_epoch(tick_started_epoch=tick_started_epoch)
 		sweep_result = sweep_changed_hot_artifacts(publish_since_epoch)
 		meta["publishedArtifacts"] = sweep_result.published_count

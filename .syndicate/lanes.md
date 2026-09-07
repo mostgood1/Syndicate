@@ -2334,6 +2334,10 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   NOT claimed, deliberately: `scripts/run_refresh_worker.py` -- held by lane
   `ncaaf-live-resim-wire`.
   NOT claimed, deliberately: `syndicate/blueprints/ops.py` -- same holder.
+  NOT claimed, deliberately: `syndicate/features/shared/artifact_publisher.py`
+  -- same holder.
+  NOT claimed, deliberately: `syndicate/features/shared/live_refresh_loop.py`
+  -- released 2026-08-15 with `mlb-props-regen`'s orphaned claims.
   Both lanes are THIS SESSION (520cd594), so the edits made from here -- the
   soccer ESPN seed at the `history/` glob, and the publish-ACCEPTED log raised
   by `segment-regrade-apply` -- are not cross-session. The claims stay in the

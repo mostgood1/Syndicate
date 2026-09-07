@@ -1172,6 +1172,65 @@ def is_exportable_artifact_relative_path(relative_path: str) -> bool:
 # allowlist, so it does not grow without limit.
 _LAST_PUBLISHED_CHECKSUM: dict[str, str] = {}
 
+# DELIBERATELY THE SAME LIFETIME AS `_LAST_PUBLISHED_CHECKSUM` ABOVE, because the
+# pairing IS the invariant. That dict is in-process by design -- "a restart
+# clears this and the next sweep republishes everything once" -- and on this
+# service the season-scoped MLB inputs (arsenal / quality / batted_ball) can
+# never be REBUILT here: they come from pybaseball Statcast leaderboards, not in
+# this image. So after every restart the first sweep republished whatever stale
+# copy the disk happened to hold, over whatever web was serving.
+#
+# MEASURED TWICE, 2026-09-07: `arsenal` and `quality` reverted to their
+# 2026-08-18 build at 18:38Z and again at 20:17:47Z, the second time on a boot
+# that already CONTAINED a fix -- because that fix sat on one of the sweep's
+# callers rather than on the sweep. Both facts are the peer lane
+# `segment-regrade-apply`'s measurement, re-derived here only far enough to
+# confirm the call graph.
+_SEASON_ARTIFACTS_PULLED_THIS_PROCESS = False
+
+
+def _pull_season_artifacts_once_per_process() -> None:
+    """Make the disk current before a sweep decides what is 'changed'.
+
+    HERE, NOT IN A CALLER. `sweep_changed_hot_artifacts` has FOUR paths into it:
+    `live_lens_loop.py:979`, `live_refresh_loop.py:5849`, and anything using the
+    `publish_changed_hot_artifacts` wrapper (`run_mlb_daily_sim_job.py`,
+    `run_queued_refresh_job.py`). A guard on one of them is bypassed by the
+    other three -- which is exactly what happened: the fix went on the
+    live_refresh path, the live-lens loop swept first on the next boot, and the
+    artifacts reverted anyway while a reassuring log line never printed.
+    `learnings.md` already carries the rule (fix the choke point all callers
+    share, not the one you can see); this is that choke point.
+
+    BEFORE THE CANDIDATE SCAN, not after: the scan compares `st_mtime` against
+    the watermark, so a pull that lands after it has refreshed nothing the scan
+    can see.
+
+    THE FLAG IS SET BEFORE THE ATTEMPT, ON PURPOSE. Setting it after would make
+    a failing or slow endpoint cost every subsequent sweep another attempt --
+    and `pull_season_artifacts` carries a 60s timeout per pattern, inside a loop
+    that runs on a live cadence. Attempt-once is the bounded choice; the cost of
+    a transient failure is one process running the old behaviour, which is
+    precisely the behaviour that existed before this function.
+
+    Never fatal, never raises: `pull_season_artifacts` already promises that, and
+    the try/except is belt-and-braces so a future change to it cannot take the
+    sweep down with it.
+    """
+    global _SEASON_ARTIFACTS_PULLED_THIS_PROCESS
+    if _SEASON_ARTIFACTS_PULLED_THIS_PROCESS:
+        return
+    _SEASON_ARTIFACTS_PULLED_THIS_PROCESS = True
+    try:
+        written = pull_season_artifacts()
+        # `written=0` is NOT success and not failure -- `pull_season_artifacts`
+        # says so itself: it is equally consistent with "already current" and
+        # "nothing matched". Logged as the raw count rather than a verdict.
+        print(f"[artifact_publisher] SEASON_PULL_BEFORE_SWEEP written={written}", flush=True)
+    except Exception as exc:  # noqa: BLE001 - a pull must never fail a sweep
+        print(f"[artifact_publisher] SEASON_PULL_BEFORE_SWEEP_FAILED "
+              f"{type(exc).__name__}: {exc}", flush=True)
+
 
 # `#395` -- HOURLY EGRESS CIRCUIT BREAKER.
 #
@@ -1920,6 +1979,9 @@ def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepR
     """
     if not _publish_url() or not _admin_token():
         return HotArtifactSweepResult(published_count=0, failed_paths=())
+    # After the config guard (an unconfigured process cannot pull either) and
+    # BEFORE the scan below, whose mtime comparison is the thing being corrected.
+    _pull_season_artifacts_once_per_process()
     root = _data_root()
     published = 0
     failed: list[Path] = []

@@ -4,6 +4,37 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def _season_pull_already_done():
+    """Keep the suite from performing `sweep_changed_hot_artifacts`'s boot pull.
+
+    `_pull_season_artifacts_once_per_process` runs on the FIRST sweep of a
+    process and makes one HTTP request per season pattern. Two problems in a
+    test suite, and the second is the dangerous one:
+
+      1. Any test that configures a publish URL suddenly issues network calls it
+         did not before -- `test_publish_changed_hot_artifacts_only_publishes_
+         recent_matching_files` asserts `urlopen` was called ONCE and started
+         failing the moment the pull landed, correctly.
+      2. The flag has PROCESS lifetime, so whichever test sweeps first pays the
+         pull and every later test skips it. That makes the behaviour
+         ORDER-DEPENDENT: the same test passes or fails depending on what ran
+         before it, which is the failure mode `suite-order-pollution` exists for.
+
+    Defaulting it to "already pulled" removes both. A test that actually wants
+    the pull resets the flag itself -- `tests/test_season_pull_before_sweep.py`
+    does exactly that, and its own fixture takes precedence.
+    """
+    from syndicate.features.shared import artifact_publisher
+
+    previous = artifact_publisher._SEASON_ARTIFACTS_PULLED_THIS_PROCESS
+    artifact_publisher._SEASON_ARTIFACTS_PULLED_THIS_PROCESS = True
+    try:
+        yield
+    finally:
+        artifact_publisher._SEASON_ARTIFACTS_PULLED_THIS_PROCESS = previous
+
+
+@pytest.fixture(autouse=True)
 def _isolate_intelligence_state(tmp_path_factory):
     """Keep the suite out of the repo's REAL intelligence-state files.
 
