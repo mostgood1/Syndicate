@@ -3590,6 +3590,14 @@ without enumerating that field's READERS first.
      `git grep` that field name and enumerate every site that BRANCHES on the
      value. One grep for `edge_vs_market_pct` would have surfaced this early
      return in seconds.
+     **AND ONE HOP FURTHER: the fields DERIVED from it.** `[amended 2026-09-07,
+     after breaking this rule while obeying it]` The fix for the above made
+     `_model_edge_for` return a market-priced edge where `edge_vs_market_pct` is
+     None; `model_edge_basis` decides "market" off that same field, so the LABEL
+     fell through to None on a real edge -- 4 of 77 served soccer rows. I ran the
+     grep and stopped at direct readers. A field computed FROM the one you
+     changed is a reader too, and it is the one a grep for the original name does
+     not show you. Found by reading the deployed board; no test caught it.
 - **Cost:** 43m51s live in production (`d9672ac7` 01:26:11Z -> `62937ea4`
   02:10:02Z), coverage only — `_modelled_fair_edge_for` is side-matched, so the
   dropped legs returned None rather than an ungated number. Plus a per-side

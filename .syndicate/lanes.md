@@ -1676,6 +1676,27 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   claim must be held and peers told why.
 - Blocked by: none.
 
+### soccer-model-edge-basis-label — CLOSED 2026-09-07 — session 28c6162b-58c8-4937-99f5-d3b260a96de4 — **LANDED `cee667e5` on origin/main. NOT DEPLOYED — diagnostic only, so it rides the next deploy rather than earning one. `model_edge_basis` now calls `_three_way_leg_edge` so the label and the number cannot disagree; `fair` threaded to its one call site, optional so two-way callers are untouched. Verified off != on (the by-construction test fails "priced away at 10.1339 with no basis" without it); 912 pass across the affected surface. Cause and severity in the commit message; found by reading the DEPLOYED board, not by a test.**
+- Goal: `model_edge_basis` returns `market_fair` for a three-way leg priced by
+  `_model_edge_for`'s three-way branch. Today it returns None on a genuinely
+  market-priced edge — 4 of 77 served soccer moneyline rows.
+- Files: `syndicate/features/shared/layer2_board.py`
+  (**`model_edge_basis` and its ONE call site at ~2117 ONLY**),
+  `tests/test_modelled_fair_edge_reachability.py`.
+- Cause, and it is mine: `62937ea4` made `_model_edge_for` return a market-priced
+  edge in the case where `edge_vs_market_pct IS None` (home leg withheld by the
+  precision gate). `model_edge_basis` decides `market` off that same field being
+  non-None, and `_modelled_fair_edge_for` is side-matched so it declines too —
+  so the label falls through to None. Same family as the `62937ea4` postmortem,
+  introduced while fixing it.
+- SEVERITY: DIAGNOSTIC ONLY. `model_edge_basis` is written to the payload and
+  read by NOTHING in .py/.html/.js except its own tests — grepped. No pricing,
+  ranking or execution path is affected; the edge VALUE is correct.
+- Verification: the 4 affected rows (SC Telstar away +4.52, FC Porto draw +5.47,
+  Braga draw -5.20, PSG@Brest away -5.95) carry `model_edge_basis=market_fair`,
+  and a test that the basis agrees with `_model_edge_for` by construction.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
