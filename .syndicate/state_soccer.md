@@ -88,6 +88,27 @@ alarms + 5 `disabled`**, verified against a real production odds CSV.
   `pace_seconds_per_event`. football-data carries goals/shots/corners/fouls/
   cards/odds and nothing else. Fixing these needs a DATA SOURCE, not wiring.
 
+**PRODUCTION READ IT AND FOUND THREE MORE, WHICH IS WHY THE GATE EXISTS.** First
+soccer `sim_input_report` ever published: **2026-09-07T19:42:35Z**, host=worker,
+`data_root=/opt/render/project/data`, 3 history files / 918 rows / 22 rated
+teams. It reports **6 alarms, not the 2 seen locally**. The three extra —
+`possession_metrics.possession_share`, both `set_piece_metrics.set_piece_xg_share`
+sites, and `availability_metrics.availability_index` — are the ones sourced from
+`espn_match_stats.json`, and they read `ok` LOCALLY.
+
+**Cause, and it discriminates inside one directory:** everything from
+`matches_*.csv` reads `ok` (shots, corners, points) and everything from the
+ESPN file alarms. refresh-worker runs NO general bootstrap (plain script, no
+Flask app, so `_bootstrap_render_data` never runs); its narrow seeder took
+`history/` with `glob_pattern="*.csv"`, silently excluding the JSON beside those
+CSVs. Git-tracked for 9 leagues since 2026-08-19, never on that disk. Fixed
+`ba8de73d` with its own pattern — a widened `*` would be suppressed forever by
+the already-present CSVs, because the seeder skips any directory with a match.
+
+**The local run was NOT a weaker version of this reading, it was a different
+one.** Local said 2 alarms; production says 6. Anyone quoting the local number
+as the engine's input health would be wrong by three fields.
+
 **THE MARKET PRIOR WAS A KEY MISMATCH.** `attach_market_odds` writes
 `market_odds` — the ANCHOR's input. The engine reads `market_features` and was
 never given one, while `totals` (1,450 rows) and `spreads` (812) were parsed out
