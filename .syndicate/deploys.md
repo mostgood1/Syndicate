@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-09-07 17:21:02Z — refresh-worker `b4b1535d` — **serialize `conditional_arsenal_source` — the last failing field in the sim input report.** `[lane ncaaf-live-resim-wire]`
+
+Carries `af70a5cd`. `roster_to_dict.ser_pitcher` serialises an EXPLICIT dict
+literal; `conditional_arsenal_source` was set in memory
+(`conditional_mix.py:99-101`), read back on load (`roster_artifact.py:343`), and
+never written. Absent from every roster artifact, and nothing raised — the
+dataclass default is `""`, so a DROPPED field and an UNFED field read the same.
+
+**verify:** the first `sim_input_report_2026-09-07.json` with a `generated_at`
+NEWER than the `16:27:40.608712+00:00` baseline must show `failures: []` and
+`pitcher.conditional_arsenal_source pct > 0`. Read at
+`/api/ops/artifacts/export?pattern=*sim_input_report*` on
+`syndicate-an21.onrender.com`. **`bb_gb_rate` is the control** — pitcher 0.6933 /
+batter 0.6786 at baseline; if the source field moves and `bb_gb_rate` does not,
+that is a cached artifact, not a new roster build. A rebuild is guaranteed only
+while `SYNDICATE_MLB_ROSTER_REBUILD_DATE=2026-09-07` matches
+`central_today_iso()`, which goes inert at 05:00Z.
+
+**MEASUREMENT PENDING — this row is an open obligation, not history.**
+
+**Baseline being moved off** (`generated 16:27:40Z`, host=worker, rosters=8):
+POPULATED 64/65, 5 disabled by config, and `failures` held exactly ONE entry —
+`pitcher.conditional_arsenal_source pct=0.0` — while `pitcher.conditional_arsenal`
+itself read **0.86**. The producer sets both on adjacent lines, so that split is
+the signature of a write-side drop rather than a missing input.
+
+**BREAK-GLASS GRANT USED, PREFLIGHT ONLY.** Preflight at 17:18:26Z returned
+`HOLD: 5 job(s) in flight` — `run_mlb_daily_sim_job.py` (1277),
+`run_refresh_odds_job.py` (1279), `refresh_odds_sources.py` (1280) and
+`build_soccer_artifacts.py --league championship` (1473). Preflight has no
+override for in-flight jobs (`elif jobs: HOLD`), and the guard reads its env
+off-switch from its own process, so a 10-minute session grant was the only path.
+**The CLAIM lock was held by this lane independently** (acquired 16:54:14Z), so
+the grant bypassed preflight, NOT the claim. The user was shown the full
+five-job collateral — not just the sim they had named — and chose to deploy
+through it anyway; all five re-run on their own cadence. Grant deleted
+immediately after the POST: a standing grant is a disabled guard.
+
+**Deploy `dep-daff4vm1egvs739t17ng`, trigger=api, from `origin/main`
+(`--allow-off-main` NOT used).** Expected cost, accepted: one killed sim, one
+odds refresh, one soccer build, and ~21 min of frozen board (`#563`).
+
 ## 2026-09-06 19:50:37Z — refresh-worker `bd658209` — **DEPLOY 2: THE REFUSAL IS LIVE AND THE MIS-BINDINGS ARE GONE.** `[lane mlb-first5-kalshi-fanin-mismatch]`
 
 **verify:** `[venue_quote_fanin] SEGMENT_MISMATCH_GRID` on instance `2httk`,
