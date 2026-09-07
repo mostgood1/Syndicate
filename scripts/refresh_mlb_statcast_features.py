@@ -194,10 +194,10 @@ def publish_latest(*, timeout_seconds: int = 180) -> bool | None:
               flush=True)
         return None
     ok = ap._publish_streamed(  # noqa: SLF001
-        src, relative_path=rel, url=url, token=token, timeout_seconds=timeout_seconds,
-        # Name the TOOL when there is no service lane -- this script
-        # runs wherever an operator runs it, so every artifact it published
-        # reached the receiver as `publisher=unknown` (measured 2026-09-07).
+        src, relative_path=rel, url=url, token=token, timeout_seconds=timeout_seconds,
+        # Name the TOOL when there is no service lane -- this script
+        # runs wherever an operator runs it, so every artifact it published
+        # reached the receiver as `publisher=unknown` (measured 2026-09-07).
         publisher=ap.publisher_identity_for_tool("refresh_mlb_statcast_features"))
     print(f"[statcast_refresh] publish {rel} -> {ok}", flush=True)
     return ok
