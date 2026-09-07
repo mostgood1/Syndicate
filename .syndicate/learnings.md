@@ -3161,3 +3161,65 @@ nineteen days of identical `FAIL 10` are nineteen days of the same broken
 measurement, not nineteen days of dead inputs. The predicate lesson in that entry
 (key on the thing, not on a count containing it) still stands -- it is just that
 the thing it should have keyed on was wrong too.
+
+## 2026-09-07 RESOLVED: the ten MLB pitcher inputs ARE unfed -- and my retraction was the wrong turn
+
+**This closes a thread that reversed twice. The FIRST answer was right; the
+retraction two entries up is WRONG and is withdrawn.**
+
+The report now records which rosters it measured, and it read the sim's own path:
+
+    generated      2026-09-07T07:48:38Z
+    roster_source  'sim'
+    roster_glob    .../data/daily/snapshots/*/roster_objs/roster_obj_*.json
+    rosters        8
+    POPULATED      0/10
+
+So all ten pitcher fields are genuinely empty in the artifact the simulation
+consumes: `pitch_type_{whiff,inplay,hr}_mult`, `conditional_arsenal{,_source}`,
+`count_bucket_map`, and the four `statcast_splits_*`.
+
+### WHY I RETRACTED A CORRECT FINDING
+
+I read `daily/snapshots/<date>/roster_*.json` -- FLAT game rosters -- saw
+`pitch_type_whiff_mult` at 14/18 on four separate dates, and concluded seven of
+the ten had been fed all along. **Those are a different file.** The sim reuses the
+SERIALIZED `roster_objs/roster_obj_*.json`; the flat rosters are a separate
+published artifact. Two files, one directory apart, similar names, opposite
+content -- and I compared the one I could read against a claim about the one I
+could not.
+
+The tell was available and I walked past it: the flat file's top-level keys are
+`away/home/mode/park/pbp/pitch_model/statcast/umpire/weather` while
+`read_game_roster_artifact` expects `schema_version/away/home/meta`. Different
+schemas. I noticed the difference, wrote it down, and still treated the two as
+interchangeable evidence.
+
+**THE RULE: "I read the artifact" is only stronger than "the report says" when it
+is THE SAME ARTIFACT.** Reading the wrong file directly is not more rigorous than
+reading a report about the right one -- it is less, because it FEELS like primary
+evidence. Confirm the identity of the file before promoting it over a summary.
+
+### AND THE ROSTER-REBUILD DIAGNOSIS IS WRONG IN ITS MIDDLE TERM
+
+The chain I published was: stale gate -> stale `roster_objs` -> dead fields. The
+gate WAS stale (`2026-08-19`, armed the day before the fix it was meant to prove
+went live) and that part stands. But after arming it for `2026-09-07` and running
+a job on that date, **the fields are still zero.** A fresh build produces empty
+fields too, so reuse was never the cause.
+
+That relocates the defect to the LOADERS -- `apply_arsenal_to_pitcher` and
+`_apply_cached_statcast_pitch_splits` -- which run at build time and are supposed
+to populate exactly these fields from artifacts that are present, loadable, and
+correctly shaped on the worker (`arsenal_2026.json`, 546 KB, 466 pitchers,
+`payload["pitchers"]` exactly as `load_arsenal` expects). Present input, running
+loader, empty output: that is the next thing to chase, and it is NOT a
+publishing, allowlist, path or reuse problem, all of which were checked and
+cleared in this thread.
+
+### WHAT THE INSTRUMENT FIX BOUGHT
+
+The report now carries `roster_source` and `roster_glob`, so this question is
+answerable in one read instead of a night of it. It did not change the answer --
+it made the answer TRUSTWORTHY, which is the only reason the reversal could be
+settled at all.
