@@ -1941,8 +1941,16 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 "scripts/soccer_sim_input_checklist.py",
                 "--publish",
                 "--warn-only",
+                # 1h, not 6. The throttle exists so a 60s `live` cadence does not
+                # pay for a ratings build every tick -- 1h already achieves that
+                # (32s of work per hour, worst case, measured). 6h additionally
+                # made the gate unable to CONFIRM A FIX on the same day it
+                # landed: the 19:42:35Z report would have suppressed every run
+                # until 01:42Z, including the one meant to verify the
+                # espn_match_stats seed. An audit you cannot re-run after
+                # changing an input is not an audit, it is a daily snapshot.
                 "--min-interval-hours",
-                "6",
+                "1",
             ),
             description="Audit which soccer sim-engine inputs are CONSUMED but UNPOPULATED, and publish the bounded result so production is readable.",
         )
