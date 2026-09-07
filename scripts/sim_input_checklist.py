@@ -584,13 +584,42 @@ def main() -> int:
     # rosters it measured cannot be checked against them, which is exactly how a
     # wrong parent directory survived nineteen days of daily publication.
     roster_source = "sim"
-    paths = sorted(glob.glob(str(_SIM_SNAPSHOTS / "*/roster_objs/roster_obj_*.json")))[:args.games]
+    # NEWEST DATE FIRST, and this line is the whole bug.
+    #
+    # It was `sorted(...)[:args.games]` -- ASCENDING, take the first N -- which
+    # selects the OLDEST rosters on disk. Measured 2026-09-07: 317 roster_obj
+    # files across 26 dates (2026-06-15..07-12), and the eight it picked were all
+    # from **2026-06-15**. The arsenal and pitch-splits artifacts did not exist
+    # until 2026-08-20, so those rosters CANNOT contain the fields being audited,
+    # and never will.
+    #
+    # THAT IS WHY THE REPORT NEVER MOVED. Nineteen days of `rosters: 8` and ten
+    # fields at 0.0%, identical every night, unaffected by a deploy, a roster
+    # rebuild, an env change, or the artifacts arriving -- because it re-measured
+    # the same June rosters each time. A constant reading was taken as a stable
+    # fact about production; it was a stable fact about a fixed set of old files.
+    #
+    # The cost: a stale-gate root cause, a production env change, two deploys, a
+    # finding, a retraction of that finding, and a retraction of the retraction --
+    # all resting on a measurement of June.
+    #
+    # `reverse=True` sorts date-descending because the date is the leading path
+    # segment and the format is zero-padded ISO, so lexical order IS chronological
+    # order. Taking the newest also makes the sample the one anybody debugging
+    # actually cares about.
+    paths = sorted(glob.glob(str(_SIM_SNAPSHOTS / "*/roster_objs/roster_obj_*.json")),
+                   reverse=True)[:args.games]
     if not paths:
         # FALLING BACK IS ANNOUNCED, never silent. The legacy tree belongs to the
         # daily_pitcher_props pipeline and its rosters are NOT what the sim runs
         # on -- measuring them and saying nothing is what produced a nineteen-day
         # false negative. Reported so a reader can discount the numbers.
-        legacy = sorted(glob.glob(str(_LEGACY_SNAPSHOTS / "*/roster_objs/roster_obj_*.json")))[:args.games]
+        # `reverse=True` HERE TOO. Fixing the primary glob and leaving this one
+        # ascending would put the oldest-rosters bug back the moment the fallback
+        # fires -- two sinks for one rule, one of them updated, which is the exact
+        # mistake made earlier in this same file today.
+        legacy = sorted(glob.glob(str(_LEGACY_SNAPSHOTS / "*/roster_objs/roster_obj_*.json")),
+                        reverse=True)[:args.games]
         if legacy:
             roster_source = "legacy_daily_pitcher_props"
             paths = legacy
