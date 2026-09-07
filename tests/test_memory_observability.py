@@ -624,3 +624,46 @@ def test_malloc_info_survives_a_non_numeric_size():
     broken = _MALLOC_INFO_SAMPLE.replace('<system type="current" size="6291456"/>',
                                          '<system type="current" size="banana"/>')
     assert memory_observability.parse_malloc_info_xml(broken) is None
+
+
+# --- `#632`: the ring's read cost -------------------------------------------
+
+def test_ring_records_drop_cmdline_but_the_live_snapshot_keeps_it():
+    """The ring is read-modify-written ~15x/min: `json.loads` the whole file,
+    append one record, truncate, re-encode. At the documented size (300 records,
+    360 KB) that single load materialises ~18,600 blocks SIMULTANEOUSLY LIVE and
+    retains 11 -- and `#632` established that pymalloc arena count follows peak
+    live blocks, with arenas rarely returned.
+
+    `cmdline` is 58% of a record and CONSTANT PER PID, so the ring stored the
+    same strings up to 300 times. Dropping it halves the peak (18,644 -> 9,642)
+    and takes the ring from 360 KB to 151 KB.
+    """
+    record = {
+        "stage": "post_build_overview",
+        "processes": [
+            {"pid": 97, "ppid": 39, "name": "python3.11", "rss_mb": 500.0,
+             "cmdline": ["/opt/render/project/src/.venv/bin/python3.11", "wsgi:app"]},
+            {"pid": 98, "ppid": 39, "name": "python3.11", "rss_mb": 400.0,
+             "cmdline": ["/opt/render/project/src/.venv/bin/python3.11", "wsgi:app"]},
+        ],
+    }
+    slim = memory_observability._slim_for_ring(record)
+    assert all("cmdline" not in p for p in slim["processes"])
+    # Everything else must survive -- this is a size cut, not a content cut.
+    assert [p["pid"] for p in slim["processes"]] == [97, 98]
+    assert [p["rss_mb"] for p in slim["processes"]] == [500.0, 400.0]
+    assert slim["processes"][0]["name"] == "python3.11"
+    assert slim["stage"] == "post_build_overview"
+    # The CALLER's dict must not be mutated: the same payload is also handed to
+    # the live snapshot and to the log line, which do keep cmdline.
+    assert "cmdline" in record["processes"][0]
+
+
+def test_slim_for_ring_survives_junk_without_raising():
+    # Telemetry must never raise. A payload with no processes, or a non-dict
+    # entry, has to pass through rather than take the checkpoint down.
+    assert memory_observability._slim_for_ring({"stage": "x"}) == {"stage": "x"}
+    assert memory_observability._slim_for_ring({"processes": []})["processes"] == []
+    odd = memory_observability._slim_for_ring({"processes": ["not-a-dict", None]})
+    assert odd["processes"] == ["not-a-dict", None]

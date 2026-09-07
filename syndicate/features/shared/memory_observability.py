@@ -2023,6 +2023,48 @@ def process_memory_checkpoint_path() -> Path:
     return reports_root() / "live_refresh_loop" / "memory_diagnostics.json"
 
 
+def _slim_for_ring(record: dict[str, Any]) -> dict[str, Any]:
+    """Drop `cmdline` from the records this ring PERSISTS.
+
+    WHY, measured 2026-09-07. This ring is read-modify-written on every
+    checkpoint -- `json.loads` the whole file, append one, truncate, re-encode --
+    roughly 15 times a minute. At the documented size (300 records, 1,228 B each,
+    360 KB) that single `json.loads` materialises **18,620 blocks
+    SIMULTANEOUSLY LIVE** and retains 11. `#632` established that pymalloc arena
+    count follows PEAK simultaneous live blocks and that an arena is rarely
+    returned, so this is a recurring arena-sizing event inside the very
+    instrument built to investigate the OOM.
+
+    **`cmdline` is 58% of a record and is CONSTANT PER PID**, so the ring stored
+    the same strings up to 300 times. Dropping it takes a record from 1,228 B to
+    514 B and the ring from 360 KB to 151 KB.
+
+    IT IS DROPPED ONLY FROM THE PERSISTED RING. The live `/api/ops/memory`
+    snapshot still carries cmdlines, so nothing that reads the CURRENT process
+    list loses anything.
+
+    THE ONE HISTORICAL CONSUMER IS EXPLICITLY OBSOLETE. Two comments in
+    `syndicate/blueprints/ops.py` record that sampling cmdlines out of this
+    diagnostic was how a refresh skip and per-sport sim runs were once
+    diagnosed -- and both call it an accident that a purpose-built endpoint now
+    replaces: *"This endpoint exists so the next person does not need that
+    accident"* (`/api/ops/odds-refresh/...`), and `/api/ops/sims/ledger` for the
+    other. Neither reads this ring.
+    """
+    try:
+        procs = record.get("processes")
+        if isinstance(procs, list) and procs:
+            record = dict(record)
+            record["processes"] = [
+                {k: v for k, v in p.items() if k != "cmdline"}
+                if isinstance(p, dict) else p
+                for p in procs
+            ]
+    except Exception:  # noqa: BLE001 - telemetry must never raise
+        return record
+    return record
+
+
 def dump_process_memory_checkpoint(stage: str, payload: dict[str, Any]) -> None:
     """Append one sample to the bounded ring buffer.
 
@@ -2048,7 +2090,8 @@ def dump_process_memory_checkpoint(stage: str, payload: dict[str, Any]) -> None:
         path = process_memory_checkpoint_path()
         existing = read_json_file(path)
         records = list(existing.get("records") or []) if isinstance(existing, dict) else []
-        records.append({"stage": stage, "wall_clock": time.time(), "pid": os.getpid(), **payload})
+        records.append(_slim_for_ring(
+            {"stage": stage, "wall_clock": time.time(), "pid": os.getpid(), **payload}))
         records = records[-PROCESS_MEMORY_CHECKPOINT_MAX_RECORDS:]
         write_json_file(path, {"records": records})
     except Exception as exc:  # noqa: BLE001
