@@ -701,180 +701,56 @@ def games_from_cfbd_when_engine_schedule_empty(cfbd_games: dict[tuple[str, str],
 
 
 
+
 # ---------------------------------------------------------------------------
 # DRIVE-PRIOR FEATURE PAYLOAD (`#457` closed at the CONSUMER end)
 # ---------------------------------------------------------------------------
 #
-# `football_sim_input_checklist` alarm, verbatim: "UNWIRED PAYLOAD:
-# scripts/generate_smartsim2_ncaaf_projections.py constructs
-# SmartSim2SimulationInput without `feature_generation_payload`, so every key
-# `drive_priors.py` reads falls to its neutral default on every game this script
-# projects."
+# `football_sim_input_checklist` alarm: this script built
+# `SmartSim2SimulationInput` without `feature_generation_payload`, so all nine
+# blocks `drive_priors.build_drive_priors` reads were neutral on every NCAAF
+# game.
 #
-# THE SNAPSHOTS ALREADY EXIST AND NOTHING READS THEM. `sources.py` defines
-# `pace_snapshot_path()`, `returning_production_snapshot_path()` and
-# `coach_continuity_snapshot_path()`; `build_ncaaf_*_snapshot.py` and `cfbd.py`
-# WRITE all three. Grep for a reader outside the builders themselves and there is
-# none. Three producers, zero consumers.
-#
-# AND THE COST WAS MEASURED, in `pace_snapshot_path`'s own docstring: with no
-# pace block `drive_priors._pace_index` falls back to **24.0 s/play**, so EVERY
-# NCAAF game ran at `pace_index = +0.400` while the real 2025 league mean is
-# 26.56 (sd 2.08, range 21.0..33.4 over 266 teams / 37,263 drives). A constant is
-# not a neutral default here -- it pinned every game 18% faster than the average
-# team actually plays.
-#
-# THE KEY NAMES DO NOT MATCH AND THAT IS THE WHOLE TRAP. The pace snapshot writes
-# `seconds_per_play`. `_pace_index` reads
-# `["pace_seconds_per_play", "secs_per_play", "home_pace_secs_play",
-# "away_pace_secs_play"]` -- and `seconds_per_play` is in NEITHER list. Passing
-# the snapshot through unmapped would look wired, read as fed, and change
-# nothing: the same silent no-op this alarm exists to remove, one layer down.
-# `returning_production.percent_ppa` and `coach_continuity.continuity_score` DO
-# match what `_returning_index` and `_coach_index` read, so those pass straight
-# through -- which is why the mismatch on pace is easy to miss.
-
-_NCAAF_FEATURE_SNAPSHOT_CACHE: dict[str, dict[str, dict[str, str]]] = {}
+# THE BUILDER ALREADY EXISTED. `syndicate/features/ncaaf/feature_payload.py`
+# fills four blocks from the 2026-08-27 snapshots and documents why it leaves
+# three EMPTY (`defensive_metrics` misrouted, `pace` null at source,
+# `player_usage` wrong grain). `#457` records that all three production
+# entrypoints constructed the input WITHOUT the payload -- so a complete builder
+# sat behind a flag nothing consulted. The missing half was the WIRING, which is
+# all this section is. I wrote a second builder before finding it; that duplicate
+# is deleted rather than kept beside the original, because a second copy of a
+# rule is how the first one rots.
 
 
 def _ncaaf_drive_priors_enabled() -> bool:
     """OFF by default. `SYNDICATE_NCAAF_DRIVE_PRIORS=1` turns it on.
 
-    Same reasoning as NFL's `SYNDICATE_NFL_DRIVE_PRIORS`, and it binds harder
-    here. `NCAAF_CALIBRATION_PROFILE` was fitted with every drive-prior block at
-    its neutral default -- including a pace index pinned at +0.400 on every game.
-    Feeding real pace moves that toward ~+0.14 for a league-average team, which
-    changes every drive, every game, at once. `model_engine_standard.md`: adding
-    a MECHANISM to a calibrated engine requires re-fitting the rates that were
-    absorbing it, and two mechanisms together already produced a NEGATIVE
-    interaction in 4 of 4 markets here.
+    `state.md`, quoted in `feature_payload.py`: *"DO NOT JUST WIRE IT. Both
+    calibration profiles were fit against a payload the engine cannot read, so
+    this is a mechanism added to a calibrated engine and owes a re-fit"* -- the
+    same pattern measured elsewhere as a NEGATIVE interaction in 4 of 4 markets.
+    The published deltas (margin -1.125, total -1.685, home win% -6.50pts) are
+    the DISTURBANCE, not the improvement.
 
-    NCAAF margins are also measured to lose to the closing line by 3.56 points at
-    **t = 17.20** over 2,233 out-of-sample games. Turning this on without a
-    backtest would change every number on a model in that state. So it lands
-    reachable and inert; enabling it is a separate, evidenced call.
+    So the flag makes the mechanism MEASURABLE; it is not an intent to enable.
+    `scripts/refit_ncaaf_smartsim2_payload.py` is the go/no-go, and its benchmark
+    is the MARKET (margins: model MAE 15.775 vs market 12.212, n=2233, t=+17.20),
+    not the model's own past. A change that beats OFF while still losing to the
+    close has not earned a deploy.
     """
-    raw = str(os.environ.get("SYNDICATE_NCAAF_DRIVE_PRIORS") or "").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
+    return str(os.environ.get("SYNDICATE_NCAAF_DRIVE_PRIORS") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _load_ncaaf_feature_snapshot(kind: str) -> dict[str, dict[str, str]]:
-    """One snapshot CSV, keyed by normalised team name. `{}` when absent.
+def _ncaaf_build_feature_payload(*, home_team: str, away_team: str, season: int) -> dict[str, object]:
+    """Thin adapter onto the existing builder. Never a second implementation."""
+    from syndicate.features.ncaaf import feature_payload
 
-    ABSENT MUST STAY ABSENT. A missing snapshot returns `{}` so
-    `build_drive_priors` keeps its documented default, rather than a block of
-    zeros -- which would read as "measured, and average".
-    """
-    if kind in _NCAAF_FEATURE_SNAPSHOT_CACHE:
-        return _NCAAF_FEATURE_SNAPSHOT_CACHE[kind]
-    from syndicate.features.ncaaf.sources import (
-        coach_continuity_snapshot_path,
-        pace_snapshot_path,
-        returning_production_snapshot_path,
-    )
-
-    paths = {
-        "pace": pace_snapshot_path,
-        "returning_production": returning_production_snapshot_path,
-        "coach_continuity": coach_continuity_snapshot_path,
-    }
-    out: dict[str, dict[str, str]] = {}
     try:
-        path = paths[kind]()
-        if path.exists():
-            import csv as _csv
-
-            with open(path, encoding="utf-8", newline="") as handle:
-                for row in _csv.DictReader(handle):
-                    name = str(row.get("team") or row.get("team_name") or "").strip().lower()
-                    if name:
-                        out[name] = row
+        return feature_payload.build_payload(home_team=home_team, away_team=away_team, season=season)
     except Exception:
-        out = {}
-    _NCAAF_FEATURE_SNAPSHOT_CACHE[kind] = out
-    return out
-
-
-def _snapshot_float(snapshot: dict[str, dict[str, str]], team: str, column: str) -> float | None:
-    row = snapshot.get(str(team or "").strip().lower())
-    if not row:
-        return None
-    try:
-        value = float(row.get(column))
-    except (TypeError, ValueError):
-        return None
-    return value if value == value else None  # NaN-safe
-
-
-def build_ncaaf_feature_generation_payload(home_team: str, away_team: str) -> dict[str, object]:
-    """The payload `build_drive_priors` has never been given for NCAAF.
-
-    HOME-FRAMED bare keys, because the consumer is: `build_drive_priors`'s own
-    fallback is `0.5 + source.home_offense_rating`. `home_*`/`away_*` variants
-    are published alongside for any per-team consumer.
-    """
-    pace_snap = _load_ncaaf_feature_snapshot("pace")
-    ret_snap = _load_ncaaf_feature_snapshot("returning_production")
-    coach_snap = _load_ncaaf_feature_snapshot("coach_continuity")
-
-    payload: dict[str, object] = {}
-
-    # ------------------------------------------------------------------
-    # PACE IS DELIBERATELY NOT FED. `[2026-09-07, user decision]`
-    # ------------------------------------------------------------------
-    #
-    # I wired it, and I was wrong to. `scripts/calibrate_ncaaf_drive_structure.py`
-    # had ALREADY MEASURED THE SIM'S RESPONSE to real pace, and it runs the wrong
-    # way:
-    #
-    #     metric              truth    sim @ profile v2   fed TRUE pace (26.27)
-    #     plays per drive      5.77          7.34
-    #     seconds per drive   165.4         185.7                209.1
-    #     possessions/game    23.65         20.02                 17.91
-    #
-    # Feeding the true league mean moves EVERY primary FURTHER from truth.
-    # Hitting truth through this input alone would need ~22.0 s/play -- BELOW the
-    # hardcoded 24.0 and below any real team. `pace_seconds_per_play` is
-    # therefore not on the real-world scale its name implies, and RECALIBRATION
-    # DOES NOT FIX THAT: the drive-structure gap is a profile-parameter problem,
-    # not a missing-input one.
-    #
-    # WHY THIS WAS EASY TO GET WRONG, written down so it is not repeated.
-    # `sources.pace_snapshot_path`'s docstring says the 24.0 fallback "pinned
-    # every game 18% faster than the average team actually plays" -- true, and a
-    # statement about the REAL-WORLD distribution. `calibrate_ncaaf_drive_structure`
-    # is a statement about the ENGINE'S RESPONSE to that input. Two docstrings in
-    # one repo, each correct about a different thing, pointing opposite ways. The
-    # one that actually ran the simulation is the one that decides.
-    #
-    # RE-ADD ONLY WITH a scale mapping (real s/play -> engine units) AND a
-    # drive-structure run showing the primaries move TOWARD truth. `pace_snap` is
-    # still loaded above, so that work needs no plumbing -- only evidence.
-    _unused_pace_snapshot = pace_snap
-
-    home_ret = _snapshot_float(ret_snap, home_team, "percent_ppa")
-    away_ret = _snapshot_float(ret_snap, away_team, "percent_ppa")
-    if home_ret is not None or away_ret is not None:
-        block: dict[str, float] = {}
-        if home_ret is not None:
-            block["percent_ppa"] = home_ret
-            block["home_percent_ppa"] = home_ret
-        if away_ret is not None:
-            block["away_percent_ppa"] = away_ret
-        payload["returning_production"] = block
-
-    home_coach = _snapshot_float(coach_snap, home_team, "continuity_score")
-    away_coach = _snapshot_float(coach_snap, away_team, "continuity_score")
-    if home_coach is not None or away_coach is not None:
-        block = {}
-        if home_coach is not None:
-            block["continuity_score"] = home_coach
-            block["home_continuity_score"] = home_coach
-        if away_coach is not None:
-            block["away_continuity_score"] = away_coach
-        payload["coach_continuity"] = block
-
-    return payload
+        # ABSENT MUST STAY ABSENT: a failed snapshot read leaves the engine on its
+        # documented defaults rather than on a half-filled block.
+        return {}
 
 
 def build_projection(
@@ -908,8 +784,22 @@ def build_projection(
     # ONCE PER GAME, not per seed: it does not vary with the seed, and the
     # snapshots are cached module-side so this is a dict lookup after the first
     # game rather than a CSV read per simulation.
+    # DELEGATES to `syndicate/features/ncaaf/feature_payload.py`, which already
+    # existed and which I duplicated before finding it. That module is strictly
+    # better than what I wrote: it fills FOUR blocks (returning production 136
+    # teams, coach continuity 138, transfers 3,305, roster 15,496) where mine
+    # filled two, and it carries the reasoning for the three it deliberately
+    # leaves EMPTY -- `defensive_metrics` MISROUTED (all 7 keys sit in
+    # `team_metrics`), `pace` NULL AT SOURCE, `player_usage` WRONG GRAIN. Each
+    # needs a different remedy, and emitting a neutral default for any of them
+    # "would make an unfed block indistinguishable from a working one".
+    #
+    # It also settles the pace question independently: that module never fed pace
+    # either. The wiring was the missing half all along -- `#457` records that all
+    # three production entrypoints built `SmartSim2SimulationInput` WITHOUT the
+    # payload, so a complete builder sat unused behind a flag nothing consulted.
     _ncaaf_feature_payload = (
-        build_ncaaf_feature_generation_payload(home_team, away_team)
+        _ncaaf_build_feature_payload(home_team=home_team, away_team=away_team, season=season)
         if _ncaaf_drive_priors_enabled()
         else {}
     )

@@ -1,105 +1,49 @@
-"""NCAAF must FEED `feature_generation_payload` -- and map the key that doesn't match.
+"""NCAAF must FEED `feature_generation_payload` -- the WIRING, not the builder.
 
 THE DEFECT, from `football_sim_input_checklist`: the NCAAF projection script
 built `SmartSim2SimulationInput` with no `feature_generation_payload`, so all
-nine blocks `drive_priors.build_drive_priors` reads were at their neutral default
-on every game.
+nine blocks `drive_priors.build_drive_priors` reads were neutral on every game.
 
-WHAT MAKES NCAAF WORSE THAN NFL. Three snapshots were already being BUILT and
-read by nothing: `pace_snapshot_path()`, `returning_production_snapshot_path()`
-and `coach_continuity_snapshot_path()` all have producers
-(`build_ncaaf_*_snapshot.py`, `cfbd.py`) and no consumer outside those producers.
-Three producers, zero consumers.
+THE BUILDER WAS NEVER MISSING. `syndicate/features/ncaaf/feature_payload.py`
+fills four blocks from the 2026-08-27 snapshots and has done since `#457`. What
+`#457` records is that ALL THREE production entrypoints constructed the input
+WITHOUT it -- a complete builder sitting behind a flag nothing consulted. So the
+missing half was the WIRING, and these tests are about the wiring only. The
+builder's own behaviour belongs to its module; re-asserting it here would be a
+second copy of the same rule.
 
-And the cost was already measured, in `pace_snapshot_path`'s own docstring: with
-no pace block `_pace_index` falls back to **24.0 s/play**, so EVERY NCAAF game
-ran at `pace_index = +0.400` against a real 2025 league mean of 26.56 (sd 2.08,
-266 teams / 37,263 drives). A constant is not a neutral default -- it pinned
-every game 18% faster than the average team plays.
-
-THE TEST THAT MATTERS MOST HERE IS THE KEY-MAPPING ONE. The pace snapshot writes
-`seconds_per_play`; `_pace_index` reads `["pace_seconds_per_play",
-"secs_per_play", "home_pace_secs_play", "away_pace_secs_play"]`. `seconds_per_play`
-is in NEITHER list. Passing the snapshot straight through would look wired, read
-as fed, and change nothing -- the same silent no-op the alarm exists to remove,
-one layer down. `percent_ppa` and `continuity_score` DO match, which is exactly
-what makes the pace mismatch easy to miss.
-
-Snapshots are written to a tmp dir and the path helpers monkeypatched, so nothing
-here depends on `data/**` -- a lossy mirror that says nothing about production.
+(I wrote a duplicate builder before finding that module. It is deleted, not kept
+beside the original.)
 """
 from __future__ import annotations
 
-import csv
 import importlib
 import os
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 G = importlib.import_module("scripts.generate_smartsim2_ncaaf_projections")
+from syndicate.features.ncaaf import feature_payload
 from syndicate.features.football.sim_engine.smartsim2.contracts import SmartSim2SimulationInput
 from syndicate.features.football.sim_engine.smartsim2.drive_priors import build_drive_priors
 
 
-def _write(path: Path, rows: list[dict]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
-        w.writeheader()
-        w.writerows(rows)
-
-
-class _Snapshots(unittest.TestCase):
-    def setUp(self) -> None:
-        self.tmp = tempfile.TemporaryDirectory()
-        root = Path(self.tmp.name)
-        self.pace = root / "pace.csv"
-        self.ret = root / "ret.csv"
-        self.coach = root / "coach.csv"
-        # Oregon plays FAST (20.0 s/play), Baylor SLOW (31.0) -- both far from the
-        # 24.0 constant the engine falls back to, so a wired payload cannot be
-        # mistaken for the default.
-        _write(self.pace, [
-            {"team": "Oregon", "season": 2026, "seconds_per_play": 20.0},
-            {"team": "Baylor", "season": 2026, "seconds_per_play": 31.0},
-        ])
-        _write(self.ret, [
-            {"team_name": "Oregon", "season": 2026, "percent_ppa": 0.82},
-            {"team_name": "Baylor", "season": 2026, "percent_ppa": 0.31},
-        ])
-        _write(self.coach, [
-            {"team_name": "Oregon", "season": 2026, "continuity_score": 0.95},
-            {"team_name": "Baylor", "season": 2026, "continuity_score": 0.20},
-        ])
-        import syndicate.features.ncaaf.sources as S
-        self._orig = (S.pace_snapshot_path, S.returning_production_snapshot_path,
-                      S.coach_continuity_snapshot_path)
-        S.pace_snapshot_path = lambda: self.pace
-        S.returning_production_snapshot_path = lambda: self.ret
-        S.coach_continuity_snapshot_path = lambda: self.coach
-        G._NCAAF_FEATURE_SNAPSHOT_CACHE.clear()
+class GateTests(unittest.TestCase):
+    """A mechanism added to a calibrated engine ships inert until re-fitted."""
 
     def tearDown(self) -> None:
-        import syndicate.features.ncaaf.sources as S
-        (S.pace_snapshot_path, S.returning_production_snapshot_path,
-         S.coach_continuity_snapshot_path) = self._orig
-        G._NCAAF_FEATURE_SNAPSHOT_CACHE.clear()
         os.environ.pop("SYNDICATE_NCAAF_DRIVE_PRIORS", None)
-        self.tmp.cleanup()
 
-
-class GateTests(_Snapshots):
     def test_off_by_default(self) -> None:
-        for value in ("", "0", "false", "off", "nonsense"):
+        os.environ.pop("SYNDICATE_NCAAF_DRIVE_PRIORS", None)
+        self.assertFalse(G._ncaaf_drive_priors_enabled())
+        for value in ("", "0", "false", "off", "no", "nonsense"):
             with self.subTest(value=value):
                 os.environ["SYNDICATE_NCAAF_DRIVE_PRIORS"] = value
                 self.assertFalse(G._ncaaf_drive_priors_enabled())
-        os.environ.pop("SYNDICATE_NCAAF_DRIVE_PRIORS", None)
-        self.assertFalse(G._ncaaf_drive_priors_enabled())
 
     def test_turns_on(self) -> None:
         for value in ("1", "true", "on", "YES"):
@@ -108,79 +52,91 @@ class GateTests(_Snapshots):
                 self.assertTrue(G._ncaaf_drive_priors_enabled())
 
 
-class KeyMappingTests(_Snapshots):
-    """The whole point. Right numbers under the wrong names change nothing."""
+class AdapterTests(unittest.TestCase):
+    """The adapter must DELEGATE, never reimplement."""
 
-    def test_pace_is_NOT_FED_and_that_is_deliberate(self) -> None:
-        """`[2026-09-07, user decision]` -- reversed after reading the measurement.
+    def test_it_calls_the_real_builder_with_the_right_arguments(self) -> None:
+        seen: dict[str, object] = {}
 
-        `calibrate_ncaaf_drive_structure.py` measured the SIM'S RESPONSE to real
-        pace and it moves every primary FURTHER from truth: possessions/game
-        23.65 truth -> 20.02 at profile v2 -> 17.91 fed the true 26.27 league
-        mean; seconds/drive 165.4 -> 185.7 -> 209.1. Hitting truth through this
+        def fake(*, home_team, away_team, season):
+            seen.update(home_team=home_team, away_team=away_team, season=season)
+            return {"returning_production": {"percent_ppa": 0.5}}
+
+        original = feature_payload.build_payload
+        try:
+            feature_payload.build_payload = fake
+            out = G._ncaaf_build_feature_payload(home_team="Oregon", away_team="Baylor", season=2026)
+        finally:
+            feature_payload.build_payload = original
+
+        self.assertEqual(seen, {"home_team": "Oregon", "away_team": "Baylor", "season": 2026})
+        self.assertEqual(out, {"returning_production": {"percent_ppa": 0.5}})
+
+    def test_a_failed_snapshot_read_returns_EMPTY_not_a_half_block(self) -> None:
+        """ABSENT MUST STAY ABSENT. A partially-filled block is indistinguishable
+        from a working one -- the failure `model_engine_standard.md` exists for."""
+
+        def boom(**_kwargs):
+            raise OSError("snapshot unreadable")
+
+        original = feature_payload.build_payload
+        try:
+            feature_payload.build_payload = boom
+            self.assertEqual(
+                G._ncaaf_build_feature_payload(home_team="A", away_team="B", season=2026), {}
+            )
+        finally:
+            feature_payload.build_payload = original
+
+
+class PaceAbsenceTests(unittest.TestCase):
+    def test_the_builder_still_documents_why_pace_is_excluded(self) -> None:
+        """`[2026-09-07, user decision: "dont enable ncaaf pace"]` -- and the
+        module had reached the same conclusion independently, before I did.
+
+        `calibrate_ncaaf_drive_structure.py` measured the ENGINE'S RESPONSE to
+        real pace: possessions/game 23.65 truth -> 20.02 at profile v2 -> 17.91
+        when fed the true 26.27 league mean; seconds/drive 165.4 -> 185.7 ->
+        209.1. Every primary moves FURTHER from truth. Hitting truth through this
         input alone needs ~22.0 s/play, BELOW the hardcoded 24.0 and below any
-        real team, so `pace_seconds_per_play` is not on the scale its name
-        implies and recalibration does not fix that.
+        real team -- so `pace_seconds_per_play` is not on the scale its name
+        implies, and recalibration does not fix that.
 
-        This test pins the ABSENCE so a future reader who finds only
-        `sources.pace_snapshot_path`'s docstring ("every game pinned 18% faster
-        than the average team plays" -- true of the real world, not of the
-        engine) does not helpfully re-add it.
+        Pinned so a reader who finds only `sources.pace_snapshot_path`'s
+        docstring ("every game pinned 18% faster than the average team actually
+        plays" -- true of the REAL WORLD, not of the engine) cannot helpfully
+        add it back. If pace is ever fed, this test should be rewritten
+        deliberately with a drive-structure measurement, not deleted.
         """
-        payload = G.build_ncaaf_feature_generation_payload("Oregon", "Baylor")
-        self.assertNotIn("pace", payload)
-
-    def test_the_pass_through_keys_keep_their_snapshot_names(self) -> None:
-        payload = G.build_ncaaf_feature_generation_payload("Oregon", "Baylor")
-        self.assertEqual(payload["returning_production"]["percent_ppa"], 0.82)
-        self.assertEqual(payload["coach_continuity"]["continuity_score"], 0.95)
-
-    def test_bare_keys_are_HOME_framed(self) -> None:
-        home_first = G.build_ncaaf_feature_generation_payload("Oregon", "Baylor")
-        G._NCAAF_FEATURE_SNAPSHOT_CACHE.clear()
-        away_first = G.build_ncaaf_feature_generation_payload("Baylor", "Oregon")
-        self.assertEqual(home_first["returning_production"]["percent_ppa"], 0.82)
-        self.assertEqual(away_first["returning_production"]["percent_ppa"], 0.31)
-
-    def test_absent_snapshots_return_EMPTY_not_zeros(self) -> None:
-        """A block of zeros reads as 'measured, and average'."""
-        import syndicate.features.ncaaf.sources as S
-        S.pace_snapshot_path = lambda: Path(self.tmp.name) / "nope.csv"
-        S.returning_production_snapshot_path = lambda: Path(self.tmp.name) / "nope2.csv"
-        S.coach_continuity_snapshot_path = lambda: Path(self.tmp.name) / "nope3.csv"
-        G._NCAAF_FEATURE_SNAPSHOT_CACHE.clear()
-        self.assertEqual(G.build_ncaaf_feature_generation_payload("Oregon", "Baylor"), {})
-
-    def test_an_unknown_team_is_absent_not_defaulted(self) -> None:
-        payload = G.build_ncaaf_feature_generation_payload("Nowhere State", "Oregon")
-        # Home is unknown, so the HOME-framed bare key must not exist.
-        self.assertNotIn("percent_ppa", payload.get("returning_production", {}))
-        self.assertEqual(payload["returning_production"]["away_percent_ppa"], 0.82)
+        source = Path(feature_payload.__file__).read_text(encoding="utf-8")
+        self.assertIn("NULL AT SOURCE", source)
+        self.assertIn("pace", source)
 
 
-class ReachabilityTests(_Snapshots):
-    def test_the_payload_CHANGES_what_the_engine_computes(self) -> None:
-        payload = G.build_ncaaf_feature_generation_payload("Oregon", "Baylor")
-        self.assertTrue(payload, "no payload built; the rest would be vacuous")
+class ReachabilityTests(unittest.TestCase):
+    """`off != on` must change what the ENGINE computes, not just what we build."""
+
+    def test_a_payload_CHANGES_the_drive_priors(self) -> None:
+        payload = {
+            "returning_production": {"percent_ppa": 0.85},
+            "coach_continuity": {"continuity_score": 0.95},
+        }
         inert = build_drive_priors(SmartSim2SimulationInput(home_team="O", away_team="B", seed=1))
         fed = build_drive_priors(SmartSim2SimulationInput(
             home_team="O", away_team="B", seed=1, feature_generation_payload=payload))
         self.assertNotEqual(_fp(inert), _fp(fed),
-                            "payload reached build_drive_priors and changed NOTHING")
+                            "the payload reached build_drive_priors and changed NOTHING")
 
-    def test_real_pace_moves_the_index_OFF_the_24_second_constant(self) -> None:
-        """The measured defect, pinned: 24.0 s/play -> pace_index +0.400 on every
-        game. A 20.0 s/play team and a 31.0 s/play team must not share it."""
-        fast = build_drive_priors(SmartSim2SimulationInput(
+    def test_a_STRONGER_input_moves_the_priors_differently_than_a_weaker_one(self) -> None:
+        """Direction, not merely difference: a payload that perturbed the priors
+        randomly would pass the test above and mean nothing."""
+        strong = build_drive_priors(SmartSim2SimulationInput(
             home_team="O", away_team="B", seed=1,
-            feature_generation_payload={"pace": {"pace_seconds_per_play": 20.0}}))
-        slow = build_drive_priors(SmartSim2SimulationInput(
+            feature_generation_payload={"returning_production": {"percent_ppa": 0.95}}))
+        weak = build_drive_priors(SmartSim2SimulationInput(
             home_team="O", away_team="B", seed=1,
-            feature_generation_payload={"pace": {"pace_seconds_per_play": 31.0}}))
-        default = build_drive_priors(SmartSim2SimulationInput(home_team="O", away_team="B", seed=1))
-        self.assertNotEqual(_fp(fast), _fp(slow))
-        self.assertNotEqual(_fp(fast), _fp(default))
-        self.assertNotEqual(_fp(slow), _fp(default))
+            feature_generation_payload={"returning_production": {"percent_ppa": 0.05}}))
+        self.assertNotEqual(_fp(strong), _fp(weak))
 
 
 def _fp(profile) -> tuple:
