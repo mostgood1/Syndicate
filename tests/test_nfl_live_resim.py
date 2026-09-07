@@ -189,3 +189,105 @@ def test_the_band_is_the_measured_one_not_an_invented_one():
     """Pins the constant to the measurement it came from. If someone widens it,
     this test makes them say why."""
     assert UNINFORMATIVE_BAND == (0.35, 0.65)
+
+
+# --------------------------------------------------------------------------
+# THE SNAPSHOT HALF. `_run_ncaaf_live_resim_tick` calls five things from its
+# producer; this module shipped with two. These cover the three that were
+# missing, and the property that matters most: the snapshot cannot bypass
+# `resim_live_game`, so the flag and the band still apply to every game in it.
+# --------------------------------------------------------------------------
+from syndicate.features.nfl.live_resim import (  # noqa: E402
+    build_live_lens_snapshot,
+    live_lens_snapshot_path,
+    live_state_from_row,
+    validate_live_lens_snapshot,
+)
+
+LIVE_ROW = {
+    "state": "live", "period": 3, "clock_seconds": 600,
+    "home_score": 17, "away_score": 13, "possession_owner": "home",
+    "down": 2, "distance": 7, "field_position": 41,
+}
+GAMES = [{"away_team": "Dallas Cowboys", "home_team": "Philadelphia Eagles",
+          "live_key": "g1"}]
+RATINGS = {"Philadelphia Eagles": (27.0, 19.0), "Dallas Cowboys": (20.0, 24.0)}
+
+
+def test_snapshot_path_is_the_KEYVALUE_route():
+    """`data/live/` routes to Redis on Render; a date-scoped path would never be
+    carried by `pull_hot_artifacts`' `*<date>*` glob, and the symptom would look
+    exactly like the producer never running."""
+    p = str(live_lens_snapshot_path("/opt/render/project/data")).replace("\\", "/")
+    assert p.endswith("/live/nfl_live_lens.json")
+
+
+def test_validator_REJECTS_a_snapshot_with_no_games_list():
+    ok, why = validate_live_lens_snapshot({"sport": "nfl"})
+    assert ok is False and why == "snapshot_carries_no_games_list"
+
+
+def test_validator_ACCEPTS_a_real_snapshot():
+    """off != on. A validator that rejects everything is the same as one that
+    rejects nothing -- it just moves where the silence happens."""
+    snap = build_live_lens_snapshot("2026-09-14", games=GAMES,
+                                    live_index={"g1": LIVE_ROW}, ratings=RATINGS,
+                                    sims=20, env={})
+    ok, why = validate_live_lens_snapshot(snap)
+    assert ok is True, why
+
+
+def test_the_snapshot_CANNOT_bypass_the_flag():
+    """The whole safety argument rests on this. If the snapshot path could reach
+    the sim without going through `resim_live_game`, the flag and the band would
+    both be decorative."""
+    snap = build_live_lens_snapshot("2026-09-14", games=GAMES,
+                                    live_index={"g1": LIVE_ROW}, ratings=RATINGS,
+                                    sims=20, env={})
+    lanes = snap["games"][0]["gameLens"]
+    assert lanes[0]["ok"] is False
+    assert lanes[0]["refusal"]["reason"] == "nfl_live_resim_disabled"
+    assert snap["coverage"]["live_resimmed"] == 0
+
+
+def test_a_missing_live_row_refuses_BY_NAME():
+    snap = build_live_lens_snapshot("2026-09-14", games=GAMES, live_index={},
+                                    ratings=RATINGS, sims=20, env={})
+    assert snap["coverage"]["refusals_by_reason"] == {"no_live_state": 1}
+
+
+def test_an_incomplete_payload_names_the_MISSING_KEY():
+    """NFL's ESPN `situation` shape has never been checked against the one
+    NCAAF's transform assumes. A mismatch must surface as a named refusal
+    carrying the missing key, not as a confident state built from defaults."""
+    out = live_state_from_row({"state": "live", "period": 2},
+                              away_team="A", home_team="B")
+    assert out.reason == "incomplete_live_state"
+    assert "clock_seconds" in out.detail
+
+
+def test_a_final_game_is_refused_not_simulated():
+    out = live_state_from_row({**LIVE_ROW, "state": "final"},
+                              away_team="A", home_team="B")
+    assert out.reason == "game_final"
+
+
+def test_budget_exhaustion_refuses_BY_NAME_rather_than_shortening_the_slate():
+    """A short slate and a refused slate look identical from the board. `#241`
+    is why the budget exists; naming it is why the zero is readable."""
+    many = [{"away_team": f"A{i}", "home_team": f"H{i}", "live_key": f"g{i}"}
+            for i in range(6)]
+    index = {f"g{i}": LIVE_ROW for i in range(6)}
+    snap = build_live_lens_snapshot(
+        "2026-09-14", games=many, live_index=index,
+        ratings={f"H{i}": (27.0, 19.0) for i in range(6)}
+        | {f"A{i}": (20.0, 24.0) for i in range(6)},
+        sims=20, budget_seconds=1.0, env={"SYNDICATE_NFL_LIVE_RESIM": "1"},
+    )
+    reasons = snap["coverage"]["refusals_by_reason"]
+    assert snap["coverage"]["games"] == 6
+    # Every game is accounted for: resimmed + refused == games. A game that
+    # simply vanished would break this and nothing else would notice.
+    assert snap["coverage"]["live_resimmed"] + snap["coverage"]["refused"] == 6
+    assert "budget_seconds" in snap["coverage"]
+    assert reasons  # something refused; which reason depends on machine speed

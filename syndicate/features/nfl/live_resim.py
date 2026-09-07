@@ -381,3 +381,220 @@ def summarise(games: list[Mapping[str, Any]]) -> dict[str, Any]:
         "refusals_by_reason": reasons,
         "enabled": nfl_live_resim_enabled(),
     }
+
+
+# ---------------------------------------------------------------------------
+# THE SNAPSHOT HALF. Added 2026-09-07 after lane `soccer-unfed-inputs` went to
+# write the worker tick and found this producer had only two of the five things
+# `_run_ncaaf_live_resim_tick` calls. These three are the missing ones.
+#
+# THEY LIVE HERE AND NOT IN THE TICK, deliberately. The snapshot SHAPE and its
+# validator are the contract `live_lens_loop` reads, so putting them in the
+# worker would leave that contract in two places and let a lane-shape change
+# silently disagree with the validator meant to catch exactly that. Same reason
+# the season pull moved into the sweep rather than into a caller: one owner per
+# invariant.
+# ---------------------------------------------------------------------------
+
+DEFAULT_BUDGET_SECONDS = 90.0
+
+
+def default_budget_seconds() -> float:
+    raw = str(os.environ.get("SYNDICATE_NFL_LIVE_RESIM_BUDGET_SECONDS") or "").strip()
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_BUDGET_SECONDS
+    return value if 1.0 <= value <= 600.0 else DEFAULT_BUDGET_SECONDS
+
+
+def live_lens_snapshot_path(data_root: Any) -> Any:
+    """Where the join reads. The same route every other sport's live lens takes.
+
+    `data/live/nfl_live_lens.json` is NOT date-scoped and does not need to be:
+    `refresh_state_store.write_json_file` routes `data/live/` to the KEYVALUE
+    backend on Render, so it reaches the web service through Redis rather than
+    through `pull_hot_artifacts`, whose `*<date>*` glob would never match an
+    undated filename. `mlb_live_lens.json`, `wnba_live_lens.json` and
+    `ncaaf_live_lens.json` all take this route.
+
+    Putting NFL anywhere else would make it the one sport the join cannot see,
+    and the symptom would be indistinguishable from "the producer never ran" --
+    which is the ambiguity this whole lane exists to remove.
+    """
+    from pathlib import Path
+
+    return Path(data_root) / "live" / "nfl_live_lens.json"
+
+
+def validate_live_lens_snapshot(snapshot: Any) -> tuple[bool, str]:
+    """Shape gate for `live_lens_loop`. Cheap, and it must not pass an empty."""
+    if not isinstance(snapshot, Mapping):
+        return False, "snapshot_is_not_a_mapping"
+    games = snapshot.get("games")
+    if not isinstance(games, list):
+        return False, "snapshot_carries_no_games_list"
+    for game in games:
+        if not isinstance(game, Mapping):
+            return False, "game_is_not_a_mapping"
+        if not str(game.get("home_name") or "").strip():
+            return False, "game_carries_no_home_name"
+        if not isinstance(game.get("gameLens"), list):
+            return False, "game_carries_no_gameLens"
+    return True, "ok"
+
+
+def live_state_from_row(
+    row: Any, *, away_team: str, home_team: str
+) -> "NflLiveGameState | NflResimRefusal":
+    """Build a resumable state from an already-normalised live-state mapping.
+
+    DELIBERATELY NOT AN ESPN PARSER. `nfl/live_game_state.py` already owns the
+    ESPN shape, and the survey that scoped this work flagged that NFL's
+    `situation` payload has never been checked against the shape NCAAF's
+    transform assumes. Rather than guess at it, this takes explicit fields and
+    REFUSES BY NAME when they are absent -- so a payload mismatch surfaces as
+    `incomplete_live_state` naming the missing key, instead of a confident state
+    assembled out of defaults.
+    """
+    if not isinstance(row, Mapping):
+        return NflResimRefusal("no_live_state", "no live row matched this game")
+    status = str(row.get("state") or row.get("status") or "").strip().lower()
+    if status in {"final", "post", "postgame"}:
+        return NflResimRefusal("game_final", f"state={status!r}")
+    if status not in {"live", "in", "in_progress", "inprogress"}:
+        return NflResimRefusal("game_not_in_progress", f"state={status!r}")
+
+    missing = [k for k in ("period", "clock_seconds", "home_score", "away_score")
+               if row.get(k) is None]
+    if missing:
+        return NflResimRefusal("incomplete_live_state", f"missing {','.join(missing)}")
+    try:
+        period = int(row["period"])
+        clock_seconds = int(row["clock_seconds"])
+        home_score = int(row["home_score"])
+        away_score = int(row["away_score"])
+    except (TypeError, ValueError) as exc:
+        return NflResimRefusal("incomplete_live_state", type(exc).__name__)
+    if period < 1:
+        return NflResimRefusal("no_period", f"period={period}")
+
+    owner = row.get("possession_owner")
+    owner = str(owner).strip().lower() if owner is not None else None
+    if owner not in {"home", "away"}:
+        owner = None
+    return NflLiveGameState(
+        away_team=away_team,
+        home_team=home_team,
+        period=period,
+        clock_seconds=clock_seconds,
+        home_score=home_score,
+        away_score=away_score,
+        down=int(row.get("down") or 1),
+        distance=int(row.get("distance") or 10),
+        field_position=int(row.get("field_position") or 25),
+        possession_owner=owner,
+    )
+
+
+def build_live_lens_snapshot(
+    date_str: str,
+    *,
+    games: Any,
+    live_index: Mapping[str, Mapping[str, Any]],
+    ratings: Mapping[str, Any],
+    sims: int | None = None,
+    budget_seconds: float | None = None,
+    now: Any = None,
+    env: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """One entry per game, one lens lane per entry. Never raises.
+
+    INPUTS ARE INJECTED, and that is deliberate rather than lazy. The week's
+    games, the live index and the ratings each have a different owner and a
+    different failure mode, and a function that fetched all three itself could
+    not be tested without all three -- which is how a producer ships inert.
+
+    THE BUDGET IS A REFUSAL, NOT A TIMEOUT. Worker periodic work is never free
+    (`#241` restarted production in a loop). Games are simulated CHEAPEST-FIRST,
+    because cost falls sharply with time remaining, so the budget buys the most
+    games it can -- and every game it could not reach carries
+    `tick_budget_exhausted` BY NAME rather than vanishing into a silently short
+    slate. A short slate and a refused slate look identical from the board.
+
+    WHAT THIS DOES NOT DO: it does not bypass `resim_live_game`, so the flag and
+    the `UNINFORMATIVE_BAND` refusal apply to every game here. A snapshot built
+    with the flag off is all refusals, by design, and `coverage` says so.
+    """
+    try:
+        from syndicate.features.shared.request_path_guard import (
+            refuse_if_compute_in_request_path,
+        )
+
+        refuse_if_compute_in_request_path("nfl_live_resim_snapshot")
+    except ImportError:  # pragma: no cover - the guard is optional under pytest
+        pass
+
+    n_sims = int(sims or default_sims())
+    budget = float(budget_seconds if budget_seconds is not None else default_budget_seconds())
+    generated_at = str(now or datetime.now(timezone.utc).isoformat())
+
+    prepared: list[tuple[float, dict[str, str], Any]] = []
+    for game in games or ():
+        if not isinstance(game, Mapping):
+            continue
+        away_team = str(game.get("away_team") or "").strip()
+        home_team = str(game.get("home_team") or "").strip()
+        if not away_team or not home_team:
+            continue
+        resolved = live_state_from_row(
+            live_index.get(str(game.get("live_key") or "")),
+            away_team=away_team, home_team=home_team,
+        )
+        remaining = (
+            (4 - resolved.period) * 900 + resolved.clock_seconds
+            if isinstance(resolved, NflLiveGameState) else -1.0
+        )
+        prepared.append((float(remaining),
+                         {"away_team": away_team, "home_team": home_team}, resolved))
+    prepared.sort(key=lambda item: item[0])
+
+    started = time.monotonic()
+    out_games: list[dict[str, Any]] = []
+    for _remaining, names, resolved in prepared:
+        state: Any = None
+        if isinstance(resolved, NflResimRefusal):
+            result: Any = resolved
+        elif time.monotonic() - started >= budget:
+            state = resolved
+            result = NflResimRefusal(
+                "tick_budget_exhausted",
+                f"the {budget:.0f}s budget was spent before this game; NOT a sim "
+                f"failure and NOT an absent game",
+            )
+        else:
+            state = resolved
+            home_off, home_def = ratings.get(names["home_team"], (0.0, 0.0))
+            away_off, away_def = ratings.get(names["away_team"], (0.0, 0.0))
+            result = resim_live_game(
+                state,
+                home_offense=float(home_off), home_defense=float(home_def),
+                away_offense=float(away_off), away_defense=float(away_def),
+                sims=n_sims, env=env,
+            )
+        out_games.append({
+            "away_name": names["away_team"],
+            "home_name": names["home_team"],
+            "gameLens": build_game_lens(state, result, live_state_as_of=generated_at),
+        })
+
+    coverage = summarise(out_games)
+    coverage["budget_seconds"] = budget
+    coverage["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    return {
+        "sport": "nfl",
+        "date": str(date_str or ""),
+        "generated_at": generated_at,
+        "games": out_games,
+        "coverage": coverage,
+    }
