@@ -1736,3 +1736,41 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
 * **`UPDATE 32` NEEDS THE SAME DISCOUNT.** The ring is a peak generator, and that
   measurement stands; but "plausible driver of the OOM" rested on the arena
   response now retracted. It is a contributor of ~0.6 MB per checkpoint.
+
+### `[web-oom-leak]` UPDATE 35 — **THE RING IS INERT ON WEB. It never writes a checkpoint, so the cut could not have affected web's memory and `UPDATE 32`'s premise is wrong for web.**, 2026-09-07T18:2xZ `[session b2b5b45b]`
+
+* **MEASURED, two ways.** `ring_cost` — the per-checkpoint accounting deployed in
+  `224dc5a8` — is **ABSENT on both web workers** (pids 77 and 78) after live
+  traffic, and a collector polled for ~5 minutes without ever seeing it. The env
+  says why: **`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP='false'` on
+  web.** No loop, no `_diag_log_all_process_memory`, no checkpoint.
+* **SO THE RING IS A REFRESH-WORKER COST, NOT A WEB COST.** `#632` is about
+  WEB's OOM. **The ring cannot be a contributor to it.**
+* **`UPDATE 32` IS WRONG FOR WEB.** "The diagnostic machinery built to
+  investigate the OOM is a plausible driver of it" describes a code path web does
+  not execute. The mechanism is real and the local measurement stands — it is
+  simply about the refresh-worker.
+* **AND THIS EXPLAINS `UPDATE 33` STRUCTURALLY.** That A/B toggled
+  `SYNDICATE_RING_KEEP_CMDLINE` on web and read a 38 MB arena difference. **The
+  treatment was INERT on web, so the difference was NECESSARILY confound.**
+  `UPDATE 34` retracted it on evidence (47% of the gap in memory the cut cannot
+  touch); this is the reason that evidence looked the way it did. Two independent
+  routes to the same retraction.
+* **WHY THE LOCAL REPRODUCTION MISLED ME.** Locally the app is not a Render web
+  dyno, so `_start_background_loops()` DOES run and the route really did reach
+  the checkpoint — `tracemalloc` traced it honestly. **The trace was true of my
+  laptop and false of production web**, and nothing in the trace could say so.
+* **THIS IS `[project_which_service_runs_the_code]`, and I had it in front of
+  me.** Loop ownership is an env flag that moves with no diff. I built THREE
+  experiments on web — an arena A/B, its retraction, and a per-checkpoint A/B —
+  before checking whether web runs the code under test. The check that settled it
+  took one request and one env read.
+* **WHAT SURVIVES.** The cut is still correct and still worth having: `18,644 ->
+  9,642` blocks and `360 -> 151 KB` per checkpoint, deterministic, removing data
+  redundant by construction. **Its beneficiary is the REFRESH-WORKER**, where the
+  loop runs and the checkpoint fires ~15x/min. It is live there by default (the
+  flag was only ever set on web).
+* **NEXT, if the ring is worth pursuing:** run the `ring_cost` A/B on
+  **refresh-worker**, not web. The instrumentation is deployed and service-
+  agnostic. And for `#632` proper, the ring is now eliminated as a web-OOM
+  candidate — the field is clear again.
