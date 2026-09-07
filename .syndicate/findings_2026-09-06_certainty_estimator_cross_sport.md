@@ -102,7 +102,20 @@ account WRONG rather than merely incomplete. Verified here before accepting.]`
 
 **MEASURED COST OF THE FIX**, far larger than the NCAAF 2-of-10 I predicted. On
 `/api/board/layer2-shortlist?sport=soccer`: 59 moneyline rows, 28 carrying a
-model edge, **17 of 28 (61%) newly withheld** -- 8 home, 9 away, 0 draw. The 2σ
+model edge, **17 of 28 (61%) newly withheld**. `[SPLIT RETRACTED 2026-09-07 by
+the lane that measured it: the "8 home / 9 away / 0 draw" breakdown CONFLATES TWO
+MECHANISMS and must not be cited. `_model_edge_for` opens with
+`if edge is None: return _modelled_fair_edge_for(...)`, an early return written
+for a ONE-SIDED QUOTE. The new gate writes `edge_vs_market_pct = None` for a
+DIFFERENT state -- priced and withheld as imprecise -- and the two are
+indistinguishable at that line, so withholding the HOME leg silently drops the
+DRAW and AWAY legs before their own bars are ever consulted (3 of 10 legs on a
+09-07 sample). Not a safety hole -- `_modelled_fair_edge_for` is side-matched and
+returns None rather than an ungated number -- but the per-side counts measure the
+early return as much as the gate. The 17/28 TOTAL stands; the split does not.
+This is the same shape as `ANALYTIC_UNCALIBRATED` and as "unknown must not
+default permissive": ONE FIELD CARRYING TWO STATES, with the consumer branching
+as if it carried one.]` The 2σ
 bar at n=400 is 4.00pp at p=0.20 and 4.98pp at p=0.50, and soccer disagreements
 are usually smaller than that. **The estimator shift was negligible (mean
 +0.03pp): the GATE does all the work.** Do not attribute the drop to

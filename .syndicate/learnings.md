@@ -2951,3 +2951,42 @@ still not count.
   with PowerShell's AUTOMATIC `$Args`, so git ran with no arguments. **The script
   parsed cleanly through all four.**
 - *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-07 FORBIDDEN: reading an artifact-backed surface ONCE to decide whether a deploy worked
+
+**The instrument's clock is not the thing's clock.** Three separate lessons in
+this ledger are one lesson, and naming them together is what makes the next one
+recognisable:
+
+- `lastRunAt` is DISPATCH, not EXECUTION (Modern Standby stalled a scheduled call
+  9h13m; the timestamp was honest about the wrong event).
+- Gate verification on ARTIFACT MTIME, not on deploy status (a 5h49m lag between
+  a deploy going live and the artifact rebuilding read as a failed fix).
+- A SHORTLIST READ shows the artifact's age, not the code's. Measured 2026-09-07
+  by lane `soccer-threeway-precision-gate`: refresh-worker went `status=live` at
+  01:26:11Z and the served shortlist stayed flat -- 36 rows / 28 edged -- for
+  EIGHT MINUTES, changing to 35/11 only at 01:34:05Z on the first post-deploy
+  build. **A single read at 01:27Z would have recorded a clean null result for a
+  fix that was already live.**
+
+THE OPERATIONAL FORM, which is the part that is actionable: **the poll interval
+must be SHORTER than the artifact's rebuild cadence.** Four samples across eight
+minutes made the transition legible; one sample is indistinguishable from a
+failed fix, and two samples on the same side of the boundary are worse -- they
+look like corroboration.
+
+WHY THIS KEEPS RECURRING. Every one of these instruments is honest about
+something; it is just not the something being asked. `status=live` is true about
+the deploy. `lastRunAt` is true about dispatch. The shortlist is true about the
+last build. Each answers a question adjacent to "is the new code's output
+visible", and adjacency is what makes the substitution invisible.
+
+The same 2026-09-07 exchange produced a second instance of a rule already here --
+**one field carrying two states, with the consumer branching as if it carried
+one.** `_model_edge_for` returns early on `edge is None`, written for a one-sided
+quote; a new precision gate then wrote `None` for "priced and withheld", and the
+early return silently dropped the draw and away legs before their own bars were
+consulted (3 of 10 legs). Sibling of `ANALYTIC_UNCALIBRATED` and of "unknown must
+not default permissive". A per-side count taken across that boundary measures the
+early return as much as the gate, which is why the "8 home / 9 away / 0 draw"
+split was retracted while the 17-of-28 total stood.
