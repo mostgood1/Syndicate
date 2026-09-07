@@ -1742,7 +1742,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   and a test that the basis agrees with `_model_edge_for` by construction.
 - Blocked by: none.
 
-### web-oom-profiler-steady — OPEN — REOPENED 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **`#632` REFRAMED: web is not dying of MEMORY, it is dying of LATENCY. 32.5% of requests exceed the 5 s health-check budget; 35 `server_failed` events, ZERO `evicted=True`. Mechanisms for the two worst routes are on `main` with 27 tests; neither is landed at its call site.**
+### web-oom-profiler-steady — OPEN — REOPENED 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **`#632` REFRAMED: web is not dying of MEMORY, it is dying of LATENCY. 32.5% of requests exceed the 5 s health-check budget; 35 `server_failed` events, ZERO `evicted=True`. BOTH call-site fixes are now LANDED (`d5e4cc51`) — export walk lists each directory once instead of 18×, and the intelligence cache does 1 rebuild per key instead of 8. PRODUCTION IS UNMEASURED: no deploy, no load test, and the A/B's elapsed was UNCHANGED because it measured work count, not wall clock.**
 - Goal: remove the request-path work that starves web's 8 gunicorn slots, one
   route at a time, each with a measurement.
 - Files: `syndicate/blueprints/ops.py` (TAKEN 2026-09-07, see that lane's block),

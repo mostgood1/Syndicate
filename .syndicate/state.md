@@ -1867,7 +1867,7 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   5 s median and 1.5 MB responses. Raising `GUNICORN_THREADS` would buy headroom
   but treats the symptom.
 
-### `[web-oom-leak]` UPDATE 38 — **BOTH SLOW ROUTES FIXED AND TESTED ON `main`; NEITHER IS LANDED AT ITS CALL SITE, because every lane claiming those two files is owned by an absent session.**, 2026-09-07T23:1xZ `[session b2b5b45b]`
+### `[web-oom-leak]` UPDATE 38 — **BOTH SLOW ROUTES FIXED AND TESTED ON `main`.** ~~NEITHER IS LANDED AT ITS CALL SITE~~ **— SUPERSEDED ON THE LANDING QUESTION BY `UPDATE 39`: both were landed 2026-09-07 on an explicit user decision. Everything else here still stands.**, 2026-09-07T23:1xZ `[session b2b5b45b]`
 
 `UPDATE 37` named three slow routes. Two now have a mechanism on `main` with
 tests, and a verified diff waiting for the file's owner.
@@ -1916,3 +1916,41 @@ that bound was added to fix. **A cache is not a drop-in for a cache.**
 typical / 11.6 s worst) and the `request_path_guard` line that already names a
 live ESPN fetch inside a Flask handler
 (`operation=wnba_has_games_for_date_espn_fetch`).
+
+
+### `[web-oom-leak]` UPDATE 39 — **BOTH CALL-SITE PATCHES ARE LANDED ON `main` (`d5e4cc51`). Production is still UNMEASURED.**, 2026-09-07T23:4xZ `[session b2b5b45b]`
+
+`UPDATE 38` left both fixes one diff short of their call sites, blocked on lane
+claims. User decision: "land both patches". Both are in.
+
+* **`syndicate/blueprints/ops.py`** — the export walk now lists each directory
+  ONCE instead of once per pattern naming it (18× for the busiest, per sport,
+  per request). 43/38 line churn is one level of dedent.
+* **`pipeline/intelligence_state.py`** — a single flight around
+  `_COMBINED_INTELLIGENCE_RESPONSE_CACHE`. The store and its ROW-COUNT pruning
+  are untouched on purpose.
+
+**What is measured:** 8 threads against the REAL
+`read_combined_intelligence_response` go from **8 date-reads to 1**. 122 tests
+in the directly relevant suites, 279 across everything calling that function.
+
+**What is NOT, and this is the part that matters:** production. No load test and
+no deploy. **Elapsed in that A/B was UNCHANGED at ~1.00 s** — the stub sleeps, so
+parallel sleeps do not contend. The A/B measures WORK COUNT; the production claim
+is SLOT OCCUPANCY (each rebuild holds one of web's 8 gunicorn slots for 5–18 s),
+which is an argument, not a reading. **The verification this lane owes is the
+≥5 s request share re-measured the same way as the 32.5% baseline, AFTER a
+deploy.** `COMBINED_BOARD_SERVED_STALE` is the line proving the single flight
+fires, and it needs a request-count denominator beside it.
+
+**Five NFL-nickname tests are red** (`test_ask_sport_coverage.py`,
+`test_ask_the_syndicate.py`). They fail IDENTICALLY on clean HEAD with both
+patches reverted — measured, not assumed. Pre-existing, and not this lane's.
+
+**Claims, for the record.** All four owning sessions are absent from
+`list_sessions(include_archived=True, limit=80)`; `send_message` to `520cd594`
+returned `Session not found`, which is how absence was CONFIRMED rather than
+inferred from a roster scan. `ops.py` TAKEN from `ncaaf-live-resim-wire`.
+`intelligence_state.py` NOT claimed — a NOTICE in `layer2-sim-disagrees`, since
+claiming it would contest the one live holder and `check_lane_invariants.py`
+fails on that, correctly.
