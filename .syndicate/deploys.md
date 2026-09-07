@@ -27,7 +27,31 @@ One glob finds everything present; the other finds NOTHING present and copies
 all nine. The `*.csv` seed had been running successfully for weeks beside a file
 it could never match.
 
-**verify (READING 2, OWED):** the first `soccer_source/.../sim_input_report_*.json`
+**READING 2 — CONFIRMED 2026-09-07T20:53:10Z. 6 ALARMS → 2.**
+
+    generated 2026-09-07T20:53:10.104862Z  host=worker
+    ALARMS   ['attacking_metrics.big_chances_per_match',
+              'tempo_metrics.pace_seconds_per_event']
+    disabled ['goals_per_match','goals_against_per_match','ppda',
+              'model_probability','ppda']
+
+`possession_metrics.possession_share`, BOTH `set_piece_metrics.set_piece_xg_share`
+sites and `availability_metrics.availability_index` are `ok`. **The two survivors
+are the two that had to survive** — `big_chances_per_match` and
+`pace_seconds_per_event` have no column in football-data, so their remaining is
+the control: had they vanished too, the instrument would be wrong rather than
+the data fixed.
+
+**PROVENANCE, stated because it is not what it looks like.** The report was
+produced by `ae9cf867` (live 20:41:26Z, a PEER's deploy of the artifact-publisher
+choke-point fix), not by my `a9a0d958`. That SHA carries the seed and the 1h
+throttle — checked by content, 2 hits for `espn_match_stats.json` and
+`min-interval-hours 1`. **The credit belongs to the seed that ran at 20:12:33Z**,
+which put the files on disk; the later boot merely read them. A reading taken
+after someone else's deploy is still valid, but attributing it to my deploy
+would be wrong.
+
+**Superseded verify text:** the first `soccer_source/.../sim_input_report_*.json`
 with `generated_at` after 20:11:58Z must drop from **6 alarms to 2** —
 `possession_metrics.possession_share`, both `set_piece_metrics.set_piece_xg_share`
 sites and `availability_metrics.availability_index` flipping to `ok`.

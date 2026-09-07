@@ -109,6 +109,20 @@ the already-present CSVs, because the seeder skips any directory with a match.
 one.** Local said 2 alarms; production says 6. Anyone quoting the local number
 as the engine's input health would be wrong by three fields.
 
+**CLOSED 2026-09-07T20:53:10Z — 6 ALARMS → 2, read in production.** After the
+seed landed (9 leagues, 20:12:33Z), `possession_share`, both `set_piece_xg_share`
+sites and `availability_index` all read `ok`. The two survivors,
+`big_chances_per_match` and `pace_seconds_per_event`, are the ones with no
+column in football-data — they had to survive, and their remaining is what
+distinguishes a fixed input from a broken instrument. Report produced by
+`ae9cf867` (a peer's deploy carrying the same seed), so the credit is the
+20:12:33Z seed, not the deploy that read it.
+
+**Where soccer's input surface actually stands:** 18 read sites — 11 fed, 5
+unpopulated BY DECISION with recorded reasons, 2 genuinely unfed and blocked on
+a DATA SOURCE rather than wiring. Nothing on this engine is now unfed for a
+reason nobody has written down.
+
 **THE MARKET PRIOR WAS A KEY MISMATCH.** `attach_market_odds` writes
 `market_odds` — the ANCHOR's input. The engine reads `market_features` and was
 never given one, while `totals` (1,450 rows) and `spreads` (812) were parsed out
