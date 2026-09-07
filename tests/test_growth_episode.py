@@ -27,6 +27,7 @@ def _reset(monkeypatch):
     memory_observability._GROWTH_EPISODE_STATE.update({
         "baseline": None, "last_check": 0.0, "episodes": [], "routes": {},
         "max_delta_mb": 0.0, "checks": 0, "pymalloc_budget": {"count": 0},
+        "last_capture": None, "requests_total": 0,
     })
     # Default the process PAST the warm-up, so a test opts IN to the boot-ramp
     # path rather than being silently blocked by it. Left the other way round,
@@ -40,6 +41,7 @@ def _reset(monkeypatch):
     memory_observability._GROWTH_EPISODE_STATE.update({
         "baseline": None, "last_check": 0.0, "episodes": [], "routes": {},
         "max_delta_mb": 0.0, "checks": 0, "pymalloc_budget": {"count": 0},
+        "last_capture": None, "requests_total": 0,
     })
 
 
@@ -337,3 +339,22 @@ def test_the_latest_triple_is_published_whether_or_not_it_fires(monkeypatch):
     assert cap["anon"] == 500.0
     assert cap["glibc"] == 390.0
     assert cap["pymalloc"] == 162.0
+
+
+def test_a_volume_denominator_survives_with_the_profile_off(monkeypatch):
+    """The A/B this enables toggles SYNDICATE_REQUEST_MEMORY_PROFILE, which is
+    where `solo_attributed` lives. A rate compared between arms with no volume
+    denominator cannot tell "the fix worked" from "traffic was lower", so the
+    count has to come from the detector itself and be LIFETIME -- the
+    per-baseline route table resets on every rebase."""
+    monkeypatch.setenv("SYNDICATE_GROWTH_EPISODE", "1")
+    monkeypatch.setenv("SYNDICATE_GROWTH_EPISODE_CHECK_SECONDS", "600")
+    monkeypatch.delenv("SYNDICATE_REQUEST_MEMORY_PROFILE", raising=False)
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: 500.0)
+    for _ in range(9):
+        memory_observability.maybe_capture_growth_episode("/x")
+    report = memory_observability.growth_episode_report()
+    assert report["requests_total"] == 9
+    # It must NOT reset when the baseline does.
+    memory_observability._growth_rebase({"t": 0.0, "anon": 1.0, "glibc": None, "pymalloc": None})
+    assert memory_observability.growth_episode_report()["requests_total"] == 9

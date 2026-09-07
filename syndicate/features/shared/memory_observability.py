@@ -3479,6 +3479,12 @@ _GROWTH_EPISODE_STATE: dict[str, Any] = {
     "routes": {},            # rule -> count since the baseline
     "max_delta_mb": 0.0,     # largest rise SEEN, even if it never fired
     "last_capture": None,    # most recent triple, fired or not
+    # LIFETIME request count. The per-baseline `routes` table resets on every
+    # rebase, and `solo_attributed` lives in the request-memory profile -- which
+    # is the very thing an A/B here would be toggling. A rate compared between
+    # arms without a volume denominator cannot tell "the fix worked" from
+    # "traffic was lower", so the denominator has to survive both arms.
+    "requests_total": 0,
     "checks": 0,
     "pymalloc_budget": {"count": 0},
 }
@@ -3621,6 +3627,7 @@ def maybe_capture_growth_episode(route: str | None = None) -> dict[str, Any] | N
         if not growth_episode_enabled():
             return None
         state = _GROWTH_EPISODE_STATE
+        state["requests_total"] = int(state["requests_total"]) + 1
         if route:
             routes = state["routes"]
             if route in routes or len(routes) < _GROWTH_EPISODE_ROUTE_CAP:
@@ -3724,6 +3731,7 @@ def growth_episode_report() -> dict[str, Any]:
                            if baseline else None),
         "baseline_anon_mb": (round(float(baseline["anon"]), 1) if baseline else None),
         "routes_since_baseline_total": sum(state["routes"].values()),
+        "requests_total": state["requests_total"],
         # The latest triple, so anon / glibc / pymalloc can be tracked over time
         # by polling rather than by adding another measurement.
         "last_capture": (dict(state["last_capture"]) if state["last_capture"] else None),
