@@ -109,7 +109,13 @@ death, never life — do not invert it.
   `syndicate/features/nfl/smartsim2_projection.py`.
   NOT claimed and NOT edited: `syndicate/features/football/sim_engine/smartsim2/**`
   (the engine itself is shared with NCAAF and a change there moves a calibrated
-  sport), `ncaaf/*` (this is the NFL half).
+  sport).
+  NOT claimed: read-only reference: nothing under the NCAAF feature tree — this
+  lane is the NFL half only. (Written without backticks deliberately. A
+  backticked glob naming that tree was parsed as a CLAIM on a path that does not
+  exist, so it guarded nothing while reading like a guard; check_lane_claims
+  flagged it. The first attempt to document that fact re-introduced it, by
+  quoting the offending token inside the explanation.)
 - **HYPOTHESIS, written before testing, and it is a REPEAT of a diagnosis this
   repo already made for the other sport.** `generate_smartsim2_nfl_projections`
   rates teams with `_mean_epa` — expected points added PER PLAY. NCAAF used the
@@ -1413,7 +1419,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   was left alone; one BAD claim (`export`) remains in `render-egress-transport`,
   which belongs to session 9e40eb04 and was relayed, not edited.
 - Blocked by: none.
-### ncaaf-live-resim-wire — OPEN — opened 2026-09-05 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — **TESTABLE OUTCOME MET IN PRODUCTION, BOTH HALVES. The re-sim produces (`sources_seen {live_resim: 9, pregame: 42}`) and its output reaches the board (74-83 rows `live_aware`, reproduced on two builds). NO LIVE EDGE IS PUBLISHED and none should be yet — the blocker is ONE LINE in `ncaaf/game_projections.py`'s h2h branch and it is a money decision, not a wiring one.**
+### ncaaf-live-resim-wire — OPEN — opened 2026-09-05 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — **WIRING DONE AND VERIFIED IN PRODUCTION (`sources_seen {live_resim: 9, pregame: 42}`; 74-83 rows `live_aware`). NOW ALSO CARRYING THE ESTIMATOR FIX: `79149c94` on `origin/main`, NOT DEPLOYED — `live_gameline_join` published the raw Wald `k/n` as the point estimate while computing Agresti-Coull for the interval. Measured cost: 83 of 2,810 MLB h2h rows at exactly 0.0/1.0, 59 PRICED, **2 of 25 games LOST on a stated certainty**. NCAAF reproduced it live today (WSU @ WASH, `P=1.0` for the final ten minutes). DEPLOY IS QUEUED behind `segment-regrade-apply`'s claim — NOT forced. Nothing is verified until a live row shows `point_estimator: "agresti_coull"`. Cross-sport exposure (soccer half-covered, NHL out of reach of this module entirely, NBA/WNBA immune but carrying unfitted scale constants) in `.syndicate/findings_2026-09-06_certainty_estimator_cross_sport.md`.**
 - Goal: `build_live_lens_snapshot` runs on refresh-worker's tick and writes
   `data/live/ncaaf_live_lens.json`, so a live NCAAF board row carries an edge
   priced off a probability that knows the score. ONE testable outcome:
