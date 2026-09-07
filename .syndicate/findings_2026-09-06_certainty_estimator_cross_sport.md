@@ -71,6 +71,46 @@ through the module the fix landed in:
     `REASON_ANALYTIC_UNCALIBRATED` and publishes nothing. Correctly excluded
     from smoothing — there is no output to smooth.
 
+`[CORRECTED 2026-09-07 by lane `soccer-threeway-precision-gate`, which did the
+work and measured it. FOUR corrections to what follows, three of which make my
+account WRONG rather than merely incomplete. Verified here before accepting.]`
+
+1. **THE HOME LEG WAS ALREADY COVERED for certainty; I overstated the exposure.**
+   `attach_soccer_projections` calls `probability_refusal.refuse_published_certainty`
+   at `soccer_projections.py:1276`, one line after pricing. It blanks a
+   `model_prob_over` of exactly 0.0/1.0 and clears the derived edge -- and it
+   reads `model_prob_over` and NOTHING ELSE. So **only draw and away were
+   exposed**, and the home leg's real defect was the missing INTERVAL, not the
+   certainty. The vector below lists `home` alongside them, which reads as
+   three exposed legs. It was two.
+2. **The blocker was much smaller than I recorded.** `n` never had to be plumbed
+   from `live_lens.py`: `soccer/adapters.py:119` already writes
+   `"simulations": distribution.simulations` onto every pregame match output, so
+   `match.get("simulations")` was in hand at the pricing point all along. One
+   assignment, not a cross-module plumb. My "cross-module change to the live
+   board" framing was the reason I deferred it, and it was wrong.
+3. **n is 400, not the 300 in the signature.** Measured, not read: all 114
+   `win_probability` values served by `/soccer/*/api/cards` are exact multiples
+   of 1/400 and no smaller n fits. Infer n from quantisation; the default in the
+   signature is not what production runs.
+4. **`_MODEL_EDGE_MAX_POINTS = 15.0` was hiding the worst cases, which is why
+   this survived so long.** A `0/400` leg against a 0.16 fair reads -16.0pp and
+   is dropped by the CAP -- never by a certainty rule. So the extreme end looked
+   handled while everything between the bar and the cap published freely. A
+   guard that silently absorbs the most alarming cases is worse than none: it
+   removes the evidence that would have prompted a fix.
+
+**MEASURED COST OF THE FIX**, far larger than the NCAAF 2-of-10 I predicted. On
+`/api/board/layer2-shortlist?sport=soccer`: 59 moneyline rows, 28 carrying a
+model edge, **17 of 28 (61%) newly withheld** -- 8 home, 9 away, 0 draw. The 2σ
+bar at n=400 is 4.00pp at p=0.20 and 4.98pp at p=0.50, and soccer disagreements
+are usually smaller than that. **The estimator shift was negligible (mean
++0.03pp): the GATE does all the work.** Do not attribute the drop to
+Agresti-Coull. Shipped on those numbers by user decision.
+
+LANDED: `6a20281c` (home leg) and `8b6a1f4d` (draw/away), both on `origin/main`,
+both routing through `price_moneyline` rather than reimplementing the gate.
+
 **NOT COVERED, AND IT IS A PRICING PATH, NOT A DISPLAY ONE.** `layer2_board`
 (`_model_edge_for`, ~1513, and its sibling at ~1589) builds a three-way vector
 
