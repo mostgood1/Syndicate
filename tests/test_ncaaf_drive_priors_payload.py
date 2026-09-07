@@ -111,15 +111,24 @@ class GateTests(_Snapshots):
 class KeyMappingTests(_Snapshots):
     """The whole point. Right numbers under the wrong names change nothing."""
 
-    def test_pace_is_REMAPPED_to_a_key_the_engine_actually_reads(self) -> None:
+    def test_pace_is_NOT_FED_and_that_is_deliberate(self) -> None:
+        """`[2026-09-07, user decision]` -- reversed after reading the measurement.
+
+        `calibrate_ncaaf_drive_structure.py` measured the SIM'S RESPONSE to real
+        pace and it moves every primary FURTHER from truth: possessions/game
+        23.65 truth -> 20.02 at profile v2 -> 17.91 fed the true 26.27 league
+        mean; seconds/drive 165.4 -> 185.7 -> 209.1. Hitting truth through this
+        input alone needs ~22.0 s/play, BELOW the hardcoded 24.0 and below any
+        real team, so `pace_seconds_per_play` is not on the scale its name
+        implies and recalibration does not fix that.
+
+        This test pins the ABSENCE so a future reader who finds only
+        `sources.pace_snapshot_path`'s docstring ("every game pinned 18% faster
+        than the average team plays" -- true of the real world, not of the
+        engine) does not helpfully re-add it.
+        """
         payload = G.build_ncaaf_feature_generation_payload("Oregon", "Baylor")
-        pace = payload["pace"]
-        # The snapshot's own column name must NOT be what we publish...
-        self.assertNotIn("seconds_per_play", pace)
-        # ...because `_pace_index` reads these, and only these.
-        self.assertIn("pace_seconds_per_play", pace)
-        self.assertEqual(pace["pace_seconds_per_play"], 20.0)
-        self.assertEqual(pace["away_pace_secs_play"], 31.0)
+        self.assertNotIn("pace", payload)
 
     def test_the_pass_through_keys_keep_their_snapshot_names(self) -> None:
         payload = G.build_ncaaf_feature_generation_payload("Oregon", "Baylor")
@@ -130,8 +139,8 @@ class KeyMappingTests(_Snapshots):
         home_first = G.build_ncaaf_feature_generation_payload("Oregon", "Baylor")
         G._NCAAF_FEATURE_SNAPSHOT_CACHE.clear()
         away_first = G.build_ncaaf_feature_generation_payload("Baylor", "Oregon")
-        self.assertEqual(home_first["pace"]["pace_seconds_per_play"], 20.0)
-        self.assertEqual(away_first["pace"]["pace_seconds_per_play"], 31.0)
+        self.assertEqual(home_first["returning_production"]["percent_ppa"], 0.82)
+        self.assertEqual(away_first["returning_production"]["percent_ppa"], 0.31)
 
     def test_absent_snapshots_return_EMPTY_not_zeros(self) -> None:
         """A block of zeros reads as 'measured, and average'."""
@@ -145,8 +154,8 @@ class KeyMappingTests(_Snapshots):
     def test_an_unknown_team_is_absent_not_defaulted(self) -> None:
         payload = G.build_ncaaf_feature_generation_payload("Nowhere State", "Oregon")
         # Home is unknown, so the HOME-framed bare key must not exist.
-        self.assertNotIn("pace_seconds_per_play", payload.get("pace", {}))
-        self.assertEqual(payload["pace"]["away_pace_secs_play"], 20.0)
+        self.assertNotIn("percent_ppa", payload.get("returning_production", {}))
+        self.assertEqual(payload["returning_production"]["away_percent_ppa"], 0.82)
 
 
 class ReachabilityTests(_Snapshots):

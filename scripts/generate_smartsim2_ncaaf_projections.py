@@ -819,17 +819,38 @@ def build_ncaaf_feature_generation_payload(home_team: str, away_team: str) -> di
 
     payload: dict[str, object] = {}
 
-    home_pace = _snapshot_float(pace_snap, home_team, "seconds_per_play")
-    away_pace = _snapshot_float(pace_snap, away_team, "seconds_per_play")
-    if home_pace is not None or away_pace is not None:
-        pace_block: dict[str, float] = {}
-        if home_pace is not None:
-            # MAPPED, not passed through -- see the trap note above.
-            pace_block["pace_seconds_per_play"] = home_pace
-            pace_block["home_pace_secs_play"] = home_pace
-        if away_pace is not None:
-            pace_block["away_pace_secs_play"] = away_pace
-        payload["pace"] = pace_block
+    # ------------------------------------------------------------------
+    # PACE IS DELIBERATELY NOT FED. `[2026-09-07, user decision]`
+    # ------------------------------------------------------------------
+    #
+    # I wired it, and I was wrong to. `scripts/calibrate_ncaaf_drive_structure.py`
+    # had ALREADY MEASURED THE SIM'S RESPONSE to real pace, and it runs the wrong
+    # way:
+    #
+    #     metric              truth    sim @ profile v2   fed TRUE pace (26.27)
+    #     plays per drive      5.77          7.34
+    #     seconds per drive   165.4         185.7                209.1
+    #     possessions/game    23.65         20.02                 17.91
+    #
+    # Feeding the true league mean moves EVERY primary FURTHER from truth.
+    # Hitting truth through this input alone would need ~22.0 s/play -- BELOW the
+    # hardcoded 24.0 and below any real team. `pace_seconds_per_play` is
+    # therefore not on the real-world scale its name implies, and RECALIBRATION
+    # DOES NOT FIX THAT: the drive-structure gap is a profile-parameter problem,
+    # not a missing-input one.
+    #
+    # WHY THIS WAS EASY TO GET WRONG, written down so it is not repeated.
+    # `sources.pace_snapshot_path`'s docstring says the 24.0 fallback "pinned
+    # every game 18% faster than the average team actually plays" -- true, and a
+    # statement about the REAL-WORLD distribution. `calibrate_ncaaf_drive_structure`
+    # is a statement about the ENGINE'S RESPONSE to that input. Two docstrings in
+    # one repo, each correct about a different thing, pointing opposite ways. The
+    # one that actually ran the simulation is the one that decides.
+    #
+    # RE-ADD ONLY WITH a scale mapping (real s/play -> engine units) AND a
+    # drive-structure run showing the primaries move TOWARD truth. `pace_snap` is
+    # still loaded above, so that work needs no plumbing -- only evidence.
+    _unused_pace_snapshot = pace_snap
 
     home_ret = _snapshot_float(ret_snap, home_team, "percent_ppa")
     away_ret = _snapshot_float(ret_snap, away_team, "percent_ppa")
