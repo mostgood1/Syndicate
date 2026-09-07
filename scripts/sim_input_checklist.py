@@ -129,7 +129,26 @@ def _season_artifact_probe(season: int = 2026) -> dict:
     return out
 
 
-SNAPSHOTS = _data_root() / "mlb_source/source_artifacts/data/daily_pitcher_props/snapshots"
+# THE ROSTERS THE SIM ACTUALLY READS, and this was WRONG until 2026-09-07.
+#
+# It pointed at `daily_pitcher_props/snapshots` -- a DIFFERENT PIPELINE. The sim
+# reuses `data/daily/snapshots/<date>/roster_objs/`, which is what
+# `daily_update.py --use-roster-artifacts` names in its own help text.
+#
+# WHAT THE WRONG PARENT COST. The published report said ten pitcher fields were
+# at 0.0% for nineteen consecutive days. Reading the rosters directly on
+# production the same day: `pitch_type_whiff_mult` 14/18, `statcast_splits_source`
+# 14/18, and the same on 09-06, 09-04 and 08-25 -- SEVEN of the ten had been fed
+# the whole time. The report and the artifact it claims to summarise flatly
+# contradicted each other, and the report is the one that was wrong. A root
+# cause, a production env change and a deploy were all spent on it before anyone
+# checked the summary against its subject.
+#
+# `rosters: 8` in that report against 12-17 roster files on disk was the visible
+# symptom, and nobody read it as one -- including me, twice.
+_SIM_SNAPSHOTS = _data_root() / "mlb_source/source_artifacts/data/daily/snapshots"
+_LEGACY_SNAPSHOTS = _data_root() / "mlb_source/source_artifacts/data/daily_pitcher_props/snapshots"
+SNAPSHOTS = _SIM_SNAPSHOTS
 
 # Fields that are legitimately sparse. Documented so a low number here is not
 # mistaken for a defect -- anything NOT listed, and consumed, must be populated.
@@ -561,7 +580,24 @@ def main() -> int:
     from sim_engine.data.roster_artifact import read_game_roster_artifact
     from sim_engine.models import BatterProfile, PitcherProfile
 
-    paths = sorted(glob.glob(str(SNAPSHOTS / "*/roster_objs/roster_obj_*.json")))[:args.games]
+    # THE SOURCE IS RECORDED, not just used. A report that does not say which
+    # rosters it measured cannot be checked against them, which is exactly how a
+    # wrong parent directory survived nineteen days of daily publication.
+    roster_source = "sim"
+    paths = sorted(glob.glob(str(_SIM_SNAPSHOTS / "*/roster_objs/roster_obj_*.json")))[:args.games]
+    if not paths:
+        # FALLING BACK IS ANNOUNCED, never silent. The legacy tree belongs to the
+        # daily_pitcher_props pipeline and its rosters are NOT what the sim runs
+        # on -- measuring them and saying nothing is what produced a nineteen-day
+        # false negative. Reported so a reader can discount the numbers.
+        legacy = sorted(glob.glob(str(_LEGACY_SNAPSHOTS / "*/roster_objs/roster_obj_*.json")))[:args.games]
+        if legacy:
+            roster_source = "legacy_daily_pitcher_props"
+            paths = legacy
+            print(f"WARNING: no rosters under the SIM path {_SIM_SNAPSHOTS} -- "
+                  f"measuring {_LEGACY_SNAPSHOTS} instead. These are a DIFFERENT "
+                  f"pipeline's rosters and every percentage below describes them, "
+                  f"NOT what the sim reads.", flush=True)
     if not paths:
         # Distinguish "wrong root" from "right root, no rosters yet". A bare
         # REFUSED sent me chasing the sim job for hours when the path was wrong.
@@ -711,7 +747,10 @@ def main() -> int:
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(
-            {"rosters": len(paths), "counts": n, "failures": len(failures),
+            {"rosters": len(paths), "roster_source": roster_source,
+             "roster_glob": str((_SIM_SNAPSHOTS if roster_source == "sim" else _LEGACY_SNAPSHOTS)
+                                / "*/roster_objs/roster_obj_*.json"),
+             "counts": n, "failures": len(failures),
              "warnings": len(warnings), "rows": rows}, indent=2), encoding="utf-8")
         print(f"\nwrote {args.json}")
 
