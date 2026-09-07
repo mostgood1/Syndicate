@@ -1,0 +1,163 @@
+# Pull upstream changes into `vendor/` on a schedule, and open a PR with them.
+#
+# WHY THIS EXISTS: `vendor/` holds partial copies of four sibling repos with no
+# shared git history. A fix merged upstream reaches Syndicate only if somebody
+# pulls it, and nothing was pulling it -- the trees had drifted to 24 differing
+# code files before anyone counted. `scripts/sync_vendor_upstream.py` does the
+# pulling; this runs it so that it happens without being remembered.
+#
+# WHY GITHUB ACTIONS AND NOT A LOCAL SCHEDULED TASK: the dev machine's own ledger
+# records `lastRunAt` being a DISPATCH time rather than an execution time, with
+# Modern Standby stalling a scheduled call by 9h13m. A sync that silently does
+# not run is worse than no sync at all, because the report it never produced is
+# indistinguishable from "nothing to do".
+#
+# WHAT IT WILL AND WILL NOT DO:
+#   * applies ONLY `UPSTREAM_AHEAD` -- files we have never touched, where upstream
+#     moved. That is the one state the script itself will act on unattended.
+#   * opens a PR. It NEVER pushes to `main`. The diff is the review surface, and a
+#     change to vendored code deserves a human before it lands.
+#   * reports `CONFLICT` and `UNCLASSIFIED` in the job summary and leaves them
+#     alone. Both need a decision that a cron job has no business making --
+#     see the script's docstring for how to make it.
+#   * never deletes a local-only file and never adds a file we do not vendor.
+#
+# IT DOES NOT FAIL THE BUILD when there is something to decide. A daily red run
+# is a daily ignored run; the signal is the PR and the summary, not the tick.
+# It fails only when the sync itself could not run (exit 2).
+
+name: vendor-sync
+
+on:
+  schedule:
+    # 09:20 UTC daily. Off the hour on purpose: GitHub's scheduler queues heavily
+    # at :00 and drops runs under load.
+    - cron: '20 9 * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply UPSTREAM_AHEAD files and open a PR (off = report only)"
+        type: boolean
+        required: false
+        default: true
+
+concurrency:
+  group: vendor-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # No dependencies: the script is stdlib plus git.
+      - name: Report the current state
+        id: report
+        run: |
+          set -o pipefail
+          python scripts/sync_vendor_upstream.py --json > sync.json || true
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          d = json.load(open("sync.json"))
+          t = d["totals"]
+          print("## vendor sync\n")
+          print("| state | files |")
+          print("|---|---|")
+          for k in sorted(t):
+              print("| `%s` | %d |" % (k, t[k]))
+          print()
+          # Only states that need somebody to DO something. `LOCAL_PATCH` is a
+          # steady state -- 52 of them today -- and printing the list daily is how
+          # a daily summary stops being read.
+          ACTIONABLE = ("UPSTREAM_AHEAD", "CONFLICT", "UNCLASSIFIED")
+          if not any(t.get(s) for s in ACTIONABLE):
+              print("Nothing to decide. %d file(s) in sync, %d local patch(es) held.\n"
+                    % (t.get("IN_SYNC", 0), t.get("LOCAL_PATCH", 0)))
+          for tree in d["trees"]:
+              rows = [r for r in tree["rows"] if r["state"] in ACTIONABLE]
+              if not rows:
+                  continue
+              print("### `vendor/%s` <- %s@%s\n" % (tree["tree"], tree["repo"], tree["branch"]))
+              for r in rows:
+                  print("- `%s` **%s**" % (r["path"], r["state"]))
+              print()
+          if t.get("CONFLICT") or t.get("UNCLASSIFIED"):
+              print("> `CONFLICT` and `UNCLASSIFIED` are left alone. Both need a decision:")
+              print("> does our blob hash appear anywhere in that path's upstream history?")
+              print("> If yes we are merely behind (`--adopt-upstream`); if no it is ours")
+              print("> (`--keep-local`). See the script's docstring.")
+          PY
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          t = json.load(open("sync.json"))["totals"]
+          print("upstream_ahead=%d" % t.get("UPSTREAM_AHEAD", 0))
+          PY
+
+      - name: Apply upstream-ahead files and open a PR
+        if: steps.report.outputs.upstream_ahead != '0' && (github.event_name == 'schedule' || inputs.apply)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python scripts/sync_vendor_upstream.py --apply
+
+          # `--apply` also refreshes baseline entries, so the baseline alone can
+          # change with no vendored content behind it. That is not worth a PR.
+          if [ -z "$(git status --porcelain -- vendor/ | grep -v 'upstream_sync.json' || true)" ]; then
+            echo "Only the baseline changed; nothing to review." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          BRANCH="ci/vendor-sync-$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add vendor/
+          git commit -m "vendor sync: take upstream changes to files we have not patched
+
+          Applied by the \`vendor-sync\` workflow. Only UPSTREAM_AHEAD files were
+          written -- files whose local content still matched the recorded
+          baseline, so nothing of ours is being overwritten. CONFLICT and
+          UNCLASSIFIED files, if any, were left alone and are listed in the run's
+          job summary."
+          git push -u origin "$BRANCH"
+
+          # Opening the PR can be BLOCKED by a repo setting -- "Allow GitHub
+          # Actions to create and approve pull requests", off here as of
+          # 2026-09-06. The branch is already pushed and is the thing that
+          # matters, so a blocked PR must not fail the run or lose the work:
+          # fall back to printing the compare link. Flip that setting on and this
+          # upgrades itself with no change here.
+          if ! gh pr create --base main --head "$BRANCH" \
+            --title "vendor sync: upstream changes to unpatched files" \
+            --body "Opened by the \`vendor-sync\` workflow.
+
+          Only \`UPSTREAM_AHEAD\` files are in this diff — ones whose local content still matched the baseline recorded at the last sync, so no local patch is being reverted. \`CONFLICT\` and \`UNCLASSIFIED\` files are never touched by this job.
+
+          **Read the [job summary](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})** for the full state, including anything left for a human.
+
+          Worth a look before merging: this is vendored code, so the review question is whether the upstream change is one we want, not whether it is correct upstream."; then
+            {
+              echo
+              echo "### PR not opened"
+              echo
+              echo "\`gh pr create\` failed — most likely **Settings → Actions → Allow GitHub Actions to create and approve pull requests** is off."
+              echo
+              echo "**The work is not lost.** The branch \`$BRANCH\` is pushed; open it by hand:"
+              echo
+              echo "${{ github.server_url }}/${{ github.repository }}/compare/main...$BRANCH?expand=1"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
