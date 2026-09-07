@@ -1555,6 +1555,7 @@ def _publish_streamed(
     url: str,
     token: str,
     timeout_seconds: int,
+    publisher: str | None = None,
 ) -> bool | None:
     """Publish by streaming the file's bytes. True/False on a real outcome,
     None when the receiver does not support this form and the caller should
@@ -1621,7 +1622,11 @@ def _publish_streamed(
                 # `#488`: lets the receiver detect two services alternately
                 # overwriting one path. Absent on older senders, which the
                 # receiver handles as UNKNOWN rather than as "same sender".
-                "X-Artifact-Publisher": _publisher_identity(),
+                # `publisher` lets an OPERATOR SCRIPT name itself; None keeps
+                # the service-lane default every in-service caller relies on.
+                "X-Artifact-Publisher": (
+                    _publisher_identity() if publisher is None else publisher
+                ),
                 "Authorization": f"Bearer {token}",
             }
             if encoding:
@@ -1985,6 +1990,34 @@ def _publisher_identity() -> str:
     the permissive branch and would silence exactly the case this detects.
     """
     return str(os.environ.get("SYNDICATE_REFRESH_LANE") or "").strip()
+
+
+def publisher_identity_for_tool(tool_name: str) -> str:
+    """Identity for an OPERATOR SCRIPT that publishes directly.
+
+    `_publish_streamed`'s three script callers -- `publish_sim_input_reports`,
+    `publish_mlb_season_artifacts`, `refresh_mlb_statcast_features` -- are not
+    services. They run wherever an operator or a session runs them, so
+    `SYNDICATE_REFRESH_LANE` is usually unset and every artifact they publish
+    arrived at the receiver as `publisher=unknown`. Measured 2026-09-07: five
+    `sim_input_report` files (wnba/nba/nhl/nfl/ncaaf) were the ONLY remaining
+    unknowns on web's ACCEPTED lines after both worker services were fixed.
+
+    PREFERS THE LANE WHEN THERE IS ONE. Run on the worker, this still says
+    `refresh-worker`, which is the accurate answer and keeps `#488`'s
+    two-services-one-path detection working.
+
+    `tool:` PREFIX ON THE FALLBACK, deliberately. A bare `publish_sim_input_reports`
+    in the publisher field would read like a service name to anyone scanning the
+    log, and `#488` is specifically about telling services apart. The prefix says
+    "this was a tool run, not a service" without inventing a service.
+
+    This does NOT weaken the empty-means-UNKNOWN contract: that exists so an
+    unidentifiable sender is never assumed to be the same publisher as the last
+    one. A tool that names itself is MORE distinguishable, not less -- it can
+    now be told apart from both workers, which is what the guard wants.
+    """
+    return _publisher_identity() or f"tool:{tool_name}"
 
 
 def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepResult:

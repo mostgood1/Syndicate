@@ -182,7 +182,11 @@ def _publish(rel: str, token: str) -> bool | None:
         return None
     return ap._publish_streamed(  # noqa: SLF001
         src, relative_path=rel, url=_base_url() + "/api/ops/artifacts/publish",
-        token=token, timeout_seconds=180)
+        token=token, timeout_seconds=180,
+        # Name the TOOL when there is no service lane -- this script
+        # runs wherever an operator runs it, so every artifact it published
+        # reached the receiver as `publisher=unknown` (measured 2026-09-07).
+        publisher=ap.publisher_identity_for_tool("publish_sim_input_reports"))
 
 
 def _read_back(rel: str, token: str) -> dict | None:

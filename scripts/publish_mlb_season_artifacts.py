@@ -211,7 +211,11 @@ def main() -> int:
     published = 0
     for rel, target, _before, _after in built:
         ok = ap_mod._publish_streamed(  # noqa: SLF001
-            target, relative_path=rel, url=url, token=token, timeout_seconds=180)
+            target, relative_path=rel, url=url, token=token, timeout_seconds=180,
+        # Name the TOOL when there is no service lane -- this script
+        # runs wherever an operator runs it, so every artifact it published
+        # reached the receiver as `publisher=unknown` (measured 2026-09-07).
+        publisher=ap_mod.publisher_identity_for_tool("publish_mlb_season_artifacts"))
         print(f"publish {rel} -> {ok}")
         if ok:
             published += 1

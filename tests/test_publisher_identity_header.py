@@ -127,3 +127,63 @@ def test_publisher_identity_reads_the_service_env(monkeypatch):
     assert ap._publisher_identity() == "live-odds-worker"
     monkeypatch.delenv("SYNDICATE_REFRESH_LANE", raising=False)
     assert ap._publisher_identity() == ""
+
+
+def test_a_TOOL_names_itself_when_there_is_no_service_lane(monkeypatch):
+    """Operator scripts are not services and were publishing as `unknown`.
+
+    `publish_sim_input_reports`, `publish_mlb_season_artifacts` and
+    `refresh_mlb_statcast_features` call `_publish_streamed` directly and run
+    wherever an operator runs them, so `SYNDICATE_REFRESH_LANE` is normally
+    unset. Measured 2026-09-07: five `sim_input_report` files were the only
+    remaining `publisher=unknown` lines on web after BOTH worker services were
+    fixed.
+    """
+    monkeypatch.delenv("SYNDICATE_REFRESH_LANE", raising=False)
+    assert ap.publisher_identity_for_tool("publish_sim_input_reports") == \
+        "tool:publish_sim_input_reports"
+
+
+def test_the_service_lane_WINS_over_the_tool_name(monkeypatch):
+    """Run on the worker, the accurate answer is the service, not the script.
+
+    This is what keeps #488's two-services-one-path detection intact: a tool
+    invoked ON refresh-worker must still report refresh-worker, or the same
+    artifact would carry two different identities depending on how it was
+    launched.
+    """
+    monkeypatch.setenv("SYNDICATE_REFRESH_LANE", "refresh-worker")
+    assert ap.publisher_identity_for_tool("publish_sim_input_reports") == "refresh-worker"
+
+
+def test_the_tool_prefix_cannot_be_mistaken_for_a_service(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_REFRESH_LANE", raising=False)
+    identity = ap.publisher_identity_for_tool("whatever")
+    assert identity.startswith("tool:"), (
+        "a bare script name in the publisher field reads like a service to anyone "
+        "scanning the log, and #488 is precisely about telling services apart"
+    )
+
+
+def test_an_explicit_publisher_overrides_the_lane_default(captured, tmp_path, monkeypatch):
+    """The parameter must actually reach the header, not just exist."""
+    monkeypatch.setenv("SYNDICATE_REFRESH_LANE", "refresh-worker")
+    monkeypatch.setattr(ap, "_data_root", lambda: tmp_path)
+    src = _artifact(tmp_path)
+    ap._publish_streamed(src, relative_path="mlb_source/source_artifacts/data/"
+                         "sim_input_report/sim_input_report_2026-09-07.json",
+                         url="https://example.invalid/api/ops/artifacts/publish",
+                         token="t", timeout_seconds=5, publisher="tool:some_script")
+    assert captured["full"].get("x-artifact-publisher") == "tool:some_script"
+
+
+def test_publisher_None_still_uses_the_service_lane(captured, tmp_path, monkeypatch):
+    """Every in-service caller passes nothing and must be unaffected."""
+    monkeypatch.setenv("SYNDICATE_REFRESH_LANE", "live-odds-worker")
+    monkeypatch.setattr(ap, "_data_root", lambda: tmp_path)
+    src = _artifact(tmp_path)
+    ap._publish_streamed(src, relative_path="mlb_source/source_artifacts/data/"
+                         "sim_input_report/sim_input_report_2026-09-07.json",
+                         url="https://example.invalid/api/ops/artifacts/publish",
+                         token="t", timeout_seconds=5)
+    assert captured["full"].get("x-artifact-publisher") == "live-odds-worker"
