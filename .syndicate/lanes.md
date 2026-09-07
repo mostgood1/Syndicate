@@ -665,7 +665,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `_apply_verdict` is called with `live_projected=verdict["model_prob"]` for
   "EVERY game market (h2h, totals AND spreads)", which is false for h2h, and
   that belief is what hid the `edge_basis` mislabel for three weeks.
-- Files: `syndicate/features/shared/layer2_board.py`
+- Files: released: `syndicate/features/shared/layer2_board.py` — **TAKEN 2026-09-06 by lane `soccer-threeway-precision-gate` (EXPLICIT USER DECISION), same absent owning session as the two claims already released below.** `list_sessions(include_archived=True, limit=100)` on this machine reaches back to 2026-08-27 and does not contain `3492626c-1ec4-4366-9dbe-f194ae319c84`; the claim was held on behalf of nobody. SCOPE TAKEN: the THREE-WAY branches of `_model_edge_for` and `_model_prob_for_side` ONLY — soccer draw/away legs, which price a raw Monte-Carlo `k/n` against the market with no interval and no gate. Measured on the served shortlist 2026-09-06: 9 away rows newly withheld of 28 priced. This lane’s `value_ev` / `_publication_columns` / `_projection_side_in_row_frame` work is NOT touched — ranges checked line-by-line first. Was:
   (**`_projection_side_in_row_frame` / `_model_edge_for` / `_model_prob_for_side`
   / `_publication_columns`, and `[2026-09-04]` the `value_ev` assignment in
   `build_layer2_rows` where the model edge becomes the RANKING value — same
@@ -2366,6 +2366,46 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: production publishes a soccer `sim_input_report` (there are 20 MLB
   and ZERO soccer today); its `failures` list holds only genuinely-unfed fields;
   and an A/B artifact build shows `_market_prior_index` moving off 0.5.
+- Blocked by: none.
+
+### soccer-threeway-precision-gate — CLOSED 2026-09-07 — session 28c6162b-58c8-4937-99f5-d3b260a96de4 — **BOTH PASSES LANDED AND DEPLOYED. (1) `6a20281c`/`8b6a1f4d` — soccer moneyline legs priced through `price_moneyline`; refresh-worker `d9672ac7` live 01:26:11Z, verified 28->11 edged rows across a rebuild. (2) `62937ea4` — fixed the regression that deploy introduced (a withheld HOME leg dropped the DRAW/AWAY legs via the `edge is None` early return); refresh-worker live 02:10:02Z, verified 3 lost legs -> 0, each now serving exactly its own-bar value, with the 3 that fail their own bar still refused. OWED: an end-to-end reading on the SERVED shortlist — the affected fixtures do not clear its filters, so it is a different population and shows nothing either way. Records: `deploys.md` x2, `log/2026-09-06.md`, `state_soccer.md [soccer-moneyline-precision]`.**
+- Goal: soccer `h2h_3_way` draw/away legs stop publishing a raw Monte-Carlo
+  `k/n` point estimate with NO interval and NO precision gate. `sims_run` is
+  plumbed from the soccer artifact onto the projection, and the three-way legs
+  are priced through `live_gameline_join.price_moneyline` so they inherit
+  `agresti_coull_point` + the 2-sigma bar rather than a second copy of the rule.
+- Files: `syndicate/features/shared/soccer_projections.py`,
+  `syndicate/features/soccer/features/live_lens.py`,
+  `syndicate/features/shared/soccer_live_gameline_source.py`,
+  `syndicate/features/shared/layer2_board.py`
+  (**`_model_edge_for` / `_model_prob_for_side` three-way branches ONLY**
+  — see the CLAIM NOTE below),
+  `tests/test_soccer_threeway_precision_gate.py` (new).
+- **CLAIM NOTE on `layer2_board.py` — TAKEN FROM AN UNOWNED LANE, 2026-09-06.**
+  `lane_claims.claims_by_path` over `origin/main:.syndicate/lanes.md` returns
+  `{'layer2-sim-disagrees'}` for this path. That lane's owning session,
+  `3492626c-1ec4-4366-9dbe-f194ae319c84`, is **absent from the full session
+  roster** — `list_sessions(include_archived=True, limit=100)` on this machine,
+  which reaches back to 2026-08-27, does not contain it. Same posture as the
+  2026-08-31 phantom sweep already recorded in this file. Its `Files:` block
+  scopes it to `_projection_side_in_row_frame` / `_model_edge_for` /
+  `_model_prob_for_side` / `_publication_columns` / the `value_ev` assignment,
+  which OVERLAPS mine by function, so this is a real overlap and not a
+  disjoint-by-range case. If that session returns, say so and I will hand back.
+- Hypothesis: the three-way branch at `layer2_board._model_edge_for` prices
+  `{"home","draw","away"}` against the market fair probability directly and
+  never reaches `price_moneyline`, so a `0/300` draw leg publishes `p=0.0` and
+  a large `edge_pp` that no interval ever bounded.
+- Falsification test: if a soccer `h2h_3_way` draw/away row that this branch
+  prices already carries a `withheld_reason`, a `prob_std_err`, or a
+  `std_err_basis`, the branch is NOT ungated and the premise is wrong.
+- Verification: (a) a REACHABILITY test that the three-way branch is entered at
+  all (`off != on`) BEFORE any correctness assertion; (b) a before/after count of
+  soccer three-way legs by `withheld_reason` over a real artifact — rows
+  STARTING to be refused is the correct outcome, and the count is the reading;
+  (c) `prob_std_err` is not applied twice — it reconstructs `successes = p*n`,
+  so smoothing the point estimate BEFORE the SE over-widens the bar.
+- Verification RAN: reachability (`off != on`) through the real `attach_soccer_projections` and through `_model_edge_for`; 847 tests pass across the affected surface; the 2 failures in `test_layer2_lane_chip_join.py` are PRE-EXISTING (re-run with this change stashed, identical). Before/after withheld counts measured on `/api/board/layer2-shortlist?sport=soccer`, not on the local mirror.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
