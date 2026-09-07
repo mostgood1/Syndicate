@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 892 rules `[generated]`
+## Index — 893 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3602,4 +3602,41 @@ The COLLISION is the defect. A missing branch announces itself; a second meaning
 quietly assigned to an existing sentinel does not. Same family as
 `unknown must not default permissive` — one field carrying two states, and the
 consumer branching as if it carried one.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-07 FORBIDDEN: `git reset` the SHARED PRIMARY TREE to origin/main to tidy away unpushed commits. It converts a harmless pointer into 153 files of revert exposure. `[lane soccer-threeway-precision-gate]`
+
+The primary tree sat 3 ahead / 327 behind. All three commits were verified
+CONTENT-REDUNDANT -- every line already upstream, checked per file, with the
+only exceptions being two generated header lines. So "drop them" looks like
+free tidying. It is not.
+
+MEASURED before acting:
+
+    tracked files where working tree != origin/main   170
+      of those, locally MODIFIED (live work)           17
+      of those, merely STALE                          153
+
+**HEAD currently MATCHES the working tree.** That is the property that makes the
+tree safe: a session running `git add -A && git commit` records only its own
+real edits. Move HEAD to origin/main and those 153 stale files become unstaged
+"modifications" that are actually REVERSIONS of up to 327 commits -- and the next
+`add -A` from any of the ~80 sessions on this machine commits them. Every pointer
+move has this shape: `reset --mixed` leaves it in the working tree,
+`reset --soft` puts it in the SHARED index, `update-ref` puts it in both.
+
+So the cosmetic gain ("ahead 3" disappears) is paid for with a
+revert hazard strictly WORSE than the one being tidied.
+
+HOW TO APPLY.
+- Unpushed commits in the primary tree are harmless while HEAD matches the tree.
+  Verify they are content-redundant, say so in the ledger, and LEAVE THEM.
+- If they are NOT redundant, land the unique content by targeted append from a
+  worktree off origin/main -- never by pushing the stale file, and never by
+  rebasing the shared tree.
+- The only real cure is a full sync (merge/pull), which needs the in-flight
+  files landed by their owning sessions first. That is the tree owner's call,
+  not a passing session's.
+- A `DO NOT PUSH` line in the commit message is the cheap mitigation, because
+  the hazard is only realised on a push.
 - *(evidence in `learnings_evidence.md`)*
