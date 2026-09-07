@@ -119,6 +119,49 @@ death, never life — do not invert it.
 - Blocked by: none. Read-only diagnosis first; no code change without the
   measurement.
 
+### nfl-live-resim-flagged — OPEN — opened 2026-09-07 — session 3492626c — **BUILT, DEFAULT OFF, and NOT WIRED. The producer exists and nothing calls it. `SYNDICATE_NFL_LIVE_RESIM` absent reads as off; a second guard refuses `degenerate_ratings` independently of the flag.**
+- Goal: an NFL live re-simulation producer that mirrors NCAAF's lens contract
+  exactly, so registering it later is a two-entry change rather than a
+  translation layer — and that CANNOT publish while the NFL rating is the one
+  `nfl-rating-units` is measuring as degenerate.
+- Files: `syndicate/features/nfl/live_resim.py` (NEW),
+  `tests/test_nfl_live_resim.py` (NEW).
+- `[user decision 2026-09-07: "build it default-off behind a flag"]`, taken
+  after the case against shipping was put and reaffirmed. The case is recorded
+  in the module docstring rather than only here, because whoever flips the flag
+  reads the module, not the ledger.
+- **WHY A SECOND GUARD.** A flag protects against being ON BY ACCIDENT. It does
+  nothing about being ON WHILE THE MODEL IS BROKEN, which is a live measured
+  condition: `nfl-rating-units` has NFL's across-game `margin_mean` stdev at
+  2.16 against NCAAF's 15.37, 93.8% of games inside P(home) 0.35-0.65. So
+  `resim_live_game` refuses `degenerate_ratings` when the two SIDES' net
+  strength cannot separate them. Checked on the INPUT, not the output: a
+  degenerate rating produces a confident-looking 0.5 that is indistinguishable
+  from a genuinely even game. It stops firing on its own when that lane lands a
+  working rating; it is a floor, not a workaround.
+- **NOT MINE TO WIRE, and deliberately absent:** the worker tick
+  (`scripts/run_refresh_worker.py`), the join
+  (`live_gameline_join.LIVE_LENS_SOURCES_BY_SPORT`) and the gate
+  (`board_enrichment._LIVE_GAMELINE_SPORTS`) are held by `ncaaf-live-resim-wire`
+  and `ncaaf-live-resim`. Until one of them registers it this module is inert BY
+  CONSTRUCTION, not merely by flag.
+- **THE CASE AGAINST TURNING IT ON, so it is not rediscovered:** NFL regular
+  season loses to the closing line at t=+3.34 over 272 held-out games;
+  `nfl_preseason_calibration.skill_note()` returns None outside the preseason
+  profile so there is NO skill gate on the branch this feeds; and
+  `NFL_CALIBRATION_PROFILE` is the unfitted in-source default. Unlike NCAAF,
+  NFL writes `market_fair_prob_over` in BOTH branches (`nfl_game_projections.py`
+  455 and 555, verified), so nothing would refuse these rows once wired — the
+  visible brake NCAAF has does not exist here.
+- Verification: 11 tests, MUTATION-CHECKED three ways — flag forced on,
+  degeneracy never firing, degeneracy always firing. Each turns the suite RED,
+  so it is not vacuous. No live NFL game exists yet (season opens 09-09/09-10;
+  the calibration module and the schedule mirror disagree by a day and neither
+  is production-confirmed), so an end-to-end reading is not available this week
+  and is NOT claimed.
+- Blocked by: none for the producer. Wiring is blocked on the claim holders and
+  on `nfl-rating-units` closing.
+
 ## OPEN
 
 ## OPEN
