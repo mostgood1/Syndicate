@@ -772,6 +772,20 @@ def main() -> int:
                 # falls back to REPO/data on a dev box and that is "local".
                 "host": "worker" if str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() else "local",
             "rosters": len(paths), "counts": n,
+            # WHICH ROSTERS THESE PERCENTAGES DESCRIBE. Added to the PUBLISHED
+            # dict on 2026-09-07 -- it went into the `--json` dict first and ONLY
+            # there, and production runs `--publish`. So the field existed, a
+            # local `--json` run showed `roster_source: sim`, I read that as
+            # confirmation, and the published report carried nothing. **I
+            # verified a fix through an output path production does not use.**
+            #
+            # That is the same defect this file exists to catch, committed while
+            # fixing it: two sinks for one value, one of them updated. The
+            # `--json` copy is for humans; THIS one is the artifact every remote
+            # audit reads, and it is the one that has to carry provenance.
+            "roster_source": roster_source,
+            "roster_glob": str((_SIM_SNAPSHOTS if roster_source == "sim" else _LEGACY_SNAPSHOTS)
+                               / "*/roster_objs/roster_obj_*.json"),
             # the link that four hypotheses could not read remotely
             "season_artifacts": _season_artifact_probe(),
             "failures": [{"kind": k, "field": f, "pct": round(v, 4)} for k, f, v in failures],
