@@ -25659,3 +25659,34 @@ pymalloc overhead is ~50-200 B. Same order, so the blocks measured DO account fo
 the arenas; the growth is not coming from somewhere the sample never saw.
 
 **cost:** two `getallocatedblocks()` calls per solo request, ~1.4 microseconds.
+
+## 2026-09-07 04:09:xxZ — web `ee81c5e7` (ON) then `5876bbc9` (OFF) — **THE PER-REQUEST LEAK IS NOT THIS SESSION'S INSTRUMENTATION.** `[lane web-oom-profile-ab]`
+
+**what:** A/B on `SYNDICATE_REQUEST_MEMORY_PROFILE`. Two sequential arms, each
+measured over process age `900-2400s`; the measuring instrument (growth detector)
+held ON in both, single-key PUT for the flag, claim held, preflight CLEAR both
+times. Flag confirmed to have REACHED the process: `request_memory` absent from
+the live payload in the OFF arm.
+
+**verify:** request-volume skew **15%** (1,680 vs 1,432), inside the 25% gate.
+
+        arm   pids   pymalloc/min   anon/min    requests
+        ON      2      0.362          2.648       1680
+        OFF     2      0.000          1.703       1432
+
+**THE RESULT THAT HOLDS:** with the profile OFF — no per-request anon reads, no
+block counting — anon still grows at **1.01 and 2.39 MB/min**. `UPDATE 28`'s
+per-request retention is REAL and mostly not mine.
+
+**THE RESULT THAT DOES NOT HOLD AS A NUMBER:** the harness printed *"36% of the
+anon rate"*. Per worker: ON `2.91`/`2.39`, OFF `2.39`/`1.01`. **The ranges
+TOUCH** — one OFF worker matched an ON worker exactly — and the entire gap rests
+on OFF pid 78, whose anon FELL `442.1 -> 417.3` in its tail. Direction
+consistent, magnitude unmeasured. That overlap check was added AFTER seeing the
+arms and is reported as a limitation, not folded into the estimate.
+
+**pymalloc: NO VERDICT, pre-registered.** 1 of 2 workers jumped ON, 0 of 2 OFF —
+one discrete 1 MB-arena event. The gate was written after the ON arm and BEFORE
+collecting OFF, because a `0.000` OFF arm was always a plausible coin flip.
+
+**decision:** the profile stays **OFF**. `SYNDICATE_GROWTH_EPISODE` stays ON.

@@ -1451,3 +1451,47 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   also closes the caveat above), Flask/Werkzeug per-request caches, and logging.
   A route allowlist is no longer the right tool; a before/after on the shared
   path is.
+
+### `[web-oom-leak]` UPDATE 29 — **THE LEAK IS NOT MOSTLY MINE. With every per-request instrument OFF, anon still grows 1.01-2.39 MB/min.**, 2026-09-07T04:5xZ `[session b2b5b45b]`
+
+* **The A/B that `UPDATE 28` owed.** `SYNDICATE_REQUEST_MEMORY_PROFILE` ON vs OFF,
+  two sequential arms, each measured over the SAME process-age window
+  (`900-2400s`) so both sit in the same phase of the lifecycle. The measuring
+  instrument — the growth detector — stayed ON in both arms, because letting an
+  intervention supply its own measurement is what produced this session's
+  retracted counterfactual. Request-volume skew **15%**, inside the 25% gate.
+* **THE HEADLINE, and it is robust:** with the profile OFF — no per-request anon
+  reads, no block counting — anon still grows at **1.01 and 2.39 MB/min**. The
+  per-request retention `UPDATE 28` found is **REAL and mostly not my
+  instrumentation's**.
+* **THE MAGNITUDE IS NOT DETERMINED, and the mean hides why:**
+
+        ON   pid 80  2.91   pid 79  2.39    mean 2.65 MB/min
+        OFF  pid 79  2.39   pid 78  1.01    mean 1.70 MB/min
+
+  The harness reported *"PARTIAL: 36% of the anon rate"*. But **the ranges
+  TOUCH** — one OFF worker ran at exactly the rate of an ON worker — and the
+  whole gap rests on OFF pid 78, whose anon **FELL** (`442.1 -> 417.3`) in its
+  tail. With n=2 workers per arm, 36% is a DIRECTION, not a magnitude. No OFF
+  worker exceeded any ON worker, so a contribution is plausible; its size is not
+  measured. **This overlap check was NOT pre-registered** — I added it after
+  seeing the arms, and it is stated as a limitation rather than folded into the
+  estimate.
+* **pymalloc: NO VERDICT, as pre-registered.** ON `0.362 -> ` OFF `0.000 MB/min`,
+  but **1 of 2 workers jumped ON and 0 of 2 OFF** — a difference of ONE discrete
+  1 MB-arena event. That gate was written after seeing the ON arm and BEFORE
+  collecting OFF, precisely because a `0.000` OFF arm was always a plausible coin
+  flip and would otherwise have read as *"the profile was the cause"*.
+* **WHAT THIS SETTLES FOR `UPDATE 28`.** Its `~25 blocks/request` figure carries
+  some instrumentation contribution that cannot be sized from here — the profile
+  IS the thing that counts blocks, so turning it off removes the measurement.
+  What survives is the part that matters: the shared-path retention is real,
+  route-independent, and persists with all of it off.
+* **DECISION: the profile stays OFF.** Its measurement job is done, it plausibly
+  costs something, and web is a 2 GB service. `SYNDICATE_GROWTH_EPISODE` stays ON
+  at ~4-5 ms per 15 s interval.
+* **NEXT:** the target is unchanged and now cleaner — a shared per-request
+  retainer that is NOT this session's code. Flask/Werkzeug per-request caches and
+  logging are the candidates. If a future arm wants a real magnitude for the
+  instrumentation's own share, it needs more workers or repeated windows; two
+  workers and one window each cannot separate a 36% effect from worker variance.

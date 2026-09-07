@@ -2169,7 +2169,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   currently OFF on web and has to be turned on for this to record anything.
 - Blocked by: none.
 
-### web-oom-profile-ab — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+### web-oom-profile-ab — CLOSED 2026-09-06 — opened 2026-09-06 — **THE LEAK IS NOT MOSTLY MINE.** With `SYNDICATE_REQUEST_MEMORY_PROFILE` OFF — no per-request anon reads, no block counting — anon still grows at **1.01 and 2.39 MB/min**, so `UPDATE 28`'s per-request retention is real and belongs to the shared request path, not to this session's code. Volume skew 15%, inside the gate; both arms measured over the same process-age window with the measuring instrument unchanged. **The magnitude of my instrumentation's own share is NOT determined:** the harness said 36%, but the per-worker ranges TOUCH (ON 2.39-2.91, OFF 2.39-1.01) and the whole gap rests on one OFF worker whose anon FELL in its tail — a direction, not a magnitude, and that overlap check was added AFTER seeing the arms. pymalloc: NO verdict, as pre-registered — 1 of 2 workers jumped ON, 0 of 2 OFF, a one-event difference in a discrete signal. Profile left OFF. NEXT: Flask/Werkzeug per-request caches and logging; a real magnitude for the instrument share needs more workers or repeated windows. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
 - Goal: settle whether THIS SESSION'S OWN per-request instrumentation drives the
   pymalloc arena rate, by toggling `SYNDICATE_REQUEST_MEMORY_PROFILE` and
   re-reading it.
