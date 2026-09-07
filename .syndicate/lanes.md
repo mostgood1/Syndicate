@@ -2408,6 +2408,38 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification RAN: reachability (`off != on`) through the real `attach_soccer_projections` and through `_model_edge_for`; 847 tests pass across the affected surface; the 2 failures in `test_layer2_lane_chip_join.py` are PRE-EXISTING (re-run with this change stashed, identical). Before/after withheld counts measured on `/api/board/layer2-shortlist?sport=soccer`, not on the local mirror.
 - Blocked by: none.
 
+### web-oom-trim-ab — OPEN — opened 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: settle whether automatic `malloc_trim` is NET-POSITIVE on web — the
+  measurement owed since the 2026-09-06 retraction.
+- Files: `scripts/malloc_trim_ab.py` (rewritten `fd0ce9c6`). No runtime code
+  changes; the trim already ships inert behind `SYNDICATE_MALLOC_TRIM_AUTO`.
+- **WHY THIS IS OWED.** The trim was enabled on 2026-09-06 and its headline —
+  *"without the trims the container would have reached ~2,361 MB"* — was
+  RETRACTED the same evening: it was built entirely from the intervention's own
+  instrumentation while the intervention ran. The counterfactual was never
+  observed. This observes it.
+- **THE HARNESS WAS REWRITTEN FIRST, because the original could not have
+  worked.** It gated on REQUEST COUNT and judged on container unreclaimable.
+  `UPDATE 34` proved both insufficient: `UPDATE 33` passed a 14% request-count
+  gate and 47% of its difference sat in memory the intervention could not touch.
+- **CONTROL TERM: pymalloc.** The trim returns glibc pages; it CANNOT touch
+  pymalloc arenas. If they differ >10% between arms, the workload differed and
+  the comparison is refused BEFORE the primary is printed. Plus a per-worker
+  overlap check — overlapping ranges give a direction, never a magnitude.
+- **BOTH ARMS GET A DEPLOY.** Web already runs `TRIM_AUTO=0`, so the OFF arm
+  could have used the live process — but the ON arm needs a restart, and an old
+  process against a fresh one lets the arena's ramp-then-plateau bias whichever
+  arm is younger. Same process-age structure or no comparison.
+- Hypothesis: the trim lowers the glibc arena materially. Falsified if the arena
+  is unchanged (<25 MB) — then it moves memory without lowering what the process
+  holds, and the flag stays OFF.
+- Verification: both arms, no restart inside either window, control within 10%,
+  and a stated per-worker spread.
+- **KNOWN COST:** ~84 min of held web claim (12-min settle + 30-min window per
+  arm) plus two deploys. Web takes a deploy every 20-30 min normally, so the
+  claim must be held and peers told why.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
