@@ -1655,3 +1655,37 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   `WARNING: compute in request path (operation=wnba_has_games_for_date_espn_fetch)`
   — a live upstream fetch inside a Flask handler, which `CLAUDE.md`'s
   load-bearing rule forbids outright.
+
+### `[web-oom-leak]` UPDATE 33 — **THE RING CUT IS WORTH 38 MB PER WORKER, MEASURED, RANGES SEPARATED.**, 2026-09-07T17:2xZ `[session b2b5b45b]`
+
+* **A/B on the diagnostic-ring cut, both arms running the SAME runtime code**
+  (toggled by `SYNDICATE_RING_KEEP_CMDLINE`, so the control did not require
+  deploying a stale commit):
+
+        arm    pids   pymalloc@600s  @1200s  @1800s
+        FAT     2         209.0       209.0   209.0
+        SLIM    2         170.0       170.0   171.0
+
+* **`-38 MB` per worker at every age point, and the PER-WORKER RANGES DO NOT
+  OVERLAP** (`max(SLIM) 176 < min(FAT) 198`). Volume skew **14%**, inside the
+  gate. **~76 MB of a 2,048 MB container, 3.7%.**
+* **The separation check was in the harness BEFORE either arm ran.** `UPDATE 29`
+  had to add it afterwards, having nearly called a coin flip a result; this time
+  a mean difference alone would not have been reported.
+* **`UPDATE 32`'s MECHANISM IS CONFIRMED AS LOAD-BEARING, not just real.** The
+  ring's read-modify-write was not merely an expensive thing that existed —
+  halving its peak measurably lowered the arena. The diagnostic built to
+  investigate this OOM was contributing ~38 MB per worker to it.
+* **AND THE MAGNITUDE IS NOT EXPLAINED.** The cut removes 9,002 blocks per
+  checkpoint (~0.86 MB at 100 B) and the arena fell **44x** that. Unverified
+  candidates: `GUNICORN_THREADS=4` concurrent peaks, per-size-class arenas that
+  cannot be reused across classes, and the peak recurring ~15x/min through the
+  ramp. **The measurement stands; the multiplier is an open question and should
+  not be quoted as understood.**
+* **METHOD NOTE:** pymalloc was FLAT across the window in BOTH arms (`209.0` at
+  all three FAT ages), so this compares plateau LEVELS, not ramp rates — the
+  arena reaches its ceiling before age 600. The plateau is set by ramp-phase
+  peaks that were not directly observed.
+* limits: n=2 workers per arm, one pair, not repeated. A peer's 13-file /
+  947-insertion landing between arms was checked and touches **zero** runtime
+  files.

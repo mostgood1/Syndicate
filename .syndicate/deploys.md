@@ -26125,3 +26125,45 @@ would be un-archived by a naive commit, which is exactly what the guard is for.
 **This commit is LOCAL ONLY. It was not pushed**: this tree has diverged
 (1 ahead / 281 behind) and rebasing a shared primary tree is not this task's
 to do.
+
+## 2026-09-07 16:0xZ and 16:5xZ — web `24e0c0ff` (FAT) then `5eaade77` (SLIM) — **THE RING CUT LOWERS THE PYMALLOC ARENA BY 38 MB PER WORKER. Ranges separated.** `[lane web-oom-ring-arena-ab]`
+
+**what:** A/B on the diagnostic-ring cut (`fd352a3b`), both arms toggled by
+`SYNDICATE_RING_KEEP_CMDLINE` so they run the SAME runtime code. Arena LEVEL
+compared at matched process ages; claim held; preflight CLEAR both times.
+
+**verify:**
+
+        arm    pids   pymalloc@600s  @1200s  @1800s
+        FAT     2         209.0       209.0   209.0
+        SLIM    2         170.0       170.0   171.0
+
+        FAT   per-worker @1800s: 220.0, 198.0    spread 22.0 MB
+        SLIM  per-worker @1800s: 166.0, 176.0    spread 10.0 MB
+
+**`-38.0 to -39.0 MB` at every age point, and THE PER-WORKER RANGES DO NOT
+OVERLAP** — `max(SLIM) 176 < min(FAT) 198`. That separation is the check
+`UPDATE 29` lacked and had to add after the fact; here it was in the harness
+before either arm ran. Request-volume skew **14%**, inside the 25% gate.
+
+**Container effect: 2 workers x 38 MB = ~76 MB of a 2,048 MB limit, 3.7%.**
+
+**WHY A LEVEL AND NOT A RATE:** pymalloc was FLAT across the whole window in
+both arms (FAT `209.0` at all three ages). The arena reaches its ceiling before
+age 600 and never moves, so the window contains no ramp and this compares
+PLATEAU LEVELS. The plateau is set by peaks during the ramp, which was not
+directly observed.
+
+**THE MAGNITUDE EXCEEDS A SINGLE-PEAK PREDICTION AND I CANNOT EXPLAIN THE
+MULTIPLIER.** The cut removes 9,002 blocks per checkpoint — ~0.86 MB at 100 B —
+yet the arena fell 38 MB, **44x** that. Unverified candidates:
+`GUNICORN_THREADS=4` allows concurrent peaks; pymalloc arenas are per-size-class
+and not reusable across classes; the peak recurs ~15x/min through the ramp.
+**Reporting the measurement, not a mechanism for the multiplier.**
+
+**CONFOUND CHECKED, NOT ASSUMED:** a peer landed 13 files / 947 insertions
+between the arms. **Zero are under `syndicate/` or `pipeline/`** — CI workflows,
+ledger prose, and offline `scripts/*_sim_input_checklist.py` that no runtime code
+imports (every mention is a comment). Web's behaviour is identical across arms.
+
+**limits:** n=2 workers per arm, one pair of arms, not repeated.
