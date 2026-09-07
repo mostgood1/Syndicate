@@ -667,3 +667,16 @@ def test_slim_for_ring_survives_junk_without_raising():
     assert memory_observability._slim_for_ring({"processes": []})["processes"] == []
     odd = memory_observability._slim_for_ring({"processes": ["not-a-dict", None]})
     assert odd["processes"] == ["not-a-dict", None]
+
+
+def test_the_ring_cut_can_be_toggled_off_for_the_ab(monkeypatch):
+    """Both arms of the arena-rate experiment must run the SAME deployed commit.
+    Deploying the pre-cut commit for the control would move production backwards
+    and make the arms differ by a whole build rather than by one behaviour."""
+    record = {"processes": [{"pid": 1, "cmdline": ["x"], "rss_mb": 1.0}]}
+    monkeypatch.setenv("SYNDICATE_RING_KEEP_CMDLINE", "1")
+    assert "cmdline" in memory_observability._slim_for_ring(record)["processes"][0]
+    monkeypatch.setenv("SYNDICATE_RING_KEEP_CMDLINE", "0")
+    assert "cmdline" not in memory_observability._slim_for_ring(record)["processes"][0]
+    monkeypatch.delenv("SYNDICATE_RING_KEEP_CMDLINE")
+    assert "cmdline" not in memory_observability._slim_for_ring(record)["processes"][0]

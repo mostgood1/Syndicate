@@ -2051,6 +2051,16 @@ def _slim_for_ring(record: dict[str, Any]) -> dict[str, Any]:
     accident"* (`/api/ops/odds-refresh/...`), and `/api/ops/sims/ledger` for the
     other. Neither reads this ring.
     """
+    # A/B ESCAPE HATCH, and it exists so both arms of the arena-rate experiment
+    # run the SAME DEPLOYED COMMIT. The alternative -- deploying the pre-cut
+    # commit for the control arm -- would move production backwards and make the
+    # two arms differ by a whole build rather than by one behaviour. Default is
+    # the CUT; setting this restores the old fat records.
+    try:
+        if str(os.environ.get("SYNDICATE_RING_KEEP_CMDLINE", "") or "").strip().lower()                 in {"1", "true", "yes", "on"}:
+            return record
+    except Exception:  # noqa: BLE001
+        pass
     try:
         procs = record.get("processes")
         if isinstance(procs, list) and procs:
