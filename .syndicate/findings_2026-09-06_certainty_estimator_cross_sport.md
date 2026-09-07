@@ -53,14 +53,56 @@ Why it is worse here than anywhere else: **soccer has draws and low scoring**, s
 a three-goal lead at 88' genuinely returns 300/300. Baseball and football need a
 full comeback to be ruled out; soccer does not.
 
-**Covered:** `home_win_prob` reaches `price_moneyline` via
-`soccer_live_gameline_source`, so the PRICED number is now smoothed.
+`[REVISED after tracing every consumer. The first draft called the uncovered
+fields a lens/display concern. Too soft: one of them is used to PRICE. The
+covered half is also wider than the draft said.]`
 
-**NOT covered — still raw `k/n` on the lens artifact, read by display and other
-consumers:** `draw_probability`, `away_win_probability`,
-`over_2_5_probability`, `both_teams_scored_probability` (all at
-`live_lens.py:289-296`). These never pass through the join, so nothing smooths
-them and nothing gates them on an interval.
+**COVERED, more than first stated.** Three of soccer's four pricing paths run
+through the module the fix landed in:
+
+  * `home_win_prob` -> `price_moneyline` (sim_count) — smoothed.
+  * totals and spreads at ANY line -> `price_distribution_market`, off
+    `total_runs_dist` / `margin_dist`, which
+    `soccer_live_gameline_source._histograms_from_scorelines` derives from the
+    resumed sim's own scoreline distribution — smoothed.
+  * the ONE analytic over-2.5 line -> `price_analytic_line_market`, which needs
+    a measured calibration error. Soccer is in NEITHER
+    `ANALYTIC_LIVE_STD_ERR_BY_SPORT` nor `..._BY_MARKET`, so it refuses with
+    `REASON_ANALYTIC_UNCALIBRATED` and publishes nothing. Correctly excluded
+    from smoothing — there is no output to smooth.
+
+**NOT COVERED, AND IT IS A PRICING PATH, NOT A DISPLAY ONE.** `layer2_board`
+(`_model_edge_for`, ~1513, and its sibling at ~1589) builds a three-way vector
+
+    {"home": model_prob_over, "draw": draw_probability, "away": away_probability}
+
+and prices the row's side against the market fair probability **directly**.
+`draw_probability` and `away_probability` are raw `k/n` from
+`soccer/features/live_lens.py:289-296` at n=300-400. This path never calls
+`price_moneyline`, so on the soccer three-way market there is:
+
+    no Agresti-Coull centre    no prob_std_err    NO PRECISION GATE AT ALL
+
+A draw leg of `0/300` is ordinary late in a match — likelier than a certainty in
+baseball or football, because the draw becomes a genuinely narrow outcome the
+moment a second goal separates the sides. **So this is the one place left in the
+platform where a raw certainty can still be PRICED, and it is also the market
+where certainty is easiest to reach.**
+
+Two defects stacked, not one: the estimator (fixed everywhere else) and the
+missing gate (never present here). The gate is the larger.
+
+**WHY IT WAS NOT FIXED IN THIS PASS.** The sim count is not available at the
+pricing point. `soccer_projections._probability_projection` returns
+`{model_prob_over, side, basis, source}` and `soccer_projections.py` contains no
+`simulations` / `sims_run` anywhere, so `n` must be plumbed from the soccer
+artifact through the projection dict into `layer2_board` before EITHER defect can
+be addressed. That is a cross-module change to the live board; it wants its own
+lane and its own measurement, not a rushed edit during a slate with three games
+in play and a deploy pending.
+
+Still raw and genuinely display-only, for completeness:
+`over_2_5_probability`, `both_teams_scored_probability`.
 
 ### NFL — not exposed TODAY, and that is exactly why order matters
 Measured by `nfl-rating-units`: across-game `margin_mean` stdev **2.16**, 0 of 14
