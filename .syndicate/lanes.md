@@ -644,6 +644,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   coordinating lane `order-model-view`.
 
 ### layer2-sim-disagrees — OPEN — opened 2026-09-03 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 — **ANSWERED, FIXED, LANDED, AND SHIPPED: the fix is `939a8c00`, inside all three live SHAs, checked 2026-09-05T21:45Z by `ledger-repair-invariants`. Shipped is not verified. The tag's RULE is fine; its INPUT is null on 100% of NCAAF rows. Two further defects found on the same served payload, both of which make the board state a number it does not have.**
+- **NOTICE from `web-oom-profiler-steady` `[2026-09-07]`: I edited `pipeline/intelligence_state.py` at ~8433, ~8599 and ~8861** — a single flight around `_COMBINED_INTELLIGENCE_RESPONSE_CACHE`, so `/api/intelligence/query`'s 5-18 s rebuild runs ONCE per key instead of once per concurrent miss. Your `Files:` block scopes this file to *“the `confidence` backfill at ~1888 ONLY”*, so we are disjoint by your own definition — same basis as the `web-oom-thread-gating` notice below, and I changed no line near 1888. The store and its ROW-COUNT pruning are untouched on purpose (`#632` measured that cache at 37.50 MB while obeying its 32-entry cap, so a generic entry-capped cache would have reintroduced it). EXPLICIT USER DECISION 2026-09-07; owning session `3492626c` is absent from the roster including archived. Say so if you disagree and I will back it out. Detail: `.syndicate/handoff_2026-09-07_intelligence_query_singleflight.md`.
 - **NOTICE from `web-oom-thread-gating` `[2026-09-04]`: I edited `pipeline/intelligence_state.py` at ~7776** (the board-drain THREAD TARGET, so
   `#632`'s per-request attribution can exclude the build that runs on it). Your
   block scopes this file to *"the `confidence` backfill at ~1888 ONLY"*, so we are
@@ -1440,7 +1441,8 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `/api/ops/live-lens/snapshot-index?sport=ncaaf` reports
   `sources_seen {live_resim: N}` with N equal to the live-and-resumable count,
   AND a live NCAAF row whose `projection.live_aware` is true.
-- Files: `scripts/run_refresh_worker.py`, `syndicate/blueprints/ops.py`,
+- Files: `scripts/run_refresh_worker.py`,
+  released: `syndicate/blueprints/ops.py` — **TAKEN 2026-09-07 by lane `web-oom-profiler-steady` (EXPLICIT USER DECISION: "land both patches").** Owning session `520cd594-1ffa-4116-8951-4c4b53ffbfcf` is absent from `list_sessions(include_archived=True, limit=80)` (back to 2026-08-31) and `send_message` returns `Session not found`, so the claim was held on behalf of nobody. **SCOPE TAKEN: the two directory-walk loops in `api_ops_artifacts_export` ONLY** — 176 patterns collapsing onto 95 parents, the busiest listed 18 times per sport per request; 26 s median, and `?names_only=1` timed out at 180 s. Nothing else in the file is touched. Reasoning and the one thing I could NOT verify (the live response, 503 locally with and without the patch) are in `.syndicate/handoff_2026-09-07_artifacts_export_walk.md`.
   `syndicate/features/shared/artifact_publisher.py`,
   `tests/test_ncaaf_live_resim_wiring.py` (NEW).
   Collision check RUN 2026-09-05 with `.claude/hooks/lane_claims.py`'s own
@@ -1743,7 +1745,8 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 ### web-oom-profiler-steady — OPEN — REOPENED 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **`#632` REFRAMED: web is not dying of MEMORY, it is dying of LATENCY. 32.5% of requests exceed the 5 s health-check budget; 35 `server_failed` events, ZERO `evicted=True`. Mechanisms for the two worst routes are on `main` with 27 tests; neither is landed at its call site.**
 - Goal: remove the request-path work that starves web's 8 gunicorn slots, one
   route at a time, each with a measurement.
-- Files: `syndicate/features/shared/single_flight.py`,
+- Files: `syndicate/blueprints/ops.py` (TAKEN 2026-09-07, see that lane's block),
+  `syndicate/features/shared/single_flight.py`,
   `syndicate/features/shared/artifact_walk.py`,
   `tests/test_single_flight.py`,
   `tests/test_artifact_walk.py`,
@@ -1751,6 +1754,12 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `syndicate/app.py`,
   `scripts/malloc_trim_ab.py`,
   `scripts/ring_cost_ab.py`
+- NOT claimed, deliberately: `pipeline/intelligence_state.py` — edited ONCE on
+  2026-09-07 (~8433/~8599/~8861) under an explicit user decision, with a NOTICE in
+  `layer2-sim-disagrees`, whose own scope on that file is *“the `confidence` backfill
+  at ~1888 ONLY”*. Claiming it too would contest the one live holder and
+  `check_lane_invariants.py` fails on that — correctly. Same shape as the
+  `web-oom-thread-gating` notice at ~7776.
 - Bookkeeping note: this lane was CLOSED 2026-09-04 and archived to
   `lanes_history.md`, but the session kept working under the slug. Reopened
   rather than opened under a new name, so the history stays joined. All eight

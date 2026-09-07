@@ -18,6 +18,7 @@ from datetime import timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from syndicate.features.shared.single_flight import SingleFlight
 from syndicate.features.shared.branch_profiler import profile_branch
 from flask import Flask
 from flask import current_app
@@ -8431,6 +8432,17 @@ def read_latest_intelligence_state_response(
 
 
 _COMBINED_INTELLIGENCE_RESPONSE_CACHE: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
+# `#632`: one rebuild at a time for a given key. NOT a cache -- the store above
+# stays exactly as it is, because its bound is ROW COUNT and this cache measured
+# 37.50 MB while obeying its 32-entry cap. A generic entry-capped cache would
+# reintroduce that. The lease is 90 s: longer than the 18 s worst rebuild, short
+# enough that a builder which dies without releasing delays the key rather than
+# wedging it.
+_COMBINED_INTELLIGENCE_SINGLE_FLIGHT = SingleFlight(lease_seconds=90.0)
+# How far past the TTL a value may be served WHILE A REBUILD IS IN FLIGHT. In
+# practice the served value is at most TTL + rebuild (~33 s) old; this is the
+# outer guard, not the expected age.
+_COMBINED_BOARD_STALE_TTL_MULTIPLE = 10.0
 _COMBINED_INTELLIGENCE_RESPONSE_CACHE_MAX_ENTRIES = 32
 # `#632`: THE ENTRY COUNT WAS THE WRONG DIMENSION. This cache measured
 # **37.50 MB** on a live worker while obeying its 32-entry cap, because entry
@@ -8599,6 +8611,36 @@ def read_combined_intelligence_response(
     cached = _COMBINED_INTELLIGENCE_RESPONSE_CACHE.get(cache_key)
     if cached is not None and (time.time() - cached[0]) < ttl_seconds:
         return dict(cached[1])
+
+    # `#632`: the read above and the write at the bottom of this function had
+    # NOTHING between them, so N concurrent misses each started their own 5-18
+    # second rebuild. Web has 8 request slots (WEB_CONCURRENCY=2 x
+    # GUNICORN_THREADS=4) and one expiry could put every one of them into the
+    # same work, leaving `/healthz` nowhere to run. 32.5% of requests exceed the
+    # 5 s health-check budget, and that -- not memory -- is what restarts this
+    # instance: 35 `server_failed` events, zero `evicted=True`.
+    #
+    # Compounding it, the TTL defaults to 15 s while the rebuild costs 5-18 s,
+    # so past ~15 s the entry is stale the moment it is written and the cache
+    # stops existing in any useful sense.
+    #
+    # One caller rebuilds. The others serve the previous value IMMEDIATELY when
+    # there is one, and only block when there is genuinely nothing to serve.
+    # Waiting is the worse option where a value exists: it still holds the
+    # thread for the length of the rebuild, and the health check does not care
+    # whether a thread is computing or blocked.
+    owns_rebuild, rebuild_done = _COMBINED_INTELLIGENCE_SINGLE_FLIGHT.begin(cache_key)
+    if not owns_rebuild:
+        if cached is not None and (time.time() - cached[0]) <= ttl_seconds * _COMBINED_BOARD_STALE_TTL_MULTIPLE:
+            print(f"[intelligence_state] COMBINED_BOARD_SERVED_STALE age_s={time.time() - cached[0]:.1f}", flush=True)
+            return dict(cached[1])
+        rebuild_done.wait(timeout=max(30.0, ttl_seconds * 4))
+        cached = _COMBINED_INTELLIGENCE_RESPONSE_CACHE.get(cache_key)
+        if cached is not None:
+            return dict(cached[1])
+        # The in-flight rebuild failed or timed out. Fall through and build --
+        # returning nothing to a caller that asked for a board is worse than
+        # doing the work twice.
 
     merged_recommendations: list[dict[str, Any]] = []
     by_date_summary: dict[str, dict[str, Any]] = {}
@@ -8860,6 +8902,12 @@ def read_combined_intelligence_response(
 
     _COMBINED_INTELLIGENCE_RESPONSE_CACHE[cache_key] = (time.time(), sliced)
     _prune_combined_intelligence_response_cache()
+    # `#632`: release AFTER the write, so every waiter wakes to a populated
+    # cache. Unconditional on purpose -- in the rare fall-through above we may
+    # not own the marker, and releasing another builder's lease early can only
+    # cost a duplicate build, never a wrong answer. Carrying an ownership flag
+    # 260 lines down would be the more fragile of the two.
+    _COMBINED_INTELLIGENCE_SINGLE_FLIGHT.finish(cache_key)
     return dict(sliced)
 
 
