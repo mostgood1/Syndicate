@@ -1495,3 +1495,49 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   logging are the candidates. If a future arm wants a real magnitude for the
   instrumentation's own share, it needs more workers or repeated windows; two
   workers and one window each cannot separate a 36% effect from worker variance.
+
+### `[web-oom-leak]` UPDATE 30 — **RETRACTION: my block instrument over-counts 16x. `UPDATE 28`'s reconciliation FAILS, and Flask/Werkzeug are NOT the retainer.**, 2026-09-07T05:2xZ `[session b2b5b45b]`
+
+* **THE DEFECT, measured locally where it can be run to ground.** The instrument
+  reads `getallocatedblocks()` in `teardown_request`. That hook fires **BEFORE**
+  the response object, the request context and the WSGI environ are released, so
+  everything still alive at that instant is scored as RETAINED when most of it is
+  about to die. Same 500 requests, two measurement points:
+
+        measured AT teardown_request (what the instrument does):  64.7 blocks/req
+        measured AFTER the request fully returns (ground truth):   4.1 blocks/req
+
+  **A 16x over-count.** After a `gc.collect()` the true figure is **under 1
+  block/request**.
+* **RETRACTED from `UPDATE 28`: "~19-38 blocks retained per request".** That is
+  per-request SCAFFOLDING counted at the wrong point in the lifecycle, not
+  retention.
+* **RETRACTED from `UPDATE 28`: "the reconciliation PASSES ... 221 and 282 bytes
+  per retained block ... same order as a small object".** I called that the thing
+  that *licensed the conclusion*. Corrected for the 16x, the same arithmetic
+  gives **3,539 and 4,516 BYTES PER BLOCK** — and **pymalloc only handles objects
+  <= 512 B, so that is impossible.** The retained blocks I measured **CANNOT**
+  account for the arena growth. The reconciliation passed only because its
+  numerator was inflated.
+* **WHAT SURVIVES `UPDATE 28`, and it is now better explained:** *no route
+  dominates*. Retention looked uniform across routes including `/healthz` because
+  the instrument was largely measuring FRAMEWORK per-request objects, which are
+  uniform by construction. The conclusion stands; the stated reason was wrong.
+* **`UPDATE 29` IS UNAFFECTED.** That A/B compared the **anon rate**, not blocks,
+  so the "leak is not my instrumentation" result does not depend on this.
+* **THE QUESTION ASKED — Flask/Werkzeug caches — IS ANSWERED: NO.** Locally,
+  after full request completion, `/healthz` retains `4.1` blocks/request raw and
+  **under 1 after GC**, against a production-instrument reading of `26.6-28.0`.
+  Toggling both my flags moved it not at all (`2.0` / `1.0` / `2.3` blocks/req).
+  Per-request framework caches are not the retainer.
+* **THE REFRAME, and it is the useful part.** Arena count is driven by **PEAK
+  SIMULTANEOUS live blocks, not retained blocks.** A transient burst that needs
+  17 MB of concurrently-live small objects forces 17 new arenas, and pymalloc
+  rarely returns an arena to the OS — so a big TRANSIENT permanently grows the
+  arena. My instrument measured the wrong quantity for the question it was built
+  to answer.
+* **NEXT:** `blocks_max` is already recorded per route and is much closer to the
+  right quantity (local `/healthz` peak: 131). The hunt is for peak concurrent
+  allocation, not for something that leaks. Fixing the instrument means measuring
+  in WSGI middleware wrapping the full call — after `close()` — rather than in
+  `teardown_request`, which is the last Flask hook but not the last thing to run.
