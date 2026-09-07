@@ -28,6 +28,13 @@ def _reset(monkeypatch):
         "baseline": None, "last_check": 0.0, "episodes": [], "routes": {},
         "max_delta_mb": 0.0, "checks": 0, "pymalloc_budget": {"count": 0},
     })
+    # Default the process PAST the warm-up, so a test opts IN to the boot-ramp
+    # path rather than being silently blocked by it. Left the other way round,
+    # every trigger test would pass for the wrong reason -- nothing fires during
+    # warm-up, so "did not fire" would look like a working threshold.
+    import os as _os
+    memory_observability._GROWTH_EPISODE_AGE_STATE.update(
+        {"pid": _os.getpid(), "t0": time.time() - 100_000.0})
     monkeypatch.delenv("SYNDICATE_GROWTH_EPISODE", raising=False)
     yield
     memory_observability._GROWTH_EPISODE_STATE.update({
@@ -246,3 +253,66 @@ def test_report_is_readable_before_anything_has_happened():
     assert report["baseline_age_s"] is None
     assert report["max_anon_rise_seen_mb"] == 0.0
     assert report["trigger_mb"] == 15.0
+
+
+# --- the warm-up: skip the boot ramp -----------------------------------------
+
+def test_the_boot_ramp_does_not_fire(monkeypatch):
+    """Measured in production 2026-09-07: the detector fired 18.4 s after boot on
+    +230.3 MB at 750 MB/min, with `/` and `/healthz` the only routes -- five
+    platform health checks. That is the boot ramp, a phase UPDATE 25/26 already
+    measured, and catching it cost the episode slot AND polluted
+    max_anon_rise_seen_mb. The phenomenon being hunted runs at ~1.4 MB/min."""
+    monkeypatch.setenv("SYNDICATE_GROWTH_EPISODE", "1")
+    monkeypatch.setenv("SYNDICATE_GROWTH_EPISODE_CHECK_SECONDS", "0")
+    anon = {"v": 99.3}
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: anon["v"])
+    monkeypatch.setattr(memory_observability, "glibc_mallinfo2",
+                        lambda: {"available": True, "glibc_total_mb": anon["v"] * 0.6})
+    monkeypatch.setattr(memory_observability, "log_pymalloc_arena_stats",
+                        lambda *a, **k: {"arena_mb": anon["v"] * 0.35})
+    # A process seconds old, exactly as in the production capture.
+    memory_observability._GROWTH_EPISODE_AGE_STATE.update(
+        {"pid": __import__("os").getpid(), "t0": time.time() - 18.0})
+
+    memory_observability.maybe_capture_growth_episode("/healthz")
+    anon["v"] = 329.7
+    assert memory_observability.maybe_capture_growth_episode("/healthz") is None
+    report = memory_observability.growth_episode_report()
+    assert report["episodes_captured"] == 0
+    # The field that distinguishes flat from mis-sized stays clean.
+    assert report["max_anon_rise_seen_mb"] == 0.0
+    assert report["warmup_remaining_s"] > 0
+
+
+def test_after_the_warmup_the_same_rise_does_fire(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_GROWTH_EPISODE", "1")
+    monkeypatch.setenv("SYNDICATE_GROWTH_EPISODE_CHECK_SECONDS", "0")
+    anon = {"v": 500.0}
+    monkeypatch.setattr(memory_observability, "_process_anon_mb", lambda: anon["v"])
+    monkeypatch.setattr(memory_observability, "glibc_mallinfo2",
+                        lambda: {"available": True, "glibc_total_mb": anon["v"] - 110.0})
+    monkeypatch.setattr(memory_observability, "log_pymalloc_arena_stats",
+                        lambda *a, **k: {"arena_mb": 100.0})
+    memory_observability._GROWTH_EPISODE_AGE_STATE.update(
+        {"pid": __import__("os").getpid(), "t0": time.time() - 2000.0})
+
+    memory_observability.maybe_capture_growth_episode("/mlb/api/cards")
+    anon["v"] = 530.0
+    fired = memory_observability.maybe_capture_growth_episode("/mlb/api/cards")
+    assert fired is not None
+    assert fired["anon_delta_mb"] == 30.0
+    # Age is stamped on the episode so a ramp-TAIL capture stays identifiable:
+    # the arena is still filling until ~30 min.
+    assert fired["process_age_s"] > 1900
+
+
+def test_process_age_is_per_pid_not_inherited_from_import(monkeypatch):
+    """gunicorn forks AFTER import, so anything captured at module scope belongs
+    to the parent. That trap shipped `proc_token` inert earlier in #632, with
+    pids 99 and 98 sharing one token."""
+    import os as _os
+    memory_observability._GROWTH_EPISODE_AGE_STATE.update({"pid": -1, "t0": 0.0})
+    age = memory_observability._growth_process_age_s()
+    assert age < 5.0, "a new pid must re-derive its own t0, not inherit one"
+    assert memory_observability._GROWTH_EPISODE_AGE_STATE["pid"] == _os.getpid()

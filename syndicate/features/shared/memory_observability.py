@@ -3475,6 +3475,18 @@ _GROWTH_EPISODE_STATE: dict[str, Any] = {
 }
 _GROWTH_EPISODE_MAX_KEPT = 12
 _GROWTH_EPISODE_ROUTE_CAP = 40
+# Per-PID, derived LAZILY. gunicorn forks AFTER import, so anything captured at
+# module scope is inherited by every worker and is the parent's, not theirs --
+# the same trap that shipped `proc_token` inert earlier in `#632` (pids 99 and 98
+# sharing one token).
+_GROWTH_EPISODE_AGE_STATE: dict[str, Any] = {"pid": None, "t0": None}
+
+
+def _growth_process_age_s() -> float:
+    pid = os.getpid()
+    if _GROWTH_EPISODE_AGE_STATE["pid"] != pid:
+        _GROWTH_EPISODE_AGE_STATE.update({"pid": pid, "t0": time.time()})
+    return time.time() - float(_GROWTH_EPISODE_AGE_STATE["t0"])
 
 
 def growth_episode_enabled() -> bool:
@@ -3624,6 +3636,22 @@ def maybe_capture_growth_episode(route: str | None = None) -> dict[str, Any] | N
             _growth_rebase(capture)
             return None
 
+        # THE WARM-UP, and it is not caution. First production run, 2026-09-07:
+        # the detector fired 18.4 s after boot on **+230.3 MB at 750 MB/min**,
+        # with `/` and `/healthz` the only routes -- five platform health checks.
+        # That is the BOOT RAMP, a phase `UPDATE 25/26` already measured and
+        # understands, and catching it cost the episode slot AND polluted
+        # `max_anon_rise_seen_mb`, the one field that distinguishes "the process
+        # was flat" from "the trigger is mis-sized". The phenomenon being hunted
+        # runs at ~1.4 MB/min, three orders of magnitude slower.
+        #
+        # The baseline still tracks during warm-up, so the first eligible reading
+        # is measured against a settled process rather than against boot.
+        warmup_s = _growth_env_float("SYNDICATE_GROWTH_EPISODE_WARMUP_SECONDS", 900.0)
+        if _growth_process_age_s() < warmup_s:
+            _growth_rebase(capture)
+            return None
+
         delta = capture["anon"] - baseline["anon"]
         if delta > float(state["max_delta_mb"]):
             # Recorded even when it never fires, so "no episodes" can be told
@@ -3639,6 +3667,7 @@ def maybe_capture_growth_episode(route: str | None = None) -> dict[str, Any] | N
 
         episode = build_growth_episode(baseline, capture, dict(state["routes"]), route)
         episode["pid"] = os.getpid()
+        episode["process_age_s"] = round(_growth_process_age_s(), 1)
         episode["captured_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
         ring = state["episodes"]
         ring.append(episode)
@@ -3667,6 +3696,16 @@ def growth_episode_report() -> dict[str, Any]:
         # is mis-sized. Without it those are the same output.
         "max_anon_rise_seen_mb": state["max_delta_mb"],
         "trigger_mb": _growth_env_float("SYNDICATE_GROWTH_EPISODE_TRIGGER_MB", 15.0),
+        "process_age_s": round(_growth_process_age_s(), 1),
+        # Nothing can fire until this reaches zero, so a reader is never left
+        # inferring silence from an instrument that was not yet armed.
+        "warmup_remaining_s": max(0.0, round(
+            _growth_env_float("SYNDICATE_GROWTH_EPISODE_WARMUP_SECONDS", 900.0)
+            - _growth_process_age_s(), 1)),
+        # NOTE for whoever reads an early episode: the glibc arena is still
+        # filling until ~30 min (`UPDATE 25`, four windows), so an episode caught
+        # shortly after the warm-up may be ramp TAIL rather than the intermittent
+        # phenomenon. `process_age_s` on the episode is what tells them apart.
         "baseline_age_s": (round(time.time() - float(baseline["t"]), 1)
                            if baseline else None),
         "baseline_anon_mb": (round(float(baseline["anon"]), 1) if baseline else None),
