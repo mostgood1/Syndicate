@@ -82,12 +82,35 @@ Two things, and the second is the one that matters:
 1. At n=20,000 an exact 0/1 needs 20,000 identical outcomes. Git-mirror scan:
    **55 h2h rows, 0 exactly 0/1.** State the denominator honestly — 55 rows on a
    mirror that is lossy by design is a **weak null, not a clearance.**
-2. **NHL does not go through `live_gameline_join` at all.** It is absent from
-   `LIVE_LENS_SOURCES_BY_SPORT` and from `ANALYTIC_LIVE_STD_ERR_BY_SPORT`; its
-   probabilities are produced and consumed on `hockeysim/artifacts.py`'s own
-   path. So the fix does not reach it, and neither does the precision gate —
-   **NHL prices with no interval requirement whatsoever.** That is a larger gap
-   than the certainty question, and it is unguarded.
+2. **NHL is REFUSED by name, and its edges come from somewhere else entirely.**
+
+   `[CORRECTED after first writing. The first version of this section said NHL
+   "does not go through live_gameline_join at all" and inferred that from its
+   absence in two tables. Wrong mechanism, and the wrong reader would have gone
+   looking in the wrong module. The conclusion — the fix does not reach NHL —
+   survives; the reason does not.]`
+
+   `run_refresh_worker.py:5647` builds a book grid for **all eight sports**, and
+   `book_grid_artifact.py:318` calls `attach_live_gamelines_for_sport` for each.
+   So NHL IS called. It then fails closed at
+   `board_enrichment.py:1621` — `_LIVE_GAMELINE_SPORTS = {"mlb", "wnba",
+   "soccer", "ncaaf"}` — returning
+   `{"supported": False, "reason": "no live re-sim wired for nhl"}` **before**
+   `price_moneyline` is ever reached. Fails closed and says so, which is the
+   behaviour you want. **NHL therefore publishes ZERO live gameline edges.**
+   The same is true of NBA, NFL and NCAAB.
+
+   NHL's actual recommendations come from `hockeysim/artifacts.py:190-217`,
+   a separate path emitting `{market, side, price, ev, prob, conf}` rows.
+   **That path has no interval and no precision gate** — grep for
+   `std_err|sigma|interval|priceable|precision` across `hockeysim/` returns only
+   engine-internal usage noise. So "NHL prices with no interval requirement" is
+   TRUE, but of the hockeysim recommendation path, not of the join.
+
+   And on that path, `conf` is defined as `max(0.0, prob - 0.5)` — **distance
+   from a coin flip, which is not a confidence measure at all.** A `k/n` at
+   n=20,000 has a genuinely tight interval; the defect is that nothing computes
+   or requires it, and a field named `conf` implies otherwise.
 
 ---
 
@@ -122,11 +145,17 @@ interval, so those sports were refused `REASON_UNUSABLE_SIMS` outright until
   uniformly to every game".
 
 **NBA specifically has no `#481`-equivalent at all.** WNBA's live transform was
-graded against outcomes and refit; NBA's was not. NBA is also absent from
-`ANALYTIC_LIVE_STD_ERR_BY_SPORT` (which holds only `wnba`) — so if NBA rows do
-reach the join they have no interval and are refused, and if they do not reach it
-they are priced with no interval requirement at all. **Which of those two it is,
-I did not determine.** It is one grep and it should be the first step.
+graded against outcomes and refit; NBA's was not.
+
+`[SETTLED — this was left open in the first draft and is now answered, so nobody
+repeats the grep.]` NBA reaches `attach_live_gamelines_for_sport` (the worker
+builds a book grid for all eight sports, `run_refresh_worker.py:5647`) and fails
+closed there on `_LIVE_GAMELINE_SPORTS`, which holds only
+`{mlb, wnba, soccer, ncaaf}`. **NBA publishes zero live gameline edges**, refused
+by name with `"no live re-sim wired for nba"` — never reaching `price_moneyline`,
+so its absence from `ANALYTIC_LIVE_STD_ERR_BY_SPORT` never comes into play. The
+unfitted scale constants below are therefore a PREGAME-path problem for NBA,
+not a live-pricing one.
 
 ### The honest framing of the NBA/WNBA work
 This is a **mechanism** change, not an estimator fix, so per
