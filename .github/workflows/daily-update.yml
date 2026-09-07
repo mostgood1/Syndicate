@@ -462,28 +462,25 @@ jobs:
           Write-Host "Pushing commit to origin/$branch"
           git push origin "HEAD:$branch"
 
-      - name: Trigger Render web redeploy
-        # Only meaningful when the full pipeline just regenerated everything
-        # locally -- web needs a fresh bootstrap-from-git to pick that up. The
-        # default backup-only path commits a snapshot of data web already has
-        # live via the hot-artifact push, so forcing a redeploy would just add
-        # a brief cold-start with no new data to show for it.
-        if: ${{ env.RUN_FULL_PIPELINE == 'true' }}
-        shell: pwsh
-        run: |
-          $hookUrl = $env:RENDER_WEB_DEPLOY_HOOK_URL
-          if ([string]::IsNullOrWhiteSpace($hookUrl)) {
-            Write-Host 'RENDER_WEB_DEPLOY_HOOK_URL secret not set; skipping Render redeploy trigger.'
-            exit 0
-          }
-          try {
-            Invoke-RestMethod -Method Post -Uri $hookUrl -TimeoutSec 30 | Out-Null
-            Write-Host 'Render web deploy hook triggered.'
-          } catch {
-            Write-Warning "Render deploy hook call failed (non-fatal): $_"
-          }
-        env:
-          RENDER_WEB_DEPLOY_HOOK_URL: ${{ secrets.RENDER_WEB_DEPLOY_HOOK_URL }}
+      # THE RENDER REDEPLOY STEP WAS REMOVED `[2026-09-07, user decision]`.
+      #
+      # It POSTed to `RENDER_WEB_DEPLOY_HOOK_URL` and deployed production, and it
+      # was the only path in this repo that could do so. It bypassed the entire
+      # deploy protocol in CLAUDE.md: no `deploy_claim.py acquire`, so nothing
+      # serialised it against another session's deploy; no `deploy_preflight.py`,
+      # so no `OFF_MAIN` check and no CLEAR-within-15-minutes for the SHA being
+      # shipped; and no `.syndicate/deploys.md` entry, which the protocol calls
+      # the non-negotiable measurement. `.claude/hooks/deploy-guard.py` cannot
+      # see it either -- that guards local tool calls, not a GitHub runner.
+      #
+      # A deploy hook also ships whatever the SERVICE is configured to ship, and
+      # web has run a deploy branch rather than `main`, so the resulting SHA was
+      # not predictable from reading this file. Deploying also kills an in-flight
+      # MLB sim.
+      #
+      # A recovery run still does everything else -- pipeline, artifacts, commit,
+      # push. If it needs to reach production afterwards, deploy it the normal
+      # way, through the two locks, so the measurement lands in `deploys.md`.
 
       - name: Upload daily update log
         if: ${{ env.RUN_FULL_PIPELINE == 'true' }}
