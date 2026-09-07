@@ -25690,3 +25690,55 @@ one discrete 1 MB-arena event. The gate was written after the ON arm and BEFORE
 collecting OFF, because a `0.000` OFF arm was always a plausible coin flip.
 
 **decision:** the profile stays **OFF**. `SYNDICATE_GROWTH_EPISODE` stays ON.
+
+
+## 2026-09-07 00:02:45Z — refresh-worker `271a92e1` — **THE SEGMENT RE-GRADE IS APPLIED: 49 MIS-GRADED ORDERS CORRECTED, −$31.32, REVERSIBLY.** `[lane segment-regrade-apply]`
+
+**what:** deployed the `*_ON_BOOT` hook that runs
+`scripts/apply_segment_regrade.py --apply` on the service that owns the
+keyvalue-backed execution ledger. `segment` reached the order row and no MLB
+resolver read it, so `first5`/`first3`/`first1` bets were graded against all
+nine innings. Claim held by this lane; preflight CLEAR for the exact SHA;
+POSTed in the same tick. Deployed only after `WSU @ WASH` went final, because
+lane `ncaaf-live-resim-wire` was capturing live score-path against model
+probability on a game that happens once and a deploy takes the worker with it.
+
+**verify:** the boot log, read at 00:05:35Z against `finishedAt`:
+
+        [segment_regrade] rc=0  manifest reports/segment_regrade/manifest_2026-09-05.json
+          ledger rows          3373
+          to correct             49
+          corrected              49
+          already corrected       0
+          NOT FOUND in ledger     0
+        [refresh_state_store] KEYVALUE_WRITE_LARGE
+          key=...reports/intelligence/execution_ledger.json size_bytes=3829567
+          caller=execution_ledger.py:931
+            <- apply_segment_regrade.py:215 <- apply_segment_regrade.py:225
+
+**THE `caller=` CHAIN IS THE MEASUREMENT, NOT THE COUNT.** Line 215 is inside
+the `if applied:` branch, so `_persist` was demonstrably REACHED -- a count of
+49 alone is the script's arithmetic about its own intent and would read
+identically if the write never fired. `NOT FOUND 0` separately rules out the
+other failure: that the manifest's `idempotency_key`s no longer match the
+ledger.
+
+**WHAT IS STILL NOT PROVEN, STATED BECAUSE THE COUNTS LOOK LIKE PROOF:** every
+line above is the WRITER's account of itself. All 49 rows are PAPER mode and no
+endpoint exposes paper-book historical rows, so the ledger has not been read
+back by anything other than the process that wrote it. The second source is the
+script's own idempotency -- a row carrying `outcome_as_settled` is skipped -- so
+re-running the hook should report `already corrected 49 / corrected 0`. That run
+is still owed. `corrected 49` a second time would mean this write never
+persisted AND the rows are now double-flipped.
+
+**scope, and why 49 and not 53:** 10 of the 173 settled segment orders were
+settled BY THE VENUE and 3 of those changed. Permanently excluded -- for 5 of
+the 10 the contract we HELD was a whole-game `KXMLBTOTAL`, matched before
+`_segments_agree` shipped, so the venue graded the instrument we actually owned
+and its grade is correct. Applying those would invent P&L no position earned.
+Flips among the 49: `{won->lost 28, lost->won 20, lost->push 1}`.
+
+**reversible:** every corrected row carries `outcome_as_settled`,
+`pnl_as_settled_dollars`, `regraded_at`, `regrade_manifest` and
+`regrade_reason`.
