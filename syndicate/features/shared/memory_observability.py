@@ -721,6 +721,14 @@ def get_all_process_memory_snapshot() -> dict[str, Any]:
                 payload["anon_partition"] = part
     except Exception:  # noqa: BLE001 - telemetry must never raise
         pass
+    # `#632`: what the growth-episode detector has caught. This takes NO
+    # measurement -- it reads state the per-request hook already collected -- so
+    # unlike the two above it needs no throttle.
+    try:
+        if growth_episode_enabled():
+            payload["growth_episodes"] = growth_episode_report()
+    except Exception:  # noqa: BLE001 - telemetry must never raise
+        pass
     return payload
 
 
@@ -3419,6 +3427,252 @@ def anon_partition(*, force: bool = False) -> dict[str, Any] | None:
         print(f"[memory_observability] ANON_PARTITION_FAILED "
               f"{type(exc).__name__}: {exc}", flush=True)
         return None
+
+
+# --- `#632`: CATCH a growth episode, in the process ---------------------------
+#
+# WHY IN THE PROCESS AND NOT FROM A POLL. `UPDATE 26` closed the composition
+# question -- ~400 MB glibc arena, ~165 MB pymalloc, `.so` private-dirty at
+# exactly 4.4 MB, main stack 0.1 MB, the partition closing on 50 of 50 readings.
+# What is NOT known is what drives the INTERMITTENT episodes, and the 31-minute
+# mature window did not reproduce one: anon moved `-5.8`/`+15.3 MB` against
+# `UPDATE 23`'s `+42.4`/`+26.9` over the same span. A 20-second poll from a
+# laptop cannot see a sub-second burst, cannot hold a baseline across a restart,
+# and cannot name the routes that ran during the window. This can.
+#
+# WHY IT IS AFFORDABLE, measured rather than assumed. The partition's `47-96 ms`
+# median -- and its one `1,700.6 ms` call -- was `/proc/self/smaps`, which is
+# O(regions). It was NOT the allocator reads:
+#
+#     mallinfo2                    ~1 ms
+#     log_pymalloc_arena_stats     2.86 ms median (12 local runs)
+#     smaps_rollup (anon only)     one small synthetic file
+#
+# and `.so private-dirty` + `main_thread_stack` were EXACTLY constant across 66
+# minutes (`4.4` and `0.1 MB`, unmoved). So this skips `smaps` entirely and still
+# attributes every term that moves -- ~4-5 ms per capture instead of ~90. Any
+# drift in those two constants lands in `unattributed_mb`, which is reported
+# rather than absorbed, so the assumption is falsifiable from the output.
+#
+# THRESHOLD SIZING IS THE PART MOST LIKELY TO BE WRONG. `UPDATE 23`'s episode was
+# `+42.4 MB over 31 min` = **~1.4 MB/min**. A 5-minute baseline with a 20 MB
+# trigger sees ~7 MB of that and MISSES EXACTLY THE THING BEING HUNTED. So the
+# baseline is held up to 15 minutes and the trigger is 15 MB: that fires on a
+# sustained climb of >=1 MB/min and on a burst within seconds.
+#
+# THE ROUTE IS NOT AN ATTRIBUTION. The rule in flight when the threshold is
+# crossed is whichever request happened to finish there, not the one that
+# allocated. So the episode records the ROUTE MIX across the whole baseline
+# window, and the single-rule field is named `observed_at_route` and says so.
+_GROWTH_EPISODE_STATE: dict[str, Any] = {
+    "baseline": None,        # the capture every delta is measured against
+    "last_check": 0.0,       # cheap-path clock gate
+    "episodes": [],          # ring, most recent last
+    "routes": {},            # rule -> count since the baseline
+    "max_delta_mb": 0.0,     # largest rise SEEN, even if it never fired
+    "checks": 0,
+    "pymalloc_budget": {"count": 0},
+}
+_GROWTH_EPISODE_MAX_KEPT = 12
+_GROWTH_EPISODE_ROUTE_CAP = 40
+
+
+def growth_episode_enabled() -> bool:
+    """Default OFF. Rides `teardown_request`, so it is per-request work."""
+    raw = str(os.environ.get("SYNDICATE_GROWTH_EPISODE", "") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _growth_env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, "") or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _growth_capture() -> dict[str, Any] | None:
+    """The cheap triple: anon, glibc, pymalloc. No `smaps`."""
+    anon = _process_anon_mb()
+    if anon is None:
+        return None
+    glibc_mb = None
+    try:
+        mi = glibc_mallinfo2()
+        if isinstance(mi, dict) and mi.get("available"):
+            raw = mi.get("glibc_total_mb")
+            if isinstance(raw, (int, float)):
+                glibc_mb = float(raw)
+    except Exception:
+        glibc_mb = None
+    pymalloc_mb = None
+    try:
+        stats = log_pymalloc_arena_stats(
+            "growth_episode",
+            budget=(_GROWTH_EPISODE_STATE["pymalloc_budget"], 10 ** 9),
+            quiet=True)
+        if isinstance(stats, dict) and isinstance(stats.get("arena_mb"), (int, float)):
+            pymalloc_mb = float(stats["arena_mb"])
+    except Exception:
+        pymalloc_mb = None
+    return {"t": time.time(), "anon": float(anon), "glibc": glibc_mb,
+            "pymalloc": pymalloc_mb}
+
+
+def _growth_rebase(capture: dict[str, Any]) -> None:
+    _GROWTH_EPISODE_STATE["baseline"] = capture
+    _GROWTH_EPISODE_STATE["routes"] = {}
+
+
+def build_growth_episode(before: dict[str, Any], after: dict[str, Any],
+                         routes: dict[str, int], observed_at_route: str | None) -> dict[str, Any]:
+    """Attribute one anon rise across the terms that can move. Pure.
+
+    `unattributed_mb` is the honest remainder: `.so` private-dirty and the main
+    stack are NOT read here (that needs `smaps`, which is O(regions)), so if
+    either has drifted from the constants they measured as, it shows up there.
+    A large unattributed share is therefore a real finding -- it says the cheap
+    capture is no longer sufficient -- and not a rounding bucket.
+    """
+    d_anon = after["anon"] - before["anon"]
+    out: dict[str, Any] = {
+        "elapsed_s": round(after["t"] - before["t"], 1),
+        "anon_before_mb": round(before["anon"], 1),
+        "anon_after_mb": round(after["anon"], 1),
+        "anon_delta_mb": round(d_anon, 1),
+        "rate_mb_per_min": (round(d_anon / ((after["t"] - before["t"]) / 60.0), 2)
+                            if after["t"] > before["t"] else None),
+    }
+    named = 0.0
+    for key in ("glibc", "pymalloc"):
+        a, b = before.get(key), after.get(key)
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+            delta = float(b) - float(a)
+            named += delta
+            out[key + "_delta_mb"] = round(delta, 1)
+            out[key + "_pct_of_growth"] = (round(100.0 * delta / d_anon, 1)
+                                           if abs(d_anon) > 0.05 else None)
+        else:
+            out[key + "_delta_mb"] = None
+            out[key + "_pct_of_growth"] = None
+    out["unattributed_mb"] = round(d_anon - named, 1)
+    out["unattributed_pct_of_growth"] = (round(100.0 * (d_anon - named) / d_anon, 1)
+                                         if abs(d_anon) > 0.05 else None)
+    # The route MIX, not a culprit. Biggest first, capped.
+    out["routes_since_baseline"] = dict(
+        sorted(routes.items(), key=lambda kv: -kv[1])[:8])
+    out["route_requests_total"] = sum(routes.values())
+    out["observed_at_route"] = observed_at_route
+    out["observed_at_route_note"] = (
+        "the rule in flight when the threshold was crossed -- NOT the allocator; "
+        "use routes_since_baseline")
+
+    if out.get("glibc_delta_mb") is None or out.get("pymalloc_delta_mb") is None:
+        out["reads_as"] = "incomplete"
+    elif abs(d_anon) < 0.05:
+        out["reads_as"] = "no_growth"
+    else:
+        shares = {"glibc": out.get("glibc_pct_of_growth") or 0.0,
+                  "pymalloc": out.get("pymalloc_pct_of_growth") or 0.0,
+                  "unattributed": out.get("unattributed_pct_of_growth") or 0.0}
+        top = max(shares.items(), key=lambda kv: kv[1])
+        out["dominant_term"] = top[0]
+        out["dominant_pct"] = round(top[1], 1)
+        if top[0] == "unattributed" and top[1] >= 50.0:
+            # The cheap capture assumes `.so`+stack are the constants they
+            # measured as. This says that assumption no longer holds.
+            out["reads_as"] = "unattributed_dominant"
+            out["why"] = ("most of the rise is in NEITHER allocator -- the cheap "
+                          "capture is no longer sufficient and the full smaps "
+                          "partition has to come back")
+        else:
+            out["reads_as"] = "attributed"
+    return out
+
+
+def maybe_capture_growth_episode(route: str | None = None) -> dict[str, Any] | None:
+    """Per-request hook: notice a rise in anon and attribute it. Never raises.
+
+    Gate order is cheapest-first, exactly as `maybe_trim_after_request` does it:
+    a flag lookup, then ONE clock comparison, and only then a `smaps_rollup`
+    read. The allocator reads happen on the interval, not per request.
+    """
+    try:
+        if not growth_episode_enabled():
+            return None
+        state = _GROWTH_EPISODE_STATE
+        if route:
+            routes = state["routes"]
+            if route in routes or len(routes) < _GROWTH_EPISODE_ROUTE_CAP:
+                routes[route] = routes.get(route, 0) + 1
+        now = time.time()
+        every_s = _growth_env_float("SYNDICATE_GROWTH_EPISODE_CHECK_SECONDS", 15.0)
+        if now - float(state["last_check"]) < every_s:
+            return None
+        state["last_check"] = now          # claim the slot BEFORE the real work
+        state["checks"] = int(state["checks"]) + 1
+
+        capture = _growth_capture()
+        if capture is None:
+            return None
+        baseline = state["baseline"]
+        if baseline is None:
+            _growth_rebase(capture)
+            return None
+        # A restart resets every figure; a collapse in anon is that, not a
+        # negative episode.
+        if capture["anon"] < baseline["anon"] * 0.5:
+            _growth_rebase(capture)
+            return None
+
+        delta = capture["anon"] - baseline["anon"]
+        if delta > float(state["max_delta_mb"]):
+            # Recorded even when it never fires, so "no episodes" can be told
+            # apart from "the trigger is mis-sized".
+            state["max_delta_mb"] = round(delta, 1)
+
+        trigger = _growth_env_float("SYNDICATE_GROWTH_EPISODE_TRIGGER_MB", 15.0)
+        hold_s = _growth_env_float("SYNDICATE_GROWTH_EPISODE_BASELINE_SECONDS", 900.0)
+        if delta < trigger:
+            if now - float(baseline["t"]) >= hold_s:
+                _growth_rebase(capture)     # stale baseline, nothing happened
+            return None
+
+        episode = build_growth_episode(baseline, capture, dict(state["routes"]), route)
+        episode["pid"] = os.getpid()
+        episode["captured_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+        ring = state["episodes"]
+        ring.append(episode)
+        del ring[:-_GROWTH_EPISODE_MAX_KEPT]
+        _growth_rebase(capture)
+        print("GROWTH_EPISODE " + json.dumps(episode, default=str, sort_keys=True),
+              flush=True)
+        return episode
+    except Exception as exc:  # noqa: BLE001 - telemetry must never fail a request
+        print(f"[memory_observability] GROWTH_EPISODE_FAILED "
+              f"{type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
+def growth_episode_report() -> dict[str, Any]:
+    """What the detector has seen. Cheap -- reads state, takes no measurement."""
+    state = _GROWTH_EPISODE_STATE
+    baseline = state["baseline"]
+    return {
+        "enabled": growth_episode_enabled(),
+        "pid": os.getpid(),
+        "checks": state["checks"],
+        "episodes_captured": len(state["episodes"]),
+        # THE FIELD THAT MAKES A NULL READABLE. Zero episodes with a max rise of
+        # 1.2 MB means the process was flat; zero with 14.8 MB means the trigger
+        # is mis-sized. Without it those are the same output.
+        "max_anon_rise_seen_mb": state["max_delta_mb"],
+        "trigger_mb": _growth_env_float("SYNDICATE_GROWTH_EPISODE_TRIGGER_MB", 15.0),
+        "baseline_age_s": (round(time.time() - float(baseline["t"]), 1)
+                           if baseline else None),
+        "baseline_anon_mb": (round(float(baseline["anon"]), 1) if baseline else None),
+        "routes_since_baseline_total": sum(state["routes"].values()),
+        "episodes": list(state["episodes"]),
+    }
 
 
 # --- `#423` step 2: allocation-site tracing ----------------------------------

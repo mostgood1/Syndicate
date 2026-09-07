@@ -538,6 +538,21 @@ def create_app() -> Flask:
             memory_observability.maybe_trim_after_request()
         except Exception:
             pass
+        # `#632`: notice a RISE in anon and attribute it while it is happening.
+        # Rides this hook for the same reason the trim does (`#241`: no new
+        # threads), so an episode can report the route MIX it saw. The common
+        # path is a flag lookup, a dict increment and ONE clock comparison; the
+        # allocator reads happen on the interval, not per request.
+        #
+        # The rule is resolved AGAIN here rather than reusing the one above: that
+        # name is bound inside the preceding `try`, so a failure there would
+        # leave it undefined and this would lose the route to a NameError its own
+        # handler then swallowed.
+        try:
+            memory_observability.maybe_capture_growth_episode(
+                getattr(request.url_rule, "rule", None) or "<unmatched>")
+        except Exception:
+            pass
 
     if _is_render_web_dyno():
         if _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):
