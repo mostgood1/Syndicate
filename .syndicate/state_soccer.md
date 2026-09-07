@@ -1039,8 +1039,11 @@ production runs** — infer n from quantisation, do not read the signature.
 **THE BAR THAT FOLLOWS FROM THAT: 4.00 pp at p=0.20, 4.98 pp at p=0.50.** A
 soccer moneyline disagreement is usually smaller, so on
 `/api/board/layer2-shortlist?sport=soccer` (2026-09-06, 59 moneyline rows, 28
-carrying a model edge) **17 of 28 — 61% — are newly withheld**: 8 home, 9 away,
-0 draw. 11 still price. USER DECISION taken on exactly these numbers: ship it.
+carrying a model edge) **17 of 28 — 61% — are newly withheld**. 11 still price.
+**THE PER-SIDE SPLIT ORIGINALLY RECORDED HERE (8 home / 9 away / 0 draw) IS
+RETRACTED** `[2026-09-07, postmortem]`: it summed TWO mechanisms. Some legs were
+gated on their own noise; others were dropped by the `edge is None` early return
+that `62937ea4` fixed. The 17 total stands; the split cannot be cited. USER DECISION taken on exactly these numbers: ship it.
 Withheld rows fall back to EV alone; they do not disappear.
 
 **THE ESTIMATOR IS NOT WHAT MOVED.** Mean shift on `|edge|` is +0.03 pp, max

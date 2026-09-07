@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 891 rules `[generated]`
+## Index — 892 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -3552,4 +3552,54 @@ HOW TO APPLY. For a shared file, `git ls-tree -r origin/main -- <path>` or
 `git cat-file -e origin/main:<path>` after a `git fetch` -- the checkout answers
 a different question. More generally: if a sentence names two scopes, run two
 checks or name only the one you ran.
+- *(evidence in `learnings_evidence.md`)*
+
+### 2026-09-07 — FORBIDDEN: verifying a change with an AGGREGATE COUNT that BOTH your intended effect and a collateral bug would move the same way `[lane soccer-threeway-precision-gate]`
+
+Also FORBIDDEN: making an existing field take a value it never took before
+without enumerating that field's READERS first.
+
+- **What we believed:** the soccer precision gate (`d9672ac7`) did one thing —
+  withhold moneyline legs whose edge is inside their own Monte-Carlo noise. It
+  was verified on the served board: model-edge rows fell **28 -> 11** across a
+  rebuild, polled rather than read once. That number was taken as confirmation.
+- **What was actually true:** the deploy did TWO things.
+  `_price_against_market` began writing `edge_vs_market_pct = None` for a NEW
+  state — "priced against a real fair, withheld as imprecise" — on ~60% of
+  soccer moneyline rows, where before it was ~never null.
+  `layer2_board._model_edge_for` opens with `if edge is None: return
+  _modelled_fair_edge_for(...)`, an early return written for a DIFFERENT state
+  (a one-sided quote with no two-sided fair). The two are indistinguishable at
+  that line, so a withheld HOME leg silently dropped the DRAW and AWAY legs of
+  the same match before their own bars were consulted. Measured on the
+  2026-09-07 slate: **3 of 10 legs lost, including a +10.13 pp away edge
+  (Getafe) that cleared its own 4.84 pp bar.**
+- **How we found out:** not from a test and not from review — both passed. The
+  user asked for the draw leg to be checked on the next slate, and that check
+  was PER-LEG (served value against that leg's own bar), not an aggregate. An
+  aggregate could never have found it: **both mechanisms push the edged count
+  DOWN, so 28 -> 11 is exactly what the gate alone looks like AND exactly what
+  gate-plus-collateral-damage looks like.** The metric could not fail for the
+  second mechanism, and it was read as though it could.
+- **The rule going forward:** two, and the second is the cheap one.
+  1. A verification metric must be able to FAIL for the bug you did not think
+     of. If your intended effect and a plausible collateral effect move it the
+     same direction, it verifies nothing — measure per-row against the predicate
+     you actually changed.
+  2. When a change makes an existing field newly-null (or newly-anything),
+     `git grep` that field name and enumerate every site that BRANCHES on the
+     value. One grep for `edge_vs_market_pct` would have surfaced this early
+     return in seconds.
+- **Cost:** 43m51s live in production (`d9672ac7` 01:26:11Z -> `62937ea4`
+  02:10:02Z), coverage only — `_modelled_fair_edge_for` is side-matched, so the
+  dropped legs returned None rather than an ungated number. Plus a per-side
+  split published to a peer session and into `state_soccer.md` that had to be
+  retracted, because it summed the two mechanisms.
+
+**NEITHER HALF WAS A BUG, WHICH IS WHY NOTHING CAUGHT IT.** The early return is
+correct for a one-sided quote; the gate is correct for an imprecise estimate.
+The COLLISION is the defect. A missing branch announces itself; a second meaning
+quietly assigned to an existing sentinel does not. Same family as
+`unknown must not default permissive` — one field carrying two states, and the
+consumer branching as if it carried one.
 - *(evidence in `learnings_evidence.md`)*
