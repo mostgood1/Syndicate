@@ -2300,6 +2300,25 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   the harness up front this time rather than after the fact.
 - Blocked by: none.
 
+### daily-update-deploy-hook — **CLOSED-VERIFIED 2026-09-07** — opened 2026-09-07 — **`daily-update.yml`'s Render redeploy step is GONE `[user decision]`. It was the only path in the repo that could deploy production, and it bypassed every lock.** No `deploy_claim.py`, no `deploy_preflight.py` (so no `OFF_MAIN` check, no CLEAR-for-this-SHA), no `deploys.md` entry, and `deploy-guard.py` cannot see a GitHub runner at all. Opt-in via `run_full_pipeline=true` (default `'false'`), and the secret `RENDER_WEB_DEPLOY_HOOK_URL` is LIVE (updated 2026-07-13) — so it was one dispatch away, not theoretical. Found by an audit of what the remaining workflows DO rather than when they fire. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: no workflow can deploy production. Verified: zero references to the
+  deploy hook remain, the file still parses, and the surrounding steps are intact.
+- Files: `.github/workflows/daily-update.yml`.
+- **The rest of the audit came back clean, and that is worth recording so it is
+  not re-run from scratch:** no `schedule:` in any workflow, **no webhooks, no
+  deploy keys**. `ci.yml` is push/PR; the other three are `workflow_dispatch`
+  only. Secrets configured: `ADMIN_TOKEN`, `ODDS_API_KEY`,
+  `RENDER_WEB_DEPLOY_HOOK_URL` — the last is now unreferenced by any workflow.
+- **Two things left ALONE, deliberately.** (1) `daily-update.yml`'s default
+  dispatch path still `git push`es a data snapshot (~370 files / ~51MB) to
+  whichever branch it is dispatched from — documented and intended under `#486`,
+  not a defect, but not obvious from the button either. (2) `ci.yml` still has no
+  `concurrency:` group — that is `#572`, already open; it sheds runs that should
+  have happened rather than running things that should not.
+- Verification: `grep -c RENDER_WEB_DEPLOY_HOOK_URL .github/workflows/` is 0, the
+  YAML parses, and the step count drops by exactly one with its neighbours intact.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
