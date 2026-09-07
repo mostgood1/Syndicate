@@ -173,3 +173,114 @@ def test_a_zero_of_four_hundred_draw_leg_is_priced_off_the_smoothed_estimate():
     assert got is not None
     assert got != pytest.approx(-12.0, abs=0.01), "that would be the raw certainty"
     assert -12.0 < got < -11.0
+
+
+# --------------------------------------------------------------------------
+# THE WITHHELD-HOME COLLISION.
+#
+# `_model_edge_for` opens with `if edge is None: return
+# _modelled_fair_edge_for(...)`, an early return written for a ONE-SIDED QUOTE.
+# The precision gate gave `edge_vs_market_pct is None` a SECOND meaning --
+# "priced against a real two-sided fair, and withheld as imprecise" -- and the
+# fallback was written for only the first. So a withheld HOME leg silently
+# dropped the DRAW and AWAY legs before their own bars were ever consulted.
+#
+# Neither half is a bug. The early return is correct for a one-sided quote and
+# the gate is correct for an imprecise estimate; the COLLISION is the defect,
+# which is why nothing failed and why the per-side withheld counts were
+# measuring two things at once.
+#
+# MEASURED on the 2026-09-07 pregame slate with the deployed code over
+# production projections: 3 of 10 draw/away legs cleared their own 2-sigma bar
+# and were dropped anyway. Getafe away is one of them, and its numbers are the
+# fixture below.
+# --------------------------------------------------------------------------
+
+
+def _home_withheld(model_home, draw, away, sims=PRODUCTION_SIMS):
+    """A projection as `_price_against_market` leaves it when the GATE refuses.
+
+    The distinguishing shape: `edge_vs_market_pct` is None, but
+    `market_fair_prob_over` IS present and the interval IS stamped -- because
+    `_stamp_precision` stamps on the refusal branch too. A genuinely one-sided
+    quote has neither.
+    """
+    return {
+        "projection": {
+            "basis": "win_probability",
+            "side": "home",
+            "model_prob_over": model_home,
+            "draw_probability": draw,
+            "away_probability": away,
+            "market_fair_prob_over": 0.3971,
+            "edge_vs_market_pct": None,
+            "edge_unavailable_reason": (
+                "the model probability is inside its own simulation noise: "
+                "edge_within_simulation_noise"
+            ),
+            "prob_std_err": 0.02373,
+            "std_err_basis": "sim_count",
+            "point_estimator": "agresti_coull",
+            "sims_run": sims,
+        }
+    }
+
+
+def test_a_withheld_home_leg_no_longer_drops_the_away_leg():
+    """Getafe, 2026-09-07: model .385 vs fair .2848 is +10.13 pp on ITS OWN bar.
+
+    Before the fix this returned None -- not because the away leg failed a test,
+    but because a DIFFERENT leg of the same match had been withheld.
+    """
+    row = _home_withheld(0.3475, 0.2675, 0.385)
+    got = _model_edge_for(row, "away", 0.2848)
+    assert got is not None, "a leg that clears its own bar must not be dropped"
+    assert 9.5 < got < 10.5, got
+
+
+def test_a_withheld_home_leg_no_longer_drops_the_draw_leg():
+    """Same match, draw side: -6.56 pp on its own bar."""
+    row = _home_withheld(0.3475, 0.2675, 0.385)
+    got = _model_edge_for(row, "draw", 0.3354)
+    assert got is not None
+    assert -7.0 < got < -6.0, got
+
+
+def test_the_leg_is_still_gated_on_ITS_OWN_bar_not_waved_through():
+    """The fix restores REACHABILITY, not permissiveness.
+
+    Estoril's draw (model .2825 vs fair .2806) is 0.2 pp against a ~4.5 pp bar
+    and must still be refused. If this ever returns a number, the fix stopped
+    being a gate and became a bypass.
+    """
+    row = _home_withheld(0.4325, 0.2825, 0.285)
+    assert _model_edge_for(row, "draw", 0.2806) is None
+
+
+def test_a_genuinely_one_sided_quote_still_gets_the_modelled_fair():
+    """The behaviour the early return was WRITTEN for is untouched.
+
+    No three-way vector, so `_three_way_leg_edge` returns the sentinel and the
+    modelled-fair fallback runs exactly as before. This is the regression guard
+    on the fix itself.
+    """
+    row = {"projection": {"side": "home", "edge_vs_market_pct": None,
+                          "edge_vs_modelled_fair_pct": 4.4,
+                          "modelled_fair_side": "home"}}
+    assert _model_edge_for(row, "home", None) == 4.4
+    assert _model_edge_for(row, "away", None) is None, "side-matched, never negated"
+
+
+def test_the_sentinel_separates_no_vector_from_refused_leg():
+    """Both are `None` to a caller that does not use the sentinel, and collapsing
+    them is the same class of defect as the one this whole block is about."""
+    from syndicate.features.shared.layer2_board import _NO_THREE_WAY, _three_way_leg_edge
+    no_vector = _three_way_leg_edge({"model_prob_over": 0.5}, "home", 0.5)
+    refused = _three_way_leg_edge(
+        {"model_prob_over": 0.3475, "draw_probability": 0.2825,
+         "away_probability": 0.285, "sims_run": PRODUCTION_SIMS},
+        "draw", 0.2806)
+    assert no_vector is _NO_THREE_WAY
+    assert refused is None
+    assert no_vector is not refused
+

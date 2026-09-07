@@ -1432,6 +1432,65 @@ def model_edge_basis(row: Mapping[str, Any], side: str) -> str | None:
     return None
 
 
+#: `_three_way_leg_edge` found no three-way vector at all, which is NOT the same
+#: as finding one and refusing the leg. Both would be `None`, and collapsing them
+#: is the exact defect this sentinel exists to stop -- see `_model_edge_for`'s
+#: `edge is None` branch, where one `None` already came to mean two things.
+_NO_THREE_WAY = "__no_three_way_vector__"
+
+
+def _three_way_leg_edge(projection: Mapping[str, Any], row_side: str, fair: Any) -> Any:
+    """This row's own leg of a three-way market, priced against ITS OWN bar.
+
+    Returns a float (priced), None (there IS a vector and this leg is refused),
+    or `_NO_THREE_WAY` (no draw leg -- caller should do something else).
+
+    ONE IMPLEMENTATION, TWO CALL SITES. `_model_edge_for` reaches this from two
+    different states -- a home leg that priced, and a home leg the precision gate
+    withheld -- and a second copy of the pricing rule for the second state is how
+    the first one rots. `live_gameline_join` says it in those words.
+
+    NEGATION IS A TWO-WAY IDENTITY AND SOCCER h2h IS THREE-WAY. `-edge_home` is
+    the other side's edge only when there is exactly one other side, because
+    P(away) = 1 - P(home) makes the two errors equal and opposite. With a draw
+    leg the three edges sum to zero but are otherwise unrelated.
+    """
+    draw_prob = _as_float(projection.get("draw_probability"))
+    if draw_prob is None:
+        return _NO_THREE_WAY
+
+    model_prob = {
+        "home": _as_float(projection.get("model_prob_over")),
+        "draw": draw_prob,
+        "away": _as_float(projection.get("away_probability")),
+    }.get(str(row_side or "").strip().lower())
+    fair_prob = _as_float(fair)
+    if model_prob is None or fair_prob is None:
+        # A three-way side we cannot price is DROPPED, not negated. Falling back
+        # to the two-way identity here is how the sign inversion this branch
+        # exists to fix would survive its own fix.
+        return None
+
+    # THE PRECISION GATE. `price_moneyline` is CALLED, not reimplemented: it owns
+    # the Agresti-Coull point estimate, the standard error and the 2-sigma bar,
+    # and it applies them in the one correct order -- the SE comes off the RAW
+    # `p`, because `prob_std_err` reconstructs `successes = p * n` and smoothing
+    # first would apply add-two twice and over-widen the bar ~39% at the boundary.
+    from syndicate.features.shared.live_gameline_join import price_moneyline
+
+    verdict = price_moneyline(
+        model_prob=model_prob,
+        market_prob=fair_prob,
+        sims=projection.get("sims_run"),
+    )
+    if not verdict.get("priceable"):
+        return None
+    direct = float(verdict["edge_pp"])
+    if abs(direct) > _MODEL_EDGE_MAX_POINTS:
+        return None
+    return round(direct, 4)
+
+
 def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> float | None:
     """The sim's disagreement with the market, in POINTS OF PROBABILITY.
 
@@ -1468,6 +1527,39 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
         # got. `#242`'s rule is that a modelled number must not wear a measured
         # one's clothes -- so this is a FALLBACK reached only when the measured
         # term does not exist, never a substitute for one that does.
+        #
+        # AND THAT LAST SENTENCE IS WHY THE THREE-WAY CHECK GOES ABOVE IT.
+        # `edge_vs_market_pct is None` acquired a SECOND meaning on 2026-09-06
+        # when the soccer precision gate shipped: it now also means "there WAS a
+        # two-sided fair, the leg was priced against it, and the edge was inside
+        # its own Monte-Carlo noise". Both states are a bare `None` here, and
+        # this fallback was written for only one of them.
+        #
+        # The collision is not a bug in either half. The early return is correct
+        # for a one-sided quote; the gate is correct for an imprecise estimate.
+        # What is wrong is a single sentinel carrying both, which is why nothing
+        # failed and why the per-side withheld counts were measuring two things
+        # at once.
+        #
+        # MEASURED on the 2026-09-07 pregame slate, deployed code over production
+        # projections: **3 of 10 draw/away legs cleared their OWN 2-sigma bar and
+        # were dropped anyway** because the HOME leg of the same match had been
+        # withheld -- among them a +10.13 pp away edge (Getafe, model .385 vs
+        # fair .2848). A leg's precision is a property of THAT leg: the three
+        # probabilities are different numbers with different edges and different
+        # bars, and one being imprecise says nothing about the others.
+        #
+        # Not a safety hole before this fix -- `_modelled_fair_edge_for` is
+        # side-matched and returned None rather than an ungated number, so the
+        # cost was COVERAGE. It is still worth fixing at the source rather than
+        # leaving the board quietly narrower than the gate intends.
+        gated = _three_way_leg_edge(projection, side, fair)
+        if gated is not _NO_THREE_WAY:
+            # A vector exists, so the MEASURED term exists for this leg -- either
+            # a priced edge or a named refusal. Falling through to the modelled
+            # fair from here is precisely the substitution the paragraph above
+            # forbids.
+            return gated
         return _modelled_fair_edge_for(projection, side)
     if abs(edge) > _MODEL_EDGE_MAX_POINTS:
         # Dropped, not clamped. Clamping would keep an unusable number in the
@@ -1510,59 +1602,28 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
     # terms stay in the unconditional three-way space, the property
     # `soccer_projections._price_against_market` documents as what makes the
     # comparison valid at all.
-    model_by_side = {
-        "home": _as_float(projection.get("model_prob_over")),
-        "draw": _as_float(projection.get("draw_probability")),
-        "away": _as_float(projection.get("away_probability")),
-    }
-    if model_by_side["draw"] is not None:
-        model_prob = model_by_side.get(row_side)
-        fair_prob = _as_float(fair)
-        if model_prob is None or fair_prob is None:
-            # A three-way market whose side we cannot price is dropped, NOT
-            # negated. Falling back to the two-way identity here is how the bug
-            # above would survive its own fix.
-            return None
-        # THE PRECISION GATE. This subtraction used to be published as-is, and
-        # it was the last path on the platform where a raw Monte-Carlo certainty
-        # could reach a board edge.
-        #
-        # THE DRAW LEG IS THE EXPOSED ONE, for a structural reason rather than a
-        # statistical accident: a draw is a NARROW outcome, so once a second
-        # goal separates the sides `draws / n` genuinely reaches zero. `0/400`
-        # is ordinary late in a match here, where in baseball or football it is
-        # a tail case. And `probability_refusal.refuse_published_certainty` --
-        # the one guard that would catch it -- reads `model_prob_over` and
-        # NOTHING ELSE, so it covers the home leg and is blind to these two.
-        #
-        # `79149c94` fixed the ESTIMATOR half platform-wide and this path was
-        # missed for exactly the reason it is being fixed here: it never went
-        # through the shared pricer, so neither the estimator nor the interval
-        # reached it.
-        #
-        # `price_moneyline` is CALLED, not reimplemented -- the same rule the
-        # home leg now follows in `soccer_projections._price_against_market`.
-        # It also owns the ordering trap: `prob_std_err` reconstructs
-        # `successes = p * n`, so the SE must come off the RAW `p` before
-        # add-two touches the centre, or the bar over-widens ~39% at the
-        # boundary and silently withholds real edges.
-        #
-        # A REFUSAL RETURNS None, which is what this function already does for
-        # everything else it declines: the row falls back to EV alone, which
-        # cannot pick a side but also cannot invert one.
-        from syndicate.features.shared.live_gameline_join import price_moneyline
-
-        verdict = price_moneyline(
-            model_prob=model_prob,
-            market_prob=fair_prob,
-            sims=projection.get("sims_run"),
-        )
-        if not verdict.get("priceable"):
-            return None
-        direct = float(verdict["edge_pp"])
-        if abs(direct) > _MODEL_EDGE_MAX_POINTS:
-            return None
-        return round(direct, 4)
+    # THE THREE-WAY LEG, priced against its own bar. Same helper the `edge is
+    # None` branch above uses, deliberately: this function reaches three-way
+    # pricing from two different states and they must not drift apart.
+    #
+    # THE DRAW LEG IS THE EXPOSED ONE, for a structural reason rather than a
+    # statistical accident: a draw is a NARROW outcome, so once a second goal
+    # separates the sides `draws / n` genuinely reaches zero. `0/400` is
+    # ordinary late in a match here, where in baseball or football it is a tail
+    # case. And `probability_refusal.refuse_published_certainty` -- the one
+    # guard that would catch it -- reads `model_prob_over` and NOTHING ELSE, so
+    # it covers the home leg and is blind to these two.
+    #
+    # `79149c94` fixed the ESTIMATOR half platform-wide and this path was missed
+    # for exactly the reason it was fixed here: it never went through the shared
+    # pricer, so neither the estimator nor the interval reached it.
+    #
+    # A REFUSAL RETURNS None, which is what this function already does for
+    # everything else it declines: the row falls back to EV alone, which cannot
+    # pick a side but also cannot invert one.
+    three_way = _three_way_leg_edge(projection, row_side, fair)
+    if three_way is not _NO_THREE_WAY:
+        return three_way
 
     # Two-way market: the identity holds and MLB/WNBA behaviour is unchanged.
     #
