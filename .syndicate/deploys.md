@@ -5,6 +5,59 @@
 
 ---
 
+## 2026-09-07 21:52:16Z — refresh-worker `66e121f3` — **MEASURED: sub-4MiB publishes now carry `X-Artifact-Publisher`.** `[lane soccer-unfed-inputs]`
+
+`dep-dafj1lht0dsc73ebqbe0`, POSTed 21:47:02Z, live 21:52:16.663704Z, preflight
+CLEAR on a real gap.
+
+**PINNED, NOT THE TIP.** `origin/main` was `cee667e5`; I deployed `66e121f3` and
+excluded a peer's `layer2_board` pricing change. Two reasons: it is not mine to
+ship (pushing and deploying are different acts here), and a third session had a
+durability test riding this boot and had asked for one change. Enumerating
+`ae9cf867..cee667e5` first is what showed the delta was THREE runtime changes,
+not the two I had assumed — I had imposed one-change-per-deploy on a peer and
+would otherwise have broken it silently myself.
+
+**THE DIAGNOSIS WAS NARROWER THAN THE REPORT.** The peer reported "the senders
+are not setting it". In fact `_publish_streamed` had sent it since `#488`; only
+`publish_hot_artifact` — the JSON path — never did.
+`_PUBLISH_STREAM_MIN_BYTES = 4 MiB` partitions the pre-deploy baseline with ZERO
+exceptions, including nfl book_grid at 4,051,038 B reading `unknown` beside
+soccer book_grid at 5,030,371 B reading `refresh-worker` — a 24% size difference
+straddling the boundary. Their sample simply contained no large publish, so
+"not set" and "not set BELOW A THRESHOLD" rendered identically.
+
+**THE READING — same path, same size, across the deploy:**
+
+    before  publisher=unknown         nfl_source/.../book_grid_2026-09-07.json  4,051,038 B
+    after   publisher=refresh-worker  nfl_source/.../book_grid_2026-09-07.json  4,051,038 B
+
+9 sub-4MiB lines across 8 distinct paths now named. **CONTROL HELD:** streamed
+(>= 4 MiB) publishes stayed named throughout — had they gone `unknown`, the
+deploy would have broken something rather than fixed it.
+
+**Still `unknown`: live-odds-worker's own small publishes**, which is correct —
+the fix is sender-side and that service was not deployed until 22:08Z.
+
+**A FALSE ALARM OF MINE, KILLED BY A CONTROL.** `ops.py` computes
+`cross = bool(publisher and last and publisher != last)`, so an always-empty
+publisher meant a sub-4MiB publish could never be REFUSED and never recorded
+`_PUBLISH_LAST_PUBLISHER`. My change makes both reachable, and a refusal there
+means that publisher's data never lands. I measured instead of reasoning: all 10
+markers since the deploy are on `odds_history`, a MERGEABLE family that `#630`
+keeps out of the refusal branch (`ARTIFACT_MERGE_DEFERRED`/`_AT_CAPACITY`
+confirm staging), every one above 4 MiB and therefore untouched by my change —
+and **201 `verdict=REFUSED` in the hour BEFORE the deploy**. Not my doing.
+
+**THREE WINDOW SLIPS, all mine, all the same error.** I read ACCEPTED lines from
+21:48:40Z when live was 21:52:16Z (made the fix look dead), then from a start
+time in the FUTURE (zero rows), then finally from `finishedAt`. Anchor on the
+deploy's own `finishedAt` and nothing else.
+
+**PRE-EXISTING AND NOT MINE, flagged:** those 201 refusals/hour are
+`refresh-worker` and `live-odds-worker` alternating on soccer `odds_history`.
+That is the `#488` incident shape still running at volume.
+
 ## 2026-09-07 20:12:33Z — refresh-worker `a9a0d958` — **MEASURED: `espn_match_stats.json` reached the worker for the first time — 9 leagues.** `[lane soccer-unfed-inputs]`
 
 `dep-dafhien40ujc73bamtkg`, POSTed 20:06:18Z, live 20:11:58.836823Z, preflight
