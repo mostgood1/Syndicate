@@ -2125,6 +2125,20 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `%LOCALAPPDATA%\syndicate\vendor-sync-worktree` (registered in the primary
   repo's `.git/worktrees`). Retiring this means removing both, not just deleting
   the script.
+- **DISCHARGED 2026-09-07: THE TRIGGER FIRED UNATTENDED.**
+  `history.jsonl` row 2 reads `executed_at 2026-09-07T14:20:02Z` — **09:20:02
+  local, two seconds after the due time**, with nobody touching the machine.
+  `ok: true`, 7-second run, `actionable 0`, totals unchanged at
+  `IN_SYNC 570 / LOCAL_ONLY 215 / LOCAL_PATCH 52`. No gap in the file.
+  Corroborated INDEPENDENTLY of the timestamp, which matters because a timestamp
+  is what this whole design distrusts: `synced_ref` moved `d9672ac7 → 310e3a9a`
+  and `primary_behind_origin_main` moved `243 → 272`, so the run re-fetched and
+  recomputed rather than rewriting a cached value. The scheduler's own
+  `LastRunTime 09:20:01` agrees, but it was not the evidence — it is the reading
+  that was already known to be a DISPATCH time.
+  Both guarantees still hold: `git status -- vendor/` shows only the two WNBA
+  `data/processed/schedule_2026.*` files that predate this work, and the sparse
+  worktree is **130 MB**, not regrown.
 - **Not verified:** that the task fires on its own at 09:20 unattended. Every run
   so far was `Start-ScheduledTask`, which proves the action works, not that the
   trigger does — and the trigger is precisely what this machine has been caught
