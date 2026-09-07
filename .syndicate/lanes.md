@@ -2319,7 +2319,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   YAML parses, and the step count drops by exactly one with its neighbours intact.
 - Blocked by: none.
 
-### soccer-unfed-inputs — OPEN — opened 2026-09-07 — session 520cd594
+### soccer-unfed-inputs — OPEN (verification in flight) — opened 2026-09-07 — session 520cd594 — **THE "9 UNFED INPUTS" WAS A TRUE COUNT AND A FALSE DEFECT LIST: 2 defects, 2 gate blind spots, 5 DELIBERATE (four of which would have been regressions to wire — goals-as-xG double-counts 0.22->0.36, measured `total_mean` 3.16->3.39). Gate now RUNS in production for the first time since 2026-08-18 — 20 MLB reports existed and ZERO soccer. Its first run found THREE MORE unfed fields than the local run: `possession_share`, both `set_piece_xg_share`, `availability_index`, all sourced from `espn_match_stats.json`, which refresh-worker's `history/` seed glob (`*.csv`) silently excluded — git-tracked for 9 leagues since 08-19 and never on that disk. Market prior wired and BACKTESTED NULL (n=600, Brier +0.00104, t +0.592, 95% CI [-0.0024,+0.0045], no subset helps) so `SYNDICATE_SOCCER_MARKET_PRIOR` stays OFF. Shipped: `359ef031` `4c264a05` `3d02436e` `ba8de73d` `a9a0d958` + ledger. OWED: the reading from `dep-dafhien40ujc73bamtkg` (20:06:18Z) showing those three flip to `ok`.**
 - Goal: soccer's input gate RUNS in production and its alarm list means something —
   a published `soccer_source/.../sim_input_report_*.json` where the 4 DELIBERATE
   non-populations sit in a `disabled` category with reasons, `spread`/`total` are
