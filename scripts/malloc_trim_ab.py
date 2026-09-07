@@ -57,6 +57,7 @@ retraction this script exists to repair.
 from __future__ import annotations
 
 import json
+import os
 import statistics
 import sys
 import time
@@ -72,12 +73,28 @@ OUT_DIR = Path(__file__).resolve().parent.parent / "reports" / "malloc_trim_ab"
 
 
 def _token() -> str:
-    env = Path(__file__).resolve().parent.parent / ".env"
-    if not env.exists():
-        return ""
-    for line in env.read_text(encoding="utf-8", errors="ignore").splitlines():
-        if line.startswith("ADMIN_TOKEN"):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
+    """ADMIN_TOKEN from the environment first, then a `.env` beside the repo.
+
+    THE ENVIRONMENT COMES FIRST BECAUSE A WORKTREE HAS NO `.env` -- it is
+    gitignored, so `session_worktree.py open` never copies it. Reading only the
+    file returned an empty token here, which meant no `X-Admin-Token` header,
+    which meant every poll of `/api/ops/memory` came back 401 and the arm
+    collected NOTHING for 30 minutes while printing only `HTTPError`. The
+    service was healthy throughout; the harness was not.
+    """
+    env_token = str(os.environ.get("ADMIN_TOKEN") or "").strip()
+    if env_token:
+        return env_token
+    for env in (Path(__file__).resolve().parent.parent / ".env",
+                Path(r"C:/Users/tempadmin/OneDrive/Coding/Syndicate/.env")):
+        try:
+            if not env.exists():
+                continue
+            for line in env.read_text(encoding="utf-8", errors="ignore").splitlines():
+                if line.startswith("ADMIN_TOKEN"):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+        except Exception:
+            continue
     return ""
 
 
@@ -91,6 +108,20 @@ def _get(path: str, token: str, timeout: int = 90):
 
 def collect_arm(label: str) -> None:
     token = _token()
+    # PROVE THE READOUT WORKS BEFORE THE CLOCK STARTS. A 30-minute window that
+    # collected nothing is indistinguishable from a quiet one in the output, and
+    # that is exactly what an empty token produced here.
+    try:
+        probe = _get("/api/ops/memory", token)["memory"]
+        if not (probe.get("growth_episodes") or {}).get("last_capture"):
+            print(f"[{label}] the detector is not reporting -- nothing to measure.")
+            raise SystemExit(2)
+    except SystemExit:
+        raise
+    except Exception as exc:
+        print(f"[{label}] CANNOT READ /api/ops/memory ({type(exc).__name__}). "
+              f"token_present={bool(token)}. Aborting before the settle.")
+        raise SystemExit(2)
     print(f"[{label}] settling {SETTLE_MIN:.0f} min", flush=True)
     settle_end = time.time() + SETTLE_MIN * 60
     while time.time() < settle_end:
