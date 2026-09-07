@@ -725,6 +725,11 @@ def get_all_process_memory_snapshot() -> dict[str, Any]:
     # measurement -- it reads state the per-request hook already collected -- so
     # unlike the two above it needs no throttle.
     try:
+        if _RING_COST_STATE["n"]:
+            payload["ring_cost"] = ring_cost_report()
+    except Exception:  # noqa: BLE001 - telemetry must never raise
+        pass
+    try:
         if growth_episode_enabled():
             payload["growth_episodes"] = growth_episode_report()
     except Exception:  # noqa: BLE001 - telemetry must never raise
@@ -2023,6 +2028,50 @@ def process_memory_checkpoint_path() -> Path:
     return reports_root() / "live_refresh_loop" / "memory_diagnostics.json"
 
 
+_RING_COST_STATE: dict[str, Any] = {"n": 0, "blocks_sum": 0, "blocks_max": 0,
+                                    "ms_sum": 0.0, "ms_max": 0.0, "records_last": 0,
+                                    "blocks_min": None}
+
+
+def _note_ring_cost(before: int | None, t0: float, records: int) -> None:
+    """Accumulate the checkpoint's own allocation cost. Never raises."""
+    try:
+        after = _allocated_blocks()
+        if before is None or after is None:
+            return
+        d = after - before
+        st = _RING_COST_STATE
+        st["n"] = int(st["n"]) + 1
+        st["blocks_sum"] = int(st["blocks_sum"]) + d
+        st["blocks_max"] = max(int(st["blocks_max"]), d)
+        st["blocks_min"] = d if st["blocks_min"] is None else min(int(st["blocks_min"]), d)
+        ms = (time.time() - t0) * 1000.0
+        st["ms_sum"] = float(st["ms_sum"]) + ms
+        st["ms_max"] = max(float(st["ms_max"]), ms)
+        st["records_last"] = int(records)
+    except Exception:  # noqa: BLE001 - telemetry must never raise
+        pass
+
+
+def ring_cost_report() -> dict[str, Any]:
+    """What the checkpoint costs, per operation. Reads state, measures nothing."""
+    st = _RING_COST_STATE
+    n = int(st["n"]) or 1
+    return {
+        "n": int(st["n"]),
+        "blocks_mean": round(int(st["blocks_sum"]) / n, 1),
+        "blocks_max": int(st["blocks_max"]),
+        "blocks_min": st["blocks_min"],
+        "ms_mean": round(float(st["ms_sum"]) / n, 2),
+        "ms_max": round(float(st["ms_max"]), 2),
+        # The ring's own length: the read cost scales with it, so an arm whose
+        # ring had not yet filled is not comparable to one whose had.
+        "records_last": int(st["records_last"]),
+        "keep_cmdline": str(os.environ.get("SYNDICATE_RING_KEEP_CMDLINE", "") or "").strip(),
+        "pid": os.getpid(),
+    }
+
+
 def _slim_for_ring(record: dict[str, Any]) -> dict[str, Any]:
     """Drop `cmdline` from the records this ring PERSISTS.
 
@@ -2097,6 +2146,15 @@ def dump_process_memory_checkpoint(stage: str, payload: dict[str, Any]) -> None:
     try:
         from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
 
+        # `#632`: measure THIS operation's own cost. `UPDATE 34` retracted the
+        # arena-level A/B because the arms saw different workloads 50 minutes
+        # apart, and no volume gate on REQUEST COUNT could see that. The cost of
+        # the read-modify-write is the DIRECT effect of the cut, it fires ~15
+        # times a minute, and the ring is capped at 300 records -- so it is
+        # nearly workload-independent and gives N in the hundreds per arm
+        # instead of two workers.
+        _cost_before = _allocated_blocks()
+        _cost_t0 = time.time()
         path = process_memory_checkpoint_path()
         existing = read_json_file(path)
         records = list(existing.get("records") or []) if isinstance(existing, dict) else []
@@ -2104,6 +2162,7 @@ def dump_process_memory_checkpoint(stage: str, payload: dict[str, Any]) -> None:
             {"stage": stage, "wall_clock": time.time(), "pid": os.getpid(), **payload}))
         records = records[-PROCESS_MEMORY_CHECKPOINT_MAX_RECORDS:]
         write_json_file(path, {"records": records})
+        _note_ring_cost(_cost_before, _cost_t0, len(records))
     except Exception as exc:  # noqa: BLE001
         print(f"[memory_observability] DIAG_MEMORY_DUMP_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
 

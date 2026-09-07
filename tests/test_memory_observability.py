@@ -680,3 +680,33 @@ def test_the_ring_cut_can_be_toggled_off_for_the_ab(monkeypatch):
     assert "cmdline" not in memory_observability._slim_for_ring(record)["processes"][0]
     monkeypatch.delenv("SYNDICATE_RING_KEEP_CMDLINE")
     assert "cmdline" not in memory_observability._slim_for_ring(record)["processes"][0]
+
+
+def test_ring_cost_is_recorded_per_checkpoint(tmp_path, monkeypatch):
+    """`UPDATE 34` retracted the arena-level A/B: the arms were 50 minutes apart
+    and saw different workloads, which no gate on REQUEST COUNT could detect.
+    The checkpoint's own cost is the DIRECT effect of the cut, fires ~15x/min and
+    reads a capped ring -- so it is nearly workload-independent and gives N in
+    the hundreds per arm instead of two workers."""
+    memory_observability._RING_COST_STATE.update(
+        {"n": 0, "blocks_sum": 0, "blocks_max": 0, "ms_sum": 0.0, "ms_max": 0.0,
+         "records_last": 0, "blocks_min": None})
+    monkeypatch.setattr(memory_observability, "process_memory_checkpoint_path",
+                        lambda: tmp_path / "ring.json")
+    for i in range(5):
+        memory_observability.dump_process_memory_checkpoint(
+            "stage_%d" % i, {"processes": [{"pid": 1, "rss_mb": 1.0,
+                                            "cmdline": ["a" * 40]}]})
+    rep = memory_observability.ring_cost_report()
+    assert rep["n"] == 5
+    assert rep["records_last"] == 5
+    assert isinstance(rep["blocks_mean"], float)
+    assert rep["ms_mean"] >= 0.0
+    # The ring's length is published because the read cost scales with it: an arm
+    # whose ring had not filled is not comparable to one whose had.
+    assert "keep_cmdline" in rep
+
+
+def test_ring_cost_never_raises_on_a_bad_reading(monkeypatch):
+    monkeypatch.setattr(memory_observability, "_allocated_blocks", lambda: None)
+    memory_observability._note_ring_cost(None, 0.0, 3)   # must be a no-op, not a raise
