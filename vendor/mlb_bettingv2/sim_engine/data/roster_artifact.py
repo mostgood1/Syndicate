@@ -203,6 +203,23 @@ def roster_to_dict(roster: TeamRoster) -> Dict[str, Any]:
             "statcast_splits_start_date": str(p.statcast_splits_start_date),
             "statcast_splits_end_date": str(p.statcast_splits_end_date),
             "arsenal_source": str(p.arsenal_source),
+            # `conditional_arsenal_source` -- ADDED 2026-09-07, and it is the
+            # failure the comment fifteen lines up predicts, verbatim: "a new
+            # field that is not added here survives in memory and vanishes
+            # through the artifact -- and the worker reads artifacts."
+            #
+            # `conditional_mix.py:99-101` sets `conditional_arsenal` AND its
+            # `_source` together; `_de_pitcher` reads BOTH back (the `_source` is
+            # in its string list). Only the WRITE side was missing it, so the
+            # value existed in memory, was expected on load, and was zero in
+            # every artifact -- the last field still failing after the sampling
+            # bug was fixed (production 2026-09-07T16:27:40Z read 9/10 with this
+            # one alone at 0.0%, while `conditional_arsenal` itself was fed).
+            #
+            # `getattr` with a default rather than `p.conditional_arsenal_source`
+            # because a profile built by an older path may not carry the
+            # attribute, and a serializer that raises loses the whole roster.
+            "conditional_arsenal_source": str(getattr(p, "conditional_arsenal_source", "") or ""),
             "arsenal_sample_size": int(p.arsenal_sample_size),
             "stamina_pitches": int(p.stamina_pitches),
             "role": str(p.role),
