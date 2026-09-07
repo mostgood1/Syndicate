@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 870 rules `[generated]`
+## Index — 872 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -2890,4 +2890,22 @@ still not count.
   a vendored file and its upstream blob reports the whole file as changed** on a
   CRLF checkout, because the blob is LF-normalised -- the exact artefact the tool
   avoids by comparing hashes, reintroduced the moment the check went manual.
+- *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-06 A STATE MACHINE THAT SHORT-CIRCUITS ON THE HAPPY PATH STOPS MAINTAINING THE DATA THE UNHAPPY PATHS NEED. THE STALENESS IS INVISIBLE UNTIL IT IS LOAD-BEARING
+
+- **The rule going forward.** `classify(local, upstream, baseline)` returns
+  `IN_SYNC` as soon as `local == upstream`, without consulting the baseline --
+  correct as a verdict, and exactly why the baseline was allowed to go stale
+  underneath it. When upstream absorbed our patch, the file became IN_SYNC and
+  kept its PRE-merge hash; nothing was wrong, nothing was reported, and the file
+  looked healthy. The damage only lands at the NEXT upstream change, which then
+  reads `CONFLICT` where the answer is `UPSTREAM_AHEAD` -- and `CONFLICT` is the
+  one state that STOPS an automatic sync, so the effect is to silently convert a
+  file we no longer patch into a permanent manual step. **If a field is only read
+  on some branches, something must still WRITE it on the others** -- so refresh
+  derived state on the happy path too, or the first unhappy path inherits a lie.
+  Found only by inspecting the outcome of a real run: the fixture tests passed,
+  and would have kept passing, because they never had a file transition INTO
+  in-sync and then move again.
 - *(evidence in `learnings_evidence.md`)*

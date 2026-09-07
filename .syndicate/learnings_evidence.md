@@ -25595,3 +25595,38 @@ it reads negative.**
 - **Cost:** none realised. Had the weak test been trusted alone and any of the 53
   actually been stale, that fix would have been written off as a deliberate local
   patch and never received again.
+
+## 2026-09-06 A state machine that short-circuits on the happy path stops maintaining the data the unhappy paths need
+
+- **What we believed:** that after merging the three upstream PRs and re-recording
+  the three resulting CONFLICTs, the vendor sync was in a clean and correct state
+  -- 0 actionable, exit 0, no vendored source touched. All of which was true.
+- **What was actually true underneath:** one file,
+  `nhl_betting/data/shifts_api.py`, had moved LOCAL_PATCH -> IN_SYNC (upstream
+  took its only local change) while its baseline entry still held the PRE-merge
+  hash: `8acd0544` recorded against upstream's `be45a00b`. `classify` returns
+  IN_SYNC on `local == upstream` before it looks at the baseline, so the stale
+  value changed no verdict and produced no report.
+- **Why that matters, and it is not cosmetic:** feeding the real hashes to the
+  real `classify` with upstream moved one step returns **CONFLICT**, where the
+  correct answer is **UPSTREAM_AHEAD**. CONFLICT is the single state that stops
+  an automatic sync and demands a human, so a stale baseline turns a file we no
+  longer patch into a permanent manual step -- the exact inverse of what the tool
+  is for, arriving silently and much later than the mistake.
+- **How we found out:** reading the outcome of the real run rather than the exit
+  code. The queue was empty and every total was as predicted; the question "is
+  the baseline for the file that just changed state actually current?" was the
+  only thing that surfaced it.
+- **The fix and its falsification test:** refresh IN_SYNC baselines on every
+  write. It changed **exactly one** entry and left every state total unchanged
+  (IN_SYNC 570, LOCAL_ONLY 215, LOCAL_PATCH 52) -- which was the pre-registered
+  test for "too broad" -- and the simulated upstream move now returns
+  UPSTREAM_AHEAD.
+- **The rule going forward:** if a field is read only on some branches, something
+  must still write it on the others. Derived state has to be refreshed on the
+  happy path, or the first unhappy path inherits a stale value that nothing has
+  been checking.
+- **Cost:** none realised, caught before any second upstream change. The fixture
+  tests passed throughout and would have kept passing -- none of them had a file
+  transition INTO in-sync and then move again, which is the only sequence that
+  exposes it.

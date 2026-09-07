@@ -1950,6 +1950,42 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   been a constructed baseline state on a real file, which is close but not the
   same thing.
 
+### vendor-sync-stale-baseline — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`ba65e5a2`. FIRST REAL END-TO-END RUN: three upstream PRs merged, sync run, loop closed.** `IN_SYNC 569 → 570` — `nhl_betting/data/shifts_api.py`'s only local change WAS the `__all__` deletion upstream took, so an upstream merge genuinely reached us. `CONFLICT 0 → 3` on `nba/app.py`, `wnba/app.py`, `nhl/cli.py`, which is CORRECT: upstream moved and we hold other patches there. Audited each — the only upstream commit since our baseline is our OWN merge, and our content already carries it (shadowed-definition count 1 upstream and 1 local, by AST for all four names) — so resolved by re-recording, not by merging text. Queue back to 0, exit 0. **`git diff -- vendor/` across the whole merge+sync is `upstream_sync.json` ALONE.** **AND IT EXPOSED A REAL BUG.** A file that BECOMES `IN_SYNC` kept its pre-merge baseline, because `classify` returns `IN_SYNC` on `local == upstream` before consulting the baseline — invisible while healthy, surfacing at the NEXT upstream change as a spurious `CONFLICT` where the answer is `UPSTREAM_AHEAD`. `CONFLICT` is the one state that STOPS an automatic sync, so it silently turns a file we no longer patch into a permanent manual step. Measured on the real entry (`8acd0544` vs `be45a00b`, real `classify` → CONFLICT); fixed by refreshing in-sync baselines on write; **exactly 1 entry changed, totals unchanged**, same move now → `UPSTREAM_AHEAD`. 25 tests. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: a file that becomes IN_SYNC does not keep a stale baseline, so the NEXT
+  upstream change to it reads `UPSTREAM_AHEAD` and syncs automatically instead of
+  reading `CONFLICT` and stopping.
+- Files: `scripts/sync_vendor_upstream.py`, `vendor/upstream_sync.json`,
+  `tests/test_sync_vendor_upstream.py`. Claimed by no other OPEN lane.
+- **FOUND BY INSPECTING THE OUTCOME OF THE REAL MERGE, not by a test.** Merging
+  the three upstream PRs moved `nhl_betting/data/shifts_api.py` from LOCAL_PATCH
+  to IN_SYNC — its only local change WAS the `__all__` deletion upstream just
+  took. But its baseline entry still holds the PRE-merge hash
+  (`8acd0544` vs upstream's `be45a00b`), because `classify` returns IN_SYNC on
+  `local == upstream` before it ever looks at the baseline. Verified against the
+  real classifier: today it reads IN_SYNC, and with upstream moved one step it
+  reads **CONFLICT** where the correct answer is **UPSTREAM_AHEAD**.
+- **Why it matters:** `CONFLICT` is the one state that stops an automatic sync
+  and demands a human. A stale baseline therefore converts a file we no longer
+  patch into a permanent manual step — the exact opposite of the tool's purpose,
+  and silent, because the file looks healthy until upstream moves.
+- Hypothesis: n/a — reproduced directly against `classify` with the real hashes.
+- Falsification test: if refreshing IN_SYNC baselines on save changed any state
+  other than that one, the fix is too broad.
+- Verification: the stale entry is refreshed; a simulated upstream move on it
+  reads `UPSTREAM_AHEAD` rather than `CONFLICT`; the report totals are otherwise
+  unchanged; and a test pins it.
+- Blocked by: none.
+- **The falsification test was run and passed:** the fix refreshed exactly ONE
+  baseline entry and left every state total unchanged (IN_SYNC 570, LOCAL_ONLY
+  215, LOCAL_PATCH 52), so it is not too broad.
+- **This closes the "no real upstream merge has been carried yet" item** that the
+  previous two lanes both recorded as owed.
+- Note what the run did NOT demonstrate: a real `UPSTREAM_AHEAD` apply. The files
+  upstream changed are precisely the ones we had patched, so they came back as
+  CONFLICT by construction. `UPSTREAM_AHEAD` remains proven only against a
+  constructed baseline state and the fixture — genuine, but not the same as
+  upstream moving a file we had never touched.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
