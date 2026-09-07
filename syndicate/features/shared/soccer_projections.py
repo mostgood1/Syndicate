@@ -475,6 +475,23 @@ def _as_float(value: Any) -> float | None:
         return None
 
 
+def _as_int(value: Any) -> int | None:
+    """A positive whole count, or None.
+
+    `bool` is rejected explicitly: `True` is `1` in Python, and a `True` here
+    would become a one-trial sim count -- an interval so wide it withholds
+    everything, arriving silently. Non-positive is None for the same reason
+    `prob_std_err` refuses `n <= 0`: it is not a count.
+    """
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return None
+    return count if count > 0 else None
+
+
 def _total_prob_from_scorelines(scorelines: Any, line: float) -> tuple[float, float] | None:
     """(P(over), P(push)) for ANY total line, from the scoreline distribution.
 
@@ -530,13 +547,35 @@ def _total_prob_from_scorelines(scorelines: Any, line: float) -> tuple[float, fl
     return over, push
 
 
-def _probability_projection(prob: float, *, basis: str, side: str = "over") -> dict[str, Any]:
-    return {
+def _probability_projection(
+    prob: float, *, basis: str, side: str = "over", sims_run: Any = None
+) -> dict[str, Any]:
+    """A model probability, and -- when the artifact states it -- the SIM COUNT
+    that probability was estimated from.
+
+    `sims_run` IS THE INPUT WITHOUT WHICH NO PRECISION GATE CAN EXIST. Every
+    probability this module emits for a game market is a raw Monte-Carlo `k/n`
+    (`live_lens.py:289` `round(home_wins / n, 4)`; the pregame adapter's
+    `MatchDistributionSummary` the same way), and `k/n` alone cannot say how
+    much of itself is noise. `live_gameline_join.prob_std_err` needs `n`, and
+    with no `n` it returns None and `price_moneyline` withholds the row by
+    `REASON_UNUSABLE_SIMS` -- which is the correct refusal, not a gap to paper
+    over. `board_enrichment` states the same rule for WNBA: "Inventing an n to
+    open the gate would be the single worst substitution available here."
+
+    Absent rather than null when the artifact does not carry it, so a consumer
+    can tell "this producer never stated a sim count" from "it stated zero".
+    """
+    projection: dict[str, Any] = {
         "model_prob_over": round(prob, 4),
         "side": side,
         "basis": basis,
         "source": "soccer_recommendations",
     }
+    sims = _as_int(sims_run)
+    if sims is not None:
+        projection["sims_run"] = sims
+    return projection
 
 
 def _mean_projection(mean: float, line: Any, *, basis: str) -> dict[str, Any]:
@@ -744,7 +783,84 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
             )
         projection["edge_unavailable_reason"] = reason
         return
-    projection["edge_vs_market_pct"] = round((float(model_prob) - float(fair)) * 100.0, 2)
+
+    # THE PRECISION GATE, FOR THE ONE BASIS THAT IS A RAW MONTE-CARLO `k/n`.
+    #
+    # `win_probability` is counted straight off the sim -- `live_lens.py:289`
+    # is `round(home_wins / n, 4)` and the pregame adapter's summary is the
+    # same shape. Subtracting the market fair from that and publishing the
+    # difference is what this line used to do, and it had NO interval behind
+    # it: a `0/300` leg published `p = 0.0` and whatever edge the quoted price
+    # implied, with nothing able to say the estimate was inside its own noise.
+    #
+    # `price_moneyline` is CALLED rather than reimplemented. It already owns
+    # the Agresti-Coull point estimate, the standard error, the 2-sigma bar and
+    # the refusal vocabulary, and it applies them in the one order that is
+    # correct: the SE is computed from the RAW `p` first, because
+    # `prob_std_err` reconstructs `successes = p * n` and smoothing beforehand
+    # would apply add-two twice and over-widen the bar. A second copy of that
+    # rule here is how the first one rots -- the module says so itself.
+    #
+    # SCOPED TO THIS BASIS ON PURPOSE. `over_2_5_probability` and
+    # `scoreline_distribution` are renormalised out of a distribution rather
+    # than counted, so they are not `k/n` and an add-two on them would be a
+    # mechanism change to a different estimator. They keep the previous
+    # arithmetic and are named here so the omission is a decision, not a miss.
+    if str(projection.get("basis") or "") != "win_probability":
+        projection["edge_vs_market_pct"] = round((float(model_prob) - float(fair)) * 100.0, 2)
+        return
+
+    from syndicate.features.shared.live_gameline_join import price_moneyline
+
+    verdict = price_moneyline(
+        model_prob=model_prob,
+        market_prob=fair,
+        sims=projection.get("sims_run"),
+    )
+    _stamp_precision(projection, verdict)
+    if not verdict.get("priceable"):
+        projection["edge_vs_market_pct"] = None
+        projection["edge_unavailable_reason"] = (
+            "the model probability is inside its own simulation noise: "
+            f"{verdict.get('withheld_reason') or 'unspecified'}"
+        )
+        return
+    projection["edge_vs_market_pct"] = round(float(verdict["edge_pp"]), 2)
+
+
+def _stamp_precision(projection: dict[str, Any], verdict: Mapping[str, Any]) -> None:
+    """Carry the pricer's interval onto the projection, priced or refused.
+
+    STAMPED EVEN WHEN THE ROW IS WITHHELD, and that is the point: a blank
+    `edge_vs_market_pct` with no interval beside it is indistinguishable from a
+    row nothing ever tried to price. `live_gameline_join`'s whole premise is
+    that "every zero is diagnosable by name", and a refusal that leaves no
+    trace is the one shape that defeats it.
+
+    `model_prob_over` KEEPS ITS RAW VALUE, and THE SMOOTHED ESTIMATE IS NOT
+    PUBLISHED AS A FIELD. Two reasons, and the second is the one that decided it:
+
+      * anything that recomputes an interval from `model_prob_over` --
+        `layer2_board._model_edge_for` does exactly that for the draw and away
+        legs -- would apply add-two twice if the smoothed value had been written
+        back in place, over-widening its own bar and withholding real edges;
+      * `attach_soccer_projections` calls `refuse_published_certainty` on the
+        NEXT LINE after this one, which blanks a `model_prob_over` of exactly
+        0.0/1.0 and clears the edges derived from it. It does not know about any
+        field this function invents, so a published `model_prob_over_smoothed`
+        would SURVIVE that refusal -- leaving `0.0066` sitting on a row whose
+        probability was explicitly refused, readable as a probability by anyone
+        who found it. An inert field nothing reads is bad; an inert field that
+        contradicts the row beside it is worse.
+
+    The estimator still leaves a trace: `point_estimator` names it, and
+    `prob_std_err` / `std_err_basis` are the interval the decision was made on,
+    which is what makes a withheld row diagnosable rather than blank.
+    """
+    for key in ("prob_std_err", "std_err_basis", "point_estimator"):
+        value = verdict.get(key)
+        if value is not None:
+            projection[key] = value
 
 
 def _age_hours(generated_at: str) -> float | None:
@@ -967,7 +1083,19 @@ def attach_soccer_projections(
             if prob is not None:
                 # Expressed from the HOME side, matching how the board's other
                 # sports state a game-line projection.
-                projection = _probability_projection(prob, basis="win_probability", side="home")
+                #
+                # `simulations` IS ALREADY ON THE ARTIFACT and was simply never
+                # carried onto the projection -- `adapters.py:104` writes it on
+                # every match output, and the live producer's
+                # `LiveMatchProjection.to_dict` writes it too. So the three legs
+                # below arrive with the one input a precision gate needs; until
+                # now they arrived as bare `k/n` and were priced as certainties.
+                projection = _probability_projection(
+                    prob,
+                    basis="win_probability",
+                    side="home",
+                    sims_run=match.get("simulations"),
+                )
                 projection["draw_probability"] = _as_float(win.get("draw"))
                 projection["away_probability"] = _as_float(win.get("away"))
         elif market in {"totals", "totals_alt"}:
