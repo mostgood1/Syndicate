@@ -604,11 +604,11 @@ class DivergenceGuardTests(unittest.TestCase):
         ops._PUBLISH_LAST_PUBLISHER[self.PATH] = "refresh-worker"
         first, marker = ops._publish_divergence_verdict(self.PATH, self.SMALL, "live-odds-worker")
         self.assertTrue(first, "a cross-publisher shrink must be refused")
-        self.assertIn("verdict=REFUSED", marker)
+        self.assertIn("verdict=WOULD_REFUSE", marker)
 
         second, marker2 = ops._publish_divergence_verdict(self.PATH, self.SMALL, "live-odds-worker")
         self.assertTrue(second, "the SECOND attempt must still be refused -- this is the bug")
-        self.assertIn("verdict=REFUSED", marker2)
+        self.assertIn("verdict=WOULD_REFUSE", marker2)
 
     def test_a_refused_publisher_never_takes_the_last_publisher_slot(self) -> None:
         ops._PUBLISH_LAST_PUBLISHER[self.PATH] = "refresh-worker"

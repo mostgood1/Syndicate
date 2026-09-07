@@ -2209,7 +2209,20 @@ def _publish_divergence_verdict(relative_path: str, incoming_bytes: int, publish
     # identical to a one-off.
     streak = _PUBLISH_CONSECUTIVE_REFUSALS.get(relative_path, 0) + 1
     _PUBLISH_CONSECUTIVE_REFUSALS[relative_path] = streak
-    return True, marker + f" verdict=REFUSED consecutive_refusals={streak}"
+    # `WOULD_REFUSE`, not `REFUSED`. This function returns the verdict; only the
+    # CALLER knows whether it is acted on, because `#630` exempts mergeable
+    # families via `if refuse and not will_merge`. Printing `REFUSED` here meant
+    # the log asserted a data loss that had not happened: measured 2026-09-07,
+    # `is_mergeable_odds_history` is True for every path this fired on
+    # (`soccer_source/tracking/odds_history/*` AND
+    # `soccer_source/artifacts/soccer/odds_history/*`), so none of them was ever
+    # refused -- 819 ARTIFACT_MERGE_CHILD records over 2h say they merged.
+    #
+    # I read those lines as live data loss and reported them to two sessions as
+    # "the #488 incident shape still running at volume". They were not. A peer
+    # spent an hour disproving it. The instrument was honest about something
+    # ADJACENT -- the function's opinion -- and read as the request's outcome.
+    return True, marker + f" verdict=WOULD_REFUSE consecutive_refusals={streak}"
 
 
 def _log_publish_accepted(relative_path, target_path, prev):
@@ -2356,6 +2369,12 @@ def _publish_streamed_body() -> Any:
         )
         refuse, marker = _publish_divergence_verdict(relative_path, written, publisher)
         if marker:
+            # The OUTCOME is the caller's to state -- it is the only thing here
+            # that knows `will_merge`. Without it the line carries a verdict and
+            # no disposition, which is what made 366 merged publishes read as
+            # 366 refusals.
+            if refuse:
+                marker += " outcome=" + ("REFUSED" if not will_merge else "MERGED_EXEMPT")
             print(marker, flush=True)
         # `#630`: for a MERGED family the shrink guard must not refuse. It was
         # built for `#488`, where a replace really did destroy rows, and a
