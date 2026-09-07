@@ -570,6 +570,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none. Next: **`#623`** (the 09-17 sprint + pre-registered gates + parked `#614`/`#616` reads) and **`#626`(d)(e)** (reuse-guard/live-capture, klass-hole). **`#622`** owns the ranking-key question — per `#615` T2-1 is ANSWERED (no sim-derived key exists; do NOT keep re-looking at the 656-row sample, ~30 looks are already on record). `scripts/prereg_wnba_favourite_lean.py` is frozen and waiting for the sprint.
 
 ### ncaaf-games-cache-refresh — OPEN — opened 2026-09-01 — session b85e895e-dde2-4066-8336-dc6c1d4c3c61 — **DEPLOYED `cc1feccc` to BOTH services (web 21:21:43Z, refresh-worker 21:56:06Z). Web half VERIFIED discriminatingly (200 vs 403 allowlist probe). Producer half LIVE BUT UNPROVEN — the daily gate does not fire until ~00:26Z. Two verifications ARMED as scheduled tasks.**
+- **CLAIM TAKEN by `ncaaf-live-resim-wire` (session 520cd594) `[2026-09-06, user: "take the ncaaf claim and fix it"]`**: `scripts/generate_smartsim2_ncaaf_projections.py`. `football_sim_input_checklist` had it as an UNWIRED PAYLOAD alarm -- it built `SmartSim2SimulationInput` with no `feature_generation_payload`, so all nine drive-prior blocks were neutral on every NCAAF game. Three snapshots (pace / returning_production / coach_continuity) were being BUILT and read by NOTHING. Now wired, INERT behind `SYNDICATE_NCAAF_DRIVE_PRIORS` (default off). OWNING SESSION WAS GONE: neither b85e895e nor 3492626c appears in `list_sessions`, including archived, checked 2026-09-07T01:1xZ. If you are back and this collides, say so and I will hand it straight back.
 - Files: syndicate/features/football/sim_engine/smartsim2/historical_truth/ncaaf_historical_loader.py,
   scripts/generate_smartsim2_ncaaf_projections.py,
   syndicate/features/ncaaf/week_state.py (NEW),
@@ -986,6 +987,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none. NOT DEPLOYED, and inert until beta is non-zero.
 
 ### ncaaf-live-resim — OPEN — opened 2026-09-05 — session 3492626c — NCAAF has a full live slate and produces NO live-aware model edge
+- **CLAIM TAKEN by `ncaaf-live-resim-wire` (session 520cd594) `[2026-09-06, user: "take the ncaaf claim and fix it"]`**: `scripts/generate_smartsim2_ncaaf_projections.py`. `football_sim_input_checklist` had it as an UNWIRED PAYLOAD alarm -- it built `SmartSim2SimulationInput` with no `feature_generation_payload`, so all nine drive-prior blocks were neutral on every NCAAF game. Three snapshots (pace / returning_production / coach_continuity) were being BUILT and read by NOTHING. Now wired, INERT behind `SYNDICATE_NCAAF_DRIVE_PRIORS` (default off). OWNING SESSION WAS GONE: neither b85e895e nor 3492626c appears in `list_sessions`, including archived, checked 2026-09-07T01:1xZ. If you are back and this collides, say so and I will hand it straight back.
 - Goal: establish whether smartsim2 can be re-run from mid-game state, and if it
   can, ship the SMALLEST live-aware path — one market family (moneyline / h2h),
   one worker-published artifact, one join, and a refusal that never falls back to

@@ -700,6 +700,162 @@ def games_from_cfbd_when_engine_schedule_empty(cfbd_games: dict[tuple[str, str],
     return rows
 
 
+
+# ---------------------------------------------------------------------------
+# DRIVE-PRIOR FEATURE PAYLOAD (`#457` closed at the CONSUMER end)
+# ---------------------------------------------------------------------------
+#
+# `football_sim_input_checklist` alarm, verbatim: "UNWIRED PAYLOAD:
+# scripts/generate_smartsim2_ncaaf_projections.py constructs
+# SmartSim2SimulationInput without `feature_generation_payload`, so every key
+# `drive_priors.py` reads falls to its neutral default on every game this script
+# projects."
+#
+# THE SNAPSHOTS ALREADY EXIST AND NOTHING READS THEM. `sources.py` defines
+# `pace_snapshot_path()`, `returning_production_snapshot_path()` and
+# `coach_continuity_snapshot_path()`; `build_ncaaf_*_snapshot.py` and `cfbd.py`
+# WRITE all three. Grep for a reader outside the builders themselves and there is
+# none. Three producers, zero consumers.
+#
+# AND THE COST WAS MEASURED, in `pace_snapshot_path`'s own docstring: with no
+# pace block `drive_priors._pace_index` falls back to **24.0 s/play**, so EVERY
+# NCAAF game ran at `pace_index = +0.400` while the real 2025 league mean is
+# 26.56 (sd 2.08, range 21.0..33.4 over 266 teams / 37,263 drives). A constant is
+# not a neutral default here -- it pinned every game 18% faster than the average
+# team actually plays.
+#
+# THE KEY NAMES DO NOT MATCH AND THAT IS THE WHOLE TRAP. The pace snapshot writes
+# `seconds_per_play`. `_pace_index` reads
+# `["pace_seconds_per_play", "secs_per_play", "home_pace_secs_play",
+# "away_pace_secs_play"]` -- and `seconds_per_play` is in NEITHER list. Passing
+# the snapshot through unmapped would look wired, read as fed, and change
+# nothing: the same silent no-op this alarm exists to remove, one layer down.
+# `returning_production.percent_ppa` and `coach_continuity.continuity_score` DO
+# match what `_returning_index` and `_coach_index` read, so those pass straight
+# through -- which is why the mismatch on pace is easy to miss.
+
+_NCAAF_FEATURE_SNAPSHOT_CACHE: dict[str, dict[str, dict[str, str]]] = {}
+
+
+def _ncaaf_drive_priors_enabled() -> bool:
+    """OFF by default. `SYNDICATE_NCAAF_DRIVE_PRIORS=1` turns it on.
+
+    Same reasoning as NFL's `SYNDICATE_NFL_DRIVE_PRIORS`, and it binds harder
+    here. `NCAAF_CALIBRATION_PROFILE` was fitted with every drive-prior block at
+    its neutral default -- including a pace index pinned at +0.400 on every game.
+    Feeding real pace moves that toward ~+0.14 for a league-average team, which
+    changes every drive, every game, at once. `model_engine_standard.md`: adding
+    a MECHANISM to a calibrated engine requires re-fitting the rates that were
+    absorbing it, and two mechanisms together already produced a NEGATIVE
+    interaction in 4 of 4 markets here.
+
+    NCAAF margins are also measured to lose to the closing line by 3.56 points at
+    **t = 17.20** over 2,233 out-of-sample games. Turning this on without a
+    backtest would change every number on a model in that state. So it lands
+    reachable and inert; enabling it is a separate, evidenced call.
+    """
+    raw = str(os.environ.get("SYNDICATE_NCAAF_DRIVE_PRIORS") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _load_ncaaf_feature_snapshot(kind: str) -> dict[str, dict[str, str]]:
+    """One snapshot CSV, keyed by normalised team name. `{}` when absent.
+
+    ABSENT MUST STAY ABSENT. A missing snapshot returns `{}` so
+    `build_drive_priors` keeps its documented default, rather than a block of
+    zeros -- which would read as "measured, and average".
+    """
+    if kind in _NCAAF_FEATURE_SNAPSHOT_CACHE:
+        return _NCAAF_FEATURE_SNAPSHOT_CACHE[kind]
+    from syndicate.features.ncaaf.sources import (
+        coach_continuity_snapshot_path,
+        pace_snapshot_path,
+        returning_production_snapshot_path,
+    )
+
+    paths = {
+        "pace": pace_snapshot_path,
+        "returning_production": returning_production_snapshot_path,
+        "coach_continuity": coach_continuity_snapshot_path,
+    }
+    out: dict[str, dict[str, str]] = {}
+    try:
+        path = paths[kind]()
+        if path.exists():
+            import csv as _csv
+
+            with open(path, encoding="utf-8", newline="") as handle:
+                for row in _csv.DictReader(handle):
+                    name = str(row.get("team") or row.get("team_name") or "").strip().lower()
+                    if name:
+                        out[name] = row
+    except Exception:
+        out = {}
+    _NCAAF_FEATURE_SNAPSHOT_CACHE[kind] = out
+    return out
+
+
+def _snapshot_float(snapshot: dict[str, dict[str, str]], team: str, column: str) -> float | None:
+    row = snapshot.get(str(team or "").strip().lower())
+    if not row:
+        return None
+    try:
+        value = float(row.get(column))
+    except (TypeError, ValueError):
+        return None
+    return value if value == value else None  # NaN-safe
+
+
+def build_ncaaf_feature_generation_payload(home_team: str, away_team: str) -> dict[str, object]:
+    """The payload `build_drive_priors` has never been given for NCAAF.
+
+    HOME-FRAMED bare keys, because the consumer is: `build_drive_priors`'s own
+    fallback is `0.5 + source.home_offense_rating`. `home_*`/`away_*` variants
+    are published alongside for any per-team consumer.
+    """
+    pace_snap = _load_ncaaf_feature_snapshot("pace")
+    ret_snap = _load_ncaaf_feature_snapshot("returning_production")
+    coach_snap = _load_ncaaf_feature_snapshot("coach_continuity")
+
+    payload: dict[str, object] = {}
+
+    home_pace = _snapshot_float(pace_snap, home_team, "seconds_per_play")
+    away_pace = _snapshot_float(pace_snap, away_team, "seconds_per_play")
+    if home_pace is not None or away_pace is not None:
+        pace_block: dict[str, float] = {}
+        if home_pace is not None:
+            # MAPPED, not passed through -- see the trap note above.
+            pace_block["pace_seconds_per_play"] = home_pace
+            pace_block["home_pace_secs_play"] = home_pace
+        if away_pace is not None:
+            pace_block["away_pace_secs_play"] = away_pace
+        payload["pace"] = pace_block
+
+    home_ret = _snapshot_float(ret_snap, home_team, "percent_ppa")
+    away_ret = _snapshot_float(ret_snap, away_team, "percent_ppa")
+    if home_ret is not None or away_ret is not None:
+        block: dict[str, float] = {}
+        if home_ret is not None:
+            block["percent_ppa"] = home_ret
+            block["home_percent_ppa"] = home_ret
+        if away_ret is not None:
+            block["away_percent_ppa"] = away_ret
+        payload["returning_production"] = block
+
+    home_coach = _snapshot_float(coach_snap, home_team, "continuity_score")
+    away_coach = _snapshot_float(coach_snap, away_team, "continuity_score")
+    if home_coach is not None or away_coach is not None:
+        block = {}
+        if home_coach is not None:
+            block["continuity_score"] = home_coach
+            block["home_continuity_score"] = home_coach
+        if away_coach is not None:
+            block["away_continuity_score"] = away_coach
+        payload["coach_continuity"] = block
+
+    return payload
+
+
 def build_projection(
     *,
     season: int,
@@ -728,8 +884,18 @@ def build_projection(
 
     home_scores: list[int] = []
     away_scores: list[int] = []
+    # ONCE PER GAME, not per seed: it does not vary with the seed, and the
+    # snapshots are cached module-side so this is a dict lookup after the first
+    # game rather than a CSV read per simulation.
+    _ncaaf_feature_payload = (
+        build_ncaaf_feature_generation_payload(home_team, away_team)
+        if _ncaaf_drive_priors_enabled()
+        else {}
+    )
+
     for seed in range(1, seeds + 1):
         sim_input = SmartSim2SimulationInput(
+            feature_generation_payload=_ncaaf_feature_payload,
             home_team=home_team,
             away_team=away_team,
             seed=seed,
