@@ -48,6 +48,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.fetch_nfl_preseason_schedule import preseason_schedule_path
+from scripts.generate_smartsim2_nfl_projections import _drive_priors_enabled
+from scripts.generate_smartsim2_nfl_projections import build_feature_generation_payload
 from scripts.generate_smartsim2_nfl_projections import SEEDS_PER_GAME
 from scripts.generate_smartsim2_nfl_projections import assert_projections_carry_information
 from scripts.generate_smartsim2_nfl_projections import assert_ratings_data_available
@@ -159,10 +161,39 @@ def build_preseason_projection(
 
     rating_source = f"nflverse_pbp_epa_prior_season_shrunk[{home_source}/{away_source}]"
 
+    # THE THIRD AND LAST `UNWIRED PAYLOAD` ALARM. This script built
+    # `SmartSim2SimulationInput` with no `feature_generation_payload`, so all
+    # nine blocks `drive_priors.build_drive_priors` reads were neutral on every
+    # preseason game.
+    #
+    # `current_plays=[]` MIRRORS `team_rating` FOUR LINES ABOVE, deliberately and
+    # for its real meaning: no current-season pbp exists in preseason, so the
+    # builder's own prior-season fallback is what should fire. Passing
+    # `prior_season_plays` as `current_plays` would look equivalent and would
+    # silently apply the `before_week` filter to the wrong season.
+    #
+    # Same switch as the regular-season script, not a second one: it is one NFL
+    # engine and two flags would drift. The gate binds harder here if anything --
+    # `nfl_preseason_calibration.MEASURED_SKILL` records margins at correlation
+    # **-0.047**, "no measured skill -- moneyline probabilities are
+    # uninformative", over 146 games.
+    feature_payload = (
+        build_feature_generation_payload(
+            home_team=home_team,
+            away_team=away_team,
+            week=1,
+            current_plays=[],
+            prior_plays=prior_season_plays,
+        )
+        if _drive_priors_enabled()
+        else {}
+    )
+
     home_scores: list[int] = []
     away_scores: list[int] = []
     for seed in range(1, seeds + 1):
         sim_input = SmartSim2SimulationInput(
+            feature_generation_payload=feature_payload,
             home_team=home_team,
             away_team=away_team,
             seed=seed,
