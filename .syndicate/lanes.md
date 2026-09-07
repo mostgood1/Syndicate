@@ -1986,6 +1986,53 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   constructed baseline state and the fixture — genuine, but not the same as
   upstream moving a file we had never touched.
 
+### web-oom-growth-episode — OPEN — opened 2026-09-06 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: CATCH one of `#632`'s intermittent growth episodes IN THE PROCESS, and
+  attribute its anon delta across `glibc` / `pymalloc` / unattributed.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_growth_episode.py`, `syndicate/app.py`.
+  NOT claimed, deliberately: `syndicate/blueprints/ops.py` — held by lane
+  `ncaaf-live-resim-wire`; the reading rides the existing `/api/ops/memory`.
+- **WHY A CLIENT POLL CANNOT DO THIS (`UPDATE 26`).** The composition is now
+  fully known and static: ~400 MB glibc arena, ~165 MB pymalloc, `.so`
+  private-dirty at exactly `4.4 MB`, main stack `0.1 MB`. What is NOT known is
+  what drives the intermittent episodes — and the 31-min mature window did not
+  reproduce one (anon `-5.8`/`+15.3` against `UPDATE 23`'s `+42.4`/`+26.9`). A
+  20-second poll from my machine cannot see a sub-second burst and cannot hold a
+  baseline across a restart. The detector has to live in the process.
+- **THE COST FINDING THAT MAKES THIS AFFORDABLE.** The partition's `47-96 ms`
+  median (and one `1,700.6 ms` call) was **`/proc/self/smaps`, which is
+  O(regions)** — NOT the allocator reads. Measured: `mallinfo2` ~`1 ms`,
+  `log_pymalloc_arena_stats` **median `2.86 ms`** (benchmarked locally, 12 runs).
+  And `.so`+stack were EXACTLY constant over 66 minutes, so an episode detector
+  can skip `smaps` entirely and still attribute across every term that moves.
+  ~4-5 ms per capture, not ~90.
+- Hypothesis, written before measuring: the episodes are **glibc arena growth**,
+  not pymalloc — `pymalloc_arenas` moved `+0.0 MB` over 31 mature minutes on both
+  workers, and the little growth that did occur went **98.7% to glibc**.
+- Falsification test: an episode lands mostly in `pymalloc_arenas`, or mostly in
+  the UNATTRIBUTED term. Unattributed would mean `.so`/stack are not the
+  constants they measured as, and the full `smaps` has to come back.
+- **THRESHOLD SIZING, and it is the part most likely to be got wrong.**
+  `UPDATE 23`'s episode was `+42.4 MB over 31 min` = **~1.4 MB/min**. A 5-minute
+  baseline with a 20 MB trigger would see only ~7 MB and **MISS EXACTLY THE THING
+  BEING HUNTED**. So the baseline is held up to 15 min and the trigger is 15 MB:
+  that fires on a sustained climb of >= 1 MB/min AND on a burst within seconds.
+- Verification: at least one `GROWTH_EPISODE` captured in production with a
+  per-term split that sums to the anon delta, plus the ROUTE MIX seen since the
+  baseline. Zero episodes over a long window is also a result — it would mean the
+  trigger is mis-sized, and the ring records the max delta seen so that is
+  distinguishable from "nothing happened".
+- **THE ROUTE IS NOT AN ATTRIBUTION.** The rule in flight when the threshold is
+  crossed is the request that happened to finish there, not the allocator. So the
+  episode records the route MIX across the whole baseline window, and the
+  single-route field is named `observed_at_route` and says what it is.
+- COST (`#241`): flag-gated `SYNDICATE_GROWTH_EPISODE`, default OFF; rides the
+  EXISTING `teardown_request` hook rather than a new thread — same precedent as
+  `maybe_trim_after_request`; the common path is one clock comparison and one
+  small `smaps_rollup` read.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
