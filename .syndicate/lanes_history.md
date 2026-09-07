@@ -29232,3 +29232,779 @@ lost no protection and no open lane left the session-start digest.
   `autoDeploy = no` means nothing shipped. The NBA/NHL changes are no-ops by
   measurement; the value is the check and the three restored tests, which land in
   CI (the `pytest-baseline` job runs `tests/`).
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-09-07
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### segment-regrade-apply — CLOSED 2026-09-07 — opened 2026-09-06 — session 3492626c — **49 rows corrected, −$31.32, and the idempotency re-run reported `already corrected 49 / corrected 0`, so the write persisted. Second source is a per-ROW marker read, not the writer's account of itself.**
+- Goal: the 49 mis-graded segment orders carry their CORRECTED outcome in the
+  execution ledger, auditable and reversible.
+- Files: `scripts/apply_segment_regrade.py` (NEW)
+- NOT MINE TO EDIT: `scripts/run_refresh_worker.py` holds the `*_ON_BOOT`
+  trigger pattern and is claimed by `ncaaf-live-resim-wire`. Surfaced to them
+  rather than edited.
+- Why 49 and not 53: 10 of the 173 were settled BY THE VENUE and 3 of those
+  changed. Excluded permanently — for 5 of the 10 the contract we HELD was a
+  full-game `KXMLBTOTAL`, so the venue graded the instrument we actually owned
+  and its grade is the correct one. Applying those would invent P&L no position
+  earned. P&L effect of the 49: **-$31.32**.
+- Design decisions, stated because both could reasonably go the other way:
+  (1) it OVERWRITES `outcome` and preserves `outcome_as_settled` /
+  `pnl_as_settled_dollars` / `regraded_at` / `regrade_reason`. Additive-only
+  would leave calibration, CLV, ROI and `ledger_summary` still reading the wrong
+  field, which is the defect itself. (2) it REFUSES unless the keyvalue backend
+  is configured — verified `rc=3` locally — because a laptop run would write a
+  local document and report success while production is untouched.
+- The original blocker is STALE and that is checked, not assumed:
+  `regrade_segment_orders.py` declined to write partly because concurrent edits
+  were being lost. `#600` replaced the blind whole-document write with
+  `_merge_onto_current` (`execution_ledger.py:842`); this script ASSERTS that
+  function exists before writing, so running it against an older build refuses
+  rather than reintroducing the lost update.
+- Verification: dry run reports 49 / -$31.32 / flips
+  `{won->lost 28, lost->won 20, lost->push 1}`; `--apply` off-service returns
+  `rc=3`. The real verification is post-run: `/api/ops/execution/ledger-summary`
+  `by_segment` settled counts unchanged, and 49 rows carrying
+  `outcome_as_settled`.
+- **APPLIED 2026-09-07 00:03:18Z** under refresh-worker `271a92e1`:
+  `corrected 49, already 0, NOT FOUND 0, rc=0`, plus `KEYVALUE_WRITE_LARGE ...
+  caller=execution_ledger.py:931 <- apply_segment_regrade.py:215`. Narrative and
+  the four failed confirmation attempts: `.syndicate/log/2026-09-07.md`.
+- STILL OPEN — the SECOND SOURCE. Every reading above is the writer's account of
+  itself, and no endpoint exposes paper-book historical rows (all 49 are paper).
+  The remaining instrument is the script's own idempotency: re-run the boot hook
+  and read `already corrected 49 / corrected 0`. Blocked only on having a commit
+  ahead of live to roll forward onto.
+- Blocked by: the trigger. Needs a boot hook in a file another lane holds.
+
+### web-oom-secondary-arenas — CLOSED 2026-09-06 — opened 2026-09-06 — **THE HYPOTHESIS WAS HALF RIGHT AND THE PREMISE WAS WRONG.** Secondary arenas DO take the growth — `+190.9` of `+211.7 MB` on pid 97 — but only during the ~30-minute RAMP, and `mallinfo2` was never blind to them: `82/82` readings scored `all_arenas`, matching the all-arena total to `0.0 MB` and missing the main arena by `70.1 MB`. So UPDATE 23's *"80% landed where mallinfo2 cannot look"* is CORRECTED to *"77.6% landed outside the allocator"*. **The arena has a CEILING at ~390 MB, reproducible across three independent windows on pid 97 (`387.7`, `388.2->395.4`, `390.1`), reached in ~30 min; after that it stops and all further anon growth is non-`malloc`.** `hblkhd` is `0.4 MB`, so the residual is not glibc's mmap path either. And only `~52 MB` of the `~390 MB` arena is live data — 87% is free chunks retained. Instrument cost `0.9-1.0 ms` median. One defect of my own found and fixed mid-lane: the coverage denominator was the container cgroup, not the process. NEXT: name the `~150-205 MB` per worker that is not `malloc` — pymalloc arenas, thread stacks, C-extension buffers — by re-reading the heap census against the per-process denominator. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: build the PER-ARENA `malloc_info` readout and use it to say which arena
+  holds `#632`'s growth on **web**. `mallinfo2` reports the MAIN ARENA ONLY, and
+  the clean 2026-09-06 window showed the main arena moving `+7.2`/`+8.3 MB` while
+  anon rose `+42.4`/`+26.9` — so ~80% of the growth is somewhere it cannot look.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_malloc_info_arenas.py`.
+  NOT claimed, deliberately: `syndicate/blueprints/ops.py` — held by lane
+  `ncaaf-live-resim-wire`.
+  NOT claimed, deliberately: `scripts/run_refresh_worker.py` — same holder.
+  The reading therefore reaches web through the EXISTING `/api/ops/memory`
+  → `get_all_process_memory_snapshot()`, which lives in this lane's own file, so
+  no route needs adding. A dedicated endpoint would read better; it is not worth
+  crossing a lane for.
+- **WHY `#435`'s DISMISSAL DOES NOT SETTLE THIS — two independent reasons.**
+  (1) DIFFERENT SERVICE. `malloc_arena_snapshot()` is called from
+  `scripts/run_refresh_worker.py` and NOWHERE ELSE, so 13.9% coverage is a
+  REFRESH-WORKER number. Web has never taken this reading. On web the main arena
+  ALONE is 330-390 MB against 536-677 MB anon — 58-72%, not 13.9%. The arena is
+  representative here and was not there.
+  (2) DIFFERENT QUESTION. That number was coverage of TOTAL anon, used to decide
+  whether the aggregate verdict could be trusted. This lane asks how the arenas
+  SPLIT, which the current parser cannot answer at all: it reads only the
+  top-level totals and discards every per-`<heap>` figure.
+- Hypothesis, written before measuring: web's SECONDARY arenas hold the growth.
+  `GUNICORN_THREADS=4` creates per-thread arenas, glibc mmaps them in 64 MB-aligned
+  heaps, and `#632`'s smaps breakdown already localised the growth to **8-64 MB
+  anonymous mappings** — which is the shape of a non-main arena heap.
+- Falsification test: top-level `system current` ≈ the main arena's own
+  `system current` (one real arena), or arena total stays far below anon while
+  anon climbs. Either way the growth is NOT in a glibc arena and this is raw
+  `mmap` — report that, do not reach for a third allocator metric.
+- Verification, and it is a RECONCILIATION not a single number: (a) per-heap
+  `system current` must SUM to the top-level `system current`, reported as a
+  residual so a parse error cannot pass as a finding; (b) heap `nr=0`'s
+  `system current` must agree with `mallinfo2`'s `arena` on the same process at
+  the same instant — two independent libc calls that must tell the same story;
+  (c) >= 25 readings over >= 30 min on both web workers, no restart, trim OFF.
+- COST DISCIPLINE (`#241`): `get_all_process_memory_snapshot()` is also reached
+  from `log_all_process_memory()`, which workers call at STAGE CHECKPOINTS. So
+  the detail is FLAG-GATED (default OFF), throttled to one libc call per
+  interval, and reports its own `duration_ms` so the cost is measured rather
+  than assumed.
+- Blocked by: none.
+
+### dup-module-defs-vendor — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`77aaff4b`. Six roots now, not four.** Repo-root (`app.py`, `run_debug.py`, `run_tests_wrapper.py`, `wsgi.py`) all CLEAN, so free coverage. `vendor/`'s **12** duplicates are PINNED in `VENDOR_BASELINE`, not failed — every pair DIFFERS, they are upstream's, and failing on all 12 leaves a permanently-red gate, which gets muted, which costs the owned-code coverage that is the point. New-in-vendor FAILS; a pin entry that stops matching is reported STALE and also fails, so the pin cannot rot into the general-purpose allowlist this check deliberately does not have. **`ALLOWLIST`, which governs OWNED code, is still EMPTY.** **A REAL DEFECT IN MY OWN CHECK, exposed only by widening its scope:** it read sources as `utf-8`, so every BOM'd file raised `SyntaxError: U+FEFF` and was SKIPPED. Measured over `vendor/`: **`utf-8` skips 46 files and reports 10 duplicates; `utf-8-sig` skips 0 and reports 12.** Python's import machinery uses `utf-8-sig`, so those files import fine — only the checker could not read them. Regression test added. **I FIRST WROTE THAT NUMBER AS 15, off a `tail`-truncated error list** — the same findings-only-summary failure the fix is about, made while documenting the fix. Corrected by measuring both encodings. **NOT EDITED: any `vendor/**` source.** The 12 include `_ev_from_prob_and_american` (EV math, two implementations) in both `nba_betting_repo/app.py` and `wnba_betting_repo/app.py`, which owned code IMPORTS (`syndicate/features/{nba,wnba}/live_lens.py`), plus `props_project_all` where a 3-line alias shadows a ~514-line implementation. Surfaced to the user as a separate decision, not taken unilaterally. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: `scripts/check_duplicate_module_names.py` covers `vendor/` and the
+  repo-root `*.py` files, and a NEW duplicate in either fails the check —
+  without a permanently-red gate over code we do not own.
+- Files: `scripts/check_duplicate_module_names.py`,
+  `tests/test_duplicate_module_names.py`. Collision check 2026-09-06: named by no
+  OPEN lane (only by this session's own CLOSED `dup-module-defs` block).
+  NOT editing any `vendor/**` source — see below.
+- Hypothesis: n/a (static facts, already measured).
+- **MEASURED BEFORE WRITING ANYTHING.** Repo-root: `app.py`, `run_debug.py`,
+  `run_tests_wrapper.py`, `wsgi.py` — all four CLEAN, so adding them is free.
+  `vendor/`: 609 files, 4.4 s, **12 duplicates**, and every pair DIFFERS
+  substantially — `_ev_from_prob_and_american` (EV math) in both
+  `nba_betting_repo/app.py` and `wnba_betting_repo/app.py`, `props_project_all`
+  in `nhl_betting_repo` where the shadowed def is a 3-line alias and the live one
+  is a 514-line implementation, `__all__` in `shifts_api.py` exporting 2 names
+  shadowed vs 4 live. **Both `app.py` files are imported by owned code**
+  (`syndicate/features/{nba,wnba}/live_lens.py` import `_live_lens_tick_payload`
+  from them), so these are dead definitions inside modules we load.
+- **A REAL DEFECT IN THE CHECKER, found by this extension.** It read sources as
+  `utf-8`, so 15 BOM'd files under `vendor/wnba_betting_repo/tools/` raised
+  `SyntaxError: invalid non-printable character U+FEFF` and were SKIPPED. Python's
+  own import machinery decodes with `utf-8-sig` and handles them fine. Those skips
+  hid **2 of the 12** findings. A parse error that skips a file is the
+  unknown-defaults-permissive shape.
+- Falsification test: if the vendored finding set cannot be frozen without
+  churn — i.e. it changes for reasons unrelated to a vendor sync — the freeze is
+  the wrong mechanism and vendor should be advisory-only.
+- Verification: repo-root and `vendor/` both scanned; owned-code allowlist still
+  EMPTY; the 12 vendored findings pinned; `off != on` — an injected duplicate in
+  a repo-root file AND in `vendor/` each make the check exit non-zero, and a
+  pinned vendor entry that disappears is reported as stale rather than lingering.
+- Blocked by: none.
+- **Verification ran.** `off != on` at CLI level for BOTH new roots: baseline
+  exit 0; a duplicate planted in a repo-root file prints `DUPLICATE` and exits 1;
+  a duplicate planted under `vendor/` prints `NEW-IN-VENDOR` and exits 1; both
+  removed, exit 0, no probe files left behind. 11 tests pass (4 new, plus one
+  that a narrowed `--roots syndicate` run does NOT report the whole pin as
+  stale — a check that cries wolf on a narrowed run gets run with `|| true`).
+- Parsing vendored code also pushed 13 `DeprecationWarning: invalid escape
+  sequence` into every test run's warning summary; suppressed around the parse,
+  since this function analyses source it never executes and those warnings
+  already reach anyone who imports the modules. Letting them accumulate is how a
+  check earns a blanket `-W ignore` that would hide our own.
+- Cost: `vendor/` is 609 files / 4.4 s for the CLI; the test file went 11 s → 23 s.
+- **OWED, and it is a decision rather than work:** whether to delete the 12
+  shadowed vendored definitions. Arguments both ways are in the commit message —
+  a vendor sync would clobber the edits, but two of the files are imported by
+  owned code. Precedent exists for editing `vendor/**` when the user asks
+  (`vendor/mlb_bettingv2/.../build_season_betting_cards_manifest.py`, 2026-08-31).
+
+### vendor-dupe-deletion — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`15f40071`. 5 DELETED, 7 CORRECTLY NOT — the ask was 'delete the 12' and only 5 were dead.** 51 lines removed, ZERO insertions. **Verified by OBSERVABLE SURFACE, not source diff:** a probe imported each edited module before and after and compared `_ev_from_prob_and_american` over 13 input combinations on both apps, all **89** Typer commands with callback/docstring/params, and `shifts_api.__all__` — IDENTICAL in every field. BOM on `wnba_betting_repo/app.py` and CRLF preserved. **THE 7 THAT ARE WORKING CODE:** `out` x2 and `cols_subset` x2 are sequential rebindings whose successor CONSUMES them (`cols_subset = [c for c in cols_subset if ...]`) — deleting gives `NameError`. `fetch_rosters_cmd` x2 is the interesting shape: the module NAME is dead but the OBJECT is not, because Click registers each function at decoration and the two decorators name their commands DIFFERENTLY — verified against click 8.1.7, the group holds BOTH `fetch-rosters-cmd` AND `fetch-rosters`. `backtest_daily_summary.py` is TWO SCRIPTS CONCATENATED: `if __name__ == '__main__': sys.exit(main(sys.argv))` sits BETWEEN the two defs, so as a script the first `main` runs and exits before the second exists, and as an import the second wins. **`VENDOR_BASELINE` 12 → 2.** — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: the genuinely-dead shadowed definitions in `vendor/` are gone, with the
+  served behaviour of each file proven unchanged; the rest are correctly NOT
+  deleted, and the checker stops flagging the ones that were never duplicates.
+- Files: `vendor/nba_betting_repo/app.py`, `vendor/wnba_betting_repo/app.py`,
+  `vendor/nhl_betting_repo/nhl_betting/cli.py`,
+  `vendor/nhl_betting_repo/nhl_betting/data/shifts_api.py`,
+  `scripts/check_duplicate_module_names.py`, `tests/test_duplicate_module_names.py`.
+  Collision check 2026-09-06: no OPEN lane claims any of them (the `vendor/`
+  claims at lanes.md:504/506 are `mlb_bettingv2` and RELEASED).
+- **THE ASK WAS "DELETE THE 12". ONLY 5 ARE DEAD. This is the finding, not a
+  caveat.** A shadowed module-level binding is dead only if NOTHING reads it
+  before the second binding executes AND no decorator captured the object.
+  Measured, per pair:
+  - **DEAD (5), deleting:** `_ev_from_prob_and_american` x2 (undecorated, never
+    read between), `props_collect` + `props_project_all`
+    (`@app.command(name='props-collect')` then `@app.command()` — Typer derives
+    the SAME name from the function, so the registry collapses to one and the
+    first is unreachable), `__all__` in `shifts_api.py` (plain literal, not
+    self-referential).
+  - **LIVE (7), NOT deleting:** `out` x2 and `cols_subset` x2 are ordinary
+    SEQUENTIAL REBINDINGS whose second RHS consumes the first value
+    (`cols_subset = [c for c in cols_subset if ...]`) — deleting gives
+    `NameError`. `fetch_rosters_cmd` x2 is `@cli.command()` then
+    `@cli.command('fetch-rosters')`: **Click registers BOTH, under
+    `fetch-rosters-cmd` AND `fetch-rosters`** — verified by running the decorator
+    pattern against click 8.1.7 — so the "shadowed" def is a working CLI command.
+    `backtest_daily_summary.py` is TWO SCRIPTS CONCATENATED: line 100 is
+    `if __name__ == '__main__': sys.exit(main(sys.argv))`, which runs the FIRST
+    `main` and exits before the second is ever defined, so as a script the FIRST
+    is live and as an import the SECOND is — deleting either changes behaviour.
+- **A DEFECT IN MY OWN CLASSIFIER, caught before it did damage.** v1 used a
+  strict `lineno < second.lineno` window and so missed that the second binding's
+  OWN right-hand side reads the name. It called both `cols_subset` pairs "safe to
+  delete"; acting on that would have shipped a `NameError` into two vendored
+  scripts.
+- Falsification test: if deleting a "dead" definition changes a file's observable
+  surface — the surviving function's source, a Typer/Click command set, or an
+  `__all__` value — then it was not dead and the classification is wrong.
+- Verification: per file, before/after comparison of the OBSERVABLE surface, not
+  the source diff; the checker's own suite still passes; `VENDOR_BASELINE` shrinks
+  to exactly the pairs that remain, each with the reason it is not deletable.
+- Blocked by: none.
+- **A DEFECT IN MY OWN CLASSIFIER, caught before it did damage — this is the
+  part worth keeping.** v1 used a strict `lineno < second.lineno` liveness window
+  and so never looked at the second binding's OWN right-hand side. It reported
+  both `cols_subset` pairs as "safe to delete". Acting on that would have shipped
+  a `NameError` into two vendored scripts. The window must be `lo < line <= end
+  of the next binding`.
+- `duplicates_in_source` now requires the earlier binding to be DEAD, which drops
+  `out`, `cols_subset` and `main` as the false positives they always were.
+  **Two guards that it did not weaken the check:** run against
+  `memory_observability.py` at `67af1276^` it STILL reports both
+  `_MALLOC_TRIM_STATE` and `_resolve_malloc_trim`, and reports clean at
+  `67af1276`; and a decorated pair is still reported even though the name is
+  dead, because REPORTED IS NOT SAFE TO DELETE.
+- Suites: check exits 0 with 2 pinned; `test_duplicate_module_names` 16 passed
+  (5 new); `test_nba_live_lens_routes` + `test_nba_live_snapshots_local` +
+  `test_live_lens_local` + `test_wnba_live_lens_published_cards_context` +
+  `test_wnba_live_lens_worker` **66 passed** — those cover the owned modules that
+  `import` the two edited `app.py` files. `test_archives -k "live_lens or nhl"`
+  89 passed / 2 failed, and the 2 are the same pre-existing
+  `test_nfl_live_lens_api_*` pair re-baselined earlier today against unmodified
+  HEAD; they touch no file this lane changed.
+- **Not deployed and none needed:** `vendor/**` and a checker, no `render.yaml`.
+- **OWED ITEM DISCHARGED 2026-09-06 — the 5 fixes are open as upstream PRs**, so a
+  vendor re-pull carries them instead of reverting them:
+  [NBA-Betting#1](https://github.com/mostgood1/NBA-Betting/pull/1),
+  [WNBA-Betting#1](https://github.com/mostgood1/WNBA-Betting/pull/1),
+  [NHL-Betting#1](https://github.com/mostgood1/NHL-Betting/pull/1). All OPEN and
+  MERGEABLE; +0/-10, +0/-10, +0/-31.
+- **WHERE `vendor/` COMES FROM IS RECORDED NOWHERE IN THIS REPO** — no
+  `.gitmodules`, no `.git` under `vendor/`, no `pyproject`/`setup.py` in the
+  vendored trees, and `CLAUDE.md` says only "vendored sibling-repo code pulled in
+  directly". The mapping had to be derived from the account's repo list and then
+  confirmed by content: `vendor/nba_betting_repo` -> `mostgood1/NBA-Betting`
+  (default branch `main`), `vendor/wnba_betting_repo` -> `mostgood1/WNBA-Betting`
+  (`main`), `vendor/nhl_betting_repo` -> `mostgood1/NHL-Betting` (**`master`**,
+  not `main`), `vendor/mlb_bettingv2` -> `mostgood1/MLB-BettingV2`.
+- **SUPERSEDED SAME DAY, and the line above is now false:** the mapping IS recorded
+  in-repo — it went into `CLAUDE.md`'s directory map, with the divergence warning
+  and the "a fix landed only in `vendor/` is reverted by the next re-pull" rule.
+
+### web-oom-non-malloc-anon — CLOSED 2026-09-06 — opened 2026-09-06 — **FOUND, AND IT IS A CONSTANT.** The non-`malloc` anon is CPython's pymalloc arenas, **162-165 MB per worker**, plus `.so` private-dirty at exactly `4.4 MB` and the main stack at `0.1 MB`. CPython `mmap`s its arenas, so glibc never allocated them and `mallinfo2` could not see them by construction. The partition CLOSES: **50/50** mature readings `explained` (49/50 ramp), residuals `-0.8` to `-8.2 MB` on a 105-583 MB process, and `smaps` agrees with `smaps_rollup` to `0.0 MB`. **Hypothesis confirmed on the LEVEL and REFUTED on the GROWTH:** over 31 mature minutes pymalloc moved `+0.0 MB` on both workers, so my claim that it "becomes the growth driver" after the arena plateaus was speculation and is withdrawn. The mature window also did NOT reproduce UPDATE 23's growth (anon `-5.8`/`+15.3` vs `+42.4`/`+26.9`), so growth on web is INTERMITTENT and this window cannot attribute it. Overlap bar recalibrated after a production false positive. Partition flag back OFF — median `47-96 ms` but one call took `1,700.6 ms`. NEXT: `#632` is no longer a composition question; catch a growth EPISODE, and settle the trim A/B on the ~340 MB/worker of retained free chunks. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: NAME the `~150-205 MB` per web worker that is anonymous memory and is
+  **not `malloc`**, as a PARTITION of process anon that reconciles — not a list
+  of candidates.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_anon_partition.py`.
+  NOT claimed, deliberately: `syndicate/blueprints/ops.py` — held by lane
+  `ncaaf-live-resim-wire`; the reading rides the existing `/api/ops/memory`.
+- **WHAT IS ALREADY ESTABLISHED (`UPDATE 25`, measured today):** the glibc arena
+  fills to a **~390 MB ceiling in ~30 min** and then stops, reproducible across
+  three windows on pid 97 (`387.7`, `388.2->395.4`, `390.1`). `hblkhd` is
+  `0.4 MB`, so the rest is not glibc's mmap path either. At ~50 min: pid 97 anon
+  `595.6`, glibc `390.5` (65.6%), **NOT glibc `205.1` (34.4%)**; pid 98 anon
+  `515.7`, NOT glibc `142.1` (27.6%). That residual grows in BOTH phases
+  (`+55.2` over the ramp, `+35.2` over UPDATE 23's mature window), so once the
+  arena saturates it is the whole OOM trajectory.
+- **THE THREE AUTHORITIES ALREADY EXIST; NONE IS READ TOGETHER.** `parse_smaps`
+  (kernel, per-region `Anonymous:`), `glibc_mallinfo2` (arena + `hblkhd`),
+  `log_pymalloc_arena_stats` (CPython `_debugmallocstats`, real arena totals off
+  the line so the arena SIZE is never assumed). Nothing reads all three AT THE
+  SAME INSTANT and subtracts, which is the only way to get a residual that means
+  anything.
+- Hypothesis, written before measuring: **CPython's pymalloc arenas dominate the
+  residual.** On Linux CPython mmaps its arenas rather than `malloc`ing them, so
+  they are anon that no allocator metric in this investigation has counted.
+  Thread stacks (`GUNICORN_THREADS=4`) and `.so` private-dirty data are the other
+  named terms.
+- **THE OVERLAP TEST, and it is the load-bearing one.** If pymalloc were built
+  WITHOUT `ARENA_USE_MMAP` its arenas would come from `malloc` and already be
+  inside glibc's number — adding them would DOUBLE COUNT. So the partition is
+  refused when `glibc + pymalloc + file_backed + stack > anon`, and that
+  inequality is itself the test of which build this is. It must not be assumed
+  from the CPython version.
+- Falsification test: the residual stays large after every named term is
+  subtracted — then it is none of pymalloc, stacks or `.so` data, and the size
+  buckets in `anon_mmap_by_size_mb` are the next lead rather than a fourth guess.
+- Verification: a partition that reconciles against `smaps_rollup` anon with a
+  NAMED residual, on both workers, plus agreement between `parse_smaps`'s own
+  total and `_process_anon_mb()`. Every term reported with the instrument that
+  produced it.
+- COST (`#241`, and smaps is heavier than `mallinfo2`): own flag
+  `SYNDICATE_ANON_PARTITION`, default OFF, its own longer throttle, and it
+  reports its own `duration_ms`. `get_all_process_memory_snapshot()` is reached
+  from `log_all_process_memory()` at worker stage checkpoints.
+- **DENOMINATOR (`UPDATE 25`'s own mistake, one lane ago):** per-process anon
+  from `_process_anon_mb()`, NEVER the container cgroup. Pids reporting an
+  IDENTICAL anon is the tell that this went wrong.
+- Blocked by: none.
+
+### vendor-upstream-sync — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`73ee3d2b`. `scripts/sync_vendor_upstream.py` + `vendor/upstream_sync.json` + 21 tests.** Six states from (local, upstream, baseline); **exactly one — `UPSTREAM_AHEAD` — is applied automatically**, and `UNCLASSIFIED` deliberately does NOT fall through to it. Seeded baseline: **IN_SYNC 569, LOCAL_ONLY 215, UNCLASSIFIED 53.** Seeding records IN_SYNC files ONLY, or the next run would call a pre-existing local patch `UPSTREAM_AHEAD` and overwrite it. **off != on PROVEN ON THE REAL nhl TREE, not just the fixture:** a file we edit reports `LOCAL_PATCH` and is left byte-identical to our edit; a file at the last-synced state whose upstream moved reports `UPSTREAM_AHEAD`, is updated to upstream, and its baseline advances. Tree and baseline restored afterwards, restore checked. **TWO REAL BUGS, both found by RUNNING it against the real tree rather than reading it — the hand-run demo failing is what exposed both.** (1) it read local hashes from `ls-tree HEAD`, so an UNCOMMITTED local edit was invisible, classified `IN_SYNC`, and `--apply` would have destroyed it — the working tree is what gets overwritten, so it is what must be hashed. (2) `--filter=blob:none` WITHOUT `--no-checkout` is WORSE than not filtering: `git clone` populates a worktree, needs every blob, and refetches them one request at a time into separate packs — **3.8 GB of cache, MLB-BettingV2 alone 2.6 GB against a 354 MB repo**. With `--no-checkout`: **950 KB, and 5m29s → 8.9s**, same totals. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: an upstream merge reaches `vendor/` by running one script, and that script
+  can NEVER silently revert a local patch. Single testable outcome: with a
+  recorded baseline, a file that upstream changed and we did not is applied, and a
+  file we changed and upstream did not is KEPT and reported — `off != on` on both.
+- Files: `scripts/sync_vendor_upstream.py` (new),
+  `vendor/upstream_sync.json` (new, the baseline),
+  `tests/test_sync_vendor_upstream.py` (new). Collision check 2026-09-06: zero
+  mentions of any of these names anywhere in the ledger.
+- **MEASURED FIRST, and the numbers drive the design.** Comparing git BLOB HASHES
+  (not worktree bytes, so CRLF cannot produce a false difference) between each
+  `vendor/` tree and its upstream default branch:
+  - the trees are heavily PARTIAL: 507 of upstream's 9,017 files for
+    `nba_betting_repo`, 425 of 4,185 for `wnba`, 89 of 3,000 for `nhl`. A sync
+    must be scoped to the subset we already vendor, never a full-tree copy.
+  - **541 local-only files** overall. A sync must never delete them.
+  - 48 files differ, but **only 24 are CODE** — the rest are `data/` artifacts
+    (dated CSVs, ESPN caches, `.logs/`), which are regenerated mirror output and
+    must be excluded by default.
+- **THE LOAD-BEARING PROBLEM: without a baseline, a difference is AMBIGUOUS.**
+  "upstream moved ahead" and "we patched locally" are the same observation. Right
+  now 4 of the 24 differing code files hold THIS SESSION's own deletions
+  (`nba/app.py`, `wnba/app.py`, `nhl/cli.py`, `nhl/shifts_api.py`) whose upstream
+  PRs are still OPEN — so a naive "take upstream" sync run today would silently
+  revert five fixes that were just verified. That is the failure mode the script
+  exists to prevent, not a caveat.
+- Hypothesis: n/a (measurement, not diagnosis).
+- Falsification test: if a recorded baseline cannot separate the three states —
+  local-patch, upstream-ahead, both-changed — then a 3-way manifest is the wrong
+  mechanism and the script should stay report-only.
+- Verification: unit tests over the classifier for all six states with synthetic
+  hash triples (no network); a seeded baseline that classifies the real tree; and
+  `off != on` demonstrated on a real file in each direction.
+- Blocked by: none.
+- **The design follows from measurements taken BEFORE writing anything**, by
+  blob hash so CRLF cannot fake a difference: the trees are deliberate SUBSETS
+  (507 of upstream's 9,017 for `nba_betting_repo`, 89 of 3,000 for `nhl`) so the
+  script never adds a file we do not vendor; **541 local-only files** so it never
+  deletes; and only 24 of the 48 differing files are CODE, so `data/` is excluded
+  unless asked.
+- **It also preserves each file's existing line endings on apply.** `cat-file
+  blob` returns git's LF-normalised form, and writing that into a CRLF checkout
+  flips one file while its neighbours keep theirs — invisible to git, since the
+  clean filter normalises it back, but a confusing artefact of the tool.
+- Report is the DEFAULT; nothing is written without `--apply`.
+- **The MLB tree is the most locally patched: 29 UNCLASSIFIED**, including
+  `tools/eval/build_season_betting_cards_manifest.py`, which this ledger records
+  as a deliberate user-authorised edit on 2026-08-31. The script correctly refuses
+  to touch it.
+- **OWED, and it is the real remaining gap:** the 53 UNCLASSIFIED files are
+  unresolved by construction — for each one, somebody has to diff and decide
+  whether it is ours or stale. Until that is done the sync only carries files that
+  were already in sync. The 4 nhl/nba/wnba entries among them are THIS SESSION's
+  own deletions and will resolve themselves when the upstream PRs merge.
+
+### vendor-unclassified-triage — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`80660ee6`. UNCLASSIFIED 53 → 0. All 53 are OURS; 0 stale.** Two independent tests agree: Syndicate has committed to every one since vendoring, and — the decisive one — **our local blob hash appears NOWHERE in that path's upstream history**, so the content never existed upstream and adopting upstream would have discarded real work. New `--keep-local` / `--keep-all-unclassified` record the decision (baseline := upstream's CURRENT hash, content untouched). **`git diff -- vendor/` shows ONLY `upstream_sync.json`, +53/-0 — no vendored source touched.** Lifecycle proven on the real nhl tree: `LOCAL_PATCH` now, and once upstream moves on one of them **`CONFLICT`, file untouched, exit 1** — which is what makes writing 53 files off as local patches safe. 24 tests. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: each of the 53 UNCLASSIFIED vendored files is decided, and the decision is
+  RECORDED so they stop re-prompting on every run. Testable outcome: a second sync
+  reports **0 UNCLASSIFIED**, all 53 reading `LOCAL_PATCH`, and
+  `git diff -- vendor/` still EMPTY.
+- Files: `scripts/sync_vendor_upstream.py`, `vendor/upstream_sync.json`,
+  `tests/test_sync_vendor_upstream.py`. Collision check 2026-09-06: named by no
+  other OPEN lane.
+- **TRIAGED BY TWO INDEPENDENT TESTS, agreeing 53/53 OURS, 0 stale.**
+  (1) Syndicate committed a change to every one of the 53 after vendoring it —
+  weak on its own, because several of those extras are bulk
+  `daily update ... (pre-source publish)` commits that could themselves have been
+  vendor re-pulls. So (2), the decisive one: does our local blob hash appear
+  ANYWHERE in that path's upstream history? For all 53, **no**. Our content never
+  existed upstream, so none of it is staleness and adopting upstream would
+  discard real work.
+- Spot-checked two diffs with line endings normalised; both carry the fix named
+  in their own commit subject. WNBA `scrapers/injuries.py` replaces a hand-copied
+  NBA tricode set that made every WNBA header fail; NBA `games_npu.py` gates the
+  QNN execution provider on availability instead of listing it unconditionally.
+- **A trap worth recording: the first spot-check diff showed the ENTIRE file as
+  changed.** That was CRLF-vs-LF, not content — the same artefact the sync itself
+  avoids by comparing blob hashes, reintroduced the moment I used `diff` by hand.
+- Hypothesis: n/a.
+- Falsification test: if any of the 53 matched a historical upstream blob, "all
+  ours" is wrong and that file should be adopted instead.
+- Verification: a `--keep-local` mode records baseline := upstream's CURRENT hash
+  WITHOUT touching content; the 53 then read `LOCAL_PATCH`, and a later upstream
+  move on one of them must read `CONFLICT` rather than be silently overwritten.
+  Both pinned by tests.
+- Blocked by: none.
+- **The two spot-checked diffs each carry the fix named in their own commit
+  subject**, which is the corroboration the hash test cannot give: WNBA
+  `scrapers/injuries.py` replaces a hand-copied NBA tricode set that made every
+  WNBA header fail, NBA `games_npu.py` gates the QNN execution provider on
+  availability rather than listing it unconditionally.
+- `--keep-all-unclassified` sweeps ONLY unclassified, pinned by a test. Blessing
+  an `UPSTREAM_AHEAD` file as a local patch would turn "we owe them a pull" into
+  "we deliberately diverged", which is the same silent-loss shape in reverse.
+- The `UNCLASSIFIED` report now prints both remedies per file AND the test for
+  choosing between them, so this triage does not have to be re-derived.
+- **STILL OWED, unchanged by this lane:** no real upstream merge has been carried
+  yet. The three PRs are open, so the end-to-end path (merge upstream → run sync →
+  fix lands here) has never run for real. Every `UPSTREAM_AHEAD` proof so far has
+  been a constructed baseline state on a real file, which is close but not the
+  same thing.
+
+### vendor-sync-stale-baseline — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`ba65e5a2`. FIRST REAL END-TO-END RUN: three upstream PRs merged, sync run, loop closed.** `IN_SYNC 569 → 570` — `nhl_betting/data/shifts_api.py`'s only local change WAS the `__all__` deletion upstream took, so an upstream merge genuinely reached us. `CONFLICT 0 → 3` on `nba/app.py`, `wnba/app.py`, `nhl/cli.py`, which is CORRECT: upstream moved and we hold other patches there. Audited each — the only upstream commit since our baseline is our OWN merge, and our content already carries it (shadowed-definition count 1 upstream and 1 local, by AST for all four names) — so resolved by re-recording, not by merging text. Queue back to 0, exit 0. **`git diff -- vendor/` across the whole merge+sync is `upstream_sync.json` ALONE.** **AND IT EXPOSED A REAL BUG.** A file that BECOMES `IN_SYNC` kept its pre-merge baseline, because `classify` returns `IN_SYNC` on `local == upstream` before consulting the baseline — invisible while healthy, surfacing at the NEXT upstream change as a spurious `CONFLICT` where the answer is `UPSTREAM_AHEAD`. `CONFLICT` is the one state that STOPS an automatic sync, so it silently turns a file we no longer patch into a permanent manual step. Measured on the real entry (`8acd0544` vs `be45a00b`, real `classify` → CONFLICT); fixed by refreshing in-sync baselines on write; **exactly 1 entry changed, totals unchanged**, same move now → `UPSTREAM_AHEAD`. 25 tests. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: a file that becomes IN_SYNC does not keep a stale baseline, so the NEXT
+  upstream change to it reads `UPSTREAM_AHEAD` and syncs automatically instead of
+  reading `CONFLICT` and stopping.
+- Files: `scripts/sync_vendor_upstream.py`, `vendor/upstream_sync.json`,
+  `tests/test_sync_vendor_upstream.py`. Claimed by no other OPEN lane.
+- **FOUND BY INSPECTING THE OUTCOME OF THE REAL MERGE, not by a test.** Merging
+  the three upstream PRs moved `nhl_betting/data/shifts_api.py` from LOCAL_PATCH
+  to IN_SYNC — its only local change WAS the `__all__` deletion upstream just
+  took. But its baseline entry still holds the PRE-merge hash
+  (`8acd0544` vs upstream's `be45a00b`), because `classify` returns IN_SYNC on
+  `local == upstream` before it ever looks at the baseline. Verified against the
+  real classifier: today it reads IN_SYNC, and with upstream moved one step it
+  reads **CONFLICT** where the correct answer is **UPSTREAM_AHEAD**.
+- **Why it matters:** `CONFLICT` is the one state that stops an automatic sync
+  and demands a human. A stale baseline therefore converts a file we no longer
+  patch into a permanent manual step — the exact opposite of the tool's purpose,
+  and silent, because the file looks healthy until upstream moves.
+- Hypothesis: n/a — reproduced directly against `classify` with the real hashes.
+- Falsification test: if refreshing IN_SYNC baselines on save changed any state
+  other than that one, the fix is too broad.
+- Verification: the stale entry is refreshed; a simulated upstream move on it
+  reads `UPSTREAM_AHEAD` rather than `CONFLICT`; the report totals are otherwise
+  unchanged; and a test pins it.
+- Blocked by: none.
+- **The falsification test was run and passed:** the fix refreshed exactly ONE
+  baseline entry and left every state total unchanged (IN_SYNC 570, LOCAL_ONLY
+  215, LOCAL_PATCH 52), so it is not too broad.
+- **This closes the "no real upstream merge has been carried yet" item** that the
+  previous two lanes both recorded as owed.
+- Note what the run did NOT demonstrate: a real `UPSTREAM_AHEAD` apply. The files
+  upstream changed are precisely the ones we had patched, so they came back as
+  CONFLICT by construction. `UPSTREAM_AHEAD` remains proven only against a
+  constructed baseline state and the fixture — genuine, but not the same as
+  upstream moving a file we had never touched.
+
+### web-oom-growth-episode — CLOSED 2026-09-06 — opened 2026-09-06 — **CAUGHT SEVEN, AND THE HYPOTHESIS IS REFUTED.** 7 episodes in 55 min, both workers, all `attributed` with unattributed `-2.0%` to `+24.9%`. The lane predicted glibc; **4 are glibc-dominant and 3 are PYMALLOC-dominant (74-98.4%)**, alternating. **This also corrects `UPDATE 26`'s "pymalloc is a large CONSTANT, not a leak"** — it jumps `+6`/`+13`/`+17`/`+18 MB`, near-integer, 1 MB arena granularity; the 31-min mature window simply did not span a jump. Sustained rate **3.68-3.98 MB/min per worker**, 2.6-2.9x UPDATE 23, ~7.4 MB/min per container — an OOM trajectory. `/api/ops/artifacts/publish` is in all seven route mixes but growth does NOT scale with it (224 reqs/101 publishes → +17.6 MB; 36 reqs/9 publishes → +55.4 MB), and that attribution was already retracted once this session as trim-inflated — not re-adopted on a co-occurrence. Detector needed a warm-up after firing on the boot ramp (+230.3 MB at 750 MB/min, `/healthz` only). NEXT: what triggers a pymalloc arena jump, and whether glibc's episodes are the arena re-expanding past its ceiling. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: CATCH one of `#632`'s intermittent growth episodes IN THE PROCESS, and
+  attribute its anon delta across `glibc` / `pymalloc` / unattributed.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_growth_episode.py`, `syndicate/app.py`.
+  NOT claimed, deliberately: `syndicate/blueprints/ops.py` — held by lane
+  `ncaaf-live-resim-wire`; the reading rides the existing `/api/ops/memory`.
+- **WHY A CLIENT POLL CANNOT DO THIS (`UPDATE 26`).** The composition is now
+  fully known and static: ~400 MB glibc arena, ~165 MB pymalloc, `.so`
+  private-dirty at exactly `4.4 MB`, main stack `0.1 MB`. What is NOT known is
+  what drives the intermittent episodes — and the 31-min mature window did not
+  reproduce one (anon `-5.8`/`+15.3` against `UPDATE 23`'s `+42.4`/`+26.9`). A
+  20-second poll from my machine cannot see a sub-second burst and cannot hold a
+  baseline across a restart. The detector has to live in the process.
+- **THE COST FINDING THAT MAKES THIS AFFORDABLE.** The partition's `47-96 ms`
+  median (and one `1,700.6 ms` call) was **`/proc/self/smaps`, which is
+  O(regions)** — NOT the allocator reads. Measured: `mallinfo2` ~`1 ms`,
+  `log_pymalloc_arena_stats` **median `2.86 ms`** (benchmarked locally, 12 runs).
+  And `.so`+stack were EXACTLY constant over 66 minutes, so an episode detector
+  can skip `smaps` entirely and still attribute across every term that moves.
+  ~4-5 ms per capture, not ~90.
+- Hypothesis, written before measuring: the episodes are **glibc arena growth**,
+  not pymalloc — `pymalloc_arenas` moved `+0.0 MB` over 31 mature minutes on both
+  workers, and the little growth that did occur went **98.7% to glibc**.
+- Falsification test: an episode lands mostly in `pymalloc_arenas`, or mostly in
+  the UNATTRIBUTED term. Unattributed would mean `.so`/stack are not the
+  constants they measured as, and the full `smaps` has to come back.
+- **THRESHOLD SIZING, and it is the part most likely to be got wrong.**
+  `UPDATE 23`'s episode was `+42.4 MB over 31 min` = **~1.4 MB/min**. A 5-minute
+  baseline with a 20 MB trigger would see only ~7 MB and **MISS EXACTLY THE THING
+  BEING HUNTED**. So the baseline is held up to 15 min and the trigger is 15 MB:
+  that fires on a sustained climb of >= 1 MB/min AND on a burst within seconds.
+- Verification: at least one `GROWTH_EPISODE` captured in production with a
+  per-term split that sums to the anon delta, plus the ROUTE MIX seen since the
+  baseline. Zero episodes over a long window is also a result — it would mean the
+  trigger is mis-sized, and the ring records the max delta seen so that is
+  distinguishable from "nothing happened".
+- **THE ROUTE IS NOT AN ATTRIBUTION.** The rule in flight when the threshold is
+  crossed is the request that happened to finish there, not the allocator. So the
+  episode records the route MIX across the whole baseline window, and the
+  single-route field is named `observed_at_route` and says what it is.
+- COST (`#241`): flag-gated `SYNDICATE_GROWTH_EPISODE`, default OFF; rides the
+  EXISTING `teardown_request` hook rather than a new thread — same precedent as
+  `maybe_trim_after_request`; the common path is one clock comparison and one
+  small `smaps_rollup` read.
+- Blocked by: none.
+
+### vendor-sync-schedule — **BLOCKED 2026-09-06 — NOT CLOSED, because the stated verification FAILED** — opened 2026-09-06 — **`09588947` is landed and correct, and it CANNOT RUN.** A real `workflow_dispatch` returned `completed/failure` in 1s with zero steps executed: *"The job was not started because your account is locked due to a billing issue."* **THIS IS NOT ABOUT THIS WORKFLOW. GITHUB ACTIONS IS DEAD FOR THE WHOLE REPO, AND HAS BEEN FOR 15 DAYS.** Last successful run of ANY workflow: **2026-08-22T21:07Z**. 100 of the last 100 runs failed. A run sampled from 2026-09-05 shows the same signature (`steps=0`, job never started). **So `ci.yml` — the pytest-baseline gate this repo's protocol leans on — has not gated anything for 15 days, and every commit landed in that window is unverified by CI**, including this session's. Nothing surfaced that; it had to be looked for. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: the vendor sync runs daily without anyone remembering to run it, and its
+  output is a PR a human reviews — never a push to `main`, never an auto-apply of
+  anything but `UPSTREAM_AHEAD`.
+- Files: `.github/workflows/vendor-sync.yml` (new). Claimed by no other OPEN lane.
+- **NOT a local scheduled task, deliberately.** This machine's ledger already
+  records `lastRunAt` being dispatch rather than execution, with Modern Standby
+  stalling a scheduled call by 9h13m. A sync that silently does not run is worse
+  than no sync, because the report it never produced reads the same as "nothing
+  to do". GitHub Actions runs off this machine entirely.
+- Follows `pytest-baseline-update.yml`'s house pattern: heavy WHY header,
+  concurrency group, explicit `permissions`, and **it opens a PR rather than
+  committing to `main`** — the diff is the review surface.
+- Hypothesis: n/a.
+- Falsification test: if the runner cannot reach the four upstream repos, or the
+  report differs from the local one, the workflow is measuring something else and
+  scheduling it is worthless.
+- Verification: a real `workflow_dispatch` run on the actual runner, whose totals
+  MATCH the locally measured `IN_SYNC 570 / LOCAL_ONLY 215 / LOCAL_PATCH 52`, and
+  which opens no PR when there is nothing to take. Not "the YAML parses".
+- Blocked by: none.
+- **THE CRON IS GONE `[2026-09-07, user decision]`, `ff850d06`.** The user asked
+  whether this re-used GitHub Actions, and it did: `#486` (2026-08-20) removed
+  `Daily Update`'s cron — *"we no longer use that daily update feature,
+  everything runs on render"* — and this file shipped with a daily `schedule:`,
+  making it **the only cron left in the repo**, seventeen days later. Now
+  `workflow_dispatch` only, matching `daily-update.yml` and
+  `pytest-baseline-update.yml`. The workflow is still worth keeping: it is the
+  reviewed PR-opening path and it can APPLY, which the local job never does.
+  **I did not find that decision because I never looked for one** — I checked
+  that other workflows existed and copied their conventions, which is not the
+  same as asking whether a convention was a choice.
+- **UNBLOCKED BY:** resolving the GitHub billing lock on the account. Nothing in
+  this repo needs to change — the workflow starts running on its own schedule the
+  moment the lock lifts, and `--offline`-free runs need no secrets.
+- **Deliberately NOT done:** changing any billing or repository setting. That is
+  the account owner's, not a session's.
+- What IS verified: the YAML parses, both embedded `run` scripts pass `bash -n`,
+  the report block was exercised against real `--json` output from the current
+  trees, and the workflow is registered and dispatchable (`vendor-sync active
+  351896093`). What is NOT verified is the only thing that matters — that it
+  produces the right answer on a runner.
+- **A second, unrelated blocker found on the way and worth knowing before the
+  first successful run:** "Allow GitHub Actions to create and approve pull
+  requests" is OFF (`can_approve_pull_request_reviews=false`), so `gh pr create`
+  from the Actions token will be refused. The workflow already degrades — it
+  pushes the branch first and prints a compare URL — but the PR step will not
+  work until that setting is on either.
+- The existing `pytest-baseline-update.yml` opens a PR the same way and **has
+  never run once**, so that path was never proven here. It is not a precedent.
+
+### vendor-sync-local-stopgap — **CLOSED-VERIFIED 2026-09-06** — opened 2026-09-06 — **`aa0349aa` + `e94a6ea5`. A SCHEDULER-DRIVEN run produced the right answer.** Task `Syndicate vendor-sync report`, daily 09:20, `StartWhenAvailable`, state Ready. Verified by the ARTIFACT, never by `LastRunTime`: `reports/vendor_sync/latest.json` carries a fresh `executed_at` and `IN_SYNC 570 / LOCAL_ONLY 215 / LOCAL_PATCH 52`, an exact match for the hand measurement. **FOUR BUGS, EVERY ONE FOUND BY RUNNING IT — the script was syntactically fine throughout.** (1) it read the PRIMARY checkout, which is **241 commits behind `origin/main` and does not contain `sync_vendor_upstream.py` at all**; now reports on `origin/main` via a sparse worktree. (2) `$ErrorActionPreference='Stop'` plus redirected native stderr turned git's own `Preparing worktree (detached HEAD ...)` progress line into a thrown error on a command that had SUCCEEDED — PowerShell 5.1 wraps native stderr in ErrorRecords. (3) `param([string[]] $Args)` collides with PowerShell's AUTOMATIC `$Args`; git ran with no arguments (`git  -> exit 1`). (4) the worktree setup inferred its postcondition from *the directory exists*, so a worktree left half-built by bug 2 was never made sparse — **3.9 GB materialised, `data/` and all**, for a job reading two directories; now checked and repaired, **3876 MB → 125 MB**. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: while GitHub Actions is billing-locked, the vendor sync still runs daily
+  on this machine AND leaves proof it executed — so "upstream has not moved" and
+  "the task never fired" are distinguishable. Testable outcome: a report artifact
+  whose `executed_at` advances, verified by running the task and reading the
+  FILE, not the scheduler's `LastRunTime`.
+- Files: `scripts/vendor_sync_daily.ps1` (new),
+  `reports/vendor_sync/` (new, generated). Claimed by no other OPEN lane.
+- **THE WHOLE DESIGN IS SHAPED BY THIS MACHINE'S KNOWN FAILURE MODE.** The ledger
+  records `lastRunAt` being a DISPATCH time rather than an execution time, with
+  Modern Standby stalling a scheduled call by 9h13m — and the workflow this is
+  standing in for failed the same silent way (never started, no report). So the
+  task's output is an ARTIFACT WITH ITS OWN TIMESTAMP, and verification reads
+  that artifact. A scheduler that says it ran is not evidence it ran.
+- **REPORT ONLY. It never writes `vendor/`.** The primary tree is shared by
+  concurrent sessions; leaving modified vendored files there is how an unrelated
+  session sweeps them into its commit. Applying stays a human act.
+- **It records how far behind `origin/main` the tree is.** The primary tree is
+  routinely behind (measured repeatedly today), and a sync reading a stale tree
+  can classify a file that was already resolved as UNCLASSIFIED. Labelling the
+  reading beats silently publishing a wrong one.
+- Hypothesis: n/a.
+- Falsification test: if the artifact's `executed_at` does not advance after a
+  real task run, the scheduler is not running it and the stopgap is worthless —
+  which is exactly the thing that must not be assumed.
+- Verification: register, run the task, and read `reports/vendor_sync/latest.json`
+  — its `executed_at` must be fresh and its totals must MATCH the local
+  `IN_SYNC 570 / LOCAL_ONLY 215 / LOCAL_PATCH 52`. Then confirm `git status` shows
+  no `vendor/` modification.
+- Blocked by: `vendor-sync-schedule` is BLOCKED on GitHub billing; this exists
+  because of that and should be RETIRED when it clears.
+- **Report-only holds.** `git status -- vendor/` in the primary tree shows only
+  two WNBA `data/processed/schedule_2026.*` files, and both were already modified
+  before this session began — checked against the session-start snapshot rather
+  than assumed.
+- The task and its sparse worktree are MACHINE-LOCAL state, not in the repo:
+  task `Syndicate vendor-sync report`, worktree
+  `%LOCALAPPDATA%\syndicate\vendor-sync-worktree` (registered in the primary
+  repo's `.git/worktrees`). Retiring this means removing both, not just deleting
+  the script.
+- **DISCHARGED 2026-09-07: THE TRIGGER FIRED UNATTENDED.**
+  `history.jsonl` row 2 reads `executed_at 2026-09-07T14:20:02Z` — **09:20:02
+  local, two seconds after the due time**, with nobody touching the machine.
+  `ok: true`, 7-second run, `actionable 0`, totals unchanged at
+  `IN_SYNC 570 / LOCAL_ONLY 215 / LOCAL_PATCH 52`. No gap in the file.
+  Corroborated INDEPENDENTLY of the timestamp, which matters because a timestamp
+  is what this whole design distrusts: `synced_ref` moved `d9672ac7 → 310e3a9a`
+  and `primary_behind_origin_main` moved `243 → 272`, so the run re-fetched and
+  recomputed rather than rewriting a cached value. The scheduler's own
+  `LastRunTime 09:20:01` agrees, but it was not the evidence — it is the reading
+  that was already known to be a DISPATCH time.
+  Both guarantees still hold: `git status -- vendor/` shows only the two WNBA
+  `data/processed/schedule_2026.*` files that predate this work, and the sparse
+  worktree is **130 MB**, not regrown.
+- **Not verified:** that the task fires on its own at 09:20 unattended. Every run
+  so far was `Start-ScheduledTask`, which proves the action works, not that the
+  trigger does — and the trigger is precisely what this machine has been caught
+  failing before. The `history.jsonl` gap is what will answer it; read that
+  tomorrow rather than assuming.
+  because of that and should be RETIRED when it clears.
+
+### web-oom-pymalloc-trigger — CLOSED 2026-09-06 — opened 2026-09-06 — **THE HYPOTHESIS IS REFUTED AND THE LANE'S OWN FALSIFICATION CONDITION FIRED.** Per-route retained pymalloc blocks over ~1,340 solo requests per worker: among routes with `n>=80` the rate spans **18.6-32.8/req** (pid 97) and **21.2-37.9** (pid 98) — a **1.8x spread, identical on both workers**, where a route-specific leak would be orders apart. **`/healthz` retains 26.6-28.0 blocks/req**, the same as the artifact endpoints, so the retainer is in the SHARED request path, not a handler. `publish` leads on TOTAL only because it is served most and has the LOWEST per-request rate — ranking by total would have re-adopted a once-retracted attribution for the third time. **Reconciliation PASSES**: scaled for the 78-81% solo coverage, ~42.7k/48.3k blocks against 9.0/13.0 MB of arena jumps = **221/282 B per block**, same order as a small object. Open caveat: this session's own per-request instrumentation would look exactly like this; the phenomenon predates it (`UPDATE 23`) so it is not mine, but its contribution is unmeasured. NEXT: toggle the profile OFF and re-read the arena rate — cheapest test, and it closes the caveat too. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: find WHICH ROUTE drives `#632`'s pymalloc arena jumps, by attributing
+  RETAINED pymalloc blocks per route on solo requests.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_retained_blocks.py`.
+  NOT claimed, deliberately: `syndicate/blueprints/ops.py` — held by lane
+  `ncaaf-live-resim-wire`; the reading rides the existing `/api/ops/memory`.
+- **WHY BLOCKS AND NOT ARENA BYTES.** `UPDATE 27` caught pymalloc jumping
+  `+6`/`+13`/`+17`/`+18 MB` in 1 MB units — so a jump is a burst of SMALL-OBJECT
+  allocations outliving the free pools, not fragmentation. Per-request resolution
+  is needed, and the arena read costs `2.86 ms` a side.
+  `sys.getallocatedblocks()` is **0.679 microseconds** (measured, 100k calls) and
+  is the quantity that DRIVES arena count. Benchmarked: a 50,000-dict burst moved
+  it `+149,723`; after `del` it settled at `+140`. **4,200x cheaper, and it
+  measures the cause rather than the effect.**
+- **IT REUSES THE EXISTING SOLO MACHINERY RATHER THAN ADDING A FOURTH
+  INSTRUMENT.** `note_request_start`/`note_request_end` already gate on
+  `inflight == 0` at BOTH ends plus a background-loop seq check — built after
+  per-route attribution produced shares of 61-150%, which is impossible for a
+  partition. Retained blocks ride that same window and inherit every discard.
+- Hypothesis, written before measuring: ONE route dominates retained blocks, and
+  it is an artifacts endpoint — `/api/ops/artifacts/publish`, `stream` or
+  `export` appear in all seven episode route mixes.
+- **BUT THAT ROUTE IS ALREADY ONCE-RETRACTED.** I attributed growth to
+  `publish` earlier this session and withdrew it as TRIM-INFLATED; pre-trim it
+  cost ~0 MB in anon terms. And `UPDATE 27` showed growth does NOT scale with it
+  (224 reqs/101 publishes → `+17.6 MB`; 36 reqs/9 publishes → `+55.4 MB`). So
+  this lane needs a per-route BLOCK total, not another co-occurrence.
+- Falsification test: retained blocks spread evenly across routes, or the top
+  route by blocks is NOT one that appears in the episode mixes. Either way the
+  jumps are not request-driven and the next suspect is a background loop.
+- Verification: a per-route `blocks_no_gc2_total` table from production with a
+  clear leader, and its magnitude reconciled against the arena jumps — a `+17 MB`
+  jump is ~17 arenas, so the leader must account for a comparable block count.
+- **GC2 IS SPLIT, NOT EXCLUDED**, the same rule the anon deltas already follow: a
+  gen-2 collection inside a window frees blocks the request never allocated, so
+  those windows under-report retention and are counted apart.
+- **A COUPLING WORTH KNOWING:** blocks ride the solo window, which only opens
+  when per-process anon reads. If `smaps_rollup` ever fails, block attribution
+  stops with it — pinned by a test, and the `unreadable` counter is what makes
+  that visible instead of silent.
+- COST: two `getallocatedblocks()` calls per solo request, ~1.4 microseconds
+  total. Gated by the EXISTING `SYNDICATE_REQUEST_MEMORY_PROFILE`, which is
+  currently OFF on web and has to be turned on for this to record anything.
+- Blocked by: none.
+
+### web-oom-profile-ab — CLOSED 2026-09-06 — opened 2026-09-06 — **THE LEAK IS NOT MOSTLY MINE.** With `SYNDICATE_REQUEST_MEMORY_PROFILE` OFF — no per-request anon reads, no block counting — anon still grows at **1.01 and 2.39 MB/min**, so `UPDATE 28`'s per-request retention is real and belongs to the shared request path, not to this session's code. Volume skew 15%, inside the gate; both arms measured over the same process-age window with the measuring instrument unchanged. **The magnitude of my instrumentation's own share is NOT determined:** the harness said 36%, but the per-worker ranges TOUCH (ON 2.39-2.91, OFF 2.39-1.01) and the whole gap rests on one OFF worker whose anon FELL in its tail — a direction, not a magnitude, and that overlap check was added AFTER seeing the arms. pymalloc: NO verdict, as pre-registered — 1 of 2 workers jumped ON, 0 of 2 OFF, a one-event difference in a discrete signal. Profile left OFF. NEXT: Flask/Werkzeug per-request caches and logging; a real magnitude for the instrument share needs more workers or repeated windows. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: settle whether THIS SESSION'S OWN per-request instrumentation drives the
+  pymalloc arena rate, by toggling `SYNDICATE_REQUEST_MEMORY_PROFILE` and
+  re-reading it.
+- Files: scratchpad harness only (`profile_ab.py`). No code changes; the two
+  supporting commits (`4f8e9356`, `7f104271`) are already landed.
+- **WHY THIS IS OWED.** `UPDATE 28` found retention is per-REQUEST, not per-route
+  — ~19-38 blocks on every route including `/healthz`. **That is also exactly
+  what my own per-request instrumentation would look like**, and UPDATE 28 could
+  not separate the two. It recorded the caveat rather than resolving it; this
+  resolves it.
+- Hypothesis: the profile is NOT the driver — the growth predates every
+  instrument this session added (`UPDATE 23` measured it hours earlier). But
+  "predates" only proves the leak is not MINE, not that my instruments contribute
+  nothing, which is the actual question.
+- **THE INSTRUMENT IS NOT THE THING BEING TOGGLED.** pymalloc is read by the
+  growth detector, which stays ON in both arms. Letting an intervention supply
+  its own measurement is precisely what produced this session's RETRACTED
+  counterfactual.
+- **THE AGE WINDOW IS THE CONTROL:** both arms measured over process age
+  `900-2400s`. pymalloc RAMPS from boot (`55 -> 102 -> 143 -> 162 MB` measured
+  over ~35 min), so comparing a young process against an old one reports the
+  ramp, not the flag.
+- **VOLUME IS A GATE, NOT A CORRECTION.** Arms are sequential, so traffic drift
+  is uncontrolled. `requests_total` comes from the detector because
+  `solo_attributed` lives inside the flag being toggled; `compare` REFUSES a
+  verdict above 25% skew rather than normalising after seeing the data.
+- Falsification test: the rate is materially unchanged with the profile off —
+  then UPDATE 28's per-request retention is real, belongs to the shared request
+  path, and Flask/Werkzeug and logging are next.
+- Verification: both arms collected over the same age window with <25% volume
+  skew, and a stated share. If the ON arm did not grow either, that is NOT a
+  result and the pair is re-run.
+- Blocked by: none.
+
+### web-oom-retention-reread — CLOSED 2026-09-07 — opened 2026-09-07 — **STEADY-STATE RETENTION IS ZERO: `-0.0` and `+5.5` blocks/request** over 794 and 722 solo requests, measured as a DELTA between warm snapshots (cumulative totals are boot-dominated: `663,143` blocks at n=34 vs `663,803` at n=239). Local ground truth was `4.45/req`, so the fix transfers from `test_client` to gunicorn. **`UPDATE 28` is confirmed as an INFLIGHT measurement** — its 18.6-37.9 matches this run's inflight column at 17.1-30.7. **The reconciliation FAILS as predicted:** pid 78 shows `53.0 MB` of arena growth against NET `-18` blocks retained; pid 79 implies `1,425 B/block` against pymalloc's 512 B cap. Hypothesis CONFIRMED (no per-request leak) and the driver is PEAK, not retention. **NEW LEAD, explicitly not a conclusion:** `/wnba/api/live_player_boxscore` peaks at **44,007 blocks in one request**, 13-60x every other route, on 9-11 calls; 53 MB would need 10-20 such requests and it ran 9. Right order, but co-occurrence is the same shape that made `publish` look guilty three times — needs a direct test (correlate the episode timestamp with that route's calls, or call it in isolation). Also unexplained: the peak differs 13x BETWEEN workers for the same route. Profile returned to OFF. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: re-read the per-route retention table with the FIXED instrument, and
+  replace `UPDATE 28`'s retracted numbers with correct ones.
+- Files: scratchpad reader only. The fix is already landed (`8bcdef11`); this
+  lane deploys and measures, it does not change code.
+- **WHY A RE-READ IS OWED.** `UPDATE 30` retracted `UPDATE 28`'s "~19-38 blocks
+  retained per request" and its reconciliation: the instrument read
+  `getallocatedblocks()` at `teardown_request`, which fires BEFORE the response,
+  the request context and the environ are released, over-counting retention
+  **16x** (64.7 vs 4.1 blocks/req locally). The table it produced is not
+  retention, so the question it was meant to answer is still open.
+- The fix measures on the NEXT request's way in, once everything of the previous
+  one is gone. Verified locally: ground truth `4.45`, fixed `5.33`, old `16.85`
+  blocks/req — error `12.40 -> 0.88`.
+- **TWO COLUMNS NOW, AND THEY ANSWER DIFFERENT QUESTIONS.**
+  `blocks_retained_*` is retention. `blocks_inflight_*` is the old teardown
+  figure, kept and RENAMED because `UPDATE 30`'s reframe makes it useful: arena
+  count follows PEAK SIMULTANEOUS live blocks, and a within-request peak is what
+  that figure is closer to. **`blocks_inflight_max` is the column the arena
+  question actually needs.**
+- Hypothesis: retained blocks per request are SMALL (single digits, as locally),
+  so per-request retention is not the OOM driver at all, and the arena growth
+  tracks `blocks_inflight_max` — i.e. transient peaks, not leaks.
+- Falsification test: retention is large in production (tens per request) despite
+  being small locally. That would mean gunicorn/threading adds retention that
+  `test_client` does not, and the local ground truth does not transfer.
+- Verification: a per-route table with BOTH columns, and a reconciliation of
+  retained blocks against any pymalloc arena jump caught in the same window —
+  the check that `UPDATE 28` reported as passing on inflated input.
+- **COST, and it is a deliberate trade:** `UPDATE 29` found turning the profile
+  OFF is associated with a lower anon rate (direction consistent, magnitude
+  undetermined). Turning it back ON for this measurement re-incurs that. The
+  flag goes back OFF when the reading is done.
+- Blocked by: none.
+
+### web-oom-ring-arena-ab — CLOSED 2026-09-07 — opened 2026-09-07 — **THE CUT IS WORTH 38 MB PER WORKER.** FAT `209.0` vs SLIM `170.0-171.0` MB pymalloc at ages 600/1200/1800, `-38 to -39 MB` at every point, **per-worker ranges SEPARATED** (`max(SLIM) 176 < min(FAT) 198`), volume skew 14%. ~76 MB of a 2,048 MB container. Hypothesis CONFIRMED and `UPDATE 32`'s mechanism is load-bearing, not merely real. **Open question:** the arena fell 44x more than a single 9,002-block peak predicts — candidates (4 threads, per-size-class arenas, 15x/min recurrence) are UNVERIFIED and the multiplier must not be quoted as understood. Method: pymalloc was flat in both arms, so this is a PLATEAU-level comparison, not a ramp rate. Limits: n=2 workers/arm, one pair. The separation check was in the harness before either arm ran — `UPDATE 29` had to add it after. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 **FOLLOW-UP DEFERRED (`UPDATE 36`):** the corrected A/B — the checkpoint's OWN cost, on refresh-worker where the ring actually runs — could not be run: 75 min of polling found NO clear window (board builds every 5-8 min, deploys take ~5), so waiting cannot create one. Harness committed: `scripts/ring_cost_ab.py`.
+- Goal: measure whether halving the diagnostic ring's allocation peak
+  (`fd352a3b`) changes the pymalloc ARENA in production.
+- Files: scratchpad harness only (`arena_rate_ab.py`). Code already landed.
+- **WHY A LEVEL AND NOT A RATE.** The cut removes ~9,000 simultaneously-live
+  blocks from a peak recurring ~15x/min. Arenas are sized to the HIGHEST peak
+  ever seen and pymalloc rarely returns one, so once the arena covers the old
+  peak a smaller peak CANNOT shrink it. **Any effect is in the RAMP**, so this
+  compares the arena LEVEL at matched process ages (600/1200/1800 s).
+- **THIS ALSO FIXES `UPDATE 29`'s POWER PROBLEM.** pymalloc moves in discrete
+  1 MB jumps: there, one worker jumped `+18 MB` and the other `+0.0` over the
+  same window, and a `0.0/0.0` control arm was always a plausible coin flip. A
+  LEVEL at fixed age is a far more stable statistic than counting rare events.
+- **BOTH ARMS RUN THE SAME BUILD**, toggled by `SYNDICATE_RING_KEEP_CMDLINE`
+  (`2803f83f`). Deploying the pre-cut commit would have moved production
+  backwards and made the arms differ by a whole build rather than one behaviour.
+- Hypothesis: the arena level is LOWER in the SLIM arm at matched age. If the
+  ring is a real arena-sizing event, halving its peak should show in the ramp.
+- Falsification test: no material difference (<4 MB at age 1800 s). That would
+  mean the ring peak, though real and measured, is NOT what sizes the arena, and
+  `UPDATE 32`'s mechanism is not the driver.
+- Verification: both arms with all three age points on >= 2 workers, volume skew
+  <25%, AND a per-worker spread check — overlapping ranges mean a DIRECTION at
+  most, never a magnitude. That check is `UPDATE 29`'s exact failure, added to
+  the harness up front this time rather than after the fact.
+- Blocked by: none.
+
+### daily-update-deploy-hook — **CLOSED-VERIFIED 2026-09-07** — opened 2026-09-07 — **`daily-update.yml`'s Render redeploy step is GONE `[user decision]`. It was the only path in the repo that could deploy production, and it bypassed every lock.** No `deploy_claim.py`, no `deploy_preflight.py` (so no `OFF_MAIN` check, no CLEAR-for-this-SHA), no `deploys.md` entry, and `deploy-guard.py` cannot see a GitHub runner at all. Opt-in via `run_full_pipeline=true` (default `'false'`), and the secret `RENDER_WEB_DEPLOY_HOOK_URL` is LIVE (updated 2026-07-13) — so it was one dispatch away, not theoretical. Found by an audit of what the remaining workflows DO rather than when they fire. — session 64ac3b1f-ab0c-4872-80dd-f8824923ca3c
+- Goal: no workflow can deploy production. Verified: zero references to the
+  deploy hook remain, the file still parses, and the surrounding steps are intact.
+- Files: `.github/workflows/daily-update.yml`.
+- **The rest of the audit came back clean, and that is worth recording so it is
+  not re-run from scratch:** no `schedule:` in any workflow, **no webhooks, no
+  deploy keys**. `ci.yml` is push/PR; the other three are `workflow_dispatch`
+  only. Secrets configured: `ADMIN_TOKEN`, `ODDS_API_KEY`,
+  `RENDER_WEB_DEPLOY_HOOK_URL` — the last is now unreferenced by any workflow.
+- **Two things left ALONE, deliberately.** (1) `daily-update.yml`'s default
+  dispatch path still `git push`es a data snapshot (~370 files / ~51MB) to
+  whichever branch it is dispatched from — documented and intended under `#486`,
+  not a defect, but not obvious from the button either. (2) `ci.yml` still has no
+  `concurrency:` group — that is `#572`, already open; it sheds runs that should
+  have happened rather than running things that should not.
+- Verification: `grep -c RENDER_WEB_DEPLOY_HOOK_URL .github/workflows/` is 0, the
+  YAML parses, and the step count drops by exactly one with its neighbours intact.
+- Blocked by: none.
+
+### soccer-threeway-precision-gate — CLOSED 2026-09-07 — session 28c6162b-58c8-4937-99f5-d3b260a96de4 — **BOTH PASSES LANDED AND DEPLOYED. (1) `6a20281c`/`8b6a1f4d` — soccer moneyline legs priced through `price_moneyline`; refresh-worker `d9672ac7` live 01:26:11Z, verified 28->11 edged rows across a rebuild. (2) `62937ea4` — fixed the regression that deploy introduced (a withheld HOME leg dropped the DRAW/AWAY legs via the `edge is None` early return); refresh-worker live 02:10:02Z, verified 3 lost legs -> 0, each now serving exactly its own-bar value, with the 3 that fail their own bar still refused. **DEBT DISCHARGED 2026-09-07 10:42-10:54 CDT** by scheduled task `soccer-threeway-shortlist-verify`: six draw/away rows on the SERVED shortlist, all six on withheld-home fixtures, THREE of them draw rows — which retires the "draw leg unexercised in production" caveat both deploys carried. Postmortem landed (`523f94cd`); nothing owed. Records: `deploys.md` x2, `log/2026-09-06.md`, `state_soccer.md [soccer-moneyline-precision]`.**
+- Goal: soccer `h2h_3_way` draw/away legs stop publishing a raw Monte-Carlo
+  `k/n` point estimate with NO interval and NO precision gate. `sims_run` is
+  plumbed from the soccer artifact onto the projection, and the three-way legs
+  are priced through `live_gameline_join.price_moneyline` so they inherit
+  `agresti_coull_point` + the 2-sigma bar rather than a second copy of the rule.
+- Files: `syndicate/features/shared/soccer_projections.py`,
+  `syndicate/features/soccer/features/live_lens.py`,
+  `syndicate/features/shared/soccer_live_gameline_source.py`,
+  `syndicate/features/shared/layer2_board.py`
+  (**`_model_edge_for` / `_model_prob_for_side` three-way branches ONLY**
+  — see the CLAIM NOTE below),
+  `tests/test_soccer_threeway_precision_gate.py` (new).
+- **CLAIM NOTE on `layer2_board.py` — TAKEN FROM AN UNOWNED LANE, 2026-09-06.**
+  `lane_claims.claims_by_path` over `origin/main:.syndicate/lanes.md` returns
+  `{'layer2-sim-disagrees'}` for this path. That lane's owning session,
+  `3492626c-1ec4-4366-9dbe-f194ae319c84`, is **absent from the full session
+  roster** — `list_sessions(include_archived=True, limit=100)` on this machine,
+  which reaches back to 2026-08-27, does not contain it. Same posture as the
+  2026-08-31 phantom sweep already recorded in this file. Its `Files:` block
+  scopes it to `_projection_side_in_row_frame` / `_model_edge_for` /
+  `_model_prob_for_side` / `_publication_columns` / the `value_ev` assignment,
+  which OVERLAPS mine by function, so this is a real overlap and not a
+  disjoint-by-range case. If that session returns, say so and I will hand back.
+- Hypothesis: the three-way branch at `layer2_board._model_edge_for` prices
+  `{"home","draw","away"}` against the market fair probability directly and
+  never reaches `price_moneyline`, so a `0/300` draw leg publishes `p=0.0` and
+  a large `edge_pp` that no interval ever bounded.
+- Falsification test: if a soccer `h2h_3_way` draw/away row that this branch
+  prices already carries a `withheld_reason`, a `prob_std_err`, or a
+  `std_err_basis`, the branch is NOT ungated and the premise is wrong.
+- Verification: (a) a REACHABILITY test that the three-way branch is entered at
+  all (`off != on`) BEFORE any correctness assertion; (b) a before/after count of
+  soccer three-way legs by `withheld_reason` over a real artifact — rows
+  STARTING to be refused is the correct outcome, and the count is the reading;
+  (c) `prob_std_err` is not applied twice — it reconstructs `successes = p*n`,
+  so smoothing the point estimate BEFORE the SE over-widens the bar.
+- Verification RAN: reachability (`off != on`) through the real `attach_soccer_projections` and through `_model_edge_for`; 847 tests pass across the affected surface; the 2 failures in `test_layer2_lane_chip_join.py` are PRE-EXISTING (re-run with this change stashed, identical). Before/after withheld counts measured on `/api/board/layer2-shortlist?sport=soccer`, not on the local mirror.
+- Blocked by: none.
