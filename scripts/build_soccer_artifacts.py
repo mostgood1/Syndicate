@@ -40,8 +40,10 @@ from syndicate.features.soccer.features.lineups import attach_confirmed_starters
 from syndicate.features.soccer.features.loaders import build_soccer_simulation_input
 from syndicate.features.soccer.features.loaders import compute_team_ratings
 from syndicate.features.soccer.features.market_anchoring import anchor_ratings_to_market
+from syndicate.features.soccer.features.market_odds import attach_market_features
 from syndicate.features.soccer.features.market_odds import attach_market_odds
 from syndicate.features.soccer.features.market_odds import home_win_probability_by_event
+from syndicate.features.soccer.features.market_odds import market_lines_by_event
 from syndicate.features.soccer.features.lineups import _norm_player_name
 from syndicate.features.soccer.sources import default_season
 from syndicate.features.soccer.sources import roster_rows
@@ -537,6 +539,56 @@ def _apply_market_anchor(
 
     priced = home_win_probability_by_event(rows)
     attach = attach_market_odds(fixtures, priced)
+
+    # ABOVE THE `weight <= 0.0` EARLY RETURN, DELIBERATELY.
+    #
+    # That return is the state production is actually in (anchor weight 0.0), so
+    # anything placed after it never runs on the worker -- it would be a feature
+    # that is present, tested, and unreachable, which is the failure mode this
+    # whole change is about. The sim engine's market prior has NOTHING to do
+    # with the anchor's arming, so it must not inherit the anchor's switch.
+    #
+    # `totals` and `spreads` rows were parsed out of this very CSV and dropped:
+    # 1,450 and 812 rows respectively across the ten leagues on 2026-09-07,
+    # against 3,783 h2h. `_market_prior_index` read the resulting empty dict and
+    # returned a CONSTANT 0.5 for every fixture ever simulated.
+    # BEHIND A FLAG, DEFAULT OFF -- and the reason is a measurement, not caution.
+    #
+    # Sized 2026-09-07 over all ten leagues' live boards, n=181 priced events:
+    # unfed, `_market_prior_index` returns 0.5 for EVERY fixture; fed, it runs
+    # min 0.133 / median 0.633 / max 1.000, sd 0.201. So the median moves the
+    # term UP, from 0.5*0.02 to ~0.633*0.02 -- this is not added variance around
+    # the old value, it is a SYSTEMATIC SHIFT into an engine whose rates were
+    # calibrated with the term pinned. That is the mechanism-vs-estimator hazard
+    # in CLAUDE.md verbatim: the rates that were absorbing the constant have to
+    # be re-fit, or the shift lands as bias. It also saturates -- a 3.0 total
+    # with a -1.5 spread already exceeds the 1.0 clamp.
+    #
+    # Effect if armed: shot_generation_probability moves by mean 0.0044, max
+    # 0.0100 (weight 0.02 at `possession_priors.py:347`).
+    #
+    # ON REQUIRES A BACKTEST, per the 2026-09-07 user decision that approved
+    # feeding these inputs: graded soccer sim output with the flag off vs on over
+    # dates with retained `odds_history`, not a slate average. Until that exists
+    # this stays off and the attach is a REACHABILITY fixture -- the wiring is
+    # live, tested, and one env var from being armed.
+    market_prior_on = str(os.environ.get("SYNDICATE_SOCCER_MARKET_PRIOR") or "").strip().lower() in ("1", "on", "true")
+    if market_prior_on:
+        mfeat = attach_market_features(fixtures, market_lines_by_event(rows))
+    else:
+        # Still COUNT what would have been attached. A bare "disabled" line makes
+        # "flag off" and "feed broken" the same nothing, which is the ambiguity
+        # `#626`(h) and the anchor's own `state` field exist to prevent.
+        mfeat = attach_market_features([dict(f) for f in fixtures], market_lines_by_event(rows))
+    audit["market_features"] = dict(mfeat, armed=market_prior_on)
+    print(
+        f"[soccer_market_prior] MARKET_FEATURES league={league} armed={market_prior_on} "
+        f"fixtures={mfeat['fixtures']} attached={mfeat['attached']} "
+        f"with_total={mfeat['with_total']} with_spread={mfeat['with_spread']} "
+        f"skipped={mfeat['skipped']} priced_events={mfeat['priced_events']}"
+        + ("" if market_prior_on else " -- COUNTED ONLY, fixtures unchanged (SYNDICATE_SOCCER_MARKET_PRIOR unset)"),
+        flush=True,
+    )
     audit.update(
         {
             "attached": attach["attached"],

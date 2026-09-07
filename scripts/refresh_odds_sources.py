@@ -1901,6 +1901,40 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 description=f"Grade {league}'s simulated projections against captured odds into an EV/edge picks artifact.",
             )
         )
+
+    # THE INPUT GATE, ONCE, LAST. `model_engine_standard.md` §1 mandates a
+    # gating input checklist per engine; soccer's has existed since 2026-08-18
+    # and had NO CALLER anywhere in the repo, so it had never run on the worker.
+    # Measured 2026-09-07: production held 20 MLB `sim_input_report`s and ZERO
+    # soccer ones, which means nobody could answer "is this engine's input
+    # surface fed" for soccer at all. MLB's equivalent runs from
+    # `run_mlb_daily_sim_job.py` and publishes the same artifact family.
+    #
+    # ONCE, not per league: the script audits eredivisie as the representative
+    # league and the answer is about the ENGINE's wiring, which is shared. Ten
+    # invocations would cost ten history reads for one answer.
+    #
+    # LAST, so it audits the state this tick just built rather than the previous
+    # one -- steps run in order.
+    #
+    # `--warn-only` because a non-zero exit here marks the refresh step FAILED,
+    # and an input alarm must not take down the build it is auditing. Same flag
+    # MLB's caller passes. The report is the instrument; the exit code is for a
+    # human running it by hand.
+    steps.append(
+        RefreshStep(
+            name="soccer_sim_input_checklist",
+            phases=("pregame",),
+            cwd=REPO_ROOT,
+            command=(
+                python_exe,
+                "scripts/soccer_sim_input_checklist.py",
+                "--publish",
+                "--warn-only",
+            ),
+            description="Audit which soccer sim-engine inputs are CONSUMED but UNPOPULATED, and publish the bounded result so production is readable.",
+        )
+    )
     return steps
 
 

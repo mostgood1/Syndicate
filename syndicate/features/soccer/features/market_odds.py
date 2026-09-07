@@ -41,6 +41,9 @@ from syndicate.features.soccer.features.team_names import match_team_name
 
 _H2H_MARKETS = {"h2h", "moneyline", "ml"}
 _DRAW_LABELS = {"draw", "tie", "x"}
+_TOTALS_MARKETS = {"totals", "total", "over_under", "ou"}
+_SPREADS_MARKETS = {"spreads", "spread", "handicap", "asian_handicap"}
+_OVER_LABELS = {"over", "o"}
 
 
 def american_to_probability(price: Any) -> float | None:
@@ -165,6 +168,150 @@ def _fuzzy_event_for(fixture: Mapping[str, Any], probabilities: Mapping[str, Map
         # clubs are in the feed on different match-ups. Not a join.
         return None, "name_match_pair_disagreed"
     return hits[0], "fuzzy"
+
+
+def market_lines_by_event(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Consensus TOTALS and SPREADS line per event, from the same odds CSV.
+
+    WHY THIS EXISTS. `home_win_probability_by_event` filters to `_H2H_MARKETS`
+    and drops every other row. Measured 2026-09-07 across all ten leagues'
+    `game_odds_current.csv`: **h2h 3,783 rows, totals 1,450, spreads 812** -- so
+    two of the three markets on the worker's own disk were being parsed and
+    thrown away, while `possession_priors._market_prior_index` read
+    `market_features["total"]["line"]` and `["spread"]["home_line"]` and found
+    nothing, returning a CONSTANT for every fixture in every league.
+
+    MEDIAN, NOT MEAN, and taken on the LINE not on a price. Books disagree by a
+    quarter-goal (13 distinct totals lines, 23 spreads) and a mean would invent
+    a line no book offers, e.g. 2.583. The median is always a real quote from
+    the set. Averaging in probability space -- the rule at the top of this file
+    -- is about PRICES; a handicap line is already on a linear scale, so the
+    hazard there does not apply here.
+
+    The spread line is taken from the HOME side's row. A handicap is signed and
+    side-specific (`-0.5` for the home favourite is `+0.5` for the away side),
+    so reading whichever row came first would flip the sign on roughly half the
+    fixtures and hand the engine `abs(spread_line)` computed off the wrong team.
+    """
+    totals: dict[str, list[float]] = defaultdict(list)
+    spreads: dict[str, list[float]] = defaultdict(list)
+    context: dict[str, dict[str, str]] = {}
+
+    for row in rows:
+        market = str(row.get("market") or "").strip().casefold()
+        event_id = str(row.get("event_id") or "").strip()
+        if not event_id:
+            continue
+        line = _safe_line(row.get("line"))
+        if line is None:
+            continue
+        home = str(row.get("home_team") or "").strip()
+        context.setdefault(event_id, {"home_team": home, "away_team": str(row.get("away_team") or "").strip()})
+        side = str(row.get("side") or "").strip()
+        if market in _TOTALS_MARKETS:
+            # One line per event, quoted twice (Over and Under). Taking only the
+            # OVER rows avoids counting the same line twice and skewing the
+            # median when the two sides are quoted at different depths.
+            if side.casefold() in _OVER_LABELS:
+                totals[event_id].append(line)
+        elif market in _SPREADS_MARKETS:
+            # `(home,)` -- a ONE-ELEMENT TUPLE, not the bare string.
+            # `match_team_name(name, candidates)` iterates `candidates`, so
+            # passing the string iterates its CHARACTERS and fuzzy-matches
+            # nearly anything: both the home and away spread rows matched, and
+            # the median of [-0.5, +0.5] came out 0.0 -- a fabricated pick'em on
+            # every fixture. Caught by `test_spread_line_is_taken_from_the_HOME_side`.
+            if home and match_team_name(side, (home,)) is not None:
+                spreads[event_id].append(line)
+
+    out: dict[str, dict[str, Any]] = {}
+    for event_id in set(totals) | set(spreads):
+        entry: dict[str, Any] = dict(context.get(event_id) or {})
+        if totals.get(event_id):
+            entry["total_line"] = _median(totals[event_id])
+            entry["total_books"] = len(totals[event_id])
+        if spreads.get(event_id):
+            entry["spread_home_line"] = _median(spreads[event_id])
+            entry["spread_books"] = len(spreads[event_id])
+        out[event_id] = entry
+    return out
+
+
+def _safe_line(value: Any) -> float | None:
+    text = str(value if value is not None else "").strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def attach_market_features(fixtures: list[dict], lines: Mapping[str, Mapping[str, Any]]) -> dict:
+    """Put the market lines where the SIM ENGINE reads them, and count the join.
+
+    `attach_market_odds` (below) writes `fixture["market_odds"]`, which is what
+    the ANCHOR consumes. The sim engine reads a different key entirely --
+    `build_soccer_match_features(..., market_features=fixture.get("market_features"))`
+    -- so odds attached for the anchor have never been visible to
+    `possession_priors`. Same shape as the soccer LIVE edge defect already in
+    `state.md`: the number exists and the reader cannot see it.
+
+    This writes `market_features` and leaves `market_odds` untouched, so the
+    anchor's behaviour is byte-identical and the two mechanisms stay separable
+    -- the anchor remains OFF BY DECISION (weight 0.0) and nothing here arms it.
+
+    `model_probability` is deliberately NOT set. The engine's key list is
+    `["model_probability", "confidence", "edge"]`, and those name the MODEL's own
+    view; feeding the market's de-vigged win probability under that name would
+    be both a lie about provenance and circular at prior-build time. The
+    market's opinion is carried by the two LINES, which is what a line is for.
+    """
+    attached = 0
+    with_total = 0
+    with_spread = 0
+    skipped: list[str] = []
+    for fixture in fixtures:
+        event_id = str(fixture.get("match_id") or "").strip()
+        entry = lines.get(event_id)
+        if not entry:
+            entry = next(
+                (row for row in lines.values()
+                 if row.get("home_team") == fixture.get("home_team")
+                 and row.get("away_team") == fixture.get("away_team")),
+                None,
+            )
+        if not entry:
+            skipped.append(f"{fixture.get('home_team')} v {fixture.get('away_team')}")
+            continue
+        features: dict[str, Any] = dict(fixture.get("market_features") or {})
+        if entry.get("total_line") is not None:
+            features["total"] = {"line": float(entry["total_line"])}
+            with_total += 1
+        if entry.get("spread_home_line") is not None:
+            features["spread"] = {"home_line": float(entry["spread_home_line"])}
+            with_spread += 1
+        if not features:
+            skipped.append(f"{fixture.get('home_team')} v {fixture.get('away_team')}")
+            continue
+        fixture["market_features"] = features
+        attached += 1
+    return {
+        "fixtures": len(fixtures),
+        "attached": attached,
+        "with_total": with_total,
+        "with_spread": with_spread,
+        "skipped": len(skipped),
+        "priced_events": len(lines),
+    }
 
 
 def attach_market_odds(fixtures: list[dict], probabilities: Mapping[str, Mapping[str, Any]]) -> dict:

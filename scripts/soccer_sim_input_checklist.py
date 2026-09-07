@@ -39,6 +39,9 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from syndicate.features.soccer.contracts import SoccerMatchFeatures  # noqa: E402
+from syndicate.features.soccer.features.market_odds import (  # noqa: E402
+    market_lines_by_event,
+)
 from syndicate.features.soccer.features.loaders import (  # noqa: E402
     build_soccer_match_features,
     compute_team_ratings,
@@ -90,6 +93,57 @@ CONTAINER_TO_FIELD = {
     "availability_metrics": "availability_metrics",
 }
 
+# `spread` and `total` are NOT SoccerMatchFeatures fields -- they are sub-dicts
+# INSIDE `market_features`, read as locals:
+#
+#     total  = market_features.get("total")
+#     spread = market_features.get("spread")
+#     total_line = _first_float(total, ["line", "total", "value"])
+#
+# The AST walk sees the LOCAL name, so both landed in the "NO MAPPING" branch
+# and were counted as alarms. That is the instrument reporting its own blind
+# spot as a defect in the engine: two of the nine alarms on 2026-09-07 were
+# these, and neither carried any evidence about whether the field is fed.
+NESTED_CONTAINER_TO_FIELD = {
+    "spread": ("market_features", "spread"),
+    "total": ("market_features", "total"),
+}
+
+# UNPOPULATED BY DELIBERATE DECISION, NOT BY DEFECT -- each with the reason and
+# where the reasoning lives. Modelled on MLB's `7dc4893d`, which moved five
+# `vs_pitcher_*` fields out of the failure count for exactly this reason: a gate
+# whose alarm list permanently contains four known-good entries cannot tell
+# anyone that a FIFTH one is new. These are still printed, and still counted --
+# under `disabled`, never under `failures`.
+#
+# Removing an entry here is a claim that the decision behind it was reversed.
+# Do not silence a NEW alarm by adding to this dict.
+DISABLED: dict[str, str] = {
+    "attacking_metrics.goals_per_match":
+        "goals are the xG STAND-IN on the football-data path (`xg_for = home_goals`), so "
+        "feeding a goals field beside it puts the same number through `_attack_strength` "
+        "twice -- 0.22 as xG plus 0.14 as goals = 0.36. Measured by A/B artifact build: "
+        "`total_mean` 3.16 -> 3.39, `home_mean` 1.71 -> 1.89 on one eredivisie fixture. "
+        "See loaders.py `NO goals_for / goals_against ON THIS PATH, DELIBERATELY`.",
+    "defensive_metrics.goals_against_per_match":
+        "same double-count on the defensive side (0.22 + 0.14 on `xg_against`). Same "
+        "loaders.py comment.",
+    "defensive_metrics.ppda":
+        "the football-data history carries no ppda column, so `compute_team_ratings` emits "
+        "0.0 -- and 0.0 is not 'no pressing', it is MISSING read as the most aggressive "
+        "press possible (`_pressing_index` maps low ppda -> high press). loaders.py drops "
+        "it rather than feed a fabricated extreme.",
+    "possession_metrics.ppda":
+        "same source gap and same deliberate drop as `defensive_metrics.ppda`.",
+    "market_features.model_probability":
+        "the engine's key list here is ['model_probability','confidence','edge'] -- all three "
+        "name the MODEL's own view. Feeding the market's de-vigged win probability under that "
+        "name would misstate its provenance and is circular at prior-build time (the prior is "
+        "an input to the model whose probability it would be). The market's opinion IS fed, as "
+        "the two things a market actually quotes: `total.line` and `spread.home_line`. "
+        "Re-open this only if a genuine pre-sim model probability exists to put here.",
+}
+
 
 def consumed_keys() -> dict[str, list[list[str]]]:
     """Every `_first_float(container, [keys])` the engine performs, by container."""
@@ -118,6 +172,14 @@ def main() -> int:
              "per-match feature payloads this gate measures are not allowlisted; the worker "
              "runs this and publishes the bounded result instead -- MLB's sim_input_report "
              "pattern (`scripts/sim_input_checklist.py`).",
+    )
+    ap.add_argument(
+        "--warn-only", action="store_true",
+        help="report alarms but exit 0. For the PRODUCTION caller: this gate runs inside a "
+             "refresh step, and a non-zero exit there marks the step failed and can mask or "
+             "disrupt the build it is auditing. MLB's caller passes the same flag "
+             "(`run_mlb_daily_sim_job.py`). A human run should NOT pass it -- the non-zero "
+             "exit is the gate.",
     )
     args = ap.parse_args()
 
@@ -169,10 +231,46 @@ def main() -> int:
         (r["home_starters_available_share"] for r in espn_stats if r.get("home_starters_available_share") is not None),
         None,
     )
+    # The MARKET LINES production now attaches, read the same way production
+    # reads them -- `build_soccer_artifacts.py` calls `market_lines_by_event` on
+    # this exact CSV and puts the result on the fixture as `market_features`.
+    # Kept in sync here for the same reason the ESPN backfill above is: a gate
+    # that constructs its payload differently from production stops representing
+    # production, and its alarms stop meaning anything.
+    #
+    # ANY real priced event, not this synthetic pairing -- same discipline as
+    # `real_availability` above. The (home, away) pair here is the two
+    # alphabetically-first rated teams and need not be playing this week; what
+    # the gate checks is that the constructor -> engine path carries a real
+    # value, not that this particular fixture is priced.
+    odds_path = hist_dir.parent / "api" / "odds" / "game_odds_current.csv"
+    real_market: dict = {}
+    if odds_path.is_file():
+        with odds_path.open(encoding="utf-8-sig", newline="") as fh:
+            priced_lines = market_lines_by_event(list(csv.DictReader(fh)))
+        # SOURCED INDEPENDENTLY, not both from the first priced event. The two
+        # markets have different coverage -- eredivisie 2026-09-07: 12 of 12
+        # events carry a total, only 7 of 12 a spread -- so taking both from one
+        # event reports `spread.home_line` UNFED whenever that event happens to
+        # be one of the five without one. That is the gate reporting sampling
+        # luck as a wiring defect, which is the failure this whole file exists
+        # to avoid.
+        first_total = next((e["total_line"] for e in priced_lines.values()
+                            if e.get("total_line") is not None), None)
+        first_spread = next((e["spread_home_line"] for e in priced_lines.values()
+                             if e.get("spread_home_line") is not None), None)
+        if first_total is not None:
+            real_market["total"] = {"line": float(first_total)}
+        if first_spread is not None:
+            real_market["spread"] = {"home_line": float(first_spread)}
+    print(f"  market lines: {odds_path.name} "
+          f"{'present' if odds_path.is_file() else 'ABSENT'} -> market_features={sorted(real_market) or 'none'}")
+
     match = build_soccer_match_features(
         league="eredivisie", date="2026-08-19",
         home_team=home, away_team=away, ratings=ratings,
         home_starters_available_share=real_availability,
+        market_features=real_market or None,
     )
 
     print("SOCCER SIM INPUT CHECKLIST")
@@ -188,13 +286,38 @@ def main() -> int:
     # move because of them.
     report_rows: list[dict[str, object]] = []
 
+    disabled_rows: list[dict[str, object]] = []
+
     for container in sorted(consumed):
         target = CONTAINER_TO_FIELD.get(container)
-        if target is None:
+        nested = NESTED_CONTAINER_TO_FIELD.get(container)
+        if target is None and nested is None:
             print(f"  ?     {container:22s} -> NO MAPPING in CONTAINER_TO_FIELD (engine param unknown to this script)")
             alarms.append(f"{container} (unmapped)")
             report_rows.append({"container": container, "target": None, "field": None,
                                 "status": "unmapped", "fed_by": None})
+            continue
+        if nested is not None:
+            # A sub-dict of a real field (`market_features["spread"]`), so the
+            # payload is one level down. Resolved here rather than mapped to the
+            # PARENT field, which would report `spread` fed whenever
+            # `market_features` held anything at all.
+            outer, inner = nested
+            payload = (getattr(match, outer) or {}).get(inner) or {}
+            for keys in consumed[container]:
+                label = f"{container}.{keys[0]}"
+                present = [k for k in keys if k in payload]
+                if present:
+                    print(f"  ok    {label:46s} fed by {present[0]!r} (via {outer}[{inner!r}])")
+                    report_rows.append({"container": container, "target": f"{outer}.{inner}",
+                                        "field": keys[0], "keys_accepted": keys,
+                                        "status": "ok", "fed_by": present[0]})
+                else:
+                    print(f"  ALARM {label:46s} CONSUMED, {outer}[{inner!r}] has none of {keys}")
+                    alarms.append(label)
+                    report_rows.append({"container": container, "target": f"{outer}.{inner}",
+                                        "field": keys[0], "keys_accepted": keys,
+                                        "status": "ALARM", "fed_by": None})
             continue
         if target not in field_names:
             print(f"  FAIL  {container:22s} -> '{target}' is not a SoccerMatchFeatures field")
@@ -218,6 +341,17 @@ def main() -> int:
                 print(f"  ok    {label:46s} fed by {present[0]!r}")
                 report_rows.append({"container": container, "target": target, "field": keys[0],
                                     "keys_accepted": keys, "status": "ok", "fed_by": present[0]})
+            elif label in DISABLED:
+                # Consumed, unpopulated, and MEANT to be. Printed so it stays
+                # visible, but kept out of `alarms` so the alarm list only ever
+                # holds things nobody has decided about.
+                print(f"  off   {label:46s} DELIBERATE -- {DISABLED[label][:72]}...")
+                disabled_rows.append({"container": container, "target": target, "field": keys[0],
+                                      "keys_accepted": keys, "status": "disabled",
+                                      "reason": DISABLED[label]})
+                report_rows.append({"container": container, "target": target, "field": keys[0],
+                                    "keys_accepted": keys, "status": "disabled",
+                                    "fed_by": None, "reason": DISABLED[label]})
             else:
                 print(f"  ALARM {label:46s} CONSUMED, container '{target}' has none of {keys}")
                 alarms.append(label)
@@ -228,6 +362,7 @@ def main() -> int:
     print(f"containers on SoccerMatchFeatures : {len(field_names)}")
     print(f"engine read sites                 : {sum(len(v) for v in consumed.values())}")
     print(f"CONSUMED + UNPOPULATED            : {len(alarms)}")
+    print(f"unpopulated BY DECISION (disabled): {len(disabled_rows)}")
     if dead:
         print(f"populated but unread (dead)       : {len(dead)}")
     print()
@@ -266,6 +401,9 @@ def main() -> int:
             "containers": len(field_names),
             "read_sites": sum(len(v) for v in consumed.values()),
             "alarms": alarms,
+            # Separate key, like MLB's report. A consumer counting `alarms` must
+            # not have to know which entries were decisions.
+            "disabled": disabled_rows,
             "rows": report_rows,
         }, indent=2), encoding="utf-8")
         print("")
@@ -274,6 +412,14 @@ def main() -> int:
         print("  artifacts endpoint gates on HOT_ARTIFACT_PATTERNS and the per-match")
         print("  feature payloads this gate measures are deliberately not on it.")
 
+    if alarms and args.warn_only:
+        # The PRODUCTION path. Reported loudly, exit 0 -- see --warn-only's help.
+        # Printed rather than silent so the refresh log distinguishes "ran and
+        # found alarms" from "ran clean"; with a bare exit 0 those two are the
+        # same line of output, which is the ambiguity this gate exists to remove.
+        print(f"WARN_ONLY: {len(alarms)} alarm(s) reported, exiting 0 so the refresh step "
+              f"is not marked failed. The published report is the instrument.")
+        return 0
     return 1 if alarms else 0
 
 

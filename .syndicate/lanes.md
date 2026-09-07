@@ -2319,6 +2319,43 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   YAML parses, and the step count drops by exactly one with its neighbours intact.
 - Blocked by: none.
 
+### soccer-unfed-inputs — OPEN — opened 2026-09-07 — session 520cd594
+- Goal: soccer's input gate RUNS in production and its alarm list means something —
+  a published `soccer_source/.../sim_input_report_*.json` where the 4 DELIBERATE
+  non-populations sit in a `disabled` category with reasons, `spread`/`total` are
+  mapped instead of reported as unmapped, and `market_features` is fed so
+  `_market_prior_index` stops returning a constant. Market feed ships only behind a
+  backtest.
+- Files: `scripts/soccer_sim_input_checklist.py`, `scripts/build_soccer_artifacts.py`,
+  `scripts/refresh_odds_sources.py` (soccer steps only),
+  `tests/test_soccer_sim_input_checklist.py` (new).
+- Findings so far (2026-09-07, re-derived — NOT taken from the earlier session's
+  "9 unfed" claim, which was true as a count and misleading as a defect list):
+  **9 CONSUMED+UNPOPULATED, of which only 3 are defects.** DELIBERATE, do NOT
+  wire: `goals_per_match` + `goals_against_per_match` (goals are the xG stand-in;
+  feeding both double-weights 0.22 -> 0.36, measured `total_mean` 3.16 -> 3.39) and
+  `defensive_metrics.ppda` + `possession_metrics.ppda` (source carries no ppda;
+  `compute_team_ratings` emits 0.0 and 0.0 reads as MAXIMAL press, so it is dropped
+  rather than fabricated). NO SOURCE: `big_chances_per_match`,
+  `pace_seconds_per_event` — football-data CSVs carry goals/shots/corners/fouls/
+  cards/odds and nothing else. REAL: `model_probability`, `spread`, `total`, all
+  from `market_features`, which `build_soccer_artifacts.py` never sets (0
+  occurrences), so `_market_prior_index` is pinned at 0.5 and contributes a
+  constant. It IS reachable — `possession_priors.py:347`, weight **0.02** into
+  `shot_generation_probability` — so the term varies over [0, 0.02], small but not
+  nil.
+- NOT the anchor. `market_anchoring.solve_market_rating_shift` is a DIFFERENT
+  mechanism and stays OFF BY DECISION (`state_soccer.md [soccer-market-anchor]`,
+  weight 0.0). Nothing in this lane touches it. `learnings.md` has no FORBIDDEN
+  rule covering `market_features`; the `soccer-anchor-*` rules are about
+  measurement method, cost and deploy mechanics.
+- User override logged 2026-09-07: asked whether to feed the 3 market inputs given
+  the anchor decision, answered "Feed them too", with a backtest before it ships.
+- Verification: production publishes a soccer `sim_input_report` (there are 20 MLB
+  and ZERO soccer today); its `failures` list holds only genuinely-unfed fields;
+  and an A/B artifact build shows `_market_prior_index` moving off 0.5.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
