@@ -1523,7 +1523,43 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
             # negated. Falling back to the two-way identity here is how the bug
             # above would survive its own fix.
             return None
-        direct = (model_prob - fair_prob) * 100.0
+        # THE PRECISION GATE. This subtraction used to be published as-is, and
+        # it was the last path on the platform where a raw Monte-Carlo certainty
+        # could reach a board edge.
+        #
+        # THE DRAW LEG IS THE EXPOSED ONE, for a structural reason rather than a
+        # statistical accident: a draw is a NARROW outcome, so once a second
+        # goal separates the sides `draws / n` genuinely reaches zero. `0/400`
+        # is ordinary late in a match here, where in baseball or football it is
+        # a tail case. And `probability_refusal.refuse_published_certainty` --
+        # the one guard that would catch it -- reads `model_prob_over` and
+        # NOTHING ELSE, so it covers the home leg and is blind to these two.
+        #
+        # `79149c94` fixed the ESTIMATOR half platform-wide and this path was
+        # missed for exactly the reason it is being fixed here: it never went
+        # through the shared pricer, so neither the estimator nor the interval
+        # reached it.
+        #
+        # `price_moneyline` is CALLED, not reimplemented -- the same rule the
+        # home leg now follows in `soccer_projections._price_against_market`.
+        # It also owns the ordering trap: `prob_std_err` reconstructs
+        # `successes = p * n`, so the SE must come off the RAW `p` before
+        # add-two touches the centre, or the bar over-widens ~39% at the
+        # boundary and silently withholds real edges.
+        #
+        # A REFUSAL RETURNS None, which is what this function already does for
+        # everything else it declines: the row falls back to EV alone, which
+        # cannot pick a side but also cannot invert one.
+        from syndicate.features.shared.live_gameline_join import price_moneyline
+
+        verdict = price_moneyline(
+            model_prob=model_prob,
+            market_prob=fair_prob,
+            sims=projection.get("sims_run"),
+        )
+        if not verdict.get("priceable"):
+            return None
+        direct = float(verdict["edge_pp"])
         if abs(direct) > _MODEL_EDGE_MAX_POINTS:
             return None
         return round(direct, 4)
