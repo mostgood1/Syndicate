@@ -2102,3 +2102,86 @@ test got wrong are kept as comments: the grid row had no `age_seconds`, so the
 staleness gate — which sits ABOVE the market branch, so a newly registered sport
 cannot route around it — refused every case before any model reached it, and the
 refusal tests "passed" for a reason unrelated to the re-sim.
+
+**SECOND LIVE-SLATE READING — THE RECORD PATH IS REPRODUCIBLE: 59 of 64 LIVE
+TICKS, 92.2%. THE 20.6% FALLBACK PREDICTION IS REJECTED** `[2026-09-06 20:08:19Z
+-- 2026-09-07 00:16:44Z, refresh-worker, WSU @ WASH / WIS @ ND / LOU @ MISS,
+lane ncaaf-live-resim-wire]`. The first reading proved the path CAN serve; it was
+one tick and it came from a favourable draw. This is the whole live-slate period,
+every tick, and it answers the reproducibility question.
+
+**A CENSUS, NOT A SAMPLE.** Every `NCAAF_LIVE_RESIM` tick with `in_progress > 0`
+from the slate's first live tick to the time of writing -- n=64, no window
+chosen after the fact.
+
+| | ticks | share |
+|---|---|---|
+| served from the worker record (`record_dates >= 1`) | **59** | **92.2%** |
+| fell back to an ESPN fetch | 5 | 7.8%  (Wilson 95% [3.4%, 17.0%]) |
+| refusal reason, all five | `record_stale` | -- |
+| **live ticks that lost coverage (`live_resimmed == 0`)** | **0** | **0%** |
+
+**THE STANDING 20.6% PREDICTION IS REJECTED, AND THE REASON IS ITS INPUT, NOT ITS
+FORM.** At p=0.206 the expected count is 13.2; 5 were observed,
+`P(X <= 5 | n=64, p=0.206) = 0.0049`. The estimator
+`E[max(0, gap-400)] / E[gap]` was fed a **514 s** median measured OFF-slate.
+Reconstructing the producer's writes from the consumer's own `age_seconds`
+(55 distinct writes, 20:06:57Z -- 00:11:07Z) gives a live-slate cadence of
+**median 244 s, mean 271 s, max 534 s** -- and that gap distribution puts the
+same estimator at **5.9%**, against 7.8% observed. **The formula was right; the
+cadence it was fed was from a quieter hour.** The producer writes roughly twice
+as often when a slate is actually live, so the fallback rate is ~4x lower than
+predicted. Do not carry the 20.6% forward.
+
+**CAVEAT ON THAT CADENCE, STATED BECAUSE IT CUTS ONE WAY.** The write times are
+reconstructed from integer `age_seconds` on the CONSUMER side, so a write nobody
+read is invisible. Under-sampling can only MISS writes and INFLATE gaps -- 244 s
+is an **upper bound** on the median, which strengthens the conclusion rather
+than weakening it.
+
+**THE TWO-DATE PREDICTION MADE ABOVE IS CONFIRMED, ON THIS SLATE.** Split by how
+many dates the tick's ESPN index carried -- the all-or-nothing-per-date rule
+means EITHER date going stale forces the fetch:
+
+| dates in motion | fallback | rate | Wilson 95% |
+|---|---|---|---|
+| 1 | 2/55 | **3.6%** | [1.0%, 12.3%] |
+| 2 (after the 00:05Z UTC rollover) | 3/9 | **33.3%** | [12.1%, 64.6%] |
+
+A ~9x difference. The earlier claim -- *"on a real Saturday with games spanning
+two ET dates, two are moving and the fallback roughly doubles"* -- understated
+it if anything. **The consolidation IS weakest when the board needs it most**,
+and the mechanism is now measured rather than argued. n=9 on the two-date arm:
+directional, not a rate to quote.
+
+**COVERAGE NEVER DEPENDED ON WINNING THE RACE.** All 64 live ticks re-simmed
+every in-progress game. A `record_stale` refusal costs an ESPN fetch and ~8 s of
+tick time; it costs **no game**. Fallback rate is a cost metric here, not a
+correctness one -- which is the gate working as designed.
+
+**BOARD, SAME INSTANT** `[/api/board/book-grid?sport=ncaaf, 00:06:41Z]`:
+`index_size 2`, `sources_seen {live_resim: 2, pregame: 49}`,
+`accepted_sources ["live_resim"]`, `rows_live_gameline_edged 0` (expected --
+NCAAF h2h carries no `market_fair_prob_over`; withheld 64, top reasons
+`live_resim_published_no_distribution_for_this_market 21`,
+`segment_is_not_full_game 22`, `quote_older_than_live_pricing_ceiling 19`).
+
+**THE RESUME IDENTITY HOLDS, AND THE NUMBER MOVES.** WIS @ ND at 0-0, Q1 6:35:
+live `home_win_prob 0.983333` against the pregame `model_prob_over 0.9833` --
+equal to 4dp, which is the resume identity, not a stuck value. Wisconsin then
+kicked a field goal and the next snapshot read **0.975** (ND down 0.83pp,
+correct direction). LOU @ MISS moved 0.6917 -> 0.650 across two snapshots.
+
+**BUT 120 SIMS CANNOT RESOLVE AN EARLY 3-POINT SWING.** `prob_std_err` is
+**0.0417** for LOU @ MISS (`std_err_basis: sim_count`, n=120). The observed
+score effect is the same size as the noise, so an early live number is directionally
+readable and NOT worth pricing to the point. Separately, model-vs-market is wide
+(ND live 0.983 vs de-vigged consensus **0.862**) -- that is the KNOWN margin-model
+deficit the row already declares (`model_skill.verdict`, 15.775 vs 12.212 MAE,
+t=17.2), not a live-path fault, and the board withholds the projection for it.
+
+**ONE ANOMALY, LOGGED UNDIAGNOSED:** at 00:13:06Z the board served `as_of
+00:07:02Z` after having served `as_of 00:09:51Z` at 00:11:35Z -- a **backwards
+`as_of`**. Six back-to-back reads at 00:16:1xZ all agreed on one snapshot, so it
+is not a stable two-instance split. Single observation, cause unknown, not
+chased. Worth a second look if a live probability is ever seen to un-move.
