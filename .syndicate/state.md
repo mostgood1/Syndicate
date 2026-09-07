@@ -1326,3 +1326,45 @@ self-mirror half alone**. Consistent with the fix; not proof of it.
   C-extension buffers. `#632`'s earlier heap census put Python objects at 28.3%
   of anon, which is the right order of magnitude — that census should be re-read
   against THIS denominator rather than repeated.
+
+### `[web-oom-leak]` UPDATE 26 — **THE NON-MALLOC ANON IS PYMALLOC (162-165 MB/worker) AND IT IS A CONSTANT, NOT A LEAK. Growth is INTERMITTENT.**, 2026-09-07T00:0xZ `[session b2b5b45b]`
+
+* **THE PARTITION CLOSES.** `anon = glibc_malloc + pymalloc_arenas +
+  so_private_dirty + main_thread_stack`. **50 of 50** mature readings and 49 of 50
+  ramp readings scored `explained`, residuals `-0.8` to `-8.2 MB` on a 105-583 MB
+  process, and `smaps`'s own total agrees with `smaps_rollup` to `0.0 MB`. This is
+  a complete account of a web worker's anonymous memory, not a best guess.
+* **THE `205 MB` HOLE FROM `UPDATE 25` IS NAMED: CPython's pymalloc arenas,
+  162-165 MB per worker.** CPython `mmap`s them, so glibc never allocated them
+  and `mallinfo2` was structurally incapable of seeing them. The other two
+  non-`malloc` terms are real and negligible: `.so` private-dirty **exactly
+  `4.4 MB`** and the main stack `0.1 MB`, both unmoved across 66 minutes.
+* **AND IT IS A CONSTANT.** Over 31 mature minutes `pymalloc_arenas` did not move
+  ONE megabyte on either worker — `162.0 -> 162.0`, `165.0 -> 165.0`. **I had
+  written that pymalloc "becomes the growth driver" once the arena plateaus; that
+  was speculation stated as a finding and the measurement refutes it.** In the
+  ramp it takes 7.5-14.2% of growth; at maturity, 0.0%.
+* **THE MATURE WINDOW DID NOT REPRODUCE THE GROWTH.** Anon moved `-5.8` and
+  `+15.3 MB` in 31 min, against `UPDATE 23`'s `+42.4`/`+26.9` over the same span.
+  On pid 98 the little growth there was went **98.7% to glibc**. So the episode
+  UPDATE 23 caught is NOT attributed by this window — it did not occur during it.
+  **Growth on web is INTERMITTENT**, and one stable window is not evidence it
+  stopped (`[feedback_absence_in_a_window_is_not_absence]`).
+* **WHAT THIS CHANGES ABOUT `#632`.** The steady-state composition is now fully
+  known and contains no mystery: ~400 MB glibc arena (of which only ~52 MB is
+  live data — 87% free chunks retained), ~165 MB pymalloc, ~4.5 MB everything
+  else. Nothing is unaccounted for. **The OOM question is therefore no longer
+  "what is the memory" but "what causes the intermittent growth episodes", and
+  the single largest standing cost is the ~340 MB/worker of free-but-retained
+  arena that `malloc_trim` addresses** — `scripts/malloc_trim_ab.py`, still owed.
+* **INSTRUMENT COST, measured not assumed:** partition median `47-96 ms`, **max
+  `1,700.6 ms`** — `/proc/self/smaps` is O(regions) and the throttle bounds
+  frequency, not duration. `SYNDICATE_ANON_PARTITION` is back **OFF** (deployed
+  `cc598278`). `SYNDICATE_MALLOC_ARENA_DETAIL` stays ON at `0.9-1.0 ms` median.
+* **A CALIBRATION BUG OF MY OWN, caught in production within minutes.** The
+  partition shipped with ONE tolerance serving two questions and false-tripped
+  `terms_overlap` at residual `-4.3 MB` on a `209 MB` process. The overlap bar is
+  now set against the FAULT it exists to catch — a whole pymalloc term double
+  counted, ~100 MB — not against zero: 5%/8 MB, an order of magnitude above the
+  slack and below the fault. The read-agreement check keeps the tight 2%/2 MB bar
+  because it compares two reads of the SAME quantity.

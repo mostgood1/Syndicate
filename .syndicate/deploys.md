@@ -25521,3 +25521,50 @@ brief's "`_alt` cannot match a main-line contract by design" premise is wrong
 about the deployed code. That is true, and their entry already establishes the
 same fact with the stronger attribution (`21aac548`'s collapse). Mine is a
 restatement, not a finding.
+
+## 2026-09-06 22:52:56Z — web `ad218a3e`, then `2211d59b` 22:58Z — **THE NON-MALLOC ANON IS CPYTHON'S PYMALLOC ARENAS, AND AT MATURITY IT IS A CONSTANT.** `[lane web-oom-non-malloc-anon]`
+
+**what:** deployed the anon PARTITION instrument (`SYNDICATE_ANON_PARTITION=1`,
+single-key PUT, no `blueprint_sync`), then redeployed `2211d59b` to recalibrate an
+overlap bar that false-tripped in production. Claim held by
+`web-oom-non-malloc-anon` across all of it; preflight CLEAR each time.
+
+**verify:** the partition CLOSES. Across the mature window **50 of 50 readings**
+scored `explained`, and across the ramp window 49 of 50, with residuals of
+`-0.8` to `-8.2 MB` against a 105-583 MB process. `smaps`'s own total agrees with
+`smaps_rollup` to `0.0 MB` — two independent kernel reads of one quantity.
+
+**THE ANSWER:** `anon = glibc_malloc + pymalloc_arenas + so_private_dirty +
+main_thread_stack`, and the non-`malloc` part is **CPython's pymalloc arenas,
+162-165 MB per worker.** CPython `mmap`s them, so glibc never allocated them and
+no allocator metric in this investigation could see them. The other two
+non-`malloc` terms are real but tiny and DEAD FLAT: `.so` private-dirty pinned at
+exactly `4.4 MB` and the main stack at `0.1 MB`, unmoved across 66 minutes.
+
+**RAMP window (35 min from boot), both workers:**
+
+        pid 97  n=24  anon +387.6   glibc +328.8 (84.8%)   pymalloc +55.0 (14.2%)
+        pid 98  n=25  anon +292.5   glibc +271.7 (92.9%)   pymalloc +22.0 ( 7.5%)
+
+**MATURE window (31 min, glibc already at its ceiling), both workers:**
+
+        pid 97  n=26  anon   -5.8   glibc   -5.8   pymalloc +0.0   -- NOT a result
+        pid 98  n=24  anon  +15.3   glibc  +15.1 (98.7%)  pymalloc +0.0
+
+**`pymalloc_arenas` did not move ONE megabyte in 31 minutes on either worker**
+(`162.0 -> 162.0`, `165.0 -> 165.0`). It is a large CONSTANT, not a leak.
+
+**AND THE MATURE WINDOW DID NOT REPRODUCE THE GROWTH IT WENT LOOKING FOR.** Anon
+moved `-5.8` and `+15.3 MB` in 31 minutes, against `UPDATE 23`'s `+42.4`/`+26.9`
+over the same span. So this window cannot attribute that episode — it did not
+happen during it. Growth is INTERMITTENT, and one stable window is not evidence
+that it stopped (`[feedback_absence_in_a_window_is_not_absence]`).
+
+**COST, and it is why the flag is now OFF:** median `47-96 ms`, and one call on
+pid 98 took **1,700.6 ms**. `/proc/self/smaps` is O(regions) and that is a
+1.7-second stall on a worker serving requests; the 45 s throttle bounds the
+FREQUENCY, not the duration. `SYNDICATE_ANON_PARTITION=0` and deployed
+`cc598278`. `SYNDICATE_MALLOC_ARENA_DETAIL` stays ON — median `0.9-1.0 ms`.
+
+**glibc's ceiling confirmed a fourth and fifth time:** `418.0` and `400.5 MB` at
+the end of the ramp, oscillating `400-420` through the whole mature window.
