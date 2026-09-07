@@ -98,6 +98,7 @@ death, never life — do not invert it.
 - Blocked by: the trigger. Needs a boot hook in a file another lane holds.
 
 ### nfl-rating-units — OPEN — opened 2026-09-06 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — **NFL's sim cannot tell teams apart: across-game margin spread 2.16 pts against NCAAF's 15.37**
+- **CROSS-LANE WRITE, DECLARED** `[2026-09-06]`: `scripts/generate_smartsim2_nfl_projections.py` was also edited from lane `ncaaf-live-resim-wire` (SAME session, 520cd594) to wire `feature_generation_payload` -- `football_sim_input_checklist` had it as an UNWIRED PAYLOAD alarm, so every drive-prior block was neutral on every NFL game. `lane-postwrite-check` flagged it correctly; it sees files, not authors. Landed INERT behind `SYNDICATE_NFL_DRIVE_PRIORS` (default off) for the same reason the PPG ratings did: this engine already loses to the close at t=3.34, and adding a mechanism to a calibrated engine needs a re-fit first. The checklist alarm for this script is CLEARED; the preseason and NCAAF scripts still carry theirs.
 - Goal: establish whether NFL's smartsim2 projections are undifferentiated because
   the ratings are a PER-PLAY rate rather than points-per-game, and if so state the
   size of the effect. ONE testable outcome: the across-game stdev of

@@ -416,6 +416,150 @@ def _rating_pair(
     return ((off - off_mean) / NFL_RATING_SCALE, -((dfn - def_mean) / NFL_RATING_SCALE))
 
 
+def _drive_priors_enabled() -> bool:
+    """OFF by default. `SYNDICATE_NFL_DRIVE_PRIORS=1` turns it on.
+
+    WHY A FLAG RATHER THAN JUST WIRING IT. `model_engine_standard.md`: adding a
+    MECHANISM to a calibrated engine requires re-fitting the rates that were
+    absorbing it, and measured here, two mechanisms together produced a NEGATIVE
+    interaction in 4 of 4 markets. Every drive-prior block has been at its
+    neutral default on every NFL game this script has ever projected, so the
+    calibration profile was fitted with them inert -- switching them on changes
+    every projection at once, on a live sport, unmeasured.
+
+    And this engine is ALREADY measured to lose: walk-forward on 816 games
+    (train 2023-24, test 2025), test MAE 10.495 against the closing line's 9.722,
+    **t = +3.34**, model closer on 118/272 (43.4%). A change that moves every
+    number on a model in that state has to be scored before it is trusted, not
+    after.
+
+    So this lands INERT and reachable, exactly as `SYNDICATE_NFL_PPG_RATINGS`
+    did. The wiring defect is fixed; enabling it is a separate, evidenced call.
+    """
+    raw = str(os.environ.get("SYNDICATE_NFL_DRIVE_PRIORS") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _offense_feature_block(
+    plays: list[tuple[int, str, str, str, float]], *, team: str, before_week: int | None
+) -> dict[str, float]:
+    """`offensive_epa`, `success_rate` and `pass_rate` for one team's OFFENSE.
+
+    KEY NAMES ARE NOT FREE CHOICES. `drive_priors._offense_strength` reads
+    `["offensive_epa", "epa_play", "home_offensive_epa", "away_offensive_epa",
+    "epa"]` for the first, `["success_rate", ...]` for the second and
+    `["pass_rate_over_expectation", "proe", "home_pass_rate", "away_pass_rate"]`
+    for the third, taking the FIRST that exists. A block with the right numbers
+    under the wrong names is the same silent no-op as no block at all -- which is
+    the defect being fixed, reintroduced one layer down.
+
+    SUCCESS RATE IS `epa > 0`, the standard definition, and it is derivable from
+    what `load_pbp_plays` already yields. Nothing here adds I/O: the loader
+    returns (week, posteam, defteam, play_type, epa) and reads 5 of the pbp
+    file's 300+ columns, so every metric below comes from tuples already in
+    memory. Pace, red-zone and explosive-play rates are NOT here for exactly that
+    reason -- they would need new columns, and inventing them from what is loaded
+    would be worse than leaving the engine on its documented neutral default.
+    """
+    rows = [
+        (w, pt, epa)
+        for (w, po, _de, pt, epa) in plays
+        if po == team and (before_week is None or w < before_week)
+    ]
+    if not rows:
+        return {}
+    n = float(len(rows))
+    return {
+        "offensive_epa": round(sum(r[2] for r in rows) / n, 6),
+        "success_rate": round(sum(1 for r in rows if r[2] > 0.0) / n, 6),
+        "pass_rate": round(sum(1 for r in rows if r[1] == "pass") / n, 6),
+    }
+
+
+def _defense_feature_block(
+    plays: list[tuple[int, str, str, str, float]], *, team: str, before_week: int | None
+) -> dict[str, float]:
+    """The same three, from the DEFENCE's side of the ball.
+
+    SIGN CONVENTION, stated because getting it backwards is silent. `epa` in the
+    pbp is always from the OFFENSE's perspective, so EPA allowed is NEGATED here
+    to make "higher is better" hold for a defence, matching `_rating_pair`'s
+    treatment of the same quantity. `drive_priors._defense_strength` reads
+    `defensive_epa`, and a defence whose sign is inverted reads as elite when it
+    is poor -- the shape that produced 19-28 point phantom edges on the spread
+    frame in 2026-08.
+    """
+    rows = [
+        (w, pt, epa)
+        for (w, _po, de, pt, epa) in plays
+        if de == team and (before_week is None or w < before_week)
+    ]
+    if not rows:
+        return {}
+    n = float(len(rows))
+    return {
+        "defensive_epa": round(-sum(r[2] for r in rows) / n, 6),
+        "success_rate_allowed": round(sum(1 for r in rows if r[2] > 0.0) / n, 6),
+    }
+
+
+def build_feature_generation_payload(
+    *,
+    home_team: str,
+    away_team: str,
+    week: int | None,
+    current_plays: list[tuple[int, str, str, str, float]],
+    prior_plays: list[tuple[int, str, str, str, float]] | None = None,
+) -> dict[str, object]:
+    """The payload `drive_priors.build_drive_priors` has never been given.
+
+    HOME-FRAMED, DELIBERATELY, because the consumer is. `build_drive_priors`
+    produces ONE profile per game and its own fallback is
+    `0.5 + source.home_offense_rating` -- home-framed. Publishing an away-framed
+    `offensive_epa` would silently swap which team the drive priors describe. The
+    `home_*` / `away_*` variants are published ALONGSIDE so a future per-team
+    consumer has both, but the bare keys stay home-framed to match the fallback
+    this replaces.
+
+    LEAKAGE: `before_week=week` everywhere, so a projection for week W uses only
+    weeks < W, the same contract `team_rating` already keeps. Falls back to the
+    prior season when the current one has nothing yet.
+    """
+    def _blocks(team: str) -> tuple[dict[str, float], dict[str, float]]:
+        off = _offense_feature_block(current_plays, team=team, before_week=week)
+        dfn = _defense_feature_block(current_plays, team=team, before_week=week)
+        if not off and prior_plays:
+            off = _offense_feature_block(prior_plays, team=team, before_week=None)
+        if not dfn and prior_plays:
+            dfn = _defense_feature_block(prior_plays, team=team, before_week=None)
+        return off, dfn
+
+    home_off, home_def = _blocks(pbp_team_code(home_team))
+    away_off, away_def = _blocks(pbp_team_code(away_team))
+    if not home_off and not away_off and not home_def and not away_def:
+        # NOTHING MEASURED IS NOT A NEUTRAL PAYLOAD. Returning {} keeps the
+        # engine on the documented default rather than handing it a block of
+        # zeros, which would read as "measured, and average".
+        return {}
+
+    offensive_metrics: dict[str, float] = {}
+    offensive_metrics.update({f"home_{k}": v for k, v in home_off.items()})
+    offensive_metrics.update({f"away_{k}": v for k, v in away_off.items()})
+    offensive_metrics.update(home_off)          # bare keys = HOME frame
+
+    defensive_metrics: dict[str, float] = {}
+    defensive_metrics.update({f"home_{k}": v for k, v in home_def.items()})
+    defensive_metrics.update({f"away_{k}": v for k, v in away_def.items()})
+    defensive_metrics.update(home_def)
+
+    payload: dict[str, object] = {}
+    if offensive_metrics:
+        payload["offensive_metrics"] = offensive_metrics
+    if defensive_metrics:
+        payload["defensive_metrics"] = defensive_metrics
+    return payload
+
+
 def team_rating(
     team: str,
     *,
@@ -570,10 +714,25 @@ def build_projection(
             for note in notes:
                 injury_diagnostics.append({"game_id": game_id, "team": team_name, **note})
 
+    # BUILT ONCE PER GAME, NOT PER SEED. It does not vary with the seed, and
+    # rebuilding it inside the loop would scan every play 300 times per game.
+    feature_payload = (
+        build_feature_generation_payload(
+            home_team=home_team,
+            away_team=away_team,
+            week=week,
+            current_plays=current_plays,
+            prior_plays=prior_plays,
+        )
+        if _drive_priors_enabled()
+        else {}
+    )
+
     home_scores: list[int] = []
     away_scores: list[int] = []
     for seed in range(1, seeds + 1):
         sim_input = SmartSim2SimulationInput(
+            feature_generation_payload=feature_payload,
             home_team=home_team,
             away_team=away_team,
             seed=seed,
