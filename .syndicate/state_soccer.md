@@ -1069,3 +1069,13 @@ LIVE sim count plumbed first — `live_projection_join.py:633` overwrites
 `side_probabilities` ({home, draw, away}) and NOTHING reads it but its own test.
 `attach_live_gamelines` prices `hit["home_win_prob"]` only and skips
 `h2h_3_way` at the market filter entirely.
+
+**END-TO-END DISCHARGED 2026-09-07 10:42-10:54 CDT.** Six draw/away rows on the
+SERVED shortlist carry a model edge on fixtures whose HOME leg the gate withheld
+— Lazio@Udinese away +6.32, Lincoln@Preston away -7.41, CeltaVigo@Getafe away
++10.19, Charlotte@Montreal draw +4.85, PSG@Brest draw +6.43, Juventus@Sassuolo
+draw +5.87. THREE ARE DRAW ROWS, retiring the "draw leg verified only by unit
+test" caveat. `suspect = 0` across 29 candidate rows: every served null was
+re-priced against its own bar and refused correctly. Agresti-Coull confirmed in
+the served data — `p` reconstructs to `(k+2)/404` exactly on all six.
+`sims_run: 400` and `point_estimator: "agresti_coull"` on every projection.
