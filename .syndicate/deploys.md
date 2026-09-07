@@ -26232,6 +26232,28 @@ would be un-archived by a naive commit, which is exactly what the guard is for.
 (1 ahead / 281 behind) and rebasing a shared primary tree is not this task's
 to do.
 
+#### CORRECTION to the entry above — the Juventus home-leg edge is 2.30 pp, not 2.0 pp `[2026-09-07, lane soccer-threeway-precision-gate]`
+
+The entry reads: *"home model 0.1975 vs fair 0.1775 is 2.0 pp against a 3.98 pp
+bar"*. **2.0 pp is the RAW `k/n` edge. The gate does not price that number.**
+
+    raw            (0.1975      - 0.1775) * 100 = 2.00 pp
+    Agresti-Coull  ((79+2)/404  - 0.1775) * 100 = 2.30 pp   <- what the gate prices
+    2-sigma bar at p=0.1975, n=400                 3.98 pp   (as stated, correct)
+
+THE VERDICT IS UNCHANGED — 2.30 < 3.98, so the leg is still correctly refused,
+and every other figure in that entry recomputes exactly (Lazio away
+`(k+2)/404 = 0.405941`, the bar itself, all six closers).
+
+IT IS WORTH CORRECTING ANYWAY, because that entry's own subject is
+smoothed-versus-raw. A raw figure quoted inside the argument for publishing the
+smoothed one is the wrong number in the right place, and the next reader
+checking the gate's behaviour against it would recompute 2.30 and think the
+ledger disagreed with the code.
+
+Appended rather than edited: this file is append-only, and a measurement that is
+silently rewritten cannot be audited. The original line stands above.
+
 ## 2026-09-07 16:0xZ and 16:5xZ — web `24e0c0ff` (FAT) then `5eaade77` (SLIM) — **THE RING CUT LOWERS THE PYMALLOC ARENA BY 38 MB PER WORKER. Ranges separated.** `[lane web-oom-ring-arena-ab]`
 
 **what:** A/B on the diagnostic-ring cut (`fd352a3b`), both arms toggled by
