@@ -21,9 +21,19 @@
     unrelated session sweeps them into its commit. Applying an upstream change
     stays a human act -- run `scripts/sync_vendor_upstream.py --apply` yourself.
 
-    It also records how far behind `origin/main` this checkout is. The primary
-    tree is routinely behind, and a sync reading a stale tree can classify an
-    already-resolved file as UNCLASSIFIED. A labelled reading beats a wrong one.
+    IT DOES NOT READ THE PRIMARY CHECKOUT'S CONTENT. It reports on `origin/main`,
+    via a small reusable sparse worktree holding only `scripts/` and `vendor/`.
+
+    That is not tidiness, it is the first thing that broke. The first registered
+    run failed outright: the primary checkout is **241 commits behind
+    origin/main** and does not contain `scripts/sync_vendor_upstream.py` at all,
+    because that script landed today. A daily job pinned to a shared working tree
+    inherits whatever state that tree happens to be in -- which here is months of
+    drift plus other sessions' uncommitted work. `origin/main` is the thing worth
+    reporting on anyway: it is what a sync would be applied to.
+
+    The primary checkout's own lag is still recorded, as `primary_behind_origin_main`,
+    because it is worth knowing and costs one command.
 
 .PARAMETER RepoRoot
     Checkout to report on. Defaults to this script's own repository.
@@ -88,18 +98,82 @@ if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Forc
 
 $started = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
-# How stale is this checkout? Recorded, not corrected -- fetching is cheap, but
-# moving someone else's shared working tree is not this job's business.
-$behind = $null
-try {
-    & git -C $RepoRoot fetch --quiet origin main 2>$null
-    $behind = (& git -C $RepoRoot rev-list --count "HEAD..origin/main" 2>$null | Select-Object -First 1)
-} catch { $behind = $null }
+# Run a native command and judge it by its EXIT CODE, never by whether it wrote
+# to stderr.
+#
+# This is not defensive style, it is the second thing that broke here. Windows
+# PowerShell 5.1 wraps each stderr line from a native exe in an ErrorRecord when
+# that stream is redirected, so with `$ErrorActionPreference = 'Stop'` git's
+# ordinary chatter throws. The first attempt recorded
+# `error: "Preparing worktree (detached HEAD aa0349aa)"` -- git's own progress
+# message, on a command that had SUCCEEDED -- and reported the run as failed.
+function Invoke-Native {
+    # NOT `$Args`: that is a PowerShell AUTOMATIC variable holding a function's
+    # unbound arguments, and a parameter of that name does not bind reliably --
+    # the failure looked like `git  -> exit 1`, git invoked with no arguments.
+    param([string] $Exe, [string[]] $Arguments, [switch] $Capture)
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        if ($Capture) { $out = & $Exe @Arguments } else { & $Exe @Arguments | Out-Null; $out = $null }
+        if ($LASTEXITCODE -ne 0) { throw ("{0} {1} -> exit {2}" -f $Exe, ($Arguments -join " "), $LASTEXITCODE) }
+        return $out
+    } finally { $ErrorActionPreference = $prev }
+}
 
+$behind = $null
+$syncedRef = $null
 $syncJson = $null
 $syncError = $null
+
 try {
-    $raw = & py -3 (Join-Path $RepoRoot "scripts\sync_vendor_upstream.py") --json 2>$null
+    Invoke-Native git @("-C", $RepoRoot, "fetch", "--quiet", "origin", "main")
+
+    # Informational only. Never corrected here: moving somebody else's shared
+    # working tree is not this job's business.
+    $behind = (Invoke-Native git @("-C", $RepoRoot, "rev-list", "--count", "HEAD..origin/main") -Capture | Select-Object -First 1)
+    $syncedRef = (Invoke-Native git @("-C", $RepoRoot, "rev-parse", "--short", "origin/main") -Capture | Select-Object -First 1)
+
+    # A small reusable worktree at origin/main, holding only what the sync reads.
+    # Created once, re-pointed each run. Sparse because a full worktree of this
+    # repo is 37k files and `data/` alone is 34k of them.
+    $wt = Join-Path $env:LOCALAPPDATA "syndicate\vendor-sync-worktree"
+    if (-not (Test-Path (Join-Path $wt ".git"))) {
+        if (Test-Path $wt) { Remove-Item -Recurse -Force $wt }
+        New-Item -ItemType Directory -Path (Split-Path -Parent $wt) -Force | Out-Null
+        Invoke-Native git @("-C", $RepoRoot, "worktree", "add", "--detach", "--no-checkout", $wt, "origin/main")
+    }
+
+    # CHECK THE POSTCONDITION, do not infer it from "the directory exists".
+    # A run that dies between `worktree add` and `sparse-checkout set` leaves a
+    # worktree that is real but NOT sparse, and an existence check calls that
+    # done -- after which every checkout materialises the whole repo. That
+    # happened: the first attempt threw on git's stderr (see Invoke-Native), and
+    # the leftover worktree grew to 3.9 GB, `data/` and all, on a job whose input
+    # is two directories.
+    $isSparse = $false
+    try {
+        $prev = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+        & git -C $wt sparse-checkout list 2>&1 | Out-Null
+        $isSparse = ($LASTEXITCODE -eq 0)
+        $ErrorActionPreference = $prev
+    } catch { $isSparse = $false }
+    if (-not $isSparse) {
+        Invoke-Native git @("-C", $wt, "sparse-checkout", "set", "scripts", "vendor")
+    }
+
+    Invoke-Native git @("-C", $wt, "checkout", "--detach", "--force", "origin/main")
+
+    $script = Join-Path $wt "scripts\sync_vendor_upstream.py"
+    if (-not (Test-Path $script)) { throw "sync script absent at origin/main: $script" }
+
+    # The sync exits 1 when files need a decision -- a normal, expected outcome,
+    # not a failure. Its JSON is the result; judge that, not the code.
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $raw = & py -3 $script --json
+    $ErrorActionPreference = $prev
+    if (-not $raw) { throw "sync produced no output" }
     $syncJson = ($raw -join "`n") | ConvertFrom-Json
 } catch {
     $syncError = $_.Exception.Message
@@ -123,8 +197,9 @@ $record = [ordered]@{
     finished_at        = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     host               = $env:COMPUTERNAME
     repo_root          = $RepoRoot
-    head               = (& git -C $RepoRoot rev-parse --short HEAD 2>$null | Select-Object -First 1)
-    behind_origin_main = if ($null -ne $behind) { [int]$behind } else { $null }
+    primary_head       = (& git -C $RepoRoot rev-parse --short HEAD 2>$null | Select-Object -First 1)
+    synced_ref         = $syncedRef
+    primary_behind_origin_main = if ($null -ne $behind) { [int]$behind } else { $null }
     ok                 = ($null -ne $syncJson)
     error              = $syncError
     totals             = $totals
@@ -141,7 +216,7 @@ $json = $record | ConvertTo-Json -Depth 6
 $row = [ordered]@{
     executed_at        = $started
     ok                 = $record.ok
-    behind_origin_main = $record.behind_origin_main
+    primary_behind_origin_main = $record.primary_behind_origin_main
     actionable         = $actionable.Count
     totals             = $totals
 } | ConvertTo-Json -Depth 4 -Compress
@@ -153,6 +228,6 @@ if (-not $record.ok) {
 }
 
 $summary = ($totals.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key) $($_.Value)" }) -join ", "
-Write-Output "vendor-sync $started  [$summary]  actionable=$($actionable.Count)  behind_origin_main=$($record.behind_origin_main)"
+Write-Output "vendor-sync $started  [$summary]  actionable=$($actionable.Count)  synced_ref=$($record.synced_ref) primary_behind=$($record.primary_behind_origin_main)"
 foreach ($a in $actionable) { Write-Output "  $($a.state)  $($a.tree)/$($a.path)" }
 exit 0
