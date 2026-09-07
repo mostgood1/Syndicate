@@ -26,10 +26,13 @@ CONSUMED + UNPOPULATED is the alarm, and it exits non-zero.
 """
 from __future__ import annotations
 
+import argparse
 import ast
 import json
+import os
 import sys
 from dataclasses import fields
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -43,6 +46,28 @@ from syndicate.features.soccer.features.loaders import (  # noqa: E402
 )
 
 ENGINE = REPO / "syndicate/features/soccer/sim_engine/soccersim/possession_priors.py"
+
+
+def _data_root() -> Path:
+    """The root this script both READS its history from and PUBLISHES under.
+
+    Copied verbatim from `scripts/sim_input_checklist.py::_data_root` (MLB), and
+    the reason is MLB's own scar, quoted in that function's docstring: the read
+    path was hardcoded to `REPO/data` while `--publish` resolved
+    `SYNDICATE_DATA_ROOT`, so **the file read from one root and wrote to
+    another** -- on the worker it audited the ephemeral checkout and stamped the
+    result as production.
+
+    The `hist_dir` below was hardcoded the same way. It is routed through here so
+    that ONE root answers both questions, which is what makes the `host` field in
+    the published report mean anything: `host: worker` now says the numbers came
+    off the mounted disk, not off whatever the checkout happens to carry.
+
+    Locally `SYNDICATE_DATA_ROOT` is unset and this returns `REPO/data`, i.e. the
+    exact path that was hardcoded here before -- no local behaviour change.
+    """
+    root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    return Path(root).expanduser().resolve() if root else (REPO / "data")
 
 # The engine's own parameter names -> the SoccerMatchFeatures field that feeds
 # them. Taken from `adapters.py::_engine_input` (:51-55), which is the single
@@ -86,6 +111,16 @@ def consumed_keys() -> dict[str, list[list[str]]]:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--publish", action="store_true",
+        help="write the report into the artifact tree so PRODUCTION can be audited. The "
+             "per-match feature payloads this gate measures are not allowlisted; the worker "
+             "runs this and publishes the bounded result instead -- MLB's sim_input_report "
+             "pattern (`scripts/sim_input_checklist.py`).",
+    )
+    args = ap.parse_args()
+
     # A REAL feature payload from the production constructor -- not a fixture.
     # Ratings shaped like `compute_team_ratings` output so the call is honest.
     # RATINGS COME FROM REAL HISTORY, NOT A HAND FIXTURE.
@@ -98,7 +133,7 @@ def main() -> int:
     # direction is not, and a stale fixture can do both.
     import csv
 
-    hist_dir = REPO / "data/soccer_source/eredivisie/history"
+    hist_dir = _data_root() / "soccer_source" / "eredivisie" / "history"
     hist = sorted(hist_dir.glob("matches_*.csv"))
     if not hist:
         print("  cannot run: no eredivisie match history on disk")
@@ -148,16 +183,24 @@ def main() -> int:
     consumed = consumed_keys()
     alarms: list[str] = []
     dead: list[str] = []
+    # Same rows the block below PRINTS, captured so `--publish` can carry them.
+    # Pure appends -- no branch here decides anything, so the exit code cannot
+    # move because of them.
+    report_rows: list[dict[str, object]] = []
 
     for container in sorted(consumed):
         target = CONTAINER_TO_FIELD.get(container)
         if target is None:
             print(f"  ?     {container:22s} -> NO MAPPING in CONTAINER_TO_FIELD (engine param unknown to this script)")
             alarms.append(f"{container} (unmapped)")
+            report_rows.append({"container": container, "target": None, "field": None,
+                                "status": "unmapped", "fed_by": None})
             continue
         if target not in field_names:
             print(f"  FAIL  {container:22s} -> '{target}' is not a SoccerMatchFeatures field")
             alarms.append(f"{container} -> {target}")
+            report_rows.append({"container": container, "target": target, "field": None,
+                                "status": "FAIL", "fed_by": None})
             continue
         payload = getattr(match, target) or {}
         for keys in consumed[container]:
@@ -173,9 +216,13 @@ def main() -> int:
             label = f"{container}.{keys[0]}"
             if present:
                 print(f"  ok    {label:46s} fed by {present[0]!r}")
+                report_rows.append({"container": container, "target": target, "field": keys[0],
+                                    "keys_accepted": keys, "status": "ok", "fed_by": present[0]})
             else:
                 print(f"  ALARM {label:46s} CONSUMED, container '{target}' has none of {keys}")
                 alarms.append(label)
+                report_rows.append({"container": container, "target": target, "field": keys[0],
+                                    "keys_accepted": keys, "status": "ALARM", "fed_by": None})
 
     print()
     print(f"containers on SoccerMatchFeatures : {len(field_names)}")
@@ -190,9 +237,44 @@ def main() -> int:
         print("from a build where the feature does not exist.")
         for a in alarms:
             print(f"  - {a}")
-        return 1
-    print("All consumed inputs are populated.")
-    return 0
+    else:
+        print("All consumed inputs are populated.")
+
+    if args.publish:
+        # `os` and `datetime` are imported at MODULE scope on purpose. MLB's
+        # `--publish` block once did `import os` locally, which made `os` a local
+        # name for the WHOLE function and turned an earlier diagnostic print into
+        # an UnboundLocalError on exactly the failing path.
+        base = _data_root()   # the same root `hist_dir` above was read from
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        out = (base / "soccer_source/source_artifacts/data/sim_input_report"
+               / f"sim_input_report_{stamp}.json")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps({
+            "schema_version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            # "worker" iff the mounted-disk root is configured; `_data_root()`
+            # falls back to REPO/data on a dev box and that is "local".
+            "host": "worker" if str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() else "local",
+            "data_root": str(base),
+            "league": "eredivisie",
+            # This script's OWN counts, named for what they count -- soccer has
+            # no rosters to count and must not borrow MLB's key for one.
+            "history_files": len(hist),
+            "history_rows": len(rows),
+            "rated_teams": len(ratings),
+            "containers": len(field_names),
+            "read_sites": sum(len(v) for v in consumed.values()),
+            "alarms": alarms,
+            "rows": report_rows,
+        }, indent=2), encoding="utf-8")
+        print("")
+        print(f"published {out}")
+        print("  This is the ONLY way the production population is readable: the")
+        print("  artifacts endpoint gates on HOT_ARTIFACT_PATTERNS and the per-match")
+        print("  feature payloads this gate measures are deliberately not on it.")
+
+    return 1 if alarms else 0
 
 
 if __name__ == "__main__":

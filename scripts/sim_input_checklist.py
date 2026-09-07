@@ -800,6 +800,20 @@ def main() -> int:
             # "worker" iff the mounted-disk root is configured; `_data_root()`
                 # falls back to REPO/data on a dev box and that is "local".
                 "host": "worker" if str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() else "local",
+            # `host` IS NOT PROVENANCE, and on 2026-09-07 it told a real lie.
+            # It says only "SYNDICATE_DATA_ROOT was set in the producing
+            # process" -- so a LAPTOP run with that var set stamps itself
+            # `worker`. A copy of this very report sitting in the repo checkout
+            # read `host: worker` with 24 failures, and its resolved root was
+            # `C:\Users\...\Syndicate\data`. The only field that separated it
+            # from a production report was `season_artifacts.data_root`, which
+            # is buried in a sub-object and easy to miss -- and was missed.
+            #
+            # So the resolved root is lifted to the TOP LEVEL, beside the claim
+            # it qualifies. Read them together: `host: worker` with a
+            # `resolved_root` of `/opt/render/project/data` is production; the
+            # same `host` with a `C:\...` root is a dev box.
+            "resolved_root": str(base),
             "rosters": len(paths), "counts": n,
             # WHICH ROSTERS THESE PERCENTAGES DESCRIBE. Added to the PUBLISHED
             # dict on 2026-09-07 -- it went into the `--json` dict first and ONLY

@@ -59,14 +59,19 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 import sys
 from dataclasses import fields
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
+from syndicate.features.football.artifacts import (  # noqa: E402
+    football_source_artifacts_root,
+)
 from syndicate.features.football.sim_engine.smartsim2.contracts import (  # noqa: E402
     SmartSim2SimulationInput,
 )
@@ -419,6 +424,13 @@ def main() -> int:
     parser.add_argument("--season", type=int, default=None)
     parser.add_argument("--week", type=int, default=1)
     parser.add_argument("--json", type=Path, default=None, help="write the bounded report artifact here")
+    parser.add_argument(
+        "--publish", action="store_true",
+        help="write the report into the artifact tree so PRODUCTION can be audited. The "
+             "per-game feature payloads this gate measures are not allowlisted; the worker "
+             "runs this and publishes the bounded result instead -- MLB's sim_input_report "
+             "pattern (`scripts/sim_input_checklist.py`).",
+    )
     parser.add_argument("--strict-entrypoints", action="store_true", help="fail on a scripts/ entrypoint not listed in ENTRYPOINTS")
     parser.add_argument("--skip-population", action="store_true", help="levels 0 and 1 only (no artifact reads)")
     args = parser.parse_args()
@@ -521,19 +533,71 @@ def main() -> int:
         print("PASS -- every consumed input is wired and populated")
     print("=" * 78)
 
+    # Built once so `--json` and `--publish` can never describe different runs.
+    report: dict[str, Any] = {
+        "entrypoints": rows,
+        "consumed_blocks": {b: {"aliases": blocks[b], "keys": keys.get(b, [])} for b in sorted(blocks)},
+        "population": population,
+        "expected_sparse_by_sport": EXPECTED_SPARSE_BY_SPORT,
+        "population_floor": POPULATION_FLOOR,
+        "alarms": alarms,
+        "notes": notes,
+        "status": "fail" if alarms else "pass",
+    }
+
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
-        args.json.write_text(json.dumps({
-            "entrypoints": rows,
-            "consumed_blocks": {b: {"aliases": blocks[b], "keys": keys.get(b, [])} for b in sorted(blocks)},
-            "population": population,
-            "expected_sparse_by_sport": EXPECTED_SPARSE_BY_SPORT,
-            "population_floor": POPULATION_FLOOR,
-            "alarms": alarms,
-            "notes": notes,
-            "status": "fail" if alarms else "pass",
-        }, indent=2), encoding="utf-8")
+        args.json.write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"report written: {args.json}")
+
+    if args.publish:
+        # `os` and `datetime` are imported at MODULE scope on purpose. MLB's
+        # `--publish` block once did `import os` locally, which made `os` a local
+        # name for the WHOLE function and turned an earlier diagnostic print into
+        # an UnboundLocalError on exactly the failing path.
+        #
+        # NO SECOND NOTION OF THE ROOT. This script never reads a path of its
+        # own -- Level 2 goes through `FootballSimulationAdapter.load_features`,
+        # i.e. the football feature layer, whose artifact root IS
+        # `football_source_artifacts_root` (`features/football/artifacts.py`,
+        # over `preferred_artifact_roots`). Publishing through that same helper
+        # means the report lands beside the tree it measured on every substrate,
+        # instead of under a `REPO/data` guess that is the ephemeral checkout on
+        # a worker. It resolves to `<root>/<sport>_source/source_artifacts`, so
+        # the path below matches the HOT_ARTIFACT_PATTERNS glob
+        # `*_source/source_artifacts/data/sim_input_report/sim_input_report_*.json`.
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # Deliberately NOT the `sports` local above -- that one only exists when
+        # population ran. `--publish --skip-population` must still write a report,
+        # and `--sport both` must write one per sport.
+        publish_sports = ["nfl", "ncaaf"] if args.sport == "both" else [args.sport]
+        published: dict[str, Any] = {
+            "schema_version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            # "worker" iff the mounted-disk root is configured. Same derivation
+            # as MLB's, and deliberately NOT read off the resolved root: it is
+            # the field that makes the report trustworthy, so it must not be
+            # guessable or hardcoded.
+            "host": "worker" if str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() else "local",
+            # Levels 0 and 1 are sport-agnostic and the alarm list is flat, so
+            # the WHOLE report is written under each sport's own tree rather
+            # than sliced by guessing which alarm belongs to whom from its text.
+            "sports": publish_sports,
+            **report,
+        }
+        for sport in publish_sports:
+            root = football_source_artifacts_root(sport=sport)
+            out = root / "data" / "sim_input_report" / f"sim_input_report_{stamp}.json"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(
+                json.dumps({**published, "published_for_sport": sport,
+                            "artifact_root": str(root)}, indent=2),
+                encoding="utf-8",
+            )
+            print(f"\npublished {out}")
+        print("  This is the ONLY way the production population is readable: the")
+        print("  artifacts endpoint gates on HOT_ARTIFACT_PATTERNS and the per-game")
+        print("  feature payloads this gate measures are deliberately not on it.")
 
     return 1 if alarms else 0
 

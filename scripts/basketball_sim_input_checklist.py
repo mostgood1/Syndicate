@@ -71,7 +71,9 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +82,26 @@ sys.path.insert(0, str(REPO))
 
 BRIDGE_PATH = REPO / "syndicate/features/shared/basketball_props_smart_sim.py"
 ONNX_PATH = REPO / "syndicate/features/shared/basketball_props_onnx.py"
+
+
+def _data_root() -> Path:
+    """The root the `processed_root`s below are read from AND `--publish` writes to.
+
+    Copied from `scripts/sim_input_checklist.py::_data_root` (MLB). MLB's own
+    docstring records why it must be ONE function: that script had its read path
+    hardcoded to `REPO/data` while `--publish` resolved `SYNDICATE_DATA_ROOT`, so
+    **the file read from one root and wrote to another** -- on the worker it
+    audited the ephemeral checkout and stamped the result as production.
+
+    `LEAGUES[*]["processed_root"]` was hardcoded the same way. Routing both
+    through here is what makes the published `host` field mean something:
+    `host: worker` now says the numbers came off the mounted disk.
+
+    Locally `SYNDICATE_DATA_ROOT` is unset and this returns `REPO/data`, i.e. the
+    exact prefix that was hardcoded here before -- no local behaviour change.
+    """
+    root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    return Path(root).expanduser().resolve() if root else (REPO / "data")
 
 # Real per-sport local mirrors. Per CLAUDE.md / model_engine_standard.md Sec 3b
 # these are a lossy, periodically-refreshed cold-start copy, NOT production --
@@ -94,7 +116,13 @@ LEAGUES: dict[str, dict[str, Any]] = {
         # SAME boxscores_history.csv (byte-identical, diffed). This is exactly
         # the per-family-desync trap CLAUDE.md describes: which of two
         # git-tracked mirror copies is "the" local one is not fixed per sport.
-        "processed_root": REPO / "data/wnba_source/source_artifacts/data/processed",
+        "processed_root": _data_root() / "wnba_source/source_artifacts/data/processed",
+        # The `<sport>_source` directory this league's report publishes under.
+        # Stated rather than derived from the league key so a future rename has
+        # to be made deliberately -- and because it is what the
+        # HOT_ARTIFACT_PATTERNS glob (`*_source/source_artifacts/data/
+        # sim_input_report/sim_input_report_*.json`) actually matches on.
+        "source_dir": "wnba_source",
         "season": 2026,
         # Real coverage measured from boxscores_history.csv: 2026-04-25 .. 2026-07-07.
         "priors_as_of": "2026-07-08",
@@ -102,7 +130,12 @@ LEAGUES: dict[str, dict[str, Any]] = {
     },
     "nba": {
         "package": "nba_betting",
-        "processed_root": REPO / "data/nba_source/data/processed",
+        # NOTE the different sub-path from wnba above (no `source_artifacts/`) --
+        # that asymmetry is the checkout's, not a typo. The PUBLISH path is
+        # `source_dir/source_artifacts/data/sim_input_report/` for both, because
+        # that is the only shape the allowlist glob matches.
+        "processed_root": _data_root() / "nba_source/data/processed",
+        "source_dir": "nba_source",
         "season": 2026,
         # Real coverage measured from boxscores_history.csv: up to 2026-05-24
         # (NBA season/finals window before the summer gap).
@@ -424,6 +457,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json", type=Path, default=None)
     parser.add_argument("--warn-only", action="store_true")
+    parser.add_argument(
+        "--publish", action="store_true",
+        help="write the report into the artifact tree so PRODUCTION can be audited. The "
+             "processed/ inputs this gate measures are not allowlisted; the worker runs "
+             "this and publishes the bounded result instead -- MLB's sim_input_report "
+             "pattern (`scripts/sim_input_checklist.py`).",
+    )
     args = parser.parse_args()
 
     print("=" * 84)
@@ -507,18 +547,57 @@ def main() -> int:
         print("PASS -- every consumed input is reachable and populated on this substrate")
     print("=" * 84)
 
+    # Built once so `--json` and `--publish` can never describe different runs.
+    report: dict[str, Any] = {
+        "level0_bridge_reachability": l0_rows,
+        "level1_player_priors": l1_data,
+        "level2_team_advanced": l2_data,
+        "level3_calibration_artifacts": l3_data,
+        "alarms": alarms,
+        "notes": notes,
+        "status": "fail" if alarms else "pass",
+    }
+
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
-        args.json.write_text(json.dumps({
-            "level0_bridge_reachability": l0_rows,
-            "level1_player_priors": l1_data,
-            "level2_team_advanced": l2_data,
-            "level3_calibration_artifacts": l3_data,
-            "alarms": alarms,
-            "notes": notes,
-            "status": "fail" if alarms else "pass",
-        }, indent=2, default=str), encoding="utf-8")
+        args.json.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
         print(f"report written: {args.json}")
+
+    if args.publish:
+        # `os` and `datetime` are imported at MODULE scope on purpose. MLB's
+        # `--publish` block once did `import os` locally, which made `os` a local
+        # name for the WHOLE function and turned an earlier diagnostic print into
+        # an UnboundLocalError on exactly the failing path.
+        base = _data_root()   # the same root LEAGUES[*]["processed_root"] read from
+        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        published: dict[str, Any] = {
+            "schema_version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            # "worker" iff the mounted-disk root is configured; `_data_root()`
+            # falls back to REPO/data on a dev box and that is "local".
+            "host": "worker" if str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() else "local",
+            "data_root": str(base),
+            # This gate covers BOTH leagues in one pass -- Level 0's key drift
+            # and Level 1's consumed/produced sets are shared, and the alarm
+            # list is flat. Splitting it per league would mean guessing which
+            # alarm belongs to whom from its text, so the WHOLE report is
+            # written under each league's own `<league>_source` tree instead.
+            # `published_for_league` says which copy you are holding.
+            "leagues": sorted(LEAGUES),
+            **report,
+        }
+        for league, cfg in LEAGUES.items():
+            out = (base / cfg["source_dir"] / "source_artifacts/data/sim_input_report"
+                   / f"sim_input_report_{stamp}.json")
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(
+                json.dumps({**published, "published_for_league": league}, indent=2, default=str),
+                encoding="utf-8",
+            )
+            print(f"\npublished {out}")
+        print("  This is the ONLY way the production population is readable: the")
+        print("  artifacts endpoint gates on HOT_ARTIFACT_PATTERNS and the processed/")
+        print("  inputs this gate measures are deliberately not on it.")
 
     return 1 if (alarms and not args.warn_only) else 0
 

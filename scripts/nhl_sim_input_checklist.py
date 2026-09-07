@@ -53,6 +53,7 @@ import argparse
 import ast
 import glob
 import json
+import os
 import re
 import sys
 from dataclasses import fields
@@ -406,17 +407,64 @@ def main() -> int:
         print(f"\nwrote {args.json}")
 
     if args.publish:
-        import os
+        # THREE DEFECTS FIXED HERE 2026-09-07, each of which independently made
+        # NHL's production population UNREADABLE. NHL is the one engine reported
+        # as PASSING its input checklist, and that PASS had never once been read
+        # from production -- it could not be.
+        #
+        # (1) THE PATH WAS NOT ALLOWLISTED. It wrote `<base>/data/sim_input_report/`,
+        #     i.e. `nhl_source/data/...` with no `source_artifacts` segment.
+        #     `HOT_ARTIFACT_PATTERNS` matches
+        #     `*_source/source_artifacts/data/sim_input_report/sim_input_report_*.json`.
+        #     Checked with the real predicate rather than by eye:
+        #     `is_hot_artifact_relative_path("nhl_source/data/sim_input_report/...")`
+        #     is False, the `source_artifacts` form is True. So the report could
+        #     never cross worker -> web and `/api/ops/artifacts/export` could
+        #     never see it.
+        #
+        # (2) IT KEYED OFF THE WRONG ENV VAR. `SYNDICATE_ARTIFACT_ROOT_NHL` is
+        #     NOT SET on refresh-worker -- read from the live env-vars API
+        #     2026-09-07; what IS set is `SYNDICATE_DATA_ROOT=/opt/render/project/data`
+        #     (and `SYNDICATE_NBA_ARTIFACT_ROOT`, a different key again). So on
+        #     the worker this fell back to `REPO/data/nhl_source`, inside the
+        #     EPHEMERAL CHECKOUT, which every deploy erases. Same failure the
+        #     SP+ ratings cache had.
+        #
+        # (3) IT MISREPORTED ITS OWN SUBSTRATE. `substrate` was derived from that
+        #     unset var, so a real worker run would have stamped itself
+        #     `local_checkout` and been discarded by anyone reading it.
+        #
+        # `SYNDICATE_ARTIFACT_ROOT_NHL` is still honoured as an explicit override
+        # when set, because removing a documented knob is a separate decision.
         from datetime import datetime, timezone
-        root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NHL") or "").strip()
-        base = Path(root).expanduser().resolve() if root else (REPO / "data" / "nhl_source")
+        override = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NHL") or "").strip()
+        data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+        if override:
+            base = Path(override).expanduser().resolve()
+        elif data_root:
+            base = Path(data_root).expanduser().resolve() / "nhl_source"
+        else:
+            base = REPO / "data" / "nhl_source"
         stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        out = base / "data" / "sim_input_report" / f"sim_input_report_{stamp}.json"
+        out = (base / "source_artifacts" / "data" / "sim_input_report"
+               / f"sim_input_report_{stamp}.json")
         out.parent.mkdir(parents=True, exist_ok=True)
-        payload["substrate"] = "worker" if root else "local_checkout"
+        payload["host"] = "worker" if (override or data_root) else "local"
+        # PROVENANCE, because `host` alone is a LIE and has already told one.
+        # `host` says only "a mounted-disk root was configured", not "this ran on
+        # Render". A report in this repo's checkout stamped `host: worker` with
+        # 24 failures turned out to be a LAPTOP run -- its resolved root was
+        # `C:\Users\...\Syndicate\data`. The resolved path is the field that can
+        # actually settle it, so it is recorded next to the claim it qualifies.
+        payload["resolved_root"] = str(base)
+        payload["substrate"] = payload["host"]  # back-compat with older readers
         payload["generated_at"] = datetime.now(timezone.utc).isoformat()
         out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"\npublished {out}")
+        print(f"  resolved_root {base}  host={payload['host']}")
+        print("  This is the ONLY way the production population is readable:")
+        print("  the artifacts endpoint gates on HOT_ARTIFACT_PATTERNS and the")
+        print("  roster/player-level objects are deliberately not on it.")
 
     return 1 if (failures and not args.warn_only) else 0
 
