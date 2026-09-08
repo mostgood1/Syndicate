@@ -19,14 +19,15 @@ third thing pinned below.
 
 THREE THINGS THIS PINS THAT ARE EASY TO REGRESS:
 
-1. **The partial output must survive the kill.** CPython builds
-   `TimeoutExpired` with the RAW buffered bytes (`Popen._check_timeout` passes
-   `output=b''.join(stdout_seq)`), bypassing the decoder that `text=True`
-   installed -- and then `subprocess.run` OVERWRITES both attributes with a
-   decoded `communicate()` *on Windows only*. So the attribute is `str` on a
-   dev box and `bytes` on the Render cron. A fix tested only on the host where
-   the step already passes would have shipped an empty print to the host where
-   it times out.
+1. **The output must reach the log BEFORE anything kills the step.** The first
+   fix recovered output from `TimeoutExpired`, which only works when the CHILD
+   is killed and this parent survives. An OOM is not that shape: measured
+   2026-09-08, the step ran 17.6 minutes, the container was killed at 2Gi, and
+   Render's log for that window holds **zero lines** -- parent included, so no
+   handler ran. `run(stream=True)` echoes each line as the child produces it,
+   so a kill of any kind now leaves a trail up to the moment it happened. This
+   also retired `_as_text`: the buffer is filled as we go, so nothing reads
+   `TimeoutExpired.stdout` and its platform-dependent type no longer matters.
 
 2. **A timeout must not be summarised as a test failure.** `learnings.md`
    2026-08-20 makes reading a KILLED pytest run as a result FORBIDDEN: a
@@ -63,20 +64,52 @@ def module():
     return mod
 
 
-def test_as_text_handles_the_linux_bytes_path(module):
-    """The branch this host cannot reach by running a subprocess.
+def test_streaming_echoes_lines_as_they_are_produced(module, capsys):
+    """Live output, and specifically MORE than the 12-line tail.
 
-    On Linux `TimeoutExpired.stdout` is bytes even under `text=True`. Tested
-    directly because the end-to-end test below exercises the Windows `str`
-    path when it runs on Windows, and the cron is Linux.
+    20 lines are emitted; a tail-only step shows 12. Asserting on the FIRST
+    line is what distinguishes streaming from merely a longer tail.
     """
-    assert module._as_text(b"collected 40 items\n") == "collected 40 items\n"
-    assert module._as_text("already text") == "already text"
-    assert module._as_text(None) == ""
-    # Undecodable bytes must degrade, not raise -- a killed run can be cut
-    # mid-codepoint, and losing the whole tail to a UnicodeDecodeError would
-    # reintroduce exactly the blindness this fixes.
-    assert module._as_text(b"ok \xff\xfe") == "ok ��"
+    prog = "\n".join(f"print('line {i}', flush=True)" for i in range(20))
+    result = module.run("streamed", ["-c", prog], timeout=60, stream=True)
+
+    printed = capsys.readouterr().out
+    assert result["rc"] == 0
+    assert "line 0" in printed, "only the tail was printed -- not streaming"
+    assert "line 19" in printed
+
+
+def test_not_streaming_still_prints_only_the_tail(module, capsys):
+    """The fast steps keep today's compact output; streaming is opt-in."""
+    prog = "\n".join(f"print('line {i}', flush=True)" for i in range(20))
+    result = module.run("tailed", ["-c", prog], timeout=60)
+
+    printed = capsys.readouterr().out
+    assert result["rc"] == 0
+    assert "line 0" not in printed
+    assert "line 19" in printed
+
+
+def test_a_streamed_timeout_keeps_every_line_it_emitted(module, capsys):
+    """The buffer fills as we go, so a kill loses nothing already printed."""
+    prog = ("import time\n"
+            "for i in range(5):\n"
+            "    print(f'collected chunk {i}', flush=True)\n"
+            "time.sleep(60)\n")
+    result = module.run("hung streamed", ["-c", prog], timeout=3, stream=True)
+
+    printed = capsys.readouterr().out
+    assert result["rc"] == 124 and result["timed_out"] is True
+    assert any("collected chunk 4" in line for line in result["tail"])
+    assert "collected chunk 0" in printed
+    assert "PARTIAL OUTPUT FROM A KILLED RUN" in printed
+
+
+def test_the_pytest_step_is_the_one_that_streams(module):
+    """Wiring check: a correct `stream` parameter nothing passes is inert."""
+    source = (REPO / "scripts" / "run_ci_suite.py").read_text(encoding="utf-8")
+
+    assert "args.pytest_timeout, stream=True" in source
 
 
 def test_a_killed_run_keeps_the_output_it_produced(module, capsys):

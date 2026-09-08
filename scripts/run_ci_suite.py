@@ -67,6 +67,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -205,60 +206,83 @@ def _step_env() -> dict[str, str]:
     return env
 
 
-def _as_text(stream: object) -> str:
-    """Decode a `TimeoutExpired` stream, which is bytes even under `text=True`.
+def _pump(pipe, sink: list[str], echo: bool) -> None:
+    """Drain a pipe line by line, echoing as it goes.
 
-    CPython's `Popen._check_timeout` builds the exception with
-    `output=b''.join(stdout_seq)` -- the RAW buffered chunks, never run through
-    the text decoder that `text=True` installed. On Windows `subprocess.run`
-    then overwrites both attributes with a decoded `communicate()`, so the type
-    depends on the host: `str` locally, `bytes` on the Render cron. Handling
-    only one of them would have made this print work on the machine where the
-    step already passes and stay empty on the one where it times out.
+    A thread rather than iterating in the caller, because a blocking read on a
+    hung child would make the timeout unenforceable -- the whole point is to
+    kill a step that has stopped making progress.
     """
-    if stream is None:
-        return ""
-    if isinstance(stream, bytes):
-        return stream.decode("utf-8", "replace")
-    return str(stream)
+    try:
+        for raw in pipe:
+            line = raw.rstrip("\n")
+            sink.append(line)
+            if echo:
+                print("   " + line[:400], flush=True)
+    except Exception:  # noqa: BLE001 -- a broken pipe must not kill the run
+        pass
 
 
-def run(label: str, argv: list[str], timeout: int) -> dict:
+def run(label: str, argv: list[str], timeout: int, *, stream: bool = False) -> dict:
+    """Run one step. `stream=True` echoes its output live instead of at the end.
+
+    WHY STREAMING IS NOT COSMETIC. With output captured, a step is SILENT for
+    its entire run and everything it printed is lost the moment the process is
+    killed by anything that also kills this parent. Measured 2026-09-08: the
+    pytest step ran 17.6 minutes and was OOM-killed at 2Gi, and Render's log for
+    that window contains **zero lines** -- the container went, parent included,
+    so no handler ran and no tail was ever printed. The diagnosis rested
+    entirely on Render's own `oomKilled` event.
+
+    Echoing as the child produces it puts every line in the log BEFORE the kill,
+    so an OOM now leaves a trail up to the moment it died instead of erasing the
+    run. That is the failure mode the previous fix could not reach: it handled
+    `TimeoutExpired`, where a killed CHILD is still readable, and an OOM is not
+    that shape.
+
+    It also removes the need to recover output from the exception. The buffer is
+    filled as we go, so a timeout has the same lines a success would -- no
+    dependence on `TimeoutExpired.stdout`, whose type differs by platform.
+
+    Off by default: the fast steps finish in under a minute and their 12-line
+    tail is the right granularity. This is for the step that runs for an hour.
+    """
     started = time.time()
     timed_out = False
     print(f"\n=== {label} ===", flush=True)
+    lines: list[str] = []
+    proc = subprocess.Popen(
+        [sys.executable, *argv], cwd=REPO_ROOT, env=_step_env(),
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1, errors="replace")
+    pump = threading.Thread(target=_pump, args=(proc.stdout, lines, stream), daemon=True)
+    pump.start()
     try:
-        proc = subprocess.run([sys.executable, *argv], cwd=REPO_ROOT,
-                              capture_output=True, text=True, timeout=timeout,
-                              env=_step_env())
-        rc, out = proc.returncode, (proc.stdout or "") + (proc.stderr or "")
-    except subprocess.TimeoutExpired as exc:
-        # PRINT WHAT IT GOT THROUGH. This branch used to discard `exc.stdout`
-        # and emit the single line "TIMEOUT after 3000s", which is the least
-        # informative thing it could have said: `capture_output=True` means the
-        # step is silent for its whole run, so a timeout produced a 50-minute
-        # hole with one line at the end of it and no way to tell a suite that
-        # was 95% done from one that hung on the third test.
-        #
-        # THE PARTIAL OUTPUT IS NOT A RESULT, and it is labelled so on purpose.
-        # `learnings.md` 2026-08-20, FORBIDDEN: reading a KILLED pytest run as
-        # a result -- a 12-failure report was made up from exactly this kind of
-        # truncated output and used to argue for rolling back three verified
-        # deploys. What a timeout licenses is "it reached HERE", never "these
-        # are the failures". rc stays 124 and the step stays FAILED.
+        rc = proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # A CAP HIT IS NOT A TEST RESULT, and it is labelled so on purpose.
+        # `learnings.md` 2026-08-20, FORBIDDEN: reading a KILLED pytest run as a
+        # result -- a 12-failure report was invented from truncated output and
+        # used to argue for rolling back three verified deploys. What this
+        # licenses is "it reached HERE", never "these are the failures".
         timed_out = True
         rc = 124
-        out = _as_text(exc.stdout) + _as_text(exc.stderr)
-        print(f"   TIMED OUT after {timeout}s -- rc=124. The lines below are "
-              f"PARTIAL OUTPUT FROM A KILLED RUN, not a result: they say how "
-              f"far it got, and nothing about what passed or failed.",
-              flush=True)
-        if not out.strip():
-            print("   (the killed process had produced no output at all)",
-                  flush=True)
-    tail = [l for l in out.strip().splitlines() if l.strip()][-12:]
-    for l in tail:
-        print("   " + l[:400], flush=True)
+        proc.kill()
+        proc.wait()
+        print(f"   TIMED OUT after {timeout}s -- rc=124. Anything above is "
+              f"PARTIAL OUTPUT FROM A KILLED RUN, not a result: it says how far "
+              f"it got, and nothing about what passed or failed.", flush=True)
+    pump.join(timeout=10)
+    tail = [l for l in lines if l.strip()][-12:]
+    if not stream:
+        for l in tail:
+            print("   " + l[:400], flush=True)
+    # SAID IN BOTH MODES. "Produced nothing" and "produced something I am not
+    # showing you" are different facts, and a step that dies silently is the
+    # case where the distinction matters most -- it is the difference between
+    # a hang and a crash before first output.
+    if not tail:
+        print("   (the step produced no output at all)", flush=True)
     print(f"   -> rc={rc}  {time.time()-started:.0f}s", flush=True)
     return {"step": label, "rc": rc, "seconds": round(time.time() - started, 1),
             "timed_out": timed_out, "tail": tail[-6:]}
@@ -299,7 +323,7 @@ def main() -> int:
                 else "  -- DIVERGES from ci.yml's 'auto', deliberately, for memory")
         print(f"\n(xdist workers: {args.pytest_workers}{note}; "
               f"chunks {args.pytest_chunks}; cap {args.pytest_timeout}s)", flush=True)
-        results.append(run(label, argv, args.pytest_timeout))
+        results.append(run(label, argv, args.pytest_timeout, stream=True))
 
     failed = [r for r in results if r["rc"] != 0]
     timed_out = [r for r in results if r.get("timed_out")]
