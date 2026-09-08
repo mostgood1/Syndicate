@@ -91,15 +91,35 @@ class LiveMcResult:
     # ------------------------------------------------------------------
     # THE FIRST FIVE INNINGS, read off the SAME sims. Nothing extra is run.
     #
-    # WHY THIS EXISTS. Measured 2026-09-07 against the production lens
-    # (`/api/ops/live-lens/snapshot-index`, 11 of 11 MLB games): every
-    # `first1`/`first3`/`first5` lane carried `modelHomeWinProb: null` and
-    # `source: null`. MLB's segment lanes are EMPTY -- not filtered out, not
-    # imprecise, absent. Three docstrings (`live_gameline_join` line ~416,
-    # `mlb/live_lens` ~775 and ~1398) asserted they carry a probability
-    # "derived from `_live_margin_win_prob` over a segment interpolation"; that
-    # function is `_wnba_live_margin_win_prob` and exists only on WNBA's path.
-    # The claim was true of WNBA and was written into MLB's modules.
+    # WHY THIS EXISTS. **A FIRST DRAFT OF THIS COMMENT SAID MLB's SEGMENT LANES
+    # ARE EMPTY. THAT WAS WRONG AND THE ERROR IS WORTH KEEPING.** It came from
+    # reading `/api/ops/live-lens/snapshot-index` and sampling the first three
+    # games in the payload -- all three FINAL, and `_build_game_lens` returns
+    # `[]` for a final game, so what those rows carried was the CARD-derived
+    # lens (`_live_lens_segments_from_card`), which has no `source` and no
+    # probability by construction. I measured the wrong population and reported
+    # its absence as the system's.
+    #
+    # ON LIVE GAMES the lanes are populated, 2026-09-07: gamePk 823902 read
+    # `first5 0.3242, first7 0.2991` with `first1/first3` None, and 823175 read
+    # `first7 0.6511` with `first1/first3/first5` None. Monotone in segment
+    # length, which is `_segment_projection`'s `closed` flag behaving correctly:
+    # a segment whose innings are already played is DECIDED, not projected.
+    #
+    # THE REAL DEFECT IS WHAT THAT PROBABILITY IS. It is
+    # `_live_margin_win_prob` over `_segment_projection`, and that function is a
+    # LINEAR INTERPOLATION OF PREGAME MEANS: `mean * target_innings/9`, less the
+    # expected runs to date, plus the actual runs. It reads no bases, no outs,
+    # no inning, no pitcher -- only a cumulative score and a progress fraction.
+    # And it carries **no `simsRun`**, which is gated on `lane_is_live_mc`.
+    #
+    # That last part is what makes it unpriceable rather than merely weak: the
+    # publish-refuse-to-price contract releases an edge only when it clears
+    # `PRICEABLE_SIGMA` standard errors of `sqrt(p(1-p)/n)`, and with no `n`
+    # there is no interval to clear. So the honest fix is not to admit the
+    # interpolation -- it is to produce a first-five probability from the SAME
+    # Bernoulli trials the full-game number already comes from, which carries
+    # its own `n` and needs no new error-bar assumption.
     #
     # So every `first5` market row on a live MLB board is refused
     # `segment_is_not_full_game` -- 25 of 29 and 34 of 41 rows considered on the

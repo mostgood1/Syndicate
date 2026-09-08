@@ -1,17 +1,30 @@
 """`estimate_live` publishes a FIRST-FIVE readout of the sims it already runs.
 
-WHY THIS EXISTS. Measured 2026-09-07 against production via
-`/api/ops/live-lens/snapshot-index`: on **11 of 11 MLB games**, every
-`first1`/`first3`/`first5` lane carried `modelHomeWinProb: null` and
-`source: null`. MLB's segment lanes are EMPTY -- not filtered, not imprecise,
-absent. So every first5 market row on a live board is refused
-`segment_is_not_full_game` (25 of 29 and 34 of 41 rows considered on the
-2026-09-05/06 builds), and the 49 mis-graded settled orders were all first5.
+WHY THIS EXISTS. **An earlier version of this docstring claimed MLB's segment
+lanes are EMPTY. That was wrong**, and the way it was wrong is the point: it
+sampled the first three games in `/api/ops/live-lens/snapshot-index` and all
+three were FINAL. `_build_game_lens` returns `[]` for a final game, so those
+rows carried the card-derived lens, which has no `source` and no probability by
+construction. The wrong population was measured and its absence reported as the
+system's.
 
-Three docstrings claimed those lanes carry a probability "derived from
-`_live_margin_win_prob` over a segment interpolation". That function is
-`_wnba_live_margin_win_prob` and exists only on WNBA's path; the claim was true
-of WNBA and was written into MLB's modules.
+ON LIVE GAMES the lanes are populated (2026-09-07): gamePk 823902 read
+`first5 0.3242, first7 0.2991`; 823175 read `first7 0.6511`. The `None`s are
+monotone in segment length -- `_segment_projection`'s `closed` flag, correctly
+refusing to project a segment whose innings are already played.
+
+THE REAL DEFECT is what that probability IS. `_live_margin_win_prob` over
+`_segment_projection` is a LINEAR INTERPOLATION OF PREGAME MEANS -- `mean *
+innings/9`, less expected runs to date, plus actual runs -- reading no bases, no
+outs, no pitcher. And it carries no `simsRun`, so `sqrt(p(1-p)/n)` has no `n`
+and the publish-refuse-to-price gate has no interval to clear. That is why it
+cannot price, and why the fix is a real Monte-Carlo readout carrying its own
+trials rather than admitting the interpolation.
+
+Either way the consequence is unchanged: every first5 market row on a live MLB
+board is refused `segment_is_not_full_game` -- 25 of 29 and 34 of 41 rows
+considered on the 2026-09-05/06 builds -- and the 49 mis-graded settled orders
+were all first5.
 
 THE LOAD-BEARING ASSUMPTION, pinned below. `simulate_game` indexes its
 per-inning arrays by ABSOLUTE inning -- `inning_idx = state.inning - 1`
