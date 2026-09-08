@@ -2150,3 +2150,43 @@ is also in flight at all three. Per-request memory is not visible, so this is
 CORRELATION, relayed to `nfl-ncaaf-ui-parity` and not diagnosed here. No
 `oomKilled` since 15:31:38Z, but the cluster ran 10-20 min apart and that window
 is comparable — **not proof the guard ended it.**
+
+### `[web-oom-leak]` UPDATE 44 — **`/api/intelligence/query`'s rebuild cost was a 15-SECOND cache TTL on data that changes every 10–18 MINUTES. `board_read` 2,916–6,841 ms → 0.1 ms.**, 2026-09-08T16:4xZ `[session b2b5b45b]`
+
+The last route `#632` owed. **The fix is an env value, not code:**
+`SYNDICATE_INTELLIGENCE_COMBINED_BOARD_CACHE_SECONDS`, absent (code default
+**15**) → **180**, via the single-key API.
+
+    stage                  BEFORE (15 s TTL)      AFTER (180 s TTL)
+    board_read             2,916 / 3,816 / 6,841    0.1 / 0.1 / 0.2 / 0.1
+    TOTAL server-side      4,142 / 5,010 / 7,626    409 / 1,058 / 645 / 532
+
+Comparable boards (1,520 → 1,465 rows). **At the UI's real 60 s cadence:** a
+request 65 s after another HIT (0.2 ms); one 292 s after another correctly MISSED
+(3,420 ms). Steady state is 2 of 3 polls cached; at 15 s a 60 s poll missed 3 of
+3 by construction. Measured board republish cadence, which is what makes 180 s
+conservative: **11m31s, 17m58s, 10m09s**.
+
+**THE SAME DEFECT SHAPE AS THE CHIP BUG EARLIER THE SAME DAY** — a freshness
+bound far tighter than the data it guards (here 40–72x). Worth carrying: when a
+producer and a consumer both hold a time bound, check their RATIO, not each
+value's plausibility.
+
+**THIS COULD NOT BE FOUND BY PROBING AND THE ATTEMPT PRODUCED TWO WRONG
+ANSWERS.** The same request varies **7,759 → 3,000 ms** — a 4,759 ms spread, 9x
+the effect being chased. The `QUERY_STAGE_MS` instrument (`0d55ba1b`) is what
+made it attributable. **And my probes never once hit the cache**: spaced ~16–17 s
+against a 15 s TTL, so the control request was itself a miss — which is exactly
+why a cache problem presented as noise.
+
+**EVERY READING HERE IS MY OWN TRAFFIC.** 4 requests to that endpoint in the
+16:30–16:40Z window, all mine, of 51 to the service. **The organic reading is
+OWED**; a watcher is armed and had found nothing by 16:51Z, with a passing
+control (87 requests to web after the boundary, none to this endpoint).
+
+**STILL UNFIXED, and it is the next candidate:** `limit=50` returns 50 rows and
+still ships **13.71 MB**, because the limit slices `top_opportunities` and NOT
+`ranked_all` (7.37 MB) or `board_contract.cards` (7.37 MB). **Those two are NOT
+interchangeable duplicates** — 3,317 of 3,914 rows match and **597 differ** — so
+they cannot be aliased away; slicing them is the fix, and it is a contract
+change.
