@@ -17,15 +17,27 @@ METRIC: Brier score (`syndicate.features.shared.model_scoring.brier_score`) — 
 this scores a REAL BOOK PRICE against a binary outcome, comparing two probability FORECASTS, not
 forecast-vs-outcome directly for the model side).
 
-WHY THESE COLUMNS ARE NOT CIRCULAR. `predictions_{date}.csv`'s `p_home_ml`/`p_over`/`p_home_pl_-1.5`
-come from `adapters.build_game_prediction`, which only calls `game_market_sim.simulate_from_period_lambdas`
-on `HockeyGameFeatures.period_goal_lambdas` — the market-anchoring mechanism
-(`market_anchoring.anchor_game_features`) is a SEPARATE, opt-in code path that only touches the
-PROPS pipeline (`build_prop_projections`), never this one. Confirmed by reading `adapters.py`
-directly, not assumed from column naming. Where a `_model`-suffixed column exists (one legacy file
-from the pre-migration vendor pipeline, `hockeysim_engine_reference.md` §1), it is preferred anyway
-— cheap insurance, since that file's plain columns were written by different, non-Syndicate code
-this script did not audit.
+WHICH COLUMNS ARE THE MODEL -- CORRECTED 2026-09-08 (pricing plane v1, P4). An earlier version of
+this docstring said `p_home_ml`/`p_home_pl_-1.5` were "not circular" because market anchoring was
+an "opt-in" path that only touched props. That described `loaders.build_game_features`'s
+`anchor_to_market=False` flag -- which the production producer (`scripts/build_nhl_artifacts.py`,
+called by `scripts/refresh_nhl_oddsapi.py`) never uses. The producer injects the consensus
+moneyline and calls `market_anchoring.anchor_game_features` at weight 0.35 BEFORE
+`build_game_prediction` runs, for every game with a usable moneyline. So the served
+`p_home_ml`/`p_home_pl_-1.5` are a 65% model / 35% market blend, and scoring them "vs the market"
+scores the market partly against itself. (`p_over` is untouched: the anchor shifts goals between
+the two sides and preserves the total, so totals were never anchored.)
+
+Since P4 the producer records, per row, `anchor_weight`, `anchor_state`
+(anchored | no_market | disabled) and the UN-anchored `p_home_ml_raw` / `p_home_pl_-1.5_raw` --
+the same estimator run on the pre-anchor lambdas. This script scores the `_raw` columns as the
+MODEL and reports the served columns separately under the label `anchored`. A row that predates
+those columns (no `_raw` value, and no `_model`-suffixed column from the one legacy vendor file,
+`hockeysim_engine_reference.md` §1) is REFUSED for moneyline/puck-line under the named reason
+`anchored_probability_not_separable` -- never scored as if the blend were the model. That refusal
+also covers `--source production` rows today: `/nhl/api/cards` exposes only the served
+`p_home_win`, so production-sourced moneyline rows are unscoreable as a model until that route
+surfaces the raw column. Totals are unaffected on every source.
 
 JOIN, COUNTED NOT SILENTLY DROPPED (the MLB harness's own hard-won discipline, see its docstring
 and `docs/ai_context/todo.md`'s`#463`-adjacent notes): every row that fails to score is counted
@@ -252,24 +264,39 @@ def load_settled_outcomes(root: Path) -> Dict[Tuple[str, str, str], Tuple[int, i
 # One entry per market: how to pull the model's own probability, the market's two American prices
 # (for a fair-probability de-vig), and how to compute the realized 0/1 outcome from a settled score.
 # `push_check`, when present, returns True for a row that should be excluded (not scored either way).
+#
+# `served_col` is the column the board serves. For `anchored: True` markets it is a model/market
+# blend in production (see the docstring), so the MODEL is `raw_col` (`_raw`, P4) or, failing that,
+# `legacy_model_col` (the one pre-migration vendor file). With neither, the row is refused under
+# `anchored_probability_not_separable`. Totals are not anchored: served IS the model.
+ANCHORED_NOT_SEPARABLE = "anchored_probability_not_separable"
 MARKET_SPECS = [
     {
         "key": "home_ml",
-        "model_cols": ("p_home_ml_model", "p_home_ml"),
+        "served_col": "p_home_ml",
+        "raw_col": "p_home_ml_raw",
+        "legacy_model_col": "p_home_ml_model",
+        "anchored": True,
         "odds_cols": ("home_ml_odds", "away_ml_odds"),
         "outcome": lambda h, a, row: 1.0 if h > a else 0.0,
         "push_check": lambda h, a, row: h == a,  # NHL games can't end tied, but guard anyway
     },
     {
         "key": "total_over",
-        "model_cols": ("p_over_model", "p_over"),
+        "served_col": "p_over",
+        "raw_col": None,
+        "legacy_model_col": "p_over_model",
+        "anchored": False,
         "odds_cols": ("over_odds", "under_odds"),
         "outcome": lambda h, a, row: 1.0 if (h + a) > _to_float(row.get("totals_line_used") or 0) else 0.0,
         "push_check": lambda h, a, row: (h + a) == _to_float(row.get("totals_line_used")),
     },
     {
         "key": "home_puck_line_-1.5",
-        "model_cols": ("p_home_pl_-1.5",),
+        "served_col": "p_home_pl_-1.5",
+        "raw_col": "p_home_pl_-1.5_raw",
+        "legacy_model_col": None,
+        "anchored": True,
         "odds_cols": ("home_pl_-1.5_odds", "away_pl_+1.5_odds"),
         "outcome": lambda h, a, row: 1.0 if (h - a) > 1.5 else 0.0,
         "push_check": lambda h, a, row: False,  # a half-point line can never push
@@ -277,10 +304,44 @@ MARKET_SPECS = [
 ]
 
 
+def resolve_model_probability(spec: Dict, row: Dict) -> Tuple[Optional[float], Optional[float], str]:
+    """``(p_model, p_served, how)`` for one market on one row.
+
+    ``how`` names where the model number came from: ``raw`` (P4 `_raw` column), ``legacy_model``
+    (the vendor `_model` column), ``served`` (an un-anchored market -- totals -- or a P4 row whose
+    `anchor_state` says served == raw), ``no_model`` (nothing to score) or
+    ``anchored_probability_not_separable`` (an anchored market on a row that carries only the blend).
+    """
+    p_served = _to_float(row.get(spec["served_col"]))
+    legacy_col = spec.get("legacy_model_col")
+    p_legacy = _to_float(row.get(legacy_col)) if legacy_col else None
+    raw_col = spec.get("raw_col")
+    p_raw = _to_float(row.get(raw_col)) if raw_col else None
+
+    if p_raw is not None:
+        return p_raw, p_served, "raw"
+    if p_legacy is not None:
+        return p_legacy, p_served, "legacy_model"
+    if p_served is None:
+        return None, None, "no_model"
+    if not spec["anchored"]:
+        return p_served, p_served, "served"
+    # An anchored market with no raw column: only a P4 row that SAYS it was not anchored
+    # (no_market / disabled => served == raw) is separable. A legacy row, or a production-route
+    # row, carries no such statement and is refused rather than scored as the model.
+    state = str(row.get("anchor_state") or "").strip().lower()
+    if state in ("no_market", "disabled"):
+        return p_served, p_served, "served"
+    return None, p_served, ANCHORED_NOT_SEPARABLE
+
+
 def score(rows: List[Dict], outcomes: Dict[Tuple[str, str, str], Tuple[int, int]]):
     counters: Counter = Counter()
+    # `model` = the raw model probability; `market` = the de-vigged book; `anchored` = the SERVED
+    # column for anchored markets (a model/market blend in production) -- reported, never called
+    # the model.
     pairs: Dict[str, Dict[str, List[Tuple[float, float]]]] = {
-        m["key"]: {"model": [], "market": []} for m in MARKET_SPECS
+        m["key"]: {"model": [], "market": [], "anchored": []} for m in MARKET_SPECS
     }
     dates_seen = set()
     dates_matched = set()
@@ -323,20 +384,26 @@ def score(rows: List[Dict], outcomes: Dict[Tuple[str, str, str], Tuple[int, int]
         dates_matched.add(date)
         h_score, a_score = settled
 
+        # Anchoring provenance (P4). A row without `anchor_state` predates the columns: its
+        # moneyline/puck-line numbers are the blend, with no raw twin to separate.
+        state = str(row.get("anchor_state") or "").strip().lower() or "legacy_unknown"
+        counters[f"anchor_state:{state}"] += 1
+        w = _to_float(row.get("anchor_weight"))
+        counters[f"anchor_weight:{w if w is not None else 'unknown'}"] += 1
+
         for spec in MARKET_SPECS:
             key = spec["key"]
-            p_model = None
-            for col in spec["model_cols"]:
-                p_model = _to_float(row.get(col))
-                if p_model is not None:
-                    break
             odds = [_to_float(row.get(c)) for c in spec["odds_cols"]]
-            if p_model is None:
-                counters[f"{key}:no_model"] += 1
-                continue
             if any(o is None for o in odds):
                 counters[f"{key}:no_market"] += 1
                 continue
+            p_model, p_served, how = resolve_model_probability(spec, row)
+            if p_model is None:
+                # `no_model` or `anchored_probability_not_separable` -- named, never scored.
+                counters[f"{key}:{how}"] += 1
+                continue
+            if how == "legacy_model":
+                counters[f"{key}:model_from_legacy_model_column"] += 1
             if spec["push_check"](h_score, a_score, row):
                 counters[f"{key}:push"] += 1
                 continue
@@ -347,6 +414,8 @@ def score(rows: List[Dict], outcomes: Dict[Tuple[str, str, str], Tuple[int, int]
             outcome = spec["outcome"](h_score, a_score, row)
             pairs[key]["model"].append((p_model, outcome))
             pairs[key]["market"].append((fair[0], outcome))
+            if spec["anchored"] and p_served is not None:
+                pairs[key]["anchored"].append((p_served, outcome))
             counters[f"{key}:scored"] += 1
 
     return pairs, counters, dates_seen, dates_matched
@@ -407,13 +476,22 @@ def main() -> int:
 
     print("\n" + "=" * 88)
     print("RESULTS -- Brier, lower is better, 0.25 = coin flip")
+    print("  model = the RAW (un-anchored) model probability; anchored = the SERVED column, a")
+    print("  model/market blend at `anchor_weight` on moneyline/puck-line rows (P4); market = de-vigged book")
     print("=" * 88)
     results = {}
     for spec in MARKET_SPECS:
         key = spec["key"]
         model_summary = _summarize(pairs[key]["model"])
         market_summary = _summarize(pairs[key]["market"])
+        anchored_summary = _summarize(pairs[key]["anchored"]) if spec["anchored"] else None
         if model_summary is None or market_summary is None:
+            refused = counters.get(f"{key}:{ANCHORED_NOT_SEPARABLE}", 0)
+            if refused:
+                print(f"  {key:22s} REFUSED -- {refused} row(s) carry only the anchored blend "
+                      f"({ANCHORED_NOT_SEPARABLE}); 0 rows with a separable raw model")
+                results[key] = {"verdict": f"refused_{ANCHORED_NOT_SEPARABLE}", "refused_rows": refused}
+                continue
             print(f"  {key:22s} UNMEASURED -- 0 scoreable rows")
             results[key] = {"verdict": "unmeasured"}
             continue
@@ -426,12 +504,21 @@ def main() -> int:
         b_model = model_summary["brier"]
         b_market = market_summary["brier"]
         verdict = "MODEL BEATS MARKET" if b_model < b_market else "market wins"
-        print(f"  {key:22s} n={n:3d}  base_rate={base:.3f}  model={b_model:.4f}  "
-              f"market={b_market:.4f}  {verdict}")
+        anchored_txt = ""
+        if anchored_summary is not None:
+            anchored_txt = f"  anchored(served)={anchored_summary['brier']:.4f}"
+        print(f"  {key:22s} n={n:3d}  base_rate={base:.3f}  model(raw)={b_model:.4f}  "
+              f"market={b_market:.4f}{anchored_txt}  {verdict}")
         results[key] = {
             "n": n, "base_rate": base, "brier_model": round(b_model, 4),
             "brier_market": round(b_market, 4), "verdict": verdict,
         }
+        if anchored_summary is not None:
+            results[key]["brier_anchored_served"] = round(anchored_summary["brier"], 4)
+        refused = counters.get(f"{key}:{ANCHORED_NOT_SEPARABLE}", 0)
+        if refused:
+            results[key]["refused_rows"] = refused
+            print(f"  {'':22s} ({refused} legacy/production row(s) refused: {ANCHORED_NOT_SEPARABLE})")
 
     print("\n" + "=" * 88)
     total_scored = sum(v.get("n", 0) for v in results.values() if "n" in v)
@@ -454,6 +541,12 @@ def main() -> int:
             "counters": dict(counters),
             "results": results,
             "total_scored": total_scored,
+            "model_column_policy": {
+                "home_ml": "p_home_ml_raw (P4) else p_home_ml_model (legacy vendor) else REFUSED",
+                "home_puck_line_-1.5": "p_home_pl_-1.5_raw (P4) else REFUSED",
+                "total_over": "p_over (never anchored)",
+                "anchored_series": "served p_home_ml / p_home_pl_-1.5 -- a model/market blend at anchor_weight",
+            },
         }
         args.json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"\nwrote {args.json}")

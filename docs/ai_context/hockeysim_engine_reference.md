@@ -1544,12 +1544,18 @@ production question:
   ("maintaining the allowlist is part of shipping an input"), and if this
   self-generation mechanism is ever centralized onto one service, those two
   files will need the allowlist that's now already in place.
-- **`market_anchoring.py` circularity, inherited caveat**: `.syndicate/audit_2026-08-14_models.md`
-  (line 170/192) already flags that NHL uses current book prices as a model
-  input (`market_anchoring.py`), making any market-relative/CLV evaluation of
-  this engine near-circular by construction until accounted for. Nothing in
-  this session's work changes that; repeating it here so it isn't lost between
-  documents.
+- **`market_anchoring.py` circularity — CONFIRMED, and it is the main board, not props**
+  `[corrected 2026-09-08, P4]`: `.syndicate/audit_2026-08-14_models.md` (line 170/192) flagged
+  that NHL uses current book prices as a model input. The code audit behind P4 pinned down
+  exactly where: `scripts/build_nhl_artifacts.py` (the production producer, called by
+  `scripts/refresh_nhl_oddsapi.py::_run_owned_generation`) injects the consensus moneyline and
+  calls `market_anchoring.anchor_game_features` at weight **0.35** BEFORE
+  `build_game_prediction` runs, for every game with a usable moneyline. `loaders.py`'s
+  `anchor_to_market=False` default is real but the producer never goes through it. So the
+  served `p_home_ml` / `p_home_pl_-1.5` are a 65/35 model/market blend; totals are preserved by
+  the shift and are NOT anchored. Since P4 the weight is the env flag
+  `SYNDICATE_NHL_MARKET_ANCHOR_WEIGHT` (absent ⇒ 0.35, `0` ⇒ off) and every row records
+  `anchor_weight` / `anchor_state` / `p_home_ml_raw` / `p_home_pl_-1.5_raw` — see §8c.
 - All population numbers in §5 are `[this checkout]` only. Per
   `model_engine_standard.md` §3b, that is **UNMEASURED against production**,
   not a production fact — the next step for whoever picks up §5's remaining
@@ -1572,11 +1578,15 @@ MLB's `convergence-phase7-crps` lane methodology (`scripts/grade_mlb_hitter_prop
 
 **Metric: Brier score**, not CRPS — this compares two probability FORECASTS (model, market)
 against one binary outcome; CRPS scores a distribution against a realized value (§6's job, not
-this one). **Not circular**: `predictions_{date}.csv`'s `p_home_ml`/`p_over`/`p_home_pl_-1.5` come
-from `adapters.build_game_prediction`, which only calls `simulate_from_period_lambdas` on
-`period_goal_lambdas` — confirmed by reading the code, not assumed. `market_anchoring.py`'s
-circularity risk (noted above) applies to the PROPS pipeline, a genuinely different code path this
-backtest never touches. Real settled outcomes come from the same boxscore cache §2e/§2g/§2i/§2j/§2k
+this one). **~~Not circular~~ — RETRACTED 2026-09-08, see §8c.** This paragraph originally
+claimed `p_home_ml`/`p_home_pl_-1.5` were the pure model because `build_game_prediction` only
+reads `period_goal_lambdas` and anchoring was "opt-in" on the props path. Both halves were
+literally true and materially wrong: `build_game_prediction` does only read
+`period_goal_lambdas`, but the producer had ALREADY rewritten those lambdas toward the moneyline
+at 0.35 (`build_nhl_artifacts.py`, `market_anchoring.anchor_game_features`) before the call, and
+the "opt-in" flag it cited is `loaders.py`'s, which the producer bypasses. The props pipeline,
+meanwhile, is the one path that is NOT anchored. `p_over` is unaffected (the anchor preserves
+the total). Real settled outcomes come from the same boxscore cache §2e/§2g/§2i/§2j/§2k
 already bulk-fetched; real market odds are already embedded in `predictions_{date}.csv` itself.
 
 **A real bug found while building this**: the first run showed `n=8` from 5 files; 4 of those files
@@ -1589,6 +1599,8 @@ separate production-pipeline finding, not just a backtest artifact** — worth i
 
 **Measured (local only)**: n=3–4 per market (moneyline, total, puck line) after dedup — the market
 wins all three (0.2061 vs 0.2630 moneyline; 0.2115 vs 0.2294 total; 0.2133 vs 0.2146 puck line).
+**The moneyline and puck-line "model" numbers here were scored on the ANCHORED (65/35) served
+probabilities, not the model** (§8c); only the totals comparison is a model-vs-market reading.
 **Stated as plainly as everywhere else in this document**: n=3–4, all from one playoff series,
 cannot support a real verdict either way — this proves the harness is correct end-to-end on real
 data, not that the engine has or lacks an edge.
@@ -1614,11 +1626,65 @@ off-day requests (13 collapsed in the combined run).
 
 **Updated measured result**: n=14–15 per market (moneyline, total), n=3 puck line (local-only, as
 before) across 12 dates with a matched outcome (`2026-03-01`..`2026-06-11`) — roughly 3-4x the
-sample. Moneyline: market still wins (0.2905 vs 0.2769). Total: **model beats market this run**
-(0.2102 vs 0.2378). **Stated with EQUAL weight to every other caveat in this document, not less
+sample. Moneyline: market still wins (0.2905 vs 0.2769) — **scored on the anchored blend, so this
+is "65% model + 35% market vs market", not model vs market** (§8c); the same applies to the
+puck-line row. Total: **model beats market this run** (0.2102 vs 0.2378) — totals are not
+anchored, so this one IS a model-vs-market reading. **Stated with EQUAL weight to every other caveat in this document, not less
 because the sample got bigger**: n=14-15 remains far below a powered sample, and a "beats market"
 headline on a small sample is exactly the kind of result noise would most readily produce — this is
 evidence the harness holds up against a real production pull, not evidence of an edge. Local
 `predictions_<date>.csv` coverage was the binding constraint the first pass flagged; this addendum
 addresses it directly, and the harness needs no further changes to keep widening as the season
 resumes and new dates accumulate.
+
+**§8c — P4 correction (2026-09-08, "Pricing plane v1"): the main board IS anchored, and now says so.**
+The claim above that the moneyline/puck-line columns were "not circular" was wrong, and the §8/§8b
+moneyline + puck-line numbers were scored on anchored probabilities. What changed:
+
+- **The mechanism, file:line.** `scripts/build_nhl_artifacts.py::_predictions_and_markets` injects
+  the consensus lines (`features/market_lines.py`) and calls
+  `market_anchoring.anchor_game_features(g, weight=…)` (bisection on the goal differential,
+  total preserved, `market_anchoring.py::_solve_goal_shift`) BEFORE `adapters.build_game_prediction`.
+  `build_predictions_for_date` / `build_recommendations_for_date` defaulted to `anchor=True,
+  anchor_weight=0.35`, and `scripts/refresh_nhl_oddsapi.py::_run_owned_generation` — the production
+  generator — called them with defaults. No flag existed. `loaders.py`'s `anchor_to_market=False`
+  is unchanged and still governs only callers that go through the loader.
+- **The flag.** `SYNDICATE_NHL_MARKET_ANCHOR_WEIGHT` (`market_anchoring.resolve_anchor_weight`):
+  absent ⇒ 0.35 (bit-identical to the pre-flag artifact on every pre-existing column — tested);
+  `0` ⇒ no anchoring; any float in `[0, 1]` ⇒ that weight (clamped; unparseable ⇒ default, and the
+  source says so). The refresh entrypoint resolves it ONCE per run, prints
+  `nhl owned generation: market anchor weight=… (source=…)` with `flush=True`, and passes the
+  value explicitly into both builders. The CLI's `--anchor-weight` beats the env; `--no-anchor` ⇒ 0.
+- **The artifact.** Four columns appended to `predictions_{date}.csv` (`artifacts.PREDICTIONS_COLUMNS`;
+  the UI reads by name, so the tail is inert): `anchor_weight`, `anchor_state`
+  (`anchored` | `no_market` | `disabled`), `p_home_ml_raw`, `p_home_pl_-1.5_raw`. The `_raw` twins
+  are `build_game_prediction` run on the UN-anchored lambdas with the same per-game seed — the pure
+  model, kept beside the served number (`build_nhl_artifacts.predict_game`). When
+  `anchor_state != "anchored"`, served == raw. `HockeyGamePrediction` carries the same four fields
+  (`contracts.py`), defaulting to `None` for predictions built outside the producer.
+- **The grader.** `scripts/grade_nhl_predictions_vs_market.py` now scores `_raw` as the MODEL and
+  reports the served column as a third series labelled `anchored(served)`. A row with no `_raw`
+  value, no legacy `_model` column, and no `anchor_state` asserting served == raw is REFUSED for
+  moneyline/puck-line under `anchored_probability_not_separable` (counted, printed, in the JSON) —
+  never scored as the model. That refusal currently covers every `--source production` row:
+  `/nhl/api/cards` exposes only the served `p_home_win`, so production-sourced moneyline
+  comparisons are unavailable as a model reading until the route surfaces `p_home_ml_raw`.
+  Totals score exactly as before on every source. Re-running §8/§8b against files that predate
+  P4 will therefore report moneyline/puck-line as REFUSED, which is the correct reading of them.
+- **Props — verified NOT anchored, on two independent grounds.** `build_props_for_date` builds its
+  own slate via `build_slate_features(date, root=root)` with the loader's default
+  `anchor_to_market=False` and injects no market at all; and even if the anchored slate were
+  reused, `anchor_game_features` replaces only `period_goal_lambdas` while the boxscore engine's
+  `TeamRates.goals_per_60` (`player_props._team_rates`) is back-filled by `apply_projection` from the
+  UN-anchored projection (§3). So prop rows carry no anchoring provenance and none was added.
+  The earlier statement that anchoring "applies to the PROPS pipeline" had the two paths exactly
+  reversed.
+- **Not fixed here, still open:** the byte-identical stale `predictions_<date>.csv` re-serving
+  described above (§8, "A real bug found while building this") is a separate pipeline defect; the
+  grader's dedup still masks it in the backtest and nothing in P4 addresses the producer side.
+- **Tests:** `tests/test_hockeysim_anchor_flag.py` — flag absent ⇒ legacy columns bit-identical to
+  the hand-computed pre-flag output; `0` ⇒ served == raw and off ≠ on; the env weight is the weight
+  `anchor_game_features` receives (spied), and an explicit kwarg beats the env; `no_market`
+  pass-through; the refresh entrypoint threads one resolved weight into both builders and none
+  into props; the grader refuses a legacy row and scores raw on a P4 row, end-to-end through the
+  real producer CSV.

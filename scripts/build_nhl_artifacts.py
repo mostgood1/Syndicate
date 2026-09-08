@@ -6,9 +6,24 @@ Syndicate-owned inputs: the mirrored slate/roster/lineup/goalie artifacts + coll
 (``syndicate.local_nhl_odds`` collector output).
 
 Pipeline per game: build_slate_features (projection-primed) -> inject consensus market lines ->
-(optional) market-anchor -> build_game_prediction. Emits predictions_{date}.csv,
-recommendations_sim_{date}.csv (leaning pick per market), and props_recommendations_{date}.csv
-(boxscore engine joined to collected prop lines).
+build_game_prediction on the UN-anchored lambdas (the `_raw` columns) -> market-anchor at the ONE
+resolved weight -> build_game_prediction again on the anchored lambdas (the served columns).
+Emits predictions_{date}.csv, recommendations_sim_{date}.csv (leaning pick per market), and
+props_recommendations_{date}.csv (boxscore engine joined to collected prop lines).
+
+MARKET ANCHORING IS ON BY DEFAULT HERE (pricing plane v1, P4). `loaders.build_game_features`'s
+`anchor_to_market` flag defaults to False, but this producer never uses it -- it injects the
+consensus lines itself and calls `market_anchoring.anchor_game_features` directly, so in production
+(`scripts/refresh_nhl_oddsapi.py::_run_owned_generation`) every game with a usable moneyline is
+anchored at 0.35 BEFORE the sim. The one production knob is `SYNDICATE_NHL_MARKET_ANCHOR_WEIGHT`
+(absent => 0.35, bit-identical to the pre-flag artifact; `0` => no anchoring; any float in [0, 1]);
+`--anchor-weight` / `--no-anchor` override it for a local run. Every predictions row records
+`anchor_weight`, `anchor_state` (anchored | no_market | disabled), `p_home_ml_raw` and
+`p_home_pl_-1.5_raw` so the pure model survives beside the served blend.
+
+`build_props_for_date` builds its OWN slate with no market injected and no anchoring; it does not
+consume the anchored lambdas (and `anchor_game_features` never touches `goals_per_60`, the field
+the boxscore engine reads), so prop rows carry no anchoring provenance.
 
 Usage:
     py -3 scripts/build_nhl_artifacts.py --date 2026-06-14 --props --recommendations
@@ -39,7 +54,13 @@ from syndicate.features.nhl.sim_engine.hockeysim.contracts import (  # noqa: E40
     HockeyGamePrediction,
     HockeyMarketLines,
 )
-from syndicate.features.nhl.sim_engine.hockeysim.market_anchoring import anchor_game_features  # noqa: E402
+from syndicate.features.nhl.sim_engine.hockeysim.market_anchoring import (  # noqa: E402
+    ANCHOR_STATE_ANCHORED,
+    ENV_ANCHOR_WEIGHT,
+    anchor_game_features,
+    anchor_state_for,
+    resolve_anchor_weight,
+)
 from syndicate.features.nhl.sim_engine.hockeysim.player_props import build_prop_projections  # noqa: E402
 from syndicate.features.nhl.sim_engine.hockeysim.features.loaders import (  # noqa: E402
     _processed_dir,
@@ -56,10 +77,43 @@ from syndicate.features.nhl.sim_engine.hockeysim.features.props_lines import (  
 )
 
 
+def _effective_anchor_weight(anchor: bool, anchor_weight: Optional[float]) -> float:
+    """The ONE resolved weight this producer honours: ``--no-anchor`` => 0; an explicit kwarg wins;
+    otherwise the env flag; otherwise 0.35 (``resolve_anchor_weight``)."""
+    if not anchor:
+        return 0.0
+    weight, _source = resolve_anchor_weight(anchor_weight)
+    return weight
+
+
+def predict_game(game, *, anchor_weight: float) -> HockeyGamePrediction:
+    """One game's prediction row with anchoring provenance.
+
+    Runs the (seeded, deterministic) game-market sim on the UN-anchored lambdas first -- that is
+    the pure model, recorded as ``p_home_ml_raw`` / ``p_home_pl_minus_1_5_raw``. When the game is
+    ``anchored`` (weight > 0 and a usable moneyline), the lambdas are shifted toward the book and
+    the sim runs again on the anchored lambdas; that second run is the SERVED row, unchanged from
+    the pre-flag producer. Otherwise the raw run IS the served row (served == raw).
+    """
+    state = anchor_state_for(game.market, anchor_weight)
+    raw = build_game_prediction(game)
+    served = raw
+    if state == ANCHOR_STATE_ANCHORED:
+        served = build_game_prediction(anchor_game_features(game, weight=anchor_weight))
+    return replace(
+        served,
+        anchor_weight=float(anchor_weight),
+        anchor_state=state,
+        p_home_ml_raw=raw.p_home_ml,
+        p_home_pl_minus_1_5_raw=raw.p_home_pl_minus_1_5,
+    )
+
+
 def _predictions_and_markets(
-    date: str, *, root: Optional[Path], anchor: bool, anchor_weight: float,
+    date: str, *, root: Optional[Path], anchor: bool, anchor_weight: Optional[float],
 ) -> Tuple[List[HockeyGamePrediction], Dict[str, HockeyMarketLines]]:
-    """Build every game's prediction for a slate (market-injected, optionally anchored)."""
+    """Build every game's prediction for a slate (market-injected, anchored at the resolved weight)."""
+    weight = _effective_anchor_weight(anchor, anchor_weight)
     games = build_slate_features(date, root=root)
     lines = load_market_lines(date, root=root)
     predictions: List[HockeyGamePrediction] = []
@@ -68,18 +122,20 @@ def _predictions_and_markets(
         market = market_for_game(lines, g.home.name, g.away.name)
         if market is not None:
             g = replace(g, market=market)
-            if anchor:
-                g = anchor_game_features(g, weight=anchor_weight)
         markets[g.game_pk] = g.market
-        predictions.append(build_game_prediction(g))
+        predictions.append(predict_game(g, anchor_weight=weight))
     return predictions, markets
 
 
 def build_predictions_for_date(
     date: str, *, root: Optional[Path] = None, anchor: bool = True,
-    anchor_weight: float = 0.35, out_dir: Optional[Path] = None,
+    anchor_weight: Optional[float] = None, out_dir: Optional[Path] = None,
 ) -> Tuple[Path, int]:
-    """Produce predictions_{date}.csv for a slate. Returns (path, game_count)."""
+    """Produce predictions_{date}.csv for a slate. Returns (path, game_count).
+
+    ``anchor_weight=None`` (the production default) resolves through ``SYNDICATE_NHL_MARKET_ANCHOR_WEIGHT``,
+    falling back to 0.35; ``anchor=False`` forces 0 (state ``disabled``).
+    """
     predictions, markets = _predictions_and_markets(date, root=root, anchor=anchor, anchor_weight=anchor_weight)
     out_path = (out_dir or _processed_dir(root)) / f"predictions_{date}.csv"
     n = write_predictions_csv(out_path, predictions, markets)
@@ -88,9 +144,10 @@ def build_predictions_for_date(
 
 def build_recommendations_for_date(
     date: str, *, root: Optional[Path] = None, anchor: bool = True,
-    anchor_weight: float = 0.35, out_dir: Optional[Path] = None,
+    anchor_weight: Optional[float] = None, out_dir: Optional[Path] = None,
 ) -> Tuple[Path, int]:
-    """Produce recommendations_sim_{date}.csv (leaning pick per market). Returns (path, row_count)."""
+    """Produce recommendations_sim_{date}.csv (leaning pick per market). Returns (path, row_count).
+    Anchor-weight resolution is identical to :func:`build_predictions_for_date`."""
     predictions, markets = _predictions_and_markets(date, root=root, anchor=anchor, anchor_weight=anchor_weight)
     out_path = (out_dir or _processed_dir(root)) / f"recommendations_sim_{date}.csv"
     n = write_recommendations_sim_csv(out_path, predictions, markets)
@@ -167,8 +224,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Build local NHL artifacts (hockeysim producer)")
     ap.add_argument("--date", required=True, help="slate date YYYY-MM-DD")
     ap.add_argument("--root", default=None, help="artifact root (default data/nhl_source)")
-    ap.add_argument("--no-anchor", action="store_true", help="disable market anchoring")
-    ap.add_argument("--anchor-weight", type=float, default=0.35)
+    ap.add_argument("--no-anchor", action="store_true", help="disable market anchoring (anchor_state=disabled)")
+    ap.add_argument("--anchor-weight", type=float, default=None,
+                    help=f"pre-sim moneyline anchor weight in [0,1]; default: ${ENV_ANCHOR_WEIGHT}, else 0.35")
     ap.add_argument("--recommendations", action="store_true", help="also build recommendations_sim")
     ap.add_argument("--props", action="store_true", help="also build props_recommendations")
     ap.add_argument("--props-n-sims", type=int, default=400)
@@ -178,8 +236,12 @@ def main() -> int:
     root = Path(args.root) if args.root else None
     out_dir = Path(args.out_dir) if args.out_dir else None
     anchor = not args.no_anchor
+    weight, source = resolve_anchor_weight(args.anchor_weight)
+    if not anchor:
+        weight, source = 0.0, "--no-anchor"
+    print(f"market anchor weight={weight} (source={source}, env={ENV_ANCHOR_WEIGHT})", flush=True)
     path, n = build_predictions_for_date(
-        args.date, root=root, anchor=anchor, anchor_weight=args.anchor_weight, out_dir=out_dir,
+        args.date, root=root, anchor=anchor, anchor_weight=weight, out_dir=out_dir,
     )
     if n == 0:
         print(f"No games for {args.date} (no mirrored scoreboard). Nothing written.")
@@ -187,7 +249,7 @@ def main() -> int:
     print(f"Wrote {n} game predictions -> {path}")
     if args.recommendations:
         rpath, rn = build_recommendations_for_date(
-            args.date, root=root, anchor=anchor, anchor_weight=args.anchor_weight, out_dir=out_dir,
+            args.date, root=root, anchor=anchor, anchor_weight=weight, out_dir=out_dir,
         )
         print(f"Wrote {rn} game recommendations -> {rpath}")
     if args.props:

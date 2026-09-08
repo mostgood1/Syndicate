@@ -27,6 +27,11 @@ PREDICTIONS_COLUMNS: List[str] = [
     "home_pl_-1.5_odds", "away_pl_+1.5_odds",
     "p_over", "p_under", "p_push_total", "p_home_pl_-1.5", "p_away_pl_+1.5",
     "ev_home_ml", "ev_away_ml", "ev_over", "ev_under", "ev_home_pl_-1.5", "ev_away_pl_+1.5",
+    # Appended (P4, pricing plane v1) -- market-anchoring provenance. Every column above is
+    # unchanged in position and value; readers use DictReader so the extra tail is inert to the UI.
+    # `p_home_ml` / `p_home_pl_-1.5` are the SERVED (anchored, when `anchor_state == "anchored"`)
+    # numbers; the `_raw` twins are the pure model. The market backtest scores `_raw` as the model.
+    "anchor_weight", "anchor_state", "p_home_ml_raw", "p_home_pl_-1.5_raw",
 ]
 
 
@@ -77,6 +82,10 @@ def prediction_to_row(pred: HockeyGamePrediction, market: Optional[HockeyMarketL
         "ev_under": _fmt(ev.get("under")),
         "ev_home_pl_-1.5": _fmt(ev.get("home_pl_-1.5")),
         "ev_away_pl_+1.5": _fmt(ev.get("away_pl_+1.5")),
+        "anchor_weight": _fmt(pred.anchor_weight),
+        "anchor_state": pred.anchor_state,
+        "p_home_ml_raw": _fmt(pred.p_home_ml_raw),
+        "p_home_pl_-1.5_raw": _fmt(pred.p_home_pl_minus_1_5_raw),
     }
     return row
 

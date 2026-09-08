@@ -143,6 +143,15 @@ class HockeyGamePrediction:
     totals_line_used: Optional[float] = None
     # EV fields (filled when market odds are present).
     ev: Dict[str, float] = field(default_factory=dict)
+    # Market-anchoring provenance (pricing plane v1, P4). The producer anchors period lambdas toward
+    # the moneyline BEFORE the sim, so `p_home_ml` / `p_home_pl_minus_1_5` above are a blend when
+    # `anchor_state == "anchored"`. The `_raw` twins are the same estimator run on the UN-anchored
+    # lambdas -- the pure model, kept beside the served number. `None` on predictions built outside
+    # the producer (tests, ad-hoc adapter calls) and on legacy artifacts.
+    anchor_weight: Optional[float] = None
+    anchor_state: Optional[str] = None  # anchored | no_market | disabled
+    p_home_ml_raw: Optional[float] = None
+    p_home_pl_minus_1_5_raw: Optional[float] = None
 
 
 @dataclass(frozen=True)

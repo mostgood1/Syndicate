@@ -568,7 +568,14 @@ def _run_owned_generation(*, artifact_root: Path, target_dates: list[str], props
     if scripts_dir not in sys.path:
         sys.path.insert(0, scripts_dir)
     from syndicate.features.nhl.sim_engine.hockeysim.ingestion import collect_slate_inputs
+    from syndicate.features.nhl.sim_engine.hockeysim.market_anchoring import ENV_ANCHOR_WEIGHT, resolve_anchor_weight
     import build_nhl_artifacts as _producer
+
+    # ONE resolved pre-sim market-anchor weight for the whole run (P4): absent env => 0.35 (the
+    # pre-flag behaviour), "0" => anchoring off. Printed, not logged -- `logger.info` never reaches
+    # Render's collector (CLAUDE.md).
+    anchor_weight, anchor_source = resolve_anchor_weight()
+    print(f"nhl owned generation: market anchor weight={anchor_weight} (source={anchor_source}, env={ENV_ANCHOR_WEIGHT})", flush=True)
 
     for target_date in target_dates:
         try:
@@ -576,8 +583,8 @@ def _run_owned_generation(*, artifact_root: Path, target_dates: list[str], props
         except Exception as exc:
             warnings.append(f"owned lineup/goalie collection failed {target_date}: {exc}")
         try:
-            _producer.build_predictions_for_date(target_date, root=artifact_root)
-            _producer.build_recommendations_for_date(target_date, root=artifact_root)
+            _producer.build_predictions_for_date(target_date, root=artifact_root, anchor_weight=anchor_weight)
+            _producer.build_recommendations_for_date(target_date, root=artifact_root, anchor_weight=anchor_weight)
         except Exception as exc:
             warnings.append(f"owned game generation failed {target_date}: {exc}")
         try:
