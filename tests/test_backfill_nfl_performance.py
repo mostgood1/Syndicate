@@ -74,19 +74,56 @@ _PROJECTION_ROW = {
 
 
 class LoadCompletedGamesTests(unittest.TestCase):
-    def test_reads_completed_game_with_negated_market_margin(self) -> None:
+    def test_market_margin_is_NOT_negated_because_nflverse_is_home_positive(self) -> None:
+        """THE REGRESSION. This test previously asserted -3.5 and passed.
+
+        `schedule_{season}.csv` is written by `fetch_nfl_schedule.py`, which
+        copies nflverse `games.csv` VERBATIM. nflverse's `spread_line` is
+        already home-margin-positive -- a home favourite is +8.5 -- so the
+        negation that used to be here inverted every regular-season
+        market_margin.
+
+        MEASURED 2026-09-07 by running `load_completed_games` over real 2025
+        results: the old code's `market_margin` agreed with the actual winner
+        **34.7%** of the time, where the market itself goes 65.3% (MAE 9.72).
+        Almost exactly one-minus the truth -- a sign error, not a weak signal.
+
+        The old test encoded the same misreading as the code, which is why a
+        green suite meant nothing here. It asserted the negation it was
+        supposed to be checking.
+        """
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write_schedule(root / "schedule_2025.csv", [_SCHEDULE_ROW])
             games = backfill.load_completed_games(2025, 1, source_root=root)
             self.assertIn("2025_01_NE_SEA", games)
             game = games["2025_01_NE_SEA"]
-            # spread_line=3.5 is bet notation (home getting 3.5) -> market_margin
-            # (home_points - away_points sense) is its negation, -3.5.
-            self.assertEqual(game["market_margin"], -3.5)
+            # spread_line=3.5 means the HOME side is favoured by 3.5, and
+            # market_margin is in the same (home_points - away_points) sense,
+            # so it is +3.5 -- unchanged, not negated.
+            self.assertEqual(game["market_margin"], 3.5)
             self.assertEqual(game["market_total"], 44.5)
             self.assertEqual(game["home_score"], 24.0)
             self.assertEqual(game["away_score"], 20.0)
+
+    def test_market_margin_sign_TRACKS_the_favourite(self) -> None:
+        """A second, sign-only probe so a future edit cannot half-fix this.
+
+        Equality on one number can be satisfied by an unrelated change; this
+        pins the PROPERTY -- a positive schedule spread must mean the home
+        team is favoured, and a negative one the away team.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            away_favoured = dict(_SCHEDULE_ROW, game_id="2025_01_KC_LAC",
+                                 spread_line="-6.5")
+            _write_schedule(root / "schedule_2025.csv",
+                            [_SCHEDULE_ROW, away_favoured])
+            games = backfill.load_completed_games(2025, 1, source_root=root)
+            self.assertGreater(games["2025_01_NE_SEA"]["market_margin"], 0,
+                               "a positive spread_line means the HOME team is favoured")
+            self.assertLess(games["2025_01_KC_LAC"]["market_margin"], 0,
+                            "a negative spread_line means the AWAY team is favoured")
 
     def test_excludes_games_without_final_scores(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -255,7 +292,8 @@ class LoadCompletedPreseasonGamesTests(unittest.TestCase):
             games_default = backfill.load_completed_games(2025, 1, source_root=root)
             games_explicit = backfill.load_completed_games(2025, 1, source_root=root, season_kind="regular")
             self.assertEqual(games_default, games_explicit)
-            self.assertEqual(games_default["2025_01_NE_SEA"]["market_margin"], -3.5)
+            # +3.5, not -3.5: nflverse spread_line is home-margin-positive.
+            self.assertEqual(games_default["2025_01_NE_SEA"]["market_margin"], 3.5)
 
 
 class LoadPreseasonMarketSnapshotsTests(unittest.TestCase):

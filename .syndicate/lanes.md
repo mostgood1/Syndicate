@@ -65,7 +65,7 @@ id resolves to an ARCHIVED session is hard evidence the lane is orphaned. The
 markers for running sessions did NOT match any roster id, so the mapping proves
 death, never life — do not invert it.
 
-### nfl-rating-units — OPEN — opened 2026-09-06 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — **NFL's sim cannot tell teams apart: across-game margin spread 2.16 pts against NCAAF's 15.37**
+### nfl-rating-units — OPEN (diagnosis COMPLETE, one decision owed) — opened 2026-09-06 — session 520cd594-1ffa-4116-8951-4c4b53ffbfcf — **HYPOTHESIS FALSIFIED. The units are NOT the cause: per-play and per-game differentials are the SAME SIGNAL (Pearson r 0.9967 / 0.9967 on 2024 / 2025, SD ratio ~60x), so the conversion is a linear rescaling carrying no new information, and head to head on held-out 2025 they are indistinguishable (MAE 10.58 vs 10.60). THE DEFECT IS THE SCALE CONSTANT: `NFL_RATING_SCALE = 10.0` is wrong for these units. Derived OUT-OF-SAMPLE (walk-forward ratings, OLS on 2023-24 vs actual margins, scored on 2025): **scale ~20**, which independently reaches the value the docstring identified and refused to use because it had been fitted to the market's SD — a different basis, same answer, objection answered. Slope varies 0.322-0.493 across splits so report ~20, not a decimal. THE MODEL STILL LOSES TO THE CLOSE (MAE 10.58 vs 9.79; SU 60.2% vs 64.2%), independently reproducing the refusal audit's t=+3.34 — so fixing the scale makes the BOARD coherent (it currently shows 93.8% of games as coin flips) and does NOT license pricing. SEPARATE DEFECT FOUND AND FIXED: `market_margin` was INVERTED for every NFL regular-season game — nflverse `spread_line` is home-margin-positive and `backfill_nfl_performance` negated it; measured 34.7% agreement with the winner, 65.3% after the fix. Two tests had asserted the wrong sign and passed. Detail: `findings_2026-09-07_nfl_rating_units_and_market_sign.md`.**
 - **CROSS-LANE WRITE, DECLARED** `[2026-09-06]`: `scripts/generate_smartsim2_nfl_projections.py` was also edited from lane `ncaaf-live-resim-wire` (SAME session, 520cd594) to wire `feature_generation_payload` -- `football_sim_input_checklist` had it as an UNWIRED PAYLOAD alarm, so every drive-prior block was neutral on every NFL game. `lane-postwrite-check` flagged it correctly; it sees files, not authors. Landed INERT behind `SYNDICATE_NFL_DRIVE_PRIORS` (default off) for the same reason the PPG ratings did: this engine already loses to the close at t=3.34, and adding a mechanism to a calibrated engine needs a re-fit first. The checklist alarm for this script is CLEARED; the preseason and NCAAF scripts still carry theirs.
 - Goal: establish whether NFL's smartsim2 projections are undifferentiated because
   the ratings are a PER-PLAY rate rather than points-per-game, and if so state the
@@ -75,7 +75,12 @@ death, never life — do not invert it.
 - Files (collision-checked 2026-09-06 with `lane_claims.claims_by_path` over
   `origin/main`; every one returned FREE):
   `scripts/generate_smartsim2_nfl_projections.py`,
-  `syndicate/features/nfl/smartsim2_projection.py`.
+  `syndicate/features/nfl/smartsim2_projection.py`,
+  `scripts/backfill_nfl_performance.py` (TAKEN 2026-09-07 -- checked FREE
+  before taking; the market-sign defect was found from this lane's backtest),
+  `tests/test_backfill_nfl_performance.py`,
+  `scripts/backtest_nfl_rating_units.py` (NEW 2026-09-07 — the walk-forward
+  harness; the finding above is reproducible by running it).
   NOT claimed and NOT edited: `syndicate/features/football/sim_engine/smartsim2/**`
   (the engine itself is shared with NCAAF and a change there moves a calibrated
   sport).

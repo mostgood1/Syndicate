@@ -94,13 +94,29 @@ def load_completed_games(
                 "away_team": row["away_team"],
                 "away_score": float(away_score),
                 "home_score": float(home_score),
-                # spread_line is bet notation (home -10.5 = home favored by
-                # 10.5), so market_margin (home_points - away_points, the
-                # expected-outcome sense) is its negation -- same convention
-                # nfl/cards.py's _nfl_market_board_rows_for_game already
-                # documents and NCAAF's backfill uses (market_margin =
-                # -mean(spreads)).
-                "market_margin": -float(spread_line) if spread_line else None,
+                # NOT NEGATED, and the comment that used to sit here is why
+                # this was wrong. `schedule_{season}.csv` is written by
+                # `fetch_nfl_schedule.py`, which copies nflverse `games.csv`
+                # VERBATIM -- and nflverse's `spread_line` is already
+                # HOME-MARGIN-POSITIVE (a home favourite is +8.5), not bet
+                # notation. Negating it inverted every regular-season
+                # market_margin.
+                #
+                # MEASURED 2026-09-07 by running THIS function over real
+                # 2025 results: `market_margin` agreed with the actual
+                # winner **34.7%** of the time, against the market's own
+                # 65.3% / MAE 9.72 on the same games. Almost exactly
+                # one-minus the truth, which is the signature of a sign
+                # error rather than a weak signal.
+                #
+                # THE OLD COMMENT WAS RIGHT ABOUT ITS SIBLINGS AND WRONG
+                # ABOUT THIS LINE, which is why it survived: the preseason
+                # branch below and `backfill_smartsim2_performance.py` both
+                # negate a SPORTSBOOK spread, which genuinely IS bet
+                # notation. Two sources, two conventions, one negation
+                # applied to both. Check the SOURCE's convention, never a
+                # sibling call site's.
+                "market_margin": float(spread_line) if spread_line else None,
                 "market_total": float(total_line) if total_line else None,
             }
     return index
