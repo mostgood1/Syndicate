@@ -5,6 +5,58 @@
 
 ---
 
+## 2026-09-08 19:35:03Z — `ci-suite` @ `052b5d93`, `--pytest-chunks 8 --pytest-workers 0` — **MEASURED: THE SUITE COMPLETED. First full pytest pass ever on a Render cron; no OOM, no timeout.** `[lane render-cron-failures]`
+
+Deploy `dep-dag5d3eq1p3s73edvep0` (live 18:42:14Z), run
+`crn-dafg4h0u01pc73aavs6g-1788892953`. Taken behind both locks — claim held by
+this lane, preflight `CLEAR: no cron run in flight` — the cron locks built
+earlier the same day, used on a real deploy.
+
+    step                       previously                    this run
+    pytest vs baseline         OOM at 2Gi, 537s / 1056s      **rc=1 at 3013s**
+    the 9 fast steps           rc=0                          rc=0
+
+**CHUNKING IS THE LEVER. It is the first configuration that finishes.** Worker
+count never was: `auto`, `2` and `0` all died, and fewer workers died SOONER.
+`rc=1` is `EXIT_NEW_FAILURES`, **not** `EXIT_RUN_BROKEN` — so no chunk died,
+the refusal path did not fire, and the union covers the whole suite. 3013s sits
+well inside the 7200s cap.
+
+**WHAT FAILED IS NOT KNOWN, AND THE REASON IS THE DEFECT THIS RUN EXPOSED.**
+`run_ci_suite.run()` captured the step and printed a 12-line tail; the tail was
+consumed by the suite's OWN `PROCESS_ENUM_DEBUG` / `ALL_PROCESS_MEMORY` /
+`CONTAINER_MEMORY` output, so the `collected=` totals and the `NEW FAILURE`
+list never reached the log at all. A 50-minute run produced a verdict with no
+evidence. Streaming (`e8f782a1`) was deployed as `c208b5ef` and the run
+repeated as `...-1788896349` to obtain the list.
+
+**AND THE READING THAT FELL OUT OF THAT DEBUG OUTPUT IS THE MOST USEFUL NUMBER
+OF THE DAY.** The container, at the end of a run that SUCCEEDED:
+
+    memory_current_mb        2004.4   of memory_max_mb 2048   (98%)
+    memory_anon_mb            410.1
+    memory_inactive_file_mb   410.5
+
+**`memory.current` sat at 98% of the limit while ANONYMOUS memory was 410 MB.**
+Most of that 2 GB is PAGE CACHE, not the suite's own allocations — the
+hypothesis raised and set aside earlier, now supported by a direct cgroup
+reading rather than by inference. It also explains the local-vs-Render gap:
+Windows working-set does not count file cache and a Linux cgroup does, which is
+why the local probe read 629 MB where the cron had already hit 2048. The
+standing rule `project-memory-current-is-page-cache` said to split anon from
+`inactive_file` before calling anything a leak, and this is that case again.
+
+**NOT ESTABLISHED:** that page cache CAUSED the OOMs. The kernel normally
+reclaims cache before killing, so the honest statement is that anon and cache
+together crossed the line and chunking helps by resetting anon per chunk — with
+the container still finishing at 98%, so headroom is thin either way.
+
+**OPEN, AND IT DECIDES WHETHER CHUNKING IS SAFE TO KEEP:** chunking changes
+which tests share a process, and the baseline was recorded from a SINGLE-process
+run. A test that passed only because of another file's side effects would now
+fail. So `rc=1` may be a chunking ARTIFACT rather than a regression on `main`,
+and the list from the streaming re-run is what tells them apart.
+
 ## 2026-09-08 17:09:30Z — `ci-suite` @ `--pytest-workers 0` — **MEASURED: IT OOMs AT THE FLOOR, AND SOONER. Worker count is not the lever, and the ladder I proposed pointed the wrong way.** `[lane render-cron-failures]`
 
 Config change only (no deploy — see below). Run
