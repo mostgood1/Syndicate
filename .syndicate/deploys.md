@@ -26563,3 +26563,41 @@ they did not read an event to confirm timeout rather than restart.
 **verify:** `unhealthy` NOT firing under a 6x3 burst — **NOW PASSING**, once, in
 a clean window. The >=5 s request share against the 32.5% baseline is still
 unmeasured; that needs organic traffic, not a synthetic burst.
+
+
+## 2026-09-08 01:38Z — refresh-worker — ENV ARMED, DEPLOY HELD `[lane nfl-rating-units]`
+
+**STATE: `SYNDICATE_NFL_PPG_RATINGS=1` IS SET ON refresh-worker AND NOT YET
+DEPLOYED.** Written down because that is an invisible armed state: the code half
+(`abc56f64`, `NFL_RATING_SCALE` 10.0 -> 20.0) is already on `origin/main`, so
+**the next refresh-worker deploy by ANY session activates this change**, whether
+or not they know about it. That is the state I intend, but a peer should not
+discover it by surprise.
+
+- env set 01:38Z via the single-key endpoint, read back `= 1` (set is not the
+  same as set; both directions checked).
+- claim: held by `nfl-rating-units` from 01:34:24Z.
+- preflight with `--target-commit abc56f64`: **HOLD** — `run_mlb_daily_sim_job.py`
+  (pid 1960) started between my first and second preflight. A deploy kills it,
+  so the deploy waits. Polling for CLEAR.
+- The first preflight returned CLEAR and the guard correctly REFUSED it anyway:
+  it had been run without `--target-commit`, so it vouched for no particular
+  SHA. It also caught that my shell lane was `soccer-unfed-inputs` while the
+  claim was held by `nfl-rating-units` — both my lanes, but the guard is right
+  that a claim must be held by the lane that is deploying.
+
+**WHAT THIS SHIPS.** NFL's across-game margin spread was 2.16 pts against a
+market SD of ~5.8, putting 93.8% of games inside P(home) 0.35-0.65 — a board
+telling the user every NFL game is a coin flip, two days before the season
+opens. The scale is set from a walk-forward out-of-sample fit (OLS on 2023-24
+against realised margins, scored on a 2025 the fit never saw).
+
+**verify:** the next `smartsim2_nfl_projections_2026_wk1` artifact written after
+the deploy must show an across-game `margin_mean` stdev of roughly 5, not 2.16,
+AND `rating_source` unchanged (`current_season_rolling` / `prior_season_fallback`,
+never `neutral_no_data` — a degenerate rating would also flatten the spread and
+must not be mistaken for the fix landing). Reading owed here.
+
+**NOT verified and not claimed:** that this improves accuracy. It does not — the
+corrected model still loses to the close (MAE 10.58 vs 9.79, SU 60.2% vs 64.2%).
+This is a display-honesty fix and must not be read as a pricing edge.
