@@ -2036,7 +2036,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Also decided, and recorded because a future reader will wonder: crons are deliberately **NOT** in the guard's `ALL_SERVICES`. They are not in `render.yaml`, so `blueprint_sync` cannot reach them; including them would make every blueprint push demand three claims nobody needs, which is how a lock stops meaning anything.
 - Blocked by: none. **No deploy of any kind. These are local tooling and a hook; nothing here reaches Render.**
 
-### learnings-instrument-family-consolidation — OPEN — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea99184 — **~50 entries in `learnings.md` restate one claim about measurement sources; four of them were broken in a single session and none reached it**
+### learnings-instrument-family-consolidation — **CLOSED 2026-09-08 — THE FOLD WAS REJECTED ON THE EVIDENCE; A MAP SHIPPED INSTEAD** — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea99184 — **~50 entries in `learnings.md` restate one claim about measurement sources; four of them were broken in a single session and none reached it**
 - Goal: fold the instrument/predicate/measurement-source family into ONE entry,
   with **zero rules lost** — every consolidated original recoverable VERBATIM,
   and every rule still reachable from `learnings_index.md` afterwards.
@@ -2075,6 +2075,40 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   against origin's copies with **0 index entries removed**; (4) each folded
   rule's sentence is still reachable by a `grep` of `learnings_index.md`.
 - Blocked by: none.
+- **GOAL, verbatim:** *"fold the instrument/predicate/measurement-source family
+  into ONE entry, with zero rules lost."*
+  **`GOAL: NOT MET AS STATED — because the goal was WRONG, and that is the
+  finding.`** The premise was that the family was ~50-95 near-duplicates. It is
+  not. A full inventory from `origin/main` found **~95 entries in FOUR families
+  whose FIXES DIFFER** (instrument / measurement-source / predicate / confounded
+  reading), in 17 clusters. Folding them would have deleted ~78 headings, each
+  naming a mechanism a generic rule would not have prevented. **"Check your
+  instruments" would have prevented none of the incidents that produced these.**
+- **THE DECIDING EVIDENCE was cheaper than the inventory.** The 2026-08-20
+  precedent's own five originals had been **absent from `learnings_index.md`
+  since the day they were archived** — `build_learnings_index.py` spanned
+  `learnings_archive.md` but not the dated file. Consolidation had already cost
+  five rules once, silently. A pass that had already failed that way once is not
+  a pass to repeat at 19x the scale.
+- **WHAT SHIPPED INSTEAD:** one MAP entry (`2026-09-08 MAP: ~95 rules ... one
+  question in 17 shapes`). It costs **one heading and destroys nothing**; the
+  fold would have cost 78 rules to save the same one heading. The problem was
+  never rule COUNT — it is that 911 rules reach a session as SIX headings.
+- **READINGS.** `learnings.md` headings **254 -> 255** (+1, the map; nothing
+  folded). Index **916 -> 917**, **0 entries removed**. BOM intact. Generator fix
+  `d1d4045d` independently measured 911 -> 916 with the 5 orphans recovered.
+  Verification (1) heading conservation: trivially met, nothing was moved.
+  (2) archive-verbatim: **N/A, no archive was written.** (3) 0 index entries
+  removed: met. (4) every rule reachable: met, and 5 MORE reachable than before.
+- **BUILT AND NOT USED, deliberately:** `scripts/consolidate_learnings.py`
+  (`1e9f9365`), tested to refuse three ways. It is the right tool for a fold that
+  is genuinely warranted; this one was not. Its refusal on an unfixed generator
+  is what makes the next attempt safe.
+- **DO NOT RE-PROPOSE THE FOLD** without new evidence that two entries share a
+  MECHANISM, not merely a topic. The one clean duplicate pair found
+  (`2026-08-13` discriminator-only-on-FAILURE, written twice the same day) lives
+  in `learnings_evidence.md` and was left alone: merging two already-compacted
+  evidence entries saves no delivery and risks a rule.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

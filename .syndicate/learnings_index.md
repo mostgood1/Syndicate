@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 916 rules `[generated]`
+## Index — 917 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -368,7 +368,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 562**
+**Rules and corrections — 563**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -471,6 +471,7 @@
 - [2026-09-07 The deploy-claim breadcrumb id is not merely un-prefixed -- it is not in the…](#2026-09-07-the-deploy-claim-breadcrumb-id-is-not-merely-un-prefixed----it-is-not-in-the-roster-at-all)
 - [2026-09-07 A pre-filter that can change the ANSWER is not a pre-filter. `[#632, session…](#2026-09-07-a-pre-filter-that-can-change-the-answer-is-not-a-pre-filter-632-session-b2b5b45b)
 - [2026-09-08 A probe is production load, and an unbounded one is an outage. `[#632, sessi…](#2026-09-08-a-probe-is-production-load-and-an-unbounded-one-is-an-outage-632-session-b2b5b45b)
+- [2026-09-08 MAP: ~95 rules in this file are one question in 17 shapes — *"is the number…](#2026-09-08-map-95-rules-in-this-file-are-one-question-in-17-shapes-is-the-number-i-read-the-one-the-decision-depends-on-read-this-before-writing-another-lane-learnings-instrument-family-consolidation-session-e51345f0)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

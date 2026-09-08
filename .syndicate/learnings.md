@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 916 rules `[generated]`
+## Index — 917 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4185,3 +4185,91 @@ until worktrees; the stash still is), [[concurrent_parallel_sessions]],
   DIGEST. Measured.` already established that. **A rule that exists and does not
   reach the session is an exhortation with a distribution problem** — which is
   the same finding as this session's other rule, turned on this file itself.
+
+## 2026-09-08 MAP: ~95 rules in this file are one question in 17 shapes — *"is the number I read the one the decision depends on?"* Read this before writing another. `[lane learnings-instrument-family-consolidation, session e51345f0]`
+
+- **What we believed:** that the instrument/predicate family had grown to ~50-95
+  near-duplicate entries and should be CONSOLIDATED — folded into one entry with
+  the originals archived, following `2026-08-20 — ONE ERROR IN FIVE GUISES`.
+  That was the plan, a tool was built for it, and it was **rejected on the
+  evidence.**
+- **What was actually true:** they are not near-duplicates. A full inventory read
+  from `origin/main` found **~95 entries in FOUR families whose fixes differ**,
+  and folding them would have deleted ~78 headings each naming a mechanism a
+  generic rule would not have prevented:
+  - **A — INSTRUMENT** (~65): *can the reading vary with the truth at all?*
+    Fix: build a case that makes it read otherwise.
+  - **B — MEASUREMENT-SOURCE** (~11): *is the value about the thing it claims?*
+    Fix: find the surface that actually serves the reading.
+  - **C — PREDICATE** (~13): *where did the threshold come from?*
+    Fix: read the enforcer, not a docstring beside it.
+  - **D — CONFOUNDED READING** (~10): *is the population or window contaminated?*
+    Fix: split by eligibility, or clip the regime.
+  "Check your instruments" is what a merged entry would have said, and it would
+  have prevented none of the incidents that produced these.
+- **How we found out:** the inventory was commissioned specifically to argue
+  AGAINST consolidation, and did. The decisive check was cheaper: **the 2026-08-20
+  precedent's own five originals had been absent from `learnings_index.md` since
+  the day they were archived** — the generator spanned `learnings_archive.md` but
+  not the dated file. Consolidation had already cost five rules once, silently.
+  (Fixed 2026-09-08, `d1d4045d`: 911 -> 916 indexed, 0 removed.)
+- **The rule going forward:**
+  1. **Before writing a rule about a measurement, grep this map's clusters
+     below.** ~95 entries already cover this ground; the odds you have a new
+     claim are low and the cost of a duplicate is dilution.
+  2. **Do not fold this family.** Merge at CLUSTER level at most, never at
+     family level, and only where two entries make the same claim from the same
+     mechanism. A topical neighbour is not a duplicate.
+  3. **A map is the cheaper lever than a merge.** The problem was never that
+     there are too many rules — it is that 911 rules reach a session as SIX
+     headings. This entry costs one heading and destroys nothing; a merge would
+     have cost 78 rules to save the same one heading.
+- **THE 17 CLUSTERS.** Regenerate membership with
+  `grep -iE 'instrument|predicate|discriminat|control|denominator|proxy|reachab' .syndicate/learnings_index.md`.
+  - **A1 calibration** — prove it CAN read otherwise before trusting a clean
+    reading. *(08-13 emit-non-zero · 08-27 built-out-of-the-thing-it-measures ·
+    09-02 mutate-before-believing-green)*
+  - **A2 wrong surface** — the instrument is not attached to what broke.
+    *(08-16 wrapper-vs-siblings · 08-27 reading-from-a-different-surface)*
+  - **A3 silent failure** — working and never-ran emit the same thing.
+    *(08-13 discriminator-only-on-FAILURE, written TWICE the same day from two
+    incidents · 08-19 guard-that-fails-open-silently)*
+  - **A4 coverage gap** — the failure lives where the instrument never looks.
+    *(09-04 cannot-see-the-suspect · 09-05 one-branch-does-not-certify-the-other)*
+  - **A5 control design** — the comparison group cannot discriminate.
+    *(08-27 control-broken-the-same-way · 09-06 same-length-of-time)*
+  - **A6 discriminating power** — the signal was never shown to separate the
+    states. *(08-31 visible-vs-discriminates · 09-06 key-not-value)*
+  - **A7 singletons (~14)** — mechanism-specific, deliberately unmerged: a killed
+    process emits no log; watchers lie in four ways; a green suite over a file
+    that cannot boot.
+  - **B1 reachability** — code-reachable is not data-reachable. *(08-13
+    presence-is-not-reachability · 09-04 deploy-target-by-what-SERVES)*
+  - **B2 describes the instrument** — the reading is a fact about the reader.
+    *(08-29 count-0-is-about-the-SCANNER · 09-01 degenerate-fit)*
+  - **B3 singletons (2)** — including 09-03 *polling a friendlier proxy instead
+    of the instrument that GATES*, which is 2026-08-20's claim recurring two
+    weeks later in another subsystem. **Left separate on purpose: it is the
+    evidence that consolidating a family does not stop the mistake.**
+  - **C1 read the enforcer (9)** — not the comment, the docstring, or the name.
+    *(09-02 threshold-from-ENFORCER-claim-from-PREDICATE — the anchor · 09-06
+    name-the-WRITER-of-the-field)*
+  - **C2 predicate soundness (4)** — is it observable, and does its label follow
+    from its condition? *(08-13 label-entailed-by-exit-condition · 09-03
+    check-it-is-OBSERVABLE-first)*
+  - **D1 wrong denominator (4)** — which ROWS are in the population. *(08-13
+    pooled-denominator · 09-04 denominator-from-OUTSIDE-the-instrument)*
+  - **D2 window confound (5)** — which MOMENTS are in the window. *(09-02
+    measuring-the-RAMP-after-a-restart · 09-07 another-session-was-loading-it)*
+  - **D3 singleton** — 09-07 a predicate on a TOTAL that can move for another
+    reason.
+  *(D1 and D2 are NOT one cluster: one is an eligibility filter you failed to
+  apply, the other a regime you failed to exclude. Different operations.)*
+- **Cost:** four of these rules were broken in a single session on 2026-09-08 —
+  the digest budget read off total stdout instead of `$BODY`; an open-lane count
+  from a grep instead of the parser `lane-guard` uses; a commit diffed against
+  the base its index was SEEDED from instead of the one it lands on; a push-state
+  claim restated from a two-hour-old reading. Every one of them had a rule, aged
+  6 to 24 days, and none reached the session. **That is the cost this map exists
+  to reduce, and it is the second confirmed instance of this file's own
+  2026-09-08 rule about delivery.**
