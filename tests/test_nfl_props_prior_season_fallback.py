@@ -397,7 +397,23 @@ def _load_refresh_worker():
     return module
 
 
-def test_an_empty_prop_artifact_does_not_read_as_fresh(tmp_path):
+def _write_real_artifact(monkeypatch, tmp_path, sim_rows):
+    """Produce the artifact through the PRODUCTION writer, never by hand.
+
+    The first version of these tests hand-wrote `{"rows": []}`. The artifact has
+    never had a `rows` key -- `write_nfl_prop_projection_artifact` emits
+    `sim_rows` -- so the helper under test read a key that is always absent,
+    always returned False, and the override it gates never fired. The tests
+    passed because they asserted against the same invented schema as the bug.
+    Round-tripping the real writer is what makes them able to fail.
+    """
+    from syndicate.features.nfl import props as props_module
+
+    monkeypatch.setattr(props_module, "nfl_artifact_output_root", lambda: tmp_path)
+    return props_module.write_nfl_prop_projection_artifact(2026, 1, sim_rows)
+
+
+def test_an_empty_prop_artifact_does_not_read_as_fresh(monkeypatch, tmp_path):
     """Gate on the ROWS, not the mtime.
 
     `_season_projection_should_launch` answers "is it old?" from stat() alone,
@@ -407,17 +423,24 @@ def test_an_empty_prop_artifact_does_not_read_as_fresh(tmp_path):
     over web's good copy after each restart. Without this the repair is
     unreachable for a day, i.e. the fix ships inert.
     """
+    worker = _load_refresh_worker()
+    path = _write_real_artifact(monkeypatch, tmp_path, [])
+    assert worker._nfl_prop_artifact_is_empty(path) is True
+
+
+def test_a_real_populated_artifact_is_not_empty(monkeypatch, tmp_path):
+    """The SCHEMA-AGREEMENT test. A wrong key here makes the override inert."""
     import json
 
     worker = _load_refresh_worker()
-    is_empty = worker._nfl_prop_artifact_is_empty
+    rows = [{"entity": f"p{i}", "market": "anytime_td"} for i in range(40)]
+    path = _write_real_artifact(monkeypatch, tmp_path, rows)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert "sim_rows" in payload, "the writer's row key changed -- update the helper"
+    assert worker._nfl_prop_artifact_is_empty(path) is False
 
-    empty = tmp_path / "empty.json"
-    empty.write_text(json.dumps({"season": 2026, "week": 1, "rows": []}), encoding="utf-8")
-    assert is_empty(empty) is True
 
-
-def test_the_empty_check_never_forces_a_launch_on_anything_else(tmp_path):
+def test_the_empty_check_never_forces_a_launch_on_anything_else(monkeypatch, tmp_path):
     """Every non-empty state must return False, including the ones it cannot read.
 
     ABSENT is not empty -- the staleness decision already has a missing-artifact
@@ -431,12 +454,8 @@ def test_the_empty_check_never_forces_a_launch_on_anything_else(tmp_path):
     worker = _load_refresh_worker()
     is_empty = worker._nfl_prop_artifact_is_empty
 
-    small_non_empty = tmp_path / "small.json"
-    small_non_empty.write_text(json.dumps({"rows": [{"a": 1}] * 5}), encoding="utf-8")
-    assert is_empty(small_non_empty) is False
-
     large = tmp_path / "large.json"
-    large.write_text(json.dumps({"rows": [{"a": "x" * 200}] * 100}), encoding="utf-8")
+    large.write_text(json.dumps({"sim_rows": [{"a": "x" * 200}] * 100}), encoding="utf-8")
     assert large.stat().st_size > worker._NFL_PROP_ARTIFACT_SUSPECT_BYTES
     assert is_empty(large) is False
 
@@ -455,8 +474,7 @@ def _drive_nfl_prop_autorun(worker, monkeypatch, tmp_path, *, since_launch, cool
     """Run the autorun with everything but the launch decision stubbed out."""
     import json
 
-    artifact = tmp_path / "nfl_prop_projections_2026_wk1.json"
-    artifact.write_text(json.dumps({"season": 2026, "week": 1, "rows": []}), encoding="utf-8")
+    artifact = _write_real_artifact(monkeypatch, tmp_path, [])
 
     launched: list[str] = []
     monkeypatch.setattr(worker, "_season_projection_auto_refresh_enabled", lambda: True)

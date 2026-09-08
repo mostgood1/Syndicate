@@ -5307,7 +5307,17 @@ def _nfl_prop_artifact_is_empty(artifact_path: Path) -> bool:
         return False
     if not isinstance(payload, dict):
         return False
-    rows = payload.get("rows")
+    # `sim_rows` IS THE KEY, and I got this wrong the first time in a way that
+    # made the whole override inert: the helper read `rows`, which this artifact
+    # has never had, so it returned False for every input and the launch was
+    # never forced. The unit tests passed because I wrote their fixtures with
+    # the same invented key -- a test that agrees with the bug.
+    #
+    # `write_nfl_prop_projection_artifact` emits {season, week, generated_at,
+    # sim_rows, row_count} and `read_nfl_prop_projection_artifact` reads
+    # `sim_rows`. Match the READER exactly; the test now round-trips the real
+    # writer so the two cannot drift apart silently again.
+    rows = payload.get("sim_rows")
     return isinstance(rows, list) and not rows
 
 
