@@ -2695,10 +2695,23 @@ def simulate_game(
         batter_shape_mults = _statcast_shape_rate_mults(batter_prof, role="batter")
         pitcher_shape_mults = _statcast_shape_rate_mults(pitcher_prof, role="pitcher")
 
+        # HOME-FIELD ADVANTAGE. See `GameConfig.home_field_offense_mult` for the
+        # measurement (mean predicted home margin -0.186 against an actual
+        # +0.021 over 1,015 games) and for why it is symmetric.
+        #
+        # `batting_roster is home` is the same discriminator the venue splits
+        # above already use, so this introduces no new notion of which side is
+        # at home. At the default of 1.0 both branches multiply by exactly 1.0
+        # and the expression is bit-identical to the previous one.
+        _hfa = float(getattr(cfg, "home_field_offense_mult", 1.0) or 1.0)
+        if _hfa <= 0.0:
+            _hfa = 1.0
+        hfa_mult = _hfa if batting_roster is home else (1.0 / _hfa)
+
         batter_k = _clamp_rate(float(batter_prof.k_rate) * _mult_from_map(b_mults, "k") * _mult_from_map(batter_venue_mults, "k") * float(batter_shape_mults.get("k", 1.0)), 0.05, 0.55)
         batter_bb = _clamp_rate(float(batter_prof.bb_rate) * _mult_from_map(b_mults, "bb") * _mult_from_map(batter_venue_mults, "bb") * float(batter_shape_mults.get("bb", 1.0)), 0.01, 0.22)
-        batter_hr = _clamp_rate(float(batter_prof.hr_rate) * _mult_from_map(b_mults, "hr") * _mult_from_map(batter_venue_mults, "hr") * float(batter_shape_mults.get("hr", 1.0)), 0.002, 0.12)
-        batter_inplay = _clamp_rate(float(batter_prof.inplay_hit_rate) * _mult_from_map(b_mults, "inplay") * _mult_from_map(batter_venue_mults, "inplay") * float(batter_shape_mults.get("inplay", 1.0)), 0.10, 0.45)
+        batter_hr = _clamp_rate(float(batter_prof.hr_rate) * _mult_from_map(b_mults, "hr") * _mult_from_map(batter_venue_mults, "hr") * float(batter_shape_mults.get("hr", 1.0)) * hfa_mult, 0.002, 0.12)
+        batter_inplay = _clamp_rate(float(batter_prof.inplay_hit_rate) * _mult_from_map(b_mults, "inplay") * _mult_from_map(batter_venue_mults, "inplay") * float(batter_shape_mults.get("inplay", 1.0)) * hfa_mult, 0.10, 0.45)
         batter_xb_share = _clamp_rate(float(getattr(batter_prof, "xb_hit_share", 0.28) or 0.28) * float(batter_shape_mults.get("xb", 1.0)) * float(pitcher_shape_mults.get("xb", 1.0)), 0.08, 0.55)
         pitch_count_mult = _clamp(
             math.sqrt(float(batter_shape_mults.get("pitch_count", 1.0)) * float(pitcher_shape_mults.get("pitch_count", 1.0))),

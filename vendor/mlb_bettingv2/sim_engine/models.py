@@ -456,6 +456,49 @@ class InningHalfState:
 
 @dataclass
 class GameConfig:
+    # ------------------------------------------------------------------
+    # HOME-FIELD ADVANTAGE. 1.0 is an EXACT no-op and is the default.
+    #
+    # THE DEFECT IT ADDRESSES, measured 2026-09-07 over 1,015 games / 78 dates
+    # (2026-05-28..08-17) against MLB StatsAPI finals: the daily sim's mean
+    # predicted home margin is **-0.186 runs** against an actual **+0.021** --
+    # it under-rates the home team by ~0.21 runs on every game. The whole of
+    # that bias sits in innings 1-5 (-0.217, -2.1 sigma); innings 6+ are
+    # unbiased (+0.010, +0.1 sigma). It is also why ACTUAL sat above PREDICTED
+    # in every calibration bin of every segment.
+    #
+    # The cause is structural: this package contained **no home-field term at
+    # all**. The only home/away asymmetry was per-player `venue_mult_home` /
+    # `venue_mult_away` splits -- shrunk toward 1.0 by `pitcher_home_away_alpha`
+    # -- plus the batting-order effect of the home team not batting in the ninth
+    # when ahead. A league-wide advantage was being asked of per-player splits
+    # that are noisy and mean-reverting, so on average it vanished.
+    #
+    # WHY IT IS APPLIED SYMMETRICALLY, and this is the part that protects the
+    # rest of the engine. `model_engine_standard.md` is explicit that adding a
+    # MECHANISM to a calibrated engine requires re-fitting whatever was
+    # absorbing it, and that two mechanisms landed together once produced a
+    # NEGATIVE interaction in 4 of 4 markets. Here the thing at risk is TOTALS,
+    # which is a separately priced market and is currently near-unbiased (full
+    # total bias -0.120 runs). So the home side is multiplied by `m` and the
+    # away side by `1/m`: the MARGIN moves and the expected TOTAL is preserved
+    # to first order, which converts "re-fit everything" into "measure that the
+    # total did not move" -- and `scripts/calibrate_mlb_home_field.py` measures
+    # exactly that rather than assuming it.
+    #
+    # Applied to `hr_rate` and `inplay_hit_rate` only: the two rates that
+    # directly create bases. Deliberately NOT `k_rate`/`bb_rate`, which would
+    # move plate-appearance counts and therefore pitch counts, bullpen entry
+    # timing and every prop that keys off them -- a much wider blast radius for
+    # the same one-dimensional effect.
+    #
+    # CALIBRATED VALUE: see `scripts/calibrate_mlb_home_field.py`, which solves
+    # for the `m` that produces the measured +0.207-run margin gap and reports
+    # what it does to totals. The default stays 1.0 until that value is adopted
+    # by an explicit decision, because turning it on changes every published
+    # MLB probability at once.
+    home_field_offense_mult: float = 1.0
+
     # *** BROKEN. DO NOT ENABLE. Kept only so the finding is not re-derived. ***
     #
     # Measured 2026-08-18: switching this on inflates run scoring by 8-35% across
