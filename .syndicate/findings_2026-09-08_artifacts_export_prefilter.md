@@ -87,3 +87,50 @@ Two shapes, and the second is safer:
   `.py` files (I grepped `*.py` on `origin/main` only).
 - The performance win `d5e4cc51` bought. It is real and the walk genuinely did
   time out at 180 s before it; the fix must not simply be a revert.
+
+---
+
+## CORRECTION and CLOSE-OUT `[2026-09-08, same session]`
+
+**FIXED by lane `web-oom-profiler-steady` in `a0d02297`.** They reproduced the
+red test before accepting the report, and took the post-filter-backstop shape:
+`patterns_that_can_match` now decides emptiness as a product-automaton
+reachability search with each side running its OWN wildcard semantics, an
+undecidable `[...]` class is KEPT rather than dropped, and the caller's fnmatch
+post-filter still runs behind it. Their own account of the root cause is sharper
+than mine: the defect was in their TEST, which asserted their assumption about
+`*` instead of the caller's actual fnmatch call — *a test written from the same
+misreading as the code cannot catch that code.*
+
+### RETRACTION: "At least two sessions used it tonight" — I cannot support that
+
+The paragraph above says the endpoint "is how most sessions verify production. At
+least two sessions used it tonight." **I did not use it.** My production reads
+this session were `/api/board/layer2-shortlist`, `/api/board/layer1`,
+`/soccer/<league>/api/cards`, the Render deploys/env API and `render_logs.py` —
+never `/api/ops/artifacts/export`. I also told the owning lane "I used it myself
+earlier tonight", which was false and is corrected to them directly.
+
+What I actually knew was that ONE lane read it. "Most sessions" was inherited
+from the reporter's framing and repeated as if measured. The impact argument
+does not need it and is weaker for it.
+
+### THE BLAST RADIUS IS NARROWER STILL, and this part IS verified
+
+Only reads passing a `?pattern=` were ever affected. **An empty subset is a
+no-op** — verified by running the real function against the real pattern list on
+`origin/main`:
+
+    patterns_that_can_match(all_patterns, "") == all_patterns   -> True  (177 patterns)
+
+So unfiltered exports returned everything they always did. Combined with the
+read-only-callers finding above, the defect is: *pattern-filtered listings only,
+no deletions, no unfiltered reads.*
+
+### STILL OPEN at the time of writing
+
+`a0d02297` is on `main` but **web was live on `3e454a75`, which carries the
+bug.** The owning lane holds the web deploy claim and is redeploying. Until that
+is live, a `count=0` from `/api/ops/artifacts/export` **with** a `?pattern=` is
+still ambiguous.
+
