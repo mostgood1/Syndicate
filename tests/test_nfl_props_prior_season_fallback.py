@@ -220,3 +220,64 @@ def test_the_rate_basis_label_reads_the_field_the_join_actually_carries():
     # Unknown is its own answer, never the reassuring branch.
     assert _rate_basis_label(None) == "Unknown"
     assert _rate_basis_label("something_else") == "Unknown"
+
+
+# ------------------------------------------------- the zero-row publish guard
+
+
+def test_a_zero_row_build_refuses_before_it_writes_or_publishes(monkeypatch, tmp_path):
+    """THIS BUG CLOBBERED PRODUCTION, and the guard existed -- in the wrong PLACE.
+
+    `main()` returned `0 if sim_rows > 0 else 3`, which reads like a guard and
+    is not one: the write and the publish both happened ABOVE it, so the exit
+    code reported damage already done.
+
+    MEASURED 2026-09-08. The autorun fired at 19:19:57Z, the worker built 0 rows
+    (it has the play-by-play but NOT the odds capture -- neither service has
+    both), and it published that empty artifact over a healthy 966-row one:
+
+        artifact generated_at 16:01:02Z row_count 966
+              -> generated_at 19:19:57Z row_count 0
+        served /nfl/api/props: 1,684 cards -> 0
+
+    AN EXIT CODE IS A REPORT. A GUARD SITS BEFORE THE SIDE EFFECT.
+
+    Stale beats empty here: a stale prop board is wrong about prices; an empty
+    one is indistinguishable from "this week has no market", which is the exact
+    ambiguity the artifact exists to remove.
+    """
+    import scripts.build_nfl_prop_projections as builder
+
+    wrote: list = []
+    published: list = []
+    monkeypatch.setattr(builder, "nfl_props_rows_for_week", lambda s, w, use_artifact=True: ([], []))
+    monkeypatch.setattr(builder, "write_nfl_prop_projection_artifact",
+                        lambda s, w, rows: wrote.append(rows) or tmp_path / "x.json")
+    monkeypatch.setattr(builder, "publish_hot_artifact", lambda path: published.append(path) or True)
+
+    result = builder.build(2026, 1)
+
+    assert result["refused"] == "zero_sim_rows"
+    assert result["ok"] is False
+    assert wrote == [], "a zero-row build must not WRITE the artifact"
+    assert published == [], "a zero-row build must not PUBLISH"
+
+
+def test_a_populated_build_still_writes_and_publishes(monkeypatch, tmp_path):
+    """The guard must refuse only the empty case -- a refusal that also blocks
+    good builds is just an outage with better manners."""
+    import scripts.build_nfl_prop_projections as builder
+
+    rows = [{"entity": "A.J. Brown", "market": "anytime_td::a.j. brown",
+             "sim_projection": 0.37, "rate_source": "prior_season_fallback"}]
+    published: list = []
+    monkeypatch.setattr(builder, "nfl_props_rows_for_week", lambda s, w, use_artifact=True: ([{}], rows))
+    monkeypatch.setattr(builder, "write_nfl_prop_projection_artifact", lambda s, w, r: tmp_path / "x.json")
+    monkeypatch.setattr(builder, "publish_hot_artifact", lambda path: published.append(path) or True)
+
+    result = builder.build(2026, 1)
+
+    assert result.get("refused") is None
+    assert result["sim_rows"] == 1
+    assert result["published"] is True
+    assert len(published) == 1

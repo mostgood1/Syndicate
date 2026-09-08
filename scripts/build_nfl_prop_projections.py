@@ -57,6 +57,46 @@ def build(season: int, week: int) -> dict:
     # back the artifact it is about to overwrite. Without it a stale artifact
     # would be republished forever and look like a healthy rebuild.
     odds_rows, sim_rows = nfl_props_rows_for_week(season, week, use_artifact=False)
+
+    # REFUSE BEFORE WRITING. A zero-row build must not touch the artifact at
+    # all -- not write it, not publish it.
+    #
+    # THIS IS THE BUG THAT CLOBBERED PRODUCTION, and my first cut wrote the
+    # guard in the wrong PLACE rather than omitting it. `main()` returned
+    # `0 if sim_rows > 0 else 3`, which reads like a guard and is not one: the
+    # write and the publish both happen ABOVE it, so the exit code reports
+    # damage already done. Measured 2026-09-08: the autorun fired at 19:19:57Z,
+    # built 0 rows on the worker, published them over a healthy 966-row
+    # artifact, and `/nfl/api/props` went 1,684 cards -> 0 in production.
+    #
+    # An exit code is a REPORT. A guard has to sit before the side effect.
+    #
+    # Empty is not an error worth crashing on -- a week with no capture
+    # legitimately has nothing to build -- so this returns a refusal the caller
+    # can log, and leaves whatever is already published untouched. Stale beats
+    # empty here: a stale prop board is wrong about prices, an empty one is
+    # indistinguishable from "this week has no market".
+    if not sim_rows:
+        print(
+            f"[build_nfl_prop_projections] REFUSED season={season} week={week} "
+            f"reason=zero_sim_rows odds_rows={len(odds_rows)} "
+            f"(existing artifact left untouched)",
+            flush=True,
+        )
+        return {
+            "ok": False,
+            "refused": "zero_sim_rows",
+            "season": season,
+            "week": week,
+            "path": None,
+            "published": False,
+            "odds_rows": len(odds_rows),
+            "sim_rows": 0,
+            "entities": 0,
+            "rate_sources": {},
+            "markets": {},
+        }
+
     path = write_nfl_prop_projection_artifact(season, week, sim_rows)
     # PUBLISH, or the worker writes to its own disk and web never sees it --
     # which is the entire defect this artifact exists to fix, reintroduced one
@@ -93,16 +133,20 @@ def main() -> int:
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print(f"wrote {result['path']}  published={result['published']}")
+        if result.get("refused"):
+            print(f"REFUSED: {result['refused']} -- odds_rows {result['odds_rows']}, "
+                  f"nothing written, existing artifact left untouched")
+        else:
+            print(f"wrote {result['path']}  published={result['published']}")
         print(f"  odds_rows {result['odds_rows']}  sim_rows {result['sim_rows']}  "
               f"entities {result['entities']}")
         print(f"  rate_sources {result['rate_sources']}")
         print(f"  markets {result['markets']}")
 
-    # A zero-row artifact is a FAILURE to report, not a file to publish quietly:
-    # it is indistinguishable downstream from "this week has no market", and
-    # that ambiguity is the whole defect this script exists to remove.
-    return 0 if result["sim_rows"] > 0 else 3
+    # The exit code REPORTS; `build()` above is what actually refuses. Keeping
+    # both is deliberate -- the autorun reads neither today, and a future caller
+    # that checks the code should still get a non-zero on a refusal.
+    return 0 if result.get("sim_rows") else 3
 
 
 if __name__ == "__main__":
