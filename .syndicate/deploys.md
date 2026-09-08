@@ -27936,3 +27936,40 @@ THEIR measurement and is not re-derived here; the unchanged NFL board above is
 consistent with it but is not a test of their flags.
 
 Claim released after this entry.
+
+### refresh-worker 66516b2b (peer deploy) — pricing-plane-v1 deploy 1: every flag ABSENT, the board is byte-identical and carries the new stamps `[lane pricing-plane-v1, 2026-09-08T22:1xZ, substrate render]`
+
+Deployed by lane nfl-props-autorun-e2e (dep-dag7tgh42hec73ejmiq0, live 21:34:40Z)
+at this lane's request. Re-derived here: `merge-base --is-ancestor` YES for all six
+pricing-plane commits (1cdf5c17 P1, 2055798c P2, 89ada578 P3, d2ee1094 P4,
+516bd71d P5, d3c7ee7c allowlist). No env change; every pricing-plane flag is
+absent on the service (`SYNDICATE_FAIR_ANCHOR`, `SYNDICATE_FAIR_DEVIG_METHOD`,
+`SYNDICATE_KELLY_ON_FAIR`, `SYNDICATE_PREGAME_INTERVAL_GATE`,
+`SYNDICATE_PRICING_CALIBRATION`, `SYNDICATE_BASKETBALL_SIM_MARKET_ANCHOR`,
+`SYNDICATE_NHL_MARKET_ANCHOR_WEIGHT`).
+
+**verify — the lane's falsification test, on the SERVED board, PASSING.** First
+post-boot shortlist (`/api/board/layer2-shortlist?limit=2000`, read ~22:1xZ):
+
+    rows 1,731   stamped with fair_consensus_prob / fair_anchor_book / fair_devig_method: 1,731 / 1,731
+    fair_method  consensus 1,532   book_margin_model 199   sharp_anchor 0   exchange_mid 0
+    fair_devig_method  multiplicative 1,532   (one-sided rows carry none)
+    fair_probability == fair_consensus_prob on 1,532 / 1,532 consensus rows, max |diff| 0.000e+00
+
+The pre-deploy artifact (1,640 rows) carried `fair_method` and none of the new
+keys, so the stamps date the build to the new code; zero anchor-tier rows and an
+exact median match are what "flag absent" must read. Offline, the same fixture
+through `build_layer2_rows` / `sizing_inputs_from_row` / `commit_portfolio` /
+`compute_board_stake` at base a87b5863 vs the merged head: 0 values changed, 0
+removed, 8 stamp keys added; harness deterministic (0 diffs run-to-run).
+
+NOT read yet: the sizer's stamps (`kelly_basis`, `blend_beta`,
+`staked_probability_version`, `model_probability_raw`, `interval_gate`) on the
+paper plan's positions — they appear on the next `portfolio_commit` cycle; and
+the basketball `market_anchor` block (next WNBA sim) and NHL raw columns (next
+NHL producer run, off-season). These are the remaining deploy-1 readings, not
+blockers.
+
+Caveat inherited from the deploying lane: its NFL prop-artifact repair is a race
+it won by ~66 s on this boot; an empty NFL prop board after a future boot is that,
+not this lane.
