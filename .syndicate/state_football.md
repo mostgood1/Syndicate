@@ -2369,3 +2369,55 @@ rather than a neutral 0.5.
    `shared_default` NFL cards while web served `nfl_main`.
 
 Working: `deploys.md` 2026-09-08 14:02:20Z; narrative `log/2026-09-08.md`.
+
+## [nfl-props-week1-dead] NFL PLAYER PROPS WERE STRUCTURALLY DEAD EVERY WEEK 1, AND THE MODEL RAN ON THE SERVICE WITHOUT THE DATA `[FIXED, DEPLOYED AND VERIFIED 2026-09-08, web 76ab1ecd/4be5c5a5, lane nfl-props-precompute]`
+
+**`/nfl/api/props` served 0 cards against a capture of 5,929 real quotes** (519
+players, 8 books, 16 matchups, 9 markets). Nothing errored, nothing logged. The
+ODDS half was healthy throughout -- production's own 874 KB file through the
+real reader yields **2,442 odds rows**.
+
+**FOUR DEFECTS, EACH HIDING THE NEXT:**
+
+1. **Week-1 cold start.** `player_name_index(2026)` = **0 names** vs 2025's
+   **574** -- it derives from the CURRENT season's play-by-play, so in week 1
+   nothing resolves and every row hits `continue`. `player_rate` fails the same
+   way one line later (`row["week"] < week` is empty at week 1). Props were dead
+   EVERY week 1 and would have started working in week 2 unaided. The TEAM path
+   solved this long ago (`_team_rating` -> `prior_season_fallback`); the player
+   path had no equivalent.
+2. **The under side showed P(over).** One sim row per player+market, joined to
+   BOTH sides, no flip. Kyler Murray read `99.1%` on Under 20.5 AND Over 22.5.
+3. **A defender inherited a running back's game log.** `Cam Brown` and
+   `Chase Brown` both resolve to `00-0038597`; the collision guard only compares
+   players PRESENT IN pbp, so a defender quoted for anytime TD is absent from
+   the index and triggers no collision. **194 of 1,157 projections were on the
+   wrong human** -- +47.5% on a +2200 line.
+4. **The model ran where the data is not.** With 1-3 live, production still
+   served 0. `refused_wrong_team=0 refused_unknown_team=0` proved nothing
+   reached the team check, so every row exited at `player_id is None` --
+   requiring `player_name_index` empty for BOTH seasons. **web has no pbp;
+   refresh-worker does** (`rating_source=nflverse_pbp_epa_rolling[...]`).
+   Three services, three disks.
+
+**2 AND 3 ARE OLDER THAN 1 AND WERE EXPOSED BY IT.** The page served zero cards
+on every week 1, so no under card and no wrong-player card had ever rendered for
+anyone to check. Shipping the fallback alone would have put 1,990 cards carrying
+fabricated edges on the board the night before the season.
+
+**VERIFIED on the served payload:** cards **0 -> 1,684**, players **253**, 9
+markets, over/under **0 incoherent of 714 pairs**, `Cam Brown` absent,
+`Rate basis: Prior season` on 1,684/1,684.
+
+**THE SHAPE OF THE FIX IS THE PLATFORM'S OWN RULE:** precompute on the worker,
+publish an artifact, web reads it -- the same reason `smartsim2_projections_*.csv`
+works. Reader PREFERS the artifact and FALLS BACK to computing, so one code path
+serves both services. Paths follow `nfl_props_path`'s content-then-existence
+contract, NOT `default_nfl_source_root()`, which probes an unrelated file family
+and picks the ephemeral checkout (`#441`).
+
+**STILL OWED:** the autorun (`_launch_autorun_nfl_prop_projections`) is landed
+and has NEVER FIRED -- the live artifact is hand-published and does not refresh
+itself. And **these are not edges**: every card is prior-season form, blind to
+depth-chart moves; the largest are UNDER on players the market now prices as
+starters.

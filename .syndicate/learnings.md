@@ -2952,6 +2952,76 @@ still not count.
   parsed cleanly through all four.**
 - *(evidence in `learnings_evidence.md`)*
 
+## 2026-09-08 FORBIDDEN: a parity check that compares PRESENTATION and ignores CAPABILITY `[lane nfl-ncaaf-ui-parity]`
+
+**What we believed.** That moving NFL onto NCAAF's card partial was a strict
+improvement, because every number said so: compact card 643-1085px across
+sixteen distinct heights -> 181px uniform, crests 0 -> 32, prose blocks 32 -> 0,
+`card_variant` 16/16.
+
+**What was actually true.** The partial being switched TO rendered two fewer
+panels than the one being switched FROM. Same served NFL game, both partials:
+
+    generic   panels = game, boxscore, props, panels
+    football  panels = identity, context, coverage, details
+
+Box Score and Props were dropped, live, for several hours. The data was never
+missing: `shared_prop_rows`, `shared_box_sections` and `shared_period_rows` were
+all **16/16 non-empty** on the served payload the whole time.
+
+**How we found out.** The user said props and a box score were "a big miss".
+Not from any check of mine -- and every check of mine passed, because I had
+measured how the card LOOKED and never what it could DO.
+
+**The rule going forward.** When swapping a renderer, diff the CAPABILITY SET,
+not the appearance: enumerate the panels/tabs/sections each side produces for
+the SAME input and diff them. One `grep -c 'data-panel-id'` on both partials
+would have caught this before the deploy. Heights, crests and byte counts are
+evidence about presentation and say nothing about what was traded away.
+
+**Cost.** Two tabs missing from the live NFL board for ~4 hours on the day
+before the season opener, found by the user rather than by me. Restored in
+`4be5c5a5`, contract-based so it also gave NCAAF a Box Score it had never had.
+
+**And the fix's own first cut repeated the family's oldest defect:** I gated the
+new TABS on `box_sections`/`prop_rows` and left the PANELS ungated, shipping an
+orphan `props` panel on NCAAF -- markup reachable by nothing, which is exactly
+what that card's header records collapsing a card on 2026-08-14. Caught before
+commit by rendering both sports and diffing tab-set against panel-set, which is
+now a test.
+
+## 2026-09-08 FORBIDDEN: reading ZERO from an allowlist-gated instrument as ABSENCE `[lane nfl-props-precompute]`
+
+**What we believed.** That production had no NFL play-by-play, because
+`/api/ops/artifacts/export?pattern=*pbp_2025*` returned `count=0`, and therefore
+that the prop model was structurally dead everywhere.
+
+**What was actually true.** That endpoint only serves ALLOWLISTED patterns, and
+pbp is not one. `count=0` means "no matching allowlisted artifact", not "no
+file". The stream endpoint returns **403** for the same path -- a REFUSAL, not a
+404. Both instruments are blind here, and I read blindness as evidence.
+
+**Then the retraction was ALSO wrong, in the other direction.** Seeing
+`rating_source=nflverse_pbp_epa_rolling[...]` on the deployed projection
+artifact, I retracted and said production HAS pbp. True of **refresh-worker**,
+which generates that artifact -- and I generalised it to "production". This
+platform runs THREE SERVICES WITH SEPARATE DISKS; "production" is not a place.
+
+**How we found out.** A counter, not an argument. With the fix live, the props
+join printed `odds_rows=2455 sim_rows=0 refused_wrong_team=0
+refused_unknown_team=0`. Both refusals at zero proved nothing reached the team
+check, so every row exited at the one `continue` above it -- which requires the
+player index empty for BOTH seasons. web has no pbp; the worker does.
+
+**The rule going forward.** Before reading a zero as absence, ask what the
+instrument REFUSES to show. An allowlist, an auth gate and a 403 all produce
+zeros that look like emptiness. And when a claim is about "production", name the
+SERVICE -- a fact true of the worker is not a fact about web.
+
+**Cost.** Two wrong claims to the user in one session, one in each direction,
+and an artifact pipeline nearly built for the wrong reason. Net cost low only
+because the counter was added before acting on either.
+
 ## 2026-09-08 FORBIDDEN: promising a verification target without tracing WHICH PRODUCER stamps that field `[lane nfl-ncaaf-ui-parity]`
 
 **What we believed.** That deploying the NFL card fix to refresh-worker would be
