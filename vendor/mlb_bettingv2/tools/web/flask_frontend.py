@@ -17018,14 +17018,60 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
                 "marginDist": live_mc_projection.get("first5MarginDist") or {},
                 "closed": False,
             }
-        baseline_probs = predictions.get(lane["key"]) if isinstance(predictions.get(lane["key"]), dict) else {}
+        # THE `live` LANE IS THE FULL GAME, RE-SIMULATED FROM THE CURRENT STATE
+        # (`innings: 9`), so the pregame number it supersedes is the FULL-GAME
+        # one. `card["predictions"]` only ever holds `full` / `first1` / `first3`
+        # / `first5` -- see where it is built, there is no `live` key and never
+        # was -- so `predictions.get("live")` is None and the live lane would
+        # carry no baseline even with the key names below corrected.
+        #
+        # That is not a cosmetic gap: `live_gameline_from_lens` returns the FIRST
+        # lens row stamped `live_mc`, and the lane order here puts `live` before
+        # `full`. So the live lane's baseline is the one that reaches the ledger's
+        # `pregame_home_win_prob`, and a None here is what the ledger records --
+        # which is what it recorded, on every row, until 2026-09-08.
+        #
+        # `first7` legitimately has no prediction row and stays None: absent is
+        # the honest answer, and the ledger stores it as absent.
+        baseline_key = "full" if lane["key"] == "live" else lane["key"]
+        baseline_probs = predictions.get(baseline_key) if isinstance(predictions.get(baseline_key), dict) else {}
         baseline_home_prob = None
         if baseline_probs:
-            if lane["key"] == "full":
-                baseline_home_prob = _safe_float(baseline_probs.get("homeWin"))
+            # THE KEYS ARE snake_case, AND THIS READ USED camelCase UNTIL
+            # 2026-09-08 -- so `baselineHomeWinProb` was None on every lane this
+            # function has ever built.
+            #
+            # `baseline_probs` is `card["predictions"][lane_key]`, and its only
+            # producers are `_merge_prediction_row` (a fixed copy list of
+            # snake_case fields: `home_win_prob`, `away_win_prob`, `tie_prob`, ...)
+            # and `_normalized_full_game_probs` (writes `home_win_prob` /
+            # `away_win_prob` / `tie_prob`). Nothing anywhere writes `homeWin` or
+            # `awayWin`: across the whole vendor tree those two strings occurred at
+            # exactly three sites and all three were THESE READS.
+            #
+            # `_safe_float(None)` is None and the caller treats None as "no
+            # baseline", so this failed SILENTLY and every test stayed green --
+            # `tests/test_live_gameline_quote_age.py` hand-writes
+            # `baselineHomeWinProb` into its fixture and never runs this function,
+            # so it asserted on propagation and could not see the producer.
+            #
+            # Measured before the fix: `pregame_home_win_prob` was populated on 0
+            # of 2872 v4 and 0 of 531 v5 MLB ledger rows (08-20..09-07) -- never,
+            # since it shipped -- while `progress_fraction`/`inning`/`outs`, added
+            # in the SAME commit and carried over the SAME hops, were 2872/2872.
+            # Same commit, same path, one field dead: that asymmetry is what a
+            # key-name defect looks like from the data side.
+            #
+            # `learnings.md:3097`: FORBIDDEN -- keying a predicate to a field name
+            # you have not confirmed the record STORES.
+            if baseline_key == "full":
+                # Already normalised by `_normalized_full_game_probs` at build
+                # time (`normalize_full=True` on the "full" lane only), so the
+                # two-way renormalisation below would be a no-op here.
+                baseline_home_prob = _safe_float(baseline_probs.get("home_win_prob"))
             else:
-                baseline_home_prob = _safe_float(baseline_probs.get("homeWin"))
-                away_prob = _safe_float(baseline_probs.get("awayWin"))
+                baseline_home_prob = _safe_float(baseline_probs.get("home_win_prob"))
+                away_prob = _safe_float(baseline_probs.get("away_win_prob"))
                 baseline_home_prob, _ = _normalize_two_way_probs(baseline_home_prob, away_prob)
         model_home_prob = _live_margin_win_prob(projection.get("homeMargin")) if not projection.get("closed") else None
         if is_live and lane["key"] in {"live", "full"} and isinstance(live_mc_projection, dict):
