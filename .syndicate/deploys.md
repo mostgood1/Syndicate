@@ -27540,3 +27540,25 @@ failure or a dead service. The watcher also hit two transient log-read
 
 **verify:** `board_read` under 100 ms on a warm cache, ON ORGANIC TRAFFIC —
 **PASSING at 0.0 ms.** This closes the last measurement `#632` owed.
+
+### web b4f4c790 — WNBA per-quarter linescores on `/wnba/api/final_player_boxscore`, VERIFIED BY CONTENT `[lane restore-measurement, deploy dep-dag6ak5bedkc73fof3k0, fired 2026-09-08T19:43:12Z, live 19:49:04Z]`
+
+Carried origin/main tip b4f4c790 (a main commit; live was 4be5c5a5). The one
+change this lane needed on web: `blueprints/wnba.py` returns `linescores`
+beside `rows`, which `scripts/build_wnba_boxscores.py` (refresh-worker) reads
+to write `wnba_source/data/processed/linescores_<date>.json`, the only source
+`bet_status_wnba` grades a q1..q4/h1/h2 segment order from (WP1, ad0f25eb).
+
+Preflight CLEAR (infra only, 2 defunct children). Claim held by
+restore-measurement. Killed nothing.
+
+**verify:** `GET /wnba/api/final_player_boxscore?date=2026-08-30` carries a
+`linescores` list — **PASSING**: `games 4, rows 86, linescores n=4`, e.g.
+`{game_id 401857186, away MIN [21,20,21,19] = 81, home ATL [26,26,19,18] = 89}`.
+Read 19:5xZ, after the deploy's finishedAt. Dates 2026-09-01..09-07 read
+`games 0` on this endpoint (no completed event ids), so the content check used
+the last regular-season slate the endpoint can see; that zero is the schedule
+reader's view, not this change, and was not chased here.
+
+Not yet in production on web: 6eacbe05 (the `linescores_2*.json` allowlist
+entry, WP1c) — export/mirroring only; grading is worker-local and unaffected.
