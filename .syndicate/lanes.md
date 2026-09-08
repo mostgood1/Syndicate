@@ -1819,6 +1819,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Verification: (1) an artifact builder that produces prop projections for (season, week) and a reader that prefers it, with the compute path kept as a fallback so dev/local still works; (2) `off != on` reachability — the artifact ABSENT must still serve today's zero, and PRESENT must serve rows, so a green reading cannot come from the fallback; (3) the served `/nfl/api/props` reporting cards as n/N, never a boolean.
 - Files: syndicate/features/nfl/props.py, scripts/build_nfl_prop_projections.py, tests/test_nfl_prop_projections_artifact.py
 - Blocked by: none. **NOT the same as `nfl-rating-units`** — that lane owns the GAME-line scale; this one owns player props and touches none of its files.
+### profitable-buckets — OPEN, WAITING ON DATA — opened 2026-09-08 — session 3492626c — **NO DEMONSTRATED LIVE-GAMELINE EDGE ON MLB. h2h is a clean null; the one candidate (`spreads q4_late`, +14.22pp) was TWO stacked artifacts; totals/spreads are unmeasurable until `model_total_mean` accumulates.**
+- Goal: a ranked bucket table where every row is (game_state, market, segment, progress_band) x REALISED performance, with a denominator. Output is a decision: bet these, not those.
+- Files: scripts/bucket_realised_performance.py, scripts/bucket_edge_concentration.py, scripts/bucket_live_edges.py, .syndicate/findings_2026-09-08_*.md
+- Hypothesis: CONFIRMED and then some. Paper edge is not money — and worse, the way it was being computed manufactured edge from nothing.
+- Falsification test: ran it. The buckets with the largest paper edge did NOT have real realised performance; both leaders dissolved under scrutiny.
+- Verification: **DONE for h2h** (clean null, every band inside noise at ~94 games/bucket, one bet per game). **NOT POSSIBLE YET for totals/spreads** — the correct baseline is the LINE vs `model_total_mean`/`model_margin_mean`, and that column only began being written 2026-09-06/07 (12 games).
+- **PENDING RE-RUN, 2026-09-15.** Scheduled task `mlb-bucket-rerun-with-totals` (fires 09-15 09:00 local, auto-disables). Recorded here as well because a scheduled task on this box has stalled before — `lastRunAt` is dispatch, not execution. If it did not run, run it by hand: `python scripts/bucket_realised_performance.py --sport mlb --days 14`. **Precondition: if fewer than ~60 games carry `model_total_mean`, STOP and say so** rather than reporting a rate with no power.
+- Findings, in the order they were forced: `findings_2026-09-08_bucket_realised_performance.md` (rows-vs-games: +21σ → +2.93σ on the same data), `findings_2026-09-08_spreads_edge_is_stale_quotes.md` (the survivor was stale quotes; the model has the score, the book's quote does not), `findings_2026-09-08_totals_baseline_not_resolution.md` (the de-vig is ~0.50 whatever the line is — the baseline was wrong, not the outcome resolution, and this invalidates spreads too).
+- Blocked by: data accumulation only.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
