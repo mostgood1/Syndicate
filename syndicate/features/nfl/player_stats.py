@@ -221,6 +221,105 @@ def resolve_player_id(season: int, full_name: str) -> str | None:
     return player_name_index(season).get(short_name_from_full(full_name).strip().lower())
 
 
+# WEEK 1 HAS NO CURRENT-SEASON PLAYS, AND THAT KILLED EVERY PROP.
+#
+# MEASURED 2026-09-08, production, NFL week 1: `/nfl/api/props` served
+# **0 cards** against a capture of **5,929 real quotes** (519 players, 8 books,
+# 16 matchups). The odds half was fine -- running production's own file through
+# the real reader yields 2,442 odds rows. The SIM half was zero, and it failed
+# at the FIRST gate:
+#
+#     player_name_index(2026):   0 names      <- no 2026 plays exist yet
+#     player_name_index(2025): 574 names
+#
+# `player_name_index` is derived from `load_player_plays(season)`, so in week 1
+# no player resolves, `resolve_player_id` returns None for everyone, and
+# `nfl_props_rows_for_week` hits `continue` on every row. `player_rate` fails
+# the same way one line later: its window is `row["week"] < week`, which is
+# empty at week 1. So NFL props are structurally dead every week 1 and start
+# working in week 2 -- silently, with no error and no log line.
+#
+# THE TEAM PATH ALREADY SOLVED THIS. `generate_smartsim2_nfl_projections.py`'s
+# `_team_rating` falls back to the entire prior season and TAGS the result
+# `prior_season_fallback`; every 2026 week-1 game carries that tag today. The
+# player path had no equivalent.
+#
+# WHY THESE ARE NEW FUNCTIONS RATHER THAN A FIX IN PLACE. `resolve_player_id`
+# and `player_rate` are called by `backtest_nfl_props.py`,
+# `fit_nfl_props_game_context.py` and `report_nfl_props_roi.py`. Adding a
+# prior-season fallback inside them would change what those runs measure --
+# a denominator moving for a reason unrelated to the thing being measured is
+# how a model looks like it improved. The backtests keep the strict functions;
+# the BOARD gets the fallback, and every caller can see which it used.
+#
+# EVERY RETURN CARRIES ITS SOURCE, because a prior-season rate is a different
+# claim from a current-form one and the card has to be able to say so.
+
+
+def resolve_player_id_with_prior(season: int, full_name: str) -> tuple[str | None, str]:
+    """(player_id, source) -- current season first, prior season as fallback.
+
+    The nflverse player id is stable across seasons, so an id resolved from the
+    prior season is the same human in this one. Ambiguous short names are still
+    dropped rather than guessed, in BOTH seasons -- see `player_name_index`,
+    which records what a wrong resolution costs (a cornerback priced +4000
+    carrying Tyreek Hill's game log).
+    """
+    key = short_name_from_full(full_name).strip().lower()
+    current = player_name_index(season).get(key)
+    if current is not None:
+        return current, "current_season"
+    prior = player_name_index(season - 1).get(key)
+    if prior is not None:
+        return prior, "prior_season_fallback"
+    return None, "unresolved"
+
+
+# A week past any real NFL season, so the prior-season lookup takes the WHOLE
+# season rather than a slice. `player_rate` filters `row["week"] < week`, and
+# passing the current week (1) would return an empty prior season too -- the
+# same off-by-a-season trap the fallback exists to remove.
+_ALL_WEEKS = 999
+
+
+def player_rate_with_prior(
+    season: int, week: int, player_id: str, stat: str
+) -> tuple[float | None, float | None, int, str]:
+    """(mean, stdev, n, source) with a whole-prior-season fallback.
+
+    Falls back only when the current season cannot answer -- so from week 3 or
+    so onward this is the strict function plus a tag, and the fallback quietly
+    stops being used as real form accumulates.
+    """
+    mean, stdev, n = player_rate(season, week, player_id, stat)
+    if mean is not None:
+        return mean, stdev, n, "current_season_rolling"
+    prior_mean, prior_stdev, prior_n = player_rate(season - 1, _ALL_WEEKS, player_id, stat)
+    if prior_mean is not None:
+        return prior_mean, prior_stdev, prior_n, "prior_season_fallback"
+    return None, None, n, "no_data"
+
+
+def anytime_td_rate_with_prior(
+    season: int, week: int, player_id: str
+) -> tuple[float | None, int, str]:
+    """(mean, n, source) for anytime_td, with the same prior-season fallback.
+
+    Routed through `anytime_td_rate` in BOTH arms so `#471`'s Gamma-Poisson
+    shrinkage still applies to the prior-season sample -- a full prior season is
+    a large n, so the shrinkage correctly does almost nothing there, but going
+    around it would have silently reintroduced the raw-MLE underestimate the
+    shrinkage exists to fix.
+    """
+    mean, n = anytime_td_rate(season, week, player_id)
+    if mean is not None:
+        return mean, n, "current_season_rolling"
+    prior_mean, prior_n = anytime_td_rate(season - 1, _ALL_WEEKS, player_id)
+    if prior_mean is not None:
+        return prior_mean, prior_n, "prior_season_fallback"
+    return None, n, "no_data"
+
+
 _STAT_EXTRACTORS = {
     "passing_yards": lambda play, pid: float(play["passing_yards"] or 0) if play.get("passer_player_id") == pid and play.get("passing_yards") else 0.0,
     "passing_attempts": lambda play, pid: 1.0 if play.get("passer_player_id") == pid and play.get("pass_attempt") == "1" else 0.0,

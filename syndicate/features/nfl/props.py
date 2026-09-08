@@ -26,7 +26,10 @@ from syndicate.features.nfl.player_stats import STAT_KEYS
 from syndicate.features.nfl.game_context import favoured_by_delta, implied_total_ratio
 from syndicate.features.nfl.player_stats import anytime_td_rate, player_team_by_week
 from syndicate.features.nfl.player_stats import player_rate
+from syndicate.features.nfl.player_stats import anytime_td_rate_with_prior
+from syndicate.features.nfl.player_stats import player_rate_with_prior
 from syndicate.features.nfl.player_stats import resolve_player_id
+from syndicate.features.nfl.player_stats import resolve_player_id_with_prior
 from syndicate.features.nfl.sources import nfl_source_roots
 from syndicate.features.nfl.sources import nfl_props_path
 from syndicate.features.nfl.sources import nfl_roster_snapshot_path
@@ -391,18 +394,26 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
             if under_odds is not None:
                 odds_rows.append({"game_id": game_id, "market": join_market, "period": "full_game", "entity": player_name, "side": "under", "line": line, "odds": under_odds, "market_type": "prop"})
 
-        player_id = resolve_player_id(season, player_name)
+        # PRIOR-SEASON FALLBACK, because week 1 has no current-season plays.
+        # `player_name_index(2026)` held 0 names on 2026-09-08 while 2025 held
+        # 574, so every one of the 5,929 real quotes failed here and the board
+        # served 0 cards. The team path has done this since it was built
+        # (`_team_rating` -> `prior_season_fallback`); the player path had no
+        # equivalent, so props were structurally dead every week 1 and would
+        # have started working in week 2 with nobody knowing why.
+        player_id, id_source = resolve_player_id_with_prior(season, player_name)
         if player_id is None:
             continue
+        rate_source = "no_data"
         if stat == "anytime_td":
             # `#471` shrinkage -- see player_stats.anytime_td_rate's
             # docstring. stdev is meaningless for this market
             # (_nfl_prop_model_probability's anytime_td branch never reads
             # it), so it is not computed here.
-            mean, n = anytime_td_rate(season, week, player_id)
+            mean, n, rate_source = anytime_td_rate_with_prior(season, week, player_id)
             stdev = None
         else:
-            mean, stdev, n = player_rate(season, week, player_id, stat)
+            mean, stdev, n, rate_source = player_rate_with_prior(season, week, player_id, stat)
         # Game context. Applied to the MEAN only: the rolling stdev describes
         # this player's own game-to-game spread and a scoring-environment shift
         # is not evidence about that dispersion.
@@ -411,9 +422,17 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
         model_prob = _nfl_prop_model_probability(stat=stat, mean=mean, stdev=stdev, n=n, line=line)
         if model_prob is None:
             continue
+        # THE SOURCE TRAVELS WITH THE ROW. A projection off last season's rate
+        # is a different claim from one off this season's form, and a card that
+        # cannot say which is a card that quietly overstates what it knows.
+        # `nfl_season_rate` is preserved verbatim for the current-season case so
+        # nothing downstream that pins that string changes meaning.
         sim_rows.append({
             "game_id": game_id, "market": join_market, "period": "full_game", "entity": player_name,
-            "sim_projection": model_prob, "projected_value": mean, "sim_source": "nfl_season_rate",
+            "sim_projection": model_prob, "projected_value": mean,
+            "sim_source": "nfl_season_rate" if rate_source == "current_season_rolling" else f"nfl_{rate_source}",
+            "rate_source": rate_source,
+            "player_id_source": id_source,
         })
     return odds_rows, sim_rows
 
