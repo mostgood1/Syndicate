@@ -157,6 +157,10 @@ def graded_rows_for_league_date(league: str, date_str: str) -> list[dict[str, An
                     {
                         "sport": "soccer",
                         "league": league,
+                        # WP8: ESPN event id -- the board writes the same id into
+                        # a record's gamePk/event_id (soccer/cards.py), so
+                        # settlement joins on it before any club matching.
+                        "event_id": event_id or None,
                         "market": "moneyline",
                         "selection": selection,
                         "home": home_team,
@@ -170,12 +174,12 @@ def graded_rows_for_league_date(league: str, date_str: str) -> list[dict[str, An
 
             over_result = "win" if total_goals > 2.5 else "loss"
             under_result = "win" if total_goals < 2.5 else "loss"
-            rows.append({"sport": "soccer", "league": league, "market": "total", "selection": "over", "home": home_team, "away": away_team, "title": title, "line": 2.5, "actual": total_goals, "odds": _price_for(match_odds_rows, market="totals", side="over", line=2.5), "result": over_result})
-            rows.append({"sport": "soccer", "league": league, "market": "total", "selection": "under", "home": home_team, "away": away_team, "title": title, "line": 2.5, "actual": total_goals, "odds": _price_for(match_odds_rows, market="totals", side="under", line=2.5), "result": under_result})
+            rows.append({"sport": "soccer", "league": league, "event_id": event_id or None, "market": "total", "selection": "over", "home": home_team, "away": away_team, "title": title, "line": 2.5, "actual": total_goals, "odds": _price_for(match_odds_rows, market="totals", side="over", line=2.5), "result": over_result})
+            rows.append({"sport": "soccer", "league": league, "event_id": event_id or None, "market": "total", "selection": "under", "home": home_team, "away": away_team, "title": title, "line": 2.5, "actual": total_goals, "odds": _price_for(match_odds_rows, market="totals", side="under", line=2.5), "result": under_result})
 
             both_scored = home_score > 0 and away_score > 0
-            rows.append({"sport": "soccer", "league": league, "market": "btts", "selection": "yes", "home": home_team, "away": away_team, "title": title, "actual": both_scored, "odds": _price_for(match_odds_rows, market="btts", side="yes"), "result": "win" if both_scored else "loss"})
-            rows.append({"sport": "soccer", "league": league, "market": "btts", "selection": "no", "home": home_team, "away": away_team, "title": title, "actual": both_scored, "odds": _price_for(match_odds_rows, market="btts", side="no"), "result": "loss" if both_scored else "win"})
+            rows.append({"sport": "soccer", "league": league, "event_id": event_id or None, "market": "btts", "selection": "yes", "home": home_team, "away": away_team, "title": title, "actual": both_scored, "odds": _price_for(match_odds_rows, market="btts", side="yes"), "result": "win" if both_scored else "loss"})
+            rows.append({"sport": "soccer", "league": league, "event_id": event_id or None, "market": "btts", "selection": "no", "home": home_team, "away": away_team, "title": title, "actual": both_scored, "odds": _price_for(match_odds_rows, market="btts", side="no"), "result": "loss" if both_scored else "win"})
     return rows
 
 

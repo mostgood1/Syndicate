@@ -108,13 +108,24 @@ def _mlb_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
             result = str(row.get("result") or "").strip().lower()
             if result not in {"win", "loss", "push", "void"}:
                 continue
+            # WP8: the game's identity, which `_normalized_rows` carried and this
+            # adapter dropped. `game_pk` is the StatsAPI gamePk -- the SAME
+            # namespace the board writes into a record's `game_id`
+            # (`home.py:_game_identifier`), so settlement can join on it first.
+            # `matchup` is "AWY @ HOM" in tri-codes; split so the fixture's
+            # clubs are fields rather than a substring of `title`.
+            home_abbr, away_abbr = _split_matchup(row.get("matchup"))
             rows.append(
                 {
                     "sport": "mlb",
+                    "game_id": _game_id_text(row.get("game_pk")),
+                    "game_pk": row.get("game_pk"),
                     "market": row.get("market"),
                     "selection": row.get("selection"),
                     "player": row.get("player_name"),
                     "team": row.get("team"),
+                    "home": home_abbr,
+                    "away": away_abbr,
                     "title": row.get("title"),
                     "line": row.get("line"),
                     "actual": row.get("actual"),
@@ -124,6 +135,24 @@ def _mlb_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
                 }
             )
     return rows
+
+
+def _game_id_text(value: Any) -> str | None:
+    try:
+        number = int(value)
+    except Exception:
+        text = str(value or "").strip()
+        return text or None
+    return str(number) if number else None
+
+
+def _split_matchup(value: Any) -> tuple[str | None, str | None]:
+    """"AWY @ HOM" -> (home, away); anything else -> (None, None)."""
+    text = str(value or "").strip()
+    if " @ " not in text:
+        return None, None
+    away, _, home = text.partition(" @ ")
+    return (home.strip() or None, away.strip() or None)
 
 
 def _local_market_accuracy_graded_rows_for_date(
@@ -150,6 +179,12 @@ def _local_market_accuracy_graded_rows_for_date(
             rows.append(
                 {
                     "sport": sport,
+                    # WP8: pass a game identity through when the scorer carries
+                    # one. `live_lens_local._score_market_games_day` emits none
+                    # today, so these are None and the join uses the club path;
+                    # the day it does, this adapter must not be the drop.
+                    "game_id": row.get("game_id") or None,
+                    "event_id": row.get("event_id") or None,
                     "market": row.get("market"),
                     "selection": row.get("side"),
                     "home": row.get("home"),

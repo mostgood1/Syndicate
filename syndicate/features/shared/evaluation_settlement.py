@@ -34,6 +34,10 @@ from syndicate.features.shared.intelligence_evaluation import _record_sport
 from syndicate.features.shared.intelligence_evaluation import settle_result
 import functools
 from syndicate.features.shared.intelligence_evaluation import ledger_index_session
+from syndicate.features.shared.settlement_identity import GradedRowIndex
+from syndicate.features.shared.settlement_identity import NO_KEY_MATCH_REASONS
+from syndicate.features.shared.settlement_identity import find_graded_row
+from syndicate.features.shared.settlement_identity import record_identity
 
 
 # "Supported" now means "has a registered grader in graded_outcomes.py",
@@ -357,37 +361,21 @@ def _record_line(record: Mapping[str, Any]) -> float | None:
         return None
 
 
-def match_graded_row(record: Mapping[str, Any], rows: Iterable[Mapping[str, Any]]) -> Mapping[str, Any] | None:
-    """Loose "shared normalized token" match, mirroring
-    prediction_reconciliation._match_result_row: first row whose key-set
-    overlaps the record's and whose market agrees (when both sides have one)
-    wins. Not a scored/best-match search -- same known limitation as the
-    reconciliation module this mirrors.
+def match_graded_row(record: Mapping[str, Any], rows: "GradedRowIndex | Iterable[Mapping[str, Any]]") -> Mapping[str, Any] | None:
+    """The graded row this record settles against, or None.
+
+    WP8 (2026-09-08): was a loose "shared normalized token" match -- first row
+    whose key set overlapped the record's, whose market agreed and whose line
+    agreed. On production it settled 0 of 29,630, because the two sides never
+    spelled the same fact the same way (`settlement_identity` has the
+    side-by-side). Now joins on ONE identity, in order: same game id, then
+    canonical club + side within the same fixture, then the old loose overlap
+    as a last resort. `rows` may be a `GradedRowIndex` (built once per sport by
+    `settle_ledger_for_date`) or any iterable of rows.
     """
-    record_keys = _evaluation_record_keys(record)
     recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
-    record_market_family = _market_family(recommendation.get("market") or recommendation.get("market_family"))
-    record_line = _record_line(record)
-    for row in rows:
-        if not isinstance(row, Mapping):
-            continue
-        row_keys = _graded_row_keys(row)
-        if record_keys and row_keys and record_keys.isdisjoint(row_keys):
-            continue
-        if not _markets_compatible(
-            recommendation.get("market") or recommendation.get("market_family"),
-            row.get("market"),
-            record.get("sport") or recommendation.get("sport") or row.get("sport"),
-        ):
-            continue
-        if record_line is not None and row.get("line") is not None:
-            try:
-                if abs(record_line - float(row.get("line"))) > 1e-6:
-                    continue
-            except Exception:
-                pass
-        return row
-    return None
+    sport = _record_sport(record) or str(recommendation.get("sport") or "").strip().lower() or None
+    return find_graded_row(record, rows, sport=sport, markets_compatible=_markets_compatible).row
 
 
 def _american_profit(odds: Any, stake: float = 1.0) -> float | None:
@@ -503,6 +491,8 @@ def settle_ledger_for_date(
     ]
 
     graded_rows_by_sport: dict[str, list[dict[str, Any]]] = {}
+    # WP8: identities computed once per sport, not once per record x row.
+    graded_index_by_sport: dict[str, GradedRowIndex] = {}
     matched = 0
     settled = 0
     unmatched = 0
@@ -517,6 +507,14 @@ def settle_ledger_for_date(
     unmatched_unsupported_sport = 0
     unmatched_no_graded_rows = 0
     unmatched_no_key_match = 0
+    # WP8: WHY a key match failed, because the counters are the only
+    # production instrument for this join. `team_unresolved` -- the record's
+    # club token is not in the sport's alias map; `selection_unmapped` -- its
+    # selection text names neither a side nor a club; `game_not_graded` -- the
+    # record and the graded rows both carry game ids and none agree;
+    # `game_id_absent` -- the record carries no game id and the club path
+    # found nothing either. The parent counter is unchanged and is the sum.
+    unmatched_no_key_match_reasons: dict[str, int] = {reason: 0 for reason in NO_KEY_MATCH_REASONS}
     unmatched_bad_result = 0
     # #260: records that CANNOT settle because their market identity was
     # malformed at write time. Counted separately so `settled` is measured
@@ -563,20 +561,29 @@ def settle_ledger_for_date(
             unmatched += 1
             unmatched_no_graded_rows += 1
             continue
-        row = match_graded_row(record, candidate_rows)
+        if record_sport not in graded_index_by_sport:
+            graded_index_by_sport[record_sport] = GradedRowIndex(candidate_rows)
+        outcome = find_graded_row(
+            record, graded_index_by_sport[record_sport], sport=record_sport, markets_compatible=_markets_compatible
+        )
+        row = outcome.row
         if row is None:
             unmatched += 1
             unmatched_no_key_match += 1
+            reason_token = str(outcome.reason or NO_KEY_MATCH_REASONS[-1])
+            unmatched_no_key_match_reasons[reason_token] = unmatched_no_key_match_reasons.get(reason_token, 0) + 1
             if len(unmatched_samples) < _MAX_SAMPLES:
                 recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
                 unmatched_samples.append(
                     {
                         "sport": record_sport,
-                        "reason": "no_key_match",
+                        "reason": f"no_key_match:{reason_token}",
                         "record_keys": sorted(_evaluation_record_keys(record)),
+                        "record_identity": record_identity(record, sport=record_sport).summary(),
                         "record_market_family": _market_family(recommendation.get("market") or recommendation.get("market_family")),
                         "record_line": _record_line(record),
                         "graded_rows_available": len(candidate_rows),
+                        "graded_rows_with_game_id": len(graded_index_by_sport[record_sport].by_game_id),
                         "graded_row_market_families_sample": sorted({_market_family(row.get("market")) for row in candidate_rows[:25] if _market_family(row.get("market"))}),
                     }
                 )
@@ -656,9 +663,11 @@ def settle_ledger_for_date(
         "unmatched_unsupported_sport": unmatched_unsupported_sport,
         "unmatched_no_graded_rows": unmatched_no_graded_rows,
         "unmatched_no_key_match": unmatched_no_key_match,
+        "unmatched_no_key_match_reasons": unmatched_no_key_match_reasons,
         "unmatched_bad_result": unmatched_bad_result,
         "unmatched_samples": unmatched_samples,
         "graded_rows_available": {sport_key: len(rows) for sport_key, rows in graded_rows_by_sport.items()},
+        "graded_rows_with_game_id": {sport_key: len(index.by_game_id) for sport_key, index in graded_index_by_sport.items()},
         "dry_run": dry_run,
         "total_ledger_records": len(records),
         "total_recommendation_records": len(recommendation_records),
@@ -714,7 +723,21 @@ def settle_ledger_for_dates(
             "unmatched_unsupported_sport": sum(int(r.get("unmatched_unsupported_sport") or 0) for r in results),
             "unmatched_no_graded_rows": sum(int(r.get("unmatched_no_graded_rows") or 0) for r in results),
             "unmatched_no_key_match": sum(int(r.get("unmatched_no_key_match") or 0) for r in results),
+            "unmatched_no_key_match_reasons": {
+                reason: sum(int((r.get("unmatched_no_key_match_reasons") or {}).get(reason) or 0) for r in results)
+                for reason in NO_KEY_MATCH_REASONS
+            },
             "unmatched_bad_result": sum(int(r.get("unmatched_bad_result") or 0) for r in results),
+            # WP8: a sport ABSENT from `graded_rows_available` below is
+            # ambiguous -- its grader is only called when a pending record for
+            # that sport exists, so "no wnba entry" reads identically for "the
+            # grader returned nothing" and "the ledger holds no wnba records".
+            # This says which. Every (sport, date) pair, zeros included.
+            "pending_by_sport": {
+                f"{r.get('sport')}:{r.get('date')}": int(r.get("pending") or 0)
+                for r in results
+                if r.get("sport")
+            },
             # Bounded across the whole call, not per-date/sport, so this
             # never grows with the number of (date, sport) pairs settled.
             "unmatched_samples": [sample for r in results for sample in (r.get("unmatched_samples") or [])][:5],
@@ -722,6 +745,11 @@ def settle_ledger_for_dates(
                 f"{r.get('sport')}:{r.get('date')}": r.get("graded_rows_available")
                 for r in results
                 if r.get("graded_rows_available")
+            },
+            "graded_rows_with_game_id": {
+                f"{r.get('sport')}:{r.get('date')}": r.get("graded_rows_with_game_id")
+                for r in results
+                if r.get("graded_rows_with_game_id")
             },
         },
     }
