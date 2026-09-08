@@ -2008,3 +2008,55 @@ measured** — that baseline came from organic traffic and a synthetic burst can
 answer it. The `unhealthy` absence is ONE run, observed ~2–3 min past burst end.
 `/api/board/game-chips` (11 ms typical / 11.6 s worst) and the
 `request_path_guard` ESPN fetch inside a Flask handler are both untouched.
+
+### `[web-oom-leak]` UPDATE 41 — **THE CHIP PUBLISH CADENCE IS NOT FIXED, and my own `b81eab85` cannot fix it. The fast path is a MEMORY-PRESSURE FALLBACK, not a periodic refresher.**, 2026-09-08T03:1xZ `[session b2b5b45b]`
+
+**MEASURED, and this is the number that matters.** Consecutive
+`GAME_CHIPS_PUBLISHED` on refresh-worker, **per date**, 22:00–02:54Z:
+
+    date=2026-09-07 (what web reads)  n=13  median 24.1 min  range 12.6–32.2
+    date=2026-09-08                   n=7   median 47.3 min  range 24.7–55.6
+    LAYER2_FAST_REFRESH lines                0
+
+Against the endpoint's **120 s** freshness threshold, a 24.1-minute median is
+**12x over** — which is why `/api/board/game-chips` serves
+`source=inline_artifact_stale` on essentially every request. Per date matters:
+the worker alternates today and tomorrow, so an all-dates gap understates what
+web sees by ~2x.
+
+**`b81eab85` FIXED A REAL DEFECT THAT CHANGES NOTHING TODAY.**
+`_layer2_fast_refresh_at` was one float guarding a per-DATE resource, and the
+heavy build stamped it, so a build for 09-07 silenced the fast path for 09-08.
+Keyed per date, 6 tests, 651 passing across every suite touching the state
+service. **But the path it gates is only CALLED at
+`intelligence_state.py:7555`, inside
+`if _abort_build_candidate_pool_if_memory_critical("pre_source_state_fingerprint")`
+— a MEMORY-PRESSURE FALLBACK.** `MEMORY_GUARD_ABORT` has not fired since the
+worker's 02:54:37Z deploy and headroom reads **3,450 MB**, so the guard never
+refuses and the fallback never runs.
+
+**I CLAIMED THE OPPOSITE AND IT WAS WRONG.** `b81eab85`'s message says the fix
+"makes an inert path START RUNNING" and warns it adds periodic work on a
+memory-constrained worker (`#241`). Both halves are false: the path stays inert,
+so there is **no added duty cycle** — the risk I flagged does not exist — and
+**no cadence improvement** either. The fix is correct and latent: it will matter
+the first time the memory guard fires, and not before.
+
+**NO DEPLOY WAS NEEDED OR MADE.** `b81eab85` reached refresh-worker inside
+another session's `5b459411` at 02:54:37Z. Verified by CONTENT, not ancestry:
+`_mark_layer2_fast_refresh` appears 3x in `git show 5b459411:pipeline/intelligence_state.py`.
+Claim acquired, found redundant, released — a redundant restart would have killed
+an in-flight board build and interrupted live-lens ticks during live games for
+nothing.
+
+**THE ACTUAL LEVER, not attempted.** Chips are published once per
+`build_layer2_shortlist`, so their cadence IS the heavy board build's cadence
+(~10–20 min per date). `layer2_shortlist.py`'s own comment already states the
+chips depend on NONE of the surrounding work — they are built from per-sport
+provider payloads. So the fix is a **small periodic chip publish decoupled from
+the board build**, at ~120 s for `central_today_iso()` only. That is genuinely
+new periodic work on the 4 GB worker and needs a headroom reading either side —
+`#241` is the precedent. The cheap alternative is raising
+`SYNDICATE_GAME_CHIP_ARTIFACT_MAX_AGE_SECONDS` toward the real cadence, which
+`#564`'s comment already describes as "favour the worker and accept a staler
+scoreboard" — that hides the symptom rather than fixing it.
