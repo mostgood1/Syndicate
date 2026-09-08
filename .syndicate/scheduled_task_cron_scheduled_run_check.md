@@ -21,6 +21,21 @@ execution — Modern Standby on this machine once stalled a scheduled Bash call 
 the same answer whenever it actually runs. Do not read a late fire as a failed
 check; read the artifact, not the timestamp.
 
+## UPDATED 2026-09-08 22:0xZ — expect 15 failures, not 19
+
+`#648`'s 4 STALE TESTS were repaired (`510b692e`) **and deployed**
+(`dep-dag8d6h5efls73fi338g`, live 22:07:15Z, behind claim + `CLEAR` preflight).
+
+**The deploy is the load-bearing half.** The cron runs its LAST DEPLOY, not
+`main`, and `autoDeploy = no` — so pushing the repairs would have changed
+nothing and the task would have read 19 against an expectation of 15. Checked
+before deploying: `point_estimator` appeared **0** times in the test file at the
+then-live `c208b5ef` and **1** on `origin/main`.
+
+Reading guide for the task: **15** = the repairs landed; **19** = they did not
+take, so check the run's commit is `510b692e` or later before calling it a
+regression; anything else = report the number and the names, do not assume.
+
 ## What it must find
 
 - `sim-input-reports` `crn-dafj4ie7bikc738q9ol0` → `successful`, and the
