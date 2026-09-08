@@ -5401,10 +5401,36 @@ def _launch_autorun_nfl_prop_projections(
     # so only a suspiciously small file is ever parsed. Nothing is read per tick
     # in the steady state.
     if not should_launch and decision_reason.startswith("artifact_fresh"):
-        empty_rows = _nfl_prop_artifact_is_empty(artifact_path)
-        if empty_rows:
-            should_launch = True
-            decision_reason = f"artifact_empty overriding[{decision_reason}]"
+        if _nfl_prop_artifact_is_empty(artifact_path):
+            # THE COOLDOWN IS NOT OPTIONAL HERE -- without it this override IS
+            # `#389`'s busy loop, rebuilt.
+            #
+            # The repair can legitimately fail to fix anything: if web's
+            # published copy is ALSO empty (exactly the state right after this
+            # worker's boot sweep republishes its own empty file), the builder
+            # refuses, pulls an empty artifact over an empty artifact, and the
+            # local file stays zero-row. The next tick then sees empty again and
+            # relaunches -- forever, a subprocess per tick, on the 4 GB worker
+            # whose OOM headroom already gates the MLB sims. That is the same
+            # shape as `SEASON_PROJECTION_LAUNCHING reason=artifact_stale` firing
+            # ~30 times in 2h45m on 2026-08-29, and as `#241`'s restart loop.
+            #
+            # So ask `#389`'s question -- when did we last LAUNCH this target? --
+            # and reuse the SAME cooldown the stale branch uses rather than
+            # inventing a second knob.
+            since_launch = _seconds_since_season_projection_launch(
+                "nfl_props", season=season, week=week,
+            )
+            cooldown = float(_season_projection_relaunch_cooldown_seconds())
+            if since_launch is not None and since_launch < cooldown:
+                decision_reason = (
+                    f"artifact_empty_relaunched_recently "
+                    f"since_launch_seconds={int(since_launch)} "
+                    f"cooldown_seconds={int(cooldown)}"
+                )
+            else:
+                should_launch = True
+                decision_reason = f"artifact_empty overriding[{decision_reason}]"
 
     if not should_launch:
         _log_season_projection_skip("nfl_props", decision_reason)

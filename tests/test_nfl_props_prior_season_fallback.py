@@ -449,3 +449,74 @@ def test_the_empty_check_never_forces_a_launch_on_anything_else(tmp_path):
     not_a_dict = tmp_path / "list.json"
     not_a_dict.write_text(json.dumps([1, 2, 3]), encoding="utf-8")
     assert is_empty(not_a_dict) is False
+
+
+def _drive_nfl_prop_autorun(worker, monkeypatch, tmp_path, *, since_launch, cooldown=900.0):
+    """Run the autorun with everything but the launch decision stubbed out."""
+    import json
+
+    artifact = tmp_path / "nfl_prop_projections_2026_wk1.json"
+    artifact.write_text(json.dumps({"season": 2026, "week": 1, "rows": []}), encoding="utf-8")
+
+    launched: list[str] = []
+    monkeypatch.setattr(worker, "_season_projection_auto_refresh_enabled", lambda: True)
+    monkeypatch.setattr(worker, "central_today_iso", lambda: "2026-09-08")
+    monkeypatch.setattr(worker, "_active_sports_for_date", lambda d: "nfl")
+    monkeypatch.setattr(worker, "_season_projection_process_still_running", lambda s: False)
+    monkeypatch.setattr(worker, "_season_projection_target_week", lambda s, y: 1)
+    monkeypatch.setattr(worker, "_nfl_prop_projection_artifact_path", lambda s, w: artifact)
+    monkeypatch.setattr(
+        worker,
+        "_season_projection_should_launch",
+        lambda *a, **k: (False, "artifact_fresh age_seconds=10 interval_seconds=86400"),
+    )
+    monkeypatch.setattr(
+        worker, "_seconds_since_season_projection_launch", lambda *a, **k: since_launch
+    )
+    monkeypatch.setattr(worker, "_season_projection_relaunch_cooldown_seconds", lambda: cooldown)
+    monkeypatch.setattr(worker, "_log_season_projection_skip", lambda *a, **k: None)
+    monkeypatch.setattr(worker, "_nfl_prop_projection_script_args", lambda s, w: ["true"])
+    monkeypatch.setattr(worker, "_record_season_projection_launch", lambda *a, **k: None)
+
+    class _Proc:
+        pid = 4242
+
+    def fake_popen(args):
+        launched.append("launched")
+        return _Proc()
+
+    monkeypatch.setattr(worker.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(worker, "_write_worker_status", lambda **k: None)
+    worker._launch_autorun_nfl_prop_projections(
+        worker_status_path=tmp_path / "s.json",
+        latest_manifest_path=tmp_path / "m.json",
+        refresh_cycle={},
+    )
+    return launched
+
+
+def test_the_empty_override_relaunches_when_the_cooldown_has_passed(monkeypatch, tmp_path):
+    worker = _load_refresh_worker()
+    launched = _drive_nfl_prop_autorun(worker, monkeypatch, tmp_path, since_launch=5000.0)
+    assert launched == ["launched"]
+
+
+def test_the_empty_override_is_throttled_by_the_relaunch_cooldown(monkeypatch, tmp_path):
+    """Without this the override IS `#389`'s busy loop, rebuilt.
+
+    The repair can legitimately fail to fix anything -- if web's published copy
+    is also empty, the builder pulls an empty over an empty and the local file
+    stays zero-row. The next tick would then see empty again and relaunch,
+    forever, a subprocess per tick on the 4 GB worker. Same shape as
+    `reason=artifact_stale` firing ~30 times in 2h45m on 2026-08-29.
+    """
+    worker = _load_refresh_worker()
+    launched = _drive_nfl_prop_autorun(worker, monkeypatch, tmp_path, since_launch=30.0)
+    assert launched == [], "an empty artifact must not relaunch inside the cooldown"
+
+
+def test_a_first_ever_launch_is_not_blocked_by_the_cooldown(monkeypatch, tmp_path):
+    """No recorded launch (None) must still be allowed through."""
+    worker = _load_refresh_worker()
+    launched = _drive_nfl_prop_autorun(worker, monkeypatch, tmp_path, since_launch=None)
+    assert launched == ["launched"]
