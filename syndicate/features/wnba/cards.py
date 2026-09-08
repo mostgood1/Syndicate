@@ -576,7 +576,7 @@ def _merge_sim_indexes(cards_sim_index: dict[tuple[str, str], dict[str, Any]], r
             continue
         existing_sim = existing.get("sim") if isinstance(existing.get("sim"), dict) else {}
         merged_sim = dict(existing_sim)
-        for field_name in ("quarters", "players_summary", "players", "missing_prop_players", "injuries", "pregame_context"):
+        for field_name in ("quarters", "players_summary", "players", "missing_prop_players", "injuries", "pregame_context", "market_anchor"):
             if field_name in merged_sim:
                 continue
             raw_value = raw_sim.get(field_name)
@@ -2231,6 +2231,8 @@ def _source_sim_payload(game_id: str, sim_game: dict[str, Any] | None, row: dict
             "market_home_spread": _safe_float(row.get("home_spread")),
             "market_total": _safe_float(row.get("total")),
         },
+        # P3: pre-sim market anchoring record (state/weights/raw model means).
+        "market_anchor": dict(sim.get("market_anchor")) if isinstance(sim.get("market_anchor"), dict) else None,
     }
 
 

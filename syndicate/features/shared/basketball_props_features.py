@@ -207,6 +207,69 @@ def load_player_logs_local(*, processed_root: Path):
     raise FileNotFoundError("player_logs not found; run fetch-player-logs")
 
 
+_ASOF_SLATE_FILES_LOCAL = ("game_odds_{date}.csv", "predictions_{date}.csv", "game_cards_{date}.csv")
+_ASOF_HOME_COLS_LOCAL = ("home_team", "home_tri", "home")
+_ASOF_AWAY_COLS_LOCAL = ("visitor_team", "away_team", "away_tri", "away")
+
+
+def _matchup_team_key(value: object) -> str:
+    """Tricode key for slate/log team joins; falls back to upper/strip."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local
+
+        code = str(_to_tricode_local(text) or "").strip().upper()
+        if code:
+            return code
+    except Exception:
+        pass
+    return text.upper()
+
+
+def _asof_matchup_map_local(*, processed_root: Path, date: str) -> dict[str, str]:
+    """Map team tricode -> synthetic MATCHUP string ("LAL vs. BOS" / "BOS @ LAL") for the date's slate.
+
+    Read from the first of `game_odds_<date>.csv`, `predictions_<date>.csv`,
+    `game_cards_<date>.csv` that carries home/away columns. The string is shaped
+    exactly like the boxscore MATCHUP column so the as-of prediction row can use
+    the same `_parse_matchup_context` as the history rows. Empty when nothing
+    is on disk for the date -- callers then fall through to is_home=0.0, the
+    pre-fix value.
+    """
+    import pandas as pd
+
+    date_s = str(date or "").strip()[:10]
+    if not date_s:
+        return {}
+    for template in _ASOF_SLATE_FILES_LOCAL:
+        path = processed_root / template.format(date=date_s)
+        if not path.exists():
+            continue
+        try:
+            frame = pd.read_csv(path)
+        except Exception:
+            continue
+        if frame is None or frame.empty:
+            continue
+        home_col = next((col for col in _ASOF_HOME_COLS_LOCAL if col in frame.columns), None)
+        away_col = next((col for col in _ASOF_AWAY_COLS_LOCAL if col in frame.columns), None)
+        if home_col is None or away_col is None:
+            continue
+        out: dict[str, str] = {}
+        for _, row in frame.iterrows():
+            home = _matchup_team_key(row.get(home_col))
+            away = _matchup_team_key(row.get(away_col))
+            if not home or not away:
+                continue
+            out.setdefault(home, f"{home} vs. {away}")
+            out.setdefault(away, f"{away} @ {home}")
+        if out:
+            return out
+    return {}
+
+
 def build_features_for_date_local(*, processed_root: Path, date: str, windows: list[int] | None = None, players: list[int] | None = None):
     import numpy as np
     import pandas as pd
@@ -307,6 +370,8 @@ def build_features_for_date_local(*, processed_root: Path, date: str, windows: l
         "pf": pf, "plus_minus": plus_minus,
     }
 
+    asof_matchup_map = _asof_matchup_map_local(processed_root=processed_root, date=date)
+
     rows = []
     grp = hist.groupby(pid, sort=False)
     for player_id, group in grp:
@@ -363,12 +428,18 @@ def build_features_for_date_local(*, processed_root: Path, date: str, windows: l
             "tov_per_min": "_tov_per_min",
             "usage_per_min": "_usage_per_min",
         }
+        asof_team = group.iloc[-1][_find_col(hist, TEAM_COLS)] if _find_col(hist, TEAM_COLS) else None
+        # P3 input fix: the as-of row used to hardcode is_home=0.0 for every
+        # player (history rows derive it from MATCHUP at the block above). Build
+        # the same "TEAM vs. OPP" / "TEAM @ OPP" string from the date's slate and
+        # run it through the same parser, so home and away rows differ.
+        asof_is_home, _asof_opp = _parse_matchup_context(asof_matchup_map.get(_matchup_team_key(asof_team)))
         rec = {
             "player_id": player_id,
             "player_name": group.iloc[-1][_find_col(hist, PLAYER_NAME_COLS)] if _find_col(hist, PLAYER_NAME_COLS) else None,
-            "team": group.iloc[-1][_find_col(hist, TEAM_COLS)] if _find_col(hist, TEAM_COLS) else None,
+            "team": asof_team,
             "asof_date": target_date.date(),
-            "is_home": 0.0,
+            "is_home": float(asof_is_home),
             "days_rest": float((target_date.normalize() - group[dcol].iloc[-1].normalize()).days) if len(group) > 0 else np.nan,
             "games_last7": float(((target_date - group[dcol]) <= pd.Timedelta(days=7)).sum()) if len(group) > 0 else 0.0,
             "games_last14": float(((target_date - group[dcol]) <= pd.Timedelta(days=14)).sum()) if len(group) > 0 else 0.0,

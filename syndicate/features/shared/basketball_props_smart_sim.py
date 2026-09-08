@@ -29,6 +29,109 @@ _MARKET_PLAYER_NAMES_CACHE_LOCAL: dict[tuple[str, str], dict[tuple[str, str], se
 _REAL_SMART_SIM_MODULE_CACHE_LOCAL: dict[str, Any] = {}
 _ADVANCED_STATS_BUILDER_MODULE_CACHE_LOCAL: dict[tuple[str, str], tuple[Any, Any]] = {}
 
+# --- Pre-simulation market anchoring (pricing plane v1, step 2 / P3) -------------
+#
+# The quarter model's team means are blended TOWARD the market before a single
+# sample is drawn: total -> 0.7*market + 0.3*model, margin -> 0.95*(-spread) +
+# 0.05*model (vendor `quarters.py` defaults; the wrapper's local port below is
+# what production actually executes, see `_simulate_quarters_local`). With that
+# on, any downstream spread/total "edge" measured against the same market is
+# noise by construction. This flag makes the mechanism explicit and removable:
+#
+#   SYNDICATE_BASKETBALL_SIM_MARKET_ANCHOR = on                 (default; bit-identical to before)
+#                                          | off                (no pre-sim blend at all)
+#                                          | weights:<tw>,<mw>  (explicit total/margin weights)
+#
+# Whatever the state, the raw model means are recorded in
+# `QuarterSummaryLocal.market_anchor` and written to the smart_sim artifact so a
+# row can be de-anchored post hoc. An unparseable value falls back to `on` and
+# says so on stdout (the conservative branch is the one production already runs).
+_MARKET_ANCHOR_ENV_LOCAL = "SYNDICATE_BASKETBALL_SIM_MARKET_ANCHOR"
+_MARKET_ANCHOR_STATES_LOCAL = ("on", "off", "weights")
+
+
+@dataclass(frozen=True)
+class MarketAnchorPolicyLocal:
+    state: str = "on"
+    total_w: float | None = None
+    margin_w: float | None = None
+    raw: str | None = None
+
+    @property
+    def enabled(self) -> bool:
+        return self.state != "off"
+
+
+def _market_anchor_policy_local(raw: str | None = None) -> MarketAnchorPolicyLocal:
+    """Parse the anchor flag. `raw=None` reads the environment."""
+    text = raw if raw is not None else os.environ.get(_MARKET_ANCHOR_ENV_LOCAL)
+    text_s = str(text or "").strip()
+    lowered = text_s.lower()
+    if not lowered or lowered == "on":
+        return MarketAnchorPolicyLocal(state="on", raw=text_s or None)
+    if lowered == "off":
+        return MarketAnchorPolicyLocal(state="off", raw=text_s)
+    if lowered.startswith("weights:"):
+        body = text_s.split(":", 1)[1]
+        parts = [part.strip() for part in body.split(",")]
+        try:
+            if len(parts) != 2:
+                raise ValueError("expected exactly two weights")
+            total_w = _clamp01_local(float(parts[0]))
+            margin_w = _clamp01_local(float(parts[1]))
+        except Exception as exc:
+            print(
+                f"[market_anchor] {_MARKET_ANCHOR_ENV_LOCAL}={text_s!r} is malformed ({exc}); falling back to 'on'",
+                flush=True,
+            )
+            return MarketAnchorPolicyLocal(state="on", raw=text_s)
+        return MarketAnchorPolicyLocal(state="weights", total_w=float(total_w), margin_w=float(margin_w), raw=text_s)
+    print(
+        f"[market_anchor] {_MARKET_ANCHOR_ENV_LOCAL}={text_s!r} is not one of {_MARKET_ANCHOR_STATES_LOCAL}; falling back to 'on'",
+        flush=True,
+    )
+    return MarketAnchorPolicyLocal(state="on", raw=text_s)
+
+
+def _apply_market_anchor_local(
+    *,
+    home_mu: float,
+    away_mu: float,
+    market_total: float | None,
+    market_home_spread: float | None,
+    w_total: float,
+    w_margin: float,
+    min_team_pts: float,
+) -> tuple[float, float]:
+    """The pre-sim market blend, verbatim from the pre-flag `_simulate_quarters_local`.
+
+    Kept as its own function so a test can assert it is NEVER REACHED under
+    `off` (reachability, not just output). Do not restructure the arithmetic:
+    the `on` state is required to stay bit-identical to the pre-flag code.
+    """
+    if market_total is not None:
+        market_total_f = float(market_total)
+        cur_total_mu = home_mu + away_mu
+        blend_total = w_total * market_total_f + (1.0 - w_total) * cur_total_mu
+        scale = blend_total / max(1e-6, cur_total_mu)
+        home_mu *= scale
+        away_mu *= scale
+    cur_total_mu = home_mu + away_mu
+    margin_mu = home_mu - away_mu
+    if market_home_spread is not None:
+        market_spread = float(market_home_spread)
+        target_margin_mu = w_margin * (-market_spread) + (1.0 - w_margin) * margin_mu
+        home_mu = 0.5 * (cur_total_mu + target_margin_mu)
+        away_mu = 0.5 * (cur_total_mu - target_margin_mu)
+        min_team_pts = float(min_team_pts)
+        if home_mu < min_team_pts:
+            home_mu = min_team_pts
+            away_mu = cur_total_mu - home_mu
+        if away_mu < min_team_pts:
+            away_mu = min_team_pts
+            home_mu = cur_total_mu - away_mu
+    return home_mu, away_mu
+
 
 def _json_default_local(value: Any) -> Any:
     if is_dataclass(value):
@@ -552,6 +655,11 @@ class QuarterSummaryLocal:
     final_margin_sigma: float
     probs: dict[str, float]
     evs: dict[str, float]
+    # Pre-sim market anchoring record (P3): state, weights, market inputs, and
+    # the RAW model means captured before the blend, so the artifact preserves
+    # the un-anchored model even when anchoring is on. None only for callers
+    # that construct the summary by hand.
+    market_anchor: dict[str, Any] | None = None
 
 
 def _norm_name_key(value: object) -> str:
@@ -1080,9 +1188,11 @@ def _apply_totals_calibration_local(*, processed_root: Path, date_str: str, home
     return float(home_mu), float(away_mu), q_biases
 
 
-def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, league, n_samples: int = 5000) -> QuarterSummaryLocal:
+def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, league, n_samples: int = 5000, anchor_policy: MarketAnchorPolicyLocal | None = None) -> QuarterSummaryLocal:
     import numpy as np
 
+    if anchor_policy is None:
+        anchor_policy = _market_anchor_policy_local()
     home = inp.home
     away = inp.away
     pace = np.mean([
@@ -1119,28 +1229,39 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
         home_mu, away_mu, q_biases = _apply_totals_calibration_local(processed_root=processed_root, date_str=inp.date, home_tri=str(home.team).upper(), away_tri=str(away.team).upper(), home_mu=home_mu, away_mu=away_mu)
     except Exception:
         q_biases = {}
-    w_total, w_margin = _blend_weights_local(processed_root=processed_root, inp=inp)
-    if inp.market_total is not None:
-        market_total = float(inp.market_total)
-        cur_total_mu = home_mu + away_mu
-        blend_total = w_total * market_total + (1.0 - w_total) * cur_total_mu
-        scale = blend_total / max(1e-6, cur_total_mu)
-        home_mu *= scale
-        away_mu *= scale
-    cur_total_mu = home_mu + away_mu
-    margin_mu = home_mu - away_mu
-    if inp.market_home_spread is not None:
-        market_spread = float(inp.market_home_spread)
-        target_margin_mu = w_margin * (-market_spread) + (1.0 - w_margin) * margin_mu
-        home_mu = 0.5 * (cur_total_mu + target_margin_mu)
-        away_mu = 0.5 * (cur_total_mu - target_margin_mu)
-        min_team_pts = float(getattr(league, "min_team_points"))
-        if home_mu < min_team_pts:
-            home_mu = min_team_pts
-            away_mu = cur_total_mu - home_mu
-        if away_mu < min_team_pts:
-            away_mu = min_team_pts
-            home_mu = cur_total_mu - away_mu
+    # --- pre-sim market anchoring (flagged, recorded; see MarketAnchorPolicyLocal) ---
+    model_total_raw = float(home_mu + away_mu)
+    model_margin_raw = float(home_mu - away_mu)
+    if anchor_policy.state == "weights":
+        w_total = float(anchor_policy.total_w if anchor_policy.total_w is not None else 0.0)
+        w_margin = float(anchor_policy.margin_w if anchor_policy.margin_w is not None else 0.0)
+    elif anchor_policy.enabled:
+        w_total, w_margin = _blend_weights_local(processed_root=processed_root, inp=inp)
+    else:
+        w_total, w_margin = None, None
+    if anchor_policy.enabled:
+        home_mu, away_mu = _apply_market_anchor_local(
+            home_mu=home_mu,
+            away_mu=away_mu,
+            market_total=inp.market_total,
+            market_home_spread=inp.market_home_spread,
+            w_total=w_total,
+            w_margin=w_margin,
+            min_team_pts=float(getattr(league, "min_team_points")),
+        )
+    market_anchor_record: dict[str, Any] = {
+        "state": str(anchor_policy.state),
+        "flag": _MARKET_ANCHOR_ENV_LOCAL,
+        "flag_value": anchor_policy.raw,
+        "total_w": (float(w_total) if w_total is not None else None),
+        "margin_w": (float(w_margin) if w_margin is not None else None),
+        "market_total": (float(inp.market_total) if inp.market_total is not None else None),
+        "market_spread": (float(inp.market_home_spread) if inp.market_home_spread is not None else None),
+        "model_total_raw": model_total_raw,
+        "model_margin_raw": model_margin_raw,
+        "anchored_total": float(home_mu + away_mu),
+        "anchored_margin": float(home_mu - away_mu),
+    }
     home_splits = _quarter_splits_for_team_local(processed_root=processed_root, team_tri=home.team, is_home=True, league=league)
     away_splits = _quarter_splits_for_team_local(processed_root=processed_root, team_tri=away.team, is_home=False, league=league)
     cur_total_mu = float(home_mu + away_mu)
@@ -1319,7 +1440,47 @@ def _simulate_quarters_local(*, processed_root: Path, inp: GameInputsLocal, leag
                     evs["ev_total_under"] = ev_total_under
     except Exception:
         pass
-    return QuarterSummaryLocal(quarters=quarters, final_total_mu=final_total_mu, final_total_sigma=final_total_sigma, final_margin_mu=final_margin_mu, final_margin_sigma=final_margin_sigma, probs=probs, evs=evs)
+    return QuarterSummaryLocal(quarters=quarters, final_total_mu=final_total_mu, final_total_sigma=final_total_sigma, final_margin_mu=final_margin_mu, final_margin_sigma=final_margin_sigma, probs=probs, evs=evs, market_anchor=market_anchor_record)
+
+
+def _simulate_quarters_from_vendor_inputs_local(*, processed_root: Path, league_code: str, inp: Any, n_samples: int = 3000) -> QuarterSummaryLocal:
+    """Route the vendor's own `simulate_quarters(inp)` through the local port.
+
+    The vendored `simulate_smart_game` only calls `simulate_quarters` when the
+    caller passes `quarters=None`; the wrapper always passes the local port's
+    quarters, so in production this is a fallback that should never fire. It is
+    monkeypatched anyway so the vendor blend (`quarters._blend_weights`) cannot
+    re-anchor behind `SYNDICATE_BASKETBALL_SIM_MARKET_ANCHOR=off`: every path
+    into a quarter sim now goes through `_simulate_quarters_local`, which is the
+    one place the flag is read.
+    """
+    home_src = getattr(inp, "home")
+    away_src = getattr(inp, "away")
+
+    def _team(src: Any) -> TeamContextLocal:
+        return TeamContextLocal(
+            team=str(getattr(src, "team", "") or ""),
+            pace=getattr(src, "pace", None),
+            off_rating=getattr(src, "off_rating", None),
+            def_rating=getattr(src, "def_rating", None),
+            injuries_out=int(getattr(src, "injuries_out", 0) or 0),
+            back_to_back=bool(getattr(src, "back_to_back", False) or False),
+            rest_days=getattr(src, "rest_days", None),
+            games_last_3d=getattr(src, "games_last_3d", None),
+            form_7=getattr(src, "form_7", None),
+            form_30=getattr(src, "form_30", None),
+        )
+
+    local_inp = GameInputsLocal(
+        date=str(getattr(inp, "date", "") or ""),
+        home=_team(home_src),
+        away=_team(away_src),
+        market_total=getattr(inp, "market_total", None),
+        market_home_spread=getattr(inp, "market_home_spread", None),
+        blend_total_market_w=getattr(inp, "blend_total_market_w", None),
+        blend_margin_market_w=getattr(inp, "blend_margin_market_w", None),
+    )
+    return _simulate_quarters_local(processed_root=processed_root, inp=local_inp, league=_league_for_code_local(league_code), n_samples=int(n_samples))
 
 
 def _period_lines_from_processed_local(*, processed_root: Path, date_str: str, home_tri: str, away_tri: str) -> dict[str, Any] | None:
@@ -4279,6 +4440,14 @@ def _call_source_simulate_smart_game_local(*, smart_sim_module, processed_root: 
             away_tri=away_tri,
             league=_league_for_code_local(league_code),
         ),
+        # P3: the vendor's `quarters is None` fallback must not re-anchor behind
+        # SYNDICATE_BASKETBALL_SIM_MARKET_ANCHOR -- route it through the local port.
+        "simulate_quarters": lambda inp, n_samples=3000: _simulate_quarters_from_vendor_inputs_local(
+            processed_root=processed_root,
+            league_code=league_code,
+            inp=inp,
+            n_samples=n_samples,
+        ),
         "_load_intervals_band_calibration": lambda: _load_intervals_band_calibration_local(processed_root=processed_root),
         "_load_intervals_time_profile": lambda: _load_intervals_time_profile_local(processed_root=processed_root, league_code=league_code),
         "_load_player_stat_calibration": lambda: _load_player_stat_calibration_local(processed_root=processed_root),
@@ -4659,6 +4828,18 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
             away_tri=away_tri,
             out_path=out_path_s,
         )
+
+        # P3: record the pre-sim market anchoring alongside the sim output so
+        # the raw model means survive into the artifact whatever the flag state.
+        try:
+            if isinstance(out, dict):
+                anchor_record = dict(getattr(qsum, "market_anchor", None) or {})
+                anchor_record["market_total_source"] = (
+                    "job" if market_total is not None else ("period_lines_h1_total_x2" if market_total_for_quarters is not None else None)
+                )
+                out["market_anchor"] = anchor_record
+        except Exception:
+            pass
 
         try:
             name_to_id_local = state.get("name_to_id") or {}

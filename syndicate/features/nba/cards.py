@@ -2182,6 +2182,8 @@ def _game_from_row(
             "market": {
                 "market_home_spread": market_payload.get("market_home_spread", home_spread),
             },
+            # P3: pre-sim market anchoring record (state/weights/raw model means).
+            "market_anchor": sim_payload.get("market_anchor") if isinstance(sim_payload.get("market_anchor"), dict) else None,
             "context": {
                 "away_pace": context_payload.get("away_pace", 99.0),
                 "home_pace": context_payload.get("home_pace", 99.0),
