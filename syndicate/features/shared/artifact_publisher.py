@@ -340,6 +340,13 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # absence via `projection_provenance`; wire the publisher first.
     "ncaaf_source/data/smartsim2_projections_*_wk*.csv",
     "nfl_source/smartsim2_projections_*_wk*.csv",
+    # The ratings those projections were built from, for the live re-sim.
+    # Allowlisted beside the projections deliberately: the re-sim reads it on a
+    # DIFFERENT service from the one that generates it, and an artifact that is
+    # written but not allowlisted is invisible to every other service -- the
+    # exact shape that left `espn_match_stats.json` off the worker for three
+    # weeks while it sat git-tracked in the checkout (2026-09-07).
+    "nfl_source/smartsim2_ratings_*_wk*.json",
     # WHICH NCAAF WEEKS HAVE BEEN PLAYED. `lane ncaaf-games-cache-refresh`,
     # measured 2026-09-01.
     #

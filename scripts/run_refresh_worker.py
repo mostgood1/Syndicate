@@ -2264,6 +2264,147 @@ def _ncaaf_live_resim_live_index(dates: list[str]) -> tuple[dict[str, dict[str, 
     return index, stats
 
 
+def _nfl_live_resim_status_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "nfl_live_resim.json"
+
+
+def _nfl_live_resim_interval_seconds() -> float:
+    """Seconds between NFL ticks. Reuses NCAAF's env knob shape, own default.
+
+    300s rather than NCAAF's tighter cadence because an NFL slate is ~16 games
+    against a Saturday's ~60, and because every tick that finds nothing still
+    costs a projections stat and a scoreboard fetch.
+    """
+    raw = str(os.environ.get("SYNDICATE_NFL_LIVE_RESIM_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 300.0
+    return value if value > 0 else 300.0
+
+
+def _run_nfl_live_resim_tick() -> dict[str, Any] | None:
+    """Re-sim every live NFL game from its current state and publish the lens.
+
+    Mirrors `_run_ncaaf_live_resim_tick` in shape. Two deliberate differences,
+    both because NFL's inputs are not NCAAF's:
+
+    RATINGS COME FROM AN ARTIFACT, NOT FROM PLAY-BY-PLAY. `team_rating()` needs
+    two `load_pbp_plays()` calls -- 98 MB / 48,771 rows / 2.29 s per season,
+    measured -- which on a cadence is `#241`, the hazard that restart-looped
+    production. It would also let this re-sim's ratings DRIFT from the pregame
+    projection it exists to update, and neither the re-sim flag nor
+    `UNINFORMATIVE_BAND` would catch that: they gate the probability, not its
+    provenance. `generate_smartsim2_nfl_projections.py` now writes the ratings
+    it used; this reads them.
+
+    THE LIVE ROWS GO THROUGH AN ADAPTER. `nfl_game_state_index` and
+    `live_state_from_row` genuinely disagree on field names and value shapes --
+    see `scripts/_nfl_live_resim_tick.normalise_live_row`, which documents the
+    mismatch field by field. Without it every game refuses
+    `game_not_in_progress` on a display string.
+    """
+    from syndicate.features.nfl.live_resim import nfl_live_resim_enabled
+
+    if not nfl_live_resim_enabled():
+        return None
+
+    store = _refresh_state_store()
+    status_path = _nfl_live_resim_status_path()
+    last_status = store["read_json_file"](status_path) or {}
+    now = time.time()
+    try:
+        last_run_epoch = float(last_status.get("lastRunEpoch"))
+    except (TypeError, ValueError):
+        last_run_epoch = 0.0
+    if now - last_run_epoch < _nfl_live_resim_interval_seconds():
+        return None
+
+    season = date.today().year
+    week = _season_projection_target_week("nfl", season)
+    if week is None:
+        store["write_json_file"](
+            status_path, {**last_status, "lastRunEpoch": now, "last": {"skipped": "no_target_week"}}
+        )
+        return {"skipped": "no_target_week", "season": season}
+
+    from syndicate.features.nfl.smartsim2_projection import (
+        read_projection_artifact,
+        read_ratings_artifact,
+    )
+
+    data_root = store["data_root"]()
+    nfl_root = data_root / "nfl_source"
+    projections = read_projection_artifact(season=season, week=week, data_root=nfl_root)
+    if not projections:
+        # NO SCOREBOARD FETCH ON THIS PATH, same reasoning as NCAAF's: with no
+        # games to join, the pull buys nothing. Out of season this is the branch
+        # that runs, forever, for the cost of one artifact stat.
+        store["write_json_file"](
+            status_path,
+            {**last_status, "lastRunEpoch": now, "last": {"skipped": "no_projection_artifact", "week": week}},
+        )
+        return {"skipped": "no_projection_artifact", "season": season, "week": week}
+
+    ratings = read_ratings_artifact(season=season, week=week, data_root=nfl_root)
+    # NOT a hard stop. An absent ratings artifact means every game refuses
+    # `no_pregame_ratings` BY NAME, which is readable; returning early here
+    # would make "ratings missing" indistinguishable from "no games".
+
+    from syndicate.features.nfl.live_game_state import nfl_game_state_index
+    from syndicate.features.nfl.live_resim import (
+        build_live_lens_snapshot,
+        live_lens_snapshot_path,
+        validate_live_lens_snapshot,
+    )
+    from scripts._nfl_live_resim_tick import build_live_index
+
+    games = [
+        {
+            "away_team": projection.away_team,
+            "home_team": projection.home_team,
+            "live_key": f"{projection.away_team}@{projection.home_team}",
+        }
+        for projection in projections
+    ]
+
+    try:
+        state_index = nfl_game_state_index(season, week, seasontype=2)
+    except Exception as exc:  # noqa: BLE001 - a scoreboard outage must not kill the tick
+        state_index = {}
+        print(f"[refresh_worker] NFL_LIVE_RESIM_STATE_FETCH_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+    live_index = build_live_index(state_index, games)
+    now_utc = datetime.now(timezone.utc)
+    snapshot = build_live_lens_snapshot(
+        now_utc.date().isoformat(),
+        games=games,
+        live_index=live_index,
+        ratings=ratings,
+    )
+
+    written = False
+    valid, reason = validate_live_lens_snapshot(snapshot)
+    if valid:
+        store["write_json_file"](live_lens_snapshot_path(data_root), snapshot)
+        written = True
+
+    result = {
+        "season": season,
+        "week": week,
+        "date": snapshot.get("date"),
+        "projections": len(projections),
+        "ratings_teams": len(ratings),
+        "state_index": len(state_index),
+        "live_index": len(live_index),
+        "written": written,
+        "invalid_reason": None if valid else reason,
+        "coverage": snapshot.get("coverage"),
+    }
+    store["write_json_file"](status_path, {"lastRunEpoch": now, "last": result})
+    return result
+
+
 def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
     """Re-sim every live NCAAF game from its current state and publish the lens.
 
@@ -6538,6 +6679,17 @@ def main() -> int:
                 print(f"[refresh_worker] NCAAF_LIVE_RESIM {json.dumps(ncaaf_live_resim_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] NCAAF_LIVE_RESIM_ERROR {type(exc).__name__}: {exc}", flush=True)
+
+        # NFL, immediately after NCAAF and in the same try-shape. Returns None
+        # and logs nothing when `SYNDICATE_NFL_LIVE_RESIM` is unset, which is
+        # the default -- so on an unflagged worker this costs one env read per
+        # cycle and nothing else.
+        try:
+            nfl_live_resim_meta = _run_nfl_live_resim_tick()
+            if nfl_live_resim_meta:
+                print(f"[refresh_worker] NFL_LIVE_RESIM {json.dumps(nfl_live_resim_meta, sort_keys=True, default=str)}", flush=True)
+        except Exception as exc:
+            print(f"[refresh_worker] NFL_LIVE_RESIM_ERROR {type(exc).__name__}: {exc}", flush=True)
 
         refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
         if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):

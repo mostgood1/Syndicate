@@ -47,6 +47,7 @@ from syndicate.features.football.sim_engine.smartsim2.game_simulator import simu
 from syndicate.features.nfl.injury_adjustment import adjust_team_rating_for_injuries
 from syndicate.features.nfl.smartsim2_projection import SmartSimNflProjection
 from syndicate.features.nfl.smartsim2_projection import write_projection_artifact
+from syndicate.features.nfl.smartsim2_projection import write_ratings_artifact
 from syndicate.features.nfl.sources import default_nfl_source_root
 from syndicate.features.nfl.sources import nfl_pbp_diagnostic
 from syndicate.features.nfl.sources import nfl_pbp_path
@@ -834,6 +835,39 @@ def main() -> None:
     # not earlier, where the projections do not exist yet, and not after.
     assert_projections_carry_information(projections, season=args.season, week=args.week)
     path = write_projection_artifact(projections, season=args.season, week=args.week, data_root=output_root)
+
+    # THE RATINGS THE LIVE RE-SIM WILL READ, from the SAME plays these
+    # projections were built from, in the same run.
+    #
+    # `team_rating` is deterministic in (team, week, plays), so recomputing it
+    # here yields exactly what `build_projection` used above -- and writing it
+    # is what makes that guarantee available to a different process. The
+    # alternative was a live tick calling `load_pbp_plays` itself: measured
+    # 98 MB / 48,771 rows / 2.29 s per season, twice, which is `#241` on a
+    # cadence AND would let the re-sim's ratings drift from the pregame number
+    # it exists to update. Neither the re-sim flag nor `UNINFORMATIVE_BAND`
+    # would catch that drift: they gate the probability, not its provenance.
+    #
+    # Every team in the SCHEDULE, not every team with plays -- the re-sim can
+    # only ever ask about a scheduled game, and a team on `neutral_no_data`
+    # must appear rather than be absent, so the reader can tell "rated
+    # neutral" from "not in the file".
+    ratings_for_artifact: dict[str, tuple[float, float, str]] = {}
+    for row in schedule_rows:
+        for team in (row["home_team"], row["away_team"]):
+            if team in ratings_for_artifact:
+                continue
+            offense, defense, source = team_rating(
+                team, week=args.week, current_plays=current_plays, prior_plays=prior_plays
+            )
+            ratings_for_artifact[team] = (offense, defense, source)
+    ratings_path = write_ratings_artifact(
+        ratings_for_artifact, season=args.season, week=args.week, data_root=output_root
+    )
+    _sources = {}
+    for _o, _d, _s in ratings_for_artifact.values():
+        _sources[_s] = _sources.get(_s, 0) + 1
+    log(f"RATINGS_ARTIFACT path={ratings_path} teams={len(ratings_for_artifact)} sources={_sources}")
     injury_notes_path = DATA_ROOT / f"smartsim2_projections_{args.season}_wk{args.week}_injury_notes.json"
     if all_injury_diagnostics:
         injury_notes_path.write_text(json.dumps(all_injury_diagnostics, indent=2), encoding="utf-8")
@@ -863,6 +897,11 @@ def main() -> None:
         from syndicate.features.shared.artifact_publisher import publish_hot_artifact
 
         published = publish_hot_artifact(Path(path))
+        # The ratings artifact goes the same way. A worker that regenerates
+        # projections on its own disk must also hand web the ratings, or the
+        # live re-sim reads a file that only exists on the generating service.
+        published_ratings = publish_hot_artifact(Path(ratings_path))
+        print(f"ratings_artifact_published={published_ratings}", flush=True)
     except Exception as exc:  # noqa: BLE001 - transfer must never fail generation
         published = False
         print(f"artifact_publish_error={type(exc).__name__}: {exc}", flush=True)

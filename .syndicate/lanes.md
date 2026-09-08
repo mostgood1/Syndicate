@@ -1655,6 +1655,14 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   -- same holder.
   NOT claimed, deliberately: `syndicate/features/shared/live_refresh_loop.py`
   -- released 2026-08-15 with `mlb-props-regen`'s orphaned claims.
+  NOT claimed, deliberately: `scripts/generate_smartsim2_nfl_projections.py`
+  -- held by lane `nfl-rating-units`.
+  NOT claimed, deliberately: `syndicate/features/nfl/smartsim2_projection.py`
+  -- same holder, ALSO session 520cd594. Edited from here to publish the
+  ratings artifact the NFL live re-sim tick reads. That lane's own block already
+  records a prior same-session cross-lane write to the first file for the same
+  reason, so this follows an established, declared precedent rather than setting
+  a new one.
   Both lanes are THIS SESSION (520cd594), so the edits made from here -- the
   soccer ESPN seed at the `history/` glob, and the publish-ACCEPTED log raised
   by `segment-regrade-apply` -- are not cross-session. The claims stay in the
