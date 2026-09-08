@@ -30,6 +30,30 @@
   {% set smartsim_reason_items = smartsim_reasons['items'] if smartsim_reasons and smartsim_reasons['items'] is defined else [] %}
   {% set live_state = game.shared_is_live if game.shared_is_live is defined else false %}
   {% set metrics = game.metrics if game.metrics is defined and game.metrics else [] %}
+  {#- BOX SCORE AND PROPS, ported from `_game_card_generic.html`
+      `[2026-09-08, lane nfl-props-precompute]`.
+
+      THESE WERE LOST WHEN NFL MOVED ONTO THIS PARTIAL EARLIER THE SAME DAY,
+      and it was my regression. The generic card renders `boxscore` and `props`
+      panels off the SHARED contract; this card rendered neither, so switching
+      NFL's `card_variant` to the football branch silently dropped two tabs.
+      Measured on the same served NFL game, both partials:
+
+          generic  panels = game, boxscore, props, panels
+          football panels = identity, context, coverage, details
+
+      The data was never missing -- `shared_prop_rows`, `shared_box_sections`
+      and `shared_period_rows` are all 16/16 non-empty on the served NFL
+      payload, and `shared_box_sections` is 51/51 on NCAAF, which has never
+      rendered them either.
+
+      CONTRACT-BASED, NOT MLB-SHAPED. MLB's equivalents read `actual_box`'s
+      batting/pitching columns and an R/H/E linescore; football has none of
+      those. These read the cross-sport keys both codes already populate, which
+      is why one port serves both. -#}
+  {% set box_sections = game.shared_box_sections if game.shared_box_sections is defined else [] %}
+  {% set prop_rows = game.shared_prop_rows if game.shared_prop_rows is defined else [] %}
+  {% set prop_status_rows = game.shared_prop_status_rows if game.shared_prop_status_rows is defined else prop_rows %}
   {% set away_team = teams.get('away') if teams else {} %}
   {% set home_team = teams.get('home') if teams else {} %}
   {% set away_header = scoreboard_header.get('away') if scoreboard_header else {} %}
@@ -76,6 +100,8 @@
     {% set card_tabs = [{'id': 'identity', 'label': 'Game'}]
       + ([{'id': blend_panel_id, 'label': ('Model Comparison' if scoreboard.projection_sources_mode == 'public_trial' else 'Blend Trial')}] if blend_panel_id else [])
       + ([{'id': 'smartsim-reasons', 'label': 'Why It Leans'}] if smartsim_reason_items else [])
+      + ([{'id': 'boxscore', 'label': 'Box Score'}] if box_sections else [])
+      + ([{'id': 'props', 'label': 'Props'}] if prop_rows else [])
       + [{'id': 'context', 'label': 'Team Context'}]
       + ([{'id': 'matchup-context', 'label': 'Matchup'}] if show_matchup_tab else [])
       + [{'id': 'coverage', 'label': 'Coverage'}, {'id': 'details', 'label': 'Details'}] %}
@@ -419,6 +445,135 @@
         </div>
       </div>
     </section>
+
+  {#- GATED ON THE SAME CONDITION AS ITS TAB. This card's rule -- written at
+      the top and enforced by `tests/test_ncaaf_card_template.py` -- is that a
+      panel exists IFF a tab addresses it. The first cut gated the two TABS on
+      `box_sections`/`prop_rows` and left the PANELS ungated, which on an NCAAF
+      game with no props rendered an orphan `props` panel: markup shipped to
+      the browser that nothing can reach. That is the same defect the file
+      already records costing a collapsed card on 2026-08-14. -#}
+  {% if box_sections %}
+  <section class="cards-panel" data-panel-id="boxscore" id="panel-{{ card_dom_id }}-boxscore" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-boxscore" tabindex="0">
+    <div class="cards-box-grid{% if box_sections|length < 2 %} cards-box-grid--stack{% endif %}">
+      {% for section in box_sections %}
+        <div class="cards-panel-card">
+          <div class="cards-box-head">
+            <div class="cards-table-title"><strong>{{ section.title }}</strong></div>
+            <span class="cards-chip">{{ 'Live' if live_state else 'Sim' }}</span>
+          </div>
+          <div class="cards-callout-copy">{{ section.body }}</div>
+          {% if section.columns and section.table_rows %}
+            <div class="cards-table-wrap cards-statgrid-wrap">
+              <table class="cards-statgrid">
+                <thead>
+                  <tr>
+                    {% for col in section.columns %}
+                      <th{% if not loop.first %} class="cards-statgrid-num"{% endif %}>{{ col }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for trow in section.table_rows %}
+                    <tr>
+                      {% for cell in trow %}
+                        {% if loop.first %}
+                          <th scope="row" class="cards-statgrid-name">{{ cell }}</th>
+                        {% else %}
+                          <td class="cards-statgrid-num">{{ cell }}</td>
+                        {% endif %}
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+          {% if section.rows %}
+            <div class="cards-table-wrap">
+              <div class="cards-table-list">
+                {% for row in section.rows %}
+                  <div class="cards-table-row">
+                    <div class="cards-table-row-main">
+                      <span class="cards-table-row-name">{{ row.name }}</span>
+                      {% if row.detail %}<span class="cards-table-copy">{{ row.detail }}</span>{% endif %}
+                    </div>
+                    <div class="cards-table-row-value">{{ row.value | default('—', true) }}</div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% elif not (section.columns and section.table_rows) and not section.body %}
+            {#- Only when the section has NOTHING to say. A section carrying a
+                table, or a body that already explains the absence, was
+                printing this generic line UNDER its own specific one --
+                "No player projections were published for Coventry City in
+                this match." immediately followed by "No box rows are
+                available for this game yet." Two empty states, one gap. -#}
+            <div class="cards-empty-copy">No box rows are available for this game yet.</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% endif %}
+  {% if prop_rows %}
+  <section class="cards-panel" data-panel-id="props" id="panel-{{ card_dom_id }}-props" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-props" tabindex="0">
+    <div class="cards-box-grid{% if prop_rows|length < 4 %} cards-box-grid--stack{% endif %}">
+      <div class="cards-panel-card cards-panel-card--overview-main">
+        <div class="cards-box-head">
+          <div>
+            <div class="cards-table-kicker">{{ game.shared_tab_props_title if game.shared_tab_props_title is defined else 'Props' }}</div>
+            <div class="cards-table-title"><strong>{{ 'Live props lane' if live_state else 'Official and playable props' }}</strong></div>
+          </div>
+          <span class="cards-overview-badge">Props</span>
+        </div>
+        {% if prop_rows %}
+          <div class="cards-callout-list">
+            {% for row in prop_rows[:8] %}
+              <div class="cards-callout">
+                <strong>{{ row.name }}</strong>
+                {% if row.detail %}<span class="cards-callout-copy">{{ row.detail }}</span>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="cards-empty-copy">No playable props were linked for this game.</div>
+        {% endif %}
+      </div>
+      {#- The status table reads the SAME rows as the list above it. When those
+          rows were scraped off a display panel rather than built from
+          `prop_recommendations`, every heading and every value on it is a panel
+          constant, so the table is the list again with nothing added --
+          measured on production soccer 2026-08-15 as five rows rendered twice.
+          `shared_prop_status_rows` is the subset that carries a real per-row
+          tier/line/price. -#}
+      {% if prop_status_rows %}
+      <div class="cards-panel-card">
+        <div class="cards-box-head">
+          <div class="cards-table-title"><strong>{{ 'Live props status' if live_state else 'Official props status' }}</strong></div>
+          <span class="cards-chip">{{ 'Live' if live_state else 'Pregame' }}</span>
+        </div>
+          <div class="cards-table-wrap">
+            <div class="cards-table-list">
+              {% for row in prop_status_rows[:8] %}
+                <div class="cards-table-row">
+                  <div class="cards-table-row-main">
+                    <span class="cards-table-row-name">{{ row.heading }}</span>
+                    <span class="cards-table-copy">{{ row.name }}</span>
+                  </div>
+                  <div class="cards-table-row-value">{{ row.value | default('—', true) }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  {% endif %}
 
     <section class="cards-panel" data-panel-id="details" id="panel-{{ card_dom_id }}-details" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-details" tabindex="0">
       <div class="cards-box-grid{% if game.panels is defined and game.panels|length < 2 %} cards-box-grid--stack{% endif %}">

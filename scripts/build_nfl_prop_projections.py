@@ -49,6 +49,7 @@ from syndicate.features.nfl.props import (  # noqa: E402
     nfl_props_rows_for_week,
     write_nfl_prop_projection_artifact,
 )
+from syndicate.features.shared.artifact_publisher import publish_hot_artifact  # noqa: E402
 
 
 def build(season: int, week: int) -> dict:
@@ -57,6 +58,12 @@ def build(season: int, week: int) -> dict:
     # would be republished forever and look like a healthy rebuild.
     odds_rows, sim_rows = nfl_props_rows_for_week(season, week, use_artifact=False)
     path = write_nfl_prop_projection_artifact(season, week, sim_rows)
+    # PUBLISH, or the worker writes to its own disk and web never sees it --
+    # which is the entire defect this artifact exists to fix, reintroduced one
+    # layer up. `publish_hot_artifact` no-ops with a printed
+    # SKIP_NOT_CONFIGURED when the publish URL/token are unset (local runs), so
+    # this is safe off-worker and loud about it rather than silent.
+    published = publish_hot_artifact(path)
     rate_sources = collections.Counter(str(row.get("rate_source") or "?") for row in sim_rows)
     markets = collections.Counter(
         str(row.get("market") or "").split("::", 1)[0] for row in sim_rows
@@ -66,6 +73,7 @@ def build(season: int, week: int) -> dict:
         "season": season,
         "week": week,
         "path": str(path),
+        "published": bool(published),
         "odds_rows": len(odds_rows),
         "sim_rows": len(sim_rows),
         "entities": len({str(row.get("entity") or "") for row in sim_rows}),
@@ -85,7 +93,7 @@ def main() -> int:
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print(f"wrote {result['path']}")
+        print(f"wrote {result['path']}  published={result['published']}")
         print(f"  odds_rows {result['odds_rows']}  sim_rows {result['sim_rows']}  "
               f"entities {result['entities']}")
         print(f"  rate_sources {result['rate_sources']}")

@@ -452,3 +452,76 @@ def test_the_live_lens_counts_the_slate_by_phase():
         {"status": "Week 1"},
     ]
     assert nfl_live_lens._phase_counts(games) == {"live": 1, "final": 2, "pregame": 1}
+
+
+# ------------------------------------------- box score + props on the football card
+
+
+def _game_with_shared_sections(**overrides):
+    game = _nfl_game()
+    game["shared_box_sections"] = [
+        {"title": "Projected box", "body": "Simulated drive totals.",
+         "columns": ["Team", "Pts"], "table_rows": [["NE", "21.8"], ["SEA", "22.0"]]},
+    ]
+    game["shared_prop_rows"] = [
+        {"name": "A.J. Brown — Receiving Yards", "detail": "Over 68.5 (-110)"},
+    ]
+    game["shared_prop_status_rows"] = game["shared_prop_rows"]
+    game.update(overrides)
+    return game
+
+
+def test_the_football_card_renders_a_box_score_and_a_props_panel():
+    """THE REGRESSION THIS PINS WAS MINE, and it shipped for several hours.
+
+    Moving NFL onto the football partial dropped two tabs the GENERIC partial
+    had been rendering. Measured on the same served NFL game, both partials:
+
+        generic   panels = game, boxscore, props, panels
+        football  panels = identity, context, coverage, details
+
+    The data was never missing: `shared_prop_rows`, `shared_box_sections` and
+    `shared_period_rows` were all 16/16 non-empty on the served NFL payload.
+    I measured card HEIGHTS, crests and prose blocks when making that switch and
+    never enumerated the PANELS I was trading away -- a parity check that
+    compares presentation and not capability.
+    """
+    html = _env().get_template("shared/_game_card_ncaaf.html").render(
+        game=_game_with_shared_sections()
+    )
+    assert 'data-panel-id="boxscore"' in html
+    assert 'data-panel-id="props"' in html
+    assert 'data-tab-target="boxscore"' in html
+    assert 'data-tab-target="props"' in html
+    assert "A.J. Brown" in html
+
+
+def test_a_panel_exists_iff_a_tab_addresses_it_on_both_sports():
+    """This card's own rule, and the first cut of the port broke it: the TABS
+    were gated on `box_sections`/`prop_rows` and the PANELS were not, so an
+    NCAAF game with no props rendered an orphan `props` panel -- markup shipped
+    to the browser that nothing can reach. Same defect this file's header
+    records collapsing a card on 2026-08-14."""
+    import re
+
+    for game in (
+        _game_with_shared_sections(),                      # both sections
+        _game_with_shared_sections(shared_prop_rows=[]),   # box only
+        _game_with_shared_sections(shared_box_sections=[], shared_prop_rows=[]),  # neither
+    ):
+        html = _env().get_template("shared/_game_card_ncaaf.html").render(game=game)
+        tabs = set(re.findall(r'data-tab-target="([a-z-]+)"', html))
+        panels = set(re.findall(r'data-panel-id="([a-z-]+)"', html))
+        assert tabs == panels, f"orphans: tabs-only={tabs - panels} panels-only={panels - tabs}"
+
+
+def test_the_sections_are_contract_based_not_mlb_shaped():
+    """One port serves both football codes because it reads the CROSS-SPORT
+    keys, not MLB's. MLB's own panels read `actual_box`'s batting/pitching
+    columns and an R/H/E linescore -- football has none of those, and copying
+    them would have produced a card that renders nothing."""
+    source = (TEMPLATE_ROOT / "shared" / "_game_card_ncaaf.html").read_text(encoding="utf-8")
+    for key in ("shared_box_sections", "shared_prop_rows", "shared_prop_status_rows"):
+        assert key in source, key
+    for mlb_only in ("batting_columns", "pitching_columns", "cards-linescore"):
+        assert mlb_only not in source, f"MLB-shaped markup leaked in: {mlb_only}"

@@ -5239,6 +5239,104 @@ def _log_season_projection_skip(sport: str, reason: str) -> None:
     print(f"[refresh_worker] {label} sport={sport} {reason}", flush=True)
 
 
+def _nfl_prop_projection_artifact_path(season: int, week: int) -> Path:
+    from syndicate.features.nfl.props import nfl_prop_projection_artifact_path
+
+    return nfl_prop_projection_artifact_path(season, week)
+
+
+def _nfl_prop_projection_script_args(season: int, week: int) -> list[str]:
+    script_path = Path(__file__).resolve().parent / "build_nfl_prop_projections.py"
+    return [sys.executable, str(script_path), "--season", str(season), "--week", str(week)]
+
+
+def _launch_autorun_nfl_prop_projections(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    """Precompute NFL player-prop projections on the WORKER, where the pbp is.
+
+    WHY THIS AUTORUN EXISTS, measured rather than assumed. On 2026-09-08
+    `/nfl/api/props` served **0 cards** for week 1 against a capture of 5,929
+    real quotes. Web's own request log, once the join was instrumented:
+
+        [nfl_props] JOIN season=2026 week=1 odds_rows=2455 sim_rows=0
+                    refused_wrong_team=0 refused_unknown_team=0
+
+    Both refusal counters at zero prove nothing reached the team check, so every
+    row exited at `player_id is None` -- which requires `player_name_index`
+    empty for BOTH 2026 and 2025, and both derive from play-by-play. **web has
+    no pbp.** This service does. `CLAUDE.md`: workers write artifacts, web reads
+    them; the prop model was running on the service without the data AND on the
+    request path, violating both halves of that rule at once.
+
+    SHAPE COPIED FROM `_launch_autorun_season_projections` DELIBERATELY: same
+    env gate, same `_season_projection_should_launch` staleness decision (whose
+    `#389` fix -- answering "when did we last LAUNCH?" when the artifact cannot
+    answer -- applies here identically, and reimplementing it would reintroduce
+    the busy loop it removed), same one-job-per-tick discipline, same
+    never-fatal error handling.
+
+    IT DEPENDS ON THE ODDS CAPTURE, NOT THE OTHER WAY ROUND. A week with no
+    `oddsapi_player_props_*.csv` rows produces a zero-row artifact, which the
+    builder exits 3 on rather than publishing quietly -- a silent empty artifact
+    is indistinguishable downstream from "this week has no market", which is the
+    ambiguity this whole chain exists to remove.
+    """
+    if not _season_projection_auto_refresh_enabled():
+        return False
+    selected_date = central_today_iso()
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    if "nfl" not in active:
+        return False
+    if _season_projection_process_still_running("nfl_props"):
+        return False
+    season = date.today().year
+    week = _season_projection_target_week("nfl", season)
+    if week is None:
+        return False
+
+    artifact_path = _nfl_prop_projection_artifact_path(season, week)
+    should_launch, decision_reason = _season_projection_should_launch(
+        "nfl_props", artifact_path, season=season, week=week,
+    )
+    if not should_launch:
+        _log_season_projection_skip("nfl_props", decision_reason)
+        return False
+
+    print(
+        f"[refresh_worker] NFL_PROP_PROJECTION_LAUNCHING season={season} week={week} "
+        f"reason={decision_reason}",
+        flush=True,
+    )
+    try:
+        process = subprocess.Popen(_nfl_prop_projection_script_args(season, week))
+    except Exception as exc:  # noqa: BLE001 -- never fatal to the tick loop
+        _write_worker_status(
+            worker_status_path=worker_status_path,
+            latest_manifest_path=latest_manifest_path,
+            state="error",
+            detail=f"Failed to auto-launch NFL prop-projection build (season={season} week={week}): {type(exc).__name__}: {exc}",
+            ran_job=False,
+            latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+            refresh_cycle=refresh_cycle,
+        )
+        return False
+    # THE PID IS POSITIONAL AND LOAD-BEARING. `#389`'s backstop answers "when
+    # did we last LAUNCH this target?" when the artifact cannot answer, and
+    # `_season_projection_process_still_running` reads the recorded pid to
+    # decide whether a run is already in flight. Omitting it -- which the first
+    # cut of this function did -- would have raised TypeError on the very first
+    # launch, inside a `try` that only wraps Popen, i.e. it would have crashed
+    # the tick rather than the launch.
+    _record_season_projection_launch(
+        "nfl_props", int(getattr(process, "pid", 0) or 0), season=season, week=week
+    )
+    return True
+
+
 def _launch_autorun_season_projections(
     *,
     latest_manifest_path: Path,
@@ -6997,6 +7095,13 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_season_projections(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_prop_projections(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,
