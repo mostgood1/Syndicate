@@ -683,3 +683,77 @@ def test_the_registered_row_key_matches_what_the_writer_emits(tmp_path):
         f"the writer emits {sorted(payload)} and the guard looks for "
         f"{_NON_EMPTY_ROW_KEYS} -- they have drifted apart"
     )
+
+
+def test_the_line_is_part_of_the_prop_join_key():
+    """A player quoted at two lines must not share one probability.
+
+    `_nfl_prop_model_probability` is called with `line=` and returns P(over THAT
+    line), so two quoted numbers produce two different answers. Both rows used
+    to be stored under `stat::player`, so `join_odds_to_sim` matched whichever
+    it found and applied it to EVERY line of that market.
+
+    MEASURED on the served board 2026-09-08: 371 of 371 (player, market, side)
+    groups with more than one quoted line showed an IDENTICAL model probability
+    across all of them -- 924 cards, 56% of the board. Justin Herbert passing
+    TDs printed 15.4% against Over 1.5 while the artifact held 0.5580 for that
+    line, manufacturing a "+46.1% edge" on the Under.
+    """
+    from syndicate.features.nfl.props import _nfl_prop_join_market_key
+
+    k15 = _nfl_prop_join_market_key("passing_tds", "Justin Herbert", 1.5)
+    k25 = _nfl_prop_join_market_key("passing_tds", "Justin Herbert", 2.5)
+    assert k15 != k25, "two lines must not collide onto one key"
+    assert k15 == "passing_tds::justin herbert::1.5"
+
+
+def test_anytime_td_keeps_its_two_segment_key():
+    """That market has no line; its key must not grow a trailing separator."""
+    from syndicate.features.nfl.props import _nfl_prop_join_market_key
+
+    assert _nfl_prop_join_market_key("anytime_td", "Travis Kelce") == "anytime_td::travis kelce"
+    assert (
+        _nfl_prop_join_market_key("anytime_td", "Travis Kelce", None)
+        == "anytime_td::travis kelce"
+    )
+
+
+def test_line_token_is_canonical_so_the_two_sides_cannot_disagree():
+    """The odds feed and the model must produce the SAME string or the join
+    silently finds nothing -- which is indistinguishable from "no projection"."""
+    from syndicate.features.nfl.props import _nfl_prop_line_token
+
+    assert _nfl_prop_line_token(1.5) == _nfl_prop_line_token("1.50") == "1.5"
+    assert _nfl_prop_line_token(0) == "0"
+    assert _nfl_prop_line_token(None) == ""
+    assert _nfl_prop_line_token("") == ""
+
+
+def test_display_stat_still_strips_a_three_segment_key():
+    """`nfl_prop_display_stat` relabels a joined row; a third segment must not
+    leak into the market label shown on a card."""
+    from syndicate.features.nfl.props import nfl_prop_display_stat
+
+    assert nfl_prop_display_stat("passing_tds::justin herbert::1.5") == "passing_tds"
+    assert nfl_prop_display_stat("anytime_td::travis kelce") == "anytime_td"
+
+
+def test_the_card_projection_index_is_line_independent(monkeypatch, tmp_path):
+    """Cards render `projected_value` -- the projected STAT, a property of the
+    player, identical across every line. Only `sim_projection` is line-specific
+    and cards do not show it. So the index must collapse line-keyed rows."""
+    from syndicate.features.nfl import props as props_module
+
+    rows = [
+        {"market": "passing_yards::patrick mahomes::245.5", "projected_value": 256.2},
+        {"market": "passing_yards::patrick mahomes::250.5", "projected_value": 256.2},
+    ]
+    monkeypatch.setattr(props_module, "nfl_artifact_output_root", lambda: tmp_path)
+    props_module.write_nfl_prop_projection_artifact(2026, 1, rows)
+    props_module._nfl_card_prop_projection_index_cached.cache_clear()
+    monkeypatch.setattr(
+        props_module, "nfl_prop_projection_artifact_path",
+        lambda s, w: tmp_path / f"nfl_prop_projections_{s}_wk{w}.json",
+    )
+    index = props_module._nfl_card_prop_projection_index(2026, 1)
+    assert index.get("passing_yards::patrick mahomes") == 256.2

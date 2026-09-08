@@ -272,7 +272,18 @@ def _nfl_prop_model_probability(*, stat: str, mean: float | None, stdev: float |
     return (1.0 - weight) * normal_prob + weight * lognormal_prob
 
 
-def _nfl_prop_join_market_key(stat: str, player_name: str) -> str:
+def _nfl_prop_line_token(line: Any) -> str:
+    """Canonical line text for a join key. `None` (anytime_td) -> "".
+
+    `%g` so 1.5 and 1.50 and 1.5000000001 cannot become different keys -- the
+    odds feed and the model must agree on this string exactly or the join
+    silently finds nothing, which looks identical to "no projection exists".
+    """
+    value = _safe_float(line)
+    return "" if value is None else f"{value:g}"
+
+
+def _nfl_prop_join_market_key(stat: str, player_name: str, line: Any = None) -> str:
     """The DISPLAY stat ("receptions", "anytime_td") is shared by every
     player who has that prop -- every player on the board legitimately has
     their own anytime_td row simultaneously. If that shared stat were used
@@ -287,8 +298,29 @@ def _nfl_prop_join_market_key(stat: str, player_name: str) -> str:
     relabeled back after the join via nfl_prop_display_stat) -- no
     reliable "slot" concept exists for NFL skill-position props the way
     MLB's starting-pitcher side does, so every player simply gets their
-    own slot, same as MLB's hitter-prop case."""
-    return f"{stat}::{player_name.strip().casefold()}"
+    own slot, same as MLB's hitter-prop case.
+
+    THE LINE IS PART OF THE KEY, ADDED 2026-09-08, and leaving it out was a
+    live scoring bug rather than a tidiness problem. `_nfl_prop_model_probability`
+    is called with `line=` and returns P(over THAT line), so a player quoted at
+    two numbers produces two DIFFERENT probabilities -- but both rows were
+    stored under `stat::player`, so `join_odds_to_sim` matched whichever it
+    found and applied it to every line of that market.
+
+    MEASURED on the served board: **371 of 371 (player, market, side) groups
+    with more than one quoted line showed an IDENTICAL model probability across
+    all of them -- 924 cards, 56% of the board.** Justin Herbert passing TDs
+    printed 15.4% for Over 1.5 when the artifact holds 0.5580 for that line and
+    0.1536 for Over 2.5; the 2.5 figure was being shown against the 1.5 price,
+    manufacturing a "+46.1% edge" on the Under. Bhayshul Tuten rushing yards
+    read 95.5% under 47.5, 50.5 AND 51.5, which is arithmetically impossible.
+
+    `anytime_td` has no line and keeps its two-segment key, so nothing about
+    that market changes."""
+    token = _nfl_prop_line_token(line)
+    if not token:
+        return f"{stat}::{player_name.strip().casefold()}"
+    return f"{stat}::{player_name.strip().casefold()}::{token}"
 
 
 def nfl_prop_display_stat(market_key: str) -> str:
@@ -516,14 +548,16 @@ def nfl_props_rows_for_week(
         if stat is None:
             continue
         player_name = str(row.get("player") or "").strip()
-        join_market = _nfl_prop_join_market_key(stat, player_name)
+        # LINE FIRST: it is part of the join key now. Reading it after building
+        # the key is how the two rows for one market ended up indistinguishable.
+        line = _safe_float(row.get("line"))
+        join_market = _nfl_prop_join_market_key(stat, player_name, line)
         # Keyed by real team full names (not a game_pk) -- this feed carries
         # no game id of its own, and callers that need to attach these rows
         # to a specific game-board entry (build_nfl_market_board) match on
         # this same away/home pair, then remap to that game's real game_id
         # before joining -- see nfl_props_key().
         game_id = nfl_props_key(str(row.get("away_team") or ""), str(row.get("home_team") or ""))
-        line = _safe_float(row.get("line"))
         over_odds = _safe_float(row.get("over_price"))
         under_odds = _safe_float(row.get("under_price"))
 
@@ -901,9 +935,14 @@ def _nfl_card_prop_projection_index(season: int, week: int) -> dict[str, float]:
 def _nfl_card_prop_projection_index_cached(
     season: int, week: int, _mtime_ns: int
 ) -> dict[str, float]:
+    # KEYED ON `stat::player`, DELIBERATELY WITHOUT THE LINE. The cards show
+    # `projected_value` -- the projected STAT (256.2 passing yards), which is a
+    # property of the player and identical across every line they are quoted at.
+    # Only `sim_projection` is line-specific, and the cards do not render it.
+    # So this collapses the (now line-keyed) artifact rows back to two segments.
     index: dict[str, float] = {}
     for row in read_nfl_prop_projection_artifact(season, week) or []:
-        key = str(row.get("market") or "").strip()
+        key = "::".join(str(row.get("market") or "").strip().split("::")[:2])
         value = _safe_float(row.get("projected_value"))
         if key and value is not None:
             index.setdefault(key, value)
