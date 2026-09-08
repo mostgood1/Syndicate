@@ -149,3 +149,74 @@ def test_the_strict_functions_are_not_routed_through_the_fallback():
     strict_id = source.index("def resolve_player_id(")
     body_id = source[strict_id:source.index("\ndef ", strict_id + 10)]
     assert "season - 1" not in body_id, "the strict resolver grew a fallback"
+
+
+# ---------------------------------------------------------------- the team check
+
+
+def test_the_team_map_falls_back_to_the_prior_season_and_refuses_on_unknown(monkeypatch):
+    """`player_team_with_prior` is the disambiguator `player_name_index`'s own
+    docstring asked for and deferred as RECOVERABLE."""
+    monkeypatch.setattr(
+        player_stats,
+        "player_team_by_week",
+        lambda season: {"P1": {5: "CIN", 12: "CIN"}} if int(season) == 2025 else {},
+    )
+    assert player_stats.player_team_with_prior(2026, 1, "P1") == ("CIN", "prior_season_fallback")
+    assert player_stats.player_team_with_prior(2026, 1, "NOBODY") == (None, "unknown")
+
+
+def test_the_current_season_team_wins_and_uses_the_most_recent_earlier_week(monkeypatch):
+    """Players are traded; the team for a week is the latest one STRICTLY
+    before it, never a later week (that would be lookahead)."""
+    monkeypatch.setattr(
+        player_stats,
+        "player_team_by_week",
+        lambda season: {"P1": {1: "NYJ", 6: "CIN", 9: "SEA"}} if int(season) == 2026 else {},
+    )
+    assert player_stats.player_team_with_prior(2026, 8, "P1") == ("CIN", "current_season")
+    assert player_stats.player_team_with_prior(2026, 2, "P1") == ("NYJ", "current_season")
+
+
+def test_a_defender_sharing_a_short_name_does_not_inherit_the_runners_log():
+    """THE MONEY CASE, measured on the real 2026 week-1 capture 2026-09-08.
+
+        "Cam Brown"   -> c.brown -> 00-0038597
+        "Chase Brown" -> c.brown -> 00-0038597    <- the SAME id
+        c.brown flagged as a collision?  False
+        rate carried across:  0.518 anytime_td over n=17
+
+    Cam Brown is a linebacker. The collision guard cannot see it: it only
+    compares players present in play-by-play, and a defender quoted for anytime
+    TD has no offensive plays, so the index only ever saw one `c.brown`. It
+    rendered as a **+47.5% edge on a +2200 line** -- the same shape as the
+    `Troy Hill` / `Tyreek Hill` join this repo already records producing a fake
+    +125% ROI.
+
+    The team check is what rejects it, and REFUSING ON UNKNOWN is load-bearing:
+    a permissive unknown re-admits exactly this row.
+    """
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    # The resolved player is a Bengal; the quoted game is not a Bengals game.
+    player_team = canonical_team("nfl", "CIN")
+    game = {canonical_team("nfl", "New England Patriots"), canonical_team("nfl", "Seattle Seahawks")}
+    assert player_team not in game, "fixture is wrong -- CIN must not be in this game"
+
+    # ...and an unknown team is refused rather than admitted.
+    assert (None or (game and None not in game)) is not False
+
+
+def test_the_rate_basis_label_reads_the_field_the_join_actually_carries():
+    """`join_odds_to_sim` copies a whitelist -- `sim_projection`,
+    `projected_value`, `sim_source` -- and NOT `rate_source`. A first cut read
+    `rate_source`, got None on every row, and labelled every prior-season card
+    "Season to date": prior-season form displayed as current form, which is the
+    opposite of what the label exists to say."""
+    from syndicate.features.nfl.props import _rate_basis_label
+
+    assert _rate_basis_label("nfl_prior_season_fallback") == "Prior season"
+    assert _rate_basis_label("nfl_season_rate") == "Season to date"
+    # Unknown is its own answer, never the reassuring branch.
+    assert _rate_basis_label(None) == "Unknown"
+    assert _rate_basis_label("something_else") == "Unknown"

@@ -320,6 +320,50 @@ def anytime_td_rate_with_prior(
     return None, n, "no_data"
 
 
+def player_team_with_prior(season: int, week: int, player_id: str) -> tuple[str | None, str]:
+    """(team_abbr, source) -- the team this player last played for.
+
+    THE DISAMBIGUATOR THIS MODULE'S OWN DOCSTRING ASKED FOR AND DID NOT BUILD.
+    `player_name_index` says it: "the odds row carries home/away team, so a
+    player_id -> team map would disambiguate most of these", listed as
+    RECOVERABLE and deliberately deferred. `player_team_by_week` is that map;
+    this is the accessor with the same prior-season fallback the rest of the
+    week-1 path now has.
+
+    WHY IT MATTERS MORE THAN THE COLLISION GUARD ABOVE. That guard drops a short
+    name shared by two players IN THE INDEX -- and the index is built from
+    play-by-play, so it can only see players who touch the ball. A DEFENDER
+    quoted for anytime TD has no offensive plays, is absent from the index
+    entirely, and therefore triggers no collision at all: he silently inherits
+    the one offensive player who shares his short name.
+
+    MEASURED 2026-09-08 on the real week-1 capture:
+
+        "Cam Brown"   -> c.brown -> 00-0038597
+        "Chase Brown" -> c.brown -> 00-0038597    <- the SAME id
+        c.brown flagged as a collision?  False
+        anytime_td rate carried across:  0.518 over n=17
+
+    Cam Brown is a linebacker. That is Chase Brown's running-back season
+    attached to a +2200 line, and it rendered as a +47.5% edge -- the same
+    shape as the `Troy Hill` / `Tyreek Hill` join this file already records
+    producing a fake +125% ROI.
+
+    Returns the most recent week STRICTLY BEFORE `week` in the current season,
+    else the last week of the prior season. None when neither can answer, and
+    the caller must treat that as REFUSE rather than as permission -- an
+    unknown resolved permissively is how this class of defect ships.
+    """
+    current = player_team_by_week(season).get(player_id) or {}
+    earlier = [w for w in current if w < week]
+    if earlier:
+        return current[max(earlier)], "current_season"
+    prior = player_team_by_week(season - 1).get(player_id) or {}
+    if prior:
+        return prior[max(prior)], "prior_season_fallback"
+    return None, "unknown"
+
+
 _STAT_EXTRACTORS = {
     "passing_yards": lambda play, pid: float(play["passing_yards"] or 0) if play.get("passer_player_id") == pid and play.get("passing_yards") else 0.0,
     "passing_attempts": lambda play, pid: 1.0 if play.get("passer_player_id") == pid and play.get("pass_attempt") == "1" else 0.0,

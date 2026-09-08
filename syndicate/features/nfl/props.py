@@ -28,7 +28,9 @@ from syndicate.features.nfl.player_stats import anytime_td_rate, player_team_by_
 from syndicate.features.nfl.player_stats import player_rate
 from syndicate.features.nfl.player_stats import anytime_td_rate_with_prior
 from syndicate.features.nfl.player_stats import player_rate_with_prior
+from syndicate.features.nfl.player_stats import player_team_with_prior
 from syndicate.features.nfl.player_stats import resolve_player_id
+from syndicate.features.shared.team_aliases import canonical_team
 from syndicate.features.nfl.player_stats import resolve_player_id_with_prior
 from syndicate.features.nfl.sources import nfl_source_roots
 from syndicate.features.nfl.sources import nfl_props_path
@@ -369,6 +371,15 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
     or a name the pbp data has no record of) -- never silently dropped."""
     odds_rows: list[dict[str, Any]] = []
     sim_rows: list[dict[str, Any]] = []
+    # Counted, not silent: "the join found nobody" and "the join worked and
+    # these players are genuinely on other teams" produce the same empty board.
+    # TWO REFUSALS, TWO COUNTERS. "this player is on another team" and "this
+    # player's team cannot be established" are different facts with different
+    # fixes, and a pooled counter whose populations differ in eligibility
+    # cannot be read -- I pooled them on the first cut and immediately misread
+    # 194 unknowns as 194 wrong-team joins.
+    refused_wrong_team = 0
+    refused_unknown_team = 0
     for row in _best_price_player_props(season, week):
         stat = _NFL_PROP_MARKET_TO_STAT.get(str(row.get("market") or "").strip())
         if stat is None:
@@ -404,6 +415,39 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
         player_id, id_source = resolve_player_id_with_prior(season, player_name)
         if player_id is None:
             continue
+        # THE TEAM CHECK. A resolved id is not yet the right human.
+        #
+        # `player_name_index`'s collision guard only sees players who appear in
+        # play-by-play, so a DEFENDER quoted for anytime TD is absent from the
+        # index, triggers no collision, and inherits the one offensive player
+        # sharing his short name. Measured on this exact capture 2026-09-08:
+        # "Cam Brown" (LB) and "Chase Brown" (RB) both resolve to
+        # `00-0038597`, `c.brown` is NOT flagged as a collision, and Chase
+        # Brown's 0.518 anytime-TD rate rendered as a **+47.5% edge on a +2200
+        # line**.
+        #
+        # The odds row names both clubs, so the resolved player's own club
+        # settles it. REFUSE ON UNKNOWN: a player whose team cannot be
+        # established does not get a projection. `unknown -> permissive` is the
+        # documented trap here, and this is precisely the join it would let
+        # through.
+        #
+        # THE ODDS ROW SURVIVES EITHER WAY -- the contract is that a real quoted
+        # line is never silently dropped. What is withheld is the MODEL's
+        # opinion, which is the thing that could be wrong about a person.
+        player_team, player_team_source = player_team_with_prior(season, week, player_id)
+        canon_player = canonical_team("nfl", player_team) if player_team else None
+        canon_game = {
+            canonical_team("nfl", str(row.get("away_team") or "")),
+            canonical_team("nfl", str(row.get("home_team") or "")),
+        }
+        canon_game.discard(None)
+        if canon_player is None:
+            refused_unknown_team += 1
+            continue
+        if canon_game and canon_player not in canon_game:
+            refused_wrong_team += 1
+            continue
         rate_source = "no_data"
         if stat == "anytime_td":
             # `#471` shrinkage -- see player_stats.anytime_td_rate's
@@ -433,12 +477,44 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
             "sim_source": "nfl_season_rate" if rate_source == "current_season_rolling" else f"nfl_{rate_source}",
             "rate_source": rate_source,
             "player_id_source": id_source,
+            "player_team": player_team,
+            "player_team_source": player_team_source,
         })
+    print(
+        f"[nfl_props] JOIN season={season} week={week} odds_rows={len(odds_rows)} "
+        f"sim_rows={len(sim_rows)} refused_wrong_team={refused_wrong_team} "
+        f"refused_unknown_team={refused_unknown_team}",
+        flush=True,
+    )
     return odds_rows, sim_rows
 
 
 def _format_stat_label(stat: str) -> str:
     return {value: key for key, value in _NFL_PROP_MARKET_TO_STAT.items()}.get(stat, stat.replace("_", " ").title())
+
+
+def _rate_basis_label(sim_source: Any) -> str:
+    """Human label for which season a projection's rate came from.
+
+    READS `sim_source`, NOT `rate_source`, AND THAT IS THE WHOLE POINT.
+    `join_odds_to_sim` copies an explicit whitelist off the sim row --
+    `sim_projection`, `projected_value`, `sim_source` -- and nothing else. A
+    first cut of this read `row["rate_source"]`, which the join does not carry,
+    so it was None on every row and the ternary rendered "Season to date" for
+    every week-1 card: prior-season form displayed as current form, which is
+    the opposite of what this label exists to say.
+
+    UNKNOWN IS ITS OWN ANSWER. An unrecognised source says so rather than
+    falling into either real branch -- if the join ever stops carrying
+    `sim_source` this reads "Unknown" instead of silently asserting the
+    reassuring one.
+    """
+    text = str(sim_source or "")
+    if text.endswith("prior_season_fallback"):
+        return "Prior season"
+    if text == "nfl_season_rate":
+        return "Season to date"
+    return "Unknown"
 
 
 def build_nfl_props_page_context(season: int, week: int) -> dict[str, Any]:
@@ -458,9 +534,31 @@ def build_nfl_props_page_context(season: int, week: int) -> dict[str, Any]:
         if sim_projection is None or odds is None:
             continue
         implied_prob = (100.0 / (odds + 100.0)) if odds > 0 else ((-odds) / ((-odds) + 100.0))
-        edge = sim_projection - implied_prob
-        stat_label = _format_stat_label(nfl_prop_display_stat(row.get("market")))
         side = str(row.get("side") or "").title()
+        # THE UNDER SIDE GETS 1 - P(over), AND IT DID NOT BEFORE.
+        #
+        # `_nfl_prop_model_probability` returns `1 - CDF(line)`, i.e. P(OVER),
+        # and there is exactly ONE sim row per player+market -- which
+        # `join_odds_to_sim` attaches to BOTH the over and the under odds row.
+        # Without this flip an under card displayed the OVER's probability and
+        # subtracted the UNDER's implied price from it.
+        #
+        # MEASURED on the 2026 week-1 capture the moment the page had cards to
+        # show: Kyler Murray rushing yards read `model 99.1%` on Under 20.5,
+        # Under 21.5 AND Over 22.5 simultaneously -- three incoherent claims
+        # from one number -- and produced a **+50.3% edge** on a bet the model
+        # actually rates at ~0.9%. Six cards exceeded |50%| edge.
+        #
+        # This defect is OLDER than the prior-season fallback that exposed it:
+        # the page served 0 cards on every week 1, so nothing ever rendered an
+        # under card for anyone to check. A fake edge on a longshot is the exact
+        # failure `player_name_index`'s docstring records costing real money.
+        #
+        # anytime_td is one-sided (no line, over only), so it never reaches the
+        # flip and its `#471` shrinkage is untouched.
+        model_prob = sim_projection if side.lower() != "under" else (1.0 - sim_projection)
+        edge = model_prob - implied_prob
+        stat_label = _format_stat_label(nfl_prop_display_stat(row.get("market")))
         line = row.get("line")
         line_text = f"{line:g}" if isinstance(line, (int, float)) else "-"
         cards.append({
@@ -469,9 +567,19 @@ def build_nfl_props_page_context(season: int, week: int) -> dict[str, Any]:
             "badge": f"{edge:+.1%} edge",
             "meta": f"{side} {line_text}" if line is not None else side,
             "metrics": [
-                {"label": "Real rate model", "value": f"{sim_projection:.1%}"},
+                {"label": "Real rate model", "value": f"{model_prob:.1%}"},
                 {"label": "Market implied", "value": f"{implied_prob:.1%}"},
                 {"label": "Real odds", "value": f"{odds:+.0f}" if odds is not None else "-"},
+                # THE BASIS, ON THE CARD, because the edge is not readable
+                # without it. A week-1 projection is LAST SEASON's usage: it
+                # cannot know about a depth-chart move, a rookie promoted to
+                # starter, or a free-agent signing. Measured on the 2026 week-1
+                # board, the largest surviving "edges" are all UNDER on low
+                # lines for players the market now prices as starters --
+                # Bhayshul Tuten, George Holani, Rhamondre Stevenson. That is
+                # the MODEL being stale about a role, not the book being wrong,
+                # and a reader who cannot see the basis has no way to tell.
+                {"label": "Rate basis", "value": _rate_basis_label(row.get("sim_source"))},
                 {"label": "Season-to-date value", "value": f"{row.get('projected_value'):.1f}" if row.get("projected_value") is not None else "-"},
             ],
             "summary": f"{row.get('entity')}'s real season-to-date rate implies {sim_projection:.1%} on this {stat_label.lower()} line, vs. a market-implied {implied_prob:.1%}.",

@@ -48,7 +48,12 @@ class NflPropsTests(unittest.TestCase):
         pbp_dir = os.path.join(self.nfl_root, "tracking", "nflverse", "pbp")
         os.makedirs(pbp_dir, exist_ok=True)
         fieldnames = [
-            "game_id", "week", "season_type",
+            # `posteam` added 2026-09-08: props requires the resolved player's
+            # club to match one of the game's two teams (Cam Brown / Chase
+            # Brown), and `player_team_by_week` reads it from exactly this
+            # column. Without it every fixture player has an UNKNOWN team and
+            # is correctly refused -- which is the guard working, not a bug.
+            "game_id", "week", "season_type", "posteam",
             "passer_player_id", "passer_player_name", "passing_yards", "pass_attempt", "pass_touchdown",
             "rusher_player_id", "rusher_player_name", "rushing_yards", "rush_attempt", "rush_touchdown",
             "receiver_player_id", "receiver_player_name", "receiving_yards", "complete_pass", "touchdown", "interception",
@@ -111,12 +116,20 @@ class NflPropsTests(unittest.TestCase):
         pbp_rows = []
         for week in ("1", "2"):
             game = f"2025_0{week}_KC_DEN"
-            pbp_rows.append({"game_id": game, "week": week, "season_type": "REG", "rusher_player_id": "RB1", "rusher_player_name": "R.One", "rushing_yards": "3", "rush_attempt": "1"})
-            pbp_rows.append({"game_id": game, "week": week, "season_type": "REG", "rusher_player_id": "RB2", "rusher_player_name": "R.Two", "rushing_yards": "4", "rush_attempt": "1", "rush_touchdown": "1", "touchdown": "1"})
+            pbp_rows.append({"game_id": game, "week": week, "season_type": "REG", "posteam": "NE", "rusher_player_id": "RB1", "rusher_player_name": "R.One", "rushing_yards": "3", "rush_attempt": "1"})
+            pbp_rows.append({"game_id": game, "week": week, "season_type": "REG", "posteam": "NE", "rusher_player_id": "RB2", "rusher_player_name": "R.Two", "rushing_yards": "4", "rush_attempt": "1", "rush_touchdown": "1", "touchdown": "1"})
         self._write_pbp(2025, pbp_rows)
         self._write_props(2025, 3, [
             {"player": "R. One", "market": "Anytime TD", "line": "", "over_price": "250", "home_team": "New England Patriots", "away_team": "Seattle Seahawks"},
         ])
+        # `posteam` added to the fixture 2026-09-08: props now requires the
+        # resolved player's club to match one of the game's two teams, because
+        # a defender sharing a short name was inheriting a running back's game
+        # log (Cam Brown / Chase Brown, a +47.5% edge on a +2200 line). The
+        # fixture quotes NE @ SEA, so its plays are NE plays. Patching the
+        # STRICT resolver no longer reaches props, which calls
+        # `resolve_player_id_with_prior` -- the fixture's own pbp resolves
+        # "R. One" -> RB1, so the patch is redundant rather than wrong.
         with patch.object(player_stats, "resolve_player_id", return_value="RB1"):
             _odds_rows, sim_rows = props.nfl_props_rows_for_week(2025, 3)
         self.assertEqual(len(sim_rows), 1)
@@ -275,12 +288,14 @@ class NflPropsTests(unittest.TestCase):
         ])
         pbp_dir = os.path.join(self.nfl_root, "tracking", "nflverse", "pbp")
         os.makedirs(pbp_dir, exist_ok=True)
-        fieldnames = ["game_id", "week", "season_type", "passer_player_id", "passer_player_name", "passing_yards", "pass_attempt", "pass_touchdown", "rusher_player_id", "rusher_player_name", "rushing_yards", "rush_attempt", "rush_touchdown", "receiver_player_id", "receiver_player_name", "receiving_yards", "complete_pass", "touchdown"]
+        # `posteam`: see the note on the other pbp writer above -- props now
+        # requires the resolved player's club to match the quoted game.
+        fieldnames = ["game_id", "week", "season_type", "posteam", "passer_player_id", "passer_player_name", "passing_yards", "pass_attempt", "pass_touchdown", "rusher_player_id", "rusher_player_name", "rushing_yards", "rush_attempt", "rush_touchdown", "receiver_player_id", "receiver_player_name", "receiving_yards", "complete_pass", "touchdown"]
         with open(os.path.join(pbp_dir, "pbp_2025.csv"), "w", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=fieldnames)
             writer.writeheader()
             for week in (1, 2):
-                writer.writerow({"game_id": f"2025_0{week}_X_Y", "week": str(week), "season_type": "REG", "rusher_player_id": "RATE1", "rusher_player_name": "H.Guy", "rushing_yards": "10", "rush_attempt": "1", "rush_touchdown": "1", "touchdown": "1"})
+                writer.writerow({"game_id": f"2025_0{week}_X_Y", "week": str(week), "season_type": "REG", "posteam": "NE", "rusher_player_id": "RATE1", "rusher_player_name": "H.Guy", "rushing_yards": "10", "rush_attempt": "1", "rush_touchdown": "1", "touchdown": "1"})
 
         odds_rows, sim_rows = props.nfl_props_rows_for_week(2025, 22)
         inventory = join_odds_to_sim(odds_rows, sim_rows)
