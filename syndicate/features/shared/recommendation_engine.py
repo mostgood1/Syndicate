@@ -16,6 +16,7 @@ import logging
 import hashlib
 import json
 import math
+import os
 import time
 import uuid
 from dataclasses import dataclass
@@ -35,6 +36,108 @@ MODEL_VERSION = "recommendation-engine-v1"
 DEFAULT_EVALUATION_LEDGER = repo_root_from(__file__) / "reports" / "intelligence" / "evaluation_ledger.jsonl"
 DEFAULT_PERFORMANCE_SUMMARY = repo_root_from(__file__) / "reports" / "intelligence" / "performance_summary.json"
 logger = logging.getLogger(__name__)
+
+# WP3 "restore measurement" (2026-09-08). The evaluation-ledger feedback terms
+# -- the reliability multiplier, calibration penalty, ROI term, the edge
+# threshold bumps in filter_candidates and the performance multiplier in
+# rank_recommendations -- had NO sample-size gate of their own. Policy
+# promotion is gated at DecisionPolicy.min_sample_size = 50, but the feedback
+# terms moved rankings on `market_sample >= 3`. With the ledger window empty
+# today (newest chunk 2026-07-21 against a 14-day load window) every term sits
+# at its neutral value, so the moment settlement writes a chunk again they
+# would have switched on at n=3 with nothing saying so.
+#
+# This is the ONE gate they all share. Below the floor a profile is neutral
+# and SAYS it is neutral because it was gated (`feedback_gated`, `sample_size`,
+# `min_sample`), so a reader can tell "neutral because gated" from "neutral
+# because measured". It lives here rather than beside build_reliability_profile
+# because intelligence_evaluation.py is held by another open lane; the wrapper
+# below is what every ranker call site consumes.
+MIN_FEEDBACK_SAMPLE = 50
+
+
+def feedback_min_sample() -> int:
+    """Settled-sample floor below which ledger feedback stays neutral.
+
+    Env-overridable via SYNDICATE_FEEDBACK_MIN_SAMPLE so a test or an operator
+    can lower it deliberately; garbage falls back to the default rather than
+    to "no gate".
+    """
+    raw = str(os.environ.get("SYNDICATE_FEEDBACK_MIN_SAMPLE") or "").strip()
+    try:
+        value = int(raw) if raw else MIN_FEEDBACK_SAMPLE
+    except ValueError:
+        value = MIN_FEEDBACK_SAMPLE
+    return max(1, value)
+
+
+def feedback_sample_gate(sample_size: Any, *, min_sample: int | None = None) -> dict[str, Any]:
+    """Decide whether `sample_size` settled results is enough to feed back.
+
+    Returns the decision AND its inputs -- `feedback_gated`, `sample_size`,
+    `min_sample` -- so the caller can carry all three into whatever profile or
+    context it returns. An unparseable or absent sample counts as 0, which is
+    gated: unknown must not default permissive.
+    """
+    floor = int(min_sample) if min_sample is not None else feedback_min_sample()
+    try:
+        count = int(float(sample_size)) if sample_size is not None and not isinstance(sample_size, bool) else 0
+    except (TypeError, ValueError):
+        count = 0
+    count = max(0, count)
+    return {"feedback_gated": count < floor, "sample_size": count, "min_sample": floor}
+
+
+_NEUTRAL_RELIABILITY_FIELDS: dict[str, float] = {
+    "calibration_error": 0.0,
+    "calibration_penalty": 0.0,
+    "win_rate_adjustment": 0.0,
+    "roi_adjustment": 0.0,
+    "reliability_multiplier": 1.0,
+}
+
+
+def _gated_reliability_profile(
+    *,
+    records: Iterable[Mapping[str, Any]] | None = None,
+    ledger_path: Path | str | None = None,
+    sport: str | None = None,
+) -> dict[str, Any]:
+    """build_reliability_profile, gated on its own settled sample.
+
+    The applied fields (`reliability_multiplier`, `calibration_error`,
+    `calibration_penalty`, `win_rate_adjustment`, `roi_adjustment`, and the
+    top-level `roi` the ranker's ROI term and threshold bumps read) are forced
+    to their neutral values while `sample_size < min_sample`. The measurement
+    itself is never hidden: `metrics` keeps what was computed and `measured`
+    carries the values that WOULD have applied, so "gated" is inspectable.
+    Resolves `build_reliability_profile` through the module global on purpose,
+    so a test that patches it still counts the calls.
+    """
+    profile = dict(build_reliability_profile(records=records, ledger_path=ledger_path, sport=sport))
+    gate = feedback_sample_gate(profile.get("sample_size"))
+    metrics = profile.get("metrics") if isinstance(profile.get("metrics"), Mapping) else {}
+    measured_roi = _coerce_float(metrics.get("roi"))
+    profile["feedback_gated"] = bool(gate["feedback_gated"])
+    profile["sample_size"] = gate["sample_size"]
+    profile["min_sample"] = gate["min_sample"]
+    if gate["feedback_gated"]:
+        profile["measured"] = {**{key: profile.get(key) for key in _NEUTRAL_RELIABILITY_FIELDS}, "roi": measured_roi}
+        profile.update(_NEUTRAL_RELIABILITY_FIELDS)
+        profile["roi"] = None
+    else:
+        profile["roi"] = measured_roi
+    return profile
+
+
+def _feedback_block_sample(block: Mapping[str, Any] | None) -> int:
+    if not isinstance(block, Mapping):
+        return 0
+    for key in ("settled_count", "total_bets", "sample_size", "count"):
+        value = _coerce_float(block.get(key))
+        if value is not None and value > 0:
+            return int(value)
+    return 0
 
 
 @dataclass(frozen=True)
@@ -597,14 +700,21 @@ def _performance_multiplier_for_candidate(
     sport_block = _copy_mapping((summary.get("by_sport") or {}).get(sport_key)) if sport_key else {}
     market_block = _copy_mapping((summary.get("by_market") or {}).get(market_key)) if market_key else {}
 
-    sport_roi = _coerce_float(sport_block.get("roi")) if sport_block else None
-    market_roi = _coerce_float(market_block.get("roi")) if market_block else None
+    # Same sample floor as the ledger profiles (feedback_sample_gate). Each
+    # block is gated on its OWN settled count -- a sport with 200 settled bets
+    # and a market with 4 feed back the sport term only. A block that carries
+    # no count at all is gated: unknown must not default permissive.
+    sport_gate = feedback_sample_gate(_feedback_block_sample(sport_block))
+    market_gate = feedback_sample_gate(_feedback_block_sample(market_block))
+    sport_roi = _coerce_float(sport_block.get("roi")) if sport_block and not sport_gate["feedback_gated"] else None
+    market_roi = _coerce_float(market_block.get("roi")) if market_block and not market_gate["feedback_gated"] else None
 
     bucket_row = _confidence_bucket_row(summary, probability)
+    bucket_gate = feedback_sample_gate(_feedback_block_sample(bucket_row))
     bucket_label = str(bucket_row.get("bucket") or bucket_row.get("label") or "") if isinstance(bucket_row, Mapping) else ""
     bucket_predicted = _coerce_probability(bucket_row.get("predicted_probability")) if isinstance(bucket_row, Mapping) else None
     bucket_actual = _coerce_probability(bucket_row.get("actual_win_rate")) if isinstance(bucket_row, Mapping) else None
-    bucket_calibration = (bucket_actual - bucket_predicted) if (bucket_actual is not None and bucket_predicted is not None) else None
+    bucket_calibration = (bucket_actual - bucket_predicted) if (bucket_actual is not None and bucket_predicted is not None and not bucket_gate["feedback_gated"]) else None
 
     sport_multiplier = _roi_multiplier(sport_roi, scale=0.25, cap=0.035)
     market_multiplier = _roi_multiplier(market_roi, scale=0.20, cap=0.025)
@@ -620,6 +730,17 @@ def _performance_multiplier_for_candidate(
             "confidence_bucket_predicted_probability": round(bucket_predicted, 4) if bucket_predicted is not None else None,
             "confidence_bucket_actual_win_rate": round(bucket_actual, 4) if bucket_actual is not None else None,
             "confidence_bucket_calibration": round(bucket_calibration, 4) if bucket_calibration is not None else None,
+            "feedback_gated": {
+                "sport": sport_gate["feedback_gated"],
+                "market": market_gate["feedback_gated"],
+                "confidence_bucket": bucket_gate["feedback_gated"],
+            },
+            "sample_size": {
+                "sport": sport_gate["sample_size"],
+                "market": market_gate["sample_size"],
+                "confidence_bucket": bucket_gate["sample_size"],
+            },
+            "min_sample": sport_gate["min_sample"],
         },
     }
 
@@ -1209,7 +1330,7 @@ def select_policy(
 
 def _market_profile(records: list[dict[str, Any]], *, sport: str | None, market: str) -> dict[str, Any]:
     scoped_records = [record for record in records if (sport is None or _record_sport(record) in {None, sport}) and _record_market(record) == market]
-    return build_reliability_profile(records=scoped_records, sport=sport)
+    return _gated_reliability_profile(records=scoped_records, sport=sport)
 
 
 def _candidate_policy_key(candidates: Iterable[Mapping[str, Any]], *, sport: str | None = None) -> str:
@@ -1254,7 +1375,7 @@ def filter_candidates(
         history_rows = [dict(record) for record in evaluation_records if isinstance(record, Mapping)]
     else:
         history_rows = [record for record in _load_records_from_ledger(ledger_path) if isinstance(record, Mapping)]
-    sport_profile = build_reliability_profile(records=history_rows, sport=sport)
+    sport_profile = _gated_reliability_profile(records=history_rows, sport=sport)
     policy_spec = _policy_spec(policy or select_policy(history_rows, sport=sport))
     filtered: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
@@ -1367,12 +1488,19 @@ def filter_candidates(
             continue
         reliability_multiplier = float(sport_profile.get("reliability_multiplier") or 1.0) * float(market_profile.get("reliability_multiplier") or 1.0)
         calibration_error = float(market_profile.get("calibration_error") or sport_profile.get("calibration_error") or 0.0)
-        market_roi = _coerce_float(market_profile.get("metrics", {}).get("roi"))
+        # `roi` is the GATED top-level field from _gated_reliability_profile
+        # (None below the sample floor), not `metrics.roi`, which is the raw
+        # measurement and stays visible for diagnostics only. The old
+        # `market_sample >= 3` guard is replaced by the shared gate: a profile
+        # that does not say `feedback_gated: False` -- gated, or built by
+        # something that never set the field -- gets no threshold bump.
+        market_roi = _coerce_float(market_profile.get("roi"))
         market_sample = int(market_profile.get("sample_size") or 0)
+        market_feedback_live = market_profile.get("feedback_gated") is False
         threshold = float(min_edge) + float(policy_spec.min_edge_bias)
-        if market_sample >= 3 and market_roi is not None and market_roi < -0.04:
+        if market_feedback_live and market_roi is not None and market_roi < -0.04:
             threshold += min(0.06, abs(market_roi) * 0.30)
-        if market_sample >= 3 and calibration_error > 0.18:
+        if market_feedback_live and calibration_error > 0.18:
             threshold += min(0.04, calibration_error * 0.15)
         if reliability_multiplier < 0.88:
             threshold += 0.01
@@ -1565,8 +1693,9 @@ def rank_recommendations(
         history_rows = [record for record in evaluation_records if isinstance(record, Mapping)]
     else:
         history_rows = [dict(record) for record in evaluation_records if isinstance(record, Mapping)]
-    sport_profile = build_reliability_profile(records=history_rows, sport=sport)
+    sport_profile = _gated_reliability_profile(records=history_rows, sport=sport)
     scored: list[dict[str, Any]] = []
+    rank_rejected_counts: dict[str, int] = {}
     # Same per-market memoization as filter_candidates above -- avoids
     # recomputing build_reliability_profile from scratch for every candidate
     # that shares a market.
@@ -1584,8 +1713,22 @@ def rank_recommendations(
         market_features = _copy_mapping(candidate.get("market_features"))
         if not market_features:
             market_features = build_market_features(candidate, sport=sport, payload_cache=odds_payload_cache)
-        fair_probability = float(candidate.get("fair_probability") or 0.5)
+        # No coin flip. This read `float(candidate.get("fair_probability") or
+        # 0.5)` and then let model_probability and confidence fall back to it,
+        # so a candidate with no probability of any kind was ranked as a 50/50
+        # with full confidence. `_fair_probability` already refuses (returns
+        # None) instead of inventing 0.5; this line survived it. A candidate
+        # with neither a fair nor a model probability is now REFUSED by name,
+        # through the same rejected_sink filter_candidates uses.
+        fair_probability = _coerce_probability(candidate.get("fair_probability"))
         model_probability = _coerce_probability(candidate.get("model_probability")) or _probability_from_simulation_payload(candidate) or fair_probability
+        if fair_probability is None:
+            fair_probability = model_probability
+        if fair_probability is None:
+            rank_rejected_counts["no_fair_probability"] = rank_rejected_counts.get("no_fair_probability", 0) + 1
+            if rejected_sink is not None:
+                rejected_sink.append({**candidate, "_shadow_rejection_reason": "no_fair_probability"})
+            continue
         live_pricing = _repriced_probabilities(candidate, model_probability=model_probability)
         tracking_snapshot = _tracking_snapshot(candidate, live_pricing=live_pricing, model_probability=model_probability)
         edge = live_pricing["edge"] if live_pricing["edge"] is not None else candidate.get("edge")
@@ -1604,7 +1747,8 @@ def rank_recommendations(
         market_bonus = float(market_dynamics.get("market_bonus") or 0.0)
         edge_bonus = float(edge or 0.0) * 100.0
         calibration_error = float(market_profile.get("calibration_error") or sport_profile.get("calibration_error") or 0.0)
-        roi = _coerce_float(market_profile.get("metrics", {}).get("roi")) or 0.0
+        # Gated top-level `roi` (None below the sample floor), not `metrics.roi`.
+        roi = _coerce_float(market_profile.get("roi")) or 0.0
         core_adjusted_score = (
             base_score * sport_strength * market_strength * sim_weight * (0.85 + policy_spec.confidence_weight * 0.30)
             + market_fit_score * (0.20 + policy_spec.market_fit_weight * 0.60)
@@ -1719,6 +1863,17 @@ def rank_recommendations(
         )
         scored.append(_standardize_recommendation_fields(recommendation, edge=edge, fair_probability=fair_probability, implied_probability=implied_probability))
 
+    # One line, unconditional, via print -- same contract as FILTER_CANDIDATES
+    # above: `rejected={}` is the output that distinguishes a rule that ran and
+    # refused nothing from a rule that never executed.
+    print(
+        f"[recommendation_engine] RANK_RECOMMENDATIONS sport={sport or 'all'} "
+        f"in={len(filtered_candidates)} out={len(scored)} "
+        f"rejected={json.dumps(rank_rejected_counts, sort_keys=True)} "
+        f"feedback_gated={json.dumps({'sport': sport_profile.get('feedback_gated'), 'sample_size': sport_profile.get('sample_size'), 'min_sample': sport_profile.get('min_sample')}, sort_keys=True)}",
+        flush=True,
+    )
+
     scored.sort(
         key=lambda item: (
             float(item.get("adjusted_score") or 0.0),
@@ -1758,6 +1913,9 @@ def build_recommendation_output(
 __all__ = [
     "MODEL_VERSION",
     "SCHEMA_VERSION",
+    "MIN_FEEDBACK_SAMPLE",
+    "feedback_min_sample",
+    "feedback_sample_gate",
     "calculate_edge",
     "compare_policies",
     "build_policy_optimization_summary",

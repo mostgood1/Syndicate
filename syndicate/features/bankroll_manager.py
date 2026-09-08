@@ -48,6 +48,15 @@ def _odds_adjustment(odds: Any) -> float | None:
     return max(0.01, decimal_odds - 1.0)
 
 
+def _decimal_price(value: Any) -> float | None:
+    """A decimal (European) price, or None. Anything at or below 1.0 is not a
+    price -- it would imply a probability >= 1 -- and is treated as absent."""
+    price = _safe_float(value)
+    if price is None or price <= 1.0:
+        return None
+    return price
+
+
 def _implied_probability_from_odds(odds: Any) -> float | None:
     american_odds = _safe_float(odds)
     if american_odds is None:
@@ -112,6 +121,25 @@ def _portfolio_risk_level(*, average_volatility: float, average_correlation: flo
     return "high"
 
 
+def _refused_bet_size(candidate: Mapping[str, Any], *, reason: str) -> dict[str, Any]:
+    """The compute_bet_size shape with every sizing number at zero and the
+    refusal named. Probabilities are reported as None -- the value that was
+    actually available -- never as an invented 0.5."""
+    confidence = _confidence_scale(candidate)
+    return {
+        "model_probability": None,
+        "implied_probability": None,
+        "odds": candidate.get("odds"),
+        "odds_adjustment": 0.0,
+        "edge": 0.0,
+        "kelly_fraction": 0.0,
+        "confidence": round(confidence, 4),
+        "cap_fraction": round(_cap_fraction(confidence), 4),
+        "recommended_bet_size": 0.0,
+        "reason": reason,
+    }
+
+
 def compute_bet_size(candidate: Mapping[str, Any]) -> dict[str, Any]:
     warn_if_compute_in_request_path("compute_bet_size")
     base_candidate = dict(candidate) if isinstance(candidate, Mapping) else {}
@@ -119,16 +147,34 @@ def compute_bet_size(candidate: Mapping[str, Any]) -> dict[str, Any]:
     model_probability = _safe_float(base_candidate.get("model_probability"))
     if model_probability is not None and model_probability > 1.0:
         model_probability /= 100.0
-    model_probability = _clamp(model_probability if model_probability is not None else 0.5, 0.0, 1.0)
 
     implied_probability = _safe_float(base_candidate.get("implied_probability"))
     if implied_probability is not None and implied_probability > 1.0:
         implied_probability /= 100.0
     if implied_probability is None:
         implied_probability = _implied_probability_from_odds(base_candidate.get("odds"))
-    implied_probability = _clamp(implied_probability if implied_probability is not None else 0.5, 0.0, 1.0)
+    # A decimal price is a price. Without this, a candidate carrying only
+    # `decimal_price` would be refused below as unpriced, when it is priced.
+    decimal_price = _decimal_price(base_candidate.get("decimal_price"))
+    if implied_probability is None and decimal_price is not None:
+        implied_probability = 1.0 / decimal_price
+
+    # WP3 (2026-09-08): an absent probability used to default to 0.5 on
+    # EITHER side, which made the edge 0 and the stake 0 silently -- a "no
+    # bet" indistinguishable from "no input". It is now a named refusal that
+    # keeps the full return shape (every caller reads the keys with .get and
+    # treats 0 as no stake), so nothing downstream changes except that the
+    # reason is visible.
+    if model_probability is None:
+        return _refused_bet_size(base_candidate, reason="no_model_probability")
+    if implied_probability is None:
+        return _refused_bet_size(base_candidate, reason="no_implied_probability")
+    model_probability = _clamp(model_probability, 0.0, 1.0)
+    implied_probability = _clamp(implied_probability, 0.0, 1.0)
 
     odds_adjustment = _odds_adjustment(base_candidate.get("odds"))
+    if odds_adjustment is None and decimal_price is not None:
+        odds_adjustment = max(0.01, decimal_price - 1.0)
     if odds_adjustment is None:
         odds_adjustment = max(0.01, 1.0 - implied_probability)
 

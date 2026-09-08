@@ -105,6 +105,9 @@ class RecommendationEngineTests(unittest.TestCase):
                 "model_probability": 0.64,
             },
         ]
+        # WP3 (2026-09-08): the poor-market suppression is now behind the
+        # shared feedback sample gate (MIN_FEEDBACK_SAMPLE = 50), so three
+        # losses no longer move the threshold -- fifty do.
         historical_records = [
             {
                 "result": "loss",
@@ -113,23 +116,9 @@ class RecommendationEngineTests(unittest.TestCase):
                 "implied_probability": 0.53,
                 "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
                 "artifact_metadata": {"sport": "nba"},
-            },
-            {
-                "result": "loss",
-                "pnl": -1.0,
-                "stake": 1.0,
-                "implied_probability": 0.53,
-                "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
-                "artifact_metadata": {"sport": "nba"},
-            },
-            {
-                "result": "loss",
-                "pnl": -1.0,
-                "stake": 1.0,
-                "implied_probability": 0.53,
-                "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
-                "artifact_metadata": {"sport": "nba"},
-            },
+            }
+            for _ in range(recommendation_engine.MIN_FEEDBACK_SAMPLE)
+        ] + [
             {
                 "result": "win",
                 "pnl": 0.4,
@@ -234,6 +223,8 @@ class RecommendationEngineTests(unittest.TestCase):
                 "model_probability": 0.53,
             },
         ]
+        # WP3 (2026-09-08): the threshold bump sits behind the shared feedback
+        # sample gate, so the poor history has to clear MIN_FEEDBACK_SAMPLE.
         historical_records = [
             {
                 "result": "loss",
@@ -242,23 +233,8 @@ class RecommendationEngineTests(unittest.TestCase):
                 "implied_probability": 0.53,
                 "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
                 "artifact_metadata": {"sport": "nba"},
-            },
-            {
-                "result": "loss",
-                "pnl": -1.0,
-                "stake": 1.0,
-                "implied_probability": 0.53,
-                "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
-                "artifact_metadata": {"sport": "nba"},
-            },
-            {
-                "result": "loss",
-                "pnl": -1.0,
-                "stake": 1.0,
-                "implied_probability": 0.53,
-                "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
-                "artifact_metadata": {"sport": "nba"},
-            },
+            }
+            for _ in range(recommendation_engine.MIN_FEEDBACK_SAMPLE)
         ]
         sink: list[dict] = []
         filtered = filter_candidates(candidates, sport="nba", evaluation_records=historical_records, rejected_sink=sink)
@@ -483,23 +459,27 @@ class RecommendationEngineTests(unittest.TestCase):
 
             return ranked[0]
 
+        # WP3 (2026-09-08): each summary block feeds back only once its own
+        # settled_count clears MIN_FEEDBACK_SAMPLE; a block with no count is
+        # gated. These carry the counts the real aggregator writes.
+        n = recommendation_engine.MIN_FEEDBACK_SAMPLE
         positive = _rank_with_summary(
             {
                 "schema_version": 1,
-                "by_sport": {"nba": {"roi": 0.18}},
-                "by_market": {"points": {"roi": 0.12}},
+                "by_sport": {"nba": {"roi": 0.18, "settled_count": n}},
+                "by_market": {"points": {"roi": 0.12, "settled_count": n}},
                 "by_probability_bucket": [
-                    {"bucket": "0.60-0.70", "predicted_probability": 0.62, "actual_win_rate": 0.70, "roi": 0.09}
+                    {"bucket": "0.60-0.70", "predicted_probability": 0.62, "actual_win_rate": 0.70, "roi": 0.09, "settled_count": n}
                 ],
             }
         )
         negative = _rank_with_summary(
             {
                 "schema_version": 1,
-                "by_sport": {"nba": {"roi": -0.18}},
-                "by_market": {"points": {"roi": -0.12}},
+                "by_sport": {"nba": {"roi": -0.18, "settled_count": n}},
+                "by_market": {"points": {"roi": -0.12, "settled_count": n}},
                 "by_probability_bucket": [
-                    {"bucket": "0.60-0.70", "predicted_probability": 0.62, "actual_win_rate": 0.54, "roi": -0.09}
+                    {"bucket": "0.60-0.70", "predicted_probability": 0.62, "actual_win_rate": 0.54, "roi": -0.09, "settled_count": n}
                 ],
             }
         )

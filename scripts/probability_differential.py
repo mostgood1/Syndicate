@@ -305,6 +305,8 @@ NOT_A_SCALAR_CONVERTER: dict[str, str] = {
     "syndicate/features/nfl/game_context.py:implied_total_ratio": "team totals over prior weeks; a ratio, a different concept entirely",
     "syndicate/features/nfl/props.py:_american_is_better": "compares two prices, returns bool",
     "syndicate/features/shared/novig_client.py:_decimal_or_none": "coercion helper, returns Any",
+    # ADDED 2026-09-08 (WP3 feedback sample gate).
+    "syndicate/features/bankroll_manager.py:_decimal_price": "coerces a decimal price to float-or-None (refuses <= 1.0); a parser/validator, not a conversion -- the sizer does 1/price inline",
     "syndicate/features/shared/novig_orders.py:novig_submitter": "returns a submitter callable; a factory",
     "syndicate/features/shared/venue_quote_adapters.py:novig_outcome": "(sport, date) -> SourceOutcome; a fetch adapter",
     # SCALE ADAPTERS THAT DELEGATE. Excused because the conversion they perform
