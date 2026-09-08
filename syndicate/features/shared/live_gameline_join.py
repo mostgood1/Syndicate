@@ -243,6 +243,137 @@ _FULL_GAME_SEGMENTS = frozenset({"full", "full_game", "game"})
 # stays in ONE place -- here -- and the blast radius is zero.
 REFUSAL_KEY = "live_gameline_refusal"
 
+# ---------------------------------------------------------------------------
+# FIRST-FIVE PRICING. Default OFF.
+#
+# The segment lane now carries a REAL Monte-Carlo number rather than an
+# interpolation: `estimate_live` reads each sim's own per-inning runs, so
+# `first5` gets a win/tie/loss probability and margin/total histograms off the
+# SAME 120 trials, and `_build_game_lens` stamps them with `simsRun` under
+# `live_mc_first5`. That is what makes the precision gate computable here --
+# `sqrt(p(1-p)/n)` has an `n` for the first time on a segment row.
+#
+# WHY IT IS STILL A FLAG. The lane is new, its first production reading has not
+# happened, and the bucket harness measured the EARLY-game window as baseball's
+# weakest surface (`h2h q1_early` edge/se 1.98 against `spreads q4_late` 6.35).
+# first5 is only projectable while the game is in innings 1-5, so it lives
+# entirely inside that weak window. Turning it on is a decision to be made
+# against a measurement, not a side effect of landing the plumbing.
+FIRST5_LENS_SOURCE = "live_mc_first5"
+_FIRST5_SEGMENTS = frozenset({"first5", "first_5", "f5"})
+_DRAW_SIDES = frozenset({"draw", "tie", "x"})
+
+# Refused for being a segment we cannot price YET, as distinct from a segment we
+# refuse on principle. Kept separate so the ledger can tell "the flag is off"
+# from "the lane was missing" from "the leg set was unreadable" -- three states
+# that a single `segment_is_not_full_game` would flatten into one.
+REASON_SEGMENT_PRICING_DISABLED = "segment_pricing_disabled"
+REASON_NO_SEGMENT_PROJECTION = "no_live_segment_projection"
+REASON_SEGMENT_LEG_SET_UNKNOWN = "segment_leg_set_unknown"
+
+
+def first5_pricing_enabled() -> bool:
+    """Explicit opt-in. Absent reads as OFF."""
+    raw = str(os.environ.get("SYNDICATE_MLB_FIRST5_PRICING") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _two_way_home_prob(margin_dist: Any) -> float | None:
+    """P(home wins | the segment is not tied), from the margin histogram.
+
+    THE TRAP THIS EXISTS FOR, and it is worth the arithmetic. Over five innings
+    ties are common -- ~20% of sims on a typical game -- and a first-five
+    moneyline is quoted BOTH ways: three-way with a draw leg, and two-way where
+    a tie is a push. `market_fair_prob_over` is de-vigged from whatever legs the
+    book actually quoted, so the MODEL probability has to describe the same leg
+    set or the subtraction spans two different questions.
+
+    Worked, with the real magnitudes: a model reading home 0.44 / tie 0.20 /
+    away 0.36 against a two-way book implying 0.55 looks like **-11 pp** on the
+    home side. Condition the model on the same leg set -- 0.44/(0.44+0.36) =
+    0.55 -- and the true edge is **zero**. Eleven points of pure frame
+    mismatch, in a market this repo already lost +42.43 pp to once by pairing a
+    full-game projection with a first-inning line. Same defect, different axis.
+
+    Derived from `margin_dist` rather than from a published `tieProb` on
+    purpose: the histogram is already on the hit and is the same object the
+    spread prices against, so the two cannot disagree about what the sim said.
+    """
+    if not isinstance(margin_dist, Mapping) or not margin_dist:
+        return None
+    home = 0
+    away = 0
+    for raw_margin, raw_count in margin_dist.items():
+        try:
+            margin = int(raw_margin)
+            count = int(raw_count)
+        except (TypeError, ValueError):
+            continue
+        if count <= 0:
+            continue
+        if margin > 0:
+            home += count
+        elif margin < 0:
+            away += count
+    if home + away <= 0:
+        return None
+    return float(home) / float(home + away)
+
+
+def segment_home_win_prob(
+    hit: Mapping[str, Any], row: Mapping[str, Any]
+) -> tuple[Any, Any, str | None]:
+    """The model's home probability in the SAME leg frame the market quotes.
+
+    Returns `(probability, effective_sims, refusal_reason)`. Either the first
+    two are set or the third is.
+
+    **THE EFFECTIVE `n` IS PART OF THE ANSWER, NOT AN AFTERTHOUGHT.** A two-way
+    conditional is a proportion over the NON-TIE sims only -- 44 of 80, not 44
+    of 100 -- and `price_moneyline` builds its interval as `sqrt(p(1-p)/n)` and
+    smooths with Agresti-Coull `(k+2)/(n+4)`. Handing it the full sim count for
+    a conditional would state an interval narrower than the estimate deserves
+    and price rows that should be refused: with ~20% tie mass the bar comes out
+    about 10% too tight, which is publishing noise with a decimal point -- the
+    exact thing `PRICEABLE_SIGMA` exists to stop. The tie sims carry no
+    information about who wins GIVEN someone does, so they are not in the
+    denominator.
+
+    An unreadable leg set REFUSES rather than guessing. Guessing is not neutral
+    here: picking the raw probability when the book is two-way understates home
+    and manufactures an AWAY edge; picking the conditional when the book is
+    three-way does the reverse. Both directions invent money, so `unknown` must
+    not take either branch.
+    """
+    sides = [str(s).strip().lower() for s in (row.get("sides") or []) if str(s).strip()]
+    if len(sides) < 2:
+        return None, None, REASON_SEGMENT_LEG_SET_UNKNOWN
+    if any(s in _DRAW_SIDES for s in sides):
+        # Three-way: the draw is a listed outcome, so the de-vig already carries
+        # it and the raw home probability is the matching quantity -- over every
+        # sim, because every sim resolves to one of the three legs.
+        return hit.get("home_win_prob"), hit.get("sims_run"), None
+    two_way = _two_way_home_prob(hit.get("margin_dist"))
+    if two_way is None:
+        return None, None, REASON_SEGMENT_LEG_SET_UNKNOWN
+    return two_way, _decisive_sims(hit.get("margin_dist")), None
+
+
+def _decisive_sims(margin_dist: Any) -> int | None:
+    """How many sims the two-way conditional is actually a proportion OF."""
+    if not isinstance(margin_dist, Mapping):
+        return None
+    total = 0
+    for raw_margin, raw_count in margin_dist.items():
+        try:
+            margin = int(raw_margin)
+            count = int(raw_count)
+        except (TypeError, ValueError):
+            continue
+        if count > 0 and margin != 0:
+            total += count
+    return total or None
+
 
 # `REASON_TOTALS_MEAN` above is now a LEGACY path, not the normal one. It fires
 # only against a lens written before the producer carried `totalRunsDist` --
@@ -1140,7 +1271,12 @@ def build_live_gameline_index(
     return index
 
 
-def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str, Any]]) -> dict[str, Any]:
+def attach_live_gamelines(
+    grid: Any,
+    index: Mapping[tuple[str, str], Mapping[str, Any]],
+    *,
+    segment_index: Mapping[tuple[str, str], Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Overlay the live game-line projection on live moneyline rows.
 
     Mirrors `attach_live_projections`' contract deliberately: a row the join
@@ -1177,9 +1313,33 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
         # the join saw and declined, not one it never considered. An ABSENT
         # segment refuses too: unknown must not take the permissive branch.
         segment = str(row.get("segment") or "").strip().lower()
+        # WHICH INDEX ANSWERS THIS ROW. A `full` row may only ever see the
+        # full-game index and a `first5` row may only ever see the first5 one --
+        # the mismatch these two indexes exist to prevent is the whole reason
+        # `REASON_SEGMENT_NOT_FULL_GAME` was written, and one shared lookup
+        # would reopen it.
+        row_index = index
         if segment not in _FULL_GAME_SEGMENTS:
+            priceable_segment = (
+                segment in _FIRST5_SEGMENTS
+                and segment_index is not None
+                and first5_pricing_enabled()
+            )
+            if priceable_segment:
+                row_index = segment_index
+        if segment not in _FULL_GAME_SEGMENTS and not priceable_segment:
+            # THREE DISTINCT STATES, NOT ONE. "the flag is off" is a decision
+            # we made, "the lane is missing" is a producer gap, and "not a
+            # full-game segment" is the standing rule -- flattening them would
+            # make the ledger unable to say which one a zero came from.
+            if segment in _FIRST5_SEGMENTS and segment_index is not None:
+                seg_reason = REASON_SEGMENT_PRICING_DISABLED
+            elif segment in _FIRST5_SEGMENTS and first5_pricing_enabled():
+                seg_reason = REASON_NO_SEGMENT_PROJECTION
+            else:
+                seg_reason = REASON_SEGMENT_NOT_FULL_GAME
             record(coverage, {"priceable": False,
-                              "withheld_reason": REASON_SEGMENT_NOT_FULL_GAME},
+                              "withheld_reason": seg_reason},
                    projected=False)
             # RECORDED, NOT PRICED. See `REFUSAL_KEY` for the measurement that
             # motivates it. Identity and the reason only: no probability, no
@@ -1203,13 +1363,13 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
             # edge/se 6.35). Bounding it to an inventory keeps that intact.
             row[REFUSAL_KEY] = {
                 "priceable": False,
-                "withheld_reason": REASON_SEGMENT_NOT_FULL_GAME,
+                "withheld_reason": seg_reason,
                 "segment": segment,
             }
             continue
 
         key = (_norm_team(row.get("away_team")), _norm_team(row.get("home_team")))
-        hit = index.get(key)
+        hit = row_index.get(key)
         if hit is None:
             record(coverage, {"priceable": False, "withheld_reason": REASON_NO_LIVE_PROJECTION}, projected=False)
             continue
@@ -1274,15 +1434,31 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
                            live_projected=verdict.get("model_prob"))
             continue
 
+        # THE LEG FRAME MUST MATCH. On a full-game row this is the raw home
+        # probability exactly as before -- MLB games do not end level, so there
+        # is no tie mass to condition on. On a FIRST5 row there is (~20% of
+        # sims), and pairing a raw probability with a two-way de-vig is worth
+        # about 11 points of pure artifact. See `segment_home_win_prob`.
+        if segment in _FULL_GAME_SEGMENTS:
+            model_home_prob, effective_sims, frame_reason = (
+                hit.get("home_win_prob"), hit.get("sims_run"), None)
+        else:
+            model_home_prob, effective_sims, frame_reason = segment_home_win_prob(hit, row)
+        if frame_reason is not None:
+            verdict = {"priceable": False, "withheld_reason": frame_reason}
+            _apply_verdict(row, projection, verdict, hit, coverage)
+            continue
         verdict = price_moneyline(
-            model_prob=hit.get("home_win_prob"),
+            model_prob=model_home_prob,
             # `market_fair_prob_over` is the de-vigged HOME probability on an
             # h2h row -- confirmed against production: home -21759 -> 0.9954,
             # away +3878 -> 0.0251, sum 1.0205, 0.9954/1.0205 = 0.9754, which is
             # the value the row carries. Reading it rather than re-de-vigging
             # keeps one devig ordering in the board path.
             market_prob=projection.get("market_fair_prob_over"),
-            sims=hit.get("sims_run"),
+            # The DECISIVE sim count on a two-way segment row, the full count
+            # everywhere else. See `segment_home_win_prob`.
+            sims=effective_sims,
             # Present only for a sport with a MEASURED analytic interval; None
             # everywhere else, which leaves the sims gate in charge.
             analytic_std_err=hit.get("analytic_std_err"),

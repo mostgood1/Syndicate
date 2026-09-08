@@ -1658,6 +1658,7 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 "rows_live_gameline_edged": 0}
     try:
         from syndicate.features.shared.live_gameline_join import (
+            FIRST5_LENS_SOURCE,
             analytic_std_err_for_sport,
             attach_live_gamelines,
             build_live_gameline_index,
@@ -1699,6 +1700,30 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
             # can PRINT why an empty index is empty. `index=0` alone reads as
             # "no producer" and on 2026-08-25 that reading was wrong for WNBA.
             index_diag: dict = {}
+            # THE FIRST-FIVE INDEX, built for MLB only and from ONE source.
+            #
+            # WHY IT IS BUILT EVEN WHEN THE FLAG IS OFF. Its presence is what
+            # lets the join say `segment_pricing_disabled` instead of the
+            # standing `segment_is_not_full_game` -- "we chose not to price
+            # this" and "we cannot price this" are different answers and the
+            # ledger has to be able to tell them apart. The cost is one pass
+            # over ~11 games; the join, not this, decides whether anything is
+            # priced.
+            #
+            # `sources` is exactly `(FIRST5_LENS_SOURCE,)` and never
+            # `lens_sources_for_sport`: the point is to admit the first5 lane
+            # WITHOUT admitting `segment_projection`, which also covers every
+            # lane on a game where the re-sim bailed. One relaxed source list
+            # would price full-game markets against a fallback on exactly the
+            # games where the live sim failed.
+            segment_index = None
+            if sport == "mlb":
+                segment_index = build_live_gameline_index(
+                    snapshot,
+                    sources=(FIRST5_LENS_SOURCE,),
+                    analytic_std_err=None,
+                    sport=sport,
+                )
             coverage = attach_live_gamelines(
                 grid,
                 build_live_gameline_index(
@@ -1716,7 +1741,10 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     # every unit test passed.
                     sport=sport,
                 ),
+                segment_index=segment_index,
             )
+            if segment_index is not None:
+                coverage["segment_index_size"] = len(segment_index)
         coverage["supported"] = True
         if sport != "soccer":
             coverage["index_diagnostics"] = index_diag
