@@ -3854,3 +3854,37 @@ something correct and I replaced it with something false, confidently.
 
 Related: [[instrument_blindness]], [[read_the_field_you_already_have]],
 [[absence_in_a_window_is_not_absence]], [[a_projection_is_not_a_model_edge]].
+
+## 2026-09-07 FORBIDDEN: justifying a sign/unit transform by pointing at a SIBLING CALL SITE. The convention belongs to the SOURCE, and one function can read two sources. `[lane nfl-rating-units]`
+
+`backfill_nfl_performance` negated nflverse's `spread_line` to build
+`market_margin`. That field is already HOME-MARGIN-POSITIVE, so every NFL
+regular-season market number was inverted. Measured by running the repo's own
+`load_completed_games` over real 2025 results: **34.7%** agreement with the
+actual winner against the market's true **65.3%** -- almost exactly
+one-minus-the-truth, which is the signature of a SIGN ERROR rather than a weak
+signal. 65.3% after the fix.
+
+**THE COMMENT DEFENDING IT WAS ACCURATE AND STILL WRONG.** It cited two siblings
+-- the preseason branch a few lines below, and
+`backfill_smartsim2_performance.py` -- and BOTH of those negate CORRECTLY,
+because they read a SPORTSBOOK spread, which genuinely is bet notation. One
+function, two sources, two conventions, one negation applied to both. A reviewer
+who checks the cited siblings finds them correct and moves on.
+
+**AND A TEST ASSERTED THE WRONG VALUE AND PASSED.** Second instance the same day
+of that shape -- the artifact-export pre-filter (`web-oom-profiler-steady`) was
+the first. A test written from the same misreading as the code cannot catch that
+code, and a green suite is then evidence of nothing.
+
+**HOW TO APPLY.**
+- Trace the field to the FILE and the WRITER that produced it. Here
+  `schedule_{season}.csv` <- `fetch_nfl_schedule.py` <- nflverse `games.csv`,
+  copied verbatim. The convention was three hops away and knowable.
+- Prefer a check the DATA can fail. "Does the market pick winners more often than
+  chance" needs no documentation and cannot be satisfied by a plausible comment.
+- When you fix it, fix the TESTS THAT ENCODED IT, and add a probe for the
+  PROPERTY rather than the value -- an equality assertion can be satisfied by an
+  unrelated change.
+- *(evidence: `findings_2026-09-07_nfl_rating_units_and_market_sign.md`, and
+  PART 5 of `log/2026-09-07.md`)*

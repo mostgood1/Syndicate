@@ -460,7 +460,7 @@ once this index exists: re-splitting would orphan the parts.
 | [nfl-board-projection-coverage] | NFL BOARD PROJECTION COVERAGE IS 100% `[measured 2026-09-04T23:19:34Z on the served payload, lanes nfl-project | `state_football.md` |
 | [ncaaf-zero-orders-is-two-gates] | NCAAF SERVES ZERO ORDERS BY DESIGN, and it is TWO gates, not one `[verified 2026-09-01, lane game-market-entry | `state_football.md` |
 | [ncaaf-team-registry-two-files] | THE RESOLVER READS THE *SNAPSHOT*, AND THE FILE BESIDE IT IS OLDER AND DIFFERENT `[measured 2026-09-03]` | `state_football.md` |
-| [nfl-rating-units] | NFL'S SIM CANNOT TELL TEAMS APART, AND THE CAUSE IS A UNITS DEFECT THIS REPO ALREADY FIXED FOR NCAAF `[measure | `state_football.md` |
+| [nfl-rating-units] | NFL'S SIM COULD NOT TELL TEAMS APART — cause was the SCALE, not units; that diagnosis FALSIFIED. Scale 20.0 DEPLOYED 2026-09-08 for DISPLAY; still loses to the close and must not price | `state_football.md` |
 | [football-smartsim2] | FOOTBALL (NFL + NCAAF) — smartsim2 runs on FOUR SCALARS `[measured 2026-08-18, lane football-model-owner]` | `state_football.md` |
 | [ncaaf-calibration-profile-live] | THE PROMOTED NCAAF PROFILE IS LIVE, AND PROMOTING ONE IS A **CODE DEPLOY** `[verified 2026-09-05, render]` | `state_football.md` |
 | [nfl-archived] | NFL — earlier closed work, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19.md`, verbatim.** | `state_football.md` |

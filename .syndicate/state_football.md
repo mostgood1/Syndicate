@@ -89,7 +89,50 @@ claimed those keys because the rows are not in the file that is read.
 print `team_registry_snapshot_path()` and grep THAT file. Grepping the
 sibling `ncaaf_team_registry.csv` will show the team and prove nothing.
 
-## [nfl-rating-units] NFL'S SIM CANNOT TELL TEAMS APART, AND THE CAUSE IS A UNITS DEFECT THIS REPO ALREADY FIXED FOR NCAAF `[measured 2026-09-06, lane nfl-rating-units, substrate checkout]`
+## [nfl-rating-units] NFL'S SIM COULD NOT TELL TEAMS APART. THE CAUSE WAS THE SCALE CONSTANT, **NOT** A UNITS DEFECT — that diagnosis is FALSIFIED `[measured 2026-09-06; corrected and DEPLOYED 2026-09-07/08, lane nfl-rating-units]`
+
+**UPDATE 2026-09-08 — THE UNITS DIAGNOSIS BELOW IS FALSIFIED, AND THE SCALE IS NOW LIVE.**
+
+Per-play and per-game rating differentials are **the same signal**: Pearson
+r = 0.99689 (2024) and 0.99668 (2025), SD ratio ~60x. The conversion is a LINEAR
+RESCALING carrying no new information, and head to head on held-out 2025, each
+with its own fitted coefficient, they are indistinguishable (MAE 10.58 vs 10.60).
+So the flatness was never about the denominator — it was `NFL_RATING_SCALE`.
+
+**THE PRICING VERDICT BELOW STANDS AND WAS INDEPENDENTLY REPRODUCED.** A second
+implementation (`scripts/backtest_nfl_rating_units.py`, walk-forward, fit
+2023-24, scored on 2025) gets model MAE 10.58 vs market 9.79 and straight-up
+60.2% vs 64.2% — matching the 10.495 / 9.722 / t=+3.34 recorded below. **The
+model still loses to the close and must not price.**
+
+**WHAT CHANGED IS THE DISPOSITION, BY EXPLICIT USER DECISION**
+`[2026-09-07: "Implement and ship before the opener"]`. `NFL_RATING_SCALE` is
+now **20.0** and `SYNDICATE_NFL_PPG_RATINGS=1` is set on refresh-worker
+(`abc56f64`, live 02:09:30Z). The section below concluded *"the units correction
+stays gated OFF and no scale constant is adopted"*; that was a decision about
+PRICING, and this is a decision about DISPLAY — the board was presenting 16/16
+of week 1 as coin flips, which is false. **Whoever reads this should know the two
+dispositions differ and the later one was taken with the earlier in view.**
+
+**IT IS THE ACCURACY-OPTIMAL SCALE, NOT THE DISPERSION-MATCHING ONE** — which is
+the distinction the section below warns about. Measured on 2026 wk1 at scale 20:
+predicted `margin_mean` stdev **4.379**, against the MAE-optimal **4.36**
+recorded below and the market's ~6.2. It is SHRUNK relative to the market, which
+is the direction accuracy wanted.
+
+**AND IT CLOSES THE `DERIVED, NOT VERIFIED` ITEM BELOW.** The implied scale ~25
+was derived through `b=8.55` with the linearity check void (that job measured
+the unfixed path). This did not derive it: the engine was RUN at scale 20 on
+real 2026 wk1 inputs, twice, flag off vs on, and the realised spread is 0.980 ->
+4.379 with `rating_source` unchanged in both arms. The transfer is measured now,
+not assumed.
+
+**STILL OWED:** production's own regenerated artifact (~5:13 PM local 2026-09-08,
+86400s interval); scheduled task `nfl-wk1-projection-spread-check`. Until then
+the production claim is INFERRED from a control arm that reproduces the live
+artifact to three decimals — not directly observed.
+
+---
 
 **THE SCALE WAS FITTED AND BACKTESTED. IT LOSES TO THE CLOSING LINE AND DOES NOT
 SHIP** `[2026-09-06, walk-forward, 816 games, lane nfl-rating-units]`.
