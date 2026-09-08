@@ -677,6 +677,57 @@ def _freeze_market_dirs(source_root: Path) -> list[Path]:
     return ordered
 
 
+def _freeze_snapshot_dirs(source_root: Path, date_str: str) -> list[Path]:
+    """Every `daily/snapshots/<date>` the freeze must land in, writer's own first.
+
+    `#611`, the half that survived `9a768443`. That change made the prop seal
+    SOURCE from every tree, and production confirmed it fires (2026-09-06 to
+    09-08: 644KB / 455KB / 613KB hitter seals). It still graded nothing: the
+    09-06 card, built 2026-09-07T23:47Z on refresh-worker, read
+    `.../source_artifacts/data/market/oddsapi/oddsapi_hitter_props_2026_09_06.json`
+    -- the LIVE post-slate remnant -- with `raw_candidates_n: 0` on every prop
+    market, while the seal sat at `mlb_source/data/daily/snapshots/2026-09-06/`
+    on web (0 copies under `source_artifacts/`).
+
+    The seal crosses services by relative path: the writer's `snapshot_dir`
+    is `source_root/data/daily/snapshots/<date>`, `_materialize_artifact_bundle`
+    mirrors it to `<artifact_root>/data/daily/snapshots/<date>`, the sweep
+    pushes that to web, and refresh-worker pulls it back to the SAME relative
+    path. The grading builder's `_odds_data_roots` searches
+    `MLB_BETTING_DATA_ROOT` (= `.../source_artifacts/data`) and never the
+    sibling `data/` tree, so the seal was one directory over from every
+    reader. Game lines never had this problem only because their freeze is
+    also written to `MLB_BETTING_DATA_ROOT/market/oddsapi` by
+    `_freeze_market_dirs`, which the reader does search -- on the service
+    that ran the freeze. The pulled copy under `daily/snapshots/` is the one
+    that reaches the OTHER service, and props had no copy there the reader
+    could see.
+
+    Derived from the same env var as `_freeze_market_dirs`, for the same
+    reason: the reader resolves against it, so the writer must too.
+    """
+    candidates: list[Path] = [_daily_snapshot_dir(source_root=source_root, date_str=date_str)]
+    env_root = str(
+        os.environ.get("MLB_BETTING_DATA_ROOT")
+        or os.environ.get("MLB_BETTING_DATA_ROOT_DIR")
+        or ""
+    ).strip()
+    if env_root:
+        try:
+            candidates.append(Path(env_root).expanduser().resolve() / "daily" / "snapshots" / str(date_str))
+        except Exception:
+            pass
+    ordered: list[Path] = []
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(path)
+    return ordered
+
+
 def _oddsapi_props_richness(path: Path) -> int:
     """How much market a props doc actually carries. -1 = absent/unreadable.
 
@@ -710,7 +761,7 @@ def _oddsapi_props_richness(path: Path) -> int:
     return total
 
 
-def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict[str, str]:
+def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str, stage: str = "pre_fetch") -> dict[str, str]:
     """Seal the day's pregame odds before a live refresh overwrites them.
 
     This existed but could never fire. The guard was `mode == "live" ->
@@ -738,7 +789,8 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
     returning it. The freeze therefore only ever grows, which is what makes
     it survive the nightly collapse.
     """
-    snapshot_dir = _daily_snapshot_dir(source_root=source_root, date_str=date_str)
+    snapshot_dirs = _freeze_snapshot_dirs(source_root, date_str)
+    snapshot_dir = snapshot_dirs[0]
     market_dirs = _freeze_market_dirs(source_root)
     market_dir = market_dirs[0]
     slug = _date_slug(date_str)
@@ -772,7 +824,7 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
     if merged_lines.get("games"):
         payload = json.dumps(merged_lines, indent=2)
         destinations = [directory / lines_frozen_name for directory in market_dirs]
-        destinations.append(snapshot_dir / lines_frozen_name)
+        destinations.extend(directory / lines_frozen_name for directory in snapshot_dirs)
         for destination in destinations:
             # `market_dir` was never ensured -- only `snapshot_dir` was. A tree
             # that does not exist yet (the reader's, on a fresh disk) would
@@ -868,33 +920,33 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
         # read fixed above. Reporting that clearly is the point.
         if candidate_richness < 0:
             print(
-                f"[refresh_mlb_oddsapi] PROP_FREEZE_SKIPPED prefix={prefix} date={date_str} "
+                f"[refresh_mlb_oddsapi] PROP_FREEZE_SKIPPED prefix={prefix} date={date_str} stage={stage} "
                 f"reason=no_live_doc_in_any_tree trees={len(market_dirs)}",
                 flush=True,
             )
             continue
         if slate_started:
             print(
-                f"[refresh_mlb_oddsapi] PROP_FREEZE_SKIPPED prefix={prefix} date={date_str} "
+                f"[refresh_mlb_oddsapi] PROP_FREEZE_SKIPPED prefix={prefix} date={date_str} stage={stage} "
                 f"reason=slate_started richness={candidate_richness} best_frozen={best_frozen}",
                 flush=True,
             )
             continue
         if best_frozen >= 0 and candidate_richness <= best_frozen:
             print(
-                f"[refresh_mlb_oddsapi] PROP_FREEZE_SKIPPED prefix={prefix} date={date_str} "
+                f"[refresh_mlb_oddsapi] PROP_FREEZE_SKIPPED prefix={prefix} date={date_str} stage={stage} "
                 f"reason=not_richer_than_existing richness={candidate_richness} best_frozen={best_frozen}",
                 flush=True,
             )
             continue
         destinations = [directory / frozen_name for directory in market_dirs]
-        destinations.append(snapshot_dir / frozen_name)
+        destinations.extend(directory / frozen_name for directory in snapshot_dirs)
         for destination in destinations:
             _ensure_dir(destination.parent)
             shutil.copy2(source_path, destination)
             copied[str(destination)] = str(destination)
         print(
-            f"[refresh_mlb_oddsapi] PROP_FREEZE_WROTE prefix={prefix} date={date_str} "
+            f"[refresh_mlb_oddsapi] PROP_FREEZE_WROTE prefix={prefix} date={date_str} stage={stage} "
             f"richness={candidate_richness} best_frozen={best_frozen} "
             f"source_tree_index={[str(path) for path, _ in source_candidates].index(str(source_path))} "
             f"destinations={len(destinations)}",
@@ -917,13 +969,32 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
     # a separate, cruder implementation of exactly what event scoping
     # (fetch_mlb_oddsapi_local.py, per-game hot/cold) already replaced.
     recorded_at = _local_now()
-    frozen_pregame = _freeze_oddsapi_pregame_markets(source_root=source_root, date_str=date_str)
+    frozen_pregame = _freeze_oddsapi_pregame_markets(source_root=source_root, date_str=date_str, stage="pre_fetch")
     result = odds_module.fetch_and_write_live_odds_for_date(
         date_str,
         out_dir=source_root / "data" / "market" / "oddsapi",
         overwrite=overwrite,
         regions=regions,
     )
+    # FREEZE AGAIN, AFTER THE FETCH. `#611`.
+    #
+    # The pre-fetch freeze can only seal a doc some EARLIER pass left behind:
+    # the checkout is empty after every deploy, and a pass's own fetch lands
+    # AFTER its freeze. With one MLB pass per date per deploy that is a seal
+    # that never fires -- the shape of 2026-09-02..09-05 (zero prop seals,
+    # rich pre-slate captures every day) against 09-06..09-08 (seals, on days
+    # with an earlier same-date pass). Game lines survived this because their
+    # merge is seeded from every existing seal; props are a bare copy of one
+    # source doc, so "no doc yet" was "no seal, ever".
+    #
+    # Running the freeze on the doc this pass just fetched makes every
+    # pre-slate pass a sealing pass. It cannot make a post-slate pass one:
+    # the prop seal is refused by `slate_started` and by richness (a post-
+    # slate fetch is an empty market), and the game-line merge is per-event
+    # off each game's own clock. Both guards were built for exactly this
+    # doc; only the order of operations kept it away from them.
+    frozen_post_fetch = _freeze_oddsapi_pregame_markets(source_root=source_root, date_str=date_str, stage="post_fetch")
+    frozen_pregame = {**(frozen_pregame or {}), **(frozen_post_fetch or {})}
 
     snapshot_dir = _daily_snapshot_dir(source_root=source_root, date_str=date_str)
     copied: dict[str, str] = {}

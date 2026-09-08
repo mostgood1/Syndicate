@@ -727,6 +727,29 @@ def _odds_data_roots() -> List[Path]:
             # The mounted bundle nests the same tree under source_artifacts;
             # accept either shape so this works on both layouts.
             roots.append(resolved / "source_artifacts" / "data")
+            # AND THE SIBLING `data/` TREE OF THE SAME BUNDLE. `#611`.
+            #
+            # Artifacts cross services by RELATIVE PATH (worker -> web push,
+            # web -> refresh-worker pull, same path both ways). The prop
+            # pregame seal is written by `refresh_mlb_oddsapi.py` into
+            # `<bundle>/data/daily/snapshots/<date>/` and arrives on THIS
+            # service at exactly that path -- one directory over from the
+            # `<bundle>/source_artifacts/data/` root this env var names.
+            # Measured 2026-09-08 on web: 2026-09-06's 644KB hitter seal at
+            # `mlb_source/data/daily/snapshots/2026-09-06/`, ZERO copies under
+            # `source_artifacts/`, and the 09-06 card (built 09-07T23:47Z)
+            # reading the live post-slate remnant instead, `raw_candidates_n`
+            # 0 on every prop market. The seal existed for 32 hours before
+            # the card was built and this reader could not see it.
+            #
+            # Game lines were never bitten because their freeze ALSO lands in
+            # `<env_root>/market/oddsapi` on the service that ran it. This is
+            # the reader-side half of the fix; the writer now also lands the
+            # seal under `<env_root>/daily/snapshots/<date>`
+            # (`_freeze_snapshot_dirs`). Either half alone closes the gap on
+            # its own service; both are needed for the pulled copy.
+            if resolved.name == "data" and resolved.parent.name == "source_artifacts":
+                roots.append(resolved.parent.parent / "data")
         except Exception:
             pass
     roots.append((_ROOT / "data").resolve())
@@ -779,6 +802,51 @@ def _odds_doc_game_count(path: Path) -> int:
     if isinstance(games, dict):
         return len(games)
     return 0
+
+
+def _odds_doc_props_richness(path: Path) -> int:
+    """How many PRICED SIDES a props doc carries. -1 = unreadable.
+
+    The props docs have no `games`, so `_odds_doc_game_count` scores every
+    one of them 0 and the in-tier tiebreak below degenerates to "first
+    found" -- exactly the rule the 2026-08-31 fix removed for game lines.
+    Same definition as `refresh_mlb_oddsapi._oddsapi_props_richness`, which
+    is what the seal writer uses to keep the seal monotone: an entry with a
+    `line` but no odds is not a quote you can grade against.
+    """
+    try:
+        doc = _read_json_dict(path)
+    except Exception:
+        return -1
+    if not isinstance(doc, dict):
+        return -1
+    total = 0
+    for markets in (doc.get("pitcher_props") or doc.get("hitter_props") or {}).values():
+        if not isinstance(markets, dict):
+            continue
+        for entry in markets.values():
+            if not isinstance(entry, dict) or entry.get("line") is None:
+                continue
+            total += sum(1 for side in ("over_odds", "under_odds") if entry.get(side))
+    return total
+
+
+def _odds_doc_richness_for(key: str):
+    return _odds_doc_props_richness if key in ("hitter_lines", "pitcher_lines") else _odds_doc_game_count
+
+
+def _odds_props_read_note(label: str, path: Path, doc: Dict[str, Any], family: str) -> str:
+    """`<label> lines read: <path> (pregame-freeze|live, N players)`.
+
+    Mirrors the game-line line five hundred lines up, for the same reason:
+    `raw_candidates_n: 0` on every prop market says a supply failed and
+    says nothing about which of the candidate docs was read. `#611` spent
+    three sessions inferring that from byte counts.
+    """
+    players = doc.get(family) if isinstance(doc, dict) else None
+    count = len(players) if isinstance(players, dict) else 0
+    kind = "pregame-freeze" if path.name.endswith("_pregame.json") else "live"
+    return f"{label} lines read: {_relative_path_str(path)} ({kind}, {count} players)"
 
 
 def _odds_paths(date_str: str) -> Dict[str, Path]:
@@ -837,7 +905,7 @@ def _odds_paths(date_str: str) -> Dict[str, Path]:
             if not tier:
                 continue
             # One candidate needs no parse -- keep the common case cheap.
-            chosen = tier[0] if len(tier) == 1 else max(tier, key=_odds_doc_game_count)
+            chosen = tier[0] if len(tier) == 1 else max(tier, key=_odds_doc_richness_for(key))
             break
 
         # Fall back to the first root so the caller's own "missing" warning
@@ -1149,6 +1217,7 @@ def _collect_report_game_recommendations(
 def _collect_report_pitcher_recommendations(
     report_obj: Dict[str, Any],
     policy: Dict[str, Any],
+    warnings: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     date_str = str((report_obj.get("meta") or {}).get("date") or "").strip()
@@ -1169,6 +1238,8 @@ def _collect_report_pitcher_recommendations(
     pitcher_lines_path = _odds_paths(date_str)["pitcher_lines"]
     if pitcher_lines_path.exists():
         pitcher_odds_doc = _read_json_dict(pitcher_lines_path)
+        if warnings is not None:
+            warnings.append(_odds_props_read_note("Pitcher", pitcher_lines_path, pitcher_odds_doc, "pitcher_props"))
         pitcher_odds_by_name = {
             normalize_pitcher_name(str(name)): markets
             for name, markets in ((pitcher_odds_doc.get("pitcher_props") or {}) or {}).items()
@@ -1264,6 +1335,7 @@ def _collect_report_hitter_recommendations(
         return rows
 
     hitter_odds_doc = _read_json_dict(hitter_lines_path)
+    warnings.append(_odds_props_read_note("Hitter", hitter_lines_path, hitter_odds_doc, "hitter_props"))
     hitter_odds = {
         normalize_pitcher_name(str(name)): markets
         for name, markets in ((hitter_odds_doc.get("hitter_props") or {}) or {}).items()
@@ -1373,7 +1445,7 @@ def _build_card_from_report(
 
     warnings: List[str] = []
     raw_game_rows = _collect_report_game_recommendations(report_obj, policy, warnings)
-    pitcher_rows = _collect_report_pitcher_recommendations(report_obj, policy)
+    pitcher_rows = _collect_report_pitcher_recommendations(report_obj, policy, warnings)
     hitter_rows = _collect_report_hitter_recommendations(report_obj, policy, warnings)
 
     markets: Dict[str, Any] = {}
