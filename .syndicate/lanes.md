@@ -2027,6 +2027,41 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Also decided, and recorded because a future reader will wonder: crons are deliberately **NOT** in the guard's `ALL_SERVICES`. They are not in `render.yaml`, so `blueprint_sync` cannot reach them; including them would make every blueprint push demand three claims nobody needs, which is how a lock stops meaning anything.
 - Blocked by: none. **No deploy of any kind. These are local tooling and a hook; nothing here reaches Render.**
 
+### learnings-instrument-family-consolidation — OPEN — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea99184 — **~50 entries in `learnings.md` restate one claim about measurement sources; four of them were broken in a single session and none reached it**
+- Goal: fold the instrument/predicate/measurement-source family into ONE entry,
+  with **zero rules lost** — every consolidated original recoverable VERBATIM,
+  and every rule still reachable from `learnings_index.md` afterwards.
+- Files: `.syndicate/learnings.md`, `.syndicate/learnings_index.md`,
+  `.syndicate/learnings_archive_2026-09-08.md` (NEW), `.syndicate/leads.md`
+  (collision-checked 2026-09-08 with `lane_claims.matches()`: all free; `leads.md`
+  is this session's own lane. **NOTE: every path here is `lane_claims.is_exempt`,
+  so these claims guard NOTHING — `.syndicate/` is exempt from `lane-guard` by
+  design, and `check_lane_claims.py` reports such claims as intent, not
+  protection.**)
+- Hypothesis: n/a — not diagnostic. Promoted from a lead written the same day.
+  The lever is `learnings.md`'s own: *"the next lever is not a raise and not a
+  compaction; it is fewer, better rules."* Worked precedent: `2026-08-20 — ONE
+  ERROR IN FIVE GUISES`, which folded five entries into one and archived the
+  originals verbatim to `learnings_archive_2026-08-20.md` (13,674 B, on origin).
+- **THE RISK, and it is the whole reason this lane has a falsification test.**
+  Consolidation is the only operation in this ledger that can DESTROY a rule.
+  `compact_learnings.py` never does — it keeps the heading and the rule line and
+  moves only the evidence. Folding N entries into one deletes N headings from
+  `learnings.md`, and a rule nobody can find is a rule that gets broken again.
+  Topically-adjacent is NOT the same claim; anything that is independently
+  actionable stays.
+- Falsification test: if ANY consolidated entry's rule is not recoverable
+  verbatim after the pass, the consolidation destroyed a rule and the whole
+  change is reverted — not patched.
+- Verification: (1) **heading conservation** — total `^## ` across
+  `learnings.md` + `learnings_evidence.md` + `learnings_archive.md` +
+  `learnings_archive_2026-09-08.md` is >= the pre-pass total, counted the same
+  way before and after; (2) every consolidated original's heading appears
+  VERBATIM in the dated archive; (3) `build_learnings_index.py` regenerated
+  against origin's copies with **0 index entries removed**; (4) each folded
+  rule's sentence is still reachable by a `grep` of `learnings_index.md`.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
