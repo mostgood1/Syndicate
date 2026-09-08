@@ -28230,3 +28230,51 @@ along):** since the 22:54:00Z boot, refresh-worker logs carry ZERO
 `REFUSED_NOT_THE_PRODUCER`, no publish attempt at all; `/nfl/api/props` 1,670
 rank_cards post-boot (1,670 pre). Recorded as: **not exercised on this boot; no
 publish attempt observed** — a fact about the sweep, not evidence about the guard.
+
+
+---
+
+## 2026-09-08 23:25-23:28Z — web `20c8b870` -> `98deeceb` — lane `nfl-props-autorun-e2e`
+
+**verify: PASSING, on the SERVED ASSET and on the RENDERED PAGE, not on the
+deploy status.**
+
+The rank-card title had no colour of its own, so it inherited the dark page
+theme's `#edf4fb` and rendered near-white on `.rank-card`'s own white background
+(`linear-gradient(180deg,#ffffff,#f9fbff)`). The player name — the single most
+important text on every card — was invisible.
+
+| reading | before | after |
+|---|---|---|
+| title colour | `rgb(237,244,251)` | `rgb(19,34,58)` |
+| contrast on the white card | **1.11** | **15.94** |
+| WCAG AA (needs 4.5) | fails | passes |
+| titles on the page | 3,340 | 3,340, **one distinct colour** |
+
+Three separate confirmations, because "the deploy went live" proves nothing about
+a static asset:
+1. `GET /static/shared/rank_board.css` on production returns the rule itself —
+   `.rank-card h3 { color: #13223a; }`.
+2. Computed style in the browser: all 3,340 titles resolve to ONE colour,
+   `rgb(19,34,58)`, with the temporary injected test rule confirmed GONE
+   (`injectedStyleGone: true`) so the reading is the deploy's, not my probe's.
+3. Screenshot: "Bhayshul Tuten — Rushing Attempts" and the other three headline
+   cards are legible dark text.
+
+**Found by LOOKING at the page.** Every API check this session passed while this
+was broken — the payload carried a perfect `title` field on all 1,670 cards. No
+amount of JSON verification could have caught it.
+
+Board unaffected: 1,670 cards before and after. The deploy restart showed as
+`ERR` at 23:27:45Z (2m37s in, matching the 2m08s/2m23s signature of the two
+previous web deploys) and recovered at 23:28:47Z.
+
+**UNRELATED AND STILL OPEN — web is unstable.** Seven `server_failed` events
+today, FIVE `oomKilled` at 2Gi between 14:07 and 15:13Z, plus health-check
+timeouts at 14:07:23Z and 23:19:39Z ("timed out after 5 seconds"). Those OOMs
+predate this lane's work. Memory before tonight's timeout: `anon 1101.6 MB`,
+`current 1754.9` of `2048` (85.7%), 410.6 of it reclaimable page cache. The
+props page is a 2,541,986-byte document and nobody has measured its per-request
+cost — recorded as a LEAD, not a diagnosis.
+
+Claim released after this entry.
