@@ -46,6 +46,7 @@ import io
 import json
 import sys
 import urllib.request
+from collections.abc import Mapping
 from datetime import date as _date
 from datetime import timedelta as _timedelta
 from pathlib import Path
@@ -142,9 +143,98 @@ def _split_pair(raw: Any) -> tuple[str, str]:
     return (made.strip(), attempted.strip())
 
 
+def _summary_for_event(event_id: str) -> dict[str, Any]:
+    return _get(f"{_SUMMARY}?event={urllib.request.quote(str(event_id))}")
+
+
+def event_payload(event_id: str, date_str: str) -> dict[str, Any]:
+    """ONE summary fetch -> `{"rows": [...], "linescore": {...} | None}`.
+
+    The player rows and the quarter linescore come out of the same ESPN
+    payload, so they are read from one fetch rather than two: the summary
+    call is the expensive hop (per event, through web on Render), and a
+    second copy of it for the linescore would double the slate's cost for a
+    field that was already in hand.
+    """
+    summary = _summary_for_event(event_id)
+    return {
+        "rows": rows_from_summary(summary, event_id, date_str),
+        "linescore": linescore_from_summary(summary, event_id),
+    }
+
+
 def rows_for_event(event_id: str, date_str: str) -> list[dict[str, Any]]:
     """One row per player with a stat line, from the OFFICIAL box."""
-    summary = _get(f"{_SUMMARY}?event={urllib.request.quote(str(event_id))}")
+    return event_payload(event_id, date_str)["rows"]
+
+
+def linescore_from_summary(summary: Mapping[str, Any], event_id: str) -> dict[str, Any] | None:
+    """Per-period points for both sides, from the summary's header, or None.
+
+    WHY IT IS CAPTURED HERE. `bet_status_wnba` grades a quarter or half game
+    line off `linescores_<date>.json`, and this is the only place settlement
+    already reads ESPN for a completed game -- so the capture rides the fetch
+    that exists rather than a new poller. The shape is the one
+    `build_wnba_recon._linescore_totals` already reads from the same endpoint:
+    `header.competitions[0].competitors[].linescores[].displayValue` (with
+    `value` as the fallback spelling), `homeAway` naming the side.
+
+    None whenever either side is missing a tri-code or has no periods at all;
+    a linescore for one team is not a linescore. Overtime periods are kept as
+    extra entries, never folded into the fourth -- the reader decides what a
+    segment includes.
+    """
+    header = summary.get("header") if isinstance(summary.get("header"), Mapping) else {}
+    competitions = header.get("competitions") or []
+    if not competitions or not isinstance(competitions[0], Mapping):
+        return None
+    home: dict[str, Any] | None = None
+    away: dict[str, Any] | None = None
+    for competitor in competitions[0].get("competitors") or []:
+        if not isinstance(competitor, Mapping):
+            continue
+        team = competitor.get("team") if isinstance(competitor.get("team"), Mapping) else {}
+        record = {
+            "tri": str(team.get("abbreviation") or "").strip().upper(),
+            "periods": [
+                _points(entry.get("displayValue", entry.get("value")))
+                if isinstance(entry, Mapping) else None
+                for entry in (competitor.get("linescores") or [])
+            ],
+            "score": _points(competitor.get("score")),
+        }
+        side = str(competitor.get("homeAway") or "").strip().lower()
+        if side == "home":
+            home = record
+        elif side == "away":
+            away = record
+    if not home or not away or not home["tri"] or not away["tri"]:
+        return None
+    if not home["periods"] or not away["periods"]:
+        return None
+    return {
+        "game_id": str(event_id),
+        "home_tri": home["tri"],
+        "away_tri": away["tri"],
+        "home": home["periods"],
+        "away": away["periods"],
+        "home_score": home["score"],
+        "away_score": away["score"],
+    }
+
+
+def _points(value: Any) -> float | int | None:
+    try:
+        parsed = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed:
+        return None
+    return int(parsed) if parsed.is_integer() else parsed
+
+
+def rows_from_summary(summary: Mapping[str, Any], event_id: str, date_str: str) -> list[dict[str, Any]]:
+    """One row per player with a stat line, from an already-fetched summary."""
     out: list[dict[str, Any]] = []
     for team_block in (summary.get("boxscore") or {}).get("players") or []:
         team = team_block.get("team") if isinstance(team_block.get("team"), dict) else {}
@@ -188,6 +278,37 @@ def rows_for_event(event_id: str, date_str: str) -> list[dict[str, Any]]:
 
 def artifact_relative_path(date_str: str) -> str:
     return f"wnba_source/data/processed/boxscores_{date_str}.csv"
+
+
+def linescores_relative_path(date_str: str) -> str:
+    # The READER owns the spelling; imported so producer and consumer cannot
+    # drift onto two file names.
+    from syndicate.features.shared.bet_status_wnba import linescores_relative_path as reader_path
+
+    return reader_path(date_str)
+
+
+def write_linescores(date_str: str, linescores: list[dict[str, Any]]) -> bool:
+    """Persist the quarter sidecar beside the box. NEVER RAISES, and never
+    blocks the CSV: the player box settles props and full-game lines, and a
+    failure to write the segment sidecar must not cost those."""
+    if not linescores:
+        return False
+    try:
+        from syndicate.features.shared.refresh_state_store import data_root, write_json_file
+
+        relative = linescores_relative_path(date_str)
+        write_json_file(
+            data_root() / relative,
+            {"date": date_str, "source": "espn", "games": list(linescores)},
+        )
+        print(f"[wnba_boxscores] LINESCORES_WROTE date={date_str} games={len(linescores)} "
+              f"path={relative}", flush=True)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        print(f"[wnba_boxscores] LINESCORES_WRITE_FAILED date={date_str} "
+              f"{type(exc).__name__}: {exc}", flush=True)
+        return False
 
 
 def to_csv(rows: list[dict[str, Any]]) -> str:
@@ -249,6 +370,10 @@ def build_date(date_str: str, *, dry_run: bool = False,
     from syndicate.features.shared.refresh_state_store import data_root, write_text_file
 
     rows: list[dict[str, Any]] = []
+    # The quarter sidecar, gathered beside the rows on BOTH routes. An event
+    # whose summary carries no header yields no entry rather than an empty
+    # one, so a partial sidecar never claims a game it cannot grade.
+    linescores: list[dict[str, Any]] = []
     if base_url:
         # VIA WEB, because ESPN 403s Render's egress. See `fetch_via_web`.
         try:
@@ -259,6 +384,7 @@ def build_date(date_str: str, *, dry_run: bool = False,
             return {"date": date_str, "status": "web_fetch_failed", "games": 0, "rows": 0}
         event_ids = [""] * int(payload.get("games") or 0)
         rows = [row for row in (payload.get("rows") or []) if isinstance(row, dict)]
+        linescores = [game for game in (payload.get("linescores") or []) if isinstance(game, dict)]
         for failure in payload.get("failed_events") or []:
             # Surfaced rather than hidden: a partial slate must not be mistaken
             # for a complete one, or the rebuild gate stops rebuilding.
@@ -274,11 +400,15 @@ def build_date(date_str: str, *, dry_run: bool = False,
 
         for event_id in event_ids:
             try:
-                rows.extend(rows_for_event(event_id, date_str))
+                fetched = event_payload(event_id, date_str)
             except Exception as exc:  # noqa: BLE001
                 # One event's failure must not cost the rest of the slate.
                 print(f"[wnba_boxscores] EVENT_FAILED date={date_str} event={event_id} "
                       f"{type(exc).__name__}: {exc}", flush=True)
+                continue
+            rows.extend(fetched.get("rows") or [])
+            if isinstance(fetched.get("linescore"), dict):
+                linescores.append(fetched["linescore"])
 
     if not event_ids:
         print(f"[wnba_boxscores] NO_FINAL_GAMES date={date_str} -- nothing written", flush=True)
@@ -296,14 +426,19 @@ def build_date(date_str: str, *, dry_run: bool = False,
     relative = artifact_relative_path(date_str)
     if dry_run:
         print(f"[wnba_boxscores] DRY_RUN date={date_str} games={len(event_ids)} "
-              f"rows={len(rows)} bytes={len(payload)} path={relative}", flush=True)
+              f"rows={len(rows)} linescores={len(linescores)} bytes={len(payload)} "
+              f"path={relative}", flush=True)
         return {"date": date_str, "status": "dry_run", "games": len(event_ids),
-                "rows": len(rows), "bytes": len(payload), "csv": payload}
+                "rows": len(rows), "linescores": len(linescores),
+                "bytes": len(payload), "csv": payload}
 
     write_text_file(data_root() / relative, payload)
     print(f"[wnba_boxscores] WROTE date={date_str} games={len(event_ids)} "
           f"rows={len(rows)} bytes={len(payload)} path={relative}", flush=True)
-    return {"date": date_str, "status": "ok", "games": len(event_ids), "rows": len(rows)}
+    # AFTER the CSV, and on its own error path: see `write_linescores`.
+    wrote_linescores = write_linescores(date_str, linescores)
+    return {"date": date_str, "status": "ok", "games": len(event_ids), "rows": len(rows),
+            "linescores": len(linescores) if wrote_linescores else 0}
 
 
 def _dates(start: str, end: str) -> list[str]:

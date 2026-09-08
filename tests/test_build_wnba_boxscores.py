@@ -117,12 +117,15 @@ def test_one_bad_event_does_not_cost_the_rest_of_the_slate(monkeypatch, tmp_path
     monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "file")
     monkeypatch.setattr(mod, "completed_event_ids", lambda d: ["bad", "good"])
 
-    def _rows(event_id, date_str):
+    def _payload(event_id, date_str):
         if event_id == "bad":
             raise RuntimeError("espn timeout")
-        return [{c: "" for c in mod.COLUMNS} | {"PLAYER_NAME": "A", "date": date_str}]
+        return {"rows": [{c: "" for c in mod.COLUMNS} | {"PLAYER_NAME": "A", "date": date_str}],
+                "linescore": None}
 
-    monkeypatch.setattr(mod, "rows_for_event", _rows)
+    # `event_payload` is the one-fetch hop `build_date` takes; `rows_for_event`
+    # is now a view over it.
+    monkeypatch.setattr(mod, "event_payload", _payload)
     result = mod.build_date("2026-08-25")
     assert result["status"] == "ok" and result["rows"] == 1
 

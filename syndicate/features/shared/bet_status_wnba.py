@@ -59,9 +59,24 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from syndicate.features.shared.bet_status import segment_refusal
+from syndicate.features.shared.bet_status import FULL_GAME_SEGMENT, segment_refusal
+from syndicate.features.shared.segment_actuals import (
+    REASON_SEGMENT_ACTUAL_PREFIX,
+    is_segment_scoreboard_market,
+    order_segment,
+    segment_scores_view,
+)
 
-__all__ = ["wnba_status_resolver"]
+__all__ = ["wnba_status_resolver", "linescores_relative_path"]
+
+# THE SEGMENTS THIS RESOLVER CAN READ, as 1-based ESPN linescore periods.
+# `market_segments.SPORT_SEGMENTS["wnba"]` is the vocabulary. `h2` is listed
+# with its regulation quarters only; overtime is appended at read time -- see
+# `_segment_points`.
+_SEGMENT_PERIODS: dict[str, tuple[int, ...]] = {
+    "q1": (1,), "q2": (2,), "q3": (3,), "q4": (4,),
+    "h1": (1, 2), "h2": (3, 4),
+}
 
 REASON_NO_EVENT_ID = "no_event_id"
 REASON_NO_BOX = "no_live_box_for_date"
@@ -197,6 +212,12 @@ def wnba_status_resolver(selected_date: str):
             cache["final_teams"] = _load_final_team_scores(final_rows())
         return cache["final_teams"]
 
+    def linescores():
+        # The per-quarter sidecar, read ONCE per resolver like everything else.
+        if "linescores" not in cache:
+            cache["linescores"] = _load_linescores(selected_date)
+        return cache["linescores"]
+
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         if str(order.get("sport") or "").strip().lower() != "wnba":
             # This resolver is handed every order; a non-WNBA one is not a
@@ -209,13 +230,29 @@ def wnba_status_resolver(selected_date: str):
         # matched `_MARKET_TO_BOX_KEY["player_points"]`, and got graded off the
         # whole-game box. Same defect, one market family over.
         #
+        # A SEGMENT GAME LINE IS NOW GRADED, off the quarter linescore that
+        # `build_wnba_boxscores` captures beside the final box
+        # (`linescores_<date>.json`). The refusal below is the FALLBACK, and it
+        # fires unchanged whenever the segment path returns None: no sidecar for
+        # the date (a box built before the capture existed, or a game not yet
+        # final), the game not in it, a segment this sport does not play, or a
+        # PLAYER prop -- the linescore carries no player stats, so a first-half
+        # points line still cannot be answered from it.
+        #
         # The wording is WNBA's own, not the shared default: this string is a
         # recorded reading in `state_basketball.md` and renaming it would orphan
         # that for nothing. Everything else about the check is now shared with
         # mlb / ncaaf / nfl / soccer, which had no such check at all.
-        refusal = segment_refusal(order, reason_prefix="final_box_is_full_game_not_")
-        if refusal is not None:
-            return refusal
+        segment = order_segment(order)
+        if segment != FULL_GAME_SEGMENT:
+            segment_market = _canonical(order.get("market"))
+            if segment in _SEGMENT_PERIODS and is_segment_scoreboard_market("wnba", segment_market):
+                graded = _segment_game_line(order, segment_market, segment, linescores())
+                if graded is not None:
+                    return graded
+            refusal = segment_refusal(order, reason_prefix="final_box_is_full_game_not_")
+            if refusal is not None:
+                return refusal
 
         # THE MARKET CHECK COMES FIRST, before the artifact read. "We have no
         # box key for this market" is permanent; "the box is not captured yet"
@@ -594,6 +631,156 @@ def _game_line_from_final_box(order, market, team_scores) -> dict[str, Any]:
         "home_name": order.get("home_team"),
         "away_name": order.get("away_team"),
     }
+
+
+def linescores_relative_path(selected_date: str) -> str:
+    """Where `build_wnba_boxscores` writes the per-quarter sidecar. ONE spelling,
+    imported by the producer, so the reader and the writer cannot drift."""
+    return f"wnba_source/data/processed/linescores_{selected_date}.json"
+
+
+def _load_linescores(selected_date: str) -> dict[Any, dict[str, Any]] | None:
+    """`frozenset(tri, tri) -> {home_tri, away_tri, home: [pts..], away: [pts..]}`.
+
+    None when the sidecar is absent or unreadable -- the caller then lets the
+    existing segment refusal fire, which is literally true of that date: the
+    only box on disk is the whole game. An EMPTY dict means the file exists and
+    no game in it survived, which is a different fact and reads the same way
+    downstream (game not found -> refusal), so both are safe.
+
+    KEYED ON THE MATCHUP, not the ESPN id, for the reason this module already
+    states at length: the order carries the board's OddsAPI hash. The tris go
+    through `_wnba_tri` so ESPN's `GS` and the order's `Golden State Valkyries`
+    land on the same code, exactly as `_load_final_team_scores` does.
+    """
+    from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+    try:
+        payload = read_json_file(data_root() / linescores_relative_path(selected_date))
+    except Exception:
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    games = payload.get("games")
+    if not isinstance(games, list):
+        return None
+
+    index: dict[Any, dict[str, Any]] = {}
+    for game in games:
+        if not isinstance(game, Mapping):
+            continue
+        home_tri = _wnba_tri(game.get("home_tri"))
+        away_tri = _wnba_tri(game.get("away_tri"))
+        if not home_tri or not away_tri or home_tri == away_tri:
+            continue
+        key = frozenset((home_tri, away_tri))
+        if key in index:
+            # The same two clubs twice on one date: an artifact defect, and
+            # refusing both is the only safe reading -- same rule as the
+            # team-score index.
+            index[key] = {"ambiguous": True}
+            continue
+        index[key] = {
+            "game_id": str(game.get("game_id") or ""),
+            "home_tri": home_tri,
+            "away_tri": away_tri,
+            "home": list(game.get("home") or []),
+            "away": list(game.get("away") or []),
+        }
+    return index
+
+
+def _segment_points(game: Mapping[str, Any], segment: str) -> tuple[float, float] | None:
+    """`(home, away)` points over the segment's periods, or None if any is missing.
+
+    A period missing on EITHER side refuses the whole segment rather than
+    summing what is there -- "a partial sum is a smaller number that looks
+    real" is this module's standing rule, and a first-half total short one
+    quarter would settle the UNDER on a score that never happened.
+
+    `h2` INCLUDES OVERTIME, `q4` DOES NOT. That is the book convention for a
+    second-half market (the half is "the rest of the game"), and it is a
+    CONVENTION rather than a measurement -- stated here so a reader grading an
+    overtime game knows which rule produced the number. `build_wnba_recon`'s
+    `h2` deliberately EXCLUDES it because that file answers a different
+    question (the model's regulation-half projection); the two are not in
+    conflict, they are two definitions, and this is the one money settles on.
+    Overtime is folded in only when BOTH sides report the same number of
+    periods; a linescore where one side has an extra period is refused.
+    """
+    periods = _SEGMENT_PERIODS.get(segment)
+    if not periods:
+        return None
+    home = [_as_float(value) for value in (game.get("home") or [])]
+    away = [_as_float(value) for value in (game.get("away") or [])]
+    wanted = list(periods)
+    if segment == "h2":
+        if len(home) != len(away):
+            return None
+        wanted.extend(range(5, len(home) + 1))
+    home_total = away_total = 0.0
+    for number in wanted:
+        at = number - 1
+        if at >= len(home) or at >= len(away):
+            return None
+        if home[at] is None or away[at] is None:
+            return None
+        home_total += home[at]
+        away_total += away[at]
+    return home_total, away_total
+
+
+def _segment_game_line(order, market, segment, index) -> dict[str, Any] | None:
+    """Grade a WNBA segment spread/total/moneyline off the quarter linescore.
+
+    None means "let the existing segment refusal fire" -- no sidecar, game not
+    in it, or a matchup the order is too thin to key. A NAMED refusal comes
+    back only once the game has been found and the answer still cannot be
+    read: the periods are missing (`segment_actual_unavailable:<seg>`), or the
+    order and ESPN disagree about who was at home.
+
+    `is_final=True` is asserted for the same reason `_game_line_from_final_box`
+    asserts it: the sidecar is written by the same producer, from the same
+    completed-games list, so a game's presence in it IS the statement that it
+    is over -- and a finished quarter cannot change either way.
+    """
+    from syndicate.features.shared.game_line_bet import REASON_HOME_AWAY_DISAGREE
+
+    if index is None:
+        return None
+    key = _matchup_key(order.get("away_team"), order.get("home_team"))
+    if key is None:
+        return None
+    game = index.get(key)
+    if not game or game.get("ambiguous"):
+        return None
+
+    home_tri = _wnba_tri(order.get("home_team"))
+    away_tri = _wnba_tri(order.get("away_team"))
+    if game.get("home_tri") != home_tri or game.get("away_tri") != away_tri:
+        # The matchup key is a frozenset and cannot tell home from away; this
+        # is the check that does. ESPN's `homeAway` and the odds provider's
+        # roles agree in practice, and a segment spread graded on the wrong
+        # side is a confident wrong verdict, so "in practice" is not enough.
+        return {"unavailable_reason": REASON_HOME_AWAY_DISAGREE}
+
+    points = _segment_points(game, segment)
+    if points is None:
+        return {"unavailable_reason": f"{REASON_SEGMENT_ACTUAL_PREFIX}{segment}"}
+    home_points, away_points = points
+    return segment_scores_view(
+        sport="wnba",
+        market=market,
+        order=order,
+        segment=segment,
+        home_score=home_points,
+        away_score=away_points,
+        is_final=True,
+        started=True,
+        home_name=order.get("home_team"),
+        away_name=order.get("away_team"),
+        matched_by="final_linescore_segment",
+    )
 
 
 def _load_final_box(rows, normalize_name):

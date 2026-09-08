@@ -683,7 +683,7 @@ def api_final_player_boxscore():
     warn_if_compute_in_request_path("wnba_final_player_boxscore_fetch")
     count_only = str(request.args.get("count_only") or "").strip() in {"1", "true", "yes"}
     try:
-        from scripts.build_wnba_boxscores import completed_event_ids, rows_for_event
+        from scripts.build_wnba_boxscores import completed_event_ids, event_payload
 
         event_ids = completed_event_ids(selected_date)
     except Exception as exc:  # noqa: BLE001
@@ -699,19 +699,27 @@ def api_final_player_boxscore():
         return jsonify({"ok": True, "date": selected_date, "games": len(event_ids), "rows": []})
 
     rows: list = []
+    # The quarter linescore per completed game, from the SAME summary fetch as
+    # the rows. `build_wnba_boxscores` persists it beside the CSV and
+    # `bet_status_wnba` grades quarter/half game lines off it.
+    linescores: list = []
     failed: list = []
     for event_id in event_ids:
         try:
-            rows.extend(rows_for_event(event_id, selected_date))
+            fetched = event_payload(event_id, selected_date)
         except Exception as exc:  # noqa: BLE001
             # One event's failure must not cost the rest of the slate, but the
             # caller has to know the answer is partial or it will treat a short
             # slate as a complete one and stop rebuilding.
             failed.append({"event_id": str(event_id), "error": f"{type(exc).__name__}: {exc}"})
+            continue
+        rows.extend(fetched.get("rows") or [])
+        if isinstance(fetched.get("linescore"), dict):
+            linescores.append(fetched["linescore"])
 
     return jsonify({
         "ok": True, "date": selected_date, "games": len(event_ids),
-        "rows": rows, "failed_events": failed,
+        "rows": rows, "linescores": linescores, "failed_events": failed,
     })
 
 
