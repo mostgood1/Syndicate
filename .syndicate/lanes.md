@@ -1958,12 +1958,18 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   - `test_scope_guard.py` **31/31** (a test now pins that the guard names
     `/lead`). All 9 hook suites green, **208 assertions**.
   - `bash -n session-start.sh` clean; the digest emits the census line.
-- **VERIFICATION ITEM (2) IS NOT MET — STATED, NOT PAPERED OVER.** It required
-  the census to emit AND *"its total body shrinks below BUDGET=1800"*. The census
-  emits; the body is **1911 B**. The lane section shrank by 389 B and other
-  sections consumed it, so **the digest tail is still cut**. The 1.9% lane sample
-  is fixed; the digest's overflow is NOT, and calling this lane's goal met does
-  not mean the digest is now lossless. Recorded as an open lead.
+- **VERIFICATION ITEM (2) IS MET. I REPORTED IT AS FAILED, AND THAT WAS A
+  MEASUREMENT ERROR — corrected 2026-09-08 by re-reading the source.**
+  Probed with the script's own `LEN`, logic unaltered: **BODY = 1556 B against
+  BUDGET = 1800 B**, 244 B headroom, `DIGEST OVERFLOW` not emitted, last line
+  intact. The census change took the body **1945 B -> 1556 B**; the 389 B saving
+  landed exactly as designed.
+  **What I did wrong:** I measured **total stdout (1911 B)** against a budget that
+  governs only `$BODY`. `DIGEST NOTES` and `LEDGER INCOHERENT` are `echo`n at
+  `session-start.sh:476-477`, AFTER the `LEN` check at `:472` — 304 B that never
+  counted. The two numbers sit four lines apart and I took the adjacent one.
+  Same shape as this session's other three errors. The claim stood on `origin` in
+  `lanes.md` and twice in the daily log before it was caught.
 - **A COUNTING DEFECT FOUND WHILE BUILDING THIS, which changes an earlier number
   in this ledger.** The open-lane population is **53 (worktree) / 51 (origin)**,
   not the 47 reported earlier today. Three separate counts disagreed: a
