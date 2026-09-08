@@ -28132,3 +28132,62 @@ The corrected model still LOSES to the closing line — held-out 2025 MAE 10.58 
 the market's 9.79, straight-up 60.2% vs 64.2%. **Display honesty only.** The
 observed margin SD of 4.379 still sits UNDER the market's ~5.8-6.1, i.e. the
 board remains somewhat under-confident, which is the safe direction.
+### refresh-worker d8ed991a — pricing-plane-v1 deploy 2: `SYNDICATE_FAIR_ANCHOR=sharp` ON. Pinnacle anchors like a sharp; the EXCHANGE tier does not, and that is the finding `[lane pricing-plane-v1, deploy dep-dag91f15efls739uqck0, fired 2026-09-08T22:48:28Z, live 22:54:00Z, substrate render, user decision 22:0xZ]`
+
+Main tip d8ed991a (bumped from d2f7aab1 at lane nfl-props-autorun-e2e's request so
+its producer guard e625557a rode along; every pricing-plane commit is an ancestor).
+Env: `SYNDICATE_FAIR_ANCHOR=sharp` set 22:09Z, injected at this boot; every other
+pricing-plane flag still absent. Preflight CLEAR recorded for this SHA after the
+22:29:54Z MLB sim finished (exit 0); a soccer sweep restarted in the seconds between
+the CLEAR and the POST and was killed — one odds cycle, rewritten by the next.
+Claim held by restore-measurement; released after this entry.
+
+**verify 1 — the flag reaches the board, PASSING.** First post-boot shortlist
+(`/api/board/layer2-shortlist?limit=2000`, read 23:10:12Z), 2,000 rows:
+
+    fair_method   consensus 1,467   exchange_mid 263   sharp_anchor 68   book_margin_model 202
+    devig         power 331 (anchor tiers)   multiplicative 1,467   none 202
+    anchor books  kalshi 137  pinnacle 68  prophetx 60  novig 38  matchbook 14  polymarket 12  betfair_ex_eu 2
+
+Pre-deploy (22:09Z snapshot, same endpoint): sharp_anchor 0, exchange_mid 0.
+
+**verify 2 — sharp-minus-median per row (pp), from the stamps, n=331 anchored rows:**
+
+    all         mean +0.147  median +0.328  p10 -1.66  p90 +3.06  min -28.75  max +11.23   |d|>1pp 171   |d|>2pp 93
+    by book     pinnacle  n=68  mean|d| 0.885  >2pp 6   >5pp 1
+                kalshi    n=137 mean|d| 2.699  >2pp 51  >5pp 17
+                prophetx  n=60  mean|d| 2.044  >2pp 28  >5pp 3
+                novig     n=38  mean|d| 1.369  >2pp 5   >5pp 2
+                polymarket n=12 mean|d| 2.428  >2pp 3   >5pp 1
+                matchbook n=14  mean|d| 0.530  >2pp 0   >5pp 0
+    by sport    mlb n=284 mean -0.215      ncaaf n=47 mean +2.334
+    by market   totals_alt n=76 mean -1.107   totals n=66 +0.586   spreads n=61 +0.733   spreads_alt n=56 +0.227   h2h n=31 +0.651
+
+The ten largest gaps are ALL exchange-mid rows, nine of them Kalshi on MLB
+`totals_alt`/`totals` at deep or in-play lines (e.g. under 3.5: fair 0.093 vs median
+0.380, quoted +950; under 4.5: 0.223 vs 0.490), one Polymarket HRR prop with
+`books=1`. A wide or thin two-sided exchange quote has a mid, but that mid is not a
+fair. **Pinnacle IS the sharp tier the flag was built for; the exchange tier as
+shipped is not yet one.**
+
+**verify 3 — what it did to admission, same rows, same price and book (n=724):**
+EV sign flips 88; rows that crossed the sizer's 2.0 `min_ev_pct` line 57; mean EV
+delta +0.138 pp. So ~8% of unchanged-price rows changed admission on the new fair,
+and by the by-book table most of that movement comes from the exchange tier.
+
+**DECISION TAKEN ON THIS READING (recorded, not deferred):** the flag STAYS `sharp`
+tonight — the user decided deploy 2, real-money exposure is capped ($10/order,
+$50/$100 per venue-day), and the per-row stamps make every row's counterfactual
+median recoverable. **Follow-up delegated now (P1b):** an exchange quote anchors only
+when its own two-side hold is tight (`SYNDICATE_FAIR_EXCHANGE_MAX_HOLD_PCT`, default
+4.0) and it quotes ≥2 books' worth of depth signal, otherwise the row falls to
+consensus; plus a `sharp_only` flag value (Pinnacle tier only). Until P1b is live,
+read exchange-mid rows as UNVALIDATED; the 3-day same-book CLV reading for deploy 2
+must be split by `fair_method` and by `fair_anchor_book`, never pooled.
+
+**Peer readings for lane nfl-props-autorun-e2e (guards e625557a + d8ed991a rode
+along):** since the 22:54:00Z boot, refresh-worker logs carry ZERO
+`nfl_prop_projections` lines — no `PUBLISH_OK … bytes=284`, no
+`REFUSED_NOT_THE_PRODUCER`, no publish attempt at all; `/nfl/api/props` 1,670
+rank_cards post-boot (1,670 pre). Recorded as: **not exercised on this boot; no
+publish attempt observed** — a fact about the sweep, not evidence about the guard.
