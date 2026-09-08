@@ -31,6 +31,16 @@ reference, not an executable price, and nothing in this module or in
 `_fair_by_side` accounts for depth, commission or the chance the order does not
 fill. `venue_fees` and `venue_basis_edge` own that, on the EXECUTION side.
 
+THE EXCHANGE TIER IS GATED, THE SHARP TIER IS NOT (P1b). Membership here says
+which venues MAY anchor; `layer2_board._anchored_fair` decides per row whether a
+given pair does. An exchange pair anchors only when its own two-side hold is at
+most `SYNDICATE_FAIR_EXCHANGE_MAX_HOLD_PCT` (4.0) and the row's `books_quoting`
+reaches `SYNDICATE_FAIR_EXCHANGE_MIN_BOOKS` (3); otherwise the row falls to the
+consensus chain and names the gate in `fair_anchor_refusal`. The first `sharp`
+board (2026-09-08, 331 anchored rows) put Kalshi at a mean 2.7 pp from the
+median with 17 rows past 5 pp, against Pinnacle's 0.9 pp and 1 -- the gates are
+that reading, and `SYNDICATE_FAIR_ANCHOR=sharp_only` drops tier 2 entirely.
+
 `SHARP_BOOKS` is the union the ledger reports coverage on. It is deliberately
 NOT extended with the direct venues: `state.md [sharp-reference-price]` measured
 100% game-line coverage on exactly this five-book set, and a record's

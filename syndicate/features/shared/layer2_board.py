@@ -84,6 +84,7 @@ from syndicate.features.shared.opportunity_signals import (
     consensus_fair_probability,
     devig,
     expected_value_pct,
+    hold_pct,
 )
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
 from syndicate.features.shared.sharp_books import EXCHANGE_ANCHOR_PRIORITY, SHARP_ANCHOR_PRIORITY
@@ -935,8 +936,11 @@ def _canonical_team_key(sport: str, name: str) -> str | None:
 #:                      itself and take the MEDIAN per selection (`#384`).
 #:   sharp              try a SHARP book's own two-sided market first
 #:                      (`sharp_books.SHARP_ANCHOR_PRIORITY`: Pinnacle), then a
-#:                      two-sided EXCHANGE mid (`EXCHANGE_ANCHOR_PRIORITY`), and
-#:                      only then the median chain, unchanged.
+#:                      two-sided EXCHANGE mid (`EXCHANGE_ANCHOR_PRIORITY`) --
+#:                      GATED, see below -- and only then the median chain,
+#:                      unchanged.
+#:   sharp_only         the Pinnacle tier, then straight to the median chain. No
+#:                      exchange tier at all.
 #:
 #: Read per call rather than at import, for the same reason
 #: `_model_value_term_mode` is: a test flips it with `monkeypatch`, and a worker
@@ -944,6 +948,43 @@ def _canonical_team_key(sport: str, name: str) -> str | None:
 FAIR_ANCHOR_ENV = "SYNDICATE_FAIR_ANCHOR"
 FAIR_ANCHOR_MEDIAN = "median"
 FAIR_ANCHOR_SHARP = "sharp"
+FAIR_ANCHOR_SHARP_ONLY = "sharp_only"
+_FAIR_ANCHOR_MODES: tuple[str, ...] = (FAIR_ANCHOR_MEDIAN, FAIR_ANCHOR_SHARP, FAIR_ANCHOR_SHARP_ONLY)
+
+#: THE EXCHANGE TIER'S TWO GATES (P1b). Measured on the first `sharp` board
+#: (refresh-worker d8ed991a, 2026-09-08 23:10Z, 2,000 rows, 331 anchored):
+#: Pinnacle's mean |sharp - median| was 0.885 pp with ONE row past 5 pp;
+#: Kalshi's was 2.699 pp with SEVENTEEN, and the ten largest gaps on the board
+#: were all `exchange_mid` -- nine Kalshi MLB totals at deep or in-play lines
+#: (under 3.5: fair 0.093 against a median of 0.380), one Polymarket prop with
+#: `books=1`. A wide or thin two-sided exchange quote has a mid; that mid is not
+#: a fair. So an exchange pair anchors only when it is BOTH:
+#:
+#:   TIGHT         its own two-side hold (`opportunity_signals.hold_pct`, the
+#:                 same figure the board publishes as a book's margin) is at
+#:                 most `SYNDICATE_FAIR_EXCHANGE_MAX_HOLD_PCT` (default 4.0 --
+#:                 under the canonical -110/-110 book's 4.55%, so a quote no
+#:                 tighter than a soft book cannot outrank the soft-book
+#:                 median). Refused as `exchange_hold_too_wide`.
+#:   CORROBORATED  the row's `books_quoting` -- the grid's count of books with
+#:                 a fresh price on the side, the exchange itself included -- is
+#:                 at least `SYNDICATE_FAIR_EXCHANGE_MIN_BOOKS` (default 3). A
+#:                 lone exchange with nobody else on the line is refused as
+#:                 `exchange_uncorroborated`. Unknown counts are refused, not
+#:                 admitted. The PINNACLE tier is exempt on purpose: Pinnacle is
+#:                 the corroboration, and its one `>5pp` row does not justify a
+#:                 gate on the tier the flag was built for.
+#:
+#: A refused row falls through to the consensus chain exactly as if no exchange
+#: had quoted, and carries `fair_anchor_refusal` naming the gate. Both tiers
+#: carry `fair_anchor_hold_pct` so the next reading can be cut by hold without
+#: a rerun.
+FAIR_EXCHANGE_MAX_HOLD_PCT_ENV = "SYNDICATE_FAIR_EXCHANGE_MAX_HOLD_PCT"
+FAIR_EXCHANGE_MAX_HOLD_PCT_DEFAULT = 4.0
+FAIR_EXCHANGE_MIN_BOOKS_ENV = "SYNDICATE_FAIR_EXCHANGE_MIN_BOOKS"
+FAIR_EXCHANGE_MIN_BOOKS_DEFAULT = 3
+FAIR_ANCHOR_REFUSAL_HOLD_TOO_WIDE = "exchange_hold_too_wide"
+FAIR_ANCHOR_REFUSAL_UNCORROBORATED = "exchange_uncorroborated"
 
 #: `SYNDICATE_FAIR_DEVIG_METHOD` -- the de-vig applied INSIDE EACH BOOK on the
 #: consensus chain: `multiplicative` (default) or `power`. Independent of the
@@ -967,12 +1008,24 @@ FAIR_METHOD_EXCHANGE_MID = "exchange_mid"
 
 def _fair_anchor_mode() -> str:
     raw = str(os.environ.get(FAIR_ANCHOR_ENV) or "").strip().lower()
-    return FAIR_ANCHOR_SHARP if raw == FAIR_ANCHOR_SHARP else FAIR_ANCHOR_MEDIAN
+    return raw if raw in _FAIR_ANCHOR_MODES else FAIR_ANCHOR_MEDIAN
 
 
 def _fair_devig_method() -> str:
     raw = str(os.environ.get(FAIR_DEVIG_METHOD_ENV) or "").strip().lower()
     return raw if raw in _FAIR_DEVIG_METHODS else _FAIR_DEVIG_METHODS[0]
+
+
+def _fair_exchange_max_hold_pct() -> float:
+    """`SYNDICATE_FAIR_EXCHANGE_MAX_HOLD_PCT`; the default on absent or unparseable."""
+    value = _as_float(os.environ.get(FAIR_EXCHANGE_MAX_HOLD_PCT_ENV))
+    return value if value is not None and value >= 0.0 else FAIR_EXCHANGE_MAX_HOLD_PCT_DEFAULT
+
+
+def _fair_exchange_min_books() -> int:
+    """`SYNDICATE_FAIR_EXCHANGE_MIN_BOOKS`; the default on absent or unparseable."""
+    value = _as_float(os.environ.get(FAIR_EXCHANGE_MIN_BOOKS_ENV))
+    return int(value) if value is not None and value >= 1.0 else FAIR_EXCHANGE_MIN_BOOKS_DEFAULT
 
 
 @dataclass(frozen=True)
@@ -993,6 +1046,34 @@ class _FairResolution:
     #: regardless of mode, so a sharp-vs-median gap is measurable per row from
     #: the served payload without a rerun. Empty when no book quotes every side.
     consensus_by_side: dict[str, float]
+    #: The two-side hold (pp) of the pair the anchor tiers EVALUATED: the
+    #: anchor's own when a tier anchored, the first refused exchange's when
+    #: `anchor_refusal` is set, None when no anchor pair was ever fresh (and
+    #: always None under `median`). Read it with `method`/`anchor_refusal`; a
+    #: value on a `consensus` row means an exchange was looked at and refused.
+    anchor_hold_pct: float | None = None
+    #: Why the exchange tier did NOT anchor although an exchange quoted both
+    #: sides fresh: `exchange_hold_too_wide` or `exchange_uncorroborated`. None
+    #: when a tier anchored, when no exchange pair was fresh, and under every
+    #: mode that has no exchange tier.
+    anchor_refusal: str | None = None
+
+
+@dataclass(frozen=True)
+class _AnchorAttempt:
+    """One tier's verdict: an anchor, or the reason the best candidate was refused."""
+
+    fair_by_side: dict[str, float] | None
+    book: str | None
+    hold_pct: float | None
+    refusal: str | None
+
+    @property
+    def anchored(self) -> bool:
+        return self.fair_by_side is not None and self.book is not None
+
+
+_NO_ANCHOR = _AnchorAttempt(None, None, None, None)
 
 
 def _consensus_fair(cells: Any, sides: list[str], *, method: str) -> dict[str, float]:
@@ -1066,26 +1147,75 @@ def _anchor_pair(cells: Mapping[str, Any], book: str, sides: list[str]) -> list[
     return prices
 
 
+def _row_books_quoting(row: Mapping[str, Any], sides: list[str]) -> int | None:
+    """The grid's fresh-book count for the row; None when it carries none.
+
+    `book_grid` stamps `books_quoting` on the row (books with any fresh price)
+    and on each side's `best` (books fresh on THAT side). The row-level count is
+    the corroboration question -- how many books are on this line at all -- and
+    the per-side counts are the fallback for a row built without it.
+    """
+    count = _as_float(row.get("books_quoting"))
+    if count is None:
+        best = row.get("best") or {}
+        per_side = [_as_float((best.get(side) or {}).get("books_quoting")) for side in sides]
+        known = [value for value in per_side if value is not None]
+        count = max(known) if known else None
+    return int(count) if count is not None else None
+
+
 def _anchored_fair(
-    cells: Any, sides: list[str], books: tuple[str, ...]
-) -> tuple[dict[str, float], str] | None:
+    cells: Any,
+    sides: list[str],
+    books: tuple[str, ...],
+    *,
+    max_hold_pct: float | None = None,
+    min_books: int | None = None,
+    books_quoting: int | None = None,
+) -> _AnchorAttempt:
     """The first book in `books` quoting every side fresh, power-de-vigged.
 
-    Returns `(fair_by_side, book)`, or None when no book in the tier qualifies
-    -- including when `devig` refuses the pair's overround, which is evidence
-    the legs are not one market and must not become an anchor.
+    Returns an `_AnchorAttempt` that is anchored, or `_NO_ANCHOR` when no book
+    in the tier qualifies -- including when `devig` refuses the pair's
+    overround, which is evidence the legs are not one market and must not
+    become an anchor.
+
+    THE GATES apply only when the caller passes them, which the exchange tier
+    does and the sharp tier does not (see the `FAIR_EXCHANGE_*` block):
+
+      `min_books`     the row's `books_quoting` must reach it, or every pair in
+                      the tier is `exchange_uncorroborated`. A None count is
+                      unknown, and unknown is refused.
+      `max_hold_pct`  the pair's own `hold_pct` must not exceed it, or the pair
+                      is `exchange_hold_too_wide`.
+
+    A refused pair does not end the tier -- a tighter exchange further down the
+    priority may still anchor -- but if none does, the attempt carries the
+    FIRST refusal in priority order and that pair's hold, so the row can say
+    which gate stopped the deepest venue that quoted it.
     """
     if not isinstance(cells, Mapping):
-        return None
+        return _NO_ANCHOR
+    refusal: str | None = None
+    refused_hold: float | None = None
     for book in books:
         prices = _anchor_pair(cells, book, sides)
         if prices is None:
             continue
+        hold = hold_pct(prices)
+        if min_books is not None and (books_quoting is None or books_quoting < min_books):
+            if refusal is None:
+                refusal, refused_hold = FAIR_ANCHOR_REFUSAL_UNCORROBORATED, hold
+            continue
+        if max_hold_pct is not None and (hold is None or hold > max_hold_pct):
+            if refusal is None:
+                refusal, refused_hold = FAIR_ANCHOR_REFUSAL_HOLD_TOO_WIDE, hold
+            continue
         probabilities = devig(prices, method=_ANCHOR_DEVIG_METHOD)
         if not probabilities or len(probabilities) != len(sides):
             continue
-        return ({str(side): probabilities[i] for i, side in enumerate(sides)}, book)
-    return None
+        return _AnchorAttempt({str(side): probabilities[i] for i, side in enumerate(sides)}, book, hold, None)
+    return _AnchorAttempt(None, None, refused_hold, refusal)
 
 
 def _resolve_fair(row: Mapping[str, Any], sides: list[str]) -> _FairResolution:
@@ -1099,16 +1229,39 @@ def _resolve_fair(row: Mapping[str, Any], sides: list[str]) -> _FairResolution:
     # mode is measured against, not only the default answer.
     consensus = _consensus_fair(cells, sides, method=devig_method)
 
+    # What the exchange tier decided when it did NOT anchor, carried onto the
+    # consensus resolution below so the refusal is visible on the row.
+    refusal: str | None = None
+    refused_hold: float | None = None
+
+    if anchor_mode in (FAIR_ANCHOR_SHARP, FAIR_ANCHOR_SHARP_ONLY):
+        attempt = _anchored_fair(cells, sides, SHARP_ANCHOR_PRIORITY)
+        if attempt.anchored:
+            return _FairResolution(
+                attempt.fair_by_side, FAIR_METHOD_SHARP_ANCHOR, attempt.book, _ANCHOR_DEVIG_METHOD, consensus,
+                anchor_hold_pct=attempt.hold_pct,
+            )
     if anchor_mode == FAIR_ANCHOR_SHARP:
-        anchored = _anchored_fair(cells, sides, SHARP_ANCHOR_PRIORITY)
-        if anchored is not None:
-            return _FairResolution(anchored[0], FAIR_METHOD_SHARP_ANCHOR, anchored[1], _ANCHOR_DEVIG_METHOD, consensus)
-        anchored = _anchored_fair(cells, sides, EXCHANGE_ANCHOR_PRIORITY)
-        if anchored is not None:
-            return _FairResolution(anchored[0], FAIR_METHOD_EXCHANGE_MID, anchored[1], _ANCHOR_DEVIG_METHOD, consensus)
+        attempt = _anchored_fair(
+            cells,
+            sides,
+            EXCHANGE_ANCHOR_PRIORITY,
+            max_hold_pct=_fair_exchange_max_hold_pct(),
+            min_books=_fair_exchange_min_books(),
+            books_quoting=_row_books_quoting(row, sides),
+        )
+        if attempt.anchored:
+            return _FairResolution(
+                attempt.fair_by_side, FAIR_METHOD_EXCHANGE_MID, attempt.book, _ANCHOR_DEVIG_METHOD, consensus,
+                anchor_hold_pct=attempt.hold_pct,
+            )
+        refusal, refused_hold = attempt.refusal, attempt.hold_pct
 
     if consensus:
-        return _FairResolution(consensus, "consensus", None, devig_method, consensus)
+        return _FairResolution(
+            consensus, "consensus", None, devig_method, consensus,
+            anchor_hold_pct=refused_hold, anchor_refusal=refusal,
+        )
 
     # SAME-BOOK fallback only. A two-sided de-vig is legitimate when both prices
     # come from ONE book -- that is what the per-book pass above does. It is the
@@ -1150,11 +1303,19 @@ def _fair_by_side(row: Mapping[str, Any], sides: list[str]) -> tuple[dict[str, f
 
     THE TIERS, in the order tried. `fair_method` names which one answered.
 
-      sharp_anchor         `SYNDICATE_FAIR_ANCHOR=sharp` only. ONE sharp book's
-                           own two sides (`sharp_books.SHARP_ANCHOR_PRIORITY`),
-                           observed together, power-de-vigged.
-      exchange_mid         `sharp` only. ONE two-sided exchange's pair, the same
-                           way (`EXCHANGE_ANCHOR_PRIORITY`).
+      sharp_anchor         `SYNDICATE_FAIR_ANCHOR=sharp` or `sharp_only`. ONE
+                           sharp book's own two sides
+                           (`sharp_books.SHARP_ANCHOR_PRIORITY`), observed
+                           together, power-de-vigged. Ungated.
+      exchange_mid         `sharp` only -- `sharp_only` has no exchange tier.
+                           ONE two-sided exchange's pair, the same way
+                           (`EXCHANGE_ANCHOR_PRIORITY`), and ONLY when the pair
+                           is TIGHT (own hold <= `SYNDICATE_FAIR_EXCHANGE_MAX_HOLD_PCT`,
+                           4.0) and CORROBORATED (row `books_quoting` >=
+                           `SYNDICATE_FAIR_EXCHANGE_MIN_BOOKS`, 3). A refused
+                           row falls through and names the gate in
+                           `fair_anchor_refusal`; see the `FAIR_EXCHANGE_*`
+                           block for the production reading that made these.
       consensus            `#384` -- de-vig EACH book against itself, then the
                            MEDIAN per selection across books. THE DEFAULT, and
                            the whole chain from here down is unchanged.
@@ -2195,6 +2356,13 @@ def build_layer2_rows(
                 "fair_anchor_book": fair_resolution.anchor_book if fair is not None else None,
                 "fair_devig_method": fair_resolution.devig_method if fair is not None else None,
                 "fair_consensus_prob": fair_resolution.consensus_by_side.get(side),
+                # P1b. The hold of the pair the anchor tiers evaluated -- the
+                # anchor's on `sharp_anchor`/`exchange_mid` rows, the refused
+                # exchange's when `fair_anchor_refusal` names a gate -- so the
+                # next reading can be cut by hold without a rerun. Both None
+                # under `median`, and None where no anchor pair was fresh.
+                "fair_anchor_hold_pct": fair_resolution.anchor_hold_pct,
+                "fair_anchor_refusal": fair_resolution.anchor_refusal,
                 # `#382`. The margin model measures each book's hold on the GRID
                 # (which still holds every leg) and stamps it at
                 # `modelled_fair[side].assumed_hold_pct`. This fan-out copies a
