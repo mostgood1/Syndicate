@@ -26745,3 +26745,61 @@ anything on web** — `#564`'s own comment already measured inter-publish gaps o
 **verify:** the inline path's FLOOR falls below 1 s and the stale-serve count
 matches processes x (rounds - 1) — **PASSING**, 648 ms and 4 of 4 predicted.
 The route's >=5 s share does NOT clear the budget and is NOT claimed to.
+
+---
+
+## 2026-09-08 04:21:24Z — refresh-worker `5b459411` → `a828a5a4` — **MEASURED: chip publish gaps 24.1 min → ~135 s (10.7x). Cost: +14% unreclaimable. One tuning flaw of my own found.** `[lane web-oom-profiler-steady]`
+
+`dep-dafop30n74is73avk970`, preflight CLEAR, claim held. Waited ~56 min for a
+window rather than killing an MLB sim, an odds refresh and a board build; the
+claim expired during the wait and was re-acquired.
+
+**THE RESULT — per date, which is the only denominator that means anything here
+(the endpoint reads exactly one date):**
+
+    arm      gaps for date=2026-09-07
+    BEFORE   n=13  median 24.1 min   range 12.6-32.2
+    AFTER    133.6 s, 137.2 s, 133.1 s
+
+**10.7x.** `CHIP_PUBLISHER_THREAD_STARTED interval_s=120.0` at 04:22:05, first
+publish 13 s later, 256 chips, correct date.
+
+**REACHABILITY WAS THE RISK AND IT WAS MEASURED, NOT ASSUMED.** I first wired the
+publish into the worker's loop tick. Then I read that tick's real frequency —
+**1-18 min, median ~15**, because it blocks on the board build — so publishing
+from there would have inherited the exact cadence being fixed AND LOOKED LIKE A
+FIX. The tick now only bootstraps a daemon thread with its own clock.
+
+**THE COST, measured like-for-like rather than against an idle baseline:**
+
+    container_memory_unreclaimable_mb   pre-deploy      post-deploy
+    (during board builds, n=60 / n=51)  median 1731     median 1971   +14%
+                                        max    1842     max    2159   +17%
+
+**My first baseline was 1014.8 MB and would have overstated this ~3.5x** — it was
+an IDLE reading against a during-build one. `container_memory_headroom_mb` reads
+33-91 MB throughout and is the known-misleading field (it counts reclaimable page
+cache); the unreclaimable figure is the one that binds. At the 2159 MB peak,
+effective headroom is ~1937 MB against the board-build guard's **900 MB** floor —
+a 2.2x margin. **No `server_failed`, no restarts, no `DEFERRED_BOARD_BUILD`.**
+Build cost is 11.6-17.1 s per publish, so ~10-14% duty cycle.
+
+**A TUNING FLAW OF MINE, found by probing web end to end:**
+
+    artifact_age=102.8 111.2 119.6  -> worker_artifact       232/515/303 ms
+    artifact_age=128.0 141.4        -> inline_artifact_stale  5391/505 ms
+
+**A publisher whose interval EQUALS the reader's freshness threshold is stale for
+part of every cycle.** Gaps are ~135 s (120 s interval + up to 30 s poll
+granularity) against a 120 s threshold, so the tail of each cycle still fans out.
+I wrote "120 s matches the endpoint's own threshold" in the module docstring as
+if that were a virtue; it is the defect. Two ways to close it, NOT yet chosen:
+lower the publish interval below the threshold (more worker duty, on a service
+already +14%), or raise `SYNDICATE_GAME_CHIP_ARTIFACT_MAX_AGE_SECONDS` on web
+from 120 to ~180 (no worker cost, scoreboard ~20 s staler, needs a web deploy to
+take effect).
+
+**verify:** per-date `GAME_CHIPS_PUBLISHED` gaps under 3 minutes — **PASSING** at
+~135 s, from 24.1 min. Web serving `source=worker_artifact` on every request —
+**NOT yet passing**, ~60% of probes, blocked on the interval/threshold mismatch
+above.
