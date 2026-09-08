@@ -2041,7 +2041,11 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   with **zero rules lost** — every consolidated original recoverable VERBATIM,
   and every rule still reachable from `learnings_index.md` afterwards.
 - Files: `.syndicate/learnings.md`, `.syndicate/learnings_index.md`,
-  `.syndicate/learnings_archive_2026-09-08.md` (NEW), `.syndicate/leads.md`
+  `.syndicate/learnings_archive_2026-09-08.md` (NEW), `.syndicate/leads.md`,
+  `scripts/build_learnings_index.py` **[ADDED 2026-09-08 mid-lane — an out-of-area
+  write that SERVES the goal, which is `scope-guard`'s "goal" branch: verification
+  item (4) requires every folded rule to stay reachable from the index, and the
+  generator did not span dated archives, so the goal was unreachable without it]**
   (collision-checked 2026-09-08 with `lane_claims.matches()`: all free; `leads.md`
   is this session's own lane. **NOTE: every path here is `lane_claims.is_exempt`,
   so these claims guard NOTHING — `.syndicate/` is exempt from `lane-guard` by

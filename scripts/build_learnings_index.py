@@ -8,7 +8,7 @@ between the markers; every rule body is untouched.
 
 Run after appending a rule:  py -3 scripts/build_learnings_index.py
 """
-import io, re, sys
+import glob, io, os, re, sys
 
 PATH = ".syndicate/learnings.md"
 EVIDENCE = ".syndicate/learnings_evidence.md"
@@ -88,6 +88,30 @@ def main():
         if h not in seen:
             entries.append((h, ARCHIVE_LINK))
             seen.add(h)
+
+    # AND EVERY DATED CONSOLIDATION ARCHIVE, for the same reason a third time.
+    #
+    # A CONSOLIDATION pass -- 2026-08-20, "ONE ERROR IN FIVE GUISES" -- folds
+    # several entries into one and moves the originals VERBATIM to a dated file,
+    # `learnings_archive_2026-08-20.md`. That file was never spanned here, so all
+    # FIVE of its rules left the index on the day they were archived. Measured
+    # 2026-09-08: not one of the five appears in `learnings_index.md`.
+    #
+    # This is the failure this function's own comment warns about ("a rule you
+    # cannot find is a rule you will break again") landing on the ONE operation
+    # most able to cause it. Compaction never removes a heading from
+    # `learnings.md`; consolidation is the only pass that does, so it is exactly
+    # the pass whose output must stay indexed.
+    for path in sorted(glob.glob(".syndicate/learnings_archive_*.md")):
+        try:
+            txt = io.open(path, encoding="utf-8").read()
+        except OSError:
+            continue
+        link = os.path.basename(path)
+        for h in _headings(txt):
+            if h not in seen:
+                entries.append((h, link))
+                seen.add(h)
 
     if not entries:
         print("no rule headings found; refusing to write an empty index")
