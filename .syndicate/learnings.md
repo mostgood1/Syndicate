@@ -4496,3 +4496,42 @@ did not cover in my head: **a persisted baseline FILE**, not a worktree.
   remembered "before" is not a baseline — and the flag that makes the A/B
   possible must be used, not merely shipped.
 - Cost: one wrong claim to the user, retracted in the next message.
+
+
+### 2026-09-08 — FORBIDDEN: pushing `render.yaml` without first ENUMERATING the live env of all three services. It is 166 keys behind production.
+
+- What we believed: `render.yaml` describes production, so adding one gunicorn
+  flag to it is a one-line change whose blast radius is that flag.
+- What was actually true, measured key-by-key against
+  `/v1/services/<id>/env-vars` (paginated at 100; `limit` > 100 returns 400):
+
+      service            yaml   live   sync would DELETE   would CHANGE
+      web (syndicate)      52     84          33                1
+      refresh-worker       84    161          77                1
+      live-odds-worker     76    132          56                1
+
+  **A `blueprint_sync` would delete 166 live env vars and overwrite
+  `ODDS_API_KEY` on all three services with a different value.** Among the
+  deletions: `SYNDICATE_EXECUTION_MODE=live`, `SYNDICATE_EXECUTION_LIVE_ARMED=1`,
+  and the spend caps of a LIVE-MONEY execution system
+  (`MAX_ORDER_DOLLARS=10`, `MAX_DAY_DOLLARS=40`, `..._ALL_VENUES=150`), plus
+  sport intervals, segment markets and backfill windows. The caps do have code
+  defaults so deletion is not "unlimited" — but it silently rewrites a
+  live-money configuration that nobody has enumerated.
+- How we found out: by running CLAUDE.md's own pre-push enumeration instead of
+  treating it as boilerplate. It took one script and it was the difference
+  between a one-line flag and a three-service configuration rewrite.
+- The rule going forward: **`render.yaml` is not a description of production;
+  it is a 166-key-stale proposal to REPLACE production.** Nobody may push it
+  until the drift is reconciled INTO the file. Until then, treat any
+  render.yaml edit as blocked, and reach production config through the
+  SINGLE-KEY env endpoint (`PUT /v1/services/<id>/env-vars/<KEY>`), which
+  writes exactly one key and fires no sync. The bulk `PUT /env-vars` is the
+  same failure mode by hand and must not be used either.
+- Worked example, same evening: the gunicorn `--max-requests` fix web needed was
+  delivered by setting `GUNICORN_CMD_ARGS` as a single env key (84 -> 85 keys,
+  verified, nothing else touched) instead of editing the startCommand in
+  `render.yaml`. Identical effect, no sync, revertible by deleting one key.
+- Cost: none, because the enumeration ran first. Had it not, the cost would have
+  been a live-money system's configuration and every sport's tuning, hours
+  before the NFL season opener.
