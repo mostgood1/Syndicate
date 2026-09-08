@@ -30008,3 +30008,91 @@ lost no protection and no open lane left the session-start digest.
   so smoothing the point estimate BEFORE the SE over-widens the bar.
 - Verification RAN: reachability (`off != on`) through the real `attach_soccer_projections` and through `_model_edge_for`; 847 tests pass across the affected surface; the 2 failures in `test_layer2_lane_chip_join.py` are PRE-EXISTING (re-run with this change stashed, identical). Before/after withheld counts measured on `/api/board/layer2-shortlist?sport=soccer`, not on the local mirror.
 - Blocked by: none.
+
+
+## SUPERSEDED LANE BLOCKS MOVED FROM `lanes.md` — 2026-09-08
+
+Moved verbatim by `scripts/trim_lane_blocks.py`; nothing summarised or
+deleted. Every block here was NEITHER claim-bearing NOR reading OPEN at move
+time, verified against `lane-guard.py`'s own `_claims()` — so `lane-guard`
+lost no protection and no open lane left the session-start digest.
+
+### web-oom-trim-ab — CLOSED 2026-09-07 — opened 2026-09-07 — **OFF ARM COMPLETE, ON ARM NOT RUN, AND THE QUESTION IS NO LONGER THE RIGHT ONE.** OFF: pid 79 glibc `390.6` pymalloc `198.1` anon `592.0` (n=44); pid 78 glibc `378.5` pymalloc `194.8` anon `576.0` (n=44); no restart in window. The ON arm was halted BEFORE deploying because checking whether my deploy had broken web turned up `UPDATE 37`: **35 `server_failed` events, ZERO `evicted=True`** — web is failing 5-second HEALTH CHECKS, not being OOM-killed, and has been since 2026-08-26. `malloc_trim` holds the malloc lock ~14 ms per call, so enabling it on a service whose failures are latency would push the real failure mode the WRONG way. Flag left at `0`; harness (`scripts/malloc_trim_ab.py`) is rewritten and runnable with a pymalloc CONTROL term if the question is ever revived. Superseded by the latency investigation. — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703
+- Goal: settle whether automatic `malloc_trim` is NET-POSITIVE on web — the
+  measurement owed since the 2026-09-06 retraction.
+- Files: `scripts/malloc_trim_ab.py` (rewritten `fd0ce9c6`). No runtime code
+  changes; the trim already ships inert behind `SYNDICATE_MALLOC_TRIM_AUTO`.
+- **WHY THIS IS OWED.** The trim was enabled on 2026-09-06 and its headline —
+  *"without the trims the container would have reached ~2,361 MB"* — was
+  RETRACTED the same evening: it was built entirely from the intervention's own
+  instrumentation while the intervention ran. The counterfactual was never
+  observed. This observes it.
+- **THE HARNESS WAS REWRITTEN FIRST, because the original could not have
+  worked.** It gated on REQUEST COUNT and judged on container unreclaimable.
+  `UPDATE 34` proved both insufficient: `UPDATE 33` passed a 14% request-count
+  gate and 47% of its difference sat in memory the intervention could not touch.
+- **CONTROL TERM: pymalloc.** The trim returns glibc pages; it CANNOT touch
+  pymalloc arenas. If they differ >10% between arms, the workload differed and
+  the comparison is refused BEFORE the primary is printed. Plus a per-worker
+  overlap check — overlapping ranges give a direction, never a magnitude.
+- **BOTH ARMS GET A DEPLOY.** Web already runs `TRIM_AUTO=0`, so the OFF arm
+  could have used the live process — but the ON arm needs a restart, and an old
+  process against a fresh one lets the arena's ramp-then-plateau bias whichever
+  arm is younger. Same process-age structure or no comparison.
+- Hypothesis: the trim lowers the glibc arena materially. Falsified if the arena
+  is unchanged (<25 MB) — then it moves memory without lowering what the process
+  holds, and the flag stays OFF.
+- Verification: both arms, no restart inside either window, control within 10%,
+  and a stated per-worker spread.
+- **KNOWN COST:** ~84 min of held web claim (12-min settle + 30-min window per
+  arm) plus two deploys. Web takes a deploy every 20-30 min normally, so the
+  claim must be held and peers told why.
+- Blocked by: none.
+
+### soccer-model-edge-basis-label — CLOSED 2026-09-07 — session 28c6162b-58c8-4937-99f5-d3b260a96de4 — **LANDED `cee667e5` on origin/main. NOT DEPLOYED — diagnostic only, so it rides the next deploy rather than earning one. `model_edge_basis` now calls `_three_way_leg_edge` so the label and the number cannot disagree; `fair` threaded to its one call site, optional so two-way callers are untouched. Verified off != on (the by-construction test fails "priced away at 10.1339 with no basis" without it); 912 pass across the affected surface. Cause and severity in the commit message; found by reading the DEPLOYED board, not by a test.**
+- Goal: `model_edge_basis` returns `market_fair` for a three-way leg priced by
+  `_model_edge_for`'s three-way branch. Today it returns None on a genuinely
+  market-priced edge — 4 of 77 served soccer moneyline rows.
+- Files: `syndicate/features/shared/layer2_board.py`
+  (**`model_edge_basis` and its ONE call site at ~2117 ONLY**),
+  `tests/test_modelled_fair_edge_reachability.py`.
+- Cause, and it is mine: `62937ea4` made `_model_edge_for` return a market-priced
+  edge in the case where `edge_vs_market_pct IS None` (home leg withheld by the
+  precision gate). `model_edge_basis` decides `market` off that same field being
+  non-None, and `_modelled_fair_edge_for` is side-matched so it declines too —
+  so the label falls through to None. Same family as the `62937ea4` postmortem,
+  introduced while fixing it.
+- SEVERITY: DIAGNOSTIC ONLY. `model_edge_basis` is written to the payload and
+  read by NOTHING in .py/.html/.js except its own tests — grepped. No pricing,
+  ranking or execution path is affected; the edge VALUE is correct.
+- Verification: the 4 affected rows (SC Telstar away +4.52, FC Porto draw +5.47,
+  Braga draw -5.20, PSG@Brest away -5.95) carry `model_edge_basis=market_fair`,
+  and a test that the basis agrees with `_model_edge_for` by construction.
+- Blocked by: none.
+
+### publish-refusal-201-triage — CLOSED 2026-09-07 — session 28c6162b-58c8-4937-99f5-d3b260a96de4 — **ANSWERED: NOT data loss and NOT the `#488` shape. `verdict=REFUSED` is the verdict function’s opinion, printed before the caller decides; `#630`’s `if refuse and not will_merge` exempts merged families and `will_merge` is True for EVERY refused path (predicate run against the real log paths). 819 odds_history merges over 2h, all merged. HYPOTHESIS CONFIRMED as written. **The real cost is different and larger: 2.22 GB/hour of publishes, 785 of 819 merges adding ZERO markets** — refresh-worker republishes a ~74-75% subset every ~2.3 min across 16 paths. NOT pure waste (34 merges added 1-84 markets; the merge PREVENTS the `#488` clobber and must stay). Findings `bcf33ccf`, handed to lane `ncaaf-live-resim-wire` which owns the files. Read-only; no claim taken, nothing edited.**
+- Goal: say whether the ~201/hour `verdict=REFUSED` publish-divergence lines on
+  soccer `odds_history` are DATA LOSS or LOG NOISE, and name the evidence.
+  DIAGNOSTIC ONLY — `ops.py` and `artifact_publisher.py` are held by lane
+  `ncaaf-live-resim-wire`; I claim NOTHING and will hand any fix to them.
+- Files: NOT CLAIMED — read-only. Findings go to
+  `.syndicate/findings_2026-09-07_publish_refusal_201.md` (new, mine).
+- Reported by lane `soccer-unfed-inputs` (session 520cd594): 201
+  `verdict=REFUSED` in the hour BEFORE their deploy, `refresh-worker` vs
+  `live-odds-worker` alternating on soccer `odds_history`, continuously — the
+  `#488` incident shape still at volume.
+- HYPOTHESIS (written before testing): **these are LOG NOISE, not refusals.**
+  `_publish_divergence_verdict` builds the marker string — including the literal
+  `verdict=REFUSED` — and returns `should_refuse=True`, but the CALLER
+  (`_publish_streamed_body`, ~line 109) acts on it only via
+  `if refuse and not will_merge:`. `#630` deliberately exempts merged families,
+  and `is_mergeable_odds_history` makes these paths one. So the line reports the
+  verdict FUNCTION'S opinion, not the outcome; the publish then merges.
+- FALSIFICATION: if any of those publishes returned the HTTP refusal
+  (`ok:false`, "publish refused: would replace a larger artifact"), or if the
+  on-disk odds_history for those paths is missing one publisher's rows, the
+  hypothesis is WRONG and this is real loss.
+- Verification: pair the REFUSED lines against `ARTIFACT_MERGE` /
+  `ARTIFACT_MERGE_DEFERRED` for the SAME path+timestamp, and read the HTTP
+  status the publisher got. The response is decisive; the log line is not.
+- Blocked by: none.
