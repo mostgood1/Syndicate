@@ -16601,6 +16601,28 @@ def _live_mc_bail(reason: str, detail: str = "") -> None:
     print(f"[live_mc] LIVE_MC_BAIL reason={reason}{(' ' + detail) if detail else ''}", flush=True)
 
 
+def _lane_has_live_mc_first5(live_mc_projection: Optional[Dict[str, Any]]) -> bool:
+    """Did the live MC actually answer for the first five innings?
+
+    ONE predicate, read in four places (the projection branch, the probability
+    branch, the source stamp and the `simsRun` stamp), because those four must
+    agree. A lane that takes the MC's distribution but keeps the interpolation's
+    probability -- or worse, takes either and is still labelled
+    `segment_projection` -- is the shape of bug this file has paid for before:
+    `simsRun` was once published as `None` beside `source: "live_mc"`, and the
+    gate downstream had no trial count to open with.
+
+    Both clauses are required. `first5Available` is False past the fifth inning,
+    and the probability can still be None inside an available window if the sim
+    produced no trials -- absent must not take the permissive branch.
+    """
+    if not isinstance(live_mc_projection, dict):
+        return False
+    if not live_mc_projection.get("first5Available"):
+        return False
+    return live_mc_projection.get("first5HomeWinProb") is not None
+
+
 def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optional[Dict[str, Any]], *, date_str: Optional[str] = None) -> Optional[Dict[str, Any]]:
     if not isinstance(snapshot, dict) or not isinstance(sim_context, dict):
         _live_mc_bail("no_snapshot_or_sim_context")
@@ -16720,6 +16742,49 @@ def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optiona
         "awayWinProb": round(float(result.away_win_prob), 4),
         "closed": False,
         "source": "live_mc",
+        # ------------------------------------------------------------------
+        # THE FIRST FIVE INNINGS, off the SAME sims (`estimate_live` reads them
+        # from `GameResult.away_inning_runs`/`home_inning_runs`, which it
+        # already had). Carried here so the `first5` LANE can stop being an
+        # interpolation.
+        #
+        # WHAT IT REPLACES. Today a `first5` lane's `modelHomeWinProb` comes
+        # from `_live_margin_win_prob` over `_segment_projection` -- a LINEAR
+        # SCALING OF PREGAME MEANS (`mean * innings/9`, less expected-to-date,
+        # plus actual runs) that reads no bases, no outs, no inning and no
+        # pitcher. Measured on production 2026-09-07: gamePk 823902 published
+        # `first5 0.3242` from exactly that arithmetic.
+        #
+        # The interpolation is not merely weak, it is UNPRICEABLE: it carries no
+        # `simsRun`, so `sqrt(p(1-p)/n)` has no `n` and the
+        # publish-refuse-to-price gate has no interval to clear. These fields
+        # carry the trial count with them, which is the whole point.
+        #
+        # `first5Available` is False once the game is past the fifth -- the sim
+        # holds no line score for innings 1-5 on such a start, only padded
+        # zeros. Absent rather than wrong.
+        "first5Available": bool(getattr(result, "first5_available", False)),
+        "first5HomeWinProb": (
+            round(float(result.first5_home_win_prob), 4)
+            if getattr(result, "first5_home_win_prob", None) is not None else None
+        ),
+        "first5AwayWinProb": (
+            round(float(result.first5_away_win_prob), 4)
+            if getattr(result, "first5_away_win_prob", None) is not None else None
+        ),
+        # PUBLISHED, NOT FOLDED. Five innings end level often and an F5 market is
+        # commonly three-way or a push, so the consumer needs the tie mass rather
+        # than a two-way normalisation baked in here.
+        "first5TieProb": (
+            round(float(result.first5_tie_prob), 4)
+            if getattr(result, "first5_tie_prob", None) is not None else None
+        ),
+        "first5Total": (
+            round(float(result.first5_avg_total_runs), 2)
+            if getattr(result, "first5_avg_total_runs", None) is not None else None
+        ),
+        "first5TotalRunsDist": getattr(result, "first5_total_runs_dist", None) or {},
+        "first5MarginDist": getattr(result, "first5_margin_dist", None) or {},
         # Carried so the live PROP rows can price off the same 120 sims that
         # produced the numbers above, instead of falling back to the pregame
         # distribution for their P(over).
@@ -16926,6 +16991,33 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
                 "marginDist": live_mc_projection.get("marginDist") or {},
                 "closed": False,
             }
+        elif is_live and lane["key"] == "first5" and _lane_has_live_mc_first5(live_mc_projection):
+            # THE SAME SUBSTITUTION, FOR THE ONE SEGMENT THE SIM CAN NOW ANSWER.
+            #
+            # The comment above says these histograms describe the FULL
+            # remaining game, "so putting them on a `first3`/`first5` lane would
+            # price a full-game distribution against a segment market". That was
+            # correct and is why this is a SEPARATE branch reading SEPARATE
+            # fields: `first5TotalRunsDist` and `first5MarginDist` are scoped to
+            # innings 1-5, computed by `estimate_live` from each sim's own
+            # per-inning runs. Nothing full-game reaches a segment lane here.
+            #
+            # `first3`/`first1` deliberately stay interpolated: the readout
+            # exists only for five innings so far, and inventing the other two
+            # from this one would reintroduce exactly the mismatch above.
+            f5_margin = live_mc_projection.get("first5HomeMargin")
+            projection = {
+                # Per-side means are NOT published for the segment: the readout
+                # counts wins/ties and totals, and splitting a total into two
+                # side means would be a second estimator nobody has checked.
+                "away": None,
+                "home": None,
+                "total": _safe_float(live_mc_projection.get("first5Total")),
+                "homeMargin": _safe_float(f5_margin),
+                "totalRunsDist": live_mc_projection.get("first5TotalRunsDist") or {},
+                "marginDist": live_mc_projection.get("first5MarginDist") or {},
+                "closed": False,
+            }
         baseline_probs = predictions.get(lane["key"]) if isinstance(predictions.get(lane["key"]), dict) else {}
         baseline_home_prob = None
         if baseline_probs:
@@ -16938,6 +17030,10 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
         model_home_prob = _live_margin_win_prob(projection.get("homeMargin")) if not projection.get("closed") else None
         if is_live and lane["key"] in {"live", "full"} and isinstance(live_mc_projection, dict):
             model_home_prob = _safe_float(live_mc_projection.get("homeWinProb"))
+        elif is_live and lane["key"] == "first5" and _lane_has_live_mc_first5(live_mc_projection):
+            # The MC's own first-five home-win probability, replacing
+            # `_live_margin_win_prob` over an interpolated margin.
+            model_home_prob = _safe_float(live_mc_projection.get("first5HomeWinProb"))
 
         lane_markets = _game_lens_markets_for_lane(markets, str(lane["key"]))
         h2h = lane_markets.get("h2h") if isinstance(lane_markets.get("h2h"), dict) else {}
@@ -17015,6 +17111,19 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
             and lane["key"] in {"live", "full"}
             and isinstance(live_mc_projection, dict)
         )
+        # A SEPARATE PREDICATE, AND A SEPARATE SOURCE LABEL, ON PURPOSE.
+        # `_lens_rows_have_live_state_signal` tests `source == "live_mc"` to
+        # answer "did the FULL-GAME live re-sim run on this game", and a merge
+        # decision hangs off that answer. A first5 lane must not make that
+        # question read True, so it is stamped `live_mc_first5` and the existing
+        # test is untouched. It also keeps the join able to accept the segment
+        # lane WITHOUT accepting the bail-out `segment_projection` population,
+        # which the same label would otherwise conflate.
+        lane_is_live_mc_first5 = bool(
+            is_live
+            and lane["key"] == "first5"
+            and _lane_has_live_mc_first5(live_mc_projection)
+        )
         rows.append(
             {
                 "key": lane["key"],
@@ -17025,8 +17134,21 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
                 "progress": progress,
                 "baselineHomeWinProb": baseline_home_prob,
                 "modelHomeWinProb": model_home_prob,
-                "simsRun": (live_mc_projection.get("simsRun") if lane_is_live_mc else None),
-                "source": str(live_mc_projection.get("source") or "live_projection") if lane_is_live_mc else ("segment_projection" if lane["key"] != "live" else "live_projection"),
+                # `simsRun` now reaches the first5 lane too -- and ONLY when the
+                # MC actually answered for it. The note above ("stamping 120
+                # there would make an interpolation look exactly as precise as a
+                # real re-sim") is the reason this is conditional rather than
+                # widened: when `lane_is_live_mc_first5` is False the lane is
+                # still the interpolation and still gets None.
+                "simsRun": (
+                    live_mc_projection.get("simsRun")
+                    if (lane_is_live_mc or lane_is_live_mc_first5) else None
+                ),
+                "source": (
+                    str(live_mc_projection.get("source") or "live_projection") if lane_is_live_mc
+                    else "live_mc_first5" if lane_is_live_mc_first5
+                    else ("segment_projection" if lane["key"] != "live" else "live_projection")
+                ),
                 "markets": {
                     "moneyline": moneyline_market,
                     "spread": spread_market,
