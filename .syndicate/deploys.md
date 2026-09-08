@@ -27973,3 +27973,32 @@ blockers.
 Caveat inherited from the deploying lane: its NFL prop-artifact repair is a race
 it won by ~66 s on this boot; an empty NFL prop board after a future boot is that,
 not this lane.
+
+### live-odds-worker b9f088de — pricing-plane-v1 deploy 1 complete on all three services: flags absent, the tape keeps writing `[lane pricing-plane-v1, deploy dep-dag837h5efls73fgnfrg, fired 2026-09-08T21:43:58Z, live 21:50:19Z, substrate render]`
+
+Main commit b9f088de (live was 57052784, a peer's 20:43Z deploy; every
+pricing-plane commit is an ancestor). Preflight CLEAR between odds cycles after
+a 45 s poll (two earlier reads held on `refresh_odds_sources` children and were
+waited out; the drain path is unavailable from this machine because the
+workers' keyvalue URL only exists on Render). Claim held by restore-measurement.
+No env change; every pricing-plane flag absent on the service.
+
+**verify — PASSING.** Boot clean (infra processes + one defunct child awaiting
+reap). First post-boot sweep `ODDS_SWEEP_LAUNCHED date=2026-09-08 sports=soccer
+count=1` at 21:57:48Z; `Traceback` since boot: 0. Tape growth across that sweep,
+mtimes read from `/api/ops/artifacts/export?names_only=1`:
+
+    soccer_source/tracking/book_quotes/2026-09-08.jsonl   3,608,504 B @21:42:51Z  ->  3,610,468 B @22:05:14Z
+    mlb_source/tracking/book_quotes/2026-09-08.jsonl     27,364,388 B @21:43:22Z  -> 27,410,641 B @22:05:15Z
+
+So the odds path still appends under the new code. This service's pricing-plane
+surface is the WNBA sim's `market_anchor` block (P3) and nothing else of P1-P5
+runs here; that block is read on the next WNBA sim, which needs a WNBA slate
+(none on 09-01..09-08 per the final-boxscore endpoint).
+
+**DEPLOY 1 IS COMPLETE:** web 1cdf5c17 (peer, 19:49Z), refresh-worker 66516b2b
+(peer at this lane's request, 21:34Z, board verified: 1,731 rows stamped, 0
+anchor-tier, median == fair 1,532/1,532), live-odds-worker b9f088de (this
+entry). Every flag absent everywhere. Deploy 2 (`SYNDICATE_FAIR_ANCHOR=sharp`
+on refresh-worker) waits for a user decision and its own same-instant reading.
+Claim released after this entry.
