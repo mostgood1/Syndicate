@@ -112,3 +112,59 @@ the post-deploy number must be compared against.
 The watcher's parting line ("next step is `teams_match` on these leagues' club
 names") was retired in the same pass — a false lead left in a log that a future
 session reads is worse than no lead.
+
+---
+
+## PARTIAL READING AFTER THE FIX — 0 of 43, and it does NOT support the fix
+
+**2026-09-08 ~19:52Z. BELOW THE SIX-FIXTURE FLOOR (5 of 6), so this is a SIGNAL,
+NOT A VERDICT.** Recorded because the alternative — leaving the handoff reading
+"pending" — would let the next session assume the fix is probably fine.
+
+```
+post-deploy (recorded_at >= 2026-09-08T19:18:19)
+  fixtures                5/6
+  spreads rows            43
+  with market_fair_prob   0/43  = 0.0%
+  CONTROL h2h            43/43
+  reasons                 no_two_sided_market_price: 43
+```
+
+**Against the pre-fix baseline of 0/37 across 6 fixtures, this is unchanged.**
+
+**The obvious escape hatch is CLOSED: it is not a wrong-service deploy.** All
+three services were checked and every one contains `6ff8f47b`:
+
+```
+live-odds-worker  5e84b758  live 19:49:46Z   contains 6ff8f47b: YES
+refresh-worker    aedb66c9  live 19:58:07Z   contains 6ff8f47b: YES
+web               b4f4c790  live 19:49:04Z   contains 6ff8f47b: YES
+```
+
+(refresh-worker moved off my `5ad2459a` at 19:58Z when another lane deployed
+`aedb66c9`; the fix survives, being an ancestor of both.)
+
+**So the honest state is: the fix is live everywhere, and soccer spreads are
+still refusing every row for the reason the fix was supposed to eliminate.**
+
+**What the next session should NOT do:** re-open the club-name vocabulary.
+`teams_match` is exonerated twice over, and the control here says so again —
+h2h resolved **43/43** on the same fixtures, through the same
+`_canonical_side_view`.
+
+**What to check first, in this order:**
+1. **Is `_canonical_line` actually on the path these rows take?** Presence in
+   the deployed tree is not reachability. Assert the branch executes — the
+   `book_grid` grouping may not be what the soccer ledger's de-vig consumes at
+   all, which would make `6ff8f47b` correct and IRRELEVANT rather than wrong.
+2. **Is `_row_selection_is_home` returning False in production?** It swallows
+   every exception from `teams_match` and falls through to `False`. A raising
+   import or matcher would produce EXACTLY this signature — silently, with no
+   log line. That is a `unknown-must-not-default-permissive` shape and it is my
+   own code.
+3. Only then reconsider the sign model itself.
+
+**Do not read this as the fix being wrong.** Read it as: 43 rows across 5
+fixtures give no evidence it worked, one of the two most likely explanations is
+a defect in the fix's own error handling, and the six-fixture verdict was never
+taken.
