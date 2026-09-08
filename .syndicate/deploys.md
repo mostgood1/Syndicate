@@ -27804,3 +27804,72 @@ worker's local copy correct makes any republisher harmless — but the mechanism
 is unpinned and should not be described as "a periodic sweep" without checking.
 
 Claim still HELD for the follow-up deploy; released after it.
+
+
+---
+
+## 2026-09-08 21:04-21:07Z — web `b4f4c790` -> `1cdf5c17` — lane `nfl-props-autorun-e2e`
+
+USER-REPORTED, then measured: *"all props are ATD, we are missing everything
+else"* on the main NFL game cards.
+
+**verify: PASSING, and it was THREE defects, not one.** Read from the served
+`/nfl/api/cards` before and after, as rates over the 16 week-1 games:
+
+| reading | before | after |
+|---|---|---|
+| markets in `shared_prop_rows` | `{Anytime TD: 128}` | `{ATD 41, Passing Yds 32, Receiving Yds 28, Receptions 20, Rushing Yds 7}` |
+| games showing BOTH teams | **0 / 16** | **16 / 16** |
+| rows carrying `projected` | **0 / 128** | **93 / 128** |
+
+None of this was a data gap: the artifact carried 9 markets and real
+projections for the same players in the same week, and `/nfl/props` was
+serving them at the same instant.
+
+**The three causes were independent, which is why the symptom looked like one
+thing.**
+
+1. **A SORT, not a filter.** Selection ordered by `(priority_index, price)`
+   while `_build_prop_rows` caps at 8, so the FIRST market in
+   `_NFL_CARD_PROP_PRIORITY` drained every slot on every card, every time. A
+   strict priority order over a hard cap is a filter. Now round-robins markets.
+2. **HOME NEVER APPEARED.** `_build_prop_rows` walks away-then-home and returns
+   as soon as it holds 8, so any away list of 8+ leaves home with NOTHING. This
+   was invisible in the user's report (which named the market, not the team) and
+   only showed up on a per-game team split. Fixed by capping 4 per side — half
+   the shared budget — rather than touching `_build_prop_rows`, which every
+   other sport shares.
+3. **NO MODEL OUTPUT.** Rows were built from the raw odds capture and never
+   joined to the projection artifact, so `projected`/`confidence` were null on
+   all 128 while the same players had real numbers on `/nfl/props`.
+
+**The 35 rows still without `projected` are CORRECT, not a shortfall.** They are
+players with no artifact row — week-1 cold start, no prior-season data — and
+render absent rather than as a fabricated number.
+
+**Deliberately NOT displayed: `sim_projection`.** For
+`passing_yards::patrick mahomes` the artifact holds `projected_value=256.2` (the
+projected stat) and `sim_projection=0.716` (P(over) for ONE quoted line). The
+artifact has **no `line` field** and several rows share a market key with
+different lines, so a `sim_projection` cannot be attributed to the line a card
+happens to show. Rendering it would print a probability against the wrong
+number — the kind of error that looks like a feature.
+
+**CHECKED AND CLEARED, recorded so nobody re-opens it:** `A.J. Brown` on NE and
+`Rashid Shaheed` on SEA read as mis-attribution against 2025 rosters. They are
+not. The odds capture (19 and 23 rows, all tagged `New England Patriots @
+Seattle Seahawks`) and the roster snapshot (`A.J. Brown -> NE`,
+`Rashid Shaheed -> SEA`, 2,906 entries) INDEPENDENTLY agree, so
+`nfl_prop_recommendations_for_matchup`'s team check is behaving exactly as its
+docstring claims. The suspicion was recall, not evidence.
+
+**Collateral, benign:** the deploy restarted web and the board watcher recorded
+`rank_cards=ERR` at 21:06:08Z, recovering to 1,664 at 21:08:10Z. The dip is
+gunicorn restarting, NOT the artifact — the count moved 1,703 -> 1,664 because
+the odds capture refreshes underneath a fixed 980-row projection artifact, so
+the join total drifts.
+
+This deploy also carried another lane's `pricing-plane-v1` (`1cdf5c17`,
+`3a2f40bb`, `a87b5863`), which is flag-gated and defaults to today's median.
+
+Claim released after this entry.
