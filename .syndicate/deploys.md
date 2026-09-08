@@ -27626,3 +27626,79 @@ reader's view, not this change, and was not chased here.
 
 Not yet in production on web: 6eacbe05 (the `linescores_2*.json` allowlist
 entry, WP1c) — export/mirroring only; grading is worker-local and unaffected.
+
+### refresh-worker aedb66c9 (peer deploy) — restore-measurement's worker code is LIVE; two readings taken tonight, four owed to tomorrow's daily runs `[lane restore-measurement, 2026-09-08T20:0xZ]`
+
+The deploy itself was taken by lane `nfl-props-precompute` (dep-dag6ernf3r2c73a4ceeg,
+live 19:58:07Z) at this lane's request; `aedb66c9` contains `5e84b758`
+(`merge-base --is-ancestor` yes) and so every worker-side change of this lane:
+segment settlement all five sports (ad0f25eb, 0f538aa9, ded6bd47, c9c6d02c), the
+settlement join fix (5e84b758), the feedback sample gate (1cc00026), the live
+scorer contract 3 (d3492bb4), the prop seal (47990a30), and
+`EVALUATION_SETTLEMENT_SPORTS` (3d08b860). It also carries 22b82428's segment
+refusal, which the graders sit on top of as their fallback. NOT carried:
+6eacbe05 (export-only allowlist line for `linescores_2*.json`); a second boot
+inside the 25-min spacing was not worth that. My claim was taken 20:00:53Z and
+released without deploying. Env injected at this deploy:
+`SYNDICATE_NFL_SEGMENT_MARKETS=h1`, `SYNDICATE_NCAAF_SEGMENT_MARKETS=h1`,
+`EVALUATION_SETTLEMENT_SPORTS=mlb,wnba` (all set 19:4xZ; the settlement enable
+key was ALREADY `true` with lookback 7, see findings 2026-09-08).
+
+**verify (tonight), reading 1 — the feedback gate is live and reads GATED, PASSING:**
+
+    2026-09-08T20:04:18Z [recommendation_engine] RANK_RECOMMENDATIONS sport=all
+      in=100 out=100 rejected={} feedback_gated={"min_sample": 50, "sample_size": 0, "sport": true}
+
+That is the line WP3 exists to print: neutral-because-gated is now
+distinguishable from neutral-because-measured, and nothing can move a rank on
+the first settled chunk.
+
+**verify (tonight), reading 2 — INHERITED from mlb-live-segment-pricing (archived):
+the soccer AH pairing fix 6ff8f47b still does not price spreads.** Today's shard,
+rows recorded after 19:18:19Z (the fix's own deploy), distinct fixtures not rows:
+
+    h2h      49 rows   market_fair_prob 49/49   5 fixtures   (control holds)
+    spreads  51 rows   market_fair_prob  0/51   5 fixtures   all no_two_sided_market_price
+    totals   92 rows   market_fair_prob 92/92   5 fixtures
+
+Identical to the pre-fix baseline (0/37 across 6). Still ONE fixture short of
+that lane's six-fixture floor, so a SIGNAL against the fix, not a verdict, and
+not this lane's to act on; recorded so the archived lane's owed reading is not
+lost.
+
+**NOT READ TONIGHT — `SEGMENT_CAPTURE` on refresh-worker.** The football
+per-event fetch runs only inside a kickoff window (pregame ≤6h, live ≤1h45) and
+the NFL opener is 2026-09-09 local; a null before then is absence of the
+population, not of the feature.
+
+**OWED — four readings on tomorrow's daily runs, each with the command:**
+
+1. Settlement (autorun ~11:00Z, gate 06:00 CT):
+   `/api/ops/evaluation-settlement/status` → `autorun_status` with `epoch` AFTER
+   the deploy: `sports == [mlb, wnba]`, `summary.settled > 0`,
+   `summary.settled_rate_of_settleable > 0` (was 0 / 29,630), and
+   `unmatched_no_key_match_reasons` present. Baseline today: settled 0,
+   no_key_match 23,080.
+2. Segment orders (reconciliation ~07:00Z):
+   `/api/ops/execution/ledger-summary?days=2&mode=paper` → refusal counters:
+   no NEW `actual_is_full_game_not_*` / `final_box_is_full_game_not_*`; any
+   segment refusal is `segment_actual_unavailable:*` or `unsupported_segment:*`.
+3. MLB supply (locked card after tonight's slate): `/mlb/api/market-accuracy`
+   `rows.all` ≥ 10 for 2026-09-08, and the card's `inputs.hitter_lines` ending
+   `_pregame.json` with `Hitter lines read: … (pregame-freeze, N players)`.
+4. Tape (first NFL/soccer game window): `book_quotes/<date>.jsonl` rows with
+   `segment=h1` for nfl/ncaaf/soccer; refresh-worker + live-odds-worker logs
+   carry `SEGMENT_CAPTURE` lines that are not "disabled".
+
+### live-odds-worker 5e84b758 — soccer per-event segment capture, soccer poller halves, MLB prop seal `[lane restore-measurement, deploy dep-dag6caohchos7382ck90, fired 19:46:51Z, live 19:49:46Z]`
+
+Main commit 5e84b758 (live was 1395c7ae). Preflight CLEAR (odds cycle idle
+between sweeps; earlier reads held on `refresh_odds_sources` +
+`build_soccer_artifacts` children and were waited out, not overridden). Claim
+held by restore-measurement. Env injected: `SYNDICATE_SOCCER_SEGMENT_MARKETS=h1`,
+`SYNDICATE_NFL_SEGMENT_MARKETS=h1` (NCAAF was already `h1` on this service).
+
+**verify: OWED.** Two log lines decide it and a poll is armed for both:
+`SEGMENT_CAPTURE` on the next soccer pregame window (≤6h before a fixture; the
+line must not read "disabled"), and `PROP_FREEZE_WROTE … stage=post_fetch` on the
+next MLB pass. Nothing is claimed for this deploy until one of them is read.
