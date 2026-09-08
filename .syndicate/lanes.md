@@ -1822,6 +1822,13 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   status the publisher got. The response is decisive; the log line is not.
 - Blocked by: none.
 
+### mlb-ledger-segment-visibility — OPEN — opened 2026-09-07 — session 3492626c — **LANDED `16b7ad1f`, VERIFIED LOCALLY, PRODUCTION READING PENDING A DEPLOY.** Seven MLB ledger days / 28,763 production records were `segment=full` WITHOUT EXCEPTION, and the join's own counters refused 25/29 and 34/41 rows `segment_is_not_full_game` (86%, 83%) — the largest category of live rows, invisible in the ledger. Root cause was a truncated DENOMINATOR, not just segment blindness: refusals below `row["live_gameline"] = block` reach the ledger, refusals above it vanished, so `14,003 of 27,249 priceable` was a rate over the post-attach population.
+- Goal: MLB live rows refused for being a non-full-game segment appear in the live-gameline ledger as counted, non-priceable rows. NOT to price them — the guard is correct and measured (+42.43pp of fabricated edge, SD @ CLE 2026-08-16).
+- Files: syndicate/features/shared/live_gameline_join.py, syndicate/features/shared/live_gameline_ledger.py, tests/test_live_gameline_ledger.py, tests/test_live_gameline_segment_visibility.py, scripts/verify_segment_visibility.py
+- Hypothesis: CONFIRMED on production. The ledger's denominator is the post-attach population only.
+- Falsification test: ran it — if `segment_is_not_full_game`/`no_live_projection`/`stale_quote` already appeared as ledger `withheld_reason` values the lane was wrong. They do not, across all seven days.
+- Verification: LOCAL — `scripts/verify_segment_visibility.py` drives the real join + real ledger writer + the bucket harness's own bucketing key: `SEGMENTS VISIBLE: ['first1','first3','first5','full']`, up from `{'full'}`, all non-full `priceable=0` with no number attached. 12 new tests; mutation check reverted each half separately → 9 and 8 failures. 233 pass across 8 live_gameline suites; 468 across layer2/book_grid/board_enrichment (2 pre-existing failures in `test_layer2_lane_chip_join.py`, identical on clean origin/main). PRODUCTION — **not yet read.** Needs refresh-worker to carry `16b7ad1f`.
+- Blocked by: none. Deploy is deliberately NOT raced — `deploy_after_statcast.py` already holds the refresh-worker gate (the worker is mid-`pybaseball` season fetch that a restart would kill) and posts `origin/main` tip, so it carries this commit. `scratchpad/watch_segment_reading.py` measures afterwards and does not deploy.
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
