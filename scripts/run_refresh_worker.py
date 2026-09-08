@@ -2970,6 +2970,35 @@ def _evaluation_settlement_lookback_days() -> int:
     return max(1, min(60, value))
 
 
+def _evaluation_settlement_sports() -> tuple[str, ...]:
+    """Which sports the settlement autorun sweeps. ABSENT = every registered grader.
+
+    `EVALUATION_SETTLEMENT_SPORTS="mlb,wnba"` narrows the daily pass to those
+    graders. Absent keeps the pre-existing behaviour (all of
+    `GRADED_OUTCOME_GRADERS`) so deploying this changes nothing until the key
+    is set. Unknown tokens are DROPPED rather than guessed, and dropping every
+    token falls back to ALL rather than to an empty sweep -- an empty sweep
+    would read as a healthy run that settled nothing, which is the
+    deployed-inert shape `#625` names. The resolved scope is written into the
+    status payload so a reader can see what the run covered.
+
+    Why a scope exists at all (2026-09-08, user decision): each lookback date is
+    a ~250-350 MB chunk on a 4 GB worker, and the graders for football/soccer
+    are being extended for segments the same week. Narrowing to the two
+    shards whose grading is known-good limits the blast radius of the first
+    settled chunks reaching the ranker's 14-day window.
+    """
+    from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
+
+    registered = tuple(sorted(GRADED_OUTCOME_GRADERS.keys()))
+    raw = str(os.environ.get("EVALUATION_SETTLEMENT_SPORTS") or "").strip().lower()
+    if not raw:
+        return registered
+    wanted = [token.strip() for token in raw.split(",") if token.strip()]
+    kept = tuple(token for token in registered if token in wanted)
+    return kept or registered
+
+
 def _evaluation_settlement_target_hour_central() -> int:
     """Central-time hour after which the daily settlement autorun is
     allowed to run.
@@ -3547,10 +3576,10 @@ def _launch_autorun_evaluation_settlement(
     )
 
     from syndicate.features.shared.evaluation_settlement import settle_ledger_for_dates
-    from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
 
     today_date = central_today_iso()
     lookback_days = _evaluation_settlement_lookback_days()
+    settlement_sports = _evaluation_settlement_sports()
     # Oldest first, so a backfill settles in chronological order and the
     # status summary reads naturally.
     target_dates = tuple(
@@ -3566,7 +3595,7 @@ def _launch_autorun_evaluation_settlement(
         # own graders. A sport whose grader is still a documented []-stub
         # (soccer/ncaab/ncaaf) costs one cheap no-op pass here and settles
         # for real the moment its grader lands, with no autorun change.
-        result = settle_ledger_for_dates(list(target_dates), sports=sorted(GRADED_OUTCOME_GRADERS.keys()))
+        result = settle_ledger_for_dates(list(target_dates), sports=list(settlement_sports))
         summaries = result.get("totals") or {}
     except Exception as exc:
         error_text = f"{type(exc).__name__}: {exc}"
@@ -3700,6 +3729,7 @@ def _launch_autorun_evaluation_settlement(
             # writes no traceback.
             "state": "completed",
             "dates": list(target_dates),
+            "sports": list(settlement_sports),
             "summary": summaries,
             "error": error_text,
             "chunk_diagnostics": chunk_diagnostics,
