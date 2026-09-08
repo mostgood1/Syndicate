@@ -418,9 +418,19 @@ def build_records(
                 # (spreads q4_late, n=2471, 20.49pp, edge/se 6.35). A segment
                 # PRICE series is a real thing to want, and it needs its own
                 # file rather than this one's remaining headroom.
-                "model_home_win_prob": None,
-                "market_fair_prob": None,
-                "edge_pp": None,
+                # THE OBSERVATION, when the join computed one. These are the
+                # SAME four fields `_moved` dedupes on, so a first5 row is
+                # rewritten only when its (2dp) probability actually moves --
+                # see `REFUSAL_KEY` in `live_gameline_join` for why that bound
+                # matters against `_MAX_RECORDS_PER_FILE`.
+                #
+                # `priceable` STAYS FALSE. These rows were never on the board
+                # and no order could reach them; the numbers exist so the live
+                # first-five probability can be SCORED against outcomes, which
+                # is the precondition for ever turning pricing on.
+                "model_home_win_prob": refusal.get("observed_model_prob"),
+                "market_fair_prob": refusal.get("observed_market_prob"),
+                "edge_pp": refusal.get("observed_edge_pp"),
                 "priceable": False,
                 "withheld_reason": refusal.get("withheld_reason"),
                 "sigma": None,

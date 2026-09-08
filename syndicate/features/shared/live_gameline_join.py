@@ -1363,6 +1363,12 @@ def attach_live_gamelines(
         # would reopen it.
         row_index = index
         if segment not in _FULL_GAME_SEGMENTS:
+            # Looked up for the OBSERVATION even when pricing is off -- the
+            # whole point is to record what the price would have been.
+            seg_hit = None
+            if segment_index is not None and segment in _FIRST5_SEGMENTS:
+                seg_hit = segment_index.get(
+                    (_norm_team(row.get("away_team")), _norm_team(row.get("home_team"))))
             priceable_segment = (
                 segment in _FIRST5_SEGMENTS
                 and segment_index is not None
@@ -1404,7 +1410,52 @@ def attach_live_gamelines(
             # the ledger to LATE full-game rows -- which the bucket harness
             # measured as baseball's strongest surface (spreads q4_late, n=2471,
             # edge/se 6.35). Bounding it to an inventory keeps that intact.
+            # THE OBSERVATION. `[2026-09-08, user decision: "record first5 as
+            # observations"]`.
+            #
+            # WHY IT IS RECORDED BUT NOT PUBLISHED. Turning first5 pricing ON
+            # would put the edge on the board -- and a board row carrying
+            # `edge_vs_market_pct` reaches the Layer 2 shortlist, which is what
+            # `portfolio_commit` reads, so it becomes an ORDER CANDIDATE.
+            # Segments already reach that shortlist (30 of 102 rows on the
+            # served board, 2026-08-16), so this is not hypothetical. The live
+            # first-five probability has never been scored for skill, and money
+            # behind an unscored number is the thing this repo keeps paying for.
+            #
+            # So the price is COMPUTED and WRITTEN TO THE LEDGER ONLY. Nothing
+            # touches `row["live_gameline"]` or `row["projection"]`, so the
+            # board is byte-identical and no order can see it. That is the
+            # "instrument first, fix second" posture `_SEGMENT_REFUSAL_ENABLED`
+            # already ships under.
+            #
+            # ROUNDED TO 2dp ON PURPOSE, and this is a volume bound rather than
+            # a precision opinion. `live_gameline_ledger._moved` dedupes on
+            # exactly these fields, so full precision would rewrite every first5
+            # row on every build -- and `append_records` STOPS WRITING for the
+            # rest of the day at `_MAX_RECORDS_PER_FILE`, with MLB already at
+            # 8,070 rows on 2026-08-21 against a 20,000 cap. At 2dp a row is
+            # rewritten only when the probability actually moves by >= 0.01,
+            # which is finer than any Brier or calibration question this series
+            # will be asked at these sample sizes.
+            obs_model = obs_market = obs_edge = None
+            if isinstance(seg_hit, Mapping):
+                try:
+                    _mp, _n, _why = segment_home_win_prob(seg_hit, row)
+                    _market = (row.get("projection") or {}).get("market_fair_prob_over") \
+                        if isinstance(row.get("projection"), Mapping) else None
+                    if _mp is not None and _market is not None:
+                        obs_model = round(float(_mp), 2)
+                        obs_market = round(float(_market), 2)
+                        obs_edge = round((float(_mp) - float(_market)) * 100.0, 2)
+                except Exception:
+                    obs_model = obs_market = obs_edge = None
             row[REFUSAL_KEY] = {
+                # Present ONLY on the ledger. `priceable` stays False and the
+                # board never sees these, so an edge here can never be bet --
+                # it exists to be SCORED against outcomes later.
+                "observed_model_prob": obs_model,
+                "observed_market_prob": obs_market,
+                "observed_edge_pp": obs_edge,
                 "priceable": False,
                 "withheld_reason": seg_reason,
                 "segment": segment,
