@@ -139,6 +139,64 @@ def _run_pytest(pytest_args: list[str], junit_path: Path) -> int:
     return subprocess.run(command, cwd=REPO_ROOT).returncode
 
 
+def _split_test_files(pytest_args: list[str], chunks: int) -> tuple[list[list[str]], list[str]]:
+    """(groups of test files, flags) so each group can run in a FRESH process.
+
+    WHY CHUNKING EXISTS. `#647`: the `ci-suite` cron's pytest step is OOM-killed
+    at 2Gi in every configuration tried -- `-n auto`, `-n 2` (1056s in) and
+    `-n 0` (537s in) -- and REDUCING worker count made it fail SOONER, so worker
+    count was never the lever. Measured locally on the same command, sampling
+    the process tree: memory climbs to ~675 MB, sits flat for several minutes,
+    then climbs again to a **2443 MB peak** -- past the 2048 MB limit on a box
+    with no cgroup accounting and no page cache in the count. One process must
+    hold what the whole suite accumulates; N processes each hold ~1/N of it.
+
+    FILES ARE GLOBBED, NOT COLLECTED. `pytest --collect-only` imports every test
+    module to enumerate them, which costs the very memory this is trying to
+    bound -- paying the peak once just to plan how to avoid paying it.
+
+    ROUND-ROBIN, NOT CONTIGUOUS BLOCKS. Test files vary enormously in cost, and
+    contiguous slices put neighbouring (often related, often similarly heavy)
+    files in one group. Round-robin spreads them, which matters because the
+    peak is set by the WORST group, not the average -- the same "split ratio is
+    the longest unit" arithmetic that applies to any job split.
+
+    Returns `([], flags)` when no files can be identified -- a `-k` expression
+    or an explicit nodeid -- and the caller then runs unchunked rather than
+    inventing a split it cannot verify.
+    """
+    # A BARE TOKEN IS NOT NECESSARILY A PATH. `-n 0` arrives as two arguments and
+    # only the first starts with `-`, so classifying by that alone made the `0` a
+    # path, which resolved to nothing and refused the whole split. Order is
+    # preserved as tokens are sorted into the two lists, so a flag and its value
+    # stay adjacent.
+    flags: list[str] = []
+    files: list[str] = []
+    for raw in pytest_args:
+        if raw.startswith("-"):
+            flags.append(raw)
+            continue
+        if "::" in raw or "*" in raw or "?" in raw:
+            # A nodeid or a glob: the file set is not something we can enumerate
+            # reliably, so refuse rather than invent a split.
+            return [], list(pytest_args)
+        candidate = REPO_ROOT / raw
+        if candidate.is_dir():
+            files.extend(sorted(str(f.relative_to(REPO_ROOT).as_posix())
+                                for f in candidate.rglob("test_*.py")))
+        elif candidate.is_file():
+            files.append(raw)
+        else:
+            # Resolves to nothing on disk, so it is a flag's VALUE, not a path.
+            flags.append(raw)
+    if not files:
+        return [], list(pytest_args)
+    groups: list[list[str]] = [[] for _ in range(max(1, chunks))]
+    for index, path in enumerate(files):
+        groups[index % len(groups)].append(path)
+    return [g for g in groups if g], flags
+
+
 def _load_baseline(path: Path) -> dict:
     if not path.exists():
         return {}
@@ -158,23 +216,67 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--baseline", default=str(DEFAULT_BASELINE))
     parser.add_argument("--junit", default=None, help="reuse an existing junit XML instead of running pytest")
     parser.add_argument("--runnable", action="store_true", help="also print a pytest selector per test")
+    parser.add_argument("--chunks", type=int, default=1,
+                        help="run the suite in N sequential pytest processes and UNION the "
+                             "results. Bounds peak memory, which a 2Gi box needs (`#647`): "
+                             "one process holds the whole suite's accumulation, N hold ~1/N "
+                             "each. Default 1 = today's behaviour, unchanged.")
     parser.add_argument("pytest_args", nargs="*", default=["tests/"], help="paths/args passed to pytest")
     args = parser.parse_args(argv)
 
     baseline_path = Path(args.baseline)
     pytest_args = args.pytest_args or ["tests/"]
 
+    groups: list[list[str]] = []
+    flags: list[str] = []
+    if args.chunks > 1 and not args.junit:
+        groups, flags = _split_test_files(pytest_args, args.chunks)
+        if not groups:
+            print(f"[pytest_baseline] --chunks {args.chunks} requested but the test files could "
+                  f"not be identified from {pytest_args!r} -- running UNCHUNKED rather than "
+                  f"guessing a split", flush=True)
+
     with tempfile.TemporaryDirectory() as tmp:
-        junit_path = Path(args.junit) if args.junit else Path(tmp) / "report.xml"
-        if not args.junit:
-            _run_pytest(pytest_args, junit_path)
-        if not junit_path.exists():
-            # pytest produces a report even when tests fail, so an ABSENT one
-            # means the run itself broke (bad args, import crash, OOM). That is
-            # never "no failures" and must not be allowed to read as a pass.
-            print(f"[pytest_baseline] NO JUNIT REPORT at {junit_path} -- the run did not complete", flush=True)
-            return EXIT_RUN_BROKEN
-        current, total = _failed_keys(junit_path)
+        if groups:
+            # EVERY CHUNK MUST PRODUCE A REPORT, AND A MISSING ONE IS FATAL.
+            # This is the whole risk of chunking: the union of N partial runs
+            # looks exactly like a complete run, so a chunk that OOMs or crashes
+            # silently removes its tests from `current` -- and because this gate
+            # ALSO fails when the failure set SHRINKS, those tests would be
+            # reported as newly FIXED. A crash would print as good news.
+            print(f"[pytest_baseline] {len(groups)} chunk(s), {sum(len(g) for g in groups)} "
+                  f"test file(s), one fresh process each", flush=True)
+            current, total = set(), 0
+            for index, group in enumerate(groups, start=1):
+                chunk_junit = Path(tmp) / f"report_{index}.xml"
+                print(f"\n[pytest_baseline] chunk {index}/{len(groups)} -- {len(group)} file(s)", flush=True)
+                _run_pytest(group + flags, chunk_junit)
+                if not chunk_junit.exists():
+                    print(f"[pytest_baseline] chunk {index}/{len(groups)} produced NO JUNIT REPORT -- "
+                          f"it did not complete (OOM, import crash, bad args). Refusing to compare a "
+                          f"PARTIAL union against a full baseline: the missing tests would read as "
+                          f"newly fixed.", flush=True)
+                    return EXIT_RUN_BROKEN
+                keys, count = _failed_keys(chunk_junit)
+                if count == 0:
+                    print(f"[pytest_baseline] chunk {index}/{len(groups)} collected 0 testcases -- "
+                          f"refusing to treat that as a pass", flush=True)
+                    return EXIT_RUN_BROKEN
+                current |= keys
+                total += count
+                print(f"[pytest_baseline] chunk {index}/{len(groups)} collected={count} "
+                      f"failing={len(keys)}   running total={total}", flush=True)
+        else:
+            junit_path = Path(args.junit) if args.junit else Path(tmp) / "report.xml"
+            if not args.junit:
+                _run_pytest(pytest_args, junit_path)
+            if not junit_path.exists():
+                # pytest produces a report even when tests fail, so an ABSENT one
+                # means the run itself broke (bad args, import crash, OOM). That is
+                # never "no failures" and must not be allowed to read as a pass.
+                print(f"[pytest_baseline] NO JUNIT REPORT at {junit_path} -- the run did not complete", flush=True)
+                return EXIT_RUN_BROKEN
+            current, total = _failed_keys(junit_path)
 
     if total == 0:
         print("[pytest_baseline] 0 testcases collected -- refusing to treat that as a pass", flush=True)

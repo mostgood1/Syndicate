@@ -99,6 +99,25 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FAST_STEP_TIMEOUT = 900
 PYTEST_TIMEOUT_DEFAULT = 7200
 
+# `#647`. THE KNOB THAT WORKER COUNT WAS NOT.
+#
+# The pytest step was OOM-killed at 2Gi in every worker configuration tried,
+# and REDUCING workers made it fail SOONER (`-n 0` at 537s against `-n 2`'s
+# 1056s) -- because `-n 0` is the floor for PROCESS COUNT, not for PEAK MEMORY.
+# One process must hold what the whole suite accumulates. Measured locally on
+# the same command, sampling the process tree: a **2443 MB peak** against a
+# 2048 MB limit, on a box with no cgroup accounting and no page cache counted.
+#
+# Chunking is the lever that actually moves it: N sequential processes each
+# hold roughly 1/N of the accumulation, and `pytest_baseline.py` unions their
+# results so the gate still compares a whole-suite failure set.
+#
+# 8 IS NOT MEASURED. It is chosen to leave real headroom against a peak that is
+# ~1.2x the limit -- the peak is set by the WORST chunk, not the average, and
+# the observed shape (flat, then a steep second climb) says cost is not evenly
+# spread. Replace it with a measured value once a run completes on the cron.
+PYTEST_CHUNKS_DEFAULT = 8
+
 # (label, argv) -- copied from .github/workflows/ci.yml, job `test`.
 FAST_STEPS: tuple[tuple[str, list[str]], ...] = (
     ("archive regression suite", ["-m", "unittest", "tests.test_archives"]),
@@ -123,9 +142,9 @@ FAST_STEPS: tuple[tuple[str, list[str]], ...] = (
 # inside this step. `-n auto` spawns one xdist worker per CPU and each holds a
 # full import of the app, so the peak scales with core count on a box that has
 # more cores than gigabytes.
-def _pytest_step(workers: str) -> tuple[str, list[str]]:
+def _pytest_step(workers: str, chunks: int) -> tuple[str, list[str]]:
     return ("pytest vs baseline",
-            ["scripts/pytest_baseline.py", "--runnable", "--",
+            ["scripts/pytest_baseline.py", "--runnable", "--chunks", str(chunks), "--",
              "tests/", "-n", workers, "--dist=loadscope"])
 
 
@@ -254,6 +273,11 @@ def main() -> int:
                          "cron cannot afford that (it OOM'd at 18:36:44Z on "
                          "2026-09-07) because each worker holds a full app "
                          "import. Pass a small integer there.")
+    ap.add_argument("--pytest-chunks", type=int, default=PYTEST_CHUNKS_DEFAULT,
+                    help="run the suite in N sequential pytest processes, unioning the "
+                         "results. This is the knob that WORKER COUNT was not: measured "
+                         "2026-09-08, the suite peaks at 2443 MB in one process against "
+                         "a 2048 MB limit.")
     ap.add_argument("--pytest-timeout", type=int, default=PYTEST_TIMEOUT_DEFAULT,
                     help="wall-clock cap for the pytest step, seconds. A cap "
                          "hit is rc=124 and is NOT a test result -- see the "
@@ -270,11 +294,11 @@ def main() -> int:
 
     results = [run(label, argv, FAST_STEP_TIMEOUT) for label, argv in FAST_STEPS]
     if not args.skip_pytest:
-        label, argv = _pytest_step(str(args.pytest_workers))
+        label, argv = _pytest_step(str(args.pytest_workers), args.pytest_chunks)
         note = ("" if str(args.pytest_workers) == "auto"
                 else "  -- DIVERGES from ci.yml's 'auto', deliberately, for memory")
         print(f"\n(xdist workers: {args.pytest_workers}{note}; "
-              f"cap {args.pytest_timeout}s)", flush=True)
+              f"chunks {args.pytest_chunks}; cap {args.pytest_timeout}s)", flush=True)
         results.append(run(label, argv, args.pytest_timeout))
 
     failed = [r for r in results if r["rc"] != 0]
