@@ -3750,3 +3750,64 @@ does not make you apply it to the next thing you build.
 
 Related: [[shell_layer_transcodes_bytes]] (0-deletion rule on a shared append),
 [[compound_absence_claim]], [[primary_tree_is_not_deployed_code]].
+## 2026-09-07 FORBIDDEN: writing a test from the SAME reading of a contract that produced the code. `[#632, session b2b5b45b]`
+
+`d5e4cc51`'s `patterns_that_can_match` compared directory DEPTH. The caller
+applies the subset with `fnmatch`, whose `*` CROSSES `/`; the patterns are
+globbed, where it does not. My unit test
+`test_subset_prefilter_is_conservative_when_it_cannot_tell` asserted MY reading
+of `*` rather than the caller's actual call, **so it passed and proved nothing**.
+The endpoint then short-answered with no error for 10 minutes in production.
+
+**A test written from the same misreading as the code cannot catch that code.**
+Reviewers cannot either, for the same reason.
+
+**How to apply:** when a value crosses a boundary between two languages/dialects
+(glob vs fnmatch, SQL vs ORM, shell vs Python quoting), the test must exercise
+THE CALLER'S ACTUAL CALL, not your model of it. And prefer a PROPERTY over
+examples: *pre-filter then post-filter must equal post-filter alone* is
+executable, and it is what finally caught this. Then verify the test can FAIL:
+reverting to the buggy implementation produced 250 unsound drops. A test never
+seen red is not evidence. See [[feedback_gate_on_the_output_not_the_input]].
+
+## 2026-09-07 FORBIDDEN: reading a null result from a window that ENDS BEFORE THE EFFECT CAN OCCUR. `[#632, session b2b5b45b]`
+
+I checked Render events ~1 minute after a load burst began, saw none, and
+reported "no health-check event fired" as a RESULT. It fired at burst-end +32 s.
+In the baseline arm it had fired at +0 s.
+
+**A burst's blast radius is its longest TAIL, not its last request.** 18 requests
+with 20–65 s tails hold gunicorn slots long after dispatch stops, so the
+observation window must extend past the slowest request, not past the last one.
+
+**How to apply:** before reporting an absence, state the window AND the latency
+of the thing you are looking for, and confirm the window covers it. Reinforces
+[[feedback_absence_in_a_window_is_not_absence]].
+
+## 2026-09-07 FORBIDDEN: comparing percentiles across arms with DIFFERENT ERROR COUNTS. `[#632, session b2b5b45b]`
+
+BEFORE: 16/18 completed, 2 errors, p50 20,671 ms. AFTER: 18/18, 0 errors, p50
+24,108 ms. I nearly reported "latency got 17% worse". **The two errors were the
+WORST cases and were excluded from BEFORE's percentiles**, so the arms do not
+share a denominator; the fix's arm is penalised for completing the requests the
+baseline dropped.
+
+**How to apply:** percentiles over successes only are a survivorship statistic.
+Report completion rate BESIDE them, and when error counts differ, the percentile
+comparison is invalid — say so rather than picking the flattering reading. Also:
+**retain raw per-request samples, not summaries.** Keeping only summaries is what
+made this unresolvable. See [[feedback_a_rate_not_a_count]].
+
+## 2026-09-07 A pre-filter that can change the ANSWER is not a pre-filter. `[#632, session b2b5b45b]`
+
+An optimisation placed in front of a filter must be provably sound in ONE
+direction only: keeping something that cannot match wastes work and the
+post-filter still corrects it; dropping something that can match is
+unrecoverable and silent. `patterns_that_can_match` now returns True for
+anything it cannot decide (a `[...]` class), and the caller's `fnmatch`
+backstop was kept.
+
+**How to apply:** state which direction of error is recoverable before writing
+the optimisation, and make the undecidable case fall to the recoverable side.
+Reinforces [[feedback_unknown_must_not_default_permissive]] — same rule, opposite
+polarity: the safe default is whichever side a downstream check can still fix.

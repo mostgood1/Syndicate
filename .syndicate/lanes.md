@@ -1756,7 +1756,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   and a test that the basis agrees with `_model_edge_for` by construction.
 - Blocked by: none.
 
-### web-oom-profiler-steady — OPEN — REOPENED 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **`#632` REFRAMED: web is not dying of MEMORY, it is dying of LATENCY. 32.5% of requests exceed the 5 s health-check budget; 35 `server_failed` events, ZERO `evicted=True`. BOTH call-site fixes are now LANDED (`d5e4cc51`) — export walk lists each directory once instead of 18×, and the intelligence cache does 1 rebuild per key instead of 8. PRODUCTION IS UNMEASURED: no deploy, no load test, and the A/B's elapsed was UNCHANGED because it measured work count, not wall clock.**
+### web-oom-profiler-steady — OPEN — REOPENED 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **`#632` ANSWERED AND MEASURED IN PRODUCTION. Web dies of LATENCY, not memory — DEMONSTRATED: a 6x3 burst reproduced `unhealthy — HTTP health check failed`, byte-identical to the 35 `server_failed` events. Deployed `8589c005`: export `names_only` 60,876 → 19,139 ms p50 (3.2x); the intelligence single flight turns 16/18-with-2-errors-and-`unhealthy` into 18/18-clean-and-NO-`unhealthy`, 9 stale serves. I also shipped and fixed a regression the same night (`d5e4cc51` → `a0d02297`, 48,717 witnesses / 0 unsound). STILL OPEN: the >=5 s share vs the 32.5% baseline is NOT measured — that needs organic traffic, not a burst.**
 - Goal: remove the request-path work that starves web's 8 gunicorn slots, one
   route at a time, each with a measurement.
 - Files: `syndicate/blueprints/ops.py` (TAKEN 2026-09-07, see that lane's block),
@@ -1786,14 +1786,14 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   mean the latency lives somewhere these two routes do not reach — most likely
   `/api/board/game-chips` (11 ms typical, 11.6 s worst) or the ESPN fetch
   `request_path_guard` already names inside a Flask handler.
-- Verification: the ≥5 s request share, re-measured the same way as the 32.5%
-  baseline, AFTER both call-site patches are live. NOT the test suite — the
-  tests prove the mechanism, not the effect. A `COMBINED_BOARD_SERVED_STALE`
-  count with a request denominator beside it proves the single flight is firing.
-- Blocked by: a USER DECISION. Both call sites are claimed by lanes whose
-  owning sessions (`5611932c`, `3492626c`, and `ncaaf-live-resim-wire`'s) are
-  absent from `list_sessions(include_archived=True, limit=80)`. Handoffs and
-  verified patches are written; taking the claims needs an explicit override.
+- Verification: PARTLY DONE. `unhealthy` NOT firing under a 6x3 burst — **now
+  PASSING**, once, in a clean window, with 9 `COMBINED_BOARD_SERVED_STALE`
+  lines proving the flight fires. The ≥5 s request share against the 32.5%
+  baseline is **STILL NOT MEASURED**; that baseline came from ORGANIC traffic
+  and a synthetic burst cannot answer it. Take it from live logs, not a probe.
+- Blocked by: nothing. Claims resolved by explicit user decision 2026-09-07
+  (`ops.py` taken; `intelligence_state.py` a NOTICE, not a claim — claiming it
+  contests the one live holder and `check_lane_invariants.py` fails on that).
 
 ### publish-refusal-201-triage — CLOSED 2026-09-07 — session 28c6162b-58c8-4937-99f5-d3b260a96de4 — **ANSWERED: NOT data loss and NOT the `#488` shape. `verdict=REFUSED` is the verdict function’s opinion, printed before the caller decides; `#630`’s `if refuse and not will_merge` exempts merged families and `will_merge` is True for EVERY refused path (predicate run against the real log paths). 819 odds_history merges over 2h, all merged. HYPOTHESIS CONFIRMED as written. **The real cost is different and larger: 2.22 GB/hour of publishes, 785 of 819 merges adding ZERO markets** — refresh-worker republishes a ~74-75% subset every ~2.3 min across 16 paths. NOT pure waste (34 merges added 1-84 markets; the merge PREVENTS the `#488` clobber and must stay). Findings `bcf33ccf`, handed to lane `ncaaf-live-resim-wire` which owns the files. Read-only; no claim taken, nothing edited.**
 - Goal: say whether the ~201/hour `verdict=REFUSED` publish-divergence lines on

@@ -1955,3 +1955,56 @@ inferred from a roster scan. `ops.py` TAKEN from `ncaaf-live-resim-wire`.
 `intelligence_state.py` NOT claimed — a NOTICE in `layer2-sim-disagrees`, since
 claiming it would contest the one live holder and `check_lane_invariants.py`
 fails on that, correctly.
+
+### `[web-oom-leak]` UPDATE 40 — **DEPLOYED AND MEASURED. The export walk is 3.2x. The intelligence single flight turns a health-check FAILURE into a clean run. `#632`'s core question is answered.**, 2026-09-08T01:0xZ `[session b2b5b45b]`
+
+Web `72aebc06` → `8589c005`. Supersedes `UPDATE 39`'s "production is UNMEASURED".
+
+**THE CAUSAL PROOF, which is the finding that outlives the numbers.** A 6-concurrent
+x 3 burst on `/api/intelligence/query` produced `unhealthy — HTTP health check
+failed (timed out after 5 seconds)` at 00:28:29.375Z, the second the burst ended —
+**byte-identical to the 35 `server_failed` events this investigation began from.**
+`UPDATE 37` argued web dies of latency, not memory. It is now demonstrated: 18
+requests on one slow route take the service down. **Both load tests caused a real
+brief outage (~28 s, ~30 s).**
+
+**MEASURED — export `?names_only=1`** (reads no file bodies, so it isolates the
+walk): **60,876 → 19,139 ms p50, 95,740 → 25,579 ms max.** The AFTER arm ran on a
+COLD page cache, which understates it. n=2 per probe.
+
+**MEASURED — `/api/intelligence/query`, identical load, clean window:**
+
+    arm                   completed  errors   p50        unhealthy
+    BEFORE 72aebc06          16/18      2    20,671 ms   YES
+    AFTER2 8589c005 clean    18/18      0    24,108 ms   **NO**
+
+9 `COMBINED_BOARD_SERVED_STALE` lines confirm the mechanism firing. **The
+percentiles are biased AGAINST the fix**: BEFORE's exclude its 2 errors — the
+worst cases — so the arms lack a common denominator and "p50 got worse" is
+unsupported. Raw samples were not retained; only summaries. **Store them next time.**
+
+**REACHABILITY, checked before trusting any of it:**
+`SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT='true'` on web (absent ⇒ FALSE, so
+this was not optional to check), `WEB_CONCURRENCY=2` x `GUNICORN_THREADS=4` = 8
+slots, and `..._CACHE_SECONDS` **absent**, so the 15 s code default is live.
+
+**I SHIPPED AND FIXED A REGRESSION IN THE SAME NIGHT.** `d5e4cc51`'s
+`patterns_that_can_match` compared directory DEPTH while the caller applies the
+subset with `fnmatch`, whose `*` crosses `/` — so `?pattern=` silently dropped
+every deep family, live 00:37:33–00:47:15Z. Fixed `a0d02297`. **48,717 witnesses
+/ 0 unsound drops** over the real 177 patterns; **250 unsound** against the actual
+buggy file. Scope, narrowed by three independent checks: **pattern-filtered
+listings only — no deletions, no unfiltered reads.**
+
+**A SUBSET-SHAPED LIMIT ON THE 3.2x, and it was measured with NO `?pattern=` at
+all.** Keep-counts are a local function of the pattern lists: `wnba_source/*`
+keeps 111 of 177, `mlb_source/*` 107, but leading-`*` `*sim_input_report*` keeps
+**161** — so it degenerates to nearly the full 176-pattern walk. **The grouped
+walk is subset-independent and helps everywhere; the pre-filter cannot save a
+leading `*`.**
+
+**STILL OPEN.** The **>=5 s request share against the 32.5% baseline is NOT
+measured** — that baseline came from organic traffic and a synthetic burst cannot
+answer it. The `unhealthy` absence is ONE run, observed ~2–3 min past burst end.
+`/api/board/game-chips` (11 ms typical / 11.6 s worst) and the
+`request_path_guard` ESPN fetch inside a Flask handler are both untouched.
