@@ -1,4 +1,4 @@
-# The home-field term. Built, and NOT turned on: the toy calibration (1.0096) does not transfer to real rosters (1.0170, 3.2 sigma apart).
+# The home-field term — ADOPTED at 1.0169, from three agreeing real slates. The toy calibration (1.0096) was 5.3 sigma wrong and never shipped.
 
 **2026-09-07, lane `mlb-live-segment-pricing`, session 3492626c.**
 `GameConfig.home_field_offense_mult`, applied in `simulate.py`.
@@ -135,26 +135,54 @@ with the high-power synthetic estimate of ~-0.015 runs at the operating point.
 Two independent measurements now agree that the totals coupling is small — the
 11.5-sigma alarm was the artifact, and it stays retracted.
 
-### Why the default STILL stays 1.0, rather than moving to 1.0170
+### ADOPTED 2026-09-08 at 1.0169 — three slates, and they agree
 
-The condition for adopting was that the toy elasticity hold. It did not, so
-1.0096 is out. 1.0170 is the better estimate but it is **not yet validated
-either**, and adopting it would repeat the mistake one level up:
+The single-slate number was not enough to turn on, so two more slates were run
+and pooled with a heterogeneity check.
 
-- It rests on **one slate, one date, 10 games**. The toy number rested on 18,000
-  simulations of the wrong rosters; this rests on 12,000 simulations of one
-  day's rosters. That is a different weakness, not an absent one.
-- The two real arms give **0.1220** and **0.1395** runs/%, so the solved value
-  depends on which arm is used (1.0170 against 1.0148). The gap is ~0.5 sigma
-  and should not be over-read, but it is not zero either.
-- Turning it on changes **every published MLB probability at once**. That is not
-  a thing to do off a single day's rosters.
+| slate | games | m=1.010 elasticity | m=1.020 |
+|---|---|---|---|
+| 2026-06-18 | 9 | +0.1111 ± 0.0320 | +0.1489 ± 0.0215 |
+| 2026-07-20 | 10 | +0.1220 ± 0.0295 | +0.1395 ± 0.0207 |
+| 2026-08-05 | 10 | +0.1332 ± 0.0294 | +0.1101 ± 0.0191 |
+| **POOLED** | 29 | **+0.1227 ± 0.0175** | **+0.1312 ± 0.0118** |
+| toy | — | +0.2158 (**−5.3σ**) | +0.1878 (**−4.8σ**) |
 
-**The next step is cheap and specific**: re-run
-`scripts/validate_home_field_real_slate.py` on two or three more slates. Rosters
-are cached per (season, date, team, probable), so each additional date costs
-roster-build time once and then only simulation. If the real elasticity lands in
-the same place across slates, adopt the pooled value with an argument behind it.
+    SOLVED  home_field_offense_mult = 1.0169   (1 se: 1.0148 .. 1.0197)
+
+**Cochran's Q is 0.3 on df=2** at the operating arm (2.1 on df=2 at m=1.020), so
+the slates are measuring one constant and pooling is legitimate. That check was
+put in *before* the run precisely because it could have failed: the elasticity
+depends on how often the rate clamps bind, which depends on roster composition,
+and June and August teams are not the same teams. Had Q come back large the
+finding would have been that the multiplier is **not a constant** — a more
+interesting result than a clean average, and one that would have blocked
+adoption. It did not.
+
+The pooled value lands at 1.0169 against the single 2026-07-20 slate's 1.0170 —
+corroborated rather than merely repeated, since the other two slates moved it by
+0.0001.
+
+**Totals held on a third independent measurement.** Pooled across real slates:
+**−0.0108 ± 0.0181 (0.6σ)** at m=1.010 and **−0.0262 ± 0.0242 (1.1σ)** at
+m=1.020, agreeing with the high-power synthetic estimate of ~−0.015 runs. The
+11.5σ alarm remains retracted as a small-sample artifact.
+
+### What adoption does and does not do
+
+- `GameConfig.home_field_offense_mult` now defaults to **1.0169**. Passing
+  **1.0** explicitly still disables the term exactly, so anything needing the
+  pre-adoption numbers (a backtest against historical output) can get them.
+- The test that pinned the default as an exact no-op **now asserts the
+  opposite**: that the default is the calibrated value AND that it actually
+  reaches the simulation. Its failure on the flip was the test working.
+- **This is a code change on `main`. It is not in production.** `autoDeploy` is
+  off for `.py`, so the MLB sim keeps running the old behaviour until a deploy
+  is taken — separately gated, and a deploy kills an in-flight sim.
+- Expected effect once deployed: the home margin bias of −0.207 runs closes, and
+  with it the calibration skew where ACTUAL sat above PREDICTED in every bin of
+  every segment. Worth **~1.9 points of win probability**, applied the same way
+  on every game.
 
 ## A second finding, unrelated to the term
 

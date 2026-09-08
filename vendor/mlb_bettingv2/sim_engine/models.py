@@ -492,12 +492,42 @@ class GameConfig:
     # timing and every prop that keys off them -- a much wider blast radius for
     # the same one-dimensional effect.
     #
-    # CALIBRATED VALUE: see `scripts/calibrate_mlb_home_field.py`, which solves
-    # for the `m` that produces the measured +0.207-run margin gap and reports
-    # what it does to totals. The default stays 1.0 until that value is adopted
-    # by an explicit decision, because turning it on changes every published
-    # MLB probability at once.
-    home_field_offense_mult: float = 1.0
+    # THE ADOPTED VALUE IS 1.0169, AND IT CAME FROM REAL ROSTERS, NOT TOY ONES.
+    #
+    # `scripts/calibrate_mlb_home_field.py` first solved 1.0096 on SYNTHETIC
+    # rosters where both sides are identical league-average teams. That number
+    # is WRONG and was never adopted. `scripts/validate_home_field_real_slate.py`
+    # measured the same elasticity on real slates with real probable pitchers:
+    #
+    #     slate        m=1.010 elasticity (runs of margin per 1%)
+    #     2026-06-18   +0.1111 +/- 0.0320
+    #     2026-07-20   +0.1220 +/- 0.0295
+    #     2026-08-05   +0.1332 +/- 0.0294
+    #     POOLED       +0.1227 +/- 0.0175    Q=0.3 on df=2 -- the slates AGREE
+    #     toy said     +0.2158               -- 5.3 sigma away
+    #
+    # Real rosters earn only ~57% of the margin a toy roster earns per percent,
+    # because rates are multiplied and then CLAMPED (`_clamp_rate(hr, 0.002,
+    # 0.12)`, inplay 0.10-0.45) and a clamp that can never bind on a uniform toy
+    # lineup binds on a real one's extremes -- the slates carry `hr_rate` from
+    # 0.0000 to 0.0694 against the toy roster's constant 0.035. Adopting 1.0096
+    # would have delivered about +0.117 runs of the +0.207 owed and read as done.
+    #
+    # HETEROGENEITY WAS CHECKED, not assumed: Cochran's Q is 0.3 on 2 degrees of
+    # freedom, so the three slates are measuring one constant and pooling them is
+    # legitimate. Had they disagreed the right conclusion would have been that
+    # the multiplier is not a constant at all.
+    #
+    # TOTALS HELD, on three independent measurements. Pooled across the real
+    # slates: -0.0108 +/- 0.0181 at m=1.010 (0.6 sigma) and -0.0262 +/- 0.0242 at
+    # m=1.020 (1.1 sigma), agreeing with the high-power synthetic estimate of
+    # ~-0.015 runs. An earlier reading put this at 11.5 sigma; that was a
+    # small-sample artifact of a trend line fitted through a definitional origin
+    # with correlated errors, and it is retracted.
+    #
+    # 1 se on the solved value is 1.0148 .. 1.0197. Set `home_field_offense_mult`
+    # explicitly to 1.0 to disable.
+    home_field_offense_mult: float = 1.0169
 
     # *** BROKEN. DO NOT ENABLE. Kept only so the finding is not re-derived. ***
     #

@@ -116,53 +116,36 @@ def roster_for(client, team_id, name, abbr, season, date, probable):
     return roster
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--date", default="2026-07-15")
-    ap.add_argument("--games", type=int, default=10)
-    ap.add_argument("--sims", type=int, default=300)
-    ap.add_argument("--mults", default="1.0,1.01,1.02")
-    args = ap.parse_args()
-
-    season = int(args.date[:4])
-    games = schedule(args.date)[: args.games]
+def measure_slate(date, n_games, n_sims, mults, client):
+    """One slate's paired elasticity. Returns None when the slate is unusable."""
+    season = int(date[:4])
+    games = schedule(date)[:n_games]
     if not games:
-        print(f"UNMEASURED: no games on {args.date}")
-        return 1
-    print(f"slate {args.date}: {len(games)} games, {args.sims} sims/arm/game")
-
-    client = StatsApiClient()
+        print(f"  {date}: NO GAMES (All-Star break or off day) -- UNMEASURED")
+        return None
     built = []
     t0 = time.time()
     for g in games:
         try:
             home = roster_for(client, g["home_id"], g["home_name"], g["home_abbr"],
-                              season, args.date, g["home_pp"])
+                              season, date, g["home_pp"])
             away = roster_for(client, g["away_id"], g["away_name"], g["away_abbr"],
-                              season, args.date, g["away_pp"])
+                              season, date, g["away_pp"])
         except Exception as exc:
-            print(f"  skip {g['away_abbr']}@{g['home_abbr']}: "
-                  f"{type(exc).__name__}: {str(exc)[:70]}")
+            print(f"    skip {g['away_abbr']}@{g['home_abbr']}: "
+                  f"{type(exc).__name__}: {str(exc)[:60]}")
             continue
         built.append((g, away, home))
-        print(f"  {g['away_abbr']}@{g['home_abbr']}  rosters ready "
-              f"({time.time() - t0:.0f}s)", flush=True)
     if not built:
-        print("UNMEASURED: no rosters built")
-        return 1
+        print(f"  {date}: no rosters built -- UNMEASURED")
+        return None
+    print(f"  {date}: {len(built)} games, rosters ready ({time.time()-t0:.0f}s)",
+          flush=True)
 
-    # How much do these real rosters actually differ from the toy uniform one?
-    hrs = [b.hr_rate for _g, a, h in built for r in (a, h) for b in r.lineup.batters]
-    print(f"\nreal batter hr_rate across the slate: {min(hrs):.4f}..{max(hrs):.4f} "
-          f"(sd {statistics.pstdev(hrs):.4f})   toy roster was a constant 0.0350")
-
-    mults = [float(x) for x in args.mults.split(",")]
     rng = random.Random(20260908)
-    seeds = [rng.randint(1, 2**31 - 1) for _ in range(args.sims)]
-
-    # margins[m] is one entry per (game, seed) -- the pairing key
-    margins: dict[float, list[float]] = {m: [] for m in mults}
-    totals: dict[float, list[float]] = {m: [] for m in mults}
+    seeds = [rng.randint(1, 2**31 - 1) for _ in range(n_sims)]
+    margins = {m: [] for m in mults}
+    totals = {m: [] for m in mults}
     for g, away, home in built:
         for m in mults:
             for s in seeds:
@@ -171,55 +154,130 @@ def main() -> int:
                 h, a = int(res.home_score or 0), int(res.away_score or 0)
                 margins[m].append(h - a)
                 totals[m].append(h + a)
-        print(f"  simulated {g['away_abbr']}@{g['home_abbr']} "
-              f"({time.time() - t0:.0f}s)", flush=True)
+    print(f"  {date}: simulated ({time.time()-t0:.0f}s)", flush=True)
 
     base = mults[0]
-    print(f"\n{'mult':>6s} {'margin':>9s} {'d(marg)':>9s} {'+/-':>6s} "
-          f"{'runs/%':>9s} {'+/-':>7s}   {'d(total)':>9s} {'+/-':>6s}")
-    real_elastic = {}
+    out = {"date": date, "games": len(built), "sims": n_sims, "arms": {}}
+    hrs = [b.hr_rate for _g, a, h in built for r in (a, h) for b in r.lineup.batters]
+    out["hr_rate_sd"] = statistics.pstdev(hrs)
     for m in mults:
+        if m == base:
+            continue
         dm_pairs = [y - x for x, y in zip(margins[base], margins[m])]
         dt_pairs = [y - x for x, y in zip(totals[base], totals[m])]
-        dm = statistics.mean(dm_pairs)
-        dm_se = statistics.pstdev(dm_pairs) / math.sqrt(len(dm_pairs)) if dm_pairs else float("nan")
-        dt = statistics.mean(dt_pairs)
-        dt_se = statistics.pstdev(dt_pairs) / math.sqrt(len(dt_pairs)) if dt_pairs else float("nan")
         pct = (m - base) * 100
-        e = dm / pct if pct else float("nan")
-        e_se = dm_se / pct if pct else float("nan")
-        if pct:
-            real_elastic[m] = (e, e_se)
-        print(f"{m:6.3f} {statistics.mean(margins[m]):+9.4f} {dm:+9.4f} {dm_se:6.4f} "
-              f"{e:+9.4f} {e_se:7.4f}   {dt:+9.4f} {dt_se:6.4f}")
+        dm = statistics.mean(dm_pairs)
+        dm_se = statistics.pstdev(dm_pairs) / math.sqrt(len(dm_pairs))
+        out["arms"][m] = {
+            "elasticity": dm / pct, "elasticity_se": dm_se / pct,
+            "d_total": statistics.mean(dt_pairs),
+            "d_total_se": statistics.pstdev(dt_pairs) / math.sqrt(len(dt_pairs)),
+            "n_pairs": len(dm_pairs),
+        }
+    return out
 
-    print(f"\nREAL vs TOY elasticity (runs of margin per 1% of multiplier):")
-    verdict_lines = []
-    for m, (e, e_se) in real_elastic.items():
+
+def pool(values, errs):
+    """Inverse-variance pooled mean, its se, and a heterogeneity chi-square.
+
+    POOLING SLATES THAT DISAGREE WOULD BE ITS OWN ERROR -- it would report a
+    tight interval around a number no single slate supports. So Q is computed
+    alongside: under the null that every slate measures the SAME elasticity, Q
+    is chi-square with (k-1) degrees of freedom, and Q >> k-1 means the slates
+    are measuring different things and the pooled value is not meaningful.
+    """
+    w = [1.0 / (e * e) for e in errs if e > 0]
+    v = [x for x, e in zip(values, errs) if e > 0]
+    if not w:
+        return float("nan"), float("nan"), float("nan"), 0
+    mean = sum(wi * xi for wi, xi in zip(w, v)) / sum(w)
+    se = math.sqrt(1.0 / sum(w))
+    q = sum(wi * (xi - mean) ** 2 for wi, xi in zip(w, v))
+    return mean, se, q, len(v) - 1
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--date", default=None, help="single slate (back-compat)")
+    ap.add_argument("--dates", default=None, help="comma-separated slates to pool")
+    ap.add_argument("--games", type=int, default=10)
+    ap.add_argument("--sims", type=int, default=400)
+    ap.add_argument("--mults", default="1.0,1.01,1.02")
+    ap.add_argument("--json", type=pathlib.Path)
+    args = ap.parse_args()
+
+    dates = [d.strip() for d in (args.dates or args.date or "2026-07-20").split(",")
+             if d.strip()]
+    mults = [float(x) for x in args.mults.split(",")]
+    client = StatsApiClient()
+
+    print(f"slates: {dates}   {args.games} games each, {args.sims} sims/arm/game\n")
+    results = []
+    for d in dates:
+        r = measure_slate(d, args.games, args.sims, mults, client)
+        if r:
+            results.append(r)
+    if not results:
+        print("\nUNMEASURED: no slate produced a reading.")
+        return 1
+
+    print(f"\n{'slate':>12s} {'games':>6s} {'hr sd':>7s}", end="")
+    for m in mults[1:]:
+        print(f"   {('m=%.3f' % m):>18s}", end="")
+    print()
+    for r in results:
+        print(f"{r['date']:>12s} {r['games']:6d} {r['hr_rate_sd']:7.4f}", end="")
+        for m in mults[1:]:
+            a = r["arms"][m]
+            print(f"   {a['elasticity']:+8.4f} +/-{a['elasticity_se']:.4f}", end="")
+        print()
+
+    print(f"\nPOOLED ELASTICITY (inverse-variance), runs of margin per 1%:")
+    verdict = {}
+    for m in mults[1:]:
+        vals = [r["arms"][m]["elasticity"] for r in results]
+        errs = [r["arms"][m]["elasticity_se"] for r in results]
+        mean, se, q, df = pool(vals, errs)
         toy = TOY_ELASTICITY.get(m)
-        if toy is None:
-            continue
-        z = (e - toy) / e_se if e_se else float("nan")
-        verdict_lines.append((m, e, e_se, toy, z))
-        print(f"  m={m:.3f}   real {e:+.4f} +/- {e_se:.4f}   toy {toy:+.4f}   "
-              f"difference {e - toy:+.4f}  ({z:+.2f} sigma)")
+        line = (f"  m={m:.3f}   pooled {mean:+.4f} +/- {se:.4f}   "
+                f"(Q={q:.1f}, df={df}")
+        if df > 0:
+            line += f" -> {'HETEROGENEOUS, do not pool' if q > 2 * df + 2 else 'slates agree'}"
+        line += ")"
+        if toy is not None:
+            line += f"   toy {toy:+.4f}  ({(mean - toy)/se:+.1f} sigma)"
+        print(line)
+        verdict[m] = (mean, se, q, df)
 
-    if verdict_lines:
-        m, e, e_se, toy, z = verdict_lines[0]
-        solved_real = 1.0 + (TARGET_MARGIN_RUNS / e) / 100 if e else float("nan")
-        solved_toy = 1.0 + (TARGET_MARGIN_RUNS / toy) / 100 if toy else float("nan")
-        print(f"\nSOLVED MULTIPLIER for the +{TARGET_MARGIN_RUNS:.3f}-run deficit")
-        print(f"  from the REAL elasticity at m={m:.3f}:  {solved_real:.4f}")
-        print(f"  from the TOY  elasticity at m={m:.3f}:  {solved_toy:.4f}")
-        if abs(z) < 2.0:
-            print(f"\n  The two agree within {abs(z):.1f} sigma. The toy calibration "
-                  f"TRANSFERS, and\n  1.0096 stands as the value to adopt.")
-        else:
-            print(f"\n  ** THEY DISAGREE at {abs(z):.1f} sigma. The toy calibration "
-                  f"does NOT transfer;\n  use the real-roster number. **")
-    print(f"\nBASELINE NOTE: a real slate has teams of differing quality, so the "
-          f"margin\ncolumn is not centred on zero and carries no information about "
-          f"the term.\nOnly the paired DIFFERENCES above are read.")
+    m0 = mults[1]
+    mean, se, q, df = verdict[m0]
+    if mean and mean > 0:
+        solved = 1.0 + (TARGET_MARGIN_RUNS / mean) / 100
+        lo = 1.0 + (TARGET_MARGIN_RUNS / (mean + se)) / 100
+        hi = 1.0 + (TARGET_MARGIN_RUNS / (mean - se)) / 100 if mean > se else float("nan")
+        print(f"\nSOLVED MULTIPLIER for the +{TARGET_MARGIN_RUNS:.3f}-run deficit,")
+        print(f"from the POOLED real elasticity at m={m0:.3f}:  {solved:.4f}"
+              f"   (1 se: {lo:.4f} .. {hi:.4f})")
+        print(f"  toy said 1.0096; the single 2026-07-20 slate said 1.0170")
+        if df > 0 and q > 2 * df + 2:
+            print(f"\n  ** THE SLATES DISAGREE (Q={q:.1f} on df={df}). The pooled")
+            print(f"  number is not meaningful -- something varies BETWEEN slates")
+            print(f"  that this design treats as fixed. Do not adopt it. **")
+
+    print(f"\nTOTALS, pooled across slates:")
+    for m in mults[1:]:
+        vals = [r["arms"][m]["d_total"] for r in results]
+        errs = [r["arms"][m]["d_total_se"] for r in results]
+        mean, se, q, df = pool(vals, errs)
+        print(f"  m={m:.3f}   {mean:+.4f} +/- {se:.4f}   ({abs(mean)/se:.1f} sigma "
+              f"from zero)" if se else "")
+
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps(results, indent=2), encoding="utf-8")
+        print(f"\nwrote {args.json}")
+    print(f"\nBASELINE NOTE: a real slate has teams of differing quality, so raw "
+          f"margins\nare not centred on zero. Only the paired DIFFERENCES are read.")
     return 0
 
 

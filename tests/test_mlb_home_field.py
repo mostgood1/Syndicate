@@ -8,6 +8,10 @@ runs on every game, entirely within innings 1-5 (innings 6+ are unbiased at
 asymmetry was per-player venue splits shrunk toward 1.0, plus the batting-order
 effect.
 
+ADOPTED 2026-09-08 at **1.0169**, from three real slates whose pooled
+elasticity is +0.1227 +/- 0.0175 runs per 1% (Q=0.3 on df=2 -- they agree). The
+toy-roster figure of 1.0096 was 5.3 sigma away and was never adopted.
+
 THE ORDER OF THESE TESTS IS THE POINT. `model_engine_standard.md` requires a
 REACHABILITY test before correctness tests, because four features in one session
 shipped inert with every correctness test green. So the first class here asks
@@ -129,19 +133,49 @@ class TestReachability:
         assert home_runs > away_runs, (home_runs, away_runs)
 
 
-class TestTheDefaultIsAnExactNoOp:
-    def test_1_0_is_bit_identical_to_not_passing_it(self, seeds):
-        """The default must not change a single published number. `1.0` and the
-        field's own default have to produce identical box scores, not merely
-        similar means."""
-        explicit = _run(1.0, seeds[:150])
-        implicit = _run(None, seeds[:150])
-        assert explicit == implicit
+ADOPTED = 1.0169
+
+
+class TestTheDefaultIsLIVE:
+    """**THIS CLASS USED TO ASSERT THE OPPOSITE.** While the term was being
+    validated the default was 1.0 and a test pinned it as an exact no-op --
+    `1.0` and the field's own default had to produce bit-identical box scores.
+    Adopting 1.0169 makes that assertion false BY CONSTRUCTION, and the test
+    failing was it doing its job rather than a regression. It is replaced, not
+    deleted, because the property it protected is still worth pinning from the
+    other side: the default must be the value that was actually calibrated, and
+    it must actually reach the simulation."""
+
+    def test_the_default_is_the_ADOPTED_calibrated_value(self):
+        """Pins the number itself, so a silent drift in it is caught. 1.0169 is
+        the pooled real-slate solution (1 se 1.0148..1.0197); the toy figure of
+        1.0096 was never adopted and is 5.3 sigma away."""
+        assert GameConfig().home_field_offense_mult == pytest.approx(ADOPTED)
+
+    def test_the_default_actually_REACHES_the_simulation(self, seeds):
+        """A default the engine never reads would satisfy the test above and
+        change nothing. Box scores under the default must differ from box
+        scores with the term explicitly disabled."""
+        default = _run(None, seeds[:150])
+        disabled = _run(1.0, seeds[:150])
+        assert default != disabled, (
+            "the default is set to 1.0169 but produces the same games as 1.0 -- "
+            "the term is not reaching the simulation")
+
+    def test_explicit_1_0_STILL_disables_it(self, seeds):
+        """The escape hatch has to keep working: passing 1.0 must reproduce the
+        pre-adoption behaviour exactly, so anything that needs the old numbers
+        (a backtest against historical output, say) can still get them."""
+        a = _run(1.0, seeds[:120])
+        b = _run(1.0, seeds[:120])
+        assert a == b
+        assert _run(1.0, seeds[:120]) != _run(ADOPTED, seeds[:120])
 
     @pytest.mark.parametrize("bad", [0.0, -1.0, -0.5])
     def test_a_degenerate_multiplier_falls_back_to_the_no_op(self, seeds, bad):
         """A zero or negative multiplier would invert or annihilate the away
-        side. Unknown must not take a destructive branch."""
+        side. Unknown must not take a destructive branch -- it falls back to
+        1.0 (off), never to the adopted value."""
         assert _run(bad, seeds[:80]) == _run(1.0, seeds[:80])
 
 
