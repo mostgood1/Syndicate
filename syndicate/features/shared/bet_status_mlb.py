@@ -31,9 +31,20 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from syndicate.features.shared.bet_status import segment_refusal
+from syndicate.features.shared.bet_status import FULL_GAME_SEGMENT, segment_refusal
+from syndicate.features.shared.segment_actuals import (
+    REASON_SEGMENT_ACTUAL_PREFIX,
+    is_segment_scoreboard_market,
+    order_segment,
+    segment_scores_view,
+)
 
 __all__ = ["mlb_status_resolver"]
+
+# THE SEGMENTS THIS RESOLVER CAN READ, and how many innings each needs.
+# `market_segments.SPORT_SEGMENTS["mlb"]` is the vocabulary; a segment absent
+# here (any other sport's) falls to `segment_refusal` unchanged.
+_SEGMENT_INNINGS: dict[str, int] = {"first1": 1, "first3": 3, "first5": 5}
 
 REASON_NO_GAME_PK = "no_game_pk"
 REASON_NO_FEED = "no_live_feed"
@@ -264,6 +275,57 @@ def _feed_team_names(feed: Mapping[str, Any]) -> tuple[Any, Any]:
     )
 
 
+def _segment_runs(
+    feed: Mapping[str, Any], innings_needed: int
+) -> tuple[float, float, bool] | None:
+    """`(home, away, complete)` cumulative runs through inning N, or None.
+
+    READS `linescore.innings`, the per-inning list `_combined_score` walks
+    past on its way to the nine-inning total -- same payload, one key over.
+
+    None means THE FEED CANNOT ANSWER: a FINAL game whose linescore stops
+    short of inning N (rain-shortened), or one where a half of an inning
+    <= N was never played (called with the home side ahead, so the bottom
+    half carries no `runs`). Those are named by the caller, never graded.
+    A live or pre-game feed returns the running total with
+    `complete=False` until inning N has ENDED -- `currentInning` past N,
+    or equal to N with `inningState == "End"` -- so a first-five total can
+    decide early on the over (monotone) and never early on the under.
+    """
+    linescore = (feed.get("liveData") or {}).get("linescore") or {}
+    raw_innings = linescore.get("innings")
+    innings = raw_innings if isinstance(raw_innings, list) else []
+    final = _game_is_final(feed)
+    home = away = 0.0
+    seen = 0
+    for position, entry in enumerate(innings, start=1):
+        if not isinstance(entry, Mapping):
+            continue
+        number = _int_or_none(entry.get("num")) or position
+        if number > innings_needed:
+            continue
+        home_runs = (entry.get("home") or {}).get("runs")
+        away_runs = (entry.get("away") or {}).get("runs")
+        if final and (home_runs is None or away_runs is None):
+            return None
+        try:
+            home += float(home_runs or 0)
+            away += float(away_runs or 0)
+        except (TypeError, ValueError):
+            return None
+        seen = max(seen, number)
+    if seen < innings_needed:
+        return None if final else (home, away, False)
+    if final:
+        return home, away, True
+    current = _int_or_none(linescore.get("currentInning"))
+    state = str(linescore.get("inningState") or "").strip().lower()
+    complete = current is not None and (
+        current > innings_needed or (current == innings_needed and state == "end")
+    )
+    return home, away, complete
+
+
 def _combined_score(feed: Mapping[str, Any]) -> float | None:
     linescore = (feed.get("liveData") or {}).get("linescore") or {}
     teams = linescore.get("teams") or {}
@@ -310,6 +372,38 @@ def mlb_status_resolver(selected_date: str):
                 cache[game_pk] = None
         return cache[game_pk]
 
+    def _resolve_segment(order, segment, innings_needed, market):
+        """One segment order: the schedule join and feed read the full game
+        uses, then the segment's own runs through `segment_scores_view`."""
+        game_pk, reason = _resolve_game_pk(order, schedule())
+        if game_pk is None:
+            return {"unavailable_reason": reason or REASON_NO_GAME_PK}
+        feed = _feed(game_pk)
+        if not isinstance(feed, Mapping) or not feed:
+            return {"unavailable_reason": REASON_NO_FEED}
+        runs = _segment_runs(feed, innings_needed)
+        if runs is None:
+            # The feed has the game and not the segment. Named with the
+            # segment, and NEVER the whole-game score.
+            return {"unavailable_reason": f"{REASON_SEGMENT_ACTUAL_PREFIX}{segment}"}
+        home_runs, away_runs, complete = runs
+        home_name, away_name = _feed_team_names(feed)
+        return segment_scores_view(
+            sport="mlb",
+            market=market,
+            order=order,
+            segment=segment,
+            home_score=home_runs,
+            away_score=away_runs,
+            is_final=complete,
+            started=_game_has_started(feed),
+            home_name=home_name,
+            away_name=away_name,
+            matched_by="feed_live_linescore_innings",
+            expect_home=order.get("home_team"),
+            expect_away=order.get("away_team"),
+        )
+
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         # SPORT FIRST. This resolver is handed every order in the ledger, and a
         # non-MLB one is not a defect in anything -- it just needs a different
@@ -331,9 +425,20 @@ def mlb_status_resolver(selected_date: str):
         # one stage earlier -- five orders, $7.08 -- and its fix put `segment`
         # into the board/venue MATCH key only, which stops you PLACING the bet
         # on the wrong ticket and does nothing about grading it.
-        refusal = segment_refusal(order)
-        if refusal is not None:
-            return refusal
+        #
+        # NOW GRADED, off `linescore.innings` in the same feed -- see
+        # `_segment_runs`. The refusal is the FALLBACK: a segment this sport
+        # does not play, or a PLAYER prop with a segment (the linescore has
+        # no player stats), still refuses exactly as before.
+        segment = order_segment(order)
+        if segment != FULL_GAME_SEGMENT:
+            segment_market = str(order.get("market") or "").strip().lower()
+            innings_needed = _SEGMENT_INNINGS.get(segment)
+            if innings_needed is not None and is_segment_scoreboard_market("mlb", segment_market):
+                return _resolve_segment(order, segment, innings_needed, segment_market)
+            refusal = segment_refusal(order)
+            if refusal is not None:
+                return refusal
 
         game_pk, reason = _resolve_game_pk(order, schedule())
         if game_pk is None:
