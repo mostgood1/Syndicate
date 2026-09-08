@@ -28071,3 +28071,64 @@ are not re-attempted blind:**
   Not implemented; low value against the risk of touching the join again today.
 
 Web claim released after this entry.
+
+---
+
+## 2026-09-08 22:32:51Z — refresh-worker — **THE OWED PRODUCTION READING: CONFIRMS the inference, to three decimals, control intact** `[lane nfl-rating-units, measured by scheduled task `nfl-wk1-projection-spread-check`]`
+
+Closes the "**STILL OWED: production's OWN artifact**" obligation left open by the
+**2026-09-08 02:09:30Z refresh-worker `a0d02297` -> `abc56f64`** entry above. That
+entry's production claim was INFERRED from a local control arm because the live
+file had not yet regenerated. It has now. **No deploy, no forced regeneration,
+read-only.**
+
+**THE FILE DID REGENERATE — checked BEFORE computing anything.**
+`smartsim2_projections_2026_wk1.csv`, read via
+`/api/ops/artifacts/export`: `generated_at` now spans
+**2026-09-08T22:27:44Z .. 22:29:15Z** (one stamp per game, written as each sim
+finished), against the stale `2026-09-07T22:07:13Z` the inference was made from.
+`names_only=1` gives `mtime` **1788906771.99 = 2026-09-08T22:32:51Z**, i.e.
+**20 h 23 m after the deploy finished** (1788833370). 3,212 bytes, 16 rows.
+
+**OBSERVED vs PREDICTED — every number matches.**
+
+| | BEFORE (prod, 09-07T22:07:13Z) | PREDICTED (local ON arm) | **OBSERVED (prod, 09-08T22:2xZ)** |
+|---|---|---|---|
+| `margin_mean` stdev (pop) | 0.980 | 4.379 | **4.379** |
+| `margin_mean` range | -0.73 .. +2.77 | -3.94 .. +9.73 | **-3.94 .. +9.73** |
+| `home_win_rate` range | 0.460 .. 0.587 | 0.370 .. 0.777 | **0.370 .. 0.777** |
+| inside P(home) 0.35-0.65 | 16/16 | 11/16 | **11/16** |
+| `rating_source` | `prior_season_fallback` x16 | UNCHANGED x16 | **UNCHANGED x16** |
+
+Extremes: `CLE @ JAX` +9.73 / P(home) 0.777 and `CHI @ CAR` -3.94 / 0.390. The
+five games now OUTSIDE the coin-flip band are CLE@JAX, WAS@PHI, SF@LA, ARI@LAC,
+NO@DET.
+
+**THE CONTROL HELD.** All 16 rows read
+`nflverse_pbp_epa_rolling[prior_season_fallback/prior_season_fallback]`. **Zero
+`neutral_no_data`.** This was the reading that mattered as much as the headline:
+a ratings COLLAPSE would also have widened the spread and would have looked
+exactly like the fix landing. It did not happen. `seeds_used` 300 and
+`profile_name nfl_v1` on all 16, unchanged.
+
+**THE CODE THAT WROTE IT IS NOT `abc56f64` ITSELF — checked, and it does contain
+it.** refresh-worker's live SHA at write time was **`66516b2b`** (live
+2026-09-08T21:34:40Z, lane `nfl-props-autorun-e2e`), 58 minutes before the
+generation window. `git merge-base --is-ancestor abc56f64 66516b2b` = **true**,
+and the env half is still armed: `SYNDICATE_NFL_PPG_RATINGS = 1` read live off
+`/v1/services/srv-d91dpertqb8s73co8ls0/env-vars` (161 keys, paginated).
+`SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` and `NFL_RATING_SCALE` are both
+ABSENT from the live service, so both take their code defaults (86400 s; the
+20.0 that `abc56f64` compiled in) — which is why the regeneration landed ~24 h
+after the previous build rather than sooner.
+
+**verify:** CONFIRMS. The owed production reading reproduces the predicted ON arm
+exactly on all five statistics, from a file demonstrably rebuilt after the
+deploy, under a `rating_source` control that did not degrade. The 02:09:30Z
+entry's inference is now an observation.
+
+**NOT claimed, and this does not change:** any accuracy or pricing improvement.
+The corrected model still LOSES to the closing line — held-out 2025 MAE 10.58 vs
+the market's 9.79, straight-up 60.2% vs 64.2%. **Display honesty only.** The
+observed margin SD of 4.379 still sits UNDER the market's ~5.8-6.1, i.e. the
+board remains somewhat under-confident, which is the safe direction.
