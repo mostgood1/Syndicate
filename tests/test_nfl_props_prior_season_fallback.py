@@ -601,3 +601,85 @@ def test_balanced_selection_falls_back_rather_than_returning_a_short_card():
     ]
     rows = _nfl_card_prop_rows_balanced(entries, 4)
     assert len(rows) == 3, "every available row is used before the card goes short"
+
+
+def _refused(tmp_path, payload, relative="nfl_source/nfl_prop_projections_2026_wk1.json"):
+    import json
+
+    from syndicate.features.shared.artifact_publisher import _publish_refused_as_empty
+
+    path = tmp_path / "artifact.json"
+    path.write_text(
+        payload if isinstance(payload, str) else json.dumps(payload), encoding="utf-8"
+    )
+    return _publish_refused_as_empty(path, relative)
+
+
+def test_an_empty_prop_artifact_is_refused_at_the_publish_choke_point(tmp_path):
+    """The guard that does not RACE.
+
+    refresh-worker cannot build this artifact -- it has the odds (2,463 rows)
+    but not the player-level pbp -- so its autorun wrote a 284-byte zero-row
+    file and the next queued refresh job published it over web's healthy copy:
+    `PUBLISH_OK ... bytes=284` at 19:19:57, 19:22:34 and 20:01:38, taking
+    /nfl/api/props to 0 cards twice.
+
+    The producer already refuses to WRITE an empty artifact and the autorun
+    repairs an already-empty local copy. Neither is sufficient: the first cannot
+    help when the bad file predates it, and the second is a race that won by 66
+    seconds on one boot and can lose on a slower one. This sits on the act that
+    does the damage.
+    """
+    assert _refused(tmp_path, {"season": 2026, "week": 1, "sim_rows": []}) is True
+    assert _refused(tmp_path, {"rows": []}) is True, "legacy row key also covered"
+
+
+def test_a_populated_artifact_publishes_normally(tmp_path):
+    assert _refused(tmp_path, {"sim_rows": [{"entity": "x"}] * 5}) is False
+
+
+def test_unreadable_is_not_empty_and_must_still_publish(tmp_path):
+    """Refusing on "I could not tell" would turn a parse bug into a silent
+    publishing outage -- a worse failure than the one being fixed."""
+    assert _refused(tmp_path, "{truncated json") is False
+    assert _refused(tmp_path, [1, 2, 3]) is False
+    assert _refused(tmp_path, {"season": 2026}) is False, "no row key = cannot tell"
+
+
+def test_the_guard_only_applies_to_registered_paths(tmp_path):
+    """An empty payload on an UNREGISTERED path is none of this guard's business."""
+    assert _refused(tmp_path, {"sim_rows": []}, relative="mlb_source/something.json") is False
+
+
+def test_the_guard_is_size_gated_so_the_steady_state_costs_one_stat(tmp_path):
+    """A real week-1 artifact is ~404 KB and must never be parsed per publish."""
+    from syndicate.features.shared.artifact_publisher import _NON_EMPTY_SUSPECT_BYTES
+
+    payload = {"sim_rows": [], "pad": "x" * (_NON_EMPTY_SUSPECT_BYTES + 1000)}
+    assert _refused(tmp_path, payload) is False
+
+
+def test_the_registered_row_key_matches_what_the_writer_emits(tmp_path):
+    """SCHEMA AGREEMENT, pinned deliberately.
+
+    An earlier guard in this same chain read `rows`; the artifact has only ever
+    emitted `sim_rows`, so it returned False for every input and shipped inert.
+    """
+    import json
+
+    from syndicate.features.nfl import props as props_module
+    from syndicate.features.shared.artifact_publisher import _NON_EMPTY_ROW_KEYS
+
+    monkey_root = tmp_path
+    original = props_module.nfl_artifact_output_root
+    try:
+        props_module.nfl_artifact_output_root = lambda: monkey_root
+        path = props_module.write_nfl_prop_projection_artifact(2026, 1, [])
+    finally:
+        props_module.nfl_artifact_output_root = original
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert any(key in payload for key in _NON_EMPTY_ROW_KEYS), (
+        f"the writer emits {sorted(payload)} and the guard looks for "
+        f"{_NON_EMPTY_ROW_KEYS} -- they have drifted apart"
+    )

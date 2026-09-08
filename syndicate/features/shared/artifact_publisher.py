@@ -1739,6 +1739,71 @@ def _publish_streamed(
         return False
 
 
+# ARTIFACTS THAT ARE MEANINGLESS WHEN EMPTY, and must never be published as
+# such. Registry rather than a special case in one caller, for the reason
+# `_pull_season_artifacts_once_per_process` already records at length: the
+# sweep has FOUR paths into it and a guard on one is bypassed by the other
+# three.
+#
+# MEASURED 2026-09-08. refresh-worker cannot BUILD the NFL prop artifact -- it
+# has the odds (2,463 rows) but not the player-level play-by-play, which is not
+# allowlisted and is 97.9 MB against a 12 MiB ceiling. Its autorun therefore
+# wrote a 284-byte zero-row artifact to local disk, and the next queued refresh
+# job swept it up and published it over web's healthy 966-row copy:
+# `PUBLISH_OK ... bytes=284` at 19:19:57, 19:22:34 and 20:01:38, taking
+# `/nfl/api/props` from 1,684 cards to 0 twice.
+#
+# The producer already refuses to WRITE an empty artifact, and the autorun now
+# repairs a local copy that is already empty. Both were necessary and neither is
+# sufficient: the first cannot help when the bad file predates it, and the
+# second is a RACE -- it won by 66 seconds on the 21:34:40Z boot and a slower
+# boot loses it. This guard is the one that does not race, because it sits on
+# the act that does the damage.
+#
+# EMPTY IS NOT THE SAME AS ABSENT OR UNREADABLE. Only a file that parses and
+# carries an explicitly empty row list is refused. A file this cannot read is
+# published exactly as before -- refusing on "I could not tell" would turn a
+# parse bug into a silent publishing outage, which is a worse failure than the
+# one being fixed.
+_NON_EMPTY_REQUIRED_PATTERNS = (
+    "nfl_source/nfl_prop_projections_*.json",
+)
+
+# The row key differs by artifact family, so try each and use the first the
+# payload actually has. `sim_rows` is what
+# `write_nfl_prop_projection_artifact` emits -- and reading the wrong key here
+# is not hypothetical: an earlier guard in this same chain read `rows`, which
+# that artifact has never had, and shipped completely inert.
+_NON_EMPTY_ROW_KEYS = ("sim_rows", "rows", "records")
+
+# A populated NFL week-1 prop artifact is ~404 KB; the empty one is 284 B. Only
+# a suspiciously small file is ever parsed, so the steady state costs one
+# `stat()` and no JSON decode.
+_NON_EMPTY_SUSPECT_BYTES = 8192
+
+
+def _publish_refused_as_empty(file_path: Path, relative_path: str) -> bool:
+    """True only when this path is registered non-empty AND is provably empty."""
+    if not any(
+        fnmatch.fnmatch(relative_path, pattern)
+        for pattern in _NON_EMPTY_REQUIRED_PATTERNS
+    ):
+        return False
+    try:
+        if file_path.stat().st_size > _NON_EMPTY_SUSPECT_BYTES:
+            return False
+        payload = json.loads(file_path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 -- unreadable is not empty; publish as before
+        return False
+    if not isinstance(payload, dict):
+        return False
+    for key in _NON_EMPTY_ROW_KEYS:
+        if key in payload:
+            rows = payload.get(key)
+            return isinstance(rows, list) and not rows
+    return False
+
+
 def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     """Best-effort push of a single allowlisted artifact to the web service.
 
@@ -1757,6 +1822,16 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
         return False
 
     file_path = Path(path)
+
+    # BEFORE the stream/envelope fork, so BOTH publishing forms are covered.
+    if _publish_refused_as_empty(file_path, relative_path):
+        print(
+            f"[artifact_publisher] REFUSED_EMPTY_PAYLOAD path={relative_path} "
+            f"bytes={file_path.stat().st_size} "
+            f"(a registered non-empty artifact; existing published copy kept)",
+            flush=True,
+        )
+        return False
 
     # Big files go up as a raw streamed body instead of a JSON envelope. See
     # _PUBLISH_STREAM_MIN_BYTES for the measurement and the reasoning; below the
