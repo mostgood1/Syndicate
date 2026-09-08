@@ -5280,6 +5280,37 @@ def _nfl_prop_projection_script_args(season: int, week: int) -> list[str]:
     return [sys.executable, str(script_path), "--season", str(season), "--week", str(week)]
 
 
+_NFL_PROP_ARTIFACT_SUSPECT_BYTES = 8192
+
+
+def _nfl_prop_artifact_is_empty(artifact_path: Path) -> bool:
+    """True only when the artifact is present and carries ZERO rows.
+
+    Size-gated so the steady state costs one `stat()`: a real week-1 artifact is
+    ~444 KB (980 rows), the empty one this exists to detect is 284 B. Anything
+    larger than the suspect threshold is taken as non-empty without parsing.
+
+    Absent is NOT empty -- a missing artifact is already handled by the
+    staleness decision's own missing-artifact branch, and returning True here
+    would double-count it into `#389`'s relaunch loop. Unreadable is not empty
+    either: a truncated or half-written file is a state this cannot diagnose, so
+    it declines to force a launch rather than guess.
+    """
+    try:
+        if not artifact_path.is_file():
+            return False
+        if artifact_path.stat().st_size > _NFL_PROP_ARTIFACT_SUSPECT_BYTES:
+            return False
+        with artifact_path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except Exception:  # noqa: BLE001 -- never fatal to the tick loop
+        return False
+    if not isinstance(payload, dict):
+        return False
+    rows = payload.get("rows")
+    return isinstance(rows, list) and not rows
+
+
 def _launch_autorun_nfl_prop_projections(
     *,
     latest_manifest_path: Path,
@@ -5297,10 +5328,27 @@ def _launch_autorun_nfl_prop_projections(
 
     Both refusal counters at zero prove nothing reached the team check, so every
     row exited at `player_id is None` -- which requires `player_name_index`
-    empty for BOTH 2026 and 2025, and both derive from play-by-play. **web has
-    no pbp.** This service does. `CLAUDE.md`: workers write artifacts, web reads
-    them; the prop model was running on the service without the data AND on the
-    request path, violating both halves of that rule at once.
+    empty for BOTH 2026 and 2025, and both derive from play-by-play.
+
+    CORRECTED 2026-09-08: this docstring used to end "**web has no pbp.** This
+    service does." THE SECOND HALF IS FALSE, and this autorun was built on it.
+    Its own first run, 120 ms after the launch line above:
+
+        JOIN ... sim_source=computed odds_rows=2463 sim_rows=0
+                 refused_wrong_team=0 refused_unknown_team=0
+
+    2,463 odds rows here, zero sim rows, both counters zero -- the identical
+    signature web showed. `nflverse_pbp_epa_rolling` in the projection artifact
+    is TEAM-level EPA and never implied the player-level columns. NEITHER
+    SERVICE HAS THE PLAYER pbp: `nfl_source/tracking/nflverse/pbp/pbp_*.csv` is
+    not in `HOT_ARTIFACT_PATTERNS` at all, and `pbp_2025.csv` is 97.9 MB against
+    a 12 MiB publish ceiling, so it cannot be shipped here either.
+
+    SO THIS AUTORUN CANNOT SUCCEED ON THIS SERVICE, and its remaining job is to
+    fail without damage: the builder refuses to publish a zero-row artifact and
+    repairs its local copy from the published one. The real producer is an
+    offline run on a machine that has the pbp -- which `CLAUDE.md` permits:
+    artifact generation happens in background workers "or offline scripts".
 
     SHAPE COPIED FROM `_launch_autorun_season_projections` DELIBERATELY: same
     env gate, same `_season_projection_should_launch` staleness decision (whose
@@ -5332,6 +5380,32 @@ def _launch_autorun_nfl_prop_projections(
     should_launch, decision_reason = _season_projection_should_launch(
         "nfl_props", artifact_path, season=season, week=week,
     )
+    # AN EMPTY ARTIFACT IS NOT A FRESH ONE -- gate on the OUTPUT, not the mtime.
+    #
+    # `_season_projection_should_launch` answers "is it old?" from `stat()`
+    # alone. A zero-row artifact written 10 seconds ago is mtime-fresh and
+    # content-broken, and this exact state is what refresh-worker was left in:
+    # the pre-guard run wrote a 284-byte empty file at 19:19:57Z, so every
+    # subsequent tick for the next 24 h reads `artifact_fresh` and skips --
+    # while a periodic sweep republishes that empty file over web's good copy
+    # after every restart. Without this override the repair below is unreachable
+    # for a day, which is to say the fix ships inert.
+    #
+    # Deliberately NOT changed inside `_season_projection_should_launch`: that
+    # helper is shared with the MLB/NCAAF season projections, whose artifacts
+    # have a different shape, and `#389`'s whole lesson is that widening a
+    # relaunch condition is how a busy loop gets built. The override is scoped
+    # to this sport and to the one reason string it can safely reinterpret.
+    #
+    # Cheap by construction: a healthy artifact is ~444 KB, an empty one 284 B,
+    # so only a suspiciously small file is ever parsed. Nothing is read per tick
+    # in the steady state.
+    if not should_launch and decision_reason.startswith("artifact_fresh"):
+        empty_rows = _nfl_prop_artifact_is_empty(artifact_path)
+        if empty_rows:
+            should_launch = True
+            decision_reason = f"artifact_empty overriding[{decision_reason}]"
+
     if not should_launch:
         _log_season_projection_skip("nfl_props", decision_reason)
         return False

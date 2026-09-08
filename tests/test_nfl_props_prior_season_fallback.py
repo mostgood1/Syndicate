@@ -380,3 +380,72 @@ def test_the_player_pbp_is_not_publishable_which_is_why_the_worker_cannot_build(
     assert not is_hot_artifact_relative_path(
         "nfl_source/tracking/nflverse/pbp/pbp_2025.csv"
     )
+
+
+def _load_refresh_worker():
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location(
+        "run_refresh_worker_for_nfl_prop_gate", repo_root / "scripts" / "run_refresh_worker.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_an_empty_prop_artifact_does_not_read_as_fresh(tmp_path):
+    """Gate on the ROWS, not the mtime.
+
+    `_season_projection_should_launch` answers "is it old?" from stat() alone,
+    so the 284-byte empty artifact the pre-guard run left on refresh-worker at
+    19:19:57Z reads `artifact_fresh` for a full 24 h. During that window the
+    autorun skips every tick while a periodic sweep republishes that empty file
+    over web's good copy after each restart. Without this the repair is
+    unreachable for a day, i.e. the fix ships inert.
+    """
+    import json
+
+    worker = _load_refresh_worker()
+    is_empty = worker._nfl_prop_artifact_is_empty
+
+    empty = tmp_path / "empty.json"
+    empty.write_text(json.dumps({"season": 2026, "week": 1, "rows": []}), encoding="utf-8")
+    assert is_empty(empty) is True
+
+
+def test_the_empty_check_never_forces_a_launch_on_anything_else(tmp_path):
+    """Every non-empty state must return False, including the ones it cannot read.
+
+    ABSENT is not empty -- the staleness decision already has a missing-artifact
+    branch, and returning True here would double-count it into `#389`'s relaunch
+    loop. TRUNCATED is not empty either: that is a state this cannot diagnose,
+    so it declines to force a launch rather than guess. And the check is
+    size-gated, so a healthy ~444 KB artifact is never parsed per tick.
+    """
+    import json
+
+    worker = _load_refresh_worker()
+    is_empty = worker._nfl_prop_artifact_is_empty
+
+    small_non_empty = tmp_path / "small.json"
+    small_non_empty.write_text(json.dumps({"rows": [{"a": 1}] * 5}), encoding="utf-8")
+    assert is_empty(small_non_empty) is False
+
+    large = tmp_path / "large.json"
+    large.write_text(json.dumps({"rows": [{"a": "x" * 200}] * 100}), encoding="utf-8")
+    assert large.stat().st_size > worker._NFL_PROP_ARTIFACT_SUSPECT_BYTES
+    assert is_empty(large) is False
+
+    assert is_empty(tmp_path / "does_not_exist.json") is False
+
+    truncated = tmp_path / "truncated.json"
+    truncated.write_text("{not valid json", encoding="utf-8")
+    assert is_empty(truncated) is False
+
+    not_a_dict = tmp_path / "list.json"
+    not_a_dict.write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+    assert is_empty(not_a_dict) is False
