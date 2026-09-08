@@ -1664,7 +1664,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   reason, so this follows an established, declared precedent rather than setting
   a new one.
   Both lanes are THIS SESSION (520cd594), so the edits made from here -- the
-  soccer ESPN seed at the `history/` glob, and the publish-ACCEPTED log raised
+  soccer ESPN seed at the league history-directory glob, and the publish-ACCEPTED log raised
   by `segment-regrade-apply` -- are not cross-session. The claims stay in the
   other block because two lanes may not claim one file; duplicating them trips
   the contested-file invariant, which is how I found the right shape. Written
