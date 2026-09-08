@@ -26691,3 +26691,57 @@ LOSES to the close — held-out 2025 MAE 10.58 vs 9.79, straight-up 60.2% vs
 64.2%. This is display honesty, not edge. The ON arm's margin SD of 4.38 also
 sits UNDER the market's ~5.8-6.1, i.e. still slightly under-confident, which is
 the safe direction to be wrong in.
+
+---
+
+## 2026-09-08 02:2xZ — web `8589c005` → `81213a32` — **MEASURED: the chip fan-out coalesces (inline floor 9,672 → 648 ms). NOT SUFFICIENT: one real build still costs 5–9 s.** `[lane web-oom-profiler-steady]`
+
+`dep-dafn1lad0e5s73d3opjg`, preflight CLEAR, claim held. **PINNED, NOT THE TIP**
+(`origin/main` was `d133ba6c`): the tip carries a peer's lens change that is not
+mine to ship. I could NOT exclude `abc56f64` (`NFL_RATING_SCALE 10.0 → 20.0`, a
+live model change) because it sits BELOW my commit — excluding it would mean
+going off `main`, which preflight forbids. **It shipped. Enumerating it here
+rather than letting it be silent**, along with `live_gameline_join.py`,
+`live_gameline_ledger.py` and `soccer_projections.py`.
+
+**THE HEADLINE NUMBERS ARE NOT COMPARABLE, and reading them raw inverts the
+result.** 4 concurrent x 3 rounds, both arms:
+
+    arm      worker_artifact  inline_artifact_stale  >=5s        artifact age
+    BEFORE        8/12               4/12            4/12 (33%)   10 .. 1013 s
+    AFTER         0/12              12/12            6/12 (50%)  548 ..  631 s
+
+Two thirds of the BEFORE arm never ran the fan-out at all. The AFTER arm caught
+the worker ~10 minutes past its last publish, so every request took the inline
+path. **That is the worker's publish cadence differing between arms, not this
+change.** Same denominator trap as the intelligence measurement earlier tonight.
+
+**LIKE FOR LIKE — the inline path, the only path this touches:**
+
+    arm      n     min      p50      max      >=5s
+    BEFORE   4    9,672   11,520   13,392    4/4 (100%)
+    AFTER   12      648    5,998    9,434    6/12 (50%)
+
+    AFTER, every sample: 648 697 699 720 | 4610 4854 7142 7184 7794 7860 8589 9434
+
+**THE FOUR SUB-750 ms RESPONSES ARE THE STALE SERVES, and their COUNT is the
+mechanism confirmed rather than assumed.** Web runs **2 gunicorn processes**,
+each with its own cache and its own flight. Round 1 is cold so both build;
+rounds 2 and 3 each yield one builder plus one stale serve per process =
+2 x 2 = **exactly 4**. Predicted before it was read, and it matches.
+
+**IT IS NOT ENOUGH, and the reason is not the fix.** The duplication is gone —
+the floor fell 9,672 → 648 ms and the median halved — but ONE real fan-out
+costs 5–9 s, over the 5 s health-check budget by itself. This removed the
+multiplication, not the build.
+
+**THE REMAINING PROBLEM IS UPSTREAM.** The worker's chip artifact was 548–631 s
+stale for the whole AFTER window and 10–1,013 s in the BEFORE one, against a
+120 s threshold. When it is fresh this route serves in ~400 ms and none of this
+matters. **The high-value fix is the publish cadence on refresh-worker, not
+anything on web** — `#564`'s own comment already measured inter-publish gaps of
+3–19 minutes. Not this lane's file and not attempted here.
+
+**verify:** the inline path's FLOOR falls below 1 s and the stale-serve count
+matches processes x (rounds - 1) — **PASSING**, 648 ms and 4 of 4 predicted.
+The route's >=5 s share does NOT clear the budget and is NOT claimed to.
