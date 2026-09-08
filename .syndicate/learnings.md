@@ -3679,3 +3679,41 @@ have counted for it to be true, and whether you counted it. If not, attribute it
 alone. And a claim about your OWN behaviour is checkable in seconds: I did not
 check mine.
 - *(evidence in `learnings_evidence.md`)*
+
+## 2026-09-07 FORBIDDEN: publishing a PRODUCTION LATENCY or ERROR reading without first establishing that no other session was loading that service. ~80 sessions share these three services; a concurrent load test makes the instrument read the other session, not the route. `[lane ncaaf-live-resim-wire]`
+
+I probed `/api/ops/artifacts/export?names_only=1` on web, saw one subset take
+>150 s and a third return **502**, and reported it as `#632` latency on that
+route. It was not. `web-oom-profiler-steady` was firing 18 requests at
+`/api/intelligence/query` in three 6-concurrent bursts, 00:50:06-00:53:14Z,
+against **8 gunicorn slots** (`WEB_CONCURRENCY=2` x `GUNICORN_THREADS=4`), each
+held 20-65 s. Their clean reading of the SAME route at 00:48:22Z was **19.1 s
+median / 25.6 s max**. My number was ~8x their number and was measuring them.
+
+THE OVERLAP IS CHECKABLE AFTER THE FACT, and checking it is what turned a
+retraction into two findings. My probe's output file was last written
+**00:53:45.302Z** and had run >120 s, so it began no later than 00:51:45Z --
+inside their window. But it also showed:
+
+- My 502 landed **31 s AFTER their burst ENDED**. So a burst's slot-hold outlives
+  its last dispatch by the length of its longest request; "my load stopped at T"
+  does not mean the service was free at T.
+- It landed **1.4 s BEFORE** their `unhealthy` event at 00:53:46.700Z, so that
+  health-check failure is at least PARTLY MINE. **The confound is symmetric and
+  you owe the other session the reciprocal warning** -- otherwise they
+  re-baseline against a failure you caused.
+
+**HOW TO APPLY.**
+- Before publishing any production timing, ask what else is running. `lanes.md`
+  names the lanes; a message to the owner costs one turn and is cheaper than a
+  retraction.
+- SPLIT THE READING BY WHAT LOAD CAN TOUCH. Counts, ancestry, and pure local
+  computations survive; wall-clock and 5xx do not. Here the correctness readings
+  (2,371 artifacts / 667 deep; 6,316 / 5,924) and the keep-counts (111/107/161 of
+  177 patterns) all stood -- only the latency claim died. Saying which half is
+  which is the difference between a retraction and a total loss.
+- **A STRUCTURAL claim and its PRODUCTION consequence are two claims.** "Leading-`*`
+  subsets are the pre-filter's worst case" is arithmetic over the pattern list and
+  stands. "...and therefore still fall over in production" needed the measurement,
+  and died with it. Do not let the surviving half smuggle the dead half along.
+- *(evidence in this file's PART 4 entry in `log/2026-09-07.md`)*
