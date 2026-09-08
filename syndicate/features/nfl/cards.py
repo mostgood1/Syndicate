@@ -521,6 +521,55 @@ def build_cards_page_context(selected_week: int, *, season: int | None = None, s
             using_smartsim_fallback = True
     using_sample_data = False
 
+    # ---------------------------------------------------------------------
+    # LIVE GAME STATE. Without this the NFL regular-season board is
+    # PERMANENTLY PREGAME.
+    #
+    # `live_game_state.py` has existed for weeks and its ONLY callers were
+    # `preseason_cards.py` (always `SEASONTYPE_PRESEASON`) and an unrelated
+    # fantasy-news module. `scripts/poll_nfl_live_state.py`'s own docstring
+    # says so outright: "the regular season is not wired at all". Both
+    # builders above hardcode `card_variant: "shared_default"` and neither
+    # ever set `game["live_state"]` -- which is the key
+    # `publication_adapter._shared_game_state` reads to produce
+    # `shared_is_live` / `shared_game_state`, the fields the card template
+    # already branches on.
+    #
+    # MEASURED 2026-08-13, the defect this closes: 117 live in-game NFL
+    # market rows with `state=pregame, score=-` while ESPN had two of those
+    # games in Q1. Measured again 2026-09-07: 71 NFL board rows, all
+    # pregame, zero live.
+    #
+    # SEASONTYPE_REGULAR, not PRESEASON. The constant has been defined and
+    # unused since the preseason work -- passing the wrong one here would
+    # fetch a scoreboard for the wrong season type and the join would match
+    # nothing, which looks exactly like "no games are live".
+    #
+    # NEVER FATAL. A cards page that renders without live state is degraded;
+    # one that 500s because ESPN was slow is broken. The coverage counts are
+    # printed rather than swallowed, because "the join found nothing" and
+    # "the join worked and every game is pregame" produce the same board and
+    # are different defects.
+    if games:
+        try:
+            from syndicate.features.nfl.live_game_state import (
+                SEASONTYPE_REGULAR,
+                attach_nfl_live_game_state,
+                nfl_game_state_index,
+            )
+
+            coverage = attach_nfl_live_game_state(
+                games,
+                nfl_game_state_index(season, resolved_week,
+                                     seasontype=SEASONTYPE_REGULAR),
+            )
+            print(f"[nfl_cards] LIVE_STATE season={season} week={resolved_week} "
+                  f"{coverage}", flush=True)
+        except Exception as exc:
+            print(f"[nfl_cards] LIVE_STATE_FAILED season={season} "
+                  f"week={resolved_week} error={type(exc).__name__}: {exc}",
+                  flush=True)
+
     weeks = _available_card_weeks(season)
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
     scoreboard_items = [
@@ -876,10 +925,54 @@ def build_nfl_market_board(season: int, week: int) -> dict[str, Any]:
                 "home_abbr": home_abbr,
                 "away_logo": away_branding.logo_url if away_branding else None,
                 "home_logo": home_branding.logo_url if home_branding else None,
+                # Overwritten below from real ESPN state. Kept as the literal
+                # default so a game the live join does not match still carries
+                # a valid value rather than a missing key.
                 "game_state": "pregame",
                 "rows": inventory,
             }
         )
+
+    # THE SECOND INSTANCE OF THE SAME DEFECT, on a different route. `/nfl/cards`
+    # was permanently pregame because nothing set `live_state`; this board was
+    # permanently pregame because it hardcodes the string outright. Fixing only
+    # the first would leave two NFL surfaces disagreeing about whether the same
+    # game is live -- which is worse than both being wrong the same way, because
+    # it reads as a data problem rather than a wiring one.
+    #
+    # Same rules: SEASONTYPE_REGULAR, never fatal, coverage printed. The lookup
+    # is by matchup rather than by `live_state`, because these rows are not game
+    # cards and never go through `publication_adapter`.
+    if board_games:
+        try:
+            from syndicate.features.nfl.live_game_state import (
+                SEASONTYPE_REGULAR,
+                nfl_game_state_index,
+            )
+
+            index = nfl_game_state_index(season, week, seasontype=SEASONTYPE_REGULAR)
+            matched = 0
+            for entry in board_games:
+                row = index.get(str(entry.get("matchup") or "")) or index.get(
+                    f"{entry.get('away_abbr')} @ {entry.get('home_abbr')}")
+                # `dict`, not `Mapping`: this module imports only `Any` from
+                # typing, and `nfl_game_state_index` is annotated
+                # `dict[str, dict[str, Any]]`. A bare `Mapping` here compiled
+                # fine and would have raised NameError on the first live game
+                # -- the third time today a missing import passed py_compile
+                # and would have failed at runtime.
+                if not isinstance(row, dict):
+                    continue
+                state = str(row.get("state") or "").strip().lower()
+                if state:
+                    entry["game_state"] = state
+                    matched += 1
+            print(f"[nfl_market_board] LIVE_STATE season={season} week={week} "
+                  f"games={len(board_games)} matched={matched} index={len(index)}",
+                  flush=True)
+        except Exception as exc:
+            print(f"[nfl_market_board] LIVE_STATE_FAILED season={season} week={week} "
+                  f"error={type(exc).__name__}: {exc}", flush=True)
 
     return {
         "season": season,
