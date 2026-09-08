@@ -170,6 +170,24 @@ death, never life — do not invert it.
   on `nfl-rating-units` closing.
 
 ## OPEN
+### publish-503-rate-baseline — OPEN — opened 2026-09-08 — session 435e6279-c6d8-4a9c-b41c-f1bd67112631
+- Goal: state whether web's `/api/ops/artifacts/publish` **503 rate** (merge-at-capacity
+  backpressure, `syndicate/blueprints/ops.py:2298`) is steady state or specific to a
+  bandwidth-spike hour — as a RATE with its denominator, per hour, over 24 contiguous buckets.
+- Files: NONE. The measurement runs from a scratch script outside the repo and writes no
+  tracked file; the result is recorded in the ledger only. Deliberately naming no path
+  here — an earlier draft wrote the ledger destinations into this block and the parser
+  read them as a claim on the whole ledger directory, contesting another OPEN lane.
+- Hypothesis: the 23% 503 rate measured in ONE hour (693/2,996, 2026-09-07T23:00Z) is
+  elevated relative to ordinary hours, i.e. the merge ceiling is hit disproportionately
+  during a spike bucket.
+- Falsification test: if ordinary (non-spike, non-deploy) buckets show a comparable or
+  higher 503 share, the hypothesis is dead and 23% is simply what this system does.
+- Verification: a 24-row table, every row fetched by the IDENTICAL pager and text filter
+  (no separately-sampled control — `2026-09-03` FORBIDDEN), each row carrying its
+  denominator and its fetch coverage, with deploy-adjacent buckets reported separately and
+  never pooled (`2026-09-02` FORBIDDEN: post-restart ramp).
+- Blocked by: none
 
 ## OPEN
 ### settled-sample-nfl-reconcile — OPEN — opened 2026-09-04 — two settlement ledgers disagreed about NFL, and the disagreement sizes real money
