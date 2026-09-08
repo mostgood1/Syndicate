@@ -7119,6 +7119,46 @@ class IntelligenceStateService:
             # a factor -- settles whether the thread is genuinely idle or
             # actually working. Remove once resolved.
             print(f"[intelligence_state] LOOP_ITERATION pending_keys={len(self._pending_keys)} watched_payloads={len(self._watched_payloads)}", flush=True)
+            # `#632`. PUBLISH THE SCOREBOARD CHIPS ON THEIR OWN CADENCE.
+            #
+            # Chips were written once per `build_layer2_shortlist`, so their
+            # cadence WAS the heavy board build's. Measured on refresh-worker
+            # 2026-09-08, per date (the endpoint reads exactly one --
+            # `central_today_iso()`): consecutive `GAME_CHIPS_PUBLISHED` ran a
+            # **24.1 minute median, range 12.6-32.2**, against the endpoint's
+            # 120 s freshness threshold. So `/api/board/game-chips` served
+            # `source=inline_artifact_stale` on 5 of 5 probes and ran the
+            # per-sport fan-out inline on essentially every request.
+            #
+            # HERE, at the top of the tick, because this is the only point that
+            # runs on EVERY iteration regardless of what the board build is
+            # doing -- and the chips depend on none of that work
+            # (`layer2_shortlist.py` says so in its own comment).
+            #
+            # The call is cheap when it refuses: interval-gated (120 s default,
+            # 60 s floor) before it touches memory or providers, and it never
+            # raises. `#241` is why the gates live in the callee rather than
+            # here -- added periodic worker work caused a restart loop once.
+            #
+            # IT NEEDS ITS OWN THREAD, and that was MEASURED, not assumed. This
+            # tick fires every **1-18 minutes, median ~15** -- it blocks on the
+            # board build and on its own condition wait -- so publishing from
+            # here would inherit the very cadence being fixed. `ensure_publisher_thread`
+            # is idempotent, so this tick merely BOOTSTRAPS a thread that then
+            # runs on its own 120 s clock; nothing else needs to know about a
+            # new lifecycle.
+            try:
+                from syndicate.features.shared.game_chip_publisher import (
+                    ensure_publisher_thread,
+                )
+
+                ensure_publisher_thread()
+            except Exception as _chip_pub_exc:
+                print(
+                    "[intelligence_state] CHIP_PUBLISH_TICK_FAILED "
+                    f"error={type(_chip_pub_exc).__name__}: {_chip_pub_exc}",
+                    flush=True,
+                )
             # #93 follow-up. Independent of the canonical board-state flags
             # below -- this seeds the legacy _watched_payloads queue (the
             # storage that's actually live in production) with an explicit
