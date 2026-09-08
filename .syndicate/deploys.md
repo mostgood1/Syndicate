@@ -28327,3 +28327,69 @@ props page is a 2,541,986-byte document and nobody has measured its per-request
 cost — recorded as a LEAD, not a diagnosis.
 
 Claim released after this entry.
+
+
+---
+
+## 2026-09-08 23:44-23:47Z — web `98deeceb` -> `e4552e27` + ENV `GUNICORN_CMD_ARGS` — lane `nfl-props-autorun-e2e`
+
+**Purpose: bound web's unrecycled memory growth before the NFL opener.** Web had
+**7 `server_failed` events today, 5 of them `oomKilled` at 2Gi**, and gunicorn
+was running with NO `--max-requests`, so a worker was never recycled and a
+pymalloc accumulation (+532.5 MB in one measured episode) was permanent until an
+OOM or a deploy.
+
+**THE CHANGE WAS NOT MADE IN `render.yaml`, AND THAT IS THE MOST IMPORTANT LINE
+IN THIS ENTRY.** The obvious edit — adding `--max-requests` to the startCommand —
+would fire `blueprint_sync`. Enumerating first (CLAUDE.md's own pre-push step)
+showed `render.yaml` is **166 env vars behind production**:
+
+    service            yaml   live   sync would DELETE   would CHANGE
+    web                  52     84          33                1
+    refresh-worker       84    161          77                1
+    live-odds-worker     76    132          56                1
+
+A sync would have deleted `SYNDICATE_EXECUTION_MODE=live`,
+`SYNDICATE_EXECUTION_LIVE_ARMED=1` and the spend caps of a LIVE-MONEY execution
+system, and overwritten `ODDS_API_KEY` on all three services. **User decision
+taken on this evidence: use the env route instead.** `learnings.md` now carries
+it as FORBIDDEN-until-reconciled.
+
+**What was actually done:** `GUNICORN_CMD_ARGS = "--max-requests 1000
+--max-requests-jitter 100"` set on web via the SINGLE-KEY endpoint
+(`PUT /v1/services/<id>/env-vars/<KEY>`), then a deploy, because env changes need
+one. Verified the blast radius: web went **84 -> 85 keys, exactly +1**, with
+`WEB_CONCURRENCY`, `GUNICORN_THREADS`, `GUNICORN_TIMEOUT` and `ADMIN_TOKEN`
+re-read and unchanged. Revert = delete that one key.
+
+The jitter is load-bearing, not decoration: with `WEB_CONCURRENCY=2`, an
+un-jittered recycle restarts BOTH workers at the same request count, leaving
+nobody to answer `/healthz` — which is precisely the starvation failure
+`render.yaml`'s own comment records from 2026-07-25.
+
+**verify: OWED. NOT claimed, and here is why the obvious check is worthless.**
+`Booting worker` / `Worker exiting` are NOT captured on this service — searched
+the previous deploy's window and matched NOTHING — so their absence proves
+nothing about recycling. The discriminating instrument is `pid` +
+`process_age_s` on `GROWTH_EPISODE`.
+
+**Pre-fix baseline, measured (this IS the defect):**
+
+    pid 97:  age  906.6 -> 1148.2 -> 1877.5 -> 2850.0 s
+    pid 98:  age  914.6 -> 1033.9 -> 1400.0 -> 2357.9 s
+
+Two workers, ages climbing monotonically to 47 minutes, never resetting.
+
+**THE READING OWED:** a NEW pid, or `process_age_s` resetting to a small value,
+WITHOUT a deploy. Threshold is 1,000 requests; at ~400 `/healthz`/hour plus real
+traffic that is 1-2 h out, so it cannot be read tonight. A watcher is armed on
+the Render API (deliberately not on web — this service's own fragility is the
+subject).
+
+**PARTIAL, and stated as partial:** `/healthz` answers 200 in 0.32 s and the
+deploy succeeded, so gunicorn booted with the variable present. That does NOT
+prove the flag is in effect — a clean boot is equally consistent with gunicorn
+having IGNORED the variable. Gunicorn 21.2 documents `GUNICORN_CMD_ARGS`, so
+"read and applied" is likely; likely is not verified.
+
+Board unaffected: 1,670 cards after the deploy. Claim released after this entry.
