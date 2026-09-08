@@ -512,6 +512,11 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # not in this list cannot be published to the worker OR audited through
     # /api/ops/artifacts/*, which makes every question about it a local guess.
     "*_source/calibration/*.json",
+    # The staked-probability blend profile (lane pricing-plane-v1, P2, 2055798c)
+    # lives at the DATA ROOT, not under a sport tree, because its cells span
+    # sports; the glob above cannot match it. Declared single-entry write under
+    # this file's region-split convention. Absent profile = beta 0 = bit-identical.
+    "calibration/staked_probability_profile.json",
     "*_source/data/processed/recommendations*.json",
     "*_source/data/processed/recommendations*.csv",
     "*_source/data/processed/props_recommendations*.json",
