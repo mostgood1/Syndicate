@@ -26432,3 +26432,83 @@ strength: that is the OUTCOME verified, not WHICH CODE PATH produced it.** If a
 row ever appears with an edge and a null basis, web's older SHA is the first
 place to look, and this is not an oversight to re-fix silently.
 
+
+---
+
+## 2026-09-08 00:37:33Z / 00:47:15Z — web `72aebc06` → `3e454a75` → `8589c005` — **MEASURED: the export walk is 3.2x faster. The intelligence single flight FIRES AND IS NOT ENOUGH — `unhealthy` still trips.** `[lane web-oom-profiler-steady]`
+
+Two deploys, `dep-daflg11t0dsc73elm70g` (live 00:37:33Z) and
+`dep-daflketbedkc739podp0` (live 00:47:15Z). Both preflight CLEAR, claim held
+throughout. The second exists because the first shipped a regression of mine —
+see below.
+
+**`/api/ops/artifacts/export` — THE CLEAN RESULT.**
+
+    probe                     BEFORE (72aebc06)   AFTER (8589c005)
+    names_only=1  p50            60,876 ms          19,139 ms     3.2x
+    names_only=1  max            95,740 ms          25,579 ms     3.7x
+    since=now     p50            21,961 ms          17,184 ms     1.3x
+
+`names_only=1` reads no file bodies, so it isolates the directory WALK, which is
+what changed. The smaller `since=now` gain fits — that path still stats every
+file. The AFTER arm ran on a freshly booted instance with a COLD page cache,
+which should make it slower, so this understates rather than flatters. **n=2 per
+probe.**
+
+**`/api/intelligence/query` — THE FIX FIRES AND THE ROUTE STILL FAILS.**
+
+Mechanism confirmed live: **7 `COMBINED_BOARD_SERVED_STALE` lines, ages 28.9 s
+to 116.9 s.** Callers are being served the previous value instead of each
+starting a rebuild. Reachability was checked first, not assumed:
+`SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT='true'` on web, so the branch is
+live, and `..._CACHE_SECONDS` is ABSENT, so the 15 s code default is what runs.
+
+    6 concurrent x 3 bursts   BEFORE      AFTER
+    p50                       20,671 ms   27,109 ms
+    p90                       29,828 ms   58,313 ms
+    >=5 s                     16/16       18/18
+    `unhealthy` fired         YES         YES
+
+**THE AFTER LATENCY IS NOT ATTRIBUTABLE.** A peer session ran a >150 s
+`names_only=1` export probe straight through my burst window, holding gunicorn
+slots the BEFORE arm never contended with. A clean re-run is in flight. What is
+NOT confounded is the event: `unhealthy — HTTP health check failed (timed out
+after 5 seconds)` at **00:53:46.700Z**, 32 s after the burst ended. The fix does
+not prevent the failure it was aimed at. One rebuild still costs 20–30 s and
+holds one of 8 slots.
+
+**THE BURST REPRODUCED THE PRODUCTION OUTAGE — that is the real finding of the
+night.** The BEFORE burst produced `unhealthy` at **00:28:29.375Z**, the same
+second it ended, recovering 28 s later. Same event class and byte-identical
+message to the 35 `server_failed` events `#632` started from. The diagnosis is
+now demonstrated, not argued: 18 concurrent-ish requests on one slow route take
+web down. **Both of my load tests caused a real, brief production outage.**
+
+**A CORRECTION I OWE THIS LEDGER.** I first reported "no events fired" for the
+AFTER burst. I had checked at ~00:51, MID-BURST, before the event could occur,
+and read that absence as a result. It fired at 00:53:46. I also called the
+second rollout "~12 minutes of 502" — wrong: `deploy_ended` was 00:47:15, ~2 min
+after `build_ended`, a normal swap; the deploys API's `update_in_progress` was
+lagging the events feed and I read the lag as a stall.
+
+**`3e454a75` SHIPPED A REGRESSION OF MINE, live 00:37:33Z–00:47:15Z (~10 min).**
+`patterns_that_can_match` compared directory DEPTH while the caller applies the
+subset with `fnmatch`, whose `*` crosses `/` — so `?pattern=<sport>_source/*`
+silently dropped every deep family and the endpoint short-answered with NO
+error. Found by lane `soccer-unfed-inputs`, bisected by
+`soccer-threeway-precision-gate`, fixed in `a0d02297`, verified independently by
+`ncaaf-live-resim-wire` with a **48,717-witness sweep over the production
+177-pattern list, 0 unsound drops**. Scope, narrowed by three independent
+checks: **pattern-filtered listings only — no deletions, no unfiltered reads**
+(`patterns_that_can_match(all, "") == all` verified against the real 177).
+
+**I must retract one clause from `a0d02297`'s message:** it says "on the endpoint
+most sessions use to verify production". That framing came from a peer who
+subsequently retracted it — they had not used the endpoint at all. I repeated it
+without checking. The impact argument never needed it.
+
+**verify:** the >=5 s request share re-measured against the 32.5% baseline, and
+`unhealthy` NOT firing under a 6x3 burst. **The second is still FAILING.** The
+export half is done; the intelligence half is not, and the next step is finding
+where that route's 20–30 s actually goes — the single flight guards the
+combined-board build, and the time may not be there.
