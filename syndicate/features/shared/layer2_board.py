@@ -1853,6 +1853,118 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
     return -edge
 
 
+#: Keys a SPORT's own producer stamps when it has already calibrated the
+#: probability it published. `basketball_props_edges` writes `model_prob_raw`
+#: and `_prob_calibrated` beside `model_prob`; `nfl_game_projections` writes
+#: `calibrated: True`. A row carrying any of these is calibrated UPSTREAM and
+#: the pricing seam must not apply a second curve on top of the first.
+_UPSTREAM_CALIBRATION_KEYS = (
+    "calibrated",
+    "prob_calibrated",
+    "_prob_calibrated",
+    "calibration_applied",
+    "calibration_method",
+    "model_prob_raw",
+)
+
+CALIBRATION_METHOD_UPSTREAM = "upstream"
+CALIBRATION_METHOD_BYPASSED = "skipped_no_fair"
+#: The methods that actually MOVE the probability; identity/upstream/bypassed
+#: leave the edge and the model EV exactly as the producer priced them.
+_CALIBRATION_METHODS_THAT_MOVE = frozenset({"affine_logit", "isotonic"})
+
+
+def _calibrate_model_edge(
+    row: Mapping[str, Any], side: str, fair: Any, model_edge: float | None
+) -> tuple[float | None, dict[str, Any]]:
+    """The pricing-plane calibration seam (`lane pricing-plane-v1`, P5).
+
+    Takes the edge `_model_edge_for` priced for THIS row's side and returns
+    `(edge, stamps)`. With `SYNDICATE_PRICING_CALIBRATION` absent or `off` it
+    returns `(model_edge, {})` -- the same object, no stamps, bit-identical
+    board. With it on, the sport's versioned per-(market, segment) curve
+    (`probability_calibration`) is applied to the PROBABILITY and the edge is
+    re-differenced against the same fair; identity when no curve exists.
+
+    THE PROBABILITY IS RECOVERED AS `fair + edge/100`, the sizer's own
+    definition (`portfolio_commit.py:311`), unless the projection carries an
+    explicit `model_probability`. Not `model_prob_over`: soccer publishes the
+    RAW `model_prob_over` and prices the SMOOTHED estimate into
+    `edge_vs_market_pct` (`soccer_projections.py:828`), so re-deriving from the
+    raw field would move the baseline on every soccer row before any curve was
+    applied. Whatever number the edge was differenced from is the number the
+    curve gets, and `model_probability_raw` records it.
+
+    STAMPS GO ON THE CANDIDATE, NOT THE PROJECTION. `candidate["projection"]`
+    is the grid row's own dict, shared by both sides of the market
+    (`test_projection_reaches_the_candidate` pins it verbatim); writing a
+    side-specific number into it would put the over's calibration on the
+    under's row.
+
+    IDENTITY RETURNS THE ORIGINAL FLOAT, not `round((p - fair) * 100)`, so a
+    profile-less `on` differs from `off` only by the stamps.
+
+    THE CERTAINTY REFUSAL STILL FIRES AFTER THE CURVE. A clamped isotonic cell
+    can land on exactly 0.0/1.0, and `probability_refusal` runs upstream on the
+    projection where it cannot see this number -- so the same rule is applied
+    here: an exact certainty is refused, not priced.
+    """
+    if model_edge is None:
+        return model_edge, {}
+    from syndicate.features.shared import probability_calibration as _pc
+
+    if not _pc.pricing_calibration_enabled():
+        return model_edge, {}
+    projection = row.get("projection")
+    projection = projection if isinstance(projection, Mapping) else {}
+    fair_prob = _as_float(fair)
+    explicit = _as_float(projection.get("model_probability"))
+    if fair_prob is None:
+        # Nothing to re-difference against: an edge the producer computed
+        # without a fair the board can see is left exactly as it is, and the
+        # row says why.
+        return model_edge, {
+            "model_probability_raw": explicit,
+            "model_probability_cal": explicit,
+            "model_edge_pct_raw": model_edge,
+            "calibration_version": None,
+            "calibration_method": CALIBRATION_METHOD_BYPASSED,
+        }
+    p_raw = explicit if explicit is not None else fair_prob + float(model_edge) / 100.0
+    p_raw = max(0.0, min(1.0, p_raw))
+    sport = row.get("sport")
+    stamps: dict[str, Any] = {
+        "model_probability_raw": round(p_raw, 6),
+        "model_probability_cal": round(p_raw, 6),
+        "model_edge_pct_raw": model_edge,
+        "calibration_version": None,
+        "calibration_method": _pc.METHOD_IDENTITY,
+    }
+    if any(projection.get(key) not in (None, False) for key in _UPSTREAM_CALIBRATION_KEYS):
+        stamps["calibration_method"] = CALIBRATION_METHOD_UPSTREAM
+        return model_edge, stamps
+    profile, _meta = _pc.cached_profile(sport)
+    p_cal, meta = _pc.calibrate(sport, row.get("market"), row.get("segment"), p_raw, profile=profile)
+    stamps["calibration_version"] = meta.get("version")
+    stamps["calibration_method"] = meta.get("method")
+    if meta.get("cell") is not None:
+        stamps["calibration_cell"] = meta.get("cell")
+    if meta.get("cell_error"):
+        stamps["calibration_cell_error"] = meta.get("cell_error")
+    if p_cal is None or meta.get("method") == _pc.METHOD_IDENTITY:
+        return model_edge, stamps
+    stamps["model_probability_cal"] = round(p_cal, 6)
+    if float(p_cal) in (0.0, 1.0):
+        stamps["calibration_refused"] = "exact_certainty"
+        return None, stamps
+    edge = round((float(p_cal) - fair_prob) * 100.0, 4)
+    if abs(edge) > _MODEL_EDGE_MAX_POINTS:
+        # Same rule as the raw edge: dropped, not clamped (#242).
+        stamps["calibration_refused"] = "edge_exceeds_bound"
+        return None, stamps
+    return edge, stamps
+
+
 def _model_prob_for_side(row: Mapping[str, Any], side: Any = None) -> float | None:
     """The model's probability for THIS ROW'S OWN side.
 
@@ -2260,6 +2372,10 @@ def build_layer2_rows(
 
             ev = expected_value_pct(price, fair) if fair is not None else None
             model_edge = _model_edge_for(row, side, fair)
+            # THE PRICING-PLANE CALIBRATION SEAM. Inert (same float, no stamps)
+            # unless `SYNDICATE_PRICING_CALIBRATION` is on -- see
+            # `_calibrate_model_edge`.
+            model_edge, calibration_stamps = _calibrate_model_edge(row, side, fair, model_edge)
             # THE VALUE TERM THE SCORE ACTUALLY RANKS AND ADMITS ON.
             #
             # `ev_pct` below is left EXACTLY as computed -- `portfolio_commit`
@@ -2271,6 +2387,15 @@ def build_layer2_rows(
             # substitution happens HERE, on the term that feeds the score, and
             # nowhere else.
             model_ev = _model_value_ev(row, side, price, fair_method)
+            if (
+                model_ev is not None
+                and model_edge is not None
+                and calibration_stamps.get("calibration_method") in _CALIBRATION_METHODS_THAT_MOVE
+            ):
+                # A curve moved the probability, so the EV priced against the
+                # model must move with it or the two fields describe different
+                # models. Same price, calibrated probability.
+                model_ev = expected_value_pct(price, calibration_stamps.get("model_probability_cal"))
             if model_ev is not None:
                 # THE VALUE TERM, and only this. `ev_pct` below is untouched:
                 # `portfolio_commit` back-derives the market fair from it and
@@ -2338,6 +2463,12 @@ def build_layer2_rows(
             candidate["model_ev_pct"] = model_ev
             candidate["ev_basis"] = ev_basis
             candidate["model_edge_pct"] = model_edge
+            if calibration_stamps:
+                # `model_probability_raw` / `model_probability_cal` /
+                # `model_edge_pct_raw` / `calibration_version` /
+                # `calibration_method`. Present ONLY when the seam is on, so an
+                # off board serves exactly the fields it served yesterday.
+                candidate.update(calibration_stamps)
             # WHICH FAIR THAT EDGE WAS PRICED AGAINST. Stamped beside the number
             # rather than left for a reader to infer, because a modelled fair
             # and a measured one are different confidences and `#242` forbids
