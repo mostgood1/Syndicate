@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import subprocess
 import sys
@@ -139,6 +140,35 @@ def _run_pytest(pytest_args: list[str], junit_path: Path) -> int:
     return subprocess.run(command, cwd=REPO_ROOT).returncode
 
 
+def _chunk_index(path: str, chunks: int) -> int:
+    """Which chunk a test file belongs to. A PURE FUNCTION OF THE PATH.
+
+    WHY NOT ROUND-ROBIN, WHICH THIS REPLACED. `groups[index % n]` over a sorted
+    list means inserting ONE file shifts every file after it into a different
+    process -- and tests that assert on what else is resident then change
+    verdict with nobody touching them. Measured across two `ci-suite` runs ~90
+    minutes apart at near-identical code: `test_heap_roots` x4 and
+    `test_home_mlb_live_lens_states` VANISHED, `test_retainer_census` APPEARED,
+    and each was then shown to pass in isolation (`#649`). Chunk 1 collected
+    2243 in one run and 1788 in the next. **A gate whose red list moves without
+    the code moving cannot be read by a human on a schedule.**
+
+    NOT `hash()`. Python randomises `hash()` for `str` per process unless
+    `PYTHONHASHSEED` is pinned, so the built-in would make the split differ
+    between two runs of the SAME suite on the SAME commit -- reintroducing the
+    exact instability this exists to remove, in a shape that would be much
+    harder to see. `blake2b` is stable across processes, machines and versions.
+
+    Balance is no longer exact. Round-robin guaranteed equal file COUNTS;
+    hashing gives approximately equal ones, and the peak is set by the worst
+    chunk. Measured on the real 1,066-file tree at `--chunks 8` -- see the lane
+    note -- the spread stayed within a few files of even, which is well inside
+    the variation that file COST already introduces.
+    """
+    digest = hashlib.blake2b(path.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, "big") % max(1, chunks)
+
+
 def _split_test_files(pytest_args: list[str], chunks: int) -> tuple[list[list[str]], list[str]]:
     """(groups of test files, flags) so each group can run in a FRESH process.
 
@@ -155,11 +185,10 @@ def _split_test_files(pytest_args: list[str], chunks: int) -> tuple[list[list[st
     module to enumerate them, which costs the very memory this is trying to
     bound -- paying the peak once just to plan how to avoid paying it.
 
-    ROUND-ROBIN, NOT CONTIGUOUS BLOCKS. Test files vary enormously in cost, and
-    contiguous slices put neighbouring (often related, often similarly heavy)
-    files in one group. Round-robin spreads them, which matters because the
-    peak is set by the WORST group, not the average -- the same "split ratio is
-    the longest unit" arithmetic that applies to any job split.
+    ASSIGNMENT IS A HASH OF THE PATH, NOT A POSITION. See `_chunk_index`. It
+    still spreads related files the way round-robin did -- which matters because
+    the peak is set by the WORST group, not the average -- and it additionally
+    makes a file's chunk independent of how many other files exist.
 
     Returns `([], flags)` when no files can be identified -- a `-k` expression
     or an explicit nodeid -- and the caller then runs unchunked rather than
@@ -191,9 +220,10 @@ def _split_test_files(pytest_args: list[str], chunks: int) -> tuple[list[list[st
             flags.append(raw)
     if not files:
         return [], list(pytest_args)
-    groups: list[list[str]] = [[] for _ in range(max(1, chunks))]
-    for index, path in enumerate(files):
-        groups[index % len(groups)].append(path)
+    n = max(1, chunks)
+    groups: list[list[str]] = [[] for _ in range(n)]
+    for path in files:
+        groups[_chunk_index(path, n)].append(path)
     return [g for g in groups if g], flags
 
 

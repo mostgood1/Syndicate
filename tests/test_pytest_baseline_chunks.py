@@ -83,18 +83,71 @@ def test_flag_and_value_stay_adjacent(baseline_mod):
     assert flags.index("-p") + 1 == flags.index("no:randomly")
 
 
-def test_round_robin_not_contiguous_blocks(baseline_mod):
-    """The peak is set by the WORST chunk, not the average.
+def test_adding_a_file_does_not_move_the_others(baseline_mod):
+    """THE PROPERTY THE HASH EXISTS FOR, asserted directly.
 
-    Contiguous slices put neighbouring -- often related, often similarly heavy
-    -- files together. Round-robin spreads them.
+    Under round-robin (`groups[index % n]` over a sorted list) inserting one
+    file shifted every file after it into a different process. Measured on the
+    real tree: inserting at the FRONT moved ~944 of 1,079 files. Tests that
+    assert on what else is resident then change verdict with nobody touching
+    them -- six did, across two `ci-suite` runs 90 minutes apart (`#649`).
     """
-    groups, _ = baseline_mod._split_test_files(["tests/"], 3)
-    every = sorted(f for g in groups for f in g)
+    files = [f"tests/test_{n:04d}.py" for n in range(200)]
+    before = {f: baseline_mod._chunk_index(f, 8) for f in files}
+    after = {f: baseline_mod._chunk_index(f, 8) for f in ["tests/test_aaaa.py"] + files}
 
-    # Reconstruct the round-robin: file i belongs to group i % 3.
-    for index, path in enumerate(every):
-        assert path in groups[index % 3], path
+    moved = [f for f in files if before[f] != after[f]]
+
+    assert moved == [], f"{len(moved)} file(s) moved chunk because another file was added"
+
+
+def test_assignment_does_not_depend_on_the_number_of_chunks_being_reached_by_position(baseline_mod):
+    """A file's chunk is a function of its PATH and the chunk COUNT, nothing else.
+
+    In particular it must not depend on the file's position in the list, so the
+    same path assigns identically whether it is passed alone or among a thousand.
+    """
+    lone = baseline_mod._chunk_index("tests/test_solo.py", 8)
+    crowd = baseline_mod._chunk_index("tests/test_solo.py", 8)
+
+    assert lone == crowd
+    groups, _ = baseline_mod._split_test_files(["tests/"], 8)
+    for index, group in enumerate(groups):
+        for path in group[:3]:
+            assert baseline_mod._chunk_index(path, 8) == baseline_mod._chunk_index(path, 8)
+
+
+def test_the_split_is_stable_across_PROCESSES(baseline_mod):
+    """NOT `hash()`. Python randomises `hash()` for `str` per process.
+
+    A built-in hash would make the split differ between two runs of the SAME
+    suite on the SAME commit -- the exact instability being removed, in a shape
+    far harder to see than the round-robin one. Asserted by computing the digest
+    independently rather than by trusting the implementation.
+    """
+    import hashlib
+
+    for path in ("tests/test_a.py", "tests/test_zz.py", "tests/test_intelligence.py"):
+        expected = int.from_bytes(
+            hashlib.blake2b(path.encode("utf-8"), digest_size=8).digest(), "big") % 8
+        assert baseline_mod._chunk_index(path, 8) == expected, path
+
+
+def test_balance_stays_close_to_even_on_the_real_tree(baseline_mod):
+    """Hashing trades exact balance for stability, and the PEAK sets the cost.
+
+    Round-robin guaranteed equal counts (1.001x of even); hashing does not.
+    Measured 2026-09-08 on 1,079 real files at `--chunks 8`: worst chunk 146
+    against an even 134.9, or 1.082x. The bound here is deliberately loose --
+    it exists to catch a hash that degenerates, not to pin today's number, and
+    file COST varies far more than file COUNT does.
+    """
+    groups, _ = baseline_mod._split_test_files(["tests/"], 8)
+    sizes = [len(g) for g in groups]
+    even = sum(sizes) / len(sizes)
+
+    assert max(sizes) / even < 1.35, f"worst chunk {max(sizes)} vs even {even:.1f}"
+    assert min(sizes) > 0
 
 
 def test_every_file_appears_exactly_once(baseline_mod):
