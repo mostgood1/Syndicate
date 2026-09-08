@@ -1,0 +1,265 @@
+{
+  "app": {
+    "access_lines": 4224,
+    "log_lines": 8081,
+    "note": "served_bytes is RESPONSE size only; a POST body (e.g. artifacts/publish) is NOT counted here",
+    "served_bytes": 84884023,
+    "served_mb": 80.95,
+    "top_clients": [
+      {
+        "bytes": 34571611,
+        "count": 1786,
+        "key": "10.195.148.26"
+      },
+      {
+        "bytes": 21521582,
+        "count": 1201,
+        "key": "10.194.99.120"
+      },
+      {
+        "bytes": 9859056,
+        "count": 65,
+        "key": "10.194.209.140"
+      },
+      {
+        "bytes": 5432482,
+        "count": 57,
+        "key": "10.194.67.129"
+      },
+      {
+        "bytes": 3763197,
+        "count": 52,
+        "key": "10.192.43.130"
+      },
+      {
+        "bytes": 3738438,
+        "count": 64,
+        "key": "10.197.255.130"
+      },
+      {
+        "bytes": 2697276,
+        "count": 66,
+        "key": "10.199.110.30"
+      },
+      {
+        "bytes": 2439165,
+        "count": 47,
+        "key": "10.196.86.141"
+      },
+      {
+        "bytes": 832656,
+        "count": 46,
+        "key": "10.196.115.130"
+      },
+      {
+        "bytes": 28560,
+        "count": 840,
+        "key": "10.228.17.146"
+      }
+    ],
+    "top_paths": [
+      {
+        "bytes": 50001065,
+        "count": 638,
+        "key": "/api/ops/artifacts/export"
+      },
+      {
+        "bytes": 19625876,
+        "count": 8,
+        "key": "/api/intelligence/query"
+      },
+      {
+        "bytes": 7267829,
+        "count": 445,
+        "key": "/api/ops/artifacts/stream"
+      },
+      {
+        "bytes": 4169640,
+        "count": 120,
+        "key": "/nfl/cards"
+      },
+      {
+        "bytes": 2935851,
+        "count": 1,
+        "key": "/"
+      },
+      {
+        "bytes": 419726,
+        "count": 2,
+        "key": "/api/board/book-grid"
+      },
+      {
+        "bytes": 302190,
+        "count": 2022,
+        "key": "/api/ops/artifacts/publish"
+      },
+      {
+        "bytes": 100495,
+        "count": 8,
+        "key": "/api/board/game-chips"
+      },
+      {
+        "bytes": 28560,
+        "count": 840,
+        "key": "/healthz"
+      },
+      {
+        "bytes": 16847,
+        "count": 5,
+        "key": "/api/ops/memory"
+      },
+      {
+        "bytes": 11682,
+        "count": 59,
+        "key": "/wnba/api/live_player_boxscore"
+      },
+      {
+        "bytes": 3848,
+        "count": 74,
+        "key": "/wnba/api/final_player_boxscore"
+      }
+    ]
+  },
+  "bucket": "2026-09-08T14:00:00Z",
+  "captured_at": "2026-09-08T21:44:18Z",
+  "deploys_in_window": [],
+  "edge": {
+    "bytes": 25875643,
+    "mb": 24.68,
+    "requests": 395,
+    "top_clients": [
+      {
+        "bytes": 25854762,
+        "count": 333,
+        "key": "73.75.177.190"
+      },
+      {
+        "bytes": 10584,
+        "count": 31,
+        "key": "74.220.48.175"
+      },
+      {
+        "bytes": 9566,
+        "count": 28,
+        "key": "74.220.48.178"
+      },
+      {
+        "bytes": 702,
+        "count": 2,
+        "key": "51.8.102.53"
+      },
+      {
+        "bytes": 29,
+        "count": 1,
+        "key": "9.129.2.4"
+      }
+    ],
+    "top_paths": [
+      {
+        "bytes": 19628308,
+        "count": 8,
+        "key": "/api/intelligence/query"
+      },
+      {
+        "bytes": 4162054,
+        "count": 120,
+        "key": "/nfl/cards"
+      },
+      {
+        "bytes": 1502939,
+        "count": 116,
+        "key": "/api/ops/artifacts/export"
+      },
+      {
+        "bytes": 420332,
+        "count": 2,
+        "key": "/api/board/book-grid"
+      },
+      {
+        "bytes": 102911,
+        "count": 8,
+        "key": "/api/board/game-chips"
+      },
+      {
+        "bytes": 20276,
+        "count": 74,
+        "key": "/wnba/api/final_player_boxscore"
+      },
+      {
+        "bytes": 20150,
+        "count": 59,
+        "key": "/wnba/api/live_player_boxscore"
+      },
+      {
+        "bytes": 17942,
+        "count": 5,
+        "key": "/api/ops/memory"
+      },
+      {
+        "bytes": 702,
+        "count": 2,
+        "key": "/robots.txt"
+      },
+      {
+        "bytes": 29,
+        "count": 1,
+        "key": "/"
+      }
+    ],
+    "top_user_agents": [
+      {
+        "bytes": 19717941,
+        "count": 15,
+        "key": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, l"
+      },
+      {
+        "bytes": 4162054,
+        "count": 120,
+        "key": "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, lik"
+      },
+      {
+        "bytes": 1974641,
+        "count": 183,
+        "key": "Python-urllib/3.11"
+      },
+      {
+        "bytes": 20276,
+        "count": 74,
+        "key": "Mozilla/5.0"
+      },
+      {
+        "bytes": 702,
+        "count": 2,
+        "key": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/"
+      },
+      {
+        "bytes": 29,
+        "count": 1,
+        "key": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatib"
+      }
+    ]
+  },
+  "metered_mb": null,
+  "note": "bucket is RIGHT-labelled: it covers window_covered, i.e. the hour BEFORE its label. edge_* is public traffic only; app_* includes internal service-to-service.",
+  "other_services_same_hour": {
+    "live-odds-worker": 15.7,
+    "refresh-worker": 11.5
+  },
+  "publish_into_web": {
+    "live-odds-worker": {
+      "bytes": 149230583,
+      "mb": 142.32,
+      "publishes": 473
+    },
+    "refresh-worker": {
+      "bytes": 81117183,
+      "mb": 77.36,
+      "publishes": 229
+    }
+  },
+  "service": "web",
+  "window_covered": {
+    "end": "2026-09-08T14:00:00Z",
+    "start": "2026-09-08T13:00:00Z"
+  }
+}
