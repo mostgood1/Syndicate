@@ -3966,3 +3966,73 @@ code, and a green suite is then evidence of nothing.
   unrelated change.
 - *(evidence: `findings_2026-09-07_nfl_rating_units_and_market_sign.md`, and
   PART 5 of `log/2026-09-07.md`)*
+
+## 2026-09-08 FORBIDDEN: carrying a scoped finding forward as a GENERAL claim after its scope expires. `[#632, session b2b5b45b]`
+
+`UPDATE 37` established "web is not OOM-killed, it TIMES OUT" from 35
+`server_failed` events with zero `evicted=True`. True of those events. I then
+repeated it for a full day — in messages to two peers and in my own reasoning —
+while web took **six `oomKilled memoryLimit=2Gi`** in one day, four of them before
+I sent anything.
+
+**A finding is scoped to the window it was measured in.** "Not X in these 35
+events" is not "not X". The moment it becomes a premise for someone else's
+debugging it needs re-checking, because the cost of a stale premise is paid by
+whoever trusts it.
+
+**How to apply:** when relaying a finding to a peer, state its WINDOW alongside
+it. When a finding is more than a few hours old and you are about to act on it,
+re-read the events. See [[feedback_absence_in_a_window_is_not_absence]] and
+[[feedback_rebaseline_before_judging]] — this is the same failure aged into a
+belief.
+
+## 2026-09-08 FORBIDDEN: a periodic publisher whose interval EQUALS its reader's freshness threshold. `[#632, session b2b5b45b]`
+
+I set the chip publish interval to 120 s to "match" the endpoint's 120 s
+threshold and wrote that in the docstring as a virtue. The real gap is
+`interval + build_time + poll_granularity` = ~135 s, so the artifact was stale
+for the tail of EVERY cycle and ~40% of requests still fell back to the inline
+fan-out.
+
+**A publisher must run FASTER than the threshold that judges it**, by at least
+its own build time plus its scheduler's granularity. Matching exactly guarantees
+a stale window; matching is the worst of both.
+
+**How to apply:** when a producer and a consumer both carry a time bound, write
+down which is which and make the producer's strictly smaller — or raise the
+consumer's, which is what was done here (120 → 180 on web) because the worker was
+the constrained service.
+
+## 2026-09-08 FORBIDDEN: reading a marker at the wrong nesting level and concluding the code did not run. `[#632, session b2b5b45b]`
+
+I verified a new response guard by reading `_response_slimmed_reason` at the TOP
+level of the payload, got `None`, and was one sentence from reporting that the
+guard had not fired in production. The payload nests under `response`; the marker
+was there, with the right value.
+
+**A null read from the wrong path is indistinguishable from a null read from dead
+code** — and I have spent a whole session insisting on exactly that distinction
+for logs. It applies to payloads too.
+
+**How to apply:** before concluding "the code did not run", print the CONTAINER
+you searched, not just the miss. Dump the keys. If a marker is absent, prove you
+looked where it is written. Same family as
+[[feedback_absent_signal_is_about_the_emitter]].
+
+## 2026-09-08 A probe is production load, and an unbounded one is an outage. `[#632, session b2b5b45b]`
+
+To measure a slow endpoint I POSTed it with no `limit` and no `slim_aliases`. It
+built a **64.98 MB** response in a 2 GiB container and web was `oomKilled` twice
+within three minutes. Earlier the same night a 6-concurrent burst tripped a real
+`unhealthy` health-check failure. **Three production incidents this session were
+caused by my own measurements.**
+
+Reproducing a failure deliberately IS legitimate and produced the session's best
+evidence. What was not legitimate was sending the heaviest possible variant of a
+request without first asking what it would cost.
+
+**How to apply:** before probing, estimate the response size and the concurrency
+you are about to add, and bound them explicitly (a `limit`, a slim flag, fewer
+threads). Prefer the shape a real client sends — I measured a request production
+never serves and nearly drew conclusions from it. Then say plainly, in the write-
+up, which incidents were yours.

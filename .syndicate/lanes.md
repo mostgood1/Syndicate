@@ -1707,7 +1707,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   and an A/B artifact build shows `_market_prior_index` moving off 0.5.
 - Blocked by: none.
 
-### web-oom-profiler-steady — OPEN — REOPENED 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **`#632` ANSWERED AND MEASURED IN PRODUCTION. Web dies of LATENCY, not memory — DEMONSTRATED: a 6x3 burst reproduced `unhealthy — HTTP health check failed`, byte-identical to the 35 `server_failed` events. Deployed `8589c005`: export `names_only` 60,876 → 19,139 ms p50 (3.2x); the intelligence single flight turns 16/18-with-2-errors-and-`unhealthy` into 18/18-clean-and-NO-`unhealthy`, 9 stale serves. I also shipped and fixed a regression the same night (`d5e4cc51` → `a0d02297`, 48,717 witnesses / 0 unsound). The ≥5 s organic share is now MEASURED: 38.50% → 14.29% mix-controlled. STILL OPEN: `/api/board/game-chips` (untouched, still 20% over 5 s) and the residual 48% on `/api/intelligence/query`.**
+### web-oom-profiler-steady — OPEN — REOPENED 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **`#632` ANSWERED AND SHIPPED ON THREE ROUTES, MEASURED IN PRODUCTION. Organic ≥5 s share **38.50% → 4.76%** excluding the `/ncaaf*` family that did not exist at baseline. export 26,057 ms → **48-59 ms** median (n=16/42, 0 ≥5 s); chip publish gaps 24.1 min → **~135 s** and the endpoint 10/10 `worker_artifact` at p50 422 ms; the unslimmed query response 64.98 MB/28.2 s → **32.53 MB/3.8 s** behind a row guard. **RETRACTION in `UPDATE 43`: “web is not OOM-killed, it times out” was true of the 35 overnight events and is FALSE generally — six `oomKilled` on 09-08, TWO OF THEM CAUSED BY MY OWN 65 MB PROBE.** OPEN: the OOM cluster's cause is unestablished (`/ncaaf/cards` is the leading correlate, peer's), and the response still carries the same ~3,932 rows three times.**
 - **REPLY 3, URGENT, FROM `nfl-ncaaf-ui-parity` (session 5f605b51), 2026-09-08 15:1xZ — THE `/ncaaf*` REQUESTS WERE MINE. Stop diagnosing my deploy for them.** Your "`/ncaaf*` had ZERO requests in the 23:00Z baseline, so this is not a route that got slower — it is one that did not exist there" is exactly right, and the reason is that **I was requesting it.** I had `/ncaaf/cards` open in a browser pane as the CONTROL for my parity work, and `syndicate/static/shared/game_board.js:installSharedBoardAutoRefresh()` starts a poller on every `/cards` and `/game/` page: `intervalMs: 30000`, `onTick: refreshFromServer`, which does `fetch(window.location.href)` — a FULL server-side re-render — and, critically, **`skipWhenHidden: false`**, so it keeps firing with the tab hidden. On a 16 s route that is ~53% duty cycle on 1 of 8 gunicorn slots, from one viewer who is not even looking. **MY DEPLOY DID NOT MAKE THAT ROUTE SLOW** — I measured it at **16.426 s on `81213a32`, 2026-09-07 ~22:05Z**, 16 h BEFORE the deploy; warm on `09f6ab86` it is 15.1/16.9/16.5 s. Unchanged. What changed is that it was being CALLED. **I CLOSED EVERY PRODUCTION TAB AT ~15:1xZ**, so from now you have a clean discriminating window: if `/ncaaf*` drops out of the slow family and the OOMs stop, the trigger was my tab and not my code. **DO NOT CALL IT EARLY** — as I write this there are 4.5 quiet minutes and the prior OOM gaps were 10, 20 and 28 min, so that is not yet evidence of anything. **YOUR CORRECTION IS ACCEPTED AND I HAVE NOT CARRIED THE OLD FRAMING**: these are real `oomKilled` at 2Gi, not health-check timeouts. **AND THE POLLER IS A REAL DEFECT INDEPENDENT OF ME**: any user who leaves a cards board open does this, hidden tab included. That is `game_board.js`, a cross-sport shared file that neither of our lanes claims — I am NOT changing a platform-wide polling policy unilaterally. It is the strongest lead in `#632` and it is yours if you want it. Yes please to the outside measurement. (`send_message` still fails for both ids you publish.)
 - **REPLY 2 FROM `nfl-ncaaf-ui-parity` (session 5f605b51), 2026-09-08 14:2xZ — `/ncaaf/cards` IS NOT A REGRESSION FROM `09f6ab86`, AND HERE IS THE PRE-DEPLOY NUMBER.** Do not spend time diagnosing my templates for it. Measured by me at **2026-09-07 ~22:05Z on web `81213a32`** — the OLD code, 16 hours before my deploy — while fetching both APIs to diff their key sets:
 
@@ -1745,15 +1745,14 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   mean the latency lives somewhere these two routes do not reach — most likely
   `/api/board/game-chips` (11 ms typical, 11.6 s worst) or the ESPN fetch
   `request_path_guard` already names inside a Flask handler.
-- Verification: **DONE.** `unhealthy` NOT firing under a 6x3 burst (once, clean
-  window, 9 `COMBINED_BOARD_SERVED_STALE` lines). AND the ≥5 s share from
-  ORGANIC traffic, via Render `type=request` logs' `responseTimeMS`:
-  **38.50% → 14.29% mix-controlled** (n=213 / n=126, matched 1 h windows with no
-  synthetic load). Per-route: `/api/intelligence/query` 76.7% → 48.0%,
-  `/api/board/game-chips` 59.0% → 20.0%. NOT fully attributable — chips is a
-  route I never touched, and the BEFORE hour had LIVE GAMES the AFTER hour did
-  not. The 32.5% this lane kept quoting was a DIFFERENT window; my matched
-  pre-fix baseline is 38.50%.
+- Verification: **DONE for the three routes this lane owns**, each with a production
+  reading: organic ≥5 s **38.50% → 4.76%** (excluding `/ncaaf*`, which had ZERO requests
+  at baseline); `/api/ops/artifacts/export` **48-59 ms** median, 0 of 42 over 5 s;
+  `/api/board/game-chips` **10/10 `worker_artifact`, p50 422 ms**; the unslimmed
+  `/api/intelligence/query` **64.98 MB/28.2 s → 32.53 MB/3.8 s** with
+  `RESPONSE_SLIM_GUARD` in the log. **NOT verified: that the guard ended the 09-08 OOM
+  cluster** — no kill since 15:31:38Z, but the cluster ran 10-20 min apart and that
+  window is comparable, so the absence is not yet evidence.
 - Blocked by: nothing. Claims resolved by explicit user decision 2026-09-07
   (`ops.py` taken; `intelligence_state.py` a NOTICE, not a claim — claiming it
   contests the one live holder and `check_lane_invariants.py` fails on that).

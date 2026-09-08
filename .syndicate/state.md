@@ -2107,3 +2107,46 @@ threshold raised to 180 s so the two no longer straddle.
 `/api/intelligence/query` still at 40% over 5 s on n=5 — the single flight removed
 the duplicate rebuilds but one rebuild still costs seconds, and that cost is
 untouched.
+
+### `[web-oom-leak]` UPDATE 43 — **WEB *CAN* BE OOM-KILLED, and the unslimmed `/api/intelligence/query` is one way to do it. This RETRACTS the "not memory, latency" framing as a GENERAL claim.**, 2026-09-08T15:5xZ `[session b2b5b45b]`
+
+`UPDATE 37` established that web dies of LATENCY, not memory: 35 `server_failed`,
+zero `evicted=True`, every one a 5 s health-check timeout. **That remains true of
+those events and is now FALSE as a general statement.**
+
+**SIX `oomKilled memoryLimit=2Gi` on web on 2026-09-08.** Four preceded anything I
+sent (01:10:07, 14:13:44, 14:23:48, 14:43:54). **Two are MINE** (15:11:13,
+15:13:28): I POSTed `/api/intelligence/query` with no `slim_aliases` and it built
+**3,927 rows five times over into a 64.98 MB payload in 28.2 s**, inside a 2 GiB
+container with 8 gunicorn slots.
+
+**THE DANGEROUS SHAPE IS THE DEFAULT.** `slim_aliases` is opt-IN. The UI sends it;
+nothing else must. `scripts/watch_clamp_trigger.py:340` POSTs
+`{"question": "show me the board"}` unslimmed on a 600 s poll — its last
+observation is 2026-08-16 so it is NOT running, checked before blaming it, but it
+is a loaded gun. `response_compression.py` already documented this endpoint at
+**53-67 MB per call**; that the default can kill the service was not written down.
+
+**FIXED AND VERIFIED IN PRODUCTION (`009bb3c3`, live 15:31:38Z).**
+`_RESPONSE_SLIM_ROW_GUARD = 2500` on all three response exits. Re-sending the
+request that killed it:
+
+    latency   28,235 ms -> 3,785 ms      payload  64.98 MB -> 32.53 MB
+    server:   RESPONSE_SLIM_GUARD rows=3932 guard=2500
+              dropped=['boardContract','by_sport','recommendations']
+
+Below the guard the contract is UNCHANGED — an unasking caller gets the same
+object back, uncopied. Above it, only keys `_slim_response_aliases` PROVES are
+duplicates are dropped, each declared in `_response_aliases`.
+
+**STILL CARRIES THE SAME ~3,932 ROWS THREE TIMES for 32.53 MB.** The guard makes
+the endpoint survivable, NOT efficient. Collapsing `cards` / `ranked_all` /
+`top_opportunities` is a real contract change and was not attempted.
+
+**THE OOM CLUSTER'S CAUSE IS NOT ESTABLISHED.** `/ncaaf/cards` is in flight at all
+three pre-probe kills — one in the SAME SECOND — and is 25 of the 29 slow requests
+on the service (median 11,626 ms, 20/20 over 5 s, POST-BOOT). `/api/intelligence/query`
+is also in flight at all three. Per-request memory is not visible, so this is
+CORRELATION, relayed to `nfl-ncaaf-ui-parity` and not diagnosed here. No
+`oomKilled` since 15:31:38Z, but the cluster ran 10-20 min apart and that window
+is comparable — **not proof the guard ended it.**
