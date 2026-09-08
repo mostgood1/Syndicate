@@ -1,5 +1,54 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#648` — **19 REAL REGRESSIONS ON `main`, and nothing was watching for 17 days** — lane `render-cron-failures`, 2026-09-08 — **FILED WITH EVIDENCE; NOT DIAGNOSED, NOT FIXED**
+
+Full working: `.syndicate/findings_2026-09-08_nineteen_pytest_regressions.md`.
+Substrate **render** — every number is from a cron run, not a checkout.
+
+The first time the full pytest suite ever completed on the `ci-suite` cron
+(chunking, `#647`) it reported 25 new failures against the baseline. **19 are
+genuine breakage**, established by two independent checks: the test existed at
+the baseline commit `a20204dd` (`git show` per test, since the suite grew
+11,745 → 16,418 and "new unrecorded test" was a live explanation), AND it still
+fails in ISOLATION on the same host (9 files alone: `21 failed, 790 passed`).
+
+    test_intelligence_state.py        8     test_soccer_live_gates_wiring.py  2
+    test_intelligence.py              5     test_live_refresh_loop.py         1
+    test_refresh_odds_sources.py      2     test_memory_observability.py      1
+
+**13 of 19 are the intelligence layer across two files** — likely ONE root
+cause, and the cheapest place to start.
+
+**WHY IT WAS INVISIBLE.** `ci.yml` has been billing-locked since 2026-08-22, so
+none of the ~420 commits since were gated; the cron built to replace it could
+not complete the pytest step until today; and the archive suite that does run
+(386 tests) is green and covers none of these. This is not "something broke
+today" — it is the first look after 17 unwatched days.
+
+**THE BASELINE IS DELIBERATELY NOT REGENERATED.** Doing so absorbs all 19 into
+"known" and blinds the gate to them in the same commit intended to make it
+trustworthy — `pytest_baseline.py`'s own docstring: *"a permanently-tolerated
+failure is how a gate becomes decoration."* `ci-suite` will therefore report
+`rc=1` daily until these are fixed or consciously accepted. **That red is
+correct and should not be silenced by updating the baseline.**
+
+**NOT ESTABLISHED:** no root cause (no traceback read yet), no attribution to a
+commit (no bisect), and not necessarily 19 distinct bugs.
+
+**ALSO FILED, not regressions:** 4 `test_heap_roots` failures (file added
+2026-09-05, passes isolated — chunk-order sensitive), 1 genuinely failing NEW
+test (`test_evaluation_ledger_projection::test_max_chunks_bounds_a_run…`), 1
+chunking artifact (`test_home_mlb_live_lens_states`), and 1 host-dependent test
+that fails ALONE and passes chunked (`test_malloc_arena_snapshot_degrades_quietly_off_glibc`
+asserts `is None` off glibc; Render is glibc).
+
+**A TRAP THIS COST THREE RUNS TO AVOID, worth reading before touching it:** the
+first isolation run pointed the cron at `python -m pytest` directly, bypassing
+`run_ci_suite._step_env()`, and produced **116 failed / 698 passed** — dominated
+by `SYNDICATE_DATA_ROOT must be set` and `Local state backend not allowed`. The
+`RENDER` scrub lives inside `run_ci_suite` ONLY, so any other entry point that
+runs this suite on Render inherits the original host-detection bug.
+
 ### `#647` — **TWO RENDER CRONS HAD NEVER HAD A GREEN RUN. Three unrelated defects, and TWO OF THE THREE LOOKED LIKE "main is red" when neither was** — lane `render-cron-failures`, 2026-09-08 — **FIXED, DEPLOYED AND MEASURED on 2 of 3; the pytest CAP is a guess awaiting its first finishing run**
 
 **UPDATE 2026-09-08 ~17:00Z — RESIDUAL 2 IS CLOSED, AND RESIDUAL 1'S DIAGNOSIS
