@@ -26601,3 +26601,51 @@ must not be mistaken for the fix landing). Reading owed here.
 **NOT verified and not claimed:** that this improves accuracy. It does not — the
 corrected model still loses to the close (MAE 10.58 vs 9.79, SU 60.2% vs 64.2%).
 This is a display-honesty fix and must not be read as a pricing edge.
+
+### THE OWED READING — the >=5 s share from ORGANIC traffic `[lane web-oom-profiler-steady, 2026-09-08T02:0xZ]`
+
+`UPDATE 40` and this lane's `Verification:` line both said this was outstanding
+and that a synthetic burst could not answer it. It is now measured.
+
+**SOURCE.** Render's `type=request` log records carry `responseTimeMS` and a
+`path` label. **Gunicorn's access log here is the default combined format with NO
+duration field**, so the app logs cannot answer this at all — worth writing down,
+because that is where I looked first. Paging must go BACKWARD (lower `endTime`),
+per `render_logs.py`'s docstring. Windows chosen to contain NO synthetic load of
+mine: BEFORE is a matched 1 h while `72aebc06` was live; AFTER starts after my
+last burst ended.
+
+    A) ALL traffic, mix NOT controlled
+       BEFORE 72aebc06  23:00-00:00Z  n=213  >=5s= 82 (38.50%)  med=3669 ms
+       AFTER  8589c005  00:58-02:00Z  n=229  >=5s= 18 ( 7.86%)  med= 450 ms
+
+    B) EXCLUDING /api/ops/artifacts/export -- the route whose VOLUME changed
+       BEFORE                          n=213  >=5s= 82 (38.50%)  med=3669 ms
+       AFTER                           n=126  >=5s= 18 (14.29%)  med= 557 ms
+
+    C) PER-ROUTE >=5s RATE -- mix-independent
+       /api/intelligence/query   76.7% (46/60) med 6800  ->  48.0% (12/25) med 3945
+       /api/board/game-chips     59.0% (36/61) med 5537  ->  20.0% ( 5/25) med 2844
+
+**THE HEADLINE IS (B), NOT (A).** The backup workflow ran 103 export calls in the
+AFTER window and **0** in the BEFORE window, all of them fast (median 266 ms, 0 of
+101 over 5 s). Quoting 38.50% → 7.86% would be crediting my fix for a traffic-mix
+change. Mix-controlled it is **38.50% → 14.29%, a 2.7x reduction.**
+
+**AND I CANNOT CLAIM ALL OF THAT EITHER.** `/api/board/game-chips` improved from
+59.0% to 20.0% and **I never touched that route.** Two readings are consistent
+with it: contention genuinely fell because the other two routes stopped holding
+slots, or the windows differ — the BEFORE hour had LIVE GAMES IN PROGRESS
+(`check_deploy_safety` warned so at 00:27Z) and the AFTER hour did not, which
+moves board work independently of anything I shipped. **I cannot separate them
+with this data.** The direction is large and consistent; the attribution is
+partial.
+
+**Also note the 32.5% figure this lane has been quoting is NOT this measurement.**
+It came from a different, earlier window. My own matched pre-fix baseline is
+**38.50%**, and that is the number the AFTER arm should be read against.
+
+**verify:** DONE for this lane's stated condition. The >=5 s share fell on a
+mix-controlled comparison and both slow routes' per-route rates fell. `#632`'s
+remaining latency is now concentrated in `/api/board/game-chips` (untouched) and
+the residual 48% on `/api/intelligence/query`.

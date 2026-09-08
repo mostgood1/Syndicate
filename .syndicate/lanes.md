@@ -1756,7 +1756,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   and a test that the basis agrees with `_model_edge_for` by construction.
 - Blocked by: none.
 
-### web-oom-profiler-steady — OPEN — REOPENED 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **`#632` ANSWERED AND MEASURED IN PRODUCTION. Web dies of LATENCY, not memory — DEMONSTRATED: a 6x3 burst reproduced `unhealthy — HTTP health check failed`, byte-identical to the 35 `server_failed` events. Deployed `8589c005`: export `names_only` 60,876 → 19,139 ms p50 (3.2x); the intelligence single flight turns 16/18-with-2-errors-and-`unhealthy` into 18/18-clean-and-NO-`unhealthy`, 9 stale serves. I also shipped and fixed a regression the same night (`d5e4cc51` → `a0d02297`, 48,717 witnesses / 0 unsound). STILL OPEN: the >=5 s share vs the 32.5% baseline is NOT measured — that needs organic traffic, not a burst.**
+### web-oom-profiler-steady — OPEN — REOPENED 2026-09-07 — session b2b5b45b-e938-4cb5-81c2-c211ecc7c703 — **`#632` ANSWERED AND MEASURED IN PRODUCTION. Web dies of LATENCY, not memory — DEMONSTRATED: a 6x3 burst reproduced `unhealthy — HTTP health check failed`, byte-identical to the 35 `server_failed` events. Deployed `8589c005`: export `names_only` 60,876 → 19,139 ms p50 (3.2x); the intelligence single flight turns 16/18-with-2-errors-and-`unhealthy` into 18/18-clean-and-NO-`unhealthy`, 9 stale serves. I also shipped and fixed a regression the same night (`d5e4cc51` → `a0d02297`, 48,717 witnesses / 0 unsound). The ≥5 s organic share is now MEASURED: 38.50% → 14.29% mix-controlled. STILL OPEN: `/api/board/game-chips` (untouched, still 20% over 5 s) and the residual 48% on `/api/intelligence/query`.**
 - Goal: remove the request-path work that starves web's 8 gunicorn slots, one
   route at a time, each with a measurement.
 - Files: `syndicate/blueprints/ops.py` (TAKEN 2026-09-07, see that lane's block),
@@ -1786,11 +1786,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   mean the latency lives somewhere these two routes do not reach — most likely
   `/api/board/game-chips` (11 ms typical, 11.6 s worst) or the ESPN fetch
   `request_path_guard` already names inside a Flask handler.
-- Verification: PARTLY DONE. `unhealthy` NOT firing under a 6x3 burst — **now
-  PASSING**, once, in a clean window, with 9 `COMBINED_BOARD_SERVED_STALE`
-  lines proving the flight fires. The ≥5 s request share against the 32.5%
-  baseline is **STILL NOT MEASURED**; that baseline came from ORGANIC traffic
-  and a synthetic burst cannot answer it. Take it from live logs, not a probe.
+- Verification: **DONE.** `unhealthy` NOT firing under a 6x3 burst (once, clean
+  window, 9 `COMBINED_BOARD_SERVED_STALE` lines). AND the ≥5 s share from
+  ORGANIC traffic, via Render `type=request` logs' `responseTimeMS`:
+  **38.50% → 14.29% mix-controlled** (n=213 / n=126, matched 1 h windows with no
+  synthetic load). Per-route: `/api/intelligence/query` 76.7% → 48.0%,
+  `/api/board/game-chips` 59.0% → 20.0%. NOT fully attributable — chips is a
+  route I never touched, and the BEFORE hour had LIVE GAMES the AFTER hour did
+  not. The 32.5% this lane kept quoting was a DIFFERENT window; my matched
+  pre-fix baseline is 38.50%.
 - Blocked by: nothing. Claims resolved by explicit user decision 2026-09-07
   (`ops.py` taken; `intelligence_state.py` a NOTICE, not a claim — claiming it
   contests the one live holder and `check_lane_invariants.py` fails on that).
