@@ -27738,3 +27738,69 @@ either window after this service came up. Owed on the next soccer fixture
 window: `segment=h1` rows in `soccer_source/tracking/book_quotes/<date>.jsonl`.
 
 Claim released after this entry.
+
+
+---
+
+## 2026-09-08 20:26-20:37Z — refresh-worker `aedb66c9` -> `9aed3bac` — lane `nfl-props-autorun-e2e`
+
+**verify: the deploy WAS INERT. Recorded as a null, not as a fix.**
+`_nfl_prop_artifact_is_empty` read `payload["rows"]`; the artifact has never had
+that key — `write_nfl_prop_projection_artifact` emits `{season, week,
+generated_at, sim_rows, row_count}`. The helper therefore returns False for every
+input and the staleness override it gates never fires. **This is live on
+refresh-worker right now doing nothing.** Found by reading the artifact on disk
+for another reason: 404,766 B with `row_count=980` while my probe printed
+`rows: 0`. Three unit tests had passed because their fixtures used the same
+invented key. Fixed in `aee453fd` (reads `sim_rows`; tests now round-trip the
+production writer, and were verified able to fail — reverting the key turns 3
+red).
+
+**What the deploy did NOT break, measured.** Boot finished 20:37:40.504Z. The
+board was 1,703 `rank_cards` before and 1,703 after, and
+`render_logs --text nfl_prop_projections --start 20:35:00Z` matched NOTHING —
+so no `PUBLISH_OK ... bytes=284` followed this boot. An override that never
+fires also never busy-loops, which is the only reason an inert deploy was
+harmless here.
+
+**The state that made this urgent, and it is NOT fixed by this deploy.**
+refresh-worker cannot build the NFL prop artifact at all. Its own first autorun:
+
+    19:19:57.443  NFL_PROP_PROJECTION_LAUNCHING season=2026 week=1 reason=artifact_missing_no_prior_launch
+    19:19:57.565  [nfl_props] JOIN ... sim_source=computed odds_rows=2463 sim_rows=0
+                  refused_wrong_team=0 refused_unknown_team=0
+
+**2,463 odds rows on the worker — more than web's 2,455 — and zero sim rows**,
+both refusal counters zero. So the odds capture was never missing; the
+PLAYER-LEVEL pbp is, on BOTH services, and it cannot travel:
+`nfl_source/tracking/nflverse/pbp/pbp_*.csv` is not in `HOT_ARTIFACT_PATTERNS`
+at all and `pbp_2025.csv` is 97.9 MB against a 12 MiB `_PUBLISH_MAX_BYTES`. The
+earlier belief that "web has no pbp, refresh-worker does" came from reading
+`rating_source=nflverse_pbp_epa_rolling` (TEAM-level EPA) and is corrected in
+`state_football [nfl-props-week1-dead]`.
+
+**Board restored OUT OF BAND (offline build+publish, not by this deploy),
+because the worker's empty artifact had reached web.** Web's published artifact
+measured **111 bytes**; the worker had published `bytes=284` at 19:19:57,
+19:22:34 and 20:01:38. Rebuilt on a checkout that has both halves:
+`odds_rows=2463 sim_rows=980`, 253 players, 9 markets, 444,139 B published
+20:17:22Z. Served now: **1,703 `rank_cards`**, `Real rate model` /
+`Market implied` / `Real odds` / `Rate basis` all **1703/1703**, `Rate basis` =
+"Prior season" on all, **723 over/under pairs with 0 incoherent**, 9 markets.
+
+**OWED, and it is the whole point of the next deploy** (`5d4e0d68`, pending the
+25-min spacing): the worker's LOCAL artifact is still the 284-byte empty one, so
+any republisher can still clobber web from it. `aee453fd` makes the override
+actually fire, which lets the builder's refusal REPAIR that local copy from the
+published one. **Ordering matters: web's copy must be good FIRST** (it is, as of
+20:17:22Z) or the repair pulls an empty over an empty.
+
+**NOT ESTABLISHED, stated as open rather than asserted:** WHICH code republishes
+the prop artifact every few minutes. No caller besides the builder exists in the
+repo, `sweep_changed_hot_artifacts`'s in-repo comment says its only production
+caller is `live_lens_loop` on another service, and nothing has republished since
+the 20:37:40Z boot. The repair does not depend on identifying it — making the
+worker's local copy correct makes any republisher harmless — but the mechanism
+is unpinned and should not be described as "a periodic sweep" without checking.
+
+Claim still HELD for the follow-up deploy; released after it.
