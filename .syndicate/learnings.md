@@ -4426,3 +4426,32 @@ until worktrees; the stash still is), [[concurrent_parallel_sessions]],
 - Cost: one wasted deploy of an inert change (~20 min build), on the day before
   the season opener. The silver lining is the only reason it was harmless: an
   override that never fires also never busy-loops.
+
+## 2026-09-08 RECURRENCE, not a new rule: I compared a baseline recorded on ONE host against a run on ANOTHER and read the difference as change over TIME. `[lane render-cron-failures, session e371dfde]`
+
+**The general case is already here** — 2026-08-28, *"baselining a test in a
+fresh worktree when the test reads state the worktree does not share — it is
+not a baseline, it is a different experiment"*. This is that rule in a shape it
+did not cover in my head: **a persisted baseline FILE**, not a worktree.
+
+- **What I did.** `tests/pytest_baseline.json` records 19 known-failing tests,
+  taken 2026-08-26 under `-n auto` on somebody's machine. The `ci-suite` cron
+  first completed the suite 2026-09-08 and reported 25 new failures. I filed 19
+  of them as REGRESSIONS on two checks that were both TRUE — the test existed at
+  the baseline commit, and it still failed in ISOLATION on the cron — and both
+  are equally consistent with *never having passed on that host*. **The cron did
+  not exist when the baseline was taken.** 15 of the 19 turned out to be a
+  memory floor (`floor_mb=3000` against `max_mb=2048`) that the runner cannot
+  reach; the rest were stale tests. **Zero regressions.**
+- **The sentence that would have caught it:** *"not in the baseline's failing
+  set"* means **passed somewhere else**, never **passed here**.
+- **Why it is worth a line despite the duplicate-rule ban.** The recurrence is
+  the information: the 2026-08-28 rule is filed under WORKTREES, and I did not
+  retrieve it while holding a JSON file recorded on a different box. A rule
+  indexed by its mechanism is invisible from a different mechanism. If this
+  family gets consolidated (see the 2026-09-08 MAP entry), index it by the
+  QUESTION — *are these two numbers from the same environment?* — not by the
+  artefact that carried it.
+- **Retracted publicly the same day**: `#648`, `.syndicate/findings_2026-09-08_nineteen_pytest_regressions.md`,
+  commits `db9febae` / `33abd83c`. A peer session's two passing runs on their own
+  machine are what broke it open.

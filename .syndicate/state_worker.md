@@ -5,6 +5,76 @@ The INDEX of every subject, across every part, is in `state.md`; the
 one-subject-one-section rule is global and spans these files.
 Same rules as state.md: when a fact changes, EDIT THE LINE.
 
+## [render-crons] THE THREE CRON SERVICES: WHAT THEY ARE, AND FOUR FACTS THAT COST A SESSION TO LEARN `[2026-09-08, lane render-cron-failures, verified on render]`
+
+`sim-input-reports` `crn-dafj4ie7bikc738q9ol0` `0 7 * * *`,
+`ci-suite` `crn-dafg4h0u01pc73aavs6g` `0 8 * * *`,
+`mlb-season-artifacts` `crn-dafffnn40ujc73b349pg` `0 9 * * 1`. All
+`autoDeploy = no`, all created 2026-09-07 — **after** the deploy-lock tooling,
+which is why they fell through it.
+
+**1. A CRON CANNOT BE DEPLOYED BY COMMIT.** `POST
+/v1/services/<crn-id>/deploys` with `{"commitId": ...}` returns **HTTP 400**,
+`cannot deploy cron job service ... by commit reference ID`. The body must be
+`{}` and it takes the **BRANCH TIP** — so the SHA that runs is whatever `main`
+is at build time. Read the deploy's own `commit.id` back.
+
+**2. A START-COMMAND CHANGE NEEDS NO DEPLOY.** `PATCH /v1/services/<crn-id>`
+with `serviceDetails.envSpecificDetails.startCommand` creates NO deploy, and
+the next run uses the new command from the OLD deploy. **The opposite of env
+vars**, which do need one. The running container keeps its own copy, so a
+change mid-run is safe.
+
+**3. `RENDER` IS INJECTED ON CRON JOBS TOO**, so anything running this repo's
+tests there measures its own host. `run_ci_suite._step_env()` scrubs it.
+Measured on the same 9 files: **116 failed / 698 passed with the scrub
+bypassed, 21 with it.** The scrub lives in `run_ci_suite` ONLY — any other
+entry point inherits the bug.
+
+**4. `lastSuccessfulRunAt` READS `None` EVEN AFTER SUCCESSFUL RUNS.** Do not
+use it. Read `cron_job_run_ended` events. A run is triggered with
+`POST /v1/cron-jobs/<id>/runs`.
+
+**Cron services can now be claimed** (`96cc8cab`): `deploy_claim.py`,
+`deploy_preflight.py` and `deploy-guard.py` all handle `crn-`.
+`cron_run_in_flight()` answers preflight's in-flight question from run EVENTS,
+because a cron emits **0** `ALL_PROCESS_MEMORY` lines (refresh-worker: 20 over
+the same 3h window) and the process-sample path would return `UNKNOWN` forever.
+Crons are deliberately NOT in the guard's `ALL_SERVICES`: they are absent from
+`render.yaml`, so `blueprint_sync` cannot reach them.
+
+## [ci-suite-pytest-step] THE FULL SUITE RUNS ON THE CRON ONLY WHEN CHUNKED, AND IT IS PERMANENTLY RED FOR A KNOWN REASON `[2026-09-08, lane render-cron-failures, verified on render]`
+
+**Worker count was never the lever.** OOM-killed at 2Gi at `-n auto`, at `-n 2`
+(1056 s in) and at `-n 0` (537 s in) — **fewer workers failed SOONER**, because
+`-n 0` is the floor for PROCESS COUNT and not for PEAK MEMORY: one process must
+hold what the whole suite accumulates.
+
+**Chunking is what works.** `--pytest-chunks 8 --pytest-workers 0` COMPLETED
+twice, **3013 s and 3039 s**, `collected=16418`. `pytest_baseline.py --chunks N`
+runs N fresh processes and UNIONS their results, and refuses (`EXIT_RUN_BROKEN`)
+on any chunk that writes no junit or collects 0 cases — because this gate also
+fails on a SHRINKING failure set, so a dead chunk would otherwise report its
+tests as newly FIXED.
+
+**IT REPORTS `rc=1` EVERY DAY AND THAT RED IS CORRECT.** 19 failures, all
+cause-known (`#648`): **15 are a memory floor the runner cannot reach** —
+`OVERVIEW_STOPPED_FOR_MEMORY floor_mb=3000` against `max_mb=2048`, unsatisfiable
+by construction, already documented at `intelligence.py:2915-2930` — and **4 are
+stale tests** from two deliberate landings, owned by other lanes. **ZERO are
+regressions.**
+
+**DO NOT REGENERATE THE BASELINE TO SILENCE IT.** 15 of the 19 fail only because
+the runner has 2 GB; recording them bakes a HOST property into a commit-level
+gate. `tests/pytest_baseline.json` (11,745 tests / 19 known, recorded
+2026-08-26 under `-n auto` on another machine) is stale against a suite that is
+now **16,418** tests, and a regenerated one must come from the cron, not a
+laptop.
+
+**OPEN:** should a suite whose intelligence tests need 3 GB of headroom run on a
+2 GB cron at all? The tests are not wrong and the guard is not wrong — the
+RUNNER is too small for that subset.
+
 ## [refresh-worker-headroom-2026-09-02] THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-env-snapshots, measured off 200 MEMORY_WATCHDOG samples 15:30-16:10Z]`
 
 **Read `memory_anon_mb`, not `memory_headroom_mb`.** `memory_current_mb` includes
