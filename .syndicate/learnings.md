@@ -4036,3 +4036,46 @@ you are about to add, and bound them explicitly (a `limit`, a slim flag, fewer
 threads). Prefer the shape a real client sends — I measured a request production
 never serves and nearly drew conclusions from it. Then say plainly, in the write-
 up, which incidents were yours.
+
+## 2026-09-08 - FORBIDDEN: `git stash` inside a session worktree. The stash stack is REPOSITORY-GLOBAL.
+
+**What happened.** I used `git stash -q -u && git fetch && git rebase && git
+stash pop -q` as a rebase helper in my session worktree, as I had several times
+that day. This time my tree was CLEAN, so `stash -q -u` stashed **nothing** --
+and `stash pop` popped **another session's** work in progress
+(`stash@{0}: WIP on session/pc-counters`) into my worktree, producing `UU`
+merge conflicts in four files belonging to lane
+`mlb-first5-kalshi-fanin-mismatch` plus 58 lines of their lane blocks staged in
+`lanes.md`.
+
+**`scripts/session_worktree.py` gives each session its own INDEX. It does not
+give it its own STASH.** `git stash` is a ref (`refs/stash`) in the shared
+repository, so every worktree pushes and pops the same stack. Worktree isolation
+does not extend to it, and nothing warns you.
+
+**Why the earlier uses did not break.** On every previous call I actually had
+local changes, so my own entry was on top and `pop` returned mine. The hazard is
+invisible until the one time the tree is clean -- which is exactly when the
+helper looks safest.
+
+**Nothing was lost, and the reason is luck plus git being careful.** The pop
+conflicted rather than applying cleanly, so git KEPT the entry
+("The stash entry is kept in case you need it again"). Had it applied cleanly it
+would have been DROPPED, and another session's uncommitted work would have
+existed only inside my worktree, on top of my unrelated changes.
+
+**How to apply.**
+- **Do not run `git stash` in a worktree.** To rebase over local changes, commit
+  them first (a throwaway commit you amend or reset later), or `git rebase
+  --autostash` which uses its own storage, or simply rebase before you start
+  editing.
+- If you have already popped someone else's work:
+  `git restore --staged --worktree <their paths>` to put them back at HEAD,
+  confirm `git stash list` still holds their entry, and say so. **Never
+  `git stash drop`.**
+- `git status --porcelain` showing `UU` on files you have never touched is the
+  signature. Read the paths before resolving anything.
+
+Related: [[shared_index_can_hold_a_revert]] (same class -- the index was shared
+until worktrees; the stash still is), [[concurrent_parallel_sessions]],
+[[untracked_is_not_new]].
