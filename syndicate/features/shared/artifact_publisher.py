@@ -1804,6 +1804,49 @@ def _publish_refused_as_empty(file_path: Path, relative_path: str) -> bool:
     return False
 
 
+# A SERVICE THAT CANNOT BUILD AN ARTIFACT MUST NOT PUBLISH IT.
+#
+# The empty-payload registry above catches a zero-row file. It does NOT catch a
+# STALE one, and on 2026-09-08 that gap became live: the NFL prop artifact's row
+# keys changed from `stat::player` to `stat::player::line` (the old shape applied
+# one probability to every line of a market and mispriced 56% of the board).
+# refresh-worker still holds the OLD-key copy it pulled at 21:36:21Z. That file
+# is not empty, so nothing above refuses it -- and on the worker's next boot the
+# sweep would publish it over web's line-keyed copy, whereupon web matches
+# NOTHING and the board serves zero cards. A stale artifact is as damaging as an
+# empty one and is invisible to a row-count check.
+#
+# The honest rule is narrower and does not depend on knowing the schema: this
+# worker cannot BUILD the NFL prop artifact -- `_pbp_path` reads
+# `nfl_source/tracking/nflverse/pbp/pbp_<season>.csv`, that path is not
+# allowlisted and `pbp_2025.csv` is 97.9 MB against a 12 MiB ceiling, so the pbp
+# is on developer machines only. A service holding no pbp can only ever be
+# republishing somebody else's copy, and it has no way to know whether that copy
+# is current. So it must not push it at all.
+#
+# NOT AN IMPORT: checking the file directly keeps this module free of a
+# `syndicate.features.nfl` dependency, which would be a new import cycle in the
+# lowest layer of the publisher.
+_PRODUCER_INPUT_REQUIRED = (
+    ("nfl_source/nfl_prop_projections_*.json", "nfl_source/tracking/nflverse/pbp"),
+)
+
+
+def _publish_refused_no_producer_input(relative_path: str) -> str:
+    """Returns the missing producer input for a registered path, else ""."""
+    for pattern, required_dir in _PRODUCER_INPUT_REQUIRED:
+        if not fnmatch.fnmatch(relative_path, pattern):
+            continue
+        try:
+            probe = _data_root() / Path(required_dir)
+            if probe.is_dir() and any(probe.glob("*.csv")):
+                return ""
+        except Exception:  # noqa: BLE001 -- unknown must not silently permit
+            pass
+        return required_dir
+    return ""
+
+
 def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     """Best-effort push of a single allowlisted artifact to the web service.
 
@@ -1824,6 +1867,16 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     file_path = Path(path)
 
     # BEFORE the stream/envelope fork, so BOTH publishing forms are covered.
+    missing_input = _publish_refused_no_producer_input(relative_path)
+    if missing_input:
+        print(
+            f"[artifact_publisher] REFUSED_NOT_THE_PRODUCER path={relative_path} "
+            f"missing_input={missing_input} "
+            f"(this service cannot build it, so it must not republish it)",
+            flush=True,
+        )
+        return False
+
     if _publish_refused_as_empty(file_path, relative_path):
         print(
             f"[artifact_publisher] REFUSED_EMPTY_PAYLOAD path={relative_path} "

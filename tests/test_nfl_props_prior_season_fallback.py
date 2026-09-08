@@ -757,3 +757,54 @@ def test_the_card_projection_index_is_line_independent(monkeypatch, tmp_path):
     )
     index = props_module._nfl_card_prop_projection_index(2026, 1)
     assert index.get("passing_yards::patrick mahomes") == 256.2
+
+
+def test_a_service_without_the_pbp_may_not_publish_the_prop_artifact(tmp_path, monkeypatch):
+    """STALE is as damaging as EMPTY, and invisible to a row-count check.
+
+    The artifact's row keys changed from `stat::player` to
+    `stat::player::line` on 2026-09-08. refresh-worker still holds the OLD-key
+    copy it pulled at 21:36:21Z. That file is not empty, so the empty-payload
+    guard does not refuse it -- and on the worker's next boot the sweep would
+    publish it over web's line-keyed copy, whereupon web matches NOTHING and the
+    board serves zero cards.
+
+    The rule that catches this without knowing the schema: a service that cannot
+    BUILD the artifact cannot know whether its copy is current, so it must not
+    push it. The producer needs the play-by-play, which lives only on developer
+    machines (not allowlisted, 97.9 MB against a 12 MiB ceiling).
+    """
+    from syndicate.features.shared import artifact_publisher as ap
+
+    (tmp_path / "nfl_source").mkdir(parents=True)
+    monkeypatch.setattr(ap, "_data_root", lambda: tmp_path)
+    assert ap._publish_refused_no_producer_input(
+        "nfl_source/nfl_prop_projections_2026_wk1.json"
+    ) == "nfl_source/tracking/nflverse/pbp"
+
+
+def test_the_producer_may_still_publish(tmp_path, monkeypatch):
+    """A machine that HAS the pbp is the producer and must not be blocked."""
+    from syndicate.features.shared import artifact_publisher as ap
+
+    pbp = tmp_path / "nfl_source" / "tracking" / "nflverse" / "pbp"
+    pbp.mkdir(parents=True)
+    (pbp / "pbp_2025.csv").write_text("play_id\n1\n", encoding="utf-8")
+    monkeypatch.setattr(ap, "_data_root", lambda: tmp_path)
+    assert ap._publish_refused_no_producer_input(
+        "nfl_source/nfl_prop_projections_2026_wk1.json"
+    ) == ""
+
+
+def test_the_producer_rule_touches_nothing_else(tmp_path, monkeypatch):
+    """Every other artifact publishes exactly as before, on either machine."""
+    from syndicate.features.shared import artifact_publisher as ap
+
+    (tmp_path / "nfl_source").mkdir(parents=True)
+    monkeypatch.setattr(ap, "_data_root", lambda: tmp_path)
+    for path in (
+        "mlb_source/daily_summary_2026-09-08.json",
+        "nfl_source/oddsapi_player_props_2026_wk1.csv",
+        "ncaaf_source/whatever.json",
+    ):
+        assert ap._publish_refused_no_producer_input(path) == "", path
