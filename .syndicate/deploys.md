@@ -5,6 +5,68 @@
 
 ---
 
+## 2026-09-08 14:02:20Z — web `09f6ab86` — **MEASURED: NFL now renders the football board partials. `card_variant` 0/16 → 16/16, compact card 643-1085px → 160-180px, crests 0 → 30.** `[lane nfl-ncaaf-ui-parity]`
+
+`dep-dag17ltg1s2s738jm660`, created 13:55:35Z, live **14:02:20.837922Z**.
+Preflight `CLEAR`, `target_on_main: True`, `jobs_in_flight: []`, claim held by
+this lane. No `render.yaml` change, so no `blueprint_sync`. **refresh-worker
+was NOT deployed** — it was held by lane `web-oom-profiler-steady` and this
+reading does not need it (see "which service serves it" below).
+
+**verify: the SERVED `/nfl/api/cards` and the RENDERED `/nfl/cards`, with
+`/ncaaf/*` fetched in the same pass as the control.** Rates, not booleans.
+
+| | NFL before (81213a32, 09-07) | **NFL after (09f6ab86)** | NCAAF control before → after |
+|---|---|---|---|
+| `card_variant` | `shared_default` 16/16 | **`nfl_main` 16/16** | `ncaaf_main` 51/51 → 51/51 |
+| compact card height | 643-1085px, **16 distinct on 16 cards** | **160-180px, 2 distinct** | 181px → 180px, uniform x51 |
+| crest `<img>` in the strip | 0 | **30** | 102 → 102 |
+| prose blocks in the strip | 32 | **0** | 0 → 0 |
+| `probabilities.home_cover` | 0/16 | **14/16** | 51/51 → 51/51 |
+| `probabilities.total_over` | 0/16 | **14/16** | 51/51 → 51/51 |
+| `scoreboard.kickoff_label` | key absent | **16/16** | 51/51 → 51/51 |
+| `scoreboard.venue` | key absent | **16/16** | 51/51 → 51/51 |
+| market tile labels | Home mean / Away mean / Projected spread / Win probability | **Books / Spread / Total / Win probability** | unchanged |
+
+**THE 14/16 IS THE HONEST NUMBER AND IT IS NOT A SHORTFALL.** The two games
+without a cover probability are the two with no quoted book line
+(`market_margin` and `market_total` are 14/16 on the same payload), and the
+helper returns `None` rather than a neutral 0.5 when there is no line to price
+against. The local pre-deploy run gave the SAME 14/16 on a different odds
+file, so this is the market's coverage, not the code's.
+
+**ONE CLAIM IS VOID, NOT VERIFIED, AND MUST NOT BE READ AS PASSING:** the ESPN
+`status` stamp on started games. `started (live or final)` is **0/16** — 2026
+week 1 kicks off 09-09T00:20Z — so the branch never executed. NCAAF exercised
+the identical code path on the same payload (`started 51/51`, ESPN status
+51/51), which is evidence the mechanism works, and is NOT evidence about NFL's
+copy. First live NFL game is the test.
+
+**WHICH SERVICE SERVES IT:** `/nfl/api/cards` builds its context in **web's**
+request path, so web alone delivers and verifies this. The downstream board
+artifacts that Layer 1/2 and the chips read are refresh-worker's output and
+will NOT carry the new `predictions` block until refresh-worker is deployed —
+a separate, still-owed reading.
+
+**CONFIG DELTA THIS DEPLOY CARRIED THAT I DID NOT MAKE.** Lane
+`web-oom-profiler-steady` (`#632`, session `b2b5b45b`) set
+`SYNDICATE_GAME_CHIP_ARTIFACT_MAX_AGE_SECONDS` `absent (code default 120)`
+→ `180` on web at ~13:56Z via the single-key API, **after** this deploy was
+created at 13:55:35Z — so this boot injected it. Verified on the live
+env-vars API before the deploy finished, not taken on trust. It only widens
+how stale an artifact `/api/board/game-chips` accepts before rebuilding
+inline; it touches nothing in the card paths, and deleting the key restores
+the 120 s default with no deploy. Recorded here so a later bisect does not
+have to rediscover that this deploy moved code AND config
+(`feedback_enumerate_env_changes_when_bisecting`).
+
+**AND THIS DEPLOY IS NOT TIP.** Target was `09f6ab86`, not `bfd6eec2`.
+`b81eab85` + `a828a5a4` (that lane's `pipeline/intelligence_state.py` work)
+ARE ancestors and shipped; `a81bbf80`, `c1c33140` (sim: explicit HOME-FIELD
+term) and `bfd6eec2` are NOT in it. Anyone measuring the chips route after
+14:02:20Z is measuring `09f6ab86` + the 180 s env.
+
+---
 ## 2026-09-07 21:52:16Z — refresh-worker `66e121f3` — **MEASURED: sub-4MiB publishes now carry `X-Artifact-Publisher`.** `[lane soccer-unfed-inputs]`
 
 `dep-dafj1lht0dsc73ebqbe0`, POSTed 21:47:02Z, live 21:52:16.663704Z, preflight
