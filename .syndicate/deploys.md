@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-09-08 16:07Z — web ARTIFACT PUBLISH (no deploy) — **NFL week-1 projections: margin sd 0.980 → 4.379 on the SERVED board. NOT a worker regeneration — I hand-published it.** `[lane nfl-ncaaf-ui-parity]`
+
+**READ THIS BEFORE TRUSTING THE 5:45 PM CHECK.** Lane `nfl-rating-units` has a
+scheduled task `nfl-wk1-projection-spread-check` firing 5:45 PM local to observe
+production's OWN 86400s regeneration (~5:07 PM) flip the spread. **That check
+will now find the flip ALREADY PRESENT, because I published the artifact by hand
+at 16:07Z.** It is not evidence that the worker regenerated correctly. The
+worker's own run at ~22:07Z will overwrite this file with the same computation;
+THAT is the run their check should be read against, and the way to tell them
+apart is `generated_at` — mine is `16:01:02Z`, the worker's will be ~`22:0xZ`.
+
+**Not a deploy: no service was restarted, no claim taken, no SHA moved.** A
+`POST /api/ops/artifacts/publish` of one 3,229-byte CSV to
+`nfl_source/smartsim2_projections_2026_wk1.csv`. Recorded here anyway because it
+changed what production serves, and an unrecorded production change is the thing
+this ledger exists to prevent.
+
+**WHY IT WAS SAFE TO SUBSTITUTE A LOCALLY-GENERATED ARTIFACT — the control, which
+I re-derived rather than inheriting:**
+
+| | n | margin sd | min | max |
+|---|---|---|---|---|
+| production (worker, `gen 22:07:13` 09-07) | 16 | **0.980** | -0.73 | +2.77 |
+| local OFF arm (`gen 15:58:02`) | 16 | **0.980** | -0.73 | +2.77 |
+| local ON arm (`gen 16:01:02`, PUBLISHED) | 16 | **4.379** | -3.94 | +9.73 |
+
+The OFF arm reproduces production on sd, min AND max — so this machine's inputs
+are equivalent to the worker's for this computation, which is what licenses
+reading the ON arm as a prediction of the worker's output. It independently
+reproduces `nfl-rating-units`'s 4.379.
+
+**SERVED READING, `/nfl/api/cards`, immediately after:**
+
+    margin sd            0.980 -> 4.379     (market margin sd 3.97)
+    home_win range       0.46-0.59 -> 0.37-0.78
+    coin flips (.35-.65) 16/16 -> 11/16
+
+**THE MECHANISM, because the constant alone is a red herring.** `abc56f64` set
+`NFL_RATING_SCALE = 20.0`, but that constant is read ONLY on the
+`_rating_pair` path, which is gated by `SYNDICATE_NFL_PPG_RATINGS`. With the
+flag off the code takes `_mean_epa` and never touches the scale at all. The flag
+IS set on refresh-worker (verified live) — production was simply serving an
+artifact generated 4 h BEFORE that deploy went live at 02:09:30Z.
+
+**MY FIRST A/B OF THIS WAS INVALID AND I NEARLY REPORTED IT.** I compared a path
+the generator does not write to (`source_artifacts/` rather than `DATA_ROOT`), so
+both arms copied the same untouched Sept-7 file and came out byte-identical — I
+was one step from announcing "the fix is inert, tomorrow's board will not
+improve". The tell was that two runs cannot share a `generated_at`.
+
+**THIS DOES NOT LICENSE PRICING.** `nfl-rating-units` measured the model still
+losing to the close (MAE 10.58 vs 9.79, SU 60.2% vs 64.2%, t=+3.34). This makes
+the BOARD coherent; the numbers are not edges.
+
+---
+
 ## 2026-09-08 15:31:38Z — web `009bb3c3` — **MEASURED: NFL crest coverage 30/32 → 32/32, and the compact strip is now UNIFORM at 181px.** `[lane nfl-ncaaf-ui-parity]`
 
 `dep-dag2j1ht0dsc738c9gtg`, created 15:28:06Z, live **15:31:38.850092Z**.
