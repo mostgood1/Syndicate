@@ -2263,7 +2263,7 @@ before it is treated as a defect.
 then, so no verification window exists earlier, regardless of which clock a
 reader is using.
 
-## [nfl-ncaaf-ui-parity] NFL RENDERED THE GENERIC BOARD PARTIALS WHILE NCAAF RENDERED THE FOOTBALL ONES — one string, three surfaces `[measured 2026-09-07 on production web 81213a32, lane nfl-ncaaf-ui-parity; FIXED IN CODE, NOT DEPLOYED]`
+## [nfl-ncaaf-ui-parity] NFL RENDERED THE GENERIC BOARD PARTIALS WHILE NCAAF RENDERED THE FOOTBALL ONES — one string, three surfaces `[FIXED, DEPLOYED AND VERIFIED IN PRODUCTION 2026-09-08T14:02:20Z, web 09f6ab86, lane nfl-ncaaf-ui-parity]`
 
 **`shared/_game_card.html` and `shared/_scoreboard_strip.html` branch on
 `card_variant` and NOTHING else.** NFL emitted `shared_default` from all three
@@ -2329,10 +2329,35 @@ Shipped in code:
   panel: the model-against-market comparison was being shipped to the browser
   and was unreachable.
 
-**AFTER-NUMBERS ARE `checkout`, NOT `render`.** Measured in a browser against a
-local server in the lane worktree with copied NFL fixtures: compact cards
-161-181px (2 heights; the 161s are the games with no book line, whose market
-chips are correctly omitted), 30 crests, zero prose blocks, kickoff 16/16,
-venue 16/16, cover/over 14/16 — the 14 is bounded by the local odds fixture,
-not by the code. **This is evidence about the CODE. Nothing here says what
-production serves until it is deployed and re-read.**
+**VERIFIED ON `render` 2026-09-08T14:02:20.837922Z, web `09f6ab86`.** The
+pre-deploy `checkout` numbers this section used to end on are superseded by the
+served ones; they agreed, which is worth one line and not more.
+
+    card_variant          shared_default 16/16 -> nfl_main 16/16
+    compact card height   643-1085px, 16 distinct -> 160-180px, 2 distinct
+    crest <img>           0 -> 30
+    strip prose blocks    32 -> 0
+    home_cover            0/16 -> 14/16
+    total_over            0/16 -> 14/16
+    kickoff_label         key absent -> 16/16
+    venue                 key absent -> 16/16
+
+CONTROL, same pass: NCAAF `ncaaf_main` 51/51, 180px uniform x51, 102 crests,
+its own full-name spread label preserved. **The 14/16 is the MARKET's coverage,
+not the code's** — the two misses are the two games with no quoted book line
+(`market_margin` is 14/16 on the same payload) and the helper returns `None`
+rather than a neutral 0.5.
+
+**TWO THINGS ARE STILL NOT VERIFIED AND MUST NOT BE READ AS PASSING.**
+
+1. **The ESPN `status` stamp on a started NFL game is VOID.** `started (live
+   or final)` was **0/16** — 2026 week 1 kicks off 09-09T00:20Z — so the branch
+   never executed. NCAAF ran the identical path on the same payload (`started
+   51/51`, status 51/51): evidence the MECHANISM works, not evidence about
+   NFL's copy. First live NFL game is the test.
+2. **refresh-worker was NOT deployed** (held by `web-oom-profiler-steady` at
+   the time; free since). Layer 1/2 and the chips read ITS artifacts, so the
+   new `predictions` block has not reached them. Second reading owed:
+   `home_cover` non-null on `/api/board/book-grid?sport=nfl` after a rebuild.
+
+Working: `deploys.md` 2026-09-08 14:02:20Z; narrative `log/2026-09-08.md`.
