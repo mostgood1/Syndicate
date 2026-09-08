@@ -1750,15 +1750,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   mean the latency lives somewhere these two routes do not reach — most likely
   `/api/board/game-chips` (11 ms typical, 11.6 s worst) or the ESPN fetch
   `request_path_guard` already names inside a Flask handler.
-- Verification: **DONE for all four routes this lane owns**, each with a production
-  reading — see `state.md` `UPDATE 42`/`UPDATE 44` and `deploys.md`. **NOT verified:
-  ORGANIC traffic on `/api/intelligence/query`.** Every stage reading is my own (4 of 4
-  requests in the measured window were mine, of 51 to the service). A watcher is armed
-  and I am sending nothing, so any `QUERY_STAGE_MS` line is organic; `board_read` under
-  100 ms is a hit. Control passes — 87 requests reached web after the boundary, none to
-  this endpoint — so the silence is real, not instrument failure. **Also NOT verified:
-  that the response guard ended the 09-08 OOM cluster**; four of six kills preceded my
-  probe and `/ncaaf/cards` went to zero traffic in the same window.
+- Verification: **DONE for all four routes, and the ORGANIC reading is now IN.**
+  On real UI traffic 17:27Z (I sent nothing after the 16:43:01Z boundary, so the lines
+  are organic by construction): `board_read` **6,323.3 ms → 0.0 ms** on consecutive
+  requests 5 s apart, total **8,908.6 → 1,071.9 ms**, on a 3,098-row board — twice the
+  size my own verification used. Control held: 87+ requests reached web on other routes
+  during the 44 min of silence, so the wait was a real absence, not a dead instrument.
+  **NOT verified, and not this lane's:** that the response guard ended the 09-08 OOM
+  cluster (four of six kills preceded my probe; `/ncaaf/cards` went to zero traffic in
+  the same window).
 - Blocked by: nothing. Claims resolved by explicit user decision 2026-09-07
   (`ops.py` taken; `intelligence_state.py` a NOTICE, not a claim — claiming it
   contests the one live holder and `check_lane_invariants.py` fails on that).

@@ -27461,3 +27461,30 @@ construction.
 is actually in use the `QUERY_STAGE_MS` lines will say so directly —
 `board_read` under 100 ms is a hit — and that reading is owed before this is
 called closed on real usage.
+
+### THE OWED ORGANIC READING — confirmed on REAL traffic, 17:27Z `[lane web-oom-profiler-steady]`
+
+Every earlier stage reading was my own traffic. This one is not: I sent nothing to
+`/api/intelligence/query` after the 16:43:01Z boundary, so any `QUERY_STAGE_MS`
+line after it is organic by construction. **That is the whole method** — the
+request logs carry no caller identity to filter on, and inventing one would be a
+worse instrument than staying off the service.
+
+    17:27:19  rows=3098  board_read = 6,323.3 ms  MISS  total 8,908.6 ms  drop=False
+    17:27:24  rows=3098  board_read =     0.0 ms  HIT   total 1,071.9 ms  drop=True
+
+**8.3x on real traffic**, and on a **3,098-row board** — twice the size of the
+1,465-row board my own verification ran against, so the result holds at a scale I
+had not tested.
+
+**The MISS is correct, not a failure.** The endpoint had no traffic for ~45 min,
+so the entry was far past its 180 s TTL. What matters is the second request 5 s
+later reading `board_read = 0.0 ms`.
+
+**CONTROL HELD THROUGHOUT.** During the 44 minutes of silence, 87+ requests
+reached web on other routes, so the absence was real rather than an instrument
+failure or a dead service. The watcher also hit two transient log-read
+`HTTPError`s and correctly treated them as "no data", not "no traffic".
+
+**verify:** `board_read` under 100 ms on a warm cache, ON ORGANIC TRAFFIC —
+**PASSING at 0.0 ms.** This closes the last measurement `#632` owed.
