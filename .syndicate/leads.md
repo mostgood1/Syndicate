@@ -44,6 +44,8 @@ because the work kept deviating:
 - [ ] 2026-09-08 — from `lead-deferral-and-lane-census` — `scope-guard` covers the Edit family only; `lane-postwrite-check` measured shell writes at ~1 in 10 of all writes to tracked source, so that fraction of drift is unseen — evidence: `.claude/hooks/lane-postwrite-check.py` docstring, 9,023 Edit vs 1,045 Bash/PowerShell writes over 292 transcripts
 - [ ] 2026-09-08 — from the `live-gameline-accuracy-snapshot` task — the MLB live model prices further from 0.5 than the market on 5 of 5 post-fix dates checked (mean abs(p-0.5) 0.246-0.304 vs 0.211-0.251), which is what lets one comeback game set a whole date's Brier sign; whether that extremeness is skill or miscalibration is unmeasured — evidence: `findings_2026-09-08_live_gameline_0904_per_game.md`, needs a reliability curve over the pooled post-fix sample, not one date
 
+- [ ] 2026-09-08 — from `lead-deferral-and-lane-census` — the instrument/predicate rule family in `learnings.md` is ~50 entries saying closely-related things; four were broken in one session and none reached it. `2026-08-20` (*ONE ERROR IN FIVE GUISES*) is the worked precedent for folding a family into one stronger entry — evidence: `grep -iE 'predicate|instrument|proxy' learnings_index.md`, and the recurrence table in `log/2026-09-08.md`
+
 ## Promoted
 
 _(none yet — strike a line above and name the lane slug it became)_
