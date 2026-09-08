@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-09-08 15:05:37Z — refresh-worker `296e14ec` — **CODE PARITY WITH WEB. No NFL reading is available today, and the one I promised was WRONG — retracted below.** `[lane nfl-ncaaf-ui-parity]`
+
+`dep-dag25lgn74is73c71t7g`, created 14:59:34Z, live **15:05:37.070927Z**.
+Preflight `CLEAR` — only the two infrastructure processes — so **NO JOB WAS
+KILLED**. Claim held by this lane, released after this row. No `render.yaml`.
+
+**RETRACTION, and it is mine.** The 14:02:20Z row above says the owed reading
+is "`home_cover` non-null on `/api/board/book-grid?sport=nfl` after a worker
+rebuild". **That reading is impossible and always was.** I checked the payload
+BEFORE deploying rather than after, and that endpoint's `projection` block is
+stamped by `attach_nfl_game_projections`, which reads the smartsim2 projection
+artifact DIRECTLY — it never touches the card's `predictions` block:
+
+    projection keys : basis, model_prob_over, projected, side, edge_vs_market_pct,
+                      model_skill, source, generated_at, …
+    basis           : "smartsim2_home_win_rate"    source: "nfl_smartsim2"
+    coverage        : 300/300 non-null ALREADY, before and after
+
+`home_cover` is not a key there and would not have appeared. **I asserted a
+reading without tracing its producer**, which is the defect this ledger already
+has a rule about; had I deployed and then read it, a flat 300/300 would have
+been available to spin either way.
+
+**WHAT THIS DEPLOY ACTUALLY BUYS: code parity, and that is the honest claim.**
+Before it, refresh-worker ran `a828a5a4`, where NFL cards emit
+`shared_default`, while web served `nfl_main`. Every worker-side surface that
+builds NFL cards — the chips via `_NFLDataProvider.games()`, the intelligence
+state, the daily-update sim contract — was publishing the OLD card shape while
+web served the new one. Two surfaces disagreeing about the same game is the
+defect this lane exists to remove, so closing it before kickoff is the point.
+
+**verify (content, not ancestry):** `git show 296e14ec:syndicate/features/nfl/cards.py`
+carries `"card_variant": "nfl_main"` **2/2**, and
+`syndicate/features/shared/football_cards.py` exists at that SHA. Live SHAs
+read from the API: web `09f6ab86` (14:02:20Z), refresh-worker `296e14ec`
+(15:05:37Z).
+
+**NOT BROKEN BY THE RESTART:** the chip publisher resumed **43 s** after boot —
+`/api/board/game-chips` `source=worker_artifact`, `published_at 15:06:20Z`,
+`artifact_age_seconds 4.0`. Recorded because lane `web-oom-profiler-steady`
+landed that publisher at `a828a5a4` and a deploy that silently stopped it would
+look exactly like their 24.1-minute-gap regression returning.
+
+**NO NFL READING EXISTS TODAY, and that is a fact about the slate, not a
+hedge.** NFL has **0 chips** (259 published: mlb 15, soccer 240, wnba 4)
+because 2026 week 1 kicks off 09-09T00:20Z. The first discriminating reading
+for BOTH this and the still-void ESPN `status` stamp is the first live NFL
+game.
+
+**I ALSO SHIPPED SOMEONE ELSE'S CODE TO THIS SERVICE.** `296e14ec` is 3
+commits past web's `09f6ab86`, and one of them is `c1c33140` — an explicit
+HOME-FIELD term in the football sim, **default 1.0, i.e. OFF**. It is inert as
+shipped, and refresh-worker now carries it while web does not. Named here so
+nobody has to rediscover the asymmetry.
+
+---
 ## 2026-09-08 14:02:20Z — web `09f6ab86` — **MEASURED: NFL now renders the football board partials. `card_variant` 0/16 → 16/16, compact card 643-1085px → 160-180px, crests 0 → 30.** `[lane nfl-ncaaf-ui-parity]`
 
 `dep-dag17ltg1s2s738jm660`, created 13:55:35Z, live **14:02:20.837922Z**.
