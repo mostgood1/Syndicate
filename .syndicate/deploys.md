@@ -5,6 +5,76 @@
 
 ---
 
+## 2026-09-08 16:14:5xZ — crons `sim-input-reports` + `ci-suite` @ `85a36f3c` — **MEASURED: both crons' FIRST successful runs. `nhl alarms=21` reads back; the archive suite is rc=0 where it was 18F/21E.** `[lane render-cron-failures]`
+
+Neither cron had had a green run since being created 2026-09-07. Three
+independent defects, fixed in `5d97601f` (an ancestor of the deployed
+`85a36f3c`). Deploys `dep-dag384e1egvs73a4erp0` and `dep-dag384n40ujc73e3rah0`,
+live `16:14:53.5537Z` and `16:14:57.239439Z`.
+
+**A CRON CANNOT BE DEPLOYED BY COMMIT.** `POST /v1/services/<crn-id>/deploys`
+with `{"commitId": ...}` returns **HTTP 400**, `cannot deploy cron job service
+... by commit reference ID`. The body must be `{}`, and it takes the BRANCH TIP
+— so the deployed SHA is whatever `main` is at build time (`85a36f3c`, not the
+`0d3426fc` intended eight minutes earlier). Confirm ancestry and read the
+deploy's own `commit.id` back; do not assume the SHA you meant is the SHA that
+ran. The first attempt returned 400 for BOTH services and, through a
+summarising one-liner, printed as two empty successes rather than as an error.
+
+### Fix 1 — `sim-input-reports`, run `crn-dafj4ie7bikc738q9ol0-1788884143`, **successful** `16:17:28Z`
+
+    === READ-BACK FROM PRODUCTION ===
+      OK  wnba_source   resolved_root=/opt/render/project/src/data             alarms=1
+      OK  nba_source    resolved_root=/opt/render/project/src/data             alarms=1
+      OK  nhl_source    resolved_root=/opt/render/project/src/data/nhl_source  alarms=21
+      OK  nfl_source    resolved_root=.../nfl_source/source_artifacts          alarms=6
+      OK  ncaaf_source  resolved_root=.../ncaaf_source/source_artifacts        alarms=6
+
+**`nhl alarms=21` is the load-bearing number.** It is the exact `int` that threw
+`TypeError: object of type 'int' has no len()` here at 07:01:53Z the same day,
+and it reads back as a COUNT rather than a boolean — so `_alarm_count` read the
+int shape, rather than merely not crashing. Three prior runs died at this step
+(exit 4, then exit 1 twice). The crash landed AFTER the pull and all five
+publishes, so the cron had been reporting failure on work already in production.
+
+### Fix 2 — `ci-suite`, run `crn-dafg4h0u01pc73aavs6g-1788884287`
+
+| step | at `724eda34`, `08:02:30Z` | **at `85a36f3c`, `16:20:31Z`** |
+|---|---|---|
+| archive regression suite | **rc=1**, `Ran 386 tests … FAILED (failures=18, errors=21)` | **rc=0**, 59s |
+| the other 8 fast steps | rc=0 | rc=0 |
+
+**The tests had been measuring their own host.** `RENDER` is injected on every
+Render service type, cron jobs included. Fixed by scrubbing Render's injected
+vars from each step's child env (`_step_env`), NOT by the per-symptom
+`SYNDICATE_WEB_DYNO=0` — tried first, and it **moved 18F/21E only to 4F/19E**,
+because it answers one of nineteen bare-`RENDER` reads across ten files and the
+next reader (`refresh_state_store.data_root()`) fails as a `RuntimeError`
+instead of an assertion. No Render config change was needed in the end: both
+crons' env-var sets are untouched.
+
+### Fix 3 — the pytest cap: **PENDING, and deliberately left open**
+
+`(xdist workers: 2 ...; cap 7200s)` is live, up from the 3000s a 3001s run hit
+the same morning; the step began `16:20:34Z`. **7200 is a CEILING, NOT A
+MEASUREMENT** — nobody has yet seen this step finish on a Render cron, and this
+row must not be read as saying the cap is right. It says only that a real rc is
+now reachable, and that a killed run will print how far it got instead of one
+line. What closes this is the step's DURATION. If it returns 124 again, the
+number of tests it reached is the finding, and the cap wants that measured
+number rather than a second guess.
+
+**NO CLAIM WAS TAKEN, BECAUSE NONE EXISTS FOR THESE SERVICES.**
+`deploy_claim.py`'s `SERVICES` and `deploy_preflight.py`'s `SERVICE_IDS` name
+only web / refresh-worker / live-odds-worker, so `--service sim-input-reports`
+is rejected by `choices`. `deploy-guard.py`'s `DEPLOYS_ENDPOINT` regex DOES
+match `/v1/services/crn-…/deploys`, but `SRV_ID` matches only `srv-`, so
+`_target_services()` returns `()` and the guard takes its "ignorance, not a
+readable no" branch: **ALLOWED UNCHECKED, while printing advice to take a lock
+that cannot be taken for this service.** The three crons were created
+2026-09-07, after the lock tooling. No `render.yaml` change, so no
+`blueprint_sync`; nothing was in flight (prior runs ended 07:01Z and 08:52Z).
+
 ## 2026-09-08 16:07Z — web ARTIFACT PUBLISH (no deploy) — **NFL week-1 projections: margin sd 0.980 → 4.379 on the SERVED board. NOT a worker regeneration — I hand-published it.** `[lane nfl-ncaaf-ui-parity]`
 
 **READ THIS BEFORE TRUSTING THE 5:45 PM CHECK.** Lane `nfl-rating-units` has a
