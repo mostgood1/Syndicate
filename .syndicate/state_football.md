@@ -2396,8 +2396,40 @@ real reader yields **2,442 odds rows**.
 4. **The model ran where the data is not.** With 1-3 live, production still
    served 0. `refused_wrong_team=0 refused_unknown_team=0` proved nothing
    reached the team check, so every row exited at `player_id is None` --
-   requiring `player_name_index` empty for BOTH seasons. **web has no pbp;
-   refresh-worker does** (`rating_source=nflverse_pbp_epa_rolling[...]`).
+   requiring `player_name_index` empty for BOTH seasons.
+
+**CORRECTED 2026-09-08 (lane `nfl-props-autorun-e2e`): defect 4's second half
+was WRONG.** This section said "**web has no pbp; refresh-worker does**
+(`rating_source=nflverse_pbp_epa_rolling[...]`)". That inference does not hold --
+`nflverse_pbp_epa_rolling` is TEAM-level EPA and says nothing about player-level
+columns. The worker's own first autorun, 120 ms after its launch line:
+
+    19:19:57.565  [nfl_props] JOIN season=2026 week=1 sim_source=computed
+                  odds_rows=2463 sim_rows=0 refused_wrong_team=0 refused_unknown_team=0
+
+**refresh-worker had 2,463 odds rows -- more than web's 2,455 -- and still built
+zero.** NEITHER SERVICE HAS THE PLAYER-LEVEL pbp, and it cannot be shipped to
+either: `_pbp_path` reads `nfl_source/tracking/nflverse/pbp/pbp_<season>.csv`,
+that path is **not in `HOT_ARTIFACT_PATTERNS` at all** (so it can neither publish
+nor stream), and `pbp_2025.csv` is **97.9 MB** against a 12 MiB
+`_PUBLISH_MAX_BYTES`. `load_player_plays` returns `()` for a missing file, so the
+failure is silent everywhere except the row count.
+
+**CONSEQUENCE: refresh-worker can never build this artifact.** The producer is an
+offline run on a machine that has the pbp, which `CLAUDE.md` permits (artifact
+generation happens in background workers "or offline scripts"). The autorun's
+remaining job on the worker is to fail without damage.
+
+**AND IT DID DAMAGE BEFORE THAT LANDED.** The pre-guard autorun wrote a 284-byte
+empty artifact to the worker's disk at 19:19:57Z and a periodic sweep republished
+it over web's good copy after every restart -- `PUBLISH_OK ... bytes=284` at
+19:19:57, 19:22:34 and again at 20:01:38 right after the 19:58:07 deploy, with
+`PUBLISH_SKIPPED_UNCHANGED checksum=77a9ed3cd0c7` between. Web's published
+artifact measured **111 bytes**. A guard that only declines to WRITE does not fix
+this, because the damaging file already exists; the builder now REPAIRS its local
+copy from the published one, and the autorun's staleness gate no longer reads a
+zero-row artifact as `artifact_fresh` (mtime said fresh for 24 h, which would have
+made the repair unreachable for a day).
    Three services, three disks.
 
 **2 AND 3 ARE OLDER THAN 1 AND WERE EXPOSED BY IT.** The page served zero cards

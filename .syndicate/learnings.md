@@ -4343,3 +4343,58 @@ until worktrees; the stash still is), [[concurrent_parallel_sessions]],
   6 to 24 days, and none reached the session. **That is the cost this map exists
   to reduce, and it is the second confirmed instance of this file's own
   2026-09-08 rule about delivery.**
+
+
+### 2026-09-08 — FORBIDDEN: inferring that a service HAS an input from a related artifact's provenance string. Read the consuming code's own counter.
+
+- What we believed: refresh-worker had the NFL play-by-play and web did not, so
+  moving the prop model to the worker would fix a zero-row join. The evidence
+  was the worker's projection artifact carrying
+  `rating_source=nflverse_pbp_epa_rolling[...]`.
+- What was actually true: that string is TEAM-level EPA and says nothing about
+  the player-level columns `player_name_index` needs. **Neither service can
+  resolve a player name.** The worker's own first autorun:
+  `JOIN ... sim_source=computed odds_rows=2463 sim_rows=0 refused_wrong_team=0
+  refused_unknown_team=0` — 2,463 odds rows, MORE than web's 2,455, and still
+  zero. `_pbp_path` reads `nfl_source/tracking/nflverse/pbp/pbp_<season>.csv`,
+  which is **not in `HOT_ARTIFACT_PATTERNS` at all**, and `pbp_2025.csv` is
+  **97.9 MB** against a 12 MiB `_PUBLISH_MAX_BYTES`. The input cannot travel, so
+  the worker can NEVER build this artifact. The producer is an offline run.
+- How we found out: reading the worker's own JOIN line at the timestamp of its
+  launch — a field that had been in the log for an hour before anyone read it.
+  The inference chain (`rating_source` mentions pbp -> the service has pbp) was
+  never checked against the counter that the consuming code already emits.
+- The rule going forward: an input's presence is a property of THE PATH THE
+  CONSUMER READS, not of any artifact that mentions it. Before moving work to a
+  service "because the data is there", read that service's own instrumentation
+  for the consuming code path. A provenance label is about the producer's
+  inputs, never about yours.
+- Cost: one commit built on the wrong premise (landed, then removed the same
+  hour), and — worse — an autorun deployed to a service that cannot succeed,
+  whose first run published a 284-byte empty artifact over a healthy 966-row one
+  and took `/nfl/api/props` to zero cards a day before the season opener.
+
+### 2026-09-08 — FORBIDDEN: a guard that only DECLINES TO WRITE, when the damaging artifact already exists on disk.
+
+- What we believed: moving the zero-row guard above the write and publish fixed
+  the clobber. "Existing artifact left untouched" reads like safety.
+- What was actually true: untouched was exactly the problem. The empty 284-byte
+  file was ALREADY on the worker's disk, and a periodic publish sweep
+  republishes it to web after every restart — `PUBLISH_OK ... bytes=284` at
+  19:19:57, 19:22:34, and again at 20:01:38 immediately after the 19:58:07
+  deploy, with `PUBLISH_SKIPPED_UNCHANGED checksum=77a9ed3cd0c7` in between. So
+  the outage was not a one-off; it recurred on every boot, and the guard was
+  silent through all of it because it never ran again.
+- How we found out: `/nfl/api/props` was empty AFTER the guard was live, and the
+  published artifact measured 111 bytes.
+- The rule going forward: when a guard prevents producing bad state, ask what
+  the bad state ALREADY on disk will do next. If something else republishes,
+  serves, or re-reads it, the guard must REPAIR, not just abstain. Pair every
+  "refuse to write" with "and restore the good copy" wherever a copy exists.
+- Second-order, and it nearly shipped: the repair was gated behind an autorun
+  whose staleness check reads `stat()` only, so a zero-row artifact written ten
+  seconds ago is `artifact_fresh` for 24 h. The fix would have deployed and done
+  nothing for a day. **Gate on the OUTPUT (rows), not the input (mtime).**
+- Cost: a second deploy, and a repair that was written unconditionally the first
+  time — it pulled web's 111-byte empty file straight over a good local copy
+  before being conditioned on `local_rows == 0`.
