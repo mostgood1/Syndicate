@@ -5,6 +5,70 @@
 
 ---
 
+## 2026-09-08 ~19:5xZ — refresh-worker `aedb66c9` — **the zero-row publish guard is LIVE. It is also UNTESTED in production, and that distinction is the whole entry.** `[lane nfl-props-precompute]`
+
+`dep-dag6ernf3r2c73a4ceeg`. Preflight `CLEAR` — only infrastructure — so **no
+job was killed**; two earlier windows were passed up rather than kill a live
+1000-sim MLB job. Claim held by this lane, released after this row.
+
+**WHAT THIS FIXES — a production incident I caused 40 minutes earlier.** The new
+prop autorun fired for the first time at 19:19:57Z
+(`reason=artifact_missing_no_prior_launch`, correct — I had published to WEB's
+disk and the worker has its own), built **0 rows**, and published them over a
+healthy 966-row artifact:
+
+    artifact  generated_at 16:01:02Z row_count 966 -> 19:19:57Z row_count 0
+    served /nfl/api/props   1,684 cards -> 0
+
+**MY GUARD EXISTED AND SAT IN THE WRONG PLACE**, which is worse than absent
+because the commit message described it as protection: `main()` returned
+`0 if sim_rows > 0 else 3` while the write and the publish both happened ABOVE
+it. **An exit code is a REPORT; a guard sits before the side effect.**
+
+**verify — three readings, and the third is a NULL I am not dressing up:**
+
+1. **Guard present at the deployed SHA, by CONTENT not ancestry:**
+   `git show aedb66c9:scripts/build_nfl_prop_projections.py | grep -c
+   reason=zero_sim_rows` -> **1**.
+2. **The good artifact survived the restart:** web serves
+   `generated_at 2026-09-08T16:56:21Z`, `row_count 966`, and
+   `/nfl/api/props` serves **1,697 cards** (up from 1,684 — the odds capture
+   refreshed to 2,463 rows).
+3. **THE GUARD HAS NOT RUN.** No `NFL_PROP_PROJECTION_LAUNCHING` since
+   19:19:57Z and no `REFUSED reason=zero_sim_rows` anywhere. The worker's own
+   artifact is a fresh 0-row file on its persistent disk, so
+   `_season_projection_should_launch` reads `artifact_fresh` and skips for
+   ~24h. **The guard is deployed, not proven.** Its first real test is the next
+   launch, and calling this deploy a verification of the guard would be exactly
+   the "presence is not reachability" error.
+
+**ROOT CAUSE, reproduced rather than inferred:** deleting the odds capture
+locally yields `odds_rows=0 -> sim_rows=0`, which is precisely the artifact the
+worker produced. **refresh-worker has the play-by-play but NOT the NFL odds
+capture; web has the odds capture but NOT the play-by-play. Neither service has
+both.** My artifact design assumed one service had everything. **THIS DEPLOY
+DOES NOT CLOSE THAT** — it only makes the failure inert.
+
+**AN OPEN QUESTION I AM NOT RESOLVING HERE, flagged so nobody reads past it:**
+`19:53:29 [artifact_publisher] PUBLISH_SKIPPED_UNCHANGED
+path=nfl_source/nfl_prop_projections_2026_wk1.json checksum=77a9ed3cd0c7` on the
+worker, while the worker's own JOIN lines still read
+`sim_source=artifact ... sim_rows=0`. Web serves 966 rows, so the two copies
+cannot both be right about what "unchanged" means. Either the worker pulled
+web's copy, or `PUBLISH_SKIPPED_UNCHANGED` compares against a local
+last-published record rather than the remote. Not diagnosed; not assumed.
+
+**CARRIED FOR lane `restore-measurement` (session 2edf8b82), who asked:**
+`aedb66c9` is at or after `5e84b758` (`merge-base --is-ancestor` -> yes), so the
+settlement join fix, five-sport segment settlement, `#611`, the feedback sample
+gate, the live scorer and `EVALUATION_SETTLEMENT_SPORTS` are all live on
+refresh-worker. Cite `dep-dag6ernf3r2c73a4ceeg`. **Their "the window is open"
+was wrong** — preflight read `HOLD, jobs: 2` with a live 1000-sim MLB job at the
+moment they said it; I waited. And expect `REFUSED reason=zero_sim_rows` from
+the prop autorun eventually: that is the guard working, not a regression.
+
+---
+
 ## 2026-09-08 19:35:03Z — `ci-suite` @ `052b5d93`, `--pytest-chunks 8 --pytest-workers 0` — **MEASURED: THE SUITE COMPLETED. First full pytest pass ever on a Render cron; no OOM, no timeout.** `[lane render-cron-failures]`
 
 Deploy `dep-dag5d3eq1p3s73edvep0` (live 18:42:14Z), run
