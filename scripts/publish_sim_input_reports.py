@@ -189,6 +189,45 @@ def _publish(rel: str, token: str) -> bool | None:
         publisher=ap.publisher_identity_for_tool("publish_sim_input_reports"))
 
 
+def _alarm_count(doc: dict | None) -> int | None:
+    """Alarm count from a published report, whichever shape it used.
+
+    THERE ARE TWO SHAPES AND BOTH ARE DELIBERATE. The basketball, football and
+    soccer checklists publish `alarms` as a LIST of strings; NHL
+    (`nhl_sim_input_checklist.py:402`) and MLB (`sim_input_checklist.py:714`)
+    publish `failures` as an int that `len()` has ALREADY been applied to.
+
+    Reading either with a bare `len()` is what killed this cron's first three
+    scheduled runs -- `TypeError: object of type 'int' has no len()` on
+    `nhl_source.failures = 21` (read back from production 2026-09-08). The
+    crash landed in the VERIFY loop, after the pull, all five checklists and
+    all five publishes had already succeeded, so the cron reported failure on
+    work that was sitting in production the whole time.
+
+    Returns None when neither field is present, because "no alarm field" and
+    "zero alarms" must not collapse into each other. The old expression was
+    `len(doc.get("failures") or doc.get("alarms") or [])`, and the `or` chain
+    did exactly that collapse twice over: a report with `failures = 0` fell
+    THROUGH to `alarms`, and a report with neither field read as a confident 0.
+    """
+    if not isinstance(doc, dict):
+        return None
+    for key in ("failures", "alarms"):
+        if key not in doc:
+            continue
+        value = doc[key]
+        if isinstance(value, bool):
+            # bool subclasses int; a flag is not a count, so refuse rather
+            # than report `True` as one alarm.
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, (list, tuple, dict, str)):
+            return len(value)
+        return None
+    return None
+
+
 def _read_back(rel: str, token: str) -> dict | None:
     url = (_base_url() + "/api/ops/artifacts/export?"
            + urllib.parse.urlencode({"pattern": rel, "limit": "2"}))
@@ -268,11 +307,21 @@ def main() -> int:
         for rel in published:
             doc = _read_back(rel, token)
             got = (doc or {}).get("resolved_root")
-            n = len((doc or {}).get("failures") or (doc or {}).get("alarms") or [])
+            n = _alarm_count(doc)
             state = "OK" if doc else "MISSING"
-            print(f"  {state:8s} {rel.split('/')[0]:16s} resolved_root={got} alarms={n}")
+            shown = "UNREADABLE" if n is None else n
+            print(f"  {state:8s} {rel.split('/')[0]:16s} resolved_root={got} alarms={shown}")
             if not doc:
                 rc_overall = 6
+            elif n is None:
+                # A report that reads back but carries NEITHER `failures` nor
+                # `alarms` in a countable shape is a schema break, and the one
+                # thing this must not do is print 0 for it -- an unreadable
+                # report would then be indistinguishable from a clean engine,
+                # which is the same failure this whole script exists to stop.
+                # All five current producers emit one of the two (verified
+                # against production 2026-09-08), so this is a real signal.
+                rc_overall = 7
         print("\nA report that reads back with `resolved_root` under the mounted "
               "root is a PRODUCTION reading. `host` alone is not -- it only means "
               "SYNDICATE_DATA_ROOT was set, and a laptop with that set stamps "
