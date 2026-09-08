@@ -14,6 +14,10 @@ than erroring or fabricating.
 
 from __future__ import annotations
 
+import json
+from datetime import datetime
+from datetime import timezone
+
 import csv
 import math
 import os
@@ -32,6 +36,7 @@ from syndicate.features.nfl.player_stats import player_team_with_prior
 from syndicate.features.nfl.player_stats import resolve_player_id
 from syndicate.features.shared.team_aliases import canonical_team
 from syndicate.features.nfl.player_stats import resolve_player_id_with_prior
+from syndicate.features.nfl.sources import nfl_artifact_output_root
 from syndicate.features.nfl.sources import nfl_source_roots
 from syndicate.features.nfl.sources import nfl_props_path
 from syndicate.features.nfl.sources import nfl_roster_snapshot_path
@@ -362,13 +367,139 @@ def nfl_game_context_multiplier(season: int, week: int, player_id: str, stat: st
     return float(ratio ** alpha) * math.exp(beta * float(delta))
 
 
-def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def nfl_prop_projection_artifact_path(season: int, week: int) -> Path:
+    """Where the precomputed prop projections for *season*/*week* actually ARE.
+
+    `#441`, AND THE PROPS TWIST. This deliberately does not use
+    `default_nfl_source_root()`, which resolves a root by probing for the
+    UNRELATED `upcoming_recs_*.csv` family: git ships 5 of those and the mounted
+    disk has none, so it always picks the ephemeral CHECKOUT. That is exactly
+    how a real 42,753-byte week-1 prop capture on the mounted disk went unread
+    while `/nfl/api/props` served its empty state -- see `nfl_props_path`.
+
+    Same contract as that function: prefer a root whose copy HAS ROWS, then one
+    where the file merely exists, then a concrete path under the WRITE root so a
+    diagnostic still names a location rather than returning None. A
+    zero-row artifact must not shadow a populated one on another root.
+    """
+    relative = Path(f"nfl_prop_projections_{season}_wk{week}.json")
+    first_existing: Path | None = None
+    for root in nfl_source_roots():
+        candidate = root / relative
+        try:
+            if not candidate.is_file():
+                continue
+        except OSError:
+            continue
+        if _prop_projection_row_count(candidate) > 0:
+            return candidate
+        if first_existing is None:
+            first_existing = candidate
+    if first_existing is not None:
+        return first_existing
+    return nfl_artifact_output_root() / relative
+
+
+def _prop_projection_row_count(path: Path) -> int:
+    """Rows in a prop-projection artifact, 0 for anything unreadable.
+
+    The content probe that defeats a stub. Cheap enough to run per candidate
+    root because the artifact carries its own `row_count`.
+    """
+    try:
+        with path.open("r", encoding="utf-8-sig") as handle:
+            payload = json.load(handle)
+    except Exception:
+        return 0
+    if not isinstance(payload, dict):
+        return 0
+    rows = payload.get("sim_rows")
+    if isinstance(rows, list):
+        return len(rows)
+    try:
+        return int(payload.get("row_count") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def read_nfl_prop_projection_artifact(season: int, week: int) -> list[dict[str, Any]] | None:
+    """Precomputed sim rows, or None when the artifact is absent/unreadable.
+
+    WHY THIS EXISTS -- a SERVICE-BOUNDARY problem, not a modelling one.
+    MEASURED on production 2026-09-08 from web's own request log, with the
+    week-1 cold-start fix already live:
+
+        [nfl_props] JOIN season=2026 week=1 odds_rows=2455 sim_rows=0
+                    refused_wrong_team=0 refused_unknown_team=0
+
+    BOTH refusal counters at zero prove nothing reached the team check, so the
+    loop exited at the only `continue` above it -- `player_id is None` -- on all
+    2,455 rows. That requires `player_name_index` to be empty for BOTH 2026 and
+    2025, and both are derived from play-by-play. **web has no pbp.**
+
+    refresh-worker does: its projection artifact carries
+    `rating_source=nflverse_pbp_epa_rolling[...]`. Three services, three disks
+    (`CLAUDE.md`: cross-disk access is a hard requirement) -- the prop model was
+    being computed on the one WITHOUT the data, which is also the one `CLAUDE.md`
+    says must do no heavy computation.
+
+    None is NOT "no props": it means this reader cannot answer and the caller
+    computes instead. A missing artifact must never be mistaken for a quoted
+    market having no projection.
+    """
+    path = nfl_prop_projection_artifact_path(season, week)
+    try:
+        if not path.is_file():
+            return None
+        with path.open("r", encoding="utf-8-sig") as handle:
+            payload = json.load(handle)
+    except Exception:
+        return None
+    rows = payload.get("sim_rows") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return None
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def write_nfl_prop_projection_artifact(
+    season: int, week: int, sim_rows: list[dict[str, Any]]
+) -> Path:
+    """Write the artifact under the WRITE root and return its path.
+
+    `nfl_artifact_output_root()` rather than the read resolver, for the reason
+    `#389`/`#441` record: the root a reader PICKS and the root a writer SHOULD
+    USE are different questions, and conflating them is how output lands
+    somewhere nothing reads.
+    """
+    path = nfl_artifact_output_root() / f"nfl_prop_projections_{season}_wk{week}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "season": int(season),
+        "week": int(week),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "sim_rows": sim_rows,
+        "row_count": len(sim_rows),
+    }
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle)
+    return path
+
+
+def nfl_props_rows_for_week(
+    season: int, week: int, *, use_artifact: bool = True
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Real odds + real-rate-based sim rows for every quoted player prop
     this week. Entity = player's real full name (as quoted by the odds
     feed); market = the stat key disambiguated by player (see
     _nfl_prop_join_market_key). A real quoted line is always included
     even when the player's rate can't be resolved yet (too few games,
     or a name the pbp data has no record of) -- never silently dropped."""
+    # THE ARTIFACT IS PREFERRED, AND COMPUTING IS THE FALLBACK -- not the other
+    # way round. On web the compute path cannot answer at all (no pbp), and on
+    # the worker it can; one code path serves both because the artifact is
+    # simply absent where it has not been produced yet.
+    artifact_rows = read_nfl_prop_projection_artifact(season, week) if use_artifact else None
+
     odds_rows: list[dict[str, Any]] = []
     sim_rows: list[dict[str, Any]] = []
     # Counted, not silent: "the join found nobody" and "the join worked and
@@ -435,6 +566,10 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
         # THE ODDS ROW SURVIVES EITHER WAY -- the contract is that a real quoted
         # line is never silently dropped. What is withheld is the MODEL's
         # opinion, which is the thing that could be wrong about a person.
+        if artifact_rows is not None:
+            # The artifact already carries every sim row; the loop still runs to
+            # build the ODDS rows, which are cheap and come from the CSV.
+            continue
         player_team, player_team_source = player_team_with_prior(season, week, player_id)
         canon_player = canonical_team("nfl", player_team) if player_team else None
         canon_game = {
@@ -480,8 +615,12 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
             "player_team": player_team,
             "player_team_source": player_team_source,
         })
+    if artifact_rows is not None:
+        sim_rows = artifact_rows
     print(
-        f"[nfl_props] JOIN season={season} week={week} odds_rows={len(odds_rows)} "
+        f"[nfl_props] JOIN season={season} week={week} "
+        f"sim_source={'artifact' if artifact_rows is not None else 'computed'} "
+        f"odds_rows={len(odds_rows)} "
         f"sim_rows={len(sim_rows)} refused_wrong_team={refused_wrong_team} "
         f"refused_unknown_team={refused_unknown_team}",
         flush=True,

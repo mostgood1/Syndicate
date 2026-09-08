@@ -224,6 +224,26 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # unexpectedly matching an unrelated shallow-depth file in another
     # sport's tree.
     "nfl_source/oddsapi_player_props_*.csv",
+    # `nfl-props-precompute`: the PRECOMPUTED prop projections that pair with
+    # the capture immediately above. Without this entry the publish is refused
+    # with "relative_path is not an allowed hot artifact" -- which is what it
+    # did on the first attempt, and is exactly how a producer can be built,
+    # deployed and wired and still never reach the service that reads it.
+    #
+    # WHY THE ARTIFACT EXISTS AT ALL. The prop model resolves player identity
+    # and rolling rates from play-by-play. Measured 2026-09-08 from web's own
+    # request log, with the week-1 cold-start fix already live:
+    #
+    #     [nfl_props] JOIN season=2026 week=1 odds_rows=2455 sim_rows=0
+    #                 refused_wrong_team=0 refused_unknown_team=0
+    #
+    # Both refusal counters at zero prove nothing reached the team check, so
+    # every row exited at `player_id is None` -- which requires
+    # `player_name_index` empty for BOTH seasons, i.e. web has no pbp.
+    # refresh-worker does. Three services, three disks; the model was being
+    # computed on the one without the data. Scoped to `nfl_source/` for the
+    # same reason as the line above.
+    "nfl_source/nfl_prop_projections_*.json",
     # `nfl-injuries-fetcher` / `nfl-roster-depth-autorun`: the three real
     # NFL data-ingestion artifacts wired into refresh-worker autoruns
     # 2026-08-20, none of which were allowlisted at the time -- production
