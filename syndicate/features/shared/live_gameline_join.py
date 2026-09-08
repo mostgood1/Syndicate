@@ -418,12 +418,40 @@ REASON_UNSUPPORTED_MARKET = "market_not_priced_from_a_live_distribution"
 # p99 **74,997s**. So ~1 row in 100 was being priced off a price over 20 hours
 # old, and 39.5% off one older than ten minutes.
 #
-# WHY 600s AND NOT 120s. 120s is the population the model was actually validated
-# on and is the defensible research cut, but it keeps only 23.1% of rows and
-# choosing it here would be a product decision disguised as a safety fix. 600s
-# removes the population that is unambiguously dead -- an in-play baseball
-# moneyline that has not moved in ten minutes is not a live quote -- and keeps
-# 60.5%. Tighten with the env knob once someone owns that decision.
+# **600s WAS PROVISIONAL AND IS NOW 120s FOR MLB `[2026-09-08, user decision]`.**
+# The note that stood here said 120s "is the population the model was actually
+# validated on and is the defensible research cut", kept 600s because choosing
+# 120 "would be a product decision disguised as a safety fix", and asked someone
+# to "tighten with the env knob once someone owns that decision". The user owns
+# it. This is that tightening, and it changes the DEFAULT rather than relying on
+# an env var nobody sets.
+#
+# SECOND, INDEPENDENT MEASUREMENT, 2026-09-08 -- realised outcomes rather than
+# Brier, on 93 MLB `spreads q4_late` games from the live-gameline ledger:
+#
+#   all quotes        n=93   +14.22pp of realised edge   (+2.93 sigma)
+#   fresh <= 120s     n=30    +9.88pp                    (+1.12 sigma)
+#
+#   high disagreement (>=15pp)   n=32   median quote age 254s
+#   low  disagreement (<15pp)    n=61   median quote age 172s
+#
+# The games where the model "disagrees" most carry quotes 82 seconds OLDER, and
+# the apparent edge loses its significance once the stale ones are removed. That
+# is the same conclusion the Brier table above reached by a different route: the
+# model does not improve with quote age, the MARKET decays. An "edge" harvested
+# from a 186-second-old median quote is not collectable -- the price is gone
+# before anyone could take it.
+#
+# WHAT THIS COSTS, said plainly rather than buried: at 120s the model HONESTLY
+# LOSES to the market (Brier 0.20000 against 0.17403 in the table above), and
+# ~77% of live rows stop being priced. This change does not create a profitable
+# bucket. It removes a fake one, which is the more valuable of the two.
+#
+# PER SPORT, BECAUSE ONLY MLB WAS MEASURED. Both measurements are baseball. A
+# 120s ceiling might be badly wrong for a sport whose quotes legitimately sit
+# still between plays, so every other sport keeps 600s until someone measures
+# it. `lens_sources_for_sport` is an explicit table for the same reason -- an
+# unmeasured sport must not inherit another one's number.
 #
 # ABSENT AGE IS REFUSED, NOT PASSED. `unknown must not default permissive` is a
 # standing rule here. Every one of the 72,587 measured records carried
@@ -433,34 +461,49 @@ REASON_STALE_QUOTE = "quote_older_than_live_pricing_ceiling"
 REASON_QUOTE_AGE_ABSENT = "row_carries_no_quote_age"
 _DEFAULT_MAX_QUOTE_AGE_SECONDS = 600.0
 
+# MEASURED sports only. An absent sport gets the 600s default, which is the
+# conservative direction here: it prices MORE rows, but it is the behaviour that
+# has been running, so an unmeasured sport is left exactly as it was rather than
+# silently inheriting baseball's ceiling.
+_MAX_QUOTE_AGE_BY_SPORT: dict[str, float] = {"mlb": 120.0}
 
-def max_quote_age_seconds() -> float:
+
+def max_quote_age_seconds(sport: Any = None) -> float:
     """Ceiling on how old a quote may be and still be priced live.
 
-    `SYNDICATE_LIVE_GAMELINE_MAX_QUOTE_AGE_SECONDS`. A non-positive value or an
-    unparseable one falls back to the default rather than disabling the gate --
-    a knob that can be typo'd into "off" is the shape this repo has already been
-    burned by (`#603` shipped inert twice).
+    `SYNDICATE_LIVE_GAMELINE_MAX_QUOTE_AGE_SECONDS` overrides EVERY sport -- an
+    operator turning this down in an incident should not have to know the table.
+    A non-positive or unparseable value falls back rather than disabling the
+    gate: a knob that can be typo'd into "off" is the shape this repo has
+    already been burned by (`#603` shipped inert twice).
     """
     raw = str(os.environ.get("SYNDICATE_LIVE_GAMELINE_MAX_QUOTE_AGE_SECONDS") or "").strip()
-    try:
-        value = float(raw)
-    except ValueError:
-        return _DEFAULT_MAX_QUOTE_AGE_SECONDS
-    return value if value > 0.0 else _DEFAULT_MAX_QUOTE_AGE_SECONDS
+    if raw:
+        try:
+            value = float(raw)
+        except ValueError:
+            value = 0.0
+        if value > 0.0:
+            return value
+    key = str(sport or "").strip().lower()
+    return _MAX_QUOTE_AGE_BY_SPORT.get(key, _DEFAULT_MAX_QUOTE_AGE_SECONDS)
 
 
-def quote_age_verdict(age_seconds: Any) -> dict[str, Any] | None:
+def quote_age_verdict(age_seconds: Any, sport: Any = None) -> dict[str, Any] | None:
     """`None` if the quote is fresh enough to price; a refusal verdict if not.
 
     Returns a verdict shaped like `price_moneyline`'s so `record` folds it into
     the same counters and the refusal is named in `withheld_by_reason`.
+
+    `sport` selects the ceiling. Omitting it keeps the 600s default, so an
+    existing caller that does not know its sport is unchanged rather than
+    accidentally tightened.
     """
     if isinstance(age_seconds, bool) or not isinstance(age_seconds, (int, float)):
         return {"priceable": False, "withheld_reason": REASON_QUOTE_AGE_ABSENT,
                 "model_prob": None, "market_prob": None, "edge_pp": None}
     age = float(age_seconds)
-    if age != age or age > max_quote_age_seconds():  # NaN-safe
+    if age != age or age > max_quote_age_seconds(sport):  # NaN-safe
         return {"priceable": False, "withheld_reason": REASON_STALE_QUOTE,
                 "model_prob": None, "market_prob": None, "edge_pp": None}
     return None
@@ -1384,7 +1427,11 @@ def attach_live_gamelines(
         # `projected=False` because the row never reached a projection -- this
         # is a refusal to price against a dead MARKET quote, not a failure of
         # the model, and folding it into `projected` would misattribute it.
-        stale = quote_age_verdict(row.get("age_seconds"))
+        # SPORT FROM THE INDEX, never a default. `hit` is already resolved here
+        # and carries it; guessing would apply baseball's 120s ceiling to a sport
+        # nobody has measured, which is exactly what the per-sport table exists
+        # to prevent.
+        stale = quote_age_verdict(row.get("age_seconds"), sport=hit.get("sport"))
         if stale is not None:
             record(coverage, stale, projected=False)
             continue
