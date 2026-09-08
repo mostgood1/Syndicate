@@ -19,6 +19,14 @@ which is why they fell through it.
 `{}` and it takes the **BRANCH TIP** — so the SHA that runs is whatever `main`
 is at build time. Read the deploy's own `commit.id` back.
 
+**2a. BUT A CODE CHANGE DOES, AND THE ASYMMETRY IS A TRAP.** `autoDeploy = no`,
+so a cron keeps running its LAST DEPLOY however many times you push. Measured
+2026-09-08 22:0xZ: 4 test repairs were pushed as `510b692e` and the cron was
+still on `c208b5ef` — `point_estimator` appeared **0** times in the test file at
+the live commit and **1** on `origin/main`. An expectation was about to be
+written against the pushed code rather than the running code. **Diff the SERVED
+commit's file, not `main`'s, before predicting what a run will report.**
+
 **2. A START-COMMAND CHANGE NEEDS NO DEPLOY.** `PATCH /v1/services/<crn-id>`
 with `serviceDetails.envSpecificDetails.startCommand` creates NO deploy, and
 the next run uses the new command from the OLD deploy. **The opposite of env
