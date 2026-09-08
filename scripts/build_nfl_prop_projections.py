@@ -50,9 +50,47 @@ from syndicate.features.nfl.props import (  # noqa: E402
     write_nfl_prop_projection_artifact,
 )
 from syndicate.features.shared.artifact_publisher import publish_hot_artifact  # noqa: E402
+from syndicate.features.shared.artifact_publisher import pull_streamed_artifact  # noqa: E402
 
 
 def build(season: int, week: int) -> dict:
+    # PULL THE ODDS CAPTURE FIRST -- IT LIVES ON WEB, NOT HERE, AND THAT SPLIT
+    # IS WHAT MADE THIS SCRIPT PUBLISH AN EMPTY ARTIFACT OVER A GOOD ONE.
+    #
+    # MEASURED 2026-09-08: the autorun's first real run built 0 rows on
+    # refresh-worker and clobbered a healthy 966-row artifact. Reproduced
+    # locally by deleting the odds file -- `odds_rows=0 -> sim_rows=0`, exactly
+    # the artifact the worker produced. **refresh-worker has the play-by-play
+    # but NOT the NFL odds capture; web has the odds capture but NOT the
+    # play-by-play. Neither service has both.**
+    #
+    # WHY THE CAPTURE NEVER ARRIVED ON ITS OWN, and it is by construction, not
+    # by accident: `pull_hot_artifacts` is DATE-scoped (`?pattern=*<date>*`)
+    # because an unfiltered pull reproducibly hit Render's proxy timeout. This
+    # file is WEEK-suffixed -- `oddsapi_player_props_2026_wk1.csv` -- so it can
+    # never match a date pattern. `pull_hot_artifacts`'s own docstring names the
+    # class: "a handful of non-dated files ... are out of scope for this
+    # per-cycle pull and would need a separate, infrequent full sync."
+    #
+    # ONE NAMED FILE, NOT A WIDER PATTERN. `_SEASON_ARTIFACT_PATTERNS` was the
+    # other candidate and is the wrong lever: `pull_season_artifacts` is called
+    # before an MLB ROSTER build, so adding an NFL pattern there would make
+    # every MLB build pull NFL props, and that function's docstring is explicit
+    # that each request must stay narrow for the same 502 reason. This pulls
+    # exactly the file this script needs, when it needs it.
+    #
+    # Never fatal: `pull_streamed_artifact` never raises, and a 304 (already
+    # current) is a success that writes nothing -- the normal steady state. If
+    # the pull fails, the build proceeds and the zero-row guard below refuses,
+    # which is the correct degradation.
+    odds_relative = f"nfl_source/oddsapi_player_props_{season}_wk{week}.csv"
+    pulled_ok, pulled_n = pull_streamed_artifact(odds_relative)
+    print(
+        f"[build_nfl_prop_projections] ODDS_PULL path={odds_relative} "
+        f"ok={pulled_ok} written={pulled_n}",
+        flush=True,
+    )
+
     # use_artifact=False is load-bearing: the producer must COMPUTE, never read
     # back the artifact it is about to overwrite. Without it a stale artifact
     # would be republished forever and look like a healthy rebuild.
@@ -90,6 +128,8 @@ def build(season: int, week: int) -> dict:
             "week": week,
             "path": None,
             "published": False,
+            "odds_pull_ok": bool(pulled_ok),
+            "odds_pull_written": int(pulled_n or 0),
             "odds_rows": len(odds_rows),
             "sim_rows": 0,
             "entities": 0,
@@ -114,6 +154,8 @@ def build(season: int, week: int) -> dict:
         "week": week,
         "path": str(path),
         "published": bool(published),
+        "odds_pull_ok": bool(pulled_ok),
+        "odds_pull_written": int(pulled_n or 0),
         "odds_rows": len(odds_rows),
         "sim_rows": len(sim_rows),
         "entities": len({str(row.get("entity") or "") for row in sim_rows}),

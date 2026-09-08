@@ -281,3 +281,74 @@ def test_a_populated_build_still_writes_and_publishes(monkeypatch, tmp_path):
     assert result["sim_rows"] == 1
     assert result["published"] is True
     assert len(published) == 1
+
+
+def test_builder_pulls_the_odds_capture_before_it_computes(monkeypatch):
+    """The pull must happen BEFORE the compute, or it cannot help.
+
+    refresh-worker has the play-by-play; web has the NFL odds capture. Neither
+    service has both, and the capture is WEEK-suffixed
+    (`oddsapi_player_props_2026_wk1.csv`) so the date-scoped `pull_hot_artifacts`
+    can never match it. Measured 2026-09-08: the autorun's first real run built
+    0 rows on the worker off a missing input.
+
+    Ordering is the whole point -- a pull after the compute reads as wired and
+    does nothing -- so this asserts the SEQUENCE, not just the call. That is the
+    same defect class as the zero-row guard, which was present but sat below the
+    write it was supposed to prevent.
+    """
+    import scripts.build_nfl_prop_projections as builder
+
+    calls: list[str] = []
+
+    def fake_pull(relative_path, **kwargs):
+        calls.append(f"pull:{relative_path}")
+        return True, 4096
+
+    def fake_rows(season, week, *, use_artifact=True):
+        calls.append(f"compute:{season}:{week}:use_artifact={use_artifact}")
+        return [], []
+
+    monkeypatch.setattr(builder, "pull_streamed_artifact", fake_pull)
+    monkeypatch.setattr(builder, "nfl_props_rows_for_week", fake_rows)
+
+    result = builder.build(2026, 1)
+
+    assert calls == [
+        "pull:nfl_source/oddsapi_player_props_2026_wk1.csv",
+        "compute:2026:1:use_artifact=False",
+    ], f"pull must precede compute, and force a recompute; got {calls}"
+    assert result["odds_pull_ok"] is True
+    assert result["odds_pull_written"] == 4096
+    # A successful pull does NOT license a zero-row publish.
+    assert result["refused"] == "zero_sim_rows"
+    assert result["published"] is False
+
+
+def test_builder_survives_a_failed_odds_pull(monkeypatch):
+    """A failed pull degrades to the refusal, never to a crash or a clobber."""
+    import scripts.build_nfl_prop_projections as builder
+
+    monkeypatch.setattr(builder, "pull_streamed_artifact", lambda p, **k: (False, 0))
+    monkeypatch.setattr(
+        builder, "nfl_props_rows_for_week", lambda s, w, **k: ([], [])
+    )
+
+    result = builder.build(2026, 1)
+    assert result["odds_pull_ok"] is False
+    assert result["refused"] == "zero_sim_rows"
+    assert result["path"] is None
+
+
+def test_the_odds_capture_is_allowlisted_for_streaming():
+    """`pull_streamed_artifact` refuses anything off HOT_ARTIFACT_PATTERNS.
+
+    The pull above is silently a no-op if this ever stops being true, so pin it
+    rather than trusting that the pattern stays put.
+    """
+    from syndicate.features.shared.artifact_publisher import (
+        is_hot_artifact_relative_path,
+    )
+
+    assert is_hot_artifact_relative_path("nfl_source/oddsapi_player_props_2026_wk1.csv")
+    assert is_hot_artifact_relative_path("nfl_source/oddsapi_player_props_2026_wk18.csv")
