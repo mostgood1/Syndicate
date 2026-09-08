@@ -28,6 +28,13 @@ Every ledger record carries `market_fair_prob` beside `model_home_win_prob`, so
 both are scored **on exactly the same rows** and the difference is reported.
 Negative `model_minus_market_brier` = the model beat the market.
 
+THAT IS THE h2h RULE, AND IT IS THE h2h RULE ONLY. For totals and spreads the
+market's price is ~0.50 by construction and its VIEW is the LINE, so those are
+scored on the model's POINT FORECAST against the line (contract 3, 2026-09-08;
+see `_POINT_FORECAST_FAMILIES`). A row that cannot be measured is counted under
+`unmeasured` by reason, and a row on a game segment is resolved only through a
+segment-actual reader (`SegmentActualLookup`), never the full-game final.
+
 WHAT IS DELIBERATELY NOT IMPORTED. `intelligence_evaluation._calibration`
 already computes Brier and MAE, and reusing it would normally be right. It is
 not imported here because this runs inside the per-build artifact path on
@@ -39,23 +46,24 @@ cosmetic one. The arithmetic is inlined and this paragraph is why.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
+import math
+from collections.abc import Callable, Mapping
+from typing import Any, Optional
 
 # A record with no outcome is not scored, and the count is reported rather than
 # dropped: "we had no outcome" and "the model was wrong" must never look alike.
 _UNSCORED_NO_OUTCOME = "no_final_outcome_for_game"
 _UNSCORED_NO_MODEL_PROB = "record_carries_no_model_probability"
-# THE PROBABILITY DOES NOT DESCRIBE THE OUTCOME THIS SCORER HOLDS. See
-# `_SCOREABLE_MARKETS` below. Two reasons, not one, because "a totals row we
-# know we cannot score yet" and "a market nobody classified" are different
-# facts and the second one is the bug report.
-_UNSCORED_MARKET_NOT_HOME_WIN = "market_probability_is_not_a_home_win_probability"
+# A market in NEITHER table below. Its own reason because "a market nobody
+# classified" is a bug report, and folding it into a known refusal would hide
+# the bug report behind the volume of the refusal.
 _UNSCORED_MARKET_UNKNOWN = "record_carries_no_recognised_market"
 
-# THE ONLY MARKET WHOSE PROBABILITY IS A HOME-WIN PROBABILITY.
+# THE ONLY MARKET WHOSE PROBABILITY IS A HOME-WIN PROBABILITY -- scored by
+# comparing PROBABILITIES, because for h2h the de-vigged price IS the market's
+# view (market-leg sd 0.251, measured 2026-09-05).
 #
-# **THIS SET IS THE FIX FOR A REAL DEFECT, MEASURED 2026-08-30.** The ledger
+# **THIS SET WAS THE FIX FOR A REAL DEFECT, MEASURED 2026-08-30.** The ledger
 # stores `live_gameline.model_prob` under the field name `model_home_win_prob`,
 # and that name is only true for `h2h`. `live_gameline_join.attach_live_gamelines`
 # deliberately prices three markets (`h2h` plus `_DIST_MARKETS` = totals and
@@ -64,7 +72,7 @@ _UNSCORED_MARKET_UNKNOWN = "record_carries_no_recognised_market"
 #
 # This loop had no market branch at all, so every one of them was scored against
 # `won = did the home team win`. Measured on the served MLB board that day: of
-# the 6 rows carrying a `live_gameline` block, **1 was h2h** — 3 totals, 2
+# the 6 rows carrying a `live_gameline` block, **1 was h2h** -- 3 totals, 2
 # spreads. So ~5/6 of the sample was a category error, and it is why the
 # accumulated history (`reports/live_gameline_accuracy/history.jsonl`, pooled
 # `priceable_only` +0.05749 over 118 games) says nothing about the model.
@@ -73,34 +81,105 @@ _UNSCORED_MARKET_UNKNOWN = "record_carries_no_recognised_market"
 # market a coin flip, so the de-vigged market prob sits near 0.5 by construction
 # (0.3798/0.4425/0.4927/0.4919/0.4765 on that board). Against an event it is not
 # predicting, that is near-OPTIMAL: Brier for an uninformative forecast is
-# minimised at the base rate. The model's numbers are genuinely spread (0.25–0.45)
+# minimised at the base rate. The model's numbers are genuinely spread (0.25-0.45)
 # and took the quadratic penalty at chance. The market was not beating the model;
 # it was hedging an unrelated question.
-#
-# **Why totals and spreads are not simply scored properly here instead.** They
-# cannot be, retroactively: the ledger records no `line`, and the same board
-# carried model_prob 0.3167 on BOTH the 9.5 and 9.0 totals — the line is not
-# recoverable from the stored probability, so there is no outcome to score
-# against. `build_records` now records `line` (and keys on it), which makes that
-# version possible from new records onward. It is deliberately NOT built against
-# zero data; see the lane.
 _SCOREABLE_MARKETS: frozenset[str] = frozenset({"h2h"})
 
-# Known, priced, and NOT a home-win probability — so a record can be refused
-# BY NAME rather than as "everything else", and a market in neither set stays
-# visible as unknown instead of being absorbed into whichever branch happens to
-# be the fallthrough. Same explicit-table rule `build_finals_index` follows for
-# level finals.
+# THE MARKETS WHOSE VIEW IS THE LINE -- scored on the model's POINT FORECAST,
+# never on a probability comparison. Scorer contract 3, 2026-09-08. From
+# 2026-08-30 until then these were refused by name; the comment above is why,
+# and the ledger recorded no `line` before 2026-08-30 so nothing earlier can be
+# scored retroactively.
 #
-# **IMPORTED FROM THE PRODUCER, NOT RE-TYPED HERE.** A hand-copy of this set was
-# written first and was already wrong — it had `spread` and lacked `run_line`
-# and `ats`, so an MLB run-line row would have fallen through to `unknown`.
-# Drift between the set that DECIDES WHAT TO PRICE and the set that DECIDES WHAT
-# THAT PRICE MEANS is the same class of defect this whole module is fixing, and
-# `live_gameline_join` is already resident in this build path (it attaches the
-# blocks these records are written from), so the import costs no memory that the
-# refresh-worker was not already paying.
-from syndicate.features.shared.live_gameline_join import _DIST_MARKETS as _NON_HOME_WIN_MARKETS
+# WHY A PROBABILITY COMPARISON IS WRONG HERE, established in `816c93c0` and
+# implemented first in `scripts/bucket_realised_performance.py`. Books quote
+# totals and spreads about -110/-110, so the de-vigged `market_fair_prob` is
+# ~0.50 WHATEVER the line is: market-leg sd totals 0.058, spreads 0.132; the
+# within-game slope of P(over) against the line is -0.005 per run where a real
+# total needs ~-0.12, and 44% of within-game line pairs were INVERTED. That is
+# not a defect, it is what -110/-110 pricing MEANS. Comparing an informative
+# model probability to that constant manufactures edge out of nothing -- the
+# fake ~90% ATS result `subset_edge_scan` produced, and the +14pp `spreads
+# q4_late` "realised edge" the harness reported before this correction.
+#
+# The market expresses its view as the LINE, so the model's own point forecast
+# competes with the line on the actual outcome:
+#
+#   totals    `model_total_mean`  vs `line`  on the actual total   (away + home)
+#   spreads   `model_margin_mean` vs `line`  on the actual margin  (home - away)
+#
+# The model backs over/home when its mean sits above the line; the observation
+# is whether the actual landed on that side. A 0.50 baseline is legitimate for
+# this directional read PRECISELY because the book prices the line as a coin
+# flip. `actual == line` is a push and is not an observation. A row without
+# the mean is UNMEASURED by name and is never folded into a probability
+# comparison as a substitute: `market_fair_prob` is not read on these rows.
+#
+# THE LINE FRAME. `line` is the grid row's canonical away/over-frame line
+# (`#262`), and `live_gameline_join.price_distribution_market` records the
+# consequence for spreads: with the margin home-positive, home covers when
+# `margin > line`. `model_margin_mean` is `hit["home_margin"]`, the same frame,
+# so `mean > line` and `actual > line` are compared directly -- identical to
+# `bucket_realised_performance.point_forecast_side`, the formulation this
+# mirrors and must not drift from.
+#
+# THE MARKET SETS ARE IMPORTED FROM THE PRODUCER, NOT RE-TYPED HERE. A hand-copy
+# was already wrong on its first attempt -- it had `spread` and lacked
+# `run_line` and `ats`, so an MLB run-line row would have fallen through to
+# `unknown`. Drift between the set that DECIDES WHAT TO PRICE and the set that
+# DECIDES WHAT THAT PRICE MEANS is the class of defect this module exists to
+# stop, and `live_gameline_join` is already resident in this build path.
+from syndicate.features.shared.live_gameline_join import (
+    _SPREAD_MARKETS as _SPREAD_MARKET_KEYS,
+    _TOTALS_MARKETS as _TOTALS_MARKET_KEYS,
+)
+
+# family -> (ledger column carrying the model's mean, actual from (away, home)).
+# The column is `model_total_mean`, NOT `total_mean`: reading the latter returns
+# None on every row and looks exactly like an unfed field.
+_POINT_FORECAST_FAMILIES: dict[str, tuple[str, Callable[[float, float], float]]] = {
+    "totals": ("model_total_mean", lambda away, home: away + home),
+    "spreads": ("model_margin_mean", lambda away, home: home - away),
+}
+_POINT_FORECAST_FAMILY_BY_MARKET: dict[str, str] = {
+    **{m: "totals" for m in _TOTALS_MARKET_KEYS},
+    **{m: "spreads" for m in _SPREAD_MARKET_KEYS},
+}
+POINT_FORECAST_BASELINE = 0.5
+
+# UNMEASURED, BY NAME: every reason a line-priced row produced no observation.
+# "We could not measure" and "the model was wrong" must never look alike, and
+# neither may "no mean" and "push" -- the first is a pipeline gap (an unfed
+# field, exactly the failure `model_engine_standard.md` exists for), the
+# second is the game.
+_UNMEASURED_NO_FINAL = "no_final_outcome_for_game"
+_UNMEASURED_NO_FINAL_SCORE = "no_final_score_for_game"
+_UNMEASURED_NO_MEAN = "record_carries_no_model_point_forecast"
+_UNMEASURED_NO_LINE = "record_carries_no_line"
+_UNMEASURED_PUSH = "push_actual_landed_on_the_line"
+_UNMEASURED_NO_LEAN = "model_mean_equals_the_line"
+# A row whose `segment` is not the full game needs a SEGMENT actual, and the
+# full-game final is not one. See `SegmentActualLookup`.
+_UNMEASURED_SEGMENT_ACTUAL_UNAVAILABLE = "segment_actual_unavailable"
+_UNMEASURED_SEGMENT_LEVEL = "segment_actual_level_for_h2h"
+
+# THE INTERFACE FOR SEGMENT ACTUALS: `(game_key, segment) -> (away, home)` as
+# they stood at the END OF THAT SEGMENT, or None when the reader has nothing.
+# `game_key` is tried as the record's `game_pk` and then its `event_id` -- the
+# same two identifiers the finals join uses -- and `segment` is the ledger's
+# own token (`first5`, `first_half`, ...), lower-cased. A Mapping keyed
+# `(game_key, segment)` is accepted in place of the callable.
+#
+# THE DEFAULT IS NONE: FULL-GAME FINALS ONLY. Every ledger row today is
+# `segment=full` by construction of the join, and the per-sport segment-actual
+# readers are being built separately. `bet_status_*` is deliberately NOT
+# imported here: this runs on every board build, and that module's cost is
+# not this module's to pay (`#241`). Until a reader is passed in, a segment
+# row is UNMEASURED under `segment_actual_unavailable` -- it is NEVER graded
+# against the full-game final, which would score a first-five forecast on
+# nine innings and call the result a measurement.
+SegmentActualLookup = Callable[[str, str], Optional[tuple[float, float]]]
 
 # WHAT A LEVEL FINAL MEANS, PER SPORT. Two EXPLICIT tables rather than one table
 # and a relaxed default, for the reason `live_gameline_join.lens_sources_for_sport`
@@ -164,6 +243,18 @@ _QUOTE_AGE_BUCKETS: tuple[tuple[str, float, float], ...] = (
     ("gt_1800s", 1800.0, float("inf")),
 )
 
+# THE SAME AXIS, CUMULATIVE. The disjoint buckets above answer "where does the
+# quality change"; these answer the question a gate asks -- "what is the
+# number on the population I would actually publish". MLB's live publish gate
+# is 120s per sport (`_MAX_QUOTE_AGE_BY_SPORT`) and the historical ceiling was
+# 600s, so both are named. `all` is every row, age present or not, and is
+# there so a reader never has to add the other two to the absent count.
+_CUMULATIVE_QUOTE_AGE_BUCKETS: tuple[tuple[str, float], ...] = (
+    ("le_120s", 120.0),
+    ("le_600s", 600.0),
+    ("all", float("inf")),
+)
+
 
 # WHAT THIS SCORER IS, ANSWERABLE WITHOUT A SAMPLE.
 #
@@ -180,11 +271,21 @@ _QUOTE_AGE_BUCKETS: tuple[tuple[str, float, float], ...] = (
 # unhealthy. These are CONSTANTS -- they need no records, no finals and no
 # slate -- so there is no reason for them to be conditional on having a sample.
 #
-# `scorer_contract` is the deploy discriminator. Absent means a build from
-# before 2026-09-01, which is also every build that scored totals and spreads
-# against "did the home team win" (see `_SCOREABLE_MARKETS`). Bump it when the
-# SHAPE of what this module returns changes, not when a number moves.
-SCORER_CONTRACT = 2
+# `scorer_contract` is the deploy discriminator AND the pooling boundary.
+# Absent means a build from before 2026-09-01, which is also every build that
+# scored totals and spreads against "did the home team win" (see
+# `_SCOREABLE_MARKETS`). Bump it when the SCORING RULE or the SHAPE of what
+# this module returns changes, not when a number moves -- and never pool the
+# accuracy history across a bump (`learnings.md`: a number pooled across a
+# scorer boundary measures the fix, not the model).
+#
+#   1  h2h, totals and spreads all scored against a home win (the defect)
+#   2  h2h only; totals/spreads refused by name; quote-age cut  (2026-09-01)
+#   3  totals/spreads scored on the POINT FORECAST against the line, with
+#      `unmeasured` reasons; segment-aware; cumulative quote-age buckets
+#      (2026-09-08). The h2h arithmetic is UNCHANGED from 2, so h2h rows from
+#      2 and 3 remain poolable; `point_forecast` exists only from 3.
+SCORER_CONTRACT = 3
 
 
 def scorer_capabilities() -> dict[str, Any]:
@@ -199,6 +300,10 @@ def scorer_capabilities() -> dict[str, Any]:
         "scored_markets": sorted(_SCOREABLE_MARKETS),
         "fresh_quote_seconds": FRESH_QUOTE_SECONDS,
         "quote_age_buckets": [name for name, _lo, _hi in _QUOTE_AGE_BUCKETS],
+        "quote_age_cumulative_buckets": [name for name, _hi in _CUMULATIVE_QUOTE_AGE_BUCKETS],
+        # Contract 3: the line-priced markets and the rule they are scored by.
+        "point_forecast_markets": sorted(_POINT_FORECAST_FAMILIES),
+        "point_forecast_baseline": POINT_FORECAST_BASELINE,
     }
 
 
@@ -230,15 +335,18 @@ def _finite_prob(value: Any) -> float | None:
     return p
 
 
-def build_finals_index(
+def build_final_scores_index(
     grid: Any,
     *,
     sport: Any = None,
     diagnostics: dict[str, Any] | None = None,
-) -> dict[str, bool]:
-    """`game_pk` -> did HOME win, for games that are FINAL on this grid.
+) -> dict[str, tuple[float, float]]:
+    """`game_pk` -> `(away_score, home_score)`, for games FINAL on this grid.
 
     Keyed on `game_pk` because that is what the ledger stores as its join key.
+    `build_finals_index` derives the home-won boolean from this; the scores
+    themselves are what totals and spreads are scored on (contract 3), so the
+    walk of the grid happens once and both views agree by construction.
 
     **A LEVEL FINAL MEANS DIFFERENT THINGS IN DIFFERENT SPORTS, AND TREATING IT
     ONE WAY FOR ALL OF THEM SILENTLY DELETED A THIRD OF SOCCER.** This used to
@@ -290,7 +398,7 @@ def build_finals_index(
             "finals_skipped_no_numeric_score_games": 0,
         })
 
-    out: dict[str, bool] = {}
+    out: dict[str, tuple[float, float]] = {}
     # DISTINCT GAMES behind the skipped ROWS. `finals_seen` and `finals_level`
     # count rows, and a row is one market on one game -- 196 rows was ONE game
     # on 2026-08-28. A row count alone therefore cannot answer the only
@@ -385,7 +493,6 @@ def build_finals_index(
         # single record, and reported it as "no outcome" rather than silently
         # scoring nothing.
         lg = row.get("live_gameline") if isinstance(row.get("live_gameline"), Mapping) else {}
-        won = h > a
         for ident in (
             row.get("game_pk"),
             game.get("game_pk"),
@@ -395,7 +502,7 @@ def build_finals_index(
         ):
             key = str(ident or "").strip()
             if key:
-                out[key] = won
+                out[key] = (a, h)
     if diag is not None:
         # NOT the raw set: a game can be skipped for want of a score on one row
         # and indexed from another, and it is not "lost" in that case. Reported
@@ -409,6 +516,30 @@ def build_finals_index(
     return out
 
 
+def finals_from_scores(scores: Mapping[str, tuple[float, float]]) -> dict[str, bool]:
+    """The home-won view of a scores index. A level score is False, and it is
+    only present at all for sports where `build_final_scores_index` admitted it
+    (draw-bearing), so the draw rule lives in one place."""
+    return {key: h > a for key, (a, h) in scores.items()}
+
+
+def build_finals_index(
+    grid: Any,
+    *,
+    sport: Any = None,
+    diagnostics: dict[str, Any] | None = None,
+) -> dict[str, bool]:
+    """`game_pk` -> did HOME win, for games that are FINAL on this grid.
+
+    The h2h view. Every rule about which finals are admitted -- level finals,
+    unknown sports, missing scores, the identifier precedence -- is documented
+    on `build_final_scores_index`, which this derives from.
+    """
+    return finals_from_scores(
+        build_final_scores_index(grid, sport=sport, diagnostics=diagnostics)
+    )
+
+
 def _score(pairs: list[tuple[float, bool]]) -> dict[str, Any]:
     """Brier and MAE over (probability, outcome). Empty is None, never 0.0."""
     if not pairs:
@@ -419,8 +550,157 @@ def _score(pairs: list[tuple[float, bool]]) -> dict[str, Any]:
     return {"brier": round(sum(briers) / n, 5), "mae": round(sum(maes) / n, 5), "n": n}
 
 
-def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, Any]:
-    """Score model vs market over ledger records whose game has a final outcome.
+def _finite_number(value: Any) -> float | None:
+    """A finite float, or None. A bool is not a number; a numeric string is.
+
+    Strings are admitted because `line` reaches the ledger from the grid row
+    verbatim and the harness this mirrors (`point_forecast_side`) accepts them
+    -- refusing "9.5" here would read as an unfed line on a row that has one.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        try:
+            value = float(value.strip())
+        except ValueError:
+            return None
+    if not isinstance(value, (int, float)):
+        return None
+    x = float(value)
+    if x != x or x in (float("inf"), float("-inf")):  # NaN-safe
+        return None
+    return x
+
+
+def _score_pair(value: Any) -> tuple[float, float] | None:
+    """`(away, home)` as finite floats, or None."""
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return None
+    away, home = _finite_number(value[0]), _finite_number(value[1])
+    if away is None or home is None:
+        return None
+    return away, home
+
+
+def _segment_of(rec: Mapping[str, Any]) -> str:
+    """The row's segment token, `full` when absent or blank."""
+    return str(rec.get("segment") or "full").strip().lower() or "full"
+
+
+def _as_segment_lookup(segment_actuals: Any) -> SegmentActualLookup | None:
+    """Normalise the caller's reader to the callable form, or None."""
+    if segment_actuals is None:
+        return None
+    if callable(segment_actuals):
+        return segment_actuals
+    if isinstance(segment_actuals, Mapping):
+        table = segment_actuals
+        return lambda key, segment: table.get((key, segment))
+    raise TypeError(
+        "segment_actuals must be a callable (game_key, segment) -> (away, home), "
+        f"a Mapping keyed by that pair, or None; got {type(segment_actuals).__name__}"
+    )
+
+
+def _segment_actual(
+    lookup: SegmentActualLookup | None, idents: list[str], segment: str
+) -> tuple[float, float] | None:
+    """The segment's (away, home), trying every identifier -- never `a or b`."""
+    if lookup is None:
+        return None
+    for ident in idents:
+        pair = _score_pair(lookup(ident, segment))
+        if pair is not None:
+            return pair
+    return None
+
+
+def _directional(obs: list[dict[str, Any]]) -> dict[str, Any]:
+    """The point-forecast block over observations. Empty is None, never 0.0.
+
+    `hit_rate` against `POINT_FORECAST_BASELINE`, with the standard error
+    computed ON GAMES, not rows. The ledger writes a row per build per line
+    per book set -- 42,692 MLB rows over ten days were 122 games, a median of
+    334 rows per game -- and treating rows as independent understated sigma by
+    ~18x and produced a "+14.63pp at +21 sigma" result that is impossible on
+    its face (`bucket_realised_performance.py`). `n` is still the row count,
+    because it is honest about what was averaged; `games` is the denominator
+    a reader may quote a sigma on.
+
+    `model_mae` / `line_mae` are the point errors themselves: whether the
+    model's mean sat closer to the actual than the line did, on the same rows.
+    NEGATIVE `model_minus_line_mae` means the model was closer.
+    """
+    n = len(obs)
+    if not n:
+        return {
+            "n": 0, "games": 0, "hits": 0, "hit_rate": None,
+            "baseline": POINT_FORECAST_BASELINE,
+            "model_minus_baseline_pp": None, "se_pp_on_games": None,
+            "model_mae": None, "line_mae": None, "model_minus_line_mae": None,
+        }
+    hits = sum(1 for o in obs if o["hit"])
+    games = len({o["game"] for o in obs})
+    rate = hits / n
+    se = math.sqrt(max(rate * (1.0 - rate), 1e-9) / max(games, 1))
+    model_mae = sum(o["model_abs_err"] for o in obs) / n
+    line_mae = sum(o["line_abs_err"] for o in obs) / n
+    return {
+        "n": n,
+        "games": games,
+        "hits": hits,
+        "hit_rate": round(rate, 5),
+        "baseline": POINT_FORECAST_BASELINE,
+        # POSITIVE means the model's side of the line landed more often than
+        # the coin flip the book priced it as. Named in full so nobody has to
+        # guess the sign.
+        "model_minus_baseline_pp": round((rate - POINT_FORECAST_BASELINE) * 100.0, 3),
+        "se_pp_on_games": round(se * 100.0, 3),
+        "model_mae": round(model_mae, 5),
+        "line_mae": round(line_mae, 5),
+        "model_minus_line_mae": round(model_mae - line_mae, 5),
+    }
+
+
+def _point_forecast_block(obs: list[dict[str, Any]]) -> dict[str, Any]:
+    """One family's (totals or spreads) populations, same cuts as h2h."""
+    last: dict[tuple[str, str], dict[str, Any]] = {}
+    for o in obs:
+        k = (o["game"], o["segment"])
+        prev = last.get(k)
+        if prev is None or o["stamp"] >= prev["stamp"]:
+            last[k] = o
+    aged = [o for o in obs if o["age"] is not None]
+    by_segment: dict[str, int] = {}
+    for o in obs:
+        by_segment[o["segment"]] = by_segment.get(o["segment"], 0) + 1
+    return {
+        "all_records": _directional(obs),
+        "last_per_game": _directional(list(last.values())),
+        "priceable_only": _directional([o for o in obs if o["priceable"]]),
+        "fresh_quotes_only": _directional([o for o in aged if o["age"] <= FRESH_QUOTE_SECONDS]),
+        "by_quote_age": {
+            name: _directional([o for o in aged if lo <= o["age"] < hi])
+            for name, lo, hi in _QUOTE_AGE_BUCKETS
+        },
+        "by_quote_age_cumulative": {
+            name: _directional(obs if hi == float("inf") else [o for o in aged if o["age"] <= hi])
+            for name, hi in _CUMULATIVE_QUOTE_AGE_BUCKETS
+        },
+        "quote_age_absent": len(obs) - len(aged),
+        "games_with_outcome": len({o["game"] for o in obs}),
+        "records_by_segment": by_segment,
+    }
+
+
+def score_ledger_records(
+    records: Any,
+    finals: Mapping[str, bool],
+    *,
+    final_scores: Mapping[str, tuple[float, float]] | None = None,
+    segment_actuals: Any = None,
+) -> dict[str, Any]:
+    """Score model vs market over ledger records whose game has an outcome.
 
     Reported on THREE populations, because they answer different questions and
     conflating them is how a number gets quoted for the wrong thing:
@@ -434,14 +714,28 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
                       of them measures the model. `priceable` is a field, not a
                       filter, precisely so both are available.
 
-    **ALL THREE ARE RESTRICTED TO `_SCOREABLE_MARKETS`.** `finals` answers one
-    question — did the home side win — and only `h2h` carries a probability that
-    answers it. Totals and spreads rows are counted under
-    `market_probability_is_not_a_home_win_probability` rather than scored; see
-    `_SCOREABLE_MARKETS` for the measurement that forced this. Expect
-    `games_with_outcome` and every `n` to DROP against the pre-fix numbers: the
-    rows removed were the ones being scored against the wrong event, so a
-    smaller sample here is the fix working, not a regression.
+    TWO SCORING RULES, ONE PER KIND OF MARKET (contract 3):
+
+      h2h             `finals` answers "did the home side win" and only h2h
+                      carries a probability that answers it. Model and market
+                      probabilities are Brier-scored on identical rows. This
+                      path is byte-for-byte the contract-2 rule.
+      totals/spreads  `final_scores` supplies `(away, home)` and the model's
+                      POINT FORECAST is scored against the LINE on the actual
+                      total / margin, baseline 0.50. See `_POINT_FORECAST_FAMILIES`
+                      for why a probability comparison is refused for these. A
+                      caller that passes only `finals` gets every such row
+                      UNMEASURED under `no_final_score_for_game` -- never a
+                      probability comparison as a substitute.
+
+    SEGMENTS. A row whose `segment` is not `full` is resolved ONLY through
+    `segment_actuals` (see `SegmentActualLookup`); with no reader it is
+    UNMEASURED under `segment_actual_unavailable`. It is never graded against
+    the full-game final.
+
+    `unscored` carries the h2h refusals (unchanged names); `unmeasured` carries
+    the point-forecast and segment ones. Both are counts by reason, so "we
+    could not measure" never looks like "the model was wrong".
     """
     model_all: list[tuple[float, bool]] = []
     market_all: list[tuple[float, bool]] = []
@@ -449,14 +743,15 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
     model_priceable: list[tuple[float, bool]] = []
     market_priceable: list[tuple[float, bool]] = []
     model_priceable_paired: list[tuple[float, bool]] = []
-    last: dict[str, tuple[str, float, float | None, bool]] = {}
+    last: dict[tuple[str, str], tuple[str, float, float | None, bool]] = {}
     unscored: dict[str, int] = {}
+    unmeasured: dict[str, int] = {}
     # THE MIX, REPORTED RATHER THAN INFERRED. The defect this module now refuses
     # was invisible for weeks precisely because nothing said which markets the
     # sample was made of -- the headline Brier looked like a model-vs-market
     # result and was 5/6 something else. Counted over records that reached the
-    # market branch (i.e. already have an outcome and a model probability), so
-    # it describes the scoreable population, not the raw file.
+    # market branch (i.e. already have an outcome), so it describes the
+    # scoreable population, not the raw file.
     by_market: dict[str, int] = {}
     # --- THE FRESH-QUOTE CUT AND THE AGE MIX (see `FRESH_QUOTE_SECONDS`) ---
     model_fresh: list[tuple[float, bool]] = []
@@ -466,8 +761,19 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
     age_buckets: dict[str, list[list[tuple[float, bool]]]] = {
         name: [[], [], []] for name, _lo, _hi in _QUOTE_AGE_BUCKETS
     }
+    # (age or None, model_p, market_p or None, won) -- the cumulative view.
+    h2h_rows: list[tuple[float | None, float, float | None, bool]] = []
     quote_age_absent = 0
     considered = 0
+    # --- the point-forecast families ---
+    scores: Mapping[str, tuple[float, float]] = (
+        final_scores if isinstance(final_scores, Mapping) else {}
+    )
+    lookup = _as_segment_lookup(segment_actuals)
+    pf_obs: dict[str, list[dict[str, Any]]] = {fam: [] for fam in _POINT_FORECAST_FAMILIES}
+
+    def _bump(table: dict[str, int], reason: str) -> None:
+        table[reason] = table.get(reason, 0) + 1
 
     for rec in records if isinstance(records, (list, tuple)) else []:
         if not isinstance(rec, Mapping):
@@ -483,17 +789,91 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         # With `game_pk or event_id` the record's non-empty `game_pk` won,
         # `event_id` was never tried, and all 3,727 records missed an index that
         # genuinely contained their game. Measured 02:01Z, after the first fix.
-        key = next(
-            (
-                k
-                for k in (str(rec.get("game_pk") or "").strip(), str(rec.get("event_id") or "").strip())
-                if k and k in finals
-            ),
-            "",
-        )
-        if not key:
-            unscored[_UNSCORED_NO_OUTCOME] = unscored.get(_UNSCORED_NO_OUTCOME, 0) + 1
+        idents = [
+            k for k in (str(rec.get("game_pk") or "").strip(), str(rec.get("event_id") or "").strip())
+            if k
+        ]
+        # ABSENT IS NOT h2h. An unrecognised or missing `market` takes the
+        # REFUSING branch, never a scoring one: mapping unknown onto the
+        # permissive side is what turns a failed classification into a silently
+        # relaxed rule. Every ledger record written by `build_records` carries
+        # `market`, so a null here is a real anomaly and is counted as one.
+        market_key = str(rec.get("market") or "").strip().lower()
+        family = _POINT_FORECAST_FAMILY_BY_MARKET.get(market_key)
+        segment = _segment_of(rec)
+        stamp = str(rec.get("recorded_at") or "")
+
+        # ================= LINE-PRICED MARKETS: the POINT FORECAST =============
+        if family is not None:
+            col, actual_fn = _POINT_FORECAST_FAMILIES[family]
+            if segment == "full":
+                key = next((k for k in idents if k in finals or k in scores), "")
+                if not key:
+                    _bump(unmeasured, _UNMEASURED_NO_FINAL)
+                    continue
+                by_market[market_key] = by_market.get(market_key, 0) + 1
+                pair = _score_pair(scores.get(key))
+                if pair is None:
+                    _bump(unmeasured, _UNMEASURED_NO_FINAL_SCORE)
+                    continue
+            else:
+                pair = _segment_actual(lookup, idents, segment)
+                if pair is None:
+                    _bump(unmeasured, _UNMEASURED_SEGMENT_ACTUAL_UNAVAILABLE)
+                    continue
+                key = idents[0]
+                by_market[market_key] = by_market.get(market_key, 0) + 1
+            mean = _finite_number(rec.get(col))
+            if mean is None:
+                _bump(unmeasured, _UNMEASURED_NO_MEAN)
+                continue
+            line = _finite_number(rec.get("line"))
+            if line is None:
+                _bump(unmeasured, _UNMEASURED_NO_LINE)
+                continue
+            away, home = pair
+            actual = actual_fn(away, home)
+            if actual == line:
+                _bump(unmeasured, _UNMEASURED_PUSH)
+                continue
+            if abs(mean - line) < 1e-9:
+                _bump(unmeasured, _UNMEASURED_NO_LEAN)
+                continue
+            pf_obs[family].append({
+                "hit": (mean > line) == (actual > line),
+                "game": key,
+                "segment": segment,
+                "stamp": stamp,
+                "priceable": bool(rec.get("priceable")),
+                "age": _quote_age(rec.get("quote_age_seconds")),
+                "model_abs_err": abs(mean - actual),
+                "line_abs_err": abs(line - actual),
+            })
             continue
+
+        # ================= h2h: the PROBABILITY comparison (contract 2) ========
+        if segment == "full":
+            key = next((k for k in idents if k in finals), "")
+            if not key:
+                unscored[_UNSCORED_NO_OUTCOME] = unscored.get(_UNSCORED_NO_OUTCOME, 0) + 1
+                continue
+            won: bool | None = bool(finals[key])
+        else:
+            # An unknown market on a segment row is still an unknown market;
+            # classify it BEFORE asking a reader for an actual it cannot use.
+            if market_key not in _SCOREABLE_MARKETS:
+                unscored[_UNSCORED_MARKET_UNKNOWN] = unscored.get(_UNSCORED_MARKET_UNKNOWN, 0) + 1
+                by_market[market_key or "<absent>"] = by_market.get(market_key or "<absent>", 0) + 1
+                continue
+            pair = _segment_actual(lookup, idents, segment)
+            if pair is None:
+                _bump(unmeasured, _UNMEASURED_SEGMENT_ACTUAL_UNAVAILABLE)
+                continue
+            key = idents[0]
+            # A level segment is a real state of the game and NOT a home win;
+            # but a segment moneyline is graded as a push on it, so it is not
+            # an observation of this probability either. Counted, not scored.
+            won = None if pair[1] == pair[0] else pair[1] > pair[0]
         model_p = _finite_prob(rec.get("model_home_win_prob"))
         if model_p is None:
             unscored[_UNSCORED_NO_MODEL_PROB] = unscored.get(_UNSCORED_NO_MODEL_PROB, 0) + 1
@@ -502,21 +882,14 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         # exactly one question -- did the home side win -- so only a market whose
         # probability answers that question may be scored against it. See
         # `_SCOREABLE_MARKETS`.
-        #
-        # ABSENT IS NOT h2h. An unrecognised or missing `market` takes the
-        # REFUSING branch, never the scoring one: mapping unknown onto the
-        # permissive side is what turns a failed classification into a silently
-        # relaxed rule. Every ledger record written by `build_records` carries
-        # `market`, so a null here is a real anomaly and is counted as one.
-        market_key = str(rec.get("market") or "").strip().lower()
         if market_key not in _SCOREABLE_MARKETS:
-            reason = (_UNSCORED_MARKET_NOT_HOME_WIN if market_key in _NON_HOME_WIN_MARKETS
-                      else _UNSCORED_MARKET_UNKNOWN)
-            unscored[reason] = unscored.get(reason, 0) + 1
+            unscored[_UNSCORED_MARKET_UNKNOWN] = unscored.get(_UNSCORED_MARKET_UNKNOWN, 0) + 1
             by_market[market_key or "<absent>"] = by_market.get(market_key or "<absent>", 0) + 1
             continue
         by_market[market_key] = by_market.get(market_key, 0) + 1
-        won = bool(finals[key])
+        if won is None:
+            _bump(unmeasured, _UNMEASURED_SEGMENT_LEVEL)
+            continue
         market_p = _finite_prob(rec.get("market_fair_prob"))
 
         model_all.append((model_p, won))
@@ -535,6 +908,7 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         # PRICE and priceability is a property of the EDGE, and conflating them
         # is how the pooled number came to describe neither.
         age = _quote_age(rec.get("quote_age_seconds"))
+        h2h_rows.append((age, model_p, market_p, won))
         if age is None:
             quote_age_absent += 1
         else:
@@ -554,11 +928,11 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         # order. The ledger is append-only so the two normally agree -- but
         # "normally" is not a guarantee, and a merged or re-pulled file would
         # silently make file order mean nothing. `recorded_at` is ISO-8601 UTC,
-        # so lexical comparison IS chronological.
-        stamp = str(rec.get("recorded_at") or "")
-        prev = last.get(key)
+        # so lexical comparison IS chronological. Keyed per (game, segment) so
+        # a first-five moneyline can never be "the last word" on the full game.
+        prev = last.get((key, segment))
         if prev is None or stamp >= prev[0]:
-            last[key] = (stamp, model_p, market_p, won)
+            last[(key, segment)] = (stamp, model_p, market_p, won)
 
     model_last = [(p, w) for _s, p, _m, w in last.values()]
     market_last = [(m, w) for _s, _p, m, w in last.values() if m is not None]
@@ -606,6 +980,13 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         }
         return block
 
+    def _paired_rows(rows: list[tuple[float | None, float, float | None, bool]]) -> dict[str, Any]:
+        return _paired(
+            _score([(p, w) for _a, p, _m, w in rows]),
+            _score([(p, w) for _a, p, m, w in rows if m is not None]),
+            _score([(m, w) for _a, _p, m, w in rows if m is not None]),
+        )
+
     all_model, all_market = _score(model_all), _score(market_all)
     lp_model, lp_market = _score(model_last), _score(market_last)
     pr_model, pr_market = _score(model_priceable), _score(market_priceable)
@@ -615,13 +996,19 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
 
     return {
         "records_considered": considered,
-        "games_with_outcome": len(last),
+        # h2h games, as it always was: this is the denominator the retained
+        # history pools on, and the point-forecast families report their own.
+        "games_with_outcome": len({game for game, _seg in last}),
         "unscored": unscored,
+        "unmeasured": unmeasured,
         # Which markets the scoreable population was made of. `scored_markets`
-        # is the set actually admitted, so a reader never has to know
-        # `_SCOREABLE_MARKETS` to interpret the number.
+        # is the set admitted to the PROBABILITY comparison and
+        # `point_forecast_markets` the families scored on the LINE, so a reader
+        # never has to know either table to interpret the number.
         "records_by_market": by_market,
         "scored_markets": sorted(_SCOREABLE_MARKETS),
+        "point_forecast_markets": sorted(_POINT_FORECAST_FAMILIES),
+        "segment_actuals_supplied": lookup is not None,
         "all_records": _paired(all_model, all_model_pair, all_market),
         "last_per_game": _paired(lp_model, lp_model_pair, lp_market),
         "priceable_only": _paired(pr_model, pr_model_pair, pr_market),
@@ -637,5 +1024,21 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         "by_quote_age": {
             name: _paired(_score(b[0]), _score(b[2]), _score(b[1]))
             for name, b in age_buckets.items()
+        },
+        "by_quote_age_cumulative": {
+            name: _paired_rows(
+                h2h_rows if hi == float("inf")
+                else [r for r in h2h_rows if r[0] is not None and r[0] <= hi]
+            )
+            for name, hi in _CUMULATIVE_QUOTE_AGE_BUCKETS
+        },
+        # THE LINE-PRICED MARKETS. Each family carries the same cuts as h2h
+        # above, scored by `_directional` -- hit rate against the 0.50 the
+        # book priced, and the point error against the line's own.
+        "point_forecast": {
+            "rule": "model mean vs line on the actual total/margin; push dropped",
+            "baseline": POINT_FORECAST_BASELINE,
+            "independent_unit": "games",
+            **{fam: _point_forecast_block(obs) for fam, obs in pf_obs.items()},
         },
     }

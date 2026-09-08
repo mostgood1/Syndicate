@@ -125,8 +125,15 @@ def book_grid_artifact_path(sport: str, date_str: str) -> Path:
     )
 
 
-def score_block_for_grid(grid: Any, *, sport: str, date_str: str) -> dict[str, Any]:
+def score_block_for_grid(
+    grid: Any, *, sport: str, date_str: str, segment_actuals: Any = None
+) -> dict[str, Any]:
     """The `live_gameline_score` payload block. NEVER RAISES.
+
+    `segment_actuals` is the `live_gameline_score.SegmentActualLookup` hook
+    for rows whose `segment` is not the full game. None -- the default and
+    the only thing the board build passes today -- means such rows are
+    reported UNMEASURED rather than graded against the full-game final.
 
     EXTRACTED SO ITS BRANCHES ARE TESTABLE. This was inline in
     `build_book_grid_artifact`, which cannot run without a source bundle -- so
@@ -157,7 +164,8 @@ def score_block_for_grid(grid: Any, *, sport: str, date_str: str) -> dict[str, A
     try:
         from syndicate.features.shared.live_gameline_ledger import ledger_path, read_records
         from syndicate.features.shared.live_gameline_score import (
-            build_finals_index,
+            build_final_scores_index,
+            finals_from_scores,
             score_ledger_records,
             scorer_capabilities,
         )
@@ -170,7 +178,11 @@ def score_block_for_grid(grid: Any, *, sport: str, date_str: str) -> dict[str, A
         # matches -- see `build_finals_index`. `finals_diag` rides along on the
         # payload so that exclusion can never again be invisible.
         finals_diag: dict[str, Any] = {}
-        finals = build_finals_index(grid, sport=sport, diagnostics=finals_diag)
+        # ONE walk of the grid. The scores are what totals and spreads are
+        # scored on (contract 3); the home-won view h2h uses is derived
+        # from them, so the two can never disagree on which finals exist.
+        final_scores = build_final_scores_index(grid, sport=sport, diagnostics=finals_diag)
+        finals = finals_from_scores(final_scores)
         if not finals:
             # No final game on this grid is the NORMAL state mid-slate, and it
             # is not a failure. Saying so keeps it distinct from a scorer that
@@ -183,7 +195,11 @@ def score_block_for_grid(grid: Any, *, sport: str, date_str: str) -> dict[str, A
             # `caps` first: where `score_ledger_records` reports the same key it
             # is the authority, because it actually ran.
             live_gameline_score = {"enabled": True, **caps,
-                                   **score_ledger_records(records, finals),
+                                   **score_ledger_records(
+                                       records, finals,
+                                       final_scores=final_scores,
+                                       segment_actuals=segment_actuals,
+                                   ),
                                    "finals_index": finals_diag}
     except Exception as exc:  # pragma: no cover - instrumentation must not break the board
         live_gameline_score = {"enabled": True, "error": f"{type(exc).__name__}: {exc}"[:200],

@@ -354,7 +354,10 @@ class TestTheScorerSaysWhatItIsWithoutASample:
         def boom(*_a, **_k):
             raise RuntimeError("synthetic")
 
-        monkeypatch.setattr(mod, "build_finals_index", boom)
+        # The board block walks the grid once through the SCORES index
+        # (contract 3) and derives the h2h view from it; patching the
+        # derived view would leave this test passing on an unraised path.
+        monkeypatch.setattr(mod, "build_final_scores_index", boom)
         block = score_block_for_grid([], sport="mlb", date_str="2026-09-01")
         assert "error" in block and "RuntimeError" in block["error"]
         assert block["scorer_contract"] is not None
@@ -365,7 +368,7 @@ class TestTheScorerSaysWhatItIsWithoutASample:
         import syndicate.features.shared.live_gameline_score as mod
         from syndicate.features.shared.book_grid_artifact import score_block_for_grid
 
-        monkeypatch.setattr(mod, "build_finals_index",
+        monkeypatch.setattr(mod, "build_final_scores_index",
                             lambda *a, **k: (_ for _ in ()).throw(ValueError("x")))
         assert score_block_for_grid(None, sport="mlb", date_str="bad-date")["enabled"] is True
 

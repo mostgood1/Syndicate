@@ -219,8 +219,21 @@ def build_row(
     # blindness one layer down, in exactly the file a later reader would trust.
     # This loop is an allowlist, so a new counter on the served payload is
     # silently DROPPED here unless named.
+    #
+    # `scorer_contract` ADDED 2026-09-08 with contract 3, and it is the key
+    # that lets a reader split this file by scorer era WITHOUT the capture-
+    # time proxy `pool_live_gameline_trend.py` had to fall back on. A row
+    # without it predates contract 3. `point_forecast` and `unmeasured` are
+    # the totals/spreads outcomes and their named refusals -- the whole
+    # point of contract 3, and worthless if each build overwrote them. The
+    # quote-age blocks were served from 2026-09-01 and never retained,
+    # which is this allowlist doing exactly what the comment above warns.
     for extra in ("finals_index", "unscored", "reason",
-                  "records_by_market", "scored_markets"):
+                  "records_by_market", "scored_markets",
+                  "scorer_contract", "point_forecast_markets",
+                  "unmeasured", "point_forecast", "segment_actuals_supplied",
+                  "fresh_quotes_only", "fresh_quote_seconds", "quote_age_absent",
+                  "by_quote_age", "by_quote_age_cumulative"):
         value = score.get(extra)
         if value is not None:
             row[extra] = value

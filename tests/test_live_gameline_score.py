@@ -322,6 +322,13 @@ def test_the_new_counter_recovers_no_games_and_moves_no_number():
 # recorded in `learnings.md` 2026-08-27 against THIS FILE: the previous
 # "load-bearing assertion" passed for weeks while production ran n 94 vs 90,
 # because no fixture row could break it. Every test below fails on pre-fix code.
+#
+# CONTRACT 3 (2026-09-08): totals and spreads rows are no longer REFUSED by
+# name -- they take the point-forecast branch and, lacking a mean here, are
+# UNMEASURED under `record_carries_no_model_point_forecast`. The property these
+# tests hold is unchanged: the h2h Brier is computed on h2h rows ONLY, and no
+# line-priced row ever reaches the probability comparison. The point-forecast
+# scoring itself is tested in `test_live_gameline_score_point_forecast.py`.
 # --------------------------------------------------------------------------
 
 
@@ -335,7 +342,7 @@ def test_a_totals_record_is_not_scored_against_a_home_win():
         _rec("g1", 0.80, 0.60, market_key="h2h"),
         _rec("g1", 0.3167, 0.4425, market_key="totals"),
     ]
-    out = score_ledger_records(recs, finals)
+    out = score_ledger_records(recs, finals, final_scores={"g1": (3, 5)})
 
     # Only the h2h row is scored, in every cut.
     for cut in ("all_records", "last_per_game", "priceable_only"):
@@ -344,27 +351,31 @@ def test_a_totals_record_is_not_scored_against_a_home_win():
         # ... and it is the h2h row, not whichever survived: (0.8-1)^2 = 0.04
         assert out[cut]["model"]["brier"] == pytest.approx(0.04), cut
 
-    # The refusal is COUNTED and named, never silent.
-    assert out["unscored"]["market_probability_is_not_a_home_win_probability"] == 1
+    # The row is COUNTED and named, never silent -- and never a probability
+    # comparison: it carries no `model_total_mean`, so it is unmeasured.
+    assert out["unmeasured"]["record_carries_no_model_point_forecast"] == 1
+    assert out["point_forecast"]["totals"]["all_records"]["n"] == 0
     assert out["records_considered"] == 2
 
 
-def test_spreads_run_line_and_alt_lines_are_all_refused():
-    """The refusing set is imported from the producer, not re-typed.
+def test_spreads_run_line_and_alt_lines_are_all_classified_as_line_priced():
+    """The market sets are imported from the producer, not re-typed.
 
     A hand-written copy was wrong on the first attempt -- it had `spread` and
     lacked `run_line` and `ats`, so an MLB run-line row would have fallen
     through to `unknown` and been reported as an unclassified-market bug rather
-    than the known, priced, unscoreable row it is.
+    than the known, line-priced row it is. Every alias must reach the
+    point-forecast branch; none may reach the h2h Brier.
     """
     finals = {"g1": True}
     kinds = ["totals", "totals_alt", "alternate_totals", "total",
              "spreads", "spreads_alt", "alternate_spreads", "run_line", "ats"]
     out = score_ledger_records(
-        [_rec("g1", 0.4, 0.5, market_key=k) for k in kinds], finals
+        [_rec("g1", 0.4, 0.5, market_key=k) for k in kinds], finals,
+        final_scores={"g1": (3, 5)},
     )
     assert out["all_records"]["model"]["n"] == 0
-    assert out["unscored"]["market_probability_is_not_a_home_win_probability"] == len(kinds)
+    assert out["unmeasured"]["record_carries_no_model_point_forecast"] == len(kinds)
     # None of them landed in the "nobody classified this" bucket.
     assert "record_carries_no_recognised_market" not in out["unscored"]
 
@@ -391,8 +402,9 @@ def test_an_unrecognised_market_is_reported_separately_from_a_known_one():
     finals = {"g1": True}
     out = score_ledger_records(
         [_rec("g1", 0.4, 0.5, market_key="totals"),
-         _rec("g1", 0.4, 0.5, market_key="btts")], finals)
-    assert out["unscored"]["market_probability_is_not_a_home_win_probability"] == 1
+         _rec("g1", 0.4, 0.5, market_key="btts")], finals,
+        final_scores={"g1": (3, 5)})
+    assert out["unmeasured"]["record_carries_no_model_point_forecast"] == 1
     assert out["unscored"]["record_carries_no_recognised_market"] == 1
 
 
