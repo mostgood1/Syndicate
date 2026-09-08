@@ -26372,3 +26372,63 @@ ledger prose, and offline `scripts/*_sim_input_checklist.py` that no runtime cod
 imports (every mention is a comment). Web's behaviour is identical across arms.
 
 **limits:** n=2 workers per arm, one pair of arms, not repeated.
+
+## 2026-09-08 refresh-worker `66e121f3` -> `e9994d02` — the three-way basis label `[lane soccer-model-edge-basis-label]`
+
+- **what:** `cee667e5` — `model_edge_basis` returns `market_fair` for a three-way
+  leg priced by `_model_edge_for`'s three-way branch, instead of falling through
+  to None. Diagnostic only: nothing in `.py`/`.html`/`.js` reads that field but
+  its own tests, and the edge VALUES were always correct.
+- **locks:** claim `243d3dc0` acquired 23:56:33Z. **Preflight said HOLD first** —
+  refresh-worker was running its own `refresh_odds_sources.py` with a
+  `build_soccer_artifacts.py --league championship` child, which
+  `check_deploy_safety`'s summary had attributed to live-odds-worker. Polled
+  preflight (never re-acquiring — that rotates the token) until CLEAR at
+  23:59:25Z, then deployed the SAME SHA that was preflighted.
+- **waited out a sim first:** `evening_next_day_sim` (pid 4750, 23:42:27Z)
+  finished exit=0. A label with no code readers does not earn killing a sim; this
+  is the third time this lane declined to, and none was needed in the end.
+- **deploy:** `dep-dafkvs5g1s2s73f0mfng`, trigger=api, live **00:02:41Z**.
+
+- **THE BUNDLE IS 25 COMMITS, NOT ONE.** A piggyback was tried first and the
+  deploy cadence stalled (106 min against a 34-min median), so this carries other
+  lanes' live work — the NFL live re-sim producer, the web-OOM single-flight
+  primitives, `79d66a9c`'s publish verdict/outcome split, the grouped artifact
+  walk. **Anything that moves on refresh-worker tonight must be attributed across
+  all of them, not to the label fix.**
+
+### verify: 2 UNLABELLED -> 0, ON THE SAME TWO ROWS, ACROSS A CONFIRMED REBUILD
+
+    pre-deploy  23:48Z   58 rows  20 edged  2 unlabelled
+    00:03-00:09Z         58 rows  21 edged  2 unlabelled   <- 6 polls, FLAT
+    00:10:18Z            54 rows  21 edged  0 unlabelled   <- REBUILT
+
+**THE SIX FLAT POLLS ARE THE POINT.** The deploy was live at 00:02:41Z and the
+served board did not change for ~7.5 minutes. A single read in that window shows
+the rows still unlabelled and reads as a FAILED deploy. Same artifact-clock trap
+as the 28->11 reading on `d9672ac7`.
+
+**AND THE ROW COUNT FELL 58 -> 54, SO "0 UNLABELLED" ALONE WOULD NOT HAVE BEEN
+EVIDENCE.** Four rows left the board in that rebuild; if the two baselined rows
+had been among them, zero would be trivially true — the null case pre-registered
+before the deploy. Checked by name instead:
+
+    SC Telstar @ Heerenveen  away  edge  4.5225  basis 'market_fair'   PRESENT
+    PSG @ Brest              away  edge -5.9531  basis 'market_fair'   PRESENT
+
+Both still on the board, same edges, now labelled. Basis distribution across all
+21 edged rows: `{market_fair: 21}`, none unlabelled.
+
+**WEB DELIBERATELY LEFT ON `72aebc06`, WHICH DOES NOT CARRY THE FIX**
+`[2026-09-08, USER DECISION: "leave web"]`. web persists intelligence state on
+the REQUEST path (`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`
+there), so in principle it can build board rows itself and would label them the
+old way. Asked directly, with that split named. Chosen: leave it.
+
+The evidence that made this cheap: the verification above was read THROUGH web,
+and all 21 edged rows came back `market_fair` with none unlabelled — so no
+unlabelled row is currently observable on the served board. **Stated at its real
+strength: that is the OUTCOME verified, not WHICH CODE PATH produced it.** If a
+row ever appears with an edge and a null basis, web's older SHA is the first
+place to look, and this is not an oversight to re-fix silently.
+
