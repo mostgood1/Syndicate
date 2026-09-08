@@ -88,6 +88,59 @@ class LiveMcResult:
     # CONSUMER's job -- doing it here would bake a presentation convention into
     # the sim.
     margin_dist: Dict[int, int] = field(default_factory=dict)
+    # ------------------------------------------------------------------
+    # THE FIRST FIVE INNINGS, read off the SAME sims. Nothing extra is run.
+    #
+    # WHY THIS EXISTS. Measured 2026-09-07 against the production lens
+    # (`/api/ops/live-lens/snapshot-index`, 11 of 11 MLB games): every
+    # `first1`/`first3`/`first5` lane carried `modelHomeWinProb: null` and
+    # `source: null`. MLB's segment lanes are EMPTY -- not filtered out, not
+    # imprecise, absent. Three docstrings (`live_gameline_join` line ~416,
+    # `mlb/live_lens` ~775 and ~1398) asserted they carry a probability
+    # "derived from `_live_margin_win_prob` over a segment interpolation"; that
+    # function is `_wnba_live_margin_win_prob` and exists only on WNBA's path.
+    # The claim was true of WNBA and was written into MLB's modules.
+    #
+    # So every `first5` market row on a live MLB board is refused
+    # `segment_is_not_full_game` -- 25 of 29 and 34 of 41 rows considered on the
+    # 2026-09-05/06 builds, the largest refusal category there is -- and the 49
+    # mis-graded settled orders were all first5. The segment being bet is the
+    # one the model says nothing about.
+    #
+    # FREE, IN THE SAME SENSE `margin_dist` IS. `GameResult` already carries
+    # `away_inning_runs`/`home_inning_runs`; the loop below already runs every
+    # sim to completion. This counts something it has in hand.
+    #
+    # THE ARITHMETIC, AND WHY IT IS EXACT RATHER THAN APPROXIMATE.
+    # `simulate_game` indexes those lists by ABSOLUTE inning and pads
+    # already-played innings with zeros (`while len(...) <= inning_idx:
+    # append(0)`), so on a mid-game start `sum(inning_runs[:5])` is precisely
+    # the runs simulated in innings 1-5 -- all of which fall at or after the
+    # start point -- and `situation.<team>_score` is precisely everything
+    # before it. Their sum is the first-five total with no interpolation.
+    #
+    # AND WHY IT REFUSES PAST THE FIFTH. Once the current inning is 6 or later
+    # the segment is DECIDED, and the sim holds no line score for innings 1-5 --
+    # `situation` carries only a cumulative score. Reporting a number there
+    # would be reporting the padded zeros as if they were the game. `available`
+    # is False and every field is None instead. This is the same defect class as
+    # the +42.43pp full-vs-first1 mismatch, on the time axis rather than the
+    # market axis.
+    #
+    # TIES ARE NOT FOLDED HALF/HALF, unlike the full-game path above. Five
+    # innings end level often, and a first-five market is commonly quoted
+    # three-way or voided on the tie -- so a half/half fold would be a
+    # presentation convention baked into the sim, and wrong for both shapes.
+    # `first5_tie_prob` is published beside the two win probabilities and the
+    # three sum to 1. `sim.segments.<key>.tie_prob` already exists on the
+    # PREGAME side, so this matches a contract the repo already has.
+    first5_available: bool = False
+    first5_home_win_prob: Optional[float] = None
+    first5_away_win_prob: Optional[float] = None
+    first5_tie_prob: Optional[float] = None
+    first5_avg_total_runs: Optional[float] = None
+    first5_total_runs_dist: Dict[int, int] = field(default_factory=dict)
+    first5_margin_dist: Dict[int, int] = field(default_factory=dict)
     # The denominator. Every histogram above sums to exactly this, including the
     # zeros -- see `_record_player_stats`.
     sims_run: int = 0
@@ -329,6 +382,12 @@ def _build_initial_state(
     return state
 
 
+# How many innings the "first five" segment covers. Named rather than spelled `5`
+# in four places, so the first3/first1 lanes can reuse the same readout later
+# without a hunt for magic numbers.
+FIRST5_INNINGS = 5
+
+
 def estimate_live(
     away: TeamRoster,
     home: TeamRoster,
@@ -354,6 +413,20 @@ def estimate_live(
     home_sum = 0.0
     dist: Dict[int, int] = {}
     margin: Dict[int, int] = {}
+    # First-five accumulators. `f5_live` decides ONCE, before the loop, whether
+    # the segment is still open -- a per-sim test would be the same answer 120
+    # times and invites someone to make it per-sim later, which it is not:
+    # whether innings 1-5 are already played is a property of the SITUATION.
+    f5_start_inning = max(1, int(getattr(situation, "inning", 1) or 1))
+    f5_live = f5_start_inning <= FIRST5_INNINGS
+    f5_home_wins = 0.0
+    f5_away_wins = 0.0
+    f5_ties = 0
+    f5_total_sum = 0.0
+    f5_dist: Dict[int, int] = {}
+    f5_margin: Dict[int, int] = {}
+    f5_away_base = max(0, int(getattr(situation, "away_score", 0) or 0))
+    f5_home_base = max(0, int(getattr(situation, "home_score", 0) or 0))
     batter_dist: Dict[int, Dict[str, Dict[int, int]]] = {}
     pitcher_dist: Dict[int, Dict[str, Dict[int, int]]] = {}
     effective_cfg_kwargs = dict(cfg_kwargs or {})
@@ -397,6 +470,23 @@ def estimate_live(
             home_wins += 0.5
             away_wins += 0.5
 
+        if f5_live:
+            # `[:FIRST5_INNINGS]` over ABSOLUTE inning indices. Already-played
+            # innings are zeros here and their runs live in the base, so this
+            # sums each side exactly once.
+            f5_away = f5_away_base + sum(res.away_inning_runs[:FIRST5_INNINGS] or [])
+            f5_home = f5_home_base + sum(res.home_inning_runs[:FIRST5_INNINGS] or [])
+            f5_total = int(f5_away + f5_home)
+            f5_total_sum += float(f5_total)
+            f5_dist[f5_total] = f5_dist.get(f5_total, 0) + 1
+            f5_margin[f5_home - f5_away] = f5_margin.get(f5_home - f5_away, 0) + 1
+            if f5_home > f5_away:
+                f5_home_wins += 1
+            elif f5_away > f5_home:
+                f5_away_wins += 1
+            else:
+                f5_ties += 1
+
     denom = float(max(1, sims))
     if track_player_stats:
         # AFTER the loop, never inside it: a player absent from one sim may
@@ -412,6 +502,13 @@ def estimate_live(
         avg_home_runs=home_sum / denom,
         total_runs_dist=dist,
         margin_dist=margin,
+        first5_available=f5_live,
+        first5_home_win_prob=(f5_home_wins / denom) if f5_live else None,
+        first5_away_win_prob=(f5_away_wins / denom) if f5_live else None,
+        first5_tie_prob=(float(f5_ties) / denom) if f5_live else None,
+        first5_avg_total_runs=(f5_total_sum / denom) if f5_live else None,
+        first5_total_runs_dist=f5_dist,
+        first5_margin_dist=f5_margin,
         batter_stat_dist=batter_dist,
         pitcher_stat_dist=pitcher_dist,
         sims_run=sims_run,
