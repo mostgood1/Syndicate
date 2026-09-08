@@ -16,6 +16,7 @@ rushing_attempts, receptions, anytime_td, receiving_yards, interceptions.
 from __future__ import annotations
 
 import csv
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -400,17 +401,133 @@ def player_game_log(season: int, player_id: str) -> list[dict[str, Any]]:
     return sorted(totals.values(), key=lambda row: row["week"])
 
 
+def _zero_involvement_weeks(log: list[dict[str, Any]], before_week: int) -> int:
+    """Count games the player almost certainly PLAYED but recorded nothing.
+
+    `player_game_log` only creates a row for a game the player has a
+    QUALIFYING PLAY in -- passer, rusher or receiver. A receiver who dressed
+    and was never targeted produces NO ROW, so that game vanishes from the
+    denominator and the mean becomes "yards per game he was INVOLVED in"
+    rather than "yards per game". The market prices the second quantity.
+
+    MEASURED 2026-09-08 against the real week-1 capture, model minus line over
+    1,923 quoted rows: median **+7.7%**, mean **+12.1%**, with **24% of rows
+    more than 25% ABOVE the line and only 5% below**. The bias is exactly where
+    this mechanism predicts -- `receiving_yards` +18.2% and `rushing_yards`
+    +11.9%, where empty games are common, against `passing_yards` -1.1% and
+    `passing_attempts` +4.1%, where a quarterback always has plays and so never
+    loses a game from the denominator.
+
+    ISOLATED GAPS ONLY, and this is the whole judgement in one line. Over 2025:
+    1,619 games are missing from inside players' spans, but only **514 are
+    single-week gaps**; the rest are runs (121 of length 2, 63 of 3, 32 of 4, 79
+    of 5+). A five-week run is an injury, and scoring it as five 0-yard games
+    would understate a healthy player badly -- the opposite error. A lone
+    missing week is far more likely a game he played without a target. Counting
+    every in-span gap moves the mean -17.6%/-12.5%; counting only isolated ones
+    moves it -7.1%/-6.5%.
+
+    NOT VALIDATED AGAINST OUTCOMES, and that is stated here rather than in a
+    commit message nobody re-reads: `scripts/backtest_nfl_props.py` grades with
+    `excluded_zero_engagement` (7,326 graded vs 1,138 excluded for
+    receiving_yards; 4,673 vs 3,791 for rushing_yards), i.e. it drops the very
+    games this corrects, so it is STRUCTURALLY BLIND to this defect and cannot
+    referee the change. Matching the market is not evidence either -- the market
+    can be wrong. What is established is that the estimator was answering a
+    different question from the one being priced.
+
+    Weeks at or after `before_week` are never considered, so this inherits the
+    no-lookahead discipline unchanged.
+    """
+    weeks = sorted(row["week"] for row in log)
+    if len(weeks) < 2:
+        return 0
+    present = set(weeks)
+    missing = [w for w in range(weeks[0], weeks[-1] + 1) if w not in present and w < before_week]
+    isolated = 0
+    for week in missing:
+        if (week - 1) not in missing and (week + 1) not in missing:
+            isolated += 1
+    return isolated
+
+
+# A QUARTERBACK WHO DRESSES ALWAYS THROWS, so a missing week for him means he
+# DID NOT PLAY -- not that he played without being involved. Imputing zeros
+# there invents games he never appeared in.
+#
+# MEASURED, and the data said so before this rule existed. Applying the
+# correction to every stat moved `passing_yards` from **-1.1%** (already the
+# best-calibrated market on the board) to **-7.7%**, and `passing_attempts`
+# from +4.1% to -2.2% -- i.e. it BROKE the two markets that never had the
+# defect. That is the signature of a mechanism applied outside its domain: the
+# passing markets were well calibrated precisely BECAUSE a quarterback never
+# loses a game from his denominator.
+#
+# Scoped by the player's OWN log rather than a roster/position join: a real
+# quarterback accumulates passing attempts, and no roster file is needed (the
+# 2026 depth chart is missing real starters and `injuries_2026.csv` does not
+# exist, so neither is a dependable source here).
+_QB_PASSING_ATTEMPTS_FLOOR = 20.0
+
+_ZERO_IMPUTABLE_STATS = frozenset({
+    "receiving_yards",
+    "receptions",
+    "rushing_yards",
+    "rushing_attempts",
+})
+
+
+def _zero_game_imputation_applies(stat: str, log: list[dict[str, Any]]) -> bool:
+    """Only skill-position USAGE stats, and never for a quarterback.
+
+    `anytime_td` is absent from the imputable set on purpose -- see
+    `player_rate`'s docstring for why its calibration must not be disturbed.
+    The passing markets are absent because they never had the defect.
+    """
+    if stat not in _ZERO_IMPUTABLE_STATS:
+        return False
+    return sum(row.get("passing_attempts") or 0.0 for row in log) < _QB_PASSING_ATTEMPTS_FLOOR
+
+
+def _zero_game_imputation_enabled() -> bool:
+    """Absent = ON. The uncorrected estimator is measurably answering the wrong
+    question, so the corrected one is the default; the switch exists to turn it
+    OFF for an A/B, not to opt in."""
+    raw = os.environ.get("SYNDICATE_NFL_PROP_ZERO_GAMES")
+    return True if raw is None else str(raw).strip().lower() not in {"0", "false", "off", "no"}
+
+
 def player_rate(season: int, week: int, player_id: str, stat: str) -> tuple[float | None, float | None, int]:
     """Rolling pre-week (mean, stdev, sample_size) for one stat -- only
     games strictly before `week`, same no-lookahead discipline as the
     team-rating aggregator in generate_smartsim2_nfl_projections.py.
     Returns (None, None, 0) with fewer than 2 qualifying games -- a rate
-    off a single game is not a real distribution, never fabricated."""
+    off a single game is not a real distribution, never fabricated.
+
+    Games the player played without recording anything are counted as ZEROS for
+    every stat EXCEPT `anytime_td` -- see `_zero_involvement_weeks`.
+
+    WHY `anytime_td` IS EXEMPT, deliberately and not by oversight:
+    `anytime_td_rate` calls straight into this function, and its shrinkage
+    constant `ANYTIME_TD_SHRINKAGE_K = 12.0` was SWEPT AND SELECTED against the
+    rate this function returns today (fit on 2022-2023, reported on 2024-2025,
+    Brier 0.1973 -> 0.1680 on 8,464 held-out rows). Adding zeros underneath a
+    constant that was fitted on top of their absence would silently invalidate
+    that calibration -- `docs/ai_context/model_engine_standard.md`: adding a
+    MECHANISM to a calibrated engine requires RE-FITTING the rates that were
+    absorbing it. Re-fitting k is its own measured piece of work, so the TD
+    market keeps the estimator its constant was tuned for.
+    """
     import statistics
 
-    values = [row[stat] for row in player_game_log(season, player_id) if row["week"] < week]
+    log = [row for row in player_game_log(season, player_id) if row["week"] < week]
+    values = [row[stat] for row in log]
+    # The n>=2 floor is judged on REAL games, before any imputation, so an
+    # imputed zero can never manufacture a "distribution" out of one game.
     if len(values) < 2:
         return None, None, len(values)
+    if _zero_game_imputation_applies(stat, log) and _zero_game_imputation_enabled():
+        values = values + [0.0] * _zero_involvement_weeks(log, before_week=week)
     return statistics.fmean(values), statistics.pstdev(values), len(values)
 
 

@@ -808,3 +808,85 @@ def test_the_producer_rule_touches_nothing_else(tmp_path, monkeypatch):
         "ncaaf_source/whatever.json",
     ):
         assert ap._publish_refused_no_producer_input(path) == "", path
+
+
+def _log(weeks_with_values):
+    """A game log shaped like player_game_log's output."""
+    rows = []
+    for week, recv, patt in weeks_with_values:
+        rows.append({
+            "game_id": f"g{week}", "week": week,
+            "receiving_yards": recv, "receptions": 0.0, "rushing_yards": 0.0,
+            "rushing_attempts": 0.0, "passing_attempts": patt, "anytime_td": 0.0,
+        })
+    return rows
+
+
+def test_only_isolated_missing_weeks_count_as_played_zeros():
+    """A lone gap is "dressed, never targeted". A RUN is an injury.
+
+    Over 2025, 1,619 games are missing from inside players' spans but only 514
+    are single-week gaps -- the rest are runs (121 of length 2, 63 of 3, 32 of
+    4, 79 of 5+). Scoring a five-week injury as five 0-yard games understates a
+    healthy player badly, which is the opposite error to the one being fixed.
+    """
+    from syndicate.features.nfl.player_stats import _zero_involvement_weeks
+
+    # weeks 1,2,4,5 present -> week 3 is an isolated gap
+    assert _zero_involvement_weeks(_log([(1, 50, 0), (2, 60, 0), (4, 70, 0), (5, 80, 0)]), 18) == 1
+    # weeks 1,2,6 present -> 3,4,5 is a RUN, not counted
+    assert _zero_involvement_weeks(_log([(1, 50, 0), (2, 60, 0), (6, 70, 0)]), 18) == 0
+    # no gaps at all
+    assert _zero_involvement_weeks(_log([(1, 50, 0), (2, 60, 0), (3, 70, 0)]), 18) == 0
+
+
+def test_the_imputation_never_looks_ahead():
+    """Weeks at or after the target week must never be considered."""
+    from syndicate.features.nfl.player_stats import _zero_involvement_weeks
+
+    log = _log([(1, 50, 0), (2, 60, 0), (4, 70, 0), (5, 80, 0)])
+    # asking about week 3 must not see the week-3 gap implied by later games
+    assert _zero_involvement_weeks(log, 3) == 0
+
+
+def test_a_quarterback_is_exempt_because_a_dressed_qb_always_throws():
+    """MEASURED: applying this to every stat moved `passing_yards` from -1.1%
+    -- the best-calibrated market on the board -- to -7.7%, and
+    `passing_attempts` from +4.1% to -2.2%. It BROKE the two markets that never
+    had the defect, which is the signature of a mechanism applied outside its
+    domain."""
+    from syndicate.features.nfl.player_stats import _zero_game_imputation_applies
+
+    qb_log = _log([(1, 0, 35), (2, 0, 40), (4, 0, 38)])
+    skill_log = _log([(1, 50, 0), (2, 60, 0), (4, 70, 0)])
+    assert _zero_game_imputation_applies("receiving_yards", qb_log) is False
+    assert _zero_game_imputation_applies("receiving_yards", skill_log) is True
+
+
+def test_passing_markets_and_anytime_td_are_out_of_scope():
+    """anytime_td's shrinkage k=12 was swept and selected against the estimator
+    as it is TODAY (Brier 0.1973 -> 0.1680 on 8,464 held-out rows). Adding zeros
+    underneath a constant fitted on their absence would silently invalidate it --
+    model_engine_standard.md: a new MECHANISM requires RE-FITTING what absorbed
+    it."""
+    from syndicate.features.nfl.player_stats import _zero_game_imputation_applies
+
+    skill_log = _log([(1, 50, 0), (2, 60, 0), (4, 70, 0)])
+    for stat in ("anytime_td", "passing_yards", "passing_attempts", "passing_tds", "interceptions"):
+        assert _zero_game_imputation_applies(stat, skill_log) is False, stat
+    for stat in ("receiving_yards", "receptions", "rushing_yards", "rushing_attempts"):
+        assert _zero_game_imputation_applies(stat, skill_log) is True, stat
+
+
+def test_the_flag_defaults_ON_and_can_be_turned_off(monkeypatch):
+    """Absent = ON: the uncorrected estimator answers the wrong question, so the
+    switch exists to turn the fix OFF for an A/B, not to opt in."""
+    from syndicate.features.nfl.player_stats import _zero_game_imputation_enabled
+
+    monkeypatch.delenv("SYNDICATE_NFL_PROP_ZERO_GAMES", raising=False)
+    assert _zero_game_imputation_enabled() is True
+    for off in ("0", "false", "off", "no", "OFF"):
+        monkeypatch.setenv("SYNDICATE_NFL_PROP_ZERO_GAMES", off)
+        assert _zero_game_imputation_enabled() is False, off
+    monkeypatch.setenv("SYNDICATE_NFL_PROP_ZERO_GAMES", "1")
+    assert _zero_game_imputation_enabled() is True
