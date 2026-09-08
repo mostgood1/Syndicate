@@ -67,6 +67,38 @@ or delegation -- checked before building, since a rule already stated is cheaper
 than a guard. And the `syndicate-engineer` subagent that CLAUDE.md prescribes
 for exactly this has ZERO recorded invocations in the entire ledger.
 
+MEASURED 2026-09-08, AND IT IS NOT MOSTLY A DRIFT DETECTOR. The falsification
+test this guard was shipped owing has now run, over 345 session transcripts
+mapped to lanes through the `session <uuid>` in their headers, scored with THIS
+FILE'S OWN `_area`/`_is_test` (loaded by AST, not reimplemented).
+
+  RATE, on 22 scoreable sessions: **11 firings total, mean 0.50 per session,
+  median 0, max 4. SILENT in 16 of 22 (73%). Zero sessions above 4.** The
+  once-per-area cap holds: this costs about one message every two sessions.
+
+  PRECISION, hand-classified against each lane's stated Goal: **6 of 11 were
+  IN-GOAL edits into an area the lane had simply not declared. 4 were genuine
+  excursions; 1 borderline.** The strongest true positive was a session whose
+  four lanes were about an unknown-submit banner and a Polymarket price gate
+  editing `football/sim_engine/smartsim2/`. One fired on eight scratch scripts
+  written to the REPO ROOT (`_write_log.py`, `_ledger3.py`, ...).
+
+SO THE HONEST DESCRIPTION IS NARROWER THAN THE ONE THIS FILE SHIPPED WITH: at
+the measured rate it is mostly an UNDER-DECLARATION detector, with real drift a
+large minority. That is still worth having -- a stale `Files:` block is exactly
+what makes `lane-guard`'s collision detection lie, and this guard's own message
+already prescribes the right fix ("add the path to this lane's `Files:`") -- but
+do not claim it catches drift 11 times out of 11. It caught it 4 times.
+
+EVERY BIAS IN THAT MEASUREMENT FLATTERS THE GUARD, so the firing rate is a LOWER
+BOUND: sessions were scored against the UNION of all their lanes' areas (one
+session held 14) while the real hook checks the ONE lane in the marker; the
+CURRENT `Files:` lists were scored against historical edits, so a lane that added
+paths later reads as having declared them all along; 14 of 55 sessions carried a
+bogus `[compacted]` lane attribution that inflates the declared set; and 33
+sessions were excluded outright because their lane has zero parsed claims (a
+released-claims lane cannot yield a false-positive rate).
+
 WHY IT WARNS AND CANNOT BLOCK. Drift is a judgement call -- some out-of-area
 writes genuinely serve the goal -- and this repo has already lost two guards to
 firing on correct work (`checkpoint-guard`'s docstring: "A warning that fires

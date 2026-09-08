@@ -1862,7 +1862,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Findings, in the order they were forced: `findings_2026-09-08_bucket_realised_performance.md` (rows-vs-games: +21σ → +2.93σ on the same data), `findings_2026-09-08_spreads_edge_is_stale_quotes.md` (the survivor was stale quotes; the model has the score, the book's quote does not), `findings_2026-09-08_totals_baseline_not_resolution.md` (the de-vig is ~0.50 whatever the line is — the baseline was wrong, not the outcome resolution, and this invalidates spreads too).
 - Blocked by: data accumulation only.
 
-### session-scope-drift-guard — OPEN — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea99184 — **47 OPEN lanes, 22 of them UNOWNED: nothing in this repo checks a write against the CURRENT lane's own declared scope**
+### session-scope-drift-guard — **CLOSED 2026-09-08 — falsification test RAN: rate passes (0.50 firings/session, 73% silent), precision does NOT (6 of 11 firings were in-goal). Kept, claim narrowed.** — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea99184 — **47 OPEN lanes, 22 of them UNOWNED: nothing in this repo checks a write against the CURRENT lane's own declared scope**
 - **GOAL, verbatim:** *"a session that writes outside its lane's declared `Files:`
   areas is told so, once per area, in the same turn — and `/checkpoint` records
   the lane Goal against a MET / NOT MET / DRIFTED verdict, so drift becomes a
@@ -1953,9 +1953,28 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   out-of-area path returns rc=2 and prints the lane's Goal verbatim; (3) the same
   payload replayed returns rc=0.
 - Blocked by: none. `.claude/` is EXEMPT from lane-guard (`lane_claims.is_exempt`),
+- **FALSIFICATION TEST DISCHARGED `[2026-09-08]` — and it NARROWED the claim.**
+  Pre-registered rule, written before any data: *pull the guard if it speaks more
+  than ~2-3 times in a typical session, or if most firings served the goal.*
+  **RATE PASSES decisively** — 345 transcripts, 22 scoreable sessions, **11
+  firings, mean 0.50/session, median 0, max 4, SILENT in 16 of 22 (73%)**, zero
+  sessions above 4. Scored with `scope-guard.py`'s OWN `_area`/`_is_test`, loaded
+  by AST, never reimplemented. **PRECISION FAILS AS STATED** — hand-classified
+  against each lane's Goal, **6 of 11 firings were IN-GOAL edits into an area the
+  lane had never declared; 4 were genuine excursions; 1 borderline.**
+  **VERDICT: KEEP, AND RESTATE.** At the measured rate this is mostly an
+  UNDER-DECLARATION detector with real drift a large minority — not the drift
+  detector it shipped as. Worth keeping (a stale `Files:` block is what makes
+  `lane-guard`'s collision detection lie, and the guard's own message prescribes
+  the fix), but the docstring now says 4, not 11. **Every bias flatters the
+  guard**, so 0.50/session is a LOWER BOUND: sessions scored against the UNION of
+  up to 14 lanes' areas while the live hook checks ONE; current `Files:` lists
+  scored against historical edits; 14 of 55 sessions carried a bogus
+  `[compacted]` attribution; 33 excluded as unscoreable. Full narrative and the
+  three defects in my own first measurement: `.syndicate/log/2026-09-08.md`.
   so no collision is possible on these paths — checked 2026-09-08 by grep for
   `.claude/`, `hooks/`, `commands/` over every OPEN lane's claims.
-### lead-deferral-and-lane-census — OPEN — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea99184 — **following a lead costs 0 and deferring one costs 7 collision-checking steps; and session start shows 600 B of a 31,404 B open-lane section, i.e. 1.9% of the state**
+### lead-deferral-and-lane-census — **CLOSED 2026-09-08 — falsification test RAN: rate passes (0.50 firings/session, 73% silent), precision does NOT (6 of 11 firings were in-goal). Kept, claim narrowed.** — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea99184 — **following a lead costs 0 and deferring one costs 7 collision-checking steps; and session start shows 600 B of a 31,404 B open-lane section, i.e. 1.9% of the state**
 - **GOAL, verbatim:** *"(a) deferring a lead costs ONE command and no ceremony, so
   that deferring is cheaper than following — the gradient, not the exhortation, is
   the fix; and (b) session start reports the TRUE SIZE of the open-lane population
@@ -2038,6 +2057,25 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   cannot inflate the lane population or the claim set; (4) `test_scope_guard.py`
   still 30/30 after the guard's message changes.
 - Blocked by: none. `scripts/lane_census.py` is the only path outside the
+- **FALSIFICATION TEST DISCHARGED `[2026-09-08]` — and it NARROWED the claim.**
+  Pre-registered rule, written before any data: *pull the guard if it speaks more
+  than ~2-3 times in a typical session, or if most firings served the goal.*
+  **RATE PASSES decisively** — 345 transcripts, 22 scoreable sessions, **11
+  firings, mean 0.50/session, median 0, max 4, SILENT in 16 of 22 (73%)**, zero
+  sessions above 4. Scored with `scope-guard.py`'s OWN `_area`/`_is_test`, loaded
+  by AST, never reimplemented. **PRECISION FAILS AS STATED** — hand-classified
+  against each lane's Goal, **6 of 11 firings were IN-GOAL edits into an area the
+  lane had never declared; 4 were genuine excursions; 1 borderline.**
+  **VERDICT: KEEP, AND RESTATE.** At the measured rate this is mostly an
+  UNDER-DECLARATION detector with real drift a large minority — not the drift
+  detector it shipped as. Worth keeping (a stale `Files:` block is what makes
+  `lane-guard`'s collision detection lie, and the guard's own message prescribes
+  the fix), but the docstring now says 4, not 11. **Every bias flatters the
+  guard**, so 0.50/session is a LOWER BOUND: sessions scored against the UNION of
+  up to 14 lanes' areas while the live hook checks ONE; current `Files:` lists
+  scored against historical edits; 14 of 55 sessions carried a bogus
+  `[compacted]` attribution; 33 excluded as unscoreable. Full narrative and the
+  three defects in my own first measurement: `.syndicate/log/2026-09-08.md`.
   lane-guard exemption and no OPEN lane claims it.
 
 ### cron-deploy-locks — CLOSED-VERIFIED 2026-09-08 — opened 2026-09-08 — session e371dfde — **the three cron services cannot be claimed, and the guard's refusal to say so reads as approval** `[user: "yes, fix the cron locks too"]`
