@@ -28002,3 +28002,72 @@ anchor-tier, median == fair 1,532/1,532), live-odds-worker b9f088de (this
 entry). Every flag absent everywhere. Deploy 2 (`SYNDICATE_FAIR_ANCHOR=sharp`
 on refresh-worker) waits for a user decision and its own same-instant reading.
 Claim released after this entry.
+
+
+---
+
+## 2026-09-08 22:27-22:31Z — web `1cdf5c17` -> `20c8b870` — lane `nfl-props-autorun-e2e`
+
+**verify: PASSING. This deploy corrected the PRICES on 56% of the prop board.**
+
+The prop model computes P(over) for a SPECIFIC line
+(`_nfl_prop_model_probability(..., line=line)`), but every row was stored under
+`stat::player` with no line. `join_odds_to_sim` therefore matched whichever row
+it found and applied ONE probability to EVERY line of that market.
+
+    artifact:  passing_tds::justin herbert  P(over)=0.5580   <- line 1.5
+               passing_tds::justin herbert  P(over)=0.1536   <- line 2.5
+    board:     Over 1.5 -> 15.4%      Over 2.5 -> 15.4%
+
+**MEASURED on the served board before the fix: 371 of 371 (player, market, side)
+groups with more than one quoted line showed an IDENTICAL model percentage --
+924 cards, 56% of the board.** The 2.5 figure was printed against the 1.5 price,
+manufacturing a "+46.1% edge" on the Under. `Bhayshul Tuten` rushing yards read
+95.5% under 47.5, 50.5 AND 51.5, which is arithmetically impossible.
+
+After, on production: **0 of 319 groups share a probability, 0 monotonicity
+violations** (Under rises with the line, Over falls). Tuten now reads
+94.2 / 95.1 / 95.5 across 48.5 / 50.5 / 51.5.
+
+**MIGRATION: a DUAL-KEYED artifact, so the board never went empty.** Old web
+builds odds keys as `stat::player`; new web builds `stat::player::line`. Either
+one alone means a total join miss and a zero-card board. Published 980
+line-keyed rows PLUS 430 legacy two-segment copies first, confirmed old web
+still served 1,664, THEN deployed. No outage: the only dip was gunicorn
+restarting (`ERR` 22:29:51Z -> 1,515 at 22:30:52Z).
+
+**A CONSEQUENCE THAT PARTLY RETRACTS AN EARLIER CLAIM IN THIS LEDGER.** I wrote
+that the board "reprices itself as lines move". The ODDS side does, but a
+projection is line-specific, so a newly quoted line now has NO projection and its
+card is dropped — correct, and it costs coverage. Measured immediately after the
+deploy: **2,309 of 5,971 live odds rows (38.7%) had no artifact row for their
+exact line**, of which **1,559 are `anytime_td`** (a market with no line at all —
+these are players with no projection for other reasons, and are NOT caused by
+this change) and **675 are genuine line drift** in about 2h15m. Card count fell
+1,670 -> 1,515 on the stale artifact and returned to **1,670** after a rebuild on
+a freshly pulled capture.
+
+So the artifact is not "build once". `nfl-wk1-prop-artifact-refresh` is scheduled
+one-time for 2026-09-09 16:30 CDT to rebuild on near-final lines, ~2h50m before
+kickoff. Deliberately ONE fire and not hourly: this machine's own task ledger
+records that a hung scheduled run BLOCKS every later fire until killed (3 of 4
+fires hung once), and three important one-time tasks are already queued for
+2026-09-09 (04:30, 07:30, 20:15 CDT).
+
+**NOT FIXED, and it is the remaining credibility gap:** every card is still
+`Rate basis: Prior season` (1670/1670). The prices are now attributed to the
+right line; the RATE behind them is still last season's usage.
+
+**Two credibility gates investigated and REJECTED on evidence, recorded so they
+are not re-attempted blind:**
+- **Injury gate: impossible.** `injuries_2026.csv` does not exist; the feed stops
+  at 2025.
+- **Depth-chart gate: UNSAFE.** `depth_charts_2026.csv` omits James Cook, Kyle
+  Pitts, Aaron Jones and Chris Godwin entirely (checked by name across the whole
+  file, not a position-filter artifact), so gating on it would refuse real
+  starters.
+- **Roster-status gate: safe but small** — only **17 of 980 rows** sit on a
+  non-ACT or absent player (248 of 253 players are ACT in `roster_2026.csv`).
+  Not implemented; low value against the risk of touching the join again today.
+
+Web claim released after this entry.
