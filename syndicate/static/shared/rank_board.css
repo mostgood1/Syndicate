@@ -65,6 +65,26 @@
   gap: 12px;
 }
 
+/* THE CARD TITLE HAD NO COLOUR OF ITS OWN, so it inherited the DARK PAGE
+   theme's #edf4fb and rendered near-white on this card's white background.
+   Measured in the browser on /nfl/props 2026-09-08: contrast ratio **1.11**
+   against WCAG AA's 4.5 minimum -- the player name, the single most important
+   text on all 1,670 cards, was effectively invisible, while "Under 12.5" right
+   beside it read 6.93 because `.rank-card__meta` sets its own colour.
+
+   `_rank_card.html` renders the title as a bare `<h3>` with no class, and every
+   OTHER element in this card was given an explicit dark colour for the white
+   background (#3a4c66, #5f7087, #4b5b70). The heading was simply missed, so it
+   was the one element still taking the page default.
+
+   Scoped to `.rank-card` rather than fixing the page theme: this class sets its
+   own white background here (`linear-gradient(180deg,#ffffff,#f9fbff)`), so a
+   dark heading is correct wherever it is used -- every sport's rank board
+   shares this file. */
+.rank-card h3 {
+  color: #13223a;
+}
+
 .rank-card__meta {
   margin: 10px 0 14px;
   color: #4b5b70;
