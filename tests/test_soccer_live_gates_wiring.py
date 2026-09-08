@@ -161,7 +161,18 @@ def test_gate3_prices_off_soccers_real_sim_count(root):
         rows, sport="soccer", selected_date="2026-08-21")
     block = rows[0]["live_gameline"]
     assert block["sims_run"] == 400
-    assert block["model_prob"] == 0.62
+    # `#648`: the PUBLISHED centre is the Agresti-Coull point estimate, not the
+    # raw k/n -- `live_gameline_join.agresti_coull_point`, `(k + 2) / (n + 4)`
+    # at :667. That landed in `79149c94`; this assertion still read the raw 0.62
+    # and had been red ever since, unnoticed because CI was billing-locked.
+    #
+    # Pinned as THREE separate facts rather than one number, so a future change
+    # to the estimator is visible instead of absorbed: the raw term, the
+    # estimator by NAME, and the smoothed value derived from the fixture rather
+    # than hard-coded.
+    assert block["model_prob_raw"] == 0.62
+    assert block["point_estimator"] == "agresti_coull"
+    assert block["model_prob"] == pytest.approx((0.62 * 400 + 2) / (400 + 4))
     assert block["priceable"] is True, block.get("withheld_reason")
 
 
@@ -174,7 +185,13 @@ def test_gate3_home_framing_matches_the_market_term(root):
     rows[0]["side"] = "draw"
     board_enrichment.attach_live_gamelines_for_sport(
         rows, sport="soccer", selected_date="2026-08-21")
-    assert rows[0]["live_gameline"]["model_prob"] == 0.62
+    # The discrimination this test exists for is home (0.62) vs draw (0.23) vs
+    # away (0.15), and the RAW term is where that stays legible -- it survives
+    # the Agresti-Coull smoothing (`#648`) that this assertion had not learned
+    # about. Both are pinned so neither can drift silently.
+    block = rows[0]["live_gameline"]
+    assert block["model_prob_raw"] == 0.62
+    assert block["model_prob"] == pytest.approx((0.62 * 400 + 2) / (400 + 4))
 
 
 def test_gate3_live_games_only_no_pregame_leak(root):

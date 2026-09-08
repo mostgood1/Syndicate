@@ -985,8 +985,15 @@ class SoccerLeagueScopeTests(unittest.TestCase):
         with patch.object(module, "soccer_active_leagues_for_date", return_value=list(module._SOCCER_LEAGUE_SLUGS)):
             steps = module._build_soccer_steps(self._make_args(soccer_leagues="eredivisie"))
 
-        self.assertTrue(steps)
-        for step in steps:
+        # `soccer_sim_input_checklist` is ENGINE-WIDE, not per league -- the
+        # script audits the sim's shared wiring and refresh_odds_sources.py says
+        # so in its own comment, "ONCE, not per league". It is therefore built
+        # regardless of the league filter and is not a counter-example to it.
+        # Added by `359ef031` (2026-09-07); this test never learned about it and
+        # had been red since (`#648`).
+        league_steps = [s for s in steps if s.name != "soccer_sim_input_checklist"]
+        self.assertTrue(league_steps)
+        for step in league_steps:
             self.assertTrue(step.name.startswith("soccer_eredivisie_"), step.name)
 
     def test_unknown_league_slug_fails_loudly_instead_of_building_nothing(self) -> None:
@@ -1008,7 +1015,13 @@ class SoccerLeagueScopeTests(unittest.TestCase):
         ):
             steps = module._build_soccer_steps(self._make_args(soccer_leagues="epl"))
 
-        self.assertEqual(steps, [])
+        # The claim under test is that no LEAGUE work is built for an
+        # out-of-season league -- not that the step list is empty. The
+        # engine-wide `soccer_sim_input_checklist` is appended regardless (see
+        # the sibling test above), so asserting `steps == []` asserted something
+        # the code stopped doing at `359ef031` and had been red since (`#648`).
+        self.assertEqual(
+            [s.name for s in steps if s.name != "soccer_sim_input_checklist"], [])
         emitted = stderr.getvalue()
         self.assertIn("SOCCER_LEAGUE_SCOPE", emitted)
         self.assertIn("skipped_out_of_season=epl", emitted)
