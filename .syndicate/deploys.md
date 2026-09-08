@@ -5,6 +5,55 @@
 
 ---
 
+## 2026-09-08 23:31:52Z — `ci-suite` @ `e5f4b9d5` — **chunk assignment is now a HASH OF THE PATH, so the daily red list stops moving on its own. DEPLOYED; the reading it enables is tomorrow's.** `[lane chunk-assignment-stable]`
+
+Deploy `dep-dag9krp5efls73a1a37g`, live 23:31:52Z, behind claim + `CLEAR`
+preflight, claim released. Start command unchanged. Verified in the deployed
+commit rather than assumed: `_chunk_index`/`blake2b` appears **5** times at
+`e5f4b9d5` and **0** at the previous deploy `510b692e`.
+
+**THE PROBLEM.** `ci-suite`'s failing set changed run to run with nobody
+touching the code. Assignment was `groups[index % n]` over a SORTED list, so
+inserting one test file shifted every file after it into a different process,
+and tests that assert on what else is resident flipped verdict. Six did across
+two runs 90 minutes apart: `test_heap_roots` x4 and
+`test_home_mlb_live_lens_states` vanished, `test_retainer_census` appeared — and
+each was then shown to PASS in isolation (`#649`, `10 passed in 4.30s`). Chunk 1
+collected **2243** in one run and **1788** in the next.
+
+**MEASURED, on the real 1,079-file tree at `--chunks 8`:**
+
+    inserting one file at the FRONT   round-robin moved ~944 files | hash moves 0
+    worst chunk / even                round-robin 1.001x | hash 1.082x (146 v 134.9)
+    across PYTHONHASHSEED 0/1/12345   1 distinct result
+
+**Total stability for ~8% worse balance.** The peak is set by the worst chunk,
+and 8% is well inside what file COST already varies by — the whole suite peaked
+at 2443 MB in ONE process, so a slightly larger eighth is not the binding
+constraint.
+
+**NOT `hash()`**, deliberately: Python randomises it for `str` per process, so
+the built-in would make the split differ between two runs of the SAME suite on
+the SAME commit — the identical instability in a shape far harder to see. The
+test asserts stability by recomputing the `blake2b` digest independently rather
+than by trusting the implementation.
+
+**WHAT THIS DOES NOT DO.** It does not make the six order-sensitive tests pass.
+They are still order-sensitive; their chunk is merely STABLE now, so they fail
+or pass consistently instead of flickering. That is what makes a daily list
+readable by a human.
+
+**THE 17 MEASURED 20 MINUTES AGO IS NOT A BASELINE FOR TOMORROW** and the
+scheduled task has been told so. It was taken under the assignment this deploy
+replaced. The layout-independent anchor is the **15** memory-floor failures;
+above that, the order-sensitive tail may land differently. **Tomorrow's number
+becomes the baseline for every run after it** — which is the point.
+
+**UNVERIFIED, and named as such:** no run has yet executed under `e5f4b9d5`.
+Stability is proven as a property of the function, not yet observed across two
+production runs. The first pair of consecutive runs with an identical failing
+set is what would close it.
+
 ## 2026-09-08 23:11:58Z — `ci-suite` @ `510b692e` — **MEASURED: the 4 stale-test repairs TOOK. 17 new failures, not the 15 I predicted — and my prediction was wrong for a reason worth keeping.** `[lane render-cron-failures]`
 
 Run `crn-dafg4h0u01pc73aavs6g-1788905940`, full chunked suite, no config change
