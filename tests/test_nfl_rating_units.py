@@ -134,3 +134,41 @@ def test_a_team_with_no_plays_still_falls_back_and_is_NAMED(monkeypatch):
     monkeypatch.setenv("SYNDICATE_NFL_PPG_RATINGS", "1")
     off, dfn, src = G.team_rating("ZZZ", week=None, current_plays=_plays(), prior_plays=None)
     assert (off, dfn, src) == (0.0, 0.0, "neutral_no_data")
+
+
+def test_the_scale_is_20_and_that_number_has_a_derivation():
+    """PINS THE VALUE, because every other test here uses the constant
+    RELATIVELY and would pass at any scale.
+
+    20.0 came from a walk-forward out-of-sample fit on 2026-09-07: ratings for
+    a week-w game built only from plays before week w, OLS of ACTUAL MARGIN on
+    the rating differential fitted on 2023-24, scored on a 2025 the fit never
+    saw. Slope 0.404 -> scale ~20.9. Reproduce with
+    `scripts/backtest_nfl_rating_units.py`.
+
+    It is NOT 10.0. That value mirrored NCAAF's `SP_RATING_SCALE` on the
+    reasoning "same engine, same units, same divisor", and produced an
+    across-game margin SD of 2.16 against a market SD of ~5.8 -- 93.8% of games
+    inside P(home) 0.35-0.65, a board telling the user every game is a coin
+    flip. If someone restores 10.0, that display comes back.
+    """
+    assert G.NFL_RATING_SCALE == 20.0
+
+
+def test_the_scale_actually_reaches_the_rating(monkeypatch):
+    """OFF != ON for the CONSTANT, not just for the flag.
+
+    A constant can be defined, documented and unread -- this repo has a
+    standing rule about exactly that. Doubling it must halve the rating, or the
+    number above is decoration."""
+    monkeypatch.setenv("SYNDICATE_NFL_PPG_RATINGS", "1")
+    plays = [
+        (1, "AAA", "BBB", "pass", 10.0),
+        (1, "BBB", "AAA", "pass", 0.0),
+    ]
+    base = G._rating_pair(plays, team="AAA", before_week=None)
+    monkeypatch.setattr(G, "NFL_RATING_SCALE", G.NFL_RATING_SCALE * 2)
+    doubled = G._rating_pair(plays, team="AAA", before_week=None)
+    assert base is not None and doubled is not None
+    assert doubled[0] == pytest.approx(base[0] / 2)
+    assert doubled[1] == pytest.approx(base[1] / 2)

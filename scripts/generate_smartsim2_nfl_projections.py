@@ -300,13 +300,24 @@ def _mean_epa(plays: list[tuple[int, str, str, str, float]], *, team: str, side:
 # CENTRED AND SCALED EXACTLY AS NCAAF IS. The engine treats 0.0 as a league
 # AVERAGE team, so an uncentred rating shifts every team the same way -- the bias
 # `[nfl-game-context]` already records as "the NFL payload's league-mean
-# offense_index at 0.405 against a neutral 0.500". `NFL_RATING_SCALE` mirrors
-# NCAAF's `SP_RATING_SCALE` deliberately: same engine, same units, so the same
-# divisor. It is NOT fitted to hit the market's 5.69 -- doing that would be
-# choosing a coefficient to match a target, which is the fit this change avoids.
-# Where the resulting spread actually lands is a MEASUREMENT, reported in the
-# lane, not a thing this constant was solved for.
-NFL_RATING_SCALE = 10.0
+# offense_index at 0.405 against a neutral 0.500".
+#
+# IT NO LONGER MIRRORS NCAAF's `SP_RATING_SCALE`. It did, on the reasoning
+# "same engine, same units, so the same divisor" -- and the units half of that
+# was wrong. NCAAF's SP+ is points per game as published; this is EPA summed to
+# a game, and the two do not share a spread just because they share a
+# dimension. The divisor is now set from this sport's own data.
+# SET TO 20.0 ON 2026-09-07 FROM AN OUT-OF-SAMPLE FIT, superseding the 10.0
+# that mirrored NCAAF's divisor. Walk-forward ratings (a week-w game rates only
+# from plays BEFORE week w), OLS of ACTUAL MARGIN on the rating differential
+# fitted on 2023-24 and scored on a 2025 the fit never saw, wants a slope of
+# 0.404 -- which through this engine is a scale of ~20.9. Reproduce with
+# `scripts/backtest_nfl_rating_units.py`.
+#
+# THE SLOPE IS NOT PRECISE: 0.322 (fit 2023) to 0.493 (fit 2024). 20.0 is the
+# round number inside that band, not a fitted decimal, and nothing here should
+# be read as knowing the scale to better than about +/-20%.
+NFL_RATING_SCALE = 20.0
 
 
 def _points_per_game_ratings_enabled() -> bool:
@@ -325,12 +336,26 @@ def _points_per_game_ratings_enabled() -> bool:
     that differentiates 2.0x TOO MUCH, and an over-confident model that prices
     is more dangerous than a flat one that cannot.
 
-    `NFL_RATING_SCALE = 20.0` would land it on 5.69 almost exactly. That number
-    is deliberately NOT used: choosing a coefficient so the output matches a
-    target is a FIT, and this ledger's soccer precedent is a re-fit that looked
-    better on the metric it was fitted to and still LOST to the market on a
-    leak-free backtest. A scale belongs to a lane that can validate it
-    out-of-sample, not to the lane that noticed the units were wrong.
+    THAT OBJECTION HAS NOW BEEN ANSWERED, and the paragraph that used to sit
+    here refused 20.0 for a good reason that no longer applies. It was refused
+    because 20.0 had been chosen to make the output SD match the market's 5.69
+    -- fitting a coefficient to a target, the move this ledger's soccer
+    precedent warns about. On 2026-09-07 the same value was reached from a
+    DIFFERENT basis: OLS against REALISED MARGINS, fitted on 2023-24 and scored
+    on a held-out 2025. Same answer, honest derivation.
+
+    THE UNITS STORY ABOVE IS ALSO HALF WRONG and is kept only because the
+    conclusion survives. Per-play and per-game differentials correlate at
+    r = 0.9967, so the conversion adds NO information -- it is a linear
+    rescaling, and with each given its own fitted coefficient the two are
+    indistinguishable out-of-sample (MAE 10.58 vs 10.60). What was really wrong
+    was the SCALE, not the denominator.
+
+    AND IT STILL MUST NOT PRICE. The corrected model loses to the close (MAE
+    10.58 vs 9.79, straight-up 60.2% vs 64.2%), reproducing the refusal audit's
+    t = +3.34 from a second implementation. This makes the BOARD honest -- it
+    was showing 93.8% of games as coin flips -- and licenses nothing more.
+
 
     So the correction ships INERT and testable:
     `SYNDICATE_NFL_PPG_RATINGS=1` turns it on for a backtest run. Absent means

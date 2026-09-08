@@ -80,7 +80,8 @@ death, never life — do not invert it.
   before taking; the market-sign defect was found from this lane's backtest),
   `tests/test_backfill_nfl_performance.py`,
   `scripts/backtest_nfl_rating_units.py` (NEW 2026-09-07 — the walk-forward
-  harness; the finding above is reproducible by running it).
+  harness; the finding above is reproducible by running it),
+  `tests/test_nfl_rating_units.py`.
   NOT claimed and NOT edited: `syndicate/features/football/sim_engine/smartsim2/**`
   (the engine itself is shared with NCAAF and a change there moves a calibrated
   sport).
