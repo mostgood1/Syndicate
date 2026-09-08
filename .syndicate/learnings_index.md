@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 894 rules `[generated]`
+## Index — 910 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 333**
+**FORBIDDEN — 347**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -144,6 +144,8 @@
 - [2026-09-06 — FORBIDDEN: adding a transform that REBINDS the name a reported field is de…](#2026-09-06-forbidden-adding-a-transform-that-rebinds-the-name-a-reported-field-is-derived-from-the-field-keeps-its-name-changes-its-meaning-and-every-existing-reader-keeps-working-while-answering-a-different-question-lane-kalshi-join-counters-logged)
 - [2026-09-06 — FORBIDDEN: asserting "the token is present" as the test for a log line oth…](#2026-09-06-forbidden-asserting-the-token-is-present-as-the-test-for-a-log-line-other-tools-parse-a-duplicate-is-present-twice-lane-kalshi-join-counters-logged)
 - [2026-09-06 — FORBIDDEN: mutating the tree a BACKGROUND JOB is reading. It keeps running…](#2026-09-06-forbidden-mutating-the-tree-a-background-job-is-reading-it-keeps-running-and-silently-measures-something-else-lane-nfl-rating-units)
+- [2026-09-08 FORBIDDEN: promising a verification target without tracing WHICH PRODUCER st…](#2026-09-08-forbidden-promising-a-verification-target-without-tracing-which-producer-stamps-that-field-lane-nfl-ncaaf-ui-parity)
+- [2026-09-08 FORBIDDEN: leaving a self-refreshing board open while diagnosing the service…](#2026-09-08-forbidden-leaving-a-self-refreshing-board-open-while-diagnosing-the-service-it-loads-lane-nfl-ncaaf-ui-parity)
 - [2026-09-07 FORBIDDEN: reading an artifact-backed surface ONCE to decide whether a deplo…](#2026-09-07-forbidden-reading-an-artifact-backed-surface-once-to-decide-whether-a-deploy-worked)
 - [2026-09-07 FORBIDDEN: deciding whether a model earns its keep from a SLATE-AVERAGE metr…](#2026-09-07-forbidden-deciding-whether-a-model-earns-its-keep-from-a-slate-average-metric)
 - [2026-09-07 FORBIDDEN: verifying a fix with a predicate on a TOTAL that can move for ano…](#2026-09-07-forbidden-verifying-a-fix-with-a-predicate-on-a-total-that-can-move-for-another-reason)
@@ -153,6 +155,18 @@
 - [2026-09-07 — FORBIDDEN: verifying a change with an AGGREGATE COUNT that BOTH your inten…](#2026-09-07-forbidden-verifying-a-change-with-an-aggregate-count-that-both-your-intended-effect-and-a-collateral-bug-would-move-the-same-way-lane-soccer-threeway-precision-gate)
 - [2026-09-07 FORBIDDEN: `git reset` the SHARED PRIMARY TREE to origin/main to tidy away u…](#2026-09-07-forbidden-git-reset-the-shared-primary-tree-to-originmain-to-tidy-away-unpushed-commits-it-converts-a-harmless-pointer-into-153-files-of-revert-exposure-lane-soccer-threeway-precision-gate)
 - [2026-09-07 FORBIDDEN: repeating a REPORTER'S impact framing as your own measurement. Yo…](#2026-09-07-forbidden-repeating-a-reporters-impact-framing-as-your-own-measurement-you-inherit-its-scope-without-inheriting-its-evidence-lane-publish-refusal-201-triage)
+- [2026-09-07 FORBIDDEN: publishing a PRODUCTION LATENCY or ERROR reading without first es…](#2026-09-07-forbidden-publishing-a-production-latency-or-error-reading-without-first-establishing-that-no-other-session-was-loading-that-service-80-sessions-share-these-three-services-a-concurrent-load-test-makes-the-instrument-read-the-other-session-not-the-route-lane-ncaaf-live-resim-wire)
+- [2026-09-07 - FORBIDDEN: treating UNTRACKED as NEW. It can mean your HEAD is behind.](#2026-09-07---forbidden-treating-untracked-as-new-it-can-mean-your-head-is-behind)
+- [2026-09-07 FORBIDDEN: writing a test from the SAME reading of a contract that produced…](#2026-09-07-forbidden-writing-a-test-from-the-same-reading-of-a-contract-that-produced-the-code-632-session-b2b5b45b)
+- [2026-09-07 FORBIDDEN: reading a null result from a window that ENDS BEFORE THE EFFECT C…](#2026-09-07-forbidden-reading-a-null-result-from-a-window-that-ends-before-the-effect-can-occur-632-session-b2b5b45b)
+- [2026-09-07 FORBIDDEN: comparing percentiles across arms with DIFFERENT ERROR COUNTS. `[…](#2026-09-07-forbidden-comparing-percentiles-across-arms-with-different-error-counts-632-session-b2b5b45b)
+- [2026-09-07 - FORBIDDEN: reporting a null result without checking the sampled population…](#2026-09-07---forbidden-reporting-a-null-result-without-checking-the-sampled-population-could-have-produced-a-non-null-one)
+- [2026-09-07 FORBIDDEN: justifying a sign/unit transform by pointing at a SIBLING CALL SI…](#2026-09-07-forbidden-justifying-a-signunit-transform-by-pointing-at-a-sibling-call-site-the-convention-belongs-to-the-source-and-one-function-can-read-two-sources-lane-nfl-rating-units)
+- [2026-09-08 FORBIDDEN: carrying a scoped finding forward as a GENERAL claim after its sc…](#2026-09-08-forbidden-carrying-a-scoped-finding-forward-as-a-general-claim-after-its-scope-expires-632-session-b2b5b45b)
+- [2026-09-08 FORBIDDEN: a periodic publisher whose interval EQUALS its reader's freshness…](#2026-09-08-forbidden-a-periodic-publisher-whose-interval-equals-its-readers-freshness-threshold-632-session-b2b5b45b)
+- [2026-09-08 FORBIDDEN: reading a marker at the wrong nesting level and concluding the co…](#2026-09-08-forbidden-reading-a-marker-at-the-wrong-nesting-level-and-concluding-the-code-did-not-run-632-session-b2b5b45b)
+- [2026-09-08 - FORBIDDEN: `git stash` inside a session worktree. The stash stack is REPOS…](#2026-09-08---forbidden-git-stash-inside-a-session-worktree-the-stash-stack-is-repository-global)
+- [2026-09-08 FORBIDDEN: treating scope drift as a discipline problem. Change the COST of…](#2026-09-08-forbidden-treating-scope-drift-as-a-discipline-problem-change-the-cost-of-deferring-or-nothing-changes-lanes-session-scope-drift-guard-lead-deferral-and-lane-census-session-e51345f0)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`
@@ -353,7 +367,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](learnings_evidence.md#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated) `[evidence]`
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](learnings_evidence.md#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override) `[evidence]`
 
-**Rules and corrections — 555**
+**Rules and corrections — 557**
 
 - [2026-09-05 — A DEPLOY GOING LIVE AND THE ARTIFACT IT CHANGES BEING REBUILT ARE DIFFEREN…](#2026-09-05-a-deploy-going-live-and-the-artifact-it-changes-being-rebuilt-are-different-events-gate-the-check-on-the-artifacts-mtime-lane-mlb-hitter-so-dead-field-commit-bc82090f-no-deploy)
 - [2026-09-04 — A TOOL THAT MUTATES IS NOT A PROBE, AND A POLL SLOWER THAN THE WINDOW MEAS…](#2026-09-04-a-tool-that-mutates-is-not-a-probe-and-a-poll-slower-than-the-window-measures-nothing-lanes-mlb-ladder-refusal-deploy-commits-2e555b2c-ccb053c7-deployed)
@@ -454,6 +468,8 @@
 - [2026-09-07 A probe you designed yourself can MANUFACTURE bugs -- discriminate shape-fai…](#2026-09-07-a-probe-you-designed-yourself-can-manufacture-bugs----discriminate-shape-failure-from-real-failure-before-reporting)
 - [2026-09-07 A freshness gate must be `> deploy.finishedAt`, and an UNCHANGED control is…](#2026-09-07-a-freshness-gate-must-be-deployfinishedat-and-an-unchanged-control-is-not-automatically-a-null-result)
 - [2026-09-07 The deploy-claim breadcrumb id is not merely un-prefixed -- it is not in the…](#2026-09-07-the-deploy-claim-breadcrumb-id-is-not-merely-un-prefixed----it-is-not-in-the-roster-at-all)
+- [2026-09-07 A pre-filter that can change the ANSWER is not a pre-filter. `[#632, session…](#2026-09-07-a-pre-filter-that-can-change-the-answer-is-not-a-pre-filter-632-session-b2b5b45b)
+- [2026-09-08 A probe is production load, and an unbounded one is an outage. `[#632, sessi…](#2026-09-08-a-probe-is-production-load-and-an-unbounded-one-is-an-outage-632-session-b2b5b45b)
 - [2026-08-13 — A guard can measure a number that moves without the system moving](learnings_evidence.md#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving) `[evidence]`
 - [2026-08-13 — A criterion has a DIRECTION, and checking it is free](learnings_evidence.md#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free) `[evidence]`
 - [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](learnings_evidence.md#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero) `[evidence]`

@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 894 rules `[generated]`
+## Index — 910 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4079,3 +4079,64 @@ existed only inside my worktree, on top of my unrelated changes.
 Related: [[shared_index_can_hold_a_revert]] (same class -- the index was shared
 until worktrees; the stash still is), [[concurrent_parallel_sessions]],
 [[untracked_is_not_new]].
+
+## 2026-09-08 FORBIDDEN: treating scope drift as a discipline problem. Change the COST of deferring, or nothing changes. `[lanes session-scope-drift-guard + lead-deferral-and-lane-census, session e51345f0]`
+
+- **What we believed:** sessions drift off their objective because they fail to
+  notice, and the fix is to notice harder — or to delegate the lead to a subagent
+  or a new session. The user's own framing: *"every session that has an objective
+  ends up drifting instead of delegating or spinning up a new session to follow a
+  lead."*
+- **What was actually true:** two things, and both make "notice harder" useless.
+  **(1) NO HOP IS CATCHABLE BY JUDGEMENT.** Stated best by lane
+  `profitable-buckets`, opened the same day because its session kept deviating:
+  *"This session already spent hours going from a ledger bucket gap into segment
+  pricing, first5 skill, full-game discrimination, late-inning ceilings, a
+  home-field term and two deploys. **Each hop was locally justified and the sum
+  was deviation.**"* Every hop is defensible AT THE MOMENT IT IS TAKEN; only the
+  sum is wrong, and nothing was watching the sum.
+  **(2) THE COST GRADIENT POINTED THE WRONG WAY.** Following a lead cost **zero**.
+  Deferring it cost `/lane open`'s **seven** steps of collision checking. A rule
+  telling sessions to defer, laid over that gradient, is a rule asking people to
+  choose the expensive option every time.
+  Delegation was NOT the missing piece: the `syndicate-engineer` subagent
+  CLAUDE.md prescribes for exactly this had **zero recorded invocations** in the
+  entire ledger, and the sessions that DID close their lanes did it by
+  re-declaring the goal per lead inside ONE context window, not by isolating.
+- **How we found out:** measured on `origin/main` (never the checkout — the
+  primary tree was 441 commits behind): **53 OPEN lane blocks, 26 UNOWNED, 20
+  with no date newer than 2026-09-01.** Deferral ran **9 explicit instances
+  against 41 `findings_*.md`** — about **1 lead in 4.5** — and **18 of 54**
+  findings/handoff files were referenced by no lane at all. Every guard in
+  `.claude/hooks` protected FILES AND THE LEDGER FROM THE SESSION;
+  `lane-guard.py:187` fires only on `claimed by OPEN lane <other>`, so a write to
+  a file NO lane claims was free. `current_lane()` had two non-test consumers and
+  both used it only to EXCLUDE you from other-lane conflict detection. Nothing
+  anywhere asked "is this write serving the goal I declared".
+- **The rule going forward:**
+  1. **A lead gets `/lead "<one line>"`, not inline work.** One line into
+     `.syndicate/leads.md`, then back to the objective. Never into `lanes.md` — a
+     lead has no claims and would inflate the population that is the problem.
+  2. **`/checkpoint` states the lane's Goal VERBATIM and answers MET / NOT MET /
+     DRIFTED.** `DRIFTED` is not a failure verdict; it is the only one that makes
+     the next session's pickup honest. Copy the goal, never paraphrase it — a
+     paraphrase drifts toward whatever you actually did.
+  3. **When you propose a discipline fix, ask what it costs to obey.** If the
+     compliant path is more expensive than the non-compliant one, you have
+     written an exhortation, not a mechanism. `scope-guard.py` names the cheap
+     path (`/lead`) precisely because a warning that offers only the expensive
+     one is a reprimand.
+  4. **Count the ledger with `scripts/lane_census.py`, never with grep or by
+     reading prose.** Three methods gave three answers for "how many lanes are
+     open" the same hour: `grep '— OPEN'` said 47 (it misses bold `**OPEN`), a
+     prose reading said 47 (it counted three lanes as closed whose status field
+     says OPEN and whose claims `lane-guard` still enforces), the parser said 53.
+     The parser is authoritative because it is the one the guard uses.
+- **Cost:** the 53/26 population itself, and 18 orphaned findings files nothing
+  points at. Plus two near-misses inside the session that wrote this rule: the
+  first draft of `scope-guard.py` went silent on any lane whose goal contained an
+  em-dash — i.e. every lane following the ledger's own header convention — and
+  its first live run fired with a `../../..` area that would have poisoned the
+  once-per-area slot. **Both were invisible to 27 green unit tests and appeared on
+  the first run against the real ledger.** A guard for a discipline problem fails
+  toward SILENCE, which looks exactly like compliance.
