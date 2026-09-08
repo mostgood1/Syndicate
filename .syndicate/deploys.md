@@ -27042,3 +27042,50 @@ recorded, not claimed.
 **verify:** chips serving `worker_artifact` on every request — **PASSING**, 10/10
 controlled. The organic >=5 s share for that route is NOT re-measured; this
 window had n=2.
+
+---
+
+## 2026-09-08 15:31:38Z — web `09f6ab86` → `009bb3c3` — **MEASURED: the unslimmed query response 64.98 → 32.53 MB, 28,235 → 3,785 ms. The guard fires in production.** `[lane web-oom-profiler-steady]`
+
+**I DID NOT DEPLOY THIS EITHER.** `009bb3c3` reached web inside another session's
+deploy at 15:31:38Z. I acquired the claim, found the guard already live, released
+it — the tip would have added one offline analysis script and nothing else that
+web runs.
+
+**THE VERIFICATION IS THE REQUEST THAT KILLED THE SERVICE.** One POST of
+`{"question": "show me the board"}` — byte-identical to the shape that produced
+`oomKilled memoryLimit=2Gi` at 15:11 and 15:13, and byte-identical to what
+`scripts/watch_clamp_trigger.py:340` sends on its poll:
+
+    latency          28,235 ms  ->   3,785 ms      7.5x
+    decoded payload   64.98 MB  ->   32.53 MB      2.0x
+    wire (gzipped)           -  ->    4.01 MB
+    rows carried      3,927 x5  ->   3,932 x3
+
+Server-side, twice:
+
+    [intelligence] RESPONSE_SLIM_GUARD rows=3932 guard=2500
+                   dropped=['boardContract', 'by_sport', 'recommendations']
+
+**NO `oomKilled` AND NO `server_failed` SINCE 15:31:38Z.** Not proof on its own —
+the pre-guard cluster was 10-20 min apart and this window is comparable — but the
+mechanism is confirmed independently of the event count.
+
+**A CORRECTION I ALMOST SHIPPED AS A FINDING.** My first verification read
+`_response_slimmed_reason` at the TOP level, got `None`, and I was about to
+report that the guard had not fired. The payload nests under `response`; the
+markers were there all along (`_response_slimmed_rows=3932`). **The probe was
+wrong, not the code** — and a null read from the wrong nesting level looks
+exactly like a null read from a dead code path.
+
+**WHAT REMAINS TRUE AND UNCOMFORTABLE.** The response still carries the same
+~3,932 rows THREE times (`cards`, `ranked_all`, `top_opportunities`) for 32.53 MB.
+The guard removes the provable duplicates and nothing else — it makes the
+endpoint survivable, not efficient. Collapsing the remaining three into one is a
+real contract change and is NOT attempted here.
+
+**verify:** an unslimmed request no longer builds a 65 MB payload — **PASSING**,
+32.53 MB with `RESPONSE_SLIM_GUARD` in the log. The OOM cluster's actual cause is
+still NOT established; `/ncaaf/cards` was in flight at all three pre-probe kills
+and remains the leading correlate, relayed to `nfl-ncaaf-ui-parity` and not
+diagnosed by me.
