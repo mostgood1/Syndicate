@@ -2042,6 +2042,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   and every rule still reachable from `learnings_index.md` afterwards.
 - Files: `.syndicate/learnings.md`, `.syndicate/learnings_index.md`,
   `.syndicate/learnings_archive_2026-09-08.md` (NEW), `.syndicate/leads.md`,
+  `scripts/consolidate_learnings.py` (NEW),
   `scripts/build_learnings_index.py` **[ADDED 2026-09-08 mid-lane — an out-of-area
   write that SERVES the goal, which is `scope-guard`'s "goal" branch: verification
   item (4) requires every folded rule to stay reachable from the index, and the
