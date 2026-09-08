@@ -226,3 +226,121 @@ def test_subset_prefilter_never_changes_the_result_it_only_saves_work(tree):
     import fnmatch as fn
     expected = [p for p in full if fn.fnmatch(os.path.relpath(p, tree).replace("\\", "/"), subset)]
     assert sorted(narrowed) == sorted(expected)
+
+
+# --- the soundness sweep over the REAL pattern list ---------------------------
+# Contributed by lane `ncaaf-live-resim-wire`, who verified my `a0d02297` fix
+# independently rather than reading its docstring, and then pointed out that
+# every test above runs on a TOY pattern list. They were right: the shapes that
+# break a hand-written wildcard automaton are the awkward production ones.
+
+import fnmatch as fn
+import itertools
+
+from syndicate.features.shared.artifact_publisher import (
+    EXPORT_ONLY_ARTIFACT_PATTERNS,
+    HOT_ARTIFACT_PATTERNS,
+)
+
+# Fillers a real path segment can be. "" matters: `foo*.json` must be allowed to
+# produce `foo.json`, and a filter that assumes >=1 char is wrong in the same
+# direction as the original bug.
+_FILLERS = ("x", "mlb", "2026-09-07", "a_b-c", "", "wnba_source", "12")
+
+
+def _witnesses(pattern, cap=4):
+    """Concrete paths this GLOB pattern can produce.
+
+    Glob semantics, NOT fnmatch: `*` and `?` never cross '/'. A `[...]` class is
+    collapsed to its first literal member, so the witness stays a path the
+    pattern really produces -- substituting the class verbatim would forge a
+    witness and could fail this test on a CORRECT pre-filter.
+    """
+    out, i, literal = [], 0, []
+    while i < len(pattern):
+        ch = pattern[i]
+        if ch == "*":
+            literal.append(None)
+        elif ch == "?":
+            literal.append("y")
+        elif ch == "[":
+            close = pattern.find("]", i + 1)
+            if close == -1:
+                literal.append("[")
+            else:
+                body = pattern[i + 1:close]
+                if body.startswith("!"):
+                    body = body[1:]
+                    literal.append("0" if "0" not in body else "9")
+                else:
+                    literal.append(body[0] if body else "a")
+                i = close
+        else:
+            literal.append(ch)
+        i += 1
+
+    stars = sum(1 for c in literal if c is None)
+    combos = (itertools.product(_FILLERS, repeat=stars) if stars <= cap
+              else [("x",) * stars])
+    for combo in combos:
+        it = iter(combo)
+        w = "".join(next(it) if c is None else c for c in literal)
+        if "//" not in w and not w.endswith("/") and w:
+            out.append(w)
+    return out
+
+
+def test_no_PRODUCTION_pattern_is_dropped_for_a_subset_it_can_still_match():
+    """The soundness property, over the REAL 177 patterns rather than toys.
+
+    The regression that motivated this (`d5e4cc51`) was not a coding slip -- it
+    was a semantic mismatch between two wildcard languages, and it survived
+    review AND a unit test because the test encoded the same misreading as the
+    code. A toy pattern list cannot catch the next one: the shapes that break a
+    hand-written automaton are the awkward production ones -- a `[...]` class, a
+    literal `?`, an empty `*` expansion, a pattern whose star spans a '/' in the
+    SUBSET but not in itself.
+
+    So this asserts the only thing that actually matters, over every dropped
+    pattern: if a pattern can still produce a path the caller's `fnmatch` would
+    accept, dropping it is a WRONG ANSWER WITH NO ERROR.
+
+    Direction matters: this is a soundness test, not a completeness one. Keeping
+    a pattern that can never match only wastes work, and the caller's post-filter
+    still fixes the answer. Dropping one that can is unrecoverable.
+    """
+    all_patterns = list(HOT_ARTIFACT_PATTERNS) + list(EXPORT_ONLY_ARTIFACT_PATTERNS)
+    subsets = [
+        "wnba_source/*",                                  # the production failure
+        "mlb_source/*",
+        "*sim_input_report*",                             # leading star
+        "*.json",
+        "*_source/source_artifacts/data/processed/*",
+        "nfl_source/*.json",
+        "soccer_source/*/history/*",
+        "mlb_source/*/*/*/arsenal*",
+        "*recommendations*",
+        "?lb_source/*",                                   # literal ? in the subset
+        "*/*/*/*/*",
+        "nba_source/*.csv",
+    ]
+
+    unsound, checked = [], 0
+    for subset in subsets:
+        kept = set(patterns_that_can_match(all_patterns, subset))
+        for pattern in all_patterns:
+            if pattern in kept:
+                continue
+            for witness in _witnesses(pattern):
+                checked += 1
+                if fn.fnmatch(witness, subset):
+                    unsound.append((subset, pattern, witness))
+                    break
+
+    assert checked > 10_000, f"the sweep degenerated to {checked} witnesses"
+    assert not unsound, (
+        "a pattern was dropped for a subset it can still match -- the export "
+        "endpoint will return a SHORT ANSWER WITH NO ERROR, exactly as in "
+        f"d5e4cc51. First 3 of {len(unsound)}:\n" + "\n".join(
+            f"  subset={s!r} dropped={p!r} witness={w!r}" for s, p, w in unsound[:3])
+    )
