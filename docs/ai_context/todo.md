@@ -2,6 +2,51 @@
 
 ### `#647` — **TWO RENDER CRONS HAD NEVER HAD A GREEN RUN. Three unrelated defects, and TWO OF THE THREE LOOKED LIKE "main is red" when neither was** — lane `render-cron-failures`, 2026-09-08 — **FIXED, DEPLOYED AND MEASURED on 2 of 3; the pytest CAP is a guess awaiting its first finishing run**
 
+**UPDATE 2026-09-08 ~17:00Z — RESIDUAL 2 IS CLOSED, AND RESIDUAL 1'S DIAGNOSIS
+WAS WRONG.** Read this before the body below, which is superseded in one place.
+
+**Residual 2 (cron deploy locks) — DONE**, `96cc8cab`. `deploy_claim.py`,
+`deploy_preflight.py` and `deploy-guard.py` all handle `crn-` services now.
+NOT by adding three table rows: preflight's central question is answered from
+an `ALL_PROCESS_MEMORY` sample and a cron emits **0** of those (measured over a
+3h window containing a live 40-minute run; refresh-worker emitted 20), so ids
+alone would have made every cron preflight `UNKNOWN` forever. A gate that can
+never clear gets removed, and then the crons are unguarded again with the
+tooling claiming to cover them. `cron_run_in_flight()` asks the same question
+of `cron_job_run_started`/`ended` instead. Verified live, both directions:
+CLEAR idle, HOLD mid-run naming the run; guard BLOCKED on an unclaimed cron
+deploy where it used to print "ALLOWED unchecked". 125 passed, no regression.
+
+**Residual 1 — THE PYTEST STEP DOES NOT TIME OUT. IT IS OOM-KILLED AT 2Gi.**
+Measured 2026-09-08 on run `...-1788884287`: the step began 16:20:34Z and the
+container died 16:38:10Z with `{"oomKilled": {"memoryLimit": "2Gi"}}` — 1056s,
+well inside the 7200s cap. **The cap was never the binding constraint**; this
+morning's 3001s timeout was a symptom sitting on top of it, and raising the cap
+only let the run survive long enough to reach the real failure. Everything below
+about "what closes this is the DURATION" is therefore wrong about the mechanism.
+
+**And the partial-output print is INERT against an OOM**, which is the more
+generalisable half. It fires on `subprocess.TimeoutExpired`, when a killed CHILD
+can still be read; an OOM takes the whole container including the parent, so no
+handler runs — zero log lines across the entire 17.6 minutes, exactly as before.
+**The instrument I built only covers the failure mode I had already imagined**,
+which is `feedback-gate-on-the-output-not-the-input` in a new place.
+
+The memory ladder, since each trial costs a day if run on the schedule — xdist
+runs a CONTROLLER PLUS N workers, each holding a full app import:
+
+    -n auto   1 + cores   died first (the original OOM)
+    -n 2      3 imports   OOM at 2Gi, 1056s in
+    -n 1      2 imports   never tried
+    -n 0      1 import    in-process, the floor -- IN TRIAL as of 16:58Z
+
+`--pytest-workers 0` was applied to the cron's start command 2026-09-08 16:58Z
+`[user decision, after being shown the ladder]`. Confirmed locally that
+`-n 0 --dist=loadscope` is a valid invocation and genuinely in-process: `-n 2`
+prints `created: 2/2 workers`, `-n 0` prints no worker line at all.
+**UNMEASURED on Render as of this writing** — no run of this suite has ever
+completed on a cron at any worker count, so nothing here says `-n 0` fits.
+
 `sim-input-reports` (`0 7 * * *`) and `ci-suite` (`0 8 * * *`) failed every run
 from creation on 2026-09-07. Fixed in `5d97601f`, deployed as `85a36f3c`, both
 live 16:14:5xZ. Full working in `.syndicate/deploys.md`; the two residuals are
