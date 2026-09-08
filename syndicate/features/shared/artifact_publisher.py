@@ -483,6 +483,16 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # after the first period-total reads zero.
     "wnba_source/data/processed/recon_quarters_*.csv",
     "wnba_source/source_artifacts/data/processed/recon_quarters_*.csv",
+    # `linescores_<date>.json` is the per-quarter sidecar `build_wnba_boxscores`
+    # writes beside the final box (2026-09-08, lane restore-measurement) and the
+    # ONLY thing `bet_status_wnba` grades a q1..q4/h1/h2 segment order from. The
+    # path is one spelling, `bet_status_wnba.linescores_relative_path`, imported
+    # by the producer. Settlement reads it worker-local, so grading does not
+    # need this entry; export/mirroring does, and an absent entry would make the
+    # sidecar invisible from web while the grader quietly used it. Dated glob,
+    # same shape as `boxscores_2*` above, so no history file can match.
+    "wnba_source/data/processed/linescores_2*.json",
+    "wnba_source/source_artifacts/data/processed/linescores_2*.json",
     # Same set again, one directory shallower: some sports (confirmed for WNBA)
     # write their processed artifacts straight to "<sport>_source/data/processed/"
     # rather than nesting under a "source_artifacts" nested root, so the patterns
