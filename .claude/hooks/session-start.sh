@@ -49,29 +49,38 @@ over_note() {  # $1=label  $2=cap  $3=text
   return 0
 }
 
-# --- Open lanes: slug and goal only, hard-capped ---
-LANES=""
+# --- Open lanes: a CENSUS, not a truncated sample ---
+#
+# WHAT THIS REPLACED AND WHY, measured 2026-09-08. This block used to emit lane
+# headers and Goal lines, then cut them to LANE_CAP=600 bytes. The section was
+# **31,404 bytes**, so a starting session was shown **1.9% of the state** -- the
+# first three lanes in FILE order -- and the other 50 were invisible. A
+# truncated sample reads as the whole; that is the failure this whole file
+# exists to prevent, and it was sitting in the file's own lane section.
+#
+# You cannot defer a lead to a lane you cannot see, and you cannot avoid a
+# collision with a lane you were never shown. A count is strictly more
+# informative than an arbitrary sample of the same budget, and costs ~126 bytes
+# against 600 -- which also buys back headroom on a body that was overflowing
+# BUDGET (1945 > 1800) at the time this changed.
+#
+# THE AWK THAT USED TO LIVE HERE IS GONE, deliberately, and not just because it
+# was unused. It carried its OWN openness test (a third one, after `lane_claims`
+# and the digest's own greps) and had been wrong twice: v3 required a literal
+# " — OPEN" and rejected the live lane "— DEPLOYED, MEASUREMENT OPEN —",
+# under-reporting 2 -> 1; v2's bare /OPEN/ counted "NO LANE WAS EVER OPENED" as
+# open. `scripts/lane_census.py` mirrors `lane_claims._claims()` header for
+# header, so the digest and `lane-guard` now answer this question the same way
+# -- "a second tool answering the same question differently is worse than no
+# second tool" (`pending_deploys.py`, quoted in `lane_claim_audit.py`).
+#
+# FAILS OPEN like every other python call in this file: no python, a missing
+# script or a crash leaves the line off rather than blocking a session.
+CENSUS=""
 if [ -f .syndicate/lanes.md ]; then
-  # Status is the field between the 1st and 2nd em-dash, and it is FREE TEXT.
-  # v3 required a literal " — OPEN", which rejected the live lane
-  # "— DEPLOYED, MEASUREMENT OPEN —" and under-reported open lanes 2 -> 1.
-  # v2's bare /OPEN/ had the opposite failure, counting "NO LANE WAS EVER
-  # OPENED" as open. Match the WORD within the status field only: the
-  # (^|[^A-Za-z])OPEN([^A-Za-z]|$) form is a portable word boundary, since
-  # \b/\y are not consistent across awk implementations.
-  LANES_RAW=$(awk '
-    /^###[[:space:]]/ {
-      st = $0
-      if (sub(/^###[^—]*—[[:space:]]*/, "", st)) {
-        sub(/—.*$/, "", st)
-        open = (st ~ /(^|[^A-Za-z])OPEN([^A-Za-z]|$)/) ? 1 : 0
-      } else {
-        open = 0
-      }
-    }
-    open && /^###[[:space:]]/ { print; next }
-    open && /^-[[:space:]]*Goal:/ { print "   " $0 }
-  ' .syndicate/lanes.md 2>/dev/null)
+  if command -v python >/dev/null 2>&1 && [ -f scripts/lane_census.py ]; then
+    CENSUS=$(python scripts/lane_census.py --digest 2>/dev/null | head -c "$LANE_CAP")
+  fi
 
   # A "### " header with no em-dash has no parseable status and is NOT counted
   # as open. That is the permissive direction, so it has to be visible: this
@@ -79,8 +88,6 @@ if [ -f .syndicate/lanes.md ]; then
   H=$(grep -c '^###[[:space:]]' .syndicate/lanes.md 2>/dev/null || echo 0)
   P=$(grep -cE '^###[[:space:]][^—]*—' .syndicate/lanes.md 2>/dev/null || echo 0)
   UNPARSED=$(( ${H:-0} - ${P:-0} ))
-  NOTES="${NOTES}$(over_note "OPEN LANES" "$LANE_CAP" "$LANES_RAW")"
-  LANES=$(printf '%s' "$LANES_RAW" | head -c "$LANE_CAP")
 fi
 
 # --- Standing rules: headings only, never bodies ---
@@ -149,7 +156,8 @@ add ""
 
 if [ -f .syndicate/lanes.md ]; then
   add "--- OPEN LANES ---"
-  add "${LANES:-(none)}"
+  add "${CENSUS:-(census unavailable)}"
+  add "Full list: py -3 scripts/lane_census.py  —  a lead is NOT a lane: /lead \"<one line>\""
   [ "${UNPARSED:-0}" -gt 0 ] && add "(${UNPARSED} lane header(s) have no parseable status and are NOT guarded)"
   add ""
 fi

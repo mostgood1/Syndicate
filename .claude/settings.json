@@ -104,6 +104,18 @@
             "shell": "bash"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scope-guard.py ]; then python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scope-guard.py; else echo \"WARN: scope-guard.py is MISSING -- this guard is NOT running. Sync the tree (.claude/hooks/ may be mid-update).\" >&2; fi",
+            "timeout": 10,
+            "statusMessage": "Checking this write against the lane's declared scope...",
+            "shell": "bash"
+          }
+        ]
       }
     ]
   }

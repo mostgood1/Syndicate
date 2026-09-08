@@ -24,6 +24,38 @@ Write this session to disk. Assume the context window dies immediately after.
    append a second `### <slug>` block.** Rewrite the header's status field and
    any lines that changed. One lane, one block.
 
+   **THE FIRST LINE OF THE REWRITTEN BLOCK IS THE GOAL VERDICT.** Restate the
+   lane's `- Goal:` **verbatim** — copy it, never paraphrase it, because a
+   paraphrase drifts toward whatever you actually did — then exactly one of:
+
+   - `GOAL: MET` — the lane's own Verification ran. Name the reading, not the
+     intention. (`learnings.md`: never claim a fix works without a measurement.)
+   - `GOAL: NOT MET` — still the goal, not yet reached. Say what is left and
+     what is blocking it.
+   - `GOAL: DRIFTED` — the session's work went somewhere else. Name where it
+     went, and say whether that got its own lane. If it did not, open one now
+     or state explicitly that the lead is being dropped and why.
+
+   **`DRIFTED` IS NOT A FAILURE VERDICT.** It is the only one that makes the
+   next session's pickup honest, and the only one that turns drift from a
+   feeling into a number. Recording it costs nothing; omitting it is how a lane
+   ends up OPEN and UNOWNED with its goal unstated and unmet.
+
+   **WHY, measured 2026-09-08 on `origin/main`** (not on the checkout — the
+   primary tree was 429 commits behind): **47 OPEN lane blocks, 22 UNOWNED**,
+   and **21 of the 47 carry no date newer than 2026-09-01** — open, and
+   untouched for a week. Deferral runs about **1 lead in 4.5** (9 explicit
+   defers against 41 `findings_*.md`, 18 of which no lane references at all).
+   Nothing in the ledger had ever written a goal down next to its outcome, so
+   the drift rate was unmeasurable and stayed a feeling. The worked example is
+   lane `profitable-buckets` (2026-09-08), opened *because* the work kept
+   deviating: *"Each hop was locally justified and the sum was deviation."*
+
+   The write-time half of this is `.claude/hooks/scope-guard.py`, which names a
+   write outside the lane's declared `Files:` areas, once per area. It only
+   sees the file system — drift **within** a declared area is invisible to it,
+   and this verdict is the only instrument that catches that.
+
    **`lanes.md` carries STATUS. The narrative already went in step 2** — the
    daily log is where "what changed, what was verified, what is believed" lives,
    and duplicating it here is what makes this file grow. If a superseded block

@@ -1831,6 +1831,178 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Findings, in the order they were forced: `findings_2026-09-08_bucket_realised_performance.md` (rows-vs-games: +21σ → +2.93σ on the same data), `findings_2026-09-08_spreads_edge_is_stale_quotes.md` (the survivor was stale quotes; the model has the score, the book's quote does not), `findings_2026-09-08_totals_baseline_not_resolution.md` (the de-vig is ~0.50 whatever the line is — the baseline was wrong, not the outcome resolution, and this invalidates spreads too).
 - Blocked by: data accumulation only.
 
+### session-scope-drift-guard — OPEN — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea99184 — **47 OPEN lanes, 22 of them UNOWNED: nothing in this repo checks a write against the CURRENT lane's own declared scope**
+- **GOAL, verbatim:** *"a session that writes outside its lane's declared `Files:`
+  areas is told so, once per area, in the same turn — and `/checkpoint` records
+  the lane Goal against a MET / NOT MET / DRIFTED verdict, so drift becomes a
+  number instead of a feeling."*
+  **`GOAL: MET`** `[2026-09-08]` — both halves built, wired and measured. This is
+  the first block written under the verdict rule the lane itself added, so it is
+  also the format's own first use.
+  - **Write-time half:** `.claude/hooks/scope-guard.py`, wired as a PostToolUse
+    hook on `Edit|Write|MultiEdit|NotebookEdit` in `.claude/settings.json`
+    (validated: `json.load` parses, 2 matchers, 3 hooks). Exit 2 carries the text
+    to the model, the same convention as its PostToolUse siblings; the write has
+    already happened, so it CANNOT block.
+  - **Checkpoint half:** `.claude/commands/checkpoint.md` step 4 now requires the
+    Goal verbatim plus MET / NOT MET / DRIFTED. Placed INSIDE step 4 rather than
+    as a new step, because `checkpoint-guard.py`'s docstring cites "step 7" by
+    number and renumbering would break that reference.
+  - **READINGS.** `test_scope_guard.py` **30/30**. Live against the REAL ledger
+    and this lane: out-of-area path → `rc=2` printing this Goal verbatim; replay
+    → `rc=0`; a second new area → `rc=2`. Siblings unbroken: 177 assertions green
+    across 8 hook suites. `check_lane_claims.py` lists this lane's 4 claims as
+    informational (`.claude/` is never lane-guarded), not `[BAD]`.
+  - **THE SUITE WAS PROVEN ABLE TO FAIL** before it was trusted: mutating `_say`
+    to `return 0` (inert guard) turned exactly the 6 must-warn return-code
+    assertions red, 21/6. Restored byte-identical against a backup (`diff` empty).
+- **TWO DEFECTS THE LIVE RUN FOUND THAT THE UNIT TESTS DID NOT**, both failing
+  toward SILENCE, which is the direction that matters for a guard:
+  1. **A non-ASCII goal killed the guard.** Every lane header here is em-dash
+     delimited by the ledger's own rule, so goals routinely carry U+2014; writing
+     one to a cp1252 console raises `UnicodeEncodeError`, which `__main__`'s
+     fail-open `except` turns into exit 0. The guard would have gone quiet on
+     exactly the lanes that follow the house style — including this one. Fixed by
+     reconfiguring stderr to `utf-8/replace`; regression test added.
+  2. **A `relpath` escape fired with a garbage area.** A Git Bash `/c/Users/...`
+     cwd against a Windows-Python `abspath` produced
+     `../../../../../c/Users/.../mlb`, which would then be written into the
+     once-per-area slot — silencing the REAL area of that name for the session.
+     Now returns 0 when `rel` escapes the tree; regression test added.
+  Both were invisible to 27 green unit tests and appeared on the first run
+  against the real ledger. `learnings.md` 2026-09-05: a fixture can pick a
+  cheaper path than production and the failure looks like a good result.
+- Goal: a session that writes outside its lane's declared `Files:` areas is told
+  so, once per area, in the same turn — and `/checkpoint` records the lane Goal
+  against a MET / NOT MET / DRIFTED verdict, so drift becomes a number instead of
+  a feeling. User request 2026-09-08: "it feels like every session that has an
+  objective ends up drifting".
+- Files: `.claude/hooks/scope-guard.py` (NEW), `.claude/hooks/test_scope_guard.py`
+  (NEW), `.claude/settings.json`, `.claude/commands/checkpoint.md`
+- Hypothesis: n/a — not diagnostic. The measurement, **re-derived on `origin/main`,
+  not on this checkout**: 47 OPEN lane blocks, 22 UNOWNED on the header line (25
+  if body markers count), and 21 of the 47 with no date newer than 2026-09-01.
+  Deferral rate 9 instances against 41 `findings_*.md`, ~1 lead in 4.5; 18 of 54
+  findings/handoff files referenced by no lane. `learnings.md` (4,081 lines) has
+  NO rule on drift, and `syndicate-engineer` has ZERO recorded invocations.
+- **CORRECTION, and it is the same trap `render-cron-failures` hit today.** My
+  first numbers came from the primary tree, which is **429 commits behind**
+  `origin/main` (70 header blocks vs origin's 52). The OPEN count survived at 47
+  by luck; CLOSED did not (local 11, origin 4). The 2026-09-06 same-day-closure
+  cluster I first cited as the worked example (`vendor-*`, `web-oom-*`) exists in
+  NEITHER `lanes.md` nor `lanes_closed.md` on origin — pulled from the guard
+  rather than softened. Read the ledger with
+  `MSYS_NO_PATHCONV=1 git show origin/main:.syndicate/lanes.md`.
+- **THE MECHANISM** is stated by lane `profitable-buckets` (opened today, header:
+  "Opened because the work kept deviating into sim internals — user"): *"Each hop
+  was locally justified and the sum was deviation."* No hop is catchable by
+  judgement; only the sum is wrong, and nothing watches the sum. That lane's
+  hand-written ANTI-DRIFT RULE is a session solving this in prose by willpower —
+  which is what this lane converts into a mechanism. **It is UNPUSHED (origin has
+  neither the lane nor the rule); an unpushed rule is not a shared rule.**
+- **THE GUARD THAT ALREADY EXISTS — located BEFORE building, per `learnings.md`
+  2026-09-07 FORBIDDEN.** `lane-guard.py:187` fires only on `is claimed by OPEN
+  lane '<conflict>'`; `lane-postwrite-check.py` is the shell-write sibling of that
+  same predicate. `current_lane()` has exactly two non-test consumers
+  (`lane-guard.py:124`, `lane-postwrite-check.py:149,264`) and BOTH use it only to
+  exclude yourself from other-lane conflict detection. The five audit scripts
+  (`check_lane_claims`, `check_lane_invariants`, `lane_identity_check`,
+  `lane_claim_audit`, `audit_lane_unguarding`) all answer ledger-COHERENCE
+  questions. A write to a file no lane claims is free — by design, and stated as a
+  non-goal in `lane-postwrite-check`'s own docstring. Nothing answers "is this
+  write serving the goal I declared".
+- Falsification test: if the guard fires on legitimate in-goal edits more often
+  than on genuine area changes, the area rule is wrong and the guard is noise —
+  this repo has already lost two guards to exactly that, and `checkpoint-guard`'s
+  docstring is the standing statement of why ("a warning that fires every time
+  carries no information").
+- Verification: (1) `test_scope_guard.py` green, covering the once-per-area
+  contract in BOTH directions — a first edit in a new area speaks, a second edit
+  in that same area is silent; (2) a synthetic PostToolUse payload naming an
+  out-of-area path returns rc=2 and prints the lane's Goal verbatim; (3) the same
+  payload replayed returns rc=0.
+- Blocked by: none. `.claude/` is EXEMPT from lane-guard (`lane_claims.is_exempt`),
+  so no collision is possible on these paths — checked 2026-09-08 by grep for
+  `.claude/`, `hooks/`, `commands/` over every OPEN lane's claims.
+### lead-deferral-and-lane-census — OPEN — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea99184 — **following a lead costs 0 and deferring one costs 7 collision-checking steps; and session start shows 600 B of a 31,404 B open-lane section, i.e. 1.9% of the state**
+- **GOAL, verbatim:** *"(a) deferring a lead costs ONE command and no ceremony, so
+  that deferring is cheaper than following — the gradient, not the exhortation, is
+  the fix; and (b) session start reports the TRUE SIZE of the open-lane population
+  instead of an arbitrary 1.9% sample of it."*
+  **`GOAL: MET`** `[2026-09-08]` — both clauses. **But one of this lane's own four
+  Verification items is NOT met, and it is not cosmetic — see below.**
+  - **(a) `/lead`** — `.claude/commands/lead.md` + `.syndicate/leads.md` (NEW).
+    One line, no slug, no collision check, no `Files:`, no verification design.
+    It writes to `leads.md` and is FORBIDDEN from touching `lanes.md`, so a
+    deferred lead cannot inflate the open-lane population or the claim set
+    `lane-guard` enforces. Registered and live as a slash command.
+  - **(b) THE CENSUS** — `scripts/lane_census.py` (NEW), called from
+    `session-start.sh`. Mirrors `lane_claims._claims()` header for header, so the
+    digest and `lane-guard` cannot disagree. Reports `origin/main` alongside the
+    worktree and prints `TREE N BEHIND`.
+  - **THE GRADIENT IS WIRED, which is the part that matters.** `scope-guard` now
+    offers `/lead` as the cheap path instead of `/lane open`; `/lane open` opens
+    with "is this a LEAD rather than a lane?"; `/lane list` delegates to the
+    census. A warning that names only the expensive option is just a reprimand.
+- **READINGS.**
+  - **Same-instant A/B on one `lanes.md`:** raw open-lane section **32,093 B**;
+    OLD emitted **600 B showing 3 of 53 lanes** (1.9%, remainder dropped in
+    silence); NEW emitted **211 B counting all 53**. **389 B saved and the
+    truncation note is gone.**
+  - **Two independent implementations agree** on `origin/main`: the old awk
+    openness logic and `lane_census.py` both return **51 OPEN / 26 UNOWNED**.
+  - `test_scope_guard.py` **31/31** (a test now pins that the guard names
+    `/lead`). All 9 hook suites green, **208 assertions**.
+  - `bash -n session-start.sh` clean; the digest emits the census line.
+- **VERIFICATION ITEM (2) IS NOT MET — STATED, NOT PAPERED OVER.** It required
+  the census to emit AND *"its total body shrinks below BUDGET=1800"*. The census
+  emits; the body is **1911 B**. The lane section shrank by 389 B and other
+  sections consumed it, so **the digest tail is still cut**. The 1.9% lane sample
+  is fixed; the digest's overflow is NOT, and calling this lane's goal met does
+  not mean the digest is now lossless. Recorded as an open lead.
+- **A COUNTING DEFECT FOUND WHILE BUILDING THIS, which changes an earlier number
+  in this ledger.** The open-lane population is **53 (worktree) / 51 (origin)**,
+  not the 47 reported earlier today. Three separate counts disagreed: a
+  `grep '— OPEN'` returned 47 because it misses bold `**OPEN` headers; a prose
+  reading returned 47 by treating three lanes as closed; the parser returns 53.
+  **`layer2-cap-raise`, `accuracy-ledger-budget-raise` and `ncaaf-live-resim-wire`
+  say `— OPEN` in their status field while their header prose says they are done,
+  and `lane-guard` is still enforcing their claims.** The parser is authoritative
+  because it is the one the guard uses. Recorded as an open lead.
+- Goal: (a) deferring a lead costs ONE command and no ceremony, so that deferring
+  is cheaper than following — the gradient, not the exhortation, is the fix; and
+  (b) session start reports the TRUE SIZE of the open-lane population instead of
+  an arbitrary 1.9% sample of it.
+- Files: `.claude/commands/lead.md` (NEW), `.syndicate/leads.md` (NEW),
+  `scripts/lane_census.py` (NEW), `.claude/hooks/session-start.sh`,
+  `.claude/hooks/scope-guard.py`, `.claude/commands/lane.md`
+  (collision-checked 2026-09-08 with `lane_claims.matches()` over every OPEN
+  lane's claims: all six free)
+- Hypothesis: n/a — not diagnostic. Follows `session-scope-drift-guard`, which
+  built the DETECTION half. Detection without a cheap alternative just tells a
+  session it is drifting and leaves the expensive path as the only one.
+- **THE TOOL THAT ALREADY EXISTS — located BEFORE building, per `learnings.md`
+  2026-09-07 FORBIDDEN.** `/lane list` is model instructions in
+  `.claude/commands/lane.md`, not a script, so nothing computes a census today.
+  The nine lane scripts all answer other questions;
+  `release_phantom_lane_claims.py` is the near miss — it finds lanes whose
+  owning session is GONE (measured 2026-08-29: 26 OPEN lanes holding 107 claims
+  against 3 live sessions) but RELEASES CLAIMS and deliberately reports no
+  census, because "an UNOWNED lane is still a record of owed work".
+- Falsification test: if the census line does not FIT — the digest body is
+  already over budget at 1945 B against BUDGET=1800 — then replacing 600 B of
+  lane bodies with a census must MEASURABLY SHRINK the digest, or this trades
+  one truncation for another. The reading is the digest byte count before and
+  after, and it must go DOWN.
+- Verification: (1) `lane_census.py`'s counts equal an independent count taken
+  from `origin/main` in a separate process; (2) the session-start digest emits
+  the census line AND its total body shrinks below BUDGET=1800; (3) `/lead`
+  appends a lead to `.syndicate/leads.md` without touching `lanes.md`, so it
+  cannot inflate the lane population or the claim set; (4) `test_scope_guard.py`
+  still 30/30 after the guard's message changes.
+- Blocked by: none. `scripts/lane_census.py` is the only path outside the
+  lane-guard exemption and no OPEN lane claims it.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

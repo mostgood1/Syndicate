@@ -9,6 +9,16 @@ Manage work lanes in `.syndicate/lanes.md`.
 Request: `$ARGUMENTS`
 
 ## open
+
+**FIRST: is this a LEAD rather than a lane?** A lead is something you noticed
+while working on something else. It gets `/lead "<one line>"` and nothing more —
+no slug, no collision check, no `Files:`, no verification design. Everything
+below is the ceremony a real objective earns; spending it on a lead is how a
+session ends up owning work it never meant to take. **53 open lanes and 27
+UNOWNED (2026-09-08) is what the wrong answer to this question accumulates
+into.** A lane is warranted when the work has its own testable outcome and you
+intend to reach it now.
+
 1. Read `.syndicate/lanes.md` and `.syndicate/learnings.md`.
 2. Determine the file set this lane will touch. Grep if unsure — do not guess.
 3. Check for collisions against every OPEN lane. If any file overlaps, STOP
@@ -85,8 +95,20 @@ Request: `$ARGUMENTS`
    not write a NEW value into it.
 
 ## list
-Show OPEN lanes only, one line each: slug, goal, files, blocker.
-Then flag any lane open more than 48h without a checkpoint.
+Run `py -3 scripts/lane_census.py` and report what it prints. It computes the
+census with `lane_claims._claims()`'s OWN header logic, so it cannot disagree
+with what `lane-guard` enforces — and it reads `origin/main` as well as the
+worktree, which matters because the primary tree was **435 commits behind** on
+2026-09-08 and a census taken from it describes a tree nobody else has.
+
+Do NOT hand-count from `lanes.md`. Measured 2026-09-08: a `grep '— OPEN'` over
+the same file returned **47** against the parser's **53**, because it missed
+bold `**OPEN` headers — and a prose reading returned 47 a third way, by counting
+three lanes as closed whose status field still says OPEN and whose claims
+`lane-guard` is still enforcing.
+
+Then flag any lane open more than 48h without a checkpoint (the census marks
+these `quiet Nd`).
 
 ## block
 Mark the lane BLOCKED with the reason and what would unblock it.
