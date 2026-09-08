@@ -2185,3 +2185,37 @@ t=17.2), not a live-path fault, and the board withholds the projection for it.
 `as_of`**. Six back-to-back reads at 00:16:1xZ all agreed on one snapshot, so it
 is not a stable two-instance split. Single observation, cause unknown, not
 chased. Worth a second look if a live probability is ever seen to un-move.
+
+
+## [nfl-season-open-date] THE 09-09 vs 09-10 DISAGREEMENT IS A TIMEZONE, NOT AN ERROR — READ 2026-09-07 `[lane soccer-unfed-inputs]`
+
+**NFL 2026 opens 2026-09-09, Wednesday, 20:20 local — NE @ SEA, Lumen Field.**
+Read from PRODUCTION (`nfl_source/schedule_2026.csv` via the artifacts export,
+272 REG rows, 16 in week 1), not from the git mirror.
+
+Both sources that "disagreed" are correct and describe the same kickoff:
+
+    schedule_2026.csv  gameday 2026-09-09 20:20   LOCAL (PDT, UTC-7)
+    OddsAPI capture    commence_time 2026-09-10   UTC
+    20:20 PDT + 7h  =  03:20 UTC the next day
+
+`fetch_nfl_preseason_odds.py:230` records "272 events whose commence_time ran
+2026-09-10..2027-01-10" and production's schedule has **exactly 272 REG rows** —
+the same set, stamped on two clocks. Nobody was wrong; the comparison was.
+
+**Week-1 gamedays: 2026-09-09, 09-10, 09-13, 09-14.** The 09-10 game is real but
+is the SECOND one — SF @ LA at Melbourne Cricket Ground, an international
+fixture — so "the second game's date" and "the UTC date of the first" coincide
+here, which is exactly the coincidence that makes this look like a data error.
+
+**HOW TO APPLY:** a schedule date and an odds `commence_time` are not
+comparable without naming the clock. This is the same class as the standing rule
+about reporting local time rather than UTC, and here it nearly cost a
+verification window planned around the wrong day. Any "the sources disagree by
+one day" finding on a late-evening fixture should be checked for a UTC rollover
+before it is treated as a defect.
+
+**For the NFL live re-sim:** the first game it could possibly price is
+2026-09-09 20:20 PDT / 2026-09-10 03:20 UTC. There is no live NFL game before
+then, so no verification window exists earlier, regardless of which clock a
+reader is using.
