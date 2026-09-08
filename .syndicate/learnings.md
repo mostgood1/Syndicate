@@ -3811,3 +3811,46 @@ backstop was kept.
 the optimisation, and make the undecidable case fall to the recoverable side.
 Reinforces [[feedback_unknown_must_not_default_permissive]] — same rule, opposite
 polarity: the safe default is whichever side a downstream check can still fix.
+
+## 2026-09-07 - FORBIDDEN: reporting a null result without checking the sampled population COULD have produced a non-null one.
+
+**What happened.** I called `/api/ops/live-lens/snapshot-index?sport=mlb`,
+printed the first three games, saw `modelHomeWinProb: null, source: null` on
+every `first1/first3/first5` lane, and concluded **"MLB's segment lanes are
+EMPTY -- not filtered, not imprecise, absent."** I put that in a commit message
+on `main` (`70622e0b`) and told the user I was retracting a *correct* earlier
+statement in its favour. Retracted in `305f2d74`.
+
+**All three sampled games were FINAL**, and `_build_game_lens` returns `[]` for
+a final game -- so those lanes came from `_live_lens_segments_from_card`, which
+has no `source` and no `modelHomeWinProb` **by construction**. The population I
+sampled could not have produced a non-null answer no matter what the system did.
+`prop_status_text: "final final"` was in the payload I had already fetched.
+
+**On live games the lanes are populated:** gamePk 823902 `first5 0.3242,
+first7 0.2991`; 823175 `first7 0.6511`, with the Nones monotone in segment
+length -- `_segment_projection`'s `closed` flag working correctly.
+
+**Why this is its own rule and not just [[instrument_blindness]].** That rule
+says a healthy reading is evidence only once you know what makes it read
+unhealthy. This is the inverse and the more dangerous direction: an ABSENT
+reading was taken as evidence of absence, when the sampling frame guaranteed
+absence. It also compounded [[read_the_field_you_already_have]] -- the
+discriminating field was on screen -- and produced a **retraction of a true
+statement**, which is worse than the original error: the user had been told
+something correct and I replaced it with something false, confidently.
+
+**How to apply.**
+- Before reporting any null/zero as a property of the system, state the
+  population and show it contains at least one case that COULD have been
+  non-null. If it cannot, the reading is about the sample, not the system.
+- For live-state endpoints, FILTER TO LIVE before drawing conclusions. `live`,
+  `final` and `pregame` rows are produced by different code paths here, and
+  final rows are built by a path that has no live fields at all.
+- Never sample "the first N" of a heterogeneous payload. Group by the state
+  field first, then look.
+- A retraction is not free. Re-derive before overturning something you already
+  told the user was true -- [[retraction_is_not_innocence]] runs both ways.
+
+Related: [[instrument_blindness]], [[read_the_field_you_already_have]],
+[[absence_in_a_window_is_not_absence]], [[a_projection_is_not_a_model_edge]].
