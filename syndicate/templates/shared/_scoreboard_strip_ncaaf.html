@@ -111,7 +111,18 @@
               {% if game.away.logo_url %}
                 <img class="cards-strip-pregame-crest" src="{{ game.away.logo_url }}" alt="" loading="lazy" />
               {% else %}
-                <span class="cards-strip-pregame-crest cards-strip-pregame-crest--text">{{ game.away.abbr }}</span>
+                {#- A SPACER, NOT THE ABBREVIATION. This printed the abbr,
+                    and the team span two lines down prints it again -- so a
+                    team with no crest rendered "LA LA 25.1". Latent in NCAAF
+                    (102/102 crests, so it never fired) and made visible by
+                    NFL, whose branding snapshot is keyed `LAR`/`WSH` while the
+                    projection says `LA`/`WAS`. That lookup is fixed in
+                    `nfl/cards.py:_resolve_branding`; this is the OTHER half,
+                    because the fallback must still be correct the next time a
+                    team genuinely has no logo. Aria-hidden and empty: it holds
+                    the crest column's width so the two rows stay aligned, and
+                    says nothing a screen reader would hear twice. -#}
+                <span class="cards-strip-pregame-crest cards-strip-pregame-crest--text" aria-hidden="true"></span>
               {% endif %}
               <span class="cards-strip-pregame-team">{{ game.away.abbr }}</span>
               {% if show_score %}
@@ -124,7 +135,18 @@
               {% if game.home.logo_url %}
                 <img class="cards-strip-pregame-crest" src="{{ game.home.logo_url }}" alt="" loading="lazy" />
               {% else %}
-                <span class="cards-strip-pregame-crest cards-strip-pregame-crest--text">{{ game.home.abbr }}</span>
+                {#- A SPACER, NOT THE ABBREVIATION. This printed the abbr,
+                    and the team span two lines down prints it again -- so a
+                    team with no crest rendered "LA LA 25.1". Latent in NCAAF
+                    (102/102 crests, so it never fired) and made visible by
+                    NFL, whose branding snapshot is keyed `LAR`/`WSH` while the
+                    projection says `LA`/`WAS`. That lookup is fixed in
+                    `nfl/cards.py:_resolve_branding`; this is the OTHER half,
+                    because the fallback must still be correct the next time a
+                    team genuinely has no logo. Aria-hidden and empty: it holds
+                    the crest column's width so the two rows stay aligned, and
+                    says nothing a screen reader would hear twice. -#}
+                <span class="cards-strip-pregame-crest cards-strip-pregame-crest--text" aria-hidden="true"></span>
               {% endif %}
               <span class="cards-strip-pregame-team">{{ game.home.abbr }}</span>
               {% if show_score %}

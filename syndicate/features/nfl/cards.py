@@ -32,6 +32,7 @@ from syndicate.features.shared.football_cards import format_kickoff_label
 from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.market_inventory import join_odds_to_sim
+from syndicate.features.shared.team_aliases import canonical_team
 from syndicate.features.shared.team_branding import read_team_branding_snapshot
 
 
@@ -123,7 +124,41 @@ def _team_branding_index() -> dict[str, Any]:
 
 
 def _resolve_branding(team_name: str) -> Any | None:
-    return _team_branding_index().get(_normalize_branding_key(team_name))
+    """Branding row for a team token, resolving nflverse codes to ESPN ones.
+
+    THE SNAPSHOT AND THE PROJECTION SPEAK DIFFERENT VOCABULARIES, and this is
+    the SECOND time that has cost something. `nfl_team_branding.csv` is keyed
+    the way ESPN writes abbreviations -- `LAR`, `WSH` -- while the smartsim2
+    projection artifact carries nflverse's, which are `LA` and `WAS`. All 32
+    teams are in the file; two of them were simply unreachable by the name the
+    card asks with.
+
+    MEASURED ON PRODUCTION 2026-09-08, the served `/nfl/cards` compact strip:
+    **30 of 32 crest rows** carried an `<img>`; the two that fell back to text
+    were exactly `LA` and `WAS`. NCAAF is 102/102 on the same surface, so this
+    was a real parity shortfall and not a cosmetic one. `brokenImgs` was 0 --
+    no URL was wrong, the lookup just never got that far.
+
+    `state.md [nfl-board-projection-coverage]` records the identical alias gap
+    biting the PROJECTION join a week ago ("nflverse writes the Rams `LA`;
+    `_NFL_ALIAS_TO_NAME` knew only `LAR`", and `WAS` not `WSH`). That was fixed
+    in `team_aliases`, and this call site was never routed through the fix --
+    which is `#334`'s lesson exactly: fix the choke point every caller shares,
+    or the ones you did not look at keep the old behaviour.
+
+    SO THIS ADDS NO SECOND TABLE. `canonical_team` is the one map, it already
+    resolves all four spellings, and it takes a tri-code or a full name in
+    either direction. A private copy here is the drift that module exists to
+    prevent.
+    """
+    index = _team_branding_index()
+    direct = index.get(_normalize_branding_key(team_name))
+    if direct is not None:
+        return direct
+    canonical = canonical_team("nfl", team_name)
+    if not canonical:
+        return None
+    return index.get(_normalize_branding_key(canonical))
 
 
 def _format_game_date(value: Any) -> str:

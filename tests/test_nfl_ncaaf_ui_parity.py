@@ -48,6 +48,7 @@ from syndicate.features.nfl import cards as nfl_cards  # noqa: E402
 from syndicate.features.nfl import live_lens as nfl_live_lens  # noqa: E402
 from syndicate.features.nfl import preseason_cards as nfl_preseason_cards  # noqa: E402
 from syndicate.features.nfl.live_game_state import attach_nfl_live_game_state  # noqa: E402
+from syndicate.features.shared.team_aliases import canonical_team  # noqa: E402
 from syndicate.features.shared.football_cards import (  # noqa: E402
     cover_probability,
     football_market_tiles,
@@ -249,6 +250,41 @@ def test_a_football_variant_without_a_card_block_falls_back_rather_than_renderin
     html = _env().get_template("shared/_game_card_ncaaf.html").render(game=game)
     assert "cards-game-card" in html
     assert "Lumen Field" not in html
+
+
+def test_every_nfl_team_resolves_to_a_crest_through_the_canonical_alias_map():
+    """THE SNAPSHOT AND THE PROJECTION SPEAK DIFFERENT VOCABULARIES.
+
+    `nfl_team_branding.csv` is keyed the way ESPN writes abbreviations (`LAR`,
+    `WSH`); the smartsim2 projection artifact carries nflverse's (`LA`, `WAS`).
+    All 32 teams were in the file and two were unreachable by the name the card
+    asks with -- measured on the served `/nfl/cards` compact strip 2026-09-08 as
+    **30 of 32** crest rows, the misses being exactly `LA` and `WAS`, with zero
+    broken image URLs. NCAAF is 102/102 on the same surface.
+
+    Pinned through the PUBLIC resolver, not a private copy: `canonical_team` is
+    the one map and it already knew all four spellings -- the branding call site
+    simply never went through it.
+    """
+    for code, expected in (("LA", "los angeles rams"), ("WAS", "washington commanders"),
+                           ("LAR", "los angeles rams"), ("WSH", "washington commanders")):
+        assert canonical_team("nfl", code) == expected, code
+
+
+def test_the_crest_fallback_does_not_print_the_abbreviation_twice():
+    """A team with no crest rendered "LA LA 25.1" -- the fallback span and the
+    team span both printed `abbr`. Latent in NCAAF, which has never lacked a
+    crest; the fallback still has to be right the next time one does."""
+    game = _nfl_game()
+    game["away"] = {"abbr": "LA", "name": "Los Angeles Rams", "logo_url": None}
+    html = _env().get_template("shared/_scoreboard_strip_ncaaf.html").render(
+        games=[game], empty_text="none"
+    )
+    row = [line for line in html.splitlines() if "cards-strip-pregame-team" in line]
+    assert row, "no team row rendered"
+    # The abbreviation appears once per row, not twice.
+    assert html.count(">LA<") == 1, html.count(">LA<")
+    assert 'aria-hidden="true"' in html, "the spacer must be hidden from screen readers"
 
 
 # ------------------------------------------------------- the projection block
