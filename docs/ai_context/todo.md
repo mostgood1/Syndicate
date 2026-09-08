@@ -1,6 +1,40 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#649` — **`test_retainer_census` began failing on the cron 2026-09-08, and it is NOT the known memory-floor class** — lane `render-cron-failures`, 2026-09-08 — **FILED, NOT DIAGNOSED**
+### `#649` — **CLOSED 2026-09-08: `test_retainer_census` is ORDER-SENSITIVE, not a change. It joins the chunk-reshuffling group.** — lane `render-cron-failures`
+
+**DISCRIMINATOR RUN, substrate render:** `crn-dafg4h0u01pc73aavs6g-1788909461`,
+23:19:03Z, `status: successful` — **`10 passed in 4.30s`**. The file ALONE on the
+cron, `-n 0`, Render's env vars scrubbed, same commit `510b692e` that had just
+reported it failing inside a chunk of ~130 files.
+
+**Passes alone, fails in a chunk → order-sensitive.** Same host, same commit,
+same env. It joins `test_heap_roots` x4 and `test_home_mlb_live_lens_states`.
+
+**AND THE MECHANISM IS LEGIBLE FROM WHAT THE TEST DOES**, which is why this is a
+close rather than a shrug:
+`test_it_FINDS_a_large_module_level_cache_and_ranks_it_first` censuses
+module-level caches and asserts a **RANKING**. What else has been imported into
+the process is exactly the variable that moves a ranking — a chunk-mate holding
+a bigger cache displaces the one the test expects first. A test of "which is
+largest" cannot be isolated from what else is resident.
+
+**`10 passed` matters as much as `successful`.** A green cron exit is also what
+"collected 0 tests" looks like; the count is what makes it a reading.
+
+**NOT a regression, NOT the memory-floor class, and it does NOT change `#648`'s
+15.** The count to expect from `ci-suite` stays a BAND — 15 memory-floor plus
+however many order-sensitive tests the current chunk layout happens to catch.
+
+**WHAT THIS LEAVES OPEN, and it is worth more than this item was:** `--chunks`
+bought a suite that completes, and paid for it in a failing set that is not
+reproducible run to run. Six tests have now been shown to move purely with chunk
+layout. **A gate whose red list changes without the code changing cannot be read
+by a human on a schedule.** Options, none taken: `--dist=loadfile`-style stable
+assignment keyed on a hash of the file path rather than round-robin position, so
+adding a file does not reshuffle every other one; or accepting the band and
+gating only on the 15. Belongs with `#647`'s unanswered sizing question.
+
+
 
 `tests/test_retainer_census.py::CensusTests::test_it_FINDS_a_large_module_level_cache_and_ranks_it_first`
 appeared in `ci-suite`'s new-failure list at 23:11:58Z (run
