@@ -5,6 +5,45 @@
 
 ---
 
+## 2026-09-08 23:11:58Z — `ci-suite` @ `510b692e` — **MEASURED: the 4 stale-test repairs TOOK. 17 new failures, not the 15 I predicted — and my prediction was wrong for a reason worth keeping.** `[lane render-cron-failures]`
+
+Run `crn-dafg4h0u01pc73aavs6g-1788905940`, full chunked suite, no config change
+(the start command was already the gating form). `collected=16630 failing=19`,
+**`17 NEW FAILURE(S)`**, `rc=1` at 3022s, 9 fast steps `rc=0`, no OOM.
+
+**THE REPAIRS TOOK.** `test_soccer_live_gates_wiring` x2 and
+`SoccerLeagueScopeTests` x2 are ABSENT from the list, on a run at the commit
+that contains them. That was the question this run existed to answer.
+
+**I PREDICTED 15 AND TOLD THE SCHEDULED TASK TO EXPECT IT. WRONG, AND THE ERROR
+IS A CATEGORY ONE.** I computed `19 - 4`, where **19 was MY OWN curated figure**
+from `#648` ("real regressions") and the GATE had reported **25**. Six failures
+sat outside my subset. **I predicted a tool's output from a number I had
+constructed, not from the number the tool emits.** The right arithmetic was on
+25. Corrected in the scheduled task, which now carries the measured 17.
+
+    15   memory floor (test_intelligence x5, test_intelligence_state x8,
+         two ..._memory_headroom_snapshot_reports_insufficient_and_sufficient)
+     1   test_evaluation_ledger_projection -- known, genuinely failing NEW test
+     1   test_retainer_census -- NEW this run, filed as `#649`
+    ---
+    17
+
+**The 15 is exactly right for the class it names**, which is why the prediction
+felt safe. It was the wrong quantity, not a wrong measurement.
+
+**THE FAILING SET IS NOT STABLE BETWEEN RUNS, and this is a property of the
+gate that nothing recorded before.** Chunk assignment is round-robin over test
+FILES, so adding ANY test file reshuffles which tests share a process. Across
+two runs ~90 minutes apart at near-identical code: **five failures vanished with
+nobody fixing them** (`test_heap_roots` x4, `test_home_mlb_live_lens_states` x1
+— the ones the isolation probe had already flagged as order-sensitive) and one
+appeared. Chunk 1 collected **2243** in one run and **1788** in the next.
+
+**Consequence for reading this gate: 15-19 is a band, not a number.** Only a
+change in the 15 memory-floor set, an `oomKilled`, or a fast step going red is
+signal. A delta of one or two is reshuffling.
+
 ## 2026-09-08 ~19:5xZ — refresh-worker `aedb66c9` — **the zero-row publish guard is LIVE. It is also UNTESTED in production, and that distinction is the whole entry.** `[lane nfl-props-precompute]`
 
 `dep-dag6ernf3r2c73a4ceeg`. Preflight `CLEAR` — only infrastructure — so **no

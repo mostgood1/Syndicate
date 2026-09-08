@@ -1,5 +1,35 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#649` — **`test_retainer_census` began failing on the cron 2026-09-08, and it is NOT the known memory-floor class** — lane `render-cron-failures`, 2026-09-08 — **FILED, NOT DIAGNOSED**
+
+`tests/test_retainer_census.py::CensusTests::test_it_FINDS_a_large_module_level_cache_and_ranks_it_first`
+appeared in `ci-suite`'s new-failure list at 23:11:58Z (run
+`...-1788905940`, commit `510b692e`, substrate render). **It was NOT in the
+25 reported by the 20:32Z run 90 minutes earlier.**
+
+Not new to the repo: added `c18116e7` (2026-09-04), last touched `a2afc7f1`
+(2026-09-05, *"#632: widen the census roots"*). So the FILE predates both runs
+and only its RESULT changed.
+
+**TWO CANDIDATES, AND I HAVE NOT SEPARATED THEM:**
+1. **Chunk reshuffling.** Assignment is round-robin over test FILES, so a new
+   test file elsewhere moves everything. In the same 90 minutes five OTHER
+   failures vanished for exactly this reason (`test_heap_roots` x4,
+   `test_home_mlb_live_lens_states`). A census that ranks module-level caches is
+   plausibly sensitive to what else was imported into its process.
+2. **A real change** from one of the commits that landed between the two runs.
+
+**Cheapest discriminator, and it is the same one that worked for `#648`:** run
+that file ALONE on the cron with Render's env scrubbed —
+`env -u RENDER -u RENDER_SERVICE_ID ... python -m pytest tests/test_retainer_census.py -n 0 -q --tb=short`.
+Persists alone → real. Passes alone → order-sensitive, and it belongs with the
+heap_roots group rather than with a bug. **Do NOT skip the env scrub**: without
+it the suite measures its own host and returns ~116 failures of a different
+class entirely (`#648`).
+
+**Not in the 15 memory-floor set**, so it must not be waved through as "the
+known red". `#648`'s count is 15; anything above that wants a name.
+
 ### `#648` — **CLOSED 2026-09-08: ~~19 regressions~~ → 15 runner-too-small + 4 stale tests + ZERO regressions** — lane `render-cron-failures`
 
 **FINAL. Filed, retracted and closed the same day.** The full suite ran on the
