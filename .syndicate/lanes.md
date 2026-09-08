@@ -1828,6 +1828,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - **PENDING RE-RUN, 2026-09-15.** Scheduled task `mlb-bucket-rerun-with-totals` (fires 09-15 09:00 local, auto-disables). Recorded here as well because a scheduled task on this box has stalled before — `lastRunAt` is dispatch, not execution. If it did not run, run it by hand: `python scripts/bucket_realised_performance.py --sport mlb --days 14`. **Precondition: if fewer than ~60 games carry `model_total_mean`, STOP and say so** rather than reporting a rate with no power.
 - Findings, in the order they were forced: `findings_2026-09-08_bucket_realised_performance.md` (rows-vs-games: +21σ → +2.93σ on the same data), `findings_2026-09-08_spreads_edge_is_stale_quotes.md` (the survivor was stale quotes; the model has the score, the book's quote does not), `findings_2026-09-08_totals_baseline_not_resolution.md` (the de-vig is ~0.50 whatever the line is — the baseline was wrong, not the outcome resolution, and this invalidates spreads too).
 - Blocked by: data accumulation only.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
