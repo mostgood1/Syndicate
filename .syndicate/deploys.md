@@ -26649,3 +26649,45 @@ It came from a different, earlier window. My own matched pre-fix baseline is
 mix-controlled comparison and both slow routes' per-route rates fell. `#632`'s
 remaining latency is now concentrated in `/api/board/game-chips` (untouched) and
 the residual 48% on `/api/intelligence/query`.
+
+
+## 2026-09-08 02:09:30Z — refresh-worker — `a0d02297` → `abc56f64` — **MEASURED: the NFL board stops calling every game a coin flip** `[lane nfl-rating-units]`
+
+Deploy `dep-dafmq81t0dsc73eqm8a0`, trigger=api, live 02:09:30Z. Pairs with the
+env arm recorded at 01:38Z: `SYNDICATE_NFL_PPG_RATINGS=1` on refresh-worker.
+Claim held by `nfl-rating-units` from 01:34:24Z, RELEASED 02:18Z.
+
+**MEASUREMENT** — 2026 wk1, 16 games, 300 seeds, identical inputs, only the flag
+differing:
+
+| | OFF (per-play) | ON (per-game / scale 20) |
+|---|---|---|
+| `margin_mean` stdev | 0.980 | **4.379**  (4.47x) |
+| `margin_mean` range | -0.73 .. +2.77 | -3.94 .. +9.73 |
+| `home_win_rate` range | 0.460 .. 0.587 | 0.370 .. 0.777 |
+| inside P(home) 0.35-0.65 | **16/16** | **11/16** |
+| `rating_source` | `prior_season_fallback` x16 | UNCHANGED x16 |
+
+**verify:** the OFF arm reproduces the LIVE production artifact to three
+decimals — stdev 0.980, range -0.73..+2.77, 16/16 inside the band — against
+`smartsim2_projections_2026_wk1.csv` generated 2026-09-07T22:07:13Z. That
+correspondence is what licenses reading the ON arm as a prediction of what
+production will write, rather than as a local curiosity.
+
+**THE CONTROL HELD.** `rating_source` is identical in both arms
+(`prior_season_fallback` x16). A collapse to `neutral_no_data` would ALSO have
+moved the spread, and would have looked like the fix landing while actually
+meaning the ratings had failed. It did not happen.
+
+**STILL OWED: production's OWN artifact.**
+`SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` defaults to 86400 and the live file
+is ~4h old, so the worker will not regenerate until ~22:13Z on 2026-09-08 —
+still ~22h before the 2026-09-09 20:20 local kickoff, so it lands in time and I
+did NOT force it. **Until that file is re-read, the production claim is INFERRED
+from an exact-matching control arm, not directly observed.**
+
+**NOT claimed:** any accuracy or pricing improvement. The corrected model still
+LOSES to the close — held-out 2025 MAE 10.58 vs 9.79, straight-up 60.2% vs
+64.2%. This is display honesty, not edge. The ON arm's margin SD of 4.38 also
+sits UNDER the market's ~5.8-6.1, i.e. still slightly under-confident, which is
+the safe direction to be wrong in.
