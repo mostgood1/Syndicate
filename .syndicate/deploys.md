@@ -5,6 +5,73 @@
 
 ---
 
+## 2026-09-08 15:31:38Z — web `009bb3c3` — **MEASURED: NFL crest coverage 30/32 → 32/32, and the compact strip is now UNIFORM at 181px.** `[lane nfl-ncaaf-ui-parity]`
+
+`dep-dag2j1ht0dsc738c9gtg`, created 15:28:06Z, live **15:31:38.850092Z**.
+Claim held by this lane; released after this row. No `render.yaml`.
+
+**THE PREFLIGHT TOOK THREE RUNS AND THE FIRST TWO WOULD HAVE BEEN WRONG TO
+DEPLOY ON.** Recorded because the sequence is the point:
+
+    1. UNKNOWN  "no ALL_PROCESS_MEMORY sample"   <- NOT clear. An unknown must
+                                                    not default permissive.
+    2. HOLD     1 job: merge_published_artifacts <- a real job, on web
+    3. CLEAR    only infrastructure              <- deployed on this one
+
+**verify: the SERVED `/nfl/api/cards` and the RENDERED `/nfl/cards`.**
+
+| | before `09f6ab86` | **after `009bb3c3`** |
+|---|---|---|
+| `logo_url` on the payload | 30/32 | **32/32** |
+| rendered crest rows | 30/32 | **32/32** |
+| rows falling back to text | `LA`, `WAS` | **none** |
+| broken image URLs | 0 | 0 |
+| rows printing the abbr twice | 2 (`LA LA`, `WAS WAS`) | **0** |
+| compact card heights | 160, 180 (2 distinct) | **180, UNIFORM x16** |
+
+**THE UNIFORM HEIGHT IS THE SECOND-ORDER CONFIRMATION.** NCAAF's rebuild used
+exactly this signal — a single height across every card is direct evidence
+nothing wraps. NFL was two heights while two cards rendered a text stand-in
+instead of a crest; it is one height now.
+
+**THE TWO TEAMS GAINED MORE THAN A LOGO.** `LA` → `LAR` "Los Angeles Rams" and
+`WAS` → `WSH` "Washington Commanders". The failed branding lookup had been
+falling back to the raw nflverse token, so those cards showed a bare code with
+no display name. The board now serves the full, correct 32-abbreviation ESPN
+set.
+
+**CAUSE, and it is the same alias gap this repo already fixed once.**
+`nfl_team_branding.csv` is keyed `LAR`/`WSH`; the smartsim2 projection artifact
+carries nflverse's `LA`/`WAS`. All 32 teams were in the file and two were
+unreachable by the name the card asks with. `state.md
+[nfl-board-projection-coverage]` records the identical gap biting the
+PROJECTION join a week ago and being fixed in `team_aliases` — this call site
+was never routed through that fix (`#334`: fix the choke point every caller
+shares). `_resolve_branding` now falls back to the PUBLIC `canonical_team`,
+which already knew all four spellings. No second table was added.
+
+**FOUND BY LOOKING AT THE PAGE, NOT THE PAYLOAD.** The 14:02:20Z row's
+measurement said `away.logo_url 15/16` and I read that as branding simply being
+incomplete. It was not: the file had all 32. Only rendering the strip and
+counting `<img>` per ROW surfaced that the misses were a resolvable alias
+class.
+
+**THIS DEPLOY ALSO SHIPPED SOMEONE ELSE'S FIX, DELIBERATELY.** Target was tip
+`009bb3c3`, not my own `dc3983e5`. The delta is lane
+`web-oom-profiler-steady`'s guard against an unslimmed
+`/api/intelligence/query` response OOMing the 2 GiB container — the source they
+attributed the 15:11 and 15:13 OOMs to. On a service that is OOM-cycling,
+shipping my commit alone would have left that guard on the shelf.
+
+**AND IT CONFOUNDS THEIR MEASUREMENT — segment on this timestamp.** That lane
+is testing whether web's OOMs stop now that a polling browser tab of mine is
+closed. **A deploy reboots web and resets the memory ramp**, so quiet minutes
+after **15:31:38Z** prove less than quiet minutes before it. Their run already
+contends with reboots (14:14, 14:24, 14:44, 15:14), but they need this one
+named.
+
+---
+
 ## 2026-09-08 15:05:37Z — refresh-worker `296e14ec` — **CODE PARITY WITH WEB. No NFL reading is available today, and the one I promised was WRONG — retracted below.** `[lane nfl-ncaaf-ui-parity]`
 
 `dep-dag25lgn74is73c71t7g`, created 14:59:34Z, live **15:05:37.070927Z**.

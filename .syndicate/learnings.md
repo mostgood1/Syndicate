@@ -2952,6 +2952,84 @@ still not count.
   parsed cleanly through all four.**
 - *(evidence in `learnings_evidence.md`)*
 
+## 2026-09-08 FORBIDDEN: promising a verification target without tracing WHICH PRODUCER stamps that field `[lane nfl-ncaaf-ui-parity]`
+
+**What we believed.** That deploying the NFL card fix to refresh-worker would be
+verifiable by reading `shared_predictions.probabilities.home_cover` on
+`/api/board/book-grid?sport=nfl`. That prediction was written into `deploys.md`,
+into the lane block, and told to the user, all before anything was checked.
+
+**What was actually true.** That endpoint's `projection` field is stamped by
+`attach_nfl_game_projections`, which reads the smartsim2 projection artifact
+DIRECTLY and never touches the card's `predictions` block. Its keys are
+`basis` / `model_prob_over` / `projected` / `side` / `edge_vs_market_pct`;
+`home_cover` is not among them and never was. Coverage there was already
+**300/300** before the change and would have been 300/300 after.
+
+**How we found out.** By fetching the payload BEFORE deploying, to capture a
+"before" number. The keys were simply not the ones promised. Read AFTER the
+deploy instead, a flat 300/300 was available to be told either way -- "already
+perfect, nothing to prove" or "the fix did not land" -- and nothing in the
+reading itself would have distinguished them.
+
+**The rule going forward.** A verification target names a FIELD on a SURFACE. Before
+promising it, name the PRODUCER that writes that field and confirm the change is
+upstream of it. "The board reads the cards" was an assumption about a pipeline
+with two independent producers for the same-looking value. The cheap check is
+one fetch of the endpoint and a look at the key set -- do it while WRITING the
+prediction, not while settling it.
+
+**Cost.** No wrong claim reached production or the ledger unretracted: it was
+caught by a pre-deploy read and retracted in the `15:05:37Z` `deploys.md` row and
+the lane block. What it cost was a promise to the user that had to be walked
+back, and it would have cost a false verification had the order been reversed.
+
+**Related and NOT the same:** `gate-on-the-output-not-the-input` and
+`test-the-fixs-predicate-not-its-deploy-state` are about a predicate that is
+wrong or inert. This one is about a predicate that is well-formed, measurable,
+and reads a field your change cannot reach.
+
+## 2026-09-08 FORBIDDEN: leaving a self-refreshing board open while diagnosing the service it loads `[lane nfl-ncaaf-ui-parity]`
+
+**What we believed.** That the `/ncaaf*` request family appearing in web's slow-request
+logs after a 14:02:20Z deploy was organic traffic, and that the candidates for
+web's elevated OOM rate were my deploy, the other commits in its range, and a
+peer lane's burst harness.
+
+**What was actually true.** The requests were MINE, from a browser pane tab.
+`syndicate/static/shared/game_board.js:installSharedBoardAutoRefresh()` starts a
+poller on every `/cards` and `/game/` page: `intervalMs: 30000`, `onTick` doing
+`fetch(window.location.href)` -- a full server-side re-render -- and
+**`skipWhenHidden: false`**, so it keeps firing with the tab hidden. I had
+`/ncaaf/cards` open as the CONTROL for a parity comparison. On a 16 s route that
+is ~53% duty cycle on 1 of 8 gunicorn slots, from a viewer who is not looking.
+
+**How we found out.** A peer reported `/ncaaf*` as 25 of the 29 slow requests on
+the service and noted it had **ZERO** requests in their 23:00Z baseline -- "not a
+route that got slower, one that did not exist there". That is exactly the
+signature of a route nobody was requesting until somebody started. Reading the
+tab's own network log showed ~22 sequential same-URL requests, and
+`game_board.js` supplied the mechanism.
+
+**The rule going forward.** An open board is a load generator, not an
+observation. When measuring a service, close every page of it you are not
+actively reading, and say in the report which requests were yours. A "control"
+tab left open for comparison is instrumentation that changes the thing it
+measures.
+
+**Cost.** Real but unquantified: three OOM kills (14:13, 14:23, 14:43) that a
+peer lane spent its own time attributing, and my own contribution to the
+candidate list I handed them was omitted because I did not think of my browser
+as traffic. Not proven to be the cause -- closing the tab gives a clean window,
+and it was explicitly flagged not to be called early.
+
+**The check, because a rule alone will not catch this.** `skipWhenHidden: false`
+on a poller that re-renders a whole page server-side is a product defect
+independent of any operator: any user who leaves a board open does this, hidden
+tab included. It is the strongest open lead in `#632`. NOT changed here --
+`game_board.js` is a cross-sport shared file that no lane claims, and a
+platform-wide polling policy is not a thing to alter unilaterally.
+
 ## 2026-09-07 FORBIDDEN: reading an artifact-backed surface ONCE to decide whether a deploy worked
 
 **The instrument's clock is not the thing's clock.** Three separate lessons in

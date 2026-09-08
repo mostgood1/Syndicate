@@ -2341,6 +2341,9 @@ served ones; they agreed, which is worth one line and not more.
     total_over            0/16 -> 14/16
     kickoff_label         key absent -> 16/16
     venue                 key absent -> 16/16
+    crest rows (rendered) 30/32 -> 32/32   [009bb3c3, 15:31:38Z]
+    compact card heights  2 distinct -> 181px UNIFORM x16
+    venue                 key absent -> 16/16
 
 CONTROL, same pass: NCAAF `ncaaf_main` 51/51, 180px uniform x51, 102 crests,
 its own full-name spread label preserved. **The 14/16 is the MARKET's coverage,
@@ -2355,9 +2358,14 @@ rather than a neutral 0.5.
    never executed. NCAAF ran the identical path on the same payload (`started
    51/51`, status 51/51): evidence the MECHANISM works, not evidence about
    NFL's copy. First live NFL game is the test.
-2. **refresh-worker was NOT deployed** (held by `web-oom-profiler-steady` at
-   the time; free since). Layer 1/2 and the chips read ITS artifacts, so the
-   new `predictions` block has not reached them. Second reading owed:
-   `home_cover` non-null on `/api/board/book-grid?sport=nfl` after a rebuild.
+2. **refresh-worker IS deployed** — `296e14ec`, live 2026-09-08T15:05:37Z,
+   preflight CLEAR so no job was killed; verified by CONTENT (`nfl_main` 2/2 at
+   that SHA). **The second reading this section originally named was WRONG and
+   is retracted:** `home_cover` on `/api/board/book-grid?sport=nfl` cannot move
+   for this change — that endpoint's `projection` is stamped by
+   `attach_nfl_game_projections` reading the smartsim2 artifact directly, never
+   from the card's `predictions` block, and it was already 300/300. What the
+   worker deploy bought is CODE PARITY: it had been publishing
+   `shared_default` NFL cards while web served `nfl_main`.
 
 Working: `deploys.md` 2026-09-08 14:02:20Z; narrative `log/2026-09-08.md`.
