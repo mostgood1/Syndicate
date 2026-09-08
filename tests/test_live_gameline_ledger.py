@@ -68,10 +68,21 @@ class TestBuildRecords:
         assert rec["model_home_win_prob"] == 0.6
 
     def test_a_row_the_join_never_projected_is_still_not_recorded(self):
-        """Wrong segment / no live projection never get a `live_gameline` block.
+        """A row the join reached NO decision about stays out.
 
-        The gate is the block's PRESENCE, so those rows stay out without a second
-        rule here re-deciding what the join already decided.
+        **THIS DOCSTRING WAS HALF WRONG AFTER 2026-09-07 AND IS CORRECTED HERE.**
+        It used to read "wrong segment / no live projection never get a
+        `live_gameline` block ... so those rows stay out", which stopped being
+        true for the segment case: `attach_live_gamelines` now stamps a separate
+        `REFUSAL_KEY` on a row it refused for being a non-full-game segment, and
+        `build_records` emits a counted, non-priceable record for it. See
+        `tests/test_live_gameline_segment_visibility.py` for why -- seven
+        production days held 28,763 records and not one non-`full` segment,
+        making the file's denominator the post-attach population.
+
+        The assertion below is unchanged and still correct: a row carrying
+        NEITHER key was never decided about, and the ledger does not invent a
+        record for it.
         """
         row = _row()
         row.pop("live_gameline")

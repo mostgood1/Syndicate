@@ -206,6 +206,44 @@ REASON_UNUSABLE_SIMS = "sim_count_unusable"
 REASON_SEGMENT_NOT_FULL_GAME = "segment_is_not_full_game"
 _FULL_GAME_SEGMENTS = frozenset({"full", "full_game", "game"})
 
+# WHERE A REFUSED SEGMENT ROW IS RECORDED, and why it is a SEPARATE key.
+#
+# THE DEFECT. Measured on production 2026-09-07 across seven MLB ledger days and
+# 28,763 records: **every single row is `segment=full`**, and not one carries a
+# withheld reason from above the attach site. The ledger's own docstring assumed
+# that was fine -- "rows refused earlier never get one, so they stay out" -- but
+# it makes the file's denominator the POST-ATTACH population, not the live
+# population. `14,003 of 27,249 priceable` is a rate over the wrong base.
+#
+# AND THE MISSING PART IS THE MAJORITY. Same day, the join's own coverage
+# counters on the two most recent MLB builds: 25 of 29 rows considered and 34 of
+# 41 were refused `segment_is_not_full_game` -- 86% and 83%. The segment refusal
+# is the LARGEST category of live rows there is, and the ledger cannot see it.
+# That is not an accounting nicety: the segment mis-grade this session confirmed
+# involved 49 orders and every one of them was **first5**, so the ledger is
+# blindest on exactly the segment real money is going through.
+#
+# WHY NOT JUST RELAX THE REFUSAL. Because it is correct, and the comment on
+# `REASON_SEGMENT_NOT_FULL_GAME` carries the measurement: a full-game projection
+# priced against a first-inning market produced **+42.43 pp** of edge that was
+# entirely an artifact of the mismatch. Pricing these rows is a DIFFERENT and
+# much larger piece of work -- the lens does publish `segment_projection` lanes
+# (`sources_seen` 2026-08-23: `live_mc` 20 against `segment_projection` 40, so
+# they outnumber the re-sim lanes two to one), but they are an interpolation
+# with no `simsRun`, so the precision gate that governs every published edge
+# cannot even be computed for them. Counting is not pricing, and this key
+# carries NO probability and NO edge precisely so nothing downstream can mistake
+# one for the other.
+#
+# WHY A SEPARATE KEY RATHER THAN `live_gameline`. `layer2_board` copies
+# `row["live_gameline"]` onto the board candidate and `live_gameline_score`
+# scores it. A refusal block under that name would put an empty live block on
+# every first5 board row, which is the "degraded looks legitimate" trap this
+# module keeps paying for. Nothing but the ledger reads this key, so the rule
+# stays in ONE place -- here -- and the blast radius is zero.
+REFUSAL_KEY = "live_gameline_refusal"
+
+
 # `REASON_TOTALS_MEAN` above is now a LEGACY path, not the normal one. It fires
 # only against a lens written before the producer carried `totalRunsDist` --
 # i.e. an old snapshot -- and is deliberately kept so that case stays
@@ -1143,6 +1181,31 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
             record(coverage, {"priceable": False,
                               "withheld_reason": REASON_SEGMENT_NOT_FULL_GAME},
                    projected=False)
+            # RECORDED, NOT PRICED. See `REFUSAL_KEY` for the measurement that
+            # motivates it. Identity and the reason only: no probability, no
+            # edge, no market price.
+            #
+            # THE OMISSION OF `market_fair_prob` IS DELIBERATE AND IS WHAT
+            # BOUNDS THIS. `live_gameline_ledger._moved` dedupes on exactly
+            # (`model_home_win_prob`, `market_fair_prob`, `edge_pp`,
+            # `priceable`), so a record whose four are constant is written ONCE
+            # per (game, segment, market, line, book set) per day and skipped on
+            # every later build. Carrying the segment market's own de-vig would
+            # be genuinely useful -- it is the one half of a segment edge that
+            # needs no model -- but it MOVES, so every build would rewrite every
+            # segment row. That matters because `append_records` stops writing
+            # for the REST OF THE DAY at `_MAX_RECORDS_PER_FILE`, and MLB
+            # already wrote 8,070 rows on 2026-08-21 against a 20,000 cap while
+            # segment rows outnumber full-game rows about five to one. An
+            # unbounded widening here would fill the file mid-slate and blind
+            # the ledger to LATE full-game rows -- which the bucket harness
+            # measured as baseball's strongest surface (spreads q4_late, n=2471,
+            # edge/se 6.35). Bounding it to an inventory keeps that intact.
+            row[REFUSAL_KEY] = {
+                "priceable": False,
+                "withheld_reason": REASON_SEGMENT_NOT_FULL_GAME,
+                "segment": segment,
+            }
             continue
 
         key = (_norm_team(row.get("away_team")), _norm_team(row.get("home_team")))

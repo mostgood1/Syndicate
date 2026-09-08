@@ -83,6 +83,13 @@ from typing import Any
 # stored. A reader that needs them must filter to `v >= 5`.
 LEDGER_VERSION = 5
 
+# THE KEY THE JOIN STAMPS ON A ROW IT REFUSED ABOVE THE ATTACH SITE. Imported by
+# NAME rather than re-spelled here, so the two files cannot drift into
+# disagreeing about which key means "counted, not priced" -- the same failure the
+# v4 comment on the `live_gameline` copy list records, where a key added in one
+# file and not the other shipped inert with every test green.
+from syndicate.features.shared.live_gameline_join import REFUSAL_KEY as _REFUSAL_KEY
+
 # A live slate tops out around 15 games x a handful of priceable markets. 500
 # is far above that and still bounds a pathological build.
 _MAX_RECORDS_PER_BUILD = 500
@@ -198,9 +205,33 @@ def build_records(
     denominator that makes it a rate.
 
     The gate is presence of the join's own `live_gameline` block, which
-    `attach_live_gamelines` attaches on exactly the `projected=True` path — rows
-    refused earlier (wrong segment, no live projection) never get one, so they
-    stay out without a second rule here deciding it.
+    `attach_live_gamelines` attaches on exactly the `projected=True` path.
+
+    **THAT GATE ALONE MADE THE DENOMINATOR WRONG, AND THIS ADDS THE OTHER HALF.**
+    The sentence that used to end this docstring — "rows refused earlier (wrong
+    segment, no live projection) never get one, so they stay out without a
+    second rule here deciding it" — was true, and was the defect. Refusals BELOW
+    the attach site (`prob_interval_swamps_edge`, `no_two_sided_market_price`)
+    land here as `priceable: false` rows; refusals ABOVE it vanished entirely.
+    So the file recorded a rate over the post-attach population while reading as
+    a rate over the live one.
+
+    Measured 2026-09-07 on production, seven MLB days / 28,763 records: **every
+    row `segment=full`**, and the only withheld reasons present were the three
+    post-attach ones. Meanwhile the join's own counters on the two most recent
+    builds refused **25 of 29** and **34 of 41** rows `segment_is_not_full_game`
+    — 83-86% of everything considered, invisible here. This is the argument v2
+    already made for recording non-priceable rows ("a self-selected sample, with
+    an n small enough that the answer is unfalsifiable"), applied to the gate v2
+    did not reach. And it matters in money, not only in accounting: the segment
+    mis-grade confirmed this session covered 49 orders and every one of them was
+    **first5** — the ledger is blindest on exactly the segment being bet.
+
+    A refusal record carries identity, `segment`, `market`, `line`, the book set
+    and the reason, and NOTHING ELSE. No model probability, no market price, no
+    edge. They are emitted AFTER every `live_gameline` record so that
+    `append_records`' `records[:_MAX_RECORDS_PER_BUILD]` truncation drops a
+    refusal before it can ever drop a priceable row.
     """
     out: list[dict[str, Any]] = []
     if not isinstance(grid, (list, tuple)):
@@ -333,6 +364,100 @@ def build_records(
                 "has_pinnacle": "pinnacle" in books,
             }
         )
+
+    # --- the REFUSED half of the denominator, emitted last on purpose ---
+    #
+    # ORDERING IS LOAD-BEARING, NOT COSMETIC. `append_records` truncates with
+    # `records[:_MAX_RECORDS_PER_BUILD]`, keeping the FIRST 500, so anything
+    # appended below is dropped before a priceable full-game row is. Segment
+    # rows outnumber full-game rows roughly five to one in the considered
+    # population (25/29 and 34/41 on the 2026-09-05/06 builds), which is exactly
+    # the ratio that would have let an interleaved widening push real edges out
+    # of the file.
+    for row in grid:
+        if not isinstance(row, Mapping):
+            continue
+        refusal = row.get(_REFUSAL_KEY)
+        if not isinstance(refusal, Mapping):
+            continue
+        books = sorted({str(b).strip().lower() for b in (row.get("books") or []) if str(b).strip()})
+        game = row.get("game") if isinstance(row.get("game"), Mapping) else {}
+        out.append(
+            {
+                "v": LEDGER_VERSION,
+                "recorded_at": stamp,
+                "sport": str(sport or "").strip().lower(),
+                "date": str(date_str or "").strip(),
+                # NO `game_pk`. The segment refusal fires ABOVE the index
+                # lookup, so there is no lens hit to lift one from, and moving
+                # the check below the lookup would relabel an unmatched segment
+                # row `no_live_projection` -- a less specific answer to the more
+                # specific question. Identity for these rows is (teams, segment,
+                # market, line, book set), which `record_key` already keys on.
+                "game_pk": None,
+                "event_id": row.get("event_id"),
+                "home_team": row.get("home_team"),
+                "away_team": row.get("away_team"),
+                "segment": row.get("segment"),
+                "market": row.get("market"),
+                "line": row.get("line"),
+                "books_key": ",".join(books),
+                # ALL FOUR CONSTANT, AND THAT IS WHAT BOUNDS THIS. `_moved`
+                # compares exactly (`model_home_win_prob`, `market_fair_prob`,
+                # `edge_pp`, `priceable`), so a refusal record is written ONCE
+                # per (game, segment, market, line, book set) per day and
+                # skipped on every later build. Carrying the segment market's
+                # own de-vig would be genuinely useful -- it is the half of a
+                # segment edge that needs no model -- but it MOVES, so every
+                # build would rewrite every segment row. `append_records` stops
+                # writing for the REST OF THE DAY at `_MAX_RECORDS_PER_FILE`,
+                # and MLB already wrote 8,070 rows on 2026-08-21 against that
+                # 20,000 cap. An unbounded widening would fill the file
+                # mid-slate and blind the ledger to LATE full-game rows -- which
+                # the bucket harness measured as baseball's strongest surface
+                # (spreads q4_late, n=2471, 20.49pp, edge/se 6.35). A segment
+                # PRICE series is a real thing to want, and it needs its own
+                # file rather than this one's remaining headroom.
+                "model_home_win_prob": None,
+                "market_fair_prob": None,
+                "edge_pp": None,
+                "priceable": False,
+                "withheld_reason": refusal.get("withheld_reason"),
+                "sigma": None,
+                "point_estimator": None,
+                "model_prob_raw": None,
+                "prob_std_err": None,
+                "sims_run": None,
+                "total_mean": None,
+                "home_margin": None,
+                "as_of": None,
+                "carried_forward": None,
+                # THE FINE-GRAINED GAME-STATE FIELDS STAY NULL, DELIBERATELY.
+                # Dedup means a refusal row is written at FIRST SIGHTING and
+                # never refreshed, so an inning or a score stamped here would
+                # describe the first build that saw the market and then sit
+                # frozen for the rest of the game while reading as current.
+                # That is the "degraded looks legitimate" failure this repo
+                # keeps paying for, and a null is the honest form of it.
+                # `game_state` is the exception and is safe: the join only ever
+                # considers rows whose state is live/in_progress, so the value
+                # is true for the whole window it describes.
+                "inning": None,
+                "half": None,
+                "outs": None,
+                "outs_recorded": None,
+                "progress_fraction": None,
+                "pregame_home_win_prob": None,
+                "game_state": game.get("state"),
+                "home_score": None,
+                "away_score": None,
+                "quote_age_seconds": None,
+                "quote_updated_at": None,
+                "sharp_books": [b for b in books if b in _SHARP_BOOKS],
+                "has_pinnacle": "pinnacle" in books,
+            }
+        )
+
     return out
 
 
