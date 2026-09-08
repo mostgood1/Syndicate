@@ -316,6 +316,11 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                 "status_detail": event.get("status_detail"),
                 "score_home": live_state["score_home"],
                 "score_away": live_state["score_away"],
+                # PER-HALF GOALS, for first-half settlement. Read off the
+                # summary already in hand (`espn_match_box.extract_linescores`
+                # -- the scoreboard's own `linescores` is null for soccer), so
+                # this costs no fetch. `None` when the summary lacks them.
+                **_linescore_fields(summary),
                 "home_red_cards": live_state["home_red_cards"],
                 "away_red_cards": live_state["away_red_cards"],
                 "home_shots_so_far": live_state["home_shots_so_far"],
@@ -532,10 +537,31 @@ def _finished_matches(leagues, iso_date, *, source_root) -> list[dict[str, Any]]
                 "away_team": record.get("away_team"),
                 "score_home": record.get("score_home"),
                 "score_away": record.get("score_away"),
+                # Two short lists, not squad-sized: the half-time split is what
+                # a `segment="h1"` order grades against (`segment_actuals`).
+                # A box cached before this field existed carries `None`, and
+                # the resolver refuses that BY NAME rather than guessing.
+                "home_linescores": record.get("home_linescores"),
+                "away_linescores": record.get("away_linescores"),
                 "status_state": record.get("status_state") or "post",
                 "final": True,
             })
     return out
+
+
+def _linescore_fields(summary: Any) -> dict[str, Any]:
+    """`home_linescores` / `away_linescores` off a match summary, never raising
+    -- a missing header must cost the two fields, not the live-state record."""
+    try:
+        from syndicate.features.soccer.ingestion.espn_match_box import extract_linescores
+
+        linescores = extract_linescores(summary) if isinstance(summary, dict) else {}
+    except Exception:
+        linescores = {}
+    return {
+        "home_linescores": linescores.get("home"),
+        "away_linescores": linescores.get("away"),
+    }
 
 
 def main() -> int:

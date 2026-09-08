@@ -152,6 +152,17 @@ def _game_from_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
     home_score = _score_or_none(home_row.get("score")) if (in_progress or final) else None
     away_score = _score_or_none(away_row.get("score")) if (in_progress or final) else None
 
+    # PER-PERIOD SCORES -- a SETTLEMENT field, which is why it is in here and
+    # not in `_board_fields_from_event`: it is what lets a `q1..q4`/`h1`/`h2`
+    # order grade off the period it was bet on instead of refusing forever.
+    # Already in the payload and discarded -- VERIFIED 2026-09-08 on
+    # 401858438: `[{"value": 10.0, "displayValue": "10", "period": 1}, ...]`.
+    # Same pregame gate as the score. `segment_actuals` is the one reader.
+    from syndicate.features.shared.segment_actuals import linescores_from_competitor
+
+    home_linescores = linescores_from_competitor(home_row) if (in_progress or final) else None
+    away_linescores = linescores_from_competitor(away_row) if (in_progress or final) else None
+
     return {
         "event_id": _text(event.get("id")),
         "home_team": _text(home_team.get("displayName")),
@@ -160,6 +171,8 @@ def _game_from_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
         "away_abbr": _text(away_team.get("abbreviation")).upper(),
         "home_score": home_score,
         "away_score": away_score,
+        "home_linescores": home_linescores,
+        "away_linescores": away_linescores,
         "in_progress": in_progress,
         "final": final,
         "status": _text(status_type.get("shortDetail")) or _text(status_type.get("description")),

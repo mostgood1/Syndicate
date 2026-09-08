@@ -171,6 +171,24 @@ def _game_from_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
     home_score = _score_or_none(home_row.get("score")) if (in_progress or final) else None
     away_score = _score_or_none(away_row.get("score")) if (in_progress or final) else None
 
+    # PER-PERIOD SCORES, so a segment order (`q1..q4`, `h1`, `h2`) can be
+    # graded off the quarter it was bet on rather than refused forever.
+    # `competitors[].linescores[]` was already in this payload and was being
+    # discarded -- VERIFIED 2026-09-08 on 401772830: `[{"value": 7.0,
+    # "displayValue": "7", "period": 1}, ...]`. Same pregame gate as the
+    # score: an unplayed game carries no periods, not a list of zeros.
+    # `segment_actuals` is the single reader of this field.
+    from syndicate.features.shared.segment_actuals import linescores_from_competitor
+
+    home_linescores = linescores_from_competitor(home_row) if (in_progress or final) else None
+    away_linescores = linescores_from_competitor(away_row) if (in_progress or final) else None
+    period = None
+    if in_progress or final:
+        try:
+            period = int(status.get("period")) if status.get("period") is not None else None
+        except (TypeError, ValueError):
+            period = None
+
     return {
         "event_id": _text(event.get("id")),
         "home_team": _text(home_team.get("displayName")),
@@ -179,6 +197,11 @@ def _game_from_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
         "away_abbr": _text(away_team.get("abbreviation")).upper(),
         "home_score": home_score,
         "away_score": away_score,
+        "home_linescores": home_linescores,
+        "away_linescores": away_linescores,
+        # The current period is what closes a segment before the game closes:
+        # `q1` is final once period 2 is under way. `None` on a pregame game.
+        "period": period,
         "in_progress": in_progress,
         "final": final,
         "status": _text(status_type.get("shortDetail")) or _text(status_type.get("description")),

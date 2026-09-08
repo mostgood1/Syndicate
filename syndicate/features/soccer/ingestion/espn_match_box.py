@@ -150,13 +150,51 @@ def extract_goals(summary: dict[str, Any]) -> list[dict[str, Any]]:
     return goals
 
 
+def extract_linescores(summary: dict[str, Any]) -> dict[str, list[int | None]]:
+    """``{"home": [1st-half goals, 2nd-half goals], "away": [...]}`` from the
+    summary HEADER, or ``{}`` when the summary does not carry them.
+
+    THE SCOREBOARD DOES NOT HAVE THIS. Soccer's scoreboard event carries
+    ``linescores: null`` (verified 2026-09-08, EPL 401879317), so a half-time
+    score is only reachable from the match summary this module already
+    parses: ``header.competitions[0].competitors[].linescores`` is
+    ``[{"displayValue": "3"}, {"displayValue": "1"}]`` -- one entry per half,
+    ordered, no ``period`` key. It is what lets a first-half order settle
+    (``segment_actuals``); nothing on the card reads it.
+
+    Sides keyed off ``homeAway``, never list order, same as ``extract_team_box``.
+    """
+    from syndicate.features.shared.segment_actuals import linescores_from_competitor
+
+    header = summary.get("header") if isinstance(summary.get("header"), dict) else {}
+    competitions = header.get("competitions") if isinstance(header.get("competitions"), list) else []
+    competition = competitions[0] if competitions and isinstance(competitions[0], dict) else {}
+    out: dict[str, list[int | None]] = {}
+    for row in competition.get("competitors") or []:
+        if not isinstance(row, dict):
+            continue
+        side = str(row.get("homeAway") or "").strip().lower()
+        if side not in {"home", "away"}:
+            continue
+        values = linescores_from_competitor(row)
+        if values is not None:
+            out[side] = values
+    return out
+
+
 def build_match_box(summary: dict[str, Any], *, event_id: str) -> dict[str, Any]:
     """The per-match box record written into ``live_state_{date}.json``."""
+    linescores = extract_linescores(summary)
     return {
         "event_id": event_id,
         "teams": extract_team_box(summary),
         "goals": extract_goals(summary),
+        # Per-half goals for segment settlement. ``None`` (not ``[]``) when the
+        # summary carries none, so the resolver refuses BY NAME rather than
+        # reading an empty half as 0-0.
+        "home_linescores": linescores.get("home"),
+        "away_linescores": linescores.get("away"),
     }
 
 
-__all__ = ["build_match_box", "extract_goals", "extract_team_box"]
+__all__ = ["build_match_box", "extract_goals", "extract_linescores", "extract_team_box"]
