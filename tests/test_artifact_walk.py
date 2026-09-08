@@ -156,16 +156,67 @@ def test_subset_prefilter_drops_directories_that_cannot_match():
 
 def test_subset_prefilter_is_conservative_when_it_cannot_tell():
     # Wrong here costs FILES, not time: this feeds a backup, so dropping a
-    # pattern that could have matched loses an artifact silently. Only
-    # exclusions the segment algebra PROVES are made.
+    # pattern that could have matched loses an artifact silently.
     patterns = ["*_source/data/live_lens/a_*.json"]
     assert patterns_that_can_match(patterns, "") == patterns
     assert patterns_that_can_match(patterns, "reports/x.json") == []
-    # Depth DECIDES: no pattern here is recursive, so a glob segment matches
-    # exactly one path segment and different depths can never meet. My first
-    # version kept these "to be safe" and thereby filtered nothing at all.
+    # A SEPARATOR-COUNT argument, not a depth argument. The subset is applied
+    # with fnmatch, whose `*` crosses `/`, so a subset may be shallower than the
+    # pattern and still match. What rules a pattern out is that its paths cannot
+    # carry the literal separators the subset demands.
     assert patterns_that_can_match(["*/b/c/*.json"], "*/*/*/*/*.json") == []
     assert patterns_that_can_match(["*/b/c/*.json"], "*/*/*/*.json") == ["*/b/c/*.json"]
+    # A bracket class is undecidable here, so it must be KEPT, never dropped.
+    assert patterns_that_can_match(["a/b/c.json"], "a/[bc]*") == ["a/b/c.json"]
+
+
+def test_a_SHALLOW_subset_keeps_DEEP_patterns_because_fnmatch_star_crosses_slash():
+    """THE REGRESSION. `d5e4cc51` shipped a pre-filter that compared directory
+    DEPTH, so `?pattern=wnba_source/*` dropped every `source_artifacts/data/...`
+    family and the endpoint returned a SHORT ANSWER WITH NO ERROR -- on the
+    endpoint most sessions use to verify production.
+
+    Reported by lane `soccer-unfed-inputs`, bisected by
+    `soccer-threeway-precision-gate`. The two sides never shared semantics: the
+    patterns are globbed (`*` stops at `/`), the subset is applied with fnmatch
+    (`*` crosses `/`)."""
+    import fnmatch as fn
+    deep = "*_source/source_artifacts/data/processed/recommendations*.json"
+    path = "wnba_source/source_artifacts/data/processed/recommendations_slate_2026-07-13.json"
+    assert fn.fnmatch(path, "wnba_source/*"), "premise: fnmatch's * crosses '/'"
+    assert patterns_that_can_match([deep], "wnba_source/*") == [deep]
+
+
+def test_the_prefilter_can_only_REMOVE_WORK_never_change_the_answer(tree):
+    """The property that would have caught the regression, and the only one
+    really worth asserting: pre-filter then post-filter must equal post-filter
+    alone, for every subset. My original test asserted my ASSUMPTION about `*`
+    rather than the caller's actual fnmatch call, so it passed while the code
+    was wrong -- a test written from the same misreading as the code cannot
+    catch that code."""
+    import fnmatch as fn
+    all_patterns = PATTERNS + [
+        "*_source/source_artifacts/data/processed/notes.txt",
+        "mlb_source/data/live_lens/beta_*.json",
+    ]
+    subsets = [
+        "*_source/*",                       # shallow, spans segments
+        "wnba_source/*",                    # the exact production failure
+        "*_source/data/live_lens/*.json",
+        "*/source_artifacts/*",
+        "*.json",
+        "mlb_source/*/*/*/*/*.json",
+        "nope/*",
+    ]
+
+    def rel(path):
+        return os.path.relpath(path, tree).replace("\\", "/")
+
+    for subset in subsets:
+        truth = sorted(x for x in _naive(tree, all_patterns) if fn.fnmatch(rel(x), subset))
+        got = sorted(x for x in _grouped(tree, patterns_that_can_match(all_patterns, subset))
+                     if fn.fnmatch(rel(x), subset))
+        assert got == truth, f"subset {subset!r} changed the RESULT, not just the work"
 
 
 def test_subset_prefilter_never_changes_the_result_it_only_saves_work(tree):
