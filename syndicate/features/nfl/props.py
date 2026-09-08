@@ -857,6 +857,9 @@ def nfl_player_team_collisions(season: int) -> dict[str, frozenset[str]]:
 
 # Only markets a card can render as a one-line pick. `is_ladder` alternate
 # lines are excluded upstream by the capture; this is the display filter.
+# Half of _build_prop_rows' hard cap of 8, so away cannot starve home.
+_NFL_CARD_PROP_ROWS_PER_SIDE = 4
+
 _NFL_CARD_PROP_PRIORITY = (
     "Anytime TD",
     "Passing Yards",
@@ -865,6 +868,103 @@ _NFL_CARD_PROP_PRIORITY = (
     "Receiving Yards",
     "Receptions",
 )
+
+
+def _nfl_card_prop_projection_index(season: int, week: int) -> dict[str, float]:
+    """{join_market_key: projected_value} from the precomputed prop artifact.
+
+    Keyed on the artifact MTIME so a republish invalidates it: the file is
+    rewritten out of band (the producer is an offline run -- refresh-worker
+    cannot build it, see build_nfl_prop_projections.py), and a plain lru_cache
+    would pin the first copy this process ever read for the life of the dyno.
+    An absent artifact yields an empty dict, so cards fall back to odds-only
+    rows -- the pre-existing behaviour, not an error.
+
+    projected_value, NOT sim_projection, and the distinction is load-bearing.
+    For passing_yards::patrick mahomes the artifact carries
+    projected_value=256.2 (the projected stat) and sim_projection=0.716
+    (P(over) for ONE quoted line). The artifact has no line field and several
+    rows share a market key with different lines, so a sim_projection cannot be
+    attributed to the line a card happens to show -- rendering it would put a
+    probability next to the wrong number. Only projected_value is well defined
+    per (player, market); for anytime_td the two are equal anyway.
+    """
+    try:
+        path = nfl_prop_projection_artifact_path(season, week)
+        stamp = path.stat().st_mtime_ns if path.is_file() else 0
+    except Exception:
+        stamp = 0
+    return _nfl_card_prop_projection_index_cached(season, week, stamp)
+
+
+@lru_cache(maxsize=8)
+def _nfl_card_prop_projection_index_cached(
+    season: int, week: int, _mtime_ns: int
+) -> dict[str, float]:
+    index: dict[str, float] = {}
+    for row in read_nfl_prop_projection_artifact(season, week) or []:
+        key = str(row.get("market") or "").strip()
+        value = _safe_float(row.get("projected_value"))
+        if key and value is not None:
+            index.setdefault(key, value)
+    return index
+
+
+def _nfl_card_prop_rows_balanced(
+    entries: list[dict[str, Any]], limit: int
+) -> list[dict[str, Any]]:
+    """Round-robin across MARKETS instead of draining the highest-priority one.
+
+    MEASURED on production 2026-09-08: all 16 week-1 cards showed 8 rows and
+    all 128 were Anytime TD. Not a data gap -- the artifact carries 9 markets --
+    but a sort. The selection was ordered by (priority_index, price) and
+    _build_prop_rows caps at 8, so the first market in _NFL_CARD_PROP_PRIORITY
+    consumed every slot on every card, every time. A strict priority order over
+    a hard cap is a filter, not a ranking.
+
+    Within a market the incoming order is preserved (shortest price first), so
+    this changes WHICH markets appear, never which row represents a market.
+    """
+    by_market: dict[str, list[dict[str, Any]]] = {}
+    for entry in entries:
+        by_market.setdefault(str(entry.get("market") or ""), []).append(entry)
+    queues = [by_market[m] for m in _NFL_CARD_PROP_PRIORITY if by_market.get(m)]
+    queues.extend(
+        rows for market, rows in by_market.items()
+        if market not in _NFL_CARD_PROP_PRIORITY
+    )
+    # ONE ROW PER PLAYER, so four slots buy four players and not one QB four
+    # times. Round-robin over markets alone still concentrates: passing yards,
+    # passing TDs and rushing yards are all led by the SAME starting
+    # quarterback, so the first cut returned Drake Maye three times out of four
+    # on NE@SEA. A card with four rows has room for four names.
+    #
+    # Fallback is deliberate: if skipping duplicates cannot fill the limit
+    # (a side with very few quoted players), the skipped rows are added back
+    # rather than leaving the panel short -- a thinner card is worse than a
+    # repeated player.
+    ordered: list[dict[str, Any]] = []
+    seen_players: set[str] = set()
+    deferred: list[dict[str, Any]] = []
+    while queues and len(ordered) < limit:
+        for queue in list(queues):
+            if len(ordered) >= limit:
+                break
+            if queue:
+                entry = queue.pop(0)
+                player = str(entry.get("player") or "").strip().casefold()
+                if player and player in seen_players:
+                    deferred.append(entry)
+                else:
+                    seen_players.add(player)
+                    ordered.append(entry)
+            if not queue:
+                queues.remove(queue)
+    for entry in deferred:
+        if len(ordered) >= limit:
+            break
+        ordered.append(entry)
+    return ordered
 
 
 def nfl_prop_recommendations_for_matchup(
@@ -902,6 +1002,7 @@ def nfl_prop_recommendations_for_matchup(
         return {"away": [], "home": []}
 
     team_index = nfl_player_team_index(season)
+    projection_index = _nfl_card_prop_projection_index(season, week)
     game_key = nfl_props_key(away_full_name, home_full_name)
 
     # Best price per (player, market, line, side): the capture may now carry
@@ -939,16 +1040,40 @@ def nfl_prop_recommendations_for_matchup(
                 "book": str(row.get("book") or "").strip(),
                 "selection": "over",
                 "display_pick": _nfl_card_prop_display_pick(market, line),
+                # The MODEL number, so a card row is a projection and not just a
+                # price. Without it every field _build_prop_rows maps onto
+                # `projected` is absent and the panel renders odds only --
+                # measured 2026-09-08, `projected` and `confidence` were null on
+                # all 128 served rows while /nfl/props showed a real edge for the
+                # same players in the same week.
+                "projected": projection_index.get(
+                    _nfl_prop_join_market_key(
+                        _NFL_PROP_MARKET_TO_STAT.get(market, ""), player
+                    )
+                ),
             }
 
-    rows_by_side: dict[str, list[dict[str, Any]]] = {"away": [], "home": []}
-    priority = {market: index for index, market in enumerate(_NFL_CARD_PROP_PRIORITY)}
+    # PER SIDE, AND CAPPED PER SIDE. _build_prop_rows walks away first and
+    # returns as soon as it holds 8 rows, so any away list of 8 or more leaves
+    # the home team with NOTHING. Measured 2026-09-08: 0 of 16 cards showed a
+    # single home prop -- all 128 served rows were the away team's. Returning at
+    # most half the contract's budget per side makes both teams appear without
+    # touching _build_prop_rows, which every other sport shares.
+    by_side: dict[str, list[dict[str, Any]]] = {"away": [], "home": []}
     for entry in sorted(
         best.values(),
-        key=lambda item: (priority.get(item["market"], 99), -item["_price"] if item["_price"] < 0 else item["_price"]),
+        key=lambda item: -item["_price"] if item["_price"] < 0 else item["_price"],
     ):
-        side = "away" if entry["_team"] == away_abbr else "home"
-        rows_by_side[side].append({key: value for key, value in entry.items() if not key.startswith("_")})
+        by_side["away" if entry["_team"] == away_abbr else "home"].append(entry)
+
+    rows_by_side: dict[str, list[dict[str, Any]]] = {"away": [], "home": []}
+    for side, entries in by_side.items():
+        rows_by_side[side] = [
+            {key: value for key, value in entry.items() if not key.startswith("_")}
+            for entry in _nfl_card_prop_rows_balanced(
+                entries, _NFL_CARD_PROP_ROWS_PER_SIDE
+            )
+        ]
     return rows_by_side
 
 

@@ -538,3 +538,66 @@ def test_a_first_ever_launch_is_not_blocked_by_the_cooldown(monkeypatch, tmp_pat
     worker = _load_refresh_worker()
     launched = _drive_nfl_prop_autorun(worker, monkeypatch, tmp_path, since_launch=None)
     assert launched == ["launched"]
+
+
+def test_card_prop_rows_span_markets_and_both_sides():
+    """Three defects measured on production 2026-09-08, one test.
+
+    All 16 week-1 cards showed 8 rows; all 128 were `Anytime TD`, all 128
+    belonged to the AWAY team, and `projected` was null on every one. None was a
+    data gap -- the artifact carried 9 markets and real projections for the same
+    players. The causes were a sort, a cap, and a missing join:
+
+      1. selection ordered by `(priority_index, price)` over `_build_prop_rows`'
+         hard cap of 8, so the first market drained every slot;
+      2. `_build_prop_rows` walks away-then-home and returns at 8, so an away
+         list of 8+ leaves home with nothing;
+      3. rows were built from the raw odds capture, never the projection
+         artifact.
+    """
+    from syndicate.features.nfl.props import (
+        _NFL_CARD_PROP_ROWS_PER_SIDE,
+        _nfl_card_prop_rows_balanced,
+    )
+
+    entries = []
+    for market in ("Anytime TD", "Passing Yards", "Receptions", "Receiving Yards"):
+        for i in range(6):
+            entries.append({"market": market, "player": f"{market} player {i}", "_price": 100})
+
+    rows = _nfl_card_prop_rows_balanced(entries, _NFL_CARD_PROP_ROWS_PER_SIDE)
+    assert len(rows) == _NFL_CARD_PROP_ROWS_PER_SIDE
+    markets = {r["market"] for r in rows}
+    assert len(markets) == _NFL_CARD_PROP_ROWS_PER_SIDE, (
+        f"one market must not drain the card; got {markets}"
+    )
+    players = [r["player"] for r in rows]
+    assert len(set(players)) == len(players), f"one row per player; got {players}"
+
+
+def test_per_side_cap_is_half_the_shared_contract_budget():
+    """`_build_prop_rows` caps at 8 across BOTH sides, away first.
+
+    If this constant ever exceeds half that budget the home team silently
+    disappears again, which is invisible in any per-side test.
+    """
+    from syndicate.features.nfl.props import _NFL_CARD_PROP_ROWS_PER_SIDE
+
+    assert _NFL_CARD_PROP_ROWS_PER_SIDE * 2 <= 8
+
+
+def test_balanced_selection_falls_back_rather_than_returning_a_short_card():
+    """A side with few players must still fill the card.
+
+    Skipping duplicate players is a preference, not a hard constraint -- a
+    thinner panel is worse than showing one player twice.
+    """
+    from syndicate.features.nfl.props import _nfl_card_prop_rows_balanced
+
+    entries = [
+        {"market": "Anytime TD", "player": "Solo Guy", "_price": 100},
+        {"market": "Passing Yards", "player": "Solo Guy", "_price": -110},
+        {"market": "Rushing Yards", "player": "Solo Guy", "_price": -105},
+    ]
+    rows = _nfl_card_prop_rows_balanced(entries, 4)
+    assert len(rows) == 3, "every available row is used before the card goes short"
