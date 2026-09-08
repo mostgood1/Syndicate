@@ -45,7 +45,13 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from syndicate.features.shared.bet_status import segment_refusal
+from syndicate.features.shared.segment_actuals import (
+    FULL_GAME_SEGMENT,
+    REASON_UNSUPPORTED_SEGMENT_PREFIX,
+    order_segment,
+    segment_actuals,
+    segment_periods,
+)
 
 __all__ = ["ncaaf_status_resolver"]
 
@@ -145,14 +151,16 @@ def ncaaf_status_resolver(selected_date: str):
             return {"unavailable_reason": REASON_NOT_NCAAF}
 
         # SEGMENT BEFORE MARKET, because it is the more permanent of the two.
-        # `home_score + away_score` below is the WHOLE-GAME total; a 1H or 1Q
-        # bet asks a question this scoreboard cannot answer at any point in the
-        # game's life, whereas an unsupported market might yet be supported.
-        # Without this, `segment="h1"` + `market="totals"` grades a first-half
-        # under against the full-game score and settles it LOST with confidence.
-        refusal = segment_refusal(order)
-        if refusal is not None:
-            return refusal
+        # A segment this sport does not play refuses here BY NAME -- a join
+        # defect no capture answers. `q1..q4`/`h1`/`h2` are graded below off
+        # the poller's per-period linescores, and refuse by name when a record
+        # lacks them (`segment_actuals`) -- never off `home_score +
+        # away_score`, which is the whole-game total and the wrong answer.
+        # Absent or `full` means the whole game, the one permissive default,
+        # for the reason `bet_status.segment_refusal` states.
+        segment = order_segment(order)
+        if segment != FULL_GAME_SEGMENT and segment_periods("ncaaf", segment) is None:
+            return {"unavailable_reason": f"{REASON_UNSUPPORTED_SEGMENT_PREFIX}{segment}"}
 
         # Market check FIRST: permanent before transient, so a structural gap is
         # not hidden behind a reason that looks like it will fix itself.
@@ -199,15 +207,32 @@ def ncaaf_status_resolver(selected_date: str):
         if record is None:
             return {"unavailable_reason": REASON_GAME_NOT_FOUND}
 
-        home = _as_float(record.get("home_score"))
-        away = _as_float(record.get("away_score"))
+        if segment == FULL_GAME_SEGMENT:
+            home = _as_float(record.get("home_score"))
+            away = _as_float(record.get("away_score"))
+            is_final = bool(record.get("final"))
+            started = bool(record.get("in_progress")) or is_final
+        else:
+            # THE SEGMENT'S OWN SCORE PAIR, or a named refusal. `is_final` is
+            # the SEGMENT's -- a first-half total is decided at the half --
+            # and `h2` (overtime included) closes only with the game. A segment
+            # not yet begun reports `started=False`, not a refusal.
+            actual = segment_actuals("ncaaf", segment, record)
+            if actual.get("unavailable_reason"):
+                return actual
+            if not actual.get("started"):
+                return {"current_value": None, "is_final": False, "started": False}
+            home = _as_float(actual.get("home_score"))
+            away = _as_float(actual.get("away_score"))
+            is_final = bool(actual.get("is_final"))
+            started = True
 
         if is_total:
             if home is None or away is None:
                 return {"unavailable_reason": REASON_NO_SCORES}
             return {
                 "current_value": home + away,
-                "is_final": bool(record.get("final")),
+                "is_final": is_final,
                 "started": True,
             }
 
@@ -218,18 +243,19 @@ def ncaaf_status_resolver(selected_date: str):
             line=order.get("line"),
             home_team=home_team,
             away_team=away_team,
-            home_score=record.get("home_score"),
-            away_score=record.get("away_score"),
+            home_score=home,
+            away_score=away,
             # College football cannot tie -- overtime runs until someone wins --
             # so a level score is not a terminal state and `False` (two-way,
             # level is a push) is the honest encoding of a game that has not
-            # finished. `h2h_3_way` is still three-way off the market name.
+            # finished. A level QUARTER or HALF is a genuine push under the
+            # same flag. `h2h_3_way` is still three-way off the market name.
             draw_possible=False,
         )
         if "unavailable_reason" in view:
             return view
-        view["is_final"] = bool(record.get("final"))
-        view["started"] = bool(record.get("in_progress")) or bool(record.get("final"))
+        view["is_final"] = is_final
+        view["started"] = started
         return view
 
     return resolve

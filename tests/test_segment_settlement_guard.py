@@ -108,11 +108,17 @@ def test_the_wnba_wording_is_preserved_for_its_recorded_reading():
 # --------------------------------------------------------------------------
 
 # (module, factory, the sport token the resolver gates on)
+#
+# ONLY THE RESOLVERS THAT STILL GRADE OFF A WHOLE-GAME ACTUAL. nfl, ncaaf and
+# soccer left this list 2026-09-08: their pollers now persist per-period
+# linescores and the resolvers grade `q1..q4`/`h1`/`h2` off them through
+# `segment_actuals`, refusing BY NAME (`segment_actual_unavailable:<seg>`)
+# when a record lacks the periods. The property this file asserts -- a segment
+# order is never graded off the full-game score -- is asserted for those three
+# in `tests/test_segment_settlement_football_soccer.py`, against the new
+# refusal rather than the old one.
 _RESOLVERS = [
-    ("bet_status_ncaaf", "ncaaf_status_resolver", "ncaaf"),
-    ("bet_status_nfl", "nfl_status_resolver", "nfl"),
     ("bet_status_mlb", "mlb_status_resolver", "mlb"),
-    ("bet_status_soccer", "soccer_status_resolver", "soccer"),
     ("bet_status_wnba", "wnba_status_resolver", "wnba"),
 ]
 

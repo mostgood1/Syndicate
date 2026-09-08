@@ -99,7 +99,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from syndicate.features.shared.bet_status import segment_refusal
+from syndicate.features.shared.segment_actuals import (
+    FULL_GAME_SEGMENT,
+    REASON_UNSUPPORTED_SEGMENT_PREFIX,
+    order_segment,
+    segment_actuals,
+    segment_periods,
+)
 
 __all__ = ["soccer_status_resolver"]
 
@@ -170,12 +176,15 @@ def soccer_status_resolver(selected_date: str):
 
         # SEGMENT BEFORE MARKET, same ordering and same reason as the market
         # check below. `market_segments` gives soccer `h1`/`h2`, and
-        # `fetch_soccer_oddsapi_odds_local` already asks for both -- so a
-        # first-half goals bet is a shape this ledger can receive, and the
-        # artifact read below carries the full-time score only.
-        refusal = segment_refusal(order)
-        if refusal is not None:
-            return refusal
+        # `fetch_soccer_oddsapi_odds_local` already asks for both. Those two
+        # are graded below off the per-half goals the poller now carries
+        # (`segment_actuals`), refusing BY NAME on a record without them; any
+        # other segment is a join defect and refuses here. Absent or `full`
+        # means the whole match, for the reason `bet_status.segment_refusal`
+        # states.
+        segment = order_segment(order)
+        if segment != FULL_GAME_SEGMENT and segment_periods("soccer", segment) is None:
+            return {"unavailable_reason": f"{REASON_UNSUPPORTED_SEGMENT_PREFIX}{segment}"}
 
         # THE MARKET CHECK COMES FIRST, before the artifact read -- the rule
         # `bet_status_wnba` states and paid for: "we cannot grade this market"
@@ -214,14 +223,32 @@ def soccer_status_resolver(selected_date: str):
         if record is None:
             return {"unavailable_reason": REASON_MATCH_NOT_FOUND}
 
+        if segment == FULL_GAME_SEGMENT:
+            home = _as_float(record.get("home_score"))
+            away = _as_float(record.get("away_score"))
+            # ASSERTED BY THE ARTIFACT, never read off the clock. Stoppage time
+            # is real and decides totals.
+            is_final = bool(record.get("final"))
+        else:
+            # THE HALF'S OWN SCORE PAIR, or a named refusal. `is_final` is the
+            # half's: a first-half total is decided at the interval, which the
+            # poller's `status_period` (2 once the second half is under way)
+            # or the match's own `final` asserts -- never the clock.
+            actual = segment_actuals("soccer", segment, record)
+            if actual.get("unavailable_reason"):
+                return actual
+            if not actual.get("started"):
+                return {"current_value": None, "is_final": False, "started": False}
+            home = _as_float(actual.get("home_score"))
+            away = _as_float(actual.get("away_score"))
+            is_final = bool(actual.get("is_final"))
+
         if is_total:
             # NO TRANSLATION. The order already carries `side="over"` and a
             # numeric line, so the grader needs only the combined goals --
             # exactly what `bet_status_mlb._combined_score` hands it. Passing
             # this through `game_line_view` is what refused it as
             # `unmapped_market` in the first place.
-            home = _as_float(record.get("home_score"))
-            away = _as_float(record.get("away_score"))
             if home is None or away is None:
                 # A half-known score is not a score. Refusing both together
                 # stops a missing away total reading as a clean sheet -- the
@@ -229,7 +256,7 @@ def soccer_status_resolver(selected_date: str):
                 return {"unavailable_reason": REASON_NO_SCORES}
             return {
                 "current_value": home + away,
-                "is_final": bool(record.get("final")),
+                "is_final": is_final,
                 "started": True,
             }
 
@@ -240,11 +267,13 @@ def soccer_status_resolver(selected_date: str):
             line=order.get("line"),
             home_team=home_team,
             away_team=away_team,
-            home_score=record.get("home_score"),
-            away_score=record.get("away_score"),
+            home_score=home,
+            away_score=away,
             # SOCCER DRAWS. A level 2-way moneyline is a PUSH and a level
             # three-way is a LOSS; `game_line_view` encodes both off this flag
-            # and the market name, so neither is decided here.
+            # and the market name, so neither is decided here. A first-half
+            # result is three-way exactly as the match result is: a level half
+            # is the DRAW outcome, not a push on the favourite.
             draw_possible=True,
         )
         if "unavailable_reason" in view:
@@ -254,9 +283,7 @@ def soccer_status_resolver(selected_date: str):
             "current_value": view.get("current_value"),
             "side": view.get("side"),
             "line": view.get("line"),
-            # ASSERTED BY THE ARTIFACT, never read off the clock. Stoppage time
-            # is real and decides totals.
-            "is_final": bool(record.get("final")),
+            "is_final": is_final,
             "started": True,
         }
 
@@ -389,12 +416,15 @@ def _load_matches(selected_date: str) -> list[dict[str, Any]] | None:
         return _recall_finals(selected_date)
 
     games, _age = resolved
+    segment_fields = _segment_fields_by_matchup(selected_date)
     out: list[dict[str, Any]] = []
     for game in games:
         if not isinstance(game, Mapping):
             continue
         home = game.get("home") if isinstance(game.get("home"), Mapping) else {}
         away = game.get("away") if isinstance(game.get("away"), Mapping) else {}
+        state = str(game.get("state") or "").strip().lower()
+        extra = segment_fields.get((_norm(home.get("name")), _norm(away.get("name")))) or {}
         out.append(
             {
                 "home_team": home.get("name"),
@@ -404,10 +434,91 @@ def _load_matches(selected_date: str) -> list[dict[str, Any]] | None:
                 # `_soccer_live_state_games` has already collapsed both of the
                 # artifact's finished signals (`status_state == "post"` and the
                 # `final` boolean) into one state token.
-                "final": str(game.get("state") or "").strip().lower() == "final",
+                "final": state == "final",
+                "in_progress": state == "live",
+                "status_detail": game.get("detailed"),
+                # SEGMENT FIELDS, joined back on from the artifacts the shared
+                # reader trims them out of -- see `_segment_fields_by_matchup`.
+                # Absent reads as a named refusal downstream, never as 0-0.
+                "home_linescores": extra.get("home_linescores"),
+                "away_linescores": extra.get("away_linescores"),
+                "period": extra.get("period"),
             }
         )
     # Kept BEFORE returning, so the window is recorded on every tick that can
     # still see it rather than only on the one that happens to grade.
     _remember_finals(selected_date, out)
+    return out
+
+
+def _segment_fields_by_matchup(selected_date: str) -> dict[tuple[str, str], dict[str, Any]]:
+    """`(home, away)` -> `{home_linescores, away_linescores, period}` for every
+    match this service can see. Never raises; empty when nothing carries them.
+
+    WHY THIS IS A SECOND READ OF THE SAME ARTIFACTS. `_load_matches` delegates
+    to `board_enrichment._soccer_live_state_games`, which is the one reader
+    of soccer's two-source asymmetry -- and which trims each match down to the
+    fields the CHIP correction needs, dropping the per-half goals the poller
+    now writes. Carrying them through that trim is a three-line edit to
+    `board_enrichment.py`, and that file is claimed by OPEN lane
+    `ncaaf-live-resim` (2026-09-08), so it is not made here. Until it is, the
+    two settlement fields are joined back on from the SAME three sources the
+    shared reader walks, by the team pair the poller wrote, in the same order:
+    the aggregate's in-play `games`, its `finals`, then each catalogued
+    league's `match_box` by NAME. A record WITHOUT the fields never overwrites
+    one WITH them.
+
+    The join key is the exact normalised pair, not `teams_match`: both sides of
+    the join are the poller's own `displayName`s, so aliasing has nothing to
+    resolve and would only widen the match.
+    """
+    out: dict[tuple[str, str], dict[str, Any]] = {}
+    records: list[Mapping[str, Any]] = []
+    try:
+        from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+        from syndicate.features.shared.soccer_live_gameline_source import soccer_live_games
+    except ImportError:  # pragma: no cover - deploy-skew guard
+        return out
+
+    try:
+        records.extend(g for g in soccer_live_games(selected_date) if isinstance(g, Mapping))
+    except Exception:
+        pass
+    try:
+        root = data_root()
+        snapshot = read_json_file(root / "live" / "soccer_live_lens.json")
+        if isinstance(snapshot, Mapping) and str(snapshot.get("date") or "") == str(selected_date):
+            finals = snapshot.get("finals")
+            if isinstance(finals, list):
+                records.extend(r for r in finals if isinstance(r, Mapping))
+        try:
+            from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+
+            league_names = list(LEAGUE_DISPLAY_NAMES)
+        except Exception:  # pragma: no cover - deploy-skew guard
+            league_names = []
+        for league in league_names:
+            payload = read_json_file(
+                root / "soccer_source" / str(league) / "api" / "live_state" / f"live_state_{selected_date}.json"
+            )
+            if not isinstance(payload, Mapping):
+                continue
+            match_box = payload.get("match_box")
+            if isinstance(match_box, Mapping):
+                records.extend(r for r in match_box.values() if isinstance(r, Mapping))
+    except Exception:
+        pass
+
+    for record in records:
+        key = (_norm(record.get("home_team")), _norm(record.get("away_team")))
+        if not key[0] or not key[1]:
+            continue
+        fields = {
+            "home_linescores": record.get("home_linescores"),
+            "away_linescores": record.get("away_linescores"),
+            "period": record.get("status_period"),
+        }
+        if fields["home_linescores"] is None and fields["away_linescores"] is None and key in out:
+            continue
+        out[key] = fields
     return out

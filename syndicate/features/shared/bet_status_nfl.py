@@ -66,7 +66,13 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from syndicate.features.shared.bet_status import segment_refusal
+from syndicate.features.shared.segment_actuals import (
+    FULL_GAME_SEGMENT,
+    REASON_UNSUPPORTED_SEGMENT_PREFIX,
+    order_segment,
+    segment_actuals,
+    segment_periods,
+)
 
 __all__ = ["nfl_status_resolver"]
 
@@ -170,17 +176,17 @@ def nfl_status_resolver(selected_date: str):
             # defect in anything and must not be reported as an NFL failure.
             return {"unavailable_reason": REASON_NOT_NFL}
 
-        # SEGMENT BEFORE MARKET -- the more permanent of the two. The scoreboard
-        # this resolver reads carries whole-game team scores, so a 1H or 1Q bet
-        # is unanswerable from it for the entire life of the game, while an
-        # unsupported market might yet become supported. NFL is the sport most
-        # exposed to this: `fetch_nfl_team_odds_local` already REQUESTS 36
-        # segment market keys, so the day that capture starts returning rows is
-        # the day these orders appear -- and without this they would grade
-        # against the full-game score.
-        refusal = segment_refusal(order)
-        if refusal is not None:
-            return refusal
+        # SEGMENT BEFORE MARKET -- the more permanent of the two. A segment
+        # this sport does not play (`first5` on an NFL order) is a join defect
+        # that no capture will ever answer, so it refuses here BY NAME. A
+        # segment it does play (`q1..q4`, `h1`, `h2`) is graded below off the
+        # poller's per-period linescores -- and refuses by name when a record
+        # lacks them, never off the whole-game score (`segment_actuals`).
+        # Absent or `full` means the whole game, the one permissive default,
+        # for the reason `bet_status.segment_refusal` states.
+        segment = order_segment(order)
+        if segment != FULL_GAME_SEGMENT and segment_periods("nfl", segment) is None:
+            return {"unavailable_reason": f"{REASON_UNSUPPORTED_SEGMENT_PREFIX}{segment}"}
 
         # THE MARKET CHECK COMES FIRST, before the artifact read: "we cannot
         # grade this market" is permanent, "the capture is not there yet" is
@@ -226,8 +232,26 @@ def nfl_status_resolver(selected_date: str):
         if record is None:
             return {"unavailable_reason": REASON_GAME_NOT_FOUND}
 
-        home = _as_float(record.get("home_score"))
-        away = _as_float(record.get("away_score"))
+        if segment == FULL_GAME_SEGMENT:
+            home = _as_float(record.get("home_score"))
+            away = _as_float(record.get("away_score"))
+            is_final = bool(record.get("final"))
+            started = bool(record.get("in_progress")) or is_final
+        else:
+            # THE SEGMENT'S OWN SCORE PAIR, or a named refusal. `is_final` is
+            # the SEGMENT's: a first-half total is decided at the half, not at
+            # the final whistle, and `h2` (overtime included) only with the
+            # game. A segment that has not begun yet reports `started=False`
+            # rather than a refusal -- not unanswerable, not yet asked.
+            actual = segment_actuals("nfl", segment, record)
+            if actual.get("unavailable_reason"):
+                return actual
+            if not actual.get("started"):
+                return {"current_value": None, "is_final": False, "started": False}
+            home = _as_float(actual.get("home_score"))
+            away = _as_float(actual.get("away_score"))
+            is_final = bool(actual.get("is_final"))
+            started = True
 
         if is_total:
             # NO TRANSLATION. The order already carries `side="over"` and a
@@ -242,7 +266,7 @@ def nfl_status_resolver(selected_date: str):
                 return {"unavailable_reason": REASON_NO_SCORES}
             return {
                 "current_value": home + away,
-                "is_final": bool(record.get("final")),
+                "is_final": is_final,
                 "started": True,
             }
 
@@ -253,17 +277,18 @@ def nfl_status_resolver(selected_date: str):
             line=order.get("line"),
             home_team=home_team,
             away_team=away_team,
-            home_score=record.get("home_score"),
-            away_score=record.get("away_score"),
+            home_score=home,
+            away_score=away,
             # See the module docstring. A level NFL moneyline is a PUSH, not a
-            # loss, and that is what False encodes. `h2h_3_way` is graded
-            # three-way off the market name regardless.
+            # loss, and that is what False encodes -- for a quarter or a half
+            # exactly as for the game. `h2h_3_way` is graded three-way off the
+            # market name regardless.
             draw_possible=False,
         )
         if "unavailable_reason" in view:
             return view
-        view["is_final"] = bool(record.get("final"))
-        view["started"] = bool(record.get("in_progress")) or bool(record.get("final"))
+        view["is_final"] = is_final
+        view["started"] = started
         return view
 
     return resolve
