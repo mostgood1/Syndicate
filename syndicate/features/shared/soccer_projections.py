@@ -701,7 +701,7 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
     # quoted set is complete.
     from syndicate.features.shared.prop_projections import _no_vig_over_probability
 
-    fair = _no_vig_over_probability(row)
+    fair = _no_vig_over_probability(_canonical_side_view(row))
     projection["market_fair_prob_over"] = fair
     # WHY THE DE-VIG CAME BACK EMPTY, STAMPED HERE SO IT SURVIVES THE LIVE
     # EARLY-RETURN BELOW (`#536`).
@@ -1385,3 +1385,96 @@ def attach_soccer_projections(
             default=None,
         ),
     }
+
+
+def _canonical_side_view(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Relabel TEAM-NAME sides to `home`/`away` so the shared de-vig can read them.
+
+    THE DEFECT THIS FIXES, measured on production 2026-09-06/07. Soccer's live
+    spreads carried 377 ledger rows in a day, `model_home_win_prob` set on 354
+    of them and `market_fair_prob` set on **ZERO**, so 354 refused
+    `no_two_sided_market_price`. The model had an opinion on 94% of those rows
+    and it was discarded for want of a market to compare it against.
+
+    THE CAUSE IS A THIRD VOCABULARY. `_no_vig_over_probability` resolves the two
+    legs by LABEL, and its own comment names the two it knows:
+
+        over_side  = ... in {"over", "yes", "home", "1"}
+        under_side = ... in {"under", "no", "away", "2"}
+        # "Two vocabularies, one shape: props quote over/under, game markets
+        #  quote home/away."
+
+    Soccer quotes a third: the actual team name. From
+    `soccer_source/epl/api/odds/game_odds_current.csv`, 126 spreads rows and 492
+    h2h rows, `side` values are `Arsenal`, `Sunderland`, `Crystal Palace`, ...
+    with `Draw` as the third h2h leg. Run directly against that shape the de-vig
+    returns None; run against `home`/`away` it returns 0.5564. The arithmetic
+    was never the problem.
+
+    NOT A THREE-WAY PROBLEM, and it is worth saying because the obvious reading
+    is wrong. These spreads are ASIAN HANDICAP -- the measured lines include
+    `0.25` and `-0.75`, quarter lines that exist only in AH, and the split stake
+    is precisely the mechanism that REMOVES the draw. So there is no third leg to
+    include here. Soccer's genuine three-way market is `h2h`, which
+    `_THREE_WAY_GAME_MARKETS` already handles, and any `Draw` label is passed
+    through untouched below so that handling still applies.
+
+    WHY HERE AND NOT IN THE SHARED HELPER. `prop_projections.py` is claimed by
+    lane `mlb-prop-phase1`, and more importantly a team-name vocabulary is a
+    SOCCER fact -- widening the shared matcher would change how every sport
+    resolves its legs to fix one sport's labels. This translates at the boundary
+    instead, and hands the shared function exactly the shape it documents.
+
+    CONSERVATIVE BY CONSTRUCTION. It returns the row UNCHANGED unless it can
+    resolve BOTH teams, so a row it does not understand keeps today's behaviour
+    rather than acquiring a guessed one. A half-resolved market -- one leg
+    relabelled and one not -- would de-vig across a leg set that does not exist,
+    which errs in the bettor's favour, and the helper's own comment calls that
+    "the most dangerous direction".
+    """
+    sides = [s for s in (row.get("sides") or []) if str(s).strip()]
+    if not sides:
+        return row
+    home_team = row.get("home_team")
+    away_team = row.get("away_team")
+    if not str(home_team or "").strip() or not str(away_team or "").strip():
+        return row
+    # Already canonical? Leave it completely alone -- re-mapping a row that the
+    # shared helper can already read is pure risk for no gain.
+    lowered = {str(s).strip().lower() for s in sides}
+    if lowered & {"home", "away", "over", "under", "1", "2"}:
+        return row
+
+    sport = row.get("sport") or "soccer"
+    consensus = dict(row.get("consensus") or {})
+    new_sides: list[Any] = []
+    new_consensus: dict[str, Any] = {}
+    resolved_home = resolved_away = False
+    for side in sides:
+        token = str(side).strip()
+        if token.lower() in {"draw", "tie", "x"}:
+            # Passed through untouched: the shared helper looks for exactly
+            # these and includes the leg in the denominator.
+            new_sides.append(token)
+            if token in consensus:
+                new_consensus[token] = consensus[token]
+            continue
+        if not resolved_home and teams_match(sport, token, home_team):
+            new_sides.append("home")
+            if token in consensus:
+                new_consensus["home"] = consensus[token]
+            resolved_home = True
+            continue
+        if not resolved_away and teams_match(sport, token, away_team):
+            new_sides.append("away")
+            if token in consensus:
+                new_consensus["away"] = consensus[token]
+            resolved_away = True
+            continue
+        # An unrecognised leg means the quoted set is not what this thinks it
+        # is. Refuse the whole translation rather than emit a partial one.
+        return row
+
+    if not (resolved_home and resolved_away):
+        return row
+    return {**row, "sides": new_sides, "consensus": new_consensus}
