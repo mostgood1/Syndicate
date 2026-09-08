@@ -1,4 +1,81 @@
-# 19 REAL REGRESSIONS ON `main`, FOUND THE FIRST TIME THE FULL SUITE EVER RAN ON THE CRON
+# ~~19 REAL REGRESSIONS~~ — **RETRACTED THE SAME DAY. 15 of the 19 are a MEMORY FLOOR THE CONTAINER CANNOT REACH, not breakage.**
+
+> **READ THIS FIRST. The title below is wrong and is kept only so the retraction
+> has something to point at.** The traceback arrived after this was filed and
+> falsifies the central claim. What survives is at the bottom under WHAT STILL
+> STANDS.
+
+## THE RETRACTION `[2026-09-08 ~21:30Z, substrate render]`
+
+The 13 intelligence-layer failures are **not regressions**. Their traceback, from
+the cron:
+
+    [intelligence] OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb floor=expensive
+      floor_mb=3000 sports_done=0 snapshot={'current_mb': 263.7, 'max_mb': 2048.0,
+      'headroom_mb': 1915.4}
+    [intelligence_state] MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint
+      floor_mb=1900 snapshot={'headroom_mb': 1843.3, 'min_required_mb': 1900.0}
+
+**MLB's overview floor is 3000 MB. The cron's ENTIRE container limit is 2048 MB.**
+The floor is unsatisfiable there by construction, so MLB is skipped every time and
+the assertions see an empty overview — `[] != [{'slug': 'mlb'}]`, `0 != 10`,
+`StopIteration`. On a developer machine headroom exceeds 3000 MB and all 13 pass.
+
+`intelligence.py:2915-2930` ALREADY DOCUMENTS THIS, measured in production
+2026-08-27: *"the expensive floor is unreachable at rest"*, eighteen consecutive
+refresh-worker builds reading `BOARD_OVERVIEW_READY sports=0`. It is a known
+property, not a new defect.
+
+The same class covers the two `test_memory_headroom_snapshot_reports_insufficient_and_sufficient`
+tests: they must produce a SUFFICIENT reading, which a 2048 MB box cannot give
+for a high floor. **15 of 19 accounted for.**
+
+## THE ERROR IN MY REASONING, WHICH IS THE REUSABLE PART
+
+I qualified these as regressions on two checks — the test existed at baseline
+commit `a20204dd`, and it still fails in ISOLATION on the cron. Both were true
+and both were consistent with the tests never having passed on that host.
+
+**THE MISSING PREMISE: the baseline was recorded in a DIFFERENT ENVIRONMENT, and
+the cron did not exist when it was taken.** It was recorded 2026-08-26 under
+`-n auto` on a machine with ordinary RAM; `ci-suite` was created 2026-09-07.
+"Not in the baseline's failing set" therefore means "passed on some other box",
+NEVER "passed here". I compared a set recorded on one host against a run on
+another and read the difference as change over TIME. It was change over PLACE.
+
+**A baseline is a fact about an ENVIRONMENT as much as about a commit. Comparing
+across hosts requires establishing the hosts are comparable, and I did not.**
+
+Peer session 2edf8b82 supplied the reading that broke it open: the 16 tests pass
+on their machine both at merged head AND at `1eb59ce7`, so no commit of theirs
+moves them in either direction — which is what a time-based regression would
+have to do.
+
+## WHAT STILL STANDS
+
+- **The suite completes on the cron.** Chunking works; that is `#647` and is
+  unaffected.
+- **4 of the 19 are still unexplained** and are the only live candidates:
+  `test_refresh_odds_sources.py::SoccerLeagueScopeTests` x2 and
+  `test_soccer_live_gates_wiring.py` x2. Their tracebacks were truncated out of
+  the run above and have NOT been read. **Do not call these regressions either
+  until they are.**
+- **The baseline still must not be regenerated**, but for a different reason
+  than I gave. Not "it would hide 19 regressions" — it would record, as
+  permanent known failures, tests that fail ONLY because the runner has 2 GB.
+  That bakes a host property into a commit-level gate.
+- **The real question this exposed is better than the one I filed:** should a
+  16,418-test suite whose intelligence tests need 3 GB of headroom run on a
+  2 GB cron at all? The tests are not wrong and the guard is not wrong; the
+  RUNNER is too small for this subset. That is `#647`'s sizing question
+  returning in a different costume.
+
+---
+
+*Everything below is the ORIGINAL filing, preserved unedited. Its evidence is
+sound; its CONCLUSION is retracted by the section above.*
+
+# (original) 19 REAL REGRESSIONS ON `main`, FOUND THE FIRST TIME THE FULL SUITE EVER RAN ON THE CRON
 
 `#648`. Lane `render-cron-failures`, 2026-09-08. Substrate: **render** — every
 number here is from a cron run, not a checkout.

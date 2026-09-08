@@ -1,6 +1,51 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#648` — **19 REAL REGRESSIONS ON `main`, and nothing was watching for 17 days** — lane `render-cron-failures`, 2026-09-08 — **FILED WITH EVIDENCE; NOT DIAGNOSED, NOT FIXED**
+### `#648` — **~~19 real regressions~~ RETRACTED: 15 of 19 are a MEMORY FLOOR THE RUNNER CANNOT REACH** — lane `render-cron-failures`, 2026-09-08 — **RETRACTED THE SAME DAY; 4 still unexplained**
+
+**RETRACTION `[~21:30Z, substrate render]`.** The traceback landed after this was
+filed and falsifies the central claim. The 13 intelligence-layer failures are not
+breakage:
+
+    OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb floor=expensive floor_mb=3000
+      snapshot={'max_mb': 2048.0, 'headroom_mb': 1915.4}   sports_done=0
+
+**MLB's overview floor is 3000 MB; the cron's whole container is 2048 MB.** The
+floor is unsatisfiable there, MLB is skipped every run, and the assertions see an
+empty overview. On a developer box headroom clears 3000 and all 13 pass.
+`intelligence.py:2915-2930` already documents this, measured in production
+2026-08-27 — *"the expensive floor is unreachable at rest"*. Same class covers the
+two `memory_headroom_snapshot_reports_insufficient_and_sufficient` tests, which
+need a SUFFICIENT reading a 2 GB box cannot produce. **15 of 19 accounted for.**
+
+**THE ERROR, which is the part worth keeping.** I qualified them on two true
+checks — existed at baseline `a20204dd`, still fails in ISOLATION on the cron —
+and both are equally consistent with "never passed on that host". **The missing
+premise: the baseline was recorded 2026-08-26 on another machine, and `ci-suite`
+did not exist until 2026-09-07.** "Not in the baseline's failing set" means
+"passed somewhere else", never "passed here". I read change over PLACE as change
+over TIME. **A baseline is a fact about an ENVIRONMENT as much as about a commit.**
+
+Peer session 2edf8b82 supplied the breaking reading: the 16 tests pass on their
+machine at merged head AND at `1eb59ce7`, so no commit moves them either way —
+which a time-based regression would have to do.
+
+**STILL OPEN, and the only live candidates:** 4 failures whose tracebacks have NOT
+been read — `test_refresh_odds_sources.py::SoccerLeagueScopeTests` x2 and
+`test_soccer_live_gates_wiring.py` x2. **Do not call these regressions either
+until someone reads them.**
+
+**The baseline still must not be regenerated** — but for a different reason than
+I gave. Not "it hides 19 regressions": it would record as permanent known
+failures a set of tests that fail ONLY because the runner has 2 GB, baking a HOST
+property into a commit-level gate.
+
+**THE BETTER QUESTION THIS EXPOSED:** should a suite whose intelligence tests
+need 3 GB of headroom run on a 2 GB cron at all? The tests are not wrong and the
+guard is not wrong — the RUNNER is too small for this subset. That is `#647`'s
+sizing question in a different costume, and it is unanswered.
+
+Full working, including the original filing preserved unedited:
+`.syndicate/findings_2026-09-08_nineteen_pytest_regressions.md`.
 
 Full working: `.syndicate/findings_2026-09-08_nineteen_pytest_regressions.md`.
 Substrate **render** — every number is from a cron run, not a checkout.
