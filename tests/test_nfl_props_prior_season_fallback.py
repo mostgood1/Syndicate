@@ -283,72 +283,100 @@ def test_a_populated_build_still_writes_and_publishes(monkeypatch, tmp_path):
     assert len(published) == 1
 
 
-def test_builder_pulls_the_odds_capture_before_it_computes(monkeypatch):
-    """The pull must happen BEFORE the compute, or it cannot help.
+def test_builder_repairs_an_empty_local_artifact_on_refusal(monkeypatch):
+    """A refusal must REPAIR the local copy, not merely decline to write it.
 
-    refresh-worker has the play-by-play; web has the NFL odds capture. Neither
-    service has both, and the capture is WEEK-suffixed
-    (`oddsapi_player_props_2026_wk1.csv`) so the date-scoped `pull_hot_artifacts`
-    can never match it. Measured 2026-09-08: the autorun's first real run built
-    0 rows on the worker off a missing input.
-
-    Ordering is the whole point -- a pull after the compute reads as wired and
-    does nothing -- so this asserts the SEQUENCE, not just the call. That is the
-    same defect class as the zero-row guard, which was present but sat below the
-    write it was supposed to prevent.
+    refresh-worker cannot build this artifact -- it has no player-level pbp --
+    so it wrote a 284-byte empty file and a periodic sweep republished that over
+    web's good copy after every restart (`PUBLISH_OK ... bytes=284` at 19:19:57,
+    19:22:34, and again at 20:01:38 right after the 19:58:07 deploy). Declining
+    to write leaves that file in place, so the outage recurs on every boot.
     """
     import scripts.build_nfl_prop_projections as builder
 
     calls: list[str] = []
+    monkeypatch.setattr(builder, "nfl_props_rows_for_week", lambda s, w, **k: ([], []))
+    monkeypatch.setattr(builder, "read_nfl_prop_projection_artifact", lambda s, w: [])
 
     def fake_pull(relative_path, **kwargs):
-        calls.append(f"pull:{relative_path}")
-        return True, 4096
-
-    def fake_rows(season, week, *, use_artifact=True):
-        calls.append(f"compute:{season}:{week}:use_artifact={use_artifact}")
-        return [], []
+        calls.append(relative_path)
+        return True, 1
 
     monkeypatch.setattr(builder, "pull_streamed_artifact", fake_pull)
-    monkeypatch.setattr(builder, "nfl_props_rows_for_week", fake_rows)
 
     result = builder.build(2026, 1)
-
-    assert calls == [
-        "pull:nfl_source/oddsapi_player_props_2026_wk1.csv",
-        "compute:2026:1:use_artifact=False",
-    ], f"pull must precede compute, and force a recompute; got {calls}"
-    assert result["odds_pull_ok"] is True
-    assert result["odds_pull_written"] == 4096
-    # A successful pull does NOT license a zero-row publish.
+    assert calls == ["nfl_source/nfl_prop_projections_2026_wk1.json"]
     assert result["refused"] == "zero_sim_rows"
+    assert result["repair_pull_ok"] is True
     assert result["published"] is False
 
 
-def test_builder_survives_a_failed_odds_pull(monkeypatch):
-    """A failed pull degrades to the refusal, never to a crash or a clobber."""
+def test_builder_never_overwrites_a_good_local_artifact(monkeypatch):
+    """The repair must not destroy a local copy that HAS rows.
+
+    Measured while writing it: the unconditional version pulled web's 111-byte
+    empty artifact over a local one. On a developer checkout -- the only machine
+    that can currently build this -- that deletes the only copy that exists.
+    """
     import scripts.build_nfl_prop_projections as builder
 
-    monkeypatch.setattr(builder, "pull_streamed_artifact", lambda p, **k: (False, 0))
+    pulled: list[str] = []
+    monkeypatch.setattr(builder, "nfl_props_rows_for_week", lambda s, w, **k: ([], []))
     monkeypatch.setattr(
-        builder, "nfl_props_rows_for_week", lambda s, w, **k: ([], [])
+        builder, "read_nfl_prop_projection_artifact", lambda s, w: [{"entity": "x"}] * 980
+    )
+    monkeypatch.setattr(
+        builder, "pull_streamed_artifact", lambda p, **k: pulled.append(p) or (True, 1)
     )
 
     result = builder.build(2026, 1)
-    assert result["odds_pull_ok"] is False
+    assert pulled == [], "a good local artifact must never be overwritten"
+    assert result["repair_pull_ok"] is False
+    assert result["repair_pull_written"] == 0
     assert result["refused"] == "zero_sim_rows"
-    assert result["path"] is None
 
 
-def test_the_odds_capture_is_allowlisted_for_streaming():
-    """`pull_streamed_artifact` refuses anything off HOT_ARTIFACT_PATTERNS.
+def test_a_successful_build_never_repairs(monkeypatch):
+    """The repair path is for refusals only -- a real build must not pull."""
+    import scripts.build_nfl_prop_projections as builder
 
-    The pull above is silently a no-op if this ever stops being true, so pin it
-    rather than trusting that the pattern stays put.
+    pulled: list[str] = []
+    rows = [{"entity": "p", "market": "anytime_td", "rate_source": "prior_season_fallback"}]
+    monkeypatch.setattr(builder, "nfl_props_rows_for_week", lambda s, w, **k: (["o"], rows))
+    monkeypatch.setattr(
+        builder, "pull_streamed_artifact", lambda p, **k: pulled.append(p) or (True, 1)
+    )
+    monkeypatch.setattr(builder, "write_nfl_prop_projection_artifact", lambda s, w, r: "p.json")
+    monkeypatch.setattr(builder, "publish_hot_artifact", lambda path: True)
+
+    result = builder.build(2026, 1)
+    assert pulled == []
+    assert result["ok"] is True
+    assert result["sim_rows"] == 1
+
+
+def test_the_projection_artifact_is_allowlisted_for_streaming():
+    """The repair is silently a no-op if this stops being true."""
+    from syndicate.features.shared.artifact_publisher import (
+        is_hot_artifact_relative_path,
+    )
+
+    assert is_hot_artifact_relative_path("nfl_source/nfl_prop_projections_2026_wk1.json")
+
+
+def test_the_player_pbp_is_not_publishable_which_is_why_the_worker_cannot_build():
+    """Pin the CONSTRAINT that makes refresh-worker unable to produce this.
+
+    `_pbp_path` reads nfl_source/tracking/nflverse/pbp/pbp_<season>.csv. That
+    path is not on HOT_ARTIFACT_PATTERNS, so it can neither publish nor stream,
+    and the 2025 file is 97.9 MB against a 12 MiB publish ceiling. If someone
+    later allowlists it, this test fails and that is the signal to revisit
+    whether the worker can become the real producer.
     """
     from syndicate.features.shared.artifact_publisher import (
         is_hot_artifact_relative_path,
     )
 
-    assert is_hot_artifact_relative_path("nfl_source/oddsapi_player_props_2026_wk1.csv")
-    assert is_hot_artifact_relative_path("nfl_source/oddsapi_player_props_2026_wk18.csv")
+    assert not is_hot_artifact_relative_path(
+        "nfl_source/tracking/nflverse/pbp/pbp_2025.csv"
+    )

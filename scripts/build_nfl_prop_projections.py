@@ -14,13 +14,39 @@ The ODDS half was healthy end to end -- 2,455 rows. BOTH refusal counters at
 zero prove nothing reached the team check, so the loop exited at the only
 `continue` above it, `player_id is None`, on every row. That requires
 `player_name_index` to be empty for BOTH 2026 and 2025, and both are derived
-from play-by-play. **web has no pbp.** refresh-worker does -- its projection
-artifact carries `rating_source=nflverse_pbp_epa_rolling[...]`.
+from play-by-play.
 
-Three services, three disks (`CLAUDE.md`: cross-disk access is a hard
-requirement). The prop model was being computed on the service WITHOUT the
-data, which is also the service `CLAUDE.md` says must do no heavy computation:
-"workers write artifacts, web reads them". This script is the worker half.
+CORRECTED 2026-09-08, and the correction is the whole point of this header.
+The first version of this docstring said "**web has no pbp.** refresh-worker
+does -- its projection artifact carries `rating_source=nflverse_pbp_epa_rolling`".
+That inference was wrong. `nflverse_pbp_epa_rolling` is TEAM-level EPA and
+says nothing about the player-level columns this model needs. The worker's own
+log, at the instant its first autorun ran:
+
+    19:19:57.443  NFL_PROP_PROJECTION_LAUNCHING season=2026 week=1
+    19:19:57.565  [nfl_props] JOIN ... sim_source=computed odds_rows=2463
+                  sim_rows=0 refused_wrong_team=0 refused_unknown_team=0
+
+**refresh-worker had 2,463 odds rows and still produced zero sim rows**, with
+both refusal counters at zero -- the identical signature web showed. So the
+odds capture was never the missing input, and NEITHER SERVICE CAN RESOLVE A
+PLAYER NAME.
+
+Why it cannot simply be shipped there: `_pbp_path` reads
+`nfl_source/tracking/nflverse/pbp/pbp_<season>.csv`, that path is **not in
+`HOT_ARTIFACT_PATTERNS` at all** (so it can neither publish nor stream), and
+`pbp_2025.csv` is **97.9 MB** against a 12 MiB `_PUBLISH_MAX_BYTES`. Loading it
+also materialises every REG play as a dict on a worker that already plateaus at
+2.65-2.70 GB of 4 GB.
+
+WHAT THAT MEANS FOR THIS SCRIPT. On a service with the pbp -- today, a
+developer checkout -- it is the producer, and `CLAUDE.md` explicitly permits
+that arm: artifact generation happens in background workers "or offline
+scripts". On refresh-worker it CANNOT succeed, so its job there is to refuse
+without damage and repair itself, which is what the two guards below do.
+`load_player_plays` returns `()` for a missing file, so the failure is silent
+at every level except the row count -- exactly the `.get(key, 1.0)` shape
+`model_engine_standard.md` exists to forbid.
 
 WHAT IT DOES NOT DO. It does not change the model. `nfl_props_rows_for_week`
 computes exactly what it always computed -- the week-1 prior-season fallback,
@@ -47,6 +73,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from syndicate.features.nfl.props import (  # noqa: E402
     nfl_props_rows_for_week,
+    read_nfl_prop_projection_artifact,
     write_nfl_prop_projection_artifact,
 )
 from syndicate.features.shared.artifact_publisher import publish_hot_artifact  # noqa: E402
@@ -54,43 +81,6 @@ from syndicate.features.shared.artifact_publisher import pull_streamed_artifact 
 
 
 def build(season: int, week: int) -> dict:
-    # PULL THE ODDS CAPTURE FIRST -- IT LIVES ON WEB, NOT HERE, AND THAT SPLIT
-    # IS WHAT MADE THIS SCRIPT PUBLISH AN EMPTY ARTIFACT OVER A GOOD ONE.
-    #
-    # MEASURED 2026-09-08: the autorun's first real run built 0 rows on
-    # refresh-worker and clobbered a healthy 966-row artifact. Reproduced
-    # locally by deleting the odds file -- `odds_rows=0 -> sim_rows=0`, exactly
-    # the artifact the worker produced. **refresh-worker has the play-by-play
-    # but NOT the NFL odds capture; web has the odds capture but NOT the
-    # play-by-play. Neither service has both.**
-    #
-    # WHY THE CAPTURE NEVER ARRIVED ON ITS OWN, and it is by construction, not
-    # by accident: `pull_hot_artifacts` is DATE-scoped (`?pattern=*<date>*`)
-    # because an unfiltered pull reproducibly hit Render's proxy timeout. This
-    # file is WEEK-suffixed -- `oddsapi_player_props_2026_wk1.csv` -- so it can
-    # never match a date pattern. `pull_hot_artifacts`'s own docstring names the
-    # class: "a handful of non-dated files ... are out of scope for this
-    # per-cycle pull and would need a separate, infrequent full sync."
-    #
-    # ONE NAMED FILE, NOT A WIDER PATTERN. `_SEASON_ARTIFACT_PATTERNS` was the
-    # other candidate and is the wrong lever: `pull_season_artifacts` is called
-    # before an MLB ROSTER build, so adding an NFL pattern there would make
-    # every MLB build pull NFL props, and that function's docstring is explicit
-    # that each request must stay narrow for the same 502 reason. This pulls
-    # exactly the file this script needs, when it needs it.
-    #
-    # Never fatal: `pull_streamed_artifact` never raises, and a 304 (already
-    # current) is a success that writes nothing -- the normal steady state. If
-    # the pull fails, the build proceeds and the zero-row guard below refuses,
-    # which is the correct degradation.
-    odds_relative = f"nfl_source/oddsapi_player_props_{season}_wk{week}.csv"
-    pulled_ok, pulled_n = pull_streamed_artifact(odds_relative)
-    print(
-        f"[build_nfl_prop_projections] ODDS_PULL path={odds_relative} "
-        f"ok={pulled_ok} written={pulled_n}",
-        flush=True,
-    )
-
     # use_artifact=False is load-bearing: the producer must COMPUTE, never read
     # back the artifact it is about to overwrite. Without it a stale artifact
     # would be republished forever and look like a healthy rebuild.
@@ -115,10 +105,61 @@ def build(season: int, week: int) -> dict:
     # empty here: a stale prop board is wrong about prices, an empty one is
     # indistinguishable from "this week has no market".
     if not sim_rows:
+        # REPAIR THIS SERVICE'S LOCAL COPY, because "left untouched" is not
+        # enough on refresh-worker: the damage there is a file that ALREADY
+        # exists and is already wrong.
+        #
+        # MEASURED 2026-09-08. The pre-guard autorun wrote a 284-byte empty
+        # artifact to the worker's disk. A periodic sweep then publishes hot
+        # artifacts to web, and it republishes that file after every restart --
+        # `PUBLISH_OK ... bytes=284` at 19:19:57, again at 19:22:34, and again
+        # at 20:01:38 immediately after the 19:58:07 deploy, with
+        # `PUBLISH_SKIPPED_UNCHANGED checksum=77a9ed3cd0c7` in between. So the
+        # board did not break once; it breaks again on every boot, and each
+        # time it silently overwrites a good 966-row artifact with an empty one.
+        # `/nfl/api/props` was serving 0 cards when this was written.
+        #
+        # A guard that only declines to write leaves that file in place
+        # forever. Pulling the PUBLISHED copy makes the local file equal to the
+        # good one, so the very next sweep is a no-op
+        # (`PUBLISH_SKIPPED_UNCHANGED`) instead of a clobber -- it converts a
+        # recurring outage into a self-correcting one.
+        #
+        # Ordering this matters and is not obvious: if web's copy is ALSO empty
+        # this pull is worthless, so the published artifact must be restored
+        # FIRST and the worker then converges onto it. It cannot make things
+        # worse -- pulling an empty over an empty is a no-op, and
+        # `pull_streamed_artifact` never raises.
+        # ONLY REPAIR A LOCAL COPY THAT IS ALREADY BROKEN. Measured while
+        # writing this: run on a checkout whose odds capture was missing, the
+        # unconditional version pulled web's 111-byte EMPTY artifact straight
+        # over the local one -- `STREAM_PULL_OK ... bytes=111`. A repair that
+        # can destroy a good copy is not a repair; on a developer box, which is
+        # the only machine that CAN build this today, it would delete the one
+        # artifact in existence.
+        #
+        # The worker's broken state is specifically "local artifact present and
+        # EMPTY", so condition on exactly that. A local copy with rows is left
+        # alone no matter what web is serving.
+        existing = read_nfl_prop_projection_artifact(season, week)
+        local_rows = len(existing or [])
+        artifact_relative = (
+            f"nfl_source/nfl_prop_projections_{season}_wk{week}.json"
+        )
+        if local_rows:
+            repaired_ok, repaired_n = False, 0
+            print(
+                f"[build_nfl_prop_projections] REPAIR_SKIPPED_LOCAL_OK "
+                f"local_rows={local_rows} (not overwriting a good local copy)",
+                flush=True,
+            )
+        else:
+            repaired_ok, repaired_n = pull_streamed_artifact(artifact_relative)
         print(
             f"[build_nfl_prop_projections] REFUSED season={season} week={week} "
             f"reason=zero_sim_rows odds_rows={len(odds_rows)} "
-            f"(existing artifact left untouched)",
+            f"(nothing written) repair_pull={artifact_relative} "
+            f"ok={repaired_ok} written={repaired_n}",
             flush=True,
         )
         return {
@@ -128,8 +169,8 @@ def build(season: int, week: int) -> dict:
             "week": week,
             "path": None,
             "published": False,
-            "odds_pull_ok": bool(pulled_ok),
-            "odds_pull_written": int(pulled_n or 0),
+            "repair_pull_ok": bool(repaired_ok),
+            "repair_pull_written": int(repaired_n or 0),
             "odds_rows": len(odds_rows),
             "sim_rows": 0,
             "entities": 0,
@@ -154,8 +195,6 @@ def build(season: int, week: int) -> dict:
         "week": week,
         "path": str(path),
         "published": bool(published),
-        "odds_pull_ok": bool(pulled_ok),
-        "odds_pull_written": int(pulled_n or 0),
         "odds_rows": len(odds_rows),
         "sim_rows": len(sim_rows),
         "entities": len({str(row.get("entity") or "") for row in sim_rows}),
