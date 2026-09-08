@@ -2061,3 +2061,49 @@ new periodic work on the 4 GB worker and needs a headroom reading either side �
 `SYNDICATE_GAME_CHIP_ARTIFACT_MAX_AGE_SECONDS` toward the real cadence, which
 `#564`'s comment already describes as "favour the worker and accept a staler
 scoreboard" — that hides the symptom rather than fixing it.
+
+### `[web-oom-leak]` UPDATE 42 — **CLOSING MEASUREMENT: on the routes that existed at baseline, the ≥5 s share fell 38.50% → 4.76%. What remains is a route family that did not exist in the baseline and is not this lane's.**, 2026-09-08T14:4xZ `[session b2b5b45b]`
+
+Settled organic window, n=111, taken >12 min past the deploy boot that
+contaminated the first reading.
+
+    window                          ALL routes           EXCLUDING /ncaaf*
+    BEFORE 2026-09-07 23:00-00:00Z  n=213  82 (38.50%)   n=213  82 (38.50%)
+    AFTER  2026-09-08 14:15-14:36Z  n=111  29 (26.13%)   n=84    4 ( 4.76%)
+
+**`/ncaaf*` had ZERO requests in the BEFORE window** — it is not a route that got
+slower, it is a route family that did not exist there. In the AFTER window it is
+**n=27 with 25 over 5 s (92.6%)**, i.e. **25 of the 29 slow requests on the whole
+service**. That is `nfl-ncaaf-ui-parity`'s freshly deployed card code
+(`09f6ab86`, 14:02:20Z), post-boot, relayed to them with the measurement recipe
+and NOT diagnosed by me.
+
+**PER ROUTE, which is the mix-independent view and the honest one:**
+
+    route                        BEFORE                    AFTER
+    /api/ops/artifacts/export    26,057 ms med (am probe)   59 ms med, 0/42 >=5s
+    /api/board/game-chips        5,537 ms, 36/61 (59%)      1,145 ms, 1/6
+    /api/intelligence/query      6,800 ms, 46/60 (77%)      4,104 ms, 2/5 (40%)
+
+**ONLY EXPORT IS STRONG (n=42).** chips n=6 and intelligence n=5 are thin and are
+recorded, not claimed; for chips the real evidence is the controlled 10-probe run
+(10/10 `worker_artifact`, p50 422 ms, 0 over 5 s).
+
+**AND THE 38.50% → 4.76% IS NOT PURELY THESE FIXES.** The windows differ in time
+of day and therefore in MIX: the baseline hour put 121 of 213 requests (57%) on
+the two heavy routes, the after window puts 11 of 111 (10%). Direction and
+magnitude are clear; a clean attribution would need matched hours.
+
+**WHAT `#632` NOW SAYS, end to end.** Web was never being OOM-killed — 35
+`server_failed`, zero `evicted=True`, every one a 5 s health-check timeout, and a
+synthetic burst reproduced that failure byte-identically. Three causes were found
+and fixed with measurements: an export walk listing each directory once instead
+of 18x per sport; a combined-board cache whose read and write had nothing between
+them; and a scoreboard artifact published on the board build's 24-minute cadence
+against a 120 s freshness threshold, now on its own 135 s clock with the reader's
+threshold raised to 180 s so the two no longer straddle.
+
+**OPEN, and neither is this lane's to close:** `/ncaaf*` at 92.6% over 5 s, and
+`/api/intelligence/query` still at 40% over 5 s on n=5 — the single flight removed
+the duplicate rebuilds but one rebuild still costs seconds, and that cost is
+untouched.
