@@ -27702,3 +27702,39 @@ held by restore-measurement. Env injected: `SYNDICATE_SOCCER_SEGMENT_MARKETS=h1`
 `SEGMENT_CAPTURE` on the next soccer pregame window (≤6h before a fixture; the
 line must not read "disabled"), and `PROP_FREEZE_WROTE … stage=post_fetch` on the
 next MLB pass. Nothing is claimed for this deploy until one of them is read.
+
+### ADDENDUM — live-odds-worker 5e84b758: the prop seal verified on the first post-deploy MLB pass; soccer segment capture is a clean null tonight `[lane restore-measurement, 2026-09-08T20:2xZ]`
+
+**The log route cannot verify this service.** `ops_refresh` launches sweep
+children with `stdout=DEVNULL` (state_soccer `[soccer-market-anchor]` recorded
+this on 09-02), so `SEGMENT_CAPTURE` / `PROP_FREEZE_*` lines never reach the
+Render logs whatever the children do; a poll on them read nothing while the
+tick itself was healthy (`ODDS_SWEEP_LAUNCHED date=2026-09-08 sports=soccer` at
+20:05:13Z). Artifacts are the instrument.
+
+**verify 1 — MLB prop seal (WP6 #611), PASSING for pitchers, hitter path
+deferred to the card.** The first MLB pass after the deploy ran at 20:18:36Z
+(`/api/ops/artifacts/export?names_only=1`, mtimes):
+
+    source_artifacts/.../2026-09-08/oddsapi_pitcher_props_2026_09_08_pregame.json   57,867 B   20:18:36Z   <- NEW, the tree the grader reads
+    data/.../2026-09-08/oddsapi_pitcher_props_2026_09_08_pregame.json               57,867 B   20:18:36Z   (was 55,838 B at 15:19Z)
+    data/.../2026-09-08/oddsapi_hitter_props_2026_09_08_pregame.json               613,113 B   15:19:37Z   KEPT: new capture 608,698 B is not richer
+    source_artifacts/.../2026-09-08/oddsapi_hitter_props_2026_09_08_pregame.json      absent
+
+Pre-deploy the grader tree held NO `_pregame` props at all (game lines only). So
+the post-fetch seal writes where the grader looks, and the not-richer guard
+refused the smaller hitter capture by design — which leaves the hitter seal in
+the sibling `data/` tree only. WP6's reader searches that sibling tree; whether
+it does so IN PRODUCTION is the reading owed on tomorrow's locked card:
+`Hitter lines read: …_pregame.json (pregame-freeze, N players)` with N in the
+hundreds. If it reads `(live, …)`, the sibling search is inert and the seal
+must copy the kept doc into both trees.
+
+**verify 2 — soccer h1 capture: null, and it is the POPULATION.** Today's tape
+after 19:49:46Z: 545 rows, all `segment=full`, across 6 Championship fixtures
+that kicked off 18:45-19:00Z. With `h1` only, the live tier closes 55 min after
+kickoff (~19:40Z) and the pregame tier is ≤6h before — no fixture was inside
+either window after this service came up. Owed on the next soccer fixture
+window: `segment=h1` rows in `soccer_source/tracking/book_quotes/<date>.jsonl`.
+
+Claim released after this entry.
