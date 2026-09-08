@@ -222,11 +222,75 @@ def _canonical_line(row: Mapping[str, Any]) -> float | None:
     Normalising to the away/over side makes the two distinguishable and makes the
     row's reported `line` unambiguous: it always names the away (or over) side's
     line, so a cell's own line agrees with the row's.
+
+    **THE HOME SIDE IS NOT ALWAYS SPELLED "home", AND SOCCER PAID FOR THAT.**
+    Measured 2026-09-08 on `soccer_source/eredivisie/api/odds/game_odds_current.csv`,
+    grouped by (away, home, line, book):
+
+        Willem II @ AZ Alkmaar  line '-2.25'  sides=['AZ Alkmaar']   ONE SIDE
+        Willem II @ AZ Alkmaar  line  '2.25'  sides=['Willem II']    ONE SIDE
+
+        groups with BOTH sides:  2      groups with ONE side:  36
+
+    `AZ Alkmaar -2.25` and `Willem II +2.25` are the SAME market. The negation
+    below is exactly what pairs them -- but soccer's `selection` is the CLUB
+    NAME, so `== "home"` never matched, the line was never flipped, and the two
+    legs landed under different anchor keys. Every soccer spreads row then
+    reached the de-vig with ONE leg and was refused
+    `no_two_sided_market_price`: **0 of 874 priceable over three days.**
+
+    The only groups that worked were `line 0.0`, the one value whose mirror is
+    itself -- which is why the defect looked like a vocabulary problem rather
+    than a sign problem.
+
+    h2h was never affected: its rows carry an empty line, so home/Draw/away
+    already shared a key.
+
+    THIS IS THE THIRD VOCABULARY AGAIN. `soccer_projections._canonical_side_view`
+    fixed the same class of defect one layer DOWN, translating club names to
+    `home`/`away` for the de-vig. That fix is correct and still needed; it simply
+    sits downstream of a market this function had already split in half, which is
+    why it could not move the number on its own.
+
+    Resolved with `teams_match` rather than a string compare, so nicknames and
+    punctuation variants ("1. FC Köln", "Wrexham AFC") resolve the same way the
+    rest of the platform resolves them. A row that does not carry `home_team`
+    keeps the literal-token behaviour exactly.
     """
     line = _line_value(row)
     if line is None:
         return None
-    return -line if str(row.get("selection") or "").strip().lower() == "home" else line
+    return -line if _row_selection_is_home(row) else line
+
+
+def _row_selection_is_home(row: Mapping[str, Any]) -> bool:
+    """Is this quote's `selection` the HOME side, however it is spelled?
+
+    `home` / `1` are the literal tokens. Soccer (and any feed that labels legs by
+    competitor) spells it as the club, so the row's own `home_team` is consulted
+    through `teams_match` -- the same matcher the rest of the platform uses, so a
+    nickname or punctuation variant resolves consistently.
+
+    Deliberately conservative in BOTH directions. An unrecognised selection is
+    NOT home, which preserves today's behaviour for every feed that already
+    worked; and a row with no `home_team` never reaches the matcher at all.
+    """
+    selection = str(row.get("selection") or "").strip()
+    if not selection:
+        return False
+    if selection.lower() in {"home", "1"}:
+        return True
+    home_team = row.get("home_team")
+    if not str(home_team or "").strip():
+        return False
+    # Never let the matcher's failure become a THROW on the grid path: this
+    # function runs once per quote row and the grid is the product.
+    try:
+        from syndicate.features.shared.team_aliases import teams_match
+
+        return bool(teams_match(row.get("sport") or "soccer", selection, home_team))
+    except Exception:
+        return False
 
 
 def _freshest_per_book_side(rows: Iterable[Mapping[str, Any]]) -> dict[tuple[str, str], dict[str, Any]]:
