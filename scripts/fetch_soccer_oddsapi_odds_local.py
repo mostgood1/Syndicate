@@ -10,6 +10,83 @@ Usage:
     python scripts/fetch_soccer_oddsapi_odds_local.py --league mls --out data/soccer_source/mls/api/odds/game_odds_2026-07-22.csv
 
 Requires ODDS_API_KEY in the environment (or .env).
+
+---
+
+FIRST-HALF / SECOND-HALF CAPTURE, via the PER-EVENT route (WP4, 2026-09-08).
+
+The bulk call above serves full-game markets ONLY. `_game_markets` below
+records the live failure: merging `h2h_h1`/`totals_h2`/... into its
+`markets=` returns `HTTP 422 INVALID_MARKET` for every league and kills the
+whole call. So the half markets are requested on
+`/sports/{key}/events/{id}/odds` instead, by `fetch_event_segments` -- a thin
+wrapper over `shared/segment_odds_fetch.py`, the same module NCAAF and NFL
+use. Every decision that costs money (which segments, which regions, which
+events are in window, the event cap) lives there so the four fetchers cannot
+drift apart; its docstring carries the measurements.
+
+**ABSENT MEANS OFF.** With `SYNDICATE_SOCCER_SEGMENT_MARKETS` unset this
+script makes exactly the ONE bulk call it always made and spends no further
+credit. `SYNDICATE_SOCCER_SEGMENT_MARKETS=h1` (or `h1,h2`, or `all`) turns
+the per-event tier on. Captured rows land in the same `book_quotes` tape as
+the full-game rows, tagged `segment=h1|h2` by the shared vocabulary, which is
+what `bet_status.segment_refusal` and the board's segment dimension read.
+
+Per-league -> OddsAPI sport key comes from `LEAGUE_SPORT_KEYS` (or
+`--sport-key`), exactly as the bulk call resolves it; the events come from
+the bulk response itself, so the segment tier never spends a listing call.
+
+COST, in the format `segment_odds_fetch.py` uses. Assumptions stated because
+none of these are measured on soccer yet -- this path has never been on.
+
+    unit          3 markets (h2h/spreads/totals, NO alternates) x 1 region
+                  = 3 credits per event per sweep for `h1`; 6 for `h1,h2`.
+    slate         soccer is fetched PER LEAGUE, one script run per league, so
+                  the 40-event circuit breaker is per league-day. A league-day
+                  is small -- typically <=10 fixtures (a 20-team league has
+                  10 per matchday, spread over Fri-Mon; the Championship's
+                  24 teams give 12 on a full Saturday) -- so the cap should
+                  never trip on a sane response and only guards a bad one.
+    clustering    kickoffs cluster on weekends and at one local hour per
+                  country: EPL/Championship 15:00 UK (~6 + ~10), Bundesliga
+                  15:30 CET (~5), La Liga / Serie A / Ligue 1 staggered
+                  through the evening (~3 each per slot), MLS Saturday night
+                  US. Peak concurrency across all ten leagues is therefore
+                  ~16 in the UK 15:00 slot and ~30 fixtures inside one 6h
+                  pregame window on a Saturday.
+    pregame tier  runs at the loop's idle tick, 900s
+                  (`SYNDICATE_LIVE_ODDS_REFRESH_IDLE_INTERVAL_SECONDS`), i.e.
+                  4 sweeps/hr, for events within 6h of kickoff:
+                      Saturday peak   30 x 3 x 4 = ~360 credits/hr
+                      weekday evening  8 x 3 x 4 =  ~96 credits/hr
+                      no fixture within 6h              0
+    live tier     runs at the live tick, 60s
+                  (`SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS`), and ONLY
+                  for a league with a match in play (`_soccer_live_scope` in
+                  `refresh_odds_sources.py` emits no step otherwise). The
+                  live window is SOCCER-SIZED, not the shared 1h45 default:
+                  a first half is 45 min + ~3 stoppage, and an h1 market is
+                  delisted at half-time, so `_soccer_segment_env` defaults
+                  the window to 55 min when only `h1` is configured (see
+                  `SOCCER_H1_LIVE_WINDOW_SECONDS`). At the football default
+                  every fixture would buy ~50 min of sweeps on a settled
+                  market -- roughly half the live spend for nothing.
+                      UK 15:00 cluster   16 x 3 x 60 = ~2,880 credits/hr
+                                         for ~55 min, then 0
+                      single live match   1 x 3 x 60 =   ~180 credits/hr
+    per fixture   `h1` at the defaults: 3 x 24 pregame sweeps + 3 x 55 live
+                  sweeps = ~237 credits. ~100 fixtures/week across ten
+                  leagues -> ~24k credits/week, ~0.5% of the 5M cap.
+                  `h1,h2` doubles the unit and (at the shared 1h45 window)
+                  roughly doubles the live sweeps again: ~4x.
+
+WHY NO SOCCER-SPECIFIC ALTERNATES / THREE-WAY. `_segment_market_map()` still
+carries `h2h_3_way_h1` and the `alternate_*` half keys for TAGGING, but the
+shared fetcher requests `DEFAULT_BASES` only. Three-way on a half is the
+natural soccer market, so once the first production shard shows what books
+actually price, `SYNDICATE_SOCCER_SEGMENT_BASES=h2h,h2h_3_way,totals` is the
+knob -- widen from a measurement, not from the assumption that soccer looks
+like football.
 """
 
 from __future__ import annotations
@@ -96,17 +173,23 @@ def _preferred_books() -> list[str]:
 def _segment_market_map() -> dict[str, tuple[str, str]]:
     """`#343`: full-game + half markets, from the ONE shared vocabulary.
 
-    Soccer plays halves, so `h1`/`h2` -- not quarters. Kept for TAGGING only
-    (see `_append_soccer_book_quotes`) -- NOT for requesting, see `_game_markets`
-    below. `market_segments.py`'s own docstring says why: "Each segment market
-    is a distinct OddsAPI market key on a per-event request." This fetcher only
-    ever calls the BULK `/sports/{sport}/odds` endpoint (see `fetch_game_odds`)
-    -- unlike MLB's fetcher, which has a separate per-event path
-    (`_event_wants_full_game_markets` in `fetch_mlb_oddsapi_local.py`) gated
-    specifically for segment markets. Soccer never grew that second path, so
-    tagging-only is the honest use of this map today: every quote this script
-    actually receives is a full-game market, and `normalize_segment` already
-    defaults an untagged key to `full` correctly.
+    Soccer plays halves, so `h1`/`h2` -- not quarters. This is the TAGGING map
+    (see `_append_soccer_book_quotes`) -- NOT the bulk request list, see
+    `_game_markets` below. `market_segments.py`'s own docstring says why:
+    "Each segment market is a distinct OddsAPI market key on a per-event
+    request." The bulk `/sports/{sport}/odds` call (`fetch_game_odds`) serves
+    full-game keys only.
+
+    Until 2026-09-08 this fetcher had no per-event path at all, so every key
+    here beyond the full-game three was a name for a market that never
+    arrived. `fetch_event_segments` below is that second path: it REQUESTS the
+    configured segment keys on `/events/{id}/odds` and its payloads are tagged
+    through this same map, so the requested set is always a subset of the
+    tagged set and a returned half market can never fall through to `full`.
+    The map deliberately stays wider than the request (`h2h_3_way_h1`,
+    `alternate_*_h1`, ...): `SYNDICATE_SOCCER_SEGMENT_BASES` can widen the
+    request without a code change here, and a key that arrives untagged is the
+    defect `market_segments.py` exists to prevent.
     """
     from syndicate.features.shared.market_segments import full_game_market_keys, segment_market_keys
 
@@ -181,6 +264,76 @@ def fetch_game_odds(api_key: str, *, sport_key: str, region: str, markets: list[
     response.raise_for_status()
     payload = response.json()
     return payload if isinstance(payload, list) else []
+
+
+#: The live tier's window when ONLY `h1` is configured. A soccer first half is
+#: 45 min + ~3 stoppage and the h1 market is delisted at half-time; 55 min
+#: covers that with margin and stops paying the moment the market is gone.
+#: The shared default (1h45) is sized for a football half and would buy ~50
+#: minutes of sweeps per fixture on a settled market.
+SOCCER_H1_LIVE_WINDOW_SECONDS = 55 * 60
+
+_SEGMENT_LIVE_WINDOW_KEY = "SYNDICATE_SOCCER_SEGMENT_LIVE_WINDOW_SECONDS"
+
+
+def _soccer_segment_env(env: dict[str, str] | None = None) -> dict[str, str]:
+    """The env the shared segment fetcher reads, with soccer's ONE default.
+
+    Everything else (`_MARKETS`, `_BASES`, `_REGIONS`, `_MAX_EVENTS`, the
+    pregame window) keeps the shared module's defaults and env keys unchanged.
+    The only soccer-specific value is the live window, and only when the
+    configured segments are `h1` alone: an `h2` market lives into the second
+    half, so a configuration that includes it keeps the shared 1h45.
+
+    An explicit `SYNDICATE_SOCCER_SEGMENT_LIVE_WINDOW_SECONDS` always wins --
+    this fills the key in only when it is absent. Returns a NEW mapping and
+    never writes `os.environ`.
+    """
+    from syndicate.features.shared.segment_odds_fetch import configured_segments
+
+    source: dict[str, str] = dict(os.environ if env is None else env)
+    if str(source.get(_SEGMENT_LIVE_WINDOW_KEY) or "").strip():
+        return source
+    if configured_segments("soccer", env=source) == ("h1",):
+        source[_SEGMENT_LIVE_WINDOW_KEY] = str(SOCCER_H1_LIVE_WINDOW_SECONDS)
+    return source
+
+
+def fetch_event_segments(
+    api_key: str,
+    events: list[dict[str, Any]],
+    *,
+    sport_key: str,
+    session: Any = None,
+    now: dt.datetime | None = None,
+    env: dict[str, str] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Half prices for the in-window events of ONE league, via the PER-EVENT route.
+
+    Thin on purpose, exactly as NCAAF's and NFL's wrappers are: every decision
+    that costs money lives in `shared/segment_odds_fetch.py`. `sport_key` is
+    the league's OddsAPI key -- the same one the bulk call used -- and `events`
+    is the bulk response, so no listing call is spent finding them.
+
+    **Absent means OFF.** With `SYNDICATE_SOCCER_SEGMENT_MARKETS` unset this
+    makes no call and spends no credit. Never raises.
+
+    `session` / `now` / `env` exist so a test can prove the off/on split on the
+    thing that costs money -- the outbound call -- without a real request.
+    """
+    from syndicate.features.shared.segment_odds_fetch import fetch_event_segments as _fetch
+
+    return _fetch(
+        api_key=api_key,
+        sport="soccer",
+        sport_key=sport_key,
+        base_url=_get_base_url(),
+        events=events,
+        session=session,
+        now=now,
+        env=_soccer_segment_env(env),
+        log_prefix="[soccer_odds]",
+    )
 
 
 def parse_event_to_rows(event: dict[str, Any], *, league: str) -> list[dict[str, Any]]:
@@ -328,7 +481,18 @@ def main() -> int:
     for event in events:
         rows.extend(parse_event_to_rows(event, league=args.league))
 
-    _append_soccer_book_quotes(league=str(args.league), events=events)
+    # The segment pass rides the SAME run as the bulk call rather than getting
+    # a step of its own, as NCAAF's does: `soccer_{league}_odds` (pregame) and
+    # `soccer_{league}_odds_live` (live, emitted only while a match is in
+    # play) in `refresh_odds_sources.py` already give this both tiers'
+    # cadence. Default OFF -- see `fetch_event_segments`. Concatenated rather
+    # than merged into `events`: `_KEY_FIELDS` in `odds_book_quotes` carries
+    # `segment`, so a full-game row and an `h1` row on the same
+    # event/book/market are distinct keys and neither displaces the other.
+    # The CSV above is built from `events` alone and is unchanged.
+    segment_payloads, _segment_stats = fetch_event_segments(api_key, events, sport_key=sport_key)
+
+    _append_soccer_book_quotes(league=str(args.league), events=events + segment_payloads)
 
     df = _stable_odds_df(pd.DataFrame(rows))
     out_path = Path(args.out)

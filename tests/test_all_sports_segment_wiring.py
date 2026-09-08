@@ -54,7 +54,7 @@ def test_no_fetcher_sends_segment_keys_to_the_bulk_endpoint():
     """The bulk `/sports/{key}/odds` route 422s `INVALID_MARKET` on any segment
     key, and the blast radius is the WHOLE call -- the full-game markets on it
     die too. That is not hypothetical: it killed every soccer league's capture
-    from 2026-08-10 to 08-19 (`fetch_soccer_oddsapi_odds_local.py:116-139`).
+    from 2026-08-10 to 08-19 (`fetch_soccer_oddsapi_odds_local.py:199-222`).
 
     So a file may hold a segment map for TAGGING, but the map handed to a bulk
     `markets=` must be full-game only. Checked by reading each bulk call's own

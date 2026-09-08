@@ -106,7 +106,7 @@ def _market_map() -> dict[str, tuple[str, str]]:
     **the bulk endpoint 422s `INVALID_MARKET` on segment keys.** Merging them in
     here would not merely waste credits, it would kill the full-game capture
     too, which is exactly what happened to soccer for nine days in August 2026
-    (`fetch_soccer_oddsapi_odds_local.py:116-139`).
+    (`fetch_soccer_oddsapi_odds_local.py:199-222`).
 
     Segments are captured by a SEPARATE per-event pass -- see
     `shared/segment_odds_fetch.py`, which carries the measurements.

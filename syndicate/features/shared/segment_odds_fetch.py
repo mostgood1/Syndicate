@@ -21,7 +21,7 @@ The two masks over the same defect:
     docstring asserting the opposite of the behaviour.**
 
 THE BULK ENDPOINT DOES NOT SERVE THESE MARKETS. This is not a guess and it is
-not new: `fetch_soccer_oddsapi_odds_local.py:116-139` records the live failure
+not new: `fetch_soccer_oddsapi_odds_local.py:199-222` records the live failure
 verbatim -- merging segment keys into `markets=` on `/sports/{key}/odds`
 returned `HTTP 422 INVALID_MARKET` for every league and every call, killing all
 soccer capture for nine days in August. `fetch_ncaaf_oddsapi_props_local.py:294`
