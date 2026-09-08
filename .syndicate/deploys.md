@@ -26865,3 +26865,57 @@ take effect).
 ~135 s, from 24.1 min. Web serving `source=worker_artifact` on every request —
 **NOT yet passing**, ~60% of probes, blocked on the interval/threshold mismatch
 above.
+
+### FOLLOW-UP — web `09f6ab86` (peer's deploy, 14:02:20Z) carried my env raise `[lane web-oom-profiler-steady]`
+
+**`SYNDICATE_GAME_CHIP_ARTIFACT_MAX_AGE_SECONDS`: absent (code default 120) → 180**,
+set via the single-key API at ~13:56Z — never `render.yaml`, so no
+`blueprint_sync` and none of web's other 82 keys were touched.
+
+**I DID NOT DEPLOY IT.** Lane `nfl-ncaaf-ui-parity` took the web claim 0.6 min
+before I tried, from a session confirmed RUNNING. Forcing a fresh claim held by a
+live peer is not mine to do, and it was unnecessary: **any web deploy re-injects
+env vars**, so theirs carried it. I messaged them first so a config change they
+did not set would not arrive unannounced. I also needed no new code —
+`_game_chip_artifact_max_age_seconds` already existed in web's live `81213a32` —
+so my own minimal option was a same-SHA redeploy, not the tip.
+
+**THE CHIPS ROUTE, controlled probe, 10 requests 20 s apart:**
+
+    threshold                       120 s (publisher only)   180 s (now)
+    source=worker_artifact                    ~60%            **10/10**
+    >=5 s                                     present            **0/10**
+    latency                            up to 5,391 ms   p50 422 ms / max 1,451 ms
+    artifact_age observed                 up to 141 s        1.4 - 121.3 s
+
+The 135 s real cadence now fits inside the window on every cycle. That closes
+`#632`'s chips thread: 24.1 min publish gaps → ~135 s (worker), and a reader
+whose threshold no longer sits *below* the cadence (web).
+
+**ORGANIC IS TOO THIN TO CARRY MOST ROUTES AND I AM NOT PRETENDING OTHERWISE.**
+Mid-morning traffic gave n=38 against the 23:00Z window's n=213:
+
+    route                        BEFORE (n=213 win)      AFTER post-boot (n=38 win)
+    /api/ops/artifacts/export    (none in window)        n=16 med    48 ms  0/16 >=5s
+    /ncaaf/cards                 (none in window)        n=8  med 8,616 ms  8/8  >=5s
+    /api/board/game-chips        n=61 med 5,537  36/61   n=2  med 2,738     0/2
+    /api/intelligence/query      n=60 med 6,800  46/60   n=2  med 13,970    2/2
+
+**Only export and ncaaf/cards have enough samples.** Export at a **48 ms median
+over 16 organic requests** is the grouped walk landing on real traffic, against
+this morning's 26,057 ms median. The chips and intelligence rows are n=2 and are
+recorded, not claimed.
+
+**TWO THINGS OWED, neither mine to close here:**
+
+1. **`/ncaaf/cards` is now the worst route on the service** — 8/8 requests over
+   5 s, median 8,616 ms, and this is POST-BOOT so it is not cold start. It is
+   `nfl-ncaaf-ui-parity`'s freshly deployed card code (+486/-13 `nfl/cards.py`,
+   -187 `ncaaf/cards.py`). Relayed to them, not diagnosed by me.
+2. **`/api/intelligence/query` read 13,970 ms median on n=2**, against 6,800 ms
+   before. n=2 cannot distinguish a regression from a cold combined-board cache
+   on a fresh boot. **Unresolved — needs a settled window with real traffic.**
+
+**verify:** chips serving `worker_artifact` on every request — **PASSING**, 10/10
+controlled. The organic >=5 s share for that route is NOT re-measured; this
+window had n=2.
