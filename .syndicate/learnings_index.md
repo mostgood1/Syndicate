@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 910 rules `[generated]`
+## Index — 911 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 347**
+**FORBIDDEN — 348**
 
 - [2026-09-06 — FORBIDDEN: instrumenting join A, reading it, and concluding about a value…](#2026-09-06-forbidden-instrumenting-join-a-reading-it-and-concluding-about-a-value-written-by-join-b-name-the-writer-of-the-field-in-the-falsification-test-itself-lane-mlb-first5-kalshi-fanin-mismatch-vs-15410ca7)
 - [2026-09-06 — FORBIDDEN: concluding a guard covers a symptom because the guard is deploy…](#2026-09-06-forbidden-concluding-a-guard-covers-a-symptom-because-the-guard-is-deployed-firing-and-named-after-it-find-the-code-that-wrote-the-field-you-are-looking-at-lane-mlb-first5-kalshi-fanin-mismatch)
@@ -167,6 +167,7 @@
 - [2026-09-08 FORBIDDEN: reading a marker at the wrong nesting level and concluding the co…](#2026-09-08-forbidden-reading-a-marker-at-the-wrong-nesting-level-and-concluding-the-code-did-not-run-632-session-b2b5b45b)
 - [2026-09-08 - FORBIDDEN: `git stash` inside a session worktree. The stash stack is REPOS…](#2026-09-08---forbidden-git-stash-inside-a-session-worktree-the-stash-stack-is-repository-global)
 - [2026-09-08 FORBIDDEN: treating scope drift as a discipline problem. Change the COST of…](#2026-09-08-forbidden-treating-scope-drift-as-a-discipline-problem-change-the-cost-of-deferring-or-nothing-changes-lanes-session-scope-drift-guard-lead-deferral-and-lane-census-session-e51345f0)
+- [2026-09-08 FORBIDDEN: proposing a rule without grepping `learnings_index.md` first. Thi…](#2026-09-08-forbidden-proposing-a-rule-without-grepping-learnings_indexmd-first-this-file-re-learns-what-it-already-knows-lane-session-scope-drift-guard-session-e51345f0)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](learnings_evidence.md#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](learnings_evidence.md#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content) `[evidence]`
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](learnings_evidence.md#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session) `[evidence]`

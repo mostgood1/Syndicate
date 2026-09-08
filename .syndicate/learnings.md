@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 910 rules `[generated]`
+## Index — 911 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -4140,3 +4140,48 @@ until worktrees; the stash still is), [[concurrent_parallel_sessions]],
   once-per-area slot. **Both were invisible to 27 green unit tests and appeared on
   the first run against the real ledger.** A guard for a discipline problem fails
   toward SILENCE, which looks exactly like compliance.
+
+## 2026-09-08 FORBIDDEN: proposing a rule without grepping `learnings_index.md` first. This file re-learns what it already knows. `[lane session-scope-drift-guard, session e51345f0]`
+
+- **What we believed:** that "a reading goes stale between measuring and acting"
+  was an uncovered lesson. I hit it three times in one session, told the user
+  `learnings.md` had no rule for it, and was told to add one.
+- **What was actually true:** it is covered at least **eight** times, and **two
+  entries are near-verbatim descriptions of the exact instances I hit**:
+  - `2026-08-15 — FORBIDDEN: a scratch index seeded with `git read-tree HEAD`
+    snapshots the WHOLE TREE, and `git diff --cached --numstat` cannot see it go
+    stale.` Same mechanism, **same file**: that entry lost 35 lines of
+    `.syndicate/deploys.md` to a peer's commit landing mid-staging. **24 days
+    later I staged against `origin/main`, origin advanced, and my commit carried
+    a 26-line deletion of `deploys.md`** — a file I never opened or named. I
+    caught it by reading `git show --stat`, not because I knew the rule; and the
+    entry had already warned that the `--cached --numstat` check I was relying on
+    is blind to this *by construction*.
+  - `2026-08-27 — A CARRIED-FORWARD FACT DECAYS EACH TIME IT IS RESTATED WITHOUT
+    RE-READING THE SOURCE.` **12 days later** I restated "lane
+    `profitable-buckets` is unpushed" from a two-hour-old reading, in a lane
+    block, in `leads.md`, and twice to the user. Its owner had pushed it. The
+    correction had to be pushed too, because the stale claim was already on
+    `origin`.
+- **How we found out:** one `grep` over `learnings_index.md` — run *after* the
+  user approved the new rule, when it should have preceded the proposal. The
+  index exists precisely for this and cost one command.
+- **The rule going forward:**
+  1. **Before proposing or appending a rule, grep `learnings_index.md`.** It
+     spans `learnings.md`, `learnings_evidence.md` and `learnings_archive.md`, so
+     a rule stays findable after its body is compacted out.
+  2. **If a matching rule exists, do not append a restatement.** Nine entries
+     saying one thing is worse than one, because the digest samples the file and
+     dilution is the failure mode. Cite the existing rule by its date instead.
+  3. **If you broke a rule that already existed, the finding is about DELIVERY,
+     not knowledge.** Say so plainly and name the rule you broke, so the next
+     reader can reach it. Do not launder a repeat into a discovery.
+- **Cost:** two rules broken 24 and 12 days after they were written, by the
+  session whose own lane was *about* scope drift — and a ninth restatement very
+  nearly appended. **The corpus has outgrown its delivery: 910 rules, of which
+  the session-start digest carries 6 headings (`RULE_CAP=450`).** Size is not the
+  constraint — `learnings.md` is 331 KB against a 460 KB cap. Compaction will not
+  fix this; `2026-08-20 — TRIMMING state.md AND learnings.md DOES NOT FIX THE
+  DIGEST. Measured.` already established that. **A rule that exists and does not
+  reach the session is an exhortation with a distribution problem** — which is
+  the same finding as this session's other rule, turned on this file itself.
