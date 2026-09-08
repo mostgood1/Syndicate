@@ -3717,3 +3717,36 @@ inside their window. But it also showed:
   stands. "...and therefore still fall over in production" needed the measurement,
   and died with it. Do not let the surviving half smuggle the dead half along.
 - *(evidence in this file's PART 4 entry in `log/2026-09-07.md`)*
+
+## 2026-09-07 - FORBIDDEN: treating UNTRACKED as NEW. It can mean your HEAD is behind.
+
+**What happened.** `.syndicate/log/2026-09-07.md` showed as `??` in
+`git status`, so I blob-staged my local copy against `origin/main` as if it were
+a new file. It was not new. My HEAD predated the commit that added it, so what I
+held was a **stale 184-line prefix of a 1,233-line file**. The push deleted
+1,125 lines of the same day's log. Restored in `9abfc537`.
+
+**`??` answers "is this in MY index", not "does this exist upstream".** On a
+tree whose HEAD is behind `origin/main` -- the normal state here, already
+recorded as `primary_tree_is_not_deployed_code` -- an untracked path and a path
+that exists upstream with far more content look **identical**. The status letter
+is about my index; the question was about the remote.
+
+**The guard printed the answer and was not looking at it.** The gate emitted
+`76 1125` on screen and refused nothing, because its deletion check named
+`lanes.md` only. Two paths were being written; one clause was checked. That is
+the compound-check failure recorded in `compound_absence_claim` **earlier the
+same day**, committed by the session that recorded it -- writing a rule down
+does not make you apply it to the next thing you build.
+
+**How to apply.**
+- Before staging ANY ledger path, run `git show origin/main:<path>` first. If it
+  exists, your copy is a candidate for a stale-prefix clobber no matter what
+  `git status` says. Merge onto the upstream copy; never push yours over it.
+- A deletion gate must iterate over **every path in the diff**, never a named
+  one: `for r in rows: if int(r[1]) != 0: refuse`, with no path allowlist.
+- This is a SCOPE bug, not an oversight: the correct reasoning was present and
+  applied to `lanes.md` in the very same script, to one of two arguments.
+
+Related: [[shell_layer_transcodes_bytes]] (0-deletion rule on a shared append),
+[[compound_absence_claim]], [[primary_tree_is_not_deployed_code]].
