@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-09-08 17:09:30Z — `ci-suite` @ `--pytest-workers 0` — **MEASURED: IT OOMs AT THE FLOOR, AND SOONER. Worker count is not the lever, and the ladder I proposed pointed the wrong way.** `[lane render-cron-failures]`
+
+Config change only (no deploy — see below). Run
+`crn-dafg4h0u01pc73aavs6g-1788886699`, in-process, ONE app import.
+
+    step                      pytest began    container died    step lasted
+    -n 2  (3 imports)         16:20:34Z       16:38:10Z         1056 s
+    -n 0  (1 import)          17:00:33Z       17:09:30Z          537 s
+
+Both `{"evicted": false, "oomKilled": {"memoryLimit": "2Gi"}}`. **Fewer
+processes made it fail SOONER, by half.** In wall-clock that is unambiguous; in
+work completed it is worse still, since `-n 2` was retiring roughly twice the
+tests per second and so got several times further through the suite before
+dying.
+
+**THE MODEL I GAVE WAS WRONG IN ITS DIRECTION.** I reasoned that xdist runs a
+controller plus N workers each holding a full app import, so fewer workers must
+mean less memory, and presented `-n 0` as the floor. It IS the floor for
+PROCESS COUNT and it is not the floor for PEAK MEMORY, because the peak here is
+dominated by what ONE process accumulates over a long run — module imports,
+fixtures, caches — not by per-process baseline. Under `--dist=loadscope` each
+worker holds only its share and no single process ever holds the union;
+collapsing to one process makes exactly that union mandatory. Three
+configurations now agree the suite does not fit in 2Gi: `auto`, `2`, `0`.
+
+**NOT ESTABLISHED, and I am not going to assert it from two points:** the
+accumulation mechanism above is inference from timing, with no per-process
+memory profile behind it. What is measured is only that reducing worker count
+did not help and hurt. The requirement — how much this suite actually needs —
+is still unmeasured; `ci.yml` completes it at `-n auto` on a 16GB runner, which
+bounds it from above at something far past 2Gi and says nothing about where.
+
+**A CRON START-COMMAND CHANGE NEEDS NO DEPLOY, measured here.** `PATCH
+/v1/services/<crn-id>` with `serviceDetails.envSpecificDetails.startCommand`
+created NO deploy, and the next run printed `(xdist workers: 0 ...)` — the new
+flag, from the old deploy. That is the OPPOSITE of env vars, which do need one.
+The run's own log is the check; do not assume either way. The claim taken for
+this was released without being spent.
+
+**The other 9 steps stay green** (archive suite rc=0 in 59s), so `ci-suite`'s
+useful signal survives; it is the full-sweep step that has never once completed
+on this box. **STILL FAILING DAILY at 08:00Z until a decision is taken** on
+chunking the suite, a larger instance, or dropping the step — none of which is
+this row's to make.
+
 ## 2026-09-08 ~17:1xZ — web `76ab1ecd` + artifact publish — **MEASURED: NFL player props serve 1,684 cards. They served 0 this morning against 5,929 real quotes.** `[lane nfl-props-precompute]`
 
 **verify: the SERVED `/nfl/api/props?season=2026&week=1`.**
