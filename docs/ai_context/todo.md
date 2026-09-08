@@ -1,5 +1,74 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#647` — **TWO RENDER CRONS HAD NEVER HAD A GREEN RUN. Three unrelated defects, and TWO OF THE THREE LOOKED LIKE "main is red" when neither was** — lane `render-cron-failures`, 2026-09-08 — **FIXED, DEPLOYED AND MEASURED on 2 of 3; the pytest CAP is a guess awaiting its first finishing run**
+
+`sim-input-reports` (`0 7 * * *`) and `ci-suite` (`0 8 * * *`) failed every run
+from creation on 2026-09-07. Fixed in `5d97601f`, deployed as `85a36f3c`, both
+live 16:14:5xZ. Full working in `.syndicate/deploys.md`; the two residuals are
+below and they are the reason this is OPEN.
+
+    defect                                    was            now
+    sim-input-reports verify loop             TypeError      successful 16:17:28Z
+    ci-suite archive step                     18F / 21E      rc=0 in 59s
+    ci-suite pytest step                      rc=124 @3001s  cap 7200s, PENDING
+
+**The two generalisable findings, both of which cost real time:**
+
+**(a) A TEST SUITE RUNNING ON RENDER MEASURES ITS OWN HOST.** `RENDER` is
+injected on EVERY Render service type — cron jobs included — so `ci-suite`
+tripped every production branch gated on it and reported `failures=18,
+errors=21` for a commit that is `OK (skipped=2)` anywhere else. Setting
+`RENDER=true` on a laptop reproduced both counts exactly. **The per-symptom fix
+is a trap and was measured as one**: `SYNDICATE_WEB_DYNO=0` moved 18/21 to only
+4/19, because it answers ONE of nineteen bare-`RENDER` reads across ten files,
+and the next reader along (`refresh_state_store.data_root()`) fails as a
+`RuntimeError` rather than an assertion — so the remaining 23 do not even
+resemble the first 18. Fixed at the choke point every step shares
+(`run_ci_suite._step_env`). **Any future job that runs this repo's tests on
+Render inherits this**, and the symptom will read as "main is red".
+
+**(b) A CRON CANNOT BE DEPLOYED BY COMMIT.** `POST
+/v1/services/<crn-id>/deploys` with `{"commitId": ...}` is **HTTP 400**,
+`cannot deploy cron job service ... by commit reference ID`. The body must be
+`{}` and it takes the BRANCH TIP, so the SHA that runs is whatever `main` is at
+build time — `85a36f3c` here, not the `0d3426fc` intended eight minutes
+earlier. Read the deploy's own `commit.id` back; the 400 is easy to miss
+because a summarising one-liner prints it as an empty success.
+
+**RESIDUAL 1 — the pytest cap is a CEILING, NOT A MEASUREMENT.**
+`PYTEST_TIMEOUT_DEFAULT = 7200` replaced a 3000s cap that a 3001s run hit. It
+is a guess, is labelled one in the source, and **nobody has yet seen this step
+finish on a Render cron.** `ci.yml` measures 45min serial → 12min at `-n auto`
+on 4 cores; this cron is `standard`, 2GB / 1 CPU, and `--pytest-workers 2` was
+chosen to stop an `oomKilled memoryLimit 2Gi`, which is serial plus overhead
+rather than a 2x. **What closes this is the step's DURATION**, after which the
+constant should become the measured value plus headroom. If it returns 124
+again, the number of tests it reached is the finding — the timeout branch now
+prints partial output for exactly that, marked `PARTIAL OUTPUT FROM A KILLED
+RUN` because `learnings.md` 2026-08-20 makes reading a killed pytest run as a
+result FORBIDDEN.
+
+**RESIDUAL 2 — CRON SERVICES CANNOT BE CLAIMED, and the guard says so in a way
+that reads as approval.** `deploy_claim.py`'s `SERVICES` and
+`deploy_preflight.py`'s `SERVICE_IDS` name only web / refresh-worker /
+live-odds-worker, so `--service sim-input-reports` is rejected by `choices`.
+`deploy-guard.py`'s `DEPLOYS_ENDPOINT` regex DOES match
+`/v1/services/crn-…/deploys`, but `SRV_ID` matches only `srv-`, so
+`_target_services()` returns `()` and the guard takes its "ignorance, not a
+readable no" branch: **ALLOWED UNCHECKED, while printing advice to take a lock
+that cannot be taken for that service.** The three crons were created
+2026-09-07, after the lock tooling was written. Deliberately NOT fixed in this
+lane — widening the locks is a change to the deploy substrate itself and wants
+its own decision. Note the shape is the standing "unknown must not default
+permissive" rule, in the one place the guard chose permissive on purpose.
+
+**ALSO NOTED, NOT ACTED ON:** the `ci-suite` start command omits `--json`, so
+`run_ci_suite.py` publishes no summary artifact and Render's log retention is
+the only record of a run. And the basketball/football checklists publish ONE
+report body to both roots with only a `published_for_*` marker differing, so
+`nba_source`'s alarm text reads `wnba … 15 teams` and `ncaaf_source`'s reads
+`nfl … 16 games` — confusing when read per-sport, though the counts are real.
+
 ### `#646` — **NFL SERVED THE GENERIC BOARD PARTIALS WHILE NCAAF SERVED THE FOOTBALL ONES — one string, three surfaces** — lane `nfl-ncaaf-ui-parity`, 2026-09-07 — **FIXED AND LANDED; DEPLOY + SERVED-PAYLOAD READING OWED**
 
 `shared/_game_card.html` and `shared/_scoreboard_strip.html` branch on
