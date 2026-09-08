@@ -27273,3 +27273,29 @@ only while a rebuild is running (now rare), but it is the number to watch.
 **verify:** `board_read` under 100 ms on a warm cache — **PASSING at 0.1–0.2 ms**,
 four consecutive requests. Remaining cost is transforms + serialise + transfer of
 a 1.16 MB payload, ~409–1,058 ms server-side.
+
+### ADDENDUM — verified at the UI's ACTUAL poll cadence, not just my probe spacing `[lane web-oom-profiler-steady, 2026-09-08T16:37Z]`
+
+The entry above verified the TTL fix with probes 20 s apart. **That is not the
+case the fix is for.** The UI polls every 60 s, and n=4 of my own traffic is not
+evidence about it — no organic request reached `/api/intelligence/query` between
+16:30 and 16:40Z (4 requests in the window, all mine, of 51 to the service).
+
+Two requests 65 s apart, which IS the UI cadence:
+
+    16:36:37   board_read  3,420.1 ms   MISS   total 3,844 ms
+    16:37:43   board_read      0.2 ms   HIT    total   478 ms
+
+**The miss is correct, not a failure.** The prior request was 16:31:45 — a 292 s
+gap against a 180 s TTL, so the entry had properly expired. The point is the
+SECOND one: 65 s later it hit.
+
+**Steady state for a continuous 60 s poll is therefore one build per 180 s with
+two hits between it — 2 of 3 polls served from cache**, which is what 180 was
+chosen for. Before the change the TTL was 15 s, so a 60 s poll missed 3 of 3 by
+construction.
+
+**STILL NOT MEASURED: organic traffic.** Everything here is my own. When the page
+is actually in use the `QUERY_STAGE_MS` lines will say so directly —
+`board_read` under 100 ms is a hit — and that reading is owed before this is
+called closed on real usage.
