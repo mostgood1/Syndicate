@@ -4455,3 +4455,44 @@ did not cover in my head: **a persisted baseline FILE**, not a worktree.
 - **Retracted publicly the same day**: `#648`, `.syndicate/findings_2026-09-08_nineteen_pytest_regressions.md`,
   commits `db9febae` / `33abd83c`. A peer session's two passing runs on their own
   machine are what broke it open.
+
+
+### 2026-09-08 — FORBIDDEN: pricing a market against an estimator without asking WHICH QUANTITY it estimates.
+
+- What we believed: the NFL prop model produced a per-game projection, so a
+  disagreement with the line was an edge.
+- What was actually true: `player_game_log` only creates a row for a game the
+  player has a QUALIFYING PLAY in, so a receiver who dressed and was never
+  targeted left the denominator. The model estimated **yards per game he was
+  INVOLVED in**; the market prices **yards per game**. Measured over 1,923
+  quoted rows: median +7.7%, mean +12.1%, 24% of rows >25% ABOVE the line
+  against 5% below — concentrated in `receiving_yards` (+18.2%) and
+  `rushing_yards` (+11.9%), while `passing_yards` (-1.1%) was clean because a
+  quarterback never loses a game from his denominator.
+- How we found out: comparing the model's projected value against the quoted
+  line per market, instead of only reading the probabilities it produced. The
+  per-market split is what identified the mechanism — a pooled number would have
+  shown "+12% high" and named nothing.
+- The rule going forward: before treating model-minus-market as an edge, state
+  the estimator's POPULATION and check it is the population the bet settles
+  over. A systematic one-sided bias is an estimator defect until proven
+  otherwise; edges are two-sided.
+- Cost: every "edge" on the board was inflated for as long as props have
+  existed, and a +46.5% headline was shown to the user as evidence of health.
+
+### 2026-09-08 — FORBIDDEN: crediting an improvement to a change without an A/B, when two fixes shipped close together.
+
+- What we believed: the zero-game estimator fix produced "a dramatic reduction
+  in overconfidence" — no more 95% probabilities, no more +46% edges.
+- What was actually true: measured both ways on the same board, cards claiming
+  >90% are **8 either way**; median |edge| 9.2 -> 8.4; edges >30pts 57 -> 51.
+  The absurd readings were killed by the LINE-KEY fix shipped an hour earlier.
+  Its real contribution is the bias (median +7.7% -> +3.5%), which is a
+  different and less dramatic claim.
+- How we found out: running the estimator A/B under its own flag, after having
+  already told the user the wrong attribution.
+- The rule going forward: when two fixes land in one session, no improvement may
+  be attributed to either until each is measured with the other held fixed. A
+  remembered "before" is not a baseline — and the flag that makes the A/B
+  possible must be used, not merely shipped.
+- Cost: one wrong claim to the user, retracted in the next message.

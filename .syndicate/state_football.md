@@ -2372,6 +2372,43 @@ Working: `deploys.md` 2026-09-08 14:02:20Z; narrative `log/2026-09-08.md`.
 
 ## [nfl-props-week1-dead] NFL PLAYER PROPS WERE STRUCTURALLY DEAD EVERY WEEK 1, AND THE MODEL RAN ON THE SERVICE WITHOUT THE DATA `[FIXED, DEPLOYED AND VERIFIED 2026-09-08, web 76ab1ecd/4be5c5a5, lane nfl-props-precompute]`
 
+**SECOND AND THIRD DEFECTS, FOUND AND FIXED 2026-09-08 22:00-23:0xZ (lane
+`nfl-props-autorun-e2e`), both VERIFIED ON PRODUCTION.**
+
+**(a) 56% OF THE BOARD WAS MISPRICED.** `_nfl_prop_model_probability` returns
+P(over A SPECIFIC LINE), but rows were keyed `stat::player` with no line, so
+`join_odds_to_sim` applied ONE probability to EVERY line of a market. Measured:
+**371 of 371 multi-line (player, market, side) groups showed an identical model
+percentage — 924 cards.** `Bhayshul Tuten` read 95.5% under 47.5, 50.5 AND
+51.5. Fixed by keying `stat::player::line` (`anytime_td` has no line and keeps
+two segments). After: **0 of 368 groups share a probability, 0 monotonicity
+violations**, 1,670 cards.
+
+**(b) THE ESTIMATOR MEASURED THE WRONG QUANTITY.** `player_game_log` creates a
+row only for a game with a QUALIFYING PLAY, so a receiver who dressed and was
+never targeted left the denominator: the model estimated *per game INVOLVED*,
+the market prices *per game*. Measured over 1,923 quoted rows: median **+7.7%**,
+mean +12.1%, 24% of rows >25% above the line vs 5% below — concentrated in
+`receiving_yards` +18.2% and `rushing_yards` +11.9%, while `passing_yards`
+-1.1% was clean (a QB never loses a game from his denominator). Fixed by
+counting ISOLATED missing weeks as zeros, scoped away from QBs and from
+`anytime_td` (whose k=12 was fitted against the current estimator). After:
+median **+3.5%**, mean +6.8%.
+
+**STILL NOT EDGES.** Bias halved not removed; every row remains
+`Rate basis: Prior season`; and the estimator change is NOT outcome-validated —
+`backtest_nfl_props.py` grades with `excluded_zero_engagement` (7,326 graded vs
+1,138 excluded for receiving_yards) and is structurally blind to this defect.
+
+**LINE COVERAGE IS NOW A LIVE OBLIGATION.** A projection is line-specific, so a
+newly quoted line has none and its card drops: 675 rows drifted in ~2h15m and
+the count fell 1,670 -> 1,515 until a rebuild. Scheduled task
+`nfl-wk1-prop-artifact-refresh` fires once 2026-09-09 16:30 CDT.
+
+**REJECTED ON EVIDENCE:** injury gate impossible (`injuries_2026.csv` absent);
+depth-chart gate UNSAFE (`depth_charts_2026.csv` omits Cook, Pitts, Jones,
+Godwin); roster-status gate safe but only 17 of 980 rows.
+
 **`/nfl/api/props` served 0 cards against a capture of 5,929 real quotes** (519
 players, 8 books, 16 matchups, 9 markets). Nothing errored, nothing logged. The
 ODDS half was healthy throughout -- production's own 874 KB file through the
