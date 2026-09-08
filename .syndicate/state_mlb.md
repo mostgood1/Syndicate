@@ -317,6 +317,31 @@ live-edge work, not discovered during it.
    that trails the market is a false edge.** Even a clean keying fix does not by
    itself make live opportunities safe to place.
 
+3. **SKILL IS NOT EDGE, and the segment model is the one with the skill**
+   `[measured 2026-09-07/08, lane mlb-live-segment-pricing]`. The **first-five-
+   innings** model DISCRIMINATES out of sample — top tercile **67.4%** vs bottom
+   **45.4%**, **3.82σ**, n=423. The **full-game** model we ACTUALLY PRICE
+   separates at **0.88σ over 501 games**, which is indistinguishable from noise.
+   But first5 still does **NOT** beat the market: **Brier 0.25016 vs 0.24653**
+   over 108 games / **12 dates** (not 78 — the join collapses to the narrowest
+   family). **`SYNDICATE_MLB_FIRST5_PRICING` STAYS OFF.** first5 is published as
+   OBSERVATIONS only (`e760abf0`), `priceable:false`, never orderable. A model
+   that discriminates and still loses to the market is exactly the shape that
+   looks like an edge on a ranked board and is not one.
+4. **NO PROFITABLE LIVE-GAMELINE BUCKET HAS BEEN DEMONSTRATED ON MLB**
+   `[measured 2026-09-08, lane profitable-buckets]`. h2h is a **clean null** —
+   every band inside noise at ~94 games/bucket, one bet per game. The single
+   candidate, `spreads q4_late` at **+14.22pp**, was **TWO STACKED ARTIFACTS**
+   and was withdrawn twice: first the quotes were STALE (the model has the
+   score, the book's quote does not), then the baseline itself was wrong —
+   books price spreads/totals at ~−110/−110, so the **de-vigged price is ~0.50
+   whatever the line is** and the market's view lives in the LINE, not the
+   price. **Any bucket result quoted per ROW is inflated**: the same data gave
+   **+21σ by row, +6.15σ by (game, line), +2.93σ by game.** totals/spreads stay
+   UNMEASURABLE until `model_total_mean` accumulates (12 games as of 09-08;
+   re-run gated at ~60).
+
+
 ## [mlb-exchange-shopping-value] EXCHANGE PRICE-SHOPPING IS WORTH `+0.74 ROI POINTS` ON GAME MARKETS AND `+2.43%` ON THE PROP GATE BOOK — both re-derived, both smaller than first published `[verified 2026-09-01, lane game-market-entry-roi-curve]`
 
 **GAME MARKETS.** n=621 settled MLB game-market paper orders, 2026-08-22..08-31.
