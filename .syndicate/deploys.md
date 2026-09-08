@@ -5,6 +5,81 @@
 
 ---
 
+## 2026-09-08 ~17:1xZ — web `76ab1ecd` + artifact publish — **MEASURED: NFL player props serve 1,684 cards. They served 0 this morning against 5,929 real quotes.** `[lane nfl-props-precompute]`
+
+**verify: the SERVED `/nfl/api/props?season=2026&week=1`.**
+
+| | this morning | **now** |
+|---|---|---|
+| cards | **0** | **1,684** |
+| empty state | "No real player-prop lines available for this week" | none |
+| distinct players | 0 | **253** |
+| markets | 0 | 9 |
+| `Rate basis` on every card | n/a | **"Prior season" 1,684/1,684** |
+| median edge | n/a | **-1.20%** |
+| \|edge\| > 50% | n/a | 3 |
+
+**THE ARTIFACT IS PROVABLY WHAT SERVED THEM, and the proof does not need a log
+line.** web's COMPUTE path was measured yielding `sim_rows=0` with BOTH refusal
+counters at zero — it cannot produce a single row on that service, because
+`player_name_index` is empty for 2026 AND 2025 there. So `1,684 > 0` can only
+have come from the artifact. (Render's logs API returned nothing for the
+`sim_source` filter; `[project_render_ops_workflow]` already records it as
+spotty and says to verify by STATE, not by log lines. This is that.)
+
+**THE CHAIN, four defects, each hiding the next:**
+
+1. **Week-1 cold start.** `player_name_index(2026)` = **0 names** vs 2025's
+   **574**; it derives from the CURRENT season's pbp, so in week 1 nothing
+   resolves. Props were structurally dead EVERY week 1 and would have started
+   working in week 2 on their own. Fixed by a prior-season fallback mirroring
+   the one `_team_rating` has always had. `sim_rows 0 -> 1,157`.
+2. **The under side showed P(over).** One sim row per player+market joined to
+   BOTH sides with no flip. Kyler Murray read `99.1%` on Under 20.5, Under 21.5
+   AND Over 22.5 at once — a **+50.3%** edge on a bet the model rates ~0.9%.
+   `833 over/under pairs, 833 incoherent -> 0`.
+3. **A linebacker inherited a running back's game log.** `"Cam Brown"` and
+   `"Chase Brown"` both resolve to `00-0038597`; the collision guard cannot see
+   it because it only compares players present in pbp, and a defender quoted for
+   anytime TD is absent from the index entirely. It rendered **+47.5% on a
+   +2200 line** — the `Troy Hill`/`Tyreek Hill` shape this repo already records
+   as a fake +125% ROI. The team check rejects it: **194 of 1,157 projections
+   were on the wrong human.** `Cam Brown present? False`, `Chase Brown? True`.
+4. **The model ran on the wrong service.** With 1-3 fixed and deployed,
+   production STILL served 0:
+
+       [nfl_props] JOIN season=2026 week=1 odds_rows=2455 sim_rows=0
+                   refused_wrong_team=0 refused_unknown_team=0
+
+   Both refusal counters at zero proved nothing reached the team check, so every
+   row exited at `player_id is None` — which requires `player_name_index` empty
+   for BOTH seasons. **web has no pbp; refresh-worker does** (its projection
+   artifact carries `rating_source=nflverse_pbp_epa_rolling[...]`). Three
+   services, three disks. Fixed by precomputing and publishing an artifact.
+
+**2 AND 3 ARE OLDER THAN 1 AND WERE EXPOSED BY IT.** The page served zero cards
+on every week 1, so no under card and no wrong-player card had ever rendered for
+anyone to check. Shipping the fallback alone this morning would have put 1,990
+cards carrying fabricated edges in front of the user the night before the season.
+
+**THE PUBLISH WAS REFUSED ON THE FIRST ATTEMPT** — `relative_path is not an
+allowed hot artifact` — until `nfl_source/nfl_prop_projections_*.json` was added
+to `HOT_ARTIFACT_PATTERNS`. Worth recording because the WORKER's publish would
+have failed the same way, silently, once wired.
+
+**THIS ARTIFACT WAS HAND-BUILT AND HAND-PUBLISHED**, like the projection one
+earlier today: 966 sim rows, 253 players, 9 markets, `generated_at` in the file.
+**The worker is not yet wired to regenerate it** — that is the next step, and
+until it lands this artifact does not refresh itself.
+
+**NOT AN EDGE, AND THE CARD NOW SAYS SO.** Every card is labelled
+`Rate basis: Prior season`, because that is what it is — last season's usage,
+blind to depth-chart moves. The largest surviving edges are all UNDER on low
+lines for players the market now prices as starters (Tuten, Holani, Stevenson):
+that is the MODEL being stale about a role, not the book being wrong.
+
+---
+
 ## 2026-09-08 16:38:10Z — `ci-suite` — **MEASURED, AND IT CORRECTS THE DIAGNOSIS: the pytest step does NOT time out. It is OOM-KILLED at 2Gi, 1056s in.** `[lane render-cron-failures]`
 
 Settles the `Fix 3 — PENDING` row above. Run
