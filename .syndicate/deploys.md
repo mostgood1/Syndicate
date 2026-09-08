@@ -27873,3 +27873,66 @@ This deploy also carried another lane's `pricing-plane-v1` (`1cdf5c17`,
 `3a2f40bb`, `a87b5863`), which is flag-gated and defaults to today's median.
 
 Claim released after this entry.
+
+
+---
+
+## 2026-09-08 21:31-21:34Z — refresh-worker `9aed3bac` -> `66516b2b` — lane `nfl-props-autorun-e2e`
+
+**verify: PASSING, on all three owed readings, from refresh-worker's own log.**
+This is the deploy the inert `9aed3bac` should have been.
+
+    21:34:40.086  live
+    21:36:20.836  NFL_PROP_PROJECTION_LAUNCHING season=2026 week=1
+                  reason=artifact_empty overriding[artifact_fresh age_seconds=8183 interval_seconds=86400]
+    21:36:21.001  STREAM_PULL_OK nfl_source/nfl_prop_projections_2026_wk1.json bytes=404766
+    21:36:21.001  build_nfl_prop_projections REFUSED season=2026 week=1 reason=zero_sim_rows
+                  odds_rows=2427 (nothing written) repair_pull=... ok=True written=1
+
+1. **The override fired**, and its own reason string carries the proof it was
+   needed: `artifact_fresh age_seconds=8183 interval_seconds=86400`. The
+   pre-existing gate would have skipped this target for another **78,217
+   seconds** — past Wednesday's kickoff. Gating on the OUTPUT (rows) rather than
+   the mtime is the entire difference.
+2. **The pull brought the GOOD artifact: `bytes=404766`**, not the 284-byte
+   empty one and not web's earlier 111-byte copy. This is the reading that
+   matters, and it is why `ok=True` alone was never sufficient — a successful
+   pull of an EMPTY file would also print `ok=True written=1`.
+3. **The builder refused without damage** (`nothing written`) on
+   `odds_rows=2427`, confirming again that the worker HAS the odds and lacks the
+   player pbp.
+
+**NO `PUBLISH_OK ... bytes=284` APPEARS AFTER THIS BOOT** — the first boot since
+2026-09-08 19:19 that did not clobber. And the board never dipped: the watcher
+polling `/nfl/api/props` every 60s held **1,664 `rank_cards`** across the whole
+boot, against a measured **1703 -> 0 -> 1703 outage (20:40:55Z .. 20:41:56Z)** on
+the previous one.
+
+Board after: 1,664 cards, `Real rate model` / `Market implied` / `Real odds` /
+`Rate basis` **1664/1664**, **703 over/under pairs with 0 incoherent**, 9 markets.
+
+**THIS IS A RACE THAT WAS WON, NOT AN INVARIANT, and it must not be recorded as
+one.** The autorun launched at boot+**100s**; the empty-artifact publish it
+repairs landed at boot+**167s** on the previous boot. The margin was ~66
+seconds. If a future boot loses it, the repair pulls an empty over an empty, the
+board goes to zero cards for about a minute, and the next retry is **one hour**
+out under `_season_projection_relaunch_cooldown_seconds` (3600, absent env).
+That cooldown is deliberate — without it the override is `#389`'s busy loop
+rebuilt — so the slow retry is the price of not spawning a subprocess per tick.
+**Recovery if it happens: republish the artifact. Do not revert.**
+
+**What this deploy does NOT fix, stated plainly:** refresh-worker still cannot
+BUILD the artifact and never will until the player-level pbp can reach it
+(`nfl_source/tracking/nflverse/pbp/pbp_*.csv` is not in `HOT_ARTIFACT_PATTERNS`
+and `pbp_2025.csv` is 97.9 MB against a 12 MiB ceiling). The producer remains an
+offline run. This deploy makes the worker fail WITHOUT DAMAGE and repair itself;
+it does not make it a producer.
+
+**Carried another lane's work, at that lane's explicit request** (`pricing-plane-v1`,
+session 2edf8b82): `516bd71d`, `1cdf5c17`, `2055798c`, `89ada578`, `d2ee1094`,
+`d3c7ee7c` — verified present by ANCESTRY, not by tip position. Their flag
+analysis ("0 values changed, 8 new stamp keys, flags absent on the service") is
+THEIR measurement and is not re-derived here; the unchanged NFL board above is
+consistent with it but is not a test of their flags.
+
+Claim released after this entry.
