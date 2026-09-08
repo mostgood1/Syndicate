@@ -113,7 +113,12 @@ def _main_worktree_root() -> Path:
 
 #: Tests monkeypatch this attribute, so it stays a module-level constant.
 CLAIM_DIR = _main_worktree_root() / ".syndicate" / "deploy_claims"
-SERVICES = ("web", "syndicate", "refresh-worker", "live-odds-worker")
+# `#647`: the three cron services, added 2026-09-08. Until then `--service
+# ci-suite` was rejected by `choices`, so a cron deploy could not be serialised
+# at all -- while `deploy-guard.py` matched the cron deploy endpoint, resolved
+# no service from a `crn-` id, and printed advice to take this very lock.
+CRON_SERVICES = ("sim-input-reports", "ci-suite", "mlb-season-artifacts")
+SERVICES = ("web", "syndicate", "refresh-worker", "live-odds-worker") + CRON_SERVICES
 DEFAULT_TTL_SECONDS = 45 * 60
 
 # `#635`. ONE LOCK PER SERVICE, NOT PER NAME.
@@ -138,12 +143,17 @@ CANONICAL = {
     "syndicate": "web",
     "refresh-worker": "refresh-worker",
     "live-odds-worker": "live-odds-worker",
+    # Crons have no aliases -- each name is its own service, so each maps to
+    # itself. Listed explicitly anyway: `canonical()` falls back to identity for
+    # unknown names, and relying on that fallback would make a typo
+    # (`ci_suite`) silently allocate its own lock instead of failing.
+    **{name: name for name in CRON_SERVICES},
 }
 LEGACY_ALIASES = {"web": ("web", "syndicate")}
 #: `status` iterates this, so one box prints one line. The old listing showed
 #: `web HELD` and `syndicate free` on consecutive lines for the same service,
 #: which is how the 2026-09-02 collision was read as "a different service".
-CANONICAL_SERVICES = ("web", "refresh-worker", "live-odds-worker")
+CANONICAL_SERVICES = ("web", "refresh-worker", "live-odds-worker") + CRON_SERVICES
 
 
 def canonical(service: str) -> str:
@@ -360,14 +370,14 @@ def cmd_status(args: argparse.Namespace) -> int:
     for svc in services:
         claim = _read(svc)
         if not claim:
-            print(f"  {svc:<17} free")
+            print(f"  {svc:<20} free")
             continue
         age, expired = age_and_expiry(claim)
         state = "EXPIRED (does not block)" if expired else "HELD"
         if not expired:
             held += 1
         print(
-            f"  {svc:<17} {state} by {claim.get('holder')} "
+            f"  {svc:<20} {state} by {claim.get('holder')} "
             f"{age/60:.1f} min  target={str(claim.get('target_commit') or '')[:8]}"
         )
         if claim.get("holder_session"):
@@ -376,11 +386,11 @@ def cmd_status(args: argparse.Namespace) -> int:
             # can never be found there -- see the long note at `holder_session`.
             # The line used to read "(liveness: list_sessions, NOT pid)" and
             # that sent a reader to a test that cannot return "present".
-            print(f"  {'':<17} session: {claim['holder_session']}"
+            print(f"  {'':<20} session: {claim['holder_session']}"
                   f"  (breadcrumb only -- NOT checkable against list_sessions;"
                   f" the TTL is the liveness bound)")
         if claim.get("reason"):
-            print(f"  {'':<17} reason: {claim['reason']}")
+            print(f"  {'':<20} reason: {claim['reason']}")
     return 1 if held else 0
 
 

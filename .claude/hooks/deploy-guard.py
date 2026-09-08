@@ -97,14 +97,27 @@ POST_INTENT = re.compile(
 GIT_PUSH = re.compile(r"\bgit\s+(?:-\S+\s+|--\S+\s+)*push\b", re.I)
 
 SERVICE_ARG = re.compile(r"--service[=\s]+['\"]?([A-Za-z0-9._-]+)", re.I)
-SRV_ID = re.compile(r"(srv-[A-Za-z0-9]+)", re.I)
+# `crn-` MATTERS AS MUCH AS `srv-`. `DEPLOYS_ENDPOINT` below already matched
+# `/v1/services/crn-.../deploys`, but this pattern did not, so `_target_services`
+# resolved NOTHING for a cron deploy and the guard took its "ignorance, not a
+# readable no" branch: ALLOWED UNCHECKED, while printing advice to take a lock
+# that `deploy_claim.py` then refused by `choices`. Measured 2026-09-08 (`#647`).
+SRV_ID = re.compile(r"((?:srv|crn)-[A-Za-z0-9]+)", re.I)
 COMMIT_ARG = re.compile(r"--commit[=\s]+['\"]?([0-9a-f]{7,40})", re.I)
 
 SERVICE_BY_ID = {
     "srv-d88ahvrbc2fs73eodu30": "web",
     "srv-d91dpertqb8s73co8ls0": "refresh-worker",
     "srv-d91dpertqb8s73co8lt0": "live-odds-worker",
+    "crn-dafj4ie7bikc738q9ol0": "sim-input-reports",
+    "crn-dafg4h0u01pc73aavs6g": "ci-suite",
+    "crn-dafffnn40ujc73b349pg": "mlb-season-artifacts",
 }
+CRON_SERVICES = ("sim-input-reports", "ci-suite", "mlb-season-artifacts")
+# `ALL_SERVICES` is what a `render.yaml` push expands to, and crons are NOT in
+# `render.yaml` -- `blueprint_sync` cannot reach them. They are guarded when
+# named directly, and must not be dragged into a blueprint push's blast radius,
+# which would demand three claims nobody needs and teach people to --force.
 ALL_SERVICES = ("web", "refresh-worker", "live-odds-worker")
 
 # `deploy_claim.py` accepts BOTH "web" and "syndicate" for the web service. Two
@@ -115,6 +128,7 @@ ALIASES = {
     "web": ("web", "syndicate"),
     "refresh-worker": ("refresh-worker",),
     "live-odds-worker": ("live-odds-worker",),
+    **{name: (name,) for name in CRON_SERVICES},
 }
 
 DEFAULT_CLAIM_TTL_SECONDS = 45 * 60

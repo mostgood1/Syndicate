@@ -92,12 +92,38 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+# `#647`. THE CRON SERVICES, ADDED 2026-09-08, AND THEY ARE NOT THREE MORE ROWS.
+# Until now every service here was long-running, and this file's central
+# question -- "is something running that a deploy would kill" -- was answered
+# from an `ALL_PROCESS_MEMORY` log sample. A cron emits NONE: it has no resident
+# process, only a container that exists for the length of a run.
+#
+# MEASURED 2026-09-08 over one 3h window that contained a live 40-minute
+# `ci-suite` run -- cron `ALL_PROCESS_MEMORY` lines: 0. refresh-worker: 20.
+#
+# So adding the ids ALONE would have been worse than the gap it closes. Rule 1
+# says unknown is not clear, `stale` would be permanently True, and every cron
+# preflight would return UNKNOWN (exit 2) forever. A gate that can never clear
+# is a gate that gets removed -- and then the crons are unguarded again, with
+# the tooling now claiming to cover them. `cron_run_in_flight()` answers the
+# same question from the evidence a cron actually produces.
+CRON_SERVICE_IDS = {
+    "sim-input-reports": "crn-dafj4ie7bikc738q9ol0",
+    "ci-suite": "crn-dafg4h0u01pc73aavs6g",
+    "mlb-season-artifacts": "crn-dafffnn40ujc73b349pg",
+}
+
 SERVICE_IDS = {
     "syndicate": "srv-d88ahvrbc2fs73eodu30",
     "web": "srv-d88ahvrbc2fs73eodu30",
     "refresh-worker": "srv-d91dpertqb8s73co8ls0",
     "live-odds-worker": "srv-d91dpertqb8s73co8lt0",
+    **CRON_SERVICE_IDS,
 }
+
+#: Services whose in-flight question is answered by run EVENTS, not a process
+#: sample. Keyed by name because that is what `--service` takes.
+CRON_SERVICES = frozenset(CRON_SERVICE_IDS)
 
 OWNER_ID = "tea-d2bb5n95pdvs73cje4fg"
 
@@ -542,6 +568,62 @@ def fleet_live_commits(key: str) -> dict[str, dict]:
     return out
 
 
+def cron_run_in_flight(service_id: str, key: str, *, limit: int = 50) -> tuple[bool | None, dict]:
+    """Is a cron RUN executing right now? True / False / None for "cannot tell".
+
+    THE CRON EQUIVALENT OF THE PROCESS SAMPLE, guarding the same hazard:
+    deploying a cron mid-run kills that run. A cron leaves no resident process
+    to enumerate, but it does leave `cron_job_run_started` / `cron_job_run_ended`
+    events, and those pair by `cronJobRunId`.
+
+    THE EVENT LIST IS SORTED HERE RATHER THAN TRUSTED. Rule 3 of this file was
+    learned on the logs API returning newest-N presented OLDEST-first, which
+    produced a four-hour error in exactly the direction that reads "safe to
+    deploy". The events endpoint has looked newest-first every time it has been
+    read -- which is precisely the sort of incidental ordering not worth
+    depending on -- so the newest `started` is picked by timestamp.
+
+    Returns `None` for an unreadable or run-event-free history rather than
+    False. A truncation cutting between a `started` and its `ended` reports IN
+    FLIGHT, which refuses: a wrong refusal costs a wait, a wrong clearance
+    costs a killed run.
+    """
+    detail: dict = {"source": "api:/v1/services/<id>/events", "limit": int(limit)}
+    try:
+        rows = _get(f"https://api.render.com/v1/services/{service_id}/events?limit={int(limit)}", key)
+    except Exception as exc:  # noqa: BLE001 -- an unreadable history is UNKNOWN, never CLEAR
+        detail["error"] = f"{type(exc).__name__}: {exc}"
+        return None, detail
+    if not isinstance(rows, list) or not rows:
+        detail["error"] = "no events returned"
+        return None, detail
+
+    started: list[tuple[str, str]] = []
+    ended: set[str] = set()
+    for row in rows:
+        event = (row or {}).get("event") or {}
+        info = event.get("details") or {}
+        run_id = str(info.get("cronJobRunId") or "")
+        if not run_id:
+            continue
+        if event.get("type") == "cron_job_run_started":
+            started.append((str(event.get("timestamp") or ""), run_id))
+        elif event.get("type") == "cron_job_run_ended":
+            ended.add(run_id)
+
+    detail["runs_started_seen"] = len(started)
+    detail["runs_ended_seen"] = len(ended)
+    if not started:
+        # Build events but no run events tells us nothing about execution.
+        detail["error"] = f"no cron_job_run_started event in the last {int(limit)} events"
+        return None, detail
+
+    stamp, run_id = max(started)          # by timestamp, not by position
+    detail["newest_run"] = {"id": run_id, "started_at": stamp}
+    detail["in_flight"] = run_id not in ended
+    return (run_id not in ended), detail
+
+
 def is_ancestor(candidate: str, descendant: str) -> bool | None:
     """True when `candidate` is already contained in `descendant`. None if git cannot say."""
     try:
@@ -702,7 +784,16 @@ def main() -> int:
     # here that turns "cannot see" into "nothing running".
     sample = parsed = None
     sample_source = "log:ALL_PROCESS_MEMORY"
-    if args.service in API_SAMPLED_SERVICES:
+    is_cron = args.service in CRON_SERVICES
+    cron_in_flight: bool | None = None
+    if is_cron:
+        # A cron has no process list to sample. Asking for one would return
+        # nothing and read as UNKNOWN forever; see CRON_SERVICE_IDS above.
+        cron_in_flight, cron_detail = cron_run_in_flight(service_id, key)
+        report["cron_run"] = cron_detail
+        report["cron_run_in_flight"] = cron_in_flight
+        sample_source = "api:cron_job_run events"
+    elif args.service in API_SAMPLED_SERVICES:
         api = web_processes()
         if api:
             processes, _sampled_at = api
@@ -712,7 +803,7 @@ def main() -> int:
             # NEGATIVE age is a receipt nobody should trust the rest of.
             sample, parsed = (now.isoformat().replace("+00:00", "Z"), ""), {"processes": processes}
             sample_source = "api:/api/ops/memory"
-    if parsed is None:
+    if parsed is None and not is_cron:
         sample = newest_log(service_id, key, "ALL_PROCESS_MEMORY")
         parsed = parse_processes(sample[1]) if sample else None
         sample_source = "log:ALL_PROCESS_MEMORY"
@@ -807,7 +898,11 @@ def main() -> int:
     report["too_soon"] = too_soon
     report["allow_rapid"] = bool(args.allow_rapid)
 
-    stale = age is None or age > args.max_sample_age_seconds
+    # THE SAME GATE, ASKED OF THE EVIDENCE THE SERVICE ACTUALLY EMITS. For a
+    # cron "I could not tell" is an unreadable run history, not a stale sample;
+    # both land on UNKNOWN, because rule 1 does not care which instrument was
+    # unavailable.
+    stale = (cron_in_flight is None) if is_cron else (age is None or age > args.max_sample_age_seconds)
     if off_main:
         verdict, code = "OFF_MAIN", EXIT_OFF_MAIN
         on_main = report.get("target_on_main")
@@ -856,7 +951,17 @@ def main() -> int:
         )
     elif stale:
         verdict, code = "UNKNOWN", EXIT_UNKNOWN
-        reason = "no ALL_PROCESS_MEMORY sample" if age is None else f"sample is {age:.0f}s old (limit {args.max_sample_age_seconds}s)"
+        if is_cron:
+            reason = ("cannot read this cron's run history ("
+                      + str((report.get("cron_run") or {}).get("error") or "unknown")
+                      + "), so whether a run is executing is unknown")
+        else:
+            reason = "no ALL_PROCESS_MEMORY sample" if age is None else f"sample is {age:.0f}s old (limit {args.max_sample_age_seconds}s)"
+    elif is_cron and cron_in_flight:
+        verdict, code = "HOLD", EXIT_HOLD
+        newest = (report.get("cron_run") or {}).get("newest_run") or {}
+        reason = (f"cron run {newest.get('id')} started {newest.get('started_at')} and has not "
+                  f"ended; deploying now kills it mid-run")
     elif jobs:
         verdict, code = "HOLD", EXIT_HOLD
         reason = f"{len(jobs)} job(s) in flight; a deploy kills them"
@@ -868,7 +973,7 @@ def main() -> int:
         reason = f"{args.target_commit[:8]} is already contained in live {live_commit[:8]} -- the deploy is redundant"
     else:
         verdict, code = "CLEAR", EXIT_CLEAR
-        reason = "only infrastructure processes running" + (
+        reason = ("no cron run in flight" if is_cron else "only infrastructure processes running") + (
             f" ({len(defunct)} defunct child(ren) awaiting reap -- already dead, cannot be killed by a deploy)" if defunct else ""
         )
     report["verdict"] = verdict
@@ -909,8 +1014,21 @@ def main() -> int:
     if args.target_commit:
         state = {True: "ALREADY LIVE -- redundant", False: "not yet live", None: "git could not say"}[report.get("target_already_live")]
         print(f"target commit  {args.target_commit[:8]}   {state}")
-    print(f"sample         {report['sample_at'] or 'NONE'}"
-          + (f"   age {age:.0f}s" if age is not None else ""))
+    # A CRON'S RECEIPT MUST NOT DISPLAY AN INSTRUMENT IT NEVER USED. Printing
+    # `sample NONE` for a cron is the exact shape of a FAILED process read --
+    # which for every other service means UNKNOWN -- so the line named the wrong
+    # evidence for the verdict printed beside it. Say which instrument answered.
+    if is_cron:
+        _run = (report.get("cron_run") or {}).get("newest_run") or {}
+        _err = (report.get("cron_run") or {}).get("error")
+        print(f"run history    {report['sample_source']}"
+              + (f"   UNREADABLE ({_err})" if _err else
+                 f"   newest run {_run.get('id')}"
+                 f"   started {_run.get('started_at')}"
+                 f"   in_flight={report.get('cron_run_in_flight')}"))
+    else:
+        print(f"sample         {report['sample_at'] or 'NONE'}"
+              + (f"   age {age:.0f}s" if age is not None else ""))
 
     # D5. Printed on EVERY run, including CLEAR, for the same reason the process
     # enumeration is: the number you need is the one for the service you are NOT
@@ -927,6 +1045,12 @@ def main() -> int:
                   f"finished {row.get('finished_at') or '?'}{marker}")
     # The enumeration is the point. Print it ALWAYS, including on CLEAR --
     # a verdict with no list is what made the original check misleading.
+    if is_cron:
+        # A cron has no process list, and printing an empty "processes" block
+        # under the run-history line above would read as a check that found
+        # nothing rather than one that was never applicable to this service.
+        print(f"\n{verdict}: {reason}")
+        return code
     print(f"\nprocesses ({report['process_count']} reported):")
     for label, group in (("infra", infra), ("JOB", jobs), ("defunct", defunct), ("UNKNOWN", unidentifiable)):
         for proc in group:
