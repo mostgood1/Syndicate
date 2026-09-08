@@ -121,8 +121,22 @@ from syndicate.features.shared.clv_position_join import opening_key_for_row
 # `_sim_view_of` for why this reaches for a private name, and why the
 # import is at module scope with no `try` around it.
 from syndicate.features.shared.layer2_board import _layer2_board_columns
+# THE UNCERTAINTY VOCABULARY, IMPORTED. `live_gameline_join` owns the sigma, the
+# refusal name and the Agresti-Coull standard error; restating any of the three
+# here is how the live and pregame gates would drift apart (P2, 2026-09-08).
+from syndicate.features.shared.live_gameline_join import (
+    PRICEABLE_SIGMA,
+    REASON_NOT_PRICEABLE,
+    prob_std_err,
+)
+from syndicate.features.shared.opportunity_signals import staked_probability
 from syndicate.features.shared.portfolio_settings import PortfolioSettings, resolve_settings
 from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
+from syndicate.features.shared.staked_probability_profile import (
+    UNFITTED_VERSION,
+    StakedProbabilityProfile,
+    load_staked_probability_profile,
+)
 
 # Carried onto every position so a committed bet can be found again -- in the
 # shortlist it came from, in the ledger it lands in, and at the venue that
@@ -273,35 +287,165 @@ def sizing_basis_of(row: Mapping[str, Any]) -> str:
     return "model_edge" if _as_float(row.get("model_edge_pct")) is not None else "market_fair"
 
 
-def sizing_inputs_from_row(row: Mapping[str, Any]) -> tuple[SizingInputs | None, str | None]:
+PREGAME_INTERVAL_GATE_ENV = "SYNDICATE_PREGAME_INTERVAL_GATE"
+
+
+def pregame_interval_gate_enabled() -> bool:
+    """Absent/false = off, and the sizer is bit-identical to before P2."""
+    raw = str(os.environ.get(PREGAME_INTERVAL_GATE_ENV) or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def model_std_err_of(row: Mapping[str, Any], model_probability: float) -> tuple[float | None, str | None]:
+    """The model's OWN standard error on this row, and where it came from.
+
+    Two sources, tried in order, on the row and then on `row["projection"]`:
+
+      `prob_std_err`   a standard error the projection already carries
+                       (soccer's pregame gate, `8b6a1f4d`, publishes one);
+      `sims_run`       a Monte Carlo trial count, from which
+                       `live_gameline_join.prob_std_err` (Agresti-Coull) derives
+                       `sqrt(p(1-p)/n)` off the RAW model probability.
+
+    Returns `(None, None)` when neither exists. A 0.0 is treated as absent, for
+    the reason `prob_std_err`'s own docstring gives: zero would read as perfect
+    precision and make every edge clear the bar.
+    """
+    projection = row.get("projection")
+    sources: tuple[Mapping[str, Any], ...] = (
+        (row, projection) if isinstance(projection, Mapping) else (row,)
+    )
+    for source in sources:
+        se = _as_float(source.get("prob_std_err"))
+        if se is not None and se > 0.0:
+            return se, "row_std_err"
+    for source in sources:
+        se = prob_std_err(model_probability, source.get("sims_run"))
+        if se is not None and se > 0.0:
+            return se, "sim_count"
+    return None, None
+
+
+def _interval_verdict(
+    row: Mapping[str, Any], *, fair: float, raw_model: float
+) -> tuple[str | None, dict[str, Any]]:
+    """`(refusal_reason | None, breadcrumb)` for the pregame interval gate.
+
+    THE RULE, borrowed from the live gate by import: the model's disagreement
+    with the market must clear `PRICEABLE_SIGMA` of the model's own standard
+    error, else the "edge" is indistinguishable from Monte Carlo noise and the
+    row is refused under the live gate's name, `prob_interval_swamps_edge`.
+
+    ABSENT UNCERTAINTY IS NOT ZERO UNCERTAINTY, AND IT IS NOT REFUSED HERE. A
+    row that carries neither `prob_std_err` nor `sims_run` is ADMITTED by this
+    gate and stamped `no_std_err`. That is a deliberate, named gap: refusing it
+    would drop every sport whose projection has not yet published an interval
+    in the same commit that adds the gate, and admitting it silently would hide
+    that the gate never saw it. Closing the gap is a per-sport job (publish the
+    interval), tracked separately -- this docstring is where the finding lives
+    until it has an item number.
+    """
+    crumb: dict[str, Any] = {
+        "gate": "off",
+        "sigma": float(PRICEABLE_SIGMA),
+        "prob_std_err": None,
+        "std_err_basis": None,
+        "edge_abs": None,
+        "bar": None,
+    }
+    if not pregame_interval_gate_enabled():
+        return None, crumb
+    se, basis = model_std_err_of(row, raw_model)
+    crumb["prob_std_err"] = se
+    crumb["std_err_basis"] = basis
+    crumb["edge_abs"] = abs(raw_model - fair)
+    if se is None:
+        crumb["gate"] = "no_std_err"
+        return None, crumb
+    bar = float(PRICEABLE_SIGMA) * se
+    crumb["bar"] = bar
+    if abs(raw_model - fair) < bar:
+        crumb["gate"] = "refused"
+        return REASON_NOT_PRICEABLE, crumb
+    crumb["gate"] = "admitted"
+    return None, crumb
+
+
+def sizing_inputs_from_row(
+    row: Mapping[str, Any], *, profile: StakedProbabilityProfile | None = None
+) -> tuple[SizingInputs | None, str | None]:
     """Derive sizing inputs from a Layer 2 shortlist row, or say why not.
 
     Returns `(inputs, None)` or `(None, reason)`. Never returns a partially
     populated object and never substitutes a neutral default -- see the module
     docstring for what a neutral default costs here.
+
+    The two-tuple form, kept for every existing caller. `sizing_inputs_with_provenance`
+    is the same derivation with the P2 breadcrumb (blend beta, profile version,
+    interval-gate verdict) as a third element.
     """
+    inputs, reason, _ = sizing_inputs_with_provenance(row, profile=profile)
+    return inputs, reason
+
+
+def _empty_provenance() -> dict[str, Any]:
+    return {
+        "staked_probability_version": UNFITTED_VERSION,
+        "blend_beta": 0.0,
+        "model_probability_raw": None,
+        "interval_gate": None,
+    }
+
+
+def sizing_inputs_with_provenance(
+    row: Mapping[str, Any], *, profile: StakedProbabilityProfile | None = None
+) -> tuple[SizingInputs | None, str | None, dict[str, Any]]:
+    """`sizing_inputs_from_row`, plus HOW the model probability was derived.
+
+    P2 (2026-09-08) added two things to the derivation, both inert by default:
+
+      1. THE PREGAME INTERVAL GATE (`SYNDICATE_PREGAME_INTERVAL_GATE`), applied
+         to the RAW model probability before any blend -- it is the SIM's claim
+         that must clear the sim's own noise. See `_interval_verdict`.
+
+      2. THE FITTED BLEND. `model_probability` is derived through
+         `opportunity_signals.staked_probability(fair, raw_model, beta=...)`
+         with `beta` from the versioned profile's cell for this row's
+         (sport, market, segment). An absent or unfitted cell keeps the raw
+         additive derivation `fair + model_edge_pct/100`, bit for bit -- read
+         `staked_probability_profile.py` for why that fallback is the raw model
+         and not the seam's own beta-0 market passthrough.
+
+    Neither applies to a market-fair row (`model_edge_pct` absent, sport opted
+    in): there is no model claim to gate and nothing to blend.
+
+    `profile` is injectable so a commit loads it once for 108 rows; None loads
+    (cached) from `staked_probability_profile.profile_path()`.
+    """
+    provenance = _empty_provenance()
     if not isinstance(row, Mapping):
-        return None, "row_not_a_mapping"
+        return None, "row_not_a_mapping", provenance
 
     quote = row.get("quote")
     price = _as_float(quote.get("price")) if isinstance(quote, Mapping) else None
     if price is None:
-        return None, "no_quote_price"
+        return None, "no_quote_price", provenance
     profit = _net_profit_per_unit(price)
     if profit is None:
-        return None, "unusable_price"
+        return None, "unusable_price", provenance
 
     ev_pct = _as_float(row.get("ev_pct"))
     if ev_pct is None:
         # The row was ranked on something other than EV, or had no fair price to
         # score against. Either way there is no market probability to recover.
-        return None, "no_ev_pct"
+        return None, "no_ev_pct", provenance
 
     fair = (ev_pct / 100.0 + 1.0) / (profit + 1.0)
     if not (0.0 < fair < 1.0):
-        return None, "derived_fair_probability_out_of_range"
+        return None, "derived_fair_probability_out_of_range", provenance
 
     model_edge_pct = _as_float(row.get("model_edge_pct"))
+    has_model_view = model_edge_pct is not None
     if model_edge_pct is None:
         # Roughly 40% of the served board ranks on market EV and price shopping
         # alone -- 65 of 108 rows carried `model_edge_pct` when measured
@@ -325,17 +469,34 @@ def sizing_inputs_from_row(row: Mapping[str, Any]) -> tuple[SizingInputs | None,
         # STILL REFUSED BY DEFAULT. A sport opts in by name, because enabling it
         # globally would start sizing 40% of the board in one unreviewed step.
         if str(row.get("sport") or "").strip().lower() not in _market_fair_sports():
-            return None, "no_model_edge_pct"
+            return None, "no_model_edge_pct", provenance
         model_edge_pct = 0.0
 
-    model_probability = fair + (model_edge_pct / 100.0)
-    if not (0.0 < model_probability < 1.0):
-        return None, "derived_model_probability_out_of_range"
+    raw_model = fair + (model_edge_pct / 100.0)
+    if not (0.0 < raw_model < 1.0):
+        return None, "derived_model_probability_out_of_range", provenance
+    provenance["model_probability_raw"] = raw_model
+    model_probability = raw_model
+
+    if has_model_view:
+        refusal, crumb = _interval_verdict(row, fair=fair, raw_model=raw_model)
+        provenance["interval_gate"] = crumb
+        if refusal is not None:
+            return None, refusal, provenance
+
+        resolved_profile = profile if profile is not None else load_staked_probability_profile()[0]
+        beta = resolved_profile.beta_for(row.get("sport"), row.get("market"), row.get("segment"))
+        if beta > 0.0:
+            blended = staked_probability(fair, raw_model, beta=beta)
+            if blended is not None and 0.0 < blended < 1.0:
+                model_probability = blended
+                provenance["blend_beta"] = beta
+                provenance["staked_probability_version"] = resolved_profile.version
 
     score = row.get("score")
     price_reliability = _as_float(score.get("price_reliability")) if isinstance(score, Mapping) else None
     if price_reliability is None:
-        return None, "no_price_reliability"
+        return None, "no_price_reliability", provenance
 
     return (
         SizingInputs(
@@ -345,6 +506,7 @@ def sizing_inputs_from_row(row: Mapping[str, Any]) -> tuple[SizingInputs | None,
             price_reliability=price_reliability,
         ),
         None,
+        provenance,
     )
 
 
@@ -363,6 +525,12 @@ def sizing_candidate(row: Mapping[str, Any], inputs: SizingInputs) -> dict[str, 
         # from `odds`. See the module docstring.
         "odds": inputs.american_price,
         "model_probability": inputs.model_probability,
+        # THE VISIBLE EDIT the docstring above promised (P2, 2026-09-08). Read by
+        # `compute_bet_size` ONLY under `SYNDICATE_KELLY_ON_FAIR`; absent that
+        # flag it is carried and ignored, and the module docstring's warning
+        # about handing the sizer a fair still holds -- it is now a named
+        # basis (`kelly_basis`) rather than a silent substitution.
+        "fair_probability": inputs.market_fair_probability,
         # Feeds `cap_fraction` only, which almost never binds -- see the
         # module docstring. The real trust discount is applied by
         # `apply_price_reliability` below, not here.
@@ -637,6 +805,9 @@ def commit_portfolio(
         sport_bucket[sport_key] = sport_bucket.get(sport_key, 0) + 1
 
     excluded_families = resolve_excluded_families()
+    # ONE profile read per commit, passed to every row. Absent artifact ==
+    # `DEFAULT_PROFILE` == every beta 0.0 == the pre-P2 derivation, bit for bit.
+    blend_profile, _blend_profile_meta = load_staked_probability_profile()
 
     priced: list[dict[str, Any]] = []
     for row in rows or ():
@@ -655,7 +826,7 @@ def commit_portfolio(
             if family in excluded_families:
                 refuse("market_family_excluded", row)
                 continue
-        inputs, reason = sizing_inputs_from_row(row)
+        inputs, reason, provenance = sizing_inputs_with_provenance(row, profile=blend_profile)
         if inputs is None:
             refuse(reason or "unknown", row)
             continue
@@ -674,12 +845,22 @@ def commit_portfolio(
         except Exception:
             refuse("sizing_failed", row)
             continue
+        # Stamped on the stake breadcrumb BEFORE `apply_price_reliability`
+        # copies it, so the provenance rides every later view of this number.
+        candidate["stake"].update(
+            {
+                "staked_probability_version": provenance["staked_probability_version"],
+                "blend_beta": provenance["blend_beta"],
+                "model_probability_raw": provenance["model_probability_raw"],
+                "interval_gate": provenance["interval_gate"],
+            }
+        )
         if (_as_float(candidate["stake"].get("stake_fraction")) or 0.0) <= 0.0:
             refuse("zero_kelly_stake", row)
             continue
         apply_price_reliability(candidate, inputs)
         attribution = stake_attribution(
-            row, inputs, settled_sample_size=samples.get(sport, 0)
+            row, inputs, settled_sample_size=samples.get(sport, 0), profile=blend_profile
         )
         priced.append(
             {"row": row, "inputs": inputs, "candidate": candidate, "attribution": attribution}
@@ -909,6 +1090,15 @@ def commit_portfolio(
                     # their ROIs stop being separable -- two different claims
                     # averaged into one uninterpretable number.
                     "basis": sizing_basis_of(row),
+                    # P2 (2026-09-08): what the model probability was
+                    # differenced against, and how it was derived. All four
+                    # read `implied` / `unfitted` / 0.0 / gate `off` unless a
+                    # flag or a fitted profile says otherwise.
+                    "kelly_basis": stake.get("kelly_basis"),
+                    "staked_probability_version": stake.get("staked_probability_version"),
+                    "blend_beta": stake.get("blend_beta"),
+                    "model_probability_raw": stake.get("model_probability_raw"),
+                    "interval_gate": stake.get("interval_gate"),
                     "kelly_fraction": stake.get("kelly_fraction"),
                     "kelly_multiplier": stake.get("kelly_multiplier"),
                     "sample_credibility": stake.get("sample_credibility"),
@@ -1002,6 +1192,7 @@ def stake_attribution(
     inputs: SizingInputs,
     *,
     settled_sample_size: int = 0,
+    profile: StakedProbabilityProfile | None = None,
 ) -> dict[str, Any]:
     """How much of this stake is the SIM, and how much is price shopping.
 
@@ -1061,7 +1252,7 @@ def stake_attribution(
     """
     ev_only_row = dict(row)
     ev_only_row["model_edge_pct"] = 0.0
-    ev_inputs, _ = sizing_inputs_from_row(ev_only_row)
+    ev_inputs, _ = sizing_inputs_from_row(ev_only_row, profile=profile)
     ev_only_fraction = 0.0
     if ev_inputs is not None:
         ev_candidate = sizing_candidate(ev_only_row, ev_inputs)

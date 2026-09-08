@@ -137,16 +137,68 @@ def _refused_bet_size(candidate: Mapping[str, Any], *, reason: str) -> dict[str,
         "cap_fraction": round(_cap_fraction(confidence), 4),
         "recommended_bet_size": 0.0,
         "reason": reason,
+        # Nothing was differenced, so no basis was used. `None`, not
+        # `"implied"`: a refusal must not read as a sized bet.
+        "kelly_basis": None,
     }
 
 
-def compute_bet_size(candidate: Mapping[str, Any]) -> dict[str, Any]:
+# ---------------------------------------------------------------------------
+# KELLY BASIS -- what the model probability is differenced AGAINST.
+# ---------------------------------------------------------------------------
+#: Env flag. Truthy => `edge = model - fair` when the candidate carries a
+#: `fair_probability`; absent/false => `edge = model - implied(price)`, which is
+#: the path every caller ran before 2026-09-08 and is bit-identical to it.
+KELLY_ON_FAIR_ENV = "SYNDICATE_KELLY_ON_FAIR"
+KELLY_BASIS_IMPLIED = "implied"
+KELLY_BASIS_FAIR = "fair"
+
+
+def kelly_on_fair_enabled() -> bool:
+    raw = str(os.environ.get(KELLY_ON_FAIR_ENV) or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def compute_bet_size(candidate: Mapping[str, Any], *, fair_probability: Any = None) -> dict[str, Any]:
+    """Full Kelly x confidence, capped. Returns a dict; never raises on input.
+
+    THE TWO BASES (`kelly_basis` in the result says which ran):
+
+      `implied`  `edge = model - implied(price)`. Textbook Kelly: with `b` the
+                 net payout, `(p*b - (1-p))/b == (p - 1/(b+1))/b`, and `1/(b+1)`
+                 IS the price's own vig-inclusive implied probability. Default.
+
+      `fair`     `edge = model - fair`, payout still from the QUOTED price. Only
+                 when `SYNDICATE_KELLY_ON_FAIR` is truthy AND a `fair_probability`
+                 (keyword, or the candidate's own key) is present. A caller with
+                 no fair -- the Layer 1 pool, the parlay runtime -- stays on
+                 `implied` whatever the flag says, and the result says so.
+
+    THE TWO DIFFER BY EXACTLY `implied - fair`, WHICH HAS THE SIGN OF `-ev_pct`.
+    On `portfolio_commit`'s rows `fair` is the consensus de-vig and `ev_pct > 0`
+    means the price beats it, so `fair > implied` and the fair basis stakes
+    LESS: it stakes only the model's disagreement with the market and drops the
+    price-shopping term `fair - implied`. On a row priced at the hold
+    (`ev_pct = -hold`) the sign flips and the fair basis stakes MORE. Neither is
+    "the correct Kelly" -- they are two claims about what the edge IS, and the
+    flag records which one the book was sized on so a settled sample can be cut
+    by it. Measured at -110, model 0.5715, fair 0.5395 (ev 4.5%):
+
+        implied  edge 0.0477  kelly 0.0525
+        fair     edge 0.0320  kelly 0.0352
+    """
     warn_if_compute_in_request_path("compute_bet_size")
     base_candidate = dict(candidate) if isinstance(candidate, Mapping) else {}
 
     model_probability = _safe_float(base_candidate.get("model_probability"))
     if model_probability is not None and model_probability > 1.0:
         model_probability /= 100.0
+
+    fair = _safe_float(fair_probability if fair_probability is not None else base_candidate.get("fair_probability"))
+    if fair is not None and fair > 1.0:
+        fair /= 100.0
+    if fair is not None and not (0.0 < fair < 1.0):
+        fair = None
 
     implied_probability = _safe_float(base_candidate.get("implied_probability"))
     if implied_probability is not None and implied_probability > 1.0:
@@ -178,7 +230,12 @@ def compute_bet_size(candidate: Mapping[str, Any]) -> dict[str, Any]:
     if odds_adjustment is None:
         odds_adjustment = max(0.01, 1.0 - implied_probability)
 
-    edge = model_probability - implied_probability
+    kelly_basis = KELLY_BASIS_IMPLIED
+    subtracted = implied_probability
+    if fair is not None and kelly_on_fair_enabled():
+        kelly_basis = KELLY_BASIS_FAIR
+        subtracted = fair
+    edge = model_probability - subtracted
     kelly_fraction = edge / odds_adjustment if odds_adjustment > 0.0 else 0.0
     kelly_fraction = max(0.0, kelly_fraction)
 
@@ -196,6 +253,11 @@ def compute_bet_size(candidate: Mapping[str, Any]) -> dict[str, Any]:
         "confidence": round(confidence, 4),
         "cap_fraction": round(cap_fraction, 4),
         "recommended_bet_size": round(recommended_bet_size, 4),
+        # WHICH PROBABILITY `edge` WAS DIFFERENCED AGAINST. Carried on every
+        # result so a book sized under the flag can be told from one that was
+        # not; the two are different claims and their ROIs are not poolable.
+        "kelly_basis": kelly_basis,
+        "fair_probability": round(fair, 4) if fair is not None else None,
     }
 
 
@@ -235,7 +297,12 @@ def _sample_credibility(settled_sample_size: Any) -> float:
     return _clamp(max(_MIN_SAMPLE_CREDIBILITY, ratio), _MIN_SAMPLE_CREDIBILITY, 1.0)
 
 
-def compute_board_stake(candidate: Mapping[str, Any], *, settled_sample_size: Any = 0) -> dict[str, Any]:
+def compute_board_stake(
+    candidate: Mapping[str, Any],
+    *,
+    settled_sample_size: Any = 0,
+    fair_probability: Any = None,
+) -> dict[str, Any]:
     """Fractional-Kelly stake for a board candidate, as a fraction of bankroll.
 
     Wraps compute_bet_size (full Kelly x confidence, capped) and shrinks it
@@ -248,7 +315,9 @@ def compute_board_stake(candidate: Mapping[str, Any], *, settled_sample_size: An
     advice: it states what the stated edge and price imply under a
     deliberately conservative Kelly variant, and says so.
     """
-    sizing = compute_bet_size(candidate)
+    # `fair_probability` rides through to `compute_bet_size`, which decides the
+    # basis; see its docstring. Absent => the vigged implied path, unchanged.
+    sizing = compute_bet_size(candidate, fair_probability=fair_probability)
     multiplier = _kelly_multiplier()
     credibility = _sample_credibility(settled_sample_size)
     full_kelly_fraction = _safe_float(sizing.get("kelly_fraction")) or 0.0
