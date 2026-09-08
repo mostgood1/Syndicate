@@ -1789,6 +1789,33 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   absent from `list_sessions(include_archived=True, limit=80)`. Handoffs and
   verified patches are written; taking the claims needs an explicit override.
 
+### publish-refusal-201-triage — CLOSED 2026-09-07 — session 28c6162b-58c8-4937-99f5-d3b260a96de4 — **ANSWERED: NOT data loss and NOT the `#488` shape. `verdict=REFUSED` is the verdict function’s opinion, printed before the caller decides; `#630`’s `if refuse and not will_merge` exempts merged families and `will_merge` is True for EVERY refused path (predicate run against the real log paths). 819 odds_history merges over 2h, all merged. HYPOTHESIS CONFIRMED as written. **The real cost is different and larger: 2.22 GB/hour of publishes, 785 of 819 merges adding ZERO markets** — refresh-worker republishes a ~74-75% subset every ~2.3 min across 16 paths. NOT pure waste (34 merges added 1-84 markets; the merge PREVENTS the `#488` clobber and must stay). Findings `bcf33ccf`, handed to lane `ncaaf-live-resim-wire` which owns the files. Read-only; no claim taken, nothing edited.**
+- Goal: say whether the ~201/hour `verdict=REFUSED` publish-divergence lines on
+  soccer `odds_history` are DATA LOSS or LOG NOISE, and name the evidence.
+  DIAGNOSTIC ONLY — `ops.py` and `artifact_publisher.py` are held by lane
+  `ncaaf-live-resim-wire`; I claim NOTHING and will hand any fix to them.
+- Files: NOT CLAIMED — read-only. Findings go to
+  `.syndicate/findings_2026-09-07_publish_refusal_201.md` (new, mine).
+- Reported by lane `soccer-unfed-inputs` (session 520cd594): 201
+  `verdict=REFUSED` in the hour BEFORE their deploy, `refresh-worker` vs
+  `live-odds-worker` alternating on soccer `odds_history`, continuously — the
+  `#488` incident shape still at volume.
+- HYPOTHESIS (written before testing): **these are LOG NOISE, not refusals.**
+  `_publish_divergence_verdict` builds the marker string — including the literal
+  `verdict=REFUSED` — and returns `should_refuse=True`, but the CALLER
+  (`_publish_streamed_body`, ~line 109) acts on it only via
+  `if refuse and not will_merge:`. `#630` deliberately exempts merged families,
+  and `is_mergeable_odds_history` makes these paths one. So the line reports the
+  verdict FUNCTION'S opinion, not the outcome; the publish then merges.
+- FALSIFICATION: if any of those publishes returned the HTTP refusal
+  (`ok:false`, "publish refused: would replace a larger artifact"), or if the
+  on-disk odds_history for those paths is missing one publisher's rows, the
+  hypothesis is WRONG and this is real loss.
+- Verification: pair the REFUSED lines against `ARTIFACT_MERGE` /
+  `ARTIFACT_MERGE_DEFERRED` for the SAME path+timestamp, and read the HTTP
+  status the publisher got. The response is decisive; the log line is not.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
