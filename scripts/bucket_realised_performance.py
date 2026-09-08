@@ -15,14 +15,35 @@ WHAT THIS MEASURES INSTEAD. For every ledger row whose game has a final:
 The difference is the edge in probability points, which is the thing that turns
 into money. Positive means the model's disagreement was right.
 
-THE MARKET IS THE CONTROL, AND THIS IS THE LOAD-BEARING PART. A ledger row's
-`market_fair_prob` is the book's de-vigged probability for the same side, and a
-book is well calibrated by construction -- so if my outcome resolution is wrong
-(a flipped line convention on spreads, an over/under mix-up on totals) the
-MARKET will look badly calibrated against it. That is a detectable, unambiguous
-signal that the join is wrong rather than the model being good. Each market is
-gated on it and REFUSED if the market fails, because a convention error would
-otherwise show up as a large fake edge in exactly the bucket that matters most.
+**`market_fair_prob` IS NOT A VALID BASELINE FOR TOTALS OR SPREADS, AND USING IT
+WAS THIS SCRIPT'S BIGGEST ERROR.** Books price those markets about -110/-110, so
+the de-vigged price is ~0.50 WHATEVER the line is -- measured market-leg sd:
+h2h 0.251, spreads 0.132, totals 0.058. Confirmed here independently: the
+within-game slope of P(over) against the line is **-0.005 per run** where a real
+total needs about -0.12, and P(over) moves only 0.512 -> 0.453 across TEN runs
+of line.
+
+The market does not express its view as a probability. **It expresses it as the
+LINE.** Comparing an informative model probability to a ~0.50 constant
+manufactures edge out of nothing -- `live_gameline_ledger` already records that
+this produced a fake ~90% ATS result in `subset_edge_scan` before that scan
+learned to refuse these markets, and it is what produced +14pp of "realised
+edge" here before this correction.
+
+SO EACH MARKET IS SCORED THE WAY ITS PRICE IS ACTUALLY SET:
+
+  h2h              the de-vig IS the market's view -> compare probabilities.
+                   Gated on the market calibrating against the outcome, because
+                   a flipped convention would otherwise read as a fake edge.
+
+  totals, spreads  the LINE is the market's view -> compare POINT FORECASTS.
+                   `model_total_mean` / `model_margin_mean` against the line,
+                   scored on the actual total / margin. The 0.50 baseline is
+                   legitimate for the directional read precisely BECAUSE the
+                   book prices it as a coin flip at that line.
+
+A row without the mean field is UNMEASURED, never folded in with a probability
+comparison as a substitute.
 
     h2h      outcome: the home team won
     totals   outcome: away + home > line          (equal = push, dropped)
@@ -147,6 +168,46 @@ def finals_for(dates: set[str]) -> dict[str, tuple[int, int]]:
                     continue
                 out[str(g.get("gamePk"))] = (int(a), int(h))
     return out
+
+
+# Point-forecast markets: the LINE is the market view, and the model's own mean
+# is what competes with it. Keyed by the ledger column that carries that mean --
+# note the column is `model_total_mean`, NOT `total_mean`; reading the latter
+# returns None on every row and looks exactly like an unfed field.
+_POINT_FORECAST = {
+    "totals": ("model_total_mean", lambda a, h: a + h),
+    "totals_alt": ("model_total_mean", lambda a, h: a + h),
+    "spreads": ("model_margin_mean", lambda a, h: h - a),
+    "spreads_alt": ("model_margin_mean", lambda a, h: h - a),
+}
+
+
+def point_forecast_side(rec: dict, final: tuple[int, int]):
+    """(model_side_won, ok) for a market whose view is the LINE.
+
+    The model backs the over/home when its own mean sits above the line. The
+    outcome is the actual total/margin against that same line, so nothing here
+    touches `market_fair_prob` -- which is ~0.50 by construction and carries no
+    information about where the line is.
+    """
+    market = str(rec.get("market") or "").strip().lower()
+    spec = _POINT_FORECAST.get(market)
+    if spec is None:
+        return None, False
+    col, actual_fn = spec
+    mean = rec.get(col)
+    line = rec.get("line")
+    if mean is None or line is None:
+        return None, False
+    try:
+        mean, line = float(mean), float(line)
+    except (TypeError, ValueError):
+        return None, False
+    away, home = final
+    actual = actual_fn(away, home)
+    if actual == line or abs(mean - line) < 1e-9:
+        return None, False        # push, or the model has no lean
+    return (mean > line) == (actual > line), True
 
 
 def resolve(rec: dict, final: tuple[int, int], spread_sign: float):
