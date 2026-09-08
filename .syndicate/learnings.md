@@ -4398,3 +4398,31 @@ until worktrees; the stash still is), [[concurrent_parallel_sessions]],
 - Cost: a second deploy, and a repair that was written unconditionally the first
   time — it pulled web's 111-byte empty file straight over a good local copy
   before being conditioned on `local_rows == 0`.
+
+
+### 2026-09-08 — FORBIDDEN: a test whose FIXTURE hand-rolls the artifact schema the code under test reads. Round-trip the production writer.
+
+- What we believed: `_nfl_prop_artifact_is_empty` detected the zero-row NFL prop
+  artifact, and three unit tests proved it. They passed.
+- What was actually true: the helper read `payload["rows"]`. That key has never
+  existed — `write_nfl_prop_projection_artifact` emits `{season, week,
+  generated_at, sim_rows, row_count}` and `read_nfl_prop_projection_artifact`
+  reads `sim_rows`. So the helper returned False for EVERY input, the staleness
+  override it gates never fired, and the commit deployed to refresh-worker
+  completely inert. The tests passed because their fixtures were written with
+  the same invented key: **they asserted against the same wrong schema as the
+  bug, so they confirmed it rather than catching it.** That is not a weak test,
+  it is an absent one wearing a passing badge.
+- How we found out: by accident, reading the real artifact on disk for an
+  unrelated reason — 404,766 bytes with `row_count=980` while a probe printed
+  `rows: 0`. Nothing in the test suite, the deploy, or the logs would have said
+  so; an inert guard is silent by construction.
+- The rule going forward: when a test exercises code that PARSES an artifact,
+  build the fixture by calling the real WRITER (patch its output root), never by
+  hand-writing a payload literal. Add one explicit schema-agreement assertion
+  naming the key. And before trusting a new guard, verify the test can FAIL:
+  reintroduce the bug and watch it go red. Here that flipped 3 tests red and
+  back to green, which is the only evidence the tests were load-bearing.
+- Cost: one wasted deploy of an inert change (~20 min build), on the day before
+  the season opener. The silver lining is the only reason it was harmless: an
+  override that never fires also never busy-loops.
