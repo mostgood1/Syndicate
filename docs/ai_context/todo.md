@@ -1,6 +1,57 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#648` — **~~19 real regressions~~ RETRACTED: 15 of 19 are a MEMORY FLOOR THE RUNNER CANNOT REACH** — lane `render-cron-failures`, 2026-09-08 — **RETRACTED THE SAME DAY; 4 still unexplained**
+### `#648` — **CLOSED 2026-09-08: ~~19 regressions~~ → 15 runner-too-small + 4 stale tests + ZERO regressions** — lane `render-cron-failures`
+
+**FINAL. Filed, retracted and closed the same day.** The full suite ran on the
+cron for the first time (`#647`) and reported 25 new failures. **None is a
+regression.** Both halves were established from readings, not reasoning:
+
+    15   a MEMORY FLOOR THE RUNNER CANNOT REACH  (see the retraction below)
+     4   STALE TESTS from two deliberate code changes  (attribution below)
+     6   never in a baseline / chunking artifacts  (original filing)
+
+**THE 4, ATTRIBUTED — found by peer session 2edf8b82, RE-DERIVED HERE rather than
+adopted, because it changed my conclusion:**
+
+- `test_soccer_live_gates_wiring.py::test_gate3_prices_off_soccers_real_sim_count`
+  and `::test_gate3_home_framing_matches_the_market_term` assert
+  `model_prob == 0.62`; the code returns **0.6188118811881188**, the
+  Agresti-Coull centre `(0.62*400+2)/404` — arithmetic re-computed here, exact.
+  Deliberate, from `79149c94` *"estimator: publish the Agresti-Coull point
+  estimate, not the raw k/n"* (2026-09-06). The tests were last repaired at
+  `63c10ed5` (2026-09-05), and **`63c10ed5` IS AN ANCESTOR of `79149c94`** —
+  verified, so the repair predates the change that invalidated it. Fix is the
+  expected value, or `abs(p - 0.62) < 2/404`. **Owned by whoever landed 79149c94,
+  not this lane.**
+- `test_refresh_odds_sources.py::SoccerLeagueScopeTests` x2 fail because a
+  `soccer_sim_input_checklist` step (phases pregame+live) now precedes the league
+  steps — **visible in the assertion output itself**, `[RefreshStep(name=
+  'soccer_sim_input_checklist' ...)] != []`. Deliberate, from `359ef031`
+  *"soccer: the input gate now runs and means something"*. **Correction to the
+  attribution as received: `359ef031` is dated 2026-09-07, not 09-02.** The
+  conclusion is unchanged — the tests were last touched at `324ef0d8` (09-04) and
+  `7c1e842c` (08-30), both earlier — but the date matters to anyone bisecting.
+  Fix is to exclude the checklist step or assert it as the known first step.
+  **Owned by lane `soccer-anchor-wiring`, not this lane.**
+
+All four reproduce in 3.3s on a Windows worktree with no `data/`, so unlike the
+15 they are neither host-bound nor memory-bound. **NOT FIXED HERE — both belong to
+other lanes and this lane does not edit across lanes.**
+
+**WHAT THE 4 ACTUALLY DEMONSTRATE, and it is the point worth keeping:** two
+deliberate changes landed with their tests left red, and nothing noticed for
+1-3 days. `ci.yml` has been billing-locked since 2026-08-22 and the cron that
+replaced it could not finish the pytest step until today. **These are not bugs in
+the code; they are evidence of the gate being down.** That is the argument for
+`#647` mattering, stated in failures rather than in principle.
+
+**THE BASELINE IS STILL NOT REGENERATED.** 15 of the 19 fail only because the
+runner has 2 GB; recording them would bake a HOST property into a commit-level
+gate. The 4 should be FIXED by their owners, not absorbed.
+
+**STILL UNANSWERED, and inherited by `#647`:** should a suite whose intelligence
+tests need 3 GB of headroom run on a 2 GB cron at all? The tests are not wrong and
+the guard is not wrong — the RUNNER is too small for that subset.
 
 **RETRACTION `[~21:30Z, substrate render]`.** The traceback landed after this was
 filed and falsifies the central claim. The 13 intelligence-layer failures are not
