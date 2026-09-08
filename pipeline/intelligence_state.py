@@ -4692,7 +4692,14 @@ class IntelligenceStateService:
         # and the full build's own shortlist write, so a healthy cycle that
         # already produced a shortlist does not immediately get a second one --
         # the point is board age, not two independent schedules.
-        self._layer2_fast_refresh_at: float = 0.0
+        # `#632`: PER DATE, not per instance. This was a single float, and the
+        # loop drains one payload -- one DATE -- per iteration, so a heavy build
+        # for 2026-09-07 silenced the fast path for 2026-09-08 and vice versa.
+        # MEASURED on refresh-worker 2026-09-08: `LAYER2_FAST_REFRESH` appears
+        # ZERO times in 2h26m of logs while `GAME_CHIPS_PUBLISHED` appears 18
+        # times, because heavy builds alternated the two dates every 10-20 min
+        # and kept the shared clock permanently fresh. The fast path was inert.
+        self._layer2_fast_refresh_at: dict[str, float] = {}
         self._app: Flask | None = None
 
     def _artifact_signature(self, relative_path: str | None) -> dict[str, Any]:
@@ -4760,6 +4767,38 @@ class IntelligenceStateService:
             "updated_at": str(active_payload.get("updated_at") or "").strip() or None,
             "market_count": int(market_count),
         }
+
+    def _layer2_fast_refresh_seen(self, selected_date: str) -> float:
+        """When this DATE last had a shortlist refresh, heavy or fast. `#632`."""
+        stamps = getattr(self, "_layer2_fast_refresh_at", None)
+        if not isinstance(stamps, dict):
+            # Tolerate the pre-`#632` float across a hot reload rather than
+            # raising: an unreadable stamp must read as "never refreshed", which
+            # is the SAFE direction here (it permits a refresh, it cannot skip
+            # one).
+            return 0.0
+        try:
+            return float(stamps.get(str(selected_date or ""), 0.0) or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _mark_layer2_fast_refresh(self, selected_date: str, when: float) -> None:
+        """Record a refresh for ONE date, and keep the map bounded. `#632`."""
+        key = str(selected_date or "").strip()
+        if not key:
+            return
+        stamps = getattr(self, "_layer2_fast_refresh_at", None)
+        if not isinstance(stamps, dict):
+            stamps = {}
+            self._layer2_fast_refresh_at = stamps
+        stamps[key] = float(when)
+        # The board window is a handful of dates; this cannot grow without
+        # bound, but a long-lived worker crossing many midnights would still
+        # accumulate. Drop the oldest rather than let a date map outlive its
+        # usefulness.
+        if len(stamps) > 16:
+            for stale_key in sorted(stamps, key=lambda k: stamps[k])[:len(stamps) - 16]:
+                stamps.pop(stale_key, None)
 
     def _refresh_layer2_shortlist_only(self, selected_date: str | None) -> dict[str, Any] | None:
         """Rebuild and persist JUST the Layer 2 shortlist, off the heavy path.
@@ -4830,7 +4869,7 @@ class IntelligenceStateService:
         # against the 104.7min measured.
         min_interval = max(60, _env_int("SYNDICATE_LAYER2_FAST_REFRESH_SECONDS", 300))
         now = time.time()
-        last = float(getattr(self, "_layer2_fast_refresh_at", 0.0) or 0.0)
+        last = self._layer2_fast_refresh_seen(normalized_date)
         if last and (now - last) < min_interval:
             return None
         # ITS OWN floor, not the overview's. See _LAYER2_MIN_SAFE_HEADROOM_BYTES.
@@ -4842,7 +4881,7 @@ class IntelligenceStateService:
             "layer2_fast_refresh", _LAYER2_MIN_SAFE_HEADROOM_BYTES, token="LAYER2_GUARD_SKIP"
         ):
             return None
-        self._layer2_fast_refresh_at = now
+        self._mark_layer2_fast_refresh(normalized_date, now)
         started = time.time()
         try:
             from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
@@ -6413,7 +6452,10 @@ class IntelligenceStateService:
             # that could rebuild the board. A failure must not look like a
             # refresh.
             if not layer2_shortlist.get("error"):
-                self._layer2_fast_refresh_at = time.time()
+                # `#632`: stamp THIS DATE only. Sharing one clock across dates
+                # is what made the fast path inert -- see the field's own
+                # comment. The reasoning below still holds WITHIN a date.
+                self._mark_layer2_fast_refresh(str(selected_date or ""), time.time())
         except Exception as exc:
             print(f"[intelligence_state] LAYER2_SHORTLIST_WRITE_FAILED error={exc}", flush=True)
         _build_span_exit("layer2_shortlist_build", _layer2_mark)
