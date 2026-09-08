@@ -70,12 +70,14 @@ from __future__ import annotations
 import json
 import math
 import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared import book_shortlist, opportunity_gate
 from syndicate.features.shared.book_margin_model import market_family as _market_family
+from syndicate.features.shared.odds_book_quotes import _FAIR_PAIR_TOLERANCE_S
 from syndicate.features.shared.opportunity_signals import (
     american_price,
     blended_score,
@@ -84,6 +86,7 @@ from syndicate.features.shared.opportunity_signals import (
     expected_value_pct,
 )
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
+from syndicate.features.shared.sharp_books import EXCHANGE_ANCHOR_PRIORITY, SHARP_ANCHOR_PRIORITY
 
 # Identity carried from the market row onto every candidate. Kept explicit
 # rather than copying the whole row: the grid row holds `cells` (every book x
@@ -926,59 +929,186 @@ def _canonical_team_key(sport: str, name: str) -> str | None:
         return None
 
 
-def _fair_by_side(row: Mapping[str, Any], sides: list[str]) -> tuple[dict[str, float], str | None]:
-    """No-vig fair probability per side, and how it was obtained.
+#: `SYNDICATE_FAIR_ANCHOR` -- WHAT THE BOARD'S FAIR PROBABILITY IS ANCHORED TO.
+#:
+#:   median  (default)  today's behaviour, bit for bit: de-vig every book against
+#:                      itself and take the MEDIAN per selection (`#384`).
+#:   sharp              try a SHARP book's own two-sided market first
+#:                      (`sharp_books.SHARP_ANCHOR_PRIORITY`: Pinnacle), then a
+#:                      two-sided EXCHANGE mid (`EXCHANGE_ANCHOR_PRIORITY`), and
+#:                      only then the median chain, unchanged.
+#:
+#: Read per call rather than at import, for the same reason
+#: `_model_value_term_mode` is: a test flips it with `monkeypatch`, and a worker
+#: picks up an env change on its next build.
+FAIR_ANCHOR_ENV = "SYNDICATE_FAIR_ANCHOR"
+FAIR_ANCHOR_MEDIAN = "median"
+FAIR_ANCHOR_SHARP = "sharp"
 
-    Two-sided is the real thing (#238). The margin model fills one-sided rows
-    and is labelled differently on purpose, so a modelled fair can never be
-    mistaken for a measured consensus.
+#: `SYNDICATE_FAIR_DEVIG_METHOD` -- the de-vig applied INSIDE EACH BOOK on the
+#: consensus chain: `multiplicative` (default) or `power`. Independent of the
+#: anchor. The median can be taken over power-de-vigged books with no sharp
+#: anchor at all, and the anchor tiers are power-de-vigged regardless of this.
+FAIR_DEVIG_METHOD_ENV = "SYNDICATE_FAIR_DEVIG_METHOD"
+_FAIR_DEVIG_METHODS: tuple[str, ...] = ("multiplicative", "power")
+
+#: The anchor tiers' de-vig. POWER, because an anchor is ONE book, and a single
+#: book puts more of its margin on the longshot side than on the favourite --
+#: multiplicative would leave the longshot's fair overstated. The median chain
+#: is robust to that by construction (many books, middle value); one book is
+#: not. See `opportunity_signals.devig`.
+_ANCHOR_DEVIG_METHOD = "power"
+
+#: `fair_method` labels for the two anchor tiers. Distinct from `consensus` so
+#: a fair that is ONE book's opinion can never be read as a market median.
+FAIR_METHOD_SHARP_ANCHOR = "sharp_anchor"
+FAIR_METHOD_EXCHANGE_MID = "exchange_mid"
+
+
+def _fair_anchor_mode() -> str:
+    raw = str(os.environ.get(FAIR_ANCHOR_ENV) or "").strip().lower()
+    return FAIR_ANCHOR_SHARP if raw == FAIR_ANCHOR_SHARP else FAIR_ANCHOR_MEDIAN
+
+
+def _fair_devig_method() -> str:
+    raw = str(os.environ.get(FAIR_DEVIG_METHOD_ENV) or "").strip().lower()
+    return raw if raw in _FAIR_DEVIG_METHODS else _FAIR_DEVIG_METHODS[0]
+
+
+@dataclass(frozen=True)
+class _FairResolution:
+    """What `_resolve_fair` decided, with everything needed to audit it per row."""
+
+    fair_by_side: dict[str, float]
+    method: str | None
+    #: The ONE book whose own sides produced `fair_by_side` (an anchor tier, or
+    #: the same-book fallback). None on the consensus chain, where no single
+    #: book did, and on the margin model.
+    anchor_book: str | None
+    #: The de-vig that produced `fair_by_side`: `power` on an anchor tier, the
+    #: `SYNDICATE_FAIR_DEVIG_METHOD` value on the consensus chain, None when the
+    #: fair came from the margin model or from nothing.
+    devig_method: str | None
+    #: The MEDIAN consensus that applies under `median` -- computed on EVERY row
+    #: regardless of mode, so a sharp-vs-median gap is measurable per row from
+    #: the served payload without a rerun. Empty when no book quotes every side.
+    consensus_by_side: dict[str, float]
+
+
+def _consensus_fair(cells: Any, sides: list[str], *, method: str) -> dict[str, float]:
+    """`#384`: de-vig EACH BOOK against itself, then the MEDIAN across books.
+
+    The body is the consensus branch of `_fair_by_side` as it stood before the
+    anchor tiers existed, moved here verbatim so the default path is unchanged
+    and so the anchor mode can compute the median it did NOT use.
     """
+    if not isinstance(cells, Mapping):
+        return {}
+    # Nesting is {book: {selection: price}} -- the same shape `cells`
+    # already has, and the shape `fair_probability_by_book` iterates. Passing
+    # it inverted returns None rather than raising, so the board would have
+    # fallen through to the modelled path everywhere and looked merely
+    # thinner rather than broken.
+    prices_by_book: dict[str, dict[str, Any]] = {}
+    for book, sides_map in cells.items():
+        if not isinstance(sides_map, Mapping):
+            continue
+        per_side = {
+            side: price
+            for side in sides
+            if isinstance(sides_map.get(side), Mapping)
+            and (price := _as_float(sides_map[side].get("price"))) is not None
+        }
+        # A book quoting only one leg has nothing to de-vig against; keeping
+        # it would let a lone longshot price normalise to a "fair" of 1.0.
+        if len(per_side) == len(sides) and len(per_side) >= 2:
+            prices_by_book[str(book)] = per_side
+    if prices_by_book:
+        consensus = consensus_fair_probability(prices_by_book, method=method)
+        if consensus and len(consensus) == len(sides):
+            return {str(side): value for side, value in consensus.items()}
+    return {}
+
+
+def _anchor_pair(cells: Mapping[str, Any], book: str, sides: list[str]) -> list[float] | None:
+    """`book`'s OWN price on every side, if it quoted them all together.
+
+    None -- and the caller tries the next book -- when any side is missing, any
+    cell is flagged `stale` by the grid, any cell's age is unknown, or the sides
+    were observed more than `_FAIR_PAIR_TOLERANCE_S` apart (the same 600s
+    `odds_book_quotes._fair_value_fields` enforces, imported rather than
+    restated). Unknown is REFUSED, not admitted: an anchor is one book standing
+    in for the whole market, and `learnings.md`'s rule that unknown must not
+    default permissive applies with full force to the number every EV on the
+    row is measured against.
+
+    The age is `age_seconds`, which BOTH cell writers stamp -- `book_grid` from
+    `observed_at`, `venue_quote_fanin._reprice_live_benchmark` from the venue
+    quote -- so a venue cell and an OddsAPI cell are judged on the same field.
+    """
+    sides_map = cells.get(book)
+    if not isinstance(sides_map, Mapping):
+        return None
+    prices: list[float] = []
+    ages: list[float] = []
+    for side in sides:
+        cell = sides_map.get(side)
+        if not isinstance(cell, Mapping) or cell.get("stale") is True:
+            return None
+        price = _as_float(cell.get("price"))
+        age = _as_float(cell.get("age_seconds"))
+        if price is None or age is None:
+            return None
+        prices.append(price)
+        ages.append(age)
+    if len(prices) < 2 or (max(ages) - min(ages)) > _FAIR_PAIR_TOLERANCE_S:
+        return None
+    return prices
+
+
+def _anchored_fair(
+    cells: Any, sides: list[str], books: tuple[str, ...]
+) -> tuple[dict[str, float], str] | None:
+    """The first book in `books` quoting every side fresh, power-de-vigged.
+
+    Returns `(fair_by_side, book)`, or None when no book in the tier qualifies
+    -- including when `devig` refuses the pair's overround, which is evidence
+    the legs are not one market and must not become an anchor.
+    """
+    if not isinstance(cells, Mapping):
+        return None
+    for book in books:
+        prices = _anchor_pair(cells, book, sides)
+        if prices is None:
+            continue
+        probabilities = devig(prices, method=_ANCHOR_DEVIG_METHOD)
+        if not probabilities or len(probabilities) != len(sides):
+            continue
+        return ({str(side): probabilities[i] for i, side in enumerate(sides)}, book)
+    return None
+
+
+def _resolve_fair(row: Mapping[str, Any], sides: list[str]) -> _FairResolution:
+    """`_fair_by_side` with its working shown. See that docstring for the rules."""
+    anchor_mode = _fair_anchor_mode()
+    devig_method = _fair_devig_method()
+    cells = row.get("cells")
     best = row.get("best") or {}
 
-    # `#384` -- DE-VIG WITHIN A BOOK, THEN TAKE THE MEDIAN ACROSS BOOKS.
-    #
-    # This used to de-vig the BEST price on each side, which routinely takes the
-    # two sides from two different books. Measured on the served board
-    # 2026-08-12: 29 of 52 two-sided groups drew their sides from different
-    # bookmakers, and `edge == ev_vs_fair_pct` on 127 of 127 rows.
-    #
-    # `opportunity_signals.fair_probability_by_book` documents exactly why that
-    # is wrong: the best over at one book and the best under at another sum to
-    # less than a real market, and normalising THAT to 1.0 "silently launders a
-    # line-shopping edge into the 'fair' price -- which then makes the edge
-    # disappear from the EV it was supposed to measure." So the board's EV was a
-    # cross-book arb surplus, identical on both sides by construction, wearing
-    # the label of an edge against fair value.
-    #
-    # `consensus_fair_probability` is the correct implementation and already
-    # existed -- it was reachable from one call site and used by neither board.
-    # It de-vigs each book against itself, then takes the MEDIAN per selection,
-    # so one stale or fat-fingered book cannot move the benchmark.
-    cells = row.get("cells")
-    if isinstance(cells, Mapping):
-        # Nesting is {book: {selection: price}} -- the same shape `cells`
-        # already has, and the shape `fair_probability_by_book` iterates. Passing
-        # it inverted returns None rather than raising, so the board would have
-        # fallen through to the modelled path everywhere and looked merely
-        # thinner rather than broken.
-        prices_by_book: dict[str, dict[str, Any]] = {}
-        for book, sides_map in cells.items():
-            if not isinstance(sides_map, Mapping):
-                continue
-            per_side = {
-                side: price
-                for side in sides
-                if isinstance(sides_map.get(side), Mapping)
-                and (price := _as_float(sides_map[side].get("price"))) is not None
-            }
-            # A book quoting only one leg has nothing to de-vig against; keeping
-            # it would let a lone longshot price normalise to a "fair" of 1.0.
-            if len(per_side) == len(sides) and len(per_side) >= 2:
-                prices_by_book[str(book)] = per_side
-        if prices_by_book:
-            consensus = consensus_fair_probability(prices_by_book)
-            if consensus and len(consensus) == len(sides):
-                return ({str(side): value for side, value in consensus.items()}, "consensus")
+    # Computed FIRST and on every row -- it is the counterfactual the anchor
+    # mode is measured against, not only the default answer.
+    consensus = _consensus_fair(cells, sides, method=devig_method)
+
+    if anchor_mode == FAIR_ANCHOR_SHARP:
+        anchored = _anchored_fair(cells, sides, SHARP_ANCHOR_PRIORITY)
+        if anchored is not None:
+            return _FairResolution(anchored[0], FAIR_METHOD_SHARP_ANCHOR, anchored[1], _ANCHOR_DEVIG_METHOD, consensus)
+        anchored = _anchored_fair(cells, sides, EXCHANGE_ANCHOR_PRIORITY)
+        if anchored is not None:
+            return _FairResolution(anchored[0], FAIR_METHOD_EXCHANGE_MID, anchored[1], _ANCHOR_DEVIG_METHOD, consensus)
+
+    if consensus:
+        return _FairResolution(consensus, "consensus", None, devig_method, consensus)
 
     # SAME-BOOK fallback only. A two-sided de-vig is legitimate when both prices
     # come from ONE book -- that is what the per-book pass above does. It is the
@@ -992,9 +1122,15 @@ def _fair_by_side(row: Mapping[str, Any], sides: list[str]) -> tuple[dict[str, f
         and len(books_used) == 1
         and "" not in books_used
     ):
-        probabilities = devig([price for price, _ in prices])
+        probabilities = devig([price for price, _ in prices], method=devig_method)
         if probabilities and len(probabilities) == len(prices):
-            return ({side: probabilities[i] for i, (_, side) in enumerate(prices)}, "two_sided_same_book")
+            return _FairResolution(
+                {side: probabilities[i] for i, (_, side) in enumerate(prices)},
+                "two_sided_same_book",
+                next(iter(books_used)),
+                devig_method,
+                consensus,
+            )
 
     modelled = row.get("modelled_fair") or {}
     out: dict[str, float] = {}
@@ -1002,7 +1138,58 @@ def _fair_by_side(row: Mapping[str, Any], sides: list[str]) -> tuple[dict[str, f
         probability = _as_float((modelled.get(side) or {}).get("fair_probability"))
         if probability is not None:
             out[side] = probability
-    return (out, "book_margin_model" if out else None)
+    return _FairResolution(out, "book_margin_model" if out else None, None, None, consensus)
+
+
+def _fair_by_side(row: Mapping[str, Any], sides: list[str]) -> tuple[dict[str, float], str | None]:
+    """No-vig fair probability per side, and how it was obtained.
+
+    Two-sided is the real thing (#238). The margin model fills one-sided rows
+    and is labelled differently on purpose, so a modelled fair can never be
+    mistaken for a measured consensus.
+
+    THE TIERS, in the order tried. `fair_method` names which one answered.
+
+      sharp_anchor         `SYNDICATE_FAIR_ANCHOR=sharp` only. ONE sharp book's
+                           own two sides (`sharp_books.SHARP_ANCHOR_PRIORITY`),
+                           observed together, power-de-vigged.
+      exchange_mid         `sharp` only. ONE two-sided exchange's pair, the same
+                           way (`EXCHANGE_ANCHOR_PRIORITY`).
+      consensus            `#384` -- de-vig EACH book against itself, then the
+                           MEDIAN per selection across books. THE DEFAULT, and
+                           the whole chain from here down is unchanged.
+      two_sided_same_book  `best` on every side from ONE book, de-vigged.
+      book_margin_model    one-sided rows; a modelled fair, labelled as such.
+
+    WHY EVERY TIER DE-VIGS WITHIN ONE BOOK -- including the anchor. `#384`:
+    this used to de-vig the BEST price on each side, which routinely takes the
+    two sides from two different books. Measured on the served board
+    2026-08-12: 29 of 52 two-sided groups drew their sides from different
+    bookmakers, and `edge == ev_vs_fair_pct` on 127 of 127 rows.
+    `opportunity_signals.fair_probability_by_book` says exactly why: the best
+    over at one book and the best under at another sum to less than a real
+    market, and normalising THAT to 1.0 "silently launders a line-shopping
+    edge into the 'fair' price -- which then makes the edge disappear from the
+    EV it was supposed to measure." An anchor built from Pinnacle's home and
+    an exchange's away would launder the same way, so the anchor is Pinnacle's
+    home AND Pinnacle's away or it is nothing, and the same for each exchange.
+
+    THE ANCHOR NEVER TOUCHES THE PRICE SIDE OF `ev_pct`. It replaces only the
+    fair probability; the price EV is measured at stays the best BETTABLE
+    book, selected in `build_layer2_rows` after this returns.
+
+    THE EXCHANGE TIER'S FILL RISK IS NOT PRICED HERE. An exchange's posted pair
+    is what could be hit at that instant for some size; the mid de-vigged from
+    it is a REFERENCE, and nothing in this function accounts for depth,
+    commission, or whether an order at that price would fill. That belongs to
+    the execution side (`venue_fees`, `venue_basis_edge`), not to the fair.
+
+    `SYNDICATE_FAIR_DEVIG_METHOD` (`multiplicative` default | `power`) chooses
+    the per-book de-vig on the consensus and same-book tiers, independently of
+    the anchor. Under the defaults this function is `#384`'s code, bit for bit.
+    """
+    resolved = _resolve_fair(row, sides)
+    return (resolved.fair_by_side, resolved.method)
 
 
 # A probability edge this large is a UNIT OR JOIN ERROR, not a finding.
@@ -1797,7 +1984,8 @@ def build_layer2_rows(
         sides = [str(side) for side in (row.get("sides") or []) if side]
         if not sides:
             continue
-        fair_by_side, fair_method = _fair_by_side(row, sides)
+        fair_resolution = _resolve_fair(row, sides)
+        fair_by_side, fair_method = fair_resolution.fair_by_side, fair_resolution.method
         best = row.get("best") or {}
         game = row.get("game") if isinstance(row.get("game"), Mapping) else None
 
@@ -1884,6 +2072,17 @@ def build_layer2_rows(
                 "books_quoting": side_best.get("books_quoting"),
                 "fair_probability": fair,
                 "fair_method": fair_method if fair is not None else None,
+                # THE PRICING PLANE'S WORKING, per row. `fair_method` alone
+                # cannot say WHICH book anchored a `sharp_anchor` row, which
+                # de-vig produced the fair, or what the median would have said
+                # -- and without the last one a sharp-vs-median comparison needs
+                # a rerun of the whole build. `fair_consensus_prob` is that
+                # median for THIS side, on every row in every mode; under the
+                # default it equals `fair_probability`, which is the check that
+                # the default is unchanged.
+                "fair_anchor_book": fair_resolution.anchor_book if fair is not None else None,
+                "fair_devig_method": fair_resolution.devig_method if fair is not None else None,
+                "fair_consensus_prob": fair_resolution.consensus_by_side.get(side),
                 # `#382`. The margin model measures each book's hold on the GRID
                 # (which still holds every leg) and stamps it at
                 # `modelled_fair[side].assumed_hold_pct`. This fan-out copies a

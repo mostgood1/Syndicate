@@ -45,6 +45,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.sharp_books import SHARP_BOOKS
+
 # v1 recorded PRICEABLE rows only. v2 records every PROJECTED row and carries
 # `priceable` / `withheld_reason` per record. **The version is load-bearing for
 # any reader**: a rate computed across both populations is a rate over two
@@ -471,7 +473,10 @@ def build_records(
     return out
 
 
-_SHARP_BOOKS = frozenset({"pinnacle", "betfair_ex_eu", "matchbook", "novig", "prophetx"})
+# ONE definition, owned by `sharp_books`. This used to be a private frozenset
+# here; the pricing plane now anchors on the same set, and a second copy would
+# drift from it. The local name is kept so existing readers do not change.
+_SHARP_BOOKS = SHARP_BOOKS
 
 
 def read_records(path: Path) -> list[dict[str, Any]]:
