@@ -2121,10 +2121,28 @@ def intelligence_query_api():
         # safe to call directly from a request handler: it never computes,
         # only reads what the background loop's board-window watch set
         # (_ensure_default_board_window_watched) has already built.
+        # `#632`: PER-STAGE TIMING, because production probing could not resolve
+        # this. Measured 2026-09-08: the SAME request varied 7,759 -> 3,000 ms
+        # run to run -- a 4,759 ms spread, NINE TIMES the 541 ms effect I was
+        # trying to attribute to one transform. Two-sample A/Bs on this endpoint
+        # are noise, and I drew (and retracted) a wrong conclusion from one.
+        # Server-side stage timing is the only instrument with the resolution
+        # this needs. One line per request, cheap, no flag -- a sampled
+        # instrument would reintroduce the sample-size problem it exists to fix.
+        _stage_ms: dict[str, float] = {}
+        _stage_t0 = time.perf_counter()
+
+        def _stage(name: str) -> None:
+            nonlocal _stage_t0
+            now = time.perf_counter()
+            _stage_ms[name] = round((now - _stage_t0) * 1000.0, 1)
+            _stage_t0 = now
+
         try:
             requested_sport = str(payload.get("sport") or "all").strip().lower() or "all"
             requested_dates = [explicit_date_value] if explicit_date else None
             response_payload = read_combined_intelligence_response(dates=requested_dates, sport=requested_sport, limit=payload.get("limit"))
+            _stage("board_read")
         except Exception:
             _LOGGER.exception("COMBINED_BOARD_RESPONSE_FAILURE")
             response_payload = None
@@ -2167,6 +2185,7 @@ def intelligence_query_api():
             memory_observability.finish_global_reassign(_lr_before, _lr_label, _lr_mid)
             if _mirror_is_ours:
                 response_payload.pop("response", None)      # `#632`: 50% of the payload
+            _stage("hydrate_and_mirror")
             _slim_asked = _alias_slim_requested(payload)
             if _slim_asked:
                 response_payload = _slim_response_aliases(response_payload)
@@ -2175,10 +2194,32 @@ def intelligence_query_api():
                 # container. See `_RESPONSE_SLIM_ROW_GUARD`.
                 response_payload = _slim_oversized_response(
                     response_payload, requested=_slim_asked)
+            _stage("slim")
             if _row_diagnostics_drop_requested(payload):
                 response_payload = _drop_unconsumed_row_diagnostics(response_payload)
+            _stage("drop_row_diagnostics")
             versioned_response = _versioned_query_response(response_payload)
             versioned_response.update(_debug_state_fields(response_payload, source="combined_board_window"))
+            _stage("version_and_debug")
+            # Rows carried, so a slow request can be read against its SIZE
+            # rather than against an assumed board.
+            _inner = response_payload.get("response") if isinstance(
+                response_payload.get("response"), dict) else response_payload
+            _rows = 0
+            if isinstance(_inner, dict):
+                for _k in ("ranked_all", "top_opportunities"):
+                    _v = _inner.get(_k)
+                    if isinstance(_v, list):
+                        _rows = max(_rows, len(_v))
+            print(
+                "[intelligence] QUERY_STAGE_MS " + json.dumps(
+                    {"rows": _rows, "slim": bool(_slim_asked),
+                     "drop": bool(_row_diagnostics_drop_requested(payload)),
+                     "limit": payload.get("limit"), "stages": _stage_ms,
+                     "total_ms": round(sum(_stage_ms.values()), 1)},
+                    sort_keys=True),
+                flush=True,
+            )
             # Was unconditionally None -- correct back when this branch was
             # only ever reached for the dateless default query. Now that an
             # explicit single date also routes here (see the comment above),
