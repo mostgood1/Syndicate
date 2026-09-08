@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-09-08 16:38:10Z — `ci-suite` — **MEASURED, AND IT CORRECTS THE DIAGNOSIS: the pytest step does NOT time out. It is OOM-KILLED at 2Gi, 1056s in.** `[lane render-cron-failures]`
+
+Settles the `Fix 3 — PENDING` row above. Run
+`crn-dafg4h0u01pc73aavs6g-1788884287` on `85a36f3c`, the first run under the
+raised cap.
+
+    pytest step began   16:20:34Z
+    container died      16:38:10Z      = 1056s, well inside the 7200s cap
+    reason              {"evicted": false, "oomKilled": {"memoryLimit": "2Gi"}}
+    log lines in that entire 17.6 min   ZERO
+
+**I DESCRIBED THIS STEP AS "A CLOCK REPORTED AS A TEST RESULT" AND THAT WAS
+WRONG ABOUT THE MECHANISM.** This morning's 08:00Z run hit the 3000s cap at
+3001s, so the visible symptom was a timeout; raising the cap simply let the run
+survive long enough to reach the failure that was always underneath. Memory,
+not time, is the binding constraint. **`--pytest-workers 2` was chosen the
+previous evening specifically to stop an `oomKilled memoryLimit 2Gi`, and it
+did not** — the same kill, at the same limit, at two workers.
+
+**THE PARTIAL-OUTPUT FIX IS INERT AGAINST THIS FAILURE, and that is the more
+useful half of the finding.** It prints what a KILLED CHILD produced when
+`subprocess.run` raises `TimeoutExpired`. An OOM kill takes the whole container,
+parent included, so no handler runs and nothing is printed: zero log lines
+across the entire step, exactly as before. `capture_output=True` means the step
+is silent while it runs, so the diagnosis rests wholly on Render's own
+`oomKilled` event. A guard that reports how far a run got is worth having and
+this is not it — **the instrument only covers the failure mode I had already
+imagined**, which is the standing shape of `feedback-gate-on-the-output-not-the-input`.
+
+**WHAT IS ACTUALLY KNOWN, AND WHAT IS STILL A GUESS.** Known: 2 xdist workers
+do not fit in 2Gi on this box, and 7200s is not the binding limit. NOT known:
+what does fit. `-n 1` halves the resident copies and is the obvious next trial
+— each worker holds a full app import, which is why `-n auto` died first — but
+**nobody has yet seen this suite complete on a Render cron at any worker count**,
+so no number here is measured yet. The cap should not be re-tuned until a run
+finishes; it is not what is failing.
+
+**The other 9 steps are unaffected and green**, including the archive suite at
+rc=0 in 59s, so `ci-suite` still detects "main is red" for everything except
+the full pytest sweep. It will go red again at 08:00Z until the memory question
+is settled — now for a correctly named reason rather than a masked one.
+
 ## 2026-09-08 16:14:5xZ — crons `sim-input-reports` + `ci-suite` @ `85a36f3c` — **MEASURED: both crons' FIRST successful runs. `nhl alarms=21` reads back; the archive suite is rc=0 where it was 18F/21E.** `[lane render-cron-failures]`
 
 Neither cron had had a green run since being created 2026-09-07. Three
