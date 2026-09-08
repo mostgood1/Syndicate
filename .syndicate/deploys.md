@@ -26512,3 +26512,54 @@ without checking. The impact argument never needed it.
 export half is done; the intelligence half is not, and the next step is finding
 where that route's 20–30 s actually goes — the single flight guards the
 combined-board build, and the time may not be there.
+
+### FOLLOW-UP MEASUREMENT — web `8589c005`, clean window 00:55:20Z–00:57:30Z `[lane web-oom-profiler-steady]`
+
+**THE PRECEDING ENTRY'S NEGATIVE VERDICT ON `/api/intelligence/query` IS
+WITHDRAWN. It was measured against a peer's >150 s export probe holding slots.**
+Re-run with the IDENTICAL 6x3 load, service confirmed quiet first (`/healthz`
+180–385 ms over 6 probes):
+
+    arm                       completed  errors   p50        p90        unhealthy
+    BEFORE   72aebc06            16/18      2    20,671 ms  29,828 ms   YES (+0 s)
+    AFTER    8589c005 (dirty)    18/18      0    27,109 ms  58,313 ms   YES (+32 s)
+    AFTER2   8589c005 (clean)    18/18      0    24,108 ms  39,255 ms   **NO**
+
+**`unhealthy` did not fire.** Events from 00:54:30Z are genuinely quiet with the
+control line confirming the endpoint answers; newest event overall is
+`server_available` 00:54:04Z. Observation window ~2–3 min past burst end, versus
++0 s and +32 s in the two failing arms. **9 `COMBINED_BOARD_SERVED_STALE` lines**
+in this run, up from 7.
+
+**THE PERCENTILES ARE BIASED AGAINST THE FIX, NOT FOR IT, AND I NEARLY REPORTED
+THEM THE WRONG WAY ROUND.** BEFORE's p50/p90 are computed over the 16 requests
+that SURVIVED — its 2 errors are excluded, and those were the worst cases. So
+"p50 got worse" is not a conclusion this data supports; the arms do not have the
+same denominator. Raw per-request samples were not retained, only summaries,
+which is what prevents resolving it properly. **Store the samples next time.**
+
+What the evidence does support: under identical load the fix turned a run that
+FAILED THE HEALTH CHECK AND LOST 2 REQUESTS into one that completed all 18 with
+no failure. That is the mechanism working — one rebuild instead of eight, with
+the rest served stale — and individual requests still queue.
+
+**A SUBSET-SHAPED LIMIT ON THE EXPORT FIX, found by `ncaaf-live-resim-wire` and
+worth recording against the 3.2x above.** How much the pre-filter can narrow
+depends entirely on the subset's shape:
+
+    wnba_source/*        keeps 111 of 177 patterns   count=2371, 667 deep   OK
+    mlb_source/*         keeps 107 of 177            count=6316, 5924 deep  OK
+    *sim_input_report*   keeps 161 of 177            HTTP 502
+
+A LEADING `*` eliminates almost nothing, so that request degenerates to nearly
+the full 176-pattern walk — the one measured timing out at 180 s. The grouped
+walk still helps there (it is subset-independent); the pre-filter does not.
+Their deep counts (667 and 5,924 paths at >=4 segments) are also the `a0d02297`
+fix confirmed end to end in production: that depth class returned NOTHING under
+`d5e4cc51`. Two caveats they stated and I am not banking past: the 502 was the
+third of three sequential requests, and may have overlapped my own burst; and
+they did not read an event to confirm timeout rather than restart.
+
+**verify:** `unhealthy` NOT firing under a 6x3 burst — **NOW PASSING**, once, in
+a clean window. The >=5 s request share against the 32.5% baseline is still
+unmeasured; that needs organic traffic, not a synthetic burst.
