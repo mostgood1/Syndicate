@@ -16,6 +16,8 @@ import inspect
 import re
 import threading
 import time
+
+from syndicate.features.shared.single_flight import SingleFlight
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
@@ -27,6 +29,24 @@ _BASKETBALL_SPORTS = {"nba", "wnba", "ncaab"}
 _FOOTBALL_SPORTS = {"nfl", "ncaaf"}
 
 _CACHE_TTL_SECONDS = 30.0
+# `#632`: ONE fan-out at a time per (date, sports). The read above and the write
+# below had NOTHING between them, so N concurrent misses each ran the whole
+# per-sport (and per-league, two matchdays, for soccer) fan-out. MEASURED on
+# production 2026-09-08: `/api/board/game-chips` served
+# `source=inline_artifact_stale` on 5 of 5 probes with the worker artifact
+# 245-304 s old against its 120 s threshold -- so the artifact path is
+# effectively dead and EVERY request runs this build. Latency ranged 305 ms
+# (cache hit) to 5,113 ms (real build), and 20% of organic requests to that
+# route exceeded the 5 s health-check budget.
+#
+# The lease is 120 s: longer than any observed build, short enough that a
+# builder which dies without releasing delays the key rather than wedging it.
+_CHIP_BUILD_FLIGHT = SingleFlight(lease_seconds=120.0)
+# How stale a chip list may be while a rebuild is IN FLIGHT. 10x the TTL = 300 s.
+# Generous on purpose: the path this replaces was serving a worker artifact
+# measured at 245-304 s old, so a 300 s bound is strictly fresher than the
+# behaviour it stands in for, and the alternative is holding a gunicorn slot.
+_CHIP_STALE_TTL_MULTIPLE = 10.0
 _cache_lock = threading.Lock()
 _cache: dict[tuple[str, tuple[str, ...]], tuple[float, list[dict[str, Any]]]] = {}
 
@@ -622,6 +642,37 @@ def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, An
         cached = _cache.get(cache_key)
         if cached is not None and now - cached[0] < _CACHE_TTL_SECONDS:
             return list(cached[1])
+
+    # `#632`. See `_CHIP_BUILD_FLIGHT` above. One caller rebuilds; the others
+    # get the previous list IMMEDIATELY when there is one, and only block when
+    # there is genuinely nothing to serve. Waiting is the worse option where a
+    # value exists -- it still holds the thread for the length of the fan-out,
+    # and a health check does not care whether a thread is computing or blocked.
+    owns_build, build_done = _CHIP_BUILD_FLIGHT.begin(cache_key)
+    if not owns_build:
+        if cached is not None and (now - cached[0]) <= _CACHE_TTL_SECONDS * _CHIP_STALE_TTL_MULTIPLE:
+            return list(cached[1])
+        build_done.wait(timeout=max(30.0, _CACHE_TTL_SECONDS * 4))
+        with _cache_lock:
+            cached = _cache.get(cache_key)
+        if cached is not None:
+            return list(cached[1])
+        # The in-flight build failed or timed out. Fall through and build --
+        # returning an empty scoreboard to a caller that asked for one is worse
+        # than doing the work twice.
+        owns_build, build_done = _CHIP_BUILD_FLIGHT.begin(cache_key)
+
+    try:
+        return _build_game_chips_uncached(date_value, normalized_sports, cache_key, now)
+    finally:
+        # Released here rather than left to the lease: this body is short and
+        # has one exit, so try/finally is honest. The lease is the backstop for
+        # a process that dies mid-build, not the primary mechanism.
+        _CHIP_BUILD_FLIGHT.finish(cache_key)
+
+
+def _build_game_chips_uncached(date_value, normalized_sports, cache_key, now):
+    from syndicate.features.shared.sport_data_provider import get_sport_data_provider
 
     today_value = central_today_iso()
     chips: list[dict[str, Any]] = []
