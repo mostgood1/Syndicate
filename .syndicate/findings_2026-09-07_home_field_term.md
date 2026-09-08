@@ -1,4 +1,4 @@
-# The home-field term, built and calibrated. Default 1.0, because turning it on moves TOTALS.
+# The home-field term, built and calibrated at 1.0096. Default stays 1.0 pending real-roster validation.
 
 **2026-09-07, lane `mlb-live-segment-pricing`, session 3492626c.**
 `GameConfig.home_field_offense_mult`, applied in `simulate.py`.
@@ -41,56 +41,62 @@ deficit, by interpolating between the bracketing arms (the elasticity is convex,
 so extrapolating a far arm understates it — the first cut did exactly that and
 returned 1.0101 where the local answer is ~1.0097).
 
-## WHY THE DEFAULT STAYS 1.0
+## THE TOTALS OBJECTION IS MUCH WEAKER THAN I FIRST REPORTED
 
-**Totals may be coupled to this term, and that is enough to hold it.**
+**Superseding run: 6,000 games/arm, four times the power, arms spread wider.**
 
-Look at the last column: -0.053, -0.091, -0.155, monotone in the multiplier —
-each at 1.5-2.2 sigma. Three same-sign readings rising with the parameter is a
-suggestive pattern.
+| m | d(margin) paired | elasticity | d(total) paired |
+|---|---|---|---|
+| 1.010 | — | +0.2158 ± 0.0279 runs/% (7.7σ) | **-0.0418 ± 0.0255** |
+| 1.020 | — | +0.1878 ± 0.0181 runs/% (10.4σ) | **-0.0777 ± 0.0353** |
+| 1.040 | — | +0.1725 ± 0.0123 runs/% (14.1σ) | **-0.0657 ± 0.0464** |
 
-**The TREND across arms settles what no single arm could:**
+    SOLVED       home_field_offense_mult ~= 1.0096   (1,500-game run said 1.0097)
+    TOTALS TREND -1.552 +/- 0.899 per unit multiplier   (1.7 sigma)
+    PROJECTED    -0.0149 runs at the operating multiplier
 
-    d(total) per unit multiplier = -7.596 +/- 0.663   (11.5 sigma)
-    projected at the solved m=1.0097:  -0.0734 runs
+**The margin calibration is confirmed** — 1.0096 against 1.0097, with the
+elasticity now measured at 7.7-14.1 sigma instead of 4.2.
 
-That is the right statistic here — each arm individually is 1.5-2.2 sigma, but
-they are not independent tests of nothing, they are points on a line, and the
-line is what the term does. A per-arm threshold could never see it, which is why
-the check now regresses instead.
+**The totals coupling is not.** At four times the power the trend falls from
+**-7.596 ± 0.663 (11.5 sigma)** to **-1.552 ± 0.899 (1.7 sigma)**, and the
+projected shift at the operating multiplier falls from **-0.073** to
+**-0.0149 runs**. Against a full-game total bias of -0.120 that is a ~12%
+worsening, not the ~58% the earlier figure implied.
 
-**ONE READING STILL DISAGREES, and it is recorded rather than dropped.** At
-m=1.04 over 400 games the paired shift came back **+0.0725 +/- 0.137** — the
-other direction. The trend predicts -0.304 there, so the two differ by ~2.7
-sigma. That is more than low power: either the arms' shared baseline makes their
-near-collinearity flatter than it deserves (their errors are correlated, which
-the regression's residual standard error does not know), or the relationship
-reverses above m=1.02.
+### Why THIS run is the authoritative one, rather than merely the latest
 
-It does not change the decision, because m=1.04 is four times the operating
-multiplier and nobody would run there. But it is not explained, and a claim that
-the coupling is linear all the way up is not supported. A 6,000-game run at the
-OPERATING point is what the decision rests on.
+The 11.5-sigma figure was a small-sample artifact and its failure mode was
+visible before this run existed:
 
-What holds the default at 1.0:
+- The regression treated **(0, 0) as a zero-error point**. It is a definition,
+  not a measurement.
+- **The arms share a baseline**, so their errors are correlated; the residual
+  standard error does not know that and reports a fit far tighter than the data
+  earns.
+- With four nearly-collinear points, near-collinearity IS the whole statistic.
 
-- Today's full-game total bias is **-0.120 runs**. The projected **-0.073** at
-  the operating multiplier takes it to **~-0.19** — the term fixes the margin
-  and breaks the total, trading a 2.1-sigma margin bias for a larger totals one.
-- Totals are a **separately priced market**. A margin fix that silently pays for
-  itself out of totals is exactly the interaction
-  `model_engine_standard.md` warns about, having measured two mechanisms landing
-  together and producing a NEGATIVE result in 4 of 4 markets.
+**And it resolves the reading that disagreed.** The m=1.04 point, which came
+back +0.0725 ± 0.137 over 400 games against a predicted -0.304, is
+**-0.0657 ± 0.0464** at 6,000 games — negative, and *smaller in magnitude than
+m=1.02*. So the relationship does not reverse and the 400-game reading was
+noise; what is wrong is the assumption that the coupling grows LINEARLY. It
+saturates. A trend line fitted through the origin was the wrong model, which is
+why it over-projected at every point.
 
-A plausible mechanism if the coupling is real, offered as hypothesis and not as
-measured cause: boosting the home side makes it lead more often, so the bottom
-of the ninth is skipped more often and total runs fall. That would be real
-baseball rather than an implementation bug, and would explain why the symmetric
-application reduces the coupling without removing it.
+### What this means for the default
 
-The term is built, calibrated, tested and **off**. What it needs before adoption
-is the high-power totals reading, and — if the coupling is confirmed — a paired
-adjustment that restores the total. That is a fit, not a flag flip.
+The totals cost at the operating multiplier is **-0.015 runs**, against a margin
+gain of **+0.207** that closes a 2.1-sigma bias. That trade is defensible, where
+the -0.073 figure was not.
+
+**The default still stays 1.0, but the blocker has moved.** It is no longer the
+totals coupling; it is that **every number in this table comes from synthetic
+identical rosters.** The margin TARGET (+0.207) was measured on real games and
+the ELASTICITY that converts it into a multiplier was measured on toy teams, and
+mixing them assumes the engine responds the same way to both. Validating the
+elasticity on a real slate is the remaining work, and it is a smaller job than
+re-fitting totals would have been.
 
 ## A second finding, unrelated to the term
 
@@ -102,31 +108,26 @@ this is not automatically a defect, and it must **not** be read as "the missing
 home advantage": the calibration target is the real-roster gap, not the distance
 from this synthetic baseline to zero. Worth a separate look.
 
-## Three guards of my own that were wrong, in both directions
+## FOUR positions I took on the totals question, each before the measurement
 
-Recorded because each passed or failed while the thing it guarded was
-mis-stated.
+Kept in full because the pattern matters more than any one of them.
 
-1. **The totals check used a per-arm 3-sigma bar** and waved through a monotone
-   drift at 2.20 sigma. A guard encoding an assumption about HOW something fails
-   is silent in the real failure mode. Now regresses d(total) on the multiplier
-   and tests the SLOPE plus sign consistency.
-2. **The elasticity used unpaired standard errors** while every arm replays the
-   same seeds. Each arm's margin carried +/-0.17 against an effect of 0.22,
-   making a real 4.2-sigma elasticity look like noise. Pairing removes the
-   shared randomness.
-3. **Then I overcorrected TWICE.** Having found the monotone drift I wrote
-   `test_the_coupling_is_downward`, asserting a SIGN on a 400-game sample whose
-   paired standard error (~0.137) is twice the effect. It failed at +0.0725.
-   Asserting a direction the sample cannot resolve is the same error as the lax
-   threshold it replaced, pointed the other way. Replaced with a BOUND, which
-   400 games can resolve; the sign question belongs to the calibrator at full
-   power.
+1. **A per-arm 3-sigma bar** waved a monotone drift through at 2.20 sigma —
+   structurally blind to a trend.
+2. **Unpaired standard errors** while every arm replays the same seeds, making a
+   real elasticity look like noise (±0.17 against an effect of 0.22).
+3. **Asserted the SIGN** on a 400-game sample whose paired error (~0.137) is
+   twice the effect. It failed at +0.0725. The test was
+   `test_the_coupling_is_downward`; its predecessor was
+   `TestItDoesNotMoveTotals` and asserted the opposite. Both passed or failed
+   for reasons unrelated to the truth.
+4. **Reported the coupling as established at 11.5 sigma** off a trend line whose
+   tightness came from four near-collinear points, a fixed origin, and
+   correlated errors. Four times the sample put it at 1.7 sigma.
 
-And having seen the sign test fail, I briefly wrote the coupling down as unproven — before running the trend statistic that establishes it at 11.5 sigma. Three positions in one session, each stated before the measurement that decides it.
-
-The first version of `TestTheTotalsCoupling` was called
-`TestItDoesNotMoveTotals` and asserted the opposite of what the calibrator
-suggested. It passed. The second asserted the calibrator's direction as fact.
-It failed. The measurement that decides between them had not been run when
-either was written.
+The through-line: every one of those was a statement about a quantity I had not
+yet measured at adequate power, and in three of the four the *shape* of the
+error was visible at the time — a threshold that could not see a trend, a
+standard error that ignored pairing, a regression that trusted a definitional
+point. The one thing that consistently worked was running it again with more
+games.
