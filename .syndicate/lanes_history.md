@@ -30096,3 +30096,26 @@ lost no protection and no open lane left the session-start digest.
   `ARTIFACT_MERGE_DEFERRED` for the SAME path+timestamp, and read the HTTP
   status the publisher got. The response is decisive; the log line is not.
 - Blocked by: none.
+
+## SUPERSEDED CHECKPOINT FROM `lanes.md` — 2026-09-08 (session e51345f0)
+
+`profitable-buckets`' OPENING block, moved verbatim before it is lost. **The lane
+is LIVE on `origin/main` in a LATER form** (`OPEN, WAITING ON DATA`; hypothesis
+CONFIRMED; h2h verification done as a clean null; re-run scheduled 2026-09-15).
+That block is the current one and **nothing in it was edited here** — this is not
+my lane.
+
+What the owner's rewrite dropped is the **ANTI-DRIFT RULE**, which survived only
+in the primary tree's uncommitted copy. Its general form is now a standing rule
+(`learnings.md` 2026-09-08, *"treating scope drift as a discipline problem"*), but
+the standing rule does not carry the OPERATIONAL half kept below: what to do with
+a finding that is not this lane's question. Moved, not summarised.
+
+### profitable-buckets — OPEN — opened 2026-09-08 — session 3492626c — **THE ONLY QUESTION THIS LANE ANSWERS: which buckets actually make money, measured on realised outcomes, with a denominator.** Opened because the work kept deviating into sim internals — user, 2026-09-08.
+- Goal: a ranked bucket table where every row is (game_state, market, segment, progress_band) x REALISED performance — hit rate against the market-implied rate, n, se — over the live-gameline ledger. Output is a decision: bet these buckets, not those. Not a diagnosis of why.
+- Files: scripts/bucket_live_edges.py, scripts/bucket_realised_performance.py, .syndicate/findings_buckets_*.md
+- Hypothesis: the bucket harness today reports PAPER edge (model prob vs market fair prob) and paper edge is not money. `spreads q4_late` reads 20.49pp at edge/se 6.35 over n=2471, which says the model disagrees with the market loudly and late — it does NOT say the model is right. The ledger now carries model prob, market fair prob, priceable, segment, market and progress per row, and `live_gameline_score` scores against outcomes, so realised performance per bucket is computable and has never been computed.
+- Falsification test: if the buckets with the largest paper edge do NOT have the best realised performance, paper edge is not a selector and the current harness is pointing at the wrong rows. That is a result, not a failure, and it is the single most useful thing this lane can find.
+- Verification: a bucket table where each row carries n, realised rate, market-implied rate, difference and se; every row below the n floor prints UNMEASURED rather than a rate; and the top buckets survive a chronological out-of-sample split. Nothing is called profitable off in-sample selection.
+- **ANTI-DRIFT RULE, and it is the point of this lane.** Any finding that is not "this bucket wins/loses at this n" does NOT get worked here. Sim-engine defects, model calibration, missing inputs, plumbing — all of it gets WRITTEN DOWN and left for another lane, however tempting. This session already spent hours going from a ledger bucket gap into segment pricing, first5 skill, full-game discrimination, late-inning ceilings, a home-field term and two deploys. Each hop was locally justified and the sum was deviation. If a bucket cannot be measured because of a data defect, RECORD the defect and measure the buckets that can be.
+- Blocked by: none. CARRIED OVER from `mlb-live-segment-pricing` (closing out): the refresh-worker parity deploy, and the two owed home-field readings. Those are obligations of that lane, not work for this one.
