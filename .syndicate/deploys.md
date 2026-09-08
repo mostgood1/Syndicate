@@ -27215,3 +27215,61 @@ real contract change and is NOT attempted here.
 still NOT established; `/ncaaf/cards` was in flight at all three pre-probe kills
 and remains the leading correlate, relayed to `nfl-ncaaf-ui-parity` and not
 diagnosed by me.
+
+---
+
+## 2026-09-08 16:29:53Z — web `6c4eb6c0` → `42b09d77` + env — **MEASURED: `board_read` 2,916–6,841 ms → 0.1 ms. The rebuild cost was a 15 s TTL on data that changes every 10–18 MINUTES.** `[lane web-oom-profiler-steady]`
+
+`dep-dag3ee6q1p3s73e6aa7g`, preflight CLEAR, claim held and released. The code
+deploy is a no-op for this result: what changed is
+**`SYNDICATE_INTELLIGENCE_COMBINED_BOARD_CACHE_SECONDS`, absent (code default
+**15**) → **180**, set via the single-key API. The deploy exists only because an
+env change does not reach a running process.
+
+**PER-STAGE, SAME SESSION, COMPARABLE BOARDS (1,520 → 1,465 rows):**
+
+    stage                  BEFORE (15 s TTL)        AFTER (180 s TTL)
+    board_read             2,916 / 3,816 / 6,841      0.1 / 0.1 / 0.2 / 0.1
+    hydrate_and_mirror       593 /   314 /    95      146 / 245 / 176 / 127
+    version_and_debug        426 /   663 /   303      180 / 395 / 274 / 189
+    drop_row_diagnostics     175 /   121 /   315       56 / 390 / 167 / 189
+    slim                      32 /    95 /    71       27 /  28 /  28 /  28
+    TOTAL server-side      4,142 / 5,010 / 7,626      409 / 1,058 / 645 / 532
+    wall clock             5,797 / 6,201 / 8,658    1,256 / 2,318 / 1,468 / 1,165
+
+**THE DEFECT WAS A FRESHNESS BOUND 40–72x TIGHTER THAN THE DATA IT GUARDS** —
+the same shape as this morning's chip bug. Measured board republish cadence via
+consecutive `GAME_CHIPS_PUBLISHED`: **11m31s, 17m58s, 10m09s.** The response
+cache expired every **15 seconds**. The UI polls every 60 s, so **every poll
+missed by construction** and paid a full board read.
+
+**I COULD NOT HAVE FOUND THIS BY PROBING, AND I TRIED.** Two-sample A/Bs on this
+endpoint have a **4,759 ms** run-to-run spread (7,759 → 3,000 ms on the SAME
+request), nine times the effect I was chasing. I nearly reported 541 ms for
+`drop_row_diagnostics` — the instrument says 56–390 ms — and I had already
+retracted a wrong "post-cache work is ~10 s" inference drawn the same way. The
+`QUERY_STAGE_MS` line (`0d55ba1b`) is what made this attributable.
+
+**MY PROBES NEVER ONCE HIT THE CACHE, WHICH IS WHY IT LOOKED LIKE NOISE.** They
+were spaced ~16–17 s apart by construction — just past the 15 s TTL. The
+"identical request, 10 s later" control was itself a cache miss.
+
+**TWO NEGATIVE RESULTS THAT KILLED MY OWN PROPOSALS:**
+
+1. `limit=50` returns 50 rows and still ships **13.71 MB**: the limit slices
+   `top_opportunities` and NOTHING else. `ranked_all` and `board_contract.cards`
+   carry the full board regardless. **Still true, still unfixed.**
+2. I proposed aliasing `cards` → `ranked_all` as duplicates. **They are not:
+   3,317 of 3,914 rows match, 597 DIFFER, same keys.** `_provably_same` is right
+   to refuse them and my alias would have dropped 597 real rows. This corrects my
+   own earlier phrase "the same rows three times" — they are three NEAR-copies.
+
+**STALENESS COST, stated plainly:** the served board can now be up to 180 s older
+than before, on top of an artifact already 10–18 min old — a ≤30% increase in
+worst-case age to remove ~85% of the request cost. `_COMBINED_BOARD_STALE_TTL_MULTIPLE`
+is 10, so the in-flight-rebuild stale ceiling moves 150 s → 1800 s; that applies
+only while a rebuild is running (now rare), but it is the number to watch.
+
+**verify:** `board_read` under 100 ms on a warm cache — **PASSING at 0.1–0.2 ms**,
+four consecutive requests. Remaining cost is transforms + serialise + transfer of
+a 1.16 MB payload, ~409–1,058 ms server-side.
