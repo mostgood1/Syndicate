@@ -532,6 +532,75 @@ def _alias_slim_requested(payload: Any) -> bool:
     return _query_bool(payload.get("slim_aliases"))
 
 
+#: Canonical rows above which the response is slimmed WHETHER OR NOT the caller
+#: asked. `#632`, and this bound is measured, not chosen round.
+#:
+#: MEASURED 2026-09-08 on the live endpoint, one request, no `slim_aliases`:
+#: **3,927 candidates -> a 64.98 MB payload carrying the SAME 3,927 rows five
+#: times** (`recommendations`, `top_opportunities`, `ranked_all`, and `cards`
+#: twice), built in **28.2 s**. Web's container limit is 2 GiB across 8 gunicorn
+#: slots. Two such builds do not fit, and web was `oomKilled memoryLimit=2Gi`
+#: minutes later. `response_compression.py` already documents this endpoint at
+#: **53-67 MB per call** -- the size was known; that it can kill the container
+#: was not written down.
+#:
+#: THE UI IS SAFE ONLY BECAUSE IT OPTS IN. `intelligenceQueryPayload` sends
+#: `slim_aliases: true`. **Every other caller gets the 65 MB shape by default** --
+#: including `scripts/watch_clamp_trigger.py:340`, which POSTs
+#: `{"question": "show me the board"}` with no slimming on a 600 s poll. That
+#: script last wrote an observation on 2026-08-16 and is NOT currently running,
+#: so it is a LOADED GUN rather than today's cause -- but a default that OOMs
+#: the service when used as documented is the defect either way.
+#:
+#: 2,500 sits above the ~2,004-row payloads the UI is measured serving and well
+#: below the 3,927 that killed it.
+_RESPONSE_SLIM_ROW_GUARD = 2500
+
+
+def _oversized_response_rows(response: Any) -> int:
+    """Canonical row count, O(1) in the lists rather than serialising.
+
+    Serialising to measure would cost the very memory this is here to avoid.
+    """
+    if not isinstance(response, dict):
+        return 0
+    best = 0
+    for key in ("top_opportunities", "ranked_all", "recommendations"):
+        value = response.get(key)
+        if isinstance(value, list):
+            best = max(best, len(value))
+    return best
+
+
+def _slim_oversized_response(response: Any, *, requested: bool) -> Any:
+    """Slim a dangerously large response even when the caller did not ask.
+
+    `_slim_response_aliases` drops ONLY keys it proves are exact duplicates and
+    declares each one in `_response_aliases`, so a caller can rebuild every
+    dropped key -- which is what makes doing this unasked defensible. The
+    contract for normal-sized payloads is untouched: below the guard, a caller
+    that did not ask gets exactly what it got before.
+    """
+    if requested:
+        return response          # already slimmed by the caller's own request
+    rows = _oversized_response_rows(response)
+    if rows <= _RESPONSE_SLIM_ROW_GUARD:
+        return response
+    slimmed = _slim_response_aliases(response)
+    if isinstance(slimmed, dict) and slimmed is not response:
+        # NAMED, not silent. A caller seeing fewer keys than it sent for must be
+        # able to tell "the server slimmed this" from "the server had no value",
+        # and a reader of the logs must be able to count how often this fires.
+        slimmed["_response_slimmed_reason"] = "row_guard"
+        slimmed["_response_slimmed_rows"] = rows
+        print(
+            f"[intelligence] RESPONSE_SLIM_GUARD rows={rows} "
+            f"guard={_RESPONSE_SLIM_ROW_GUARD} dropped={sorted((slimmed.get('_response_aliases') or {}))}",
+            flush=True,
+        )
+    return slimmed
+
+
 def _versioned_query_response(response_payload: dict[str, object]) -> dict[str, object]:
     response_payload = _json_safe_value(dict(response_payload))
     payload_hash = _response_hash(dict(response_payload))
@@ -2098,8 +2167,14 @@ def intelligence_query_api():
             memory_observability.finish_global_reassign(_lr_before, _lr_label, _lr_mid)
             if _mirror_is_ours:
                 response_payload.pop("response", None)      # `#632`: 50% of the payload
-            if _alias_slim_requested(payload):
+            _slim_asked = _alias_slim_requested(payload)
+            if _slim_asked:
                 response_payload = _slim_response_aliases(response_payload)
+            else:
+                # `#632`: the UNASKED path is the one that OOMs a 2 GiB
+                # container. See `_RESPONSE_SLIM_ROW_GUARD`.
+                response_payload = _slim_oversized_response(
+                    response_payload, requested=_slim_asked)
             if _row_diagnostics_drop_requested(payload):
                 response_payload = _drop_unconsumed_row_diagnostics(response_payload)
             versioned_response = _versioned_query_response(response_payload)
@@ -2148,8 +2223,14 @@ def intelligence_query_api():
                 LAST_RESULT = dict(response_payload.get("response") or response_payload.get("analysis") or {})
                 if _mirror_is_ours:
                     response_payload.pop("response", None)  # `#632`: 50% of the payload
-                if _alias_slim_requested(payload):
+                _slim_asked = _alias_slim_requested(payload)
+                if _slim_asked:
                     response_payload = _slim_response_aliases(response_payload)
+                else:
+                    # `#632`: same guard as the other two exits. A response path
+                    # left unguarded is the one a caller finds.
+                    response_payload = _slim_oversized_response(
+                        response_payload, requested=_slim_asked)
                 if _row_diagnostics_drop_requested(payload):
                     response_payload = _drop_unconsumed_row_diagnostics(response_payload)
                 versioned_response = _versioned_query_response(response_payload)
@@ -2216,8 +2297,14 @@ def intelligence_query_api():
             memory_observability.finish_global_reassign(_lr_before, _lr_label, _lr_mid)
             if _mirror_is_ours:
                 response_payload.pop("response", None)      # `#632`: 50% of the payload
-            if _alias_slim_requested(payload):
+            _slim_asked = _alias_slim_requested(payload)
+            if _slim_asked:
                 response_payload = _slim_response_aliases(response_payload)
+            else:
+                # `#632`: the UNASKED path is the one that OOMs a 2 GiB
+                # container. See `_RESPONSE_SLIM_ROW_GUARD`.
+                response_payload = _slim_oversized_response(
+                    response_payload, requested=_slim_asked)
             if _row_diagnostics_drop_requested(payload):
                 response_payload = _drop_unconsumed_row_diagnostics(response_payload)
             versioned_response = _versioned_query_response(response_payload)
